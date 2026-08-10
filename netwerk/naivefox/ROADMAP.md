@@ -14,7 +14,7 @@ The coding agent should mark completed checklist items and record major discover
 - [ ] Confirm `main` is not being modified.
 - [ ] Confirm `origin` points to `incident201/naivefox`.
 - [ ] Add/verify `upstream` = `https://github.com/mozilla-firefox/firefox.git`.
-- [ ] Confirm checkout is on native WSL Linux storage.
+- [ ] Confirm the checkout is on a filesystem suitable for a large native Linux Firefox build.
 - [ ] Record current upstream/base commit SHA in `UPSTREAM.md`.
 - [ ] Read root `AGENTS.md` and all NaiveFox docs.
 
@@ -638,7 +638,7 @@ A fresh compatible Linux environment can run the staged prototype with its requi
 
 The H2 prototype is complete only when this full sequence can be reproduced:
 
-1. Fresh supported Ubuntu/WSL environment.
+1. Fresh supported Linux build environment.
 2. `./mach bootstrap`.
 3. clean build.
 4. `naivefox` starts headlessly.
