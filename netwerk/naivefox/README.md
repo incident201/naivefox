@@ -9,7 +9,7 @@ The prototype reuses Firefox's **real networking stack** instead of manually imi
 - Firefox's normal HTTP/2 implementation, connection management, HPACK implementation, TLS parameters, and related network behavior.
 - A small NaiveFox-specific layer for the local SOCKS5 server, HTTP CONNECT tunnel orchestration, Naive padding compatibility, configuration, logging, and stream pumping.
 
-The first target is **Linux x86_64 only**. Development is expected to happen in an Ubuntu WSL2 distribution using Firefox's normal `mach` build system.
+The first target is **Linux x86_64 only**. Development uses Firefox's normal `mach` build system and a supported Linux build environment.
 
 HTTP/3/QUIC/Neqo are deliberately **out of scope for the first prototype**.
 
@@ -378,28 +378,20 @@ Packaging/minimization comes only after the network prototype works.
 
 ## Development environment
 
-Expected environment:
+The prototype targets a supported **Linux x86_64** build environment.
 
-```text
-Windows 11 host
-└── WSL2
-    └── Ubuntu x86_64
-        └── Firefox checkout on the native WSL filesystem
-```
+The exact host arrangement is intentionally not part of the project architecture. Development may happen on a native Linux machine, virtual machine, container-like environment, subsystem, CI runner, or another suitable Linux environment.
 
-The source tree must live inside the WSL Linux filesystem, for example:
+Requirements:
 
-```text
-/home/user/src/naivefox
-```
-
-Do not build from `/mnt/c/...` or `/mnt/d/...`.
+- the source tree must be on a filesystem suitable for large native Linux builds,
+- the environment must satisfy current Mozilla Firefox Linux build requirements,
+- the agent must use Firefox's normal bootstrap and toolchain,
+- the agent must prove a clean baseline build before modifying source.
 
 Mozilla's current Linux build documentation:
 
 https://firefox-source-docs.mozilla.org/setup/linux_build.html
-
-The agent is responsible for bootstrapping the existing checkout and proving a clean baseline build before modifying the code.
 
 Use a **full Firefox build**, not Artifact Mode, because NaiveFox modifies/links C++ backend code.
 
