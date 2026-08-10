@@ -37,7 +37,7 @@ HTTP/3/Neqo is explicitly out of scope until the H2 prototype is complete.
 
 ## Autonomy
 
-You are expected to work autonomously inside the provided WSL2 environment.
+You are expected to work autonomously inside the provided Linux development environment.
 
 You should:
 
@@ -72,7 +72,7 @@ Confirm:
 - the checkout is on the `naivefox` development branch,
 - `origin` is the project fork,
 - an `upstream` remote points to `https://github.com/mozilla-firefox/firefox.git` or can be added,
-- the source lives on a native Linux filesystem, not `/mnt/c` or `/mnt/d`.
+- the source lives on a filesystem suitable for a large native Linux Firefox build.
 
 If `upstream` is missing:
 
@@ -122,7 +122,7 @@ Record:
 - object directory,
 - compiler/toolchain reported by the build.
 
-If baseline Firefox does not build, diagnose the environment before touching NaiveFox code.
+If baseline Firefox does not build, diagnose the Linux build environment before touching NaiveFox code.
 
 ## Build philosophy
 
