@@ -63,22 +63,19 @@ Firefox baseline build exits successfully.
 
 Create the committed fixture sources under `netwerk/naivefox/test/integration/`. Put generated state under the Firefox object directory, not in the source tree.
 
-- [ ] Build a dedicated Caddy binary with:
-
-  ```bash
-  xcaddy build \
-    --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive
-  ```
-
-- [ ] Verify `http.handlers.forward_proxy` is present and validate the generated Caddyfile.
-- [ ] Record or pin resolved Caddy, xcaddy, Go, and module revisions.
-- [ ] Use the wildcard proxy site label required by `forward_proxy`, but explicitly bind proxy and target listeners to loopback high ports.
+- [ ] Pin an exact tested Caddy version and immutable `klzgrad/forwardproxy` commit in fixture metadata/setup; do not resolve `@naive` or the latest Caddy on every run.
+- [ ] Build a dedicated fixture Caddy with that pinned module.
+- [ ] Verify `http.handlers.forward_proxy` is present and validate both the Caddyfile and adapted configuration.
+- [ ] Record xcaddy and Go versions in diagnostics without requiring an unnecessary installation when compatible tools already exist.
+- [ ] Use an explicitly TLS-enabled catch-all route without a request Host matcher, bound to a checked loopback high port.
+- [ ] Present an internal-PKI certificate valid for the proxy SNI hostname, normally `localhost`.
+- [ ] Disable HTTP/3 in the fixture; NaiveFox must negotiate `h2`.
 - [ ] Set `skip_install_trust`; never let Caddy attempt to install its CA globally.
-- [ ] Configure Basic Auth from generated per-run values.
-- [ ] Restrict the proxy ACL to fixture target host/ports and deny all other destinations.
-- [ ] Create isolated Caddy XDG data/config directories and use `tls internal`.
+- [ ] Configure Basic Auth from generated per-run values and omit probe resistance.
+- [ ] Restrict both target ports and ACL rules to the fixture target, then deny everything else.
+- [ ] Create isolated Caddy XDG data/config directories.
 - [ ] Import only the fixture root CA into a dedicated NaiveFox NSS profile.
-- [ ] Create a second NSS profile without that CA for the negative trust test.
+- [ ] Create a second NSS profile without that CA.
 - [ ] Add deterministic target endpoints for small data, large data, upload/hash, delay, and early close.
 - [ ] Automate setup, readiness timeouts, execution, cleanup, and sanitized failure diagnostics.
 - [ ] Ensure setup and cleanup are idempotent and require neither `sudo` nor a system Caddy service.
@@ -86,12 +83,14 @@ Create the committed fixture sources under `netwerk/naivefox/test/integration/`.
 Acceptance:
 
 - the fixture starts with one documented command,
-- Caddy presents a certificate valid for the configured hostname,
-- the untrusted NSS profile rejects it,
-- the trusted NSS profile accepts it without disabling verification,
-- a control client can authenticate through the proxy to the restricted local target,
+- the listener is loopback-only, TLS-enabled, and presents a certificate valid for the proxy hostname,
+- the trusted NSS profile contains the fixture root and the untrusted profile does not,
+- a control client using curl `--proxy-cacert` can authenticate through the proxy to the restricted local target,
+- an HTTPS target control request additionally uses `--cacert` and validates normally,
 - attempts to reach a non-fixture destination are denied,
 - cleanup leaves no fixture child processes running.
+
+Actual trusted/untrusted Necko connection tests begin in M2.2, after the headless networking runtime exists.
 
 Do not call `caddy trust`, modify system trust, modify a normal Firefox profile, use `curl -k`, or commit generated CA/private-key/profile material.
 
@@ -205,13 +204,13 @@ Requirements:
 
 Acceptance:
 
-A request to the fixture's deterministic local HTTPS endpoint succeeds through Necko/NSS with the dedicated test profile. A public HTTPS endpoint may be used as an additional sanity check, but is not required for the reproducible suite.
+A request to the fixture's HTTPS front-end health endpoint succeeds through Necko/NSS with the dedicated test profile. A public HTTPS endpoint may be used as an additional sanity check, but is not required for the reproducible suite.
 
 Negative tests:
 
-- the local fixture proxy must fail with the fixture's untrusted NSS profile,
-- the same endpoint must succeed only with the dedicated NSS profile containing the local fixture CA,
-- a deliberately invalid hostname or unrelated untrusted TLS endpoint must still fail.
+- the fixture's HTTPS front-end health endpoint must fail with the untrusted NSS profile,
+- the same endpoint must succeed with the dedicated NSS profile containing the fixture CA,
+- a deliberately invalid hostname must still fail.
 
 No test may pass by disabling certificate verification or installing the fixture CA globally.
 
@@ -288,8 +287,6 @@ Write known bytes through the CONNECT tunnel and verify the target-side response
 
 Acceptance:
 
-- [ ] the untrusted fixture profile rejects the proxy certificate,
-- [ ] the dedicated trusted NSS profile validates the proxy certificate normally,
 - [ ] outer proxy TLS is handled by NSS,
 - [ ] negotiated protocol is HTTP/2,
 - [ ] CONNECT returns 200,
@@ -320,7 +317,7 @@ Acceptance:
 - [ ] missing required credentials -> clean failure,
 - [ ] no password appears in logs.
 
-Run these tests against the local fixture first. When supplied real-server credentials are available, repeat the successful and invalid-credential paths against that server without committing or logging the credentials.
+Run valid, invalid, and missing-credential paths against the local fixture. The supplied real server requires only the successful valid-credential interoperability path in M8.3.
 
 ---
 
@@ -393,7 +390,7 @@ curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 Acceptance:
 
 - [ ] HTTP and HTTPS target requests succeed through the local Caddy fixture,
-- [ ] curl sees and validates the HTTPS target certificate end to end,
+- [ ] curl validates the HTTPS target certificate end to end with the scoped fixture CA via `--cacert`, never `-k`,
 - [ ] a hostname request reaches Caddy unchanged as the CONNECT authority,
 - [ ] NaiveFox only sees opaque tunneled bytes after CONNECT,
 - [ ] multiple sequential requests work.
@@ -451,19 +448,23 @@ Against the local `forwardproxy@naive` fixture:
 - [ ] server response includes `padding`,
 - [ ] NaiveFox records `padding negotiated = true`.
 
-Repeat this negotiation against the supplied real server when credentials are available.
+Repeat successful negotiation against the supplied real server during M8.3.
 
-Against a regular HTTP/2 proxy without Naive padding:
+Add a focused component test for negotiation fallback:
 
-- [ ] CONNECT can still work,
-- [ ] no server padding header,
-- [ ] payload padding remains disabled.
+- [ ] a successful CONNECT response containing `padding` enables payload padding,
+- [ ] a successful CONNECT response without `padding` leaves the tunnel in raw mode,
+- [ ] absence of padding capability is not treated as a protocol error.
+
+A second non-Naive proxy fixture is not required.
 
 ---
 
 ## Phase 7 — Naive payload padding codec
 
 Implement this as a standalone, heavily tested component before putting it in live traffic.
+
+The first prototype implements legacy Naive padding Variant 1 used by the pinned `forwardproxy@naive` fixture. Newer padding-type variants are out of scope.
 
 ### M7.1 Encoder
 
@@ -476,7 +477,7 @@ payload
 zero padding
 ```
 
-Use current upstream NaiveProxy as source of truth.
+Use the legacy Variant 1 specification and the pinned `forwardproxy@naive` implementation as the wire-format source of truth.
 
 After the padded-record quota, send raw bytes.
 
@@ -541,25 +542,23 @@ Keep send and receive padded-record counters independent.
 
 ### M8.2 Local Caddy interoperability suite
 
-Run the complete automated fixture path with `padding negotiated = true`.
+Run the functional padded fixture path with `padding negotiated = true`.
 
 Test:
 
 - [ ] HTTP target through SOCKS,
-- [ ] HTTPS target through SOCKS with normal target-certificate validation,
+- [ ] HTTPS target through SOCKS with scoped `--cacert` validation and no verification bypass,
 - [ ] at least one deterministic multi-megabyte download,
 - [ ] deterministic upload with byte-count and hash verification,
-- [ ] repeated connections,
-- [ ] concurrent connections,
-- [ ] target close during transfer,
-- [ ] proxy close during transfer,
-- [ ] local client close during transfer.
+- [ ] multiple sequential connections.
 
 Verify byte-for-byte integrity with hashes. The runner must use readiness timeouts, clean up all child processes on success or failure, and preserve only sanitized diagnostics.
 
+Concurrency, backpressure, and forced close paths belong to Phase 9 and are not duplicated here.
+
 Acceptance:
 
-One documented command creates isolated fixture state, runs the complete suite, and exits successfully without a remote proxy/server or supplied credentials. Initial dependency download or fixture-binary construction may still require network access.
+One documented command creates isolated fixture state, runs the functional M8 suite, and exits successfully without a remote proxy/server or supplied credentials. Initial dependency download or fixture-binary construction may still require network access.
 
 ### M8.3 Supplied real Caddy interoperability
 
@@ -573,7 +572,7 @@ curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 
 works with `padding negotiated = true`.
 
-Repeat representative HTTPS, large-transfer, repeated-connection, and concurrent-connection tests. Use the server's normal public certificate validation; do not carry local fixture CA overrides into this test.
+Confirm one normal HTTPS request and one bounded integrity-checked transfer. Use the server's normal public certificate validation and do not carry local fixture CA overrides into this test. Concurrency, invalid credentials, and forced failure paths remain local-fixture tests unless diagnosing a real interoperability problem.
 
 If credentials have not yet been supplied, record M8.3 as pending external validation. This does not block implementation and local verification of later robustness work, but the prototype cannot be declared complete until M8.3 passes.
 

@@ -85,7 +85,7 @@ xcaddy build \
   --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive
 ```
 
-NaiveFox must interoperate with that existing server. Do not require a custom NaiveFox server.
+NaiveFox must interoperate with that existing server. Do not require a custom NaiveFox server. The command above describes compatibility; the committed local fixture must pin an exact tested Caddy version and immutable `forwardproxy` commit instead of resolving a moving branch on every run.
 
 The user may provide a real test server address and credentials for final interoperability validation. Their absence must not block development because the repository must include a reproducible local Caddy fixture.
 
@@ -102,10 +102,11 @@ Testing has two distinct gates.
 
 The local fixture runs directly in the provided Linux build environment and uses:
 
-- a dedicated Caddy binary built with the real `forwardproxy@naive` module,
-- loopback-only unprivileged listeners and an ACL restricted to the local target,
+- a dedicated Caddy binary built from pinned Caddy and `forwardproxy@naive` revisions,
+- a loopback-only, explicitly TLS-enabled catch-all listener on an unprivileged port,
+- an ACL and allowed-port list restricted to the local target,
 - Basic Auth credentials generated outside the source tree,
-- Caddy `tls internal` with isolated Caddy state, `skip_install_trust`, and an explicit loopback bind,
+- isolated Caddy internal-PKI state with `skip_install_trust`,
 - a dedicated NSS profile containing only the fixture CA trust,
 - a second untrusted NSS profile for the required certificate-failure test,
 - a deterministic local HTTP/HTTPS target for integrity, upload, close, delay, and concurrency tests.
@@ -315,6 +316,8 @@ Reference:
 
 https://github.com/klzgrad/naiveproxy/blob/master/README.md#padding-protocol-an-informal-specification
 
+The first prototype targets legacy Naive padding Variant 1 as implemented by the pinned `forwardproxy@naive` fixture: eight padded records per direction followed by raw bytes. Newer NaiveProxy padding variants are not part of this prototype.
+
 ### CONNECT header negotiation
 
 Naive-compatible clients put a `padding` header in the CONNECT request.
@@ -478,5 +481,6 @@ The first prototype is complete when all of the following are demonstrated on Li
 18. The complete local integration suite passes from one documented command.
 19. The same core path is confirmed against the supplied real Caddy server.
 20. All changes to existing Firefox files are documented in `UPSTREAM.md`.
+21. The prototype runtime can be staged and run outside the build tree on a compatible Linux system.
 
 See `ROADMAP.md` for the required implementation order.
