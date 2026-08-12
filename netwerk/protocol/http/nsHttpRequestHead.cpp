@@ -24,6 +24,7 @@ nsHttpRequestHead::nsHttpRequestHead(const nsHttpRequestHead& aRequestHead) {
   RecursiveMutexAutoLock monitor(other.mRecursiveMutex);
 
   mHeaders = other.mHeaders;
+  mProxyConnectHeaders = other.mProxyConnectHeaders;
   mMethod = other.mMethod;
   mVersion = other.mVersion;
   mRequestURI = other.mRequestURI;
@@ -40,6 +41,7 @@ nsHttpRequestHead::nsHttpRequestHead(nsHttpRequestHead&& aRequestHead) {
   RecursiveMutexAutoLock monitor(other.mRecursiveMutex);
 
   mHeaders = std::move(other.mHeaders);
+  mProxyConnectHeaders = std::move(other.mProxyConnectHeaders);
   mMethod = std::move(other.mMethod);
   mVersion = std::move(other.mVersion);
   mRequestURI = std::move(other.mRequestURI);
@@ -59,6 +61,7 @@ nsHttpRequestHead& nsHttpRequestHead::operator=(
   RecursiveMutexAutoLock monitor(mRecursiveMutex);
 
   mHeaders = other.mHeaders;
+  mProxyConnectHeaders = other.mProxyConnectHeaders;
   mMethod = other.mMethod;
   mVersion = other.mVersion;
   mRequestURI = other.mRequestURI;
@@ -117,6 +120,30 @@ nsresult nsHttpRequestHead::VisitHeaders(
   nsresult rv = mHeaders.VisitHeaders(visitor, filter);
   --mInVisitHeaders;
   return rv;
+}
+
+nsresult nsHttpRequestHead::SetProxyConnectHeader(const nsACString& h,
+                                                  const nsACString& v) {
+  RecursiveMutexAutoLock mon(mRecursiveMutex);
+  return mProxyConnectHeaders.SetHeader(
+      h, v, false, nsHttpHeaderArray::eVarietyRequestOverride);
+}
+
+nsresult nsHttpRequestHead::CopyProxyConnectHeadersTo(
+    nsHttpRequestHead& aTarget) const {
+  RecursiveMutexAutoLock mon(mRecursiveMutex);
+  for (uint32_t i = 0; i < mProxyConnectHeaders.Count(); ++i) {
+    nsHttpAtom atom;
+    nsAutoCString originalName;
+    const char* value =
+        mProxyConnectHeaders.PeekHeaderAt(i, atom, originalName);
+    nsresult rv =
+        originalName.IsEmpty()
+            ? aTarget.SetHeader(atom, nsDependentCString(value))
+            : aTarget.SetHeader(originalName, nsDependentCString(value));
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  return NS_OK;
 }
 
 void nsHttpRequestHead::Method(nsACString& aMethod) const {

@@ -1582,6 +1582,8 @@ skip-if = [
   "socketprocess_networking", # Bug 1614708
 ]
 
+["test_proxyconnect_padding_header.js"]
+
 ["test_proxyconnect_raw.js"]
 skip-if = [
   "socketprocess_networking", # Bug 1614708

@@ -4028,6 +4028,32 @@ HttpBaseChannel::SetConnectOnly(bool aTlsTunnel) {
 }
 
 NS_IMETHODIMP
+HttpBaseChannel::SetProxyConnectHeader(const nsACString& aHeader,
+                                       const nsACString& aValue) {
+  ENSURE_CALLED_BEFORE_CONNECT();
+
+  const nsCString& flatHeader = PromiseFlatCString(aHeader);
+  const nsCString& flatValue = PromiseFlatCString(aValue);
+  if (!nsHttp::IsValidToken(flatHeader) ||
+      !nsHttp::IsReasonableHeaderValue(flatValue)) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  nsHttpAtom atom = nsHttp::ResolveAtom(flatHeader);
+  if (atom == nsHttp::Host || atom == nsHttp::Connection ||
+      atom == nsHttp::Proxy_Connection || atom == nsHttp::Keep_Alive ||
+      atom == nsHttp::Transfer_Encoding || atom == nsHttp::TE ||
+      atom == nsHttp::Trailer || atom == nsHttp::Upgrade ||
+      atom == nsHttp::Content_Length || atom == nsHttp::Proxy_Authorization ||
+      atom == nsHttp::Proxy_Authenticate ||
+      flatHeader.LowerCaseEqualsLiteral("alpn")) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  return mRequestHead.SetProxyConnectHeader(flatHeader, flatValue);
+}
+
+NS_IMETHODIMP
 HttpBaseChannel::GetAllowSpdy(bool* aAllowSpdy) {
   NS_ENSURE_ARG_POINTER(aAllowSpdy);
 

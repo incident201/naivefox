@@ -280,29 +280,55 @@ Tests:
 The local Caddy integration additionally proves NSS TLS, outer H2, CONNECT
 200, Basic Auth failure modes, and bidirectional C++ stream use.
 
-Commit: `NF04 expose raw HTTP CONNECT streams` (planned commit subject)
+Commit: `1fec4f92754c NF04 expose raw HTTP CONNECT streams`
 
 ### Patch NF-UPSTREAM-003
 
-Status: research required
+Status: implemented
 
 Files:
 
 ```text
-TO_BE_DETERMINED
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.h
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/nsHttpRequestHead.h
+netwerk/protocol/http/nsHttpRequestHead.cpp
+netwerk/protocol/http/PHttpChannelParams.h
+netwerk/protocol/http/nsHttpConnection.cpp
+netwerk/test/unit/test_proxyconnect_padding_header.js
+netwerk/test/unit/xpcshell.toml
 ```
 
 Purpose:
 
-Allow the Naive-compatible `padding` header to be present on the actual proxy CONNECT request.
+Provide a privileged, pre-open API for adding a validated header to the actual
+proxy CONNECT request without adding it to the origin request.
+
+Why project-only code was insufficient:
+
+Firefox constructs a new request head for proxy CONNECT and selectively copies
+headers into it. Setting a normal origin request header therefore cannot place
+Naive's `padding` header on either the HTTP/1.1 or HTTP/2 CONNECT wire path.
+
+Implementation and behavioral risk:
+
+- store explicit CONNECT-only headers in a request-head sidecar that survives
+  copy/move and socket-process serialization;
+- copy the sidecar only in the common CONNECT construction path;
+- reject authority, framing, hop-by-hop, proxy-authentication, and ALPN
+  headers, as well as invalid tokens and values;
+- leave normal requests and channels unchanged unless the new internal method
+  is explicitly called.
 
 Tests:
 
-- proxy receives `padding`,
-- normal CONNECT behavior unchanged,
-- existing proxy tests pass.
+- validation rejects CR/LF injection and reserved headers;
+- HTTP/1.1 and HTTP/2 proxies receive the exact `padding` value;
+- CONNECT response `padding` is available through `nsIProxiedChannel`;
+- existing raw and proxy CONNECT tests pass.
 
-NF-UPSTREAM-002 and NF-UPSTREAM-003 may become one small patch if the cleanest current Firefox design naturally solves both. If so, update this inventory rather than preserving artificial separation.
+Commit: `NF06 add proxy CONNECT request headers` (planned commit subject)
 
 ### Patch NF-UPSTREAM-004
 

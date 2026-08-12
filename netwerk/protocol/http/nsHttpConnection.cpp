@@ -2110,6 +2110,10 @@ nsresult nsHttpConnection::MakeConnectString(nsAHttpTransaction* trans,
     MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 
+  nsresult connectHeaderRv =
+      trans->RequestHead()->CopyProxyConnectHeadersTo(*request);
+  NS_ENSURE_SUCCESS(connectHeaderRv, connectHeaderRv);
+
   result.Truncate();
   request->Flatten(result, false);
 

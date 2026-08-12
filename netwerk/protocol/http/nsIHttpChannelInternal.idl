@@ -221,6 +221,15 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setConnectOnly(in boolean tlsTunnel);
 
     /**
+     * Set a header on the proxy CONNECT request. This header is not included
+     * in the origin request. Must be called before the channel is opened.
+     *
+     * Connection-control and proxy-authorization headers are rejected.
+     */
+    [must_use] void setProxyConnectHeader(in ACString aHeader,
+                                          in ACString aValue);
+
+    /**
      * True iff the channel is CONNECT only.
      */
     [must_use] readonly attribute boolean onlyConnect;

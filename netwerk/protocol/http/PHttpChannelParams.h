@@ -203,6 +203,7 @@ struct ParamTraits<mozilla::net::nsHttpRequestHead> {
                     const paramType& aParam) MOZ_NO_THREAD_SAFETY_ANALYSIS {
     aParam.Enter();
     WriteParam(aWriter, aParam.mHeaders);
+    WriteParam(aWriter, aParam.mProxyConnectHeaders);
     WriteParam(aWriter, aParam.mMethod);
     WriteParam(aWriter, aParam.mVersion);
     WriteParam(aWriter, aParam.mRequestURI);
@@ -216,6 +217,7 @@ struct ParamTraits<mozilla::net::nsHttpRequestHead> {
   static bool Read(MessageReader* aReader, paramType* aResult) {
     aResult->Enter();
     if (!ReadParam(aReader, &aResult->mHeaders) ||
+        !ReadParam(aReader, &aResult->mProxyConnectHeaders) ||
         !ReadParam(aReader, &aResult->mMethod) ||
         !ReadParam(aReader, &aResult->mVersion) ||
         !ReadParam(aReader, &aResult->mRequestURI) ||

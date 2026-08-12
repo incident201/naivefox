@@ -85,6 +85,10 @@ class nsHttpRequestHead {
   [[nodiscard]] nsresult SetHeader(const nsHttpAtom& h, const nsACString& v,
                                    bool m,
                                    nsHttpHeaderArray::HeaderVariety variety);
+  [[nodiscard]] nsresult SetProxyConnectHeader(const nsACString& h,
+                                               const nsACString& v);
+  [[nodiscard]] nsresult CopyProxyConnectHeadersTo(
+      nsHttpRequestHead& aTarget) const;
   [[nodiscard]] nsresult SetEmptyHeader(const nsACString& h);
   [[nodiscard]] nsresult GetHeader(const nsHttpAtom& h, nsACString& v) const;
 
@@ -133,6 +137,7 @@ class nsHttpRequestHead {
  private:
   // All members must be copy-constructable and assignable
   nsHttpHeaderArray mHeaders MOZ_GUARDED_BY(mRecursiveMutex);
+  nsHttpHeaderArray mProxyConnectHeaders MOZ_GUARDED_BY(mRecursiveMutex);
   nsCString mMethod MOZ_GUARDED_BY(mRecursiveMutex){"GET"_ns};
   HttpVersion mVersion MOZ_GUARDED_BY(mRecursiveMutex){HttpVersion::v1_1};
 
