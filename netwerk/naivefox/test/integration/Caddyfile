@@ -1,0 +1,23 @@
+{
+	admin off
+	auto_https disable_redirects
+	skip_install_trust
+	servers {
+		protocols h1 h2
+	}
+}
+
+https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
+	bind 127.0.0.1
+	tls {$NAIVEFOX_FIXTURE_PROXY_CERT} {$NAIVEFOX_FIXTURE_PROXY_KEY}
+	route {
+		forward_proxy {
+			basic_auth {$NAIVEFOX_FIXTURE_USER} {$NAIVEFOX_FIXTURE_PASS}
+			ports {$NAIVEFOX_FIXTURE_HTTP_PORT} {$NAIVEFOX_FIXTURE_HTTPS_PORT}
+			acl {
+				allow 127.0.0.1/32
+				deny all
+			}
+		}
+	}
+}
