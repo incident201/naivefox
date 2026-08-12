@@ -328,7 +328,7 @@ Tests:
 - CONNECT response `padding` is available through `nsIProxiedChannel`;
 - existing raw and proxy CONNECT tests pass.
 
-Commit: `NF06 add proxy CONNECT request headers` (planned commit subject)
+Commit: `da53c63336f5 NF06 add proxy CONNECT request headers`
 
 ### Patch NF-UPSTREAM-004
 
@@ -366,6 +366,58 @@ Tests:
 - fixture trusted/untrusted/hostname certificate validation.
 
 Commit: `NF02 initialize the headless Gecko runtime`
+
+### Patch NF-UPSTREAM-005
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http2Session.cpp
+netwerk/protocol/http/Http2StreamTunnel.cpp
+netwerk/protocol/http/Http2StreamTunnel.h
+```
+
+Purpose:
+
+Make a raw HTTP/2 tunnel obey bounded-stream backpressure and byte-stream
+half-close semantics during large and concurrent transfers.
+
+Why project-only code was insufficient:
+
+The tunnel callback could consume Firefox's internal slow-consumer buffer, but
+`CallToWriteData()` always reported zero consumed bytes to `Http2Session`.
+After roughly one receive window of data, no `WINDOW_UPDATE` was generated and
+the tunnel deadlocked. In addition, the existing output-stream close path could
+only cancel the whole H2 stream; it could not send an output `END_STREAM` while
+leaving input open. Finally, a peer `RST_STREAM(NO_ERROR)` discarded bytes
+already held in the slow-consumer buffer.
+
+Implementation and behavioral risk:
+
+- bound each input callback to the session's requested byte count and report
+  the exact number consumed so normal H2 flow-control accounting advances;
+- treat successful output-stream close as a tunnel output half-close and use
+  the existing `mSendClosed` path to generate `END_STREAM`;
+- for tunnels only, treat peer `RST_STREAM(NO_ERROR)` as graceful EOF after
+  all already-buffered bytes have been delivered;
+- leave ordinary HTTP transactions and non-successful tunnel resets unchanged.
+
+This changes RST behavior only after a reproducible NaiveFox integration
+failure: a 32 MiB response was first stalled at the receive-window boundary,
+then truncated when Caddy closed the completed tunnel while bytes remained in
+Firefox's bounded slow-consumer buffer. It is not a fingerprinting change.
+
+Tests:
+
+- deterministic 32 MiB download and upload with integrity checks,
+- bounded-memory slow producer/consumer paths,
+- application half-close and target/proxy disconnects,
+- four simultaneous CONNECT streams on one H2 connection,
+- focused raw/proxy CONNECT xpcshell regressions.
+
+Commit: `NF09 harden H2 tunnel lifecycle` (planned commit subject)
 
 ## Rules for future upstream changes
 

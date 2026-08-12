@@ -76,9 +76,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/upload":
+        parsed = urlparse(self.path)
+        if parsed.path not in ("/upload", "/slow-upload"):
             self.send_error(404)
             return
+        delay_ms = 0
+        if parsed.path == "/slow-upload":
+            query = parse_qs(parsed.query)
+            delay_ms = min(max(int(query.get("ms", [1])[0]), 0), 100)
         try:
             remaining = int(self.headers.get("Content-Length", "-1"))
         except ValueError:
@@ -90,12 +95,15 @@ class Handler(BaseHTTPRequestHandler):
         total = remaining
         digest = hashlib.sha256()
         while remaining:
-            chunk = self.rfile.read(min(65536, remaining))
+            chunk_size = 4096 if delay_ms else 65536
+            chunk = self.rfile.read(min(chunk_size, remaining))
             if not chunk:
                 self.send_error(400)
                 return
             digest.update(chunk)
             remaining -= len(chunk)
+            if delay_ms:
+                time.sleep(delay_ms / 1000)
         body = json.dumps(
             {"bytes": total, "sha256": digest.hexdigest()}, sort_keys=True
         ).encode() + b"\n"

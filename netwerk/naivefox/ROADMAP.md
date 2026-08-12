@@ -606,6 +606,10 @@ Confirm one normal HTTPS request and one bounded integrity-checked transfer. Use
 
 If credentials have not yet been supplied, record M8.3 as pending external validation. This does not block implementation and local verification of later robustness work, but the prototype cannot be declared complete until M8.3 passes.
 
+Status on 2026-08-12: **pending external validation**. No real proxy endpoint
+or credentials were supplied. The pinned local Caddy interoperability suite is
+complete, but final real-server acceptance remains open.
+
 ---
 
 ## Phase 9 — robustness and lifecycle
@@ -639,6 +643,21 @@ Run multiple simultaneous SOCKS CONNECT streams.
 Verify whether Firefox reuses a single H2 proxy connection/multiplexes streams as expected.
 
 Do not implement an independent connection pool unless Firefox's normal pooling cannot meet the requirement.
+
+Acceptance:
+
+- [x] a 32 MiB slow-consumer download and slow-target upload preserve byte
+  integrity while NaiveFox's `VmRSS` delta stays below 32 MiB,
+- [x] local disconnect, proxy disconnect, target early close, failed CONNECT,
+  invalid authentication, timeout, and application half-close terminate
+  without a crash or leaked finite server process,
+- [x] malformed and truncated padding is rejected by the bounded codec tests,
+- [x] four simultaneous SOCKS CONNECT streams complete through one established
+  outer proxy TCP connection.
+
+Completed locally with
+`test/integration/run-robustness-tests.sh`. The test uses Firefox's normal H2
+pooling; NaiveFox does not implement a separate connection pool.
 
 ---
 

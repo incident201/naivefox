@@ -47,6 +47,18 @@ CONNECT, checks HTTP and HTTPS, verifies a deterministic 3 MiB download and 2
 MiB upload by byte count and SHA-256, repeats sequential connections, and keeps
 all credentials and generated payloads inside the isolated fixture run state.
 
+Run the M9 robustness and lifecycle suite with:
+
+```bash
+./run-robustness-tests.sh
+```
+
+It verifies bounded-memory 32 MiB download/upload backpressure, integrity,
+local/target/proxy close paths, timeout, ACL and authentication failure,
+application half-close, and four simultaneous padded CONNECT streams. While
+the concurrent streams are active, `ss` must show exactly one established TCP
+connection to the proxy, proving reuse of Firefox's outer H2 session.
+
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact
 forwardproxy commit. Later runs reuse the validated tools. The suite verifies

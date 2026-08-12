@@ -107,6 +107,18 @@ void Http2StreamTunnel::CloseStream(nsresult aReason) {
   mClosed = true;
 }
 
+void Http2StreamTunnel::CloseOutput() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (mSendClosed) {
+    return;
+  }
+  mSendClosed = true;
+  RefPtr<Http2Session> session = Session();
+  if (session) {
+    session->TransactionHasDataToWrite(this);
+  }
+}
+
 NS_IMETHODIMP
 Http2StreamTunnel::Close(nsresult aReason) {
   LOG(("Http2StreamTunnel::Close this=%p", this));
@@ -301,7 +313,7 @@ nsresult Http2StreamTunnel::CallToWriteData(uint32_t count,
   if (!mInput->HasCallback()) {
     return NS_BASE_STREAM_WOULD_BLOCK;
   }
-  return mInput->OnSocketReady(NS_OK);
+  return mInput->OnSocketReady(NS_OK, count, countWritten);
 }
 
 nsresult Http2StreamTunnel::GenerateHeaders(nsCString& aCompressedData,
@@ -408,13 +420,18 @@ NS_IMETHODIMP
 OutputStreamTunnel::CloseWithStatus(nsresult reason) {
   LOG(("OutputStreamTunnel::CloseWithStatus [this=%p reason=%" PRIx32 "]\n",
        this, static_cast<uint32_t>(reason)));
-  mCondition = reason;
 
   RefPtr<Http2StreamTunnel> tunnel = mWeakStream.get();
   mWeakStream = nullptr;
   if (!tunnel) {
     return NS_OK;
   }
+  if (NS_SUCCEEDED(reason)) {
+    mCondition = NS_BASE_STREAM_CLOSED;
+    tunnel->CloseOutput();
+    return NS_OK;
+  }
+  mCondition = reason;
   RefPtr<Http2Session> session = tunnel->Session();
   if (!session) {
     return NS_OK;
@@ -481,6 +498,22 @@ nsresult InputStreamTunnel::OnSocketReady(nsresult condition) {
   return callback ? callback->OnInputStreamReady(this) : NS_OK;
 }
 
+nsresult InputStreamTunnel::OnSocketReady(nsresult condition,
+                                          uint32_t aReadLimit,
+                                          uint32_t* aReadCount) {
+  MOZ_ASSERT(aReadCount);
+  MOZ_ASSERT(!mCountReads);
+
+  *aReadCount = 0;
+  mReadLimit = aReadLimit;
+  mReadCount = 0;
+  mCountReads = true;
+  nsresult rv = OnSocketReady(condition);
+  *aReadCount = mReadCount;
+  mCountReads = false;
+  return rv;
+}
+
 NS_IMPL_ISUPPORTS(InputStreamTunnel, nsIInputStream, nsIAsyncInputStream)
 
 NS_IMETHODIMP
@@ -520,7 +553,18 @@ InputStreamTunnel::Read(char* buf, uint32_t count, uint32_t* countRead) {
     return rv;
   }
 
-  return tunnel->OnWriteSegment(buf, count, countRead);
+  if (mCountReads) {
+    if (mReadCount == mReadLimit) {
+      return NS_BASE_STREAM_WOULD_BLOCK;
+    }
+    count = std::min(count, mReadLimit - mReadCount);
+  }
+
+  rv = tunnel->OnWriteSegment(buf, count, countRead);
+  if (mCountReads && NS_SUCCEEDED(rv)) {
+    mReadCount += *countRead;
+  }
+  return rv;
 }
 
 NS_IMETHODIMP

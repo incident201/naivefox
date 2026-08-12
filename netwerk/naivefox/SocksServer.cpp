@@ -143,6 +143,21 @@ class DuplexPump final : public RefCounted<DuplexPump> {
     }
   }
 
+  void DirectionComplete(PumpDirection* aDirection) {
+    if (mClosed) {
+      return;
+    }
+    if (aDirection == mUp.get()) {
+      if (!mUpComplete) {
+        mUpComplete = true;
+        mUp->Cancel();
+        (void)mTunnelOut->CloseWithStatus(NS_OK);
+      }
+      return;
+    }
+    Close(NS_OK);
+  }
+
   bool Closed() const { return mClosed; }
 
   ~DuplexPump() { Close(NS_BASE_STREAM_CLOSED); }
@@ -156,6 +171,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
   RefPtr<PumpDirection> mDown;
   bool mPaddingEnabled;
   std::function<void(nsresult)> mOnClose;
+  bool mUpComplete = false;
   bool mClosed = false;
 };
 
@@ -203,9 +219,8 @@ nsresult PumpDirection::Start(Span<const uint8_t> aInitial) {
   if (!aInitial.IsEmpty()) {
     std::copy(aInitial.begin(), aInitial.end(), mInputBuffer.begin());
     mInputLength = aInitial.Length();
-    return Produce();
   }
-  return WaitForInput();
+  return Produce();
 }
 
 nsresult PumpDirection::Flush() {
@@ -233,7 +248,24 @@ nsresult PumpDirection::Produce() {
       mInputOffset = 0;
       mInputLength = 0;
       if (!mEncoder || mEncoder->BufferedByteCount() == 0) {
-        return WaitForInput();
+        uint32_t read = 0;
+        nsresult rv = mInput->Read(reinterpret_cast<char*>(mInputBuffer.data()),
+                                   mInputBuffer.size(), &read);
+        if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
+          return WaitForInput();
+        }
+        if (rv == NS_BASE_STREAM_CLOSED || (NS_SUCCEEDED(rv) && read == 0)) {
+          if (mDecoder && mDecoder->Finish() != PaddingCodecStatus::Ok) {
+            mOwner->Close(NS_ERROR_FAILURE);
+          } else {
+            mOwner->DirectionComplete(this);
+          }
+          return NS_OK;
+        }
+        if (NS_FAILED(rv)) {
+          return rv;
+        }
+        mInputLength = read;
       }
     }
 
@@ -273,23 +305,7 @@ NS_IMETHODIMP PumpDirection::OnInputStreamReady(nsIAsyncInputStream* aStream) {
   if (!mOwner || mOwner->Closed()) {
     return NS_OK;
   }
-  uint32_t read = 0;
-  nsresult rv = aStream->Read(reinterpret_cast<char*>(mInputBuffer.data()),
-                              mInputBuffer.size(), &read);
-  if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
-    rv = WaitForInput();
-  } else if (rv == NS_BASE_STREAM_CLOSED || (NS_SUCCEEDED(rv) && read == 0)) {
-    nsresult closeStatus = NS_OK;
-    if (mDecoder && mDecoder->Finish() != PaddingCodecStatus::Ok) {
-      closeStatus = NS_ERROR_FAILURE;
-    }
-    mOwner->Close(closeStatus);
-    return NS_OK;
-  } else if (NS_SUCCEEDED(rv)) {
-    mInputOffset = 0;
-    mInputLength = read;
-    rv = Produce();
-  }
+  nsresult rv = Produce();
   if (NS_FAILED(rv)) {
     Fail(rv);
   }
