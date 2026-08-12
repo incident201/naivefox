@@ -5,6 +5,7 @@
 UNIFIED_SOURCES += [
     "TestHeaderPadding.cpp",
     "TestNaivePadding.cpp",
+    "TestPaddingNegotiation.cpp",
     "TestSocks5Parser.cpp",
 ]
 

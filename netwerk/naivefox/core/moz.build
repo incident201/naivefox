@@ -8,6 +8,7 @@ SOURCES += [
     "../HttpClient.cpp",
     "../NaiveFoxRunner.cpp",
     "../NeckoTunnel.cpp",
+    "../PaddingNegotiation.cpp",
     "../Socks5Parser.cpp",
     "../SocksServer.cpp",
 ]

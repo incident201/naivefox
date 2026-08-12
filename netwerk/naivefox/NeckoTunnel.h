@@ -18,7 +18,8 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          const nsACString& aProxyUser,
                          const nsACString& aProxyPassword,
                          nsIHttpUpgradeListener* aUpgradeListener,
-                         nsIStreamListener* aChannelListener);
+                         nsIStreamListener* aChannelListener,
+                         const nsACString& aConnectPadding);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,

@@ -473,18 +473,18 @@ Acceptance:
 
 Against the local `forwardproxy@naive` fixture:
 
-- [ ] request includes `padding`,
-- [ ] CONNECT succeeds,
-- [ ] server response includes `padding`,
-- [ ] NaiveFox records `padding negotiated = true`.
+- [x] request includes `padding`,
+- [x] CONNECT succeeds,
+- [x] server response includes `padding`,
+- [x] NaiveFox records `padding negotiated = true`.
 
 Repeat successful negotiation against the supplied real server during M8.3.
 
 Add a focused component test for negotiation fallback:
 
-- [ ] a successful CONNECT response containing `padding` enables payload padding,
-- [ ] a successful CONNECT response without `padding` leaves the tunnel in raw mode,
-- [ ] absence of padding capability is not treated as a protocol error.
+- [x] a successful CONNECT response containing `padding` enables payload padding,
+- [x] a successful CONNECT response without `padding` leaves the tunnel in raw mode,
+- [x] absence of padding capability is not treated as a protocol error.
 
 A second non-Naive proxy fixture is not required.
 
@@ -576,11 +576,11 @@ Run the functional padded fixture path with `padding negotiated = true`.
 
 Test:
 
-- [ ] HTTP target through SOCKS,
-- [ ] HTTPS target through SOCKS with scoped `--cacert` validation and no verification bypass,
-- [ ] at least one deterministic multi-megabyte download,
-- [ ] deterministic upload with byte-count and hash verification,
-- [ ] multiple sequential connections.
+- [x] HTTP target through SOCKS,
+- [x] HTTPS target through SOCKS with scoped `--cacert` validation and no verification bypass,
+- [x] at least one deterministic multi-megabyte download,
+- [x] deterministic upload with byte-count and hash verification,
+- [x] multiple sequential connections.
 
 Verify byte-for-byte integrity with hashes. The runner must use readiness timeouts, clean up all child processes on success or failure, and preserve only sanitized diagnostics.
 

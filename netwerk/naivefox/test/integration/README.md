@@ -35,6 +35,18 @@ sequential connections. Every curl invocation uses `--socks5-hostname` and
 `--noproxy ''`; no application-side target DNS lookup or certificate bypass is
 used.
 
+Run the complete padded M8 interoperability suite with:
+
+```bash
+./run-padded-tests.sh
+```
+
+This is the single local acceptance command for Naive legacy padding Variant 1.
+It requires successful request/response `padding` negotiation for every
+CONNECT, checks HTTP and HTTPS, verifies a deterministic 3 MiB download and 2
+MiB upload by byte count and SHA-256, repeats sequential connections, and keeps
+all credentials and generated payloads inside the isolated fixture run state.
+
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact
 forwardproxy commit. Later runs reuse the validated tools. The suite verifies

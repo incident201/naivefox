@@ -335,7 +335,8 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          const nsACString& aProxyUser,
                          const nsACString& aProxyPassword,
                          nsIHttpUpgradeListener* aUpgradeListener,
-                         nsIStreamListener* aChannelListener) {
+                         nsIStreamListener* aChannelListener,
+                         const nsACString& aConnectPadding) {
   if (!aUpgradeListener || !aChannelListener) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -428,6 +429,9 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   MOZ_TRY(internal->SetAllowHttp3(false));
   MOZ_TRY(internal->SetBlockAuthPrompt(true));
   MOZ_TRY(internal->SetConnectOnly(false));
+  if (!aConnectPadding.IsEmpty()) {
+    MOZ_TRY(internal->SetProxyConnectHeader("padding"_ns, aConnectPadding));
+  }
 
   MOZ_TRY(internal->HTTPUpgrade(EmptyCString(), aUpgradeListener));
   return channel->AsyncOpen(aChannelListener);
@@ -450,7 +454,7 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
   request.AppendLiteral("\r\nConnection: close\r\n\r\n");
   RefPtr<TunnelSmoke> listener = new TunnelSmoke(request);
   MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
-                          aProxyPassword, listener, listener));
+                          aProxyPassword, listener, listener, EmptyCString()));
 
   if (!SpinEventLoopUntil("NaiveFox::RunRawTunnelSmoke"_ns,
                           [&listener]() { return listener->Complete(); })) {

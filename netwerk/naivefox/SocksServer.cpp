@@ -10,11 +10,15 @@
 #include <functional>
 #include <utility>
 
+#include "HeaderPadding.h"
 #include "NeckoTunnel.h"
+#include "PaddingNegotiation.h"
 #include "Socks5Parser.h"
+#include "codec/NaivePadding.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/ErrorNames.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
 #include "nsCOMPtr.h"
@@ -43,6 +47,11 @@ namespace {
 
 constexpr size_t kPumpBufferSize = 64 * 1024;
 
+using net::naivefox::NaivePaddingDecoder;
+using net::naivefox::NaivePaddingEncoder;
+using net::naivefox::PaddingCodecStatus;
+using net::naivefox::SystemPaddingLengthGenerator;
+
 class DuplexPump;
 
 class PumpDirection final : public nsIInputStreamCallback,
@@ -53,7 +62,7 @@ class PumpDirection final : public nsIInputStreamCallback,
   NS_DECL_NSIOUTPUTSTREAMCALLBACK
 
   PumpDirection(DuplexPump* aOwner, nsIAsyncInputStream* aInput,
-                nsIAsyncOutputStream* aOutput);
+                nsIAsyncOutputStream* aOutput, bool aEncode, bool aDecode);
 
   nsresult Start(Span<const uint8_t> aInitial = {});
   void Cancel();
@@ -64,14 +73,21 @@ class PumpDirection final : public nsIInputStreamCallback,
   nsresult WaitForInput();
   nsresult WaitForOutput();
   nsresult Flush();
+  nsresult Produce();
   void Fail(nsresult aStatus);
 
   DuplexPump* mOwner;
   nsCOMPtr<nsIAsyncInputStream> mInput;
   nsCOMPtr<nsIAsyncOutputStream> mOutput;
-  std::array<uint8_t, kPumpBufferSize> mBuffer;
-  size_t mOffset = 0;
-  size_t mLength = 0;
+  std::array<uint8_t, kPumpBufferSize> mInputBuffer;
+  std::array<uint8_t, kPumpBufferSize> mOutputBuffer;
+  size_t mInputOffset = 0;
+  size_t mInputLength = 0;
+  size_t mOutputOffset = 0;
+  size_t mOutputLength = 0;
+  SystemPaddingLengthGenerator mPaddingGenerator;
+  Maybe<NaivePaddingEncoder> mEncoder;
+  Maybe<NaivePaddingDecoder> mDecoder;
 };
 
 class DuplexPump final : public RefCounted<DuplexPump> {
@@ -80,16 +96,18 @@ class DuplexPump final : public RefCounted<DuplexPump> {
 
   DuplexPump(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
              nsIAsyncInputStream* aTunnelIn, nsIAsyncOutputStream* aTunnelOut,
-             std::function<void(nsresult)>&& aOnClose)
+             bool aPaddingEnabled, std::function<void(nsresult)>&& aOnClose)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
         mTunnelIn(aTunnelIn),
         mTunnelOut(aTunnelOut),
+        mPaddingEnabled(aPaddingEnabled),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start(Span<const uint8_t> aInitialLocalPayload) {
-    mUp = new PumpDirection(this, mLocalIn, mTunnelOut);
-    mDown = new PumpDirection(this, mTunnelIn, mLocalOut);
+    mUp = new PumpDirection(this, mLocalIn, mTunnelOut, mPaddingEnabled, false);
+    mDown =
+        new PumpDirection(this, mTunnelIn, mLocalOut, false, mPaddingEnabled);
     nsresult rv = mDown->Start();
     if (NS_FAILED(rv)) {
       Close(rv);
@@ -136,13 +154,22 @@ class DuplexPump final : public RefCounted<DuplexPump> {
   nsCOMPtr<nsIAsyncOutputStream> mTunnelOut;
   RefPtr<PumpDirection> mUp;
   RefPtr<PumpDirection> mDown;
+  bool mPaddingEnabled;
   std::function<void(nsresult)> mOnClose;
   bool mClosed = false;
 };
 
 PumpDirection::PumpDirection(DuplexPump* aOwner, nsIAsyncInputStream* aInput,
-                             nsIAsyncOutputStream* aOutput)
-    : mOwner(aOwner), mInput(aInput), mOutput(aOutput) {}
+                             nsIAsyncOutputStream* aOutput, bool aEncode,
+                             bool aDecode)
+    : mOwner(aOwner), mInput(aInput), mOutput(aOutput) {
+  if (aEncode) {
+    mEncoder.emplace(mPaddingGenerator);
+  }
+  if (aDecode) {
+    mDecoder.emplace();
+  }
+}
 
 PumpDirection::~PumpDirection() = default;
 
@@ -170,34 +197,76 @@ void PumpDirection::Cancel() {
 }
 
 nsresult PumpDirection::Start(Span<const uint8_t> aInitial) {
-  if (aInitial.Length() > mBuffer.size()) {
+  if (aInitial.Length() > mInputBuffer.size()) {
     return NS_ERROR_FILE_TOO_BIG;
   }
   if (!aInitial.IsEmpty()) {
-    std::copy(aInitial.begin(), aInitial.end(), mBuffer.begin());
-    mLength = aInitial.Length();
-    return Flush();
+    std::copy(aInitial.begin(), aInitial.end(), mInputBuffer.begin());
+    mInputLength = aInitial.Length();
+    return Produce();
   }
   return WaitForInput();
 }
 
 nsresult PumpDirection::Flush() {
-  while (mOffset < mLength) {
+  while (mOutputOffset < mOutputLength) {
     uint32_t written = 0;
-    nsresult rv =
-        mOutput->Write(reinterpret_cast<const char*>(mBuffer.data() + mOffset),
-                       mLength - mOffset, &written);
+    nsresult rv = mOutput->Write(
+        reinterpret_cast<const char*>(mOutputBuffer.data() + mOutputOffset),
+        mOutputLength - mOutputOffset, &written);
     if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
       return WaitForOutput();
     }
     if (NS_FAILED(rv) || written == 0) {
       return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
     }
-    mOffset += written;
+    mOutputOffset += written;
   }
-  mOffset = 0;
-  mLength = 0;
-  return WaitForInput();
+  mOutputOffset = 0;
+  mOutputLength = 0;
+  return Produce();
+}
+
+nsresult PumpDirection::Produce() {
+  while (mOutputLength == 0) {
+    if (mInputOffset == mInputLength) {
+      mInputOffset = 0;
+      mInputLength = 0;
+      if (!mEncoder || mEncoder->BufferedByteCount() == 0) {
+        return WaitForInput();
+      }
+    }
+
+    Span<const uint8_t> input(mInputBuffer.data() + mInputOffset,
+                              mInputLength - mInputOffset);
+    Span<uint8_t> output(mOutputBuffer);
+    size_t consumed = 0;
+    if (mEncoder) {
+      auto result = mEncoder->Encode(input, output);
+      if (result.status != PaddingCodecStatus::Ok) {
+        return NS_ERROR_FAILURE;
+      }
+      consumed = result.inputConsumed;
+      mOutputLength = result.outputProduced;
+    } else if (mDecoder) {
+      auto result = mDecoder->Decode(input, output);
+      if (result.status != PaddingCodecStatus::Ok) {
+        return NS_ERROR_FAILURE;
+      }
+      consumed = result.inputConsumed;
+      mOutputLength = result.outputProduced;
+    } else {
+      const size_t length = std::min(input.Length(), output.Length());
+      std::copy(input.begin(), input.begin() + length, output.begin());
+      consumed = length;
+      mOutputLength = length;
+    }
+    mInputOffset += consumed;
+    if (consumed == 0 && mOutputLength == 0) {
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
+  return Flush();
 }
 
 NS_IMETHODIMP PumpDirection::OnInputStreamReady(nsIAsyncInputStream* aStream) {
@@ -205,16 +274,21 @@ NS_IMETHODIMP PumpDirection::OnInputStreamReady(nsIAsyncInputStream* aStream) {
     return NS_OK;
   }
   uint32_t read = 0;
-  nsresult rv = aStream->Read(reinterpret_cast<char*>(mBuffer.data()),
-                              mBuffer.size(), &read);
+  nsresult rv = aStream->Read(reinterpret_cast<char*>(mInputBuffer.data()),
+                              mInputBuffer.size(), &read);
   if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
     rv = WaitForInput();
   } else if (rv == NS_BASE_STREAM_CLOSED || (NS_SUCCEEDED(rv) && read == 0)) {
-    mOwner->Close(NS_OK);
+    nsresult closeStatus = NS_OK;
+    if (mDecoder && mDecoder->Finish() != PaddingCodecStatus::Ok) {
+      closeStatus = NS_ERROR_FAILURE;
+    }
+    mOwner->Close(closeStatus);
     return NS_OK;
   } else if (NS_SUCCEEDED(rv)) {
-    mLength = read;
-    rv = Flush();
+    mInputOffset = 0;
+    mInputLength = read;
+    rv = Produce();
   }
   if (NS_FAILED(rv)) {
     Fail(rv);
@@ -270,7 +344,8 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult QueueReply(Span<const uint8_t> aBytes, bool aCloseAfter);
   nsresult FlushReplies();
   void BeginTunnel(const nsACString& aTargetAuthority);
-  void ApplyConnectMetadata(nsresult aStatus, int32_t aConnectCode);
+  void ApplyConnectMetadata(nsresult aStatus, int32_t aConnectCode,
+                            const Maybe<bool>& aPaddingHeaderPresent);
   void MaybeStartTunnel();
   void TunnelReady(nsIAsyncInputStream* aTunnelIn,
                    nsIAsyncOutputStream* aTunnelOut);
@@ -291,10 +366,13 @@ class SocksConnection final : public nsIInputStreamCallback,
   std::function<void()> mOnClose;
   bool mTunnelOpening = false;
   bool mTunnelReady = false;
+  bool mPumpStarted = false;
   bool mTransportReady = false;
   bool mMetadataReady = false;
   nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
   int32_t mConnectCode = -1;
+  Maybe<bool> mPaddingHeaderPresent;
+  bool mPaddingEnabled = false;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
   nsCOMPtr<nsIAsyncOutputStream> mPendingTunnelOut;
   bool mOutputWaiting = false;
@@ -347,7 +425,8 @@ nsresult SocksConnection::FlushReplies() {
   mReplyOffset = 0;
   if (mCloseAfterWrite) {
     Close(NS_OK);
-  } else if (mTunnelReady && mPump) {
+  } else if (mTunnelReady && mPump && !mPumpStarted) {
+    mPumpStarted = true;
     nsTArray<uint8_t> initialPayload = std::move(mInitialPayload);
     return mPump->Start(Span(initialPayload));
   }
@@ -376,8 +455,19 @@ void SocksConnection::Reject(Socks5Parser::Event aEvent) {
 
 void SocksConnection::BeginTunnel(const nsACString& aTargetAuthority) {
   MOZ_ASSERT(NS_IsMainThread());
-  nsresult rv = OpenNeckoTunnel(mProxyUrl, aTargetAuthority, mProxyUser,
-                                mProxyPassword, this, this);
+  nsAutoCString padding;
+  nsresult rv = GenerateHeaderPadding(padding);
+  if (NS_FAILED(rv)) {
+    RefPtr self = this;
+    (void)mSocketTarget->Dispatch(
+        NS_NewRunnableFunction(
+            "NaiveFox::PaddingGenerationFailure",
+            [self]() { self->Reject(Socks5Parser::Event::ProtocolError); }),
+        NS_DISPATCH_NORMAL);
+    return;
+  }
+  rv = OpenNeckoTunnel(mProxyUrl, aTargetAuthority, mProxyUser, mProxyPassword,
+                       this, this, padding);
   if (NS_FAILED(rv)) {
     RefPtr self = this;
     (void)mSocketTarget->Dispatch(
@@ -467,14 +557,28 @@ NS_IMETHODIMP SocksConnection::OnStartRequest(nsIRequest* aRequest) {
   nsCOMPtr<nsIProxiedChannel> proxied = do_QueryInterface(aRequest);
   int32_t connectCode = -1;
   nsresult rv = NS_ERROR_UNEXPECTED;
+  Maybe<bool> paddingHeaderPresent;
   if (proxied) {
     rv = proxied->GetHttpProxyConnectResponseCode(&connectCode);
+    if (NS_SUCCEEDED(rv)) {
+      nsAutoCString padding;
+      nsresult headerRv =
+          proxied->GetHttpProxyResponseHeader("padding"_ns, padding);
+      if (NS_SUCCEEDED(headerRv)) {
+        paddingHeaderPresent = Some(true);
+      } else if (headerRv == NS_ERROR_NOT_AVAILABLE) {
+        paddingHeaderPresent = Some(false);
+      } else {
+        rv = headerRv;
+      }
+    }
   }
   RefPtr self = this;
   (void)mSocketTarget->Dispatch(
       NS_NewRunnableFunction("NaiveFox::SocksConnectMetadata",
-                             [self, rv, connectCode]() {
-                               self->ApplyConnectMetadata(rv, connectCode);
+                             [self, rv, connectCode, paddingHeaderPresent]() {
+                               self->ApplyConnectMetadata(rv, connectCode,
+                                                          paddingHeaderPresent);
                              }),
       NS_DISPATCH_NORMAL);
   return rv;
@@ -541,14 +645,16 @@ NS_IMETHODIMP SocksConnection::OnTransportAvailable(
   return NS_OK;
 }
 
-void SocksConnection::ApplyConnectMetadata(nsresult aStatus,
-                                           int32_t aConnectCode) {
+void SocksConnection::ApplyConnectMetadata(
+    nsresult aStatus, int32_t aConnectCode,
+    const Maybe<bool>& aPaddingHeaderPresent) {
   if (mMetadataReady) {
     return;
   }
   mMetadataReady = true;
   mMetadataStatus = aStatus;
   mConnectCode = aConnectCode;
+  mPaddingHeaderPresent = aPaddingHeaderPresent;
   MaybeStartTunnel();
 }
 
@@ -556,7 +662,9 @@ void SocksConnection::MaybeStartTunnel() {
   if (!mTransportReady || !mMetadataReady || mTunnelReady) {
     return;
   }
-  if (mClosed || NS_FAILED(mMetadataStatus) || mConnectCode != 200) {
+  if (mClosed || NS_FAILED(mMetadataStatus) ||
+      NS_FAILED(NegotiatePayloadPadding(mConnectCode, mPaddingHeaderPresent,
+                                        mPaddingEnabled))) {
     (void)mPendingTunnelIn->CloseWithStatus(NS_ERROR_FAILURE);
     (void)mPendingTunnelOut->CloseWithStatus(NS_ERROR_FAILURE);
     mPendingTunnelIn = nullptr;
@@ -578,8 +686,11 @@ void SocksConnection::TunnelReady(nsIAsyncInputStream* aTunnelIn,
     return;
   }
   mTunnelReady = true;
+  std::printf("Padding negotiated: %s\n", mPaddingEnabled ? "yes" : "no");
+  std::fflush(stdout);
   RefPtr self = this;
   mPump = new DuplexPump(mLocalIn, mLocalOut, aTunnelIn, aTunnelOut,
+                         mPaddingEnabled,
                          [self](nsresult aStatus) { self->Close(aStatus); });
   nsTArray<uint8_t> reply;
   Socks5Parser::MakeReply(0x00, reply);
