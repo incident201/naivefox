@@ -6,6 +6,9 @@ SOURCES += [
     "../GeckoRuntime.cpp",
     "../HttpClient.cpp",
     "../NaiveFoxRunner.cpp",
+    "../NeckoTunnel.cpp",
 ]
+
+LOCAL_INCLUDES += ["/netwerk/base"]
 
 FINAL_LIBRARY = "xul"

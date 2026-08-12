@@ -280,9 +280,19 @@ Any modification to existing Firefox files goes into `UPSTREAM.md`.
 
 Acceptance:
 
-- [ ] successful H2 CONNECT yields async input/output streams,
-- [ ] packet/decrypted-header inspection confirms no synthetic project-specific Upgrade/ALPN header,
+- [x] successful H2 CONNECT yields async input/output streams,
+- [x] packet/decrypted-header inspection confirms no synthetic project-specific Upgrade/ALPN header,
 - [ ] existing Firefox CONNECT tests still pass.
+
+The current internal path attaches an explicit HTTPS `nsIProxyInfo`, with
+resolve flags cloned to prefer HTTPS proxying and always use CONNECT, to an
+HTTP target channel. The HTTP target scheme prevents Necko from adding target
+TLS. `setConnectOnly(false)` followed by an empty `HTTPUpgrade()` requests raw
+stream takeover. The empty value is never copied to request headers, and a
+focused H2 proxy test inspects the CONNECT header block for absence of `ALPN`,
+`Upgrade`, and `Connection` markers. A small `nsHttpConnection` guard is needed
+so a first-use HTTPS proxy may finish its outer H2 bootstrap before the
+connect-only transaction is restarted onto an H2 tunnel stream.
 
 ### M3.3 Hard-coded raw tunnel smoke test
 
@@ -297,11 +307,16 @@ Write known bytes through the CONNECT tunnel and verify the target-side response
 
 Acceptance:
 
-- [ ] outer proxy TLS is handled by NSS,
-- [ ] negotiated protocol is HTTP/2,
-- [ ] CONNECT returns 200,
-- [ ] bytes can flow both directions,
-- [ ] close/error handling works.
+- [x] outer proxy TLS is handled by NSS,
+- [x] negotiated protocol is HTTP/2,
+- [x] CONNECT returns 200,
+- [x] bytes can flow both directions,
+- [x] close/error handling works.
+
+Validated against the pinned local Caddy fixture with
+`test/integration/run-raw-connect-tests.sh`. The client sent an HTTP request
+over the returned raw streams, verified the deterministic response marker,
+and closed cleanly.
 
 ---
 
@@ -322,10 +337,15 @@ NAIVEFOX_PROXY_PASS
 
 Acceptance:
 
-- [ ] valid credentials -> CONNECT 200,
-- [ ] invalid credentials -> clean failure,
-- [ ] missing required credentials -> clean failure,
-- [ ] no password appears in logs.
+- [x] valid credentials -> CONNECT 200,
+- [x] invalid credentials -> clean failure,
+- [x] missing required credentials -> clean failure,
+- [x] no password appears in logs.
+
+The same local raw-CONNECT runner verifies valid, invalid, and absent
+credentials. The proxy authorization value is created in memory and is never
+printed; both negative cases return CONNECT 407 and
+`NS_ERROR_PROXY_AUTHENTICATION_FAILED`.
 
 Run valid, invalid, and missing-credential paths against the local fixture. The supplied real server requires only the successful valid-credential interoperability path in M8.3.
 

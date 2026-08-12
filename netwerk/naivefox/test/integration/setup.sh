@@ -63,7 +63,7 @@ if [[ ! -x "$CADDY_BIN" || ! -f "$caddy_marker" || $(<"$caddy_marker") != "$buil
   trap - EXIT
 fi
 
-if ! "$CADDY_BIN" list-modules --packages | rg -q \
+if ! "$CADDY_BIN" list-modules --packages | rg \
   '^http\.handlers\.forward_proxy[[:space:]]+github\.com/caddyserver/forwardproxy'; then
   printf 'Caddy is missing the pinned http.handlers.forward_proxy module\n' >&2
   exit 1

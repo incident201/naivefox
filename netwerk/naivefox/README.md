@@ -416,7 +416,28 @@ obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
   --profile /path/to/nss-profile --runtime-smoke
 obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
   --profile /path/to/nss-profile --fetch https://example.com/
+obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
+  --profile /path/to/nss-profile \
+  --raw-tunnel-smoke https://proxy.example:443 target.example:80
 ```
+
+The raw-tunnel diagnostic creates an explicit HTTPS proxy through Necko,
+requires outer `h2`, and obtains the successful CONNECT as asynchronous Gecko
+streams. Credentials come only from `NAIVEFOX_PROXY_USER` and
+`NAIVEFOX_PROXY_PASS`. The reproducible local authentication and bidirectional
+stream test is:
+
+```bash
+netwerk/naivefox/test/integration/run-raw-connect-tests.sh
+```
+
+For this internal path, `setConnectOnly(false)` is followed by
+`HTTPUpgrade("", listener)`. An empty protocol is restricted to a connect-only
+channel and means raw stream takeover: it emits neither an Upgrade header nor
+the synthetic CONNECT `ALPN` header used by protocol upgrades. The explicit
+proxy's resolve flags must carry both HTTPS-proxy preference and always-tunnel
+semantics; the similarly named `nsIProxyInfo` connection flags are not a
+substitute.
 
 The socket process and HTTP/3 are disabled only for this first in-process H2
 prototype. Necko still owns HTTP, connection management, and HTTP/2, and PSM/NSS
