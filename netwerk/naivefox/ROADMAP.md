@@ -10,13 +10,13 @@ The coding agent should mark completed checklist items and record major discover
 
 ### M0.1 Verify repository state
 
-- [ ] Confirm current branch is `naivefox`.
-- [ ] Confirm `main` is not being modified.
-- [ ] Confirm `origin` points to `incident201/naivefox`.
-- [ ] Add/verify `upstream` = `https://github.com/mozilla-firefox/firefox.git`.
-- [ ] Confirm the checkout is on a filesystem suitable for a large native Linux Firefox build.
-- [ ] Record current upstream/base commit SHA in `UPSTREAM.md`.
-- [ ] Read root `AGENTS.md` and all NaiveFox docs.
+- [x] Confirm current branch is `naivefox`.
+- [x] Confirm `main` is not being modified.
+- [x] Confirm `origin` points to `incident201/naivefox`.
+- [x] Add/verify `upstream` = `https://github.com/mozilla-firefox/firefox.git`.
+- [x] Confirm the checkout is on a filesystem suitable for a large native Linux Firefox build.
+- [x] Record current upstream/base commit SHA in `UPSTREAM.md`.
+- [x] Read root `AGENTS.md` and all NaiveFox docs.
 
 Acceptance:
 
@@ -30,11 +30,11 @@ show a clean development branch and correct remotes.
 
 ### M0.2 Bootstrap Firefox build dependencies
 
-- [ ] Run `./mach bootstrap`.
-- [ ] Select full Firefox Desktop build.
-- [ ] Do not use Artifact Mode.
-- [ ] Let Mozilla tooling install the appropriate compiler/toolchain.
-- [ ] Record any required local environment changes.
+- [x] Run `./mach bootstrap`.
+- [x] Select full Firefox Desktop build.
+- [x] Do not use Artifact Mode.
+- [x] Let Mozilla tooling install the appropriate compiler/toolchain.
+- [x] Record any required local environment changes.
 
 Acceptance:
 
@@ -48,10 +48,10 @@ and normal build configuration commands work without missing-tool errors.
 
 Before any implementation change:
 
-- [ ] Run a complete `./mach build`.
-- [ ] Save build output under `artifacts/`.
-- [ ] Record object directory and compiler.
-- [ ] Do not proceed if the untouched checkout fails to build.
+- [x] Run a complete `./mach build`.
+- [x] Save build output under `artifacts/`.
+- [x] Record object directory and compiler.
+- [x] Do not proceed if the untouched checkout fails to build.
 
 Acceptance:
 
@@ -150,10 +150,10 @@ No networking yet.
 
 Acceptance:
 
-- [ ] Firefox tree builds.
-- [ ] `naivefox` is produced in the object/runtime output.
-- [ ] `naivefox --version` or equivalent runs successfully.
-- [ ] No browser window appears.
+- [x] Firefox tree builds.
+- [x] `naivefox` is produced in the object/runtime output.
+- [x] `naivefox --version` or equivalent runs successfully.
+- [x] No browser window appears.
 
 ---
 

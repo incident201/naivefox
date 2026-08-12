@@ -174,13 +174,40 @@ The agent must keep this section current.
 ```text
 Base repository: https://github.com/mozilla-firefox/firefox
 Base branch: main
-Base commit: TO_BE_RECORDED_BY_AGENT
-Last sync: TO_BE_RECORDED_BY_AGENT
+Base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
+Last sync: project branch state inspected 2026-08-12; upstream/main was 7 commits ahead
 ```
+
+The NaiveFox work began at project commit
+`7e26713ed7d05127188d2579d3c51afbe554db22`. Its merge base with the fetched
+Mozilla `main` was `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`.
+
+## Baseline build
+
+On 2026-08-12 the untouched checkout was bootstrapped for a full Firefox
+Desktop build and built successfully.
+
+```text
+Source commit: 7e26713ed7d05127188d2579d3c51afbe554db22
+Object directory: /home/zubastik/src/naivefox/obj-x86_64-pc-linux-gnu
+Build type: full Firefox Desktop, non-artifact
+Build time: 42 minutes 55 seconds
+Build log: artifacts/baseline-build.log (local, ignored)
+```
+
+Mozilla bootstrap used its managed Clang/Rust toolchains. The Ubuntu packages
+`watchman` and `gh` were added to the development environment; `gh` is not
+authenticated and is not required for local builds or tests.
+
+The minimal Ubuntu image did not contain Firefox's GTK/X11 runtime libraries.
+The normal GTK 3, X11, font, audio, D-Bus, and GLib runtime packages were
+installed before executing the dependent NaiveFox binary. Development runs
+set `LD_LIBRARY_PATH` to the build's `dist/bin` directory; Phase 11 will replace
+that build-tree convention with a staged runtime layout.
 
 ### Patch NF-UPSTREAM-001
 
-Status: planned
+Status: implemented
 
 Files:
 
@@ -200,6 +227,8 @@ Tests:
 
 - full/build-system build,
 - `naivefox` target produced.
+
+Commit: `NF01 add NaiveFox build target`
 
 ### Patch NF-UPSTREAM-002
 
