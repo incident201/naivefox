@@ -78,7 +78,7 @@ The prototype is successful when traffic flows through the user's existing Naive
 
 ## Server compatibility
 
-The test server is expected to be a normal Naive-compatible Caddy build using the Naive fork of `forwardproxy`, equivalent to:
+Both the local integration fixture and the supplied real test server are expected to use a normal Naive-compatible Caddy build with the Naive fork of `forwardproxy`, equivalent to:
 
 ```bash
 xcaddy build \
@@ -87,9 +87,34 @@ xcaddy build \
 
 NaiveFox must interoperate with that existing server. Do not require a custom NaiveFox server.
 
-The user will provide a real test server address and credentials to the coding agent.
+The user may provide a real test server address and credentials for final interoperability validation. Their absence must not block development because the repository must include a reproducible local Caddy fixture.
 
 Never commit test credentials, proxy passwords, private keys, TLS keys, packet captures containing secrets, or generated NSS profile secrets.
+
+## Integration test strategy
+
+Testing has two distinct gates.
+
+| Gate | Purpose |
+|---|---|
+| Local Caddy fixture | Reproducible development and regression testing without external credentials |
+| Supplied real Caddy | Final interoperability validation against the user's deployment, DNS, public certificate, and production-like configuration |
+
+The local fixture runs directly in the provided Linux build environment and uses:
+
+- a dedicated Caddy binary built with the real `forwardproxy@naive` module,
+- loopback-only unprivileged listeners and an ACL restricted to the local target,
+- Basic Auth credentials generated outside the source tree,
+- Caddy `tls internal` with isolated Caddy state, `skip_install_trust`, and an explicit loopback bind,
+- a dedicated NSS profile containing only the fixture CA trust,
+- a second untrusted NSS profile for the required certificate-failure test,
+- a deterministic local HTTP/HTTPS target for integrity, upload, close, delay, and concurrency tests.
+
+The fixture must not install its CA globally, modify a normal Firefox profile, disable certificate validation, start a system Caddy service, or expose an open proxy. Generated Caddy binaries, CA material, credentials, NSS databases, logs, and captures belong under the object directory and are not committed.
+
+The automated runner must cover certificate rejection/trust, ALPN `h2`, Basic Auth success and failure, raw CONNECT, SOCKS with remote hostname semantics, padding negotiation, padded traffic, deterministic transfer hashes, concurrency, and shutdown paths. The supplied real server is tested only after the local suite passes.
+
+See `AGENTS.md` for fixture construction and trust procedure and `ROADMAP.md` for milestone acceptance gates.
 
 ## Non-goals for the first prototype
 
@@ -437,11 +462,11 @@ The first prototype is complete when all of the following are demonstrated on Li
 2. `naivefox` builds as part of the Firefox tree.
 3. It starts headlessly and initializes the required Gecko networking runtime.
 4. It can perform a normal HTTPS request using Necko/NSS as a sanity test.
-5. It can establish an HTTPS connection to the supplied proxy and negotiate HTTP/2.
+5. It can establish an HTTPS connection to the local Caddy fixture through scoped NSS trust and negotiate HTTP/2.
 6. It can issue a raw HTTP/2 CONNECT without an artificial NaiveFox-specific ALPN/Upgrade marker.
 7. It exposes the CONNECT tunnel as async bidirectional streams.
 8. It serves a local SOCKS5 endpoint.
-9. `curl --socks5-hostname ...` can fetch a public HTTPS site through the test Caddy server.
+9. `curl --socks5-hostname ...` can fetch deterministic HTTP and HTTPS targets through the local Caddy fixture.
 10. Proxy authentication works.
 11. The Naive CONNECT `padding` header is sent.
 12. The server `padding` response header is detected.
@@ -450,6 +475,8 @@ The first prototype is complete when all of the following are demonstrated on Li
 15. Large transfers and multiple concurrent SOCKS connections work without corruption or unbounded buffering.
 16. Tests cover the padding codec and critical SOCKS/tunnel state transitions.
 17. A packet-capture comparison documents how the outer TLS/H2 setup compares with ordinary Firefox from the same revision.
-18. All changes to existing Firefox files are documented in `UPSTREAM.md`.
+18. The complete local integration suite passes from one documented command.
+19. The same core path is confirmed against the supplied real Caddy server.
+20. All changes to existing Firefox files are documented in `UPSTREAM.md`.
 
 See `ROADMAP.md` for the required implementation order.

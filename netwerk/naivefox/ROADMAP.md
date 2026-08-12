@@ -59,6 +59,44 @@ Firefox baseline build exits successfully.
 
 ---
 
+### M0.4 Reproducible local Caddy fixture
+
+Create the committed fixture sources under `netwerk/naivefox/test/integration/`. Put generated state under the Firefox object directory, not in the source tree.
+
+- [ ] Build a dedicated Caddy binary with:
+
+  ```bash
+  xcaddy build \
+    --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive
+  ```
+
+- [ ] Verify `http.handlers.forward_proxy` is present and validate the generated Caddyfile.
+- [ ] Record or pin resolved Caddy, xcaddy, Go, and module revisions.
+- [ ] Use the wildcard proxy site label required by `forward_proxy`, but explicitly bind proxy and target listeners to loopback high ports.
+- [ ] Set `skip_install_trust`; never let Caddy attempt to install its CA globally.
+- [ ] Configure Basic Auth from generated per-run values.
+- [ ] Restrict the proxy ACL to fixture target host/ports and deny all other destinations.
+- [ ] Create isolated Caddy XDG data/config directories and use `tls internal`.
+- [ ] Import only the fixture root CA into a dedicated NaiveFox NSS profile.
+- [ ] Create a second NSS profile without that CA for the negative trust test.
+- [ ] Add deterministic target endpoints for small data, large data, upload/hash, delay, and early close.
+- [ ] Automate setup, readiness timeouts, execution, cleanup, and sanitized failure diagnostics.
+- [ ] Ensure setup and cleanup are idempotent and require neither `sudo` nor a system Caddy service.
+
+Acceptance:
+
+- the fixture starts with one documented command,
+- Caddy presents a certificate valid for the configured hostname,
+- the untrusted NSS profile rejects it,
+- the trusted NSS profile accepts it without disabling verification,
+- a control client can authenticate through the proxy to the restricted local target,
+- attempts to reach a non-fixture destination are denied,
+- cleanup leaves no fixture child processes running.
+
+Do not call `caddy trust`, modify system trust, modify a normal Firefox profile, use `curl -k`, or commit generated CA/private-key/profile material.
+
+---
+
 ## Phase 1 — add the NaiveFox executable without networking
 
 ### M1.1 Add build directory
@@ -167,11 +205,15 @@ Requirements:
 
 Acceptance:
 
-A request to a public HTTPS endpoint succeeds through Necko/NSS.
+A request to the fixture's deterministic local HTTPS endpoint succeeds through Necko/NSS with the dedicated test profile. A public HTTPS endpoint may be used as an additional sanity check, but is not required for the reproducible suite.
 
-Negative test:
+Negative tests:
 
-A deliberately invalid/untrusted TLS endpoint must fail certificate validation unless an explicit test trust setup is used.
+- the local fixture proxy must fail with the fixture's untrusted NSS profile,
+- the same endpoint must succeed only with the dedicated NSS profile containing the local fixture CA,
+- a deliberately invalid hostname or unrelated untrusted TLS endpoint must still fail.
+
+No test may pass by disabling certificate verification or installing the fixture CA globally.
 
 ---
 
@@ -235,17 +277,19 @@ Acceptance:
 
 ### M3.3 Hard-coded raw tunnel smoke test
 
-Before SOCKS, hard-code:
+Before SOCKS, use the mandatory local fixture:
 
 ```text
-proxy = supplied or local test proxy
-target = known HTTP/TLS server
+proxy = local Naive-compatible Caddy fixture
+target = deterministic local target
 ```
 
-Write known bytes through the CONNECT tunnel and verify the target-side response, or tunnel a simple request.
+Write known bytes through the CONNECT tunnel and verify the target-side response, or tunnel a simple request. Do not wait for supplied remote credentials.
 
 Acceptance:
 
+- [ ] the untrusted fixture profile rejects the proxy certificate,
+- [ ] the dedicated trusted NSS profile validates the proxy certificate normally,
 - [ ] outer proxy TLS is handled by NSS,
 - [ ] negotiated protocol is HTTP/2,
 - [ ] CONNECT returns 200,
@@ -276,7 +320,7 @@ Acceptance:
 - [ ] missing required credentials -> clean failure,
 - [ ] no password appears in logs.
 
-If the provided Caddy server uses Basic auth, verify the actual behavior against it.
+Run these tests against the local fixture first. When supplied real-server credentials are available, repeat the successful and invalid-credential paths against that server without committing or logging the credentials.
 
 ---
 
@@ -348,8 +392,9 @@ curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 
 Acceptance:
 
-- [ ] HTTPS request succeeds through supplied Caddy,
-- [ ] curl sees the target certificate/end-to-end TLS normally,
+- [ ] HTTP and HTTPS target requests succeed through the local Caddy fixture,
+- [ ] curl sees and validates the HTTPS target certificate end to end,
+- [ ] a hostname request reaches Caddy unchanged as the CONNECT authority,
 - [ ] NaiveFox only sees opaque tunneled bytes after CONNECT,
 - [ ] multiple sequential requests work.
 
@@ -399,12 +444,14 @@ nsIProxiedChannel
 
 Acceptance:
 
-Against the supplied `forwardproxy@naive` server:
+Against the local `forwardproxy@naive` fixture:
 
 - [ ] request includes `padding`,
 - [ ] CONNECT succeeds,
 - [ ] server response includes `padding`,
 - [ ] NaiveFox records `padding negotiated = true`.
+
+Repeat this negotiation against the supplied real server when credentials are available.
 
 Against a regular HTTP/2 proxy without Naive padding:
 
@@ -492,9 +539,31 @@ Only enable codec when CONNECT padding negotiation succeeded.
 
 Keep send and receive padded-record counters independent.
 
-### M8.2 Real Caddy interoperability
+### M8.2 Local Caddy interoperability suite
 
-Use the user's supplied server.
+Run the complete automated fixture path with `padding negotiated = true`.
+
+Test:
+
+- [ ] HTTP target through SOCKS,
+- [ ] HTTPS target through SOCKS with normal target-certificate validation,
+- [ ] at least one deterministic multi-megabyte download,
+- [ ] deterministic upload with byte-count and hash verification,
+- [ ] repeated connections,
+- [ ] concurrent connections,
+- [ ] target close during transfer,
+- [ ] proxy close during transfer,
+- [ ] local client close during transfer.
+
+Verify byte-for-byte integrity with hashes. The runner must use readiness timeouts, clean up all child processes on success or failure, and preserve only sanitized diagnostics.
+
+Acceptance:
+
+One documented command creates isolated fixture state, runs the complete suite, and exits successfully without a remote proxy/server or supplied credentials. Initial dependency download or fixture-binary construction may still require network access.
+
+### M8.3 Supplied real Caddy interoperability
+
+After M8.2 passes, use the user's supplied server and credentials from a non-committed source.
 
 Acceptance:
 
@@ -504,17 +573,9 @@ curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 
 works with `padding negotiated = true`.
 
-Also test:
+Repeat representative HTTPS, large-transfer, repeated-connection, and concurrent-connection tests. Use the server's normal public certificate validation; do not carry local fixture CA overrides into this test.
 
-- [ ] HTTP target through SOCKS,
-- [ ] HTTPS target through SOCKS,
-- [ ] at least one multi-megabyte download,
-- [ ] upload if practical,
-- [ ] repeated connections,
-- [ ] concurrent connections,
-- [ ] connection close during transfer.
-
-Verify byte-for-byte integrity with hashes for large deterministic test payloads.
+If credentials have not yet been supplied, record M8.3 as pending external validation. This does not block implementation and local verification of later robustness work, but the prototype cannot be declared complete until M8.3 passes.
 
 ---
 
@@ -641,22 +702,27 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 1. Fresh supported Linux build environment.
 2. `./mach bootstrap`.
 3. clean build.
-4. `naivefox` starts headlessly.
-5. Necko HTTPS sanity request succeeds.
-6. outer proxy connection negotiates H2 via NSS.
-7. raw CONNECT tunnel has no synthetic NaiveFox ALPN/Upgrade marker.
-8. proxy authentication succeeds.
-9. local SOCKS5 CONNECT works.
-10. destination domain is passed to proxy without local resolution.
-11. `curl --socks5-hostname` works through Caddy.
-12. CONNECT `padding` negotiation succeeds with Naive-compatible Caddy.
-13. payload codec tests pass.
-14. padded end-to-end traffic succeeds.
-15. large transfer integrity test passes.
-16. concurrent connection test passes.
-17. existing touched Firefox CONNECT tests pass.
-18. capture comparison is documented.
-19. all upstream Firefox modifications are listed in `UPSTREAM.md`.
-20. prototype runtime can be staged outside the build tree.
+4. reproducible loopback-only Caddy fixture starts with isolated state.
+5. the untrusted fixture NSS profile rejects the proxy certificate.
+6. the dedicated trusted NSS profile validates it without global trust changes or verification bypasses.
+7. `naivefox` starts headlessly.
+8. Necko HTTPS sanity request succeeds.
+9. outer proxy connection negotiates H2 via NSS.
+10. raw CONNECT tunnel has no synthetic NaiveFox ALPN/Upgrade marker.
+11. proxy authentication success, invalid, and missing-credential paths behave correctly.
+12. local SOCKS5 CONNECT works.
+13. destination domain is passed to proxy without local resolution.
+14. `curl --socks5-hostname` works through the local Caddy fixture for HTTP and HTTPS targets.
+15. CONNECT `padding` negotiation succeeds with Naive-compatible Caddy.
+16. payload codec tests pass.
+17. the complete padded local end-to-end suite passes from one documented command.
+18. large download/upload integrity tests pass.
+19. repeated and concurrent connection tests pass.
+20. close/error lifecycle tests pass.
+21. supplied real Caddy interoperability passes with normal public certificate validation.
+22. existing touched Firefox CONNECT tests pass.
+23. capture comparison is documented.
+24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
+25. prototype runtime can be staged outside the build tree.
 
 After this point, and only after user approval, future work may consider HTTP/3/Neqo, native Windows, Android, or size reduction.

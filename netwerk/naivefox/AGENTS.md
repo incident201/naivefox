@@ -37,7 +37,7 @@ HTTP/3/Neqo is explicitly out of scope until the H2 prototype is complete.
 
 ## Autonomy
 
-You are expected to work autonomously inside the provided WSL2 environment.
+You are expected to work autonomously inside the provided Linux build environment.
 
 You should:
 
@@ -53,7 +53,7 @@ You should:
 
 Do not stop merely because an internal Firefox API differs from this document. Investigate the current source and adapt while preserving the architectural constraints.
 
-Ask the user only when information cannot reasonably be discovered or inferred, such as real proxy endpoint credentials that have not yet been supplied.
+Ask the user only when information cannot reasonably be discovered or inferred. Real proxy endpoint credentials are needed only for the final M8.3 interoperability gate; their absence must not block implementation or local M3-M9 validation.
 
 ## First actions in a fresh environment
 
@@ -222,11 +222,11 @@ Do not begin Neqo work.
 
 Do not add QUIC support.
 
-### 4. Caddy server remains unchanged
+### 4. Caddy protocol remains unchanged
 
-The supplied test server is the compatibility target.
+Both the reproducible local fixture and the supplied real server must use an unmodified Naive-compatible Caddy build with `forwardproxy@naive`.
 
-Do not solve a client problem by changing the server protocol.
+Fixture configuration may change only to isolate the test, bind it safely to loopback, and expose deterministic assertions. Do not solve a client problem by changing the server module or wire protocol.
 
 ### 5. Keep upstream modifications tiny
 
@@ -395,8 +395,9 @@ Investigate current:
 
 Acceptance criteria:
 
-- a valid user/password reaches the supplied Caddy server successfully,
-- invalid credentials fail cleanly,
+- a valid user/password reaches the local Caddy fixture successfully,
+- invalid and missing credentials fail cleanly,
+- the same behavior is confirmed against the supplied real Caddy server when credentials are available,
 - credentials are never written to logs.
 
 Do not hardcode credentials.
@@ -429,7 +430,8 @@ At minimum:
 - add unit/component tests for protocol state machines,
 - run targeted Firefox networking tests relevant to changed upstream code,
 - run `./mach test --auto` when appropriate,
-- perform a real end-to-end SOCKS -> Caddy test,
+- run end-to-end tests against the reproducible local Caddy fixture,
+- confirm final interoperability against the supplied real Caddy server,
 - test large transfers,
 - test concurrent connections.
 
@@ -441,6 +443,148 @@ netwerk/test/unit/test_proxyconnect_headers.js
 ```
 
 Discover the exact current test invocation with `./mach test --help` / repository tooling rather than guessing.
+
+## Reproducible local Caddy integration fixture
+
+The project must provide a self-contained local integration fixture inside the provided Linux build environment. Missing remote proxy credentials are not a blocker for M3-M9: implement and validate against the local fixture first. The supplied real server is a second interoperability gate, not the everyday development dependency.
+
+Commit the fixture source under a structure similar to:
+
+```text
+netwerk/naivefox/test/integration/
+├── README.md
+├── Caddyfile.template
+├── setup-fixture.sh
+├── start-fixture.sh
+├── stop-fixture.sh
+├── run-e2e.sh
+└── target_server.py
+```
+
+The exact filenames may follow current Mozilla test conventions, but setup, execution, and cleanup must be automated. Do not require a manually configured system service.
+
+### Generated state and isolation
+
+Keep generated state outside the source tree, preferably under the Firefox object directory:
+
+```text
+<objdir>/naivefox-fixture/
+├── bin/
+├── caddy-data/
+├── caddy-config/
+├── nss-profile/
+├── nss-profile-untrusted/
+├── run/
+└── logs/
+```
+
+The fixture must:
+
+- use unprivileged loopback ports selected or checked at runtime,
+- run Caddy and the target as ordinary child processes,
+- keep PID files and install cleanup traps,
+- stop only processes it started,
+- leave an already installed/system Caddy untouched,
+- never require `sudo` or a global firewall change,
+- never place generated binaries, CA keys, credentials, logs, or packet captures in git,
+- use restrictive permissions for generated secrets,
+- sanitize or avoid logs that could contain proxy authorization or tunneled payload.
+
+Repeated setup and cleanup must be idempotent. A failed test must still tear down child processes. The runner should print the selected non-secret ports and paths, but never generated credentials.
+
+### Real Naive-compatible Caddy
+
+Build a dedicated fixture binary with the real module:
+
+```bash
+xcaddy build \
+  --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive
+```
+
+Verify the result before running tests:
+
+```bash
+./caddy list-modules | rg '^http\.handlers\.forward_proxy$'
+./caddy validate --config Caddyfile
+```
+
+Record or pin the resolved Caddy, xcaddy, Go, and `forwardproxy@naive` revisions so a later agent can reproduce the fixture. Cache the binary in generated state, never in the repository.
+
+The Caddy configuration must:
+
+- bind the proxy only to loopback on a high port,
+- use an HTTPS site address that includes the wildcard site label required by `forward_proxy`, while an explicit Caddy `bind` still restricts the listener to `127.0.0.1` and optionally `::1`,
+- set Caddy's `skip_install_trust` global option so startup never attempts a system trust-store change,
+- use `tls internal` for a certificate valid for the configured proxy hostname, normally `localhost`,
+- enable Basic Auth with per-run credentials supplied outside the committed Caddyfile,
+- omit probe resistance in the primary deterministic auth fixture so missing/invalid credentials have an unambiguous result; test probe resistance against the supplied server or an optional second fixture mode,
+- allow CONNECT only to the fixture target host/ports and deny everything else,
+- never become a general-purpose or externally reachable open proxy,
+- serve an ordinary non-proxy response on the front-end for a health check.
+
+The client under test must still require HTTP/2 and prove that the outer NSS connection negotiated `h2`; merely reaching Caddy over HTTP/1.1 does not pass.
+
+### Local CA and NSS trust
+
+Use Caddy's isolated internal PKI or an equivalently scripted local CA. Point Caddy's XDG data/config directories at the generated fixture state so the CA root and private key never mix with the user's normal Caddy state.
+
+Trust the generated root only in a dedicated NSS profile used by NaiveFox tests. Use the NSS `certutil` from the platform package, conceptually:
+
+```bash
+certutil -N --empty-password -d "sql:$NSS_PROFILE"
+certutil -A -d "sql:$NSS_PROFILE" \
+  -n "NaiveFox local fixture CA" -t "C,," -i "$CADDY_ROOT_CA"
+certutil -L -d "sql:$NSS_PROFILE"
+```
+
+Adapt command details to the current NSS tooling when necessary, and make NaiveFox explicitly use that profile.
+
+Do not:
+
+- call `caddy trust`,
+- install the root in the operating-system trust store,
+- modify the user's normal Firefox profile,
+- disable certificate verification,
+- use `curl -k`, an NSS bad-certificate override, or an "accept all certificates" callback as the passing path.
+
+Maintain a second fresh NSS profile without the root CA. The same proxy connection must fail there with an untrusted-issuer error. This negative test proves the passing result comes from scoped trust rather than disabled validation. Use a proxy hostname matching the certificate SAN and SNI; do not hide hostname errors with an IP address.
+
+### Deterministic target
+
+Run a small loopback-only target service controlled by the fixture. It should provide deterministic endpoints for:
+
+- a small known response,
+- a multi-megabyte body generated from a stable pattern,
+- an upload that returns the received byte count and hash,
+- a delayed response for backpressure tests,
+- an intentional early close for lifecycle tests.
+
+If an HTTPS target is required, terminate its TLS with a separate local Caddy site or another scripted server certificate from the same test CA. The application using SOCKS must validate the target certificate normally; outer proxy TLS trust and inner target TLS trust are separate assertions.
+
+Use a hostname target in at least one SOCKS test and verify that the CONNECT authority received by the proxy retains that hostname. Unit/component coverage must additionally prove NaiveFox did not resolve the SOCKS domain before creating CONNECT.
+
+### Required local end-to-end sequence
+
+`run-e2e.sh` or its equivalent must perform, in order:
+
+1. build or locate the pinned fixture Caddy and verify the module,
+2. create isolated state, per-run credentials, CA, trusted NSS profile, and untrusted NSS profile,
+3. start the target and Caddy and wait for explicit readiness with a timeout,
+4. prove the untrusted NSS profile rejects the proxy certificate,
+5. use a control request with an explicit CA file, never `-k`, to prove Caddy auth/ACL wiring independently of NaiveFox,
+6. prove the trusted NSS profile connects through Necko/NSS and negotiates `h2`,
+7. test valid, invalid, and missing proxy credentials without exposing them in output,
+8. run the hard-coded raw CONNECT bidirectional smoke test,
+9. run SOCKS5 HTTP and HTTPS target requests with `curl --socks5-hostname`,
+10. assert CONNECT header padding negotiation and then padded payload operation,
+11. compare hashes for the deterministic large download and upload,
+12. run repeated and concurrent connections,
+13. exercise target close, proxy close, and client close paths,
+14. stop all fixture processes and preserve only sanitized diagnostics on failure.
+
+Where a milestone has not implemented a later feature yet, the runner may select the applicable subset, but the final local suite must execute the complete sequence with one documented command.
+
+A local pass is required before using the real server. Final real-server validation must use credentials supplied outside git and must not depend on local CA overrides.
 
 ## Packet capture / fingerprint validation
 
