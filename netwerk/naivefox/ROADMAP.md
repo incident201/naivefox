@@ -703,6 +703,11 @@ other required Gecko runtime files/resources
 
 A single static executable is not required.
 
+The current minimum-practical staged runtime is 378 MiB after stripping debug
+sections. It contains the dependent Gecko/NSS libraries plus dereferenced GRE
+resources; GTK, GLib, X11/Wayland, font, audio, C++ runtime, and libc remain
+normal system dependencies.
+
 ### M11.2 Create repeatable staging command/script
 
 Produce a staging directory or archive such as:
@@ -721,6 +726,17 @@ Do not accidentally include:
 Acceptance:
 
 A fresh compatible Linux environment can run the staged prototype with its required runtime files.
+
+The repeatable staging and verification commands are:
+
+```bash
+./netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64
+./netwerk/naivefox/tools/verify-staged-runtime.sh naivefox-linux-x86_64
+```
+
+Verification copies the package under `/tmp`, uses a separate writable profile,
+checks `ldd` for build-tree or unresolved dependencies, and runs the headless
+runtime smoke test without inheriting build-tree loader paths.
 
 ---
 

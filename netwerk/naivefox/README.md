@@ -525,3 +525,15 @@ The first prototype is complete when all of the following are demonstrated on Li
 21. The prototype runtime can be staged and run outside the build tree on a compatible Linux system.
 
 See `ROADMAP.md` for the required implementation order.
+
+After a successful build, create and verify the relocatable prototype runtime
+with:
+
+```bash
+./netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64
+./netwerk/naivefox/tools/verify-staged-runtime.sh naivefox-linux-x86_64
+```
+
+The package is created below the configured object directory and deliberately
+contains no NSS profile, fixture credentials, logs, TLS key logs, or packet
+captures. Supply a writable external `--profile` when running it.
