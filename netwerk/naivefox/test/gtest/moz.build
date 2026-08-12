@@ -3,11 +3,14 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 UNIFIED_SOURCES += [
+    "TestHeaderPadding.cpp",
+    "TestNaivePadding.cpp",
     "TestSocks5Parser.cpp",
 ]
 
 LOCAL_INCLUDES += [
     "/netwerk/naivefox",
+    "/netwerk/naivefox/codec",
 ]
 
 FINAL_LIBRARY = "xul-gtest"

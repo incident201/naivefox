@@ -4,6 +4,7 @@
 
 SOURCES += [
     "../GeckoRuntime.cpp",
+    "../HeaderPadding.cpp",
     "../HttpClient.cpp",
     "../NaiveFoxRunner.cpp",
     "../NeckoTunnel.cpp",

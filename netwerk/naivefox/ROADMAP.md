@@ -532,17 +532,17 @@ It must support:
 
 Required:
 
-- [ ] 1-byte payload,
-- [ ] 0-byte/edge behavior as defined by upstream,
-- [ ] padding 0,
-- [ ] padding 255,
-- [ ] payload 65535,
-- [ ] payload >65535 split,
-- [ ] every boundary fragmentation,
-- [ ] many coalesced records,
-- [ ] last padded record + raw tail in same input buffer,
-- [ ] malformed/truncated record,
-- [ ] deterministic round-trip randomized property test.
+- [x] 1-byte payload,
+- [x] 0-byte/edge behavior as defined by upstream,
+- [x] padding 0,
+- [x] padding 255,
+- [x] payload 65535,
+- [x] payload >65535 split,
+- [x] every boundary fragmentation,
+- [x] many coalesced records,
+- [x] last padded record + raw tail in same input buffer,
+- [x] malformed/truncated record,
+- [x] deterministic round-trip randomized property test.
 
 Acceptance:
 

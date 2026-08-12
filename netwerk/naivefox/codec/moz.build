@@ -2,12 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-GeckoProgram("naivefox", linkage="dependent")
-
-SOURCES += [
-    "NaiveFox.cpp",
+UNIFIED_SOURCES += [
+    "NaivePadding.cpp",
 ]
 
-DIRS += ["codec", "core"]
-
-TEST_DIRS += ["test/gtest"]
+FINAL_LIBRARY = "xul"
