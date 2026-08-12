@@ -29,6 +29,7 @@
 @import url("chrome://browser/skin/autocomplete.css");
 @import url("chrome://browser/skin/places/editBookmarkPanel.css");
 @import url("chrome://browser/skin/searchbar.css");
+@import url("chrome://browser/skin/sharePanel.css");
 @import url("chrome://browser/skin/sidebar.css");
 @import url("chrome://browser/skin/aiWindowSidebar.css");
 @import url("chrome://browser/skin/smartwindowGroupTabs.css");
@@ -1891,6 +1892,19 @@ popupnotificationcontent {
       /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens -- to be addressed in 2033919 */
       opacity: 0.2;
       pointer-events: none;
+    }
+  }
+
+  /* In horizontal tabs mode the sidebar launcher holds no tabs, so hide it
+   * entirely during first run rather than dimming it. The panel and its
+   * splitter are hidden too, in case the user had a sidebar panel open when
+   * they switched into the smart window. */
+  @media not -moz-pref("sidebar.verticalTabs") {
+    #sidebar-container,
+    #sidebar-launcher-splitter,
+    #sidebar-box,
+    #sidebar-splitter {
+      display: none;
     }
   }
 }

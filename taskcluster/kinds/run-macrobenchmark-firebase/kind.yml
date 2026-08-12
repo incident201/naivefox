@@ -48,6 +48,7 @@ task-defaults:
         kind: test
         tier: 1
     run:
+        clone-with: hg
         using: run-commands
         dummy-secrets:
             - content: "faketoken"
@@ -201,6 +202,7 @@ tasks:
                 - artifact: target.noarch.apk
                   extract: false
         run:
+            clone-with: hg
             secrets:
                 - name: project/gecko/level-any/firefox-android/fenix/firebase
                   key: firebaseToken

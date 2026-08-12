@@ -702,7 +702,7 @@ export class SearchModeSwitcher {
     menuitem.setAttribute("data-l10n-attrs", "accesskey");
     this.#input.document.l10n.setAttributes(
       menuitem,
-      Services.prefs.getBoolPref("browser.nova.enabled", false)
+      UrlbarPrefs.get("browser.nova.enabled")
         ? "urlbar-searchmode-popup-settings"
         : "urlbar-searchmode-popup-search-settings"
     );

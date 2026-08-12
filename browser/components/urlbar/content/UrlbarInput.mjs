@@ -130,7 +130,7 @@ export class UrlbarInput extends HTMLElement {
         <html:panel-list class="searchmode-switcher-panel-list">
           <html:div class="searchmode-switcher-panel-description" role="heading" />
 ${
-  Services.prefs.getBoolPref("browser.nova.enabled", false)
+  UrlbarPrefs.get("browser.nova.enabled")
     ? '<html:hr class="searchmode-switcher-panel-installed-engine-separator"/><html:hr class="searchmode-switcher-panel-footer-separator"/>'
     : '<html:hr/><html:hr class="searchmode-switcher-panel-installed-engine-separator searchmode-switcher-panel-footer-separator"/>'
 }
@@ -359,6 +359,7 @@ ${
     }
 
     this.controller = new UrlbarChildController({ input: this });
+    this.controller.addListener(this);
     this.view = new UrlbarView(this);
     this.searchModeSwitcher = new SearchModeSwitcher(this);
 
@@ -368,8 +369,7 @@ ${
 
     searchModeSwitcherDescription.setAttribute(
       "data-l10n-id",
-      this.#isAddressbar &&
-        !Services.prefs.getBoolPref("browser.nova.enabled", false)
+      this.#isAddressbar && !UrlbarPrefs.get("browser.nova.enabled")
         ? "urlbar-searchmode-popup-one-off-header"
         : "urlbar-searchmode-popup-header"
     );
@@ -2363,15 +2363,14 @@ ${
   }
 
   /**
-   * Invoked by the controller when the first result is received.
+   * Invoked by the controller when the first result changed.
    *
-   * @param {UrlbarResult} firstResult
-   *   The first result received.
-   * @returns {boolean}
-   *   True if this method canceled the query and started a new one.  False
-   *   otherwise.
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query the result belongs to.
    */
-  onFirstResult(firstResult) {
+  onFirstResult(queryContext) {
+    let firstResult = queryContext.results[0];
+
     // If the heuristic result has a keyword but isn't a keyword offer, we may
     // need to enter search mode.
     if (
@@ -2384,7 +2383,9 @@ ${
         checkValue: false,
       })
     ) {
-      return true;
+      // Search mode restarts the query, so these results are obsolete.
+      this.controller.discardResults();
+      return;
     }
 
     // To prevent selection flickering, we apply autofill on input through a
@@ -2401,8 +2402,6 @@ ${
       this._autofillPlaceholder = null;
       this.setValue(this.userTypedValue);
     }
-
-    return false;
   }
 
   /**
@@ -2517,6 +2516,24 @@ ${
     let trimmedValue = value.trim();
     let end = trimmedValue.search(UrlbarShared.REGEXP_SPACES);
     let firstToken = end == -1 ? trimmedValue : trimmedValue.substring(0, end);
+
+    if (
+      firstToken == UrlbarShared.RESTRICT_TOKENS.SEARCH &&
+      !this.controller.engineStore.initialized &&
+      !this.controller.engineStore.failed
+    ) {
+      // The search restrict token enters search mode with the default engine,
+      // which the store only knows once it's populated, and no query has run
+      // at this point to wait for it. The retry leaves the focus alone, having
+      // focused above. A failed search service leaves no engine to restrict
+      // to, and sets `failed`, so the retry doesn't come back here.
+      this.controller.engineStore
+        .init()
+        .catch(() => {})
+        .then(() => this.search(value, { ...options, focus: false }));
+      return;
+    }
+
     // Enter search mode if the string starts with a restriction token.
     let searchMode = this.searchModeForToken(firstToken);
     let firstTokenIsRestriction = !!searchMode;
@@ -3608,7 +3625,8 @@ ${
     // use the unmodified url instead. Otherwise, if the user edits the url
     // and confirms the new value, we may transform the url into a search.
     let trimmedUrl = UrlbarShared.stripPrefixAndTrim(url, { stripHttp })[0];
-    let isSearch = !!this.controller.getFixupInfo(trimmedUrl)?.keywordAsSent;
+    let isSearch =
+      !!this.controller.getFixupPrimitives(trimmedUrl)?.keywordAsSent;
     if (isSearch) {
       // Although https-first might not respect the shown protocol, converting
       // the result to a search would be more disruptive.
@@ -4972,9 +4990,9 @@ ${
       return;
     }
 
-    let prefName =
-      "browser.urlbar.placeholderName" + (this.isPrivate ? ".private" : "");
-    let engineName = Services.prefs.getStringPref(prefName, "");
+    let engineName = UrlbarPrefs.get(
+      "placeholderName" + (this.isPrivate ? ".private" : "")
+    );
     if (engineName) {
       this._setPlaceholder(engineName);
     }
@@ -5312,7 +5330,7 @@ ${
     if (this.#isAddressbar && (this._protocolIsTrimmed || this._wwwIsTrimmed)) {
       let untrim = this._wwwIsTrimmed;
       if (!untrim) {
-        let fixedDisplaySpec = this.controller.getFixupInfo(
+        let fixedDisplaySpec = this.controller.getFixupPrimitives(
           this.value
         )?.preferredURIDisplaySpec;
         if (fixedDisplaySpec) {
@@ -5659,8 +5677,10 @@ ${
     }
     let oldEnd = oldValue.substring(this.selectionEnd);
 
-    const pasteData =
-      lazy.UrlbarUtils.sanitizeTextFromClipboard(originalPasteData);
+    const pasteData = UrlbarShared.sanitizeTextFromClipboard(
+      originalPasteData,
+      this.controller.getFixupPrimitives(originalPasteData)
+    );
 
     if (originalPasteData != pasteData) {
       // Unfortunately we're not allowed to set the bits being pasted
@@ -6236,7 +6256,7 @@ function getDroppableData(event) {
   if (links[0]?.url) {
     event.preventDefault();
     let href = links[0].url;
-    if (lazy.UrlbarUtils.stripUnsafeProtocolOnPaste(href) != href) {
+    if (UrlbarShared.stripUnsafeProtocolOnPaste(href) != href) {
       // We may have stripped an unsafe protocol like javascript: and if so
       // there's no point in handling a partial drop.
       event.stopImmediatePropagation();

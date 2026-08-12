@@ -9065,6 +9065,19 @@ static already_AddRefed<nsIURI> GetFallbackURI(nsIURI* aURI) {
   return backupURI.forget();
 }
 
+// The essential domain fallback only targets Firefox's own internal requests
+// Opening a link from browser UI or a priviledged page still carries the
+// system principal so we need to exclude these regular pageloads.
+static bool IsInternalSystemLoad(nsILoadInfo* aLoadInfo) {
+  if (!aLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
+    return false;
+  }
+
+  ExtContentPolicyType type = aLoadInfo->GetExternalContentPolicyType();
+  return type != ExtContentPolicy::TYPE_DOCUMENT &&
+         type != ExtContentPolicy::TYPE_SUBDOCUMENT;
+}
+
 // static
 nsHttpChannel::EssentialDomainCategory
 nsHttpChannel::GetEssentialDomainCategory(nsCString& domain) {
@@ -9345,8 +9358,7 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
     MaybeUpdateDocumentIPAddressSpaceFromCache();
   }
 
-  if (!mCanceled && mTransaction &&
-      mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
+  if (!mCanceled && mTransaction && IsInternalSystemLoad(mLoadInfo)) {
     // We have to report telemetry before we actually attempt to redirect to
     // the fallback domain because doing so will change mStatus
     ReportSystemChannelTelemetry(mStatus);
@@ -9405,8 +9417,7 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
   // If this is a system principal request to an essential domain and we
   // currently have connectivity, then check if there's a fallback domain we
   // can use to retry. If so we redirect to the fallback domain.
-  if (NS_FAILED(mStatus) && !mCanceled &&
-      mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
+  if (NS_FAILED(mStatus) && !mCanceled && IsInternalSystemLoad(mLoadInfo)) {
     if (StaticPrefs::network_essential_domains_fallback() &&
         hasConnectivity()) {
       auto passDomainCategory = [&](nsIChannel* aRedirectedChannel) {

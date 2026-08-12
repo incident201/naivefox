@@ -140,6 +140,13 @@ const FEATURE_GATED_HANDLERS = new Map([
 ]);
 
 /**
+ * Slow tools that surface the action log's pending row before their handler
+ * resolves (not the same as feature-gating). Only list tools whose action log
+ * row is body-independent, since the pending row uses a placeholder body.
+ */
+const TOOLS_WITH_PENDING_ACTION_LOG = new Set([SEARCH_THE_WEB]);
+
+/**
  * Removes any feature-gated tools whose enable pref is currently off, so the
  * model is never offered tools the build is not configured to support.
  *
@@ -547,6 +554,19 @@ Object.assign(Chat, {
             browsingContext,
             mode
           );
+
+        // Emit the tool message up front with a `pending`-marked placeholder
+        // body so the action log renders its pending row while the slow work
+        // runs; the real result is reconciled into the same row below.
+        let pendingToolMessage = null;
+        if (TOOLS_WITH_PENDING_ACTION_LOG.has(toolName)) {
+          pendingToolMessage = conversation.addToolCallMessage({
+            tool_call_id: id,
+            body: { pending: true },
+            name: toolName,
+          });
+        }
+
         try {
           if (featureGatedHandler) {
             result = await featureGatedHandler(
@@ -589,7 +609,7 @@ Object.assign(Chat, {
           );
 
           const content = { tool_call_id: id, body: result, name: toolName };
-          conversation.addToolCallMessage(content);
+          conversation.updateToolCallMessage(pendingToolMessage, content);
         } catch (error) {
           console.error(error);
           toolCallError = "execution_failed";
@@ -599,8 +619,14 @@ Object.assign(Chat, {
             { startTime: toolStart },
             `chat-run-tool-error(${toolName})`
           );
+          // Only carry `name` (which drives the action-log card) when we
+          // already showed a pending row, so it resolves. Otherwise a failed
+          // call renders nothing, as before.
           const content = { tool_call_id: id, body: result };
-          conversation.addToolCallMessage(content);
+          if (pendingToolMessage) {
+            content.name = toolName;
+          }
+          conversation.updateToolCallMessage(pendingToolMessage, content);
         }
 
         recordToolCallEvent({

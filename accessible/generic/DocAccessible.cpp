@@ -1723,6 +1723,7 @@ void DocAccessible::ProcessQueuedCacheUpdates(uint64_t aInitialDomains) {
   }
 
   if (data.Length()) {
+    MOZ_ASSERT(IPCDoc(), "Shouldn't have queued updates with no IPC doc");
     IPCDoc()->SendCache(CacheUpdateType::Update, data);
   }
 }

@@ -40,7 +40,11 @@ support-files = ["data/engine.xml"]
 
 ["test_UrlbarShared_formatDate.js"]
 
+["test_UrlbarShared_getTokenMatches.js"]
+
 ["test_UrlbarShared_isOriginUrl.js"]
+
+["test_UrlbarShared_stripUnsafeProtocolOnPaste.js"]
 
 ["test_UrlbarTelemetryUtils_wireSerialization.js"]
 
@@ -59,8 +63,6 @@ support-files = ["data/engine.xml"]
 ["test_UrlbarUtils_getBackspaceBlock.js"]
 
 ["test_UrlbarUtils_getShortcutOrURIAndPostData.js"]
-
-["test_UrlbarUtils_getTokenMatches.js"]
 
 ["test_UrlbarUtils_reintegrateAutofill.js"]
 

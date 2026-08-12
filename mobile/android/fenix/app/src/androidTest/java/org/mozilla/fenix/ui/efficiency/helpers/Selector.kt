@@ -33,6 +33,12 @@ enum class SelectorStrategy {
     COMPOSE_BY_CONTENT_DESCRIPTION_SUBSTRING,
     COMPOSE_BY_TAG,
     COMPOSE_BY_TAG_AND_TEXT,
+
+    // Compose testTag combined with a content-description that merely CONTAINS secondaryValue. Mirrors
+    // the legacy onNode(hasTestTag(tag)).assert(hasContentDescription(text, substring = true)) — needed
+    // for a tagged row whose identifying label lives in its content description (e.g. an installed
+    // webExtension.item advertising the addon name).
+    COMPOSE_BY_TAG_AND_CONTENT_DESCRIPTION_SUBSTRING,
     COMPOSE_EDITABLE_BY_ANCESTOR_TAG,
     COMPOSE_ON_ALL_NODES_BY_TAG_ON_FIRST,
     COMPOSE_ON_ALL_NODES_BY_TAG_WITH_CHILD_TEXT_ON_FIRST,
@@ -55,9 +61,17 @@ enum class SelectorStrategy {
     // lands inside its ~5.5s budget — a slow-but-successful click is then indistinguishable from a
     // missed one. UiObject2.click() just injects the gesture and lets the caller do the waiting.
     UIAUTOMATOR2_BY_DESCRIPTION_CONTAINS,
+    UIAUTOMATOR2_BY_TEXT_CONTAINS,
     UIAUTOMATOR_WITH_TEXT_CONTAINS,
     UIAUTOMATOR_WITH_RES_ID,
     UIAUTOMATOR_WITH_COMPOSE_TAG,
+
+    // A res-id matched verbatim (no packageName prefix) together with a content-description that merely
+    // CONTAINS secondaryValue: UiSelector().resourceId(value).descriptionContains(secondaryValue).
+    // Mirrors the legacy itemWithResIdAndDescription(resId, description) — needed for a row (e.g. the
+    // collapsed Extensions menu row, whose res-id is the "mainMenu.extensions" Compose testTag surfaced
+    // via testTagsAsResourceId) whose description advertises the installed addon name.
+    UIAUTOMATOR_WITH_RES_ID_AND_DESCRIPTION_CONTAINS,
     UIAUTOMATOR_WITH_TEXT,
     UIAUTOMATOR_WITH_DESCRIPTION_CONTAINS,
     UIAUTOMATOR_WITH_RES_ID_AND_TEXT,

@@ -209,6 +209,21 @@ class RegExpMacroAssembler {
   }
   virtual void SkipUntilOneOfMasked3(const SkipUntilOneOfMasked3Args& args);
 
+  // Dispatches on bits [shift, shift + log2(table_size)) of the current
+  // character: control continues at the code offset stored in the table at
+  // index (current_character >> shift) & (table_size - 1). table_size is a
+  // power of two. The caller later emits the table data in place via
+  // EmitTableSwitchTable, once every target label is bound. Only emitted
+  // when CanTableSwitchOnBits() is true.
+  virtual bool CanTableSwitchOnBits() { return false; }
+  virtual void TableSwitchOnBits(int shift, int table_size, Label* table) {
+    UNREACHABLE();
+  }
+  virtual void EmitTableSwitchTable(Label* table,
+                                    base::Vector<Label* const> targets) {
+    UNREACHABLE();
+  }
+
   // Checks whether the given offset from the current position is is in-bounds.
   // May overwrite the current character.
   virtual void CheckPosition(int cp_offset, Label* on_outside_input) = 0;
@@ -347,6 +362,25 @@ class RegExpMacroAssembler {
   // be controlled with set_backtrack_limit.
   virtual void set_can_fallback(bool val) { can_fallback_ = val; }
 
+  // Whether any op touched the backtrack stack (a push, pop or stackpointer
+  // transfer) while emitting the body.  Set as the body emits and read back at
+  // GetCode time; a pattern that never backtracks skips the backtrack stack
+  // setup and the fail label push below.
+  bool backtrack_stack_used() const { return backtrack_stack_used_; }
+
+  // The fail label: the bottom-of-stack backtrack target that exhausting all
+  // real backtracks pops to fail the match.  Set once by the compiler; drivers
+  // other than the compiler (the bytecode-to-native code generator, tests)
+  // leave it unset and emit their own as part of the body.
+  virtual void set_fail_label(Label* label) { fail_label_ = label; }
+
+  // Whether GetCode pushes the fail label from the entry prologue instead of
+  // relying on the compiler's up-front PushBacktrack.  Deferring lets the
+  // prologue observe the final backtrack_stack_used() and omit it for patterns
+  // that never backtrack.  Overridden by the assemblers implementing the
+  // elision (x64, arm64).
+  virtual bool prologue_pushes_fail_label() const { return false; }
+
   enum GlobalMode {
     NOT_GLOBAL,
     GLOBAL_NO_ZERO_LENGTH_CHECK,
@@ -390,6 +424,9 @@ class RegExpMacroAssembler {
 
   bool can_fallback() const { return can_fallback_; }
 
+  void set_backtrack_stack_used() { backtrack_stack_used_ = true; }
+  Label* fail_label() const { return fail_label_; }
+
   // Which mode to generate code for (LATIN1 or UC16).
   Mode mode() const { return mode_; }
 
@@ -402,6 +439,8 @@ class RegExpMacroAssembler {
  private:
   uint32_t backtrack_limit_;
   bool can_fallback_ = false;
+  bool backtrack_stack_used_ = false;
+  Label* fail_label_ = nullptr;
   GlobalMode global_mode_;
   Isolate* const isolate_;
   Zone* const zone_;

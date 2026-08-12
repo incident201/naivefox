@@ -1040,7 +1040,7 @@ export const FocusTimer = ({
                 widgetsMayBeMaximized && (
                   <SizeSubmenu
                     submenuId="focus-timer-size-submenu"
-                    sizes={["medium", "large"]}
+                    sizes={["small", "medium", "large"]}
                     checkedSize={widgetSize}
                     onChangeSize={handleChangeSize}
                   />

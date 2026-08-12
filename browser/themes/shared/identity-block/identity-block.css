@@ -319,8 +319,6 @@
      * elements outside the URL bar.
      */
     contain: layout;
-    container-type: inline-size;
-    container-name: urlbar;
   }
 
   #tracking-protection-icon-container {
@@ -399,7 +397,7 @@
       /* On smaller screens, we don't have enough space to show both the URL and the tracker count.
          Prioritise the URL to avoid phishing and other attacks.
       */
-      @container urlbar (width < 800px) {
+      @media (width < 800px) {
         #trust-icon-tracker-count-longform-wrapper {
           /* Only show the shortform version on small screens. Note that we
              can't use `display: none` on the longform version, because that
@@ -526,7 +524,7 @@
             }
           }
 
-          @container urlbar (width >= 800px) {
+          @media (width >= 800px) {
             #trust-icon {
               animation-play-state: running;
               animation-fill-mode: none, both;

@@ -14,6 +14,7 @@ add_task(async function testContentTypeSniffing() {
     "application/jsonl",
     "application/jsonlines",
     "application/x-ndjson",
+    "text/jsonl",
   ]) {
     const TEST_URL = `data:${type},${encodeURIComponent('{"a":1}\n{"b":2}\n')}`;
     const tab = await addJsonViewTab(TEST_URL);
@@ -90,7 +91,11 @@ add_task(async function testSaveAsRestoresJsonlContentType() {
 
   const jsonl = '{"a":1}\n{"b":2}\n';
   // Whichever spelling the document was served with is restored as-is.
-  for (const type of ["application/jsonl", "application/x-ndjson"]) {
+  for (const type of [
+    "application/jsonl",
+    "application/x-ndjson",
+    "text/jsonl",
+  ]) {
     const TEST_URL = `data:${type},${encodeURIComponent(jsonl)}`;
     const tab = await addJsonViewTab(TEST_URL);
 

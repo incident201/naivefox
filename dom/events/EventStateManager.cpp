@@ -3023,6 +3023,8 @@ void EventStateManager::DetermineDragTargetAndDefaultData(
   nsIContent* editingElement = aSelectionTarget->IsEditable()
                                    ? aSelectionTarget->GetEditingHost()
                                    : nullptr;
+  nsCOMPtr<nsIPrincipal> principal;
+  bool fromChildProcess = false;
 
   // In chrome, only allow dragging inside editable areas.
   bool isChromeContext = !aWindow->GetBrowsingContext()->IsContent();
@@ -3031,7 +3033,9 @@ void EventStateManager::DetermineDragTargetAndDefaultData(
       // A child process started a drag so use any data it assigned for the dnd
       // session.
       mGestureDownDragStartData->AddInitialDnDDataTo(
-          aDataTransfer, aPrincipal, aPolicyContainer, aCookieJarSettings);
+          aDataTransfer, getter_AddRefs(principal), aPolicyContainer,
+          aCookieJarSettings);
+      fromChildProcess = true;
       mGestureDownDragStartData.forget(aRemoteDragStartData);
       *aAllowEmptyDataTransfer = true;
     }
@@ -3108,6 +3112,10 @@ void EventStateManager::DetermineDragTargetAndDefaultData(
     if (dragContent != originalDragContent) aDataTransfer->ClearAll();
     *aTargetNode = dragContent;
     NS_ADDREF(*aTargetNode);
+    if (!fromChildProcess) {
+      principal = dragContent->NodePrincipal();
+    }
+    principal.forget(aPrincipal);
   }
 }
 

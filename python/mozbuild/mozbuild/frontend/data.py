@@ -675,14 +675,21 @@ class Library(BaseLibrary):
 class StaticLibrary(Library):
     """Context derived container object for a static library"""
 
-    __slots__ = ("link_into", "no_expand_lib")
+    __slots__ = ("link_into", "no_expand_lib", "build_static_lib_archive")
 
     def __init__(
-        self, context, basename, real_name=None, link_into=None, no_expand_lib=False
+        self,
+        context,
+        basename,
+        real_name=None,
+        link_into=None,
+        no_expand_lib=False,
+        build_static_lib_archive=False,
     ):
         Library.__init__(self, context, basename, real_name)
         self.link_into = link_into
         self.no_expand_lib = no_expand_lib
+        self.build_static_lib_archive = build_static_lib_archive or no_expand_lib
 
 
 class SandboxedWasmLibrary(Library):
@@ -690,6 +697,7 @@ class SandboxedWasmLibrary(Library):
 
     # This is a real static library; make it known to the build system.
     no_expand_lib = True
+    build_static_lib_archive = True
     KIND = "wasm"
 
     def __init__(self, context, basename, real_name=None):
@@ -950,6 +958,7 @@ class HostLibrary(HostMixin, BaseLibrary):
 
     KIND = "host"
     no_expand_lib = False
+    build_static_lib_archive = False
 
 
 class HostRustLibrary(BaseRustLibrary, HostLibrary):
@@ -961,6 +970,7 @@ class HostRustLibrary(BaseRustLibrary, HostLibrary):
     LIB_FILE_VAR = "HOST_RUST_LIBRARY_FILE"
     __slots__ = BaseRustLibrary.slots
     no_expand_lib = True
+    build_static_lib_archive = True
 
     def __init__(
         self,

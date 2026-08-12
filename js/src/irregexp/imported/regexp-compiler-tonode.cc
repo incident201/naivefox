@@ -2017,6 +2017,27 @@ void CharacterRange::Intersect(const ZoneList<CharacterRange>* lhs,
   DCHECK(IsCanonical(intersection));
 }
 
+// static
+bool CharacterRange::Intersects(const ZoneList<CharacterRange>* lhs,
+                                const ZoneList<CharacterRange>* rhs) {
+  DCHECK(CharacterRange::IsCanonical(lhs));
+  DCHECK(CharacterRange::IsCanonical(rhs));
+  int lhs_index = 0;
+  int rhs_index = 0;
+  while (lhs_index < lhs->length() && rhs_index < rhs->length()) {
+    const CharacterRange& lhs_range = lhs->at(lhs_index);
+    const CharacterRange& rhs_range = rhs->at(rhs_index);
+    if (lhs_range.to() < rhs_range.from()) {
+      lhs_index++;
+    } else if (rhs_range.to() < lhs_range.from()) {
+      rhs_index++;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
 namespace {
 
 // Advance |index| and set |from| and |to| to the new range, if not out of

@@ -152,7 +152,9 @@ class DocAccessible : public HyperTextAccessible,
 
   bool IsHidden() const;
 
-  void SetViewportCacheDirty(bool aDirty) { mViewportCacheDirty = aDirty; }
+  void SetViewportCacheDirty(bool aDirty) {
+    mViewportCacheDirty = aDirty && IPCDoc();
+  }
 
   /**
    * Document load states.

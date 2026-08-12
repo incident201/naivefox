@@ -3315,6 +3315,10 @@ bool XPCJSRuntime::DescribeCustomObjects(JSObject* obj, const JSClass* clasp,
   }
 
   XPCWrappedNativeProto* p = XPCWrappedNativeProto::Get(obj);
+  if (!p) {
+    // Can be null if XPC shutdown has already happened.
+    return false;
+  }
   // Nothing here can GC. The analysis would otherwise think that ~nsCOMPtr
   // could GC, but that's only possible if nsIXPCScriptable::GetJSClass()
   // somehow released a reference to the nsIXPCScriptable, which isn't going to

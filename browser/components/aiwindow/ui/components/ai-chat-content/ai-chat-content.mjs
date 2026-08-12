@@ -246,10 +246,18 @@ export class AIChatContent extends MozLitElement {
     );
   }
 
+  // ai-window sends its mode (sidebar/fullpage) over the actor once the content
+  // is ready; reflect it as an attribute so styles can key off it.
+  #handleSetMode(event) {
+    const mode = event.detail?.mode;
+    if (mode) {
+      this.setAttribute("mode", mode);
+    }
+  }
+
   /**
    * Initialize event listeners for AI chat content events
    */
-
   #initEventListeners() {
     this.addEventListener(
       "aiChatContentActor:message",
@@ -279,6 +287,11 @@ export class AIChatContent extends MozLitElement {
     this.addEventListener(
       "aiChatContentActor:assets-ready",
       this.#handleAssetsReady.bind(this)
+    );
+
+    this.addEventListener(
+      "aiChatContentActor:set-mode",
+      this.#handleSetMode.bind(this)
     );
 
     this.addEventListener(
@@ -1841,6 +1854,8 @@ export class AIChatContent extends MozLitElement {
           ${this.#renderError()}
         </div>
       </div>
+      <div class="fullpage-top-blur"></div>
+      <div class="fullpage-top-scrim"></div>
       <kit-mention variant="sidebar"></kit-mention>
       <div
         class="assistant-response-announcer"

@@ -568,6 +568,11 @@ class DocumentLoadListener : public nsIInterfaceRequestor,
   // Indicates if we are loading a javascript URI.
   bool mIsLoadingJSURI = false;
 
+  // Set to true if this load was moved into a container other than the one of
+  // the browsing context it started in, because its URI is bound to that
+  // container. Such a load must be retargeted into a new tab.
+  bool mSwitchedContainer = false;
+
   // Corresponding redirect channel registrar Id for the final channel that
   // we want to use when redirecting the child, or doing a process switch.
   // 0 means redirection is not started.

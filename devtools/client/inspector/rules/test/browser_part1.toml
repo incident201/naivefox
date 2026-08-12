@@ -114,15 +114,15 @@ skip-if = [
 
 ["browser_rules_colorUnit.js"]
 
-["browser_rules_color_scheme_simulation.js"]
+["browser_rules_color_scheme_emulation.js"]
 
-["browser_rules_color_scheme_simulation_bfcache.js"]
+["browser_rules_color_scheme_emulation_bfcache.js"]
 
-["browser_rules_color_scheme_simulation_meta.js"]
+["browser_rules_color_scheme_emulation_meta.js"]
 
-["browser_rules_color_scheme_simulation_rdm.js"]
+["browser_rules_color_scheme_emulation_rdm.js"]
 
-["browser_rules_color_scheme_simulation_rfp.js"]
+["browser_rules_color_scheme_emulation_rfp.js"]
 
 ["browser_rules_colorpicker-and-image-tooltip_01.js"]
 

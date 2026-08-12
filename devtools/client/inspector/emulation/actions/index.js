@@ -8,11 +8,11 @@ const { createEnum } = require("resource://devtools/client/shared/enum.js");
 
 createEnum(
   [
-    // Set the color scheme simulation
-    "SET_COLOR_SCHEME_SIMULATION",
+    // Set the color scheme emulation
+    "SET_COLOR_SCHEME_EMULATION",
 
-    // Set the print simulation state
-    "SET_PRINT_SIMULATION_ENABLED",
+    // Set the print emulation state
+    "SET_PRINT_EMULATION_ENABLED",
 
     // Set the reduced motion emulation
     "SET_REDUCED_MOTION_EMULATION",

@@ -194,7 +194,7 @@ class RequestingAccessKeyEventData {
   RequestingAccessKeyEventData() = delete;
 
   static void OnBrowserParentCreated() {
-    MOZ_ASSERT(sBrowserParentCount <= INT32_MAX);
+    MOZ_ASSERT(sBrowserParentCount < INT32_MAX);
     sBrowserParentCount++;
   }
   static void OnBrowserParentDestroyed() {
@@ -3987,6 +3987,7 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
     return IPC_OK();
   }
 
+  // XXX: Can we remove AllowNullPtr here?
   if (!Manager()->ValidatePrincipal(aPrincipal,
                                     {ValidatePrincipalOptions::AllowNullPtr})) {
     return ContentParent::PrincipalValidationIpcFail(aPrincipal, this,

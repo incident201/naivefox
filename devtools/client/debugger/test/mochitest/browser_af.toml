@@ -182,9 +182,6 @@ fail-if = [
 ["browser_dbg-editor-highlight.js"]
 
 ["browser_dbg-editor-horizontal-scroll.js"]
-skip-if = [
-  "nova", # Bug 2058112
-]
 
 ["browser_dbg-editor-mode.js"]
 

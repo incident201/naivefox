@@ -38,7 +38,6 @@ codespell:
         # good enough
         tier: 2
     run:
-        clone-with: git
         mach: lint -v -l codespell -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -67,7 +66,6 @@ rejected-words:
         # good enough
         tier: 2
     run:
-        clone-with: git
         mach: lint -v -l rejected-words -f treeherder -f json:/builds/worker/mozlint.json .
     fetches:
         toolchain:
@@ -104,7 +102,6 @@ dot-mozilla-reference:
         # good enough
         tier: 2
     run:
-        clone-with: git
         mach: lint -v -l dot-mozilla-reference -f treeherder -f json:/builds/worker/mozlint.json .
 
     fetches:
@@ -133,6 +130,7 @@ eslint:
     treeherder:
         symbol: js(ES)
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         use-caches: [checkout, pip, uv, npm]
@@ -178,7 +176,6 @@ eslint-build:
         tier: 2
     run:
         using: run-task
-        clone-with: git
         cwd: '{checkout}'
         use-caches: [checkout, pip, uv, npm]
         command: >
@@ -206,6 +203,7 @@ stylelint:
     treeherder:
         symbol: stylelint
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         command: >
@@ -236,6 +234,7 @@ typescript:
         symbol: js(TSC)
         tier: 3
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         use-caches: [checkout, pip, uv, npm]
@@ -277,6 +276,7 @@ license:
     treeherder:
         symbol: pedantic(license)
     run:
+        clone-with: hg
         mach: lint -v -l license -f treeherder -f json:/builds/worker/mozlint.json .
     fetches:
         toolchain:
@@ -312,6 +312,7 @@ lintpref:
     treeherder:
         symbol: misc(pref)
     run:
+        clone-with: hg
         mach: lint -v -l lintpref -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -332,6 +333,7 @@ node-licenses:
     treeherder:
         symbol: misc(node-licenses)
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         use-caches: [checkout, pip, uv, npm]
@@ -367,6 +369,7 @@ node-package-names:
     treeherder:
         symbol: misc(npn)
     run:
+        clone-with: hg
         mach: lint -v -l node-package-names -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -378,6 +381,7 @@ mingw-cap:
     treeherder:
         symbol: misc(mingw)
     run:
+        clone-with: hg
         mach: lint -v -l mingw-capitalization -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -392,6 +396,7 @@ updatebot:
     treeherder:
         symbol: misc(mozyaml)
     run:
+        clone-with: hg
         mach: lint -v -l updatebot -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -402,6 +407,7 @@ mscom-init:
     treeherder:
         symbol: misc(mscom)
     run:
+        clone-with: hg
         mach: lint -v -l mscom-init -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -417,6 +423,7 @@ py-ruff-format:
     treeherder:
         symbol: py(ruff-format)
     run:
+        clone-with: hg
         mach: lint -v -l ruff-format -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -434,6 +441,7 @@ py-ruff:
     treeherder:
         symbol: py(ruff)
     run:
+        clone-with: hg
         mach: lint -v -l ruff -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -450,6 +458,7 @@ python-sites:
     treeherder:
         symbol: misc(pysites)
     run:
+        clone-with: hg
         mach: lint -v -l python-sites -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -461,6 +470,7 @@ test-manifest:
     treeherder:
         symbol: tests(test-manifest)
     run:
+        clone-with: hg
         mach: lint -v -l test-manifest-toml -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -475,6 +485,7 @@ review-context-toml:
     treeherder:
         symbol: misc(review-context)
     run:
+        clone-with: hg
         mach: lint -v -l review-context-toml -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -488,6 +499,7 @@ wptlint-gecko:
     treeherder:
         symbol: tests(web-platform)
     run:
+        clone-with: hg
         mach: lint -v -l wpt -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -500,6 +512,7 @@ wpt-subsuite-tagging:
     treeherder:
         symbol: tests(wpt-sub)
     run:
+        clone-with: hg
         mach: lint -v -l wpt-subsuite-tagging -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -516,6 +529,7 @@ yaml:
     treeherder:
         symbol: pedantic(yaml)
     run:
+        clone-with: hg
         mach: lint -v -l yaml -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -530,7 +544,6 @@ md:
         # Allow follow-ups for Markdown style issues rather than backing patches out.
         tier: 2
     run:
-        clone-with: git
         mach: lint -v -l md -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -544,6 +557,7 @@ shellcheck:
     treeherder:
         symbol: misc(shell)
     run:
+        clone-with: hg
         mach: lint -v -l shellcheck -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -556,6 +570,7 @@ localization:
     treeherder:
         symbol: l10n(l1nt)
     run:
+        clone-with: hg
         mach: lint -v -l l10n -f treeherder *
     attributes:
         code-review: false
@@ -575,6 +590,7 @@ l10n-conflicts:
     always-target: false
     run-on-projects: []
     run:
+        clone-with: hg
         mach: lint -W -l l10n -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -590,6 +606,7 @@ clang-format:
     treeherder:
         symbol: cpp(clang-format)
     run:
+        clone-with: hg
         mach: lint -v -l clang-format -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -613,6 +630,7 @@ rustfmt:
     treeherder:
         symbol: rust(rustfmt)
     run:
+        clone-with: hg
         mach: lint -v -l rustfmt -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -628,6 +646,7 @@ clippy:
     treeherder:
         symbol: rust(clippy)
     run:
+        clone-with: hg
         prepend-env:
             PATH: "$MOZ_FETCHES_DIR/rustc/bin/${PATH:+:$PATH}"
         mach: lint -v -l clippy -f treeherder -f json:/builds/worker/mozlint.json -j 1 .
@@ -655,6 +674,7 @@ cargo-audit:
     treeherder:
         symbol: rust(cargo-audit)
     run:
+        clone-with: hg
         prepend-env:
             PATH: "$MOZ_FETCHES_DIR/rustc/bin/:/builds/worker/.cargo/bin/${PATH:+:$PATH}"
         mach: lint -v --warnings=soft -l cargo-audit -f treeherder -f json:/builds/worker/mozlint.json .
@@ -670,6 +690,7 @@ mozcheck-tests:
     treeherder:
         symbol: rust(mozcheck)
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         command: >-
@@ -692,7 +713,6 @@ file-whitespace:
         # good enough
         tier: 2
     run:
-        clone-with: git
         mach: lint -v -l file-whitespace -f treeherder -f json:/builds/worker/mozlint.json .
     fetches:
         toolchain:
@@ -731,7 +751,6 @@ file-perm:
         # good enough
         tier: 2
     run:
-        clone-with: git
         mach: lint -v -l file-perm -f treeherder -f json:/builds/worker/mozlint.json .
     fetches:
         toolchain:
@@ -778,6 +797,7 @@ perfdocs-verify:
     treeherder:
         symbol: doc(perfdocs)
     run:
+        clone-with: hg
         mach: perfdocs --output-file /builds/worker/mozlint.json
     worker:
         env:
@@ -810,6 +830,7 @@ condprof-addons-verify:
     treeherder:
         symbol: misc(condprof-addons)
     run:
+        clone-with: hg
         mach: |
             lint -v -l condprof-addons -f treeherder -f json:/builds/worker/mozlint.json .
     fetches:
@@ -826,6 +847,7 @@ fluent-lint:
     treeherder:
         symbol: l10n(fluent)
     run:
+        clone-with: hg
         mach: lint --linter fluent-lint -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -838,6 +860,7 @@ glean-parser:
     treeherder:
         symbol: misc(glean-parser)
     run:
+        clone-with: hg
         mach: lint -v -l glean-parser -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -852,6 +875,7 @@ trojan-source:
     treeherder:
         symbol: misc(trojan-source)
     run:
+        clone-with: hg
         mach: lint -v -l trojan-source -f treeherder -f json:/builds/worker/mozlint.json .
     fetches:
         toolchain:
@@ -872,6 +896,7 @@ ignorefile-test:
     treeherder:
         symbol: ignorefile
     run:
+        clone-with: hg
         mach: lint -v -l ignorefile .gitignore .hgignore
     when:
         files-changed:
@@ -884,6 +909,7 @@ agent-skills-sync:
     treeherder:
         symbol: agent-skills-sync
     run:
+        clone-with: hg
         mach: lint -v -l agent-skills-sync -f treeherder -f json:/builds/worker/mozlint.json .claude/skills .agents/skills
     when:
         files-changed:
@@ -898,6 +924,7 @@ c-includes:
     treeherder:
         symbol: cpp(includes)
     run:
+        clone-with: hg
         mach: lint -l includes -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -918,6 +945,7 @@ header-guards:
     treeherder:
         symbol: cpp(guards)
     run:
+        clone-with: hg
         mach: lint -l header-guards -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -931,6 +959,7 @@ android-expired-strings:
     treeherder:
         symbol: android(expired-strings)
     run:
+        clone-with: hg
         mach: lint -v -l android-expired-strings -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:
@@ -945,6 +974,7 @@ gecko-trace:
     treeherder:
         symbol: misc(gecko-trace)
     run:
+        clone-with: hg
         mach: lint -l gecko-trace -f treeherder -f json:/builds/worker/mozlint.json .
     when:
         files-changed:

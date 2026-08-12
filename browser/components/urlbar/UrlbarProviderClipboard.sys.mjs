@@ -67,8 +67,10 @@ export class UrlbarProviderClipboard extends UrlbarProvider {
     ) {
       return false;
     }
-    textFromClipboard =
-      UrlbarUtils.sanitizeTextFromClipboard(textFromClipboard);
+    textFromClipboard = lazy.UrlbarShared.sanitizeTextFromClipboard(
+      textFromClipboard,
+      UrlbarUtils.getFixupPrimitives(textFromClipboard, queryContext.isPrivate)
+    );
     const validUrl = this.#validUrl(textFromClipboard);
     if (!validUrl) {
       return false;

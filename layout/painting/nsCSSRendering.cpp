@@ -1592,7 +1592,7 @@ void nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
 
       RectCornerRadii clipRectRadii;
       if (hasBorderRadius) {
-        Float spreadDistance = Float(shadowSpread / oneDevPixel);
+        Float spreadDistance = Float(shadowSpread) / oneDevPixel;
         Margin borderSizes(spreadDistance, spreadDistance, spreadDistance,
                            spreadDistance);
         nsCSSBorderRenderer::ComputeOuterRadii(borderRadii, borderSizes,

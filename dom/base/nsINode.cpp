@@ -4116,7 +4116,8 @@ void nsINode::AddAnimationObserverUnlessExists(
 already_AddRefed<nsINode> nsINode::CloneAndAdopt(
     nsINode* aNode, bool aClone, bool aDeep,
     nsNodeInfoManager* aNewNodeInfoManager, nsIGlobalObject* aNewScope,
-    nsINode* aParent, ErrorResult& aError) {
+    nsINode* aParent, ErrorResult& aError,
+    CustomElementRegistry* aFallbackRegistry) {
   MOZ_ASSERT(!aParent || aNode->IsContent(),
              "Can't insert document or attribute nodes into a parent");
 
@@ -4168,6 +4169,65 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
     if (NS_WARN_IF(NS_FAILED(rv))) {
       aError.Throw(rv);
       return nullptr;
+    }
+
+    // https://dom.spec.whatwg.org/#clone-a-single-node
+    // Step 2: If node is an element:
+    if (elem) {
+      Element* cloneElem = clone->AsElement();
+      CustomElementRegistry* registry = nullptr;
+
+      if (StaticPrefs::dom_scoped_custom_element_registries_enabled()) {
+        // 2.1. Let registry be node's custom element registry.
+        registry = elem->GetCustomElementRegistry();
+        // 2.2. If registry is null, then set registry to fallbackRegistry.
+        if (!registry) {
+          registry = aFallbackRegistry;
+        }
+        // 2.3. If registry is a global custom element registry, then set
+        //      registry to document's effective global custom element registry.
+        if (registry && !registry->IsScoped()) {
+          Document* doc = nodeInfo->GetDocument();
+          registry =
+              doc ? doc->GetEffectiveGlobalCustomElementRegistry() : nullptr;
+        }
+
+        if (registry) {
+          cloneElem->SetCustomElementRegistry(registry);
+        } else if (elem->GetCustomElementRegistryState() ==
+                   CustomElementRegistryState::Null) {
+          cloneElem->SetKeepCustomElementRegistryNull();
+        } else if (cloneElem->OwnerDoc()->HasScopedCustomElementRegistry()) {
+          // Keep the clone from inheriting the destination document's scoped
+          // registry; a global-registry element must not resolve to it.
+          cloneElem->SetKeepCustomElementRegistryNull();
+        }
+      }
+
+      // https://dom.spec.whatwg.org/#clone-a-single-node
+      // Step 2.4 (create an element): Look up definition using the resolved
+      // registry and enqueue upgrade reaction if found.
+      if (CustomElementData* data = elem->GetCustomElementData()) {
+        if (nsAtom* typeAtom = data->GetCustomElementType()) {
+          class NodeInfo* dstNodeInfo = cloneElem->NodeInfo();
+          MOZ_ASSERT(dstNodeInfo->NameAtom()->Equals(dstNodeInfo->LocalName()));
+          CustomElementDefinition* definition = nullptr;
+          if (StaticPrefs::dom_scoped_custom_element_registries_enabled()) {
+            if (registry) {
+              definition = registry->LookupCustomElementDefinition(
+                  dstNodeInfo->NameAtom(), dstNodeInfo->NamespaceID(),
+                  typeAtom);
+            }
+          } else {
+            definition = nsContentUtils::LookupCustomElementDefinition(
+                dstNodeInfo->GetDocument(), dstNodeInfo->NameAtom(),
+                dstNodeInfo->NamespaceID(), typeAtom);
+          }
+          if (definition) {
+            nsContentUtils::EnqueueUpgradeReaction(cloneElem, definition);
+          }
+        }
+      }
     }
 
     if (aParent) {
@@ -4320,11 +4380,14 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
   }
 
   if (aDeep && (!aClone || !aNode->IsAttr())) {
-    // aNode's children.
+    // https://dom.spec.whatwg.org/#concept-node-clone
+    // Step 5: For each child of node's children, in tree order: clone a node
+    // given child with subtree, parent set to copy, and fallbackRegistry.
     for (nsIContent* cloneChild = aNode->GetFirstChild(); cloneChild;
          cloneChild = cloneChild->GetNextSibling()) {
-      nsCOMPtr<nsINode> child = CloneAndAdopt(
-          cloneChild, aClone, true, nodeInfoManager, aNewScope, clone, aError);
+      nsCOMPtr<nsINode> child =
+          CloneAndAdopt(cloneChild, aClone, true, nodeInfoManager, aNewScope,
+                        clone, aError, aFallbackRegistry);
       if (NS_WARN_IF(aError.Failed())) {
         return nullptr;
       }
@@ -4390,10 +4453,20 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
       init.mDelegatesFocus = originalShadowRoot->DelegatesFocus();
       init.mSlotAssignment = originalShadowRoot->SlotAssignment();
       init.mClonable = true;
-      if (StaticPrefs::dom_scoped_custom_element_registries_enabled() &&
-          originalShadowRoot->HasCustomElementRegistry()) {
-        init.mCustomElementRegistry.Construct(
-            originalShadowRoot->GetCustomElementRegistry());
+      if (StaticPrefs::dom_scoped_custom_element_registries_enabled()) {
+        if (originalShadowRoot->HasCustomElementRegistry()) {
+          init.mCustomElementRegistry.Construct(
+              originalShadowRoot->GetCustomElementRegistry());
+        } else {
+          // The original shadow root has the global registry. Explicitly pass
+          // the destination document's global registry so that AttachShadow
+          // doesn't derive it from the host element, which may have a different
+          // registry state after cloning (e.g. null).
+          Document* doc = nodeInfoManager ? nodeInfoManager->GetDocument()
+                                          : nodeInfo->GetDocument();
+          init.mCustomElementRegistry.Construct(
+              doc ? doc->GetEffectiveGlobalCustomElementRegistry() : nullptr);
+        }
       }
 
       RefPtr<ShadowRoot> newShadowRoot =
@@ -4436,7 +4509,7 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
          cloneChild = cloneChild->GetNextSibling()) {
       nsCOMPtr<nsINode> child =
           CloneAndAdopt(cloneChild, aClone, aDeep, ownerNodeInfoManager,
-                        aNewScope, cloneContent, aError);
+                        aNewScope, cloneContent, aError, aFallbackRegistry);
       if (NS_WARN_IF(aError.Failed())) {
         return nullptr;
       }
@@ -4482,11 +4555,11 @@ void nsINode::Adopt(nsNodeInfoManager* aNewNodeInfoManager,
   nsMutationGuard::DidMutate();
 }
 
-already_AddRefed<nsINode> nsINode::Clone(bool aDeep,
-                                         nsNodeInfoManager* aNewNodeInfoManager,
-                                         ErrorResult& aError) {
-  return CloneAndAdopt(this, true, aDeep, aNewNodeInfoManager,
-                       /* aNewScope = */ nullptr, nullptr, aError);
+already_AddRefed<nsINode> nsINode::Clone(
+    bool aDeep, nsNodeInfoManager* aNewNodeInfoManager, ErrorResult& aError,
+    CustomElementRegistry* aFallbackRegistry) {
+  return CloneAndAdopt(this, true, aDeep, aNewNodeInfoManager, nullptr, nullptr,
+                       aError, aFallbackRegistry);
 }
 
 void nsINode::GenerateXPath(nsAString& aResult) {

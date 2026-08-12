@@ -5,35 +5,35 @@
 "use strict";
 
 const {
-  SET_COLOR_SCHEME_SIMULATION,
-  SET_PRINT_SIMULATION_ENABLED,
+  SET_COLOR_SCHEME_EMULATION,
+  SET_PRINT_EMULATION_ENABLED,
   SET_REDUCED_MOTION_EMULATION,
 } = require("resource://devtools/client/inspector/emulation/actions/index.js");
 
 const INITIAL_EMULATION_STATE = {
-  colorSchemeSimulation: null,
-  printSimulationEnabled: false,
+  colorSchemeEmulation: null,
+  printEmulationEnabled: false,
   reducedMotionEmulation: null,
 };
 
 function emulation(state = INITIAL_EMULATION_STATE, action) {
   switch (action.type) {
-    case SET_COLOR_SCHEME_SIMULATION:
+    case SET_COLOR_SCHEME_EMULATION:
       return {
         ...state,
-        colorSchemeSimulation: action.colorScheme,
+        colorSchemeEmulation: action.colorScheme,
       };
 
-    case SET_PRINT_SIMULATION_ENABLED:
+    case SET_PRINT_EMULATION_ENABLED:
       return {
         ...state,
-        printSimulationEnabled: action.enabled,
+        printEmulationEnabled: action.printEmulationEnabled,
       };
 
     case SET_REDUCED_MOTION_EMULATION:
       return {
         ...state,
-        reducedMotionEmulation: action.reducedMotion,
+        reducedMotionEmulation: action.enabled,
       };
 
     default:

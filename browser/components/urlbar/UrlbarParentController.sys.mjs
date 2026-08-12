@@ -762,18 +762,11 @@ export class UrlbarParentController {
       queryContext.sixthTimerId = 0;
     }
 
-    // When the input is in-process (direct path), let it react to the first
-    // result and bail before notifying if it took over (e.g. entered search
-    // mode and restarted the query). On the message path the input lives across
-    // the boundary, so it runs `onFirstResult` content-side when it receives the
-    // results instead. On the message path `this.input` is a forwarding
-    // stand-in without `onFirstResult`, so the capability check also
-    // distinguishes the paths.
-    if (queryContext.firstResultChanged && this.input?.onFirstResult) {
-      if (this.input.onFirstResult(queryContext.results[0])) {
-        // The input canceled the query and started a new one.
-        return;
-      }
+    if (queryContext.firstResultChanged) {
+      this.notify(
+        lazy.UrlbarShared.NOTIFICATIONS.QUERY_FIRST_RESULT,
+        queryContext
+      );
     }
 
     this.notify(lazy.UrlbarShared.NOTIFICATIONS.QUERY_RESULTS, queryContext);

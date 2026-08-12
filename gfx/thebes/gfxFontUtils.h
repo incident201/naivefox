@@ -657,7 +657,7 @@ class gfxFontUtils {
                                nsTArray<nsCString>& aFontList);
 
   // generate a unique font name
-  static nsresult MakeUniqueUserFontName(nsAString& aName);
+  static nsresult MakeUniqueUserFontName(nsACString& aName);
 
   // Helper used to implement gfxFontEntry::GetVariation{Axes,Instances} for
   // platforms where the native font APIs don't provide the info we want

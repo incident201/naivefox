@@ -8835,9 +8835,15 @@ bool CodeGenerator::generateBlock(LBlock* current, size_t blockNumber,
       emitDebugResultChecks(*iter);
     }
 #endif
+
+    // To reduce the blast radius of OOM during codegen, bail out early if we've
+    // OOM'ed.
+    if (masm.oom()) {
+      return false;
+    }
   }
 
-  return !masm.oom();
+  return true;
 }
 
 bool CodeGenerator::generateOutOfLineBlocks() {
@@ -22929,7 +22935,7 @@ void CodeGenerator::visitWeakMapGetObject(LWeakMapGetObject* ins) {
   });
   addOutOfLineCode(ool, ins->mir());
 
-  masm.emitWeapMapBarrierFastPath(output, scratch, scratch2, scratch3, scratch4,
+  masm.emitWeakMapBarrierFastPath(output, scratch, scratch2, scratch3, scratch4,
                                   scratch5, ool->entry());
   masm.jump(ool->rejoin());
 

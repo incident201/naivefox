@@ -2147,6 +2147,8 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageVAAPI(
   if (mInfo.mTransferFunction) {
     surface->SetTransferFunction(mInfo.mTransferFunction.value());
   }
+  surface->SetWPChromaLocation(
+      AVChromaLocationToWPChromaLocation(mFrame->chroma_location));
 
   FFMPEG_LOG(
       "VA-API frame pts={} dts={} duration={} color space {}/{} transfer {}",
@@ -2366,6 +2368,8 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageVulkan(
   if (mInfo.mTransferFunction) {
     surface->SetTransferFunction(mInfo.mTransferFunction.value());
   }
+  surface->SetWPChromaLocation(
+      AVChromaLocationToWPChromaLocation(mFrame->chroma_location));
 
   RefPtr<VideoData> vp = VideoData::CreateFromImage(
       mInfo.mDisplay, aOffset, TimeUnit::FromMicroseconds(aPts),

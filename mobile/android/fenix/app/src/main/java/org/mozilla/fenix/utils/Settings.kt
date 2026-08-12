@@ -31,6 +31,7 @@ import mozilla.components.support.ktx.android.content.doesDeviceHaveHinge
 import mozilla.components.support.ktx.android.content.floatPreference
 import mozilla.components.support.ktx.android.content.intPreference
 import mozilla.components.support.ktx.android.content.longPreference
+import mozilla.components.support.ktx.android.content.pixelSizeFor
 import mozilla.components.support.ktx.android.content.stringPreference
 import mozilla.components.support.ktx.android.content.stringSetPreference
 import mozilla.components.support.locale.LocaleManager
@@ -55,7 +56,6 @@ import org.mozilla.fenix.ext.TALL_SCREEN_HEIGHT_DP
 import org.mozilla.fenix.ext.WIDE_SCREEN_WIDTH_DP
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.ext.getPreferenceKey
-import org.mozilla.fenix.ext.pixelSizeFor
 import org.mozilla.fenix.home.pocket.ContentRecommendationsFeatureHelper
 import org.mozilla.fenix.home.topsites.TopSitesConfigConstants.TOP_SITES_MAX_COUNT
 import org.mozilla.fenix.nimbus.DefaultBrowserPrompt
@@ -3316,5 +3316,13 @@ class Settings(
     var enableHomepageTrendingRecentSearch by booleanPreference(
         key = appContext.getPreferenceKey(R.string.pref_key_enable_homepage_trending_recent_search),
         default = { FxNimbus.features.homepageTrendingRecentSearch.value().enabled },
+    )
+
+    /**
+     * Indicates if the Android PDF tools are enabled for the PDF viewer.
+     */
+    var enablePdfTools by booleanPreference(
+        key = appContext.getPreferenceKey(R.string.pref_key_enable_pdf_tools),
+        default = { FxNimbus.features.pdfViewer.value().androidUiTools },
     )
 }

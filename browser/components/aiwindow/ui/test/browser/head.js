@@ -63,8 +63,6 @@ const MOCK_RS_RECORDS = [
   ["conversation-suggestions-memories", 1],
   ["memories-initial-generation-system", 2],
   ["memories-initial-generation-user", 2],
-  ["memories-deduplication-system", 1],
-  ["memories-deduplication-user", 1],
   ["memories-sensitivity-filter-system", 1],
   ["memories-sensitivity-filter-user", 1],
   ["memories-quality-filter-system", 1],

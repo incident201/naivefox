@@ -145,9 +145,10 @@ void TrapSitesForKind::checkInvariants(const uint8_t* codeBase) const {
     last = pcOffset;
   }
 
-#  if (defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_X86) ||   \
-       defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_ARM) || \
-       defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_MIPS64))
+#  if (defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_X86) ||        \
+       defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_ARM) ||      \
+       defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_MIPS64) || \
+       defined(JS_CODEGEN_RISCV64))
   // Check that each trapsite is associated with an instruction that
   // SummarizeTrapInstruction can identify and can determine the length of.
   // The required instruction kind depends on the trapsite kind.
@@ -156,10 +157,6 @@ void TrapSitesForKind::checkInvariants(const uint8_t* codeBase) const {
   // longer the case.  SummarizeTrapInstruction now needs to be able to compute
   // the length of all trapping instructions on all targets, even for release
   // builds.  Without it, the trap-handling machinery will not work correctly.
-  //
-  // Currently, SummarizeTrapInstruction works as required on x86_{32,64},
-  // arm{32,64}, loong64, and mips64.  It still needs to be extended to work
-  // properly on riscv64.
   //
   for (uint32_t i = 0; i < length(); i++) {
     uint32_t pcOffset = pcOffsets_[i];

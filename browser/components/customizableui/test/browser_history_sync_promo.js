@@ -62,7 +62,6 @@ function clearDismissals() {
 
 registerCleanupFunction(clearDismissals);
 
-// Shows each promo variant with the correct heading, CTA and destination.
 add_task(async function test_variants() {
   let sandbox = sinon.createSandbox();
   let promoState = sandbox.stub(gSync, "getSyncPromoState");
@@ -81,9 +80,9 @@ add_task(async function test_variants() {
 
     ok(!promo.hidden, `${state}: promo is shown`);
     Assert.deepEqual(
-      promoState.lastCall.args[0],
-      ["tabs", "history"],
-      `${state}: eligibility is gated on the tabs and history engines`
+      promoState.lastCall.args,
+      [],
+      `${state}: eligibility is not gated on any individual engine`
     );
     is(
       manageHistory.nextElementSibling,
@@ -107,7 +106,6 @@ add_task(async function test_variants() {
     );
 
     handleAction.resetHistory();
-    // The CTA closes the panel via PanelUI.hide().
     let popupHidden = BrowserTestUtils.waitForEvent(
       document.getElementById("appMenu-popup"),
       "popuphidden"
@@ -119,7 +117,6 @@ add_task(async function test_variants() {
       [state, ENTRY_POINT],
       `${state}: action receives the variant and app menu entry point`
     );
-    // Activating a CTA must not dismiss the promo.
     ok(
       !Services.prefs.getBoolPref(expected.pref, false),
       `${state}: CTA does not dismiss the promo`
@@ -131,14 +128,12 @@ add_task(async function test_variants() {
   clearDismissals();
 });
 
-// Dismissing a variant persists and only suppresses that variant.
 add_task(async function test_per_variant_dismissal() {
   let sandbox = sinon.createSandbox();
   let promoState = sandbox.stub(gSync, "getSyncPromoState");
   sandbox.stub(gSync, "handleSyncPromoAction");
   clearDismissals();
 
-  // Dismiss the signin variant.
   promoState.returns("signin");
   let historyView = await openHistoryView();
   let promo = await getPromo(historyView);
@@ -153,12 +148,10 @@ add_task(async function test_per_variant_dismissal() {
   );
   await gCUITestUtils.hideMainMenu();
 
-  // The signin variant stays dismissed on reopen.
   historyView = await openHistoryView();
   promo = await getPromo(historyView);
   ok(promo.hidden, "Dismissed signin variant stays hidden");
 
-  // A different eligible variant still appears.
   promoState.returns("connectdevice");
   Services.obs.notifyObservers(null, "sync-ui-state:update");
   await promo.updateComplete;
@@ -175,7 +168,6 @@ add_task(async function test_per_variant_dismissal() {
   clearDismissals();
 });
 
-// The promo updates live and disappears when the user becomes ineligible.
 add_task(async function test_state_transitions() {
   let sandbox = sinon.createSandbox();
   let promoState = sandbox.stub(gSync, "getSyncPromoState");
@@ -207,51 +199,52 @@ add_task(async function test_state_transitions() {
   clearDismissals();
 });
 
-// A disabled engine pref refreshes the promo while the panel stays open.
-add_task(async function test_engine_pref_reactivity() {
+add_task(async function test_sync_eligibility_ignores_engines() {
   let sandbox = sinon.createSandbox();
-  // Delegate to the real getSyncPromoState with a signed-in, syncing account
-  // that has another device, so only the engine prefs decide eligibility.
-  sandbox
-    .stub(UIState, "get")
-    .returns({ status: UIState.STATUS_SIGNED_IN, syncEnabled: true });
+  let syncEnabled = true;
+  sandbox.stub(UIState, "get").callsFake(() => ({
+    status: UIState.STATUS_SIGNED_IN,
+    syncEnabled,
+  }));
   sandbox
     .stub(fxAccounts.device, "recentDeviceList")
     .get(() => [{ isCurrentDevice: true }, { isCurrentDevice: false }]);
-  sandbox.stub(gSync, "handleSyncPromoAction");
+  // Stub this to prevent error spam on tests trying to fetch attached clients
+  sandbox.stub(gSync, "updateAllUI");
   clearDismissals();
 
   await SpecialPowers.pushPrefEnv({
     set: [
-      ["services.sync.engine.tabs", true],
-      ["services.sync.engine.history", true],
+      ["services.sync.engine.tabs", false],
+      ["services.sync.engine.history", false],
     ],
   });
 
   let historyView = await openHistoryView();
   let promo = await getPromo(historyView);
-  ok(promo.hidden, "Promo hidden while fully eligible with another device");
+  ok(promo.hidden, "Promo hidden when only its engines are disabled");
 
-  // Disabling History syncing should surface the turnonsync variant live.
-  await SpecialPowers.pushPrefEnv({
-    set: [["services.sync.engine.history", false]],
-  });
+  syncEnabled = false;
+  Services.obs.notifyObservers(null, "sync-ui-state:update");
   await promo.updateComplete;
-  ok(!promo.hidden, "Promo appears when History syncing is disabled");
+  ok(!promo.hidden, "Promo shown while Sync is disabled on this installation");
   is(
     promo.shadowRoot.querySelector("moz-promo").getAttribute("data-l10n-id"),
     VARIANTS.turnonsync.heading,
-    "Disabled engine shows the turnonsync variant"
+    "Disabled Sync shows the turnonsync variant"
   );
 
-  await SpecialPowers.popPrefEnv();
+  syncEnabled = true;
+  Services.obs.notifyObservers(null, "sync-ui-state:update");
+  await promo.updateComplete;
+  ok(promo.hidden, "Promo removed once Sync is enabled on this installation");
+
   await SpecialPowers.popPrefEnv();
   await gCUITestUtils.hideMainMenu();
   sandbox.restore();
   clearDismissals();
 });
 
-// handleSyncPromoAction routes each variant to the right FxA destination.
 add_task(async function test_action_dispatch() {
   let sandbox = sinon.createSandbox();
   let signin = sandbox.stub(gSync, "openFxAEmailFirstPage");

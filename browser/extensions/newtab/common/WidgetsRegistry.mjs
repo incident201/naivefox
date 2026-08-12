@@ -121,6 +121,12 @@ export const PREF_PRIVACY_BLANK_CHANCE = "widgets.privacy.blankChance";
 export const PREF_PRIVACY_SHOW_VPN_MESSAGES = "widgets.privacy.showVpnMessages";
 export const PREF_PRIVACY_FORCE_MESSAGE_ID = "widgets.privacy.forceMessageId";
 export const PREF_PRIVACY_MESSAGE_STATE = "widgets.privacy.messageState";
+export const PREF_PRIVACY_CELEBRATION_THRESHOLD =
+  "widgets.privacy.celebrationThreshold";
+export const PREF_PRIVACY_CELEBRATION_STATE =
+  "widgets.privacy.celebrationState";
+export const PREF_PRIVACY_FORCE_CELEBRATION =
+  "widgets.privacy.forceCelebration";
 export const PREF_WIDGETS_CROSSWORD_ENABLED = "widgets.crossword.enabled";
 export const PREF_CROSSWORD_SIZE = "widgets.crossword.size";
 export const PREF_WIDGETS_SYSTEM_CROSSWORD_ENABLED =
@@ -572,6 +578,27 @@ export function resolvePrivacyShowVpnMessages(prefs) {
     return trainhop;
   }
   return !!prefs[PREF_PRIVACY_SHOW_VPN_MESSAGES];
+}
+
+/**
+ * Resolves how far the blocked-tracker count must climb before the count-up
+ * celebration fires. Priority: trainhopConfig > pref > 10 (HNT-2845).
+ *
+ * @param {object} prefs - current pref values from the Redux store
+ * @returns {number}
+ */
+export function resolvePrivacyCelebrationThreshold(prefs) {
+  const DEFAULT = 10;
+  const trainhop = prefs.trainhopConfig?.widgets?.privacyCelebrationThreshold;
+  const raw =
+    typeof trainhop === "number"
+      ? trainhop
+      : prefs[PREF_PRIVACY_CELEBRATION_THRESHOLD];
+  // A zero or negative threshold would fire on every refresh.
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 1) {
+    return DEFAULT;
+  }
+  return raw;
 }
 
 /**

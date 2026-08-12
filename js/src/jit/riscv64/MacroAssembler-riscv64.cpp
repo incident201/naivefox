@@ -2990,14 +2990,13 @@ static void AtomicExchange(MacroAssembler& masm,
   }
 
   if (nbytes == 4) {
-    if (access) {
-      AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
-
+    AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
+    auto before = masm.currentOffset();
     masm.amoswap_w(true, true, output, address, value);
-
+    if (access) {
+      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
+                           FaultingCodeRange(before));
+    }
     return;
   }
 
@@ -3038,14 +3037,14 @@ static void AtomicExchange(MacroAssembler& masm,
     Label again;
     masm.bind(&again);
 
-    if (access) {
-      // Track offset of the "lr.w" instruction.
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
-
     // Load the current value into |output|.
+    // This may fault, so we may need to emit a TrapSite.
+    auto before = masm.currentOffset();
     masm.lr_w(true, true, output, address);
+    if (access) {
+      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load32,
+                           FaultingCodeRange(before));
+    }
 
     // Combine the loaded value with |valueTemp|.
     masm.and_(scratch2, output, maskTemp);
@@ -3082,13 +3081,13 @@ static void AtomicExchange64(MacroAssembler& masm,
                              const wasm::MemoryAccessDesc* access,
                              Synchronization sync, Register address,
                              Register64 value, Register64 output) {
-  if (access) {
-    AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
-    masm.appendAndVerify(*access, js::wasm::TrapMachineInsn::Atomic,
-                         FaultingCodeRange(masm.currentOffset()));
-  }
-
+  AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
+  auto before = masm.currentOffset();
   masm.amoswap_d(true, true, output.reg, address, value.reg);
+  if (access) {
+    masm.appendAndVerify(*access, js::wasm::TrapMachineInsn::Atomic,
+                         FaultingCodeRange(before));
+  }
 }
 
 template <typename T>
@@ -3117,11 +3116,8 @@ static void AtomicFetchOp64(MacroAssembler& masm,
     value = Register64(scratch2);
   }
 
-  if (access) {
-    AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
-    masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                         FaultingCodeRange(masm.currentOffset()));
-  }
+  AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
+  auto before = masm.currentOffset();
 
   switch (op) {
     case AtomicOp::Add:
@@ -3139,6 +3135,11 @@ static void AtomicFetchOp64(MacroAssembler& masm,
       break;
     default:
       MOZ_CRASH();
+  }
+
+  if (access) {
+    masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
+                         FaultingCodeRange(before));
   }
 }
 
@@ -3186,11 +3187,8 @@ static void AtomicFetchOrEffectOp(MacroAssembler& masm,
       value = scratch2;
     }
 
-    if (access) {
-      AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
+    AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
+    auto before = masm.currentOffset();
 
     switch (op) {
       case AtomicOp::Add:
@@ -3208,6 +3206,11 @@ static void AtomicFetchOrEffectOp(MacroAssembler& masm,
         break;
       default:
         MOZ_CRASH();
+    }
+
+    if (access) {
+      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
+                           FaultingCodeRange(before));
     }
 
     return;
@@ -3257,24 +3260,28 @@ static void AtomicFetchOrEffectOp(MacroAssembler& masm,
       }
     }
 
-    if (access) {
+    {
       AutoForbidPoolsAndNops afp(&masm, /* number of insns = */ 1);
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
+      auto before = masm.currentOffset();
 
-    switch (op) {
-      case AtomicOp::And:
-        masm.amoand_w(true, true, output, address, valueTemp);
-        break;
-      case AtomicOp::Or:
-        masm.amoor_w(true, true, output, address, valueTemp);
-        break;
-      case AtomicOp::Xor:
-        masm.amoxor_w(true, true, output, address, valueTemp);
-        break;
-      default:
-        MOZ_CRASH();
+      switch (op) {
+        case AtomicOp::And:
+          masm.amoand_w(true, true, output, address, valueTemp);
+          break;
+        case AtomicOp::Or:
+          masm.amoor_w(true, true, output, address, valueTemp);
+          break;
+        case AtomicOp::Xor:
+          masm.amoxor_w(true, true, output, address, valueTemp);
+          break;
+        default:
+          MOZ_CRASH();
+      }
+
+      if (access) {
+        masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
+                             FaultingCodeRange(before));
+      }
     }
 
     if (output != zero_reg) {
@@ -3311,14 +3318,14 @@ static void AtomicFetchOrEffectOp(MacroAssembler& masm,
     Label again;
     masm.bind(&again);
 
-    if (access) {
-      // Track offset of the "lr.w" instruction.
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
-
     // Load the current value into |current|.
+    // This may fault, so we may need to emit a TrapSite.
+    auto before = masm.currentOffset();
     masm.lr_w(true, true, current, address);
+    if (access) {
+      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load32,
+                           FaultingCodeRange(before));
+    }
 
     // Apply the operation.
     switch (op) {
@@ -3827,14 +3834,14 @@ static void CompareExchange64(MacroAssembler& masm,
     Label tryAgain;
     masm.bind(&tryAgain);
 
-    if (access) {
-      // Track offset of the "lr.d" instruction.
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
-
     // Load the current value into |output|.
+    // This may fault, so we may need to emit a TrapSite.
+    auto before = masm.currentOffset();
     masm.lr_d(true, true, output.reg, address);
+    if (access) {
+      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load64,
+                           FaultingCodeRange(before));
+    }
 
     // Return if the current value isn't equal to |expect|.
     masm.ma_b(output.reg, expect.reg, &exit, Assembler::NotEqual, ShortJump);
@@ -4900,14 +4907,14 @@ static void CompareExchange(MacroAssembler& masm,
       Label again;
       masm.bind(&again);
 
-      if (access) {
-        // Track offset of the "lr.w" instruction.
-        masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                             FaultingCodeRange(masm.currentOffset()));
-      }
-
       // Load the current value into |output|.
+      // This may fault, so we may need to emit a TrapSite.
+      auto before = masm.currentOffset();
       masm.lr_w(true, true, output, address);
+      if (access) {
+        masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load32,
+                             FaultingCodeRange(before));
+      }
 
       // Return if the current value isn't equal to |oldval|.
       masm.ma_b(output, oldval, &end, Assembler::NotEqual, ShortJump);
@@ -4965,14 +4972,14 @@ static void CompareExchange(MacroAssembler& masm,
     Label again;
     masm.bind(&again);
 
-    if (access) {
-      // Track offset of the "lr.w" instruction.
-      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Atomic,
-                           FaultingCodeRange(masm.currentOffset()));
-    }
-
     // Load the current value into |output|.
+    // This may fault, so we may need to emit a TrapSite.
+    auto before = masm.currentOffset();
     masm.lr_w(true, true, output, address);
+    if (access) {
+      masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load32,
+                           FaultingCodeRange(before));
+    }
 
     // Zero other bits in the loaded value.
     masm.and_(scratch2, output, maskTemp);

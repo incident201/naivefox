@@ -229,7 +229,6 @@
 #include "nsINetworkLinkService.h"
 #include "nsIObserverService.h"
 #include "nsIParentChannel.h"
-#include "nsIPrivateAttributionService.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIServiceWorkerManager.h"
@@ -1265,35 +1264,6 @@ mozilla::ipc::IPCResult ContentParent::RecvCreateGMPService() {
 
   mGMPCreated = true;
 
-  return IPC_OK();
-}
-
-IPCResult ContentParent::RecvAttributionEvent(
-    const nsACString& aHost, PrivateAttributionImpressionType aType,
-    uint32_t aIndex, const nsAString& aAd, const nsACString& aTargetHost) {
-  nsCOMPtr<nsIPrivateAttributionService> pa =
-      components::PrivateAttribution::Service();
-  if (NS_WARN_IF(!pa)) {
-    return IPC_OK();
-  }
-  pa->OnAttributionEvent(aHost, GetEnumString(aType), aIndex, aAd, aTargetHost);
-  return IPC_OK();
-}
-
-IPCResult ContentParent::RecvAttributionConversion(
-    const nsACString& aHost, const nsAString& aTask, uint32_t aHistogramSize,
-    const Maybe<uint32_t>& aLookbackDays,
-    const Maybe<PrivateAttributionImpressionType>& aImpressionType,
-    const nsTArray<nsString>& aAds, const nsTArray<nsCString>& aSourceHosts) {
-  nsCOMPtr<nsIPrivateAttributionService> pa =
-      components::PrivateAttribution::Service();
-  if (NS_WARN_IF(!pa)) {
-    return IPC_OK();
-  }
-  pa->OnAttributionConversion(
-      aHost, aTask, aHistogramSize, aLookbackDays.valueOr(0),
-      aImpressionType ? GetEnumString(*aImpressionType) : EmptyCString(), aAds,
-      aSourceHosts);
   return IPC_OK();
 }
 
@@ -5894,8 +5864,7 @@ mozilla::ipc::IPCResult ContentParent::RecvStoreAndBroadcastBlobURLRegistration(
     return IPC_FAIL(this, "No principal");
   }
 
-  if (!ValidatePrincipal(aPrincipal,
-                         {ValidatePrincipalOptions::AlwaysAllowSystem})) {
+  if (!ValidatePrincipal(aPrincipal)) {
     return PrincipalValidationIpcFail(aPrincipal, this, __func__);
   }
 
@@ -7611,6 +7580,10 @@ mozilla::ipc::IPCResult ContentParent::RecvHistoryGo(
     bool aCheckForCancelation, HistoryGoResolver&& aResolveRequestedIndex) {
   if (!aContext.IsNullOrDiscarded()) {
     RefPtr<CanonicalBrowsingContext> canonical = aContext.get_canonical();
+    if (!canonical->Top()->IsKnownInSubTree(ChildID())) {
+      return IPC_OK();
+    }
+
     aResolveRequestedIndex(canonical->HistoryGo(
         aOffset, aHistoryEpoch, aRequireUserInteraction, aUserActivation,
         aCheckForCancelation, Some(ChildID())));
@@ -7624,6 +7597,10 @@ mozilla::ipc::IPCResult ContentParent::RecvNavigationTraverse(
     NavigationTraverseResolver&& aResolver) {
   if (!aContext.IsNullOrDiscarded()) {
     RefPtr<CanonicalBrowsingContext> canonical = aContext.get_canonical();
+    if (!canonical->Top()->IsKnownInSubTree(ChildID())) {
+      return IPC_OK();
+    }
+
     canonical->NavigationTraverse(aKey, aHistoryEpoch, aUserActivation,
                                   aCheckForCancelation, Some(ChildID()),
                                   aResolver);
@@ -7858,8 +7835,12 @@ mozilla::ipc::IPCResult ContentParent::RecvHistoryReload(
     const MaybeDiscarded<BrowsingContext>& aContext,
     const uint32_t aReloadFlags) {
   if (!aContext.IsNullOrDiscarded()) {
-    nsCOMPtr<nsISHistory> shistory =
-        aContext.get_canonical()->GetSessionHistory();
+    RefPtr<CanonicalBrowsingContext> canonical = aContext.get_canonical();
+    if (!canonical->Top()->IsKnownInSubTree(ChildID())) {
+      return IPC_OK();
+    }
+
+    nsCOMPtr<nsISHistory> shistory = canonical->GetSessionHistory();
     if (shistory) {
       shistory->Reload(aReloadFlags);
     }

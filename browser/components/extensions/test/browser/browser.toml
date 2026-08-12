@@ -23,7 +23,6 @@ support-files = [
 ["browser_AMBrowserExtensionsImport.js"]
 
 ["browser_ext_autocompletepopup.js"]
-disabled = "bug 1438663 # same focus issue as Bug 1438663"
 
 ["browser_ext_autoplayInBackground.js"]
 support-files = ["silence.ogg"]
@@ -117,9 +116,6 @@ skip-if = [
 
 ["browser_ext_webNavigation_bookmark_transitions.js"]
 support-files = ["!/browser/components/places/tests/browser/head.js"]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && opt && a11y_checks && swgl && nova", # Bug 2057928
-]
 
 ["browser_ext_webNavigation_containerIsolation.js"]
 https_first_disabled = true

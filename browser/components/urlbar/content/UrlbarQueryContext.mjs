@@ -24,6 +24,10 @@ import { UrlbarResult } from "chrome://browser/content/urlbar/UrlbarResult.mjs";
  *   The search engine name associated with the search mode.
  */
 
+// Source of the per-context `id`. Ids only have to be unique among the queries
+// of a given input, which all originate in the same realm as this counter.
+let gNextId = 1;
+
 /**
  * UrlbarQueryContext defines a user's autocomplete input from within the urlbar.
  * It supplements it with details of how the search results should be obtained
@@ -108,6 +112,7 @@ export class UrlbarQueryContext {
       }
     }
 
+    this.id = gNextId++;
     this.lastResultCount = 0;
     // Note that Set is not serializable through JSON, so these may not be
     // easily shared with add-ons.
@@ -179,6 +184,14 @@ export class UrlbarQueryContext {
    *   The heuristic result associated with the context.
    */
   heuristicResult;
+
+  /**
+   * @type {number}
+   *   Identifies this query among the ones its input started. It survives the
+   *   trip across the actor boundary, so a notification can be matched with the
+   *   query it belongs to, and results of a superseded query discarded.
+   */
+  id;
 
   /**
    * @type {boolean}

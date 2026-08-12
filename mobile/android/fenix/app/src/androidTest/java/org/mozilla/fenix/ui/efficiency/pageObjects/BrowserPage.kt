@@ -184,6 +184,31 @@ class BrowserPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule
         return this
     }
 
+    /**
+     * Click a web-content element and wait for [expectedContent] to render, reloading [url] and
+     * re-clicking between attempts. Mirrors the legacy clickPageObject retry-with-refresh: a tap can
+     * land before GeckoView has wired up the page's DOM handlers, in which case the click is a silent
+     * no-op and waiting on the same document never recovers it.
+     */
+    fun clickPageObjectUntilContent(
+        selector: Selector,
+        url: String,
+        expectedContent: String,
+        attempts: Int = 3,
+    ): BrowserPage {
+        for (attempt in 1..attempts) {
+            mozClick(selector)
+            try {
+                return verifyPageContent(expectedContent)
+            } catch (e: AssertionError) {
+                if (attempt == attempts) throw e
+                Log.i("BrowserPage", "clickPageObjectUntilContent: '$expectedContent' absent on attempt $attempt, reloading")
+                navigateToPage(url, forceNavigation = true)
+            }
+        }
+        return this
+    }
+
     // --- Downloads from a web page ---
 
     /**
@@ -259,6 +284,21 @@ class BrowserPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule
         return clickPageContent("Continue to HTTP Site")
     }
 
+    fun verifyOpenLinkInAppPrompt(appName: String): BrowserPage {
+        mozVerify(BrowserPageSelectors.OPEN_IN_APP_PROMPT(appName), timeout = waitingTimeLong)
+        return this
+    }
+
+    fun clickOpenLinkInAppPromptOpenButton(): BrowserPage {
+        mozClick(BrowserPageSelectors.OPEN_IN_APP_PROMPT_BUTTON)
+        return this
+    }
+
+    fun clickStayInBrowserPromptButton(): BrowserPage {
+        mozClick(BrowserPageSelectors.STAY_IN_FIREFOX_PROMPT_BUTTON)
+        return this
+    }
+
     /**
      * Type a username/password into the web login form. Submitting the form GETs to itself, so after
      * the first save the page reloads; typing the next set of credentials while that reload is still in
@@ -304,11 +344,11 @@ class BrowserPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule
         return this
     }
 
-    fun verifyUrl(url: String): BrowserPage {
+    fun verifyUrl(url: String, timeout: Long = waitingTimeShort): BrowserPage {
         val expectedText = url.replace("http://", "")
         val textMatcher = hasText(expectedText, substring = true, ignoreCase = true)
         try {
-            composeRule.waitUntil(waitingTimeShort) {
+            composeRule.waitUntil(timeout) {
                 composeRule.onAllNodesWithTag(ADDRESSBAR_URL, useUnmergedTree = true)
                     .fetchSemanticsNodes()
                     .any { textMatcher.matches(it) }

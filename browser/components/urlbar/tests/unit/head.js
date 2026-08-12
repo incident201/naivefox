@@ -1077,9 +1077,6 @@ async function check_results({
   const controller = UrlbarTestUtils.newMockController({
     input: {
       isPrivate: context.isPrivate,
-      onFirstResult() {
-        return false;
-      },
       getSearchSource() {
         return "dummy-search-source";
       },

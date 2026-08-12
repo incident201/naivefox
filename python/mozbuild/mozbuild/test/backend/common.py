@@ -264,6 +264,16 @@ CONFIGS = defaultdict(
                 "EXPAND_LIBS_LIST_STYLE": "list",
             },
         },
+        "rust-library-archive-dep": {
+            "defines": {},
+            "substs": {
+                "COMPILE_ENVIRONMENT": "1",
+                "RUST_TARGET": "x86_64-unknown-linux-gnu",
+                "LIB_PREFIX": "lib",
+                "LIB_SUFFIX": "a",
+                "OBJ_SUFFIX": "o",
+            },
+        },
     },
 )
 

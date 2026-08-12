@@ -8,6 +8,7 @@
  */
 
 /**
+ * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
  * @import {Query} from "./UrlbarProvidersManager.sys.mjs"
  * @import {SearchEngine} from "moz-src:///toolkit/components/search/SearchEngine.sys.mjs"
  * @import {SmartbarInput} from "chrome://browser/content/urlbar/SmartbarInput.mjs"
@@ -37,10 +38,6 @@ const lazy = XPCOMUtils.declareLazy({
   SearchSuggestionController:
     "moz-src:///toolkit/components/search/SearchSuggestionController.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
-  UrlbarProviderInterventions:
-    "moz-src:///browser/components/urlbar/UrlbarProviderInterventions.sys.mjs",
-  UrlbarProviderSearchTips:
-    "moz-src:///browser/components/urlbar/UrlbarProviderSearchTips.sys.mjs",
   UrlbarSearchUtils:
     "moz-src:///browser/components/urlbar/UrlbarSearchUtils.sys.mjs",
   UrlUtils: "resource://gre/modules/UrlUtils.sys.mjs",
@@ -187,146 +184,6 @@ export var UrlbarUtils = {
     mimeStream.addHeader("Content-Type", type);
     mimeStream.setData(dataStream);
     return mimeStream.QueryInterface(Ci.nsIInputStream);
-  },
-
-  _compareIgnoringDiacritics: null,
-
-  /**
-   * Returns a list of all the token substring matches in a string.  Matching is
-   * case insensitive.  Each match in the returned list is a tuple: [matchIndex,
-   * matchLength].  matchIndex is the index in the string of the match, and
-   * matchLength is the length of the match.
-   *
-   * @param {Array} tokens The tokens to search for.
-   * @param {string} str The string to match against.
-   * @param {Values<typeof UrlbarShared.HIGHLIGHT>} highlightType
-   *   One of the HIGHLIGHT values:
-   *     TYPED: match ranges matching the tokens; or
-   *     SUGGESTED: match ranges for words not matching the tokens and the
-   *                endings of words that start with a token.
-   *     ALL: match all ranges of str.
-   * @returns {Array} An array: [
-   *            [matchIndex_0, matchLength_0],
-   *            [matchIndex_1, matchLength_1],
-   *            ...
-   *            [matchIndex_n, matchLength_n]
-   *          ].
-   *          The array is sorted by match indexes ascending.
-   */
-  getTokenMatches(tokens, str, highlightType) {
-    if (highlightType == UrlbarShared.HIGHLIGHT.ALL) {
-      return [[0, str.length]];
-    }
-
-    if (!tokens?.length) {
-      return [];
-    }
-
-    // Only search a portion of the string, because not more than a certain
-    // amount of characters are visible in the UI, matching over what is visible
-    // would be expensive and pointless.
-    str = str.substring(0, UrlbarShared.MAX_TEXT_LENGTH).toLocaleLowerCase();
-    // To generate non-overlapping ranges, we start from a 0-filled array with
-    // the same length of the string, and use it as a collision marker, setting
-    // 1 where the text should be highlighted.
-    let hits = new Array(str.length).fill(
-      highlightType == UrlbarShared.HIGHLIGHT.SUGGESTED ? 1 : 0
-    );
-    let compareIgnoringDiacritics;
-    for (let i = 0, totalTokensLength = 0; i < tokens.length; i++) {
-      const { lowerCaseValue: needle } = tokens[i];
-
-      // Ideally we should never hit the empty token case, but just in case
-      // the `needle` check protects us from an infinite loop.
-      if (!needle) {
-        continue;
-      }
-      let index = 0;
-      let found = false;
-      // First try a diacritic-sensitive search.
-      for (;;) {
-        index = str.indexOf(needle, index);
-        if (index < 0) {
-          break;
-        }
-
-        if (highlightType == UrlbarShared.HIGHLIGHT.SUGGESTED) {
-          // We de-emphasize the match only if it's preceded by a space, thus
-          // it's a perfect match or the beginning of a longer word.
-          let previousSpaceIndex = str.lastIndexOf(" ", index) + 1;
-          if (index != previousSpaceIndex) {
-            index += needle.length;
-            // We found the token but we won't de-emphasize it, because it's not
-            // after a word boundary.
-            found = true;
-            continue;
-          }
-        }
-
-        hits.fill(
-          highlightType == UrlbarShared.HIGHLIGHT.SUGGESTED ? 0 : 1,
-          index,
-          index + needle.length
-        );
-        index += needle.length;
-        found = true;
-      }
-      // If that fails to match anything, try a (computationally intensive)
-      // diacritic-insensitive search.
-      if (!found) {
-        if (!compareIgnoringDiacritics) {
-          if (!this._compareIgnoringDiacritics) {
-            // Diacritic insensitivity in the search engine follows a set of
-            // general rules that are not locale-dependent, so use a generic
-            // English collator for highlighting matching words instead of a
-            // collator for the user's particular locale.
-            this._compareIgnoringDiacritics = new Intl.Collator("en", {
-              sensitivity: "base",
-            }).compare;
-          }
-          compareIgnoringDiacritics = this._compareIgnoringDiacritics;
-        }
-        index = 0;
-        while (index < str.length) {
-          let hay = str.substr(index, needle.length);
-          if (compareIgnoringDiacritics(needle, hay) === 0) {
-            if (highlightType == UrlbarShared.HIGHLIGHT.SUGGESTED) {
-              let previousSpaceIndex = str.lastIndexOf(" ", index) + 1;
-              if (index != previousSpaceIndex) {
-                index += needle.length;
-                continue;
-              }
-            }
-            hits.fill(
-              highlightType == UrlbarShared.HIGHLIGHT.SUGGESTED ? 0 : 1,
-              index,
-              index + needle.length
-            );
-            index += needle.length;
-          } else {
-            index++;
-          }
-        }
-      }
-
-      totalTokensLength += needle.length;
-      if (totalTokensLength > UrlbarShared.MAX_TEXT_LENGTH) {
-        // Limit the number of tokens to reduce calculate time.
-        break;
-      }
-    }
-    // Starting from the collision array, generate [start, len] tuples
-    // representing the ranges to be highlighted.
-    let ranges = [];
-    for (let index = hits.indexOf(1); index >= 0 && index < hits.length; ) {
-      let len = 0;
-      // eslint-disable-next-line no-empty
-      for (let j = index; j < hits.length && hits[j]; ++j, ++len) {}
-      ranges.push([index, len]);
-      // Move to the next 1.
-      index = hits.indexOf(1, index + len);
-    }
-    return ranges;
   },
 
   /**
@@ -657,70 +514,25 @@ export var UrlbarUtils = {
   },
 
   /**
-   * Sanitize and process data retrieved from the clipboard
+   * Returns the parts of a string's URI fixup info that a consumer which can't
+   * hold an XPCOM object can use, notably the content realm, which is served
+   * across the `UrlbarChild` actor boundary.
    *
-   * @param {string} clipboardData
-   *   The original data retrieved from the clipboard.
-   * @returns {string}
-   *   The sanitized paste data, ready to use.
+   * @param {string} searchString
+   *   The string to fix up.
+   * @param {boolean} isPrivate
+   *   Whether the fixup runs for a private context.
+   * @returns {?URIFixupPrimitives}
+   *   The fixup primitives, or null if fixup threw.
    */
-  sanitizeTextFromClipboard(clipboardData) {
-    let fixedURI, keywordAsSent;
-    try {
-      ({ fixedURI, keywordAsSent } = Services.uriFixup.getFixupURIInfo(
-        clipboardData,
-        Ci.nsIURIFixup.FIXUP_FLAG_FIX_SCHEME_TYPOS |
-          Ci.nsIURIFixup.FIXUP_FLAG_ALLOW_KEYWORD_LOOKUP
-      ));
-    } catch (e) {}
-
-    let pasteData;
-    if (keywordAsSent) {
-      // For performance reasons, we don't want to beautify a long string.
-      if (clipboardData.length < 500) {
-        // For only keywords, replace any white spaces including line break
-        // with white space.
-        pasteData = clipboardData.replace(/\s/g, " ");
-      } else {
-        pasteData = clipboardData;
-      }
-    } else if (
-      fixedURI?.scheme == "data" &&
-      !fixedURI.spec.match(/^data:.+;base64,/)
-    ) {
-      // For data url without base64, replace line break with white space.
-      pasteData = clipboardData.replace(/[\r\n]/g, " ");
-    } else {
-      // For normal url or data url having basic64, or if fixup failed, just
-      // remove line breaks.
-      pasteData = clipboardData.replace(/[\r\n]/g, "");
-    }
-
-    return this.stripUnsafeProtocolOnPaste(pasteData);
-  },
-
-  /**
-   * Used to filter out the javascript protocol from URIs, since we don't
-   * support LOAD_FLAGS_DISALLOW_INHERIT_PRINCIPAL for those.
-   *
-   * @param {string} pasteData The data to check for javacript protocol.
-   * @returns {string} The modified paste data.
-   */
-  stripUnsafeProtocolOnPaste(pasteData) {
-    for (;;) {
-      let scheme = "";
-      try {
-        scheme = Services.io.extractScheme(pasteData);
-      } catch (ex) {
-        // If it throws, this is not a javascript scheme.
-      }
-      if (scheme != "javascript") {
-        break;
-      }
-
-      pasteData = pasteData.substring(pasteData.indexOf(":") + 1);
-    }
-    return pasteData;
+  getFixupPrimitives(searchString, isPrivate) {
+    let info = this.getURIFixupInfo(searchString, isPrivate);
+    return info
+      ? {
+          keywordAsSent: info.keywordAsSent,
+          preferredURIDisplaySpec: info.preferredURI?.displaySpec ?? null,
+        }
+      : null;
   },
 
   /**
@@ -1592,24 +1404,24 @@ export var UrlbarUtils = {
       case UrlbarShared.RESULT_TYPE.TIP:
         if (result.providerName === "UrlbarProviderInterventions") {
           switch (result.payload.type) {
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.CLEAR:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.CLEAR:
               return "intervention_clear";
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.REFRESH:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.REFRESH:
               return "intervention_refresh";
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.UPDATE_ASK:
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.UPDATE_CHECKING:
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.UPDATE_REFRESH:
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.UPDATE_RESTART:
-            case lazy.UrlbarProviderInterventions.TIP_TYPE.UPDATE_WEB:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_ASK:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_CHECKING:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_REFRESH:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_RESTART:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_WEB:
               return "intervention_update";
             default:
               return "intervention_unknown";
           }
         }
         switch (result.payload.type) {
-          case lazy.UrlbarProviderSearchTips.TIP_TYPE.ONBOARD:
+          case UrlbarShared.SEARCH_TIP_TYPE.ONBOARD:
             return "tip_onboard";
-          case lazy.UrlbarProviderSearchTips.TIP_TYPE.REDIRECT:
+          case UrlbarShared.SEARCH_TIP_TYPE.REDIRECT:
             return "tip_redirect";
           case "dismissalAcknowledgment":
             return "tip_dismissal_acknowledgment";

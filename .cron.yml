@@ -45,7 +45,7 @@ jobs:
       run-on-projects:
           - mozilla-beta
       when:
-          - {weekday: "Friday", hour: 7, minute: 0}
+          - {weekday: "Wednesday", hour: 7, minute: 0}
 
     - name: merge-main-to-beta-dry-run
       job:
@@ -58,7 +58,7 @@ jobs:
       run-on-projects:
           - mozilla-central
       when:
-          - {weekday: "Friday", hour: 7, minute: 0}
+          - {weekday: "Wednesday", hour: 7, minute: 0}
 
     - name: nightly-desktop
       job:
@@ -540,3 +540,13 @@ jobs:
           - mozilla-release
       when:
           - {hour: 2, minute: 0}
+
+    - name: bhr-aggregate
+      job:
+          type: decision-task
+          treeherder-symbol: bhr
+          target-tasks-method: bhr_aggregate
+      run-on-projects:
+          - mozilla-central
+      when:
+          - {hour: 10, minute: 0}

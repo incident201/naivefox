@@ -986,6 +986,10 @@ static nsresult ParseVersion(const nsACString& aVersion,
     version = (version << 16) | SaturatingCast<uint16_t>(fragmentInt);
   }
 
+  if (NS_WARN_IF(fragmentCount == 0)) {
+    return NS_ERROR_FAILURE;
+  }
+
   *aParsedVersion = version << (4 - fragmentCount) * 16;
   return NS_OK;
 }

@@ -7,43 +7,6 @@
 const OVERFLOW_TABS = 5;
 
 /**
- * Opens tabs until the tab strip's content overflows its scrollport by
- * OVERFLOW_TABS tabs.
- *
- * @param {boolean} vertical
- */
-async function overflowTabStrip(vertical) {
-  let tabContainer = gBrowser.tabContainer;
-  let arrowScrollbox = tabContainer.arrowScrollbox;
-  let tabSize = () => {
-    let rect = gBrowser.selectedTab.getBoundingClientRect();
-    return vertical ? rect.height : rect.width;
-  };
-
-  // Adding tabs shrinks them, so the target takes a few steps to reach.
-  while (gBrowser.tabs.length < 100) {
-    let missingSpace =
-      OVERFLOW_TABS * tabSize() -
-      (arrowScrollbox.scrollSize - arrowScrollbox.scrollClientSize);
-    if (missingSpace <= 0) {
-      break;
-    }
-    for (let i = Math.ceil(missingSpace / tabSize()); i > 0; i--) {
-      BrowserTestUtils.addTab(gBrowser, "about:blank", { skipAnimation: true });
-    }
-    await TestUtils.waitForCondition(
-      () => Array.from(gBrowser.tabs).every(tab => tab._fullyOpen),
-      "Tabs are fully open"
-    );
-  }
-
-  await TestUtils.waitForCondition(
-    () => tabContainer.overflowing,
-    "Tab strip is overflowing"
-  );
-}
-
-/**
  * Drags the label of a tab group in an overflowing tab strip, which collapses
  * the group, and asserts that the tabs outside of the group stay where they
  * are, both while dragging and after dropping.
@@ -71,7 +34,10 @@ async function dragTabGroupLabelInOverflowingTabStrip({
   let smoothScroll = arrowScrollbox.smoothScroll;
   arrowScrollbox.smoothScroll = false;
 
-  await overflowTabStrip(vertical);
+  await BrowserTestUtils.overflowTabs(registerCleanupFunction, window, {
+    overflowAtStart: false,
+    overflowBy: OVERFLOW_TABS,
+  });
 
   let tabs = [...gBrowser.tabs];
   let firstGroupedTabIndex = Math.floor(tabs.length / 2);
@@ -192,7 +158,7 @@ add_task(async function test_collapsing_small_group_keeps_tabs_in_place() {
 add_task(async function test_collapsing_large_group_keeps_tabs_in_place() {
   // Enough tabs that the tab strip would stop overflowing.
   await dragTabGroupLabelInOverflowingTabStrip({
-    groupSize: OVERFLOW_TABS + 3,
+    groupSize: OVERFLOW_TABS * 2,
   });
 });
 

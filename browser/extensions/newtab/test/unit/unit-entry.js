@@ -697,6 +697,11 @@ const TEST_GLOBAL = {
         set() {},
       },
     },
+    newtabContent: {
+      surfaceId: {
+        set() {},
+      },
+    },
   },
   GleanPings: {
     newtab: {

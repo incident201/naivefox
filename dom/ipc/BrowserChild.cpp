@@ -598,13 +598,6 @@ BrowserChild::GetChromeFlags(uint32_t* aChromeFlags) {
 }
 
 NS_IMETHODIMP
-BrowserChild::SetChromeFlags(uint32_t aChromeFlags) {
-  NS_WARNING("trying to SetChromeFlags from content process?");
-
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
 BrowserChild::RemoteDropLinks(
     const nsTArray<RefPtr<nsIDroppedLinkItem>>& aLinks) {
   nsTArray<nsString> linksArray;

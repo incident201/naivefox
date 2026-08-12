@@ -885,13 +885,17 @@ add_task(
   async function test_deduplicatesMemoryIds_ChatConversation_receiveResponse() {
     let sandbox = lazy.sinon.createSandbox();
 
-    const mockMemories = [{ id: "mem-1" }, { id: "mem-2" }];
+    const mockMemories = [
+      { id: "mem-1", lifetime_accessed_count: 0, recent_accessed_counts: {} },
+      { id: "mem-2", lifetime_accessed_count: 0, recent_accessed_counts: {} },
+    ];
     sandbox.stub(MemoryStore, "getMemories").resolves(mockMemories);
+    sandbox.stub(MemoryStore, "requestSave").resolves();
 
     const conversation = new ChatConversation({});
     conversation.addAssistantMessage("text", "some response");
     const assistantMsg = conversation.messages.at(-1);
-    assistantMsg.memoriesApplied = ["mem-1", "mem-1", "mem-2", "mem-2"];
+    assistantMsg.tokens.existing_memory = ["mem-1", "mem-1", "mem-2", "mem-2"];
 
     async function* emptyStream() {}
     await conversation.receiveResponse(emptyStream());
@@ -900,7 +904,20 @@ add_task(
       MemoryStore.getMemories.calledOnce,
       "MemoryStore.getMemories should be called exactly once"
     );
-    const { memoryIds } = MemoryStore.getMemories.firstCall.args[0];
+    Assert.ok(
+      MemoryStore.requestSave.calledOnce,
+      "The recorded use should be saved exactly once for the message"
+    );
+    for (const memory of mockMemories) {
+      Assert.equal(
+        memory.lifetime_accessed_count,
+        1,
+        `Use should be recorded once per distinct memory (${memory.id})`
+      );
+    }
+    const memoryIds = new Set(
+      assistantMsg.memoriesApplied.map(memory => memory.id)
+    );
     Assert.equal(
       memoryIds.size,
       2,
@@ -912,6 +929,81 @@ add_task(
       assistantMsg.memoriesApplied,
       mockMemories,
       "memoriesApplied should be set to the resolved memories"
+    );
+
+    sandbox.restore();
+  }
+);
+
+add_task(
+  async function test_resolvesMemoriesOncePerTurn_ChatConversation_receiveResponse() {
+    let sandbox = lazy.sinon.createSandbox();
+
+    const mockMemories = [
+      { id: "mem-1", lifetime_accessed_count: 0, recent_accessed_counts: {} },
+    ];
+    sandbox.stub(MemoryStore, "getMemories").resolves(mockMemories);
+    sandbox.stub(MemoryStore, "requestSave").resolves();
+
+    const conversation = new ChatConversation({});
+    conversation.addAssistantMessage("text", "");
+    const assistantMsg = conversation.messages.at(-1);
+
+    // First turn: The model cites a memory and requests a tool call in the same pass,
+    // so this assistant message keeps streaming after the tool runs.
+    async function* toolCallStream() {
+      yield { text: "Let me check that.§existing_memory: mem-1§" };
+      yield {
+        toolCalls: [
+          { id: "call_1", function: { name: "run_search", arguments: "{}" } },
+        ],
+      };
+    }
+    const withToolCalls = await conversation.receiveResponse(toolCallStream());
+
+    Assert.equal(
+      withToolCalls.pendingToolCalls.length,
+      1,
+      "The first pass should report the pending tool call"
+    );
+    Assert.ok(
+      MemoryStore.getMemories.notCalled,
+      "Use should not be recorded while the turn is still running"
+    );
+    Assert.deepEqual(
+      assistantMsg.memoriesApplied,
+      ["mem-1"],
+      "memoriesApplied should still hold the raw cited id mid-turn"
+    );
+
+    // Second Turn: The same memory is cited again once the tool result is in.
+    async function* finalStream() {
+      yield { text: " Here is what I found.§existing_memory: mem-1§" };
+    }
+    const final = await conversation.receiveResponse(finalStream());
+
+    Assert.equal(
+      final.pendingToolCalls,
+      null,
+      "The final pass should not report any pending tool call"
+    );
+    Assert.ok(
+      MemoryStore.getMemories.calledOnce,
+      "MemoryStore.getMemories should be called exactly once for the turn"
+    );
+    Assert.ok(
+      MemoryStore.requestSave.calledOnce,
+      "The recorded use should be saved exactly once for the turn"
+    );
+    Assert.equal(
+      mockMemories[0].lifetime_accessed_count,
+      1,
+      "Use should be recorded once even though the memory was cited twice"
+    );
+    Assert.deepEqual(
+      assistantMsg.memoriesApplied,
+      mockMemories,
+      "memoriesApplied should end up as the resolved memories"
     );
 
     sandbox.restore();
@@ -1896,6 +1988,85 @@ add_task(function test_addToolCallMessage_emits_message_update() {
       received?.content?.tool_call_id,
       "tc_abc",
       "tool message carries the tool_call_id"
+    );
+  });
+});
+
+add_task(function test_updateToolCallMessage_reconciles_pending_in_place() {
+  const conversation = new ChatConversation({});
+  conversation.addUserMessage("Search the web", null);
+
+  const toolUpdates = [];
+  conversation.on("chat-conversation:message-update", (_event, msg) => {
+    if (msg?.role === MESSAGE_ROLE.TOOL) {
+      toolUpdates.push(msg);
+    }
+  });
+
+  // A slow tool emits a placeholder tool message up front so the action log
+  // can render its pending row.
+  const pending = conversation.addToolCallMessage({
+    tool_call_id: "tc_slow",
+    body: { pending: true },
+    name: "search_the_web",
+  });
+
+  // On completion the same message is reconciled with the real result.
+  const finalized = conversation.updateToolCallMessage(pending, {
+    tool_call_id: "tc_slow",
+    body: { could_answer: true },
+    name: "search_the_web",
+  });
+
+  const toolMessages = conversation.messages.filter(
+    m => m.role === MESSAGE_ROLE.TOOL
+  );
+
+  Assert.withSoftAssertions(function (soft) {
+    soft.strictEqual(
+      finalized,
+      pending,
+      "Reconciles the same message rather than creating a new one"
+    );
+    soft.equal(
+      toolMessages.length,
+      1,
+      "No duplicate tool message is added on reconciliation"
+    );
+    soft.equal(
+      toolMessages[0].content.body.could_answer,
+      true,
+      "Placeholder body is replaced by the real result"
+    );
+    soft.equal(
+      toolUpdates.length,
+      2,
+      "Emits once for the pending row and once for the reconciliation"
+    );
+  });
+});
+
+add_task(function test_updateToolCallMessage_adds_when_no_pending() {
+  const conversation = new ChatConversation({});
+  conversation.addUserMessage("Search the web", null);
+
+  const added = conversation.updateToolCallMessage(null, {
+    tool_call_id: "tc_fresh",
+    body: { ok: true },
+    name: "search_the_web",
+  });
+
+  const toolMessages = conversation.messages.filter(
+    m => m.role === MESSAGE_ROLE.TOOL
+  );
+
+  Assert.withSoftAssertions(function (soft) {
+    soft.ok(added, "Falls back to adding a fresh tool message");
+    soft.equal(toolMessages.length, 1, "Exactly one tool message is present");
+    soft.equal(
+      toolMessages[0].content.tool_call_id,
+      "tc_fresh",
+      "The fresh tool message carries the tool_call_id"
     );
   });
 });

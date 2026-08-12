@@ -30,13 +30,22 @@ from mach.decorators import Command, CommandArgument
 
 
 def _gcp_credentials_ok():
-    """Return True if usable Application Default Credentials are available."""
+    """Return True if usable Application Default Credentials are available.
+
+    Scopes must be requested explicitly: a service-account key (what the
+    TaskCluster cron uses, and what GOOGLE_APPLICATION_CREDENTIALS points at
+    when testing that path locally) comes back unscoped, and refreshing an
+    unscoped service account raises RefreshError. User credentials from
+    `gcloud auth application-default login` are already scoped and ignore this.
+    """
     import google.auth
     import google.auth.transport.requests
     from google.auth.exceptions import DefaultCredentialsError, RefreshError
 
     try:
-        creds, _ = google.auth.default()
+        creds, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
         creds.refresh(google.auth.transport.requests.Request())
         return True
     except (DefaultCredentialsError, RefreshError):

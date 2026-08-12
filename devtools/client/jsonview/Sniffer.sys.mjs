@@ -51,12 +51,14 @@ export class Sniffer {
         }
 
         // Same idea, but for JSON Lines (one JSON value per line):
-        // application/jsonl (the standard type), the older
-        // application/jsonlines and application/x-ndjson spellings, or a
-        // .jsonl file served without a matching (or without any) content type.
-        let isJsonlines = /^application\/(?:jsonl|jsonlines|x-ndjson)$/.test(
-          request.contentType
-        );
+        // application/jsonl (the standard type), the text/jsonl,
+        // application/jsonlines and application/x-ndjson alternate spellings,
+        // or a .jsonl file served without a matching (or without any)
+        // content type.
+        let isJsonlines =
+          /^(?:text\/jsonl|application\/(?:jsonl|jsonlines|x-ndjson))$/.test(
+            request.contentType
+          );
         if (!isJsonlines) {
           try {
             isJsonlines =

@@ -9979,10 +9979,23 @@ class CGMethodCall(CGThing):
         methodName = GetLabelForErrorReporting(descriptor, method, isConstructor)
         argDesc = "argument %d"
 
-        if method.getExtendedAttribute("UseCounter"):
-            useCounterName = methodName.replace(".", "_").replace(" ", "_")
+        useCounterAttr = method.getExtendedAttribute("UseCounter")
+        if useCounterAttr:
+            baseCounterName = methodName.replace(".", "_").replace(" ", "_")
+            perOverload = (
+                isinstance(useCounterAttr, list) and "PerOverload" in useCounterAttr
+            )
         else:
-            useCounterName = None
+            baseCounterName = None
+            perOverload = False
+
+        def signatureCounterName(signature):
+            if not baseCounterName:
+                return None
+            if not perOverload:
+                return baseCounterName
+            suffix = "_".join(arg.type.name for arg in signature[1])
+            return f"{baseCounterName}_{suffix}" if suffix else baseCounterName
 
         if method.isStatic():
             nativeType = descriptor.nativeType
@@ -10012,7 +10025,7 @@ class CGMethodCall(CGThing):
                 method,
                 argConversionStartsAt=argConversionStartsAt,
                 isConstructor=isConstructor,
-                useCounterName=useCounterName,
+                useCounterName=signatureCounterName(signature),
             )
 
         signatures = method.signatures()

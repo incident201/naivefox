@@ -436,22 +436,37 @@ nsresult BounceTrackingState::OnDocumentStartRequest(nsIChannel* aChannel) {
   NS_ENSURE_SUCCESS(rv, rv);
 
   // For http(s) loads the channel we record bounces for must live in the same
-  // container as the BounceTrackingState which owns the per-tab record and
-  // selects the storage partition. This relies on a tab's userContextId staying
-  // constant for its whole lifetime. If that ever changes mid-load, bounces
-  // would be recorded under the tab's original container rather than the one
-  // the load ends up in, and BTP would need to account for the transition.
+  // storage partition as the BounceTrackingState which owns the per-tab record.
   // Non-http(s) channels (e.g. the initial about:blank) are excluded because
   // they do not necessarily carry the tab's OriginAttributes. See Bug 2054941.
+  //
+  // The container is left out of the comparison because a top level load can be
+  // retargeted into a new tab in the container its site is bound to, splitting
+  // one extended navigation across two tabs.
+  //
+  // TODO: Bug 2058145: BTP does not account for those transitions yet: hops
+  // which ran in another container are recorded under this tab's, causing false
+  // negatives and, more problematic, false positives. Bug 2059768 covers the
+  // known cases with todo() expectations.
 #ifdef DEBUG
   if (nsCOMPtr<nsIURI> channelURIForAssert;
       NS_SUCCEEDED(aChannel->GetURI(getter_AddRefs(channelURIForAssert))) &&
       channelURIForAssert &&
       mozilla::net::SchemeIsHttpOrHttps(channelURIForAssert)) {
-    MOZ_ASSERT(
-        loadInfo->GetOriginAttributes().EqualsIgnoringFPD(mOriginAttributes),
-        "BTP: channel OriginAttributes (userContextId/PBM) diverged from the "
-        "cached BounceTrackingState OriginAttributes (Bug 2054941).");
+    constexpr uint32_t kIgnoredForAssert =
+        OriginAttributes::STRIP_FIRST_PARTY_DOMAIN |
+        OriginAttributes::STRIP_PARTITION_KEY |
+        OriginAttributes::STRIP_USER_CONTEXT_ID;
+
+    OriginAttributes channelAttrsForAssert = loadInfo->GetOriginAttributes();
+    channelAttrsForAssert.StripAttributes(kIgnoredForAssert);
+
+    OriginAttributes stateAttrsForAssert = mOriginAttributes;
+    stateAttrsForAssert.StripAttributes(kIgnoredForAssert);
+
+    MOZ_ASSERT(channelAttrsForAssert == stateAttrsForAssert,
+               "BTP: channel OriginAttributes (PBM) diverged from the cached "
+               "BounceTrackingState OriginAttributes (Bug 2054941).");
   }
 #endif
 

@@ -446,7 +446,6 @@ export interface Modules {
   "moz-src:///dom/manifest/ManifestProcessor.sys.mjs": typeof import("moz-src:///dom/manifest/ManifestProcessor.sys.mjs"),
   "moz-src:///dom/notification/MemoryNotificationDB.sys.mjs": typeof import("moz-src:///dom/notification/MemoryNotificationDB.sys.mjs"),
   "moz-src:///dom/notification/NotificationDB.sys.mjs": typeof import("moz-src:///dom/notification/NotificationDB.sys.mjs"),
-  "moz-src:///dom/privateattribution/PrivateAttributionService.sys.mjs": typeof import("moz-src:///dom/privateattribution/PrivateAttributionService.sys.mjs"),
   "moz-src:///intl/locale/LangPackMatcher.sys.mjs": typeof import("moz-src:///intl/locale/LangPackMatcher.sys.mjs"),
   "moz-src:///services/crypto/modules/WeaveCrypto.sys.mjs": typeof import("moz-src:///services/crypto/modules/WeaveCrypto.sys.mjs"),
   "moz-src:///services/crypto/modules/jwcrypto.sys.mjs": typeof import("moz-src:///services/crypto/modules/jwcrypto.sys.mjs"),

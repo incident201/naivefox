@@ -25,8 +25,8 @@ class SmRunSchema(Schema, kw_only=True):
     workdir: Optional[str] = None
     tooltool_downloads: Union[bool, Literal["public", "internal"]]
     # How to clone the upstream repo for the checkout, either "hg" or "git"
-    # (default: "hg")
-    clone_with: Optional[Literal["hg", "git"]] = "hg"
+    # (default: "git")
+    clone_with: Optional[Literal["hg", "git"]] = "git"
 
     def __post_init__(self):
         if self.tooltool_downloads is True:

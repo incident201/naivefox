@@ -61,8 +61,8 @@ class MozharnessTestRunSchema(Schema, kw_only=True):
     # Base work directory used to set up the task.
     workdir: Optional[str] = None
     # How to clone the upstream repo for the checkout, either "hg" or "git"
-    # (default: "hg")
-    clone_with: Optional[Literal["hg", "git"]] = "hg"
+    # (default: "git")
+    clone_with: Optional[Literal["hg", "git"]] = "git"
 
 
 def test_packages_url(taskdesc):

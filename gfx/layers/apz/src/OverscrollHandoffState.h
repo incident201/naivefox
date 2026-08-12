@@ -69,6 +69,10 @@ class OverscrollHandoffChain {
   // Clear overscroll all the way up the chain.
   void ClearOverscroll() const;
 
+  // Clear the handed-off gesture flag all the way up the chain, to be called
+  // when the gesture driving the handoff ends.
+  void ClearScrolledByHandedOffGesture() const;
+
   // Snap back the APZC that is overscrolled on the subset of the chain from
   // |aStart| onwards, if any.
   void SnapBackOverscrolledApzc(const AsyncPanZoomController* aStart) const;
@@ -142,6 +146,8 @@ struct OverscrollHandoffState {
         mChainIndex(0),
         mPanDistance(aPanDistance),
         mScrollSource(aScrollSource) {}
+
+  bool IsScrolledByHandedOffGesture() const;
 
   // The chain of APZCs along which we hand off scroll.
   // This is const to indicate that the chain does not change over the

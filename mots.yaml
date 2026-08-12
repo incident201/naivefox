@@ -8,7 +8,7 @@
 # documentation and how to modify this file.
 repo: mozilla-central
 created_at: '2021-10-14T12:50:40.073465'
-updated_at: '2026-08-05T14:32:47.253074+00:00'
+updated_at: '2026-08-10T15:43:04.147480+00:00'
 export:
   path: ./docs/mots/index.md
   format: md
@@ -105,6 +105,10 @@ people:
     bmo_id: 310076
     name: Tooru Fujisawa
     nick: arai
+  - &artem
+    bmo_id: 783324
+    name: Artem Popov
+    nick: artem
   - &aryx
     bmo_id: 258347
     name: Sebastian Hengst
@@ -125,6 +129,10 @@ people:
     bmo_id: 272464
     name: Bas Schouten
     nick: bas.schouten
+  - &basti
+    bmo_id: 635633
+    name: Sebastian Streich
+    nick: basti
   - &bc
     bmo_id: 23402
     name: Bob Clary
@@ -809,6 +817,10 @@ people:
     bmo_id: 638884
     name: Mandy Cheang
     nick: mcheang
+  - &mcleinman
+    bmo_id: 723979
+    name: Matt Cleinman
+    nick: mcleinman
   - &mconley
     bmo_id: 403756
     name: Mike Conley
@@ -3847,6 +3859,10 @@ modules:
           - *kpatenio
           - *rking
           - *niklas
+          - *basti
+          - *artem
+          - *mcleinman
+          - *baku
         machine_name: ip_protection
 
       - name: In-product Messaging
@@ -4853,5 +4869,5 @@ modules:
         - Ryan Tilder
       group: dev-platform
 hashes:
-  config: e6a958359235fa7c8d84ef7814b347de385b8ed6
-  export: f6110e8837a07e46ce32248ea6460733a76353f3
+  config: 047f362e10b5d3c0d197644c02c888be932b73dd
+  export: b38e97f0df6cea50fe3a137e2bb1a48c1fb3c0f2

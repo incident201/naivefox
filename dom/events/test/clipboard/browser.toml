@@ -30,7 +30,7 @@ skip-if = [
 
 ["browser_document_command_paste_contextmenu_suppression.js"]
 skip-if = [
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && opt && nova", # Bug 2057876
+  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'", # Bug 2057876
 ]
 
 ["browser_document_command_paste_contextmenu_suppression_ext.js"]

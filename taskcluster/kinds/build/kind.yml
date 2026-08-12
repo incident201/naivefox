@@ -42,6 +42,7 @@ task-defaults:
             - terser
             - newtab-node-modules
     run:
+        clone-with: hg
         mozconfig-variant:
             by-release-type:
                 beta: beta

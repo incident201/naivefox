@@ -27,9 +27,6 @@ tags = "bleedover"
 support-files = ["authenticate.sjs"]
 
 ["browser_ext_sidebarAction_incognito.js"]
-skip-if = [
-  "true", # Bug 1575369
-]
 
 ["browser_ext_sidebarAction_runtime.js"]
 

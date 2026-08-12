@@ -33,7 +33,6 @@ import mozilla.components.browser.state.action.ShareResourceAction
 import mozilla.components.browser.state.action.TabListAction.AddTabAction
 import mozilla.components.browser.state.action.TabListAction.RemoveTabAction
 import mozilla.components.browser.state.action.TrackingProtectionAction
-import mozilla.components.browser.state.action.TranslationsAction
 import mozilla.components.browser.state.action.TranslationsAction.SetEngineSupportedAction
 import mozilla.components.browser.state.engine.EngineMiddleware
 import mozilla.components.browser.state.ext.getUrl
@@ -62,6 +61,7 @@ import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.P
 import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.PageOriginContextualMenuInteractions.LoadFromClipboardClicked
 import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.PageOriginContextualMenuInteractions.PasteFromClipboardClicked
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarAction
+import mozilla.components.compose.browser.toolbar.store.BrowserToolbarInteraction
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarInteraction.BrowserToolbarEvent
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarInteraction.BrowserToolbarEvent.Source
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarInteraction.BrowserToolbarMenu
@@ -151,6 +151,7 @@ import org.mozilla.fenix.components.toolbar.BrowserToolbarTestTags.SITE_INFO_TRA
 import org.mozilla.fenix.components.toolbar.BrowserToolbarTestTags.SITE_INFO_UNKNOWN
 import org.mozilla.fenix.components.toolbar.DisplayActions.AddBookmarkClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.EditBookmarkClicked
+import org.mozilla.fenix.components.toolbar.DisplayActions.EditShortcutClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.HomepageClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.MenuClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.NavigateBackClicked
@@ -159,6 +160,7 @@ import org.mozilla.fenix.components.toolbar.DisplayActions.NavigateForwardClicke
 import org.mozilla.fenix.components.toolbar.DisplayActions.NavigateForwardLongClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.RefreshClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.ShareClicked
+import org.mozilla.fenix.components.toolbar.DisplayActions.ShortcutLongClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.StopRefreshClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.SummarizeClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.TranslateClicked
@@ -263,7 +265,7 @@ class BrowserToolbarMiddlewareTest {
         val newTabButton = toolbarBrowserActions[0]
         val tabCounterButton = toolbarBrowserActions[1] as TabCounterAction
         val menuButton = toolbarBrowserActions[2]
-        assertEquals(expectedNewTabButton(), newTabButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), newTabButton as ActionButtonRes)
         assertEqualsTabCounterButton(expectedTabCounterButton(), tabCounterButton)
         assertEquals(expectedMenuButton(), menuButton)
     }
@@ -277,7 +279,7 @@ class BrowserToolbarMiddlewareTest {
         val newTabButton = toolbarBrowserActions[0]
         val tabCounterButton = toolbarBrowserActions[1] as TabCounterAction
         val menuButton = toolbarBrowserActions[2]
-        assertEquals(expectedNewTabButton(), newTabButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), newTabButton as ActionButtonRes)
         assertEqualsTabCounterButton(expectedBottomTabCounterButton(), tabCounterButton)
         assertEquals(expectedMenuButton(), menuButton)
     }
@@ -405,7 +407,7 @@ class BrowserToolbarMiddlewareTest {
         val newTabButton = toolbarBrowserActions[0]
         val tabCounterButton = toolbarBrowserActions[1] as TabCounterAction
         val menuButton = toolbarBrowserActions[2]
-        assertEquals(expectedNewTabButton(), newTabButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), newTabButton as ActionButtonRes)
         assertEqualsTabCounterButton(expectedTabCounterButton(), tabCounterButton)
         assertEquals(expectedMenuButton(), menuButton)
     }
@@ -432,7 +434,7 @@ class BrowserToolbarMiddlewareTest {
         val newTabButton = toolbarBrowserActions[0] as ActionButtonRes
         val tabCounterButton = toolbarBrowserActions[1] as TabCounterAction
         val menuButton = toolbarBrowserActions[2] as ActionButtonRes
-        assertEquals(expectedNewTabButton(), newTabButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), newTabButton)
         assertEqualsTabCounterButton(expectedTabCounterButton(), tabCounterButton)
         assertEquals(expectedMenuButton(), menuButton)
 
@@ -1356,7 +1358,7 @@ class BrowserToolbarMiddlewareTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedShareButton(), shareButton)
+        assertEqualsShortcutButton(expectedShareButton(), shareButton)
 
         toolbarStore.dispatch(shareButton.onClick as BrowserToolbarEvent)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -1393,7 +1395,7 @@ class BrowserToolbarMiddlewareTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedShareButton(), shareButton)
+        assertEqualsShortcutButton(expectedShareButton(), shareButton)
 
         toolbarStore.dispatch(shareButton.onClick as BrowserToolbarEvent)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -1437,7 +1439,7 @@ class BrowserToolbarMiddlewareTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedShareButton(), shareButton)
+        assertEqualsShortcutButton(expectedShareButton(), shareButton)
 
         toolbarStore.dispatch(shareButton.onClick as BrowserToolbarEvent)
         verify {
@@ -1516,7 +1518,7 @@ class BrowserToolbarMiddlewareTest {
         val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         val menuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
-        assertEquals(expectedShareButton(), shortcutButton)
+        assertEqualsShortcutButton(expectedShareButton(), shortcutButton)
         assertNotEquals(expectedNewTabButton(), shortcutButton)
         assertEqualsTabCounterButton(expectedTabCounterButton(), tabCounterButton)
         assertEquals(expectedMenuButton(), menuButton)
@@ -1553,7 +1555,7 @@ class BrowserToolbarMiddlewareTest {
         val shortcutButton = toolbarBrowserActions[0] as ActionButtonRes
         val tabCounterButton = toolbarBrowserActions[1] as TabCounterAction
         val menuButton = toolbarBrowserActions[2] as ActionButtonRes
-        assertEquals(expectedShareButton(), shortcutButton)
+        assertEqualsShortcutButton(expectedShareButton(), shortcutButton)
         assertNotEquals(expectedNewTabButton(), shortcutButton)
         assertEqualsTabCounterButton(expectedTabCounterButton(), tabCounterButton)
         assertEquals(expectedMenuButton(), menuButton)
@@ -3347,7 +3349,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore(middleware)
 
         val homepageButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedHomepageButton(), homepageButton)
+        assertEqualsShortcutButton(expectedHomepageButton(), homepageButton)
     }
 
     @Test
@@ -3356,7 +3358,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val bookmarkButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedBookmarkButton(), bookmarkButton)
+        assertEqualsShortcutButton(expectedBookmarkButton(), bookmarkButton)
     }
 
     @Test
@@ -3384,7 +3386,7 @@ class BrowserToolbarMiddlewareTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val editButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedEditBookmarkButton(), editButton)
+        assertEqualsShortcutButton(expectedEditBookmarkButton(), editButton)
     }
 
     @Test
@@ -3402,7 +3404,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val translateButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedTranslateButton(), translateButton)
+        assertEqualsShortcutButton(expectedTranslateButton(), translateButton)
     }
 
     @Test
@@ -3420,7 +3422,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val translateButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedTranslateButton(isActive = true), translateButton)
+        assertEqualsShortcutButton(expectedTranslateButton(isActive = true), translateButton)
     }
 
     @Test
@@ -3433,7 +3435,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore(middleware)
 
         val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedNewTabButton(), shortcutButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), shortcutButton)
     }
 
     @Test
@@ -3448,7 +3450,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore(middleware)
 
         val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedNewTabButton(), shortcutButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), shortcutButton)
     }
 
     @Test
@@ -3458,7 +3460,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore(
             buildMiddleware(translationsFeatureSettings = translationsFeatureSettings),
         )
-        assertEquals(
+        assertEqualsShortcutButton(
             expectedNewTabButton(),
             toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes,
         )
@@ -3466,7 +3468,7 @@ class BrowserToolbarMiddlewareTest {
         translationsFeatureSettings.setEnabled(true)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(
+        assertEqualsShortcutButton(
             expectedTranslateButton(),
             toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes,
         )
@@ -3485,7 +3487,7 @@ class BrowserToolbarMiddlewareTest {
                 browserStore = browserStore,
             ),
         )
-        assertEquals(
+        assertEqualsShortcutButton(
             expectedNewTabButton(),
             toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes,
         )
@@ -3493,7 +3495,7 @@ class BrowserToolbarMiddlewareTest {
         browserStore.dispatch(SetEngineSupportedAction(true))
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(
+        assertEqualsShortcutButton(
             expectedTranslateButton(),
             toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes,
         )
@@ -3506,7 +3508,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val homepageButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedHomepageButton(), homepageButton)
+        assertEqualsShortcutButton(expectedHomepageButton(), homepageButton)
     }
 
     @Test
@@ -3517,7 +3519,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedSummarizeButton(), shortcutButton)
+        assertEqualsShortcutButton(expectedSummarizeButton(), shortcutButton)
     }
 
     @Test
@@ -3528,7 +3530,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedNewTabButton(), shortcutButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), shortcutButton)
     }
 
     @Test
@@ -3542,7 +3544,7 @@ class BrowserToolbarMiddlewareTest {
         )
 
         val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedSummarizeButton(state = ActionButton.State.DISABLED), shortcutButton)
+        assertEqualsShortcutButton(expectedSummarizeButton(state = ActionButton.State.DISABLED), shortcutButton)
     }
 
     @Test
@@ -3569,7 +3571,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val backButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedGoBackButton(isActive = false), backButton)
+        assertEqualsShortcutButton(expectedGoBackButton(isActive = false), backButton)
     }
 
     @Test
@@ -3592,7 +3594,7 @@ class BrowserToolbarMiddlewareTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val backButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedGoBackButton(), backButton)
+        assertEqualsShortcutButton(expectedGoBackButton(), backButton)
     }
 
     @Test
@@ -3611,7 +3613,7 @@ class BrowserToolbarMiddlewareTest {
         val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         val menuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
-        assertEquals(expectedShareButton(), shareButton)
+        assertEqualsShortcutButton(expectedShareButton(), shareButton)
         assertEqualsTabCounterButton(expectedTabCounterButton(), tabCounterButton)
         assertNotEquals(expectedShareButton(), menuButton)
     }
@@ -3625,7 +3627,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val primaryButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedBookmarkButton(), primaryButton)
+        assertEqualsShortcutButton(expectedBookmarkButton(), primaryButton)
         assertNotEquals(expectedNewTabButton(), primaryButton)
     }
 
@@ -3637,7 +3639,7 @@ class BrowserToolbarMiddlewareTest {
         val toolbarStore = buildStore()
 
         val primaryButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
-        assertEquals(expectedNewTabButton(), primaryButton)
+        assertEqualsShortcutButton(expectedNewTabButton(), primaryButton)
     }
 
     @Test
@@ -3651,6 +3653,38 @@ class BrowserToolbarMiddlewareTest {
         assertEquals(2, browserEndActions.size)
         assertEqualsTabCounterButton(expectedBottomTabCounterButton(), browserEndActions.first() as TabCounterAction)
         assertEquals(expectedMenuButton(), browserEndActions.last())
+    }
+
+    @Test
+    fun `GIVEN a shortcut is shown in the toolbar WHEN long clicking it THEN show a menu for editing the shortcut`() = runTest(testDispatcher) {
+        settings.toolbarSimpleShortcutKey = ShortcutType.HOMEPAGE.value
+
+        val toolbarStore = buildStore()
+
+        val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
+        assertEqualsShortcutLongClick(shortcutButton.onLongClick)
+    }
+
+    @Test
+    fun `WHEN choosing to edit the shortcut THEN navigate to the toolbar shortcut setting`() = runTest(testDispatcher) {
+        every { navController.currentDestination?.id } returns R.id.browserFragment
+        val toolbarStore = buildStore()
+        val shortcutButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
+        val editShortcutOption = assertIs<CombinedEventAndMenu>(shortcutButton.onLongClick)
+            .menu.items().first() as BrowserToolbarMenuButton
+
+        toolbarStore.dispatch(editShortcutOption.onClick!!)
+
+        verify {
+            navController.navigate(
+                BrowserFragmentDirections.actionGlobalCustomizationFragment(
+                    preferenceToScrollTo = testContext.getString(
+                        R.string.pref_key_customization_category_toolbar_shortcut,
+                    ),
+                ),
+                null,
+            )
+        }
     }
 
     @Test
@@ -3814,6 +3848,41 @@ class BrowserToolbarMiddlewareTest {
             }
         }
     }
+
+    /**
+     * Assert that [actual] is the [expected] toolbar button, configured as a customizable shortcut which when
+     * long clicked should show a menu allowing to edit which shortcut is shown.
+     */
+    private fun assertEqualsShortcutButton(
+        expected: ActionButtonRes,
+        actual: ActionButtonRes,
+        source: Source = Source.AddressBar.BrowserEnd,
+    ) {
+        assertEquals(expected, actual.copy(onLongClick = expected.onLongClick))
+        assertEqualsShortcutLongClick(actual.onLongClick, source)
+    }
+
+    /**
+     * Assert that [actual] is how long clicking a toolbar shortcut is handled - dispatching an event
+     * for recording telemetry and showing a menu allowing to edit which shortcut is shown.
+     */
+    private fun assertEqualsShortcutLongClick(
+        actual: BrowserToolbarInteraction?,
+        source: Source = Source.AddressBar.BrowserEnd,
+    ) {
+        val longClick = assertIs<CombinedEventAndMenu>(actual)
+        assertEquals(ShortcutLongClicked(source), longClick.event)
+        assertEquals(expectedEditShortcutMenuItems(source), longClick.menu.items())
+    }
+
+    private fun expectedEditShortcutMenuItems(source: Source = Source.AddressBar.BrowserEnd) = listOf(
+        BrowserToolbarMenuButton(
+            icon = null,
+            text = StringResText(R.string.toolbar_shortcut_menu_edit_option),
+            contentDescription = StringResContentDescription(R.string.toolbar_shortcut_menu_edit_option),
+            onClick = EditShortcutClicked(source),
+        ),
+    )
 
     private fun assertEqualsOrigin(expected: PageOrigin, actual: PageOrigin) {
         assertEquals(expected.hint, actual.hint)

@@ -41,6 +41,7 @@ class nsIAnimationObserver;
 class nsIContent;
 class nsIContentSecurityPolicy;
 class nsIFrame;
+class nsIGlobalObject;
 class nsIFormControl;
 class nsMultiMutationObserver;
 class nsINode;
@@ -1684,6 +1685,8 @@ class nsINode : public mozilla::dom::EventTarget {
    *                aParent's children. May be null. If not null then aNode
    *                must be an nsIContent.
    * @param aError The error, if any.
+   * @param aFallbackRegistry A custom element registry to fallback to if
+   *                          aNode's registry is null.
    *
    * @return If aClone is true then the cloned node will be returned,
    *          unless an error occurred.  In error conditions, null
@@ -1692,7 +1695,8 @@ class nsINode : public mozilla::dom::EventTarget {
   static already_AddRefed<nsINode> CloneAndAdopt(
       nsINode* aNode, bool aClone, bool aDeep,
       nsNodeInfoManager* aNewNodeInfoManager, nsIGlobalObject* aNewScope,
-      nsINode* aParent, mozilla::ErrorResult& aError);
+      nsINode* aParent, mozilla::ErrorResult& aError,
+      mozilla::dom::CustomElementRegistry* aFallbackRegistry = nullptr);
 
  public:
   /**
@@ -1720,12 +1724,15 @@ class nsINode : public mozilla::dom::EventTarget {
    *                            descendants. May be null if the nodeinfos
    *                            shouldn't be changed.
    * @param aError The error, if any.
+   * @param aFallbackRegistry A custom element registry to fallback to if
+   *                          aNode's registry is null.
    *
    * @return The newly created node.  Null in error conditions.
    */
-  already_AddRefed<nsINode> Clone(bool aDeep,
-                                  nsNodeInfoManager* aNewNodeInfoManager,
-                                  mozilla::ErrorResult& aError);
+  already_AddRefed<nsINode> Clone(
+      bool aDeep, nsNodeInfoManager* aNewNodeInfoManager,
+      mozilla::ErrorResult& aError,
+      mozilla::dom::CustomElementRegistry* aFallbackRegistry = nullptr);
 
   /**
    * Clones this node. This needs to be overriden by all node classes. aNodeInfo

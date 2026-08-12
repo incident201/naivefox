@@ -6,6 +6,7 @@
 #include "mozAutoDocUpdate.h"
 #include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/Likely.h"
+#include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/dom/Comment.h"
 #include "mozilla/dom/CustomElementRegistry.h"
 #include "mozilla/dom/DocGroup.h"
@@ -409,6 +410,10 @@ nsresult nsHtml5TreeOperation::AppendChildrenToNewParent(
     aNode->RemoveChildNode(child, true, nullptr, nullptr,
                            MutationEffectOnScript::KeepTrustWorthiness);
 
+    if (MOZ_UNLIKELY(aParent->IsInclusiveDescendantOf(child))) {
+      continue;
+    }
+
     ErrorResult rv;
     aParent->AppendChildTo(child, false, rv);
     if (rv.Failed()) {
@@ -624,6 +629,18 @@ nsIContent* nsHtml5TreeOperation::CreateHTMLElement(
       nsContentUtils::GetCustomElementRegistry(aIntendedParent);
   if (customElementRegistry.isNothing()) {
     customElementRegistry = std::move(aContextRegistry);
+  }
+
+  // https://github.com/whatwg/html/pull/12000
+  // https://html.spec.whatwg.org/#create-an-element-for-the-token
+  // Step 6: "If token has a customelementregistry attribute, then set registry
+  // to null." This opts the element (and its descendants, which inherit via
+  // intendedParent) out of all registries, overriding any inherited or context
+  // registry.
+  if (aAttributes &&
+      StaticPrefs::dom_scoped_custom_element_registries_enabled() &&
+      aAttributes->contains(nsHtml5AttributeName::ATTR_CUSTOMELEMENTREGISTRY)) {
+    customElementRegistry = Some(RefPtr<CustomElementRegistry>(nullptr));
   }
 
   // 7. Let definition be the result of looking up a custom element definition

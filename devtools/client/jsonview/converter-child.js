@@ -200,7 +200,7 @@ function fixSave(request, isJsonlines) {
     try {
       const header = request.getResponseHeader("Content-Type");
       match = header.match(
-        /^(application\/(?:[^;]+\+)?json|application\/(?:jsonl|jsonlines|x-ndjson))(?:;|$)/
+        /^(application\/(?:[^;]+\+)?json|text\/jsonl|application\/(?:jsonl|jsonlines|x-ndjson))(?:;|$)/
       );
     } catch (err) {
       // Handled below
@@ -208,7 +208,7 @@ function fixSave(request, isJsonlines) {
   } else {
     const uri = request.QueryInterface(Ci.nsIChannel).URI.spec;
     match = uri.match(
-      /^data:(application\/(?:[^;,]+\+)?json|application\/(?:jsonl|jsonlines|x-ndjson))[;,]/
+      /^data:(application\/(?:[^;,]+\+)?json|text\/jsonl|application\/(?:jsonl|jsonlines|x-ndjson))[;,]/
     );
   }
   let originalType;

@@ -67,6 +67,10 @@ void OverscrollHandoffChain::ClearOverscroll() const {
   ForEachApzc(&AsyncPanZoomController::ClearOverscroll);
 }
 
+void OverscrollHandoffChain::ClearScrolledByHandedOffGesture() const {
+  ForEachApzc(&AsyncPanZoomController::ClearScrolledByHandedOffGesture);
+}
+
 void OverscrollHandoffChain::SnapBackOverscrolledApzc(
     const AsyncPanZoomController* aStart) const {
   uint32_t i = IndexOf(aStart);
@@ -221,6 +225,15 @@ bool OverscrollHandoffChain::ScrollingUpWillTriggerPullToRefresh(
     }
   }
   return false;
+}
+
+bool OverscrollHandoffState::IsScrolledByHandedOffGesture() const {
+  // A chain index > 0 means the gesture originated on a descendant APZ
+  // and was handed off to this one, rather than starting here.
+  return mChainIndex > 0 &&
+         (mScrollSource == ScrollSource::Touchscreen ||
+          mScrollSource == ScrollSource::Touchpad) &&
+         mChain.GetApzcAtIndex(0)->IsInScrollingGesture();
 }
 
 }  // namespace layers

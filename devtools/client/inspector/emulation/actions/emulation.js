@@ -5,22 +5,22 @@
 "use strict";
 
 const {
-  SET_COLOR_SCHEME_SIMULATION,
-  SET_PRINT_SIMULATION_ENABLED,
+  SET_COLOR_SCHEME_EMULATION,
+  SET_PRINT_EMULATION_ENABLED,
   SET_REDUCED_MOTION_EMULATION,
 } = require("resource://devtools/client/inspector/emulation/actions/index.js");
 
 module.exports = {
-  setColorSchemeSimulation(colorScheme) {
+  setColorSchemeEmulation(colorScheme) {
     return {
-      type: SET_COLOR_SCHEME_SIMULATION,
+      type: SET_COLOR_SCHEME_EMULATION,
       colorScheme,
     };
   },
 
-  setPrintSimulationEnabled(enabled) {
+  setPrintEmulationEnabled(enabled) {
     return {
-      type: SET_PRINT_SIMULATION_ENABLED,
+      type: SET_PRINT_EMULATION_ENABLED,
       enabled,
     };
   },

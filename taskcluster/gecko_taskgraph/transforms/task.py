@@ -2421,6 +2421,7 @@ def set_task_and_artifact_expiry(config, jobs):
         job_expiry_from_now = fromNow(job_expiry, now)
         if cap and job_expiry_from_now > cap_from_now:
             job_expiry, job_expiry_from_now = cap, cap_from_now
+            job["expires-after"] = job_expiry
         # If the task has no explicit expiration-policy, but has an expires-after,
         # we use that as the default artifact expiry.
         artifact_expires = expires if "expiration-policy" in job else job_expiry

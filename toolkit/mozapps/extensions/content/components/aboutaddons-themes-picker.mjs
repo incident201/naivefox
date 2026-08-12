@@ -226,7 +226,6 @@ export class AboutaddonsThemesPicker extends MozLitElement {
                   ></span>
                   <moz-button
                     size="small"
-                    type="ghost"
                     data-l10n-id=${this.#buttonL10nId(themeId)}
                     ?hidden=${this.#isButtonHidden(themeId)}
                     @click=${() => this.#onButtonClick(themeId)}

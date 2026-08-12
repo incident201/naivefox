@@ -1002,19 +1002,20 @@ already_AddRefed<gfxFontEntry> gfxDWriteFontList::LookupLocalFont(
 already_AddRefed<gfxFontEntry> gfxDWriteFontList::MakePlatformFont(
     const nsACString& aFontName, WeightRange aWeightForEntry,
     WidthRange aWidthForEntry, SlantStyleRange aStyleForEntry,
-    const uint8_t* aFontData, uint32_t aLength) {
+    FontData* aFontData) {
   RefPtr<gfxDWriteFontFileStream> fontFileStream;
   RefPtr<IDWriteFontFile> fontFile;
+  // This will create a gfxDWriteFontFileStream that wraps aFontData and
+  // retains a reference to it as long as required.
   HRESULT hr = gfxDWriteFontFileLoader::CreateCustomFontFile(
-      aFontData, aLength, getter_AddRefs(fontFile),
-      getter_AddRefs(fontFileStream));
-  free((void*)aFontData);
+      aFontData, getter_AddRefs(fontFile), getter_AddRefs(fontFileStream));
+
   NS_ASSERTION(SUCCEEDED(hr), "Failed to create font file reference");
   if (FAILED(hr)) {
     return nullptr;
   }
 
-  nsAutoString uniqueName;
+  nsAutoCString uniqueName;
   nsresult rv = gfxFontUtils::MakeUniqueUserFontName(uniqueName);
   NS_ASSERTION(NS_SUCCEEDED(rv), "Failed to make unique user font name");
   if (NS_FAILED(rv)) {
@@ -1025,9 +1026,9 @@ already_AddRefed<gfxFontEntry> gfxDWriteFontList::MakePlatformFont(
   DWRITE_FONT_FILE_TYPE fileType;
   UINT32 numFaces;
 
-  RefPtr entry = MakeRefPtr<gfxDWriteFontEntry>(
-      NS_ConvertUTF16toUTF8(uniqueName), fontFile, fontFileStream,
-      aWeightForEntry, aWidthForEntry, aStyleForEntry);
+  RefPtr entry = MakeRefPtr<gfxDWriteFontEntry>(uniqueName, fontFile,
+                                                fontFileStream, aWeightForEntry,
+                                                aWidthForEntry, aStyleForEntry);
 
   hr = fontFile->Analyze(&isSupported, &fileType, &entry->mFaceType, &numFaces);
   NS_ASSERTION(SUCCEEDED(hr), "IDWriteFontFile::Analyze failed");

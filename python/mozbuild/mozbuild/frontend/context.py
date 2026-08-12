@@ -2532,8 +2532,9 @@ VARIABLES = {
               attribute to use for GENERATED_FILES for the specified action.
             - install_static_libs, a list of gyp ``static_library`` target names
               whose output should be installed to ``$(DIST)/lib``. Equivalent
-              to setting ``DIST_INSTALL = True`` on those targets, but selective
-              rather than affecting every target in the gyp directory.
+              to setting ``BUILD_STATIC_LIB_ARCHIVE = True`` and
+              ``DIST_INSTALL = True`` on those targets, but selective rather
+              than affecting every target in the gyp directory.
 
         Typical use looks like::
 
@@ -2804,8 +2805,18 @@ VARIABLES = {
     "NO_EXPAND_LIBS": (
         bool,
         bool,
-        """Forces to build a real static library, and no corresponding fake
-           library.
+        """Consumers link the static library archive instead of the expanded
+           object files. Implies BUILD_STATIC_LIB_ARCHIVE.
+        """,
+    ),
+    "BUILD_STATIC_LIB_ARCHIVE": (
+        bool,
+        bool,
+        """Builds the static library archive without changing consumer
+           linkage. Consumers continue to link the expanded object files.
+
+           Use this when a consumer outside mozbuild's linkage, such as a cargo
+           link directive, needs the archive to exist.
         """,
     ),
     "USE_NASM": (

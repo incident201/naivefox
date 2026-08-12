@@ -1269,7 +1269,7 @@ export function CollapseToggle(props) {
     <>
       {novaEnabled ? (
         <moz-button
-          type="icon"
+          type="primary"
           className={className}
           title={label}
           aria-label={label}

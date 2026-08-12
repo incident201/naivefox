@@ -1530,9 +1530,9 @@ class RecursiveMakeBackend(MakeBackend):
         backend_file.write_once("LIBRARY_NAME := %s\n" % libdef.basename)
         backend_file.write("FORCE_STATIC_LIB := 1\n")
         backend_file.write("REAL_LIBRARY := %s\n" % libdef.lib_name)
-        if libdef.no_expand_lib:
-            backend_file.write("NO_EXPAND_LIBS := 1\n")
-        if libdef.no_expand_lib and libdef._context.get("DIST_INSTALL"):
+        if libdef.build_static_lib_archive:
+            backend_file.write("LIBRARY := $(REAL_LIBRARY)\n")
+        if libdef.build_static_lib_archive and libdef._context.get("DIST_INSTALL"):
             backend_file.write("STATIC_LIB_FILES := $(REAL_LIBRARY)\n")
             backend_file.write("STATIC_LIB_DEST := $(DIST)/lib\n")
             backend_file.write("STATIC_LIB_TARGET := target\n")
@@ -1615,7 +1615,7 @@ class RecursiveMakeBackend(MakeBackend):
                 ),
             )
             or isinstance(obj, (StaticLibrary, SandboxedWasmLibrary))
-            and obj.no_expand_lib
+            and obj.build_static_lib_archive
         ):
             response_file_path = "%s.list" % obj.name.replace(".", "_")
             response_file_ref = self._make_ar_response_file(
@@ -1661,7 +1661,10 @@ class RecursiveMakeBackend(MakeBackend):
             elif obj.KIND == "host":
                 backend_file.write_once("HOST_EXTRA_LIBS += %s\n" % lib)
 
-        if not isinstance(obj, (StaticLibrary, HostLibrary)) or obj.no_expand_lib:
+        if (
+            not isinstance(obj, (StaticLibrary, HostLibrary))
+            or obj.build_static_lib_archive
+        ):
             # This will create the node even if there aren't any linked libraries.
             build_target = self._build_target_for_obj(obj)
             self._compile_graph[build_target]

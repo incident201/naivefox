@@ -122,6 +122,12 @@ class RegExpMacroAssemblerTracer : public RegExpMacroAssembler {
   void set_global_mode(GlobalMode mode) override;
   void set_backtrack_limit(uint32_t backtrack_limit) override;
   void set_can_fallback(bool val) override;
+  void set_fail_label(Label* label) override {
+    assembler_->set_fail_label(label);
+  }
+  bool prologue_pushes_fail_label() const override {
+    return assembler_->prologue_pushes_fail_label();
+  }
 
  private:
   js::UniquePtr<RegExpMacroAssembler> assembler_;

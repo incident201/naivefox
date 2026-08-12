@@ -54,8 +54,8 @@ function stateWithMessage(message, trackersToday = 87, sitesToday = 9) {
 }
 
 function renderPrivacy(dispatch = jest.fn(), props = {}, state = mockState) {
-  const { container, unmount } = render(
-    <WrapWithProvider state={state}>
+  const tree = currentState => (
+    <WrapWithProvider state={currentState}>
       <Privacy
         dispatch={dispatch}
         widgetsMayBeMaximized={true}
@@ -64,7 +64,13 @@ function renderPrivacy(dispatch = jest.fn(), props = {}, state = mockState) {
       />
     </WrapWithProvider>
   );
-  return { container, unmount, dispatch };
+  const { container, unmount, rerender } = render(tree(state));
+  return {
+    container,
+    unmount,
+    dispatch,
+    rerenderWithState: nextState => rerender(tree(nextState)),
+  };
 }
 
 describe("Privacy widget", () => {
@@ -425,5 +431,460 @@ describe("Privacy widget", () => {
         action.data.user_action === "message_cta"
     );
     expect(userEvent[0].data.action_value).toBe("newtab-privacy-blank");
+  });
+});
+
+describe("Privacy widget celebration", () => {
+  const anAward = (fromCount, toCount, awardedAt = 1000) => ({
+    awardedAt,
+    fromCount,
+    toCount,
+  });
+
+  const markCalls = dispatch =>
+    dispatch.mock.calls.filter(
+      ([action]) => action.type === at.WIDGETS_PRIVACY_MARK_CELEBRATED
+    );
+
+  // Only that the count-up starts from fromCount. The reason it runs in a
+  // layout effect — so the first *painted* frame isn't the final number — is
+  // not covered: RTL flushes passive effects inside act(), and jsdom never
+  // paints, so this passes under useEffect too. Needs a real browser.
+  it("starts the count-up at fromCount, not the final count", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137) },
+        137
+      )
+    );
+    expect(container.querySelector(".privacy-count-number").textContent).toBe(
+      "100"
+    );
+  });
+
+  it("hides the animating count from AT and exposes a stable one", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137) },
+        137
+      )
+    );
+
+    const visible = container.querySelector(".privacy-count-number");
+    const accessible = container.querySelector(".privacy-count-number-a11y");
+
+    expect(visible.getAttribute("aria-hidden")).toBe("true");
+    expect(visible.textContent).toBe("100");
+    // Mid-animation the visible number is stale; AT still gets the true count.
+    expect(accessible.textContent).toBe("137");
+    expect(accessible.getAttribute("aria-hidden")).toBeNull();
+  });
+
+  it("keeps the accessible count capped in step with the visible one", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-daily-cap",
+          category: "dailyCap",
+          countCeiling: 100,
+          celebration: anAward(100, 137),
+        },
+        137
+      )
+    );
+
+    expect(container.querySelector(".privacy-count-number").textContent).toBe(
+      "100+"
+    );
+    expect(
+      container.querySelector(".privacy-count-number-a11y").textContent
+    ).toBe("100+");
+  });
+
+  it("plays the celebration when the feed awards one", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137) },
+        137
+      )
+    );
+    expect(container.querySelector(".privacy-celebration")).toBeTruthy();
+    expect(
+      container.querySelectorAll(".privacy-celebration-sparkle").length
+    ).toBeGreaterThan(0);
+  });
+
+  it("acknowledges the award so a later tab can't replay it", () => {
+    const dispatch = jest.fn();
+    renderPrivacy(
+      dispatch,
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137, 777) },
+        137
+      )
+    );
+    const marks = markCalls(dispatch);
+    expect(marks.length).toBe(1);
+    expect(marks[0][0].data).toBe(777);
+  });
+
+  it("does not celebrate without an award", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage({ variant: "blank" }, 4000)
+    );
+    expect(container.querySelector(".privacy-celebration")).toBeNull();
+  });
+
+  it("uses the loud tier with a ring only on the daily-cap render", () => {
+    const plain = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137) },
+        137
+      )
+    );
+    expect(
+      plain.container.querySelector(".privacy-celebration-ring")
+    ).toBeNull();
+
+    const cap = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-daily-cap",
+          category: "dailyCap",
+          countCeiling: 100,
+          celebration: anAward(100, 137),
+        },
+        137
+      )
+    );
+    expect(
+      cap.container.querySelector(".privacy-celebration-ring")
+    ).toBeTruthy();
+    expect(
+      cap.container.querySelectorAll(".privacy-celebration-sparkle")
+    ).toHaveLength(24);
+  });
+
+  it("keeps the tier and ring it started with when the message changes mid-animation", () => {
+    const { container, rerenderWithState } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-daily-cap",
+          category: "dailyCap",
+          icon: "kit",
+          countCeiling: 100,
+          celebration: anAward(100, 137),
+        },
+        137
+      )
+    );
+    expect(
+      container.querySelectorAll(".privacy-celebration-sparkle")
+    ).toHaveLength(24);
+    expect(container.querySelector(".privacy-celebration-ring")).toBeTruthy();
+
+    // A refresh swaps an ordinary tip in under the running animation. Same
+    // award, so nothing re-triggers — the look must not downgrade mid-flight.
+    rerenderWithState(
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-info-5",
+          category: "info",
+          icon: "kit",
+          celebration: anAward(100, 137),
+        },
+        137
+      )
+    );
+
+    expect(
+      container.querySelectorAll(".privacy-celebration-sparkle")
+    ).toHaveLength(24);
+    expect(container.querySelector(".privacy-celebration-ring")).toBeTruthy();
+    expect(container.querySelector("article.privacy").className).toContain(
+      "is-major-celebration"
+    );
+  });
+});
+
+describe("Privacy widget celebration on a preloaded tab", () => {
+  const anAward = (fromCount, toCount, awardedAt = 1000) => ({
+    awardedAt,
+    fromCount,
+    toCount,
+  });
+
+  const markCalls = dispatch =>
+    dispatch.mock.calls.filter(
+      ([action]) => action.type === at.WIDGETS_PRIVACY_MARK_CELEBRATED
+    );
+
+  const setVisibility = value =>
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value,
+    });
+
+  const showTab = () => {
+    setVisibility("visible");
+    fireEvent(document, new Event("visibilitychange"));
+  };
+
+  afterEach(() => setVisibility("visible"));
+
+  it("does not spend the award while the tab is still hidden", () => {
+    setVisibility("hidden");
+    const dispatch = jest.fn();
+    const { container } = renderPrivacy(
+      dispatch,
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137) },
+        137
+      )
+    );
+
+    expect(markCalls(dispatch)).toHaveLength(0);
+    expect(container.querySelector(".privacy-celebration")).toBeNull();
+    // Held at the pre-award number, so showing the tab can't flash the final
+    // count before the climb starts.
+    expect(container.querySelector(".privacy-count-number").textContent).toBe(
+      "100"
+    );
+  });
+
+  it("plays and acknowledges once the tab is shown", () => {
+    setVisibility("hidden");
+    const dispatch = jest.fn();
+    const { container } = renderPrivacy(
+      dispatch,
+      {},
+      stateWithMessage(
+        { variant: "blank", celebration: anAward(100, 137, 777) },
+        137
+      )
+    );
+
+    showTab();
+
+    const marks = markCalls(dispatch);
+    expect(marks).toHaveLength(1);
+    expect(marks[0][0].data).toBe(777);
+    expect(container.querySelector(".privacy-celebration")).toBeTruthy();
+  });
+
+  it("does not strand the readout when the animation is skipped", () => {
+    const originalMatchMedia = globalThis.matchMedia;
+    globalThis.matchMedia = () => ({ matches: true });
+    setVisibility("hidden");
+
+    try {
+      const { container } = renderPrivacy(
+        jest.fn(),
+        {},
+        stateWithMessage(
+          { variant: "blank", celebration: anAward(100, 137) },
+          137
+        )
+      );
+      expect(container.querySelector(".privacy-count-number").textContent).toBe(
+        "100"
+      );
+
+      showTab();
+
+      // Reduced motion skips the count-up, so the hold taken while hidden has
+      // to be dropped rather than leaving the pre-award number on screen.
+      expect(container.querySelector(".privacy-count-number").textContent).toBe(
+        "137"
+      );
+    } finally {
+      globalThis.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it("holds an earned moment with no award until the tab is shown", () => {
+    setVisibility("hidden");
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-daily-cap",
+          category: "dailyCap",
+          icon: "kit",
+          countCeiling: 100,
+        },
+        137
+      )
+    );
+    expect(container.querySelector(".privacy-celebration")).toBeNull();
+
+    showTab();
+    expect(container.querySelector(".privacy-celebration")).toBeTruthy();
+    expect(container.querySelector(".privacy-celebration-ring")).toBeTruthy();
+  });
+});
+
+describe("Privacy widget daily-cap celebration", () => {
+  const capState = (extra = {}) =>
+    stateWithMessage(
+      {
+        variant: "tip",
+        messageId: "newtab-privacy-message-daily-cap",
+        category: "dailyCap",
+        icon: "kit",
+        countCeiling: 100,
+        ...extra,
+      },
+      137
+    );
+
+  it("fires the full celebration with the ring on its own, with no +10 award", () => {
+    const { container } = renderPrivacy(jest.fn(), {}, capState());
+    expect(container.querySelector(".privacy-celebration")).toBeTruthy();
+    expect(container.querySelector(".privacy-celebration-ring")).toBeTruthy();
+  });
+
+  it("does not dispatch an ack when there was no award to acknowledge", () => {
+    const dispatch = jest.fn();
+    renderPrivacy(dispatch, {}, capState());
+    const marks = dispatch.mock.calls.filter(
+      ([a]) => a.type === at.WIDGETS_PRIVACY_MARK_CELEBRATED
+    );
+    expect(marks.length).toBe(0);
+  });
+
+  it("uses the longer sparkle tier for any major moment, not just the cap", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-milestone-month",
+          category: "milestoneMonth",
+          icon: "kit",
+        },
+        2000
+      )
+    );
+    // Fires on its own, and with no ring: the ring is the daily cap's alone.
+    expect(container.querySelector(".privacy-celebration")).toBeTruthy();
+    expect(container.querySelector(".privacy-celebration-ring")).toBeNull();
+    expect(container.querySelector("article.privacy").className).toContain(
+      "is-major-celebration"
+    );
+  });
+
+  it("tilts the kit on an earned moment with no count-up award", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "streak",
+          messageId: "newtab-privacy-message-streak",
+          category: "streak",
+          icon: "kit",
+        },
+        87
+      )
+    );
+    const icon = container.querySelector(".privacy-image-icon");
+    expect(icon.getAttribute("src")).toContain("kit-circle-animated.svg");
+  });
+
+  it("leaves the kit static on an ordinary tip", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithMessage(
+        {
+          variant: "tip",
+          messageId: "newtab-privacy-message-info-5",
+          category: "info",
+          icon: "kit",
+        },
+        87
+      )
+    );
+    const icon = container.querySelector(".privacy-image-icon");
+    expect(icon.getAttribute("src")).toContain("widget-privacy-kit.svg");
+    expect(icon.getAttribute("src")).not.toContain("animated");
+  });
+});
+
+describe("Privacy widget celebration tiers", () => {
+  const sparkleCount = container =>
+    container.querySelectorAll(".privacy-celebration-sparkle").length;
+
+  const withCategory = (category, messageId) =>
+    stateWithMessage({ variant: "tip", messageId, category, icon: "kit" }, 500);
+
+  it("gives count milestones the longer sparkle", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      withCategory("milestoneMonth", "newtab-privacy-message-milestone-month")
+    );
+    expect(sparkleCount(container)).toBe(24);
+    expect(container.querySelector("article.privacy").className).toContain(
+      "is-major-celebration"
+    );
+  });
+
+  it("gives a first block the brief sparkle, not the milestone one", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      withCategory("firstProtection", "newtab-privacy-message-first-protection")
+    );
+    expect(sparkleCount(container)).toBe(12);
+    expect(container.querySelector("article.privacy").className).not.toContain(
+      "is-major-celebration"
+    );
+  });
+
+  it("gives a streak the brief sparkle too", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      withCategory("streak", "newtab-privacy-message-streak")
+    );
+    expect(sparkleCount(container)).toBe(12);
+  });
+
+  it("still tilts the kit on the brief-tier earned moments", () => {
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      withCategory("streak", "newtab-privacy-message-streak")
+    );
+    expect(
+      container.querySelector(".privacy-image-icon").getAttribute("src")
+    ).toContain("kit-circle-animated.svg");
   });
 });

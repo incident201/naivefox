@@ -634,6 +634,9 @@ nsWindowWayland::WaylandPopupGetPositionFromLayout() {
   LOG("nsWindowWayland::WaylandPopupGetPositionFromLayout\n");
 
   nsMenuPopupFrame* popupFrame = GetPopupFrame();
+  if (!popupFrame) {
+    return {};
+  }
 
   const bool isTopContextMenu = mPopupContextMenu && !mPopupAnchored;
   const bool isRTL = popupFrame->IsDirectionRTL();

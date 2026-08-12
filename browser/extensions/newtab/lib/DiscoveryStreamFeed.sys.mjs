@@ -2059,8 +2059,12 @@ export class DiscoveryStreamFeed {
     }
 
     // if surfaceID is availible either through the cache or the response set value in Glean
-    if (prefs[PREF_PRIVATE_PING_ENABLED] && feed?.data?.surfaceId) {
+    if (feed?.data?.surfaceId) {
       Glean.newtabContent.surfaceId.set(feed.data.surfaceId);
+    }
+
+    // Still gated: this pref feeds utc_offset on the Merino request
+    if (prefs[PREF_PRIVATE_PING_ENABLED] && feed?.data?.surfaceId) {
       this.store.dispatch(ac.SetPref(PREF_SURFACE_ID, feed.data.surfaceId));
     }
 

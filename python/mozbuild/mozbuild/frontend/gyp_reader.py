@@ -243,6 +243,7 @@ def process_gyp_result(
                     # should be built as a real static library.
                     context["NO_EXPAND_LIBS"] = True
                 if name in (gyp_dir_attrs.install_static_libs or []):
+                    context["BUILD_STATIC_LIB_ARCHIVE"] = True
                     context["DIST_INSTALL"] = True
             if use_libs:
                 context["USE_LIBS"] = sorted(use_libs, key=lambda s: s.lower())

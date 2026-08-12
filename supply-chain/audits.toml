@@ -1911,6 +1911,13 @@ criteria = "safe-to-deploy"
 delta = "0.36.0 -> 0.37.0"
 notes = "First-party code"
 
+[[audits.cssparser]]
+who = "Emilio Cobos Álvarez <emilio@crisal.io>"
+criteria = "safe-to-deploy"
+delta = "0.37.0 -> 0.37.0@git:eff8704e994dc54e5df2a936b78b51828ee21464"
+importable = false
+notes = "Unpublished changes all authored or reviewed by me."
+
 [[audits.cssparser-color]]
 who = "Emilio Cobos Álvarez <emilio@crisal.io>"
 criteria = "safe-to-deploy"
@@ -1942,6 +1949,13 @@ who = "Nico Burns <nico@nicoburns.com>"
 criteria = "safe-to-deploy"
 delta = "0.6.1 -> 0.7.0"
 notes = "First party code"
+
+[[audits.cssparser-macros]]
+who = "Emilio Cobos Álvarez <emilio@crisal.io>"
+criteria = "safe-to-deploy"
+delta = "0.7.0 -> 0.7.0@git:eff8704e994dc54e5df2a936b78b51828ee21464"
+importable = false
+notes = "Dependency updates + upstream-reviewed changes."
 
 [[audits.cstr]]
 who = "Emilio Cobos Álvarez <emilio@crisal.io>"

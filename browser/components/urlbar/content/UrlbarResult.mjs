@@ -422,13 +422,9 @@ export class UrlbarResult {
 
     let highlights = Array.isArray(value)
       ? value.map(subval =>
-          lazy.UrlbarUtils.getTokenMatches(
-            options.tokens,
-            subval,
-            highlightType
-          )
+          UrlbarShared.getTokenMatches(options.tokens, subval, highlightType)
         )
-      : lazy.UrlbarUtils.getTokenMatches(options.tokens, value, highlightType);
+      : UrlbarShared.getTokenMatches(options.tokens, value, highlightType);
 
     let cached = { value, highlights, options };
     this.#displayValuesCache.set(payloadName, cached);

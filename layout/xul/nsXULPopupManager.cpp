@@ -36,6 +36,7 @@
 #include "mozilla/dom/XULMenuBarElement.h"
 #include "mozilla/dom/XULMenuElement.h"
 #include "mozilla/dom/XULPopupElement.h"
+#include "mozilla/widget/NativeMenu.h"
 #include "mozilla/widget/NativeMenuSupport.h"
 #include "mozilla/widget/nsAutoRollup.h"
 #include "nsCRT.h"
@@ -296,10 +297,6 @@ nsXULPopupManager::nsXULPopupManager()
 
 nsXULPopupManager::~nsXULPopupManager() {
   NS_ASSERTION(!mPopups, "XUL popups still open");
-
-  if (mNativeMenu) {
-    mNativeMenu->RemoveObserver(this);
-  }
 }
 
 void nsXULPopupManager::Init() {
@@ -791,7 +788,6 @@ bool nsXULPopupManager::ShowNativeMenuInternal(
     NS_WARNING("Native menu still open when trying to open another");
     RefPtr<NativeMenu> menu = mNativeMenu;
     (void)menu->Close();
-    menu->RemoveObserver(this);
     mNativeMenu = nullptr;
   }
 
@@ -833,7 +829,6 @@ bool nsXULPopupManager::ShowNativeMenuInternal(
     }
 
     mNativeMenu = menu;
-    mNativeMenu->AddObserver(this);
 
     if (!aClickedFrame) {
       aClickedFrame =
@@ -960,8 +955,8 @@ bool nsXULPopupManager::ShowPopupAtScreenAsNativeMenu(Element* aPopup,
       });
 }
 
-void nsXULPopupManager::OnNativeMenuOpened() {
-  if (!mNativeMenu) {
+void nsXULPopupManager::OnNativeMenuOpened(NativeMenu* aMenu) {
+  if (mNativeMenu != aMenu) {
     return;
   }
 
@@ -989,8 +984,8 @@ void nsXULPopupManager::OnNativeMenuOpened() {
   PresShell::ReleaseCapturingContent();
 }
 
-void nsXULPopupManager::OnNativeMenuClosed() {
-  if (!mNativeMenu) {
+void nsXULPopupManager::OnNativeMenuClosed(NativeMenu* aMenu) {
+  if (NS_WARN_IF(mNativeMenu != aMenu)) {
     return;
   }
 
@@ -1009,7 +1004,6 @@ void nsXULPopupManager::OnNativeMenuClosed() {
     popupFrame->ClearAnchorContent();
     popupFrame->SetPopupState(ePopupClosed);
   }
-  mNativeMenu->RemoveObserver(this);
   mNativeMenu = nullptr;
   mNativeMenuActivatedItemCloseMenuMode = Nothing();
   mNativeMenuSubmenuStates.Clear();
@@ -1030,24 +1024,33 @@ void nsXULPopupManager::OnNativeMenuClosed() {
   }
 }
 
-void nsXULPopupManager::OnNativeSubMenuWillOpen(
-    mozilla::dom::Element* aPopupElement) {
+void nsXULPopupManager::OnNativeSubMenuWillOpen(NativeMenu* aMenu,
+                                                Element* aPopupElement) {
+  if (NS_WARN_IF(mNativeMenu != aMenu)) {
+    return;
+  }
   mNativeMenuSubmenuStates.InsertOrUpdate(aPopupElement, ePopupShowing);
 }
 
-void nsXULPopupManager::OnNativeSubMenuDidOpen(
-    mozilla::dom::Element* aPopupElement) {
+void nsXULPopupManager::OnNativeSubMenuDidOpen(NativeMenu* aMenu,
+                                               Element* aPopupElement) {
+  if (NS_WARN_IF(mNativeMenu != aMenu)) {
+    return;
+  }
   mNativeMenuSubmenuStates.InsertOrUpdate(aPopupElement, ePopupShown);
 }
 
-void nsXULPopupManager::OnNativeSubMenuClosed(
-    mozilla::dom::Element* aPopupElement) {
+void nsXULPopupManager::OnNativeSubMenuClosed(NativeMenu* aMenu,
+                                              Element* aPopupElement) {
+  if (NS_WARN_IF(mNativeMenu != aMenu)) {
+    return;
+  }
   mNativeMenuSubmenuStates.Remove(aPopupElement);
 }
 
 void nsXULPopupManager::OnNativeMenuWillActivateItem(
-    mozilla::dom::Element* aMenuItemElement) {
-  if (!mNativeMenu) {
+    NativeMenu* aMenu, Element* aMenuItemElement) {
+  if (NS_WARN_IF(mNativeMenu != aMenu)) {
     return;
   }
 

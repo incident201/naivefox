@@ -60,6 +60,7 @@ const FormFill_Encoder_Config = {
   featureId: "formfill-encoder",
   engineId: FEATURES["formfill-encoder"].engineId,
   backend: "best-onnx",
+  numThreads: 2,
 };
 
 // Head engine: custom `moz-formfill-head` pipeline, scores windowed features.
@@ -69,6 +70,7 @@ const FormFill_Head_Config = {
   featureId: "formfill-head",
   engineId: FEATURES["formfill-head"].engineId,
   backend: "best-onnx",
+  numThreads: 2,
 };
 
 export class FormAutofillML {

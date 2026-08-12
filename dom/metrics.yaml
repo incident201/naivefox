@@ -1036,7 +1036,6 @@ dom:
     notification_emails:
       - dev-telemetry-gc-alerts@mozilla.org
     expires: never
-    telemetry_mirror: GC_SLICE_DURING_IDLE
 
   xmlhttprequest_async_or_sync:
     type: labeled_counter
@@ -1055,7 +1054,6 @@ dom:
     notification_emails:
       - dom-core@mozilla.com
     expires: never
-    telemetry_mirror: h#XMLHTTPREQUEST_ASYNC_OR_SYNC
 
   storage_access_api_ui:
     type: labeled_counter

@@ -400,7 +400,7 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
   already_AddRefed<gfxFontEntry> MakePlatformFont(
       const nsACString& aFontName, WeightRange aWeightForEntry,
       WidthRange aWidthForEntry, SlantStyleRange aStyleForEntry,
-      const uint8_t* aFontData, uint32_t aLength) override;
+      FontData* aFontData) override;
 
   IDWriteGdiInterop* GetGDIInterop() { return mGDIInterop; }
   bool UseGDIFontTableAccess() const;

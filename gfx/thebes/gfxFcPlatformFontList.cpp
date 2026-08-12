@@ -494,10 +494,10 @@ gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {
       // hb_face_create to wrap that.
       if (mFTFaceInitialized) {
         if (const FTUserFontData* ufd = GetUserFontData()) {
-          if (ufd->FontData()) {
-            hb_blob_t* blob = hb_blob_create(
-                (const char*)ufd->FontData(), ufd->FontDataLength(),
-                HB_MEMORY_MODE_READONLY, nullptr, nullptr);
+          if (const auto* data = ufd->GetData()) {
+            hb_blob_t* blob =
+                hb_blob_create((const char*)data, ufd->Length(),
+                               HB_MEMORY_MODE_READONLY, nullptr, nullptr);
             // Currently the face index is always zero, as we don't support
             // collections as webfonts.
             face = hb_face_create(blob, 0);
@@ -628,8 +628,8 @@ bool gfxFontconfigFontEntry::TestCharacterMap(uint32_t aCh) {
 
 bool gfxFontconfigFontEntry::HasFontTable(uint32_t aTableTag) {
   if (FTUserFontData* ufd = GetUserFontData()) {
-    if (ufd->FontData()) {
-      return !!gfxFontUtils::FindTableDirEntry(ufd->FontData(), aTableTag);
+    if (const auto* data = ufd->GetData()) {
+      return !!gfxFontUtils::FindTableDirEntry(data, aTableTag);
     }
   }
   return gfxFT2FontEntryBase::FaceHasTable(GetFTFace(), aTableTag);
@@ -638,8 +638,8 @@ bool gfxFontconfigFontEntry::HasFontTable(uint32_t aTableTag) {
 hb_blob_t* gfxFontconfigFontEntry::GetFontTable(uint32_t aTableTag) {
   // for data fonts, read directly from the font data
   if (FTUserFontData* ufd = GetUserFontData()) {
-    if (ufd->FontData()) {
-      return gfxFontUtils::GetTableFromFontData(ufd->FontData(), aTableTag);
+    if (const auto* data = ufd->GetData()) {
+      return gfxFontUtils::GetTableFromFontData(data, aTableTag);
     }
   }
 
@@ -2351,8 +2351,8 @@ already_AddRefed<gfxFontEntry> gfxFcPlatformFontList::LookupLocalFont(
 already_AddRefed<gfxFontEntry> gfxFcPlatformFontList::MakePlatformFont(
     const nsACString& aFontName, WeightRange aWeightForEntry,
     WidthRange aWidthForEntry, SlantStyleRange aStyleForEntry,
-    const uint8_t* aFontData, uint32_t aLength) {
-  RefPtr<FTUserFontData> ufd = new FTUserFontData(aFontData, aLength);
+    FontData* aFontData) {
+  RefPtr<FTUserFontData> ufd = new FTUserFontData(aFontData);
   RefPtr<SharedFTFace> face = ufd->CloneFace();
   if (!face) {
     return nullptr;

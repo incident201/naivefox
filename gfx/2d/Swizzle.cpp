@@ -1170,7 +1170,7 @@ static void UnpackRowRGB24_To_ARGB(const uint8_t* aSrc, uint8_t* aDst,
     if constexpr (std::endian::native == std::endian::little) {
       *--dst = 0x000000FF | (r << 8) | (g << 16) | (b << 24);
     } else {
-      *--dst = 0xFF000000 | (r << 24) | (g << 16) | b;
+      *--dst = 0xFF000000 | (r << 16) | (g << 8) | b;
     }
     src -= 3;
   }

@@ -45,6 +45,9 @@ function createEngineStore(isPrivate) {
       },
     },
   });
+  // The mock controller marks its store ready so queries dispatch without one.
+  // This test drives the real init path, which needs a pristine store.
+  childController.engineStore.initialized = false;
   return childController.engineStore;
 }
 

@@ -163,6 +163,18 @@ if [[ $(uname -o) == "Msys" ]]; then
   echo "Using Windows SDK version: ${SDK_VERSION}"
   sed -i "s/SDK_VERSION = '[0-9.]*'/SDK_VERSION = '${SDK_VERSION}'/" build/vs_toolchain.py
   sed -i "s/SDK_VERSION = '[0-9.]*'/SDK_VERSION = '${SDK_VERSION}'/" build/toolchain/win/setup_toolchain.py
+
+  # Upstream targets a newer NTDDI level than our packaged SDK defines. An
+  # unknown NTDDI_VERSION token silently evaluates to 0 in the preprocessor,
+  # which turns off every SDK version guard and breaks windows.h itself, so
+  # clamp it to the newest level this SDK knows about (WDK_NTDDI_VERSION).
+  SDKDDKVER_H="$WINDOWSSDKDIR/Include/$SDK_VERSION/shared/sdkddkver.h"
+  NTDDI_MAX=$(tr -d '\r' < "$SDKDDKVER_H" | awk '$1 == "#define" && $2 == "WDK_NTDDI_VERSION" { print $3 }')
+  [[ -n "$NTDDI_MAX" ]] || { echo "ERROR: could not read WDK_NTDDI_VERSION from $SDKDDKVER_H"; exit 1; }
+  echo "Clamping NTDDI_VERSION to: ${NTDDI_MAX}"
+  sed -i "s/NTDDI_VERSION=NTDDI_[A-Z0-9_]*/NTDDI_VERSION=${NTDDI_MAX}/" build/config/win/BUILD.gn
+  grep -q "NTDDI_VERSION=${NTDDI_MAX}" build/config/win/BUILD.gn || \
+    { echo "ERROR: NTDDI_VERSION patch failed - upstream BUILD.gn may have changed"; exit 1; }
 fi
 
 if [[ $(uname -s) == "Linux" ]] || [[ $(uname -s) == "Darwin" ]]; then

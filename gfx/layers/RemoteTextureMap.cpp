@@ -1086,7 +1086,7 @@ void RemoteTextureMap::GetRemoteTexture(
       if (it != mRemoteTextureHostWrapperHolders.end() &&
           !it->second->mRemoteTextureHost) {
         it->second->mRemoteTextureHost = owner->mLatestTextureHost;
-      } else {
+      } else if (it != mRemoteTextureHostWrapperHolders.end()) {
         MOZ_ASSERT(it->second->mRemoteTextureHost == owner->mLatestTextureHost);
       }
     }

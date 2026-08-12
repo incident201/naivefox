@@ -24,8 +24,8 @@ gcloud:
   test-targets:
     - notPackage org.mozilla.fenix.syncintegration
     - notPackage org.mozilla.fenix.experimentintegration
+    - notPackage org.mozilla.fenix.ui.efficiency.devtools
     - package org.mozilla.fenix.ui.efficiency.tests
-    - package org.mozilla.fenix.ui.efficiency.devtools
     - package org.mozilla.fenix.ui.efficiency.generation.reachability.shards
     - package org.mozilla.fenix.ui.efficiency.generation.interaction.shards
 

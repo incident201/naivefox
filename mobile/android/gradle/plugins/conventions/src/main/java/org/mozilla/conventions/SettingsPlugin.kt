@@ -27,7 +27,9 @@ class SettingsPlugin : Plugin<Settings> {
 
     override fun apply(settings: Settings) {
         val extension = settings.extensions.create<SettingsExtension>("mozilla")
-        extension.disableAndroidComponentsTasks.convention(false)
+        extension.disableAndroidComponentsTasks.convention(
+            settings.startParameter.projectProperties["disableAndroidComponentsTasks"]?.toBoolean() ?: false
+        )
 
         loadBuildConfig(settings)
 

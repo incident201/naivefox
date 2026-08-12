@@ -11,6 +11,8 @@ import {
   isAgentCommand,
 } from "chrome://browser/content/urlbar/SmartbarInputUtils.mjs";
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
+import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
+
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/smartwindow-smartbar-glow.mjs";
 // eslint-disable-next-line import/no-unassigned-import
@@ -62,7 +64,6 @@ const lazy = XPCOMUtils.declareLazy({
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
   SmartbarInputController:
     "chrome://browser/content/urlbar/SmartbarInputController.mjs",
-  UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
   UrlbarQueryContext: "chrome://browser/content/urlbar/UrlbarQueryContext.mjs",
   UrlbarProviderHeuristicFallback:
     "moz-src:///browser/components/urlbar/UrlbarProviderHeuristicFallback.sys.mjs",
@@ -156,7 +157,7 @@ export class SmartbarInput extends HTMLElement {
         <html:panel-list class="searchmode-switcher-panel-list">
           <html:span class="searchmode-switcher-panel-description" role="heading" />
 ${
-  Services.prefs.getBoolPref("browser.nova.enabled", false)
+  UrlbarPrefs.get("browser.nova.enabled")
     ? '<html:hr class="searchmode-switcher-panel-installed-engine-separator"/><html:hr class="searchmode-switcher-panel-footer-separator"/>'
     : '<html:hr/><html:hr class="searchmode-switcher-panel-installed-engine-separator searchmode-switcher-panel-footer-separator"/>'
 }
@@ -331,11 +332,11 @@ ${
     this.document = this.window.document;
     this.isPrivate = lazy.PrivateBrowsingUtils.isWindowPrivate(this.window);
 
-    lazy.UrlbarPrefs.addObserver(this);
+    UrlbarPrefs.addObserver(this);
     window.addEventListener("unload", () => {
       // Stop listening to pref changes to make sure we don't init the new
       // searchbar in closed windows that have not been gc'd yet.
-      lazy.UrlbarPrefs.removeObserver(this);
+      UrlbarPrefs.removeObserver(this);
     });
   }
 
@@ -507,7 +508,7 @@ ${
   connectedCallback() {
     if (
       this.getAttribute("sap-name") == "searchbar" &&
-      !lazy.UrlbarPrefs.get("browser.search.widget.new")
+      !UrlbarPrefs.get("browser.search.widget.new")
     ) {
       return;
     }
@@ -610,7 +611,7 @@ ${
   disconnectedCallback() {
     if (
       this.getAttribute("sap-name") == "searchbar" &&
-      !lazy.UrlbarPrefs.get("browser.search.widget.new")
+      !UrlbarPrefs.get("browser.search.widget.new")
     ) {
       return;
     }
@@ -700,7 +701,7 @@ ${
     this._removeObservers();
 
     // Remove pref observer
-    lazy.UrlbarPrefs.removeObserver(this);
+    UrlbarPrefs.removeObserver(this);
 
     // Clear window and document references.
     this.window = null;
@@ -1101,7 +1102,7 @@ ${
         break;
       case "browser.search.widget.new": {
         if (this.getAttribute("sap-name") == "searchbar" && this.isConnected) {
-          if (lazy.UrlbarPrefs.get("browser.search.widget.new")) {
+          if (UrlbarPrefs.get("browser.search.widget.new")) {
             // The connectedCallback was skipped. Init now.
             this.#init();
           } else {
@@ -1248,7 +1249,7 @@ ${
     // as we only persist searchMode with ScotchBonnet enabled.
     if (
       dueToTabSwitch &&
-      lazy.UrlbarPrefs.getScotchBonnetPref("scotchBonnet.persistSearchMode")
+      UrlbarPrefs.getScotchBonnetPref("scotchBonnet.persistSearchMode")
     ) {
       this._updateSearchModeUI(this.searchMode);
     }
@@ -2070,7 +2071,7 @@ ${
 
     // Use the hidden heuristic if it exists and there's no selection.
     if (
-      lazy.UrlbarPrefs.get("experimental.hideHeuristic") &&
+      UrlbarPrefs.get("experimental.hideHeuristic") &&
       !element &&
       !isComposing &&
       !oneOffParams?.engine &&
@@ -2277,7 +2278,7 @@ ${
   handoff(searchString, searchEngine, newtabSessionId) {
     this._isHandoffSession = true;
     this._handoffSession = newtabSessionId;
-    if (lazy.UrlbarPrefs.get("shouldHandOffToSearchMode") && searchEngine) {
+    if (UrlbarPrefs.get("shouldHandOffToSearchMode") && searchEngine) {
       this.search(searchString, {
         searchEngine,
         searchModeEntry: "handoff",
@@ -2456,7 +2457,7 @@ ${
           // rare case anyway, most likely to happen for enterprises customizing
           // the urifixup prefs.
           if (
-            lazy.UrlbarPrefs.get("browser.fixup.dns_first_for_single_words") &&
+            UrlbarPrefs.get("browser.fixup.dns_first_for_single_words") &&
             UrlbarShared.looksLikeSingleWordHost(originalUntrimmedValue)
           ) {
             url = originalUntrimmedValue;
@@ -2480,7 +2481,7 @@ ${
         // and button is provided to switch to tab.
         if (
           this.hasAttribute("action-override") ||
-          ((lazy.UrlbarPrefs.get("secondaryActions.switchToTab") ||
+          ((UrlbarPrefs.get("secondaryActions.switchToTab") ||
             isSplitViewActive) &&
             element?.dataset.action !== "tabswitch")
         ) {
@@ -2539,10 +2540,10 @@ ${
           !this.searchMode &&
           result.heuristic &&
           // If we asked the DNS earlier, avoid the post-facto check.
-          !lazy.UrlbarPrefs.get("browser.fixup.dns_first_for_single_words") &&
+          !UrlbarPrefs.get("browser.fixup.dns_first_for_single_words") &&
           // TODO (bug 1642623): for now there is no smart heuristic to skip the
           // DNS lookup, so any value above 0 will run it.
-          lazy.UrlbarPrefs.get("dnsResolveSingleWordsAfterSearch") > 0 &&
+          UrlbarPrefs.get("dnsResolveSingleWordsAfterSearch") > 0 &&
           UrlbarShared.looksLikeSingleWordHost(originalUntrimmedValue)
         ) {
           // When fixing a single word to a search, the docShell would also
@@ -2887,7 +2888,7 @@ ${
           result,
           checkValue: false,
           startQuery:
-            lazy.UrlbarPrefs.get("scotchBonnet.enableOverride") &&
+            UrlbarPrefs.get("scotchBonnet.enableOverride") &&
             this.view.visibleResults.length == 1,
         });
       }
@@ -2996,15 +2997,14 @@ ${
   }
 
   /**
-   * Invoked by the controller when the first result is received.
+   * Invoked by the controller when the first result changed.
    *
-   * @param {UrlbarResult} firstResult
-   *   The first result received.
-   * @returns {boolean}
-   *   True if this method canceled the query and started a new one.  False
-   *   otherwise.
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query the result belongs to.
    */
-  onFirstResult(firstResult) {
+  onFirstResult(queryContext) {
+    let firstResult = queryContext.results[0];
+
     // If the heuristic result has a keyword but isn't a keyword offer, we may
     // need to enter search mode.
     if (
@@ -3017,7 +3017,9 @@ ${
         checkValue: false,
       })
     ) {
-      return true;
+      // Search mode restarts the query, so these results are obsolete.
+      this.controller.discardResults();
+      return;
     }
 
     // To prevent selection flickering, we apply autofill on input through a
@@ -3034,8 +3036,6 @@ ${
       this._autofillPlaceholder = null;
       this.setValue(this.userTypedValue);
     }
-
-    return false;
   }
 
   /**
@@ -3217,6 +3217,24 @@ ${
     let trimmedValue = value.trim();
     let end = trimmedValue.search(UrlbarShared.REGEXP_SPACES);
     let firstToken = end == -1 ? trimmedValue : trimmedValue.substring(0, end);
+
+    if (
+      firstToken == UrlbarShared.RESTRICT_TOKENS.SEARCH &&
+      !this.controller.engineStore.initialized &&
+      !this.controller.engineStore.failed
+    ) {
+      // The search restrict token enters search mode with the default engine,
+      // which the store only knows once it's populated, and no query has run
+      // at this point to wait for it. The retry leaves the focus alone, having
+      // focused above. A failed search service leaves no engine to restrict
+      // to, and sets `failed`, so the retry doesn't come back here.
+      this.controller.engineStore
+        .init()
+        .catch(() => {})
+        .then(() => this.search(value, { ...options, focus: false }));
+      return;
+    }
+
     // Enter search mode if the string starts with a restriction token.
     let searchMode = this.searchModeForToken(firstToken);
     let firstTokenIsRestriction = !!searchMode;
@@ -4439,7 +4457,8 @@ ${
     // use the unmodified url instead. Otherwise, if the user edits the url
     // and confirms the new value, we may transform the url into a search.
     let trimmedUrl = UrlbarShared.stripPrefixAndTrim(url, { stripHttp })[0];
-    let isSearch = !!this.controller.getFixupInfo(trimmedUrl)?.keywordAsSent;
+    let isSearch =
+      !!this.controller.getFixupPrimitives(trimmedUrl)?.keywordAsSent;
     if (isSearch) {
       // Although https-first might not respect the shown protocol, converting
       // the result to a search would be more disruptive.
@@ -4682,7 +4701,7 @@ ${
       this.value == selectedVal &&
       !uri.schemeIs("javascript") &&
       !uri.schemeIs("data") &&
-      !lazy.UrlbarPrefs.get("decodeURLsOnCopy")
+      !UrlbarPrefs.get("decodeURLsOnCopy")
     ) {
       return displaySpec;
     }
@@ -4700,7 +4719,7 @@ ${
     // If selection starts from the beginning and part or all of the URL
     // is selected, we check for decoded characters and encode them.
     // Unless decodeURLsOnCopy is set. Do not encode data: URIs.
-    if (!lazy.UrlbarPrefs.get("decodeURLsOnCopy") && !uri.schemeIs("data")) {
+    if (!UrlbarPrefs.get("decodeURLsOnCopy") && !uri.schemeIs("data")) {
       try {
         if (URL.canParse(selectedVal)) {
           // Use encodeURI instead of URL.href because we don't want
@@ -4814,7 +4833,7 @@ ${
     if (!this.#isAddressbar) {
       return val;
     }
-    let trimmedValue = lazy.UrlbarPrefs.get("trimURLs")
+    let trimmedValue = UrlbarPrefs.get("trimURLs")
       ? lazy.BrowserUIUtils.trimURL(val)
       : val;
     // Only trim value if the directionality doesn't change to RTL and we're not
@@ -5251,9 +5270,7 @@ ${
   #maybeUntrimUrl({ moveCursorToStart = false, ignoreSelection = false } = {}) {
     // Check if we can untrim the current value.
     if (
-      !lazy.UrlbarPrefs.getScotchBonnetPref(
-        "untrimOnUserInteraction.featureGate"
-      ) ||
+      !UrlbarPrefs.getScotchBonnetPref("untrimOnUserInteraction.featureGate") ||
       (!this._protocolIsTrimmed && !this._wwwIsTrimmed) ||
       !this.focused ||
       (!ignoreSelection && this.#allTextSelected)
@@ -5509,7 +5526,7 @@ ${
   #autofillDismissContextMenuVisibility() {
     let hidden = { showDismiss: false, showForget: false };
 
-    if (!lazy.UrlbarPrefs.get("autoFill.adaptiveHistory.enabled")) {
+    if (!UrlbarPrefs.get("autoFill.adaptiveHistory.enabled")) {
       return hidden;
     }
 
@@ -5852,9 +5869,9 @@ ${
       return;
     }
 
-    let prefName =
-      "browser.urlbar.placeholderName" + (this.isPrivate ? ".private" : "");
-    let engineName = Services.prefs.getStringPref(prefName, "");
+    let engineName = UrlbarPrefs.get(
+      "placeholderName" + (this.isPrivate ? ".private" : "")
+    );
     if (engineName) {
       this._setPlaceholder(engineName);
     }
@@ -5990,7 +6007,7 @@ ${
     }
 
     let l10nId;
-    if (lazy.UrlbarPrefs.get("keyword.enabled")) {
+    if (UrlbarPrefs.get("keyword.enabled")) {
       l10nId = engineName
         ? "urlbar-placeholder-with-name"
         : "urlbar-placeholder";
@@ -6093,7 +6110,7 @@ ${
     // ancestor walk crosses shadow roots because the action buttons are
     // custom elements with their own shadow trees.
     if (
-      !lazy.UrlbarPrefs.get("ui.popup.disable_autohide") &&
+      !UrlbarPrefs.get("ui.popup.disable_autohide") &&
       !this.#isInsideContainer(
         event.relatedTarget,
         this.smartbarButtonContainer
@@ -6184,7 +6201,7 @@ ${
     if (this._protocolIsTrimmed || this._wwwIsTrimmed) {
       let untrim = this._wwwIsTrimmed;
       if (!untrim) {
-        let fixedDisplaySpec = this.controller.getFixupInfo(
+        let fixedDisplaySpec = this.controller.getFixupPrimitives(
           this.value
         )?.preferredURIDisplaySpec;
         if (fixedDisplaySpec) {
@@ -6194,7 +6211,7 @@ ${
           if (expectedDisplaySpec == null) {
             untrim = true;
           } else if (
-            lazy.UrlbarPrefs.getScotchBonnetPref("trimHttps") &&
+            UrlbarPrefs.getScotchBonnetPref("trimHttps") &&
             this._untrimmedValue.startsWith("https://")
           ) {
             untrim =
@@ -6244,7 +6261,7 @@ ${
   }
 
   _on_draggableregionleftmousedown() {
-    if (!lazy.UrlbarPrefs.get("ui.popup.disable_autohide")) {
+    if (!UrlbarPrefs.get("ui.popup.disable_autohide")) {
       this.view.close();
     }
   }
@@ -6313,7 +6330,7 @@ ${
         // might not automatically remove focus from the input.
         // Respect the autohide preference for easier inspecting/debugging via
         // the browser toolbox.
-        if (!lazy.UrlbarPrefs.get("ui.popup.disable_autohide")) {
+        if (!UrlbarPrefs.get("ui.popup.disable_autohide")) {
           if (this.view.isOpen && !this.hasAttribute("focused")) {
             // In this case, as blur event never happen from the inputField, we
             // record abandonment event explicitly.
@@ -6407,7 +6424,7 @@ ${
     }
 
     if (this.view.isOpen) {
-      if (lazy.UrlbarPrefs.get("closeOtherPanelsOnOpen")) {
+      if (UrlbarPrefs.get("closeOtherPanelsOnOpen")) {
         // UrlbarView rolls up all popups when it opens, but we should
         // do the same for SmartbarInput when it's already open in case
         // a tab preview was opened
@@ -6420,9 +6437,7 @@ ${
       // TODO (bug 2014773): In Smartbar mode, we currently don’t show
       // results for an empty input.
       const canShowZeroPrefixResults =
-        !value &&
-        lazy.UrlbarPrefs.get("suggest.topsites") &&
-        !this.#isSmartbarMode;
+        !value && UrlbarPrefs.get("suggest.topsites") && !this.#isSmartbarMode;
       const willShowResults = value || canShowZeroPrefixResults;
       if (!willShowResults) {
         this.view.clear();
@@ -6446,7 +6461,7 @@ ${
     // We should do nothing during composition or if composition was canceled
     // and we didn't close the popup on composition start.
     if (
-      !lazy.UrlbarPrefs.get("keepPanelOpenDuringImeComposition") &&
+      !UrlbarPrefs.get("keepPanelOpenDuringImeComposition") &&
       (compositionState == UrlbarShared.COMPOSITION.COMPOSING ||
         (compositionState == UrlbarShared.COMPOSITION.CANCELED &&
           !compositionClosedPopup))
@@ -6457,7 +6472,7 @@ ${
     // Don't autofill when the user is explicitly deleting content, pasting, or
     // undoing/redoing.
     const allowAutofill =
-      (!lazy.UrlbarPrefs.get("keepPanelOpenDuringImeComposition") ||
+      (!UrlbarPrefs.get("keepPanelOpenDuringImeComposition") ||
         compositionState !== UrlbarShared.COMPOSITION.COMPOSING) &&
       !event.inputType?.startsWith("delete") &&
       !event.inputType?.startsWith("history") &&
@@ -6551,8 +6566,10 @@ ${
     }
     let oldEnd = oldValue.substring(this.selectionEnd);
 
-    const pasteData =
-      lazy.UrlbarUtils.sanitizeTextFromClipboard(originalPasteData);
+    const pasteData = UrlbarShared.sanitizeTextFromClipboard(
+      originalPasteData,
+      this.controller.getFixupPrimitives(originalPasteData)
+    );
 
     if (originalPasteData != pasteData) {
       // Unfortunately we're not allowed to set the bits being pasted
@@ -6611,9 +6628,9 @@ ${
     if (this.searchMode?.source == UrlbarShared.RESULT_SOURCE.ACTIONS) {
       maxResults = UNLIMITED_MAX_RESULTS;
     } else if (this.#isSmartbarMode) {
-      maxResults = lazy.UrlbarPrefs.get("smartbar.maxResults");
+      maxResults = UrlbarPrefs.get("smartbar.maxResults");
     } else {
-      maxResults = lazy.UrlbarPrefs.get("maxRichResults");
+      maxResults = UrlbarPrefs.get("maxRichResults");
     }
     let options = {
       allowAutofill,
@@ -6625,8 +6642,7 @@ ${
       prohibitRemoteResults: !!(
         event &&
         UrlbarShared.isPasteEvent(event) &&
-        lazy.UrlbarPrefs.get("maxCharsForSearchSuggestions") <
-          event.data?.length
+        UrlbarPrefs.get("maxCharsForSearchSuggestions") < event.data?.length
       ),
     };
 
@@ -6649,7 +6665,7 @@ ${
       options.searchMode = this.searchMode;
       if (
         this.searchMode.source &&
-        !lazy.UrlbarPrefs.get("unifiedSearchButton.historyInSearchMode")
+        !UrlbarPrefs.get("unifiedSearchButton.historyInSearchMode")
       ) {
         options.sources = [this.searchMode.source];
       }
@@ -6913,7 +6929,7 @@ ${
     this.#compositionState = UrlbarShared.COMPOSITION.COMPOSING;
     this.#compositionHadText = false;
 
-    if (lazy.UrlbarPrefs.get("keepPanelOpenDuringImeComposition")) {
+    if (UrlbarPrefs.get("keepPanelOpenDuringImeComposition")) {
       return;
     }
 
@@ -6943,7 +6959,7 @@ ${
       throw new Error("Trying to stop a non existing composition?");
     }
 
-    if (!lazy.UrlbarPrefs.get("keepPanelOpenDuringImeComposition")) {
+    if (!UrlbarPrefs.get("keepPanelOpenDuringImeComposition")) {
       // Clear the selection and the cached result, since they refer to the
       // state before this composition. A new input even will be generated
       // after this.
@@ -6965,7 +6981,7 @@ ${
       !event.data &&
       !this.#compositionHadText &&
       this.#compositionClosedPopup &&
-      !lazy.UrlbarPrefs.get("keepPanelOpenDuringImeComposition")
+      !UrlbarPrefs.get("keepPanelOpenDuringImeComposition")
     ) {
       this.#compositionState = UrlbarShared.COMPOSITION.NONE;
       this.#compositionClosedPopup = false;
@@ -7477,7 +7493,7 @@ function getDroppableData(event) {
   if (links[0]?.url) {
     event.preventDefault();
     let href = links[0].url;
-    if (lazy.UrlbarUtils.stripUnsafeProtocolOnPaste(href) != href) {
+    if (UrlbarShared.stripUnsafeProtocolOnPaste(href) != href) {
       // We may have stripped an unsafe protocol like javascript: and if so
       // there's no point in handling a partial drop.
       event.stopImmediatePropagation();

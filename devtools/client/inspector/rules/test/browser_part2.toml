@@ -19,7 +19,7 @@ support-files = [
   "doc_keyframeLineNumbers.html",
   "doc_media_queries.html",
   "doc_prefers_reduced_motion_emulation.html",
-  "doc_print_media_simulation.html",
+  "doc_print_media_emulation.html",
   "doc_pseudoelement.html",
   "doc_ruleLineNumbers.html",
   "doc_rules_imported_stylesheet_edit.html",
@@ -265,7 +265,7 @@ fail-if = [
 
 ["browser_rules_preview-tooltips-sizes.js"]
 
-["browser_rules_print_media_simulation.js"]
+["browser_rules_print_media_emulation.js"]
 
 ["browser_rules_pseudo-element_01.js"]
 

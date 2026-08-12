@@ -337,7 +337,7 @@ this.SyncedTabsPanelList = class SyncedTabsPanelList {
   }
 
   _createSyncedTabElement(tabInfo, index, device, canCloseTabs) {
-    let tabContainer = document.createXULElement("hbox");
+    let tabContainer = document.createXULElement("toolbaritem");
     tabContainer.setAttribute(
       "class",
       "PanelUI-tabitem-container all-tabs-item"
@@ -346,6 +346,7 @@ this.SyncedTabsPanelList = class SyncedTabsPanelList {
     let item = document.createXULElement("toolbarbutton");
     let tooltipText = (tabInfo.title ? tabInfo.title + "\n" : "") + tabInfo.url;
     item.setAttribute("itemtype", "tab");
+    item.setAttribute("flex", "1");
     item.classList.add(
       "all-tabs-button",
       "subviewbutton",
@@ -732,19 +733,19 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
       device && fxAccounts.commands.closeTab.isDeviceCompatible(device);
 
     for (let [index, tab] of recentTabs.entries()) {
-      let tabItem = this._createSyncedTabElement(tab, index, device);
-      tabsList.appendChild(tabItem);
-      // Force render() now (before adding close/undo children) so that
-      // toolbarbutton-icon and toolbarbutton-text are created even when the
-      // panelview is still in the template DocumentFragment and
-      // connectedCallback has not yet fired against the live document.
-      tabItem.render();
+      let tabContainer = this._createSyncedTabElement(tab, index, device);
+      tabsList.appendChild(tabContainer);
+      let item = tabContainer.querySelector(".all-tabs-button");
+      // Force render() now so that toolbarbutton-icon and toolbarbutton-text are
+      // created even when the panelview is still in the template DocumentFragment
+      // and connectedCallback has not yet fired against the live document.
+      item.render();
       if (canCloseTabs) {
         let closeBtn = this._createCloseTabElement(tab.url, device);
-        closeBtn.tab = tabItem;
+        closeBtn.tab = item;
         let undoBtn = this._createUndoCloseTabElement(tab.url, device);
-        undoBtn.tab = tabItem;
-        tabItem.append(closeBtn, undoBtn);
+        undoBtn.tab = item;
+        tabContainer.append(closeBtn, undoBtn);
       }
     }
   }
@@ -889,7 +890,7 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
       list.appendChild(tabsList);
 
       let viewAllBtn = document.createXULElement("toolbarbutton");
-      viewAllBtn.classList.add("subviewbutton", "panel-subview-footer-button");
+      viewAllBtn.classList.add("subviewbutton");
       viewAllBtn.setAttribute("closemenu", "none");
       this._configureViewAllTabsButton(viewAllBtn, client);
       list.appendChild(viewAllBtn);
@@ -905,7 +906,7 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
 
     if (this._canSendTabToDevice(device)) {
       let sendPageBtn = document.createXULElement("toolbarbutton");
-      sendPageBtn.classList.add("subviewbutton", "panel-subview-footer-button");
+      sendPageBtn.classList.add("subviewbutton");
       sendPageBtn.setAttribute(
         "data-l10n-id",
         "fxa-menu-device-send-current-page"
@@ -940,14 +941,14 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
 
   _createSyncedTabElement(tabInfo, index, _device) {
     let tooltipText = (tabInfo.title ? tabInfo.title + "\n" : "") + tabInfo.url;
+    let tabContainer = document.createXULElement("toolbaritem");
+    tabContainer.setAttribute(
+      "class",
+      "PanelUI-tabitem-container all-tabs-item"
+    );
+
     let item = this._createTabToolbarButton(
-      [
-        "all-tabs-button",
-        "subviewbutton",
-        "subviewbutton-iconic",
-        "PanelUI-tabitem-container",
-        "all-tabs-item",
-      ],
+      ["all-tabs-button", "subviewbutton", "subviewbutton-iconic"],
       e => {
         let object = window.gSync._getEntryPointForElement(e.currentTarget);
         SyncedTabs.recordSyncedTabsTelemetry(object, "click", {
@@ -966,6 +967,7 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
       }
     );
     item.setAttribute("itemtype", "tab");
+    item.setAttribute("flex", "1");
     item.setAttribute("targetURI", tabInfo.url);
     item.setAttribute(
       "label",
@@ -975,7 +977,8 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
       item.setAttribute("image", tabInfo.icon);
     }
     item.setAttribute("tooltiptext", tooltipText);
-    return item;
+    tabContainer.appendChild(item);
+    return tabContainer;
   }
 
   _createCloseTabElement(url, device) {
@@ -984,23 +987,26 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
       e => {
         e.stopPropagation();
 
-        let tabBtn = closeBtn.parentNode;
-        let tabList = tabBtn.parentNode;
+        let tabContainer = closeBtn.parentNode;
+        let tabList = tabContainer.parentNode;
 
-        let undoBtn = tabBtn.querySelector(".remote-tabs-undo-button");
+        let undoBtn = tabContainer.querySelector(".remote-tabs-undo-button");
 
         let prevClose = tabList.querySelector(
           ".remote-tabs-undo-button:not([hidden])"
         );
         if (prevClose) {
-          let prevTabBtn = prevClose.parentNode;
-          prevTabBtn.classList.add("tabitem-removed");
-          prevTabBtn.addEventListener("transitionend", () => {
-            prevTabBtn.remove();
+          let prevContainer = prevClose.parentNode;
+          prevContainer.classList.add("tabitem-removed");
+          prevContainer.addEventListener("transitionend", () => {
+            prevContainer.remove();
           });
         }
         closeBtn.hidden = true;
         undoBtn.hidden = false;
+        // The Undo button is a sibling of the tab button, so disabling the tab
+        // button no longer prunes Undo from the keyboard walker or the
+        // accessibility tree.
         if (closeBtn.tab) {
           closeBtn.tab.disabled = true;
         }
@@ -1117,8 +1123,8 @@ var gSync = {
 
   // Returns the call to action ("signin", "turnonsync", or "connectdevice") for
   // showing the remote tabs promo, or null when the promo should be hidden.
-  // `requiredEngines` are the sync engines that must be disabled to show the promo ["tabs"]
-  getSyncPromoState(requiredEngines) {
+  // Disabled `requiredEngines` also select "turnonsync" when provided.
+  getSyncPromoState(requiredEngines = []) {
     if (!this.FXA_ENABLED) {
       return null;
     }
@@ -1508,8 +1514,10 @@ var gSync = {
    *    and opens the secure sync subpanel.
    *  - signed in with sync off: "Sync is Off" with an error-colored
    *    "Your data isn't syncing" and opens sync preferences.
-   *  - signed out, or signed in but needing (re-)authentication: "Sync is Off"
-   *    with an error-colored "Sign in to sync" and opens the sign-in page.
+   *  - never signed in: "Sync Your Data" with no description and opens the
+   *    sign-in page.
+   *  - signed in but needing (re-)authentication: "Sync is Off" with an
+   *    error-colored "Sign in to sync" and opens the sign-in page.
    */
   _updateSyncStatusButton(state) {
     const btn = PanelMultiView.getViewNode(
@@ -1536,6 +1544,10 @@ var gSync = {
       document,
       "PanelUI-fxa-menu-sync-status-off-description"
     );
+    const mobileBtn = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-get-firefox-mobile"
+    );
 
     const syncOn =
       state.status == UIState.STATUS_SIGNED_IN && state.syncEnabled;
@@ -1555,16 +1567,23 @@ var gSync = {
         "value",
         this.fluentStrings.formatValueSync("fxa-menu-sync-off-data-description")
       );
+      offCard.after(mobileBtn);
+      mobileBtn.hidden = false;
       return;
     }
+
+    // A user who has never signed in gets a call-to-action title with no
+    // description instead of the "Sync is Off" / "Sign in to sync" copy.
+    const neverSignedIn = state.status == UIState.STATUS_NOT_CONFIGURED;
 
     // The chevron is only meaningful when the button navigates to the secure
     // sync subpanel (sync on).
     btn.classList.toggle("subviewbutton-nav", syncOn);
 
-    let titleId = syncOn
-      ? "fxa-menu-sync-status-on"
+    let neverSignedInId = neverSignedIn
+      ? "fxa-menu-sync-your-data"
       : "fxa-menu-sync-status-off";
+    let titleId = syncOn ? "fxa-menu-sync-status-on" : neverSignedInId;
     titleEl.setAttribute("value", this.fluentStrings.formatValueSync(titleId));
 
     if (syncOn) {
@@ -1580,6 +1599,9 @@ var gSync = {
       } else {
         descEl.removeAttribute("value");
       }
+    } else if (neverSignedIn) {
+      descEl.classList.remove("fxa-menu-sync-status-description-error");
+      descEl.removeAttribute("value");
     } else {
       descEl.classList.add("fxa-menu-sync-status-description-error");
       descEl.setAttribute(
@@ -1590,7 +1612,15 @@ var gSync = {
       );
     }
 
+    // Don't render the description label when there's nothing to show.
+    descEl.hidden = !descEl.hasAttribute("value");
+
     btn.hidden = false;
+
+    // "Get Firefox for mobile" sits directly under the sync status button and
+    // is only offered while sync is off.
+    btn.after(mobileBtn);
+    mobileBtn.hidden = syncOn;
   },
 
   _onSyncStatusButtonClick(anchor, event) {
@@ -1915,6 +1945,10 @@ var gSync = {
       document,
       "PanelUI-fxa-menu-profiles-separator"
     );
+    const manageAccountSeparator = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-manage-account-separator"
+    );
     const secureSyncHeader = PanelMultiView.getViewNode(
       document,
       "PanelUI-fxa-menu-secure-sync-header"
@@ -1943,6 +1977,7 @@ var gSync = {
     syncSetupEl.setAttribute("hidden", "true");
     signedInContainer.hidden = false;
     manageAccountButtonEl.hidden = true;
+    manageAccountSeparator.hidden = true;
     signInPromoEl.hidden = true;
     signedOutCardEl.hidden = true;
     menuHeaderDescriptionEl.hidden = false;
@@ -1983,6 +2018,10 @@ var gSync = {
     let headerTitleL10nId;
     let headerDescription;
 
+    // The profiles section (header and buttons) is only populated when the
+    // profiles feature is enabled; its surrounding separators follow suit.
+    const profilesShown = !!SelectableProfileService?.isEnabled;
+
     switch (state.status) {
       case UIState.STATUS_NOT_CONFIGURED:
         signOutSeparator.hidden = true;
@@ -2017,6 +2056,9 @@ var gSync = {
         profilesSeparator.remove();
         secureSyncHeader.remove();
 
+        // When signed out this is the single separator below the sign-in promo:
+        // it sits above the secure sync section, with the profiles section (when
+        // shown) slotting in between, so it stays visible regardless of profiles.
         profilesSeparator.hidden = false;
         secureSyncHeader.hidden = false;
 
@@ -2067,18 +2109,26 @@ var gSync = {
         syncSetupSeparator.setAttribute("hidden", "true");
 
         // Reposition profiles elements
+        manageAccountSeparator.remove();
         profilesHeaderLabel.remove();
         profileButtonsContainer.remove();
         profilesSeparator.remove();
         secureSyncHeader.remove();
 
-        profilesSeparator.hidden = false;
+        // Single separator below the manage account button, above whichever
+        // section comes next (profiles when shown, otherwise secure sync).
+        manageAccountSeparator.hidden = false;
+        // Only divide the profiles section from secure sync when profiles show.
+        profilesSeparator.hidden = !profilesShown;
         secureSyncHeader.hidden = false;
 
         manageAccountButtonEl.after(secureSyncHeader);
         manageAccountButtonEl.after(profilesSeparator);
         manageAccountButtonEl.after(profileButtonsContainer);
         manageAccountButtonEl.after(profilesHeaderLabel);
+        // Inserted last so it lands directly below the manage account button,
+        // separating it from the profiles section.
+        manageAccountButtonEl.after(manageAccountSeparator);
 
         break;
 
@@ -3433,9 +3483,13 @@ var gSync = {
   },
 
   openGetFirefoxMobile() {
-    switchToTabHavingURI("https://www.firefox.com/en-US/mobile/", true, {
-      replaceQueryString: true,
-    });
+    switchToTabHavingURI(
+      "https://www.firefox.com/mobile/?utm_medium=firefox-desktop&utm_source=toolbar&utm_campaign=desktop-account-menu",
+      true,
+      {
+        replaceQueryString: true,
+      }
+    );
   },
 
   openSyncedTabsPanel() {

@@ -14,6 +14,7 @@ import {
   resolveWidgetHasSidebar,
   resolveCrosswordEndpoint,
   resolvePrivacyBlankChance,
+  resolvePrivacyCelebrationThreshold,
   PREF_WIDGETS_ORDER,
 } from "common/WidgetsRegistry.mjs";
 
@@ -564,5 +565,46 @@ describe("resolvePrivacyBlankChance", () => {
         trainhopConfig: { widgets: { privacyBlankChance: 0.1 } },
       })
     ).toBe(0.1);
+  });
+});
+
+describe("resolvePrivacyCelebrationThreshold", () => {
+  const PREF = "widgets.privacy.celebrationThreshold";
+
+  it("defaults to 10 when unset", () => {
+    expect(resolvePrivacyCelebrationThreshold({})).toBe(10);
+  });
+
+  it("uses a valid numeric pref", () => {
+    expect(resolvePrivacyCelebrationThreshold({ [PREF]: 25 })).toBe(25);
+  });
+
+  it("prefers trainhopConfig over the pref", () => {
+    expect(
+      resolvePrivacyCelebrationThreshold({
+        [PREF]: 25,
+        trainhopConfig: { widgets: { privacyCelebrationThreshold: 5 } },
+      })
+    ).toBe(5);
+  });
+
+  it("ignores a non-numeric trainhop value and falls back to the pref", () => {
+    expect(
+      resolvePrivacyCelebrationThreshold({
+        [PREF]: 25,
+        trainhopConfig: { widgets: { privacyCelebrationThreshold: "5" } },
+      })
+    ).toBe(25);
+  });
+
+  it("rejects zero and negatives, which would fire on every refresh", () => {
+    expect(resolvePrivacyCelebrationThreshold({ [PREF]: 0 })).toBe(10);
+    expect(resolvePrivacyCelebrationThreshold({ [PREF]: -5 })).toBe(10);
+  });
+
+  it("rejects non-finite and non-numeric values", () => {
+    expect(resolvePrivacyCelebrationThreshold({ [PREF]: NaN })).toBe(10);
+    expect(resolvePrivacyCelebrationThreshold({ [PREF]: Infinity })).toBe(10);
+    expect(resolvePrivacyCelebrationThreshold({ [PREF]: "25" })).toBe(10);
   });
 });

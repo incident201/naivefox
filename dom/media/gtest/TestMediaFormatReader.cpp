@@ -1131,6 +1131,9 @@ TEST_F(VideoRateTest, StreamChangeWhileNullDecodingUsesNewRateOnResume) {
 // Each test sets its MockGetSamples expectation, then calls InitReader().
 class TestMFRCryptoSampleSizeCheck : public ::testing::Test {
  protected:
+  static constexpr const char* kMaxDecodeErrorPref =
+      "media.video-max-decode-error";
+
   RefPtr<MockMediaDataDemuxer> mDataDemuxer;
   RefPtr<MockMediaTrackDemuxer> mTrackDemuxer;
   RefPtr<MockDecoderModule> mPdm;
@@ -1138,6 +1141,7 @@ class TestMFRCryptoSampleSizeCheck : public ::testing::Test {
   RefPtr<VideoFrameContainer> mContainer;
   RefPtr<MediaFormatReader> mReader;
   RefPtr<ReaderProxy> mProxy;
+  Maybe<uint32_t> mMaxDecodeErrorUserValue;
 
   TestMFRCryptoSampleSizeCheck()
       : mDataDemuxer(new MockMediaDataDemuxer()),
@@ -1147,6 +1151,12 @@ class TestMFRCryptoSampleSizeCheck : public ::testing::Test {
         mOwner(std::make_unique<MockMediaDecoderOwner>()) {}
 
   void SetUp() override {
+    if (Preferences::HasUserValue(kMaxDecodeErrorPref)) {
+      mMaxDecodeErrorUserValue.emplace(
+          Preferences::GetUint(kMaxDecodeErrorPref));
+    }
+    ASSERT_NS_SUCCEEDED(Preferences::SetUint(kMaxDecodeErrorPref, 0));
+
     ON_CALL(*mDataDemuxer, GetNumberTracks(TrackType::kVideoTrack))
         .WillByDefault(Return(1));
     ON_CALL(*mDataDemuxer, GetTrackDemuxer)
@@ -1157,6 +1167,14 @@ class TestMFRCryptoSampleSizeCheck : public ::testing::Test {
         .WillByDefault([](const CreateDecoderParams& aParams) {
           return do_AddRef(new MockVideoDataDecoder(aParams));
         });
+  }
+
+  void TearDown() override {
+    nsresult rv = mMaxDecodeErrorUserValue
+                      ? Preferences::SetUint(kMaxDecodeErrorPref,
+                                             *mMaxDecodeErrorUserValue)
+                      : Preferences::ClearUser(kMaxDecodeErrorPref);
+    EXPECT_NS_SUCCEEDED(rv);
   }
 
   void InitReader() {

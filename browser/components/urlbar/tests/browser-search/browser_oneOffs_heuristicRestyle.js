@@ -19,25 +19,38 @@ const HISTORY_URL = "https://mozilla.org/";
 const KEYWORD = "kw";
 const KEYWORD_URL = "https://mozilla.org/search?q=%s";
 
-// Expected result data for our test results.
-const RESULT_DATA_BY_TYPE = {
-  [UrlbarShared.RESULT_TYPE.URL]: {
-    icon: `page-icon:${HISTORY_URL}`,
-    actionL10n: {
-      id: "urlbar-result-action-visit",
-    },
-  },
-  [UrlbarShared.RESULT_TYPE.SEARCH]: {
-    icon: "chrome://global/skin/icons/search-glass.svg",
-    actionL10n: {
-      id: "urlbar-result-action-search-w-engine",
-      args: { engine: TEST_DEFAULT_ENGINE_NAME },
-    },
-  },
-  [UrlbarShared.RESULT_TYPE.KEYWORD]: {
-    icon: `page-icon:${KEYWORD_URL}`,
-  },
-};
+// Returns the expected row state for our test UrlbarResults.
+function expectedRowState(resultDetails, isRowSelected) {
+  switch (resultDetails.type) {
+    case UrlbarShared.RESULT_TYPE.URL:
+      return {
+        icon: `page-icon:${HISTORY_URL}`,
+        hasSeparator: true,
+        hasUrl: true,
+      };
+    case UrlbarShared.RESULT_TYPE.SEARCH:
+      return {
+        icon: "chrome://global/skin/icons/search-glass.svg",
+        actionL10n: {
+          id: "urlbar-result-action-search-w-engine",
+          args: { engine: TEST_DEFAULT_ENGINE_NAME },
+        },
+        hasAction: isRowSelected,
+        hasSeparator: isRowSelected,
+      };
+    case UrlbarShared.RESULT_TYPE.KEYWORD:
+      return {
+        icon: `page-icon:${KEYWORD_URL}`,
+        actionL10n: {
+          id: "urlbar-result-action-visit",
+        },
+        hasAction: resultDetails.element.row.hasAttribute("is-url"),
+        hasSeparator: resultDetails.element.row.hasAttribute("is-url"),
+      };
+  }
+
+  throw new Error("Unhandled result type: " + resultDetails.type);
+}
 
 function getSourceIcon(source) {
   switch (source) {
@@ -62,55 +75,74 @@ function getSourceIcon(source) {
  *   The return value of UrlbarTestUtils.getDetailsOfResultAt(window, 0).
  */
 async function heuristicIsNotRestyled(expectedType, resultDetails) {
+  let isRowSelected = UrlbarTestUtils.getSelectedRowIndex(window) == 0;
+  let data = expectedRowState(resultDetails, isRowSelected);
+
+  info("Checking expected row state: " + JSON.stringify(data));
+
   Assert.equal(
     resultDetails.type,
     expectedType,
     "The restyled result is the expected type."
   );
 
+  // title
   Assert.equal(
     resultDetails.displayed.title,
     resultDetails.title,
     "The displayed title is equal to the payload title."
   );
 
-  let data = RESULT_DATA_BY_TYPE[expectedType];
-  Assert.ok(data, "Sanity check: Expected type is recognized");
+  // title separator
+  Assert.equal(
+    UrlbarTestUtils.isSeparatorVisible(resultDetails.element.separator),
+    data.hasSeparator,
+    "Row's title separator should be visible or not as expected"
+  );
 
-  let [actionText] = data.actionL10n
-    ? await document.l10n.formatValues([data.actionL10n])
-    : [""];
+  // URL
+  let isUrlVisible = BrowserTestUtils.isVisible(resultDetails.element.url);
+  if (!Services.prefs.getBoolPref("browser.nova.enabled", false)) {
+    // In Proton, the element remains visible, it's just empty.
+    isUrlVisible =
+      isUrlVisible &&
+      (!!resultDetails.displayed.url ||
+        !!document.l10n.getAttributes(resultDetails.element.url)?.id);
+  }
+  Assert.equal(
+    isUrlVisible,
+    !!data.hasUrl,
+    "Row's URL should be visible or not as expected"
+  );
+  if (data.hasUrl) {
+    Assert.ok(resultDetails.displayed.url, "Row should have a non-empty URL");
+  }
 
-  if (
-    expectedType === UrlbarShared.RESULT_TYPE.URL &&
-    resultDetails.result.heuristic &&
-    resultDetails.result.payload.title
-  ) {
-    Assert.equal(
-      resultDetails.displayed.url,
-      resultDetails.result.getDisplayableValueAndHighlights("url", {
-        isURL: true,
-      }).value
-    );
-  } else {
-    Assert.equal(
-      resultDetails.displayed.action,
-      actionText,
-      "The result has the expected non-styled action text."
+  // action
+  let isActionVisible = BrowserTestUtils.isVisible(
+    resultDetails.element.action
+  );
+  if (!Services.prefs.getBoolPref("browser.nova.enabled", false)) {
+    // In Proton, the element remains visible, it's just empty.
+    isActionVisible =
+      isActionVisible &&
+      (!!resultDetails.displayed.action ||
+        !!document.l10n.getAttributes(resultDetails.element.action)?.id);
+  }
+  Assert.equal(
+    isActionVisible,
+    !!data.hasAction,
+    "Row's action should be visible or not as expected"
+  );
+  if (data.hasAction) {
+    Assert.deepEqual(
+      document.l10n.getAttributes(resultDetails.element.action),
+      data.actionL10n,
+      "Row's action should have expected l10n attributes"
     );
   }
 
-  Assert.equal(
-    BrowserTestUtils.isVisible(resultDetails.element.separator),
-    !!actionText,
-    "The title separator is " + (actionText ? "visible" : "hidden")
-  );
-  Assert.equal(
-    BrowserTestUtils.isVisible(resultDetails.element.action),
-    !!actionText,
-    "The action text is " + (actionText ? "visible" : "hidden")
-  );
-
+  // icon
   Assert.equal(
     resultDetails.image,
     data.icon,
@@ -179,7 +211,7 @@ async function heuristicIsRestyled(
   );
 
   Assert.ok(
-    BrowserTestUtils.isVisible(resultDetails.element.separator),
+    UrlbarTestUtils.isSeparatorVisible(resultDetails.element.separator),
     "The restyled result's title separator should be visible"
   );
   Assert.ok(
@@ -523,4 +555,14 @@ async function doTest(searchString, expectedHeuristicType, useLocal, callback) {
 
   await UrlbarTestUtils.exitSearchMode(window);
   await UrlbarTestUtils.promisePopupClose(window);
+
+  // Move the mouse away from the view so that a result or one-off isn't
+  // inadvertently highlighted.
+  EventUtils.synthesizeMouse(
+    gURLBar.inputField,
+    0,
+    0,
+    { type: "mousemove" },
+    window
+  );
 }

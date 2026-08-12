@@ -957,14 +957,14 @@
   direction: ltr;
 }
 
-#color-scheme-simulation-light-toggle::before {
-  background-image: url("chrome://devtools/skin/images/rules-view-light-mode-simulation.svg");
+#color-scheme-emulation-light-toggle::before {
+  background-image: url("chrome://devtools/skin/images/rules-view-light-mode-emulation.svg");
   -moz-context-properties: fill, stroke;
   stroke: currentColor;
 }
 
-#color-scheme-simulation-dark-toggle::before {
-  background-image: url("chrome://devtools/skin/images/rules-view-dark-mode-simulation.svg");
+#color-scheme-emulation-dark-toggle::before {
+  background-image: url("chrome://devtools/skin/images/rules-view-dark-mode-emulation.svg");
 }
 
 #emulation-panel-toggle::before {
@@ -1034,9 +1034,9 @@
 }
 
 :is(
-  #print-simulation-enabled-option,
-  #color-scheme-simulation-light-option,
-  #color-scheme-simulation-dark-option,
+  #print-emulation-enabled-option,
+  #color-scheme-emulation-light-option,
+  #color-scheme-emulation-dark-option,
   #reduced-motion-emulation-reduce-option,
   #reduced-motion-emulation-no-preference-option
 )::after {
@@ -1050,12 +1050,12 @@
   stroke: currentColor;
 }
 
-#color-scheme-simulation-light-option::after {
-  background-image: url("chrome://devtools/skin/images/rules-view-light-mode-simulation.svg");
+#color-scheme-emulation-light-option::after {
+  background-image: url("chrome://devtools/skin/images/rules-view-light-mode-emulation.svg");
 }
 
-#color-scheme-simulation-dark-option::after {
-  background-image: url("chrome://devtools/skin/images/rules-view-dark-mode-simulation.svg");
+#color-scheme-emulation-dark-option::after {
+  background-image: url("chrome://devtools/skin/images/rules-view-dark-mode-emulation.svg");
 }
 
 #reduced-motion-emulation-reduce-option::after {

@@ -594,7 +594,9 @@ class CycleCollectedJSRuntime {
   OOMState mOutOfMemoryState;
   OOMState mLargeAllocationFailureState;
 
-  static const size_t kSegmentSize = 512;
+  // Keeps sizeof(Segment) within mozjemalloc's largest bin size class (3840);
+  // past that each segment gets its own page run.
+  static const size_t kSegmentSize = 3800;
   using NurseryObjectsVector =
       SegmentedVector<nsWrapperCache*, kSegmentSize, InfallibleAllocPolicy>;
   NurseryObjectsVector mNurseryObjects;

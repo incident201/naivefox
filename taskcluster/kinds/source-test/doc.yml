@@ -42,6 +42,7 @@ generate:
               name: public/trees.json
               path: /builds/worker/artifacts/trees.json
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         command: >
@@ -100,6 +101,7 @@ upload:
               name: public/code-review/issues.json
               path: /builds/worker/issues.json
     run:
+        clone-with: hg
         using: run-task
         cwd: '{checkout}'
         command: >

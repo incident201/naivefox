@@ -184,6 +184,17 @@
     </html:button-group>
   </panel>
 
+  <!-- Hover preview for the open tabs launcher button -->
+  <panel id="sidebar-opentabs-preview"
+       class="panel-no-padding"
+       role="group"
+       type="arrow"
+       noautofocus="true"
+       norolluponanchor="true"
+       consumeoutsideclicks="false">
+    <html:sidebar-opentabs-preview></html:sidebar-opentabs-preview>
+  </panel>
+
   <panel is="autocomplete-richlistbox-popup"
          type="autocomplete-richlistbox"
          id="PopupAutoComplete"
@@ -849,6 +860,7 @@
 #include ../../components/controlcenter/content/trustPanel.inc.xhtml
 #include ../../components/controlcenter/content/protectionsPanel.inc.xhtml
 #include ../../components/downloads/content/downloadsPanel.inc.xhtml
+#include ../../components/sharing/content/sharePanel.inc.xhtml
 #include ../../components/translations/content/selectTranslationsPanel.inc.xhtml
 #include ../../components/translations/content/fullPageTranslationsPanel.inc.xhtml
 #include ../../components/tabbrowser/content/browser-allTabsMenu.inc.xhtml

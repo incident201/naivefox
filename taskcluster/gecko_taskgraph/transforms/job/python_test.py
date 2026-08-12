@@ -24,8 +24,8 @@ class PythonTestSchema(Schema, kw_only=True):
     # if the value of the ENV needs to be interpolated with another ENV.
     prepend_env: Optional[dict[str, str]] = None
     # How to clone the upstream repo for the checkout, either "hg" or "git"
-    # (default: "hg")
-    clone_with: Optional[Literal["hg", "git"]] = "hg"
+    # (default: "git")
+    clone_with: Optional[Literal["hg", "git"]] = "git"
 
 
 defaults = {

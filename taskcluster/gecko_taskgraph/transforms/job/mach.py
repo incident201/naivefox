@@ -30,8 +30,8 @@ class MachSchema(Schema, kw_only=True):
     # Use the specified caches.
     use_caches: Optional[Union[bool, list[str]]] = None
     # How to clone the upstream repo for the checkout, either "hg" or "git"
-    # (default: "hg")
-    clone_with: Optional[Literal["hg", "git"]] = "hg"
+    # (default: "git")
+    clone_with: Optional[Literal["hg", "git"]] = "git"
 
 
 defaults = {

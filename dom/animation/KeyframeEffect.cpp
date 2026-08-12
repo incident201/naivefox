@@ -103,6 +103,7 @@ KeyframeEffect::KeyframeEffect(Document* aDocument,
       mEffectOptions{aOther.IterationComposite(), aOther.Composite(),
                      mTarget.mPseudoRequest},
       mKeyframes(aOther.mKeyframes.Clone()),
+      mKeyframeOffsetsHasRangeOffset(aOther.mKeyframeOffsetsHasRangeOffset),
       mProperties(aOther.mProperties.Clone()),
       mBaseValues(aOther.mBaseValues.Clone()) {}
 

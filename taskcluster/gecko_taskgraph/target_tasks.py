@@ -1294,6 +1294,12 @@ def target_tasks_pinning_update(full_task_graph, parameters, graph_config):
     return ["repo-update-pinning-update"]
 
 
+@register_target_task("bhr_aggregate")
+def target_tasks_bhr_aggregate(full_task_graph, parameters, graph_config):
+    """Select the daily Background Hang Reporter aggregation task"""
+    return ["bhr-aggregate-cron"]
+
+
 @register_target_task("l10n_bump")
 def target_tasks_l10n_bump(full_task_graph, parameters, graph_config):
     """Select the set of tasks required to perform l10n bumping."""

@@ -1909,11 +1909,13 @@ networking:
       at shutdown by a background task process.
     bugs:
       - https://bugzilla.mozilla.org/1848542
+      - https://bugzilla.mozilla.org/2057073
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1848542
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2057073
     notification_emails:
       - vgosu@mozilla.com
-    expires: 156
+    expires: 168
 
   residual_cache_folder_removal:
     type: labeled_counter
@@ -1923,12 +1925,14 @@ networking:
     bugs:
       - https://bugzilla.mozilla.org/1848542
       - https://bugzilla.mozilla.org/1989190
+      - https://bugzilla.mozilla.org/2057073
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1848542
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1989190
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2057073
     notification_emails:
       - vgosu@mozilla.com
-    expires: 156
+    expires: 168
     labels:
       - success
       - failure

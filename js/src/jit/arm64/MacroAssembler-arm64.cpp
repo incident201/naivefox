@@ -2616,11 +2616,12 @@ static void LoadExclusive(MacroAssembler& masm,
         AutoForbidPoolsAndNops afp(
             &masm,
             /* max number of instructions in scope = */ 1);
+        auto before = masm.currentOffset();
+        masm.Ldxrb(W(dest), ptr);
         if (access) {
           masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load8,
-                               FaultingCodeRange(masm.currentOffset()));
+                               FaultingCodeRange(before));
         }
-        masm.Ldxrb(W(dest), ptr);
       }
       if (signExtend) {
         masm.Sbfm(R(dest, targetWidth), R(dest, targetWidth), 0, 7);
@@ -2632,11 +2633,12 @@ static void LoadExclusive(MacroAssembler& masm,
         AutoForbidPoolsAndNops afp(
             &masm,
             /* max number of instructions in scope = */ 1);
+        auto before = masm.currentOffset();
+        masm.Ldxrh(W(dest), ptr);
         if (access) {
           masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load16,
-                               FaultingCodeRange(masm.currentOffset()));
+                               FaultingCodeRange(before));
         }
-        masm.Ldxrh(W(dest), ptr);
       }
       if (signExtend) {
         masm.Sbfm(R(dest, targetWidth), R(dest, targetWidth), 0, 15);
@@ -2648,11 +2650,12 @@ static void LoadExclusive(MacroAssembler& masm,
         AutoForbidPoolsAndNops afp(
             &masm,
             /* max number of instructions in scope = */ 1);
+        auto before = masm.currentOffset();
+        masm.Ldxr(W(dest), ptr);
         if (access) {
           masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load32,
-                               FaultingCodeRange(masm.currentOffset()));
+                               FaultingCodeRange(before));
         }
-        masm.Ldxr(W(dest), ptr);
       }
       if (targetWidth == Width::_64 && signExtend) {
         masm.Sbfm(X(dest), X(dest), 0, 31);
@@ -2664,11 +2667,12 @@ static void LoadExclusive(MacroAssembler& masm,
         AutoForbidPoolsAndNops afp(
             &masm,
             /* max number of instructions in scope = */ 1);
+        auto before = masm.currentOffset();
+        masm.Ldxr(X(dest), ptr);
         if (access) {
           masm.appendAndVerify(*access, wasm::TrapMachineInsn::Load64,
-                               FaultingCodeRange(masm.currentOffset()));
+                               FaultingCodeRange(before));
         }
-        masm.Ldxr(X(dest), ptr);
       }
       break;
     }

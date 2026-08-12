@@ -108,8 +108,11 @@ def ensure_node_modules(output):
             output.write(_hash_sources(newtab_dir))
             return
 
-        if os.environ.get("MOZ_AUTOMATION"):
-            raise Exception("newtab-node-modules must be fetched in CI")
+        if os.environ.get("MOZ_FETCHES_DIR"):
+            raise Exception(
+                "newtab-node-modules must be fetched in CI: add it to this "
+                "task's toolchain fetches."
+            )
 
         # Local dev builds: install via mozbuild's shared helper, which locates
         # node/npm and runs `npm ci` (handles the node-on-PATH and Windows npm

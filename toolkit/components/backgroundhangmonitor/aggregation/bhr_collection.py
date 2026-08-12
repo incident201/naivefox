@@ -31,7 +31,7 @@ from heuristics import apply_hang_signature_heuristics
 from profile_processor import ProfileProcessor
 from symbolication import UNSYMBOLICATED, symbolicate_modules
 
-_BQ_TABLE = "moz-fx-data-shared-prod.firefox_desktop_stable.hang_report_v1"
+_BQ_TABLE = "mozdata.firefox_desktop.hang_report"
 _MAX_SAMPLE_SLICES = 10000
 
 # Project/dataset where query results are materialized before being read back.
@@ -399,18 +399,20 @@ def symbolicate_stacks(stack, symbol_map):
     """Replace (module, offset) frames with (symbol, lib_name) frames.
 
     symbol_map is the dict returned by symbolication.symbolicate_modules,
-    keyed by (module, offset). A frame with no module, no map entry, or a
-    None symbol falls back to the UNSYMBOLICATED sentinel. Ported verbatim
-    from python_mozetl, including the tuple() coercion on the lookup key
-    and the processed[0] is not None guard.
+    keyed by (module, offset). Each value is a LIST of (symbol, lib_name)
+    frames: usually one, but more than one when the address resolves inside
+    inlined code, in which case the whole inlined chain is spliced into the
+    stack in place (outer-first) so equivalent hangs dedup (bug 2052961). A
+    frame with no module, no map entry, or a None leading symbol falls back to
+    the UNSYMBOLICATED sentinel.
     """
     symbolicated = []
     for module, offset in stack:
         if module is not None:
             debug_name = module[0]
             processed = symbol_map.get((tuple(module), offset), None)
-            if processed is not None and processed[0] is not None:
-                symbolicated.append(processed)
+            if processed and processed[0][0] is not None:
+                symbolicated.extend(processed)
             else:
                 symbolicated.append((UNSYMBOLICATED, debug_name))
         else:

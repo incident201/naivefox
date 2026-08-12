@@ -1166,9 +1166,9 @@ pref("browser.tabs.groups.smart.embeddingModelRevision", "latest");
 pref("browser.tabs.groups.smart.nearestNeighborThresholdInt", 275);
 // Clustering method: KMEANS or AGGLOMERATIVE (hierarchical, average-linkage).
 pref("browser.tabs.groups.smart.clusterMethod", "AGGLOMERATIVE");
-// AGGLOMERATIVE cosine-distance cutoff in thousandths (850 -> 0.85). Lower is
+// AGGLOMERATIVE cosine-distance cutoff in thousandths (825 -> 0.825). Lower is
 // stricter (more, smaller groups); higher is more lenient (fewer, larger).
-pref("browser.tabs.groups.smart.agglomerativeThresholdInt", 850);
+pref("browser.tabs.groups.smart.agglomerativeThresholdInt", 825);
 pref("browser.tabs.groups.smart.optin", false);
 
 pref("browser.tabs.dragDrop.createGroup.enabled", true);
@@ -2289,6 +2289,7 @@ pref("sidebar.updatedBookmarks.enabled", false);
 pref("sidebar.openTabsPanel.enabled", false);
 pref("sidebar.openTabsPanel.collapsedWindows", "{}");
 pref("sidebar.openTabsPanel.sortOption", "tabStripOrder");
+pref("sidebar.openTabsPanel.hoverPreview.enabled", true);
 
 pref("sidebar.notification.badge.aichat", false);
 
@@ -2351,8 +2352,8 @@ pref("browser.smartwindow.mistralRelease", true);
 pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
 // Smart Window: Auto Tab Grouping (bug 2054500).
-pref("browser.smartwindow.autoTabGrouping.enabled", false);
-pref("browser.smartwindow.autoTabGrouping.maxGroups", 5);
+pref("browser.smartwindow.autoTabGrouping.enabled", true);
+pref("browser.smartwindow.autoTabGrouping.maxGroups", 3);
 pref("browser.smartwindow.autoTabGrouping.minTabsPerGroup", 2);
 pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 4);
 pref("browser.smartwindow.autoTabGrouping.minCohesion", "0.15");
@@ -2370,7 +2371,7 @@ pref("browser.smartwindow.agent.supportedRegions", "US,CA");
 
 
 // Smart Window: Merino World Cup Soccer tool call (bug 2038266)
-pref("browser.smartwindow.worldcup.enabled", true);
+pref("browser.smartwindow.worldcup.enabled", false);
 pref("browser.smartwindow.worldcup.endpointURL", "https://merino.services.mozilla.com");
 pref("browser.smartwindow.worldcup.timeoutMs", 2000);
 

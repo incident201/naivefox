@@ -70,9 +70,6 @@ async function doTest({ context, expected }) {
   let controller = UrlbarTestUtils.newMockController({
     input: {
       isPrivate: context.isPrivate,
-      onFirstResult() {
-        return false;
-      },
       getSearchSource() {
         return "dummy-search-source";
       },

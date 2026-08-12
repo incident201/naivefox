@@ -5,7 +5,7 @@
 @import url("chrome://browser/skin/tabbrowser/tab.tokens.css");
 
 #fxview-tab-row-secondary-button {
-  visibility: hidden;
+  visibility: collapse;
 
   :host(:hover) & {
     visibility: visible;
@@ -20,6 +20,7 @@
   --favicon-badge-color: var(--color-accent-attention);
 
   display: flex;
+  contain: size layout;
 }
 
 :host([selected]) {
@@ -196,7 +197,6 @@
 }
 
 :host([medium-view]) #fxview-tab-row-secondary-button {
-  display: inline;
   visibility: hidden;
 }
 

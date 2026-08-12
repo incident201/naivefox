@@ -995,7 +995,7 @@ void gfxFontUtils::GetPrefsFontList(const char* aPrefName,
 
 constexpr uint32_t MAX_B64_LEN = 32;
 
-nsresult gfxFontUtils::MakeUniqueUserFontName(nsAString& aName) {
+nsresult gfxFontUtils::MakeUniqueUserFontName(nsACString& aName) {
   nsCOMPtr<nsIUUIDGenerator> uuidgen =
       do_GetService("@mozilla.org/uuid-generator;1");
   NS_ENSURE_TRUE(uuidgen, NS_ERROR_OUT_OF_MEMORY);
@@ -1020,7 +1020,7 @@ nsresult gfxFontUtils::MakeUniqueUserFontName(nsAString& aName) {
     if (*p == '/') *p = '-';
   }
 
-  aName.AssignLiteral(u"uf");
+  aName.AssignLiteral("uf");
   aName.AppendASCII(guidB64);
   return NS_OK;
 }

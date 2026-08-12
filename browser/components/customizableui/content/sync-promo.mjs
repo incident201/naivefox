@@ -9,18 +9,12 @@ import "chrome://global/content/elements/moz-promo.mjs";
 
 window.MozXULElement?.insertFTLIfNeeded("browser/appmenu.ftl");
 
-// Notification topics that can change promo eligibility (see gSync).
 const UI_STATE_UPDATE = "sync-ui-state:update";
 const DEVICE_LIST_UPDATED = "fxaccounts:devicelist_updated";
 
-// Per-surface promo configuration. Each surface maps the possible promo states
-// returned by gSync.getSyncPromoState() to the heading/CTA strings to show, and
-// declares the FxA entry point and the sync engines whose absence should trigger
-// the "turn on sync" state.
 const PROMO_CONFIG = {
   history: {
     entryPoint: "remote-tabs-app-menu-history",
-    requiredEngines: ["tabs", "history"],
     variants: {
       signin: {
         heading: "appmenu-sync-promo-signin",
@@ -41,7 +35,6 @@ const PROMO_CONFIG = {
   },
   bookmarks: {
     entryPoint: "bookmarks-app-menu",
-    requiredEngines: ["bookmarks"],
     variants: {
       signin: {
         heading: "appmenu-sync-promo-signin",
@@ -91,29 +84,20 @@ export default class SyncPromo extends MozLitElement {
   // helper object.
   #observer = { observe: () => this.#refresh() };
 
-  // Every input getSyncPromoState() and dismissal reads, so the promo stays in
-  // sync while the menu is open and across windows. UIState/device-list come
-  // through the observer service; engine and dismissal state are prefs.
-  get #observedPrefs() {
-    return [
-      ...this.#config.requiredEngines.map(e => `services.sync.engine.${e}`),
-      `browser.promo.syncPromo.${this.promoType}.`,
-    ];
+  get #dismissedPrefBranch() {
+    return `browser.promo.syncPromo.${this.promoType}.`;
   }
 
   connectedCallback() {
     super.connectedCallback();
     Services.obs.addObserver(this.#observer, UI_STATE_UPDATE);
     Services.obs.addObserver(this.#observer, DEVICE_LIST_UPDATED);
-    for (let pref of this.#observedPrefs) {
-      Services.prefs.addObserver(pref, this.#observer);
-    }
+    Services.prefs.addObserver(this.#dismissedPrefBranch, this.#observer);
 
     window.addEventListener("unload", this.disconnectedCallback, {
       once: true,
     });
-    // Recompute whenever the containing panelview is shown too, as a backstop
-    // for anything the observers above don't cover.
+    // Backstop for anything the observers above don't cover.
     this.#panelview = this.closest("panelview");
     this.#panelview?.addEventListener("ViewShowing", this.#onViewShowing);
     this.#refresh();
@@ -124,9 +108,7 @@ export default class SyncPromo extends MozLitElement {
     window.removeEventListener("unload", this.disconnectedCallback);
     Services.obs.removeObserver(this.#observer, UI_STATE_UPDATE);
     Services.obs.removeObserver(this.#observer, DEVICE_LIST_UPDATED);
-    for (let pref of this.#observedPrefs) {
-      Services.prefs.removeObserver(pref, this.#observer);
-    }
+    Services.prefs.removeObserver(this.#dismissedPrefBranch, this.#observer);
     this.#panelview?.removeEventListener("ViewShowing", this.#onViewShowing);
     this.#panelview = null;
   }
@@ -136,11 +118,11 @@ export default class SyncPromo extends MozLitElement {
   }
 
   #dismissedPref(state) {
-    return `browser.promo.syncPromo.${this.promoType}.${state}.dismissed`;
+    return `${this.#dismissedPrefBranch}${state}.dismissed`;
   }
 
   #refresh() {
-    let state = window.gSync?.getSyncPromoState(this.#config.requiredEngines);
+    let state = window.gSync?.getSyncPromoState();
     if (
       state &&
       Services.prefs.getBoolPref(this.#dismissedPref(state), false)

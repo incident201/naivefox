@@ -219,12 +219,12 @@ void CCGCScheduler::NoteGCSliceEnd(TimeStamp aStart, TimeStamp aEnd) {
   PerfStats::RecordMeasurement(PerfStats::Metric::NonIdleMajorGC,
                                nonIdleDuration);
 
-  // Note the GC_SLICE_DURING_IDLE previously had a different definition: it was
-  // a histogram of percentages of externally-triggered slices. It is now a
-  // histogram of percentages of all slices. That means that now you might have
-  // a 4ms internal slice (0% during idle) followed by a 16ms external slice
-  // (15ms during idle), whereas before this would show up as a single record of
-  // a single slice with 75% of its time during idle (15 of 20ms).
+  // Note the dom.gc_slice_during_idle previously had a different definition:
+  // it was a histogram of percentages of externally-triggered slices. It is now
+  // a histogram of percentages of all slices. That means that now you might
+  // have a 4ms internal slice (0% during idle) followed by a 16ms external
+  // slice (15ms during idle), whereas before this would show up as a single
+  // record of a single slice with 75% of its time during idle (15 of 20ms).
   TimeDuration idleDuration = sliceDuration - nonIdleDuration;
   uint32_t percent =
       uint32_t(idleDuration.ToSeconds() / sliceDuration.ToSeconds() * 100);

@@ -20,6 +20,8 @@ prefs = [
 
 ["browser_searchbar_a11y.js"]
 
+["browser_searchbar_actionLabels.js"]
+
 ["browser_searchbar_addEngine.js"]
 
 ["browser_searchbar_addEngineBadge.js"]

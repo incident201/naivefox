@@ -144,6 +144,7 @@
   "URILoadingHelper",
   "UrlbarPrefs",
   "UrlbarProviderSearchTips",
+  "UrlbarShared",
   "UrlbarTokenizer",
   "UrlbarUtils",
   "Weave",

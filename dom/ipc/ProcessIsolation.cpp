@@ -814,6 +814,16 @@ Result<NavigationIsolationOptions, nsresult> IsolationOptionsForNavigation(
        IsolationBehaviorName(behavior), OriginString(resultOrPrecursor).get(),
        aChannelCreationURI->GetSpecOrDefault().get()));
 
+  // The channel carries the container the load has been switched into, which
+  // the toplevel BC doesn't have: the load is going to be retargeted into a new
+  // tab created for that container, so select the process for it.
+  OriginAttributes originAttributes = aTopBC->OriginAttributesRef();
+  if (aForNewTab && !aParentWindow &&
+      resultOrPrecursor->GetIsContentPrincipal()) {
+    originAttributes.mUserContextId =
+        resultOrPrecursor->OriginAttributesRef().mUserContextId;
+  }
+
   // Check if we can put the previous document into the BFCache.
   if (mozilla::BFCacheInParent() && nsSHistory::GetMaxTotalViewers() > 0 &&
       !aForNewTab && !aParentWindow && !aTopBC->HadOriginalOpener() &&
@@ -843,9 +853,8 @@ Result<NavigationIsolationOptions, nsresult> IsolationOptionsForNavigation(
 
   // If the load has any special remote type handling, do so at this point.
   if (behavior != IsolationBehavior::WebContent) {
-    options.mRemoteType = MOZ_TRY(
-        SpecialBehaviorRemoteType(behavior, aCurrentRemoteType, aParentWindow,
-                                  aTopBC->OriginAttributesRef()));
+    options.mRemoteType = MOZ_TRY(SpecialBehaviorRemoteType(
+        behavior, aCurrentRemoteType, aParentWindow, originAttributes));
 
     if (options.mRemoteType != aCurrentRemoteType &&
         (options.mRemoteType.IsEmpty() || aCurrentRemoteType.IsEmpty())) {
@@ -964,7 +973,7 @@ Result<NavigationIsolationOptions, nsresult> IsolationOptionsForNavigation(
   switch (webProcessType) {
     case WebProcessType::Web:
       options.mRemoteType =
-          SharedWebRemoteType(aTopBC->OriginAttributesRef(), !isJitAllowed);
+          SharedWebRemoteType(originAttributes, !isJitAllowed);
       break;
     case WebProcessType::WebIsolated:
       options.mRemoteType =

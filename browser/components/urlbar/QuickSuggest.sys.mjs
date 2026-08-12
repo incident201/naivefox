@@ -13,7 +13,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource://gre/modules/TelemetryReportingPolicy.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
   UrlbarShared: "chrome://browser/content/urlbar/UrlbarShared.mjs",
-  UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
 
 // See the `QuickSuggest.SETTINGS_UI` jsdoc below.
@@ -779,7 +778,7 @@ class _QuickSuggest {
    *   Suggestion title.
    * @returns {object} { value, highlights }
    *   The value will be used for title.
-   *   The highlights will be created by UrlbarUtils.getTokenMatches().
+   *   The highlights will be created by UrlbarShared.getTokenMatches().
    */
   getFullKeywordTitleAndHighlights({
     tokens,
@@ -790,7 +789,7 @@ class _QuickSuggest {
     return {
       value: fullKeyword ? `${fullKeyword} — ${title}` : title,
       highlights: fullKeyword
-        ? lazy.UrlbarUtils.getTokenMatches(tokens, fullKeyword, highlightType)
+        ? lazy.UrlbarShared.getTokenMatches(tokens, fullKeyword, highlightType)
         : [],
     };
   }

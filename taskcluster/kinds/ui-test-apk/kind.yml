@@ -59,6 +59,7 @@ task-defaults:
                 focus: focus-android-all/opt
                 default: ''
     run:
+        clone-with: hg
         using: run-commands
         dummy-secrets:
             - content: "faketoken"

@@ -6,10 +6,11 @@ prefs = [
   "browser.smartwindow.enabled=true",
 ]
 
+["browser_MemoriesManager.js"]
+["browser_MemoriesSchedulers.js"]
 ["browser_conversation.js"]
 ["browser_conversation_starters.js"]
 ["browser_conversation_stream.js"]
-
 ["browser_getCurrentTabMetadata.js"]
 ["browser_monitor_agent.js"]
 ["browser_monitor_store.js"]

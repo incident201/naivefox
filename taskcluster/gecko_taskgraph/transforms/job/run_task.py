@@ -44,8 +44,8 @@ class RunTaskSchema(Schema, kw_only=True):
     # Whether to use a shallow clone or not, default True (git only).
     shallow_clone: TOptional[bool] = None
     # How to clone the upstream repo for the checkout, either "hg" or "git"
-    # (default: "hg")
-    clone_with: TOptional[Literal["hg", "git"]] = "hg"
+    # (default: "git")
+    clone_with: TOptional[Literal["hg", "git"]] = "git"
     # if true, perform a checkout of a comm-central based branch inside the
     # gecko checkout
     comm_checkout: bool = False
@@ -119,7 +119,7 @@ worker_defaults = {
     "sparse-profile": None,
     "tooltool-downloads": False,
     "run-as-root": False,
-    "clone-with": "hg",
+    "clone-with": "git",
 }
 
 

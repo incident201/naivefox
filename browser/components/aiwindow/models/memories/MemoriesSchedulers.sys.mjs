@@ -35,6 +35,13 @@ const MEMORIES_SCHEDULER_COOLDOWN_MS = Services.prefs.getIntPref(
   4 * 60 * 60 * 1000
 );
 
+// Maintenance cadence. Separate from the generation cooldown because
+// maintenance makes no LLM call and must keep running when generation is idle.
+const MEMORIES_MAINTENANCE_INTERVAL_MS = Services.prefs.getIntPref(
+  "browser.smartwindow.memoriesMaintenanceIntervalInMs",
+  4 * 60 * 60 * 1000
+);
+
 // Shorter back-off for transient (non-429) failures - retry sooner.
 const MEMORIES_SCHEDULER_TRANSIENT_BACKOFF_MS = Services.prefs.getIntPref(
   "browser.smartwindow.memoriesSchedulerTransientBackoffInMs",
@@ -59,6 +66,10 @@ const MIN_RECENT_VISITS_DAYS = 60;
  * Cooldown is keyed off the single session-memory watermark, so the two
  * modalities no longer run on independent clocks.
  *
+ * Memory maintenance ({@link MemoriesManager.runMemoryMaintenance}) runs on the
+ * same tick but its own clock, so ageing and decay deletion keep their cadence
+ * even when nothing new is worth generating from.
+ *
  * Public entry points are the static {@link maybeRunAndSchedule} and
  * {@link stop}; they manage a single instance.
  */
@@ -70,6 +81,11 @@ export class MemoriesSchedulers {
   // Earliest time we'll attempt a run again after a budget-exceeded failure.
   // In-memory only: a browser restart resets this.
   #backoffUntilMs = 0;
+  // Maintenance keeps its own in-memory, last-run watermark to ensure it runs
+  // on the right cadence regardless of it generation runs
+  #lastMaintenanceMs = 0;
+  /** @type {Promise<void> | null} */
+  #initPromise = null;
 
   /** @type {MemoriesSchedulers | null} */
   static #instance = null;
@@ -116,7 +132,7 @@ export class MemoriesSchedulers {
       ["page-visited"],
       this.#onPageVisited
     );
-    void this.#init();
+    this.#initPromise = this.#init();
     lazy.console.debug("Initialized");
   }
 
@@ -133,7 +149,9 @@ export class MemoriesSchedulers {
       lazy.console.debug("First run detected; running immediately.");
       // #onInterval's finally will start the interval.
       await this.#onInterval();
-    } else {
+    } else if (!this.#running && !this.#intervalHandle) {
+      // A run started while we were awaiting above owns the interval instead;
+      // its finally will start it.
       this.#startInterval();
     }
   }
@@ -174,7 +192,7 @@ export class MemoriesSchedulers {
    * @param {boolean} isFirstRun
    * @returns {Promise<boolean>}
    */
-  async #shouldRun(
+  async #shouldRunGeneration(
     historyEnabled,
     conversationEnabled,
     lastMemoryTs,
@@ -263,10 +281,34 @@ export class MemoriesSchedulers {
     this.#stopInterval();
 
     try {
+      const now = Date.now();
+
+      // Maintenance is on its own clock, so it runs regardless of the cooldown
+      // and evidence accumulation checks that gate generation and merging.
+      if (now - this.#lastMaintenanceMs >= MEMORIES_MAINTENANCE_INTERVAL_MS) {
+        lazy.console.debug("Running memories maintenance...");
+        try {
+          await lazy.MemoriesManager.runMemoryMaintenance();
+          lazy.console.debug("Memories maintenance complete.");
+        } catch (error) {
+          lazy.console.error("Failed to run memories maintenance", error);
+        } finally {
+          this.#lastMaintenanceMs = now;
+        }
+      } else {
+        lazy.console.debug(
+          `Maintenance cooldown not met; last run was ${(
+            (now - this.#lastMaintenanceMs) /
+            (60 * 1000)
+          ).toFixed(1)}m ago (<${Math.floor(
+            MEMORIES_MAINTENANCE_INTERVAL_MS / (60 * 60 * 1000)
+          )}h). Skipping.`
+        );
+      }
+
       const lastMemoryTs =
         (await lazy.MemoriesManager.getLastSessionMemoryTimestamp()) ?? 0;
       const isFirstRun = lastMemoryTs === 0;
-      const now = Date.now();
 
       // Cooldown check - keep accumulating pagesVisited until eligible.
       if (!isFirstRun && now - lastMemoryTs < MEMORIES_SCHEDULER_COOLDOWN_MS) {
@@ -280,21 +322,30 @@ export class MemoriesSchedulers {
         return;
       }
 
-      const shouldRun = await this.#shouldRun(
+      const shouldRunGeneration = await this.#shouldRunGeneration(
         historyEnabled,
         conversationEnabled,
         lastMemoryTs,
         isFirstRun
       );
-      if (!shouldRun) {
+      if (!shouldRunGeneration) {
         lazy.console.debug("No trigger met this interval; skipping.");
         return;
       }
 
+      // Run memories generation
       lazy.console.debug("Generating memories from sessions...");
       await lazy.MemoriesManager.generateMemoriesFromSessions();
       this.#pagesVisited = 0;
       lazy.console.debug("Memories generation complete.");
+
+      // Run merge memories
+      // This **is** conditioned on the same checks as generation because we should
+      // only try to merge memories when there are more memories that haven't been
+      // through a merge pass, and it requires an LLM call
+      lazy.console.debug("Merging memories...");
+      await lazy.MemoriesManager.mergeMemories();
+      lazy.console.debug("Merging memories complete.");
     } catch (error) {
       if (lazy.openAIEngine.is429Error(error)) {
         this.#backoffUntilMs = Date.now() + MEMORIES_SCHEDULER_COOLDOWN_MS;
@@ -316,10 +367,10 @@ export class MemoriesSchedulers {
         lazy.console.error("Failed to generate memories", error);
       }
     } finally {
+      this.#running = false;
       if (!this.#destroyed && MemoriesSchedulers.#anySourceEnabled()) {
         this.#startInterval();
       }
-      this.#running = false;
     }
   };
 
@@ -359,10 +410,21 @@ export class MemoriesSchedulers {
   }
 
   /**
+   * Testing helper: set the last-maintenance timestamp (ms since epoch). Pass 0
+   * to force maintenance on the next tick. Not used in production code.
+   *
+   * @param {number} ms
+   */
+  setLastMaintenanceMsForTesting(ms) {
+    this.#lastMaintenanceMs = ms;
+  }
+
+  /**
    * Testing helper: runs the interval handler once immediately. Not used in
    * production code.
    */
   async runNowForTesting() {
+    await this.#initPromise;
     await this.#onInterval();
   }
 }

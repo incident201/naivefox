@@ -26,6 +26,7 @@ const INVOKABLE_CONTENT_ACTIONS = {
 };
 
 /**
+ * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
  * @import {UrlbarParent} from "./UrlbarParent.sys.mjs"
  * @import {UrlbarParentController} from "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs"
  * @import {UrlbarChildController} from "chrome://browser/content/urlbar/UrlbarChildController.mjs"
@@ -144,8 +145,8 @@ export class UrlbarChild extends JSWindowActorChild {
         whereToOpenLink: event => this.whereToOpenLink(event),
         willLoadInBackground: (where, params) =>
           this.willLoadInBackground(where, params),
-        getFixupInfo: (searchString, isPrivate) =>
-          Cu.cloneInto(this.getFixupInfo(searchString, isPrivate), win),
+        getFixupPrimitives: (searchString, isPrivate) =>
+          Cu.cloneInto(this.getFixupPrimitives(searchString, isPrivate), win),
         getDisplaySpec: url => this.getDisplaySpec(url),
         getSupportUrl: topic => this.getSupportUrl(topic),
         isTextDirectionRTL: (value, window) =>
@@ -234,17 +235,11 @@ export class UrlbarChild extends JSWindowActorChild {
    *   The string to fix up.
    * @param {boolean} isPrivate
    *   Whether the fixup runs for a private context.
-   * @returns {?{keywordAsSent: boolean, preferredURIDisplaySpec: ?string}}
+   * @returns {?URIFixupPrimitives}
    *   The fixup primitives, or null if fixup threw.
    */
-  getFixupInfo(searchString, isPrivate) {
-    let info = lazy.UrlbarUtils.getURIFixupInfo(searchString, isPrivate);
-    return info
-      ? {
-          keywordAsSent: info.keywordAsSent,
-          preferredURIDisplaySpec: info.preferredURI?.displaySpec ?? null,
-        }
-      : null;
+  getFixupPrimitives(searchString, isPrivate) {
+    return lazy.UrlbarUtils.getFixupPrimitives(searchString, isPrivate);
   }
 
   /**
@@ -326,18 +321,6 @@ export class UrlbarChild extends JSWindowActorChild {
         ? lazy.UrlbarQueryContext.fromWire(param.serializedQueryContext)
         : param
     );
-    // The parent ran the query but the input lives here, so let it react to the
-    // first result (search mode, autofill) before the results are shown. If it
-    // takes over (returns true), the results are stale; don't dispatch them.
-    if (name == "onQueryResults") {
-      let queryContext = deserialized[0];
-      if (
-        queryContext.firstResultChanged &&
-        child.input.onFirstResult(queryContext.results[0])
-      ) {
-        return;
-      }
-    }
     child.notify(name, ...deserialized);
   }
 
