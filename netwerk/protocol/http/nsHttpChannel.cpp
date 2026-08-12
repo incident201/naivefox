@@ -1191,8 +1191,9 @@ nsresult nsHttpChannel::ContinueOnBeforeConnect(bool aShouldUpgrade,
 
   if (mUpgradeProtocolCallback) {
     // Websockets can run over HTTP/2, but other upgrades can't.
-    if (mUpgradeProtocol.EqualsLiteral("websocket") &&
-        StaticPrefs::network_http_http2_websockets()) {
+    if ((mUpgradeProtocol.EqualsLiteral("websocket") &&
+         StaticPrefs::network_http_http2_websockets()) ||
+        ((mCaps & NS_HTTP_CONNECT_ONLY) && mUpgradeProtocol.IsEmpty())) {
       // Need to tell the conn manager that we're ok with http/2 even with
       // the allow keepalive bit not set. That bit needs to stay off,
       // though, in case we end up having to fallback to http/1.1 (where
@@ -2021,12 +2022,15 @@ nsresult nsHttpChannel::SetupChannelForTransaction() {
   // See bug #466080. Transfer LOAD_ANONYMOUS flag to socket-layer.
   if (mLoadFlags & LOAD_ANONYMOUS) mCaps |= NS_HTTP_LOAD_ANONYMOUS;
 
-  if (mUpgradeProtocolCallback) {
+  if (mUpgradeProtocolCallback && !mUpgradeProtocol.IsEmpty()) {
     rv = mRequestHead.SetHeader(nsHttp::Upgrade, mUpgradeProtocol, false);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     rv = mRequestHead.SetHeaderOnce(nsHttp::Connection, nsHttp::Upgrade.get(),
                                     false);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
+  }
+
+  if (mUpgradeProtocolCallback) {
     mCaps |= NS_HTTP_STICKY_CONNECTION;
     mCaps &= ~NS_HTTP_ALLOW_KEEPALIVE;
   }
@@ -7729,6 +7733,11 @@ nsHttpChannel::AsyncOpen(nsIStreamListener* aListener) {
   NS_ENSURE_ARG_POINTER(listener);
   NS_ENSURE_TRUE(!LoadIsPending(), NS_ERROR_IN_PROGRESS);
   NS_ENSURE_TRUE(!LoadWasOpened(), NS_ERROR_ALREADY_OPENED);
+
+  if ((mCaps & NS_HTTP_CONNECT_ONLY) && !mUpgradeProtocolCallback) {
+    ReleaseListeners();
+    return NS_ERROR_FAILURE;
+  }
 
   if (mCanceled) {
     ReleaseListeners();

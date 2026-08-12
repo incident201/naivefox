@@ -3986,8 +3986,11 @@ HttpBaseChannel::GetRemotePort(int32_t* port) {
 NS_IMETHODIMP
 HttpBaseChannel::HTTPUpgrade(const nsACString& aProtocolName,
                              nsIHttpUpgradeListener* aListener) {
-  NS_ENSURE_ARG(!aProtocolName.IsEmpty());
   NS_ENSURE_ARG_POINTER(aListener);
+
+  if (aProtocolName.IsEmpty() && !(mCaps & NS_HTTP_CONNECT_ONLY)) {
+    return NS_ERROR_INVALID_ARG;
+  }
 
   // The protocol name is emitted verbatim into the Upgrade request header, so
   // reject anything that could inject additional headers or requests (e.g. an
@@ -4012,10 +4015,6 @@ HttpBaseChannel::GetOnlyConnect(bool* aOnlyConnect) {
 NS_IMETHODIMP
 HttpBaseChannel::SetConnectOnly(bool aTlsTunnel) {
   ENSURE_CALLED_BEFORE_CONNECT();
-
-  if (!mUpgradeProtocolCallback) {
-    return NS_ERROR_FAILURE;
-  }
 
   mCaps |= NS_HTTP_CONNECT_ONLY;
   if (aTlsTunnel) {

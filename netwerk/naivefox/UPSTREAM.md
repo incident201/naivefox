@@ -232,25 +232,55 @@ Commit: `NF01 add NaiveFox build target`
 
 ### Patch NF-UPSTREAM-002
 
-Status: research required
+Status: implemented
 
 Files:
 
 ```text
-TO_BE_DETERMINED
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpConnection.cpp
+netwerk/test/unit/test_proxyconnect_raw.js
+netwerk/test/unit/xpcshell.toml
 ```
 
 Purpose:
 
 Expose a raw successful HTTP proxy CONNECT tunnel without requiring an artificial NaiveFox-specific Upgrade/ALPN wire marker.
 
-Before implementation, document the exact existing Firefox path and why it is insufficient.
+Why project-only code was insufficient:
+
+Firefox exposes the successful CONNECT streams through `HTTPUpgrade()`, but
+the API rejected an empty protocol. A non-empty protocol becomes both normal
+Upgrade headers and an `ALPN` proxy-CONNECT header. In addition, a first-use
+HTTPS proxy negotiating H2 reset the connect-only transaction, then closed the
+outer connection before that transaction could be dispatched onto its H2
+tunnel stream.
+
+Implementation:
+
+- allow an empty `HTTPUpgrade()` protocol only after `setConnectOnly()`;
+- retain the upgrade callback/sticky transaction behavior without emitting
+  `Upgrade` or `Connection` for the empty value;
+- allow H2 for this raw connect-only case and continue to disallow H3;
+- require a callback before opening every connect-only channel;
+- do not take the connect-only early-close path while a fresh outer H2 proxy
+  connection is completing its transaction restart.
+
+Normal non-empty upgrade behavior and ordinary browsing channels are
+unchanged.
 
 Tests:
 
 - focused raw CONNECT test,
 - existing proxy CONNECT tests,
 - wire/decrypted-header verification that no synthetic marker is sent.
+
+The local Caddy integration additionally proves NSS TLS, outer H2, CONNECT
+200, Basic Auth failure modes, and bidirectional C++ stream use.
+
+Commit: `NF04 expose raw HTTP CONNECT streams` (planned commit subject)
 
 ### Patch NF-UPSTREAM-003
 

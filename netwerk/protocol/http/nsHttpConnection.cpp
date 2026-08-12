@@ -1772,7 +1772,10 @@ nsresult nsHttpConnection::OnSocketWritable() {
       return NS_ERROR_FAILURE;
     }
 
-    if (mState == HttpConnectionState::REQUEST &&
+    // A fresh HTTP/2 proxy connection still needs to restart the transaction
+    // onto a tunnel stream before the connect-only transaction can finish.
+    if (mUsingSpdyVersion == SpdyVersion::NONE &&
+        mState == HttpConnectionState::REQUEST &&
         mTlsHandshaker->EnsureNPNComplete()) {
       // Don't need to check this each write attempt since it is only
       // updated after OnSocketWritable completes.

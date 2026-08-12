@@ -195,7 +195,9 @@ interface nsIHttpChannelInternal : nsISupports
      * methods on the nsIHttpUpgradeListener might be invoked at all.
      *
      * @param aProtocolName
-     *        The value of the HTTP Upgrade request header
+     *        The value of the HTTP Upgrade request header. This may be empty
+     *        only for a channel already configured with setConnectOnly(), in
+     *        which case no Upgrade or Connection header is sent.
      * @param aListener
      *        The callback object used to handle a successful upgrade
      */
@@ -203,8 +205,9 @@ interface nsIHttpChannelInternal : nsISupports
                                 in nsIHttpUpgradeListener aListener);
 
     /**
-     * Enable only CONNECT to a proxy. Fails if no HTTPUpgrade listener
-     * has been defined. An ALPN header is set using the upgrade protocol.
+     * Enable only CONNECT to a proxy. HTTPUpgrade() must be called before the
+     * channel is opened. When its protocol is non-empty, an ALPN header is set
+     * using the upgrade protocol.
      *
      * Load flags are set with INHIBIT_CACHING, LOAD_ANONYMOUS,
      * LOAD_BYPASS_CACHE, and LOAD_BYPASS_SERVICE_WORKER.
