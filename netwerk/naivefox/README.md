@@ -69,7 +69,13 @@ Target server
 Example user-facing behavior:
 
 ```bash
-./naivefox --config naivefox.json
+export NAIVEFOX_PROXY_USER='user'
+export NAIVEFOX_PROXY_PASS='pass'
+
+./run-naivefox \
+  --profile /path/to/writable-nss-profile \
+  --socks-listen 127.0.0.1:1080 \
+  --proxy https://proxy.example.com:443
 
 curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 ```
@@ -408,7 +414,7 @@ owns Firefox's bootstrap lifetime and calls the exported NaiveFox entry point.
 This follows the dependent executable model without exposing internal XPCOM
 types across the executable boundary.
 
-Current runtime diagnostics are available before the SOCKS server is enabled:
+Runtime diagnostics are also available independently of SOCKS mode:
 
 ```bash
 export LD_LIBRARY_PATH="$PWD/obj-x86_64-pc-linux-gnu/dist/bin"
@@ -420,6 +426,19 @@ obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
   --profile /path/to/nss-profile \
   --raw-tunnel-smoke https://proxy.example:443 target.example:80
 ```
+
+The development binary's local SOCKS mode uses the same profile and
+environment-only credentials:
+
+```bash
+obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
+  --profile /path/to/nss-profile \
+  --socks-listen 127.0.0.1:1080 \
+  --proxy https://proxy.example:443
+```
+
+`--max-connections N` is an optional finite-run test control. Omitting it
+keeps the loopback SOCKS listener running.
 
 The raw-tunnel diagnostic creates an explicit HTTPS proxy through Necko,
 requires outer `h2`, and obtains the successful CONNECT as asynchronous Gecko
@@ -500,6 +519,12 @@ Source code changes over time. Always verify current `main`; never copy line num
 
 ## Definition of the first complete prototype
 
+As of 2026-08-12, every local-fixture, codec, robustness, capture, and staging
+milestone is implemented and passes in the supported Linux x86-64 environment.
+The supplied-real-Caddy gate remains pending because no real endpoint or
+credentials have been supplied. Consequently the local prototype is ready,
+but it is not declared fully complete against the external-server criterion.
+
 The first prototype is complete when all of the following are demonstrated on Linux x86_64:
 
 1. A clean upstream Firefox checkout can be bootstrapped and built.
@@ -525,6 +550,17 @@ The first prototype is complete when all of the following are demonstrated on Li
 21. The prototype runtime can be staged and run outside the build tree on a compatible Linux system.
 
 See `ROADMAP.md` for the required implementation order.
+
+Run the complete local integration gate with:
+
+```bash
+./netwerk/naivefox/test/integration/run-local-suite.sh
+```
+
+The capture phase requires the restricted `dumpcap` capabilities documented
+in `CAPTURE.md`. The command builds or reuses the pinned fixture dependencies,
+runs all local functional and failure-path suites sequentially, and deletes
+sensitive run material after every successful phase.
 
 After a successful build, create and verify the relocatable prototype runtime
 with:

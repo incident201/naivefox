@@ -6,6 +6,15 @@ and binds every listener to `127.0.0.1` on dynamically selected ports. Generated
 binaries and run state live under the Firefox object directory in
 `naivefox-fixture/`.
 
+Run every reproducible local integration gate sequentially with:
+
+```bash
+./run-local-suite.sh
+```
+
+The final capture step requires the restricted `dumpcap` capabilities
+documented below and in `../../CAPTURE.md`.
+
 Run the complete M0.4 control suite from this directory:
 
 ```bash

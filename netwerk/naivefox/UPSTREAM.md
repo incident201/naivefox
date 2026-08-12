@@ -417,7 +417,7 @@ Tests:
 - four simultaneous CONNECT streams on one H2 connection,
 - focused raw/proxy CONNECT xpcshell regressions.
 
-Commit: `NF09 harden H2 tunnel lifecycle` (planned commit subject)
+Commit: `a8ad15724cca NF09 harden H2 tunnel lifecycle`
 
 ## Rules for future upstream changes
 

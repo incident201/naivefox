@@ -806,4 +806,13 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
 
+Local status on 2026-08-12: items 1-20 and 22-25 pass. Item 21, supplied real
+Caddy interoperability, is pending because no external endpoint or credentials
+have been supplied. Run all reproducible local integration gates sequentially
+with:
+
+```bash
+./netwerk/naivefox/test/integration/run-local-suite.sh
+```
+
 After this point, and only after user approval, future work may consider HTTP/3/Neqo, native Windows, Android, or size reduction.
