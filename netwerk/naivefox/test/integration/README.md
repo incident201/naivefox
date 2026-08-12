@@ -22,6 +22,19 @@ This proves that the untrusted NSS profile rejects the proxy, the trusted
 profile accepts it through a real Necko HTTPS channel, and hostname validation
 still rejects the same certificate when the channel uses an IP address.
 
+Run the M5 local SOCKS-to-Necko tunnel checks with:
+
+```bash
+./run-socks-tests.sh
+```
+
+The command starts a finite loopback SOCKS5 server, sends domain-name HTTP and
+HTTPS requests through the Firefox/NSS HTTP/2 CONNECT path, validates the HTTPS
+target with the scoped fixture CA, and verifies clean shutdown after multiple
+sequential connections. Every curl invocation uses `--socks5-hostname` and
+`--noproxy ''`; no application-side target DNS lookup or certificate bypass is
+used.
+
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact
 forwardproxy commit. Later runs reuse the validated tools. The suite verifies

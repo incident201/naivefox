@@ -214,14 +214,11 @@ NS_IMETHODIMP TunnelSmoke::OnTransportAvailable(
       alpnRv = securityInfo->GetNegotiatedNPN(alpn);
     }
   }
-  if (NS_SUCCEEDED(alpnRv) && !alpn.EqualsLiteral("h2")) {
+  if (NS_FAILED(alpnRv) || !alpn.EqualsLiteral("h2")) {
     (void)aSocketIn->CloseWithStatus(NS_ERROR_FAILURE);
     (void)aSocketOut->CloseWithStatus(NS_ERROR_FAILURE);
     Finish(NS_ERROR_FAILURE);
     return NS_ERROR_FAILURE;
-  }
-  if (NS_FAILED(alpnRv)) {
-    alpn.AssignLiteral("unavailable");
   }
   {
     MutexAutoLock lock(mMutex);
@@ -333,10 +330,15 @@ nsresult MakeBasicAuthorization(const nsACString& aUser,
 
 }  // namespace
 
-nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
-                           const nsACString& aTargetAuthority,
-                           const nsACString& aProxyUser,
-                           const nsACString& aProxyPassword) {
+nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
+                         const nsACString& aTargetAuthority,
+                         const nsACString& aProxyUser,
+                         const nsACString& aProxyPassword,
+                         nsIHttpUpgradeListener* aUpgradeListener,
+                         nsIStreamListener* aChannelListener) {
+  if (!aUpgradeListener || !aChannelListener) {
+    return NS_ERROR_INVALID_ARG;
+  }
   nsCOMPtr<nsIURI> proxyUri;
   MOZ_TRY(NS_NewURI(getter_AddRefs(proxyUri), aProxyUrl));
 
@@ -368,12 +370,10 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
   nsAutoCString targetScheme;
   nsAutoCString targetHost;
   nsAutoCString targetUserPass;
-  nsAutoCString targetHostPort;
   int32_t targetPort = -1;
   MOZ_TRY(targetUri->GetScheme(targetScheme));
   MOZ_TRY(targetUri->GetAsciiHost(targetHost));
   MOZ_TRY(targetUri->GetUserPass(targetUserPass));
-  MOZ_TRY(targetUri->GetHostPort(targetHostPort));
   MOZ_TRY(targetUri->GetPort(&targetPort));
   if (!targetScheme.EqualsLiteral("http") || targetHost.IsEmpty() ||
       !targetUserPass.IsEmpty() || targetPort <= 0 ||
@@ -429,12 +429,28 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
   MOZ_TRY(internal->SetBlockAuthPrompt(true));
   MOZ_TRY(internal->SetConnectOnly(false));
 
+  MOZ_TRY(internal->HTTPUpgrade(EmptyCString(), aUpgradeListener));
+  return channel->AsyncOpen(aChannelListener);
+}
+
+nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
+                           const nsACString& aTargetAuthority,
+                           const nsACString& aProxyUser,
+                           const nsACString& aProxyPassword) {
+  nsAutoCString targetUrl("http://"_ns);
+  targetUrl.Append(aTargetAuthority);
+  targetUrl.Append('/');
+  nsCOMPtr<nsIURI> targetUri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(targetUri), targetUrl));
+  nsAutoCString targetHostPort;
+  MOZ_TRY(targetUri->GetHostPort(targetHostPort));
+
   nsAutoCString request("GET /small HTTP/1.1\r\nHost: "_ns);
   request.Append(targetHostPort);
   request.AppendLiteral("\r\nConnection: close\r\n\r\n");
   RefPtr<TunnelSmoke> listener = new TunnelSmoke(request);
-  MOZ_TRY(internal->HTTPUpgrade(EmptyCString(), listener));
-  MOZ_TRY(channel->AsyncOpen(listener));
+  MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
+                          aProxyPassword, listener, listener));
 
   if (!SpinEventLoopUntil("NaiveFox::RunRawTunnelSmoke"_ns,
                           [&listener]() { return listener->Complete(); })) {

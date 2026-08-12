@@ -8,7 +8,17 @@
 #include "nsStringFwd.h"
 #include "nscore.h"
 
+class nsIHttpUpgradeListener;
+class nsIStreamListener;
+
 namespace mozilla::naivefox {
+
+nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
+                         const nsACString& aTargetAuthority,
+                         const nsACString& aProxyUser,
+                         const nsACString& aProxyPassword,
+                         nsIHttpUpgradeListener* aUpgradeListener,
+                         nsIStreamListener* aChannelListener);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,

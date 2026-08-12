@@ -282,7 +282,7 @@ Acceptance:
 
 - [x] successful H2 CONNECT yields async input/output streams,
 - [x] packet/decrypted-header inspection confirms no synthetic project-specific Upgrade/ALPN header,
-- [ ] existing Firefox CONNECT tests still pass.
+- [x] existing Firefox CONNECT tests still pass.
 
 The current internal path attaches an explicit HTTPS `nsIProxyInfo`, with
 resolve flags cloned to prefer HTTPS proxying and always use CONNECT, to an
@@ -419,11 +419,11 @@ curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 
 Acceptance:
 
-- [ ] HTTP and HTTPS target requests succeed through the local Caddy fixture,
-- [ ] curl validates the HTTPS target certificate end to end with the scoped fixture CA via `--cacert`, never `-k`,
-- [ ] a hostname request reaches Caddy unchanged as the CONNECT authority,
-- [ ] NaiveFox only sees opaque tunneled bytes after CONNECT,
-- [ ] multiple sequential requests work.
+- [x] HTTP and HTTPS target requests succeed through the local Caddy fixture,
+- [x] curl validates the HTTPS target certificate end to end with the scoped fixture CA via `--cacert`, never `-k`,
+- [x] a hostname request reaches Caddy unchanged as the CONNECT authority,
+- [x] NaiveFox only sees opaque tunneled bytes after CONNECT,
+- [x] multiple sequential requests work.
 
 At this stage payload padding may still be disabled.
 
