@@ -402,6 +402,26 @@ mozglue and other required Gecko runtime files
 
 A normal Firefox build may also produce the Firefox browser executable in the object directory. That browser executable is not part of the NaiveFox product requirement.
 
+The current prototype keeps the Gecko-facing implementation inside `libxul`
+so it can use internal Necko and PSM APIs, while the small `naivefox` program
+owns Firefox's bootstrap lifetime and calls the exported NaiveFox entry point.
+This follows the dependent executable model without exposing internal XPCOM
+types across the executable boundary.
+
+Current runtime diagnostics are available before the SOCKS server is enabled:
+
+```bash
+export LD_LIBRARY_PATH="$PWD/obj-x86_64-pc-linux-gnu/dist/bin"
+obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
+  --profile /path/to/nss-profile --runtime-smoke
+obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
+  --profile /path/to/nss-profile --fetch https://example.com/
+```
+
+The socket process and HTTP/3 are disabled only for this first in-process H2
+prototype. Necko still owns HTTP, connection management, and HTTP/2, and PSM/NSS
+still owns certificate verification and TLS.
+
 Packaging/minimization comes only after the network prototype works.
 
 ## Development environment

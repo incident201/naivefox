@@ -63,22 +63,22 @@ Firefox baseline build exits successfully.
 
 Create the committed fixture sources under `netwerk/naivefox/test/integration/`. Put generated state under the Firefox object directory, not in the source tree.
 
-- [ ] Pin an exact tested Caddy version and immutable `klzgrad/forwardproxy` commit in fixture metadata/setup; do not resolve `@naive` or the latest Caddy on every run.
-- [ ] Build a dedicated fixture Caddy with that pinned module.
-- [ ] Verify `http.handlers.forward_proxy` is present and validate both the Caddyfile and adapted configuration.
-- [ ] Record xcaddy and Go versions in diagnostics without requiring an unnecessary installation when compatible tools already exist.
-- [ ] Use an explicitly TLS-enabled catch-all route without a request Host matcher, bound to a checked loopback high port.
-- [ ] Present an internal-PKI certificate valid for the proxy SNI hostname, normally `localhost`.
-- [ ] Disable HTTP/3 in the fixture; NaiveFox must negotiate `h2`.
-- [ ] Set `skip_install_trust`; never let Caddy attempt to install its CA globally.
-- [ ] Configure Basic Auth from generated per-run values and omit probe resistance.
-- [ ] Restrict both target ports and ACL rules to the fixture target, then deny everything else.
-- [ ] Create isolated Caddy XDG data/config directories.
-- [ ] Import only the fixture root CA into a dedicated NaiveFox NSS profile.
-- [ ] Create a second NSS profile without that CA.
-- [ ] Add deterministic target endpoints for small data, large data, upload/hash, delay, and early close.
-- [ ] Automate setup, readiness timeouts, execution, cleanup, and sanitized failure diagnostics.
-- [ ] Ensure setup and cleanup are idempotent and require neither `sudo` nor a system Caddy service.
+- [x] Pin an exact tested Caddy version and immutable `klzgrad/forwardproxy` commit in fixture metadata/setup; do not resolve `@naive` or the latest Caddy on every run.
+- [x] Build a dedicated fixture Caddy with that pinned module.
+- [x] Verify `http.handlers.forward_proxy` is present and validate both the Caddyfile and adapted configuration.
+- [x] Record xcaddy and Go versions in diagnostics without requiring an unnecessary installation when compatible tools already exist.
+- [x] Use an explicitly TLS-enabled catch-all route without a request Host matcher, bound to a checked loopback high port.
+- [x] Present an internal-PKI certificate valid for the proxy SNI hostname, normally `localhost`.
+- [x] Disable HTTP/3 in the fixture; NaiveFox must negotiate `h2`.
+- [x] Set `skip_install_trust`; never let Caddy attempt to install its CA globally.
+- [x] Configure Basic Auth from generated per-run values and omit probe resistance.
+- [x] Restrict both target ports and ACL rules to the fixture target, then deny everything else.
+- [x] Create isolated Caddy XDG data/config directories.
+- [x] Import only the fixture root CA into a dedicated NaiveFox NSS profile.
+- [x] Create a second NSS profile without that CA.
+- [x] Add deterministic target endpoints for small data, large data, upload/hash, delay, and early close.
+- [x] Automate setup, readiness timeouts, execution, cleanup, and sanitized failure diagnostics.
+- [x] Ensure setup and cleanup are idempotent and require neither `sudo` nor a system Caddy service.
 
 Acceptance:
 
@@ -91,6 +91,11 @@ Acceptance:
 - cleanup leaves no fixture child processes running.
 
 Actual trusted/untrusted Necko connection tests begin in M2.2, after the headless networking runtime exists.
+
+Validated on 2026-08-12 with
+`netwerk/naivefox/test/integration/run-control-tests.sh`. The fixture pins Caddy
+2.11.2, xcaddy 0.4.6, Go 1.25.12, and forwardproxy commit
+`d62c80d3dd2c706b6b87579844d2397bddd18317`.
 
 Do not call `caddy trust`, modify system trust, modify a normal Firefox profile, use `curl -k`, or commit generated CA/private-key/profile material.
 
@@ -185,10 +190,10 @@ For the prototype, disabling the separate socket process is acceptable if necess
 
 Acceptance:
 
-- [ ] `naivefox` starts headlessly.
-- [ ] initializes networking runtime,
-- [ ] runs an event-loop smoke test,
-- [ ] shuts down with no assertion/crash.
+- [x] `naivefox` starts headlessly.
+- [x] initializes networking runtime,
+- [x] runs an event-loop smoke test,
+- [x] shuts down with no assertion/crash.
 
 ### M2.2 Normal HTTPS sanity request
 
@@ -213,6 +218,11 @@ Negative tests:
 - a deliberately invalid hostname must still fail.
 
 No test may pass by disabling certificate verification or installing the fixture CA globally.
+
+Completed on 2026-08-12. A public NSS/Necko request returned HTTP 200. Against
+the local fixture, the untrusted profile failed, the scoped trusted profile
+succeeded, and a trusted request using `127.0.0.1` instead of the certificate's
+`localhost` DNS name failed hostname validation.
 
 ---
 

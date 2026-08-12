@@ -1,4 +1,5 @@
 XRE_GetBootstrap
+NaiveFoxMain
 uprofiler_get
 #ifdef XP_IOS
 MainProcessInit

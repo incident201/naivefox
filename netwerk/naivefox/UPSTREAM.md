@@ -274,6 +274,43 @@ Tests:
 
 NF-UPSTREAM-002 and NF-UPSTREAM-003 may become one small patch if the cleanest current Firefox design naturally solves both. If so, update this inventory rather than preserving artificial separation.
 
+### Patch NF-UPSTREAM-004
+
+Status: implemented
+
+Files:
+
+```text
+toolkit/library/libxul.symbols
+```
+
+Purpose:
+
+Export the single C ABI entry point used by the small dependent `naivefox`
+executable. The implementation remains inside `libxul`, where Firefox internal
+Necko, PSM, preferences, event-loop, and shutdown APIs are available.
+
+Why project-only code was insufficient:
+
+Firefox intentionally hides all `libxul` symbols except its explicit export
+list. Compiling the implementation directly into the executable would lose
+`MOZILLA_INTERNAL_API` and cannot use the internal APIs required by this
+project.
+
+Behavioral risk:
+
+One otherwise-unused symbol becomes visible. Firefox startup and browser
+behavior are unchanged.
+
+Tests:
+
+- full binary build,
+- `naivefox --runtime-smoke`,
+- public HTTPS request through Necko/NSS,
+- fixture trusted/untrusted/hostname certificate validation.
+
+Commit: `NF02 initialize the headless Gecko runtime`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:

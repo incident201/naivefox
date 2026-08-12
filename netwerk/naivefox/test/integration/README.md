@@ -12,6 +12,16 @@ Run the complete M0.4 control suite from this directory:
 ./run-control-tests.sh
 ```
 
+After building NaiveFox, run the M2.2 scoped NSS/Necko checks with:
+
+```bash
+./run-necko-tests.sh
+```
+
+This proves that the untrusted NSS profile rejects the proxy, the trusted
+profile accepts it through a real Necko HTTPS channel, and hostname validation
+still rejects the same certificate when the channel uses an IP address.
+
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact
 forwardproxy commit. Later runs reuse the validated tools. The suite verifies
