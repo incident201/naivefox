@@ -65,6 +65,7 @@ git status
 git branch --show-current
 git remote -v
 git log -1 --oneline
+git pull
 ```
 
 Confirm:
