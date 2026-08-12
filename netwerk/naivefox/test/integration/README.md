@@ -59,6 +59,19 @@ application half-close, and four simultaneous padded CONNECT streams. While
 the concurrent streams are active, `ss` must show exactly one established TCP
 connection to the proxy, proving reuse of Firefox's outer H2 session.
 
+Run the M10 Firefox/NaiveFox wire comparison with:
+
+```bash
+./run-capture-comparison.sh
+```
+
+The host must provide `dumpcap`/`tshark` and the standard restricted dumpcap
+capture capabilities described in `../../CAPTURE.md`. Raw captures, NSS TLS
+keys, copied profiles, screenshots, and process logs are private temporary
+data under the object directory and are deleted on success. Only sanitized
+ClientHello, ALPN, SETTINGS, early-frame, stream-reuse, and header-name
+metadata is retained.
+
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact
 forwardproxy commit. Later runs reuse the validated tools. The suite verifies

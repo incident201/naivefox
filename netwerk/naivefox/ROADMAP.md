@@ -700,6 +700,23 @@ Do not add speculative Chromium camouflage patches.
 
 If a measurable Firefox-specific anomaly is caused by our integration, document it first, then propose the smallest fix.
 
+Acceptance:
+
+- [x] ordinary Firefox and NaiveFox were captured from the same local build
+  family against the same fixture TLS front-end,
+- [x] both selected `h2`, and their ordered ClientHello fields and client H2
+  SETTINGS matched,
+- [x] two NaiveFox CONNECT requests used distinct stream IDs on one outer TCP
+  connection,
+- [x] Naive `padding` was present in both directions and no synthetic
+  `ALPN`, `Upgrade`, or `Connection` header marker was present,
+- [x] only sanitized metadata was retained; pcap files, NSS key logs, copied
+  profiles, screenshots, and raw logs were deleted after the successful run.
+
+The reproducible procedure and 2026-08-12 comparison record are in
+`CAPTURE.md`; `test/integration/run-capture-comparison.sh` performs the capture,
+safe extraction, assertions, and sensitive-data cleanup.
+
 ---
 
 ## Phase 11 — prototype packaging
