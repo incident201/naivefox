@@ -175,3 +175,69 @@ trace, temporary official-client configs, and duplicate release downloads were
 removed from the object directory after diagnosis. They are not recoverable.
 Only ignored, credential-free summary files and the digest-verified official
 reference package remain locally.
+
+## Extended throughput benchmark
+
+The repeatable loopback benchmark moved approximately 10.81 GiB through the
+deterministic target and compared the official NaiveProxy
+`v150.0.7871.63-1` binary with NaiveFox. Every proxied 64 MiB integrity object
+and every upload byte count/SHA-256 matched.
+
+NaiveFox medians were 421.480 MiB/s sequential download, 431.364 MiB/s with
+four parallel downloads, 412.577 MiB/s with eight parallel downloads,
+288.093 MiB/s sequential upload, and 390.542 MiB/s with four parallel uploads.
+Official-client medians for the same phases were 497.799, 342.281, 284.343,
+325.700, and 349.085 MiB/s. Direct controls were 1,577.952 MiB/s sequential
+and 1,289.432 MiB/s with eight parallel downloads.
+
+Result: PASS. Full methodology, memory figures, relative comparisons, and
+limitations are in [`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md).
+
+## Passive external-observer comparison
+
+The no-keylog capture compared ordinary Firefox and NaiveFox against the same
+fixture TLS endpoint under a matched 4 MiB server-to-client workload. Ordered
+visible ClientHello configuration fields and visible ServerHello choices were
+exact matches. Each side used one outer TCP stream. Both had 16,401-byte p90,
+p95, and p99 server TLS records; server TLS volume differed by only 2,550 bytes
+because NaiveFox carried two padded CONNECT streams instead of one browser GET.
+The plaintext request canary was absent.
+
+Result: PASS. The exact safe aggregates, observable differences, TLS 1.3
+visibility boundary, and WSL loopback caveat are in
+[`OBSERVER-TRAFFIC-REPORT.md`](OBSERVER-TRAFFIC-REPORT.md).
+
+## Ten-minute real-deployment soak
+
+One packaged NaiveFox process ran for the entire test without
+`--max-connections`. Fifteen small immutable GitHub objects were requested at
+seconds 0, 30, 60, 90, 120, 240, 270, 300, 330, 360, 480, 510, 540, 570, and
+600. The schedule intentionally includes two 120-second idle windows.
+
+| Measure | Result |
+|---|---|
+| Attempts | 15 |
+| HTTP 200 and SHA-256 matches | 15/15 |
+| Timeouts | 0 |
+| Total response bytes | 189,330 |
+| Response SHA-256 | `3c9f0da4c8313e9c1e3a32935024abe1234215be1bd79cf01f78065359f3a5d2` |
+| Latency p50 / p95 / max | 0.236 / 0.803 / 1.092 seconds |
+| Liveness/resource samples | 601 |
+| RSS baseline / peak / final | 92,988 / 93,580 / 93,264 KiB |
+| Final RSS delta | +276 KiB |
+| FD baseline / peak / final | 38 / 40 / 39 |
+| Threads baseline / peak / final | 27 / 27 / 24 |
+| Outer TCP epochs / reconnects | 2 / 1 |
+| Maximum simultaneous outer TCP | 1 |
+| Padding negotiation | 15/15 `yes`; no raw fallback |
+| Functional/resource/sampling gates | PASS / PASS / PASS |
+
+Both requests immediately following the long idle windows succeeded. The outer
+connection turned over once during the session; Firefox/Necko reconnected
+transparently while the same NaiveFox process and SOCKS listener remained
+alive. This is expected resilience, not an application restart.
+
+The soak runner is
+`netwerk/naivefox/test/integration/run-real-server-soak.sh`. Credentials are
+environment-only, the endpoint is intentionally anonymized here, raw metrics
+are private, and only the credential-free aggregate is retained locally.

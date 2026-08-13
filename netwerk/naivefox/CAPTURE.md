@@ -22,6 +22,10 @@ create separate HTTP/2 CONNECT streams. NSS writes independent TLS key logs so
 that tshark can inspect encrypted HTTP/2 without substituting another TLS or H2
 implementation.
 
+This is the privileged, decrypted internal-stack audit. The complementary
+passive test without TLS keys is documented in
+[`OBSERVER-TRAFFIC-REPORT.md`](OBSERVER-TRAFFIC-REPORT.md).
+
 ## Data handling
 
 Packet captures, TLS secrets, copied NSS profiles, screenshots, and raw process

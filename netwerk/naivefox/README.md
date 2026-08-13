@@ -467,7 +467,9 @@ obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
 ```
 
 `--max-connections N` is an optional finite-run test control. Omitting it
-keeps the loopback SOCKS listener running.
+keeps the loopback SOCKS listener running. The value counts total accepted
+SOCKS connections over the lifetime of the process; it is not a parallel or
+production concurrency limit. Normal long-lived use should omit the option.
 
 The raw-tunnel diagnostic creates an explicit HTTPS proxy through Necko,
 requires outer `h2`, and obtains the successful CONNECT as asynchronous Gecko
@@ -548,11 +550,10 @@ Source code changes over time. Always verify current `main`; never copy line num
 
 ## Definition of the first complete prototype
 
-As of 2026-08-12, every local-fixture, codec, robustness, capture, and staging
-milestone is implemented and passes in the supported Linux x86-64 environment.
-The supplied-real-Caddy gate remains pending because no real endpoint or
-credentials have been supplied. Consequently the local prototype is ready,
-but it is not declared fully complete against the external-server criterion.
+As of 2026-08-13, every local-fixture, codec, robustness, capture, staging, and
+supplied-real-Caddy milestone is implemented and passes in the supported Linux
+x86-64 environment. Extended local throughput, passive-observer, and
+10-minute real-deployment stability tests also pass.
 
 The first prototype is complete when all of the following are demonstrated on Linux x86_64:
 
@@ -590,6 +591,22 @@ The capture phase requires the restricted `dumpcap` capabilities documented
 in `CAPTURE.md`. The command builds or reuses the pinned fixture dependencies,
 runs all local functional and failure-path suites sequentially, and deletes
 sensitive run material after every successful phase.
+
+Additional repeatable test entry points are:
+
+```bash
+./netwerk/naivefox/test/integration/run-throughput-benchmark.sh
+./netwerk/naivefox/test/integration/run-observer-comparison.sh
+NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
+NAIVEFOX_REAL_PROXY_USER=user \
+NAIVEFOX_REAL_PROXY_PASS=secret \
+./netwerk/naivefox/test/integration/run-real-server-soak.sh
+```
+
+The committed outcomes and limitations are recorded in
+[`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md),
+[`OBSERVER-TRAFFIC-REPORT.md`](OBSERVER-TRAFFIC-REPORT.md), and
+[`TEST-REPORT.md`](TEST-REPORT.md).
 
 After a successful build, create and verify the relocatable prototype runtime
 with:
