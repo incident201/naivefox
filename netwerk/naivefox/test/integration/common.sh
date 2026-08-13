@@ -83,6 +83,29 @@ wait_for_proxy() {
   return 1
 }
 
+wait_for_h3_proxy() {
+  local pid=$1
+  local port=$2
+  local log=$3
+  for ((i = 0; i < 150; i++)); do
+    if ss -H -lun "sport = :$port" | grep -F "127.0.0.1:$port" >/dev/null &&
+      grep -Fq 'enabling HTTP/3 listener' "$log"; then
+      if [[ -n $(ss -H -ltn "sport = :$port") ]]; then
+        printf 'strict H3 fixture unexpectedly has a TCP listener\n' >&2
+        return 1
+      fi
+      return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      printf 'Caddy exited before HTTP/3 readiness\n' >&2
+      return 1
+    fi
+    sleep 0.1
+  done
+  printf 'timed out waiting for Caddy HTTP/3 listener\n' >&2
+  return 1
+}
+
 sanitize_stream() {
   local user=${1:-}
   local pass=${2:-}
