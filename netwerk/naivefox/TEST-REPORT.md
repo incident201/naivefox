@@ -6,7 +6,8 @@ Environment: `Ubuntu24Dev`, x86-64, Firefox opt build
 
 H2 baseline tag: `h2-prototype-v0.1`
 
-Current branch: `feature/h3`
+Validated development branch: `feature/h3`; release integration branch:
+`naivefox`; combined prototype tag: `h2-h3-prototype-v0.2`
 
 This is the committed acceptance record for the local prototype, the supplied
 real Caddy deployment, the staged runtime, and the official NaiveProxy control
@@ -390,9 +391,10 @@ turnover without restarting NaiveFox.
 The first staged preflight attempt timed out before an outer protocol was
 selected. A bounded comparison immediately established H3 from the object
 directory, and a second staged preflight also established H3; the complete
-staged run above then passed. This cold-start transient is retained as an
-observed external-network event rather than hidden or counted as a protocol
-fallback.
+staged run above then passed. The cold-start timeout was observed once, was not
+reproducible in the final preflight or soak, and is retained as a transient
+external-network observation rather than hidden or counted as a protocol
+fallback. See `KNOWN-ISSUES.md`.
 
 The runner is
 `netwerk/naivefox/test/integration/run-real-server-h3-soak.sh`. The endpoint

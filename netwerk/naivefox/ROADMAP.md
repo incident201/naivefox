@@ -902,13 +902,18 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
 
-Local status on 2026-08-12: items 1-20 and 22-25 pass. Item 21, supplied real
-Caddy interoperability, is pending because no external endpoint or credentials
-have been supplied. Run all reproducible local integration gates sequentially
-with:
+Final prototype status on 2026-08-13: all items 1-25 pass. In particular, the
+supplied real Caddy passed normal public-certificate validation, the H2
+interoperability workload and ten-minute H2 soak, and the strict-H3
+preflight plus exactly 600-second H3 soak without hidden H2 fallback. Commands,
+integrity gates, load schedules, resource measurements, and sanitized results
+are recorded in `TEST-REPORT.md`. Current architectural constraints and
+non-blocking observations are recorded in `KNOWN-ISSUES.md`.
+
+Run all reproducible local H2 and H3 integration gates sequentially with:
 
 ```bash
-./netwerk/naivefox/test/integration/run-local-suite.sh
+./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
 The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The

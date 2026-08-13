@@ -15,6 +15,9 @@ The first target is **Linux x86_64 only**. Development uses Firefox's normal `ma
 The tagged `h2-prototype-v0.1` baseline is preserved. The `feature/h3` stage
 adds strict HTTP/3/QUIC through the same executable and project architecture;
 there is no separate H3 client, SOCKS server, pool, or padding implementation.
+The combined H2/H3 prototype is recorded by `h2-h3-prototype-v0.2`. Current
+architectural constraints and non-blocking observations are centralized in
+[`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
 
 ## Repository model
 
@@ -523,11 +526,13 @@ proxy's resolve flags must carry both HTTPS-proxy preference and always-tunnel
 semantics; the similarly named `nsIProxyInfo` connection flags are not a
 substitute.
 
-The socket process remains disabled for the in-process prototype. Both
-`Http2StreamTunnel` and `Http3StreamTunnel` operate successfully in that mode;
-Necko owns HTTP and connection pooling, Neqo owns QUIC/HTTP3, and PSM/NSS owns
-certificate verification and TLS. See `H3-DESIGN.md` for the exact source path
-and `UPSTREAM.md` for the minimal focused Firefox changes.
+Single-process networking is the explicit architecture of the current Linux
+prototype, not an accidental fallback. The socket process remains disabled,
+and both `Http2StreamTunnel` and `Http3StreamTunnel` operate successfully in
+the parent process. Necko owns HTTP and connection pooling, Neqo owns
+QUIC/HTTP3, and PSM/NSS owns certificate verification and TLS. See
+`H3-DESIGN.md` for the exact source path, `KNOWN-ISSUES.md` for the boundary of
+this choice, and `UPSTREAM.md` for the minimal focused Firefox changes.
 
 Packaging/minimization comes only after the network prototype works.
 

@@ -137,13 +137,16 @@ CONNECT header block, and multiple CONNECT stream IDs on one QUIC connection.
 
 ## Socket process
 
-H3/Neqo works in the parent process through `HttpConnectionUDP`; it does not
-require the socket process. Conversely, the current raw upgrade completion
-path explicitly rejects upgrade-connect operation when networking runs in the
-socket process. The first prototype therefore keeps the socket process
-disabled, enables the H3 pref in `GeckoRuntime`, and avoids new IPC or a second
-executable. Socket-process support is a later upstreamability concern, not a
-reason to bypass Necko.
+Single-process networking is the deliberate architecture of the current Linux
+prototype. H3/Neqo works in the parent process through `HttpConnectionUDP`; it
+does not require the socket process. Conversely, the current raw upgrade
+completion path explicitly rejects upgrade-connect operation when networking
+runs in the socket process. `GeckoRuntime` therefore disables the socket
+process and enables H3 in the parent, avoiding incomplete IPC stream takeover
+and any second executable. Supporting a separate socket process later requires
+proper IPC-compatible raw CONNECT stream plumbing and regression tests; it is
+an upstreamability concern, not a reason to bypass Necko now. This constraint
+is also recorded in `KNOWN-ISSUES.md`.
 
 ## Streams, backpressure, and lifecycle
 
