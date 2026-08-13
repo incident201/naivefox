@@ -18,6 +18,7 @@
 #include "nsIAsyncOutputStream.h"
 #include "nsIChannel.h"
 #include "nsIContentPolicy.h"
+#include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInputStream.h"
 #include "nsILoadInfo.h"
@@ -425,6 +426,14 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   if (!internal) {
     return NS_ERROR_FAILURE;
   }
+  nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel);
+  if (!httpChannel) {
+    return NS_ERROR_FAILURE;
+  }
+  // The HTTP URI is only a carrier for the CONNECT authority. Applying HSTS
+  // to it replaces the explicitly proxied raw channel with an origin HTTPS
+  // channel for preloaded hosts such as github.com.
+  MOZ_TRY(httpChannel->SetAllowSTS(false));
   MOZ_TRY(internal->SetAllowSpdy(true));
   MOZ_TRY(internal->SetAllowHttp3(false));
   MOZ_TRY(internal->SetBlockAuthPrompt(true));
