@@ -10,10 +10,10 @@
 
 namespace {
 
-constexpr const char* kVersion = "0.1.0-dev";
+constexpr const char* kVersion = "0.3.0-dev";
 
 void PrintUsage(const char* aProgram) {
-  std::printf("Usage: %s [--version | OPTIONS]\n", aProgram);
+  std::printf("Usage: %s [CONFIG_PATH | --version | OPTIONS]\n", aProgram);
 }
 
 }  // namespace
@@ -21,11 +21,6 @@ void PrintUsage(const char* aProgram) {
 int main(int argc, char* argv[]) {
   if (argc == 2 && std::strcmp(argv[1], "--version") == 0) {
     std::printf("NaiveFox %s\n", kVersion);
-    return 0;
-  }
-
-  if (argc == 1) {
-    PrintUsage(argv[0]);
     return 0;
   }
 

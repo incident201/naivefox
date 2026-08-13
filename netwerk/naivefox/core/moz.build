@@ -4,14 +4,18 @@
 
 SOURCES += [
     "../AutoFallback.cpp",
+    "../Config.cpp",
     "../GeckoRuntime.cpp",
     "../HeaderPadding.cpp",
     "../HttpClient.cpp",
+    "../HttpConnectParser.cpp",
     "../NaiveFoxRunner.cpp",
     "../NeckoTunnel.cpp",
     "../PaddingNegotiation.cpp",
+    "../RuntimeLogging.cpp",
     "../Socks5Parser.cpp",
     "../SocksServer.cpp",
+    "../TunnelSession.cpp",
 ]
 
 LOCAL_INCLUDES += ["/netwerk/base"]

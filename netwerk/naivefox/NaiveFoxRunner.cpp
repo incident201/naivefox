@@ -6,13 +6,16 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "Config.h"
 #include "GeckoRuntime.h"
 #include "HttpClient.h"
 #include "NaiveFoxAPI.h"
 #include "NeckoTunnel.h"
 #include "ProfilerControl.h"
 #include "ProxyProtocol.h"
+#include "RuntimeLogging.h"
 #include "SocksServer.h"
+#include "TunnelSession.h"
 #include "mozilla/Logging.h"
 #include "nsError.h"
 #include "nsString.h"
@@ -23,19 +26,23 @@ namespace {
 class AutoLogging final {
  public:
   AutoLogging() { NS_LogInit(); }
-  ~AutoLogging() { NS_LogTerm(); }
+  ~AutoLogging() {
+    mozilla::naivefox::ShutdownRuntimeLogging();
+    NS_LogTerm();
+  }
 };
 
 void PrintUsage(const char* aProgram) {
   std::printf(
-      "Usage: %s --version\n"
+      "Usage: %s [CONFIG_PATH]\n"
+      "       %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
       "       %s --profile PATH --fetch URL\n"
       "       %s --profile PATH --raw-tunnel-smoke PROXY_URL TARGET "
       "[--protocol h2|h3|auto]\n"
       "       %s --profile PATH --socks-listen 127.0.0.1:PORT "
       "--proxy PROXY_URL [--protocol h2|h3|auto] [--max-connections N]\n",
-      aProgram, aProgram, aProgram, aProgram, aProgram);
+      aProgram, aProgram, aProgram, aProgram, aProgram, aProgram);
 }
 
 bool ParseProxyProtocol(const char* aValue,
@@ -61,6 +68,46 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   AutoLogging logging;
   mozilla::LogModule::Init(aArgc, aArgv);
   AUTO_PROFILER_INIT;
+
+  const bool configMode = aArgc == 1 || (aArgc == 2 && aArgv[1][0] != '-' &&
+                                         std::strlen(aArgv[1]) != 0);
+  if (configMode) {
+    nsAutoCString configPath(aArgc == 1 ? "config.json" : aArgv[1]);
+    mozilla::naivefox::Config config;
+    nsAutoCString error;
+    nsresult rv = mozilla::naivefox::LoadConfigFile(configPath, config, error);
+    if (NS_SUCCEEDED(rv)) {
+      rv = mozilla::naivefox::ConfigureRuntimeLogging(config.mLogMode,
+                                                      config.mLogPath, error);
+    }
+    nsAutoCString profile;
+    if (NS_SUCCEEDED(rv)) {
+      rv = mozilla::naivefox::ResolveAndCreateProfile(profile, error);
+    }
+    if (NS_FAILED(rv)) {
+      std::fprintf(stderr, "NaiveFox config error: %s\n", error.get());
+      return 2;
+    }
+
+    mozilla::naivefox::GeckoRuntime runtime;
+    rv = runtime.Initialize(aArgc, aArgv, profile, config.mProtocol);
+    if (NS_SUCCEEDED(rv)) {
+      mozilla::naivefox::TunnelConfig tunnelConfig;
+      tunnelConfig.mProxyUrl = config.mProxyUrl;
+      tunnelConfig.mProxyUser = config.mProxyUser;
+      tunnelConfig.mProxyPassword = config.mProxyPassword;
+      tunnelConfig.mProtocol = config.mProtocol;
+      rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
+                                                  tunnelConfig);
+    }
+    if (NS_FAILED(rv)) {
+      std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",
+                   static_cast<unsigned>(rv));
+      return 1;
+    }
+    mozilla::naivefox::RuntimeLog("NaiveFox completed successfully\n");
+    return 0;
+  }
 
   nsCString profile;
   nsCString fetchUrl;
@@ -125,8 +172,16 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     return 2;
   }
 
+  nsAutoCString loggingError;
+  nsresult rv = mozilla::naivefox::ConfigureRuntimeLogging(
+      mozilla::naivefox::RuntimeLogMode::Console, EmptyCString(), loggingError);
+  if (NS_FAILED(rv)) {
+    std::fprintf(stderr, "NaiveFox logging error: %s\n", loggingError.get());
+    return 1;
+  }
+
   mozilla::naivefox::GeckoRuntime runtime;
-  nsresult rv = runtime.Initialize(aArgc, aArgv, profile, protocol);
+  rv = runtime.Initialize(aArgc, aArgv, profile, protocol);
   if (NS_SUCCEEDED(rv)) {
     if (runtimeSmoke) {
       rv = runtime.RunEventLoopSmoke();

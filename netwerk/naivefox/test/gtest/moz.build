@@ -4,7 +4,9 @@
 
 UNIFIED_SOURCES += [
     "TestAutoFallback.cpp",
+    "TestConfig.cpp",
     "TestHeaderPadding.cpp",
+    "TestHttpConnectParser.cpp",
     "TestNaivePadding.cpp",
     "TestPaddingNegotiation.cpp",
     "TestSocks5Parser.cpp",

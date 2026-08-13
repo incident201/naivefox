@@ -7,11 +7,16 @@
 
 #include <cstdint>
 
-#include "ProxyProtocol.h"
+#include "Config.h"
+#include "TunnelSession.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
 
 namespace mozilla::naivefox {
+
+nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
+                             const TunnelConfig& aTunnelConfig,
+                             uint32_t aMaxConnections = 0);
 
 nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
                         const nsACString& aProxyUser,
