@@ -9,6 +9,7 @@ suites=(
   run-h3-padded-tests.sh
   run-h3-robustness-tests.sh
   run-auto-protocol-tests.sh
+  run-h3-capture-comparison.sh
 )
 
 for suite in "${suites[@]}"; do

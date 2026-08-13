@@ -115,6 +115,23 @@ data under the object directory and are deleted on success. Only sanitized
 ClientHello, ALPN, SETTINGS, early-frame, stream-reuse, and header-name
 metadata is retained.
 
+Run the strict HTTP/3 equivalent with:
+
+```bash
+./run-h3-capture-comparison.sh
+```
+
+It uses an H3-only UDP fixture and performs independent decrypted and passive
+captures for ordinary Firefox and strict-H3 NaiveFox. It asserts QUIC without
+an established TCP fallback, semantic ClientHello and transport-parameter
+parity, equal H3/QPACK settings, ordinary Firefox GET versus classic CONNECT,
+two CONNECT streams on one QUIC connection, negotiated `padding` headers, and
+the absence of synthetic marker headers. Raw captures, keys, profiles, bodies,
+screenshots, and logs are deleted after credential-free aggregates are written.
+WSL loopback capture uses `any`, then retains only the cooked transmit copy so
+duplicate packet numbers cannot disturb stateful QUIC dissection. Detailed
+results are in `../../H3-CAPTURE.md`.
+
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact
 forwardproxy commit. Later runs reuse the validated tools. The suite verifies
