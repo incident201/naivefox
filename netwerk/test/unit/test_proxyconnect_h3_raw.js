@@ -68,6 +68,7 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
         if (writeOffset < request.length) {
           output.asyncWait(outputCallback, 0, 0, Services.tm.mainThread);
         } else {
+          output.closeWithStatus(Cr.NS_OK);
           tunnelInput.asyncWait(inputCallback, 0, 0, Services.tm.mainThread);
         }
       } catch (error) {

@@ -520,6 +520,57 @@ Tests:
 
 Commit: `NF-H3-04 expose raw HTTP/3 CONNECT streams`
 
+### Patch NF-UPSTREAM-008
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/protocol/http/Http3StreamTunnel.h
+third_party/rust/neqo-http3/src/connection.rs
+third_party/rust/neqo-http3/.cargo-checksum.json
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+```
+
+Purpose:
+
+Give a raw regular HTTP/3 CONNECT tunnel byte-stream half-close semantics: a
+successful close of its output stream sends QUIC FIN while its input stream
+continues delivering the proxy response.
+
+Why project-only code was insufficient:
+
+The H3 tunnel output stream previously mapped every close to
+`CancelFetch()`, which resets both directions. Reusing the normal Neqo
+send-side close exposed a second issue: classic CONNECT and true extended
+CONNECT share `Http3StreamType::ExtendedConnect`, and Neqo removed the receive
+handler before checking whether the stream actually belonged to a
+WebTransport or CONNECT-UDP session. The server's response remained visible
+on the QUIC wire but could no longer produce `DataReadable`.
+
+Implementation and behavioral risk:
+
+- map only a successful tunnel output close to Neqo's existing
+  `stream_close_send()` path; failed closes retain full-stream cancellation;
+- retain the opposite stream handler when closing one side of classic
+  CONNECT, while preserving coupled lifecycle for actual extended-connect
+  sessions;
+- update the vendored Cargo checksum for the changed Neqo source;
+- leave ordinary HTTP requests, WebTransport, CONNECT-UDP, and full tunnel
+  cancellation unchanged.
+
+Tests:
+
+- focused raw H3 xpcshell test closes the request send-side before reading and
+  still receives the deterministic response;
+- the strict local Caddy H3-only runner verifies request FIN, delayed response,
+  response FIN, marker integrity, and authentication failure over UDP/QUIC;
+- full `gkrust`, `libxul`, and NaiveFox binary builds pass.
+
+Commit: `NF-H3-05 preserve classic CONNECT input after H3 half-close`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:

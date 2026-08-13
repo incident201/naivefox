@@ -243,13 +243,20 @@ NS_IMETHODIMP
 Http3TransportLayer::OutputStreamTunnel::CloseWithStatus(nsresult reason) {
   LOG(("OutputStreamTunnel::CloseWithStatus [this=%p reason=%" PRIx32 "]\n",
        this, static_cast<uint32_t>(reason)));
-  mCondition = reason;
 
   RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
   if (!tunnel) {
     return NS_OK;
   }
 
+  if (NS_SUCCEEDED(reason)) {
+    mCondition = NS_BASE_STREAM_CLOSED;
+    mCallback = nullptr;
+    tunnel->CloseOutput();
+    return NS_OK;
+  }
+
+  mCondition = reason;
   tunnel->CleanupStream(reason);
   return NS_OK;
 }
@@ -795,6 +802,17 @@ already_AddRefed<nsHttpConnection> Http3StreamTunnel::CreateHttpConnection(
                  aCallbacks, aRtt, aIsExtendedCONNECT);
   MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
   return conn.forget();
+}
+
+void Http3StreamTunnel::CloseOutput() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (mSendState == SEND_DONE || !mSession) {
+    return;
+  }
+
+  mSession->CloseSendingSide(mStreamId);
+  mSendState = SEND_DONE;
+  HasDataToWrite();
 }
 
 void Http3StreamTunnel::CleanupStream(nsresult aReason) {

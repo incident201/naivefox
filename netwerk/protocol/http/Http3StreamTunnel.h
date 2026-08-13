@@ -106,6 +106,7 @@ class Http3StreamTunnel final : public Http3Stream {
       bool aIsExtendedCONNECT);
 
   void CleanupStream(nsresult aReason);
+  void CloseOutput();
 
   void HasDataToWrite();
   void HasDataToRead();
