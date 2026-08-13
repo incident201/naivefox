@@ -13,6 +13,13 @@ fi
 
 cleanup() {
   status=$?
+  if [[ $status -ne 0 && -n ${RUN_DIR:-} && -d $RUN_DIR ]]; then
+    for log in necko-untrusted.log necko-trusted.log necko-hostname.log; do
+      if [[ -f $RUN_DIR/$log ]]; then
+        cp -- "$RUN_DIR/$log" "$SOURCE_ROOT/artifacts/$log"
+      fi
+    done
+  fi
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   return "$status"
 }
@@ -37,7 +44,7 @@ fi
 
 timeout 30 "$NAIVEFOX_BIN" --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
   --fetch "$trusted_url" >"$RUN_DIR/necko-trusted.log" 2>&1
-rg -q '^HTTP status: 407$' "$RUN_DIR/necko-trusted.log"
+rg -q '^HTTP status: 200$' "$RUN_DIR/necko-trusted.log"
 
 if timeout 30 "$NAIVEFOX_BIN" --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
   --fetch "$wrong_hostname_url" >"$RUN_DIR/necko-hostname.log" 2>&1; then
