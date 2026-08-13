@@ -34,12 +34,15 @@ Run the NaiveProxy-style config and simultaneous local-listener gates with:
 ```
 
 Each protocol run starts one NaiveFox process with both a SOCKS5 listener and
-an HTTP CONNECT-only listener. It verifies small HTTP/HTTPS targets, rejection
-of ordinary forward HTTP, 3 MiB download and 2 MiB upload integrity through
-both frontends, and mixed concurrency. The H2 phase requires one pooled outer
-TCP connection; the H3 phase runs against the UDP-only fixture. The behavior
-runner verifies disabled, console, and file logging plus automatic persistent
-profile creation.
+an HTTP CONNECT-only listener, both bound to `0.0.0.0`. Its generated config
+uses a two-element `proxy` array with the same URI mapped to both listeners,
+matching NaiveProxy's listener-index behavior. It verifies small HTTP/HTTPS
+targets, rejection of ordinary forward HTTP, 3 MiB download and 2 MiB upload
+integrity through both frontends, and mixed concurrency. The H2 phase requires
+one pooled outer TCP connection; the H3 phase runs against the UDP-only
+fixture. The behavior runner additionally binds to the WSL instance's concrete
+non-loopback IPv4 address, then verifies disabled, console, and file logging
+plus automatic persistent profile creation.
 
 The staging verifier passes an external root `./naivefox` launcher through
 `NAIVEFOX_RUNTIME`. It exercises both no-argument adjacent `config.json` and

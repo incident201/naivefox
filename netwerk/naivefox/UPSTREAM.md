@@ -120,8 +120,8 @@ not aliases for a moving `main`:
 
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: d8b44101698224ed18b7689e091057ac69984e2c
-Validated Minimal base commit: d8b44101698224ed18b7689e091057ac69984e2c
+Validated NaiveFox commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
+Validated Minimal base commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -351,8 +351,8 @@ The agent must keep this section current.
 Upstream repository: https://github.com/mozilla-firefox/firefox
 Upstream branch: main
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: d8b44101698224ed18b7689e091057ac69984e2c
-Validated Minimal base commit: d8b44101698224ed18b7689e091057ac69984e2c
+Validated NaiveFox commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
+Validated Minimal base commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -895,7 +895,15 @@ Purpose:
 
 Add a strict NaiveProxy-compatible JSON subset, automatic persistent profile,
 runtime logging policy, simultaneous local SOCKS5 and HTTP CONNECT-only
-listeners, and packaged no-argument/positional config invocation.
+listeners, string/array per-listener upstream mapping, explicit IPv4/IPv6 bind
+addresses, and packaged no-argument/positional config invocation.
+
+The compatibility correction was derived from
+`net/tools/naive/naive_config.cc` and `naive_proxy_bin.cc` at NaiveProxy tag
+`v150.0.7871.63-1`: one parsed proxy is shared by all listeners, while two or
+more proxy-array entries must match the listener count and are selected by
+listener index. Comma-separated multi-hop chains are a separate NaiveProxy
+feature and remain explicitly outside this project's current scope.
 
 Why no Firefox patch was needed:
 
@@ -912,15 +920,21 @@ Behavioral risk:
 The refactor moves existing SOCKS tunnel state into a reusable project class.
 The complete pre-existing H2/H3 raw, padded, robustness, Auto, and capture
 suites were rerun to cover lifecycle and backpressure. HTTP parsing is bounded
-at 16 KiB and preserves post-header bytes as initial tunnel payload. Listener
-binding is intentionally loopback-only.
+at 16 KiB and preserves post-header bytes as initial tunnel payload. Configured
+numeric IPv4/IPv6 addresses are passed to `nsIServerSocket::InitWithAddress`,
+so wildcard and LAN binds behave like NaiveProxy instead of being rewritten to
+loopback. Local listener authentication is still absent and external exposure
+is therefore an operator security decision documented in `README.md` and
+`KNOWN-ISSUES.md`.
 
 Tests:
 
 - warning-free `./mach build -j4 binaries`;
-- 45/45 `Naive*` gtests;
+- 48/48 project and padding gtests;
 - complete local H2/H3 suite, including prior robustness and capture gates;
-- strict H2 and H3 config workloads with simultaneous SOCKS5 and HTTP CONNECT;
+- strict H2 and H3 config workloads with simultaneous wildcard-bound SOCKS5
+  and HTTP CONNECT listeners and repeated per-listener proxy-array entries;
+- a concrete non-loopback interface bind and successful client connection;
 - disabled/console/file logging and automatic profile checks;
 - copied staged package with adjacent no-argument and positional config;
 - supplied real Caddy over both strict protocols with public CA validation.
@@ -929,6 +943,7 @@ Commits:
 
 - `29275f3d3f03 NF-CONFIG-01 add config-driven local proxy frontends`
 - `5a9cabd981ba NF-CONFIG-02 verify config mode locally and staged`
+- `92d25f965b8c NF-CONFIG-03 match NaiveProxy listener and proxy-array semantics`
 
 ## Rules for future upstream changes
 

@@ -79,7 +79,7 @@ Example user-facing behavior:
 export NAIVEFOX_PROXY_USER='user'
 export NAIVEFOX_PROXY_PASS='pass'
 
-./run-naivefox \
+obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
   --profile /path/to/writable-nss-profile \
   --socks-listen 127.0.0.1:1080 \
   --proxy https://proxy.example.com:443 \
@@ -229,7 +229,7 @@ NaiveFoxApp
 |
 +-- Config
 |   +-- strict NaiveProxy-compatible JSON schema
-|   +-- multiple loopback SOCKS5 / HTTP CONNECT listeners
+|   +-- multiple configurable IPv4/IPv6 SOCKS5 / HTTP CONNECT listeners
 |   +-- strict H2 (`https://`) or H3 (`quic://`) upstream
 |   +-- persistent profile and logging policy
 |
@@ -269,7 +269,8 @@ Keep these responsibilities separate. In particular, `NaivePadding` should be te
 
 The first implementation should:
 
-- Listen on loopback by default, e.g. `127.0.0.1:1080`.
+- Bind to the address configured by the user, for example `127.0.0.1`,
+  `0.0.0.0`, a LAN address, `::1`, or `::`.
 - Support SOCKS5 `CONNECT`.
 - Support destination address types:
   - IPv4.
@@ -277,7 +278,8 @@ The first implementation should:
   - Domain name.
 - Reject unsupported commands with the correct SOCKS5 reply.
 - Require no authentication on the local SOCKS endpoint for the prototype.
-- Never listen on a non-loopback address by default.
+- Do not apply an implicit loopback restriction to an explicitly configured
+  address.
 - Avoid local DNS resolution when the client supplied a domain name.
 
 For a SOCKS domain request such as:
@@ -308,17 +310,34 @@ different file.
     "socks://127.0.0.1:1080",
     "http://127.0.0.1:8080"
   ],
-  "proxy": "https://user:password@proxy.example:443",
+  "proxy": [
+    "https://user:password@proxy.example:443",
+    "https://user:password@proxy.example:443"
+  ],
   "log": ""
 }
 ```
 
 `listen` may be one string or a non-empty array. `socks://` provides SOCKS5
-CONNECT; `http://` provides HTTP CONNECT only. Multiple listeners share one
-process, Gecko runtime, Necko connection manager, upstream tunnel backend, and
-padding implementation. Listener addresses are deliberately restricted to
-`127.0.0.1`, `localhost`, or `[::1]`, and require an explicit nonzero port.
-Ordinary forward-proxy GET/POST requests sent to the HTTP listener return 405.
+CONNECT; `http://` provides HTTP CONNECT only. Numeric IPv4 and IPv6 bind
+addresses are accepted, including wildcard and non-loopback addresses;
+`localhost` is normalized to IPv4 loopback. An explicit nonzero port is
+required. Because local listener authentication is not implemented yet,
+binding a wildcard or LAN address intentionally exposes the listener and must
+be protected by the host firewall or trusted-network policy. Ordinary
+forward-proxy GET/POST requests sent to the HTTP listener return 405.
+
+Like NaiveProxy `v150.0.7871.63-1`, `proxy` may be one string or a non-empty
+array. One URI is shared by every listener. With two or more URIs, the count
+must equal the listener count and `proxy[i]` is used by `listen[i]`; repeating
+the same URI for SOCKS and HTTP is therefore valid. Comma-separated multi-hop
+proxy chains remain outside this stage and produce an explicit error rather
+than being misinterpreted.
+
+All listeners still run in one process and share one Gecko runtime, Necko
+connection manager, tunnel backend, and padding implementation. Different
+per-listener `https://` and `quic://` entries are supported without duplicating
+the transport implementation.
 
 The proxy URI contains percent-encoded credentials and selects a strict outer
 transport:
@@ -491,16 +510,16 @@ binary and GRE dependencies below `runtime/`:
 ```text
 naivefox-linux-x86_64/
 |-- naivefox
-|-- run-naivefox
 `-- runtime/
     |-- naivefox
     |-- libxul.so
     `-- ...
 ```
 
-`run-naivefox` remains a compatibility alias. Normal packaged use requires no
-build-tree loader variables, profile argument, or credential environment
-variables:
+The root `naivefox` is the only user-facing launcher. `runtime/naivefox` is the
+native ELF it invokes alongside `libxul` and the GRE files; it is not a second
+launcher. Normal packaged use requires no build-tree loader variables, profile
+argument, or credential environment variables:
 
 ```bash
 cd naivefox-linux-x86_64

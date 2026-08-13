@@ -881,8 +881,11 @@ configuration and local protocol adapters without changing Firefox or Neqo.
 
 - [x] Parse a bounded strict JSON object without SpiderMonkey or a new
   dependency; accept `listen` as one string or an array.
-- [x] Accept loopback `socks://` and `http://` listeners, and reject malformed,
+- [x] Accept numeric IPv4/IPv6 `socks://` and `http://` bind addresses,
+  including wildcard, loopback, and specific LAN addresses; reject malformed,
   unknown, duplicate, wrongly typed, or unsupported input.
+- [x] Match NaiveProxy's `proxy` string/array mapping: one URI is shared,
+  while two or more URIs map one-to-one to listeners in the same order.
 - [x] Map credential-bearing `https://` to strict H2 and `quic://` to strict H3,
   including default port 443, IPv4/IPv6, and percent decoding.
 - [x] Implement disabled, console, and mode-`0600` file logging without
@@ -904,14 +907,15 @@ configuration and local protocol adapters without changing Firefox or Neqo.
 
 ### M13.3 Local, real, and packaged acceptance
 
-- [x] Pass 45/45 project gtests, including config and HTTP parser fragmentation,
+- [x] Pass 48/48 project gtests, including config and HTTP parser fragmentation,
   authority, size, early-payload, type, scheme, and credential cases.
 - [x] Pass mixed concurrent SOCKS5 and HTTP CONNECT workloads over local strict
   H2 and H3 fixtures with negotiated padding and transfer integrity.
 - [x] Pass the unchanged H2/H3 raw, padding, robustness, Auto, and capture
   regression suites.
 - [x] Pass supplied real-Caddy config workloads over both `https://` and
-  `quic://` using public certificate validation and a staged runtime.
+  `quic://` using public certificate validation and a staged runtime, including
+  wildcard listeners and repeated per-listener proxy-array entries.
 - [x] Verify `./naivefox` with adjacent `config.json` and positional config from
   a copied package outside the object directory, with no objdir mappings.
 
@@ -949,8 +953,12 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 26. strict NaiveProxy-style config mode works without developer flags.
 27. simultaneous SOCKS5 and HTTP CONNECT listeners share one tunnel backend.
 28. config-mode strict H2 and H3 pass local, real, and staged acceptance.
+29. configured wildcard and specific non-loopback listener addresses bind and
+    accept clients without an implicit loopback policy.
+30. `proxy` string/array behavior matches NaiveProxy's shared and one-to-one
+    listener mapping, and the package exposes only one root launcher.
 
-Final prototype status on 2026-08-13: all items 1-28 pass. In particular, the
+Final prototype status on 2026-08-13: all items 1-30 pass. In particular, the
 supplied real Caddy passed normal public-certificate validation, the H2
 interoperability workload and ten-minute H2 soak, and the strict-H3
 preflight plus exactly 600-second H3 soak without hidden H2 fallback. Commands,

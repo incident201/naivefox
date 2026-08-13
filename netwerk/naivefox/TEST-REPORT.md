@@ -6,8 +6,8 @@ Environment: `Ubuntu24Dev`, x86-64, Firefox opt build
 
 H2 baseline tag: `h2-prototype-v0.1`
 
-Validated development branch: `feature/h3`; release integration branch:
-`naivefox`; combined prototype tag: `h2-h3-prototype-v0.2`
+Validated reference branch: `naivefox`; combined H2/H3 baseline tag:
+`h2-h3-prototype-v0.2`
 
 This is the committed acceptance record for the local prototype, the supplied
 real Caddy deployment, the staged runtime, and the official NaiveProxy control
@@ -19,7 +19,7 @@ authorization value, packet payload, or TLS key material.
 | Command | Result |
 |---|---|
 | `./mach build -j4 binaries` | PASS, 0 compiler warnings |
-| `./mach gtest 'Naive*'` | PASS, 45/45 tests in 9 suites |
+| `./mach gtest 'NaiveFox*'` plus `./mach gtest 'NaivePadding*'` | PASS, 48/48 tests in 9 suites |
 | `./mach xpcshell-test netwerk/test/unit/test_proxyconnect.js netwerk/test/unit/test_proxyconnect_headers.js netwerk/test/unit/test_proxyconnect_https.js netwerk/test/unit/test_proxyconnect_raw.js netwerk/test/unit/test_proxyconnect_padding_header.js` | PASS, 5/5 tests |
 | `git diff --check` | PASS |
 
@@ -40,12 +40,18 @@ duplex pumping to one shared `TunnelSession`.
 
 | Gate | Result |
 |---|---|
-| Config parser gtests | PASS, string/array listeners, H2/H3 URI mapping, default/explicit port, IPv4/IPv6, percent credentials, log modes, and strict failures |
+| Config parser gtests | PASS, string/array listeners and proxies, shared/one-to-one upstream mapping, H2/H3 URI mapping, default/explicit port, IPv4/IPv6, wildcard/non-loopback bind addresses, percent credentials, log modes, and strict failures |
 | HTTP CONNECT parser gtests | PASS, arbitrary fragmentation, split CRLF, authorities, non-CONNECT, oversized headers, and early payload |
 | `run-h2-config-tests.sh` | PASS, one process, 10 padded H2 tunnels, SOCKS5 + HTTP CONNECT, 3 MiB downloads, 2 MiB uploads, mixed concurrency |
 | `run-h3-config-tests.sh` | PASS, the same workload over an H3-only UDP fixture, 10 padded H3 tunnels and no TCP fallback |
-| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, file log is `0600`, automatic profile is `0700` |
-| `run-full-suite.sh` | PASS in 311.9 seconds, including all pre-existing H2/H3, Auto, robustness, and capture gates plus config mode |
+| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, file log is `0600`, automatic profile is `0700`, and a concrete non-loopback interface bind accepts traffic |
+| `run-full-suite.sh` | PASS in 311.5 seconds, including all pre-existing H2/H3, Auto, robustness, and capture gates plus config mode |
+
+The H2 and H3 config runs used two `0.0.0.0` listeners and a two-element
+`proxy` array containing the same URI twice, matching NaiveProxy's
+listener-by-index semantics. Both listening sockets were verified as wildcard
+binds before traffic. A separate run bound SOCKS to the WSL instance's actual
+non-loopback IPv4 address and connected through that address successfully.
 
 The local HTTP listener returned 405 for an ordinary forward-proxy request and
 did not emit its 200 response until the upstream CONNECT had succeeded. The
@@ -53,8 +59,9 @@ mixed phase ran two SOCKS and two HTTP tunnels concurrently. H2 reused one
 established outer TCP connection; strict H3 succeeded against a UDP-only
 listener where H2/TCP fallback could not satisfy the workload.
 
-The supplied real Caddy was then tested with the staged package and public CA
-validation. Each strict protocol run used one process with both listeners:
+The supplied real Caddy was then tested with the newly staged package and
+public CA validation. Each strict protocol run used one process, both wildcard
+listeners, and two repeated per-listener proxy-array entries:
 
 | Protocol/config scheme | Result |
 |---|---|
@@ -103,8 +110,9 @@ gtests, and six sequential proxy-CONNECT xpcshell files: existing H1/H2
 CONNECT, header handling, HTTPS proxying, raw H1/H2 takeover, CONNECT padding,
 and the new raw H3 path all passed. The strict H3, IPv6 H3-proxy fallback, and
 HTTP/2-over-H3-proxy Firefox tests also passed.
-The subsequent config/listener stage expanded the warning-free project gate to
-45/45 gtests and reran the complete local H2/H3 integration suite.
+The subsequent config/listener compatibility stage expanded the warning-free
+project gate to 48/48 gtests and reran the complete local H2/H3 integration
+suite.
 
 Two broader Mozilla tests expose frozen-snapshot limitations outside the
 NaiveFox classic-CONNECT path. `test_http3_proxy.js` passes 37 assertions and
@@ -250,18 +258,21 @@ because its observable TLS and H2 stack is Firefox Necko/NSS.
 Commands:
 
 ```bash
-netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64-config-final
+netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64-config-compat
 netwerk/naivefox/tools/verify-staged-runtime.sh \
-  --fetch https://example.com/ naivefox-linux-x86_64-config-final
+  --fetch https://example.com/ naivefox-linux-x86_64-config-compat
 ```
 
 Result: PASS. The verifier copied the package below `/tmp` and ran its root
 `./naivefox` launcher; the native executable and GRE dependencies remained in
-the package's `runtime/` directory.
+the package's `runtime/` directory. The redundant root `run-naivefox` alias was
+removed: the staged root contains one user-facing `naivefox` launcher plus the
+`runtime/` directory.
 
 | Check | Result |
 |---|---|
 | Installed size | 378 MiB |
+| Root launchers | One: `naivefox` |
 | Copy to a fresh `/tmp` directory | PASS |
 | Broken or absolute staged symlinks | None |
 | `ldd` missing libraries or object-directory paths | None |

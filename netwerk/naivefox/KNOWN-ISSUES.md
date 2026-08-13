@@ -66,9 +66,14 @@ H2, and the soak runner records such a failure rather than masking it.
   the one permitted establishment-only H2 retry.
 - CONNECT-UDP, MASQUE, WebTransport, SOCKS UDP ASSOCIATE, TUN/TAP, GUI work, and
   platform ports are intentionally outside this prototype.
-- Config listeners are loopback-only and unauthenticated. The HTTP frontend is
-  CONNECT-only; ordinary forward HTTP, listener authentication, UDP ASSOCIATE,
-  and non-loopback exposure are intentionally not implemented.
+- Config listeners accept explicit numeric IPv4/IPv6 addresses, including
+  wildcard and LAN binds, and are currently unauthenticated. Exposing
+  `0.0.0.0`, `::`, or a LAN address must therefore be an intentional operator
+  choice protected by host firewall or trusted-network policy. The HTTP
+  frontend is CONNECT-only; ordinary forward HTTP, listener authentication,
+  and UDP ASSOCIATE are not implemented.
+- `proxy` accepts NaiveProxy-compatible string or array mapping. Comma-separated
+  multi-hop proxy chains remain outside the current scope and fail explicitly.
 - The verified staged runtime prioritizes reproducibility over size and is not
   yet minimized.
 
