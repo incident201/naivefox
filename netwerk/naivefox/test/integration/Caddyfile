@@ -3,12 +3,13 @@
 	auto_https disable_redirects
 	skip_install_trust
 	servers {
-		protocols h1 h2
+		protocols {$NAIVEFOX_FIXTURE_PROTOCOLS}
 	}
 }
 
 https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 	bind 127.0.0.1
+	log
 	tls {$NAIVEFOX_FIXTURE_PROXY_CERT} {$NAIVEFOX_FIXTURE_PROXY_KEY}
 	route {
 		forward_proxy {

@@ -5,6 +5,22 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
+protocol=h2
+if [[ $# -gt 0 ]]; then
+  if [[ $# -ne 2 || $1 != --protocol ]]; then
+    printf 'usage: %s [--protocol h2|h3]\n' "$0" >&2
+    exit 2
+  fi
+  protocol=$2
+fi
+case $protocol in
+  h2 | h3) ;;
+  *)
+    printf 'unsupported robustness-test protocol: %s\n' "$protocol" >&2
+    exit 2
+    ;;
+esac
+
 run_dir=
 client_pid=
 client_log=
@@ -34,12 +50,12 @@ cleanup() {
     } | sanitize_stream "${NAIVEFOX_FIXTURE_USER:-}" \
       "${NAIVEFOX_FIXTURE_PASS:-}" | \
       sanitize_stream '' "${invalid_password:-}" \
-      >"$SOURCE_ROOT/artifacts/m9-robustness-client-failure.log"
+      >"$SOURCE_ROOT/artifacts/$protocol-robustness-client-failure.log"
   fi
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   if [[ $status -ne 0 ]]; then
     printf 'robustness fixture failed; sanitized client log: %s\n' \
-      "$SOURCE_ROOT/artifacts/m9-robustness-client-failure.log" >&2
+      "$SOURCE_ROOT/artifacts/$protocol-robustness-client-failure.log" >&2
   fi
   return "$status"
 }
@@ -66,6 +82,7 @@ start_client() {
   env NAIVEFOX_PROXY_USER="$user" NAIVEFOX_PROXY_PASS="$password" \
     "$OBJDIR/dist/bin/naivefox" \
     --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
+    --protocol "$protocol" \
     --socks-listen "127.0.0.1:$socks_port" \
     --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
     --max-connections "$max_connections" >"$log" 2>&1 &
@@ -126,8 +143,16 @@ monitor_rss() {
 }
 
 proxy_flow_count() {
-  ss -Htn state established "( dport = :$NAIVEFOX_FIXTURE_PROXY_PORT )" |
-    wc -l
+  if [[ $protocol == h3 ]]; then
+    # Neqo's UDP socket is not connect(2)-bound to the Caddy peer, so ss lists
+    # a wildcard remote endpoint. PID ownership plus the H3-only fixture gives
+    # us the exact outer socket count without relying on a missing dport.
+    ss -Haunp | awk -v owner="pid=$client_pid," \
+      'index($0, owner) { count++ } END { print count + 0 }'
+  else
+    ss -Htn state established \
+      "( dport = :$NAIVEFOX_FIXTURE_PROXY_PORT )" | wc -l
+  fi
 }
 
 assert_no_secret() {
@@ -144,15 +169,21 @@ assert_no_secret() {
 }
 
 command -v ss >/dev/null
-"$INTEGRATION_DIR/start.sh"
+"$INTEGRATION_DIR/start.sh" --mode "$protocol"
 run_dir=$(<"$ACTIVE_RUN_FILE")
 source "$run_dir/fixture.env"
 export LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export MOZ_CRASHREPORTER_DISABLE=1
 
 socks_port=$(choose_port)
-start_client "$NAIVEFOX_FIXTURE_USER" "$NAIVEFOX_FIXTURE_PASS" 11 \
+start_client "$NAIVEFOX_FIXTURE_USER" "$NAIVEFOX_FIXTURE_PASS" 12 \
   "$run_dir/robustness-client.log" "$socks_port"
+
+curl --silent --show-error --fail --noproxy '' \
+  --socks5-hostname "127.0.0.1:$socks_port" \
+  "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small" \
+  --output "$run_dir/warmup.out"
+[[ $(<"$run_dir/warmup.out") == 'naivefox-fixture-small' ]]
 
 monitor_rss 'slow download backpressure' \
   python3 "$INTEGRATION_DIR/robustness_client.py" slow-download \
@@ -217,8 +248,12 @@ if ((all_streams_ready == 0)); then
   printf 'concurrent CONNECT streams did not become ready together\n' >&2
   exit 1
 fi
-[[ $(proxy_flow_count) -eq 1 ]]
-[[ $max_proxy_flows -eq 1 ]]
+current_proxy_flows=$(proxy_flow_count)
+if ((current_proxy_flows != 1 || max_proxy_flows != 1)); then
+  printf 'expected one pooled %s proxy flow, observed current=%d peak=%d\n' \
+    "$protocol" "$current_proxy_flows" "$max_proxy_flows" >&2
+  exit 1
+fi
 for pid in "${concurrent_pids[@]}"; do
   kill -0 "$pid" 2>/dev/null
 done
@@ -233,7 +268,9 @@ done
 
 wait_for_client_exit 'the configured connection limit'
 valid_padding_count=$(padding_count)
-((valid_padding_count >= 10 && valid_padding_count <= 11))
+((valid_padding_count >= 11 && valid_padding_count <= 12))
+[[ $(rg -c "^Outer protocol: $protocol$" "$client_log") -eq \
+  "$valid_padding_count" ]]
 if rg -q '^Padding negotiated: no$' "$client_log"; then
   printf 'fixture tunnel unexpectedly fell back to raw mode\n' >&2
   exit 1
@@ -286,4 +323,4 @@ wait_for_client_exit 'the proxy disconnected'
 assert_no_secret "$client_log"
 
 printf '%s\n' \
-  'NaiveFox robustness, backpressure, lifecycle, and H2 multiplexing tests passed'
+  "NaiveFox robustness, backpressure, lifecycle, and $protocol multiplexing tests passed"

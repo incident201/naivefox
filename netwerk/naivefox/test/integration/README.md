@@ -12,6 +12,24 @@ Run every reproducible local integration gate sequentially with:
 ./run-local-suite.sh
 ```
 
+The existing command remains the H2 suite. Run strict H3 alone, or both
+protocol suites sequentially, with:
+
+```bash
+./run-h3-suite.sh
+./run-full-suite.sh
+```
+
+Strict H3 runners use an H3-only Caddy listener on UDP with no TCP listener on
+the proxy port. They require `Outer protocol: h3`, so H2 fallback cannot satisfy
+the workload. Both suites execute the same `naivefox` binary and share the
+SOCKS, CONNECT, padding, and pump implementation.
+
+`run-padded-tests.sh` also accepts an absolute staged launcher through
+`NAIVEFOX_RUNTIME` plus its directory through `NAIVEFOX_EXPECT_RUNTIME_DIR`.
+The staging verifier uses this mode for both protocols with inherited loader
+and TLS-keylog variables removed, and rejects any live source/objdir mapping.
+
 The final capture step requires the restricted `dumpcap` capabilities
 documented below and in `../../CAPTURE.md`.
 
@@ -35,19 +53,21 @@ Run the M5 local SOCKS-to-Necko tunnel checks with:
 
 ```bash
 ./run-socks-tests.sh
+./run-h3-socks-tests.sh
 ```
 
 The command starts a finite loopback SOCKS5 server, sends domain-name HTTP and
-HTTPS requests through the Firefox/NSS HTTP/2 CONNECT path, validates the HTTPS
-target with the scoped fixture CA, and verifies clean shutdown after multiple
-sequential connections. Every curl invocation uses `--socks5-hostname` and
-`--noproxy ''`; no application-side target DNS lookup or certificate bypass is
-used.
+HTTPS requests through the selected Firefox/NSS H2 or Firefox/Neqo/NSS H3
+CONNECT path, validates the HTTPS target with the scoped fixture CA, and
+verifies clean shutdown after multiple sequential connections. Every curl
+invocation uses `--socks5-hostname` and `--noproxy ''`; no application-side
+target DNS lookup or certificate bypass is used.
 
 Run the complete padded M8 interoperability suite with:
 
 ```bash
 ./run-padded-tests.sh
+./run-h3-padded-tests.sh
 ```
 
 This is the single local acceptance command for Naive legacy padding Variant 1.
@@ -60,13 +80,27 @@ Run the M9 robustness and lifecycle suite with:
 
 ```bash
 ./run-robustness-tests.sh
+./run-h3-robustness-tests.sh
 ```
 
 It verifies bounded-memory 32 MiB download/upload backpressure, integrity,
 local/target/proxy close paths, timeout, ACL and authentication failure,
 application half-close, and four simultaneous padded CONNECT streams. While
 the concurrent streams are active, `ss` must show exactly one established TCP
-connection to the proxy, proving reuse of Firefox's outer H2 session.
+connection for H2 or one NaiveFox-owned UDP socket for H3, proving reuse of
+Firefox's outer H2 session or Neqo's outer QUIC connection.
+
+Run the bounded protocol-selection policy tests with:
+
+```bash
+./run-auto-protocol-tests.sh
+```
+
+Auto mode performs one strict H3 attempt and at most one H2 retry. The test
+uses an H2-only endpoint for the allowed establishment fallback, then places a
+TCP decoy beside the H3-only UDP fixture and requires zero decoy accepts for H3
+success, authentication rejection, and target failure. Raw and SOCKS entry
+points use the same policy.
 
 Run the M10 Firefox/NaiveFox wire comparison with:
 
@@ -80,6 +114,23 @@ keys, copied profiles, screenshots, and process logs are private temporary
 data under the object directory and are deleted on success. Only sanitized
 ClientHello, ALPN, SETTINGS, early-frame, stream-reuse, and header-name
 metadata is retained.
+
+Run the strict HTTP/3 equivalent with:
+
+```bash
+./run-h3-capture-comparison.sh
+```
+
+It uses an H3-only UDP fixture and performs independent decrypted and passive
+captures for ordinary Firefox and strict-H3 NaiveFox. It asserts QUIC without
+an established TCP fallback, semantic ClientHello and transport-parameter
+parity, equal H3/QPACK settings, ordinary Firefox GET versus classic CONNECT,
+two CONNECT streams on one QUIC connection, negotiated `padding` headers, and
+the absence of synthetic marker headers. Raw captures, keys, profiles, bodies,
+screenshots, and logs are deleted after credential-free aggregates are written.
+WSL loopback capture uses `any`, then retains only the cooked transmit copy so
+duplicate packet numbers cannot disturb stateful QUIC dissection. Detailed
+results are in `../../H3-CAPTURE.md`.
 
 The first run downloads the SHA-256-pinned Go toolchain when no matching Go is
 already available, installs the pinned xcaddy, and builds Caddy with the exact

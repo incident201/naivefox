@@ -38,7 +38,7 @@ run_client "$valid_log" \
   NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
   NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS"
 rg -q '^Proxy CONNECT status: 200$' "$valid_log"
-rg -q '^Outer ALPN: h2$' "$valid_log"
+rg -q '^Outer protocol: h2$' "$valid_log"
 rg -q '^Raw tunnel response marker verified$' "$valid_log"
 
 for auth_case in missing invalid; do

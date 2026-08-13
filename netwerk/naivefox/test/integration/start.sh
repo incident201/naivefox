@@ -3,6 +3,24 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+
+fixture_mode=h2
+if [[ $# -gt 0 ]]; then
+  if [[ $# -ne 2 || $1 != --mode ]]; then
+    printf 'usage: %s [--mode h2|h3]\n' "$0" >&2
+    exit 2
+  fi
+  fixture_mode=$2
+fi
+case $fixture_mode in
+  h2) fixture_protocols='h1 h2' ;;
+  h3) fixture_protocols=h3 ;;
+  *)
+    printf 'unsupported fixture mode: %s\n' "$fixture_mode" >&2
+    exit 2
+    ;;
+esac
+
 init_paths
 "$INTEGRATION_DIR/setup.sh"
 find_certutil
@@ -62,6 +80,12 @@ run_certutil -A -d "sql:$RUN_DIR/profiles/trusted" \
   -n 'NaiveFox Fixture Root' -t 'CT,,' -i "$CA_CERT"
 run_certutil -N -d "sql:$RUN_DIR/profiles/untrusted" --empty-password
 
+if [[ $fixture_mode == h3 ]]; then
+  printf '%s\n' \
+    'user_pref("network.http.http3.disable_when_third_party_roots_found", false);' \
+    >"$RUN_DIR/profiles/trusted/user.js"
+fi
+
 if ! run_certutil -L -d "sql:$RUN_DIR/profiles/trusted" \
   -n 'NaiveFox Fixture Root' >/dev/null; then
   printf 'fixture root is absent from the trusted NSS profile\n' >&2
@@ -86,11 +110,17 @@ read -r http_port https_port < <(
     'import json,sys; d=json.load(open(sys.argv[1])); print(d["http_port"], d["https_port"])' \
     "$ready_file"
 )
-proxy_port=$(python3 -c \
-  'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+if [[ $fixture_mode == h3 ]]; then
+  proxy_port=$(python3 -c \
+    'import socket; s=socket.socket(type=socket.SOCK_DGRAM); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+else
+  proxy_port=$(python3 -c \
+    'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+fi
 fixture_user="nf-$(openssl rand -hex 8)"
 fixture_pass=$(openssl rand -hex 24)
 
+export NAIVEFOX_FIXTURE_PROTOCOLS="$fixture_protocols"
 export NAIVEFOX_FIXTURE_PROXY_PORT="$proxy_port"
 export NAIVEFOX_FIXTURE_PROXY_CERT="$RUN_DIR/pki/proxy.crt"
 export NAIVEFOX_FIXTURE_PROXY_KEY="$RUN_DIR/pki/proxy.key"
@@ -107,20 +137,24 @@ if ! "$CADDY_BIN" validate --config "$RUN_DIR/adapted.json" \
   exit 1
 fi
 
-python3 - "$RUN_DIR/adapted.json" "$proxy_port" <<'PY'
+python3 - "$RUN_DIR/adapted.json" "$proxy_port" "$fixture_mode" <<'PY'
 import json
 import sys
 
 config = json.load(open(sys.argv[1], encoding="utf-8"))
 port = sys.argv[2]
+mode = sys.argv[3]
+expected_protocols = ["h1", "h2"] if mode == "h2" else ["h3"]
 servers = config["apps"]["http"]["servers"]
 matches = []
 found_listener = False
 for server in servers.values():
     if f"127.0.0.1:{port}" in server.get("listen", []):
         found_listener = True
-        if server.get("protocols") != ["h1", "h2"]:
-            raise SystemExit("proxy listener protocols are not exactly h1,h2")
+        if server.get("protocols") != expected_protocols:
+            raise SystemExit(
+                f"proxy listener protocols are not exactly {expected_protocols}"
+            )
     for route in server.get("routes", []):
         matches.extend(route.get("match", []))
 if not found_listener:
@@ -134,10 +168,16 @@ env XDG_DATA_HOME="$RUN_DIR/xdg-data" XDG_CONFIG_HOME="$RUN_DIR/xdg-config" \
   >"$RUN_DIR/caddy.log" 2>&1 &
 caddy_pid=$!
 printf '%s\n' "$caddy_pid" >"$RUN_DIR/caddy.pid"
-wait_for_proxy "$caddy_pid" "$proxy_port" "$CA_CERT"
+if [[ $fixture_mode == h3 ]]; then
+  wait_for_h3_proxy "$caddy_pid" "$proxy_port" "$RUN_DIR/caddy.log"
+else
+  wait_for_proxy "$caddy_pid" "$proxy_port" "$CA_CERT"
+fi
 
 cat >"$RUN_DIR/fixture.env" <<EOF
 NAIVEFOX_FIXTURE_RUN_DIR=$RUN_DIR
+NAIVEFOX_FIXTURE_MODE=$fixture_mode
+NAIVEFOX_FIXTURE_PROTOCOLS='$fixture_protocols'
 NAIVEFOX_FIXTURE_PROXY_PORT=$proxy_port
 NAIVEFOX_FIXTURE_HTTP_PORT=$http_port
 NAIVEFOX_FIXTURE_HTTPS_PORT=$https_port
@@ -154,6 +194,8 @@ chmod 0600 "$RUN_DIR/fixture.env"
 {
   cat "$STATE_ROOT/setup-diagnostics.txt"
   printf 'run_id=%s\n' "$run_id"
+  printf 'fixture_mode=%s\n' "$fixture_mode"
+  printf 'proxy_protocols=%s\n' "$fixture_protocols"
   printf 'proxy_listener=127.0.0.1:%s\n' "$proxy_port"
   printf 'http_target=127.0.0.1:%s\n' "$http_port"
   printf 'https_target=127.0.0.1:%s\n' "$https_port"

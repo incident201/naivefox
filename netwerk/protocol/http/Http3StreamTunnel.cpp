@@ -5,6 +5,8 @@
 // HttpLog.h should generally be included first
 #include "Http3StreamTunnel.h"
 
+#include <algorithm>
+
 #include "Http3Session.h"
 #include "HttpLog.h"
 #include "nsHttpConnectionMgr.h"
@@ -12,6 +14,8 @@
 #include "nsQueryObject.h"
 
 namespace mozilla::net {
+
+static constexpr size_t kMaxTunnelBufferedInput = 256 * 1024;
 
 //-----------------------------------------------------------------------------
 // Http3TransportLayer::InputStreamTunnel impl
@@ -48,7 +52,12 @@ NS_IMETHODIMP Http3TransportLayer::InputStreamTunnel::Available(
     return mCondition;
   }
 
-  return NS_ERROR_FAILURE;
+  RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
+  if (!tunnel) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  *avail = tunnel->BufferedInputSize();
+  return NS_OK;
 }
 
 NS_IMETHODIMP Http3TransportLayer::InputStreamTunnel::StreamStatus() {
@@ -143,11 +152,17 @@ Http3TransportLayer::InputStreamTunnel::AsyncWait(
         "InputStreamTunnel::CallOnSocketReady",
         [self{std::move(self)}]() { self->OnSocketReady(self->mCondition); }));
   } else if (callback) {
+    // HasDataToRead may synchronously enter the H3 session. Publish the
+    // callback before notifying it, and do not restore a callback consumed by
+    // a reentrant OnSocketReady call.
+    mCallback = callback;
     RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
     if (!tunnel) {
+      mCallback = nullptr;
       return NS_ERROR_UNEXPECTED;
     }
     tunnel->HasDataToRead();
+    return NS_OK;
   }
 
   mCallback = callback;
@@ -237,13 +252,20 @@ NS_IMETHODIMP
 Http3TransportLayer::OutputStreamTunnel::CloseWithStatus(nsresult reason) {
   LOG(("OutputStreamTunnel::CloseWithStatus [this=%p reason=%" PRIx32 "]\n",
        this, static_cast<uint32_t>(reason)));
-  mCondition = reason;
 
   RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
   if (!tunnel) {
     return NS_OK;
   }
 
+  if (NS_SUCCEEDED(reason) && tunnel->IsConnectOnly()) {
+    mCondition = NS_BASE_STREAM_CLOSED;
+    mCallback = nullptr;
+    tunnel->CloseOutput();
+    return NS_OK;
+  }
+
+  mCondition = reason;
   tunnel->CleanupStream(reason);
   return NS_OK;
 }
@@ -288,13 +310,19 @@ Http3TransportLayer::OutputStreamTunnel::AsyncWait(
         "OutputStreamTunnel::CallOnSocketReady",
         [self{std::move(self)}]() { self->OnSocketReady(self->mCondition); }));
   } else if (callback) {
+    // HasDataToWrite may synchronously enter the H3 session. Publish the
+    // callback before notifying it, and do not restore a callback consumed by
+    // a reentrant OnSocketReady call.
+    mCallback = callback;
     // Inform the proxy connection that the inner connetion wants to
     // read data.
     RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
     if (!tunnel) {
+      mCallback = nullptr;
       return NS_ERROR_UNEXPECTED;
     }
     tunnel->HasDataToWrite();
+    return NS_OK;
   }
 
   mCallback = callback;
@@ -652,10 +680,19 @@ nsresult Http3StreamTunnel::ReadSegments() {
 
 nsresult Http3StreamTunnel::BufferInput() {
   char buf[SimpleBufferPage::kSimpleBufferPageSize];
+  const size_t buffered = mSimpleBuffer.Available();
+  if (IsConnectOnly() && buffered >= kMaxTunnelBufferedInput) {
+    mInputBufferBlocked = true;
+    return NS_BASE_STREAM_WOULD_BLOCK;
+  }
+  const uint32_t readSize =
+      IsConnectOnly()
+          ? std::min(sizeof(buf),
+                     static_cast<size_t>(kMaxTunnelBufferedInput - buffered))
+          : sizeof(buf);
   uint32_t countWritten;
-  nsresult rv = mSession->ReadResponseData(
-      mStreamId, buf, SimpleBufferPage::kSimpleBufferPageSize, &countWritten,
-      &mFin);
+  nsresult rv = mSession->ReadResponseData(mStreamId, buf, readSize,
+                                           &countWritten, &mFin);
   if (NS_FAILED(rv) && rv != NS_BASE_STREAM_WOULD_BLOCK) {
     return rv;
   }
@@ -698,6 +735,18 @@ nsresult Http3StreamTunnel::WriteSegments() {
   bool again = true;
 
   do {
+    if (mInputBufferBlocked && !mSimpleBuffer.Available()) {
+      mInputBufferBlocked = false;
+      rv = BufferInput();
+      if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
+        mInputBufferBlocked = true;
+        return NS_OK;
+      }
+      if (NS_FAILED(rv)) {
+        return rv;
+      }
+    }
+
     mSocketInCondition = NS_OK;
     rv = mTransport->CallToWriteData();
     if (mRecvState == RECV_DONE) {
@@ -712,8 +761,16 @@ nsresult Http3StreamTunnel::WriteSegments() {
     }
 
     if (mRecvState == RECEIVED_FIN) {
-      rv = NS_BASE_STREAM_CLOSED;
-      mRecvState = RECV_DONE;
+      if (IsConnectOnly() && mSimpleBuffer.Available()) {
+        // The QUIC stream may reach FIN while the tunnel consumer is blocked.
+        // Keep the transport alive until the flow-control buffer is drained;
+        // otherwise OnStreamClosed makes the buffered response unreachable.
+        rv = NS_OK;
+        again = false;
+      } else {
+        rv = NS_BASE_STREAM_CLOSED;
+        mRecvState = RECV_DONE;
+      }
     }
 
     if (NS_FAILED(rv)) {
@@ -764,9 +821,13 @@ void Http3StreamTunnel::HasDataToRead() {
   // data buffered, this is fine. The consumer can read data from the buffer.
   // However, if no data is buffered, doing this would create a busy loop that
   // continuously waits for data.
-  if (mSimpleBuffer.Available()) {
+  if (mSimpleBuffer.Available() || mInputBufferBlocked) {
     mSession->ConnectSlowConsumer(this);
   }
+}
+
+bool Http3StreamTunnel::IsConnectOnly() const {
+  return mTransaction && (mTransaction->Caps() & NS_HTTP_CONNECT_ONLY);
 }
 
 already_AddRefed<nsHttpConnection> Http3StreamTunnel::CreateHttpConnection(
@@ -783,6 +844,17 @@ already_AddRefed<nsHttpConnection> Http3StreamTunnel::CreateHttpConnection(
                  aCallbacks, aRtt, aIsExtendedCONNECT);
   MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
   return conn.forget();
+}
+
+void Http3StreamTunnel::CloseOutput() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (mSendState == SEND_DONE || !mSession) {
+    return;
+  }
+
+  mSession->CloseSendingSide(mStreamId);
+  mSendState = SEND_DONE;
+  HasDataToWrite();
 }
 
 void Http3StreamTunnel::CleanupStream(nsresult aReason) {

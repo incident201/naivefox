@@ -40,7 +40,7 @@ nsresult ConnectionAttemptPool::StartConnectionEstablishment(
 
   RefPtr<ConnectionAttempt> connAttempt;
   nsHttpConnectionInfo* ci = trans->ConnectionInfo();
-  if (ci->GetHappyEyeballsEnabled()) {
+  if (ci->GetHappyEyeballsEnabled() && !ci->DisablesHttp3ProxyFallback()) {
     connAttempt = new HappyEyeballsConnectionAttempt(
         ci, trans, caps, speculative, urgentStart, retryWithoutTRR);
   } else {

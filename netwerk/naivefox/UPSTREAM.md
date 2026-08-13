@@ -419,6 +419,232 @@ Tests:
 
 Commit: `a8ad15724cca NF09 harden H2 tunnel lifecycle`
 
+### Patch NF-UPSTREAM-006
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/base/nsIProxyInfo.idl
+netwerk/protocol/http/ConnectionAttemptPool.cpp
+netwerk/protocol/http/nsHttpConnectionInfo.h
+netwerk/protocol/http/nsHttpTransaction.cpp
+netwerk/test/unit/test_http3_proxy_strict.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Allow a privileged caller to require an HTTP/3 proxy without Necko opening or
+switching to an HTTPS/H2 fallback route.
+
+Why project-only code was insufficient:
+
+An H3 proxy transaction creates a timed HTTPS backup connection by default,
+and its generic restart path converts a `masque` proxy info into `https`.
+Rejecting H2 only after the channel completes would still put fallback TCP
+traffic on the wire and would not satisfy strict protocol selection.
+
+Implementation and behavioral risk:
+
+- add an opt-in proxy flag which is preserved by the existing proxy-info clone
+  and IPC serialization;
+- suppress the H3-proxy backup timer and the `masque` to `https` conversion
+  only when that flag is present;
+- explicitly disable Happy Eyeballs selection for a flagged transaction and
+  reject that connection-attempt path defensively even if a caller supplied a
+  preconfigured connection info;
+- leave ordinary Firefox H3 fallback, origin H3, and unflagged proxy channels
+  unchanged.
+
+Tests:
+
+- an unavailable UDP/H3 proxy with an available H2 proxy on the same port must
+  fail instead of returning the H2 target response, with Happy Eyeballs enabled
+  globally during the test;
+- the existing H3 proxy fallback suite remains enabled for unflagged channels.
+
+Commit: `a981e07b81ce NF-H3-03 require strict Necko H3 proxy selection`
+
+### Patch NF-UPSTREAM-007
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/test/http3server/src/main.rs
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Make raw regular CONNECT over an HTTP/3 proxy reliably deliver its async input
+and output streams, including through the main-thread-safe pipes used by a JS
+upgrade listener.
+
+Why project-only code was insufficient:
+
+`InputStreamTunnel::AsyncWait()` and `OutputStreamTunnel::AsyncWait()` notified
+the H3 session before storing the new callback. That notification can reenter
+`Http3Session::SendData()` synchronously. The resulting callback-free
+`ReadSegments()` iteration reported success without moving a byte and
+immediately queued itself again, spinning the socket thread before the raw
+tunnel consumer could run.
+
+Implementation and behavioral risk:
+
+- publish each async callback before notifying the H3 stream that input or
+  output is wanted;
+- preserve a callback consumed by a reentrant `OnSocketReady()` call instead
+  of accidentally restoring it after notification;
+- leave ordinary H3 transactions and callback-free waits unchanged.
+
+The test-only H3 proxy response echoes a fixed `padding` marker when that
+request header is present and rejects synthetic `ALPN`, `Upgrade`, or
+`Connection` markers in the same request. It does not change production proxy
+behavior.
+
+Tests:
+
+- focused empty-protocol raw H3 CONNECT obtains async streams, writes a known
+  HTTP request, and verifies the deterministic tunneled response;
+- request and response CONNECT `padding` metadata are checked;
+- the outer channel is asserted to be HTTP/3 and no synthetic upgrade marker
+  is accepted by the test proxy;
+- the existing H3 proxy transfer tests through large-data coverage remain
+  green before their pre-existing connection-refused timeout case.
+
+Commit: `5d889d177561 NF-H3-04 expose raw HTTP/3 CONNECT streams`
+
+### Patch NF-UPSTREAM-008
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/protocol/http/Http3StreamTunnel.h
+third_party/rust/neqo-http3/src/connection.rs
+third_party/rust/neqo-http3/.cargo-checksum.json
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+```
+
+Purpose:
+
+Give a raw regular HTTP/3 CONNECT tunnel byte-stream half-close semantics: a
+successful close of its output stream sends QUIC FIN while its input stream
+continues delivering the proxy response.
+
+Why project-only code was insufficient:
+
+The H3 tunnel output stream previously mapped every close to
+`CancelFetch()`, which resets both directions. Reusing the normal Neqo
+send-side close exposed a second issue: classic CONNECT and true extended
+CONNECT share `Http3StreamType::ExtendedConnect`, and Neqo removed the receive
+handler before checking whether the stream actually belonged to a
+WebTransport or CONNECT-UDP session. The server's response remained visible
+on the QUIC wire but could no longer produce `DataReadable`.
+
+Implementation and behavioral risk:
+
+- map only a successful **connect-only** tunnel output close to Neqo's existing
+  `stream_close_send()` path; failed closes retain full-stream cancellation;
+- retain the opposite stream handler when closing one side of classic
+  CONNECT, while preserving coupled lifecycle for actual extended-connect
+  sessions;
+- update the vendored Cargo checksum for the changed Neqo source;
+- leave ordinary HTTP requests, WebTransport, CONNECT-UDP, and full tunnel
+  cancellation unchanged.
+
+The `NS_HTTP_CONNECT_ONLY` scope is intentional. Ordinary Firefox HTTP
+channels that happen to traverse an H3 proxy also use `Http3StreamTunnel`, but
+retain their pre-existing coupled transport lifecycle.
+
+Tests:
+
+- focused raw H3 xpcshell test closes the request send-side before reading and
+  still receives the deterministic response;
+- the strict local Caddy H3-only runner verifies request FIN, delayed response,
+  response FIN, marker integrity, and authentication failure over UDP/QUIC;
+- full `gkrust`, `libxul`, and NaiveFox binary builds pass.
+
+Commit: `43aa7e8a09ff NF-H3-05 preserve classic CONNECT input after H3 half-close`
+
+Scope correction:
+`f0da0115d59c NF-H3-15 scope tunnel lifecycle changes to raw CONNECT`
+
+### Patch NF-UPSTREAM-009
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3Session.cpp
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/protocol/http/Http3StreamTunnel.h
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+```
+
+Purpose:
+
+Bound raw HTTP/3 tunnel buffering under a slow consumer and preserve the
+receive direction when the CONNECT peer sends `STOP_SENDING` after completing
+its response.
+
+Why project-only code was insufficient:
+
+The application pump already bounded its own buffers, but the H3 tunnel could
+continue draining Neqo into an unbounded `SimpleBuffer`. During a 32 MiB slow
+download Caddy then sent `STOP_SENDING(H3_REQUEST_CANCELLED)` after target
+completion. The generic session path treated that send-direction signal as a
+full request-stream cancellation and discarded response bytes which the slow
+consumer had not yet read. The public tunnel input stream also returned an
+error from `Available()` instead of its buffered byte count.
+
+Implementation and behavioral risk:
+
+- cap only a connect-only tunnel's slow-consumer buffer at 256 KiB and resume
+  Neqo reads after the application drains it;
+- for connect-only tunnels, retain a received FIN until all bytes already
+  buffered by the tunnel have reached the consumer;
+- treat `STOP_SENDING` on a connect-only regular CONNECT tunnel as closing
+  only its sending direction, while leaving the receive direction available;
+- report the current tunnel buffer size through `Available()`;
+- leave ordinary H3 requests, WebTransport, CONNECT-UDP, and non-tunnel reset
+  handling unchanged.
+
+The final scope guard uses the transaction's `NS_HTTP_CONNECT_ONLY` cap. A
+control build with these H3 tunnel changes fully reverted reproduced the
+frozen snapshot's ordinary-channel concurrent H3-proxy timeout identically;
+the scope guard nevertheless ensures NaiveFox lifecycle and buffering policy
+cannot alter normal Firefox proxy channels.
+
+The change is deliberately H3-specific and does not copy the H2 flow-control
+implementation. Neqo remains responsible for QUIC stream and connection flow
+control.
+
+Tests:
+
+- focused raw H3 xpcshell regression slowly drains a 512 KiB response in 4 KiB
+  callbacks after output half-close and verifies every byte;
+- deterministic 32 MiB slow download and upload integrity checks;
+- bounded-RSS gate after a warm-up tunnel;
+- local disconnect, response-after-half-close, target early close, timeout,
+  ACL denial, proxy loss, and four concurrent H3 CONNECT streams on one QUIC
+  connection;
+- the same full robustness workload passes in H2 mode.
+
+Commit: `17ca8b746802 NF-H3-09 bound H3 tunnel backpressure and receive lifecycle`
+
+Scope correction:
+`f0da0115d59c NF-H3-15 scope tunnel lifecycle changes to raw CONNECT`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:

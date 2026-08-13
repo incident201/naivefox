@@ -730,6 +730,16 @@ The reproducible procedure and 2026-08-12 comparison record are in
 `CAPTURE.md`; `test/integration/run-capture-comparison.sh` performs the capture,
 safe extraction, assertions, and sensitive-data cleanup.
 
+The strict HTTP/3 equivalent is complete. Ordinary Firefox and NaiveFox from
+the same build family both used QUIC v1 and `h3`; semantic TLS configuration,
+client QUIC transport parameters, and HTTP/3/QPACK settings matched. Two
+classic CONNECT request streams shared one NaiveFox QUIC connection, padding
+was visible in both header directions, and no synthetic marker header existed.
+The independent passive pass used no key log and established no TCP session.
+See `H3-CAPTURE.md` and
+`test/integration/run-h3-capture-comparison.sh`; raw pcaps, keys, profiles,
+bodies, screenshots, and logs were deleted after aggregation.
+
 ---
 
 ## Phase 11 — prototype packaging
@@ -789,6 +799,79 @@ runtime smoke test without inheriting build-tree loader paths.
 
 ---
 
+## Phase 12 — HTTP/3/QUIC through Necko and Neqo
+
+This phase starts from the immutable `h2-prototype-v0.1` tag on
+`feature/h3`. It does not update the Firefox snapshot or introduce a second
+client architecture.
+
+### M12.1 Document and select the transport
+
+- [x] Record the current Firefox H3 HTTPS-proxy, classic CONNECT,
+  `Http3StreamTunnel`, Neqo, header, and socket-process paths in
+  `H3-DESIGN.md`.
+- [x] Add `--protocol h2|h3|auto` to the existing executable and pass the
+  selection through the existing runner, SOCKS server, connection, and tunnel
+  layers.
+- [x] Preserve `h2` as the default.
+- [x] Log only the selected outer protocol, never credentials or
+  `Proxy-Authorization`.
+- [x] Make strict H3 suppress the timed backup, restart conversion, and Happy
+  Eyeballs TCP route while leaving ordinary Firefox fallback unchanged.
+- [x] Make Auto retry H2 exactly once only before any CONNECT response or
+  tunnel transport is observed.
+
+### M12.2 Raw regular CONNECT over H3
+
+- [x] Use Firefox `masque` proxy metadata only to select the existing HTTPS
+  H3 proxy transport; send classic HTTP CONNECT, not CONNECT-UDP or MASQUE.
+- [x] Obtain async bidirectional streams through `Http3StreamTunnel` with an
+  empty raw-upgrade token.
+- [x] Verify CONNECT 200, known marker I/O, response metadata, and absence of
+  synthetic `ALPN`, `Upgrade`, and `Connection` headers.
+- [x] Verify request and response `padding` header names through the common
+  CONNECT-header path.
+- [x] Cover strict failure without H2 fallback.
+
+### M12.3 Shared SOCKS, padding, and lifecycle
+
+- [x] Reuse `Socks5Parser`, `SocksServer`, `SocksConnection`, `DuplexPump`,
+  `HeaderPadding`, `PaddingNegotiation`, and the Variant 1 codec unchanged at
+  the protocol boundary.
+- [x] Verify HTTP and HTTPS targets, remote hostnames, the first eight framed
+  records in each direction, and raw traffic afterward.
+- [x] Verify 32 MiB slow download/upload integrity and bounded resident-memory
+  growth.
+- [x] Verify local disconnect, target early close, proxy loss, timeout,
+  authentication/ACL failures, and response after client half-close.
+- [x] Verify concurrent classic CONNECT streams share one Necko-owned QUIC
+  socket; do not add a project connection pool.
+- [x] Keep the full H2 workload green.
+
+### M12.4 Deterministic fixture and suites
+
+- [x] Add isolated fixture modes: H2 uses TCP `h1 h2`; strict H3 uses an
+  H3-only UDP listener and no TCP listener on the same proxy port.
+- [x] Add separate raw, SOCKS, padding, robustness, Auto, H3 aggregate, and
+  H2+H3 aggregate runners.
+- [x] Pass focused H3 xpcshell tests, project gtests, strict H3 local tests,
+  the equivalent H2 regression workload, and a warning-free binary build.
+- [x] Verify the same staged runtime outside the object directory in strict H2
+  and strict H3 modes; Neqo remains inside `libxul` and needs no second binary.
+
+### M12.5 Measurement and deployment gates
+
+- [x] Benchmark strict H3 NaiveFox against the pinned official NaiveProxy with
+  integrity-checked sequential and parallel local transfers.
+- [x] Compare decrypted Firefox/NaiveFox H3 internals and separate passive
+  observer-visible QUIC traffic; retain only sanitized aggregates.
+- [x] Complete an exactly 600-second strict-H3 soak against the supplied real
+  Caddy with periodic small/parallel loads and idle windows.
+- [x] Record commands, results, limitations, memory, runtime size, and all
+  Firefox modifications in the project Markdown reports.
+
+---
+
 # Final prototype acceptance suite
 
 The H2 prototype is complete only when this full sequence can be reproduced:
@@ -819,13 +902,21 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
 
-Local status on 2026-08-12: items 1-20 and 22-25 pass. Item 21, supplied real
-Caddy interoperability, is pending because no external endpoint or credentials
-have been supplied. Run all reproducible local integration gates sequentially
-with:
+Final prototype status on 2026-08-13: all items 1-25 pass. In particular, the
+supplied real Caddy passed normal public-certificate validation, the H2
+interoperability workload and ten-minute H2 soak, and the strict-H3
+preflight plus exactly 600-second H3 soak without hidden H2 fallback. Commands,
+integrity gates, load schedules, resource measurements, and sanitized results
+are recorded in `TEST-REPORT.md`. Current architectural constraints and
+non-blocking observations are recorded in `KNOWN-ISSUES.md`.
+
+Run all reproducible local H2 and H3 integration gates sequentially with:
 
 ```bash
-./netwerk/naivefox/test/integration/run-local-suite.sh
+./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
-After this point, and only after user approval, future work may consider HTTP/3/Neqo, native Windows, Android, or size reduction.
+The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
+user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
+must not weaken any item in this H2 suite. Native Windows, Android, and size
+reduction remain future work.

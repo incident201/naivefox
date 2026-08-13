@@ -4,14 +4,20 @@ NaiveFox is an experimental headless proxy client built inside the Firefox/Gecko
 
 The prototype reuses Firefox's **real networking stack** instead of manually imitating a browser fingerprint:
 
-- **Necko** for HTTP networking and HTTP/2 behavior.
+- **Necko** for HTTP networking, HTTP/2, and HTTP/3 behavior.
 - **NSS/PSM** for TLS.
-- Firefox's normal HTTP/2 implementation, connection management, HPACK implementation, TLS parameters, and related network behavior.
+- Firefox's normal HTTP/2 and Neqo HTTP/3 implementations, connection
+  management, HPACK/QPACK, TLS parameters, and related network behavior.
 - A small NaiveFox-specific layer for the local SOCKS5 server, HTTP CONNECT tunnel orchestration, Naive padding compatibility, configuration, logging, and stream pumping.
 
 The first target is **Linux x86_64 only**. Development uses Firefox's normal `mach` build system and a supported Linux build environment.
 
-HTTP/3/QUIC/Neqo are deliberately **out of scope for the first prototype**.
+The tagged `h2-prototype-v0.1` baseline is preserved. The `feature/h3` stage
+adds strict HTTP/3/QUIC through the same executable and project architecture;
+there is no separate H3 client, SOCKS server, pool, or padding implementation.
+The combined H2/H3 prototype is recorded by `h2-h3-prototype-v0.2`. Current
+architectural constraints and non-blocking observations are centralized in
+[`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
 
 ## Repository model
 
@@ -57,8 +63,9 @@ NaiveFox
     |
     | Necko + NSS
     | HTTPS connection to proxy
-    | ALPN: h2
-    | HTTP/2 CONNECT target.example:443
+    | --protocol h2: TLS/TCP, ALPN h2
+    | --protocol h3: QUIC/UDP, ALPN h3
+    | regular HTTP CONNECT target.example:443
     v
 Existing Caddy + klzgrad/forwardproxy@naive
     |
@@ -75,7 +82,8 @@ export NAIVEFOX_PROXY_PASS='pass'
 ./run-naivefox \
   --profile /path/to/writable-nss-profile \
   --socks-listen 127.0.0.1:1080 \
-  --proxy https://proxy.example.com:443
+  --proxy https://proxy.example.com:443 \
+  --protocol h3
 
 curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 ```
@@ -119,7 +127,13 @@ The local fixture runs directly in the provided Linux build environment and uses
 
 The fixture must not install its CA globally, modify a normal Firefox profile, disable certificate validation, start a system Caddy service, or expose an open proxy. Generated Caddy binaries, CA material, credentials, NSS databases, logs, and captures belong under the object directory and are not committed.
 
-The automated runner must cover certificate rejection/trust, ALPN `h2`, Basic Auth success and failure, raw CONNECT, SOCKS with remote hostname semantics, padding negotiation, padded traffic, deterministic transfer hashes, concurrency, and shutdown paths. The supplied real server is tested only after the local suite passes.
+The automated runners cover certificate rejection/trust, strict `h2` and
+strict `h3`, Basic Auth success and failure, raw CONNECT, SOCKS remote-hostname
+semantics, padding negotiation, deterministic transfer hashes, concurrency,
+backpressure, half-close, and shutdown paths. H3-only fixture mode exposes a
+UDP listener with no TCP listener on the proxy port, so hidden H2 fallback
+cannot make a strict H3 test pass. The supplied real server is tested only
+after the local suite passes.
 
 Run the bounded real-deployment gate with credentials supplied only through the
 environment:
@@ -139,9 +153,22 @@ credential-free summary is copied to the ignored `artifacts/` directory. Set
 `NAIVEFOX_REAL_DURATION_SECONDS` to a bounded value from 30 through 300 when a
 shorter or longer manual session is needed.
 
+The strict H3 real-deployment soak is a separate ten-minute gate. It first
+proves H3 and transfer integrity, then observes the same process for exactly
+600 seconds with periodic small and parallel requests, two deliberate idle
+windows, resource sampling, and a requirement that the proxy path uses UDP
+without a TCP fallback:
+
+```bash
+NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
+NAIVEFOX_REAL_PROXY_USER=user \
+NAIVEFOX_REAL_PROXY_PASS=secret \
+netwerk/naivefox/test/integration/run-real-server-h3-soak.sh
+```
+
 `netwerk/naivefox/tools/fetch-naiveproxy-reference.sh` downloads the pinned
-current official Linux client and verifies the GitHub release SHA-256. It is a
-behavioral reference for protocol investigation, not a wire-shaping target.
+official Linux client and verifies the GitHub release SHA-256. It is a
+behavioral and performance reference, not a wire-shaping target.
 NaiveFox deliberately does not copy Chromium-specific preambles or camouflage:
 its TLS and HTTP/2 behavior must continue to come from Firefox Necko/NSS.
 `run-reference-server-tests.sh` applies a separate, bounded long-lived workload
@@ -152,13 +179,10 @@ See `AGENTS.md` for fixture construction and trust procedure, `ROADMAP.md` for
 milestone acceptance gates, and `TEST-REPORT.md` for the committed local,
 real-deployment, reference-client, and packaged-runtime results.
 
-## Non-goals for the first prototype
+## Non-goals
 
 The first prototype does **not** need:
 
-- HTTP/3.
-- QUIC.
-- Neqo integration.
 - Android support.
 - Windows-native support.
 - TUN/TAP support.
@@ -174,7 +198,9 @@ The first prototype does **not** need:
 - Full resistance to traffic analysis.
 - Production hardening.
 
-The project should first prove that the architecture works correctly.
+The H3 stage deliberately does not implement CONNECT-UDP, MASQUE,
+WebTransport, UDP ASSOCIATE, a standalone Neqo client, or manual QUIC
+fingerprint shaping.
 
 ## Why Firefox instead of Chromium
 
@@ -463,8 +489,18 @@ environment-only credentials:
 obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
   --profile /path/to/nss-profile \
   --socks-listen 127.0.0.1:1080 \
-  --proxy https://proxy.example:443
+  --proxy https://proxy.example:443 \
+  --protocol h2
 ```
+
+`--protocol h2` is the compatibility-preserving default. `--protocol h3`
+requires a Necko/Neqo HTTP/3 proxy connection and never silently falls back to
+H2. `--protocol auto` first makes the same strict H3 attempt and retries once
+with H2 only when transport establishment fails before any CONNECT response or
+tunnel transport is observed. Authentication, ACL, target, CONNECT 200, and
+established-tunnel failures never trigger fallback. Each successful tunnel
+logs only `Outer protocol: h2` or `Outer protocol: h3`; credentials and proxy
+authorization are never logged.
 
 `--max-connections N` is an optional finite-run test control. Omitting it
 keeps the loopback SOCKS listener running. The value counts total accepted
@@ -472,13 +508,14 @@ SOCKS connections over the lifetime of the process; it is not a parallel or
 production concurrency limit. Normal long-lived use should omit the option.
 
 The raw-tunnel diagnostic creates an explicit HTTPS proxy through Necko,
-requires outer `h2`, and obtains the successful CONNECT as asynchronous Gecko
-streams. Credentials come only from `NAIVEFOX_PROXY_USER` and
-`NAIVEFOX_PROXY_PASS`. The reproducible local authentication and bidirectional
-stream test is:
+requires the selected outer protocol, and obtains regular CONNECT as
+asynchronous Gecko streams. Credentials come only from
+`NAIVEFOX_PROXY_USER` and `NAIVEFOX_PROXY_PASS`. The reproducible local
+authentication and bidirectional stream tests are:
 
 ```bash
 netwerk/naivefox/test/integration/run-raw-connect-tests.sh
+netwerk/naivefox/test/integration/run-h3-raw-connect-tests.sh
 ```
 
 For this internal path, `setConnectOnly(false)` is followed by
@@ -489,9 +526,13 @@ proxy's resolve flags must carry both HTTPS-proxy preference and always-tunnel
 semantics; the similarly named `nsIProxyInfo` connection flags are not a
 substitute.
 
-The socket process and HTTP/3 are disabled only for this first in-process H2
-prototype. Necko still owns HTTP, connection management, and HTTP/2, and PSM/NSS
-still owns certificate verification and TLS.
+Single-process networking is the explicit architecture of the current Linux
+prototype, not an accidental fallback. The socket process remains disabled,
+and both `Http2StreamTunnel` and `Http3StreamTunnel` operate successfully in
+the parent process. Necko owns HTTP and connection pooling, Neqo owns
+QUIC/HTTP3, and PSM/NSS owns certificate verification and TLS. See
+`H3-DESIGN.md` for the exact source path, `KNOWN-ISSUES.md` for the boundary of
+this choice, and `UPSTREAM.md` for the minimal focused Firefox changes.
 
 Packaging/minimization comes only after the network prototype works.
 
@@ -543,19 +584,30 @@ Relevant current Firefox source paths:
 - `netwerk/protocol/http/nsHttpConnection.cpp`
 - `netwerk/protocol/http/Http2Session.cpp`
 - `netwerk/protocol/http/Http2StreamTunnel.cpp`
+- `netwerk/protocol/http/Http3Session.cpp`
+- `netwerk/protocol/http/Http3StreamTunnel.cpp`
+- `netwerk/protocol/http/Http3TransportLayer.cpp`
 - `netwerk/test/unit/test_proxyconnect.js`
 - `netwerk/test/unit/test_proxyconnect_headers.js`
 
 Source code changes over time. Always verify current `main`; never copy line numbers or old assumptions blindly.
 
-## Definition of the first complete prototype
+## Definition of the complete H2/H3 prototype
 
 As of 2026-08-13, every local-fixture, codec, robustness, capture, staging, and
 supplied-real-Caddy milestone is implemented and passes in the supported Linux
 x86-64 environment. Extended local throughput, passive-observer, and
 10-minute real-deployment stability tests also pass.
 
-The first prototype is complete when all of the following are demonstrated on Linux x86_64:
+The H2 baseline remains defined by the list below. The H3 stage additionally
+requires one `naivefox` executable to pass strict H2, strict H3, and bounded
+Auto tests; use UDP/QUIC with no TCP fallback in strict H3; reuse the same
+SOCKS, padding codec, and bounded duplex pump; multiplex concurrent regular
+CONNECT streams on a Necko-owned H3 session; pass half-close, slow producer,
+slow consumer, large-transfer, and proxy-loss tests; and run outside the
+object directory from the same staged package.
+
+The prototype is complete when all of the following are demonstrated on Linux x86_64:
 
 1. A clean upstream Firefox checkout can be bootstrapped and built.
 2. `naivefox` builds as part of the Firefox tree.
@@ -585,22 +637,31 @@ Run the complete local integration gate with:
 
 ```bash
 ./netwerk/naivefox/test/integration/run-local-suite.sh
+./netwerk/naivefox/test/integration/run-h3-suite.sh
+./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
 The capture phase requires the restricted `dumpcap` capabilities documented
-in `CAPTURE.md`. The command builds or reuses the pinned fixture dependencies,
-runs all local functional and failure-path suites sequentially, and deletes
-sensitive run material after every successful phase.
+in `CAPTURE.md`. The H3-specific decrypted and no-keylog comparison is in
+`H3-CAPTURE.md` and is reproduced by
+`test/integration/run-h3-capture-comparison.sh`. The commands build or reuse
+the pinned fixture dependencies, run local functional and failure-path suites
+sequentially, and delete sensitive run material after every successful phase.
 
 Additional repeatable test entry points are:
 
 ```bash
 ./netwerk/naivefox/test/integration/run-throughput-benchmark.sh
+./netwerk/naivefox/test/integration/run-h3-throughput-benchmark.sh
 ./netwerk/naivefox/test/integration/run-observer-comparison.sh
 NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
 NAIVEFOX_REAL_PROXY_USER=user \
 NAIVEFOX_REAL_PROXY_PASS=secret \
 ./netwerk/naivefox/test/integration/run-real-server-soak.sh
+NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
+NAIVEFOX_REAL_PROXY_USER=user \
+NAIVEFOX_REAL_PROXY_PASS=secret \
+./netwerk/naivefox/test/integration/run-real-server-h3-soak.sh
 ```
 
 The committed outcomes and limitations are recorded in

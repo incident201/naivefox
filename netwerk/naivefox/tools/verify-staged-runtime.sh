@@ -173,6 +173,15 @@ if [[ -n $fetch_url ]]; then
     --profile "$profile_dir" --fetch "$fetch_url"
 fi
 
+for protocol in h2 h3; do
+  env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
+    NAIVEFOX_RUNTIME="$runtime_dir/run-naivefox" \
+    NAIVEFOX_EXPECT_RUNTIME_DIR="$runtime_dir" \
+    "$source_root/netwerk/naivefox/test/integration/run-padded-tests.sh" \
+    --protocol "$protocol"
+  assert_clean_tree "$runtime_dir"
+done
+
 assert_clean_tree "$runtime_dir"
 printf 'staged NaiveFox runtime verified outside the build tree: %s\n' \
   "$runtime_dir"

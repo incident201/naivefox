@@ -122,4 +122,10 @@ interface nsIProxyInfo : nsISupports
    * through the proxy.
    */
   const unsigned short ALWAYS_TUNNEL_VIA_PROXY = 1 << 1;
+
+  /**
+   * When set on an HTTP/3 proxy, do not create or switch to an HTTPS proxy
+   * fallback connection.
+   */
+  const unsigned short DISABLE_HTTP3_PROXY_FALLBACK = 1 << 2;
 };

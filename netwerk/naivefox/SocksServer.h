@@ -7,6 +7,7 @@
 
 #include <cstdint>
 
+#include "ProxyProtocol.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
 
@@ -15,7 +16,7 @@ namespace mozilla::naivefox {
 nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
                         const nsACString& aProxyUser,
                         const nsACString& aProxyPassword,
-                        uint32_t aMaxConnections);
+                        uint32_t aMaxConnections, ProxyProtocol aProtocol);
 
 }  // namespace mozilla::naivefox
 

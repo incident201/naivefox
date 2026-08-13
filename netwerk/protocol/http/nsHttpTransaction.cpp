@@ -255,6 +255,10 @@ nsresult nsHttpTransaction::Init(
   MOZ_POP_THREAD_SAFETY
   mConsumerTarget = target;
   mCaps = caps;
+  if (mConnInfo->DisablesHttp3ProxyFallback()) {
+    mCaps &= ~NS_HTTP_USE_HAPPY_EYEBALLS;
+    mConnInfo->SetHappyEyeballsEnabled(false);
+  }
 
   mParentIPAddressSpace = aParentIpAddressSpace;
   mLnaPermissionStatus = aLnaPermissionStatus;
@@ -434,7 +438,8 @@ void nsHttpTransaction::OnPendingQueueInserted(
   // enabled. The Happy Eyeballs state machine will handle fallback to h2.
   if ((mConnInfo->IsHttp3() || mConnInfo->IsHttp3ProxyConnection()) &&
       !mOrigConnInfo && !mConnInfo->GetWebTransport() &&
-      !(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS)) {
+      !(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS) &&
+      !mConnInfo->DisablesHttp3ProxyFallback()) {
     // Backup timer should only be created once.
     if (!mHttp3BackupTimerCreated) {
       CreateAndStartTimer(mHttp3BackupTimer, this,
@@ -2017,7 +2022,8 @@ nsresult nsHttpTransaction::Restart() {
   mReuseOnRestart = false;
 
   if (!mDoNotRemoveAltSvc && !mDontRetryWithDirectRoute) {
-    if (mConnInfo->IsHttp3ProxyConnection()) {
+    if (mConnInfo->IsHttp3ProxyConnection() &&
+        !mConnInfo->DisablesHttp3ProxyFallback()) {
       RefPtr<nsHttpConnectionInfo> ci =
           mConnInfo->CreateConnectUDPFallbackConnInfo();
       mConnInfo = ci;
@@ -3809,6 +3815,10 @@ void nsHttpTransaction::OnHttp3BackupTimer() {
   MOZ_ASSERT(mConnInfo->IsHttp3() || mConnInfo->IsHttp3ProxyConnection());
 
   mHttp3BackupTimer = nullptr;
+
+  if (mConnInfo->DisablesHttp3ProxyFallback()) {
+    return;
+  }
 
   if (mConnInfo->IsHttp3ProxyConnection()) {
     mBackupConnInfo = mConnInfo->CreateConnectUDPFallbackConnInfo();

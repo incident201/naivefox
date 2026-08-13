@@ -5,26 +5,28 @@
 #ifndef netwerk_naivefox_NeckoTunnel_h
 #define netwerk_naivefox_NeckoTunnel_h
 
+#include "ProxyProtocol.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
 
 class nsIHttpUpgradeListener;
+class nsIRequest;
 class nsIStreamListener;
 
 namespace mozilla::naivefox {
 
-nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
-                         const nsACString& aTargetAuthority,
-                         const nsACString& aProxyUser,
-                         const nsACString& aProxyPassword,
-                         nsIHttpUpgradeListener* aUpgradeListener,
-                         nsIStreamListener* aChannelListener,
-                         const nsACString& aConnectPadding);
+nsresult OpenNeckoTunnel(
+    const nsACString& aProxyUrl, const nsACString& aTargetAuthority,
+    const nsACString& aProxyUser, const nsACString& aProxyPassword,
+    nsIHttpUpgradeListener* aUpgradeListener,
+    nsIStreamListener* aChannelListener, const nsACString& aConnectPadding,
+    ProxyProtocol aProtocol, nsIRequest** aOpenedRequest = nullptr);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,
                            const nsACString& aProxyUser,
-                           const nsACString& aProxyPassword);
+                           const nsACString& aProxyPassword,
+                           ProxyProtocol aProtocol);
 
 }  // namespace mozilla::naivefox
 
