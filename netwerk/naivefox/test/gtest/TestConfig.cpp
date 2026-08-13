@@ -21,10 +21,11 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_EQ(config.mListeners[0].mType, ListenerType::Socks5);
   EXPECT_TRUE(config.mListeners[0].mHost.EqualsLiteral("127.0.0.1"));
   EXPECT_EQ(config.mListeners[0].mPort, 1080);
-  EXPECT_EQ(config.mProtocol, ProxyProtocol::H2);
-  EXPECT_TRUE(config.mProxyUrl.EqualsLiteral("https://example.com:443"));
-  EXPECT_TRUE(config.mProxyUser.EqualsLiteral("user"));
-  EXPECT_TRUE(config.mProxyPassword.EqualsLiteral("pass"));
+  ASSERT_EQ(config.mProxies.Length(), 1U);
+  EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H2);
+  EXPECT_TRUE(config.mProxies[0].mUrl.EqualsLiteral("https://example.com:443"));
+  EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user"));
+  EXPECT_TRUE(config.mProxies[0].mPassword.EqualsLiteral("pass"));
   EXPECT_EQ(config.mLogMode, RuntimeLogMode::Disabled);
 }
 
@@ -41,8 +42,9 @@ TEST(NaiveFoxConfig, MixedListenersQuicAndConsoleLog)
   ASSERT_EQ(config.mListeners.Length(), 2U);
   EXPECT_EQ(config.mListeners[0].mType, ListenerType::Socks5);
   EXPECT_EQ(config.mListeners[1].mType, ListenerType::HttpConnect);
-  EXPECT_EQ(config.mProtocol, ProxyProtocol::H3);
-  EXPECT_TRUE(config.mProxyUrl.EqualsLiteral("https://192.0.2.1:8443"));
+  ASSERT_EQ(config.mProxies.Length(), 1U);
+  EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H3);
+  EXPECT_TRUE(config.mProxies[0].mUrl.EqualsLiteral("https://192.0.2.1:8443"));
   EXPECT_EQ(config.mLogMode, RuntimeLogMode::Console);
 }
 
@@ -59,7 +61,9 @@ TEST(NaiveFoxConfig, IPv6AndFileLog)
   ASSERT_EQ(config.mListeners.Length(), 1U);
   EXPECT_TRUE(config.mListeners[0].mIPv6);
   EXPECT_TRUE(config.mListeners[0].mHost.EqualsLiteral("::1"));
-  EXPECT_TRUE(config.mProxyUrl.EqualsLiteral("https://[2001:db8::1]:9443"));
+  ASSERT_EQ(config.mProxies.Length(), 1U);
+  EXPECT_TRUE(
+      config.mProxies[0].mUrl.EqualsLiteral("https://[2001:db8::1]:9443"));
   EXPECT_EQ(config.mLogMode, RuntimeLogMode::File);
   EXPECT_TRUE(config.mLogPath.EqualsLiteral("/tmp/naivefox.log"));
 }
@@ -74,8 +78,57 @@ TEST(NaiveFoxConfig, PercentEncodedCredentials)
           config, error),
       NS_OK)
       << error.get();
-  EXPECT_TRUE(config.mProxyUser.EqualsLiteral("user@name"));
-  EXPECT_TRUE(config.mProxyPassword.EqualsLiteral("p:/ss"));
+  ASSERT_EQ(config.mProxies.Length(), 1U);
+  EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user@name"));
+  EXPECT_TRUE(config.mProxies[0].mPassword.EqualsLiteral("p:/ss"));
+}
+
+TEST(NaiveFoxConfig, NonLoopbackAndWildcardListeners)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://0.0.0.0:1080","http://192.168.1.1:8080","http://[::]:8081"],"proxy":"https://user:pass@example.com"})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  ASSERT_EQ(config.mListeners.Length(), 3U);
+  EXPECT_TRUE(config.mListeners[0].mHost.EqualsLiteral("0.0.0.0"));
+  EXPECT_TRUE(config.mListeners[1].mHost.EqualsLiteral("192.168.1.1"));
+  EXPECT_TRUE(config.mListeners[2].mHost.EqualsLiteral("::"));
+  EXPECT_TRUE(config.mListeners[2].mIPv6);
+}
+
+TEST(NaiveFoxConfig, ProxyArrayMapsOneToOneToListeners)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://0.0.0.0:1080","http://0.0.0.0:8080"],"proxy":["https://first:secret@one.example","quic://second:secret@two.example:8443"]})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  ASSERT_EQ(config.mProxies.Length(), 2U);
+  EXPECT_TRUE(config.mProxies[0].mUrl.EqualsLiteral("https://one.example:443"));
+  EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H2);
+  EXPECT_TRUE(
+      config.mProxies[1].mUrl.EqualsLiteral("https://two.example:8443"));
+  EXPECT_EQ(config.mProxies[1].mProtocol, ProxyProtocol::H3);
+}
+
+TEST(NaiveFoxConfig, SingleProxyArrayIsShared)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://user:pass@example.com"]})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  ASSERT_EQ(config.mProxies.Length(), 1U);
 }
 
 TEST(NaiveFoxConfig, RejectsMalformedAndWrongTypes)
@@ -87,6 +140,9 @@ TEST(NaiveFoxConfig, RejectsMalformedAndWrongTypes)
       R"({"listen":42,"proxy":"https://u:p@example.com"})",
       R"({"listen":["socks://127.0.0.1:1080",42],"proxy":"https://u:p@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":false})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":[]})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":[42]})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":["https://u:p@one.example","https://u:p@two.example"]})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@example.com","log":true})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@example.com","extra":"x"})",
   };
@@ -103,7 +159,7 @@ TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
 {
   static constexpr const char* kInvalid[] = {
       R"({"listen":"ftp://127.0.0.1:1080","proxy":"https://u:p@example.com"})",
-      R"({"listen":"socks://0.0.0.0:1080","proxy":"https://u:p@example.com"})",
+      R"({"listen":"socks://proxy.example:1080","proxy":"https://u:p@example.com"})",
       R"({"listen":"socks://127.0.0.1","proxy":"https://u:p@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"http://u:p@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com"})",
@@ -111,6 +167,7 @@ TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:%zz@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@bad_host"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@-bad.example"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@one.example,https://u:p@two.example"})",
   };
   for (const char* json : kInvalid) {
     Config config;

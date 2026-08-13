@@ -23,14 +23,18 @@ struct ListenerConfig final {
   bool mIPv6 = false;
 };
 
+struct UpstreamProxyConfig final {
+  nsCString mUrl;
+  nsCString mUser;
+  nsCString mPassword;
+  ProxyProtocol mProtocol = ProxyProtocol::H2;
+};
+
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
 
 struct Config final {
   nsTArray<ListenerConfig> mListeners;
-  nsCString mProxyUrl;
-  nsCString mProxyUser;
-  nsCString mProxyPassword;
-  ProxyProtocol mProtocol = ProxyProtocol::H2;
+  nsTArray<UpstreamProxyConfig> mProxies;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;
 };

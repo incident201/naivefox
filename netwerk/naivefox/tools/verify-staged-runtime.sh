@@ -137,14 +137,14 @@ mkdir -m 0700 "$package_dir"
 cp -aL -- "$staged_dir/." "$package_dir/"
 assert_clean_tree "$package_dir"
 
-for required in naivefox run-naivefox runtime/naivefox \
+for required in naivefox runtime/naivefox \
   runtime/dependentlibs.list runtime/application.ini; do
   if [[ ! -f $package_dir/$required ]]; then
     printf 'staged runtime is missing %s\n' "$required" >&2
     exit 1
   fi
 done
-if [[ ! -x $package_dir/naivefox || ! -x $package_dir/run-naivefox ||
+if [[ ! -x $package_dir/naivefox ||
       ! -x $package_dir/runtime/naivefox ]]; then
   printf 'staged runtime executables are not executable\n' >&2
   exit 1

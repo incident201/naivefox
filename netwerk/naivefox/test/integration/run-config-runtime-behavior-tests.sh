@@ -29,17 +29,18 @@ free_port() {
 }
 
 write_config() {
-  local path=$1 port=$2 log_mode=$3 log_path=${4:-}
+  local path=$1 port=$2 log_mode=$3 log_path=${4:-} host=${5:-127.0.0.1}
   CONFIG_PATH=$path PROXY_PORT=$NAIVEFOX_FIXTURE_PROXY_PORT \
     PROXY_USER=$NAIVEFOX_FIXTURE_USER PROXY_PASS=$NAIVEFOX_FIXTURE_PASS \
-    LISTEN_PORT=$port LOG_MODE=$log_mode LOG_PATH=$log_path python3 - <<'PY'
+    LISTEN_PORT=$port LISTEN_HOST=$host LOG_MODE=$log_mode LOG_PATH=$log_path \
+    python3 - <<'PY'
 import json
 import os
 from pathlib import Path
 from urllib.parse import quote
 
 config = {
-    "listen": f"socks://127.0.0.1:{os.environ['LISTEN_PORT']}",
+    "listen": f"socks://{os.environ['LISTEN_HOST']}:{os.environ['LISTEN_PORT']}",
     "proxy": (
         "https://"
         + quote(os.environ["PROXY_USER"], safe="")
@@ -76,6 +77,35 @@ done
 [[ ! -s $quiet_output ]]
 [[ -d $state_root/naivefox/profile ]]
 [[ $(stat -c '%a' "$state_root/naivefox/profile") == 700 ]]
+kill "$client_pid"
+wait "$client_pid" || [[ $? -eq 143 ]]
+client_pid=
+
+bind_address=$(ip -4 -o addr show scope global | awk '
+  { split($4, fields, "/"); print fields[1]; exit }
+')
+[[ -n $bind_address ]]
+address_port=$(free_port)
+address_config="$run_dir/address-config.json"
+address_output="$run_dir/address-output.log"
+write_config "$address_config" "$address_port" absent '' "$bind_address"
+env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS -u SSLKEYLOGFILE \
+  NAIVEFOX_PROFILE="$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
+  MOZ_CRASHREPORTER_DISABLE=1 \
+  LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "$runtime" "$address_config" >"$address_output" 2>&1 &
+client_pid=$!
+for ((i = 0; i < 100; i++)); do
+  [[ -n $(ss -Hltn "sport = :$address_port") ]] && break
+  kill -0 "$client_pid"
+  sleep 0.1
+done
+ss -Hltn "sport = :$address_port" | rg -Fq "$bind_address:"
+[[ $(curl --silent --show-error --fail --noproxy '' \
+  --socks5-hostname "$bind_address:$address_port" \
+  "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small") == \
+  naivefox-fixture-small ]]
+[[ ! -s $address_output ]]
 kill "$client_pid"
 wait "$client_pid" || [[ $? -eq 143 ]]
 client_pid=

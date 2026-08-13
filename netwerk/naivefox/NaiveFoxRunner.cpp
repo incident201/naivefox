@@ -89,16 +89,28 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       return 2;
     }
 
+    mozilla::naivefox::ProxyProtocol runtimeProtocol =
+        mozilla::naivefox::ProxyProtocol::H2;
+    for (const auto& proxy : config.mProxies) {
+      if (proxy.mProtocol == mozilla::naivefox::ProxyProtocol::H3) {
+        runtimeProtocol = mozilla::naivefox::ProxyProtocol::H3;
+        break;
+      }
+    }
+
     mozilla::naivefox::GeckoRuntime runtime;
-    rv = runtime.Initialize(aArgc, aArgv, profile, config.mProtocol);
+    rv = runtime.Initialize(aArgc, aArgv, profile, runtimeProtocol);
     if (NS_SUCCEEDED(rv)) {
-      mozilla::naivefox::TunnelConfig tunnelConfig;
-      tunnelConfig.mProxyUrl = config.mProxyUrl;
-      tunnelConfig.mProxyUser = config.mProxyUser;
-      tunnelConfig.mProxyPassword = config.mProxyPassword;
-      tunnelConfig.mProtocol = config.mProtocol;
+      nsTArray<mozilla::naivefox::TunnelConfig> tunnelConfigs;
+      for (const auto& proxy : config.mProxies) {
+        auto& tunnelConfig = *tunnelConfigs.AppendElement();
+        tunnelConfig.mProxyUrl = proxy.mUrl;
+        tunnelConfig.mProxyUser = proxy.mUser;
+        tunnelConfig.mProxyPassword = proxy.mPassword;
+        tunnelConfig.mProtocol = proxy.mProtocol;
+      }
       rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
-                                                  tunnelConfig);
+                                                  tunnelConfigs);
     }
     if (NS_FAILED(rv)) {
       std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",

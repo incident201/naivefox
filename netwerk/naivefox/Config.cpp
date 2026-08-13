@@ -144,9 +144,7 @@ class JsonParser final {
           return Error("duplicate proxy field");
         }
         sawProxy = true;
-        nsAutoCString proxy;
-        MOZ_TRY(ParseString(proxy, "proxy must be a string"));
-        MOZ_TRY(ParseProxy(proxy, parsed));
+        MOZ_TRY(ParseProxies(parsed.mProxies));
       } else if (key.EqualsLiteral("log")) {
         if (sawLog) {
           return Error("duplicate log field");
@@ -177,6 +175,10 @@ class JsonParser final {
     }
     if (!sawProxy) {
       return Error("config requires a proxy field");
+    }
+    if (parsed.mProxies.Length() >= 2 &&
+        parsed.mProxies.Length() != parsed.mListeners.Length()) {
+      return Error("listen addresses do not match multiple proxies");
     }
     aConfig = std::move(parsed);
     return NS_OK;
@@ -424,15 +426,54 @@ class JsonParser final {
     }
     MOZ_TRY(ParseHostPort(endpoint, true, aListener.mHost, aListener.mIPv6,
                           aListener.mPort));
-    if (aListener.mIPv6) {
-      if (!aListener.mHost.EqualsLiteral("::1")) {
-        return Error("listener must bind to a loopback address");
-      }
-    } else if (!aListener.mHost.EqualsLiteral("127.0.0.1") &&
-               !aListener.mHost.EqualsLiteral("localhost")) {
-      return Error("listener must bind to a loopback address");
+    in_addr ipv4Address{};
+    if (!aListener.mIPv6 && !aListener.mHost.EqualsLiteral("localhost") &&
+        inet_pton(AF_INET, PromiseFlatCString(aListener.mHost).get(),
+                  &ipv4Address) != 1) {
+      return Error("listener host must be an IPv4 or IPv6 address");
     }
     return NS_OK;
+  }
+
+  nsresult ParseProxies(nsTArray<UpstreamProxyConfig>& aProxies) {
+    auto appendProxy = [&](const nsACString& aValue) -> nsresult {
+      if (aValue.IsEmpty()) {
+        return Error("proxy must not be empty");
+      }
+      if (aValue.FindChar(',') >= 0) {
+        return Error("multi-hop proxy chains are not supported");
+      }
+      UpstreamProxyConfig proxy;
+      MOZ_TRY(ParseProxy(aValue, proxy));
+      aProxies.AppendElement(std::move(proxy));
+      return NS_OK;
+    };
+
+    if (mPosition < mInput.Length() && mInput.CharAt(mPosition) == '"') {
+      nsAutoCString value;
+      MOZ_TRY(ParseString(value, "proxy must be a string or array"));
+      return appendProxy(value);
+    }
+    if (!Consume('[')) {
+      return Error("proxy must be a string or array");
+    }
+    SkipWhitespace();
+    if (Consume(']')) {
+      return Error("proxy array must not be empty");
+    }
+    while (true) {
+      nsAutoCString value;
+      MOZ_TRY(ParseString(value, "proxy array entries must be strings"));
+      MOZ_TRY(appendProxy(value));
+      SkipWhitespace();
+      if (Consume(']')) {
+        return NS_OK;
+      }
+      if (!Consume(',')) {
+        return Error("expected ',' or ']' in proxy array");
+      }
+      SkipWhitespace();
+    }
   }
 
   nsresult PercentDecode(const nsACString& aInput, nsACString& aOutput) {
@@ -465,16 +506,16 @@ class JsonParser final {
     return NS_OK;
   }
 
-  nsresult ParseProxy(const nsACString& aValue, Config& aConfig) {
+  nsresult ParseProxy(const nsACString& aValue, UpstreamProxyConfig& aProxy) {
     const int32_t schemeEnd = aValue.Find("://"_ns);
     if (schemeEnd <= 0) {
       return Error("proxy must be an absolute URI");
     }
     const nsDependentCSubstring scheme = Substring(aValue, 0, schemeEnd);
     if (scheme.EqualsLiteral("https")) {
-      aConfig.mProtocol = ProxyProtocol::H2;
+      aProxy.mProtocol = ProxyProtocol::H2;
     } else if (scheme.EqualsLiteral("quic")) {
-      aConfig.mProtocol = ProxyProtocol::H3;
+      aProxy.mProtocol = ProxyProtocol::H3;
     } else {
       return Error("unsupported proxy scheme");
     }
@@ -492,11 +533,10 @@ class JsonParser final {
     if (colon <= 0) {
       return Error("proxy URI requires username and password");
     }
-    MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aConfig.mProxyUser));
-    MOZ_TRY(
-        PercentDecode(Substring(userInfo, colon + 1), aConfig.mProxyPassword));
-    if (aConfig.mProxyUser.IsEmpty() || aConfig.mProxyPassword.IsEmpty() ||
-        aConfig.mProxyUser.FindChar(':') >= 0) {
+    MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aProxy.mUser));
+    MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1), aProxy.mPassword));
+    if (aProxy.mUser.IsEmpty() || aProxy.mPassword.IsEmpty() ||
+        aProxy.mUser.FindChar(':') >= 0) {
       return Error("proxy URI contains invalid credentials");
     }
 
@@ -511,15 +551,15 @@ class JsonParser final {
         !IsDomainName(host)) {
       return Error("proxy URI contains an invalid host");
     }
-    aConfig.mProxyUrl.AssignLiteral("https://");
+    aProxy.mUrl.AssignLiteral("https://");
     if (ipv6) {
-      aConfig.mProxyUrl.Append('[');
+      aProxy.mUrl.Append('[');
     }
-    aConfig.mProxyUrl.Append(host);
+    aProxy.mUrl.Append(host);
     if (ipv6) {
-      aConfig.mProxyUrl.Append(']');
+      aProxy.mUrl.Append(']');
     }
-    aConfig.mProxyUrl.AppendPrintf(":%u", static_cast<unsigned>(port));
+    aProxy.mUrl.AppendPrintf(":%u", static_cast<unsigned>(port));
     return NS_OK;
   }
 

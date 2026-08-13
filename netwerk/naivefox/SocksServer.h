@@ -18,6 +18,10 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
                              const TunnelConfig& aTunnelConfig,
                              uint32_t aMaxConnections = 0);
 
+nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
+                             const nsTArray<TunnelConfig>& aTunnelConfigs,
+                             uint32_t aMaxConnections = 0);
+
 nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
                         const nsACString& aProxyUser,
                         const nsACString& aProxyPassword,

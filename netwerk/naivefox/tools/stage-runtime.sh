@@ -154,8 +154,7 @@ printf '%s\n' \
   'runtime_dir="$package_dir/runtime"' \
   'export LD_LIBRARY_PATH="$runtime_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"' \
   'exec "$runtime_dir/naivefox" "$@"' >"$stage_dir/naivefox"
-cp -- "$stage_dir/naivefox" "$stage_dir/run-naivefox"
-chmod 0755 "$stage_dir/naivefox" "$stage_dir/run-naivefox"
+chmod 0755 "$stage_dir/naivefox"
 
 strip_tool=${NAIVEFOX_STRIP:-}
 if [[ -n $strip_tool ]]; then

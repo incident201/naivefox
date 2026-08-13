@@ -77,13 +77,13 @@ user = quote(os.environ["PROXY_USER"], safe="")
 password = quote(os.environ["PROXY_PASS"], safe="")
 config = {
     "listen": [
-        f"socks://127.0.0.1:{os.environ['SOCKS_PORT']}",
-        f"http://127.0.0.1:{os.environ['HTTP_PORT']}",
+        f"socks://0.0.0.0:{os.environ['SOCKS_PORT']}",
+        f"http://0.0.0.0:{os.environ['HTTP_PORT']}",
     ],
-    "proxy": (
+    "proxy": [(
         f"{os.environ['PROXY_SCHEME']}://{user}:{password}"
         f"@localhost:{os.environ['PROXY_PORT']}"
-    ),
+    )] * 2,
     "log": "",
 }
 path = Path(os.environ["CONFIG_PATH"])
@@ -123,8 +123,8 @@ else
 fi
 
 for ((i = 0; i < 150; i++)); do
-  if rg -q "^SOCKS5 listening on 127.0.0.1:$socks_port$" "$client_log" &&
-    rg -q "^HTTP CONNECT listening on 127.0.0.1:$http_port$" "$client_log"; then
+  if rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log" &&
+    rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"; then
     break
   fi
   kill -0 "$client_pid" 2>/dev/null || {
@@ -133,8 +133,10 @@ for ((i = 0; i < 150; i++)); do
   }
   sleep 0.1
 done
-rg -q "^SOCKS5 listening on 127.0.0.1:$socks_port$" "$client_log"
-rg -q "^HTTP CONNECT listening on 127.0.0.1:$http_port$" "$client_log"
+rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log"
+rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"
+ss -Hltn "sport = :$socks_port" | rg -q '0\.0\.0\.0:'
+ss -Hltn "sport = :$http_port" | rg -q '0\.0\.0\.0:'
 
 if [[ -n ${NAIVEFOX_EXPECT_RUNTIME_DIR:-} ]]; then
   expected_runtime=$(realpath -- "$NAIVEFOX_EXPECT_RUNTIME_DIR")

@@ -29,6 +29,7 @@
 #include "nsNetCID.h"
 #include "nsServiceManagerUtils.h"
 #include "nsThreadUtils.h"
+#include "prnetdb.h"
 
 namespace mozilla::naivefox {
 
@@ -622,9 +623,11 @@ NS_IMETHODIMP LocalListener::OnStopListening(nsIServerSocket* aServer,
 }  // namespace
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
-                             const TunnelConfig& aTunnelConfig,
+                             const nsTArray<TunnelConfig>& aTunnelConfigs,
                              uint32_t aMaxConnections) {
-  if (aListeners.IsEmpty()) {
+  if (aListeners.IsEmpty() || aTunnelConfigs.IsEmpty() ||
+      (aTunnelConfigs.Length() >= 2 &&
+       aTunnelConfigs.Length() != aListeners.Length())) {
     return NS_ERROR_INVALID_ARG;
   }
   nsCOMPtr<nsIEventTarget> socketTarget =
@@ -633,21 +636,39 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
     return NS_ERROR_FAILURE;
   }
   RefPtr state = new ServerState(aMaxConnections);
-  for (const auto& config : aListeners) {
+  for (size_t index = 0; index < aListeners.Length(); ++index) {
+    const auto& config = aListeners[index];
+    const auto& tunnelConfig =
+        aTunnelConfigs[aTunnelConfigs.Length() == 1 ? 0 : index];
     nsCOMPtr<nsIServerSocket> server =
         do_CreateInstance("@mozilla.org/network/server-socket;1");
     if (!server) {
       state->Shutdown();
       return NS_ERROR_FAILURE;
     }
-    nsresult rv = config.mIPv6 ? server->InitIPv6(config.mPort, true, -1)
-                               : server->Init(config.mPort, true, -1);
+    nsAutoCString bindHost(config.mHost);
+    if (bindHost.EqualsLiteral("localhost")) {
+      bindHost.AssignLiteral("127.0.0.1");
+    }
+    PRNetAddr bindAddress{};
+    if (PR_StringToNetAddr(bindHost.get(), &bindAddress) != PR_SUCCESS ||
+        (bindAddress.raw.family != PR_AF_INET &&
+         bindAddress.raw.family != PR_AF_INET6)) {
+      state->Shutdown();
+      return NS_ERROR_INVALID_ARG;
+    }
+    if (bindAddress.raw.family == PR_AF_INET6) {
+      bindAddress.ipv6.port = PR_htons(config.mPort);
+    } else {
+      bindAddress.inet.port = PR_htons(config.mPort);
+    }
+    nsresult rv = server->InitWithAddress(&bindAddress, -1);
     if (NS_FAILED(rv)) {
       state->Shutdown();
       return rv;
     }
     RefPtr listener =
-        new LocalListener(config, aTunnelConfig, socketTarget, state);
+        new LocalListener(config, tunnelConfig, socketTarget, state);
     rv = server->AsyncListen(listener);
     if (NS_FAILED(rv)) {
       state->Shutdown();
@@ -664,6 +685,14 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
   }
   state->Shutdown();
   return NS_OK;
+}
+
+nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
+                             const TunnelConfig& aTunnelConfig,
+                             uint32_t aMaxConnections) {
+  nsTArray<TunnelConfig> tunnelConfigs;
+  tunnelConfigs.AppendElement(aTunnelConfig);
+  return RunLocalProxyServer(aListeners, tunnelConfigs, aMaxConnections);
 }
 
 nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
