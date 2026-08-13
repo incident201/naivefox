@@ -19,15 +19,51 @@ authorization value, packet payload, or TLS key material.
 | Command | Result |
 |---|---|
 | `./mach build -j4 binaries` | PASS, 0 compiler warnings |
-| `./mach gtest Naive*` | PASS, 30/30 tests in 6 suites |
+| `./mach gtest 'Naive*'` | PASS, 45/45 tests in 9 suites |
 | `./mach xpcshell-test netwerk/test/unit/test_proxyconnect.js netwerk/test/unit/test_proxyconnect_headers.js netwerk/test/unit/test_proxyconnect_https.js netwerk/test/unit/test_proxyconnect_raw.js netwerk/test/unit/test_proxyconnect_padding_header.js` | PASS, 5/5 tests |
 | `git diff --check` | PASS |
 
-The gtests cover fragmented SOCKS5 parsing, padding negotiation, Variant 1
+The gtests cover strict config parsing, fragmented HTTP CONNECT and SOCKS5
+parsing, padding negotiation, Variant 1
 encoder/decoder boundaries, deterministic randomized round trips, truncation,
 partial drains, entropy failure, and CONNECT header-padding vectors. The
 xpcshell set covers existing proxy behavior plus raw HTTP/1.1 and HTTP/2
 CONNECT, exact CONNECT-only padding headers, response metadata, and stream I/O.
+
+## NaiveProxy-compatible config and local listeners
+
+The user-facing config stage changed only `netwerk/naivefox/`; it did not
+update the Firefox snapshot or add a Necko/Neqo patch. `SocksConnection` and
+the new `HttpConnectConnection` delegate all upstream attempts, CONNECT
+metadata, H2/H3/Auto policy, padding negotiation, transport barriers, and
+duplex pumping to one shared `TunnelSession`.
+
+| Gate | Result |
+|---|---|
+| Config parser gtests | PASS, string/array listeners, H2/H3 URI mapping, default/explicit port, IPv4/IPv6, percent credentials, log modes, and strict failures |
+| HTTP CONNECT parser gtests | PASS, arbitrary fragmentation, split CRLF, authorities, non-CONNECT, oversized headers, and early payload |
+| `run-h2-config-tests.sh` | PASS, one process, 10 padded H2 tunnels, SOCKS5 + HTTP CONNECT, 3 MiB downloads, 2 MiB uploads, mixed concurrency |
+| `run-h3-config-tests.sh` | PASS, the same workload over an H3-only UDP fixture, 10 padded H3 tunnels and no TCP fallback |
+| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, file log is `0600`, automatic profile is `0700` |
+| `run-full-suite.sh` | PASS in 311.9 seconds, including all pre-existing H2/H3, Auto, robustness, and capture gates plus config mode |
+
+The local HTTP listener returned 405 for an ordinary forward-proxy request and
+did not emit its 200 response until the upstream CONNECT had succeeded. The
+mixed phase ran two SOCKS and two HTTP tunnels concurrently. H2 reused one
+established outer TCP connection; strict H3 succeeded against a UDP-only
+listener where H2/TCP fallback could not satisfy the workload.
+
+The supplied real Caddy was then tested with the staged package and public CA
+validation. Each strict protocol run used one process with both listeners:
+
+| Protocol/config scheme | Result |
+|---|---|
+| H2 / `https://` | PASS, 8/8 padded tunnels, two normal HTTPS pages, direct/proxied integrity match, four mixed concurrent requests |
+| H3 / `quic://` | PASS, 8/8 padded tunnels, the same normal/integrity/concurrency workload, no H2 protocol selection |
+
+The endpoint and credentials were supplied only through the private generated
+config and were removed during cleanup. Neither appears in this report,
+runtime output, or retained summaries.
 
 ## HTTP/3 local prototype gate
 
@@ -62,11 +98,13 @@ and rejected SOCKS target; the runner requires those failures before reporting
 PASS. No credentials, response bodies, packet captures, or key material are
 retained in this report.
 
-The final core regression pass used a warning-free build, 33/33 project
+The H3-stage core regression pass used a warning-free build, 33/33 project
 gtests, and six sequential proxy-CONNECT xpcshell files: existing H1/H2
 CONNECT, header handling, HTTPS proxying, raw H1/H2 takeover, CONNECT padding,
 and the new raw H3 path all passed. The strict H3, IPv6 H3-proxy fallback, and
 HTTP/2-over-H3-proxy Firefox tests also passed.
+The subsequent config/listener stage expanded the warning-free project gate to
+45/45 gtests and reran the complete local H2/H3 integration suite.
 
 Two broader Mozilla tests expose frozen-snapshot limitations outside the
 NaiveFox classic-CONNECT path. `test_http3_proxy.js` passes 37 assertions and
@@ -212,13 +250,14 @@ because its observable TLS and H2 stack is Firefox Necko/NSS.
 Commands:
 
 ```bash
-netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64-m83
+netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64-config-final
 netwerk/naivefox/tools/verify-staged-runtime.sh \
-  --fetch https://example.com/ naivefox-linux-x86_64-m83
+  --fetch https://example.com/ naivefox-linux-x86_64-config-final
 ```
 
-Result: PASS. The verified package was promoted to
-`obj-x86_64-pc-linux-gnu/naivefox-linux-x86_64-final`.
+Result: PASS. The verifier copied the package below `/tmp` and ran its root
+`./naivefox` launcher; the native executable and GRE dependencies remained in
+the package's `runtime/` directory.
 
 | Check | Result |
 |---|---|
@@ -228,10 +267,12 @@ Result: PASS. The verified package was promoted to
 | `ldd` missing libraries or object-directory paths | None |
 | External fresh profile and runtime smoke | PASS |
 | Public HTTPS fetch from copied package | HTTP 200, 559-byte Example body |
-| Strict H2 SOCKS/padding/integrity from copied package | PASS |
-| Strict H3 SOCKS/padding/integrity from copied package | PASS, UDP-only fixture |
+| No-argument adjacent `config.json` invocation | PASS, strict H2 |
+| Positional config invocation | PASS, strict H3 |
+| Strict H2 SOCKS + HTTP CONNECT/padding/integrity | PASS, 10 tunnels |
+| Strict H3 SOCKS + HTTP CONNECT/padding/integrity | PASS, 10 tunnels, UDP-only fixture |
 | Live process maps containing source/objdir paths | None |
-| Real Caddy padded workload from staged package | PASS, recorded above |
+| Real Caddy config workload from staged package | PASS over H2 and H3, recorded above |
 
 The previous generated package was replaced only after the new staged copy had
 passed the `/tmp` verification. Test profiles and credentials are not part of
@@ -240,9 +281,11 @@ the package.
 The H3 verification used the same 378 MiB staged layout. Neqo is linked into
 `libxul`, NSS/NSPR were already present, and networking remains in-process, so
 H3 required no additional library, `plugin-container`, or second executable.
-The copied package completed HTTP and HTTPS SOCKS targets, six negotiated
-padding tunnels per protocol, a 3 MiB download SHA-256 check, and a 2 MiB
-upload byte-count/SHA-256 check in both strict H2 and strict H3 modes.
+The copied package completed SOCKS and HTTP CONNECT targets, ten negotiated
+padding tunnels per protocol, two 3 MiB download SHA-256 checks, two 2 MiB
+upload byte-count/SHA-256 checks, and mixed frontend concurrency in both strict
+H2 and strict H3 modes. No build-tree `LD_LIBRARY_PATH`, explicit profile CLI,
+or credential environment variables were used by config mode.
 
 ## Data-retention result
 

@@ -228,24 +228,25 @@ NaiveFoxApp
 |   +-- Necko / PSM / NSS initialization
 |
 +-- Config
-|   +-- local SOCKS listen address
-|   +-- HTTPS proxy endpoint
-|   +-- proxy credentials
-|   +-- logging options
+|   +-- strict NaiveProxy-compatible JSON schema
+|   +-- multiple loopback SOCKS5 / HTTP CONNECT listeners
+|   +-- strict H2 (`https://`) or H3 (`quic://`) upstream
+|   +-- persistent profile and logging policy
 |
-+-- SocksServer
-|   +-- accept local SOCKS5 clients
-|   +-- negotiate SOCKS5
-|   +-- CONNECT only in v1
-|   +-- preserve domain names for remote resolution
++-- LocalProxyServer
+|   +-- one Gecko runtime and one Necko connection manager
+|   +-- SocksConnection: parse SOCKS5 CONNECT and produce SOCKS replies
+|   +-- HttpConnectConnection: parse HTTP CONNECT and produce HTTP replies
+|   +-- preserve domain names for upstream resolution
 |
-+-- SocksConnection
-|   +-- one local TCP stream
-|   +-- requested Target(host, port)
++-- TunnelSession
+|   +-- shared H2/H3/Auto attempt and fallback lifecycle
+|   +-- CONNECT metadata and padding negotiation
+|   +-- expose one established target tunnel to either frontend
 |
 +-- NeckoTunnel
-|   +-- create an explicit HTTPS proxy configuration
-|   +-- force/require HTTP/2 for the prototype
+|   +-- create an explicit HTTPS or QUIC proxy configuration
+|   +-- require the configured Firefox H2 or H3 transport
 |   +-- issue CONNECT host:port
 |   +-- expose async tunnel input/output streams
 |   +-- expose CONNECT status and response headers
@@ -256,8 +257,8 @@ NaiveFoxApp
 |   +-- payload decoder
 |
 +-- DuplexPump
-    +-- SOCKS -> Naive encode -> Necko tunnel output
-    +-- Necko tunnel input -> Naive decode -> SOCKS
+    +-- local frontend -> Naive encode -> Necko tunnel output
+    +-- Necko tunnel input -> Naive decode -> local frontend
     +-- bounded buffering and backpressure
     +-- shutdown/error propagation
 ```
@@ -297,32 +298,47 @@ This is important both for proxy semantics and for avoiding local DNS leaks.
 
 ## Proxy configuration
 
-A simple initial configuration format is sufficient. For example:
+Normal use follows the small NaiveProxy-compatible JSON subset below. With no
+arguments, `naivefox` reads `./config.json`; one positional argument selects a
+different file.
 
 ```json
 {
-  "listen": "127.0.0.1:1080",
-  "proxy": "https://proxy.example.com:443",
-  "protocol": "h2",
-  "log_level": "info"
+  "listen": [
+    "socks://127.0.0.1:1080",
+    "http://127.0.0.1:8080"
+  ],
+  "proxy": "https://user:password@proxy.example:443",
+  "log": ""
 }
 ```
 
-Credentials may be supplied by environment variables or another non-committed mechanism, for example:
+`listen` may be one string or a non-empty array. `socks://` provides SOCKS5
+CONNECT; `http://` provides HTTP CONNECT only. Multiple listeners share one
+process, Gecko runtime, Necko connection manager, upstream tunnel backend, and
+padding implementation. Listener addresses are deliberately restricted to
+`127.0.0.1`, `localhost`, or `[::1]`, and require an explicit nonzero port.
+Ordinary forward-proxy GET/POST requests sent to the HTTP listener return 405.
 
-```bash
-export NAIVEFOX_PROXY_USER='user'
-export NAIVEFOX_PROXY_PASS='pass'
-```
+The proxy URI contains percent-encoded credentials and selects a strict outer
+transport:
 
-The agent may choose a different minimal configuration representation if Firefox integration makes another approach substantially simpler.
+- `https://user:password@host[:port]` requires H2;
+- `quic://user:password@host[:port]` requires H3/QUIC without H2 fallback.
 
-Requirements:
+The default proxy port is 443. Username and password are decoded once, passed
+to the existing Necko proxy-auth path, and never written to runtime logs.
+Unknown or duplicate fields, malformed JSON, wrong types, unsupported schemes,
+and unsafe endpoints are rejected rather than ignored.
 
-- Do not log passwords.
-- Do not print `Proxy-Authorization`.
-- Do not store credentials in the repository.
-- Proxy authentication must use normal Necko proxy-auth machinery where practical. If that is not suitable, document why.
+Logging is disabled when `log` is absent, goes to the console when it is an
+empty string, and appends to a mode-`0600` file for any non-empty path. The
+normal config mode creates a writable persistent Firefox/NSS profile at
+`$XDG_STATE_HOME/naivefox/profile`, or
+`$HOME/.local/state/naivefox/profile` when XDG state is unset. Set
+`NAIVEFOX_PROFILE` to override that location. Developer/test CLI modes retain
+their explicit `--profile`, `--protocol`, and environment-only credential
+interfaces.
 
 ## HTTP/2 tunnel requirements
 
@@ -469,6 +485,29 @@ owns Firefox's bootstrap lifetime and calls the exported NaiveFox entry point.
 This follows the dependent executable model without exposing internal XPCOM
 types across the executable boundary.
 
+The staged package has a user-facing launcher at its root and keeps the native
+binary and GRE dependencies below `runtime/`:
+
+```text
+naivefox-linux-x86_64/
+|-- naivefox
+|-- run-naivefox
+`-- runtime/
+    |-- naivefox
+    |-- libxul.so
+    `-- ...
+```
+
+`run-naivefox` remains a compatibility alias. Normal packaged use requires no
+build-tree loader variables, profile argument, or credential environment
+variables:
+
+```bash
+cd naivefox-linux-x86_64
+./naivefox
+./naivefox /absolute/path/to/config.json
+```
+
 Runtime diagnostics are also available independently of SOCKS mode:
 
 ```bash
@@ -482,7 +521,7 @@ obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
   --raw-tunnel-smoke https://proxy.example:443 target.example:80
 ```
 
-The development binary's local SOCKS mode uses the same profile and
+The development binary's legacy test-only SOCKS mode uses the same profile and
 environment-only credentials:
 
 ```bash
@@ -630,6 +669,13 @@ The prototype is complete when all of the following are demonstrated on Linux x8
 19. The same core path is confirmed against the supplied real Caddy server.
 20. All changes to existing Firefox files are documented in `UPSTREAM.md`.
 21. The prototype runtime can be staged and run outside the build tree on a compatible Linux system.
+22. `naivefox` reads a strict NaiveProxy-compatible `config.json` without
+    requiring developer CLI flags or credential environment variables.
+23. One process can serve SOCKS5 and HTTP CONNECT listeners simultaneously,
+    with both frontends using the same `TunnelSession`, Necko pool, padding
+    negotiation, and bounded duplex pump.
+24. Config `https://` and `quic://` upstreams pass local, staged, and supplied
+    real-Caddy tests as strict H2 and strict H3 respectively.
 
 See `ROADMAP.md` for the required implementation order.
 
@@ -679,4 +725,5 @@ with:
 
 The package is created below the configured object directory and deliberately
 contains no NSS profile, fixture credentials, logs, TLS key logs, or packet
-captures. Supply a writable external `--profile` when running it.
+captures. Config mode creates or reuses its writable state profile
+automatically; only developer/test modes require an explicit `--profile`.

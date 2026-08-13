@@ -25,10 +25,51 @@ the proxy port. They require `Outer protocol: h3`, so H2 fallback cannot satisfy
 the workload. Both suites execute the same `naivefox` binary and share the
 SOCKS, CONNECT, padding, and pump implementation.
 
-`run-padded-tests.sh` also accepts an absolute staged launcher through
-`NAIVEFOX_RUNTIME` plus its directory through `NAIVEFOX_EXPECT_RUNTIME_DIR`.
-The staging verifier uses this mode for both protocols with inherited loader
-and TLS-keylog variables removed, and rejects any live source/objdir mapping.
+Run the NaiveProxy-style config and simultaneous local-listener gates with:
+
+```bash
+./run-h2-config-tests.sh
+./run-h3-config-tests.sh
+./run-config-runtime-behavior-tests.sh
+```
+
+Each protocol run starts one NaiveFox process with both a SOCKS5 listener and
+an HTTP CONNECT-only listener. It verifies small HTTP/HTTPS targets, rejection
+of ordinary forward HTTP, 3 MiB download and 2 MiB upload integrity through
+both frontends, and mixed concurrency. The H2 phase requires one pooled outer
+TCP connection; the H3 phase runs against the UDP-only fixture. The behavior
+runner verifies disabled, console, and file logging plus automatic persistent
+profile creation.
+
+The staging verifier passes an external root `./naivefox` launcher through
+`NAIVEFOX_RUNTIME`. It exercises both no-argument adjacent `config.json` and
+positional-config invocation from a package copied below `/tmp`, then rejects
+source/object-directory process mappings.
+
+`run-padded-tests.sh` and `run-config-tests.sh` accept an absolute staged
+launcher through `NAIVEFOX_RUNTIME` plus its native runtime directory through
+`NAIVEFOX_EXPECT_RUNTIME_DIR`. The current staging verifier uses the stronger
+config-mode runner for both protocols with inherited loader and TLS-keylog
+variables removed, and rejects any live source/objdir mapping.
+
+The supplied real Caddy can be checked with the same config frontend without
+placing credentials on a command line or in a committed file:
+
+```bash
+NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
+NAIVEFOX_REAL_PROXY_USER=user \
+NAIVEFOX_REAL_PROXY_PASS=secret \
+NAIVEFOX_REAL_RUNTIME=/absolute/path/to/staged/naivefox \
+./run-real-server-config-tests.sh h2
+
+# Repeat with h3; the private generated config uses quic://.
+./run-real-server-config-tests.sh h3
+```
+
+The runner keeps normal public certificate validation enabled, checks normal
+HTTPS and direct/proxied integrity, and mixes SOCKS with HTTP CONNECT requests.
+Private configs are deleted on both success and failure; retained summaries do
+not contain the endpoint or credentials.
 
 The final capture step requires the restricted `dumpcap` capabilities
 documented below and in `../../CAPTURE.md`.

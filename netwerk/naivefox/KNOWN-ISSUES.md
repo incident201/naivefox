@@ -58,13 +58,17 @@ H2, and the soak runner records such a failure rather than masking it.
 ## Prototype scope constraints
 
 - Linux x86-64 is the supported prototype platform.
-- H2 remains the default; H3 and per-SOCKS-attempt `auto` selection are
-  explicit CLI modes.
+- H2 remains the developer CLI default. In normal config mode, `https://`
+  selects strict H2 and `quic://` selects strict H3; config mode deliberately
+  has no `auto` scheme.
 - `auto` does not maintain a cross-connection H3 failure cache or backoff; each
   new SOCKS connection makes its own strict H3 establishment decision before
   the one permitted establishment-only H2 retry.
 - CONNECT-UDP, MASQUE, WebTransport, SOCKS UDP ASSOCIATE, TUN/TAP, GUI work, and
   platform ports are intentionally outside this prototype.
+- Config listeners are loopback-only and unauthenticated. The HTTP frontend is
+  CONNECT-only; ordinary forward HTTP, listener authentication, UDP ASSOCIATE,
+  and non-loopback exposure are intentionally not implemented.
 - The verified staged runtime prioritizes reproducibility over size and is not
   yet minimized.
 

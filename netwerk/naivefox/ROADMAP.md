@@ -872,6 +872,51 @@ client architecture.
 
 ---
 
+## Phase 13 — NaiveProxy-style config and local frontends
+
+This phase remains on the validated Firefox snapshot. It adds user-facing
+configuration and local protocol adapters without changing Firefox or Neqo.
+
+### M13.1 Strict config, logging, and profile lifecycle
+
+- [x] Parse a bounded strict JSON object without SpiderMonkey or a new
+  dependency; accept `listen` as one string or an array.
+- [x] Accept loopback `socks://` and `http://` listeners, and reject malformed,
+  unknown, duplicate, wrongly typed, or unsupported input.
+- [x] Map credential-bearing `https://` to strict H2 and `quic://` to strict H3,
+  including default port 443, IPv4/IPv6, and percent decoding.
+- [x] Implement disabled, console, and mode-`0600` file logging without
+  exposing credentials.
+- [x] Resolve and create the persistent XDG/HOME profile, with
+  `NAIVEFOX_PROFILE` as an explicit override.
+
+### M13.2 Shared tunnel session and HTTP CONNECT frontend
+
+- [x] Extract H2/H3/Auto attempts, CONNECT metadata, padding negotiation,
+  transport barriers, and `DuplexPump` ownership from `SocksConnection` into
+  one reusable `TunnelSession`.
+- [x] Keep SOCKS parsing/replies in `SocksConnection`; add a bounded streaming
+  HTTP CONNECT parser and frontend with 200 only after upstream success.
+- [x] Preserve bytes received after the HTTP header terminator as initial
+  tunnel payload; reject non-CONNECT HTTP methods with 405.
+- [x] Serve multiple SOCKS5 and HTTP CONNECT listeners in one process and leave
+  outer pooling to the shared Necko connection manager.
+
+### M13.3 Local, real, and packaged acceptance
+
+- [x] Pass 45/45 project gtests, including config and HTTP parser fragmentation,
+  authority, size, early-payload, type, scheme, and credential cases.
+- [x] Pass mixed concurrent SOCKS5 and HTTP CONNECT workloads over local strict
+  H2 and H3 fixtures with negotiated padding and transfer integrity.
+- [x] Pass the unchanged H2/H3 raw, padding, robustness, Auto, and capture
+  regression suites.
+- [x] Pass supplied real-Caddy config workloads over both `https://` and
+  `quic://` using public certificate validation and a staged runtime.
+- [x] Verify `./naivefox` with adjacent `config.json` and positional config from
+  a copied package outside the object directory, with no objdir mappings.
+
+---
+
 # Final prototype acceptance suite
 
 The H2 prototype is complete only when this full sequence can be reproduced:
@@ -901,8 +946,11 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 23. capture comparison is documented.
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
+26. strict NaiveProxy-style config mode works without developer flags.
+27. simultaneous SOCKS5 and HTTP CONNECT listeners share one tunnel backend.
+28. config-mode strict H2 and H3 pass local, real, and staged acceptance.
 
-Final prototype status on 2026-08-13: all items 1-25 pass. In particular, the
+Final prototype status on 2026-08-13: all items 1-28 pass. In particular, the
 supplied real Caddy passed normal public-certificate validation, the H2
 interoperability workload and ten-minute H2 soak, and the strict-H3
 preflight plus exactly 600-second H3 soak without hidden H2 fallback. Commands,

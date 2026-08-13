@@ -645,6 +645,80 @@ Commit: `17ca8b746802 NF-H3-09 bound H3 tunnel backpressure and receive lifecycl
 Scope correction:
 `f0da0115d59c NF-H3-15 scope tunnel lifecycle changes to raw CONNECT`
 
+## Project-only config and local-listener stage
+
+Status: implemented; no new upstream Firefox modification
+
+Existing Firefox files changed by this stage: none.
+
+Project files:
+
+```text
+netwerk/naivefox/Config.cpp
+netwerk/naivefox/Config.h
+netwerk/naivefox/HttpConnectParser.cpp
+netwerk/naivefox/HttpConnectParser.h
+netwerk/naivefox/RuntimeLogging.cpp
+netwerk/naivefox/RuntimeLogging.h
+netwerk/naivefox/TunnelSession.cpp
+netwerk/naivefox/TunnelSession.h
+netwerk/naivefox/NaiveFox.cpp
+netwerk/naivefox/NaiveFoxRunner.cpp
+netwerk/naivefox/SocksServer.cpp
+netwerk/naivefox/SocksServer.h
+netwerk/naivefox/core/moz.build
+netwerk/naivefox/test/gtest/TestConfig.cpp
+netwerk/naivefox/test/gtest/TestHttpConnectParser.cpp
+netwerk/naivefox/test/gtest/moz.build
+netwerk/naivefox/test/integration/run-config-tests.sh
+netwerk/naivefox/test/integration/run-h2-config-tests.sh
+netwerk/naivefox/test/integration/run-h3-config-tests.sh
+netwerk/naivefox/test/integration/run-config-runtime-behavior-tests.sh
+netwerk/naivefox/test/integration/run-real-server-config-tests.sh
+netwerk/naivefox/test/integration/run-full-suite.sh
+netwerk/naivefox/tools/stage-runtime.sh
+netwerk/naivefox/tools/verify-staged-runtime.sh
+```
+
+Purpose:
+
+Add a strict NaiveProxy-compatible JSON subset, automatic persistent profile,
+runtime logging policy, simultaneous local SOCKS5 and HTTP CONNECT-only
+listeners, and packaged no-argument/positional config invocation.
+
+Why no Firefox patch was needed:
+
+Both local frontends terminate only their small local protocols. The extracted
+project `TunnelSession` owns the already-tested `OpenNeckoTunnel` path,
+strict H2/H3/Auto policy, CONNECT metadata, Naive padding negotiation,
+transport lifecycle, and bounded `DuplexPump`. Multiple listeners initialize
+one `GeckoRuntime` and naturally share Firefox's existing Necko connection
+manager and pooling. No new CONNECT header, stream, IPC, QUIC, or TLS behavior
+was required.
+
+Behavioral risk:
+
+The refactor moves existing SOCKS tunnel state into a reusable project class.
+The complete pre-existing H2/H3 raw, padded, robustness, Auto, and capture
+suites were rerun to cover lifecycle and backpressure. HTTP parsing is bounded
+at 16 KiB and preserves post-header bytes as initial tunnel payload. Listener
+binding is intentionally loopback-only.
+
+Tests:
+
+- warning-free `./mach build -j4 binaries`;
+- 45/45 `Naive*` gtests;
+- complete local H2/H3 suite, including prior robustness and capture gates;
+- strict H2 and H3 config workloads with simultaneous SOCKS5 and HTTP CONNECT;
+- disabled/console/file logging and automatic profile checks;
+- copied staged package with adjacent no-argument and positional config;
+- supplied real Caddy over both strict protocols with public CA validation.
+
+Commits:
+
+- `29275f3d3f03 NF-CONFIG-01 add config-driven local proxy frontends`
+- `5a9cabd981ba NF-CONFIG-02 verify config mode locally and staged`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:
