@@ -64,8 +64,16 @@ NS_IMETHODIMP DirectoryProvider::GetFile(const char* aProperty,
   if (std::strcmp(aProperty, NS_APP_USER_PROFILE_50_DIR) == 0 ||
       std::strcmp(aProperty, NS_APP_USER_PROFILE_LOCAL_50_DIR) == 0 ||
       std::strcmp(aProperty, NS_APP_PROFILE_DIR_STARTUP) == 0 ||
-      std::strcmp(aProperty, NS_APP_PROFILE_LOCAL_DIR_STARTUP) == 0) {
+      std::strcmp(aProperty, NS_APP_PROFILE_LOCAL_DIR_STARTUP) == 0 ||
+      std::strcmp(aProperty, NS_APP_PREFS_50_DIR) == 0) {
     return Clone(mProfile, aPersistent, aResult);
+  }
+
+  if (std::strcmp(aProperty, NS_APP_PREFS_50_FILE) == 0) {
+    nsCOMPtr<nsIFile> prefs;
+    MOZ_TRY(mProfile->Clone(getter_AddRefs(prefs)));
+    MOZ_TRY(prefs->AppendNative("prefs.js"_ns));
+    return Clone(prefs, aPersistent, aResult);
   }
 
   if (std::strcmp(aProperty, NS_GRE_DIR) == 0 ||
@@ -93,7 +101,8 @@ NS_IMETHODIMP DirectoryProvider::GetFile(const char* aProperty,
 GeckoRuntime::~GeckoRuntime() { Shutdown(); }
 
 nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
-                                  const nsACString& aProfilePath) {
+                                  const nsACString& aProfilePath,
+                                  ProxyProtocol aProtocol) {
   if (mXPCOMInitialized || aProfilePath.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -125,10 +134,12 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
   MOZ_TRY(NS_InitXPCOM(nullptr, mBinDirectory, mDirectoryProvider));
   mXPCOMInitialized = true;
 
+  Preferences::InitializeUserPrefs();
   Preferences::SetBool("network.process.enabled", false);
   Preferences::SetBool("network.http.network_access_on_socket_process.enabled",
                        false);
-  Preferences::SetBool("network.http.http3.enable", false);
+  Preferences::SetBool("network.http.http3.enable",
+                       aProtocol != ProxyProtocol::H2);
   Preferences::SetBool("security.nocertdb", false);
 
   nsCOMPtr<nsIObserverService> observers =

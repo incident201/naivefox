@@ -5,6 +5,7 @@
 #ifndef netwerk_naivefox_GeckoRuntime_h
 #define netwerk_naivefox_GeckoRuntime_h
 
+#include "ProxyProtocol.h"
 #include "nsCOMPtr.h"
 #include "nsIDirectoryService.h"
 #include "nsIFile.h"
@@ -22,7 +23,8 @@ class GeckoRuntime final {
   GeckoRuntime(const GeckoRuntime&) = delete;
   GeckoRuntime& operator=(const GeckoRuntime&) = delete;
 
-  nsresult Initialize(int aArgc, char* aArgv[], const nsACString& aProfilePath);
+  nsresult Initialize(int aArgc, char* aArgv[], const nsACString& aProfilePath,
+                      ProxyProtocol aProtocol);
   nsresult RunEventLoopSmoke();
 
  private:

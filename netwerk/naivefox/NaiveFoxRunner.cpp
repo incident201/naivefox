@@ -126,7 +126,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   }
 
   mozilla::naivefox::GeckoRuntime runtime;
-  nsresult rv = runtime.Initialize(aArgc, aArgv, profile);
+  nsresult rv = runtime.Initialize(aArgc, aArgv, profile, protocol);
   if (NS_SUCCEEDED(rv)) {
     if (runtimeSmoke) {
       rv = runtime.RunEventLoopSmoke();

@@ -27,6 +27,7 @@
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
 #include "nsIEventTarget.h"
+#include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInputStream.h"
 #include "nsIProxiedChannel.h"
@@ -362,7 +363,8 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult FlushReplies();
   void BeginTunnel(const nsACString& aTargetAuthority);
   void ApplyConnectMetadata(nsresult aStatus, int32_t aConnectCode,
-                            const Maybe<bool>& aPaddingHeaderPresent);
+                            const Maybe<bool>& aPaddingHeaderPresent,
+                            const nsACString& aOuterProtocol);
   void MaybeStartTunnel();
   void TunnelReady(nsIAsyncInputStream* aTunnelIn,
                    nsIAsyncOutputStream* aTunnelOut);
@@ -390,6 +392,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
+  nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
   nsCOMPtr<nsIAsyncOutputStream> mPendingTunnelOut;
@@ -576,8 +579,13 @@ NS_IMETHODIMP SocksConnection::OnStartRequest(nsIRequest* aRequest) {
   int32_t connectCode = -1;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
-  if (proxied) {
+  nsAutoCString outerProtocol;
+  nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aRequest);
+  if (proxied && http) {
     rv = proxied->GetHttpProxyConnectResponseCode(&connectCode);
+    if (NS_SUCCEEDED(rv)) {
+      rv = http->GetProtocolVersion(outerProtocol);
+    }
     if (NS_SUCCEEDED(rv)) {
       nsAutoCString padding;
       nsresult headerRv =
@@ -594,9 +602,11 @@ NS_IMETHODIMP SocksConnection::OnStartRequest(nsIRequest* aRequest) {
   RefPtr self = this;
   (void)mSocketTarget->Dispatch(
       NS_NewRunnableFunction("NaiveFox::SocksConnectMetadata",
-                             [self, rv, connectCode, paddingHeaderPresent]() {
+                             [self, rv, connectCode, paddingHeaderPresent,
+                              outerProtocol = std::move(outerProtocol)]() {
                                self->ApplyConnectMetadata(rv, connectCode,
-                                                          paddingHeaderPresent);
+                                                          paddingHeaderPresent,
+                                                          outerProtocol);
                              }),
       NS_DISPATCH_NORMAL);
   return rv;
@@ -642,18 +652,20 @@ NS_IMETHODIMP SocksConnection::OnTransportAvailable(
   nsCOMPtr<nsITLSSocketControl> tls;
   nsCOMPtr<nsITransportSecurityInfo> securityInfo;
   nsAutoCString alpn;
-  nsresult rv = aTransport->GetTlsSocketControl(getter_AddRefs(tls));
-  if (NS_SUCCEEDED(rv) && tls) {
-    rv = tls->GetSecurityInfo(getter_AddRefs(securityInfo));
-  }
-  if (NS_SUCCEEDED(rv) && securityInfo) {
-    rv = securityInfo->GetNegotiatedNPN(alpn);
-  }
-  if (NS_FAILED(rv) || !alpn.EqualsLiteral("h2")) {
-    (void)aSocketIn->CloseWithStatus(NS_ERROR_FAILURE);
-    (void)aSocketOut->CloseWithStatus(NS_ERROR_FAILURE);
-    Reject(Socks5Parser::Event::ProtocolError);
-    return NS_OK;
+  if (mProtocol == ProxyProtocol::H2) {
+    nsresult rv = aTransport->GetTlsSocketControl(getter_AddRefs(tls));
+    if (NS_SUCCEEDED(rv) && tls) {
+      rv = tls->GetSecurityInfo(getter_AddRefs(securityInfo));
+    }
+    if (NS_SUCCEEDED(rv) && securityInfo) {
+      rv = securityInfo->GetNegotiatedNPN(alpn);
+    }
+    if (NS_FAILED(rv) || !alpn.EqualsLiteral("h2")) {
+      (void)aSocketIn->CloseWithStatus(NS_ERROR_FAILURE);
+      (void)aSocketOut->CloseWithStatus(NS_ERROR_FAILURE);
+      Reject(Socks5Parser::Event::ProtocolError);
+      return NS_OK;
+    }
   }
 
   mPendingTunnelIn = aSocketIn;
@@ -665,7 +677,8 @@ NS_IMETHODIMP SocksConnection::OnTransportAvailable(
 
 void SocksConnection::ApplyConnectMetadata(
     nsresult aStatus, int32_t aConnectCode,
-    const Maybe<bool>& aPaddingHeaderPresent) {
+    const Maybe<bool>& aPaddingHeaderPresent,
+    const nsACString& aOuterProtocol) {
   if (mMetadataReady) {
     return;
   }
@@ -673,6 +686,7 @@ void SocksConnection::ApplyConnectMetadata(
   mMetadataStatus = aStatus;
   mConnectCode = aConnectCode;
   mPaddingHeaderPresent = aPaddingHeaderPresent;
+  mOuterProtocol = aOuterProtocol;
   MaybeStartTunnel();
 }
 
@@ -681,6 +695,8 @@ void SocksConnection::MaybeStartTunnel() {
     return;
   }
   if (mClosed || NS_FAILED(mMetadataStatus) ||
+      (mProtocol == ProxyProtocol::H2 && !mOuterProtocol.EqualsLiteral("h2")) ||
+      (mProtocol == ProxyProtocol::H3 && !mOuterProtocol.EqualsLiteral("h3")) ||
       NS_FAILED(NegotiatePayloadPadding(mConnectCode, mPaddingHeaderPresent,
                                         mPaddingEnabled))) {
     (void)mPendingTunnelIn->CloseWithStatus(NS_ERROR_FAILURE);
@@ -704,6 +720,7 @@ void SocksConnection::TunnelReady(nsIAsyncInputStream* aTunnelIn,
     return;
   }
   mTunnelReady = true;
+  std::printf("Outer protocol: %s\n", mOuterProtocol.get());
   std::printf("Padding negotiated: %s\n", mPaddingEnabled ? "yes" : "no");
   std::fflush(stdout);
   RefPtr self = this;
