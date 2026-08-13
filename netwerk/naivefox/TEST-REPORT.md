@@ -61,6 +61,24 @@ and rejected SOCKS target; the runner requires those failures before reporting
 PASS. No credentials, response bodies, packet captures, or key material are
 retained in this report.
 
+The final core regression pass used a warning-free build, 33/33 project
+gtests, and six sequential proxy-CONNECT xpcshell files: existing H1/H2
+CONNECT, header handling, HTTPS proxying, raw H1/H2 takeover, CONNECT padding,
+and the new raw H3 path all passed. The strict H3, IPv6 H3-proxy fallback, and
+HTTP/2-over-H3-proxy Firefox tests also passed.
+
+Two broader Mozilla tests expose frozen-snapshot limitations outside the
+NaiveFox classic-CONNECT path. `test_http3_proxy.js` passes 37 assertions and
+then its ordinary-channel three-concurrent helper times out all three channels;
+`test_http3_with_proxy.js` fails its first CONNECT-UDP/MASQUE origin-H3 route
+with `NS_ERROR_PROXY_CONNECTION_REFUSED`. Each failure was reproduced after a
+controlled incremental build with every NaiveFox-modified H3/proxy Necko file
+mechanically reverted to `h2-prototype-v0.1`, then the current patch was
+restored and rebuilt. They are therefore recorded as base/environment defects,
+not hidden as passes and not attributed to the connect-only prototype. The
+project's required four concurrent classic CONNECT streams, 32 MiB transfers,
+slow paths, and H3 capture multiplexing all pass.
+
 Auto mode was tested in both raw and SOCKS modes. An H2-only fixture caused a
 single strict H3 establishment timeout followed by H2 success. Against the
 H3-only fixture, H3 success, invalid authentication, and denied target cases
@@ -70,9 +88,8 @@ hidden H2 retry. The pure policy matrix also rejects fallback after CONNECT
 codes 200, 403, 407, 502, and 504, after transport publication, after owner
 cancellation, and after the one allowed retry has been consumed.
 
-H3 performance comparison, passive/decrypted capture comparison, staged
-runtime verification, and the ten-minute real-server soak remain mandatory
-acceptance gates and are not claimed complete by this local result.
+The extended H3 performance, passive/decrypted capture, staged-runtime, and
+ten-minute real-server gates are reported below. All completed successfully.
 
 ## Complete local integration gate
 
@@ -251,6 +268,39 @@ and 1,289.432 MiB/s with eight parallel downloads.
 Result: PASS. Full methodology, memory figures, relative comparisons, and
 limitations are in [`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md).
 
+The same 64 MiB/three-trial workload was then run in strict H3 mode:
+
+```bash
+NAIVEFOX_BENCHMARK_REFERENCE_BINARY=/tmp/naiveproxy-source-v150/src/out/Release/naive \
+  netwerk/naivefox/test/integration/run-h3-throughput-benchmark.sh
+```
+
+The runner completed in 121.5 seconds and moved approximately 10.81 GiB. All
+download SHA-256 and upload byte-count/SHA-256 gates passed. NaiveFox recorded
+68 H3 selections and 68 negotiated-padding tunnels, with neither H2 selection
+nor raw fallback. The fixture's adapted proxy listener permitted exactly `h3`,
+and the reference had a single `quic://` proxy, so H2 could not make the test
+pass.
+
+| Client | Sequential download | 4-parallel download | 8-parallel download | Sequential upload | 4-parallel upload | Peak RSS |
+|---|---:|---:|---:|---:|---:|---:|
+| NaiveProxy v150 test build | 97.793 MiB/s | 92.743 MiB/s | 83.856 MiB/s | 80.123 MiB/s | 81.947 MiB/s | 20.8 MiB |
+| NaiveFox | 82.152 MiB/s | 81.785 MiB/s | 87.969 MiB/s | 86.166 MiB/s | 99.732 MiB/s | 117.2 MiB |
+
+Result: PASS. The published NaiveProxy binary rejects a locally trusted,
+ephemeral fixture CA in its additional QUIC known-public-root check even after
+normal certificate verification succeeds. The H3 reference was therefore
+built from exact tag `v150.0.7871.63-1` at commit
+`3ba967e2d36cc133a896e81a36257ad4c6ea20f4`, with a three-line test-only
+exception for exact hostname `localhost` in
+`net/quic/crypto/proof_verifier_chromium.cc`. The normal chain, name, date, and
+signature checks remain active. The patch SHA-256 is
+`fe09dd9100fe22fbe30ee39b81226397aca6c5ddf75b33003fdaa7946df83bec` and
+the test binary SHA-256 is
+`b837bc242b269d3e30f99fa4461b863bcb0046a9c1f13a2bf91ef75b4f4ad86b`.
+No QUIC/HTTP/3/padding/data-path source was changed. Raw NetLog was removed and
+the final runner does not generate one.
+
 ## Passive external-observer comparison
 
 The no-keylog capture compared ordinary Firefox and NaiveFox against the same
@@ -299,3 +349,88 @@ The soak runner is
 `netwerk/naivefox/test/integration/run-real-server-soak.sh`. Credentials are
 environment-only, the endpoint is intentionally anonymized here, raw metrics
 are private, and only the credential-free aggregate is retained locally.
+
+## Strict HTTP/3 ten-minute real-deployment soak
+
+The final run used the fresh 378 MiB staged runtime, normal public certificate
+validation, and explicit `--protocol h3`; neither `--insecure` nor an object
+directory library path was used. A normal HTTPS page and immutable transfer
+passed before the timed interval. One process then remained alive for exactly
+600 seconds while 26 integrity-checked requests ran at seconds 0, 30, 60, 90,
+120, 240, 270, 300, 330, 360, 480, 510, 540, and 570. The events at 60, 270,
+330, and 510 used four parallel requests. This retains two 120-second idle
+windows and a final 30-second idle interval.
+
+| Measure | Result |
+|---|---|
+| Observation | 600.127 seconds |
+| Attempts / HTTP 200 / SHA-256 matches | 26 / 26 / 26 |
+| Timeouts | 0 |
+| Total response bytes | 328,172 |
+| Latency p50 / p95 / max | 0.239 / 0.399 / 0.466 seconds |
+| Resource samples | 601 |
+| RSS baseline / peak / final | 94,756 / 96,444 / 95,188 KiB |
+| Final RSS delta | +432 KiB |
+| FD baseline / peak / final | 39 / 39 / 39 |
+| Threads baseline / peak / final | 27 / 27 / 24 |
+| UDP socket epochs / maximum simultaneous | 3 / 1 |
+| TCP proxy sockets | 0 |
+| Outer protocol confirmations | 28 `h3`; 0 `h2` |
+| Padding negotiation | 28 `yes`; 0 raw fallback |
+| Functional/resource/sampling/transport/liveness gates | PASS / PASS / PASS / PASS / PASS |
+
+Both requests following the long idle intervals succeeded, as did every
+parallel wave. Neqo uses an unconnected UDP socket, so `/proc/net/udp` does not
+contain a remote proxy port for that socket; the runner keeps that value as a
+diagnostic instead of treating it as a gate. Strict transport proof combines
+the observed UDP socket, zero TCP proxy sockets, and Necko's 28 actual `h3`
+confirmations. Three UDP socket inode epochs indicate transparent transport
+turnover without restarting NaiveFox.
+
+The first staged preflight attempt timed out before an outer protocol was
+selected. A bounded comparison immediately established H3 from the object
+directory, and a second staged preflight also established H3; the complete
+staged run above then passed. This cold-start transient is retained as an
+observed external-network event rather than hidden or counted as a protocol
+fallback.
+
+The runner is
+`netwerk/naivefox/test/integration/run-real-server-h3-soak.sh`. The endpoint
+and credentials are intentionally absent from the report and client output.
+Raw metrics, bodies, profiles, and sensitive logs are not retained after
+aggregation.
+
+## Strict HTTP/3 capture comparison
+
+Command:
+
+```bash
+netwerk/naivefox/test/integration/run-h3-capture-comparison.sh
+```
+
+Result: PASS. The current runner completed all four workloads and all online
+assertions with exit status zero as part of `run-full-suite.sh`. An earlier
+development run exposed an over-strict exact-one-Firefox-connection assertion;
+the final runner accepts a normal Firefox retry while still requiring one
+NaiveFox QUIC connection for the two CONNECT streams.
+
+The decrypted pass proved QUIC v1 with `h3`, matching semantic TLS
+configuration, matching client transport parameters, and matching HTTP/3 and
+QPACK settings for ordinary Firefox and NaiveFox from the same build family.
+Ordinary Firefox sent one GET. NaiveFox sent classic CONNECT on stream IDs 0
+and 4 over one outer QUIC connection. Both CONNECT requests and responses
+carried the `padding` header name; no synthetic `alpn`, `upgrade`, or
+`connection` header was present.
+
+The passive no-keylog pass observed 1,762 Firefox and 1,845 NaiveFox UDP
+datagrams for approximately 2 MiB server-to-client workloads. Server UDP bytes
+were 2,167,712 and 2,166,305 respectively. Neither side established TCP or sent
+TCP payload. Ordinary Firefox emitted two TCP SYN probes which the strict
+UDP-only fixture rejected with RST and performed a second QUIC attempt;
+NaiveFox emitted no TCP probe and kept both CONNECT streams on one QUIC
+connection. No Version Negotiation packet occurred.
+
+Raw pcaps, NSS keys, profiles, screenshots, bodies, and logs were deleted after
+successful aggregation. The retained credential-free summary is under
+`obj-x86_64-pc-linux-gnu/naivefox-fixture/h3-capture-safe/` and the complete
+methodology and safe results are in [`H3-CAPTURE.md`](H3-CAPTURE.md).
