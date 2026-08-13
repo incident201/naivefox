@@ -337,9 +337,13 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          const nsACString& aProxyPassword,
                          nsIHttpUpgradeListener* aUpgradeListener,
                          nsIStreamListener* aChannelListener,
-                         const nsACString& aConnectPadding) {
+                         const nsACString& aConnectPadding,
+                         ProxyProtocol aProtocol) {
   if (!aUpgradeListener || !aChannelListener) {
     return NS_ERROR_INVALID_ARG;
+  }
+  if (aProtocol != ProxyProtocol::H2) {
+    return NS_ERROR_NOT_IMPLEMENTED;
   }
   nsCOMPtr<nsIURI> proxyUri;
   MOZ_TRY(NS_NewURI(getter_AddRefs(proxyUri), aProxyUrl));
@@ -449,7 +453,8 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,
                            const nsACString& aProxyUser,
-                           const nsACString& aProxyPassword) {
+                           const nsACString& aProxyPassword,
+                           ProxyProtocol aProtocol) {
   nsAutoCString targetUrl("http://"_ns);
   targetUrl.Append(aTargetAuthority);
   targetUrl.Append('/');
@@ -463,7 +468,8 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
   request.AppendLiteral("\r\nConnection: close\r\n\r\n");
   RefPtr<TunnelSmoke> listener = new TunnelSmoke(request);
   MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
-                          aProxyPassword, listener, listener, EmptyCString()));
+                          aProxyPassword, listener, listener, EmptyCString(),
+                          aProtocol));
 
   if (!SpinEventLoopUntil("NaiveFox::RunRawTunnelSmoke"_ns,
                           [&listener]() { return listener->Complete(); })) {

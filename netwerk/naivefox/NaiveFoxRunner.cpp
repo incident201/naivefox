@@ -11,6 +11,7 @@
 #include "NaiveFoxAPI.h"
 #include "NeckoTunnel.h"
 #include "ProfilerControl.h"
+#include "ProxyProtocol.h"
 #include "SocksServer.h"
 #include "mozilla/Logging.h"
 #include "nsError.h"
@@ -30,10 +31,28 @@ void PrintUsage(const char* aProgram) {
       "Usage: %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
       "       %s --profile PATH --fetch URL\n"
-      "       %s --profile PATH --raw-tunnel-smoke PROXY_URL TARGET\n"
+      "       %s --profile PATH --raw-tunnel-smoke PROXY_URL TARGET "
+      "[--protocol h2|h3|auto]\n"
       "       %s --profile PATH --socks-listen 127.0.0.1:PORT "
-      "--proxy PROXY_URL [--max-connections N]\n",
+      "--proxy PROXY_URL [--protocol h2|h3|auto] [--max-connections N]\n",
       aProgram, aProgram, aProgram, aProgram, aProgram);
+}
+
+bool ParseProxyProtocol(const char* aValue,
+                        mozilla::naivefox::ProxyProtocol& aProtocol) {
+  if (std::strcmp(aValue, "h2") == 0) {
+    aProtocol = mozilla::naivefox::ProxyProtocol::H2;
+    return true;
+  }
+  if (std::strcmp(aValue, "h3") == 0) {
+    aProtocol = mozilla::naivefox::ProxyProtocol::H3;
+    return true;
+  }
+  if (std::strcmp(aValue, "auto") == 0) {
+    aProtocol = mozilla::naivefox::ProxyProtocol::Auto;
+    return true;
+  }
+  return false;
 }
 
 }  // namespace
@@ -49,8 +68,11 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   nsCString rawTarget;
   nsCString socksListen;
   nsCString proxyUrl;
+  mozilla::naivefox::ProxyProtocol protocol =
+      mozilla::naivefox::ProxyProtocol::H2;
   uint32_t maxConnections = 0;
   bool runtimeSmoke = false;
+  bool protocolSpecified = false;
 
   for (int i = 1; i < aArgc; ++i) {
     if (std::strcmp(aArgv[i], "--profile") == 0 && i + 1 < aArgc) {
@@ -67,6 +89,13 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       socksListen.Assign(aArgv[++i]);
     } else if (std::strcmp(aArgv[i], "--proxy") == 0 && i + 1 < aArgc) {
       proxyUrl.Assign(aArgv[++i]);
+    } else if (std::strcmp(aArgv[i], "--protocol") == 0 && i + 1 < aArgc &&
+               !protocolSpecified) {
+      protocolSpecified = true;
+      if (!ParseProxyProtocol(aArgv[++i], protocol)) {
+        PrintUsage(aArgv[0]);
+        return 2;
+      }
     } else if (std::strcmp(aArgv[i], "--max-connections") == 0 &&
                i + 1 < aArgc) {
       char* end = nullptr;
@@ -90,7 +119,8 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   if (profile.IsEmpty() || modes != 1 ||
       (rawProxyUrl.IsEmpty() != rawTarget.IsEmpty()) ||
       (socksListen.IsEmpty() != proxyUrl.IsEmpty()) ||
-      (maxConnections && socksListen.IsEmpty())) {
+      (maxConnections && socksListen.IsEmpty()) ||
+      (protocolSpecified && rawProxyUrl.IsEmpty() && socksListen.IsEmpty())) {
     PrintUsage(aArgv[0]);
     return 2;
   }
@@ -108,7 +138,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       nsAutoCString user(proxyUser ? proxyUser : "");
       nsAutoCString password(proxyPassword ? proxyPassword : "");
       rv = mozilla::naivefox::RunRawTunnelSmoke(rawProxyUrl, rawTarget, user,
-                                                password);
+                                                password, protocol);
     } else {
       constexpr auto kListenPrefix = "127.0.0.1:"_ns;
       if (!StringBeginsWith(socksListen, kListenPrefix)) {
@@ -126,7 +156,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
           nsAutoCString password(proxyPassword ? proxyPassword : "");
           rv = mozilla::naivefox::RunSocksServer(static_cast<uint16_t>(port),
                                                  proxyUrl, user, password,
-                                                 maxConnections);
+                                                 maxConnections, protocol);
         }
       }
     }

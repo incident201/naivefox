@@ -5,6 +5,7 @@
 #ifndef netwerk_naivefox_NeckoTunnel_h
 #define netwerk_naivefox_NeckoTunnel_h
 
+#include "ProxyProtocol.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
 
@@ -19,12 +20,14 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          const nsACString& aProxyPassword,
                          nsIHttpUpgradeListener* aUpgradeListener,
                          nsIStreamListener* aChannelListener,
-                         const nsACString& aConnectPadding);
+                         const nsACString& aConnectPadding,
+                         ProxyProtocol aProtocol);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,
                            const nsACString& aProxyUser,
-                           const nsACString& aProxyPassword);
+                           const nsACString& aProxyPassword,
+                           ProxyProtocol aProtocol);
 
 }  // namespace mozilla::naivefox
 

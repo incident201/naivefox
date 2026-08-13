@@ -339,7 +339,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   SocksConnection(nsIAsyncInputStream* aLocalIn,
                   nsIAsyncOutputStream* aLocalOut, const nsACString& aProxyUrl,
                   const nsACString& aProxyUser,
-                  const nsACString& aProxyPassword,
+                  const nsACString& aProxyPassword, ProxyProtocol aProtocol,
                   nsIEventTarget* aSocketTarget,
                   std::function<void()>&& aOnClose)
       : mLocalIn(aLocalIn),
@@ -347,6 +347,7 @@ class SocksConnection final : public nsIInputStreamCallback,
         mProxyUrl(aProxyUrl),
         mProxyUser(aProxyUser),
         mProxyPassword(aProxyPassword),
+        mProtocol(aProtocol),
         mSocketTarget(aSocketTarget),
         mOnClose(std::move(aOnClose)) {}
 
@@ -373,6 +374,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsCString mProxyUrl;
   nsCString mProxyUser;
   nsCString mProxyPassword;
+  ProxyProtocol mProtocol;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   Socks5Parser mParser;
   nsTArray<uint8_t> mReplies;
@@ -483,7 +485,7 @@ void SocksConnection::BeginTunnel(const nsACString& aTargetAuthority) {
     return;
   }
   rv = OpenNeckoTunnel(mProxyUrl, aTargetAuthority, mProxyUser, mProxyPassword,
-                       this, this, padding);
+                       this, this, padding, mProtocol);
   if (NS_FAILED(rv)) {
     RefPtr self = this;
     (void)mSocketTarget->Dispatch(
@@ -765,11 +767,12 @@ class SocksServer final : public nsIServerSocketListener {
 
   SocksServer(const nsACString& aProxyUrl, const nsACString& aProxyUser,
               const nsACString& aProxyPassword, uint32_t aMaxConnections,
-              nsIEventTarget* aSocketTarget)
+              ProxyProtocol aProtocol, nsIEventTarget* aSocketTarget)
       : mProxyUrl(aProxyUrl),
         mProxyUser(aProxyUser),
         mProxyPassword(aProxyPassword),
         mMaxConnections(aMaxConnections),
+        mProtocol(aProtocol),
         mSocketTarget(aSocketTarget) {}
 
   bool Complete() const { return mComplete; }
@@ -789,6 +792,7 @@ class SocksServer final : public nsIServerSocketListener {
   nsCString mProxyUser;
   nsCString mProxyPassword;
   uint32_t mMaxConnections;
+  ProxyProtocol mProtocol;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   Atomic<uint32_t, Relaxed> mAcceptedConnections{0};
   Atomic<uint32_t, Relaxed> mCompletedConnections{0};
@@ -816,8 +820,8 @@ NS_IMETHODIMP SocksServer::OnSocketAccepted(nsIServerSocket* aServer,
   ++mAcceptedConnections;
   RefPtr self = this;
   RefPtr connection = new SocksConnection(
-      localIn, localOut, mProxyUrl, mProxyUser, mProxyPassword, mSocketTarget,
-      [self]() {
+      localIn, localOut, mProxyUrl, mProxyUser, mProxyPassword, mProtocol,
+      mSocketTarget, [self]() {
         (void)NS_DispatchToMainThread(
             NS_NewRunnableFunction("NaiveFox::SocksConnectionClosed",
                                    [self]() { self->ConnectionClosed(); }));
@@ -842,7 +846,7 @@ NS_IMETHODIMP SocksServer::OnStopListening(nsIServerSocket* aServer,
 nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
                         const nsACString& aProxyUser,
                         const nsACString& aProxyPassword,
-                        uint32_t aMaxConnections) {
+                        uint32_t aMaxConnections, ProxyProtocol aProtocol) {
   nsCOMPtr<nsIServerSocket> server =
       do_CreateInstance("@mozilla.org/network/server-socket;1");
   if (!server) {
@@ -854,8 +858,9 @@ nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
     return NS_ERROR_FAILURE;
   }
   MOZ_TRY(server->Init(aListenPort, true, -1));
-  RefPtr<SocksServer> listener = new SocksServer(
-      aProxyUrl, aProxyUser, aProxyPassword, aMaxConnections, socketTarget);
+  RefPtr<SocksServer> listener =
+      new SocksServer(aProxyUrl, aProxyUser, aProxyPassword, aMaxConnections,
+                      aProtocol, socketTarget);
   MOZ_TRY(server->AsyncListen(listener));
   int32_t port = 0;
   MOZ_TRY(server->GetPort(&port));
