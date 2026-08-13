@@ -467,6 +467,59 @@ Tests:
 
 Commit: `NF-H3-03 require strict Necko H3 proxy selection`
 
+### Patch NF-UPSTREAM-007
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/test/http3server/src/main.rs
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Make raw regular CONNECT over an HTTP/3 proxy reliably deliver its async input
+and output streams, including through the main-thread-safe pipes used by a JS
+upgrade listener.
+
+Why project-only code was insufficient:
+
+`InputStreamTunnel::AsyncWait()` and `OutputStreamTunnel::AsyncWait()` notified
+the H3 session before storing the new callback. That notification can reenter
+`Http3Session::SendData()` synchronously. The resulting callback-free
+`ReadSegments()` iteration reported success without moving a byte and
+immediately queued itself again, spinning the socket thread before the raw
+tunnel consumer could run.
+
+Implementation and behavioral risk:
+
+- publish each async callback before notifying the H3 stream that input or
+  output is wanted;
+- preserve a callback consumed by a reentrant `OnSocketReady()` call instead
+  of accidentally restoring it after notification;
+- leave ordinary H3 transactions and callback-free waits unchanged.
+
+The test-only H3 proxy response echoes a fixed `padding` marker when that
+request header is present and rejects synthetic `ALPN`, `Upgrade`, or
+`Connection` markers in the same request. It does not change production proxy
+behavior.
+
+Tests:
+
+- focused empty-protocol raw H3 CONNECT obtains async streams, writes a known
+  HTTP request, and verifies the deterministic tunneled response;
+- request and response CONNECT `padding` metadata are checked;
+- the outer channel is asserted to be HTTP/3 and no synthetic upgrade marker
+  is accepted by the test proxy;
+- the existing H3 proxy transfer tests through large-data coverage remain
+  green before their pre-existing connection-refused timeout case.
+
+Commit: `NF-H3-04 expose raw HTTP/3 CONNECT streams`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:

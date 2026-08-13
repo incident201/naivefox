@@ -1248,6 +1248,18 @@ impl HttpServer for Http3ConnectProxyServer {
                     );
                     let host_hdr = headers.iter().find(|&h| h.name() == ":authority").unwrap();
                     let host_str = host_hdr.value_utf8().unwrap();
+                    let padding = headers.iter().find(|&h| h.name() == "padding");
+                    let has_forbidden_marker = headers.iter().any(|h| {
+                        matches!(h.name(), "alpn" | "upgrade" | "connection")
+                    });
+
+                    if padding.is_some() && has_forbidden_marker {
+                        stream
+                            .send_headers(&[Header::new(":status", "400")])
+                            .unwrap();
+                        stream.stream_close_send(now).unwrap();
+                        return;
+                    }
 
                     // Check if we should fallback to 127.0.0.1 before attempting connection
                     let host_without_port = if let Some(colon_pos) = host_str.rfind(':') {
@@ -1288,12 +1300,14 @@ impl HttpServer for Http3ConnectProxyServer {
 
                     tcp_stream.set_nonblocking(true).unwrap();
                     qtrace!("tcp_stream to {:?} created", host_hdr);
-                    stream
-                        .send_headers(&[
-                            Header::new(":status", "200"),
-                            Header::new("cache-control", "no-cache"),
-                        ])
-                        .unwrap();
+                    let mut response_headers = vec![
+                        Header::new(":status", "200"),
+                        Header::new("cache-control", "no-cache"),
+                    ];
+                    if padding.is_some() {
+                        response_headers.push(Header::new("padding", "fedcba9876543210"));
+                    }
+                    stream.send_headers(&response_headers).unwrap();
                     self.tcp_streams.insert(
                         stream.stream_id(),
                         TcpStream {

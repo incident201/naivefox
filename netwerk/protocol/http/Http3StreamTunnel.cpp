@@ -143,11 +143,17 @@ Http3TransportLayer::InputStreamTunnel::AsyncWait(
         "InputStreamTunnel::CallOnSocketReady",
         [self{std::move(self)}]() { self->OnSocketReady(self->mCondition); }));
   } else if (callback) {
+    // HasDataToRead may synchronously enter the H3 session. Publish the
+    // callback before notifying it, and do not restore a callback consumed by
+    // a reentrant OnSocketReady call.
+    mCallback = callback;
     RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
     if (!tunnel) {
+      mCallback = nullptr;
       return NS_ERROR_UNEXPECTED;
     }
     tunnel->HasDataToRead();
+    return NS_OK;
   }
 
   mCallback = callback;
@@ -288,13 +294,19 @@ Http3TransportLayer::OutputStreamTunnel::AsyncWait(
         "OutputStreamTunnel::CallOnSocketReady",
         [self{std::move(self)}]() { self->OnSocketReady(self->mCondition); }));
   } else if (callback) {
+    // HasDataToWrite may synchronously enter the H3 session. Publish the
+    // callback before notifying it, and do not restore a callback consumed by
+    // a reentrant OnSocketReady call.
+    mCallback = callback;
     // Inform the proxy connection that the inner connetion wants to
     // read data.
     RefPtr<Http3StreamTunnel> tunnel = mTransport->GetStream();
     if (!tunnel) {
+      mCallback = nullptr;
       return NS_ERROR_UNEXPECTED;
     }
     tunnel->HasDataToWrite();
+    return NS_OK;
   }
 
   mCallback = callback;
