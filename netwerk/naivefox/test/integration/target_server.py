@@ -58,6 +58,23 @@ class Handler(BaseHTTPRequestHandler):
                 length = min(65536, size - offset)
                 self.wfile.write(pattern_bytes(offset, length))
                 offset += length
+        elif parsed.path == "/observer":
+            size = min(int(query.get("size", [4 * 1024 * 1024])[0]), MAX_BODY)
+            if size < 0:
+                self.send_error(400)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(size))
+            self.end_headers()
+            block = b"naivefox-observer-traffic\n"
+            remaining = size
+            while remaining:
+                data = (
+                    block * ((min(remaining, 65536) + len(block) - 1) // len(block))
+                )[: min(remaining, 65536)]
+                self.wfile.write(data)
+                remaining -= len(data)
         elif parsed.path == "/delay":
             delay_ms = min(max(int(query.get("ms", [250])[0]), 0), 10000)
             time.sleep(delay_ms / 1000)
@@ -104,9 +121,12 @@ class Handler(BaseHTTPRequestHandler):
             remaining -= len(chunk)
             if delay_ms:
                 time.sleep(delay_ms / 1000)
-        body = json.dumps(
-            {"bytes": total, "sha256": digest.hexdigest()}, sort_keys=True
-        ).encode() + b"\n"
+        body = (
+            json.dumps(
+                {"bytes": total, "sha256": digest.hexdigest()}, sort_keys=True
+            ).encode()
+            + b"\n"
+        )
         self.send_bytes(200, body, "application/json")
 
 
@@ -154,4 +174,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

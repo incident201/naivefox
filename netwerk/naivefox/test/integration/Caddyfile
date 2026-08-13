@@ -13,11 +13,13 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 	route {
 		forward_proxy {
 			basic_auth {$NAIVEFOX_FIXTURE_USER} {$NAIVEFOX_FIXTURE_PASS}
+			hosts localhost
 			ports {$NAIVEFOX_FIXTURE_HTTP_PORT} {$NAIVEFOX_FIXTURE_HTTPS_PORT}
 			acl {
 				allow 127.0.0.1/32
 				deny all
 			}
 		}
+		reverse_proxy /observer* 127.0.0.1:{$NAIVEFOX_FIXTURE_HTTP_PORT}
 	}
 }
