@@ -662,6 +662,16 @@ nsresult Http3Session::ProcessEvents() {
             ("Http3Session::ProcessEvents %p - StopSeniding with error "
              "0x%" PRIx64,
              this, event.stop_sending.error));
+        if (RefPtr<Http3StreamBase> stream =
+                mStreamIdHash.Get(event.stop_sending.stream_id);
+            stream && stream->GetHttp3StreamTunnel()) {
+          // STOP_SENDING only closes our sending direction. In particular,
+          // CONNECT proxies can use H3_REQUEST_CANCELLED after the target has
+          // completed its response. Preserve the receive direction so a slow
+          // tunnel consumer can drain data already buffered before FIN.
+          stream->GetHttp3StreamTunnel()->StopSending();
+          break;
+        }
         if (event.stop_sending.error == HTTP3_APP_ERROR_NO_ERROR) {
           RefPtr<Http3StreamBase> stream =
               mStreamIdHash.Get(event.stop_sending.stream_id);

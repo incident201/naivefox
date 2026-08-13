@@ -110,6 +110,7 @@ class Http3StreamTunnel final : public Http3Stream {
 
   void HasDataToWrite();
   void HasDataToRead();
+  size_t BufferedInputSize() { return mSimpleBuffer.Available(); }
 
   [[nodiscard]] nsresult ReadSegments() override;
   [[nodiscard]] nsresult WriteSegments() override;
@@ -125,6 +126,7 @@ class Http3StreamTunnel final : public Http3Stream {
 
   RefPtr<Http3TransportLayer> mTransport;
   SimpleBuffer mSimpleBuffer;
+  bool mInputBufferBlocked = false;
 };
 
 }  // namespace mozilla::net

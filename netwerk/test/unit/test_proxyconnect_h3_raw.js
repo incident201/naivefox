@@ -8,7 +8,8 @@
 
 const REQUEST_PADDING = "0123456789abcdef";
 const RESPONSE_PADDING = "fedcba9876543210";
-const RESPONSE_BODY = "raw-h3-tunnel-ok";
+const RESPONSE_MARKER = "raw-h3-tunnel-ok";
+const RESPONSE_SIZE = 512 * 1024;
 
 add_setup(async function () {
   await setup_http3_proxy();
@@ -18,8 +19,12 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
   let target = new NodeHTTPServer();
   await target.start();
   await target.registerPathHandler("/raw-h3", (_request, response) => {
-    response.writeHead(200, { "Content-Type": "text/plain" });
-    response.end("raw-h3-tunnel-ok");
+    response.writeHead(200, {
+      "Content-Type": "text/plain",
+      "Content-Length": 512 * 1024,
+    });
+    const marker = "raw-h3-tunnel-ok";
+    response.end(marker + "x".repeat(512 * 1024 - marker.length));
   });
   registerCleanupFunction(async () => target.stop());
 
@@ -38,18 +43,24 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
   let tunnelOutput;
   const { promise, resolve, reject } = Promise.withResolvers();
 
-  const inputCallback = {
+  const slowInputCallback = {
     onInputStreamReady(input) {
-      info("raw H3 input stream ready");
       try {
         const available = input.available();
         if (available) {
-          response += NetUtil.readInputStreamToString(input, available);
+          response += NetUtil.readInputStreamToString(
+            input,
+            Math.min(available, 4096)
+          );
         }
-        if (response.includes(RESPONSE_BODY)) {
+        const headerEnd = response.indexOf("\r\n\r\n");
+        if (
+          headerEnd >= 0 &&
+          response.length - headerEnd - 4 === RESPONSE_SIZE
+        ) {
           resolve();
         } else {
-          input.asyncWait(inputCallback, 0, 0, Services.tm.mainThread);
+          input.asyncWait(slowInputCallback, 0, 0, Services.tm.mainThread);
         }
       } catch (error) {
         reject(error);
@@ -57,6 +68,7 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
     },
     QueryInterface: ChromeUtils.generateQI(["nsIInputStreamCallback"]),
   };
+
   const outputCallback = {
     onOutputStreamReady(output) {
       info("raw H3 output stream ready");
@@ -69,7 +81,14 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
           output.asyncWait(outputCallback, 0, 0, Services.tm.mainThread);
         } else {
           output.closeWithStatus(Cr.NS_OK);
-          tunnelInput.asyncWait(inputCallback, 0, 0, Services.tm.mainThread);
+          // Consume only one small chunk per callback. Neqo reaches flow
+          // control and FIN while this listener drains the tunnel slowly.
+          tunnelInput.asyncWait(
+            slowInputCallback,
+            0,
+            0,
+            Services.tm.mainThread
+          );
         }
       } catch (error) {
         reject(error);
@@ -118,7 +137,12 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
   });
 
   await promise;
-  Assert.ok(response.includes(RESPONSE_BODY));
+  const headerEnd = response.indexOf("\r\n\r\n");
+  Assert.greaterOrEqual(headerEnd, 0);
+  const body = response.slice(headerEnd + 4);
+  Assert.equal(body.length, RESPONSE_SIZE);
+  Assert.ok(body.startsWith(RESPONSE_MARKER));
+  Assert.ok(/^x+$/.test(body.slice(RESPONSE_MARKER.length)));
   Assert.equal(writeOffset, request.length);
 
   tunnelInput.close();

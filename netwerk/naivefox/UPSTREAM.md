@@ -571,6 +571,64 @@ Tests:
 
 Commit: `NF-H3-05 preserve classic CONNECT input after H3 half-close`
 
+### Patch NF-UPSTREAM-009
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3Session.cpp
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/protocol/http/Http3StreamTunnel.h
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+```
+
+Purpose:
+
+Bound raw HTTP/3 tunnel buffering under a slow consumer and preserve the
+receive direction when the CONNECT peer sends `STOP_SENDING` after completing
+its response.
+
+Why project-only code was insufficient:
+
+The application pump already bounded its own buffers, but the H3 tunnel could
+continue draining Neqo into an unbounded `SimpleBuffer`. During a 32 MiB slow
+download Caddy then sent `STOP_SENDING(H3_REQUEST_CANCELLED)` after target
+completion. The generic session path treated that send-direction signal as a
+full request-stream cancellation and discarded response bytes which the slow
+consumer had not yet read. The public tunnel input stream also returned an
+error from `Available()` instead of its buffered byte count.
+
+Implementation and behavioral risk:
+
+- cap the tunnel slow-consumer buffer at 256 KiB and resume Neqo reads after
+  the application drains it;
+- retain a received FIN until all bytes already buffered by the tunnel have
+  reached the consumer;
+- treat `STOP_SENDING` on a regular CONNECT tunnel as closing only its sending
+  direction, while leaving the receive direction available;
+- report the current tunnel buffer size through `Available()`;
+- leave ordinary H3 requests, WebTransport, CONNECT-UDP, and non-tunnel reset
+  handling unchanged.
+
+The change is deliberately H3-specific and does not copy the H2 flow-control
+implementation. Neqo remains responsible for QUIC stream and connection flow
+control.
+
+Tests:
+
+- focused raw H3 xpcshell regression slowly drains a 512 KiB response in 4 KiB
+  callbacks after output half-close and verifies every byte;
+- deterministic 32 MiB slow download and upload integrity checks;
+- bounded-RSS gate after a warm-up tunnel;
+- local disconnect, response-after-half-close, target early close, timeout,
+  ACL denial, proxy loss, and four concurrent H3 CONNECT streams on one QUIC
+  connection;
+- the same full robustness workload passes in H2 mode.
+
+Commit: `NF-H3-09 bound H3 tunnel backpressure and receive lifecycle`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:
