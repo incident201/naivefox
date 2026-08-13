@@ -19,14 +19,15 @@ authorization value, packet payload, or TLS key material.
 | Command | Result |
 |---|---|
 | `./mach build -j4 binaries` | PASS, 0 compiler warnings |
-| `./mach gtest 'NaiveFox*'` plus `./mach gtest 'NaivePadding*'` | PASS, 48/48 tests in 9 suites |
+| `./mach gtest 'NaiveFox*'` plus `./mach gtest 'NaivePadding*'` | PASS, 49/49 tests in 9 suites |
 | `./mach xpcshell-test netwerk/test/unit/test_proxyconnect.js netwerk/test/unit/test_proxyconnect_headers.js netwerk/test/unit/test_proxyconnect_https.js netwerk/test/unit/test_proxyconnect_raw.js netwerk/test/unit/test_proxyconnect_padding_header.js` | PASS, 5/5 tests |
 | `git diff --check` | PASS |
 
 The gtests cover strict config parsing, fragmented HTTP CONNECT and SOCKS5
 parsing, padding negotiation, Variant 1
 encoder/decoder boundaries, deterministic randomized round trips, truncation,
-partial drains, entropy failure, and CONNECT header-padding vectors. The
+partial drains, entropy failure, CONNECT header-padding vectors, and secure
+temporary-profile creation/removal without a home directory. The
 xpcshell set covers existing proxy behavior plus raw HTTP/1.1 and HTTP/2
 CONNECT, exact CONNECT-only padding headers, response metadata, and stream I/O.
 
@@ -44,7 +45,7 @@ duplex pumping to one shared `TunnelSession`.
 | HTTP CONNECT parser gtests | PASS, arbitrary fragmentation, split CRLF, authorities, non-CONNECT, oversized headers, and early payload |
 | `run-h2-config-tests.sh` | PASS, one process, 10 padded H2 tunnels, SOCKS5 + HTTP CONNECT, 3 MiB downloads, 2 MiB uploads, mixed concurrency |
 | `run-h3-config-tests.sh` | PASS, the same workload over an H3-only UDP fixture, 10 padded H3 tunnels and no TCP fallback |
-| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, file log is `0600`, automatic profile is `0700`, and a concrete non-loopback interface bind accepts traffic |
+| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, file log is `0600`, persistent and no-home temporary profiles are `0700`, and a concrete non-loopback interface bind accepts traffic |
 | `run-full-suite.sh` | PASS in 311.5 seconds, including all pre-existing H2/H3, Auto, robustness, and capture gates plus config mode |
 
 The H2 and H3 config runs used two `0.0.0.0` listeners and a two-element
@@ -278,6 +279,7 @@ removed: the staged root contains one user-facing `naivefox` launcher plus the
 | `ldd` missing libraries or object-directory paths | None |
 | External fresh profile and runtime smoke | PASS |
 | Public HTTPS fetch from copied package | HTTP 200, 559-byte Example body |
+| Config startup without home/XDG/profile variables | PASS, private mode-`0700` temporary profile and listening endpoint |
 | No-argument adjacent `config.json` invocation | PASS, strict H2 |
 | Positional config invocation | PASS, strict H3 |
 | Strict H2 SOCKS + HTTP CONNECT/padding/integrity | PASS, 10 tunnels |
@@ -296,7 +298,10 @@ The copied package completed SOCKS and HTTP CONNECT targets, ten negotiated
 padding tunnels per protocol, two 3 MiB download SHA-256 checks, two 2 MiB
 upload byte-count/SHA-256 checks, and mixed frontend concurrency in both strict
 H2 and strict H3 modes. No build-tree `LD_LIBRARY_PATH`, explicit profile CLI,
-or credential environment variables were used by config mode.
+or credential environment variables were used by config mode. A separate
+packaged-runtime invocation removed `HOME`, `XDG_STATE_HOME`,
+`XDG_RUNTIME_DIR`, and `NAIVEFOX_PROFILE`; Gecko/NSS initialized and the local
+listener became ready using the temporary-profile fallback.
 
 ## Data-retention result
 

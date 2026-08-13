@@ -231,7 +231,7 @@ NaiveFoxApp
 |   +-- strict NaiveProxy-compatible JSON schema
 |   +-- multiple configurable IPv4/IPv6 SOCKS5 / HTTP CONNECT listeners
 |   +-- strict H2 (`https://`) or H3 (`quic://`) upstream
-|   +-- persistent profile and logging policy
+|   +-- persistent or temporary profile and logging policy
 |
 +-- LocalProxyServer
 |   +-- one Gecko runtime and one Necko connection manager
@@ -352,12 +352,23 @@ and unsafe endpoints are rejected rather than ignored.
 
 Logging is disabled when `log` is absent, goes to the console when it is an
 empty string, and appends to a mode-`0600` file for any non-empty path. The
-normal config mode creates a writable persistent Firefox/NSS profile at
-`$XDG_STATE_HOME/naivefox/profile`, or
+normal config mode first creates or reuses a writable persistent Firefox/NSS
+profile at `$XDG_STATE_HOME/naivefox/profile`, or
 `$HOME/.local/state/naivefox/profile` when XDG state is unset. Set
-`NAIVEFOX_PROFILE` to override that location. Developer/test CLI modes retain
-their explicit `--profile`, `--protocol`, and environment-only credential
-interfaces.
+`NAIVEFOX_PROFILE` to require an explicit persistent location; an invalid
+explicit override is an error.
+
+When neither state location is usable, including for a service account with no
+home directory, NaiveFox creates a unique mode-`0700` temporary profile. It
+prefers `XDG_RUNTIME_DIR` and otherwise uses the platform temporary directory
+with `/tmp` as the final Linux fallback. The temporary profile is removed after
+an orderly runtime shutdown and starts clean on every process invocation. On
+systems where the runtime directory or `/tmp` is memory-backed, its contents
+are consequently held on tmpfs; NaiveFox does not require that property.
+Operators who need persistent user certificate databases or other profile
+state should set `NAIVEFOX_PROFILE` or provide a writable XDG/HOME state
+location. Developer/test CLI modes retain their explicit `--profile`,
+`--protocol`, and environment-only credential interfaces.
 
 ## HTTP/2 tunnel requirements
 
@@ -744,5 +755,6 @@ with:
 
 The package is created below the configured object directory and deliberately
 contains no NSS profile, fixture credentials, logs, TLS key logs, or packet
-captures. Config mode creates or reuses its writable state profile
-automatically; only developer/test modes require an explicit `--profile`.
+captures. Config mode creates or reuses a writable persistent profile when a
+state/home location is available and falls back to a private temporary profile
+when it is not; only developer/test modes require an explicit `--profile`.

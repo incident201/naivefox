@@ -891,7 +891,9 @@ configuration and local protocol adapters without changing Firefox or Neqo.
 - [x] Implement disabled, console, and mode-`0600` file logging without
   exposing credentials.
 - [x] Resolve and create the persistent XDG/HOME profile, with
-  `NAIVEFOX_PROFILE` as an explicit override.
+  `NAIVEFOX_PROFILE` as a strict explicit override; when automatic persistent
+  state is unavailable, use a unique mode-`0700` runtime/temp profile so a
+  service account without a home directory can start normally.
 
 ### M13.2 Shared tunnel session and HTTP CONNECT frontend
 
@@ -918,6 +920,9 @@ configuration and local protocol adapters without changing Firefox or Neqo.
   wildcard listeners and repeated per-listener proxy-array entries.
 - [x] Verify `./naivefox` with adjacent `config.json` and positional config from
   a copied package outside the object directory, with no objdir mappings.
+- [x] Verify the copied packaged runtime in config mode with `HOME`,
+  `XDG_STATE_HOME`, `XDG_RUNTIME_DIR`, and `NAIVEFOX_PROFILE` all absent; the
+  process creates a private temporary profile and starts its listener.
 
 ---
 
@@ -957,8 +962,10 @@ The H2 prototype is complete only when this full sequence can be reproduced:
     accept clients without an implicit loopback policy.
 30. `proxy` string/array behavior matches NaiveProxy's shared and one-to-one
     listener mapping, and the package exposes only one root launcher.
+31. config mode starts from the staged package for a user without a home or
+    XDG state directory by using a private temporary profile.
 
-Final prototype status on 2026-08-13: all items 1-30 pass. In particular, the
+Final prototype status on 2026-08-13: all items 1-31 pass. In particular, the
 supplied real Caddy passed normal public-certificate validation, the H2
 interoperability workload and ten-minute H2 soak, and the strict-H3
 preflight plus exactly 600-second H3 soak without hidden H2 fallback. Commands,

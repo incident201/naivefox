@@ -23,6 +23,23 @@ Enabling the socket process later therefore requires an IPC-compatible stream
 takeover design and focused lifecycle tests. The prototype does not silently
 enable an incomplete IPC path.
 
+## Profile storage without a home directory
+
+Normal config mode prefers persistent state under `XDG_STATE_HOME` or `HOME`.
+Unlike NaiveProxy's direct Chromium `URLRequestContext`, the current Gecko
+bootstrap still requires a filesystem profile directory for XPCOM/PSM
+services. This is an implementation requirement, not a requirement that the
+state remain persistent.
+
+If no automatic persistent location is usable, NaiveFox creates an isolated
+mode-`0700` profile under `XDG_RUNTIME_DIR`, the platform temporary directory,
+or finally `/tmp`. This permits service accounts with no home directory to run
+without changing NSS verification behavior. The directory is removed on
+orderly C++ runtime teardown; an uncatchable termination may leave it for the
+runtime-directory or system temporary-file cleanup policy. Set
+`NAIVEFOX_PROFILE` to a managed writable directory when certificate database or
+other profile state must persist across restarts.
+
 ## Frozen-snapshot Mozilla test limitations
 
 Two broader Mozilla tests fail outside NaiveFox's classic CONNECT path on the

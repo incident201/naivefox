@@ -893,8 +893,9 @@ netwerk/naivefox/tools/verify-staged-runtime.sh
 
 Purpose:
 
-Add a strict NaiveProxy-compatible JSON subset, automatic persistent profile,
-runtime logging policy, simultaneous local SOCKS5 and HTTP CONNECT-only
+Add a strict NaiveProxy-compatible JSON subset, automatic persistent or
+temporary profile lifecycle, runtime logging policy, simultaneous local
+SOCKS5 and HTTP CONNECT-only
 listeners, string/array per-listener upstream mapping, explicit IPv4/IPv6 bind
 addresses, and packaged no-argument/positional config invocation.
 
@@ -927,15 +928,23 @@ loopback. Local listener authentication is still absent and external exposure
 is therefore an operator security decision documented in `README.md` and
 `KNOWN-ISSUES.md`.
 
+An explicit `NAIVEFOX_PROFILE` remains strict and persistent. Automatic
+XDG/HOME state preserves the previous behavior when writable; only its absent
+or unusable case now falls back to an atomically created mode-`0700` temporary
+directory. This changes no PSM/NSS preference or trust behavior and requires no
+Firefox hook.
+
 Tests:
 
 - warning-free `./mach build -j4 binaries`;
-- 48/48 project and padding gtests;
+- 49/49 project and padding gtests;
 - complete local H2/H3 suite, including prior robustness and capture gates;
 - strict H2 and H3 config workloads with simultaneous wildcard-bound SOCKS5
   and HTTP CONNECT listeners and repeated per-listener proxy-array entries;
 - a concrete non-loopback interface bind and successful client connection;
-- disabled/console/file logging and automatic profile checks;
+- disabled/console/file logging, persistent-profile checks, and real
+  config-mode startup without HOME/XDG/profile variables using a temporary
+  mode-`0700` profile;
 - copied staged package with adjacent no-argument and positional config;
 - supplied real Caddy over both strict protocols with public CA validation.
 
@@ -944,6 +953,7 @@ Commits:
 - `29275f3d3f03 NF-CONFIG-01 add config-driven local proxy frontends`
 - `5a9cabd981ba NF-CONFIG-02 verify config mode locally and staged`
 - `92d25f965b8c NF-CONFIG-03 match NaiveProxy listener and proxy-array semantics`
+- `3e3ab3ddd466 NF-CONFIG-05 support users without home directories`
 
 ## Rules for future upstream changes
 
