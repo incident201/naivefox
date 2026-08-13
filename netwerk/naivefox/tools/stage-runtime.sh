@@ -74,6 +74,8 @@ if [[ ! -d $dist_bin ]]; then
 fi
 
 stage_dir=$(mktemp -d "$objdir/.naivefox-stage.XXXXXX")
+runtime_dir="$stage_dir/runtime"
+mkdir -m 0755 "$runtime_dir"
 cleanup() {
   if [[ -n ${stage_dir:-} && -d $stage_dir ]]; then
     case "$stage_dir" in
@@ -111,7 +113,7 @@ for name in "${required_files[@]}"; do
     printf 'required runtime file is missing: %s\n' "$dist_bin/$name" >&2
     exit 1
   fi
-  cp -aL -- "$dist_bin/$name" "$stage_dir/"
+  cp -aL -- "$dist_bin/$name" "$runtime_dir/"
 done
 
 while IFS= read -r library || [[ -n $library ]]; do
@@ -124,7 +126,7 @@ while IFS= read -r library || [[ -n $library ]]; do
     printf 'dependent runtime library is missing: %s\n' "$dist_bin/$library" >&2
     exit 1
   fi
-  cp -aL -- "$dist_bin/$library" "$stage_dir/"
+  cp -aL -- "$dist_bin/$library" "$runtime_dir/"
 done <"$dist_bin/dependentlibs.list"
 
 for library in libsoftokn3.so libfreeblpriv3.so; do
@@ -132,7 +134,7 @@ for library in libsoftokn3.so libfreeblpriv3.so; do
     printf 'required NSS library is missing: %s\n' "$dist_bin/$library" >&2
     exit 1
   fi
-  cp -aL -- "$dist_bin/$library" "$stage_dir/"
+  cp -aL -- "$dist_bin/$library" "$runtime_dir/"
 done
 
 for name in "${required_dirs[@]}"; do
@@ -140,7 +142,7 @@ for name in "${required_dirs[@]}"; do
     printf 'required runtime directory is missing: %s\n' "$dist_bin/$name" >&2
     exit 1
   fi
-  cp -aL -- "$dist_bin/$name" "$stage_dir/"
+  cp -aL -- "$dist_bin/$name" "$runtime_dir/"
 done
 
 printf '%s\n' \
@@ -148,10 +150,12 @@ printf '%s\n' \
   '' \
   'set -euo pipefail' \
   '' \
-  'runtime_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)' \
+  'package_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)' \
+  'runtime_dir="$package_dir/runtime"' \
   'export LD_LIBRARY_PATH="$runtime_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"' \
-  'exec "$runtime_dir/naivefox" "$@"' >"$stage_dir/run-naivefox"
-chmod 0755 "$stage_dir/run-naivefox"
+  'exec "$runtime_dir/naivefox" "$@"' >"$stage_dir/naivefox"
+cp -- "$stage_dir/naivefox" "$stage_dir/run-naivefox"
+chmod 0755 "$stage_dir/naivefox" "$stage_dir/run-naivefox"
 
 strip_tool=${NAIVEFOX_STRIP:-}
 if [[ -n $strip_tool ]]; then

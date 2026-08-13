@@ -132,24 +132,26 @@ trap 'exit 143' TERM
 profile_dir=$(mktemp -d /tmp/naivefox-profile.XXXXXX)
 chmod 0700 "$verify_root" "$profile_dir"
 
-runtime_dir="$verify_root/runtime"
-mkdir -m 0700 "$runtime_dir"
-cp -aL -- "$staged_dir/." "$runtime_dir/"
-assert_clean_tree "$runtime_dir"
+package_dir="$verify_root/package"
+mkdir -m 0700 "$package_dir"
+cp -aL -- "$staged_dir/." "$package_dir/"
+assert_clean_tree "$package_dir"
 
-for required in naivefox run-naivefox dependentlibs.list application.ini; do
-  if [[ ! -f $runtime_dir/$required ]]; then
+for required in naivefox run-naivefox runtime/naivefox \
+  runtime/dependentlibs.list runtime/application.ini; do
+  if [[ ! -f $package_dir/$required ]]; then
     printf 'staged runtime is missing %s\n' "$required" >&2
     exit 1
   fi
 done
-if [[ ! -x $runtime_dir/naivefox || ! -x $runtime_dir/run-naivefox ]]; then
+if [[ ! -x $package_dir/naivefox || ! -x $package_dir/run-naivefox ||
+      ! -x $package_dir/runtime/naivefox ]]; then
   printf 'staged runtime executables are not executable\n' >&2
   exit 1
 fi
 
 ldd_output=$(env -u LD_PRELOAD -u SSLKEYLOGFILE \
-  LD_LIBRARY_PATH="$runtime_dir" ldd "$runtime_dir/naivefox")
+  LD_LIBRARY_PATH="$package_dir/runtime" ldd "$package_dir/runtime/naivefox")
 if grep -q 'not found' <<<"$ldd_output"; then
   printf '%s\n' "$ldd_output" >&2
   printf 'staged runtime has unresolved ELF dependencies\n' >&2
@@ -164,24 +166,31 @@ fi
 
 export MOZ_CRASHREPORTER_DISABLE=1
 env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-  timeout 30 "$runtime_dir/run-naivefox" \
+  timeout 30 "$package_dir/naivefox" \
   --profile "$profile_dir" --runtime-smoke
 
 if [[ -n $fetch_url ]]; then
   env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-    timeout 60 "$runtime_dir/run-naivefox" \
+    timeout 60 "$package_dir/naivefox" \
     --profile "$profile_dir" --fetch "$fetch_url"
 fi
 
 for protocol in h2 h3; do
+  config_environment=()
+  if [[ $protocol == h2 ]]; then
+    config_environment=(
+      NAIVEFOX_CONFIG_DEFAULT=1
+      NAIVEFOX_CONFIG_PATH="$package_dir/config.json"
+    )
+  fi
   env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-    NAIVEFOX_RUNTIME="$runtime_dir/run-naivefox" \
-    NAIVEFOX_EXPECT_RUNTIME_DIR="$runtime_dir" \
-    "$source_root/netwerk/naivefox/test/integration/run-padded-tests.sh" \
-    --protocol "$protocol"
-  assert_clean_tree "$runtime_dir"
+    "${config_environment[@]}" NAIVEFOX_RUNTIME="$package_dir/naivefox" \
+    NAIVEFOX_EXPECT_RUNTIME_DIR="$package_dir/runtime" \
+    "$source_root/netwerk/naivefox/test/integration/run-config-tests.sh" \
+    "$protocol"
+  assert_clean_tree "$package_dir"
 done
 
-assert_clean_tree "$runtime_dir"
+assert_clean_tree "$package_dir"
 printf 'staged NaiveFox runtime verified outside the build tree: %s\n' \
-  "$runtime_dir"
+  "$package_dir"
