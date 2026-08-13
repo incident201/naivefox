@@ -12,6 +12,19 @@ Run every reproducible local integration gate sequentially with:
 ./run-local-suite.sh
 ```
 
+The existing command remains the H2 suite. Run strict H3 alone, or both
+protocol suites sequentially, with:
+
+```bash
+./run-h3-suite.sh
+./run-full-suite.sh
+```
+
+Strict H3 runners use an H3-only Caddy listener on UDP with no TCP listener on
+the proxy port. They require `Outer protocol: h3`, so H2 fallback cannot satisfy
+the workload. Both suites execute the same `naivefox` binary and share the
+SOCKS, CONNECT, padding, and pump implementation.
+
 The final capture step requires the restricted `dumpcap` capabilities
 documented below and in `../../CAPTURE.md`.
 
@@ -35,19 +48,21 @@ Run the M5 local SOCKS-to-Necko tunnel checks with:
 
 ```bash
 ./run-socks-tests.sh
+./run-h3-socks-tests.sh
 ```
 
 The command starts a finite loopback SOCKS5 server, sends domain-name HTTP and
-HTTPS requests through the Firefox/NSS HTTP/2 CONNECT path, validates the HTTPS
-target with the scoped fixture CA, and verifies clean shutdown after multiple
-sequential connections. Every curl invocation uses `--socks5-hostname` and
-`--noproxy ''`; no application-side target DNS lookup or certificate bypass is
-used.
+HTTPS requests through the selected Firefox/NSS H2 or Firefox/Neqo/NSS H3
+CONNECT path, validates the HTTPS target with the scoped fixture CA, and
+verifies clean shutdown after multiple sequential connections. Every curl
+invocation uses `--socks5-hostname` and `--noproxy ''`; no application-side
+target DNS lookup or certificate bypass is used.
 
 Run the complete padded M8 interoperability suite with:
 
 ```bash
 ./run-padded-tests.sh
+./run-h3-padded-tests.sh
 ```
 
 This is the single local acceptance command for Naive legacy padding Variant 1.
@@ -60,13 +75,15 @@ Run the M9 robustness and lifecycle suite with:
 
 ```bash
 ./run-robustness-tests.sh
+./run-h3-robustness-tests.sh
 ```
 
 It verifies bounded-memory 32 MiB download/upload backpressure, integrity,
 local/target/proxy close paths, timeout, ACL and authentication failure,
 application half-close, and four simultaneous padded CONNECT streams. While
 the concurrent streams are active, `ss` must show exactly one established TCP
-connection to the proxy, proving reuse of Firefox's outer H2 session.
+connection for H2 or one NaiveFox-owned UDP socket for H3, proving reuse of
+Firefox's outer H2 session or Neqo's outer QUIC connection.
 
 Run the M10 Firefox/NaiveFox wire comparison with:
 
