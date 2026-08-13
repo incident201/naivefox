@@ -210,11 +210,21 @@ Result: PASS. The verified package was promoted to
 | `ldd` missing libraries or object-directory paths | None |
 | External fresh profile and runtime smoke | PASS |
 | Public HTTPS fetch from copied package | HTTP 200, 559-byte Example body |
+| Strict H2 SOCKS/padding/integrity from copied package | PASS |
+| Strict H3 SOCKS/padding/integrity from copied package | PASS, UDP-only fixture |
+| Live process maps containing source/objdir paths | None |
 | Real Caddy padded workload from staged package | PASS, recorded above |
 
 The previous generated package was replaced only after the new staged copy had
 passed the `/tmp` verification. Test profiles and credentials are not part of
 the package.
+
+The H3 verification used the same 378 MiB staged layout. Neqo is linked into
+`libxul`, NSS/NSPR were already present, and networking remains in-process, so
+H3 required no additional library, `plugin-container`, or second executable.
+The copied package completed HTTP and HTTPS SOCKS targets, six negotiated
+padding tunnels per protocol, a 3 MiB download SHA-256 check, and a 2 MiB
+upload byte-count/SHA-256 check in both strict H2 and strict H3 modes.
 
 ## Data-retention result
 

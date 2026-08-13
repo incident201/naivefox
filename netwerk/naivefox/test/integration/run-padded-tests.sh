@@ -24,6 +24,19 @@ esac
 run_dir=
 client_pid=
 client_log=
+runtime=${NAIVEFOX_RUNTIME:-}
+expected_runtime_dir=${NAIVEFOX_EXPECT_RUNTIME_DIR:-}
+external_runtime=false
+if [[ -n $runtime ]]; then
+  if [[ $runtime != /* || ! -x $runtime || -z $expected_runtime_dir ||
+        $expected_runtime_dir != /* || ! -d $expected_runtime_dir ]]; then
+    printf 'external runtime and expected directory must be absolute and executable\n' >&2
+    exit 2
+  fi
+  external_runtime=true
+else
+  runtime="$OBJDIR/dist/bin/naivefox"
+fi
 cleanup() {
   local status=$?
   if [[ -n $client_pid ]] && kill -0 "$client_pid" 2>/dev/null; then
@@ -51,12 +64,22 @@ source "$run_dir/fixture.env"
 socks_port=$(python3 -c \
   'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
 client_log="$run_dir/padded-client.log"
-export LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export MOZ_CRASHREPORTER_DISABLE=1
 
-env NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
-  NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-  "$OBJDIR/dist/bin/naivefox" \
+runtime_environment=(env)
+if $external_runtime; then
+  runtime_environment+=(
+    -u LD_LIBRARY_PATH
+    -u LD_PRELOAD
+    -u SSLKEYLOGFILE
+  )
+else
+  export LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
+"${runtime_environment[@]}" \
+  NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
+  NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" "$runtime" \
   --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
   --protocol "$protocol" \
   --socks-listen "127.0.0.1:$socks_port" \
@@ -72,6 +95,20 @@ for ((i = 0; i < 100; i++)); do
   sleep 0.1
 done
 rg -q "^SOCKS5 listening on 127.0.0.1:$socks_port$" "$client_log"
+
+if $external_runtime; then
+  expected_executable=$(readlink -f "$expected_runtime_dir/naivefox")
+  actual_executable=$(readlink -f "/proc/$client_pid/exe")
+  if [[ $actual_executable != "$expected_executable" ]]; then
+    printf 'external test process did not execute the staged binary\n' >&2
+    exit 1
+  fi
+  if grep -Fq "$OBJDIR/" "/proc/$client_pid/maps" ||
+     grep -Fq "$SOURCE_ROOT/" "/proc/$client_pid/maps"; then
+    printf 'external runtime mapped a build-tree or source-tree file\n' >&2
+    exit 1
+  fi
+fi
 
 curl_socks=(
   --silent --show-error --fail --noproxy ''

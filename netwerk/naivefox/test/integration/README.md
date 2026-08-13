@@ -25,6 +25,11 @@ the proxy port. They require `Outer protocol: h3`, so H2 fallback cannot satisfy
 the workload. Both suites execute the same `naivefox` binary and share the
 SOCKS, CONNECT, padding, and pump implementation.
 
+`run-padded-tests.sh` also accepts an absolute staged launcher through
+`NAIVEFOX_RUNTIME` plus its directory through `NAIVEFOX_EXPECT_RUNTIME_DIR`.
+The staging verifier uses this mode for both protocols with inherited loader
+and TLS-keylog variables removed, and rejects any live source/objdir mapping.
+
 The final capture step requires the restricted `dumpcap` capabilities
 documented below and in `../../CAPTURE.md`.
 
