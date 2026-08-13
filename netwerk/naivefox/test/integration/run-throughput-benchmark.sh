@@ -6,6 +6,26 @@ umask 077
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
+protocol=h2
+if (($#)); then
+  [[ $# -eq 2 && $1 == --protocol ]] || {
+    printf 'usage: %s [--protocol h2|h3]\n' "$0" >&2
+    exit 2
+  }
+  protocol=$2
+fi
+[[ $protocol == h2 || $protocol == h3 ]] || {
+  printf 'unsupported benchmark protocol: %s\n' "$protocol" >&2
+  exit 2
+}
+readonly protocol
+if [[ $protocol == h2 ]]; then
+  readonly artifact_prefix=throughput-benchmark
+else
+  readonly artifact_prefix="$protocol-throughput-benchmark"
+fi
+readonly reference_proxy_scheme=$([[ $protocol == h3 ]] && printf quic || printf https)
+
 readonly block_size=$((64 * 1024 * 1024))
 readonly sequential_requests=4
 readonly parallel_requests=4
@@ -31,8 +51,8 @@ cleanup() {
   if ((status != 0)) && [[ -n $active_log && -f $active_log ]]; then
     sanitize_stream "${NAIVEFOX_FIXTURE_USER:-}" \
       "${NAIVEFOX_FIXTURE_PASS:-}" <"$active_log" \
-      >"$SOURCE_ROOT/artifacts/throughput-client-failure.log"
-    chmod 0600 "$SOURCE_ROOT/artifacts/throughput-client-failure.log"
+      >"$SOURCE_ROOT/artifacts/$artifact_prefix-client-failure.log"
+    chmod 0600 "$SOURCE_ROOT/artifacts/$artifact_prefix-client-failure.log"
   fi
   [[ -z $reference_config ]] || rm -f -- "$reference_config"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
@@ -40,11 +60,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$INTEGRATION_DIR/start.sh"
+"$INTEGRATION_DIR/start.sh" --mode "$protocol"
 run_dir=$(<"$ACTIVE_RUN_FILE")
 source "$run_dir/fixture.env"
-"$SOURCE_ROOT/netwerk/naivefox/tools/fetch-naiveproxy-reference.sh"
-reference_binary="$OBJDIR/naiveproxy-reference/naiveproxy-v150.0.7871.63-1-linux-x64/naive"
+if [[ -n ${NAIVEFOX_BENCHMARK_REFERENCE_BINARY:-} ]]; then
+  reference_binary=$NAIVEFOX_BENCHMARK_REFERENCE_BINARY
+else
+  "$SOURCE_ROOT/netwerk/naivefox/tools/fetch-naiveproxy-reference.sh"
+  reference_binary="$OBJDIR/naiveproxy-reference/naiveproxy-v150.0.7871.63-1-linux-x64/naive"
+fi
 [[ -x $reference_binary ]]
 
 metrics="$run_dir/throughput.tsv"
@@ -68,7 +92,7 @@ wait_for_listener() {
   local log=$2
   local pattern=$3
   for ((i = 0; i < 150; i++)); do
-    if rg -q "$pattern" "$log"; then
+    if [[ -f $log ]] && rg -q "$pattern" "$log"; then
       return 0
     fi
     if ! kill -0 "$pid" 2>/dev/null; then
@@ -245,17 +269,20 @@ benchmark_client() {
 
 start_reference() {
   local socks_port=$1
+  local reference_home="$run_dir/reference-home"
   reference_config="$run_dir/reference-config.json"
   active_log="$run_dir/reference-client.log"
   python3 - "$reference_config" "$socks_port" "$NAIVEFOX_FIXTURE_PROXY_PORT" \
-    "$NAIVEFOX_FIXTURE_USER" "$NAIVEFOX_FIXTURE_PASS" "$active_log" <<'PY'
+    "$NAIVEFOX_FIXTURE_USER" "$NAIVEFOX_FIXTURE_PASS" "$active_log" \
+    "$reference_proxy_scheme" <<'PY'
 import json
 import sys
 import urllib.parse
 
-config, port, proxy_port, user, password, log = sys.argv[1:]
+config, port, proxy_port, user, password, log, scheme = sys.argv[1:]
 proxy = (
-    "https://"
+    scheme
+    + "://"
     + urllib.parse.quote(user, safe="")
     + ":"
     + urllib.parse.quote(password, safe="")
@@ -268,13 +295,21 @@ with open(config, "x", encoding="utf-8") as output:
             "listen": f"socks://127.0.0.1:{port}",
             "proxy": proxy,
             "log": log,
+            "host-resolver-rules": "MAP localhost 127.0.0.1",
         },
         output,
     )
     output.write("\n")
 PY
   chmod 0600 "$reference_config"
-  env SSL_CERT_FILE="$NAIVEFOX_FIXTURE_CA" \
+  mkdir -m 0700 -p "$reference_home/.pki/nssdb"
+  if [[ $protocol == h3 ]]; then
+    find_certutil
+    run_certutil -N -d "sql:$reference_home/.pki/nssdb" --empty-password
+    run_certutil -A -d "sql:$reference_home/.pki/nssdb" \
+      -n naivefox-fixture-ca -t 'C,,' -i "$NAIVEFOX_FIXTURE_CA"
+  fi
+  env HOME="$reference_home" SSL_CERT_FILE="$NAIVEFOX_FIXTURE_CA" \
     SSL_CERT_DIR="$run_dir/reference-empty-cert-dir" \
     "$reference_binary" "$reference_config" >/dev/null 2>&1 &
   active_pid=$!
@@ -293,6 +328,7 @@ start_naivefox() {
     --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
     --socks-listen "127.0.0.1:$socks_port" \
     --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    --protocol "$protocol" \
     >"$active_log" 2>&1 &
   active_pid=$!
   wait_for_listener "$active_pid" "$active_log" \
@@ -321,6 +357,11 @@ benchmark_client naivefox "$naivefox_port" "$active_pid" "$active_log"
 [[ $(rg -c '^Padding negotiated: yes$' "$active_log") -eq \
   "$connections_per_client" ]]
 ! rg -q '^Padding negotiated: no$' "$active_log"
+[[ $(rg -c "^Outer protocol: $protocol$" "$active_log") -eq \
+  "$connections_per_client" ]]
+if [[ $protocol == h3 ]]; then
+  ! rg -q '^Outer protocol: h2$' "$active_log"
+fi
 kill -TERM "$active_pid"
 set +e
 wait "$active_pid"
@@ -329,9 +370,9 @@ set -e
 active_pid=
 [[ $naivefox_status -eq 0 || $naivefox_status -eq 143 ]]
 
-cp -- "$metrics" "$SOURCE_ROOT/artifacts/throughput-benchmark.tsv"
-chmod 0600 "$SOURCE_ROOT/artifacts/throughput-benchmark.tsv"
-python3 - "$metrics" >"$SOURCE_ROOT/artifacts/throughput-benchmark-summary.md" <<'PY'
+cp -- "$metrics" "$SOURCE_ROOT/artifacts/$artifact_prefix.tsv"
+chmod 0600 "$SOURCE_ROOT/artifacts/$artifact_prefix.tsv"
+python3 - "$metrics" >"$SOURCE_ROOT/artifacts/$artifact_prefix-summary.md" <<'PY'
 import csv
 import statistics
 import sys
@@ -362,6 +403,6 @@ for client in ("naiveproxy", "naivefox"):
     )
     print(f"\n{client} peak RSS: {rss / 1048576:.1f} MiB")
 PY
-chmod 0600 "$SOURCE_ROOT/artifacts/throughput-benchmark-summary.md"
+chmod 0600 "$SOURCE_ROOT/artifacts/$artifact_prefix-summary.md"
 
-printf 'NaiveFox/NaiveProxy local throughput benchmark passed\n'
+printf 'NaiveFox/NaiveProxy local %s throughput benchmark passed\n' "$protocol"
