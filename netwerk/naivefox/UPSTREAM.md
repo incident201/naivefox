@@ -419,6 +419,54 @@ Tests:
 
 Commit: `a8ad15724cca NF09 harden H2 tunnel lifecycle`
 
+### Patch NF-UPSTREAM-006
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/base/nsIProxyInfo.idl
+netwerk/protocol/http/ConnectionAttemptPool.cpp
+netwerk/protocol/http/nsHttpConnectionInfo.h
+netwerk/protocol/http/nsHttpTransaction.cpp
+netwerk/test/unit/test_http3_proxy_strict.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Allow a privileged caller to require an HTTP/3 proxy without Necko opening or
+switching to an HTTPS/H2 fallback route.
+
+Why project-only code was insufficient:
+
+An H3 proxy transaction creates a timed HTTPS backup connection by default,
+and its generic restart path converts a `masque` proxy info into `https`.
+Rejecting H2 only after the channel completes would still put fallback TCP
+traffic on the wire and would not satisfy strict protocol selection.
+
+Implementation and behavioral risk:
+
+- add an opt-in proxy flag which is preserved by the existing proxy-info clone
+  and IPC serialization;
+- suppress the H3-proxy backup timer and the `masque` to `https` conversion
+  only when that flag is present;
+- explicitly disable Happy Eyeballs selection for a flagged transaction and
+  reject that connection-attempt path defensively even if a caller supplied a
+  preconfigured connection info;
+- leave ordinary Firefox H3 fallback, origin H3, and unflagged proxy channels
+  unchanged.
+
+Tests:
+
+- an unavailable UDP/H3 proxy with an available H2 proxy on the same port must
+  fail instead of returning the H2 target response, with Happy Eyeballs enabled
+  globally during the test;
+- the existing H3 proxy fallback suite remains enabled for unflagged channels.
+
+Commit: `NF-H3-03 require strict Necko H3 proxy selection`
+
 ## Rules for future upstream changes
 
 When adding another upstream patch, append:

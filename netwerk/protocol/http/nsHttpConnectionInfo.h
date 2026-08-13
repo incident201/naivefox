@@ -308,6 +308,10 @@ class nsHttpConnectionInfo final : public ARefBase {
 
   bool IsHttp3() const { return mIsHttp3; }
   bool IsHttp3ProxyConnection() const { return mIsHttp3ProxyConnection; }
+  bool DisablesHttp3ProxyFallback() const {
+    return mProxyInfo && mProxyInfo->IsHttp3Proxy() &&
+           (mProxyInfo->Flags() & nsIProxyInfo::DISABLE_HTTP3_PROXY_FALLBACK);
+  }
 
   void SetHasIPHintAddress(bool aHasIPHint) { mHasIPHintAddress = aHasIPHint; }
   bool HasIPHintAddress() const { return mHasIPHintAddress; }
