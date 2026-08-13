@@ -42,6 +42,8 @@ the workload.
 | `netwerk/naivefox/test/integration/run-h3-raw-connect-tests.sh` | PASS, CONNECT 200 plus deterministic 407 authentication failure |
 | `netwerk/naivefox/test/integration/run-h3-padded-tests.sh` | PASS, six HTTP/HTTPS padded tunnels including 3 MiB download and 2 MiB upload |
 | `netwerk/naivefox/test/integration/run-h3-robustness-tests.sh` | PASS |
+| `./mach gtest 'NaiveFoxAutoFallback*'` | PASS, 3/3 policy tests |
+| `netwerk/naivefox/test/integration/run-auto-protocol-tests.sh` | PASS |
 | `netwerk/naivefox/test/integration/run-robustness-tests.sh --protocol h2` | PASS, H2 regression with the same workload |
 
 The H3 robustness runner verifies 32 MiB slow download and upload integrity,
@@ -58,6 +60,15 @@ The expected negative-path curl diagnostics are truncated response, timeout,
 and rejected SOCKS target; the runner requires those failures before reporting
 PASS. No credentials, response bodies, packet captures, or key material are
 retained in this report.
+
+Auto mode was tested in both raw and SOCKS modes. An H2-only fixture caused a
+single strict H3 establishment timeout followed by H2 success. Against the
+H3-only fixture, H3 success, invalid authentication, and denied target cases
+ran alongside a TCP decoy bound to the same numeric proxy port; the decoy
+accepted zero connections. This proves logical H3 failures do not create a
+hidden H2 retry. The pure policy matrix also rejects fallback after CONNECT
+codes 200, 403, 407, 502, and 504, after transport publication, after owner
+cancellation, and after the one allowed retry has been consumed.
 
 H3 performance comparison, passive/decrypted capture comparison, staged
 runtime verification, and the ten-minute real-server soak remain mandatory

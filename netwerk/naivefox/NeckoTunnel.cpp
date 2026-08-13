@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <limits>
 
+#include "AutoFallback.h"
 #include "mozilla/Base64.h"
 #include "mozilla/ErrorNames.h"
 #include "mozilla/Mutex.h"
@@ -33,6 +34,7 @@
 #include "nsISocketTransport.h"
 #include "nsIStreamListener.h"
 #include "nsITLSSocketControl.h"
+#include "nsITimer.h"
 #include "nsITransportSecurityInfo.h"
 #include "nsIURI.h"
 #include "nsNetCID.h"
@@ -71,11 +73,14 @@ class TunnelSmoke final : public nsIHttpUpgradeListener,
     return mComplete;
   }
 
-  void Snapshot(nsresult& aResult, int32_t& aConnectCode,
+  void Snapshot(nsresult& aResult, bool& aConnectCodeKnown,
+                int32_t& aConnectCode, bool& aTransportAvailable,
                 nsACString& aOuterProtocol) {
     MutexAutoLock lock(mMutex);
     aResult = mResult;
+    aConnectCodeKnown = mConnectCodeKnown;
     aConnectCode = mConnectCode;
+    aTransportAvailable = mTransportAvailable;
     aOuterProtocol = mOuterProtocol;
   }
 
@@ -130,6 +135,11 @@ class TunnelSmoke final : public nsIHttpUpgradeListener,
   bool mComplete MOZ_GUARDED_BY(mMutex) = false;
   nsresult mResult MOZ_GUARDED_BY(mMutex) = NS_ERROR_NOT_INITIALIZED;
   int32_t mConnectCode MOZ_GUARDED_BY(mMutex) = -1;
+  bool mConnectCodeKnown MOZ_GUARDED_BY(mMutex) = false;
+  bool mTransportAvailable MOZ_GUARDED_BY(mMutex) = false;
+  bool mChannelStopped MOZ_GUARDED_BY(mMutex) = false;
+  bool mUpgradeFailed MOZ_GUARDED_BY(mMutex) = false;
+  nsresult mUpgradeFailure MOZ_GUARDED_BY(mMutex) = NS_ERROR_NOT_INITIALIZED;
   nsCString mOuterProtocol MOZ_GUARDED_BY(mMutex);
 
   nsCOMPtr<nsIAsyncInputStream> mSocketIn;
@@ -167,6 +177,7 @@ NS_IMETHODIMP TunnelSmoke::OnStartRequest(nsIRequest* aRequest) {
 
   {
     MutexAutoLock lock(mMutex);
+    mConnectCodeKnown = true;
     mConnectCode = connectCode;
     mOuterProtocol = outerProtocol;
   }
@@ -191,6 +202,14 @@ NS_IMETHODIMP TunnelSmoke::OnDataAvailable(nsIRequest* aRequest,
 
 NS_IMETHODIMP TunnelSmoke::OnStopRequest(nsIRequest* aRequest,
                                          nsresult aStatus) {
+  bool upgradeFailed = false;
+  nsresult upgradeFailure = NS_ERROR_FAILURE;
+  {
+    MutexAutoLock lock(mMutex);
+    mChannelStopped = true;
+    upgradeFailed = mUpgradeFailed;
+    upgradeFailure = mUpgradeFailure;
+  }
   if (NS_FAILED(aStatus)) {
     PrintFailure("Proxy channel", aStatus);
     Finish(aStatus);
@@ -206,6 +225,8 @@ NS_IMETHODIMP TunnelSmoke::OnStopRequest(nsIRequest* aRequest,
     Finish(NS_ERROR_PROXY_AUTHENTICATION_FAILED);
   } else if (connectCode != 200) {
     Finish(NS_ERROR_FAILURE);
+  } else if (upgradeFailed) {
+    Finish(upgradeFailure);
   }
   return NS_OK;
 }
@@ -238,6 +259,10 @@ NS_IMETHODIMP TunnelSmoke::OnTransportAvailable(
 
   mSocketIn = aSocketIn;
   mSocketOut = aSocketOut;
+  {
+    MutexAutoLock lock(mMutex);
+    mTransportAvailable = true;
+  }
 
   nsresult rv = mSocketOut->AsyncWait(this, 0, 0, nullptr);
   if (NS_FAILED(rv)) {
@@ -253,7 +278,16 @@ NS_IMETHODIMP TunnelSmoke::OnTransportAvailable(
 
 NS_IMETHODIMP TunnelSmoke::OnUpgradeFailed(nsresult aErrorCode) {
   PrintFailure("Raw CONNECT upgrade", aErrorCode);
-  Finish(aErrorCode);
+  bool channelStopped = false;
+  {
+    MutexAutoLock lock(mMutex);
+    mUpgradeFailed = true;
+    mUpgradeFailure = aErrorCode;
+    channelStopped = mChannelStopped;
+  }
+  if (channelStopped) {
+    Finish(aErrorCode);
+  }
   return NS_OK;
 }
 
@@ -352,7 +386,7 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          nsIHttpUpgradeListener* aUpgradeListener,
                          nsIStreamListener* aChannelListener,
                          const nsACString& aConnectPadding,
-                         ProxyProtocol aProtocol) {
+                         ProxyProtocol aProtocol, nsIRequest** aOpenedRequest) {
   if (!aUpgradeListener || !aChannelListener) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -471,7 +505,12 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   }
 
   MOZ_TRY(internal->HTTPUpgrade(EmptyCString(), aUpgradeListener));
-  return channel->AsyncOpen(aChannelListener);
+  MOZ_TRY(channel->AsyncOpen(aChannelListener));
+  if (aOpenedRequest) {
+    nsCOMPtr<nsIRequest> request = channel;
+    request.forget(aOpenedRequest);
+  }
+  return NS_OK;
 }
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
@@ -490,31 +529,80 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
   nsAutoCString request("GET /delay?ms=250 HTTP/1.1\r\nHost: "_ns);
   request.Append(targetHostPort);
   request.AppendLiteral("\r\nConnection: close\r\n\r\n");
-  RefPtr<TunnelSmoke> listener = new TunnelSmoke(request, aProtocol);
-  MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
-                          aProxyPassword, listener, listener, EmptyCString(),
-                          aProtocol));
+  ProxyProtocol actualProtocol =
+      aProtocol == ProxyProtocol::Auto ? ProxyProtocol::H3 : aProtocol;
+  bool fallbackUsed = false;
 
-  if (!SpinEventLoopUntil("NaiveFox::RunRawTunnelSmoke"_ns,
-                          [&listener]() { return listener->Complete(); })) {
-    return NS_ERROR_FAILURE;
-  }
+  while (true) {
+    RefPtr<TunnelSmoke> listener = new TunnelSmoke(request, actualProtocol);
+    nsCOMPtr<nsIRequest> openedRequest;
+    MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
+                            aProxyPassword, listener, listener, EmptyCString(),
+                            actualProtocol, getter_AddRefs(openedRequest)));
 
-  nsresult result;
-  int32_t connectCode;
-  nsAutoCString outerProtocol;
-  listener->Snapshot(result, connectCode, outerProtocol);
-  std::printf("Proxy CONNECT status: %d\n", connectCode);
-  std::printf("Outer protocol: %s\n", outerProtocol.get());
-  const auto expectedProtocol =
-      aProtocol == ProxyProtocol::H3 ? "h3"_ns : "h2"_ns;
-  if (!outerProtocol.Equals(expectedProtocol)) {
-    return NS_ERROR_FAILURE;
+    nsCOMPtr<nsITimer> establishmentTimer;
+    bool establishmentTimedOut = false;
+    if (aProtocol == ProxyProtocol::Auto &&
+        actualProtocol == ProxyProtocol::H3) {
+      auto timer = NS_NewTimerWithCallback(
+          [request = openedRequest, &establishmentTimedOut](nsITimer*) {
+            establishmentTimedOut = true;
+            (void)request->Cancel(NS_ERROR_NET_TIMEOUT);
+          },
+          5000, nsITimer::TYPE_ONE_SHOT,
+          "NaiveFox::RawAutoH3EstablishmentTimeout"_ns);
+      if (timer.isErr()) {
+        return timer.unwrapErr();
+      }
+      establishmentTimer = timer.unwrap();
+    }
+
+    if (!SpinEventLoopUntil("NaiveFox::RunRawTunnelSmoke"_ns,
+                            [&listener]() { return listener->Complete(); })) {
+      return NS_ERROR_FAILURE;
+    }
+    if (establishmentTimer) {
+      (void)establishmentTimer->Cancel();
+    }
+
+    nsresult result;
+    bool connectCodeKnown = false;
+    int32_t connectCode = -1;
+    bool transportAvailable = false;
+    nsAutoCString outerProtocol;
+    listener->Snapshot(result, connectCodeKnown, connectCode,
+                       transportAvailable, outerProtocol);
+
+    const AutoFallbackState fallbackState{
+        aProtocol,
+        actualProtocol,
+        fallbackUsed,
+        false,
+        true,
+        NS_FAILED(result),
+        establishmentTimedOut,
+        connectCodeKnown,
+        connectCode,
+        transportAvailable,
+    };
+    if (ShouldRetryH2FromH3(fallbackState)) {
+      fallbackUsed = true;
+      actualProtocol = ProxyProtocol::H2;
+      continue;
+    }
+
+    std::printf("Proxy CONNECT status: %d\n", connectCode);
+    std::printf("Outer protocol: %s\n", outerProtocol.get());
+    const auto expectedProtocol =
+        actualProtocol == ProxyProtocol::H3 ? "h3"_ns : "h2"_ns;
+    if (!outerProtocol.Equals(expectedProtocol)) {
+      return NS_ERROR_FAILURE;
+    }
+    if (NS_SUCCEEDED(result)) {
+      std::printf("Raw tunnel response marker verified\n");
+    }
+    return result;
   }
-  if (NS_SUCCEEDED(result)) {
-    std::printf("Raw tunnel response marker verified\n");
-  }
-  return result;
 }
 
 }  // namespace mozilla::naivefox

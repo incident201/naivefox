@@ -85,6 +85,18 @@ the concurrent streams are active, `ss` must show exactly one established TCP
 connection for H2 or one NaiveFox-owned UDP socket for H3, proving reuse of
 Firefox's outer H2 session or Neqo's outer QUIC connection.
 
+Run the bounded protocol-selection policy tests with:
+
+```bash
+./run-auto-protocol-tests.sh
+```
+
+Auto mode performs one strict H3 attempt and at most one H2 retry. The test
+uses an H2-only endpoint for the allowed establishment fallback, then places a
+TCP decoy beside the H3-only UDP fixture and requires zero decoy accepts for H3
+success, authentication rejection, and target failure. Raw and SOCKS entry
+points use the same policy.
+
 Run the M10 Firefox/NaiveFox wire comparison with:
 
 ```bash

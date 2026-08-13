@@ -107,15 +107,25 @@ The implemented explicit-mode behavior is:
   `h2`;
 - `h3`: MASQUE/H3 proxy info, H3 enabled, all TCP/H2 proxy fallback disabled
   for that transaction, negotiated outer protocol must be `h3`;
-- `auto`: remains pending. It will prefer the H3 proxy route and permit one H2
-  retry only for outer transport/protocol establishment failures. A 407,
-  CONNECT/ACL rejection, bad target, or failure after tunnel establishment
-  must not trigger fallback.
+- `auto`: starts one strict H3 attempt, then permits one fresh H2 attempt only
+  when H3 terminates before any CONNECT response or transport streams. A 407,
+  CONNECT/ACL rejection, bad target, or failure after tunnel establishment is
+  terminal and cannot trigger fallback.
 
 Strict H3 uses the opt-in `DISABLE_HTTP3_PROXY_FALLBACK` proxy flag. The flag
 suppresses the H3 backup timer, the `masque` to `https` restart conversion, and
 the Happy Eyeballs route. Consequently strict tests cannot create fallback TCP
 traffic before the application checks the negotiated protocol.
+
+Each Auto attempt has an immutable protocol and generation ID. A small listener
+adapter associates every metadata, stop, transport, and upgrade callback with
+that generation; stale callbacks from a cancelled H3 attempt are ignored and
+any stale streams are closed. The project-level H3 establishment timer is five
+seconds and is cancelled on the first CONNECT response. A timeout with no
+response and no transport is therefore an eligible establishment failure, but
+an unknown response code without that timeout is not. Padding is regenerated
+for the H2 attempt, while the SOCKS reply is withheld until the final attempt
+has passed CONNECT status, protocol, channel completion, and transport checks.
 
 The upgrade callback's H3 virtual transport does not expose the outer QUIC TLS
 socket control, so the H2-only `GetNegotiatedNPN()` check cannot be reused.

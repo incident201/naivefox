@@ -10,6 +10,7 @@
 #include <functional>
 #include <utility>
 
+#include "AutoFallback.h"
 #include "HeaderPadding.h"
 #include "NeckoTunnel.h"
 #include "PaddingNegotiation.h"
@@ -36,6 +37,7 @@
 #include "nsISocketTransport.h"
 #include "nsIStreamListener.h"
 #include "nsITLSSocketControl.h"
+#include "nsITimer.h"
 #include "nsITransport.h"
 #include "nsITransportSecurityInfo.h"
 #include "nsNetCID.h"
@@ -337,17 +339,14 @@ NS_IMETHODIMP PumpDirection::OnOutputStreamReady(
   return NS_OK;
 }
 
+class TunnelAttempt;
+
 class SocksConnection final : public nsIInputStreamCallback,
-                              public nsIOutputStreamCallback,
-                              public nsIHttpUpgradeListener,
-                              public nsIStreamListener {
+                              public nsIOutputStreamCallback {
  public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIINPUTSTREAMCALLBACK
   NS_DECL_NSIOUTPUTSTREAMCALLBACK
-  NS_DECL_NSIHTTPUPGRADELISTENER
-  NS_DECL_NSIREQUESTOBSERVER
-  NS_DECL_NSISTREAMLISTENER
 
   SocksConnection(nsIAsyncInputStream* aLocalIn,
                   nsIAsyncOutputStream* aLocalOut, const nsACString& aProxyUrl,
@@ -367,17 +366,34 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult Start() { return WaitForInput(); }
 
  private:
+  friend class TunnelAttempt;
+
   ~SocksConnection() { Close(NS_BASE_STREAM_CLOSED); }
 
   nsresult WaitForInput();
   nsresult WaitForOutput();
   nsresult QueueReply(Span<const uint8_t> aBytes, bool aCloseAfter);
   nsresult FlushReplies();
-  void BeginTunnel(const nsACString& aTargetAuthority);
-  void ApplyConnectMetadata(nsresult aStatus, int32_t aConnectCode,
+  nsresult StartAttempt(ProxyProtocol aProtocol);
+  void OpenAttemptOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
+                         const nsACString& aTargetAuthority);
+  void ApplyConnectMetadata(uint64_t aGeneration, ProxyProtocol aProtocol,
+                            nsresult aStatus, bool aConnectCodeKnown,
+                            int32_t aConnectCode,
                             const Maybe<bool>& aPaddingHeaderPresent,
                             const nsACString& aOuterProtocol);
-  void ApplyChannelStop(nsresult aStatus);
+  void ApplyChannelStop(uint64_t aGeneration, ProxyProtocol aProtocol,
+                        nsresult aStatus);
+  void ApplyTransport(uint64_t aGeneration, ProxyProtocol aProtocol,
+                      nsISocketTransport* aTransport,
+                      nsIAsyncInputStream* aSocketIn,
+                      nsIAsyncOutputStream* aSocketOut);
+  void ApplyUpgradeFailure(uint64_t aGeneration, ProxyProtocol aProtocol,
+                           nsresult aStatus);
+  void ApplyEstablishmentTimeout(uint64_t aGeneration, ProxyProtocol aProtocol);
+  void ApplyOpenFailure(uint64_t aGeneration, ProxyProtocol aProtocol);
+  bool IsCurrentAttempt(uint64_t aGeneration, ProxyProtocol aProtocol) const;
+  void ResetAttemptState();
   void MaybeStartTunnel();
   void TunnelReady(nsIAsyncInputStream* aTunnelIn,
                    nsIAsyncOutputStream* aTunnelOut);
@@ -390,6 +406,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsCString mProxyUser;
   nsCString mProxyPassword;
   ProxyProtocol mProtocol;
+  ProxyProtocol mAttemptProtocol = ProxyProtocol::H2;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   Socks5Parser mParser;
   nsTArray<uint8_t> mReplies;
@@ -400,26 +417,98 @@ class SocksConnection final : public nsIInputStreamCallback,
   bool mTunnelOpening = false;
   bool mTunnelReady = false;
   bool mPumpStarted = false;
+  uint64_t mAttemptGeneration = 0;
+  bool mFallbackUsed = false;
+  nsCString mTargetAuthority;
   bool mTransportReady = false;
   bool mMetadataReady = false;
   nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
   bool mChannelStopped = false;
   nsresult mChannelStatus = NS_ERROR_NOT_INITIALIZED;
+  bool mConnectCodeKnown = false;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
   nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
   nsCOMPtr<nsIAsyncOutputStream> mPendingTunnelOut;
+  bool mUpgradeFailed = false;
+  bool mEstablishmentTimedOut = false;
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
   bool mFailureQueued = false;
   bool mClosed = false;
 };
 
+class TunnelAttempt final : public nsIHttpUpgradeListener,
+                            public nsIStreamListener {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSIHTTPUPGRADELISTENER
+  NS_DECL_NSIREQUESTOBSERVER
+  NS_DECL_NSISTREAMLISTENER
+
+  TunnelAttempt(SocksConnection* aOwner, nsIEventTarget* aSocketTarget,
+                uint64_t aGeneration, ProxyProtocol aProtocol)
+      : mOwner(aOwner),
+        mSocketTarget(aSocketTarget),
+        mGeneration(aGeneration),
+        mProtocol(aProtocol) {}
+
+  nsresult ArmEstablishmentTimeout(nsIRequest* aRequest);
+
+ private:
+  ~TunnelAttempt();
+  void CancelEstablishmentTimeout();
+
+  RefPtr<SocksConnection> mOwner;
+  nsCOMPtr<nsIEventTarget> mSocketTarget;
+  const uint64_t mGeneration;
+  const ProxyProtocol mProtocol;
+  nsCOMPtr<nsITimer> mEstablishmentTimer;
+};
+
 NS_IMPL_ISUPPORTS(SocksConnection, nsIInputStreamCallback,
-                  nsIOutputStreamCallback, nsIHttpUpgradeListener,
-                  nsIStreamListener, nsIRequestObserver)
+                  nsIOutputStreamCallback)
+NS_IMPL_ISUPPORTS(TunnelAttempt, nsIHttpUpgradeListener, nsIStreamListener,
+                  nsIRequestObserver)
+
+TunnelAttempt::~TunnelAttempt() { CancelEstablishmentTimeout(); }
+
+nsresult TunnelAttempt::ArmEstablishmentTimeout(nsIRequest* aRequest) {
+  constexpr uint32_t kAutoH3EstablishmentTimeoutMs = 5000;
+  RefPtr self = this;
+  nsCOMPtr<nsIRequest> request = aRequest;
+  auto timer = NS_NewTimerWithCallback(
+      [self, request = std::move(request)](nsITimer*) {
+        self->mEstablishmentTimer = nullptr;
+        RefPtr owner = self->mOwner;
+        const uint64_t generation = self->mGeneration;
+        const ProxyProtocol protocol = self->mProtocol;
+        (void)self->mSocketTarget->Dispatch(
+            NS_NewRunnableFunction("NaiveFox::AutoH3EstablishmentTimedOut",
+                                   [owner, generation, protocol]() {
+                                     owner->ApplyEstablishmentTimeout(
+                                         generation, protocol);
+                                   }),
+            NS_DISPATCH_NORMAL);
+        (void)request->Cancel(NS_ERROR_NET_TIMEOUT);
+      },
+      kAutoH3EstablishmentTimeoutMs, nsITimer::TYPE_ONE_SHOT,
+      "NaiveFox::AutoH3EstablishmentTimeout"_ns);
+  if (timer.isErr()) {
+    return timer.unwrapErr();
+  }
+  mEstablishmentTimer = timer.unwrap();
+  return NS_OK;
+}
+
+void TunnelAttempt::CancelEstablishmentTimeout() {
+  if (mEstablishmentTimer) {
+    (void)mEstablishmentTimer->Cancel();
+    mEstablishmentTimer = nullptr;
+  }
+}
 
 nsresult SocksConnection::WaitForInput() {
   return mLocalIn->AsyncWait(this, 0, 0, nullptr);
@@ -489,27 +578,57 @@ void SocksConnection::Reject(Socks5Parser::Event aEvent) {
   }
 }
 
-void SocksConnection::BeginTunnel(const nsACString& aTargetAuthority) {
+nsresult SocksConnection::StartAttempt(ProxyProtocol aProtocol) {
+  MOZ_ASSERT(!NS_IsMainThread());
+  if (mClosed || aProtocol == ProxyProtocol::Auto) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  ++mAttemptGeneration;
+  mAttemptProtocol = aProtocol;
+  ResetAttemptState();
+  RefPtr self = this;
+  const uint64_t generation = mAttemptGeneration;
+  nsCString authority(mTargetAuthority);
+  return NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::OpenSocksTunnelAttempt",
+      [self, generation, aProtocol, authority = std::move(authority)]() {
+        self->OpenAttemptOnMain(generation, aProtocol, authority);
+      }));
+}
+
+void SocksConnection::OpenAttemptOnMain(uint64_t aGeneration,
+                                        ProxyProtocol aProtocol,
+                                        const nsACString& aTargetAuthority) {
   MOZ_ASSERT(NS_IsMainThread());
   nsAutoCString padding;
   nsresult rv = GenerateHeaderPadding(padding);
   if (NS_FAILED(rv)) {
     RefPtr self = this;
     (void)mSocketTarget->Dispatch(
-        NS_NewRunnableFunction(
-            "NaiveFox::PaddingGenerationFailure",
-            [self]() { self->Reject(Socks5Parser::Event::ProtocolError); }),
+        NS_NewRunnableFunction("NaiveFox::PaddingGenerationFailure",
+                               [self, aGeneration, aProtocol]() {
+                                 self->ApplyOpenFailure(aGeneration, aProtocol);
+                               }),
         NS_DISPATCH_NORMAL);
     return;
   }
+  RefPtr<TunnelAttempt> attempt =
+      new TunnelAttempt(this, mSocketTarget, aGeneration, aProtocol);
+  nsCOMPtr<nsIRequest> openedRequest;
   rv = OpenNeckoTunnel(mProxyUrl, aTargetAuthority, mProxyUser, mProxyPassword,
-                       this, this, padding, mProtocol);
+                       attempt, attempt, padding, aProtocol,
+                       getter_AddRefs(openedRequest));
+  if (NS_SUCCEEDED(rv) && mProtocol == ProxyProtocol::Auto &&
+      aProtocol == ProxyProtocol::H3) {
+    rv = attempt->ArmEstablishmentTimeout(openedRequest);
+  }
   if (NS_FAILED(rv)) {
     RefPtr self = this;
     (void)mSocketTarget->Dispatch(
-        NS_NewRunnableFunction(
-            "NaiveFox::SocksTunnelOpenFailure",
-            [self]() { self->Reject(Socks5Parser::Event::ProtocolError); }),
+        NS_NewRunnableFunction("NaiveFox::SocksTunnelOpenFailure",
+                               [self, aGeneration, aProtocol]() {
+                                 self->ApplyOpenFailure(aGeneration, aProtocol);
+                               }),
         NS_DISPATCH_NORMAL);
   }
 }
@@ -553,13 +672,10 @@ NS_IMETHODIMP SocksConnection::OnInputStreamReady(
       if (offset < read) {
         mInitialPayload.AppendElements(buffer.data() + offset, read - offset);
       }
-      nsCString authority = mParser.Target().Authority();
-      RefPtr self = this;
-      rv = NS_DispatchToMainThread(
-          NS_NewRunnableFunction("NaiveFox::BeginSocksTunnel",
-                                 [self, authority = std::move(authority)]() {
-                                   self->BeginTunnel(authority);
-                                 }));
+      mTargetAuthority = mParser.Target().Authority();
+      const ProxyProtocol firstProtocol =
+          mProtocol == ProxyProtocol::Auto ? ProxyProtocol::H3 : mProtocol;
+      rv = StartAttempt(firstProtocol);
       if (NS_FAILED(rv)) {
         Close(rv);
       }
@@ -589,9 +705,11 @@ NS_IMETHODIMP SocksConnection::OnOutputStreamReady(
   return NS_OK;
 }
 
-NS_IMETHODIMP SocksConnection::OnStartRequest(nsIRequest* aRequest) {
+NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
+  CancelEstablishmentTimeout();
   nsCOMPtr<nsIProxiedChannel> proxied = do_QueryInterface(aRequest);
   int32_t connectCode = -1;
+  bool connectCodeKnown = false;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
   nsAutoCString outerProtocol;
@@ -599,6 +717,7 @@ NS_IMETHODIMP SocksConnection::OnStartRequest(nsIRequest* aRequest) {
   if (proxied && http) {
     rv = proxied->GetHttpProxyConnectResponseCode(&connectCode);
     if (NS_SUCCEEDED(rv)) {
+      connectCodeKnown = true;
       rv = http->GetProtocolVersion(outerProtocol);
     }
     if (NS_SUCCEEDED(rv)) {
@@ -614,23 +733,27 @@ NS_IMETHODIMP SocksConnection::OnStartRequest(nsIRequest* aRequest) {
       }
     }
   }
-  RefPtr self = this;
+  RefPtr owner = mOwner;
+  const uint64_t generation = mGeneration;
+  const ProxyProtocol protocol = mProtocol;
   (void)mSocketTarget->Dispatch(
-      NS_NewRunnableFunction("NaiveFox::SocksConnectMetadata",
-                             [self, rv, connectCode, paddingHeaderPresent,
-                              outerProtocol = std::move(outerProtocol)]() {
-                               self->ApplyConnectMetadata(rv, connectCode,
-                                                          paddingHeaderPresent,
-                                                          outerProtocol);
-                             }),
+      NS_NewRunnableFunction(
+          "NaiveFox::SocksConnectMetadata",
+          [owner, generation, protocol, rv, connectCodeKnown, connectCode,
+           paddingHeaderPresent, outerProtocol = std::move(outerProtocol)]() {
+            owner->ApplyConnectMetadata(generation, protocol, rv,
+                                        connectCodeKnown, connectCode,
+                                        paddingHeaderPresent, outerProtocol);
+          }),
       NS_DISPATCH_NORMAL);
-  return rv;
+  // Metadata collection is diagnostic. It must not change the channel result.
+  return NS_OK;
 }
 
-NS_IMETHODIMP SocksConnection::OnDataAvailable(nsIRequest* aRequest,
-                                               nsIInputStream* aInput,
-                                               uint64_t aOffset,
-                                               uint32_t aCount) {
+NS_IMETHODIMP TunnelAttempt::OnDataAvailable(nsIRequest* aRequest,
+                                             nsIInputStream* aInput,
+                                             uint64_t aOffset,
+                                             uint32_t aCount) {
   char discard[512];
   while (aCount) {
     uint32_t read = 0;
@@ -644,24 +767,79 @@ NS_IMETHODIMP SocksConnection::OnDataAvailable(nsIRequest* aRequest,
   return NS_OK;
 }
 
-NS_IMETHODIMP SocksConnection::OnStopRequest(nsIRequest* aRequest,
-                                             nsresult aStatus) {
-  RefPtr self = this;
+NS_IMETHODIMP TunnelAttempt::OnStopRequest(nsIRequest* aRequest,
+                                           nsresult aStatus) {
+  CancelEstablishmentTimeout();
+  RefPtr owner = mOwner;
+  const uint64_t generation = mGeneration;
+  const ProxyProtocol protocol = mProtocol;
   (void)mSocketTarget->Dispatch(
-      NS_NewRunnableFunction(
-          "NaiveFox::SocksChannelStop",
-          [self, aStatus]() { self->ApplyChannelStop(aStatus); }),
+      NS_NewRunnableFunction("NaiveFox::SocksChannelStop",
+                             [owner, generation, protocol, aStatus]() {
+                               owner->ApplyChannelStop(generation, protocol,
+                                                       aStatus);
+                             }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
 }
 
-NS_IMETHODIMP SocksConnection::OnTransportAvailable(
+NS_IMETHODIMP TunnelAttempt::OnTransportAvailable(
     nsISocketTransport* aTransport, nsIAsyncInputStream* aSocketIn,
     nsIAsyncOutputStream* aSocketOut) {
+  RefPtr owner = mOwner;
+  nsCOMPtr<nsISocketTransport> transport = aTransport;
+  nsCOMPtr<nsIAsyncInputStream> socketIn = aSocketIn;
+  nsCOMPtr<nsIAsyncOutputStream> socketOut = aSocketOut;
+  const uint64_t generation = mGeneration;
+  const ProxyProtocol protocol = mProtocol;
+  nsresult rv = mSocketTarget->Dispatch(
+      NS_NewRunnableFunction(
+          "NaiveFox::SocksTunnelTransport",
+          [owner, generation, protocol, transport = std::move(transport),
+           socketIn = std::move(socketIn), socketOut = std::move(socketOut)]() {
+            owner->ApplyTransport(generation, protocol, transport, socketIn,
+                                  socketOut);
+          }),
+      NS_DISPATCH_NORMAL);
+  if (NS_FAILED(rv)) {
+    (void)aSocketIn->CloseWithStatus(rv);
+    (void)aSocketOut->CloseWithStatus(rv);
+  }
+  return rv;
+}
+
+NS_IMETHODIMP TunnelAttempt::OnUpgradeFailed(nsresult aErrorCode) {
+  RefPtr owner = mOwner;
+  const uint64_t generation = mGeneration;
+  const ProxyProtocol protocol = mProtocol;
+  return mSocketTarget->Dispatch(
+      NS_NewRunnableFunction("NaiveFox::SocksTunnelFailure",
+                             [owner, generation, protocol, aErrorCode]() {
+                               owner->ApplyUpgradeFailure(generation, protocol,
+                                                          aErrorCode);
+                             }),
+      NS_DISPATCH_NORMAL);
+}
+
+NS_IMETHODIMP TunnelAttempt::OnWebSocketConnectionAvailable(
+    mozilla::net::WebSocketConnectionBase* aConnection) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+void SocksConnection::ApplyTransport(uint64_t aGeneration,
+                                     ProxyProtocol aProtocol,
+                                     nsISocketTransport* aTransport,
+                                     nsIAsyncInputStream* aSocketIn,
+                                     nsIAsyncOutputStream* aSocketOut) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mClosed) {
+    (void)aSocketIn->CloseWithStatus(NS_ERROR_ABORT);
+    (void)aSocketOut->CloseWithStatus(NS_ERROR_ABORT);
+    return;
+  }
   nsCOMPtr<nsITLSSocketControl> tls;
   nsCOMPtr<nsITransportSecurityInfo> securityInfo;
   nsAutoCString alpn;
-  if (mProtocol == ProxyProtocol::H2) {
+  if (aProtocol == ProxyProtocol::H2) {
     nsresult rv = aTransport->GetTlsSocketControl(getter_AddRefs(tls));
     if (NS_SUCCEEDED(rv) && tls) {
       rv = tls->GetSecurityInfo(getter_AddRefs(securityInfo));
@@ -673,7 +851,7 @@ NS_IMETHODIMP SocksConnection::OnTransportAvailable(
       (void)aSocketIn->CloseWithStatus(NS_ERROR_FAILURE);
       (void)aSocketOut->CloseWithStatus(NS_ERROR_FAILURE);
       Reject(Socks5Parser::Event::ProtocolError);
-      return NS_OK;
+      return;
     }
   }
 
@@ -681,26 +859,29 @@ NS_IMETHODIMP SocksConnection::OnTransportAvailable(
   mPendingTunnelOut = aSocketOut;
   mTransportReady = true;
   MaybeStartTunnel();
-  return NS_OK;
 }
 
 void SocksConnection::ApplyConnectMetadata(
-    nsresult aStatus, int32_t aConnectCode,
+    uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
+    bool aConnectCodeKnown, int32_t aConnectCode,
     const Maybe<bool>& aPaddingHeaderPresent,
     const nsACString& aOuterProtocol) {
-  if (mMetadataReady) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mMetadataReady) {
     return;
   }
   mMetadataReady = true;
   mMetadataStatus = aStatus;
+  mConnectCodeKnown = aConnectCodeKnown;
   mConnectCode = aConnectCode;
   mPaddingHeaderPresent = aPaddingHeaderPresent;
   mOuterProtocol = aOuterProtocol;
   MaybeStartTunnel();
 }
 
-void SocksConnection::ApplyChannelStop(nsresult aStatus) {
-  if (mChannelStopped) {
+void SocksConnection::ApplyChannelStop(uint64_t aGeneration,
+                                       ProxyProtocol aProtocol,
+                                       nsresult aStatus) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mChannelStopped) {
     return;
   }
   mChannelStopped = true;
@@ -708,20 +889,117 @@ void SocksConnection::ApplyChannelStop(nsresult aStatus) {
   MaybeStartTunnel();
 }
 
-void SocksConnection::MaybeStartTunnel() {
-  if (!mTransportReady || !mMetadataReady || !mChannelStopped || mTunnelReady) {
+void SocksConnection::ApplyUpgradeFailure(uint64_t aGeneration,
+                                          ProxyProtocol aProtocol,
+                                          nsresult aStatus) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol)) {
     return;
   }
-  if (mClosed || NS_FAILED(mMetadataStatus) || NS_FAILED(mChannelStatus) ||
-      (mProtocol == ProxyProtocol::H2 && !mOuterProtocol.EqualsLiteral("h2")) ||
-      (mProtocol == ProxyProtocol::H3 && !mOuterProtocol.EqualsLiteral("h3")) ||
+  mUpgradeFailed = true;
+  MaybeStartTunnel();
+}
+
+void SocksConnection::ApplyEstablishmentTimeout(uint64_t aGeneration,
+                                                ProxyProtocol aProtocol) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol)) {
+    return;
+  }
+  mEstablishmentTimedOut = true;
+  MaybeStartTunnel();
+}
+
+void SocksConnection::ApplyOpenFailure(uint64_t aGeneration,
+                                       ProxyProtocol aProtocol) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mClosed) {
+    return;
+  }
+  // A synchronous failure is a local configuration/API failure, not an outer
+  // H3 establishment result. Auto mode must not hide it with an H2 retry.
+  Reject(Socks5Parser::Event::ProtocolError);
+}
+
+bool SocksConnection::IsCurrentAttempt(uint64_t aGeneration,
+                                       ProxyProtocol aProtocol) const {
+  return aGeneration == mAttemptGeneration && aProtocol == mAttemptProtocol;
+}
+
+void SocksConnection::ResetAttemptState() {
+  if (mPendingTunnelIn) {
+    (void)mPendingTunnelIn->CloseWithStatus(NS_ERROR_ABORT);
+  }
+  if (mPendingTunnelOut) {
+    (void)mPendingTunnelOut->CloseWithStatus(NS_ERROR_ABORT);
+  }
+  mTransportReady = false;
+  mMetadataReady = false;
+  mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
+  mChannelStopped = false;
+  mChannelStatus = NS_ERROR_NOT_INITIALIZED;
+  mConnectCodeKnown = false;
+  mConnectCode = -1;
+  mPaddingHeaderPresent.reset();
+  mOuterProtocol.Truncate();
+  mPaddingEnabled = false;
+  mPendingTunnelIn = nullptr;
+  mPendingTunnelOut = nullptr;
+  mUpgradeFailed = false;
+  mEstablishmentTimedOut = false;
+}
+
+void SocksConnection::MaybeStartTunnel() {
+  if (!mChannelStopped || (!mMetadataReady && !mEstablishmentTimedOut) ||
+      mTunnelReady || mClosed) {
+    return;
+  }
+
+  const AutoFallbackState fallbackState{
+      mProtocol,
+      mAttemptProtocol,
+      mFallbackUsed,
+      mClosed,
+      mChannelStopped,
+      NS_FAILED(mChannelStatus),
+      mEstablishmentTimedOut,
+      mConnectCodeKnown,
+      mConnectCode,
+      mTransportReady,
+  };
+  if (ShouldRetryH2FromH3(fallbackState)) {
+    mFallbackUsed = true;
+    if (NS_FAILED(StartAttempt(ProxyProtocol::H2))) {
+      Reject(Socks5Parser::Event::ProtocolError);
+    }
+    return;
+  }
+
+  if (!mMetadataReady) {
+    Reject(Socks5Parser::Event::ProtocolError);
+    return;
+  }
+
+  const bool protocolMatches = (mAttemptProtocol == ProxyProtocol::H2 &&
+                                mOuterProtocol.EqualsLiteral("h2")) ||
+                               (mAttemptProtocol == ProxyProtocol::H3 &&
+                                mOuterProtocol.EqualsLiteral("h3"));
+  if (NS_FAILED(mMetadataStatus) || NS_FAILED(mChannelStatus) ||
+      !mConnectCodeKnown || !protocolMatches ||
       NS_FAILED(NegotiatePayloadPadding(mConnectCode, mPaddingHeaderPresent,
                                         mPaddingEnabled))) {
-    (void)mPendingTunnelIn->CloseWithStatus(NS_ERROR_FAILURE);
-    (void)mPendingTunnelOut->CloseWithStatus(NS_ERROR_FAILURE);
+    if (mPendingTunnelIn) {
+      (void)mPendingTunnelIn->CloseWithStatus(NS_ERROR_FAILURE);
+    }
+    if (mPendingTunnelOut) {
+      (void)mPendingTunnelOut->CloseWithStatus(NS_ERROR_FAILURE);
+    }
     mPendingTunnelIn = nullptr;
     mPendingTunnelOut = nullptr;
     Reject(Socks5Parser::Event::ProtocolError);
+    return;
+  }
+  if (!mTransportReady) {
+    if (mUpgradeFailed) {
+      Reject(Socks5Parser::Event::ProtocolError);
+    }
     return;
   }
   nsCOMPtr<nsIAsyncInputStream> tunnelIn = std::move(mPendingTunnelIn);
@@ -751,24 +1029,6 @@ void SocksConnection::TunnelReady(nsIAsyncInputStream* aTunnelIn,
   if (NS_FAILED(rv)) {
     Close(rv);
   }
-}
-
-NS_IMETHODIMP SocksConnection::OnUpgradeFailed(nsresult aErrorCode) {
-  RefPtr self = this;
-  return mSocketTarget->Dispatch(
-      NS_NewRunnableFunction("NaiveFox::SocksTunnelFailure",
-                             [self]() {
-                               if (!self->mClosed && !self->mTunnelReady) {
-                                 self->Reject(
-                                     Socks5Parser::Event::ProtocolError);
-                               }
-                             }),
-      NS_DISPATCH_NORMAL);
-}
-
-NS_IMETHODIMP SocksConnection::OnWebSocketConnectionAvailable(
-    mozilla::net::WebSocketConnectionBase* aConnection) {
-  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 void SocksConnection::Close(nsresult aStatus) {

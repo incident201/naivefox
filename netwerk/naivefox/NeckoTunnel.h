@@ -10,18 +10,17 @@
 #include "nscore.h"
 
 class nsIHttpUpgradeListener;
+class nsIRequest;
 class nsIStreamListener;
 
 namespace mozilla::naivefox {
 
-nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
-                         const nsACString& aTargetAuthority,
-                         const nsACString& aProxyUser,
-                         const nsACString& aProxyPassword,
-                         nsIHttpUpgradeListener* aUpgradeListener,
-                         nsIStreamListener* aChannelListener,
-                         const nsACString& aConnectPadding,
-                         ProxyProtocol aProtocol);
+nsresult OpenNeckoTunnel(
+    const nsACString& aProxyUrl, const nsACString& aTargetAuthority,
+    const nsACString& aProxyUser, const nsACString& aProxyPassword,
+    nsIHttpUpgradeListener* aUpgradeListener,
+    nsIStreamListener* aChannelListener, const nsACString& aConnectPadding,
+    ProxyProtocol aProtocol, nsIRequest** aOpenedRequest = nullptr);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,
