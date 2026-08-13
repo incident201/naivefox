@@ -109,14 +109,26 @@ class DuplexPump final : public RefCounted<DuplexPump> {
     mUp = new PumpDirection(this, mLocalIn, mTunnelOut, mPaddingEnabled, false);
     mDown =
         new PumpDirection(this, mTunnelIn, mLocalOut, false, mPaddingEnabled);
-    nsresult rv = mDown->Start();
+    RefPtr<PumpDirection> down = mDown;
+    nsresult rv = down->Start();
     if (NS_FAILED(rv)) {
-      Close(rv);
+      if (!mClosed) {
+        Close(rv);
+      }
       return rv;
     }
-    rv = mUp->Start(aInitialLocalPayload);
+    // Start() can synchronously observe EOF and close the whole pump. Keep a
+    // local strong reference and do not dereference a direction that Close()
+    // has already detached.
+    if (mClosed || !mUp) {
+      return NS_OK;
+    }
+    RefPtr<PumpDirection> up = mUp;
+    rv = up->Start(aInitialLocalPayload);
     if (NS_FAILED(rv)) {
-      Close(rv);
+      if (!mClosed) {
+        Close(rv);
+      }
     }
     return rv;
   }
@@ -365,6 +377,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   void ApplyConnectMetadata(nsresult aStatus, int32_t aConnectCode,
                             const Maybe<bool>& aPaddingHeaderPresent,
                             const nsACString& aOuterProtocol);
+  void ApplyChannelStop(nsresult aStatus);
   void MaybeStartTunnel();
   void TunnelReady(nsIAsyncInputStream* aTunnelIn,
                    nsIAsyncOutputStream* aTunnelOut);
@@ -390,6 +403,8 @@ class SocksConnection final : public nsIInputStreamCallback,
   bool mTransportReady = false;
   bool mMetadataReady = false;
   nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
+  bool mChannelStopped = false;
+  nsresult mChannelStatus = NS_ERROR_NOT_INITIALIZED;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
   nsCString mOuterProtocol;
@@ -631,18 +646,12 @@ NS_IMETHODIMP SocksConnection::OnDataAvailable(nsIRequest* aRequest,
 
 NS_IMETHODIMP SocksConnection::OnStopRequest(nsIRequest* aRequest,
                                              nsresult aStatus) {
-  if (NS_FAILED(aStatus)) {
-    RefPtr self = this;
-    (void)mSocketTarget->Dispatch(
-        NS_NewRunnableFunction("NaiveFox::SocksChannelFailure",
-                               [self]() {
-                                 if (!self->mTunnelReady && !self->mClosed) {
-                                   self->Reject(
-                                       Socks5Parser::Event::ProtocolError);
-                                 }
-                               }),
-        NS_DISPATCH_NORMAL);
-  }
+  RefPtr self = this;
+  (void)mSocketTarget->Dispatch(
+      NS_NewRunnableFunction(
+          "NaiveFox::SocksChannelStop",
+          [self, aStatus]() { self->ApplyChannelStop(aStatus); }),
+      NS_DISPATCH_NORMAL);
   return NS_OK;
 }
 
@@ -690,11 +699,20 @@ void SocksConnection::ApplyConnectMetadata(
   MaybeStartTunnel();
 }
 
-void SocksConnection::MaybeStartTunnel() {
-  if (!mTransportReady || !mMetadataReady || mTunnelReady) {
+void SocksConnection::ApplyChannelStop(nsresult aStatus) {
+  if (mChannelStopped) {
     return;
   }
-  if (mClosed || NS_FAILED(mMetadataStatus) ||
+  mChannelStopped = true;
+  mChannelStatus = aStatus;
+  MaybeStartTunnel();
+}
+
+void SocksConnection::MaybeStartTunnel() {
+  if (!mTransportReady || !mMetadataReady || !mChannelStopped || mTunnelReady) {
+    return;
+  }
+  if (mClosed || NS_FAILED(mMetadataStatus) || NS_FAILED(mChannelStatus) ||
       (mProtocol == ProxyProtocol::H2 && !mOuterProtocol.EqualsLiteral("h2")) ||
       (mProtocol == ProxyProtocol::H3 && !mOuterProtocol.EqualsLiteral("h3")) ||
       NS_FAILED(NegotiatePayloadPadding(mConnectCode, mPaddingHeaderPresent,

@@ -101,15 +101,21 @@ timer (100 ms by default), and both the backup/restart paths can call
 or per-transaction prohibition on H3-proxy fallback. Disabling the timer pref
 alone is insufficient because restart fallback remains possible.
 
-The planned behavior is:
+The implemented explicit-mode behavior is:
 
 - `h2`: HTTPS proxy info, H3 disallowed, negotiated outer protocol must be
   `h2`;
 - `h3`: MASQUE/H3 proxy info, H3 enabled, all TCP/H2 proxy fallback disabled
   for that transaction, negotiated outer protocol must be `h3`;
-- `auto`: prefer the H3 proxy route and permit one H2 fallback only for outer
-  transport/protocol establishment failures. A 407, CONNECT/ACL rejection,
-  bad target, or failure after tunnel establishment must not trigger fallback.
+- `auto`: remains pending. It will prefer the H3 proxy route and permit one H2
+  retry only for outer transport/protocol establishment failures. A 407,
+  CONNECT/ACL rejection, bad target, or failure after tunnel establishment
+  must not trigger fallback.
+
+Strict H3 uses the opt-in `DISABLE_HTTP3_PROXY_FALLBACK` proxy flag. The flag
+suppresses the H3 backup timer, the `masque` to `https` restart conversion, and
+the Happy Eyeballs route. Consequently strict tests cannot create fallback TCP
+traffic before the application checks the negotiated protocol.
 
 The upgrade callback's H3 virtual transport does not expose the outer QUIC TLS
 socket control, so the H2-only `GetNegotiatedNPN()` check cannot be reused.
@@ -139,13 +145,20 @@ would block; it does not expose QUIC packet or H3 frame boundaries to the
 padding codec.
 
 This differs from the downstream H2 tunnel implementation, so the H2 flow
-control, END_STREAM, half-close, and reset patches will not be copied. The H3
-suite must first reproduce large transfer, slow producer/consumer, local and
-target close, proxy loss, timeout, half-close, and concurrent-stream cases.
-One known area requiring a focused test is output half-close:
-`Http3TransportLayer` currently routes input and output `CloseWithStatus()` to
-`Http3StreamTunnel::CleanupStream()`, which may close both directions instead
-of sending a request FIN while retaining the response direction.
+control, END_STREAM, half-close, and reset patches were not copied. Focused H3
+tests first reproduced two independent failures:
+
+- successful output close cancelled both QUIC stream directions instead of
+  sending request FIN and retaining the response direction;
+- a slow consumer allowed the tunnel `SimpleBuffer` to grow and then lost the
+  unread response when Caddy sent `STOP_SENDING(H3_REQUEST_CANCELLED)` after
+  target completion.
+
+The narrow H3 fixes use Neqo's existing send-side close for classic CONNECT,
+retain the opposite handler only for classic CONNECT rather than WebTransport
+or CONNECT-UDP, cap the tunnel slow-consumer buffer at 256 KiB, retain received
+FIN until buffered bytes are drained, and treat tunnel `STOP_SENDING` as a
+send-direction event. Ordinary HTTP/3 transaction behavior is unchanged.
 
 Memory acceptance remains the project invariant: two fixed 64 KiB pump
 buffers per direction plus bounded codec state, with Necko/Neqo flow control
@@ -171,6 +184,9 @@ fallback. Padding tests require request and response `padding`, eight framed
 records per sending direction followed by raw bytes, and raw fallback when the
 response marker is absent.
 
-Any required Firefox-core change will be isolated, backed by a focused
-xpcshell regression, and recorded in `UPSTREAM.md` with its risk and broader
-H2/H3/WebSocket regression results.
+The live fixture now passes strict raw CONNECT authentication, shared Variant
+1 padding, multi-megabyte SOCKS transfers, and the complete 32 MiB robustness
+workload in H3-only mode. Four simultaneous CONNECT streams were observed on
+one NaiveFox-owned UDP/QUIC socket, while the same workload remains green in
+H2 mode. Each Firefox-core change is isolated, backed by a focused xpcshell
+regression, and recorded in `UPSTREAM.md`.

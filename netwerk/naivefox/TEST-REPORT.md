@@ -4,7 +4,9 @@ Date: 2026-08-13
 
 Environment: `Ubuntu24Dev`, x86-64, Firefox opt build
 
-Branch: `naivefox`
+H2 baseline tag: `h2-prototype-v0.1`
+
+Current branch: `feature/h3`
 
 This is the committed acceptance record for the local prototype, the supplied
 real Caddy deployment, the staged runtime, and the official NaiveProxy control
@@ -25,6 +27,41 @@ encoder/decoder boundaries, deterministic randomized round trips, truncation,
 partial drains, entropy failure, and CONNECT header-padding vectors. The
 xpcshell set covers existing proxy behavior plus raw HTTP/1.1 and HTTP/2
 CONNECT, exact CONNECT-only padding headers, response metadata, and stream I/O.
+
+## HTTP/3 local prototype gate
+
+The H3 work uses the same `naivefox` executable, SOCKS server, padding codec,
+and pump as H2. The fixture is H3-only for strict tests: Caddy listens on UDP
+and has no TCP listener on the proxy port, so hidden H2 fallback cannot satisfy
+the workload.
+
+| Command | Result |
+|---|---|
+| `./mach build -j4 binaries` | PASS, 0 compiler warnings |
+| `./mach xpcshell-test netwerk/test/unit/test_proxyconnect_h3_raw.js` | PASS, 11/11 focused checks |
+| `netwerk/naivefox/test/integration/run-h3-raw-connect-tests.sh` | PASS, CONNECT 200 plus deterministic 407 authentication failure |
+| `netwerk/naivefox/test/integration/run-h3-padded-tests.sh` | PASS, six HTTP/HTTPS padded tunnels including 3 MiB download and 2 MiB upload |
+| `netwerk/naivefox/test/integration/run-h3-robustness-tests.sh` | PASS |
+| `netwerk/naivefox/test/integration/run-robustness-tests.sh --protocol h2` | PASS, H2 regression with the same workload |
+
+The H3 robustness runner verifies 32 MiB slow download and upload integrity,
+an RSS growth gate of at most 32 MiB after warm-up, local disconnect, target
+early close, timeout, ACL rejection, request half-close followed by response,
+invalid proxy authentication, forced proxy loss, and four simultaneous CONNECT
+streams on one NaiveFox-owned UDP/QUIC socket. The invalid-authentication case
+also regresses an upgrade lifecycle race: Necko can publish H3 tunnel streams
+before the final channel failure, so `SocksConnection` now waits for transport,
+CONNECT metadata, and successful channel completion before returning SOCKS
+success.
+
+The expected negative-path curl diagnostics are truncated response, timeout,
+and rejected SOCKS target; the runner requires those failures before reporting
+PASS. No credentials, response bodies, packet captures, or key material are
+retained in this report.
+
+H3 performance comparison, passive/decrypted capture comparison, staged
+runtime verification, and the ten-minute real-server soak remain mandatory
+acceptance gates and are not claimed complete by this local result.
 
 ## Complete local integration gate
 
