@@ -86,7 +86,27 @@ fi
 rg -q '^Proxy CONNECT status: 407$' "$invalid_log"
 rg -q 'NS_ERROR_PROXY_AUTHENTICATION_FAILED' "$invalid_log"
 
-if rg -F "$NAIVEFOX_FIXTURE_PASS" "$valid_log" "$invalid_log"; then
+# Gecko canonicalizes an explicit :80 on the synthetic HTTP carrier. Keep a
+# negative-path regression which proves that this still reaches CONNECT rather
+# than being rejected as a missing target port.
+default_port_log="$run_dir/raw-h3-default-port.log"
+client_logs+=("$default_port_log")
+if timeout 30 env NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
+  NAIVEFOX_PROXY_PASS=deliberately-invalid \
+  "$OBJDIR/dist/bin/naivefox" \
+  --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
+  --protocol h3 \
+  --raw-tunnel-smoke "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
+  "localhost:80" >"$default_port_log" 2>&1; then
+  printf 'default-port invalid credentials unexpectedly succeeded\n' >&2
+  exit 1
+fi
+rg -q '^Outer protocol: h3$' "$default_port_log"
+rg -q '^Proxy CONNECT status: (200|407)$' "$default_port_log"
+! rg -q '0x80070057|NS_ERROR_INVALID_ARG' "$default_port_log"
+
+if rg -F "$NAIVEFOX_FIXTURE_PASS" "$valid_log" "$invalid_log" \
+  "$default_port_log"; then
   printf 'proxy password appeared in H3 client output\n' >&2
   exit 1
 fi

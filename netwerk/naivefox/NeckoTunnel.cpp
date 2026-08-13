@@ -429,6 +429,11 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   MOZ_TRY(targetUri->GetAsciiHost(targetHost));
   MOZ_TRY(targetUri->GetUserPass(targetUserPass));
   MOZ_TRY(targetUri->GetPort(&targetPort));
+  if (targetPort == -1) {
+    // The synthetic carrier is HTTP, so Gecko canonicalizes an explicit
+    // :80 to the default-port sentinel. CONNECT still targets TCP port 80.
+    targetPort = 80;
+  }
   if (!targetScheme.EqualsLiteral("http") || targetHost.IsEmpty() ||
       !targetUserPass.IsEmpty() || targetPort <= 0 ||
       targetPort > std::numeric_limits<uint16_t>::max()) {
@@ -523,11 +528,12 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
   targetUrl.Append('/');
   nsCOMPtr<nsIURI> targetUri;
   MOZ_TRY(NS_NewURI(getter_AddRefs(targetUri), targetUrl));
-  nsAutoCString targetHostPort;
-  MOZ_TRY(targetUri->GetHostPort(targetHostPort));
 
   nsAutoCString request("GET /delay?ms=250 HTTP/1.1\r\nHost: "_ns);
-  request.Append(targetHostPort);
+  // Preserve an explicitly requested default port. nsIURI::GetHostPort()
+  // omits :80 for this synthetic HTTP carrier, while proxy CONNECT still
+  // requires the caller's exact host:port authority.
+  request.Append(aTargetAuthority);
   request.AppendLiteral("\r\nConnection: close\r\n\r\n");
   ProxyProtocol actualProtocol =
       aProtocol == ProxyProtocol::Auto ? ProxyProtocol::H3 : aProtocol;
