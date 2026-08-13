@@ -110,6 +110,7 @@ class Http3StreamTunnel final : public Http3Stream {
 
   void HasDataToWrite();
   void HasDataToRead();
+  bool IsConnectOnly() const;
   size_t BufferedInputSize() { return mSimpleBuffer.Available(); }
 
   [[nodiscard]] nsresult ReadSegments() override;

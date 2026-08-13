@@ -664,7 +664,8 @@ nsresult Http3Session::ProcessEvents() {
              this, event.stop_sending.error));
         if (RefPtr<Http3StreamBase> stream =
                 mStreamIdHash.Get(event.stop_sending.stream_id);
-            stream && stream->GetHttp3StreamTunnel()) {
+            stream && stream->GetHttp3StreamTunnel() &&
+            stream->GetHttp3StreamTunnel()->IsConnectOnly()) {
           // STOP_SENDING only closes our sending direction. In particular,
           // CONNECT proxies can use H3_REQUEST_CANCELLED after the target has
           // completed its response. Preserve the receive direction so a slow

@@ -258,7 +258,7 @@ Http3TransportLayer::OutputStreamTunnel::CloseWithStatus(nsresult reason) {
     return NS_OK;
   }
 
-  if (NS_SUCCEEDED(reason)) {
+  if (NS_SUCCEEDED(reason) && tunnel->IsConnectOnly()) {
     mCondition = NS_BASE_STREAM_CLOSED;
     mCallback = nullptr;
     tunnel->CloseOutput();
@@ -681,12 +681,15 @@ nsresult Http3StreamTunnel::ReadSegments() {
 nsresult Http3StreamTunnel::BufferInput() {
   char buf[SimpleBufferPage::kSimpleBufferPageSize];
   const size_t buffered = mSimpleBuffer.Available();
-  if (buffered >= kMaxTunnelBufferedInput) {
+  if (IsConnectOnly() && buffered >= kMaxTunnelBufferedInput) {
     mInputBufferBlocked = true;
     return NS_BASE_STREAM_WOULD_BLOCK;
   }
-  const uint32_t readSize = std::min(
-      sizeof(buf), static_cast<size_t>(kMaxTunnelBufferedInput - buffered));
+  const uint32_t readSize =
+      IsConnectOnly()
+          ? std::min(sizeof(buf),
+                     static_cast<size_t>(kMaxTunnelBufferedInput - buffered))
+          : sizeof(buf);
   uint32_t countWritten;
   nsresult rv = mSession->ReadResponseData(mStreamId, buf, readSize,
                                            &countWritten, &mFin);
@@ -758,7 +761,7 @@ nsresult Http3StreamTunnel::WriteSegments() {
     }
 
     if (mRecvState == RECEIVED_FIN) {
-      if (mSimpleBuffer.Available()) {
+      if (IsConnectOnly() && mSimpleBuffer.Available()) {
         // The QUIC stream may reach FIN while the tunnel consumer is blocked.
         // Keep the transport alive until the flow-control buffer is drained;
         // otherwise OnStreamClosed makes the buffered response unreachable.
@@ -821,6 +824,10 @@ void Http3StreamTunnel::HasDataToRead() {
   if (mSimpleBuffer.Available() || mInputBufferBlocked) {
     mSession->ConnectSlowConsumer(this);
   }
+}
+
+bool Http3StreamTunnel::IsConnectOnly() const {
+  return mTransaction && (mTransaction->Caps() & NS_HTTP_CONNECT_ONLY);
 }
 
 already_AddRefed<nsHttpConnection> Http3StreamTunnel::CreateHttpConnection(
