@@ -2,10 +2,74 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <cstdlib>
+#include <filesystem>
+#include <string>
+
 #include "Config.h"
 #include "gtest/gtest.h"
 
 namespace mozilla::naivefox {
+
+namespace {
+
+class ScopedEnvironment final {
+ public:
+  ScopedEnvironment(const char* aName, const char* aValue) : mName(aName) {
+    const char* current = std::getenv(aName);
+    if (current) {
+      mHadValue = true;
+      mValue = current;
+    }
+    if (aValue) {
+      ::setenv(aName, aValue, 1);
+    } else {
+      ::unsetenv(aName);
+    }
+  }
+
+  ~ScopedEnvironment() {
+    if (mHadValue) {
+      ::setenv(mName.c_str(), mValue.c_str(), 1);
+    } else {
+      ::unsetenv(mName.c_str());
+    }
+  }
+
+ private:
+  std::string mName;
+  std::string mValue;
+  bool mHadValue = false;
+};
+
+class ScopedTestDirectory final {
+ public:
+  ScopedTestDirectory() {
+    std::error_code error;
+    std::string name = (std::filesystem::temp_directory_path(error) /
+                        "naivefox-config-test-XXXXXX")
+                           .string();
+    if (error) {
+      return;
+    }
+    name.push_back('\0');
+    if (char* created = ::mkdtemp(name.data())) {
+      mPath = created;
+    }
+  }
+
+  ~ScopedTestDirectory() {
+    std::error_code error;
+    std::filesystem::remove_all(mPath, error);
+  }
+
+  const std::filesystem::path& Path() const { return mPath; }
+
+ private:
+  std::filesystem::path mPath;
+};
+
+}  // namespace
 
 TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
 {
@@ -176,6 +240,36 @@ TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
         << json;
     EXPECT_FALSE(error.IsEmpty());
   }
+}
+
+TEST(NaiveFoxConfig, TemporaryProfileWithoutHome)
+{
+  ScopedTestDirectory root;
+  ASSERT_FALSE(root.Path().empty());
+  const std::filesystem::path temporaryRoot = root.Path() / "runtime";
+  ASSERT_TRUE(std::filesystem::create_directory(temporaryRoot));
+
+  ScopedEnvironment profileOverride("NAIVEFOX_PROFILE", nullptr);
+  ScopedEnvironment stateHome("XDG_STATE_HOME", nullptr);
+  ScopedEnvironment home("HOME", nullptr);
+  ScopedEnvironment runtimeHome("XDG_RUNTIME_DIR", nullptr);
+  const std::string nativeTemporaryRoot = temporaryRoot.string();
+  ScopedEnvironment temporaryHome("TMPDIR", nativeTemporaryRoot.c_str());
+
+  std::filesystem::path profilePath;
+  {
+    ProfileDirectory profile;
+    nsAutoCString error;
+    ASSERT_EQ(ResolveAndCreateProfile(profile, error), NS_OK) << error.get();
+    EXPECT_TRUE(profile.IsTemporary());
+    profilePath = PromiseFlatCString(profile.Path()).get();
+    EXPECT_EQ(profilePath.parent_path(), temporaryRoot);
+    EXPECT_TRUE(std::filesystem::is_directory(profilePath));
+    const auto permissions = std::filesystem::status(profilePath).permissions();
+    EXPECT_EQ(permissions & std::filesystem::perms::all,
+              std::filesystem::perms::owner_all);
+  }
+  EXPECT_FALSE(std::filesystem::exists(profilePath));
 }
 
 }  // namespace mozilla::naivefox

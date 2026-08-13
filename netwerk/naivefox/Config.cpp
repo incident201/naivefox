@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
+#include <string>
 
 #include "mozilla/Span.h"
 #include "mozilla/Utf8.h"
@@ -25,6 +26,84 @@ nsresult Fail(nsACString& aError, const char* aMessage,
               nsresult aResult = NS_ERROR_INVALID_ARG) {
   aError.Assign(aMessage);
   return aResult;
+}
+
+nsresult CreatePersistentProfile(const std::filesystem::path& aPath,
+                                 nsACString& aProfilePath, nsACString& aError) {
+  std::error_code error;
+  std::filesystem::create_directories(aPath, error);
+  if (error || !std::filesystem::is_directory(aPath, error) || error) {
+    return Fail(aError, "cannot create persistent profile directory",
+                NS_ERROR_FILE_ACCESS_DENIED);
+  }
+  std::filesystem::permissions(aPath, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::replace, error);
+  if (error) {
+    return Fail(aError, "cannot secure persistent profile directory",
+                NS_ERROR_FILE_ACCESS_DENIED);
+  }
+  const std::filesystem::path absolute =
+      std::filesystem::absolute(aPath, error);
+  if (error) {
+    return Fail(aError, "cannot resolve persistent profile directory",
+                NS_ERROR_FILE_NOT_FOUND);
+  }
+  const std::string native = absolute.string();
+  aProfilePath.Assign(native.c_str(), native.length());
+  return NS_OK;
+}
+
+bool TryCreateTemporaryProfile(const std::filesystem::path& aBase,
+                               nsACString& aProfilePath) {
+  if (aBase.empty()) {
+    return false;
+  }
+  std::error_code error;
+  const std::filesystem::path absoluteBase =
+      std::filesystem::absolute(aBase, error);
+  if (error || !std::filesystem::is_directory(absoluteBase, error) || error) {
+    return false;
+  }
+
+  std::string name = (absoluteBase / "naivefox-profile-XXXXXX").string();
+  name.push_back('\0');
+  char* created = ::mkdtemp(name.data());
+  if (!created) {
+    return false;
+  }
+
+  const std::filesystem::path profile(created);
+  std::filesystem::permissions(profile, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::replace, error);
+  if (error) {
+    std::filesystem::remove_all(profile, error);
+    return false;
+  }
+  const std::string native = profile.string();
+  aProfilePath.Assign(native.c_str(), native.length());
+  return true;
+}
+
+nsresult CreateTemporaryProfile(nsACString& aProfilePath, nsACString& aError) {
+  const char* runtimeDirectory = std::getenv("XDG_RUNTIME_DIR");
+  if (runtimeDirectory && *runtimeDirectory &&
+      std::filesystem::path(runtimeDirectory).is_absolute() &&
+      TryCreateTemporaryProfile(runtimeDirectory, aProfilePath)) {
+    return NS_OK;
+  }
+
+  std::error_code error;
+  const std::filesystem::path temporary =
+      std::filesystem::temp_directory_path(error);
+  if (!error && TryCreateTemporaryProfile(temporary, aProfilePath)) {
+    return NS_OK;
+  }
+  if (temporary != std::filesystem::path("/tmp") &&
+      TryCreateTemporaryProfile("/tmp", aProfilePath)) {
+    return NS_OK;
+  }
+  return Fail(aError, "cannot create temporary profile directory",
+              NS_ERROR_FILE_ACCESS_DENIED);
 }
 
 bool IsWhitespace(char aChar) {
@@ -605,46 +684,50 @@ nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
   return ParseConfig(json, aConfig, aError);
 }
 
-nsresult ResolveAndCreateProfile(nsACString& aProfilePath, nsACString& aError) {
+ProfileDirectory::~ProfileDirectory() {
+  if (!mTemporary || mPath.IsEmpty()) {
+    return;
+  }
+  std::error_code error;
+  std::filesystem::remove_all(
+      std::filesystem::path(PromiseFlatCString(mPath).get()), error);
+}
+
+nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
+                                 nsACString& aError) {
+  aProfile.mPath.Truncate();
+  aProfile.mTemporary = false;
+  aError.Truncate();
+
   const char* overridePath = std::getenv("NAIVEFOX_PROFILE");
-  std::filesystem::path profile;
   if (overridePath && *overridePath) {
-    profile = overridePath;
+    return CreatePersistentProfile(overridePath, aProfile.mPath, aError);
+  }
+
+  std::filesystem::path persistent;
+  const char* stateHome = std::getenv("XDG_STATE_HOME");
+  if (stateHome && *stateHome) {
+    persistent = std::filesystem::path(stateHome) / "naivefox" / "profile";
   } else {
-    const char* stateHome = std::getenv("XDG_STATE_HOME");
-    if (stateHome && *stateHome) {
-      profile = std::filesystem::path(stateHome) / "naivefox" / "profile";
-    } else {
-      const char* home = std::getenv("HOME");
-      if (!home || !*home) {
-        return Fail(aError, "HOME is required when XDG_STATE_HOME is unset",
-                    NS_ERROR_FILE_NOT_FOUND);
-      }
-      profile = std::filesystem::path(home) / ".local" / "state" / "naivefox" /
-                "profile";
+    const char* home = std::getenv("HOME");
+    if (home && *home) {
+      persistent = std::filesystem::path(home) / ".local" / "state" /
+                   "naivefox" / "profile";
     }
   }
 
-  std::error_code error;
-  std::filesystem::create_directories(profile, error);
-  if (error || !std::filesystem::is_directory(profile, error) || error) {
-    return Fail(aError, "cannot create persistent profile directory",
-                NS_ERROR_FILE_ACCESS_DENIED);
+  if (!persistent.empty()) {
+    nsAutoCString persistentError;
+    if (NS_SUCCEEDED(CreatePersistentProfile(persistent, aProfile.mPath,
+                                             persistentError))) {
+      return NS_OK;
+    }
   }
-  std::filesystem::permissions(profile, std::filesystem::perms::owner_all,
-                               std::filesystem::perm_options::replace, error);
-  if (error) {
-    return Fail(aError, "cannot secure persistent profile directory",
-                NS_ERROR_FILE_ACCESS_DENIED);
+  nsresult rv = CreateTemporaryProfile(aProfile.mPath, aError);
+  if (NS_SUCCEEDED(rv)) {
+    aProfile.mTemporary = true;
   }
-  profile = std::filesystem::absolute(profile, error);
-  if (error) {
-    return Fail(aError, "cannot resolve persistent profile directory",
-                NS_ERROR_FILE_NOT_FOUND);
-  }
-  const std::string nativeProfile = profile.string();
-  aProfilePath.Assign(nativeProfile.c_str(), nativeProfile.length());
-  return NS_OK;
+  return rv;
 }
 
 }  // namespace mozilla::naivefox

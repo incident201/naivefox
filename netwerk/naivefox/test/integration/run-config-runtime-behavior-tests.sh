@@ -6,6 +6,22 @@ source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
 runtime=${NAIVEFOX_RUNTIME:-$OBJDIR/dist/bin/naivefox}
+external_runtime=false
+if [[ -n ${NAIVEFOX_RUNTIME:-} ]]; then
+  [[ $runtime == /* && -x $runtime ]] || {
+    printf 'NAIVEFOX_RUNTIME must be an absolute executable path\n' >&2
+    exit 2
+  }
+  external_runtime=true
+fi
+runtime_environment=(env -u LD_PRELOAD)
+if $external_runtime; then
+  runtime_environment+=(-u LD_LIBRARY_PATH)
+else
+  runtime_environment+=(
+    "LD_LIBRARY_PATH=$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  )
+fi
 run_dir=
 client_pid=
 cleanup() {
@@ -62,10 +78,10 @@ quiet_config="$run_dir/quiet-config.json"
 quiet_output="$run_dir/quiet-output.log"
 state_root="$run_dir/state"
 write_config "$quiet_config" "$quiet_port" absent
-env -u NAIVEFOX_PROFILE -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+"${runtime_environment[@]}" -u NAIVEFOX_PROFILE -u NAIVEFOX_PROXY_USER \
+  -u NAIVEFOX_PROXY_PASS \
   -u SSLKEYLOGFILE XDG_STATE_HOME="$state_root" \
   MOZ_CRASHREPORTER_DISABLE=1 \
-  LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   "$runtime" "$quiet_config" >"$quiet_output" 2>&1 &
 client_pid=$!
 for ((i = 0; i < 100; i++)); do
@@ -81,6 +97,35 @@ kill "$client_pid"
 wait "$client_pid" || [[ $? -eq 143 ]]
 client_pid=
 
+no_home_port=$(free_port)
+no_home_config="$run_dir/no-home-config.json"
+no_home_output="$run_dir/no-home-output.log"
+no_home_temp="$run_dir/no-home-temp"
+mkdir -m 700 "$no_home_temp"
+write_config "$no_home_config" "$no_home_port" absent
+"${runtime_environment[@]}" -u NAIVEFOX_PROFILE -u NAIVEFOX_PROXY_USER \
+  -u NAIVEFOX_PROXY_PASS \
+  -u SSLKEYLOGFILE -u HOME -u XDG_STATE_HOME -u XDG_RUNTIME_DIR \
+  TMPDIR="$no_home_temp" MOZ_CRASHREPORTER_DISABLE=1 \
+  "$runtime" "$no_home_config" >"$no_home_output" 2>&1 &
+client_pid=$!
+for ((i = 0; i < 100; i++)); do
+  [[ -n $(ss -Hltn "sport = :$no_home_port") ]] && break
+  kill -0 "$client_pid"
+  sleep 0.1
+done
+[[ -n $(ss -Hltn "sport = :$no_home_port") ]]
+[[ ! -s $no_home_output ]]
+mapfile -t temporary_profiles < <(
+  find "$no_home_temp" -mindepth 1 -maxdepth 1 -type d \
+    -name 'naivefox-profile-*' -print
+)
+[[ ${#temporary_profiles[@]} -eq 1 ]]
+[[ $(stat -c '%a' "${temporary_profiles[0]}") == 700 ]]
+kill "$client_pid"
+wait "$client_pid" || [[ $? -eq 143 ]]
+client_pid=
+
 bind_address=$(ip -4 -o addr show scope global | awk '
   { split($4, fields, "/"); print fields[1]; exit }
 ')
@@ -89,10 +134,10 @@ address_port=$(free_port)
 address_config="$run_dir/address-config.json"
 address_output="$run_dir/address-output.log"
 write_config "$address_config" "$address_port" absent '' "$bind_address"
-env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS -u SSLKEYLOGFILE \
+"${runtime_environment[@]}" -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+  -u SSLKEYLOGFILE \
   NAIVEFOX_PROFILE="$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
   MOZ_CRASHREPORTER_DISABLE=1 \
-  LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   "$runtime" "$address_config" >"$address_output" 2>&1 &
 client_pid=$!
 for ((i = 0; i < 100; i++)); do
@@ -115,10 +160,10 @@ file_config="$run_dir/file-config.json"
 runtime_log="$run_dir/runtime.log"
 file_output="$run_dir/file-output.log"
 write_config "$file_config" "$file_port" file "$runtime_log"
-env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS -u SSLKEYLOGFILE \
+"${runtime_environment[@]}" -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+  -u SSLKEYLOGFILE \
   NAIVEFOX_PROFILE="$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
   MOZ_CRASHREPORTER_DISABLE=1 \
-  LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   "$runtime" "$file_config" >"$file_output" 2>&1 &
 client_pid=$!
 for ((i = 0; i < 100; i++)); do
@@ -140,4 +185,5 @@ kill "$client_pid"
 wait "$client_pid" || [[ $? -eq 143 ]]
 client_pid=
 
-printf '%s\n' 'NaiveFox config logging and automatic profile tests passed'
+printf '%s\n' \
+  'NaiveFox config logging and persistent/temporary profile tests passed'

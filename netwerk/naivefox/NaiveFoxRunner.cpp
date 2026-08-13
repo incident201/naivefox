@@ -80,7 +80,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       rv = mozilla::naivefox::ConfigureRuntimeLogging(config.mLogMode,
                                                       config.mLogPath, error);
     }
-    nsAutoCString profile;
+    mozilla::naivefox::ProfileDirectory profile;
     if (NS_SUCCEEDED(rv)) {
       rv = mozilla::naivefox::ResolveAndCreateProfile(profile, error);
     }
@@ -99,7 +99,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     }
 
     mozilla::naivefox::GeckoRuntime runtime;
-    rv = runtime.Initialize(aArgc, aArgv, profile, runtimeProtocol);
+    rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol);
     if (NS_SUCCEEDED(rv)) {
       nsTArray<mozilla::naivefox::TunnelConfig> tunnelConfigs;
       for (const auto& proxy : config.mProxies) {

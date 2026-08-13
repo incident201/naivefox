@@ -39,11 +39,31 @@ struct Config final {
   nsCString mLogPath;
 };
 
+class ProfileDirectory final {
+ public:
+  ProfileDirectory() = default;
+  ~ProfileDirectory();
+
+  ProfileDirectory(const ProfileDirectory&) = delete;
+  ProfileDirectory& operator=(const ProfileDirectory&) = delete;
+
+  const nsCString& Path() const { return mPath; }
+  bool IsTemporary() const { return mTemporary; }
+
+ private:
+  friend nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
+                                          nsACString& aError);
+
+  nsCString mPath;
+  bool mTemporary = false;
+};
+
 nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
                      nsACString& aError);
 nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
                         nsACString& aError);
-nsresult ResolveAndCreateProfile(nsACString& aProfilePath, nsACString& aError);
+nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
+                                 nsACString& aError);
 
 }  // namespace mozilla::naivefox
 

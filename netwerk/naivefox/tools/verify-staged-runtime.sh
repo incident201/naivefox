@@ -175,6 +175,11 @@ if [[ -n $fetch_url ]]; then
     --profile "$profile_dir" --fetch "$fetch_url"
 fi
 
+env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
+  NAIVEFOX_RUNTIME="$package_dir/naivefox" \
+  "$source_root/netwerk/naivefox/test/integration/run-config-runtime-behavior-tests.sh"
+assert_clean_tree "$package_dir"
+
 for protocol in h2 h3; do
   config_environment=()
   if [[ $protocol == h2 ]]; then
