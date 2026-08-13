@@ -5,6 +5,22 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
+protocol=h2
+if [[ $# -gt 0 ]]; then
+  if [[ $# -ne 2 || $1 != --protocol ]]; then
+    printf 'usage: %s [--protocol h2|h3]\n' "$0" >&2
+    exit 2
+  fi
+  protocol=$2
+fi
+case $protocol in
+  h2 | h3) ;;
+  *)
+    printf 'unsupported padded-test protocol: %s\n' "$protocol" >&2
+    exit 2
+    ;;
+esac
+
 run_dir=
 client_pid=
 client_log=
@@ -17,18 +33,18 @@ cleanup() {
   if [[ $status -ne 0 && -n $client_log && -f $client_log ]]; then
     sanitize_stream "${NAIVEFOX_FIXTURE_USER:-}" \
       "${NAIVEFOX_FIXTURE_PASS:-}" <"$client_log" \
-      >"$SOURCE_ROOT/artifacts/m8-padded-client-failure.log"
+      >"$SOURCE_ROOT/artifacts/$protocol-padded-client-failure.log"
   fi
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   if [[ $status -ne 0 ]]; then
     printf 'padded SOCKS fixture failed; sanitized client log: %s\n' \
-      "$SOURCE_ROOT/artifacts/m8-padded-client-failure.log" >&2
+      "$SOURCE_ROOT/artifacts/$protocol-padded-client-failure.log" >&2
   fi
   return "$status"
 }
 trap cleanup EXIT
 
-"$INTEGRATION_DIR/start.sh"
+"$INTEGRATION_DIR/start.sh" --mode "$protocol"
 run_dir=$(<"$ACTIVE_RUN_FILE")
 source "$run_dir/fixture.env"
 
@@ -42,6 +58,7 @@ env NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
   NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
   "$OBJDIR/dist/bin/naivefox" \
   --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
+  --protocol "$protocol" \
   --socks-listen "127.0.0.1:$socks_port" \
   --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
   --max-connections 6 >"$client_log" 2>&1 &
@@ -99,6 +116,7 @@ wait "$client_pid"
 client_pid=
 
 [[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 6 ]]
+[[ $(rg -c "^Outer protocol: $protocol$" "$client_log") -eq 6 ]]
 if rg -q '^Padding negotiated: no$' "$client_log"; then
   printf 'fixture tunnel unexpectedly fell back to raw mode\n' >&2
   exit 1
@@ -108,4 +126,5 @@ if rg -F "$NAIVEFOX_FIXTURE_PASS" "$client_log"; then
   exit 1
 fi
 
-printf 'NaiveFox padded SOCKS HTTP, HTTPS, and integrity tests passed\n'
+printf 'NaiveFox padded SOCKS HTTP, HTTPS, and integrity tests passed over %s\n' \
+  "$protocol"
