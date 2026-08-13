@@ -604,11 +604,24 @@ works with `padding negotiated = true`.
 
 Confirm one normal HTTPS request and one bounded integrity-checked transfer. Use the server's normal public certificate validation and do not carry local fixture CA overrides into this test. Concurrency, invalid credentials, and forced failure paths remain local-fixture tests unless diagnosing a real interoperability problem.
 
-If credentials have not yet been supplied, record M8.3 as pending external validation. This does not block implementation and local verification of later robustness work, but the prototype cannot be declared complete until M8.3 passes.
+Status on 2026-08-13: **complete**. Credentials were supplied out of tree and
+the public-CA deployment passed legacy Variant 1 negotiation with no trust
+override. The acceptance run kept one client process alive for 120 seconds and
+covered normal HTTPS pages, raw GitHub content, an integrity-checked Caddy
+source archive, and six spaced waves of four parallel page/download requests.
+All responses were HTTP 200, the direct/proxied archive SHA-256 matched, and all
+29 resulting SOCKS connections negotiated padding.
 
-Status on 2026-08-12: **pending external validation**. No real proxy endpoint
-or credentials were supplied. The pinned local Caddy interoperability suite is
-complete, but final real-server acceptance remains open.
+The real deployment exposed one Firefox-specific integration bug: the
+synthetic `http://authority/` URI used solely to construct CONNECT was upgraded
+by HSTS for preloaded targets such as GitHub. The internal tunnel builder now
+sets `allowSTS = false` on that non-navigational channel so explicit proxy
+routing is retained. TLS, HTTP/2, and the observable outer wire behavior remain
+implemented by Firefox Necko/NSS; no Chromium camouflage or preamble behavior
+was copied.
+
+Commands, bounded workload metrics, integrity hashes, and packaged-runtime
+results are recorded in `TEST-REPORT.md`.
 
 ---
 

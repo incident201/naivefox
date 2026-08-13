@@ -121,7 +121,36 @@ The fixture must not install its CA globally, modify a normal Firefox profile, d
 
 The automated runner must cover certificate rejection/trust, ALPN `h2`, Basic Auth success and failure, raw CONNECT, SOCKS with remote hostname semantics, padding negotiation, padded traffic, deterministic transfer hashes, concurrency, and shutdown paths. The supplied real server is tested only after the local suite passes.
 
-See `AGENTS.md` for fixture construction and trust procedure and `ROADMAP.md` for milestone acceptance gates.
+Run the bounded real-deployment gate with credentials supplied only through the
+environment:
+
+```bash
+NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
+NAIVEFOX_REAL_PROXY_USER=user \
+NAIVEFOX_REAL_PROXY_PASS=secret \
+netwerk/naivefox/test/integration/run-real-server-tests.sh
+```
+
+The default runner keeps one client process alive for two minutes, visits
+several ordinary HTTPS pages, compares a direct and proxied GitHub archive by
+SHA-256, and runs spaced four-request parallel waves. Generated bodies,
+profiles, and client logs stay under the object directory; only a
+credential-free summary is copied to the ignored `artifacts/` directory. Set
+`NAIVEFOX_REAL_DURATION_SECONDS` to a bounded value from 30 through 300 when a
+shorter or longer manual session is needed.
+
+`netwerk/naivefox/tools/fetch-naiveproxy-reference.sh` downloads the pinned
+current official Linux client and verifies the GitHub release SHA-256. It is a
+behavioral reference for protocol investigation, not a wire-shaping target.
+NaiveFox deliberately does not copy Chromium-specific preambles or camouflage:
+its TLS and HTTP/2 behavior must continue to come from Firefox Necko/NSS.
+`run-reference-server-tests.sh` applies a separate, bounded long-lived workload
+to that official client using a private generated config, so future comparisons
+do not depend on fragile one-line invocations.
+
+See `AGENTS.md` for fixture construction and trust procedure, `ROADMAP.md` for
+milestone acceptance gates, and `TEST-REPORT.md` for the committed local,
+real-deployment, reference-client, and packaged-runtime results.
 
 ## Non-goals for the first prototype
 
