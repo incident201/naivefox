@@ -90,3 +90,27 @@ local H2/H3/config/robustness/capture suite in 307.6 seconds. One preceding H2
 robustness run transiently opened five pooled sockets; an immediate isolated
 rerun and the final complete suite both restored the required single H2 outer
 connection, so the strict gate was not weakened.
+
+## Phase 2.2: WebRTC graph removal
+
+`--disable-webrtc` removes PeerConnection, SCTP, SRTP, WebRTC media and
+transport code. NaiveFox classic CONNECT uses Necko's HTTP tunnel paths and
+does not use WebRTC APIs or a synthetic WebRTC upgrade token.
+
+| Measure | Phase 2.1 | Phase 2.2 | Change |
+|---|---:|---:|---:|
+| Build descriptors | 21,487 | 14,142 | -7,345 (-34.2%) |
+| Backend files | 5,933 | 4,389 | -1,544 (-26.0%) |
+| Exact package bytes | 344,217,666 | 329,628,832 | -14,588,834 |
+| Stripped `libxul.so` | 325,341,920 | 310,757,744 | -14,584,176 |
+
+Relative to the Phase 1 runtime-only result, the package is smaller by
+16,274,438 bytes. `mach build -j4 binaries` completed with zero project
+warnings after removal of an already-unused local usage helper.
+
+Acceptance passed: 49/49 project gtests, six focused Firefox classic CONNECT
+tests including raw H3, the copied staged package H2/H3/Auto gate with public
+TLS fetch, and `run-full-suite.sh` in 308.3 seconds. H2 and H3 capture
+comparisons, multiplexing, half-close, backpressure, integrity, simultaneous
+SOCKS/HTTP config listeners, and strict no-fallback assertions all remained
+green. No Firefox networking source was changed.

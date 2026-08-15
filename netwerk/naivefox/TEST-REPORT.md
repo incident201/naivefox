@@ -541,3 +541,22 @@ and both capture comparisons. An in-tree test environment ordering bug found
 during this gate was fixed: all `env -u` options now precede the internal
 `LD_LIBRARY_PATH` assignment. Failure output is retained only as a sanitized,
 ignored diagnostic.
+
+## WebRTC-free product build gate
+
+Disabling WebRTC reduced build descriptors by 34.2%, from 21,487 to 14,142,
+and reduced the staged package from 344,217,666 to 329,628,832 bytes. The
+stripped `libxul.so` decreased by 14,584,176 bytes to 310,757,744 bytes.
+
+| Gate | Result |
+|---|---|
+| `mach build -j4 binaries` | PASS, zero project warnings |
+| Project gtests | PASS, 49/49 |
+| Focused H1/H2/H3 proxy-CONNECT xpcshell tests | PASS, 6/6 |
+| Copied staged package H2/H3/Auto verification | PASS |
+| `run-full-suite.sh` | PASS, 308.3 seconds |
+
+The suite proves that regular Necko H2/H3 CONNECT, strict fallback policy,
+padding, SOCKS/HTTP listeners, large transfers, lifecycle, pooling and capture
+behavior do not depend on WebRTC. No Necko, Neqo, NSS, or PSM implementation
+was modified for this build reduction.

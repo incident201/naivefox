@@ -12,10 +12,6 @@ namespace {
 
 constexpr const char* kVersion = "0.3.0-dev";
 
-void PrintUsage(const char* aProgram) {
-  std::printf("Usage: %s [CONFIG_PATH | --version | OPTIONS]\n", aProgram);
-}
-
 }  // namespace
 
 int main(int argc, char* argv[]) {

@@ -5,3 +5,4 @@ mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-naivefox-minimal
 ac_add_options --enable-tests
 ac_add_options --disable-crashreporter
 ac_add_options --disable-updater
+ac_add_options --disable-webrtc
