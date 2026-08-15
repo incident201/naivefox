@@ -560,3 +560,21 @@ The suite proves that regular Necko H2/H3 CONNECT, strict fallback policy,
 padding, SOCKS/HTTP listeners, large transfers, lifecycle, pooling and capture
 behavior do not depend on WebRTC. No Necko, Neqo, NSS, or PSM implementation
 was modified for this build reduction.
+
+## Accessibility-free product build gate
+
+Disabling Gecko accessibility reduced build descriptors from 14,142 to
+13,918 and reduced the staged package to 327,756,137 bytes. The stripped
+`libxul.so` is 308,885,048 bytes. GTK continues to provide the system ATK
+dependency; this group targets Gecko implementation code, not the toolkit ABI.
+
+| Gate | Result |
+|---|---|
+| `mach build -j4 binaries` | PASS, zero project warnings |
+| Project gtests | PASS, 49/49 |
+| Focused H1/H2/H3 proxy-CONNECT xpcshell tests | PASS, 6/6 |
+| Copied staged package H2/H3/Auto verification | PASS |
+| `run-full-suite.sh` | PASS, 305.2 seconds |
+
+All strict transport, padding, integrity, listener, lifecycle, pooling and
+capture assertions remained unchanged and passed.

@@ -114,3 +114,26 @@ TLS fetch, and `run-full-suite.sh` in 308.3 seconds. H2 and H3 capture
 comparisons, multiplexing, half-close, backpressure, integrity, simultaneous
 SOCKS/HTTP config listeners, and strict no-fallback assertions all remained
 green. No Firefox networking source was changed.
+
+## Phase 2.3: accessibility graph removal
+
+`--disable-accessibility` removes Gecko accessibility implementations. It
+does not remove GTK's system ATK dependency, so its runtime effect is smaller
+than its pre-change object-input total suggested.
+
+| Measure | Phase 2.2 | Phase 2.3 | Change |
+|---|---:|---:|---:|
+| Build descriptors | 14,142 | 13,918 | -224 (-1.6%) |
+| Backend files | 4,389 | 4,355 | -34 |
+| Exact package bytes | 329,628,832 | 327,756,137 | -1,872,695 |
+| Stripped `libxul.so` | 310,757,744 | 308,885,048 | -1,872,696 |
+
+The one-time global-define rebuild took 51 minutes 41 seconds, which is too
+expensive to justify serial experimentation with many more small configure
+flags. Relative to Phase 1, the package is now smaller by 18,147,133 bytes.
+
+Acceptance passed: warning-free `binaries`, 49/49 project gtests, six focused
+Firefox CONNECT tests, copied-package H2/H3/Auto verification, and the full
+H2/H3/config/robustness/capture suite in 305.2 seconds. This group is retained
+as a proven reduction, but further work should target an explicit lean
+application/link graph rather than repeatedly toggling small global features.

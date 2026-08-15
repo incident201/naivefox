@@ -949,6 +949,8 @@ generated output, never a hand-edited source of truth.
   crash reporter and updater as the first independently validated group.
 - [x] Remove the WebRTC/PeerConnection/SRTP/SCTP graph after proving classic
   Necko H2/H3 CONNECT has no dependency on it.
+- [x] Remove Gecko accessibility after a separate full regression gate; retain
+  GTK/ATK as a documented system dependency for now.
 - [ ] Disable proven browser-only build groups in separate logical commits
   while retaining the full Firefox source checkout.
 - [ ] Produce machine-readable build/link dependency reports.
