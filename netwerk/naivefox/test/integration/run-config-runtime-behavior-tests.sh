@@ -18,9 +18,7 @@ runtime_environment=(env -u LD_PRELOAD)
 if $external_runtime; then
   runtime_environment+=(-u LD_LIBRARY_PATH)
 else
-  runtime_environment+=(
-    "LD_LIBRARY_PATH=$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  )
+  export LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 run_dir=
 client_pid=
@@ -29,6 +27,14 @@ cleanup() {
   if [[ -n $client_pid ]] && kill -0 "$client_pid" 2>/dev/null; then
     kill "$client_pid" 2>/dev/null || true
     wait "$client_pid" 2>/dev/null || true
+  fi
+  if [[ $status -ne 0 ]]; then
+    for output in "${quiet_output:-}" "${no_home_output:-}" \
+      "${address_output:-}" "${file_output:-}"; do
+      [[ -n $output && -f $output ]] && cat "$output"
+    done | sanitize_stream "${NAIVEFOX_FIXTURE_USER:-}" \
+      "${NAIVEFOX_FIXTURE_PASS:-}" \
+      >"$SOURCE_ROOT/artifacts/config-runtime-behavior-failure.log"
   fi
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   return "$status"
