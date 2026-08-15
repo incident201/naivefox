@@ -1,0 +1,7 @@
+# NaiveFox product build. Keep tests enabled until the standalone source gate
+# has an equivalent external test build.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-naivefox-minimal
+
+ac_add_options --enable-tests
+ac_add_options --disable-crashreporter
+ac_add_options --disable-updater

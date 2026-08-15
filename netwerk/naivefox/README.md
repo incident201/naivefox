@@ -767,6 +767,13 @@ with:
 ./netwerk/naivefox/tools/verify-staged-runtime.sh naivefox-linux-x86_64
 ```
 
+On the `minimal` branch, configure and build the separately measured product
+object directory with:
+
+```bash
+MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
+```
+
 The package is created below the configured object directory and deliberately
 contains no NSS profile, fixture credentials, logs, TLS key logs, or packet
 captures. Config mode creates or reuses a writable persistent profile when a

@@ -65,3 +65,28 @@ object-directory loader paths explicitly removed:
 
 No browser build rule, `libxul`, Necko, Neqo, NSS, PSM, or NSPR source was
 changed in this phase.
+
+## Phase 2.1: product infrastructure
+
+`mozconfig-minimal` creates a separate `obj-naivefox-minimal` build with tests
+enabled while disabling the Firefox crash reporter and updater. Both are
+outside the NaiveFox runtime contract; profiles and fixture failure artifacts
+remain sufficient for the current diagnostic workflow.
+
+| Measure | Phase 1 package | Phase 2.1 package | Change |
+|---|---:|---:|---:|
+| Exact package bytes | 345,903,270 | 344,217,666 | -1,685,604 |
+| Stripped `libxul.so` | 327,025,152 | 325,341,920 | -1,683,232 |
+| Full object directory | 38 GiB reference | 21 GiB | -17 GiB |
+
+The first cold build still compiled the complete browser, DOM, gfx, media,
+WebRTC, and toolkit graphs and required approximately 71 minutes over two
+invocations (the first was interrupted at the command timeout). This group is
+therefore a safe infrastructure baseline, not meaningful graph minimisation.
+
+Acceptance passed: 49/49 project gtests, six focused Firefox proxy-CONNECT
+xpcshell files, the copied staged-runtime H2/H3/Auto gate, and the complete
+local H2/H3/config/robustness/capture suite in 307.6 seconds. One preceding H2
+robustness run transiently opened five pooled sockets; an immediate isolated
+rerun and the final complete suite both restored the required single H2 outer
+connection, so the strict gate was not weakened.

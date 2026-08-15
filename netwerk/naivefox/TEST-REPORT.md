@@ -520,3 +520,24 @@ over strict H2 and strict H3. It additionally passed Auto H3 preference,
 single H2 establishment fallback, and the no-fallback authentication/target
 error cases. The package manifest still matched after all workloads. See
 `MINIMISATION-REPORT.md` for the measured closure and largest files.
+
+## Minimal build baseline gate
+
+The first separate `obj-naivefox-minimal` build kept tests enabled and disabled
+only the updater and crash reporter. The stripped package was 344,217,666
+bytes and its `libxul.so` was 325,341,920 bytes.
+
+| Gate | Result |
+|---|---|
+| `MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4` | PASS |
+| Project gtests | PASS, 49/49 |
+| Focused H1/H2/H3 proxy-CONNECT xpcshell tests | PASS, 6/6 |
+| Copied staged package H2/H3/Auto verification | PASS |
+| `run-full-suite.sh` | PASS, 307.6 seconds |
+
+The complete suite included strict H2 and H3 raw, SOCKS, padding, integrity,
+backpressure, lifecycle, multiplexing, Auto, simultaneous config listeners,
+and both capture comparisons. An in-tree test environment ordering bug found
+during this gate was fixed: all `env -u` options now precede the internal
+`LD_LIBRARY_PATH` assignment. Failure output is retained only as a sanitized,
+ignored diagnostic.
