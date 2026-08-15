@@ -1,9 +1,10 @@
 # NaiveFox upstream maintenance policy
 
 NaiveFox is a disciplined downstream of Firefox. The repository deliberately
-keeps a full reference implementation between Mozilla's source mirror and the
-future minimized product so an upstream regression can be distinguished from
-a minimization regression.
+keeps a full reference implementation and a full-source minimization branch
+between Mozilla's source mirror and the generated compact product tree. This
+separates Firefox refresh regressions, minimization regressions, and source
+export defects.
 
 Upstream repository:
 
@@ -25,10 +26,14 @@ main         clean Firefox upstream mirror
 naivefox     full Firefox + NaiveFox reference implementation
              |
              v
-minimal      minimized NaiveFox product
+minimal      full Firefox + minimized build/runtime rules
+             |
+             | deterministic allowlist export
+             v
+minimal-source  compact standalone generated product tree
 ```
 
-These three branches have different responsibilities and are not peers.
+These four branches have different responsibilities and are not peers.
 
 ### `main`: upstream mirror only
 
@@ -59,16 +64,36 @@ Do not minimize this branch. It is the mandatory first integration layer for
 every new Firefox base and the control that distinguishes an upstream refresh
 problem from a product-minimization problem.
 
-### `minimal`: minimized product branch
+### `minimal`: full-source minimization branch
 
-`minimal` is the product branch for build/runtime dependency reduction. It is
-created from the tagged, validated full-reference point recorded below. All
+`minimal` is the working branch for build/runtime/link dependency reduction.
+It retains the complete upstream Firefox source tree so Mozilla changes can be
+integrated with ordinary Git ancestry and conflict resolution. It is created
+from the tagged, validated full-reference point recorded below. All
 minimization work happens on `minimal` or on `feature/min-*` branches based on
-it.
+it. Large upstream source directories are not deleted merely to reduce checkout
+size.
 
 `minimal` never receives Firefox commits directly from `main`. It receives a
 new Firefox base only after that base has passed the full `naivefox` refresh
 gate and then passed a second, minimization-specific refresh gate.
+
+### `minimal-source`: generated standalone product branch
+
+`minimal-source` contains only the explicit source and build dependency closure
+needed to build NaiveFox independently. It is generated from an already
+validated `minimal` checkout by `tools/export-minimal-source.sh`; it is never an
+upstream integration branch or a source of hand-edited project changes.
+
+Its history is independent of Firefox. The first published snapshot is an
+orphan commit and later snapshots form a compact linear history whose parent is
+only the previous generated snapshot. Every snapshot records the exact Firefox,
+NaiveFox, and minimal commits plus the export-manifest version in
+`UPSTREAM-BASE`.
+
+Never merge `main`, `naivefox`, or `minimal` into `minimal-source`. Never merge
+generated changes back from `minimal-source`; fix the source of truth in
+`minimal` or an upper layer, validate it, and regenerate.
 
 ## Remotes, default branch, and merge direction
 
@@ -85,6 +110,7 @@ Allowed long-lived directions:
 upstream/main -> main
 main          -> refresh/firefox-YYYYMMDD -> naivefox
 naivefox      -> refresh/minimal-YYYYMMDD -> minimal
+minimal       -> validated export snapshot -> minimal-source
 ```
 
 Forbidden directions:
@@ -94,6 +120,10 @@ naivefox -> main
 minimal  -> main
 minimal  -> naivefox
 main     -> minimal directly
+main     -> minimal-source
+naivefox -> minimal-source directly
+minimal-source -> minimal
+minimal-source -> naivefox
 ```
 
 Feature branch bases:
@@ -103,12 +133,13 @@ feature/network-*  from naivefox, for shared/reference functionality
 feature/min-*      from minimal, for minimization-only changes
 ```
 
-The project-facing GitHub default branch is `naivefox` while the full reference
-implementation is the primary deliverable. Once `minimal` is stable and is the
-normal product entry point, change the default branch to `minimal`. `main` is a
-service mirror and must not represent the project to users.
+The project-facing GitHub default branch is `naivefox` until the standalone
+export has passed its clean-build and acceptance gates. Once `minimal-source`
+is stable, change the default branch to `minimal-source`. `main` is a service
+mirror, while `naivefox` and `minimal` are developer branches; none should
+represent the compact product tree to ordinary users.
 
-Protect all three long-lived branches against force-push and deletion where
+Protect all four long-lived branches against force-push and deletion where
 repository settings permit it. Require review or the relevant validation gate
 for refresh merges; branch protection must not make `main` accept non-upstream
 commits.
@@ -120,16 +151,17 @@ not aliases for a moving `main`:
 
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
-Validated Minimal base commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
+Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Validated Minimal base commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Validated Minimal Source commit: NOT_CREATED
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
-The `minimal` branch is initialized directly at that tagged NaiveFox commit;
-it initially has no minimization-only commit. Every release or significant
-milestone must record a concrete Firefox base SHA and the corresponding
-validated NaiveFox/minimal SHA. Phrases such as "current Firefox main" are not
-valid release provenance.
+The `minimal` branch was initialized from that tagged NaiveFox line and then
+fast-forwarded through the validated config/profile corrections above; it has
+no minimization-only commit at this baseline. Every release or significant
+milestone must record concrete Firefox, NaiveFox, minimal, and generated-source
+SHAs. Phrases such as "current Firefox main" are not valid release provenance.
 
 ## Two-gate Firefox refresh workflow
 
@@ -188,6 +220,26 @@ If Gate 1 passes but Gate 2 fails, classify the failure as a minimization
 integration defect until evidence proves otherwise. Do not weaken `naivefox`
 or blame the Firefox refresh merely to make the minimized branch pass.
 
+### Gate 3: validated `minimal` -> `minimal-source`
+
+Only after Gate 2 passes may the allowlist export be regenerated. The export
+gate must:
+
+1. start from a clean, validated `minimal` checkout;
+2. create an empty export directory and copy only manifest entries;
+3. validate licenses, traceability, forbidden paths, stale manifest entries,
+   and absence of credentials, profiles, logs, captures, `.git`, and objdirs;
+4. copy the export to a clean location with no access to the full Firefox
+   source or original object directory;
+5. bootstrap, configure, and build NaiveFox from that export alone;
+6. run the required H2/H3/Auto/config/SOCKS/HTTP CONNECT and staged-runtime
+   acceptance gates;
+7. publish a new compact snapshot only after every check passes.
+
+If `minimal` passes but the export fails, the defect belongs to the source
+manifest/export tooling. It must not be worked around by editing
+`minimal-source` manually.
+
 ## Refresh cadence
 
 Do not continuously chase Firefox `main` in product branches. The clean mirror
@@ -227,6 +279,16 @@ trees merely because the minimized client does not use them. Physical source
 deletion is permitted only after measurements prove a material benefit that
 build-time exclusion cannot provide and a separate review accepts the cost to
 future Mozilla merges. Deletion must never be the first minimization tool.
+
+The compact checkout is produced separately and only after closure is known:
+
+```text
+runtime allowlist -> build graph -> link closure -> source manifest -> export
+```
+
+The source manifest is allowlist-based: the exporter starts from an empty
+directory and copies explicit inputs. A blacklist workflow that copies Firefox
+and deletes apparently unused directories is forbidden.
 
 ## Source placement rule
 

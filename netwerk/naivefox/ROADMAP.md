@@ -926,6 +926,56 @@ configuration and local protocol adapters without changing Firefox or Neqo.
 
 ---
 
+## Phase 14 — Dependency-first minimization and standalone source
+
+The detailed authority for this phase is `MINIMISATION-TASK.MD`. Work occurs
+on the full-source `minimal` branch. The compact `minimal-source` branch is a
+generated output, never a hand-edited source of truth.
+
+### M14.1 Runtime closure
+
+- [ ] Record the exact baseline package manifest, loaded libraries, resource
+  accesses, and largest entries.
+- [ ] Replace broad staged resource-directory copies with a deterministic
+  explicit allowlist.
+- [ ] Pass copied-package runtime smoke, public HTTPS, H2/H3/Auto/config,
+  SOCKS5, HTTP CONNECT, padding, integrity, concurrency, and no-home gates.
+- [ ] Record before/after bytes and remaining largest components.
+
+### M14.2 Build and link closure
+
+- [ ] Disable proven browser-only build groups in separate logical commits
+  while retaining the full Firefox source checkout.
+- [ ] Produce machine-readable build/link dependency reports.
+- [ ] Reduce `libxul` and runtime libraries without replacing or weakening
+  Necko, Neqo, NSS, PSM, NSPR, DNS, proxy, or required XPCOM services.
+- [ ] Pass the full regression and staged-runtime gate after every group.
+
+### M14.3 Source manifest and deterministic export
+
+- [ ] Create an allowlist-based source manifest and exporter which starts from
+  an empty directory.
+- [ ] Generate NaiveFox root documentation, licenses/notices, build scripts,
+  and exact `UPSTREAM-BASE` traceability.
+- [ ] Validate absence of Firefox browser product files, `.git`, objdirs,
+  artifacts, credentials, profiles, logs, captures, and absolute build paths.
+- [ ] Generate a deterministic source archive from the same export tree.
+
+### M14.4 Isolated build and publication
+
+- [ ] Build and test the export with the original Firefox source and objdir
+  unavailable.
+- [ ] Pass the complete networking/config/package acceptance suite from the
+  exported build.
+- [ ] Create the independent orphan-history `minimal-source` branch and publish
+  only validated generated snapshots.
+- [ ] Make `minimal-source` the GitHub default branch after standalone
+  acceptance.
+- [ ] Complete one controlled Firefox refresh through `main -> naivefox ->
+  minimal -> export -> minimal-source`.
+
+---
+
 # Final prototype acceptance suite
 
 The H2 prototype is complete only when this full sequence can be reproduced:

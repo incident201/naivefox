@@ -36,9 +36,19 @@ incident201/naivefox:main       <- keep clean, mirror upstream
              |
              v
 incident201/naivefox:naivefox   <- project development branch
+             |
+             v
+incident201/naivefox:minimal    <- full tree, minimized build/runtime
+             |
+             | generated allowlist export
+             v
+incident201/naivefox:minimal-source <- compact standalone product tree
 ```
 
-Do not develop directly on `main`.
+Do not develop directly on `main` or manually on `minimal-source`. Shared
+network functionality is implemented and validated on `naivefox`; minimization
+work is performed on `minimal`; the product source branch is regenerated only
+from a validated `minimal` snapshot.
 
 Project-specific code and documentation should live under:
 
@@ -49,6 +59,10 @@ netwerk/naivefox/
 Existing Firefox files should be modified only when no suitable existing internal API can solve the problem. Every upstream modification must be small, isolated, justified, tested, and documented in `UPSTREAM.md`.
 
 The root Firefox `README.md` and root Firefox `AGENTS.md` are upstream files and must not be replaced by this project.
+The generated `minimal-source` export deliberately places the NaiveFox README
+at its repository root without modifying those files in the full-tree branches.
+See `MINIMISATION-TASK.MD` and `UPSTREAM.md` for the closure, export, and Firefox
+refresh gates.
 
 ## Goal
 
