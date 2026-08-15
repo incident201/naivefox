@@ -762,10 +762,11 @@ other required Gecko runtime files/resources
 
 A single static executable is not required.
 
-The current minimum-practical staged runtime is 378 MiB after stripping debug
-sections. It contains the dependent Gecko/NSS libraries plus dereferenced GRE
-resources; GTK, GLib, X11/Wayland, font, audio, C++ runtime, and libc remain
-normal system dependencies.
+The reference branch package is 378 MiB after stripping debug sections. Phase
+14.1 on `minimal` replaces broad GRE resource copies with a traced explicit
+allowlist and produces a 331 MiB package. It still contains the dependent
+Gecko/NSS libraries; GTK, GLib, X11/Wayland, font, audio, C++ runtime, and libc
+remain normal system dependencies. See `MINIMISATION-REPORT.md`.
 
 ### M11.2 Create repeatable staging command/script
 
@@ -934,13 +935,13 @@ generated output, never a hand-edited source of truth.
 
 ### M14.1 Runtime closure
 
-- [ ] Record the exact baseline package manifest, loaded libraries, resource
+- [x] Record the exact baseline package manifest, loaded libraries, resource
   accesses, and largest entries.
-- [ ] Replace broad staged resource-directory copies with a deterministic
+- [x] Replace broad staged resource-directory copies with a deterministic
   explicit allowlist.
-- [ ] Pass copied-package runtime smoke, public HTTPS, H2/H3/Auto/config,
+- [x] Pass copied-package runtime smoke, public HTTPS, H2/H3/Auto/config,
   SOCKS5, HTTP CONNECT, padding, integrity, concurrency, and no-home gates.
-- [ ] Record before/after bytes and remaining largest components.
+- [x] Record before/after bytes and remaining largest components.
 
 ### M14.2 Build and link closure
 

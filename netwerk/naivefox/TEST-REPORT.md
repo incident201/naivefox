@@ -495,3 +495,28 @@ Raw pcaps, NSS keys, profiles, screenshots, bodies, and logs were deleted after
 successful aggregation. The retained credential-free summary is under
 `obj-x86_64-pc-linux-gnu/naivefox-fixture/h3-capture-safe/` and the complete
 methodology and safe results are in [`H3-CAPTURE.md`](H3-CAPTURE.md).
+
+## Minimal staged runtime gate
+
+Phase 14.1 replaced recursive GRE resource staging with an explicit traced
+allowlist. The package decreased from 388,995,134 bytes (378 MiB apparent) to
+345,903,270 bytes (331 MiB apparent), an exact reduction of 43,091,864 bytes
+or 11.08%, without rebuilding Gecko.
+
+Command:
+
+```bash
+./netwerk/naivefox/tools/stage-runtime.sh \
+  naivefox-linux-x86_64-min-runtime-v1
+./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  --fetch https://example.com/ naivefox-linux-x86_64-min-runtime-v1
+```
+
+Result: PASS. The verifier copied the package below `/tmp`, removed inherited
+loader/keylog state, checked its hashed manifest and ELF closure, ran runtime
+smoke and a public HTTPS fetch, exercised temporary-profile startup without a
+home, then passed simultaneous config-mode SOCKS5 and HTTP CONNECT workloads
+over strict H2 and strict H3. It additionally passed Auto H3 preference,
+single H2 establishment fallback, and the no-fallback authentication/target
+error cases. The package manifest still matched after all workloads. See
+`MINIMISATION-REPORT.md` for the measured closure and largest files.

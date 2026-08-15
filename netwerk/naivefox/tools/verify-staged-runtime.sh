@@ -109,6 +109,7 @@ assert_clean_tree() {
 }
 
 assert_clean_tree "$staged_dir"
+"$script_dir/runtime-manifest.py" verify "$staged_dir"
 
 verify_root=$(mktemp -d /tmp/naivefox-runtime-verify.XXXXXX)
 profile_dir=
@@ -136,9 +137,10 @@ package_dir="$verify_root/package"
 mkdir -m 0700 "$package_dir"
 cp -aL -- "$staged_dir/." "$package_dir/"
 assert_clean_tree "$package_dir"
+"$script_dir/runtime-manifest.py" verify "$package_dir"
 
 for required in naivefox runtime/naivefox \
-  runtime/dependentlibs.list runtime/application.ini; do
+  runtime/dependentlibs.list runtime/application.ini runtime-manifest.json; do
   if [[ ! -f $package_dir/$required ]]; then
     printf 'staged runtime is missing %s\n' "$required" >&2
     exit 1
@@ -196,6 +198,11 @@ for protocol in h2 h3; do
   assert_clean_tree "$package_dir"
 done
 
+env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
+  NAIVEFOX_RUNTIME="$package_dir/naivefox" \
+  "$source_root/netwerk/naivefox/test/integration/run-auto-protocol-tests.sh"
+
 assert_clean_tree "$package_dir"
+"$script_dir/runtime-manifest.py" verify "$package_dir"
 printf 'staged NaiveFox runtime verified outside the build tree: %s\n' \
   "$package_dir"

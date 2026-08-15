@@ -95,17 +95,6 @@ required_files=(
   platform.ini
   default.locale
   greprefs.js
-  chrome.manifest
-)
-required_dirs=(
-  defaults
-  components
-  chrome
-  res
-  modules
-  moz-src
-  localization
-  actors
 )
 
 for name in "${required_files[@]}"; do
@@ -137,13 +126,24 @@ for library in libsoftokn3.so libfreeblpriv3.so; do
   cp -aL -- "$dist_bin/$library" "$runtime_dir/"
 done
 
-for name in "${required_dirs[@]}"; do
-  if [[ ! -d $dist_bin/$name ]]; then
-    printf 'required runtime directory is missing: %s\n' "$dist_bin/$name" >&2
+resource_manifest="$script_dir/runtime-resources.manifest"
+while IFS= read -r resource || [[ -n $resource ]]; do
+  [[ -z $resource || $resource == \#* ]] && continue
+  if [[ $resource == /* || $resource == *..* ||
+        $resource != "${resource#./}" ]]; then
+    printf 'unsafe entry in runtime resource manifest: %q\n' "$resource" >&2
     exit 1
   fi
-  cp -aL -- "$dist_bin/$name" "$runtime_dir/"
-done
+  if [[ ! -f $dist_bin/$resource ]]; then
+    printf 'required runtime resource is missing: %s\n' \
+      "$dist_bin/$resource" >&2
+    exit 1
+  fi
+  mkdir -p -- "$runtime_dir/$(dirname -- "$resource")"
+  cp -aL -- "$dist_bin/$resource" "$runtime_dir/$resource"
+done <"$resource_manifest"
+
+cp -- "$script_dir/runtime-chrome.manifest" "$runtime_dir/chrome.manifest"
 
 printf '%s\n' \
   '#!/usr/bin/env bash' \
@@ -192,6 +192,8 @@ if [[ -n $forbidden ]]; then
   printf 'forbidden sensitive artifact in staged runtime: %s\n' "$forbidden" >&2
   exit 1
 fi
+
+"$script_dir/runtime-manifest.py" create "$stage_dir"
 
 mv -T -- "$stage_dir" "$output_dir"
 stage_dir=

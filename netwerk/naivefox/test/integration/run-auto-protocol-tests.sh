@@ -5,6 +5,12 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
+runtime=${NAIVEFOX_RUNTIME:-$OBJDIR/dist/bin/naivefox}
+if [[ $runtime != /* || ! -x $runtime ]]; then
+  printf 'NAIVEFOX_RUNTIME must be an absolute executable path\n' >&2
+  exit 2
+fi
+
 run_dir=
 client_pid=
 probe_pid=
@@ -44,7 +50,7 @@ start_client() {
   local password=$4
   client_logs+=("$log")
   env NAIVEFOX_PROXY_USER="$user" NAIVEFOX_PROXY_PASS="$password" \
-    "$OBJDIR/dist/bin/naivefox" \
+    "$runtime" \
     --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
     --protocol auto \
     --socks-listen "127.0.0.1:$socks_port" \
@@ -65,7 +71,11 @@ wait_client() {
   client_pid=
 }
 
-export LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [[ -z ${NAIVEFOX_RUNTIME:-} ]]; then
+  export LD_LIBRARY_PATH="$OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+else
+  unset LD_LIBRARY_PATH
+fi
 export MOZ_CRASHREPORTER_DISABLE=1
 
 # H3 has no UDP listener, so Auto must retry once through the H2-only proxy.
@@ -89,7 +99,7 @@ raw_h2_log="$run_dir/auto-raw-h2-fallback.log"
 client_logs+=("$raw_h2_log")
 timeout 20 env NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
   NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-  "$OBJDIR/dist/bin/naivefox" \
+  "$runtime" \
   --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" --protocol auto \
   --raw-tunnel-smoke "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
   "127.0.0.1:$NAIVEFOX_FIXTURE_HTTP_PORT" >"$raw_h2_log" 2>&1
@@ -131,7 +141,7 @@ raw_h3_log="$run_dir/auto-raw-h3-success.log"
 client_logs+=("$raw_h3_log")
 timeout 20 env NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
   NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-  "$OBJDIR/dist/bin/naivefox" \
+  "$runtime" \
   --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" --protocol auto \
   --raw-tunnel-smoke "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
   "127.0.0.1:$NAIVEFOX_FIXTURE_HTTP_PORT" >"$raw_h3_log" 2>&1

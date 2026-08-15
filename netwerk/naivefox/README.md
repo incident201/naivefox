@@ -772,3 +772,7 @@ contains no NSS profile, fixture credentials, logs, TLS key logs, or packet
 captures. Config mode creates or reuses a writable persistent profile when a
 state/home location is available and falls back to a private temporary profile
 when it is not; only developer/test modes require an explicit `--profile`.
+The `minimal` branch uses an explicit resource allowlist and writes a hashed
+`runtime-manifest.json`; the verifier checks it before and after copying and
+exercising the package. Current measurements and remaining large components
+are recorded in [`MINIMISATION-REPORT.md`](MINIMISATION-REPORT.md).

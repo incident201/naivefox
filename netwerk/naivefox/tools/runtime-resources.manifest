@@ -1,0 +1,22 @@
+# Paths are relative to the Firefox dist/bin directory.
+chrome/en-US/locale/en-US/global/commonDialogs.properties
+chrome/en-US/locale/en-US/global/css.properties
+chrome/en-US/locale/en-US/global/dom/dom.properties
+chrome/en-US/locale/en-US/global/layout/HtmlForm.properties
+chrome/en-US/locale/en-US/global/layout/htmlparser.properties
+chrome/en-US/locale/en-US/global/layout_errors.properties
+chrome/en-US/locale/en-US/global/mathml/mathml.properties
+chrome/en-US/locale/en-US/global/printing.properties
+chrome/en-US/locale/en-US/global/security/security.properties
+chrome/en-US/locale/en-US/global/svg/svg.properties
+chrome/en-US/locale/en-US/global/xul.properties
+chrome/en-US/locale/en-US/necko/necko.properties
+defaults/pref/channel-prefs.js
+modules/AppConstants.sys.mjs
+modules/AsyncShutdown.sys.mjs
+modules/XPCOMUtils.sys.mjs
+modules/nsAsyncShutdown.sys.mjs
+res/locale/dom/dom.properties
+res/locale/layout/HtmlForm.properties
+res/locale/necko/necko.properties
+res/multilocale.txt
