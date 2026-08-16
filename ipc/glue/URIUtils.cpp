@@ -5,18 +5,22 @@
 #include "URIUtils.h"
 
 #include "mozilla/Assertions.h"
-#include "mozilla/dom/BlobURL.h"
 #include "mozilla/net/DefaultURI.h"
-#include "mozilla/net/SubstitutingJARURI.h"
-#include "mozilla/net/SubstitutingURL.h"
-#include "nsAboutProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BlobURL.h"
+#  include "mozilla/net/SubstitutingJARURI.h"
+#  include "mozilla/net/SubstitutingURL.h"
+#  include "nsAboutProtocolHandler.h"
+#endif
 #include "nsComponentManagerUtils.h"
 #include "nsDebug.h"
 #include "nsID.h"
 #include "nsIIPCSerializableURI.h"
-#include "nsJARURI.h"
-#include "nsIIconURI.h"
-#include "nsJSProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsJARURI.h"
+#  include "nsIIconURI.h"
+#  include "nsJSProtocolHandler.h"
+#endif
 #include "nsNetCID.h"
 #include "nsSimpleNestedURI.h"
 #include "nsThreadUtils.h"
@@ -28,8 +32,10 @@ namespace {
 
 NS_DEFINE_CID(kSimpleURIMutatorCID, NS_SIMPLEURIMUTATOR_CID);
 NS_DEFINE_CID(kStandardURLMutatorCID, NS_STANDARDURLMUTATOR_CID);
+#ifndef MOZ_NAIVEFOX
 NS_DEFINE_CID(kJARURIMutatorCID, NS_JARURIMUTATOR_CID);
 NS_DEFINE_CID(kIconURIMutatorCID, NS_MOZICONURIMUTATOR_CID);
+#endif
 
 }  // namespace
 
@@ -68,13 +74,18 @@ already_AddRefed<nsIURI> DeserializeURI(const URIParams& aParams) {
       break;
 
     case URIParams::TStandardURLParams:
+#ifndef MOZ_NAIVEFOX
       if (aParams.get_StandardURLParams().isSubstituting()) {
         mutator = new net::SubstitutingURL::Mutator();
       } else {
         mutator = do_CreateInstance(kStandardURLMutatorCID);
       }
+#else
+      mutator = do_CreateInstance(kStandardURLMutatorCID);
+#endif
       break;
 
+#ifndef MOZ_NAIVEFOX
     case URIParams::TJARURIParams:
       mutator = do_CreateInstance(kJARURIMutatorCID);
       break;
@@ -106,6 +117,7 @@ already_AddRefed<nsIURI> DeserializeURI(const URIParams& aParams) {
     case URIParams::TSubstitutingJARURIParams:
       mutator = new net::SubstitutingJARURI::Mutator();
       break;
+#endif
 
     default:
       MOZ_CRASH("Unknown params!");

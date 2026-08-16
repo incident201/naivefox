@@ -4,12 +4,16 @@
 
 #include "LoadContextInfo.h"
 
-#include "mozilla/StoragePrincipalHelper.h"
-#include "mozilla/dom/ToJSValue.h"
-#include "nsDocShell.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/StoragePrincipalHelper.h"
+#  include "mozilla/dom/ToJSValue.h"
+#  include "nsDocShell.h"
+#endif
 #include "nsIChannel.h"
+#ifndef MOZ_NAIVEFOX
 #include "nsILoadContext.h"
 #include "nsIWebNavigation.h"
+#endif
 #include "nsNetUtil.h"
 
 using namespace mozilla::dom;
@@ -41,10 +45,14 @@ OriginAttributes const* LoadContextInfo::OriginAttributesPtr() {
 
 NS_IMETHODIMP LoadContextInfo::GetOriginAttributes(
     JSContext* aCx, JS::MutableHandle<JS::Value> aVal) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (NS_WARN_IF(!ToJSValue(aCx, mOriginAttributes, aVal))) {
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+#endif
 }
 
 // LoadContextInfoFactory
@@ -79,6 +87,9 @@ NS_IMETHODIMP LoadContextInfoFactory::GetAnonymous(
 NS_IMETHODIMP LoadContextInfoFactory::Custom(
     bool aAnonymous, JS::Handle<JS::Value> aOriginAttributes, JSContext* cx,
     nsILoadContextInfo** _retval) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   OriginAttributes attrs;
   bool status = attrs.Init(cx, aOriginAttributes);
   NS_ENSURE_TRUE(status, NS_ERROR_FAILURE);
@@ -86,6 +97,7 @@ NS_IMETHODIMP LoadContextInfoFactory::Custom(
   nsCOMPtr<nsILoadContextInfo> info = GetLoadContextInfo(aAnonymous, attrs);
   info.forget(_retval);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP LoadContextInfoFactory::FromLoadContext(
@@ -110,7 +122,7 @@ NS_IMETHODIMP LoadContextInfoFactory::FromWindow(nsIDOMWindow* aWindow,
 already_AddRefed<LoadContextInfo> GetLoadContextInfo(nsIChannel* aChannel) {
   nsresult rv;
 
-  DebugOnly<bool> pb = NS_UsePrivateBrowsing(aChannel);
+  bool pb = NS_UsePrivateBrowsing(aChannel);
 
   bool anon = false;
   nsLoadFlags loadFlags;
@@ -120,14 +132,21 @@ already_AddRefed<LoadContextInfo> GetLoadContextInfo(nsIChannel* aChannel) {
   }
 
   OriginAttributes oa;
+#ifdef MOZ_NAIVEFOX
+  oa.SyncAttributesWithPrivateBrowsing(pb);
+#else
   StoragePrincipalHelper::GetOriginAttributesForNetworkState(aChannel, oa);
   MOZ_ASSERT(pb == (oa.IsPrivateBrowsing()));
+#endif
 
   return MakeAndAddRef<LoadContextInfo>(anon, std::move(oa));
 }
 
 already_AddRefed<LoadContextInfo> GetLoadContextInfo(
     nsILoadContext* aLoadContext, bool aIsAnonymous) {
+#ifdef MOZ_NAIVEFOX
+  return MakeAndAddRef<LoadContextInfo>(aIsAnonymous, OriginAttributes());
+#else
   if (!aLoadContext) {
     return MakeAndAddRef<LoadContextInfo>(aIsAnonymous, OriginAttributes());
   }
@@ -144,14 +163,19 @@ already_AddRefed<LoadContextInfo> GetLoadContextInfo(
 #endif
 
   return MakeAndAddRef<LoadContextInfo>(aIsAnonymous, std::move(oa));
+#endif
 }
 
 already_AddRefed<LoadContextInfo> GetLoadContextInfo(nsIDOMWindow* aWindow,
                                                      bool aIsAnonymous) {
+#ifdef MOZ_NAIVEFOX
+  return MakeAndAddRef<LoadContextInfo>(aIsAnonymous, OriginAttributes());
+#else
   nsCOMPtr<nsIWebNavigation> webNav = do_GetInterface(aWindow);
   nsCOMPtr<nsILoadContext> loadContext = do_QueryInterface(webNav);
 
   return GetLoadContextInfo(loadContext, aIsAnonymous);
+#endif
 }
 
 already_AddRefed<LoadContextInfo> GetLoadContextInfo(

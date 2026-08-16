@@ -8,7 +8,7 @@ description = "FFI glue layer between happy-eyeballs Rust crate and Firefox's C+
 
 [dependencies]
 firefox-on-glean = { path = "../../../../toolkit/components/glean/api" }
-gecko-profiler = { path = "../../../../tools/profiler/rust-api" }
+gecko-profiler = { path = "../../../../tools/profiler/rust-api", optional = true }
 happy-eyeballs = { tag = "v0.11.0", git = "https://github.com/mozilla/happy-eyeballs" }
 log = "0.4"
 nserror = { path = "../../../../xpcom/rust/nserror" }
@@ -23,3 +23,7 @@ libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["ws2def"] }
+
+[features]
+default = ["profiler"]
+profiler = ["dep:gecko-profiler"]

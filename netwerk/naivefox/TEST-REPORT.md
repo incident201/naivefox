@@ -578,3 +578,27 @@ dependency; this group targets Gecko implementation code, not the toolkit ABI.
 
 All strict transport, padding, integrity, listener, lifecycle, pooling and
 capture assertions remained unchanged and passed.
+
+## DOM/GFX-free cold build checkpoint
+
+The current `minimal` branch was rebuilt from an empty
+`obj-naivefox-cold` directory with the lean NaiveFox mozconfig. The full
+`gmake -j4` build completed successfully after one missing generated IPDL
+input was supplied by the project lean closure. The final cold output passed
+the runtime smoke check:
+
+```text
+NaiveFox completed successfully
+```
+
+The source-closure audit found zero compiled implementation sources from
+`dom/` and zero from `gfx/`. It checked the generated unified C/C++ sources,
+all compiler source operands in the clean-build logs, and object outputs under
+the corresponding object-directory subtrees. `dom/bindings` still contains
+generated metadata required by the build, while `gfx` has no object-directory
+subtree; neither represents compiled DOM/GFX implementation code.
+
+The cold object directory is 4.0 GiB; its opt/debug `libxul.so` is 638 MiB and
+`naivefox` is 5.2 MiB. These are development-build figures, not stripped
+package measurements. No staged package, documentation refresh, or additional
+minimization phase was run after this checkpoint.

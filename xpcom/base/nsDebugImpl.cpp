@@ -12,7 +12,9 @@
 #include "mozilla/Printf.h"
 #include "mozilla/ProfilerMarkers.h"
 #include "nsDebug.h"
-#include "nsExceptionHandler.h"
+#ifdef MOZ_CRASHREPORTER
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsString.h"
 #include "nsXULAppAPI.h"
 #include "prenv.h"
@@ -466,6 +468,7 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
       // really cause trouble if we're asserting from within IPC code. So we
       // have to do without the annotations in that case.
       if (XRE_IsParentProcess()) {
+#ifdef MOZ_CRASHREPORTER
         // Don't include the PID in the crash report annotation to
         // allow faceting on crash-stats.mozilla.org.
         nsAutoCString note("xpcom_runtime_abort(");
@@ -474,6 +477,7 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
         CrashReporter::AppendAppNotesToCrashReport(note);
         CrashReporter::RecordAnnotationNSCString(
             CrashReporter::Annotation::AbortMessage, note);
+#endif
       }
 
 #if defined(DEBUG) && defined(_WIN32)
@@ -685,6 +689,8 @@ nsresult NS_ErrorAccordingToNSPR() {
 }
 
 void NS_ABORT_OOM(size_t aSize) {
+#ifdef MOZ_CRASHREPORTER
   CrashReporter::AnnotateOOMAllocationSize(aSize);
+#endif
   MOZ_CRASH("OOM");
 }

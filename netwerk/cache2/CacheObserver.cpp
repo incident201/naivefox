@@ -20,7 +20,6 @@
 #include "mozilla/net/NeckoCommon.h"
 #include "nsICacheStorage.h"
 #include "nsIObserverService.h"
-#include "nsIUserIdleService.h"
 #include "nsServiceManagerUtils.h"
 #include "prsystem.h"
 
@@ -67,7 +66,9 @@ nsresult CacheObserver::Init() {
   obs->AddObserver(sSelf, "memory-pressure", true);
   obs->AddObserver(sSelf, "application-background", true);
   obs->AddObserver(sSelf, "browser-delayed-startup-finished", true);
+#ifndef MOZ_NAIVEFOX
   obs->AddObserver(sSelf, OBSERVER_TOPIC_IDLE_DAILY, true);
+#endif
 
   return NS_OK;
 }
@@ -269,10 +270,12 @@ CacheObserver::Observe(nsISupports* aSubject, const char* aTopic,
     return NS_OK;
   }
 
+#ifndef MOZ_NAIVEFOX
   if (!strcmp(aTopic, OBSERVER_TOPIC_IDLE_DAILY)) {
     CacheFileIOManager::OnIdleDaily();
     return NS_OK;
   }
+#endif
 
   MOZ_ASSERT(false, "Missing observer handler");
   return NS_OK;

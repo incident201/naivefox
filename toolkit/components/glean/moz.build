@@ -2,36 +2,46 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-SPHINX_TREES["/toolkit/components/glean"] = "docs"
+if not CONFIG["MOZ_NAIVEFOX"]:
+    SPHINX_TREES["/toolkit/components/glean"] = "docs"
 
-# Needed so that we can include IPC things.
-include("/ipc/chromium/chromium-config.mozbuild")
+# Needed so that we can include IPC things in the Firefox product.  The lean
+# NaiveFox build generates metric names/enums below, but intentionally has no
+# telemetry service, DOM bindings or telemetry IPC actors.
+if not CONFIG["MOZ_NAIVEFOX"]:
+    include("/ipc/chromium/chromium-config.mozbuild")
 
-FINAL_LIBRARY = "xul"
+if not CONFIG["MOZ_NAIVEFOX"]:
+    FINAL_LIBRARY = "xul"
 
-EXPORTS.mozilla.glean += [
-    "!GleanMetrics.h",
-    "!GleanPings.h",
-    "ipc/FOGTransportChild.h",
-    "ipc/FOGTransportParent.h",
-]
+if CONFIG["MOZ_NAIVEFOX"]:
+    EXPORTS.mozilla.glean.bindings += [
+        "/netwerk/naivefox/glean/bindings/MetricTypes.h",
+    ]
+else:
+    EXPORTS.mozilla.glean += [
+        "!GleanMetrics.h",
+        "!GleanPings.h",
+        "ipc/FOGTransportChild.h",
+        "ipc/FOGTransportParent.h",
+    ]
 
-EXPORTS.mozilla.glean.bindings += [
-    "!GleanJSMetricsLookup.h",
-    "!GleanJSPingsLookup.h",
-]
+    EXPORTS.mozilla.glean.bindings += [
+        "!GleanJSMetricsLookup.h",
+        "!GleanJSPingsLookup.h",
+    ]
 
-include("glean.mozbuild")
+    include("glean.mozbuild")
 
-EXPORTS.mozilla.glean.bindings.jog += [
-    "bindings/jog/JOG.h",
-]
+    EXPORTS.mozilla.glean.bindings.jog += [
+        "bindings/jog/JOG.h",
+    ]
 
-IPDL_SOURCES += [
-    "ipc/PFOGTransport.ipdl",
-]
+    IPDL_SOURCES += [
+        "ipc/PFOGTransport.ipdl",
+    ]
 
-if CONFIG["COMPILE_ENVIRONMENT"]:
+if CONFIG["COMPILE_ENVIRONMENT"] and not CONFIG["MOZ_NAIVEFOX"]:
     EXPORTS.mozilla.glean += [
         "!fog_ffi_generated.h",
     ]
@@ -45,7 +55,8 @@ if CONFIG["COMPILE_ENVIRONMENT"]:
         "jog_ffi_generated.h", inputs=["/toolkit/components/glean/bindings/jog"]
     )
 
-UNIFIED_SOURCES += [
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
     "bindings/Category.cpp",
     "bindings/Glean.cpp",
     "bindings/GleanMetric.cpp",
@@ -78,15 +89,15 @@ UNIFIED_SOURCES += [
     "ipc/FOGTransportChild.cpp",
     "ipc/FOGTransportParent.cpp",
     "ipc/Support.cpp",
-]
+    ]
 
-SOURCES += [
+    SOURCES += [
     "!EventGIFFTMap.cpp",
     "!GleanJSMetricsLookup.cpp",
     "!GleanJSPingsLookup.cpp",
     "!HistogramGIFFTMap.cpp",
     "!ScalarGIFFTMap.cpp",
-]
+    ]
 
 # Provides us the list of dependent metrics|pings.yaml.
 include("metrics_index.py")
@@ -263,10 +274,11 @@ if CONFIG["MOZ_GLEAN_INTERESTING_METRICS_FILES"]:
     FINAL_TARGET_FILES += ["!interesting_serverknobs.json"]
 
 
-DIRS += [
-    "tests",  # Must be in DIRS, not TEST_DIRS or python-test won't find it.
-    "xpcom",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    DIRS += [
+        "tests",  # Must be in DIRS, not TEST_DIRS or python-test won't find it.
+        "xpcom",
+    ]
 
 with Files("docs/**"):
     SCHEDULES.exclusive = ["docs"]

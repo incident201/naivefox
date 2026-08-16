@@ -6,18 +6,23 @@
 
 #include <algorithm>
 
-#include "MockNetworkLayer.h"
-#include "MockNetworkLayerController.h"
+#ifndef MOZ_NAIVEFOX
+#  include "MockNetworkLayer.h"
+#  include "MockNetworkLayerController.h"
+#endif
 #include "NSSErrorsService.h"
 #include "NetworkDataCountLayer.h"
 #include "QuicSocketControl.h"
 #include "mozilla/ProfilerBandwidthCounter.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/SyncRunnable.h"
-#include "mozilla/Telemetry.h"
-#include "mozilla/dom/ToJSValue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Telemetry.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ToJSValue.h"
+#endif
 #include "mozilla/glean/NetwerkMetrics.h"
-#include "mozilla/net/NeckoChild.h"
 #include "mozilla/net/SSLTokensCache.h"
 #include "nsCOMPtr.h"
 #include "nsICancelable.h"
@@ -1257,9 +1262,13 @@ static bool ShouldBlockAddress(const NetAddr& aAddr, const nsCString& aHost) {
     return false;
   }
 
+#ifndef MOZ_NAIVEFOX
   NetAddr overrideAddr;
   bool hasOverride = FindNetAddrOverride(aAddr, overrideAddr);
   const NetAddr& addrToCheck = hasOverride ? overrideAddr : aAddr;
+#else
+  const NetAddr& addrToCheck = aAddr;
+#endif
 
   if (addrToCheck.IsIPAddrAny() || addrToCheck.IsIPAddrLocal() ||
       addrToCheck.IsIPAddrShared() || addrToCheck.IsLoopbackAddr()) {
@@ -1593,6 +1602,7 @@ nsresult nsSocketTransport::InitiateSocket() {
     }
   }
 
+#ifndef MOZ_NAIVEFOX
   if (Telemetry::CanRecordPrereleaseData() ||
       Telemetry::CanRecordReleaseData()) {
     if (NS_FAILED(AttachNetworkDataCountLayer(fd))) {
@@ -1602,6 +1612,8 @@ nsresult nsSocketTransport::InitiateSocket() {
            this));
     }
   }
+#endif
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::network_socket_attach_mock_network_layer() &&
       xpc::AreNonLocalConnectionsDisabled()) {
     if (NS_FAILED(AttachMockNetworkLayer(fd))) {
@@ -1611,6 +1623,7 @@ nsresult nsSocketTransport::InitiateSocket() {
            this));
     }
   }
+#endif
 
   status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);
   PRErrorCode code = PR_GetError();
@@ -2612,15 +2625,23 @@ nsSocketTransport::GetPort(int32_t* port) {
 NS_IMETHODIMP
 nsSocketTransport::GetScriptableOriginAttributes(
     JSContext* aCx, JS::MutableHandle<JS::Value> aOriginAttributes) {
+#ifdef MOZ_NAIVEFOX
+  aOriginAttributes.setNull();
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (NS_WARN_IF(!ToJSValue(aCx, mOriginAttributes, aOriginAttributes))) {
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 nsSocketTransport::SetScriptableOriginAttributes(
     JSContext* aCx, JS::Handle<JS::Value> aOriginAttributes) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MutexAutoLock lock(mLock);
   NS_ENSURE_FALSE(mFD.IsInitialized(), NS_ERROR_FAILURE);
 
@@ -2631,6 +2652,7 @@ nsSocketTransport::SetScriptableOriginAttributes(
 
   mOriginAttributes = std::move(attrs);
   return NS_OK;
+#endif
 }
 
 nsresult nsSocketTransport::GetOriginAttributes(

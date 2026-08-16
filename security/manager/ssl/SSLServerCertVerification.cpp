@@ -101,7 +101,9 @@
 #include "RootCertificateTelemetryUtils.h"
 #include "ScopedNSSTypes.h"
 #include "SharedCertVerifier.h"
-#include "VerifySSLServerCertChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "VerifySSLServerCertChild.h"
+#endif
 #include "cert.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/RefPtr.h"
@@ -113,7 +115,9 @@
 #include "mozpkix/pkixnss.h"
 #include "mozpkix/pkixutil.h"
 #include "nsComponentManagerUtils.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsICertOverrideService.h"
 #include "nsIPublicKeyPinningService.h"
 #include "nsISiteSecurityService.h"
@@ -902,6 +906,7 @@ SECStatus AuthCertificateHookInternal(
   RefPtr resultTask =
       MakeRefPtr<SSLServerCertVerificationResult>(socketControl);
 
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsSocketProcess()) {
     return RemoteProcessCertVerification(
         std::move(peerCertChain), hostName, socketControl->GetPort(),
@@ -909,6 +914,7 @@ SECStatus AuthCertificateHookInternal(
         sctsFromTLSExtension, dcInfo, providerFlags, certVerifierFlags,
         resultTask);
   }
+#endif
 
   // We *must* do certificate verification on a background thread because
   // we need the socket transport thread to be free for our OCSP requests,

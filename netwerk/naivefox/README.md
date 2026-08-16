@@ -502,6 +502,13 @@ Any Firefox-specific camouflage change must be justified by measurements compari
 
 ## Runtime and packaging model
 
+The `minimal` branch now has a measured lean-build checkpoint: the full source
+tree is retained, while the NaiveFox application no longer compiles DOM or
+GFX implementation sources. Generated binding metadata remains part of the
+shared Firefox build where required. The checkpoint was validated from an
+empty object directory with a successful cold build and runtime smoke; staged
+package sizing and further link-closure reductions remain separate work.
+
 The prototype is intentionally allowed to be large.
 
 NaiveFox is expected to be built as a Gecko-dependent executable, conceptually similar to:

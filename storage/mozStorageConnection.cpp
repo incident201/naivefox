@@ -11,16 +11,22 @@
 #include "nsThreadUtils.h"
 #include "nsIFile.h"
 #include "nsIFileURL.h"
-#include "nsIXPConnect.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIXPConnect.h"
+#endif
 #include "mozilla/AppShutdown.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/glean/StorageMetrics.h"
-#include "mozilla/Telemetry.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Telemetry.h"
+#endif
 #include "mozilla/Mutex.h"
 #include "mozilla/CondVar.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorNames.h"
-#include "mozilla/dom/quota/QuotaObject.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/quota/QuotaObject.h"
+#endif
 #include "mozilla/ScopeExit.h"
 #include "mozilla/storage/SQLiteEncryption.h"
 #include "mozilla/SpinEventLoopUntil.h"
@@ -66,7 +72,7 @@ mozilla::LazyLogModule gStorageLog("mozStorage");
 
 // Checks that the protected code is running on the main-thread only if the
 // connection was also opened on it.
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
 #  define CHECK_MAINTHREAD_ABUSE()                                   \
     do {                                                             \
       NS_WARNING_ASSERTION(                                          \
@@ -303,11 +309,13 @@ void BuildFileURIWithKey(const nsACString& aEscapedPath,
   aURI.Append(aDBKey);
 }
 
+#ifndef MOZ_NAIVEFOX
 RefPtr<QuotaObject> GetQuotaObject(sqlite3_file* aFile, bool obfuscatingVFS) {
   return obfuscatingVFS
              ? mozilla::storage::obfsvfs::GetQuotaObjectForFile(aFile)
              : mozilla::storage::quotavfs::GetQuotaObjectForFile(aFile);
 }
+#endif
 
 /**
  * This code is heavily based on the sample at:
@@ -747,7 +755,7 @@ class AsyncBackupDatabaseFile final : public Runnable, public nsITimerCallback {
                                      nsITimer::TYPE_ONE_SHOT,
                                      GetCurrentSerialEventTarget());
     }
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
     if (srv != SQLITE_DONE) {
       nsCString warnMsg;
       warnMsg.AppendLiteral(
@@ -1133,6 +1141,7 @@ nsresult Connection::initialize(nsIFile* aDatabaseFile) {
   // Open through obfsvfs with a per-file key when encryption is on and the DB
   // lives inside the profile. Outside-profile DBs (e.g. xpcshell tmp files)
   // are explicitly opened as plaintext on the base VFS below.
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::security_storage_encryption_sqlite_enabled()) {
     nsAutoCString dbPath = NS_ConvertUTF16toUTF8(path);
     EncryptionStatus encStatus;
@@ -1188,6 +1197,7 @@ nsresult Connection::initialize(nsIFile* aDatabaseFile) {
         "an existing encrypted database must not fall through to a "
         "plaintext VFS");
   }
+#endif
 
   bool exclusive =
       StaticPrefs::storage_sqlite_exclusiveLock_enabled() && !mOpenNotExclusive;
@@ -1283,6 +1293,7 @@ nsresult Connection::initialize(nsIFileURL* aFileURL) {
                          return true;
                        }));
 
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::security_storage_encryption_sqlite_enabled()) {
     // A key already in the URL means the caller is opening an encrypted DB
     // with its own key, so trust it. Otherwise look up the per-file key for
@@ -1326,6 +1337,7 @@ nsresult Connection::initialize(nsIFileURL* aFileURL) {
     // selection below); keep mDatabaseEncrypted and the page size in step.
     SetDatabaseEncrypted(hasKey);
   }
+#endif
 
   // Conservative fail-closed: a database the encryption policy says must be
   // encrypted opens through obfsvfs with its key, or not at all -- it must
@@ -1340,9 +1352,13 @@ nsresult Connection::initialize(nsIFileURL* aFileURL) {
   bool exclusive =
       StaticPrefs::storage_sqlite_exclusiveLock_enabled() && !mOpenNotExclusive;
 
+#ifdef MOZ_NAIVEFOX
+  const char* const vfs = basevfs::GetVFSName(exclusive);
+#else
   const char* const vfs = hasKey               ? obfsvfs::GetVFSName()
                           : hasDirectoryLockId ? quotavfs::GetVFSName()
                                                : basevfs::GetVFSName(exclusive);
+#endif
 
   int srv = ::sqlite3_open_v2(spec.get(), &mDBConn, mFlags, vfs);
   if (srv != SQLITE_OK) {
@@ -1757,6 +1773,7 @@ int Connection::stepStatement(sqlite3* aNativeConnection,
     ::sqlite3_reset(aStatement);
   }
 
+#ifndef MOZ_NAIVEFOX
   // Report very slow SQL statements to Telemetry
   TimeDuration duration = TimeStamp::Now() - startTime;
   const uint32_t threshold = NS_IsMainThread()
@@ -1768,6 +1785,7 @@ int Connection::stepStatement(sqlite3* aNativeConnection,
         statementString, mTelemetryFilename,
         static_cast<uint32_t>(duration.ToMilliseconds()));
   }
+#endif
 
   (void)::sqlite3_extended_result_codes(aNativeConnection, 0);
   // Drop off the extended result bits of the result code.
@@ -1837,6 +1855,7 @@ int Connection::executeSql(sqlite3* aNativeConnection, const char* aSqlString) {
       ::sqlite3_exec(aNativeConnection, aSqlString, nullptr, nullptr, nullptr);
   RecordQueryStatus(srv);
 
+#ifndef MOZ_NAIVEFOX
   // Report very slow SQL statements to Telemetry
   TimeDuration duration = TimeStamp::Now() - startTime;
   const uint32_t threshold = NS_IsMainThread()
@@ -1848,6 +1867,7 @@ int Connection::executeSql(sqlite3* aNativeConnection, const char* aSqlString) {
         statementString, mTelemetryFilename,
         static_cast<uint32_t>(duration.ToMilliseconds()));
   }
+#endif
 
   return srv;
 }
@@ -2139,6 +2159,7 @@ nsresult Connection::initializeClone(Connection* aClone, bool aReadOnly) {
                                        getter_AddRefs(attachStmt));
           NS_ENSURE_SUCCESS(rv, rv);
 
+#ifndef MOZ_NAIVEFOX
           if (mDatabaseEncrypted) {
             // Extract into a distinct dbPath: BuildFileURIWithKey must not
             // alias its input and output. It assigns "file:" to the output
@@ -2163,6 +2184,7 @@ nsresult Connection::initializeClone(Connection* aClone, bool aReadOnly) {
               BuildFileURIWithKey(dbPath, query, dbKey, path);
             }
           }
+#endif
           rv = attachStmt->BindUTF8StringByName("path"_ns, path);
           NS_ENSURE_SUCCESS(rv, rv);
           rv = attachStmt->Execute();
@@ -2791,8 +2813,12 @@ Connection::AttachDatabase(const char* aPath, const char* aName,
   nsresult rv;
   nsCString uri;
 
+#ifdef MOZ_NAIVEFOX
+  bool encryptionEnabled = false;
+#else
   bool encryptionEnabled =
       StaticPrefs::security_storage_encryption_sqlite_enabled();
+#endif
   if (encryptionEnabled) {
     nsCString dbKey, path, query;
 
@@ -3138,6 +3164,11 @@ Connection::EnableModule(const nsACString& aModuleName) {
 NS_IMETHODIMP
 Connection::GetQuotaObjects(QuotaObject** aDatabaseQuotaObject,
                             QuotaObject** aJournalQuotaObject) {
+#ifdef MOZ_NAIVEFOX
+  *aDatabaseQuotaObject = nullptr;
+  *aJournalQuotaObject = nullptr;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_ASSERT(aDatabaseQuotaObject);
   MOZ_ASSERT(aJournalQuotaObject);
 
@@ -3196,6 +3227,7 @@ Connection::GetQuotaObjects(QuotaObject** aDatabaseQuotaObject,
   databaseQuotaObject.forget(aDatabaseQuotaObject);
   journalQuotaObject.forget(aJournalQuotaObject);
   return NS_OK;
+#endif
 }
 
 SQLiteMutex& Connection::GetSharedDBMutex() { return sharedDBMutex; }

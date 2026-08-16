@@ -16,7 +16,9 @@
 #include "ThreadDelay.h"
 #include "ThreadEventQueue.h"
 #include "ThreadEventTarget.h"
-#include "mozilla/BackgroundHangMonitor.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/BackgroundHangMonitor.h"
+#endif
 #include "mozilla/ChaosMode.h"
 #include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/DebugOnly.h"
@@ -32,13 +34,19 @@
 #include "mozilla/StaticPrefs_threads.h"
 #include "mozilla/TaskController.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/dom/DocGroup.h"
-#include "mozilla/dom/ScriptSettings.h"
-#include "mozilla/glean/XpcomMetrics.h"
-#include "mozilla/ipc/BackgroundChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/DocGroup.h"
+#  include "mozilla/dom/ScriptSettings.h"
+#  include "mozilla/glean/XpcomMetrics.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ipc/BackgroundChild.h"
+#endif
 #include "mozilla/ipc/MessageChannel.h"
 #include "nsCOMPtr.h"
-#include "nsExceptionHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsFmtString.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIObserverService.h"
@@ -319,7 +327,9 @@ void nsThread::MaybeRemoveFromThreadList() {
 
 /*static*/
 void nsThread::ThreadFunc(void* aArg) {
+#ifndef MOZ_NAIVEFOX
   using mozilla::ipc::BackgroundChild;
+#endif
 
   UniquePtr<ThreadInitData> initData(static_cast<ThreadInitData*>(aArg));
   RefPtr<nsThread>& self = initData->thread;
@@ -376,7 +386,9 @@ void nsThread::ThreadFunc(void* aArg) {
 
     self->mEvents->RunShutdownTasks();
 
+#ifndef MOZ_NAIVEFOX
     BackgroundChild::CloseForCurrentThread();
+#endif
 
     // NB: The main thread does not shut down here!  It shuts down via
     // nsThreadManager::Shutdown.
@@ -626,10 +638,12 @@ nsresult nsThread::Init(const nsACString& aName) {
                                    PR_JOINABLE_THREAD, mStackSize))) {
       PRErrorCode prError = PR_GetError();
       PRInt32 osError = PR_GetOSError();
+#ifndef MOZ_NAIVEFOX
       CrashReporter::RecordAnnotationNSCString(
           CrashReporter::Annotation::ThreadLastCreateError,
           nsFmtCString("{}: prError={:#x} osError={:#x}", aName, prError,
                        osError));
+#endif
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
@@ -1084,10 +1098,14 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult) {
   // event loop since its state change hasn't happened yet.
   bool reallyWait = aMayWait && (mNestedEventLoopDepth > 0 || !ShuttingDown());
 
+#ifndef MOZ_NAIVEFOX
   Maybe<dom::AutoNoJSAPI> noJSAPI;
+#endif
 
   if (mUseHangMonitor && reallyWait) {
+#ifndef MOZ_NAIVEFOX
     BackgroundHangMonitor().NotifyWait();
+#endif
   }
 
   if (mIsMainThread) {
@@ -1105,7 +1123,9 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult) {
   // mScriptObserver.
   bool callScriptObserver = !!mScriptObserver;
   if (callScriptObserver) {
+#ifndef MOZ_NAIVEFOX
     noJSAPI.emplace();
+#endif
     mScriptObserver->BeforeProcessTask(reallyWait);
   }
 
@@ -1156,7 +1176,9 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult) {
       mozilla::TimeStamp now = mozilla::TimeStamp::Now();
 
       if (mUseHangMonitor) {
+#ifndef MOZ_NAIVEFOX
         BackgroundHangMonitor().NotifyActivity();
+#endif
       }
 
       Maybe<PerformanceCounterState::Snapshot> snapshot;
@@ -1232,7 +1254,9 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult) {
     if (mScriptObserver) {
       mScriptObserver->AfterProcessTask(mNestedEventLoopDepth);
     }
+#ifndef MOZ_NAIVEFOX
     noJSAPI.reset();
+#endif
   }
 
   --mNestedEventLoopDepth;
@@ -1509,7 +1533,7 @@ void PerformanceCounterState::MaybeReportAccumulatedTime(const nsCString& aName,
   }
 
   TimeDuration duration = aNow - mCurrentTimeSliceStart;
-#ifdef MOZ_COLLECTING_RUNNABLE_TELEMETRY
+#if defined(MOZ_COLLECTING_RUNNABLE_TELEMETRY) && !defined(MOZ_NAIVEFOX)
   if (mIsMainThread && duration.ToMilliseconds() > LONGTASK_TELEMETRY_MS) {
     glean::event::longtask.MaybeTruncateAndGet(aName).AccumulateRawDuration(
         duration);

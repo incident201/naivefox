@@ -2899,6 +2899,7 @@ dependencies = [
 name = "gkrust"
 version = "0.1.0"
 dependencies = [
+ "gkrust-naivefox",
  "gkrust-shared",
  "mozglue-static",
  "mozilla-central-workspace-hack",
@@ -2924,6 +2925,54 @@ dependencies = [
  "nsstring-gtest",
  "swgl",
  "xpcom-gtest",
+]
+
+[[package]]
+name = "gkrust-naivefox"
+version = "0.1.0"
+dependencies = [
+ "abridged_certs",
+ "app_collator_glue",
+ "binary_http",
+ "cert_storage",
+ "crypto_hash",
+ "data_storage",
+ "encoding_glue",
+ "fluent-langneg",
+ "fluent-langneg-ffi",
+ "gecko_logger",
+ "gecko_tracing",
+ "gkrust_utils",
+ "happy_eyeballs_glue",
+ "http_sfv",
+ "icu_locale",
+ "idna_glue",
+ "ipcclientcerts",
+ "ipdl_utils",
+ "jsrust_shared",
+ "locale_service_glue",
+ "log",
+ "mozurl",
+ "neqo_glue",
+ "netwerk_helper",
+ "nserror",
+ "nsstring",
+ "oblivious_http",
+ "pdf-trust-anchors",
+ "prefs_parser",
+ "qwac-trust-anchors",
+ "rusqlite 0.37.0",
+ "signature_cache",
+ "ssl_tokens_cache",
+ "static_prefs",
+ "storage",
+ "trust-anchors",
+ "unic-langid",
+ "unic-langid-ffi",
+ "unicode-bidi-ffi",
+ "uritemplate_glue",
+ "urlpattern_glue",
+ "xpcom",
 ]
 
 [[package]]

@@ -4,14 +4,16 @@
 
 #include "mozilla/net/URLPatternGlue.h"
 
-#include "js/Array.h"         // JS::GetArrayLength
-#include "js/GlobalObject.h"  // JS::CurrentGlobalOrNull
-#include "js/RegExp.h"
-#include "js/RegExpFlags.h"
-#include "js/RootingAPI.h"
-#include "mozilla/dom/BindingUtils.h"
-#include "mozilla/dom/ScriptSettings.h"  // for AutoJSAPI
-#include "nsJSUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "js/Array.h"         // JS::GetArrayLength
+#  include "js/GlobalObject.h"  // JS::CurrentGlobalOrNull
+#  include "js/RegExp.h"
+#  include "js/RegExpFlags.h"
+#  include "js/RootingAPI.h"
+#  include "mozilla/dom/BindingUtils.h"
+#  include "mozilla/dom/ScriptSettings.h"  // for AutoJSAPI
+#  include "nsJSUtils.h"
+#endif
 
 mozilla::LazyLogModule gUrlPatternLog("urlpattern");
 
@@ -264,6 +266,7 @@ bool UrlPatternTest(UrlPatternGlue aPattern, const UrlPatternInput& aInput,
   return !res.isNothing();
 }
 
+#ifndef MOZ_NAIVEFOX
 // Implementation for the same object represented in rust as RegExpObjWrapper
 // we are using this class to root the spidermonkey regexp object returned
 // from parsing so that we can hold onto it longer without it getting cleaned up
@@ -413,5 +416,23 @@ extern "C" void free_regexp_ffi(RegExpObjWrapper* regexp_wrapper) {
     delete impl;
   }
 }
+#else
+// Compression dictionaries are disabled in the lean product.  The Rust URL
+// parser remains linked for its non-DOM callers, but must not pull the DOM
+// ScriptSettings/binding runtime into NaiveFox merely to host regular
+// expressions for the disabled dictionary feature.
+extern "C" bool parse_regexp_ffi(const uint16_t*, uintptr_t, const uint16_t*,
+                                 uintptr_t, RegExpObjWrapper**) {
+  return false;
+}
+
+extern "C" bool matches_regexp_ffi(RegExpObjWrapper* const*, const uint8_t*,
+                                   uintptr_t, bool, bool*,
+                                   nsTArray<MaybeString>*) {
+  return false;
+}
+
+extern "C" void free_regexp_ffi(RegExpObjWrapper*) {}
+#endif
 
 }  // namespace mozilla::net

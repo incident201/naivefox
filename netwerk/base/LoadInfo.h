@@ -8,11 +8,18 @@
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Result.h"
 #include "mozilla/dom/ClientInfo.h"
-#include "mozilla/dom/FeaturePolicy.h"
-#include "mozilla/dom/ReferrerPolicyBinding.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/FeaturePolicy.h"
+#else
+#  include "mozilla/dom/FeaturePolicy.h"
+#endif
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/ReferrerPolicyBinding.h"
+#else
+#  include "mozilla/dom/ReferrerPolicyBinding.h"
+#endif
 #include "mozilla/dom/ServiceWorkerDescriptor.h"
 #include "mozilla/dom/UserNavigationInvolvement.h"
-#include "nsContentUtils.h"
 #include "nsIInterceptionInfo.h"
 #include "nsILoadInfo.h"
 #include "nsIPrincipal.h"

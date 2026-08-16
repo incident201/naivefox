@@ -6,6 +6,7 @@
 #define nsHttpChannel_h_
 
 #include "AlternateServices.h"
+#include "base/process.h"
 #include "AutoClose.h"
 #include "HttpBaseChannel.h"
 #include "HttpTransactionShell.h"
@@ -13,8 +14,10 @@
 #include "mozilla/AtomicBitfields.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Mutex.h"
-#include "mozilla/extensions/PStreamFilterParent.h"
-#include "mozilla/net/DocumentLoadListener.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/extensions/PStreamFilterParent.h"
+#  include "mozilla/net/DocumentLoadListener.h"
+#endif
 #include "nsHttpResponseHead.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "nsICacheEntry.h"
@@ -275,10 +278,12 @@ class nsHttpChannel final : public HttpBaseChannel,
 
   base::ProcessId ProcessId();
 
+#ifndef MOZ_NAIVEFOX
   using ChildEndpointPromise =
       MozPromise<mozilla::ipc::Endpoint<extensions::PStreamFilterChild>, bool,
                  true>;
   [[nodiscard]] RefPtr<ChildEndpointPromise> AttachStreamFilter();
+#endif
 
   already_AddRefed<WebTransportSessionEventListener>
   GetWebTransportSessionEventListener();
@@ -551,7 +556,9 @@ class nsHttpChannel final : public HttpBaseChannel,
   void SetDoNotTrack();
   void SetGlobalPrivacyControl();
 
+#ifndef MOZ_NAIVEFOX
   already_AddRefed<nsChannelClassifier> GetOrCreateChannelClassifier();
+#endif
 
   // Start an internal redirect to a new InterceptedHttpChannel which will
   // resolve in firing a ServiceWorker FetchEvent.
@@ -582,7 +589,9 @@ class nsHttpChannel final : public HttpBaseChannel,
   // nsChannelClassifier will be invoked twice in InitLocalBlockList() and
   // BeginConnect(), so save the nsChannelClassifier here to keep the
   // state of whether tracking protection is enabled or not.
+#ifndef MOZ_NAIVEFOX
   RefPtr<nsChannelClassifier> mChannelClassifier;
+#endif
 
   // Dictionary entry for the entry being used to decompress this stream
   // (i.e. we added Dictionary-Available to the request).
@@ -646,7 +655,9 @@ class nsHttpChannel final : public HttpBaseChannel,
   uint32_t mRequestTime{0};
   nsresult mLastTransportStatus{NS_OK};
 
+#ifndef MOZ_NAIVEFOX
   nsTArray<StreamFilterRequest> mStreamFilterRequests;
+#endif
 
   mozilla::TimeStamp mOnStartRequestTimestamp;
   // Timestamp of the time the channel was suspended.

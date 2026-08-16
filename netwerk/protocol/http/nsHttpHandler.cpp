@@ -8,20 +8,28 @@
 #include <bitset>
 
 #include "ASpdySession.h"
-#include "AltServiceChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "AltServiceChild.h"
+#endif
 #include "EventTokenBucket.h"
 #include "HttpLog.h"
 #include "LoadContextInfo.h"
-#include "SerializedLoadContext.h"
+#ifndef MOZ_NAIVEFOX
+#  include "SerializedLoadContext.h"
+#endif
 #include "TRRServiceChannel.h"
 #include "Tickler.h"
-#include "mozilla/AntiTrackingRedirectHeuristic.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/AntiTrackingRedirectHeuristic.h"
+#endif
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Base64.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Components.h"
-#include "mozilla/DynamicFpiRedirectHeuristic.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/DynamicFpiRedirectHeuristic.h"
+#endif
 #include "mozilla/EndianUtils.h"
 #include "mozilla/LazyIdleThread.h"
 #include "mozilla/OriginAttributesHashKey.h"
@@ -34,26 +42,33 @@
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StaticPrefs_security.h"
-#include "mozilla/StoragePrincipalHelper.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/StoragePrincipalHelper.h"
+#  include "mozilla/dom/ContentParent.h"
+#  include "mozilla/dom/Navigator.h"
+#  include "mozilla/dom/Promise.h"
+#  include "mozilla/dom/network/Connection.h"
+#endif
 #include "mozilla/SyncRunnable.h"
-#include "mozilla/dom/ContentParent.h"
-#include "mozilla/dom/Navigator.h"
-#include "mozilla/dom/Promise.h"
-#include "mozilla/dom/network/Connection.h"
-#include "mozilla/glean/GleanPings.h"
 #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
 #include "mozilla/intl/LocaleService.h"
 #include "mozilla/ipc/URIUtils.h"
-#include "mozilla/net/HttpConnectionMgrParent.h"
-#include "mozilla/net/NeckoChild.h"
-#include "mozilla/net/NeckoParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/HttpConnectionMgrParent.h"
+#  include "mozilla/net/NeckoChild.h"
+#  include "mozilla/net/NeckoParent.h"
+#endif
 #include "mozilla/net/RequestContextService.h"
-#include "mozilla/net/SocketProcessChild.h"
-#include "mozilla/net/SocketProcessParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessChild.h"
+#  include "mozilla/net/SocketProcessParent.h"
+#endif
 #include "mozilla/net/rust_helper.h"
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "nsCOMPtr.h"
-#include "nsCORSListenerProxy.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsCORSListenerProxy.h"
+#endif
 #include "nsCRT.h"
 #include "nsCategoryManagerUtils.h"
 #include "nsCharSeparatedTokenizer.h"
@@ -71,8 +86,10 @@
 #include "nsINetworkLinkService.h"
 #include "nsIOService.h"
 #include "nsIObserverService.h"
-#include "nsIParentalControlsService.h"
-#include "nsISiteIntegrityService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIParentalControlsService.h"
+#  include "nsISiteIntegrityService.h"
+#endif
 #include "nsISiteSecurityService.h"
 #include "nsISocketProvider.h"
 #include "nsIStreamConverterService.h"
@@ -82,9 +99,13 @@
 #include "nsNSSComponent.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
-#include "nsPIDOMWindow.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsPIDOMWindow.h"
+#endif
 #include "nsPrintfCString.h"
-#include "nsRFPService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsRFPService.h"
+#endif
 #include "nsServiceManagerUtils.h"
 #include "nsSocketProviderService.h"
 #include "nsSocketTransportService2.h"
@@ -95,7 +116,7 @@
 #  include <sys/utsname.h>
 #endif
 
-#if defined(MOZ_WIDGET_GTK)
+#if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/WidgetUtilsGtk.h"
 #endif
 
@@ -110,7 +131,9 @@
 #endif
 
 //-----------------------------------------------------------------------------
-#include "mozilla/net/HttpChannelChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/HttpChannelChild.h"
+#endif
 
 #define UA_PREF_PREFIX "general.useragent."
 #ifdef XP_WIN
@@ -139,7 +162,9 @@
 
 //-----------------------------------------------------------------------------
 
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::Promise;
+#endif
 
 namespace mozilla::net {
 
@@ -172,7 +197,7 @@ static nsCString GetDeviceModelId() {
 
 #ifdef XP_UNIX
 static bool IsRunningUnderUbuntuSnap() {
-#  if defined(MOZ_WIDGET_GTK)
+#  if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
   if (!widget::IsRunningUnderSnap()) {
     return false;
   }
@@ -286,11 +311,13 @@ nsHttpHandler::nsHttpHandler()
   MOZ_ASSERT(!gHttpHandler, "HTTP handler already created!");
 
   nsCOMPtr<nsIXULRuntime> runtime;
+#ifndef MOZ_NAIVEFOX
   runtime = mozilla::components::XULRuntime::Service();
   if (runtime) {
     runtime->GetProcessID(&mProcessId);
     runtime->GetUniqueProcessID(&mUniqueProcessId);
   }
+#endif
 }
 
 nsHttpHandler::~nsHttpHandler() {
@@ -358,7 +385,9 @@ nsresult nsHttpHandler::Init() {
 
   gIOService->LaunchSocketProcess();
 
+#ifndef MOZ_NAIVEFOX
   if (IsNeckoChild()) NeckoChild::InitNeckoChild();
+#endif
 
   InitUserAgentComponents();
 
@@ -382,6 +411,9 @@ nsresult nsHttpHandler::Init() {
     mActivityDistributor = components::HttpActivityDistributor::Service();
 
     auto initQLogDir = [&]() {
+#ifdef MOZ_NAIVEFOX
+      return EmptyCString();
+#else
       if (!StaticPrefs::network_http_http3_enable_qlog()) {
         return EmptyCString();
       }
@@ -401,6 +433,7 @@ nsresult nsHttpHandler::Init() {
       }
 
       return qlogDir->HumanReadablePath();
+#endif
     };
     mHttp3QlogDir = initQLogDir();
 
@@ -430,6 +463,7 @@ nsresult nsHttpHandler::Init() {
 
   mCompatFirefox.AssignLiteral("Firefox/" MOZILLA_UAVERSION);
 
+#ifndef MOZ_NAIVEFOX
   nsCOMPtr<nsIXULAppInfo> appInfo;
   appInfo = mozilla::components::XULRuntime::Service();
 
@@ -443,13 +477,18 @@ nsresult nsHttpHandler::Init() {
     appInfo->GetVersion(mAppVersion);
     mAppName.StripChars(R"( ()<>@,;:\"/[]?={})");
   } else {
+#endif
     mAppVersion.AssignLiteral(MOZ_APP_UA_VERSION);
+#ifndef MOZ_NAIVEFOX
   }
+#endif
 
   mMisc.AssignLiteral("rv:" MOZILLA_UAVERSION);
 
   // Generate the spoofed User Agent for fingerprinting resistance.
+#ifndef MOZ_NAIVEFOX
   nsRFPService::GetSpoofedUserAgent(mSpoofedUserAgent);
+#endif
 
   mSessionStartTime = NowInSeconds();
   mHandlerActive = true;
@@ -464,7 +503,11 @@ nsresult nsHttpHandler::Init() {
 #if defined(ANDROID) || defined(XP_IOS)
   mProductSub.AssignLiteral(MOZILLA_UAVERSION);
 #else
+#ifdef MOZ_NAIVEFOX
+  mProductSub.AssignLiteral("20100101");
+#else
   mProductSub.AssignLiteral(LEGACY_UA_GECKO_TRAIL);
+#endif
 #endif
 
 #if DEBUG
@@ -535,6 +578,10 @@ nsresult nsHttpHandler::Init() {
 }
 
 void nsHttpHandler::UpdateParentalControlsEnabled(bool waitForCompletion) {
+#ifdef MOZ_NAIVEFOX
+  sParentalControlsEnabled = false;
+  return;
+#else
   // Child process does not have privileges to read parentals control state
   if (!XRE_IsParentProcess()) {
     return;
@@ -569,6 +616,7 @@ void nsHttpHandler::UpdateParentalControlsEnabled(bool waitForCompletion) {
                                std::move(getParentalControlsTask)),
         mozilla::EventQueuePriority::Idle);
   }
+#endif
 }
 
 void nsHttpHandler::GenerateIdempotencyKeyForPost(const uint32_t aPostId,
@@ -629,6 +677,7 @@ nsresult nsHttpHandler::InitConnectionMgr() {
     return NS_OK;
   }
 
+#ifndef MOZ_NAIVEFOX
   if (nsIOService::UseSocketProcess(true) && XRE_IsParentProcess()) {
     mConnMgr = new HttpConnectionMgrParent();
     RefPtr<nsHttpHandler> self = this;
@@ -646,7 +695,9 @@ nsresult nsHttpHandler::InitConnectionMgr() {
                               self->mCompatDevice, self->mDeviceModelId));
     };
     gIOService->CallOrWaitForSocketProcess(std::move(task));
-  } else {
+  } else
+#endif
+  {
     MOZ_ASSERT(XRE_IsSocketProcess() || !nsIOService::UseSocketProcess());
     mConnMgr = new nsHttpConnectionMgr();
   }
@@ -859,6 +910,7 @@ bool nsHttpHandler::IsAcceptableEncoding(const char* enc, bool isSecure) {
   return rv;
 }
 
+#ifndef MOZ_NAIVEFOX
 nsISiteIntegrityService* nsHttpHandler::GetSiteIntegrityService() {
   if (!mSiteIntegrityService) {
     nsCOMPtr<nsISiteIntegrityService> service;
@@ -868,6 +920,7 @@ nsISiteIntegrityService* nsHttpHandler::GetSiteIntegrityService() {
   }
   return mSiteIntegrityService;
 }
+#endif
 
 nsISiteSecurityService* nsHttpHandler::GetSSService() {
   if (!mSSService) {
@@ -916,9 +969,10 @@ nsresult nsHttpHandler::AsyncOnChannelRedirect(
   newChan->GetURI(getter_AddRefs(newURI));
   MOZ_ASSERT(newURI);
 
+#ifndef MOZ_NAIVEFOX
   PrepareForAntiTrackingRedirectHeuristic(oldChan, oldURI, newChan, newURI);
-
   DynamicFpiRedirectHeuristic(oldChan, oldURI, newChan, newURI);
+#endif
 
   // TODO E10S This helper has to be initialized on the other process
   RefPtr<nsAsyncRedirectVerifyHelper> redirectCallbackHelper =
@@ -2022,6 +2076,7 @@ void nsHttpHandler::PrefsChanged(const char* pref) {
   }
 
   if (PREF_CHANGED(HTTP_PREF("http3.enable_qlog"))) {
+#ifndef MOZ_NAIVEFOX
     // Initialize the directory.
     nsCOMPtr<nsIFile> qlogDir;
     if (Preferences::GetBool(HTTP_PREF("http3.enable_qlog")) &&
@@ -2035,6 +2090,7 @@ void nsHttpHandler::PrefsChanged(const char* pref) {
         NS_WARNING("Creating qlog dir failed");
       }
     }
+#endif
   }
 
 #ifdef XP_MACOSX
@@ -2215,13 +2271,17 @@ nsHttpHandler::NewProxiedChannel(nsIURI* uri, nsIProxyInfo* givenProxyInfo,
 
   LOG(("nsHttpHandler::NewProxiedChannel [proxyInfo=%p]\n", givenProxyInfo));
 
+#ifndef MOZ_NAIVEFOX
   if (IsNeckoChild()) {
     httpChannel = new HttpChannelChild();
   } else {
+#endif
     // HACK: make sure PSM gets initialized on the main thread.
     net_EnsurePSMInit();
     httpChannel = new nsHttpChannel();
+#ifndef MOZ_NAIVEFOX
   }
+#endif
 
   return SetupChannelInternal(httpChannel, uri, givenProxyInfo,
                               proxyResolveFlags, proxyURI, aLoadInfo, result);
@@ -2387,7 +2447,9 @@ nsHttpHandler::Observe(nsISupports* subject, const char* topic,
     if (mAltSvcCache) {
       mAltSvcCache->ClearAltServiceMappings();
     }
+#ifndef MOZ_NAIVEFOX
     nsCORSListenerProxy::ClearPrivateBrowsingCache();
+#endif
   } else if (!strcmp(topic, "browser:purge-session-history")) {
     if (mConnMgr) {
       (void)mConnMgr->ClearConnectionHistory();
@@ -2453,12 +2515,14 @@ nsHttpHandler::Observe(nsISupports* subject, const char* topic,
     mConnMgr = nullptr;
     (void)InitConnectionMgr();
   } else if (!strcmp(topic, "idle-daily")) {
+#ifndef MOZ_NAIVEFOX
     // Submit the local-network-access ping once per day
     if (XRE_IsParentProcess()) {
 #if defined(EARLY_BETA_OR_EARLIER)  // Submit custom telemetry ping.
       glean_pings::LocalNetworkAccess.Submit();
 #endif
     }
+#endif
   }
   return NS_OK;
 }
@@ -2469,6 +2533,7 @@ nsresult nsHttpHandler::SpeculativeConnectInternal(
     nsIURI* aURI, nsIPrincipal* aPrincipal,
     Maybe<OriginAttributes>&& aOriginAttributes,
     nsIInterfaceRequestor* aCallbacks, bool anonymous) {
+#ifndef MOZ_NAIVEFOX
   if (IsNeckoChild()) {
     nsCOMPtr<nsILoadContext> loadContext = do_GetInterface(aCallbacks);
 
@@ -2477,6 +2542,7 @@ nsresult nsHttpHandler::SpeculativeConnectInternal(
         std::move(aOriginAttributes), anonymous);
     return NS_OK;
   }
+#endif
 
   if (!mHandlerActive) return NS_OK;
 
@@ -2508,6 +2574,7 @@ nsresult nsHttpHandler::SpeculativeConnectInternal(
     }
   }
 
+#ifndef MOZ_NAIVEFOX
   if (!aOriginAttributes) {
     // We must update the originAttributes with the network state first party
     // domain **after** we upgrade aURI to https.
@@ -2516,6 +2583,7 @@ nsresult nsHttpHandler::SpeculativeConnectInternal(
     StoragePrincipalHelper::UpdateOriginAttributesForNetworkState(
         aURI, originAttributes);
   }
+#endif
 
   nsAutoCString scheme;
   nsresult rv = aURI->GetScheme(scheme);
@@ -2575,6 +2643,7 @@ nsresult nsHttpHandler::SpeculativeConnectInternal(
       nsPrintfCString debugHashKey("%s", ci->HashKey().get());
       obsService->NotifyObservers(nullptr, "speculative-connect-request",
                                   NS_ConvertUTF8toUTF16(debugHashKey).get());
+#ifndef MOZ_NAIVEFOX
       for (auto* cp :
            dom::ContentParent::AllProcesses(dom::ContentParent::eLive)) {
         PNeckoParent* neckoParent =
@@ -2584,6 +2653,7 @@ nsresult nsHttpHandler::SpeculativeConnectInternal(
         }
         (void)neckoParent->SendSpeculativeConnectRequest();
       }
+#endif
     }
   }
 
@@ -2648,6 +2718,9 @@ nsHttpHandler::SpeculativeConnectWithOriginAttributesNative(
 }
 
 void nsHttpHandler::TickleWifi(nsIInterfaceRequestor* cb) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (!cb || !mWifiTickler) return;
 
   // If B2G requires a similar mechanism nsINetworkManager, currently only avail
@@ -2670,6 +2743,7 @@ void nsHttpHandler::TickleWifi(nsIInterfaceRequestor* cb) {
 
   mWifiTickler->SetIPV4Address(gwAddress);
   mWifiTickler->Tickle();
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2734,7 +2808,11 @@ nsHttpHandler::EnsureHSTSDataReadyNative(
 }
 
 NS_IMETHODIMP
-nsHttpHandler::EnsureHSTSDataReady(JSContext* aCx, Promise** aPromise) {
+nsHttpHandler::EnsureHSTSDataReady(JSContext* aCx, dom::Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  *aPromise = nullptr;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   if (NS_WARN_IF(!aCx)) {
     return NS_ERROR_FAILURE;
   }
@@ -2773,11 +2851,14 @@ nsHttpHandler::EnsureHSTSDataReady(JSContext* aCx, Promise** aPromise) {
       new HSTSDataCallbackWrapper(std::move(callback));
   promise.forget(aPromise);
   return EnsureHSTSDataReadyNative(wrapper);
+#endif
 }
 
 NS_IMETHODIMP
 nsHttpHandler::ClearCORSPreflightCache() {
+#ifndef MOZ_NAIVEFOX
   nsCORSListenerProxy::ClearCache();
+#endif
   return NS_OK;
 }
 
@@ -2835,6 +2916,7 @@ void nsHttpHandler::ExcludeHttp2OrHttp3Internal(
        ci->HashKey().get()));
   // The excluded list needs to be stayed synced between parent process and
   // socket process, so we send this information to the parent process here.
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsSocketProcess()) {
     MOZ_ASSERT(OnSocketThread());
 
@@ -2849,6 +2931,7 @@ void nsHttpHandler::ExcludeHttp2OrHttp3Internal(
               connInfoArgs);
         }));
   }
+#endif
 
   MOZ_ASSERT_IF(nsIOService::UseSocketProcess() && XRE_IsParentProcess(),
                 NS_IsMainThread());
@@ -2866,8 +2949,8 @@ void nsHttpHandler::ExcludeHttp2OrHttp3Internal(
       mExcludedHttp2Origins.Insert(ci->GetOrigin());
     }
     mConnMgr->ExcludeHttp2(ci);
+    }
   }
-}
 
 void nsHttpHandler::ExcludeHttp2(const nsHttpConnectionInfo* ci) {
   ExcludeHttp2OrHttp3Internal(ci);
@@ -3001,15 +3084,20 @@ nsresult nsHttpHandler::DoShiftReloadConnectionCleanupWithConnInfo(
 }
 
 void nsHttpHandler::ClearHostMapping(nsHttpConnectionInfo* aConnInfo) {
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsSocketProcess()) {
     AltServiceChild::ClearHostMapping(aConnInfo);
     return;
   }
+#endif
 
   AltServiceCache()->ClearHostMapping(aConnInfo);
 }
 
 void nsHttpHandler::SetHttpHandlerInitArgs(const HttpHandlerInitArgs& aArgs) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_CRASH("NaiveFox does not use the socket-process initialization path");
+#else
   MOZ_ASSERT(XRE_IsSocketProcess());
   mLegacyAppName = aArgs.mLegacyAppName();
   mLegacyAppVersion = aArgs.mLegacyAppVersion();
@@ -3023,6 +3111,7 @@ void nsHttpHandler::SetHttpHandlerInitArgs(const HttpHandlerInitArgs& aArgs) {
   mCompatFirefox = aArgs.mCompatFirefox();
   mCompatDevice = aArgs.mCompatDevice();
   mDeviceModelId = aArgs.mDeviceModelId();
+#endif
 }
 
 void nsHttpHandler::SetDeviceModelId(const nsACString& aModelId) {

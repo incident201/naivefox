@@ -9,9 +9,9 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/mozalloc.h"
-#include "nsContentUtils.h"
 #include "nsIOService.h"
 #include "nsPrintfCString.h"
+#include "nsReadableUtils.h"
 #include "nsString.h"
 
 #ifdef XP_WIN
@@ -237,7 +237,7 @@ bool IsLoopbackHostname(const nsACString& aAsciiHost) {
   }
 
   nsAutoCString host;
-  nsContentUtils::ASCIIToLower(aAsciiHost, host);
+  ToLowerCase(aAsciiHost, host);
 
   return host.EqualsLiteral("localhost") || host.EqualsLiteral("localhost.") ||
          StringEndsWith(host, ".localhost"_ns) ||

@@ -11,7 +11,9 @@
 #include "mozilla/Mutex.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/ThreadLocal.h"
-#include "mozilla/glean/NetwerkMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkMetrics.h"
+#endif
 #include "mozilla/net/DNSPacket.h"
 #include "nsIDNSService.h"
 
@@ -70,8 +72,10 @@ nsresult ResolveHTTPSRecordImpl(const nsACString& aHost,
                       response, DNSPacket::MAX_SIZE);
 #endif
 
+#ifndef MOZ_NAIVEFOX
         mozilla::glean::networking::dns_native_https_call_time
             .AccumulateRawDuration(TimeStamp::Now() - startTime);
+#endif
         if (len < 0) {
           LOG("DNS query failed");
         }

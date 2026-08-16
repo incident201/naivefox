@@ -9,7 +9,9 @@
 #include "SerializedLoadContext.h"
 #include "StaticComponents.h"
 #include "SuspendableChannelWrapper.h"
-#include "WebTransportSessionProxy.h"
+#ifndef MOZ_NAIVEFOX
+#  include "WebTransportSessionProxy.h"
+#endif
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Components.h"
 #include "mozilla/DebugOnly.h"
@@ -18,34 +20,42 @@
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_security.h"
 #include "mozilla/StoragePrincipalHelper.h"
-#include "mozilla/dom/ChromeUtilsBinding.h"
 #include "mozilla/dom/ClientInfo.h"
-#include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ServiceWorkerDescriptor.h"
-#include "mozilla/dom/nsHTTPSOnlyUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentParent.h"
+#  include "mozilla/dom/nsHTTPSOnlyUtils.h"
+#endif
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/net/CacheControlParser.h"
-#include "mozilla/net/CaptivePortalService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/CaptivePortalService.h"
+#endif
 #include "mozilla/net/DNS.h"
-#include "mozilla/net/NeckoChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoChild.h"
+#endif
 #include "mozilla/net/NeckoCommon.h"
-#include "mozilla/net/NeckoParent.h"
-#include "mozilla/net/NetworkConnectivityService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoParent.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NetworkConnectivityService.h"
+#endif
 #include "mozilla/net/SSLTokensCache.h"
-#include "mozilla/net/SocketProcessHost.h"
-#include "mozilla/net/SocketProcessParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessHost.h"
+#  include "mozilla/net/SocketProcessParent.h"
+#endif
 #include "netCore.h"
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "nsCRT.h"
-#include "nsContentSecurityManager.h"
-#include "nsContentUtils.h"
 #include "nsDNSService2.h"
 #include "nsEscape.h"
 #include "nsICancelable.h"
 #include "nsIFileProtocolHandler.h"
 #include "nsINetworkLinkService.h"
-#include "nsINode.h"
 #include "nsIObserverService.h"
 #include "nsIProtocolHandler.h"
 #include "nsIProtocolProxyCallback.h"
@@ -55,7 +65,6 @@
 #include "nsIURI.h"
 #include "nsIUploadChannel2.h"
 #include "nsIWebTransport.h"
-#include "nsIWidget.h"
 #include "nsNSSComponent.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
@@ -321,6 +330,7 @@ nsresult nsIOService::Init() {
   MOZ_ALWAYS_SUCCEEDS(AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, true));
   MOZ_ALWAYS_SUCCEEDS(AddObserver(this, NS_NETWORK_LINK_TOPIC, true));
   MOZ_ALWAYS_SUCCEEDS(AddObserver(this, NS_NETWORK_ID_CHANGED_TOPIC, true));
+#ifndef MOZ_NAIVEFOX
   MOZ_ALWAYS_SUCCEEDS(AddObserver(this, NS_WIDGET_WAKE_OBSERVER_TOPIC, true));
 
   // Register observers for sending notifications to nsSocketTransportService
@@ -328,6 +338,7 @@ nsresult nsIOService::Init() {
     AddObserver(this, "profile-initial-state", true);
     AddObserver(this, NS_WIDGET_SLEEP_OBSERVER_TOPIC, true);
   }
+#endif
 
   if (IsSocketProcessChild()) {
     Preferences::RegisterCallbacks(nsIOService::OnTLSPrefChange,
@@ -472,6 +483,9 @@ void nsIOService::OnTLSPrefChange(const char* aPref, void* aSelf) {
 }
 
 nsresult nsIOService::InitializeCaptivePortalService() {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   if (XRE_GetProcessType() != GeckoProcessType_Default) {
     // We only initalize a captive portal service in the main process
     return NS_OK;
@@ -488,6 +502,7 @@ nsresult nsIOService::InitializeCaptivePortalService() {
       NetworkConnectivityService::GetSingleton();
 
   return NS_OK;
+#endif
 }
 
 nsresult nsIOService::InitializeSocketTransportService() {
@@ -566,6 +581,7 @@ already_AddRefed<nsIOService> nsIOService::GetInstance() {
   return do_AddRef(gIOService);
 }
 
+#ifndef MOZ_NAIVEFOX
 class SocketProcessListenerProxy : public SocketProcessHost::Listener {
  public:
   SocketProcessListenerProxy() = default;
@@ -821,6 +837,25 @@ nsIOService::SocketProcessTelemetryPing() {
   });
   return NS_OK;
 }
+#else
+bool nsIOService::TooManySocketProcessCrash() { return false; }
+void nsIOService::IncreaseSocketProcessCrashCount() {}
+nsresult nsIOService::LaunchSocketProcess() { return NS_OK; }
+void nsIOService::DestroySocketProcess() {}
+bool nsIOService::SocketProcessReady() { return false; }
+bool nsIOService::UseSocketProcess(bool) { return false; }
+void nsIOService::NotifySocketProcessPrefsChanged(const char*, void*) {}
+void nsIOService::NotifySocketProcessPrefsChanged(const char*) {}
+void nsIOService::OnProcessLaunchComplete(SocketProcessHost*, bool) {}
+void nsIOService::CallOrWaitForSocketProcess(const std::function<void()>&) {}
+int32_t nsIOService::SocketProcessPid() { return 0; }
+bool nsIOService::IsSocketProcessLaunchComplete() { return false; }
+void nsIOService::OnProcessUnexpectedShutdown(SocketProcessHost*) {}
+RefPtr<MemoryReportingProcess> nsIOService::GetSocketProcessMemoryReporter() {
+  return nullptr;
+}
+NS_IMETHODIMP nsIOService::SocketProcessTelemetryPing() { return NS_OK; }
+#endif
 
 NS_IMPL_ISUPPORTS(nsIOService, nsIIOService, nsINetUtil, nsISpeculativeConnect,
                   nsIObserver, nsIIOServiceInternal, nsISupportsWeakReference,
@@ -878,6 +913,7 @@ nsresult nsIOService::AsyncOnChannelRedirect(
   // This is silly. I wish there was a simpler way to get at the global
   // reference of the contentSecurityManager. But it lives in the XPCOM
   // service registry.
+#ifndef MOZ_NAIVEFOX
   nsCOMPtr<nsIChannelEventSink> sink;
   sink = mozilla::components::ContentSecurityManager::Service();
   if (sink) {
@@ -885,6 +921,7 @@ nsresult nsIOService::AsyncOnChannelRedirect(
         helper->DelegateOnChannelRedirect(sink, oldChan, newChan, flags);
     if (NS_FAILED(rv)) return rv;
   }
+#endif
 
   // Finally, our category
   nsCOMArray<nsIChannelEventSink> entries;
@@ -1311,6 +1348,10 @@ nsIOService::NewSuspendableChannelWrapper(
 
 NS_IMETHODIMP
 nsIOService::NewWebTransport(nsIWebTransport** result) {
+#ifdef MOZ_NAIVEFOX
+  *result = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!XRE_IsParentProcess()) {
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1319,11 +1360,16 @@ nsIOService::NewWebTransport(nsIWebTransport** result) {
 
   webTransport.forget(result);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 nsIOService::OriginAttributesForNetworkState(
     nsIChannel* aChannel, JSContext* cx, JS::MutableHandle<JS::Value> _retval) {
+#ifdef MOZ_NAIVEFOX
+  _retval.setNull();
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   OriginAttributes attrs;
   if (!StoragePrincipalHelper::GetOriginAttributesForNetworkState(aChannel,
                                                                   attrs)) {
@@ -1335,6 +1381,7 @@ nsIOService::OriginAttributesForNetworkState(
   }
 
   return NS_OK;
+#endif
 }
 
 bool nsIOService::IsLinkUp() {
@@ -1398,9 +1445,11 @@ nsresult nsIOService::SetOfflineInternal(bool offline,
                                              NS_IPC_IOSERVICE_SET_OFFLINE_TOPIC,
                                              offline ? u"true" : u"false");
     }
+#ifndef MOZ_NAIVEFOX
     if (SocketProcessReady() && notifySocketProcess) {
       (void)mSocketProcess->GetActor()->SendSetOffline(offline);
     }
+#endif
   }
 
   nsIIOService* subject = static_cast<nsIIOService*>(this);
@@ -1491,6 +1540,7 @@ nsresult nsIOService::SetConnectivityInternal(bool aConnectivity) {
   // we have statistic about network change event even if we are offline.
   mLastConnectivityChange = PR_IntervalNow();
 
+#ifndef MOZ_NAIVEFOX
   if (mCaptivePortalService) {
     if (aConnectivity && gCaptivePortalEnabled) {
       // This will also trigger a captive portal check for the new network
@@ -1499,6 +1549,7 @@ nsresult nsIOService::SetConnectivityInternal(bool aConnectivity) {
       static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
     }
   }
+#endif
 
   nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
   if (!observerService) {
@@ -1509,9 +1560,11 @@ nsresult nsIOService::SetConnectivityInternal(bool aConnectivity) {
     observerService->NotifyObservers(nullptr,
                                      NS_IPC_IOSERVICE_SET_CONNECTIVITY_TOPIC,
                                      aConnectivity ? u"true" : u"false");
+#ifndef MOZ_NAIVEFOX
     if (SocketProcessReady()) {
       (void)mSocketProcess->GetActor()->SendSetConnectivity(aConnectivity);
     }
+#endif
   }
 
   if (mOffline) {
@@ -1638,6 +1691,7 @@ void nsIOService::PrefsChanged(const char* pref) {
   if (!pref || strcmp(pref, NETWORK_CAPTIVE_PORTAL_PREF) == 0) {
     nsresult rv = Preferences::GetBool(NETWORK_CAPTIVE_PORTAL_PREF,
                                        &gCaptivePortalEnabled);
+#ifndef MOZ_NAIVEFOX
     if (NS_SUCCEEDED(rv) && mCaptivePortalService) {
       if (gCaptivePortalEnabled) {
         static_cast<CaptivePortalService*>(mCaptivePortalService.get())
@@ -1646,6 +1700,7 @@ void nsIOService::PrefsChanged(const char* pref) {
         static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
       }
     }
+#endif
   }
 
   if (!pref || strncmp(pref, FORCE_EXTERNAL_PREF_PREFIX,
@@ -1847,12 +1902,14 @@ void nsIOService::SetHttpHandlerAlreadyShutingDown() {
 NS_IMETHODIMP
 nsIOService::Observe(nsISupports* subject, const char* topic,
                      const char16_t* data) {
+#ifndef MOZ_NAIVEFOX
   if (UseSocketProcess() && SocketProcessReady() &&
       mObserverTopicForSocketProcess.Contains(nsDependentCString(topic))) {
     nsCString topicStr(topic);
     nsString dataStr(data);
     (void)mSocketProcess->GetActor()->SendNotifyObserver(topicStr, dataStr);
   }
+#endif
 
   if (!strcmp(topic, kProfileChangeNetTeardownTopic)) {
     if (!mHttpHandlerAlreadyShutingDown) {
@@ -1898,10 +1955,14 @@ nsIOService::Observe(nsISupports* subject, const char* topic,
 
     SetOfflineInternal(true, false);
 
+#ifndef MOZ_NAIVEFOX
     if (mCaptivePortalService) {
       static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
       mCaptivePortalService = nullptr;
     }
+#else
+    mCaptivePortalService = nullptr;
+#endif
 
     SSLTokensCache::Shutdown();
 
@@ -1923,6 +1984,7 @@ nsIOService::Observe(nsISupports* subject, const char* topic,
     OnNetworkLinkEvent(NS_ConvertUTF16toUTF8(data).get());
   } else if (!strcmp(topic, NS_NETWORK_ID_CHANGED_TOPIC)) {
     LOG(("nsIOService::OnNetworkLinkEvent Network id changed"));
+#ifndef MOZ_NAIVEFOX
   } else if (!strcmp(topic, NS_WIDGET_WAKE_OBSERVER_TOPIC)) {
     // coming back alive from sleep
     // this indirection brought to you by:
@@ -1932,6 +1994,7 @@ nsIOService::Observe(nsISupports* subject, const char* topic,
     mInSleepMode = false;
   } else if (!strcmp(topic, NS_WIDGET_SLEEP_OBSERVER_TOPIC)) {
     mInSleepMode = true;
+#endif
   }
 
   return NS_OK;
@@ -2046,6 +2109,7 @@ nsresult nsIOService::OnNetworkLinkEvent(const char* data) {
     return NS_ERROR_NOT_AVAILABLE;
   }
 
+#ifndef MOZ_NAIVEFOX
   nsCString dataAsString(data);
   for (auto* cp : mozilla::dom::ContentParent::AllProcesses(
            mozilla::dom::ContentParent::eLive)) {
@@ -2055,6 +2119,7 @@ nsresult nsIOService::OnNetworkLinkEvent(const char* data) {
     }
     (void)neckoParent->SendNetworkChangeNotification(dataAsString);
   }
+#endif
 
   LOG(("nsIOService::OnNetworkLinkEvent data:%s\n", data));
   if (!mNetworkLinkService) {
@@ -2220,6 +2285,7 @@ nsresult nsIOService::SpeculativeConnectInternal(
     return NS_OK;
   }
 
+#ifndef MOZ_NAIVEFOX
   if (IsNeckoChild()) {
     nsCOMPtr<nsILoadContext> loadContext = do_GetInterface(aCallbacks);
 
@@ -2228,6 +2294,7 @@ nsresult nsIOService::SpeculativeConnectInternal(
         std::move(aOriginAttributes), aAnonymous);
     return NS_OK;
   }
+#endif
 
   // Check for proxy information. If there is a proxy configured then a
   // speculative connect should not be performed because the potential
@@ -2256,6 +2323,7 @@ nsresult nsIOService::SpeculativeConnectInternal(
   // only use to determine whether we need ot upgrade the speculative
   // connection from http to https.
   nsCOMPtr<nsIURI> httpsURI;
+#ifndef MOZ_NAIVEFOX
   if (aURI->SchemeIs("http")) {
     nsCOMPtr<nsILoadInfo> httpsOnlyCheckLoadInfo = MOZ_TRY(
         LoadInfo::Create(loadingPrincipal, loadingPrincipal, nullptr,
@@ -2271,6 +2339,7 @@ nsresult nsIOService::SpeculativeConnectInternal(
       aURI = httpsURI.get();
     }
   }
+#endif
 
   // dummy channel used to create a TCP connection.
   // we perform security checks on the *real* channel, responsible
@@ -2332,6 +2401,9 @@ nsIOService::SpeculativeConnect(nsIURI* aURI, nsIPrincipal* aPrincipal,
 NS_IMETHODIMP nsIOService::SpeculativeConnectWithOriginAttributes(
     nsIURI* aURI, JS::Handle<JS::Value> aOriginAttributes,
     nsIInterfaceRequestor* aCallbacks, bool aAnonymous, JSContext* aCx) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   OriginAttributes attrs;
   if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
@@ -2340,6 +2412,7 @@ NS_IMETHODIMP nsIOService::SpeculativeConnectWithOriginAttributes(
   SpeculativeConnectWithOriginAttributesNative(aURI, std::move(attrs),
                                                aCallbacks, aAnonymous);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP_(void)
@@ -2373,6 +2446,7 @@ nsIOService::GetSocketProcessId(uint64_t* aPid) {
   NS_ENSURE_ARG_POINTER(aPid);
 
   *aPid = 0;
+#ifndef MOZ_NAIVEFOX
   if (!mSocketProcess) {
     return NS_OK;
   }
@@ -2380,6 +2454,7 @@ nsIOService::GetSocketProcessId(uint64_t* aPid) {
   if (SocketProcessParent* actor = mSocketProcess->GetActor()) {
     *aPid = (uint64_t)actor->OtherPid();
   }
+#endif
 
   return NS_OK;
 }
@@ -2445,6 +2520,7 @@ nsIOService::SetSimpleURIUnknownRemoteSchemes(
   LOG(("nsIOService::SetSimpleUriUnknownRemoteSchemes"));
   mSimpleURIUnknownSchemes.SetAndMergeRemoteSchemes(aRemoteSchemes);
 
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsParentProcess()) {
     // since we only expect socket, parent and content processes to create URLs
     // that need to check the bypass list
@@ -2458,6 +2534,7 @@ nsIOService::SetSimpleURIUnknownRemoteSchemes(
       (void)cp->SendSimpleURIUnknownRemoteSchemes(aRemoteSchemes);
     }
   }
+#endif
   return NS_OK;
 }
 
@@ -2553,6 +2630,10 @@ NS_IMETHODIMP
 nsIOService::ParseCacheControlHeader(const nsACString& aCacheControlHeader,
                                      JSContext* cx,
                                      JS::MutableHandle<JS::Value> _retval) {
+#ifdef MOZ_NAIVEFOX
+  _retval.setNull();
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MOZ_ASSERT(NS_IsMainThread());
 
   mozilla::dom::HTTPCacheControlParseResult result;
@@ -2594,6 +2675,7 @@ nsIOService::ParseCacheControlHeader(const nsACString& aCacheControlHeader,
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+#endif
 }
 
 }  // namespace net

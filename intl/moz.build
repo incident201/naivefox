@@ -8,17 +8,21 @@ TEST_DIRS += [
 
 DIRS += [
     "bidi",
-    "build",
     "components",
-    "hyphenation/glue",
-    "l10n",
     "locale",
-    "locales",
     "lwbrk",
-    "strres",
     "uconv",
     "unicharutil",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    DIRS += [
+        "build",
+        "hyphenation/glue",
+        "l10n",
+        "locales",
+        "strres",
+    ]
 
 EXPORTS.mozilla += [
     "Encoding.h",

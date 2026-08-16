@@ -1,0 +1,81 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# NaiveFox starts from the JavaScript/XPCOM platform foundation, not from
+# toolkit/toolkit.mozbuild. The latter is a browser-oriented superset which
+# unconditionally pulls DOM, layout, graphics, media, DevTools, and most
+# Toolkit components into libxul.
+include("/js/app.mozbuild")
+
+# Unicode normalization needs this header-only sparse table type.  Export the
+# single header without adding the graphics build graph.
+EXPORTS += ["/gfx/thebes/gfxSparseBitSet.h"]
+
+# The preference store uses this header-only compact string table even in the
+# parent-only runtime.  Exporting it does not add dom/ipc actors or sources.
+EXPORTS.mozilla.dom.ipc += ["/dom/ipc/StringTable.h"]
+
+# SpiderMonkey links no-op standalone metric methods even when the browser
+# telemetry service is absent.  Export only their small ABI header set instead
+# of building Toolkit Glean and its DOM-facing bindings.
+EXPORTS.mozilla.glean.bindings += [
+    "/toolkit/components/glean/bindings/MetricStandaloneTypes.h",
+    "/toolkit/components/glean/bindings/private/BooleanStandalone.h",
+    "/toolkit/components/glean/bindings/private/CommonStandalone.h",
+    "/toolkit/components/glean/bindings/private/CounterStandalone.h",
+    "/toolkit/components/glean/bindings/private/CustomDistributionStandalone.h",
+    "/toolkit/components/glean/bindings/private/DenominatorStandalone.h",
+    "/toolkit/components/glean/bindings/private/MemoryDistributionStandalone.h",
+    "/toolkit/components/glean/bindings/private/NumeratorStandalone.h",
+    "/toolkit/components/glean/bindings/private/QuantityStandalone.h",
+    "/toolkit/components/glean/bindings/private/RateStandalone.h",
+    "/toolkit/components/glean/bindings/private/TimespanStandalone.h",
+    "/toolkit/components/glean/bindings/private/TimingDistributionStandalone.h",
+]
+
+DIRS += [
+    "/xpcom/xpidl",
+]
+
+if CONFIG["COMPILE_ENVIRONMENT"]:
+    DIRS += [
+        "/config/external/sqlite",
+        "/security",
+    ]
+
+if not CONFIG["MOZ_OVERRIDE_GKRUST"]:
+    if CONFIG["ENABLE_TESTS"]:
+        DIRS += ["/toolkit/library/gtest/rust"]
+    DIRS += ["/toolkit/library/rust"]
+
+if CONFIG["MOZ_SANDBOX"]:
+    DIRS += ["/security/sandbox"]
+
+if CONFIG["MOZ_USING_WASM_SANDBOXING"] and CONFIG["COMPILE_ENVIRONMENT"]:
+    DIRS += ["/security/rlbox"]
+
+DIRS += [
+    "/config/external/abseil-cpp",
+    "/intl",
+    "/modules/brotli",
+    "/modules/libpref",
+    "/netwerk/naivefox/idl",
+    "/netwerk",
+    "/xpcom",
+    "/ipc/chromium",
+    "/ipc/glue",
+    "/ipc/ipdl",
+    "/dom/bindings",
+    "/modules/libjar",
+    "/storage",
+    "/caps",
+    "/security/certverifier",
+    "/security/manager",
+    "/testing/gtest",
+    "/toolkit/components/jsoncpp",
+    "/toolkit/components/jsoncpp/src/lib_json",
+    "/toolkit/components/glean",
+    "/toolkit/library",
+    "/tools/profiler",
+]

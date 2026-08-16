@@ -9,7 +9,7 @@
 #define mozilla_ResultExtensions_h
 
 #include "mozilla/Assertions.h"
-#include "mozilla/dom/quota/RemoveParen.h"
+#include "mozilla/RemoveParen.h"
 #include "nscore.h"
 #include "prtypes.h"
 

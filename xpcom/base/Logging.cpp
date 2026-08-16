@@ -13,7 +13,6 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/FileUtils.h"
-#include "mozilla/GeckoTrace.h"
 #include "mozilla/LateWriteChecks.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/Printf.h"
@@ -941,9 +940,11 @@ void LogModule::SetLevel(LogLevel level) {
   // The following enables the propagation of runtime-set log levels (for
   // example configured via `about:logging`) from the Mozilla logging system to
   // OpenTelemetry's internal logging mechanism.
+#ifndef MOZ_NAIVEFOX
   if (strcmp(mName, "opentelemetry") == 0) {
     gecko_trace::SetOpenTelemetryInternalLogLevel(level);
   }
+#endif
 }
 
 void LogModule::Init(int argc, char* argv[]) {

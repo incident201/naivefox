@@ -22,13 +22,18 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/RandomNum.h"
 #include "mozilla/ScopeExit.h"
+#include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_security.h"
 #include "mozilla/glean/SecurityManagerSslMetrics.h"
 #include "mozilla/net/SSLTokensCache.h"
-#include "mozilla/net/SocketProcessChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessChild.h"
+#endif
 #include "mozilla/psm/EnabledSignatureSchemes.h"
-#include "mozilla/psm/IPCClientCertsChild.h"
-#include "mozilla/psm/PIPCClientCertsChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/psm/IPCClientCertsChild.h"
+#  include "mozilla/psm/PIPCClientCertsChild.h"
+#endif
 #include "mozilla/psm/mozilla_abridged_certs_generated.h"
 #include "mozpkix/pkixnss.h"
 #include "mozpkix/pkixtypes.h"
@@ -38,8 +43,13 @@
 #include "nsCRT.h"
 #include "nsCharSeparatedTokenizer.h"
 #include "nsClientAuthRemember.h"
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../../../netwerk/naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsISocketProvider.h"
+#include "nsIObserverService.h"
 #include "nsIWebProgressListener.h"
 #include "nsNSSComponent.h"
 #include "nsPrintfCString.h"
@@ -1886,6 +1896,9 @@ const uint8_t kIPCClientCertsObjectTypeECKey = 3;
 // parent process to find certificates and keys and send identifying
 // information about them over IPC.
 void DoFindObjects(FindObjectsCallback cb, void* ctx) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   net::SocketProcessChild* socketChild =
       net::SocketProcessChild::GetSingleton();
   if (!socketChild) {
@@ -1926,6 +1939,7 @@ void DoFindObjects(FindObjectsCallback cb, void* ctx) {
         break;
     }
   }
+#endif
 }
 
 // This function is provided to the IPC client certs module so it can cause the
@@ -1934,6 +1948,9 @@ void DoFindObjects(FindObjectsCallback cb, void* ctx) {
 void DoSign(size_t cert_len, const uint8_t* cert, size_t data_len,
             const uint8_t* data, size_t params_len, const uint8_t* params,
             SignCallback cb, void* ctx) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   net::SocketProcessChild* socketChild =
       net::SocketProcessChild::GetSingleton();
   if (!socketChild) {
@@ -1954,6 +1971,7 @@ void DoSign(size_t cert_len, const uint8_t* cert, size_t data_len,
     return;
   }
   cb(signature.data().Length(), signature.data().Elements(), ctx);
+#endif
 }
 
 #ifdef MOZ_WIDGET_ANDROID

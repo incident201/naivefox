@@ -103,8 +103,10 @@ class Statement final : public mozIStorageStatement,
    * The following two members are only used with the JS helper.  They cache
    * the row and params objects.
    */
+#ifndef MOZ_NAIVEFOX
   nsMainThreadPtrHandle<StatementParamsHolder> mStatementParamsHolder;
   nsMainThreadPtrHandle<StatementRowHolder> mStatementRowHolder;
+#endif
 
   /**
    * Internal version of finalize that allows us to tell it if it is being

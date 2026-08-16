@@ -9,10 +9,14 @@
 #include "GeckoProfiler.h"
 #include "IdleTaskRunner.h"
 #include "mozilla/AppShutdown.h"
-#include "mozilla/BackgroundHangMonitor.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/BackgroundHangMonitor.h"
+#endif
 #include "mozilla/EventQueue.h"
 #include "mozilla/FlowMarkers.h"
-#include "mozilla/Hal.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Hal.h"
+#endif
 #include "mozilla/IOInterposer.h"
 #include "mozilla/InputTaskManager.h"
 #include "mozilla/Perfetto.h"
@@ -665,7 +669,9 @@ void TaskController::ProcessPendingMTTask(bool aMayWait) {
     // the timer API.
     {
       MutexAutoUnlock unlock(mGraphMutex);
+#ifndef MOZ_NAIVEFOX
       BackgroundHangMonitor().NotifyWait();
+#endif
     }
 #endif
 
@@ -680,7 +686,9 @@ void TaskController::ProcessPendingMTTask(bool aMayWait) {
 #ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
     {
       MutexAutoUnlock unlock(mGraphMutex);
+#ifndef MOZ_NAIVEFOX
       BackgroundHangMonitor().NotifyActivity();
+#endif
     }
 #endif
   }

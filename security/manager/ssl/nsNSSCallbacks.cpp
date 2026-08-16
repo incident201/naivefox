@@ -24,7 +24,11 @@
 #include "mozilla/glean/SecurityManagerSslMetrics.h"
 #include "mozpkix/pkixtypes.h"
 #include "nsComponentManagerUtils.h"
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../../../netwerk/naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsIChannel.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"

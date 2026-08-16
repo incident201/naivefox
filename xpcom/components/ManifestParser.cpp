@@ -14,7 +14,7 @@
 #  include <CoreServices/CoreServices.h>
 
 #  include "nsCocoaFeatures.h"
-#elif defined(MOZ_WIDGET_GTK)
+#elif defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
 #  include <gtk/gtk.h>
 #endif
 
@@ -455,7 +455,7 @@ void ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
   SInt32 majorVersion = nsCocoaFeatures::macOSVersionMajor();
   SInt32 minorVersion = nsCocoaFeatures::macOSVersionMinor();
   nsTextFormatter::ssprintf(osVersion, u"%ld.%ld", majorVersion, minorVersion);
-#elif defined(MOZ_WIDGET_GTK)
+#elif defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
   nsTextFormatter::ssprintf(osVersion, u"%ld.%ld", gtk_major_version,
                             gtk_minor_version);
 #elif defined(MOZ_WIDGET_ANDROID)

@@ -85,6 +85,9 @@ namespace mozilla {
 namespace net {
 
 inline bool IsNeckoChild() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   static bool didCheck = false;
   static bool amChild = false;
 
@@ -93,11 +96,16 @@ inline bool IsNeckoChild() {
     amChild = (XRE_GetProcessType() == GeckoProcessType_Content);
   }
   return amChild;
+#endif
 }
 
 inline bool IsSocketProcessChild() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   static bool amChild = (XRE_GetProcessType() == GeckoProcessType_Socket);
   return amChild;
+#endif
 }
 
 class HttpChannelSecurityWarningReporter : public nsISupports {

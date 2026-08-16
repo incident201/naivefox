@@ -288,6 +288,9 @@ NSSSocketControl::StartTLS() {
 NS_IMETHODIMP
 NSSSocketControl::AsyncStartTLS(JSContext* aCx,
                                 mozilla::dom::Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   NS_ENSURE_ARG_POINTER(aCx);
   NS_ENSURE_ARG_POINTER(aPromise);
@@ -335,6 +338,7 @@ NSSSocketControl::AsyncStartTLS(JSContext* aCx,
 
   promise.forget(aPromise);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

@@ -9,6 +9,8 @@ SOURCES += [
     "../HeaderPadding.cpp",
     "../HttpClient.cpp",
     "../HttpConnectParser.cpp",
+    "../LeanDOMBindings.cpp",
+    "../MemMapSnapshot.cpp",
     "../NaiveFoxRunner.cpp",
     "../NeckoTunnel.cpp",
     "../PaddingNegotiation.cpp",
@@ -16,8 +18,24 @@ SOURCES += [
     "../Socks5Parser.cpp",
     "../SocksServer.cpp",
     "../TunnelSession.cpp",
+    "../UnknownProtocolHandler.cpp",
 ]
 
+SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
+SOURCES += ["/js/xpconnect/src/XPCString.cpp"]
+SOURCES += ["!/ipc/ipdl/PrefsTypes.cpp"]
+
+EXPORTS.mozilla += ["/toolkit/xre/AutoSQLiteLifetime.h"]
+EXPORTS.mozilla += ["/toolkit/xre/CmdLineAndEnvUtils.h"]
+EXPORTS.mozilla += ["/toolkit/xre/GeckoArgs.h"]
+EXPORTS.mozilla += ["../StoragePrincipalHelper.h"]
+EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
+EXPORTS += ["../nsContentUtils.h"]
+
 LOCAL_INCLUDES += ["/netwerk/base"]
+LOCAL_INCLUDES += ["/security/manager/ssl"]
+LOCAL_INCLUDES += ["/tools/profiler/core"]
+LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]
+LOCAL_INCLUDES += ["/ipc/chromium/src"]
 
 FINAL_LIBRARY = "xul"

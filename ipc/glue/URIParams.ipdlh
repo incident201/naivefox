@@ -2,12 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#ifndef MOZ_NAIVEFOX
 include "mozilla/dom/PermissionMessageUtils.h";
+#endif
 
 using struct mozilla::void_t from "mozilla/ipc/IPCCore.h";
+#ifndef MOZ_NAIVEFOX
 [RefCounted] using class nsIPrincipal from "nsIPrincipal.h";
 
 include PBackgroundSharedTypes;
+#endif
 
 namespace mozilla {
 namespace ipc {
@@ -57,6 +61,7 @@ struct JARURIParams
   nsCString charset;
 };
 
+#ifndef MOZ_NAIVEFOX
 struct IconURIParams
 {
   URIParams? uri;
@@ -74,26 +79,35 @@ struct HostObjectURIParams
   bool revoked;
   nullable nsIPrincipal nullPrincipal;
 };
+#endif
 
 union URIParams
 {
   SimpleURIParams;
   StandardURLParams;
   JARURIParams;
+#ifndef MOZ_NAIVEFOX
   IconURIParams;
   JSURIParams;
+#endif
   SimpleNestedURIParams;
+#ifndef MOZ_NAIVEFOX
   HostObjectURIParams;
+#endif
   DefaultURIParams;
+#ifndef MOZ_NAIVEFOX
   NestedAboutURIParams;
+#endif
   SubstitutingJARURIParams;
 };
 
+#ifndef MOZ_NAIVEFOX
 struct JSURIParams
 {
   SimpleURIParams simpleParams;
   URIParams? baseURI;
 };
+#endif
 
 struct SimpleNestedURIParams
 {
@@ -101,11 +115,13 @@ struct SimpleNestedURIParams
   URIParams innerURI;
 };
 
+#ifndef MOZ_NAIVEFOX
 struct NestedAboutURIParams
 {
   SimpleNestedURIParams nestedParams;
   URIParams? baseURI;
 };
+#endif
 
 struct SubstitutingJARURIParams
 {

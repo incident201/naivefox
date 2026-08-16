@@ -4,6 +4,7 @@
 
 #include "mozilla/BasePrincipal.h"
 
+#ifndef MOZ_NAIVEFOX
 #include "ContentPrincipalJSONHandler.h"
 #include "ExpandedPrincipal.h"
 #include "ExpandedPrincipalJSONHandler.h"
@@ -11,15 +12,21 @@
 #include "PrincipalJSONHandler.h"
 #include "SubsumedPrincipalJSONHandler.h"
 #include "ThirdPartyUtil.h"
+#endif
 #include "js/JSON.h"
 #include "mozilla/Components.h"
+#ifndef MOZ_NAIVEFOX
 #include "mozilla/ContentPrincipal.h"
 #include "mozilla/ExtensionPolicyService.h"
+#endif
 #include "mozilla/JSONStringWriteFuncs.h"
 #include "mozilla/JSONWriter.h"
+#ifndef MOZ_NAIVEFOX
 #include "mozilla/NullPrincipal.h"
 #include "mozilla/PermissionManager.h"
+#endif
 #include "mozilla/StaticPrefs_permissions.h"
+#ifndef MOZ_NAIVEFOX
 #include "mozilla/StorageAccess.h"
 #include "mozilla/dom/BlobURLProtocolHandler.h"
 #include "mozilla/dom/ChromeUtils.h"
@@ -27,18 +34,28 @@
 #include "mozilla/dom/StorageUtils.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/dom/nsMixedContentBlocker.h"
-#include "nsAboutProtocolUtils.h"
-#include "nsContentUtils.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "nsAboutProtocolUtils.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
+#ifndef MOZ_NAIVEFOX
 #include "nsDocShell.h"
+#endif
 #include "nsIEffectiveTLDService.h"
 #include "nsIOService.h"
-#include "nsIURIFixup.h"
 #include "nsIURIMutator.h"
 #include "nsIURIWithSpecialOrigin.h"
 #include "nsIURL.h"
-#include "nsMixedContentBlocker.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsMixedContentBlocker.h"
+#endif
 #include "nsNetUtil.h"
-#include "nsPIDOMWindow.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsPIDOMWindow.h"
+#endif
 #include "nsScriptSecurityManager.h"
 #include "nsSerializationHelper.h"
 #include "nsServiceManagerUtils.h"
@@ -79,6 +96,9 @@ BasePrincipal::GetOrigin(nsACString& aOrigin) {
 
 NS_IMETHODIMP
 BasePrincipal::GetWebExposedOriginSerialization(nsACString& aOrigin) {
+#ifdef MOZ_NAIVEFOX
+  return GetOrigin(aOrigin);
+#else
   aOrigin.Truncate();
   nsCOMPtr<nsIURI> prinURI;
   nsresult rv = GetURI(getter_AddRefs(prinURI));
@@ -86,6 +106,7 @@ BasePrincipal::GetWebExposedOriginSerialization(nsACString& aOrigin) {
     return NS_ERROR_NOT_AVAILABLE;
   }
   return nsContentUtils::GetWebExposedOriginSerialization(prinURI, aOrigin);
+#endif
 }
 
 NS_IMETHODIMP
@@ -133,6 +154,7 @@ BasePrincipal::GetSiteOriginNoSuffix(nsACString& aSiteOrigin) {
   return GetOriginNoSuffix(aSiteOrigin);
 }
 
+#ifndef MOZ_NAIVEFOX
 template <typename HandlerTypesT>
 bool ContainerPrincipalJSONHandler<HandlerTypesT>::ProcessInnerResult(
     bool aResult) {
@@ -345,6 +367,12 @@ already_AddRefed<BasePrincipal> BasePrincipal::FromJSON(
 
   return handler.Get();
 }
+#else
+already_AddRefed<BasePrincipal> BasePrincipal::FromJSON(
+    const nsACString& aJSON) {
+  return nullptr;
+}
+#endif
 
 // Returns a JSON representation of the principal.
 // Calling BasePrincipal::FromJSON will deserialize the JSON into
@@ -396,11 +424,13 @@ bool BasePrincipal::FastSubsumesIgnoringFPD(
     nsIPrincipal* aOther, DocumentDomainConsideration aConsideration) {
   MOZ_ASSERT(aOther);
 
+#ifndef MOZ_NAIVEFOX
   if (Kind() == eContentPrincipal &&
       !dom::ChromeUtils::IsOriginAttributesEqualIgnoringFPD(
           mOriginAttributes, Cast(aOther)->mOriginAttributes)) {
     return false;
   }
+#endif
 
   return SubsumesInternal(aOther, aConsideration);
 }
@@ -437,6 +467,11 @@ BasePrincipal::EqualsForPermission(nsIPrincipal* aOther, bool aExactHost,
   *aResult = false;
   NS_ENSURE_ARG_POINTER(aOther);
   NS_ENSURE_ARG_POINTER(aResult);
+
+#ifdef MOZ_NAIVEFOX
+  *aResult = this == Cast(aOther);
+  return NS_OK;
+#else
 
   auto* other = Cast(aOther);
   if (Kind() != other->Kind()) {
@@ -550,6 +585,7 @@ BasePrincipal::EqualsForPermission(nsIPrincipal* aOther, bool aExactHost,
 
   *aResult = otherHost == ourHost;
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -630,6 +666,10 @@ nsresult BasePrincipal::CheckMayLoadHelper(nsIURI* aURI,
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_DOM_BAD_URI;
+#else
+
   nsresult rv;
   if (aAllowIfInheritsPrincipal) {
     // If the caller specified to allow loads of URIs that inherit
@@ -676,10 +716,15 @@ nsresult BasePrincipal::CheckMayLoadHelper(nsIURI* aURI,
   }
 
   return NS_ERROR_DOM_BAD_URI;
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::IsThirdPartyURI(nsIURI* aURI, bool* aRes) {
+#ifdef MOZ_NAIVEFOX
+  *aRes = false;
+  return NS_OK;
+#else
   if (IsSystemPrincipal() || (AddonPolicyCore() && AddonAllowsLoad(aURI))) {
     *aRes = false;
     return NS_OK;
@@ -694,10 +739,15 @@ BasePrincipal::IsThirdPartyURI(nsIURI* aURI, bool* aRes) {
   }
   ThirdPartyUtil* thirdPartyUtil = ThirdPartyUtil::GetInstance();
   return thirdPartyUtil->IsThirdPartyURI(prinURI, aURI, aRes);
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::IsThirdPartyPrincipal(nsIPrincipal* aPrin, bool* aRes) {
+#ifdef MOZ_NAIVEFOX
+  *aRes = false;
+  return NS_OK;
+#else
   *aRes = true;
   nsCOMPtr<nsIURI> prinURI;
   nsresult rv = GetURI(getter_AddRefs(prinURI));
@@ -705,10 +755,15 @@ BasePrincipal::IsThirdPartyPrincipal(nsIPrincipal* aPrin, bool* aRes) {
     return NS_OK;
   }
   return aPrin->IsThirdPartyURI(prinURI, aRes);
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::IsThirdPartyChannel(nsIChannel* aChan, bool* aRes) {
+#ifdef MOZ_NAIVEFOX
+  *aRes = false;
+  return NS_OK;
+#else
   AssertIsOnMainThread();
   if (IsSystemPrincipal()) {
     // Nothing is 3rd party to the system principal.
@@ -720,6 +775,7 @@ BasePrincipal::IsThirdPartyChannel(nsIChannel* aChan, bool* aRes) {
   GetURI(getter_AddRefs(prinURI));
   ThirdPartyUtil* thirdPartyUtil = ThirdPartyUtil::GetInstance();
   return thirdPartyUtil->IsThirdPartyChannel(aChan, prinURI, aRes);
+#endif
 }
 
 NS_IMETHODIMP
@@ -741,10 +797,12 @@ BasePrincipal::IsL10nAllowed(nsIURI* aURI, bool* aRes) {
   AssertIsOnMainThread();  // URI_DANGEROUS_TO_LOAD is not threadsafe to query.
   *aRes = false;
 
+#ifndef MOZ_NAIVEFOX
   if (nsContentUtils::IsErrorPage(aURI)) {
     *aRes = true;
     return NS_OK;
   }
+#endif
 
   // The system principal is always allowed.
   if (IsSystemPrincipal()) {
@@ -780,8 +838,12 @@ BasePrincipal::IsL10nAllowed(nsIURI* aURI, bool* aRes) {
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  *aRes = false;
+#else
   auto policy = AddonPolicyCore();
   *aRes = (policy && policy->IsPrivileged());
+#endif
   return NS_OK;
 }
 
@@ -836,6 +898,10 @@ BasePrincipal::HasFirstpartyStorageAccess(mozIDOMWindow* aCheckWindow,
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
+
   nsPIDOMWindowInner* win = nsPIDOMWindowInner::From(aCheckWindow);
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetURI(getter_AddRefs(uri));
@@ -850,6 +916,7 @@ BasePrincipal::HasFirstpartyStorageAccess(mozIDOMWindow* aCheckWindow,
 
   *aOutAllowed = ShouldAllowAccessFor(win, uri, true, aRejectedReason);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -964,7 +1031,11 @@ BasePrincipal::GetIsSystemPrincipal(bool* aResult) {
 
 NS_IMETHODIMP
 BasePrincipal::GetIsAddonOrExpandedAddonPrincipal(bool* aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = false;
+#else
   *aResult = AddonPolicyCore() || ContentScriptAddonPolicyCore();
+#endif
   return NS_OK;
 }
 
@@ -1070,7 +1141,9 @@ BasePrincipal::IsURIInPrefList(const char* aPref, bool* aResult) {
   if (NS_FAILED(rv) || !prinURI) {
     return NS_OK;
   }
+#ifndef MOZ_NAIVEFOX
   *aResult = nsContentUtils::IsURIInPrefList(prinURI, aPref);
+#endif
   return NS_OK;
 }
 
@@ -1084,7 +1157,9 @@ BasePrincipal::IsURIInList(const nsACString& aList, bool* aResult) {
     return NS_OK;
   }
 
+#ifndef MOZ_NAIVEFOX
   *aResult = nsContentUtils::IsURIInList(prinURI, nsCString(aList));
+#endif
   return NS_OK;
 }
 
@@ -1102,12 +1177,18 @@ BasePrincipal::IsContentAccessibleAboutURI(bool* aResult) {
     return NS_OK;
   }
 
+#ifndef MOZ_NAIVEFOX
   *aResult = NS_IsContentAccessibleAboutURI(prinURI);
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetIsOriginPotentiallyTrustworthy(bool* aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = IsSystemPrincipal();
+  return NS_OK;
+#else
   AssertIsOnMainThread();
   *aResult = false;
 
@@ -1119,10 +1200,15 @@ BasePrincipal::GetIsOriginPotentiallyTrustworthy(bool* aResult) {
 
   *aResult = nsMixedContentBlocker::IsPotentiallyTrustworthyOrigin(uri);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetIsLoopbackHost(bool* aRes) {
+#ifdef MOZ_NAIVEFOX
+  *aRes = false;
+  return NS_OK;
+#else
   AssertIsOnMainThread();
   *aRes = false;
   nsAutoCString host;
@@ -1134,10 +1220,15 @@ BasePrincipal::GetIsLoopbackHost(bool* aRes) {
 
   *aRes = nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackHost(host);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetAboutModuleFlags(uint32_t* flags) {
+#ifdef MOZ_NAIVEFOX
+  *flags = 0;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   AssertIsOnMainThread();
   *flags = 0;
   nsCOMPtr<nsIURI> prinURI;
@@ -1155,15 +1246,21 @@ BasePrincipal::GetAboutModuleFlags(uint32_t* flags) {
     return rv;
   }
   return aboutModule->GetURIFlags(prinURI, flags);
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetOriginAttributes(JSContext* aCx,
                                    JS::MutableHandle<JS::Value> aVal) {
+#ifdef MOZ_NAIVEFOX
+  aVal.setNull();
+  return NS_OK;
+#else
   if (NS_WARN_IF(!ToJSValue(aCx, mOriginAttributes, aVal))) {
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -1191,6 +1288,69 @@ BasePrincipal::GetIsInPrivateBrowsing(bool* aIsInPrivateBrowsing) {
   return NS_OK;
 }
 
+#ifdef MOZ_NAIVEFOX
+nsresult BasePrincipal::GetAddonPolicy(
+    dom::WebExtensionPolicy** aResult) {
+  *aResult = nullptr;
+  return NS_OK;
+}
+
+nsresult BasePrincipal::GetContentScriptAddonPolicy(
+    dom::WebExtensionPolicy** aResult) {
+  *aResult = nullptr;
+  return NS_OK;
+}
+
+extensions::WebExtensionPolicy* BasePrincipal::AddonPolicy() { return nullptr; }
+
+RefPtr<extensions::WebExtensionPolicyCore> BasePrincipal::AddonPolicyCore() {
+  return nullptr;
+}
+
+bool BasePrincipal::AddonHasPermission(const nsAtom* aPerm) { return false; }
+
+nsIPrincipal* BasePrincipal::PrincipalToInherit(nsIURI* aRequestedURI) {
+  return this;
+}
+
+bool BasePrincipal::OverridesCSP(nsIPrincipal* aDocumentPrincipal) {
+  return false;
+}
+
+already_AddRefed<BasePrincipal> BasePrincipal::CreateContentPrincipal(
+    nsIURI* aURI, const OriginAttributes& aAttrs, nsIURI* aInitialDomain) {
+  return nullptr;
+}
+
+already_AddRefed<BasePrincipal> BasePrincipal::CreateContentPrincipal(
+    nsIURI* aURI, const OriginAttributes& aAttrs,
+    const nsACString& aOriginNoSuffix, nsIURI* aInitialDomain) {
+  return nullptr;
+}
+
+already_AddRefed<BasePrincipal> BasePrincipal::CreateContentPrincipal(
+    const nsACString& aOrigin) {
+  return nullptr;
+}
+
+already_AddRefed<BasePrincipal> BasePrincipal::CloneForcingOriginAttributes(
+    const OriginAttributes& aOriginAttributes) {
+  return nullptr;
+}
+
+extensions::WebExtensionPolicy* BasePrincipal::ContentScriptAddonPolicy() {
+  return nullptr;
+}
+
+RefPtr<extensions::WebExtensionPolicyCore>
+BasePrincipal::ContentScriptAddonPolicyCore() {
+  return nullptr;
+}
+
+bool BasePrincipal::AddonAllowsLoad(nsIURI* aURI, bool aExplicit) {
+  return false;
+}
+#else
 nsresult BasePrincipal::GetAddonPolicy(
     extensions::WebExtensionPolicy** aResult) {
   AssertIsOnMainThread();
@@ -1395,10 +1555,15 @@ bool BasePrincipal::AddonAllowsLoad(nsIURI* aURI,
   }
   return false;
 }
+#endif
 
 NS_IMETHODIMP
 BasePrincipal::GetLocalStorageQuotaKey(nsACString& aKey) {
   aKey.Truncate();
+
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
 
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetURI(getter_AddRefs(uri));
@@ -1444,11 +1609,16 @@ BasePrincipal::GetLocalStorageQuotaKey(nsACString& aKey) {
   aKey.Append(subdomainsDBKey);
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetNextSubDomainPrincipal(
     nsIPrincipal** aNextSubDomainPrincipal) {
+#ifdef MOZ_NAIVEFOX
+  *aNextSubDomainPrincipal = nullptr;
+  return NS_OK;
+#else
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetURI(getter_AddRefs(uri));
   if (NS_FAILED(rv) || !uri) {
@@ -1493,11 +1663,16 @@ BasePrincipal::GetNextSubDomainPrincipal(
   }
   principal.forget(aNextSubDomainPrincipal);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetStorageOriginKey(nsACString& aOriginKey) {
   aOriginKey.Truncate();
+
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
 
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetURI(getter_AddRefs(uri));
@@ -1543,6 +1718,7 @@ BasePrincipal::GetStorageOriginKey(nsACString& aOriginKey) {
   }
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -1554,7 +1730,8 @@ BasePrincipal::GetIsScriptAllowedByPolicy(bool* aIsScriptAllowedByPolicy) {
   if (NS_FAILED(rv) || !prinURI) {
     return NS_OK;
   }
-  nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
+  nsCOMPtr<nsIScriptSecurityManager> ssm =
+      do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID);
   if (!ssm) {
     return NS_ERROR_UNEXPECTED;
   }
@@ -1570,6 +1747,10 @@ bool SiteIdentifier::Equals(const SiteIdentifier& aOther) const {
 NS_IMETHODIMP
 BasePrincipal::CreateReferrerInfo(mozilla::dom::ReferrerPolicy aReferrerPolicy,
                                   nsIReferrerInfo** _retval) {
+#ifdef MOZ_NAIVEFOX
+  *_retval = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   nsCOMPtr<nsIURI> prinURI;
   RefPtr<dom::ReferrerInfo> info;
   nsresult rv = GetURI(getter_AddRefs(prinURI));
@@ -1581,6 +1762,7 @@ BasePrincipal::CreateReferrerInfo(mozilla::dom::ReferrerPolicy aReferrerPolicy,
   info = new dom::ReferrerInfo(prinURI, aReferrerPolicy);
   info.forget(_retval);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

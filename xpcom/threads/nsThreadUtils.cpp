@@ -11,7 +11,9 @@
 #include "mozilla/TaskQueue.h"
 #include "mozilla/TimeStamp.h"
 #include "nsComponentManagerUtils.h"
-#include "nsExceptionHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsIEventTarget.h"
 #include "nsITimer.h"
 #include "nsString.h"

@@ -13,7 +13,9 @@
 #include "mozilla/Services.h"
 #include "mozilla/net/MozURL_ffi.h"
 #include "mozilla/net/idna_glue.h"
-#include "nsAttrValue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsAttrValue.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsIIOService.h"
 #include "nsIInterfaceRequestor.h"
@@ -31,6 +33,7 @@
 #include "nsTArray.h"
 
 class nsIPrincipal;
+class nsAttrValue;
 class nsIAsyncStreamCopier;
 class nsIAuthPrompt;
 class nsIAuthPrompt2;

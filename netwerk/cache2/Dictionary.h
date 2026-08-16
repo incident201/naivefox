@@ -21,6 +21,7 @@
 #include "nsICryptoHash.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIObserver.h"
+#include "nsIContentPolicy.h"
 #include "nsIStreamListener.h"
 #include "nsString.h"
 #include "nsTArray.h"

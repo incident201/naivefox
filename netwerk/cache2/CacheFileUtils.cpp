@@ -10,9 +10,11 @@
 #include "CacheLog.h"
 #include "CacheObserver.h"
 #include "LoadContextInfo.h"
-#include "mozilla/Telemetry.h"
 #include "mozilla/Tokenizer.h"
-#include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Telemetry.h"
+#  include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsString.h"
 
@@ -385,6 +387,11 @@ void DetailedCacheHitTelemetry::HitRate::Reset() {
 // static
 void DetailedCacheHitTelemetry::AddRecord(ERecType aType,
                                           TimeStamp aLoadStart) {
+#ifdef MOZ_NAIVEFOX
+  (void)aType;
+  (void)aLoadStart;
+  return;
+#else
   bool isUpToDate = false;
   CacheIndex::IsUpToDate(&isUpToDate);
   if (!isUpToDate) {
@@ -460,6 +467,7 @@ void DetailedCacheHitTelemetry::AddRecord(ERecType aType,
       sHRStats[i].Reset();
     }
   }
+#endif
 }
 
 void FreeBuffer(void* aBuf) {

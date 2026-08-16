@@ -5,9 +5,11 @@
 #include "nsStringEnumerator.h"
 
 #include "mozilla/Try.h"
-#include "mozilla/dom/IteratorResultBinding.h"
-#include "mozilla/dom/RootedDictionary.h"
-#include "mozilla/dom/ToJSValue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/IteratorResultBinding.h"
+#  include "mozilla/dom/RootedDictionary.h"
+#  include "mozilla/dom/ToJSValue.h"
+#endif
 #include "nsSimpleEnumerator.h"
 #include "nsSupportsPrimitives.h"
 #include "nsTArray.h"
@@ -17,6 +19,7 @@ using namespace mozilla::dom;
 
 namespace {
 
+#ifndef MOZ_NAIVEFOX
 class JSStringEnumerator final : public nsIJSEnumerator {
   NS_DECL_ISUPPORTS
   NS_DECL_NSIJSENUMERATOR
@@ -31,8 +34,6 @@ class JSStringEnumerator final : public nsIJSEnumerator {
 
   nsCOMPtr<nsIStringEnumerator> mEnumerator;
 };
-
-}  // anonymous namespace
 
 nsresult JSStringEnumerator::Iterator(nsIJSEnumerator** aResult) {
   RefPtr<JSStringEnumerator> result(this);
@@ -64,6 +65,9 @@ nsresult JSStringEnumerator::Next(JSContext* aCx,
 }
 
 NS_IMPL_ISUPPORTS(JSStringEnumerator, nsIJSEnumerator)
+#endif
+
+}  // anonymous namespace
 
 //
 // nsStringEnumeratorBase
@@ -79,9 +83,13 @@ nsresult nsStringEnumeratorBase::GetNext(nsAString& aResult) {
 
 NS_IMETHODIMP
 nsStringEnumeratorBase::StringIterator(nsIJSEnumerator** aRetVal) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   auto result = MakeRefPtr<JSStringEnumerator>(this);
   result.forget(aRetVal);
   return NS_OK;
+#endif
 }
 
 //
@@ -227,9 +235,13 @@ nsStringEnumerator::GetNext(nsACString& aResult) {
 
 NS_IMETHODIMP
 nsStringEnumerator::StringIterator(nsIJSEnumerator** aRetVal) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   auto result = MakeRefPtr<JSStringEnumerator>(this);
   result.forget(aRetVal);
   return NS_OK;
+#endif
 }
 
 template <class T>

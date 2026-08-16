@@ -5,16 +5,44 @@
 // Moz headers (alphabetical)
 #include "nsINIParser.h"
 
+#include "mozilla/ScopeExit.h"
 #include "mozilla/Try.h"
-#include "mozilla/URLPreloader.h"
 #include "nsCRTGlue.h"
 #include "nsError.h"
 #include "nsIFile.h"
+#include "prio.h"
 
 using namespace mozilla;
 
 nsresult nsINIParser::Init(nsIFile* aFile, bool* aContainedErrors) {
-  nsCString result = MOZ_TRY(URLPreloader::ReadFile(aFile));
+  nsAutoCString path;
+  MOZ_TRY(aFile->GetNativePath(path));
+  PRFileDesc* file = PR_Open(path.get(), PR_RDONLY, 0);
+  if (!file) {
+    return NS_ERROR_FILE_NOT_FOUND;
+  }
+  auto closeFile = MakeScopeExit([&] { PR_Close(file); });
+
+  PRFileInfo64 info;
+  if (PR_GetOpenFileInfo64(file, &info) != PR_SUCCESS || info.size < 0 ||
+      info.size > INT32_MAX) {
+    return NS_ERROR_FILE_TOO_BIG;
+  }
+
+  nsCString result;
+  if (!result.SetLength(static_cast<uint32_t>(info.size), fallible)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+  int32_t total = 0;
+  while (total < info.size) {
+    const int32_t bytes =
+        PR_Read(file, result.BeginWriting() + total,
+                static_cast<int32_t>(info.size - total));
+    if (bytes <= 0) {
+      return NS_ERROR_FILE_CORRUPTED;
+    }
+    total += bytes;
+  }
 
   return InitFromString(result, aContainedErrors);
 }

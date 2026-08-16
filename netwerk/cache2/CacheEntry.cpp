@@ -16,7 +16,6 @@
 #include "CacheStorageService.h"
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/Telemetry.h"
 #include "mozilla/net/NoVarySearchUtils.h"
 #include "mozilla/psm/TransportSecurityInfo.h"
 #include "nsComponentManagerUtils.h"

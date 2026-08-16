@@ -47,7 +47,9 @@
 #include "nsISerialEventTarget.h"
 #include "nsISiteSecurityService.h"
 #include "nsITimer.h"
-#include "nsIWindowWatcher.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIWindowWatcher.h"
+#endif
 #include "nsIXULRuntime.h"
 #include "nsLiteralString.h"
 #include "nsNSSIOLayer.h"
@@ -1777,6 +1779,10 @@ nsresult nsNSSComponent::GetNewPrompter(nsIPrompt** result) {
   NS_ENSURE_ARG_POINTER(result);
   *result = nullptr;
 
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
+
   if (!NS_IsMainThread()) {
     NS_ERROR("nsSDRContext::GetNewPrompter called off the main thread");
     return NS_ERROR_NOT_SAME_THREAD;
@@ -1791,6 +1797,7 @@ nsresult nsNSSComponent::GetNewPrompter(nsIPrompt** result) {
   NS_ENSURE_SUCCESS(rv, rv);
 
   return rv;
+#endif
 }
 
 NS_IMETHODIMP

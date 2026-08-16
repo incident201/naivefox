@@ -40,7 +40,7 @@
 #      include "mozilla/UIKitDirProvider.h"
 #    endif
 #  endif
-#  if defined(MOZ_WIDGET_GTK)
+#  if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
 #    include "mozilla/WidgetUtilsGtk.h"
 #  endif
 
@@ -180,9 +180,11 @@ static nsresult GetUnixSystemConfigDir(nsIFile** aFile) {
     }
   }
 #    if defined(MOZ_WIDGET_GTK)
+#ifndef MOZ_NAIVEFOX
   if (sysConfigDir.IsEmpty() && mozilla::widget::IsRunningUnderFlatpak()) {
     sysConfigDir.Assign(nsLiteralCString("/app/etc"));
   }
+#endif
 #    endif
   if (sysConfigDir.IsEmpty()) {
     sysConfigDir.Assign(nsLiteralCString("/etc"));

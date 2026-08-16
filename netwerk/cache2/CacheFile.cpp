@@ -15,8 +15,9 @@
 #include "CacheIndex.h"
 #include "CacheLog.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/TelemetryHistogramEnums.h"
-#include "mozilla/glean/NetwerkCache2Metrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkCache2Metrics.h"
+#endif
 #include "nsComponentManagerUtils.h"
 #include "nsICacheEntry.h"
 #include "nsProxyRelease.h"
@@ -2150,8 +2151,10 @@ void CacheFile::RemoveInput(CacheFileInputStream* aInput, nsresult aStatus) {
   // chunks that won't be used anymore.
   CleanUpCachedChunks();
 
+#ifndef MOZ_NAIVEFOX
   glean::network::cache_v2_input_stream_status.AccumulateSingleSample(
       StatusToTelemetryEnum(aStatus));
+#endif
 }
 
 void CacheFile::RemoveOutput(CacheFileOutputStream* aOutput, nsresult aStatus) {
@@ -2223,8 +2226,10 @@ void CacheFile::RemoveOutput(CacheFileOutputStream* aOutput, nsresult aStatus) {
   // Notify close listener as the last action
   aOutput->NotifyCloseListener();
 
+#ifndef MOZ_NAIVEFOX
   glean::network::cache_v2_output_stream_status.AccumulateSingleSample(
       StatusToTelemetryEnum(aStatus));
+#endif
 }
 
 nsresult CacheFile::NotifyChunkListener(CacheFileChunkListener* aCallback,

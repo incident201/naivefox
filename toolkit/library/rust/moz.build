@@ -4,7 +4,11 @@
 
 include("gkrust-features.mozbuild")
 
-RustLibrary("gkrust", gkrust_features, is_gkrust=True)
+if CONFIG["MOZ_BUILD_APP"] == "netwerk/naivefox":
+    RustLibrary("gkrust", ["naivefox"], is_gkrust=True)
+else:
+    gkrust_features.append("full")
+    RustLibrary("gkrust", gkrust_features, is_gkrust=True)
 
 for feature in gkrust_features:
     # We don't want to enable refcount logging during rusttests, since the

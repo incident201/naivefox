@@ -41,7 +41,9 @@
 #include "nsISocketTransport.h"
 #include "nsISocketTransportService.h"
 #include "nsITransport.h"
-#include "nsIXPConnect.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIXPConnect.h"
+#endif
 #include "nsInterfaceRequestorAgg.h"
 #include "nsNetCID.h"
 #include "nsNetSegmentUtils.h"
@@ -631,9 +633,12 @@ class nsCompleteUpgradeData : public ARefBase {
 nsresult nsHttpConnectionMgr::CompleteUpgrade(
     HttpTransactionShell* aTrans, nsIHttpUpgradeListener* aUpgradeListener) {
   // test if aUpgradeListener is a wrapped JsObject
+#ifdef MOZ_NAIVEFOX
+  bool wrapped = false;
+#else
   nsCOMPtr<nsIXPConnectWrappedJS> wrapper = do_QueryInterface(aUpgradeListener);
-
   bool wrapped = !!wrapper;
+#endif
 
   RefPtr<nsCompleteUpgradeData> data = new nsCompleteUpgradeData(
       aTrans->AsHttpTransaction(), aUpgradeListener, wrapped);

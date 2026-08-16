@@ -8,7 +8,9 @@
 #include "base/message_loop.h"
 #include "base/scoped_nsautorelease_pool.h"
 
-#include "mozilla/BackgroundHangMonitor.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/BackgroundHangMonitor.h"
+#endif
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/ProfilerThreadSleep.h"
 
@@ -22,38 +24,50 @@ void MessagePumpDefault::Run(Delegate* delegate) {
 
   DCHECK(keep_running_) << "Quit must have been called outside of Run!";
 
+#ifndef MOZ_NAIVEFOX
   const MessageLoop* const loop = MessageLoop::current();
   mozilla::BackgroundHangMonitor hangMonitor(loop->thread_name().c_str(),
                                              loop->transient_hang_timeout(),
                                              loop->permanent_hang_timeout());
+#endif
 
   for (;;) {
     ScopedNSAutoreleasePool autorelease_pool;
 
+#ifndef MOZ_NAIVEFOX
     hangMonitor.NotifyActivity();
+#endif
     bool did_work = delegate->DoWork();
     if (!keep_running_) break;
 
+#ifndef MOZ_NAIVEFOX
     hangMonitor.NotifyActivity();
+#endif
     did_work |= delegate->DoDelayedWork(&delayed_work_time_);
     if (!keep_running_) break;
 
     if (did_work) continue;
 
+#ifndef MOZ_NAIVEFOX
     hangMonitor.NotifyActivity();
+#endif
     did_work = delegate->DoIdleWork();
     if (!keep_running_) break;
 
     if (did_work) continue;
 
     if (delayed_work_time_.is_null()) {
+#ifndef MOZ_NAIVEFOX
       hangMonitor.NotifyWait();
+#endif
       AUTO_PROFILER_LABEL("MessagePumpDefault::Run:Wait", IDLE);
       event_.Wait();
     } else {
       TimeDelta delay = delayed_work_time_ - TimeTicks::Now();
       if (delay > TimeDelta()) {
+#ifndef MOZ_NAIVEFOX
         hangMonitor.NotifyWait();
+#endif
         AUTO_PROFILER_LABEL("MessagePumpDefault::Run:Wait", IDLE);
         event_.TimedWait(delay);
       } else {

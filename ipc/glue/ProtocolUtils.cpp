@@ -89,8 +89,10 @@ void AnnotateSystemError() {
   error = errno;
 #endif
   if (error) {
+#ifdef MOZ_CRASHREPORTER
     CrashReporter::RecordAnnotationU32(
         CrashReporter::Annotation::IPCSystemError, error);
+#endif
   }
 }
 
@@ -198,8 +200,10 @@ void FatalError(const char* aMsg, bool aIsParent) {
     // this process if we're off the main thread.
     formattedMessage.AppendLiteral("\". Intentionally crashing.");
     NS_ERROR(formattedMessage.get());
+#ifdef MOZ_CRASHREPORTER
     CrashReporter::RecordAnnotationCString(
         CrashReporter::Annotation::IPCFatalErrorMsg, aMsg);
+#endif
     AnnotateSystemError();
 #ifndef FUZZING
     MOZ_CRASH("IPC FatalError in the parent process!");

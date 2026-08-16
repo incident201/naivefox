@@ -5,6 +5,10 @@
 #ifndef PKCS11ModuleDB_h
 #define PKCS11ModuleDB_h
 
+#if defined(MOZ_NAIVEFOX) && !defined(MOZ_NO_SMART_CARDS)
+#  define MOZ_NO_SMART_CARDS 1
+#endif
+
 #include "mozilla/MozPromise.h"
 #include "nsIPKCS11Module.h"
 #include "nsIPKCS11ModuleDB.h"

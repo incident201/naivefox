@@ -16,8 +16,10 @@ DIRS += [
     "protocol",
     "system",
     "ipc",
-    "url-classifier",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    DIRS += ["url-classifier"]
 
 if CONFIG["OS_TARGET"] == "Linux":
     DIRS += ["naivefox"]

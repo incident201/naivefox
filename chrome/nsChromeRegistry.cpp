@@ -16,27 +16,16 @@
 #include "nsIURIMutator.h"
 #include "nsIURL.h"
 
-#include "mozilla/dom/URL.h"
 #include "nsIConsoleService.h"
-#include "mozilla/dom/Document.h"
 #include "nsIObserverService.h"
 #include "nsIScriptError.h"
 #include "mozilla/Preferences.h"
-#include "mozilla/PresShell.h"
 #include "mozilla/Printf.h"
-#include "mozilla/StyleSheet.h"
-#include "mozilla/StyleSheetInlines.h"
-#include "mozilla/dom/Location.h"
 
 nsChromeRegistry* nsChromeRegistry::gChromeRegistry;
 
 // DO NOT use namespace mozilla; it'll break due to a naming conflict between
 // mozilla::TextRange and a TextRange in OSX headers.
-using mozilla::PresShell;
-using mozilla::StyleSheet;
-using mozilla::dom::Document;
-using mozilla::dom::Location;
-
 ////////////////////////////////////////////////////////////////////////////////
 
 void nsChromeRegistry::LogMessage(const char* aMsg, ...) {

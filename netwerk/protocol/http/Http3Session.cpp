@@ -1306,6 +1306,7 @@ nsresult Http3Session::ProcessOutputAndEvents(nsIUDPSocket* socket) {
     }
   }
 
+#ifndef MOZ_NAIVEFOX
   if (Telemetry::CanRecordPrereleaseData()) {
     auto now = TimeStamp::Now();
     if (mTimerShouldTrigger > now) {
@@ -1316,6 +1317,7 @@ nsresult Http3Session::ProcessOutputAndEvents(nsIUDPSocket* socket) {
                                                         mTimerShouldTrigger);
     }
   }
+#endif
 
   mTimerShouldTrigger = TimeStamp();
 
@@ -2758,11 +2760,16 @@ void Http3Session::Authenticated(int32_t aError,
                    network_http_http3_disable_when_third_party_roots_found()) {
       // In test, we use another perf value to override the value of
       // hasThirdPartyRoots.
+#ifdef MOZ_NAIVEFOX
+      bool hasThirdPartyRoots =
+          !mSocketControl->IsBuiltCertChainRootBuiltInRoot();
+#else
       bool hasThirdPartyRoots =
           (xpc::IsInAutomation() || PR_GetEnv("XPCSHELL_TEST_PROFILE_DIR"))
               ? StaticPrefs::
                     network_http_http3_has_third_party_roots_found_in_automation()
               : !mSocketControl->IsBuiltCertChainRootBuiltInRoot();
+#endif
       LOG(
           ("Http3Session::Authenticated [this=%p, hasThirdPartyRoots=%d, "
            "servCertHashesSucceeded=%d]",

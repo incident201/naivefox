@@ -14,13 +14,15 @@ EXPORTS += [
 
 UNIFIED_SOURCES += [
     "GreekCasing.cpp",
-    "ICUUtils.cpp",
     "IrishCasing.cpp",
     "nsBidiUtils.cpp",
     "nsSpecialCasingData.cpp",
     "nsUnicharUtils.cpp",
     "nsUnicodeProperties.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["ICUUtils.cpp"]
 
 include("/ipc/chromium/chromium-config.mozbuild")
 

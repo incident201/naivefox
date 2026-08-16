@@ -6,6 +6,8 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <limits.h>
+#include <unistd.h>
 
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
@@ -24,6 +26,9 @@
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
+#ifdef MOZ_NAIVEFOX
+#  include "xpcpublic.h"
+#endif
 
 namespace mozilla::naivefox {
 
@@ -112,10 +117,19 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
     return NS_ERROR_FAILURE;
   }
 
-  MOZ_TRY(XRE_InitCommandLine(aArgc, aArgv));
-  mCommandLineInitialized = true;
+  (void)aArgc;
+  (void)aArgv;
 
-  MOZ_TRY(XRE_GetBinaryPath(getter_AddRefs(mExecutable)));
+  char executablePath[PATH_MAX + 1];
+  const ssize_t executableLength =
+      readlink("/proc/self/exe", executablePath, PATH_MAX);
+  if (executableLength <= 0 || executableLength > PATH_MAX) {
+    return NS_ERROR_FAILURE;
+  }
+  executablePath[executableLength] = '\0';
+  MOZ_TRY(NS_NewNativeLocalFile(
+      nsDependentCSubstring(executablePath, executableLength),
+      getter_AddRefs(mExecutable)));
   MOZ_TRY(mExecutable->GetParent(getter_AddRefs(mBinDirectory)));
 
   nsCOMPtr<nsIFile> profile;
@@ -131,6 +145,7 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
       new DirectoryProvider(profile, mBinDirectory, mExecutable);
   mDirectoryProvider = provider;
 
+  mSQLiteLifetime = MakeUnique<AutoSQLiteLifetime>();
   MOZ_TRY(NS_InitXPCOM(nullptr, mBinDirectory, mDirectoryProvider));
   mXPCOMInitialized = true;
 
@@ -186,14 +201,48 @@ void GeckoRuntime::Shutdown() {
     mXPCOMInitialized = false;
   }
 
+  mSQLiteLifetime = nullptr;
+
   mDirectoryProvider = nullptr;
   mBinDirectory = nullptr;
   mExecutable = nullptr;
-
-  if (mCommandLineInitialized) {
-    (void)XRE_DeinitCommandLine();
-    mCommandLineInitialized = false;
-  }
 }
 
 }  // namespace mozilla::naivefox
+
+#ifdef MOZ_NAIVEFOX
+constexpr const volatile xpc::ReadOnlyPage xpc::ReadOnlyPage::sInstance;
+
+void xpc::ReadOnlyPage::Init() {}
+
+GeckoProcessType XRE_GetProcessType() { return GeckoProcessType_Default; }
+
+const char* XRE_GetProcessTypeString() { return "default"; }
+
+GeckoChildID XRE_GetChildID() { return 0; }
+
+bool XRE_IsE10sParentProcess() { return false; }
+
+#  define GECKO_PROCESS_TYPE(enum_value, enum_name, string_name, proc_typename, \
+                             process_bin_type, procinfo_typename,              \
+                             webidl_typename, allcaps_name)                    \
+    bool XRE_Is##proc_typename##Process() { return enum_value == 0; }
+#  include "mozilla/GeckoProcessTypes.h"
+#  undef GECKO_PROCESS_TYPE
+
+bool XRE_UseNativeEventProcessing() { return false; }
+
+nsISerialEventTarget* XRE_GetAsyncIOEventTarget() {
+  static nsCOMPtr<nsISerialEventTarget> sTarget =
+      mozilla::GetMainThreadSerialEventTarget();
+  return sTarget;
+}
+
+nsresult XRE_GetFileFromPath(const char* aPath, nsIFile** aResult) {
+  char fullPath[PATH_MAX + 1];
+  if (!realpath(aPath, fullPath)) {
+    return NS_ERROR_FAILURE;
+  }
+  return NS_NewNativeLocalFile(nsDependentCString(fullPath), aResult);
+}
+#endif

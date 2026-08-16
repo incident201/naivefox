@@ -5,12 +5,16 @@
 
 #include "nsNSSModule.h"
 
-#include "ContentSignatureVerifier.h"
-#include "OSReauthenticator.h"
-#include "SecretDecoderRing.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ContentSignatureVerifier.h"
+#  include "OSReauthenticator.h"
+#  include "SecretDecoderRing.h"
+#endif
 #include "mozilla/ModuleUtils.h"
 #include "mozilla/SyncRunnable.h"
-#include "nsCertTree.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsCertTree.h"
+#endif
 #include "nsNSSCertificateDB.h"
 #include "nsRandomGenerator.h"
 #include "nsXULAppAPI.h"
@@ -85,13 +89,19 @@ static nsresult Constructor(REFNSIID aIID, void** aResult) {
 // in necko code (bug 1418752). To prevent it we initialize all such components
 // on main thread in advance in net_EnsurePSMInit(). Update that function when
 // new component with ThreadRestriction::MainThreadOnly is added.
+#ifndef MOZ_NAIVEFOX
 IMPL(SecretDecoderRing, nullptr)
+#endif
 IMPL(nsNSSCertificateDB, nullptr)
+#ifndef MOZ_NAIVEFOX
 IMPL(nsCertTree, nullptr)
 IMPL(ContentSignatureVerifier, nullptr)
+#endif
 IMPL(nsRandomGenerator, nullptr, ProcessRestriction::AnyProcess)
+#ifndef MOZ_NAIVEFOX
 IMPL(OSReauthenticator, nullptr, ProcessRestriction::ParentProcessOnly,
      ThreadRestriction::MainThreadOnly)
+#endif
 #undef IMPL
 
 }  // namespace psm

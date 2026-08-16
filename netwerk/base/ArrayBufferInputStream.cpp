@@ -6,14 +6,18 @@
 
 #include <algorithm>
 
-#include "js/ArrayBuffer.h"  // JS::{GetArrayBuffer{ByteLength,Data},IsArrayBufferObject}
-#include "js/RootingAPI.h"  // JS::{Handle,Rooted}
-#include "js/Value.h"       // JS::Value
+#ifndef MOZ_NAIVEFOX
+#  include "js/ArrayBuffer.h"  // JS::{GetArrayBuffer{ByteLength,Data},IsArrayBufferObject}
+#  include "js/RootingAPI.h"  // JS::{Handle,Rooted}
+#  include "js/Value.h"       // JS::Value
+#  include "mozilla/dom/ScriptSettings.h"
+#endif
 #include "mozilla/UniquePtrExtensions.h"
-#include "mozilla/dom/ScriptSettings.h"
 #include "nsStreamUtils.h"
 
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::RootingCx;
+#endif
 
 NS_IMPL_ISUPPORTS(ArrayBufferInputStream, nsIArrayBufferInputStream,
                   nsIInputStream);
@@ -21,6 +25,9 @@ NS_IMPL_ISUPPORTS(ArrayBufferInputStream, nsIArrayBufferInputStream,
 NS_IMETHODIMP
 ArrayBufferInputStream::SetDataFromJS(JS::Handle<JS::Value> aBuffer,
                                       uint64_t aByteOffset, uint64_t aLength) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   NS_ASSERT_OWNINGTHREAD(ArrayBufferInputStream);
 
   if (!aBuffer.isObject()) {
@@ -52,6 +59,7 @@ ArrayBufferInputStream::SetDataFromJS(JS::Handle<JS::Value> aBuffer,
   uint8_t* src = JS::GetArrayBufferData(arrayBuffer, &isShared, nogc) + offset;
   memcpy(&mArrayBuffer[0], src, mBufferLength);
   return NS_OK;
+#endif
 }
 
 nsresult ArrayBufferInputStream::SetData(mozilla::UniquePtr<uint8_t[]> aBytes,

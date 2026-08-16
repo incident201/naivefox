@@ -4,10 +4,11 @@
 
 #include "TRRServiceChannel.h"
 
-#include "AltServiceChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "AltServiceChild.h"
+#endif
 #include "HttpLog.h"
 #include "ProxyConfigLookup.h"
-#include "ReferrerInfo.h"
 #include "TRR.h"
 #include "TRRLoadInfo.h"
 #include "TRRService.h"
@@ -935,6 +936,7 @@ void TRRServiceChannel::ProcessAltService(
        privateBrowsing(mPrivateBrowsing), callbacks = std::move(callbacks),
        proxyInfo = std::move(proxyInfo), caps(mCaps),
        connectionInfo = std::move(connectionInfo)]() {
+#ifndef MOZ_NAIVEFOX
         if (XRE_IsSocketProcess()) {
           AltServiceChild::ProcessHeader(
               altSvc, scheme, originHost, originPort, userName, privateBrowsing,
@@ -942,6 +944,7 @@ void TRRServiceChannel::ProcessAltService(
               OriginAttributes(), connectionInfo);
           return;
         }
+#endif
 
         AltSvcMapping::ProcessHeader(altSvc, scheme, originHost, originPort,
                                      userName, privateBrowsing, callbacks,

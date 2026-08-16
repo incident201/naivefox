@@ -25,7 +25,9 @@
 #include "nsIURI.h"
 #include "nsStringFwd.h"
 #include "nsTArray.h"
-#include "nsWrapperCache.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsWrapperCache.h"
+#endif
 
 #include "js/BuildId.h"
 #include "js/ErrorReport.h"
@@ -46,6 +48,9 @@ class nsIGlobalObject;
 class nsIHandleReportCallback;
 class nsIPrincipal;
 class nsPIDOMWindowInner;
+#ifdef MOZ_NAIVEFOX
+class nsWrapperCache;
+#endif
 struct JSContext;
 struct nsID;
 struct nsXPTInterfaceInfo;
@@ -197,6 +202,12 @@ static_assert(JSCLASS_GLOBAL_APPLICATION_SLOTS > 0,
 
 inline JSObject* xpc_FastGetCachedWrapper(JSContext* cx, nsWrapperCache* cache,
                                           JS::MutableHandle<JS::Value> vp) {
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox has no DOM reflector objects.  Keeping this API-shaped no-op
+  // prevents generic XPConnect/profiler headers from pulling the DOM wrapper
+  // cache and Servo style headers into the standalone networking build.
+  return nullptr;
+#else
   if (cache) {
     JSObject* wrapper = cache->GetWrapper();
     if (wrapper &&
@@ -207,6 +218,7 @@ inline JSObject* xpc_FastGetCachedWrapper(JSContext* cx, nsWrapperCache* cache,
   }
 
   return nullptr;
+#endif
 }
 
 // If aWrappedJS is a JS wrapper, unmark its JSObject.
@@ -673,12 +685,18 @@ inline nsGlobalWindowInner* SandboxWindowOrNull(JSObject* aObj,
 nsGlobalWindowInner* CurrentWindowOrNull(JSContext* cx);
 
 class MOZ_RAII AutoScriptActivity {
+#ifdef MOZ_NAIVEFOX
+ public:
+  explicit AutoScriptActivity(bool) {}
+  ~AutoScriptActivity() = default;
+#else
   bool mActive;
   bool mOldValue;
 
  public:
   explicit AutoScriptActivity(bool aActive);
   ~AutoScriptActivity();
+#endif
 };
 
 // This function may be used off-main-thread, in which case it is benignly

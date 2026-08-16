@@ -4,7 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <locale.h>
-#include "mozilla/LookAndFeel.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/LookAndFeel.h"
+#endif
 #include "mozilla/intl/Locale.h"
 #include "OSPreferences.h"
 
@@ -71,10 +73,12 @@ bool OSPreferences::ReadDateTimePattern(DateTimeFormatStyle aDateStyle,
   }
 
   // Customize the skeleton if necessary to reflect user's 12/24hr pref
+#ifndef MOZ_NAIVEFOX
   int hourCycle = LookAndFeel::GetInt(LookAndFeel::IntID::HourCycle);
   if (hourCycle == 12 || hourCycle == 24) {
     OverrideSkeletonHourCycle(hourCycle == 24, skeleton);
   }
+#endif
 
   if (!GetPatternForSkeleton(skeleton, aLocale, aRetVal)) {
     return false;

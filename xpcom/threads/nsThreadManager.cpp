@@ -23,7 +23,9 @@
 #include "mozilla/ThreadEventQueue.h"
 #include "mozilla/ThreadLocal.h"
 #include "mozilla/ipc/SharedMemoryMapping.h"
-#include "nsExceptionHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsIClassInfoImpl.h"
 #include "nsTArray.h"
 #include "nsThread.h"
@@ -687,11 +689,13 @@ void AutoNestedEventLoopAnnotation::AnnotateXPCOMSpinEventLoopStack(
   if (aStack.Length() > 0) {
     nsCString prefixedStack(XRE_GetProcessTypeString());
     prefixedStack += ": "_ns + aStack;
+#ifndef MOZ_NAIVEFOX
     CrashReporter::RecordAnnotationNSCString(
         CrashReporter::Annotation::XPCOMSpinEventLoopStack, prefixedStack);
   } else {
     CrashReporter::UnrecordAnnotation(
         CrashReporter::Annotation::XPCOMSpinEventLoopStack);
+#endif
   }
 }
 

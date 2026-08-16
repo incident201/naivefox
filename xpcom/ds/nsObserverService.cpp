@@ -346,6 +346,9 @@ class NotifyWhenScriptSafeRunnable : public mozilla::Runnable {
 nsresult nsIObserverService::NotifyWhenScriptSafe(nsISupports* aSubject,
                                                   const char* aTopic,
                                                   const char16_t* aData) {
+#ifdef MOZ_NAIVEFOX
+  return NotifyObservers(aSubject, aTopic, aData);
+#else
   if (nsContentUtils::IsSafeToRunScript()) {
     return NotifyObservers(aSubject, aTopic, aData);
   }
@@ -353,4 +356,5 @@ nsresult nsIObserverService::NotifyWhenScriptSafe(nsISupports* aSubject,
   nsContentUtils::AddScriptRunner(MakeAndAddRef<NotifyWhenScriptSafeRunnable>(
       this, aSubject, aTopic, aData));
   return NS_OK;
+#endif
 }

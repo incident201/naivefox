@@ -47,7 +47,7 @@
 
 #ifdef MOZ_WIDGET_GTK
 #  include "nsIGIOService.h"
-#  ifdef MOZ_ENABLE_DBUS
+#  if defined(MOZ_ENABLE_DBUS) && !defined(MOZ_NAIVEFOX)
 #    include "mozilla/WidgetUtilsGtk.h"
 #    include "mozilla/widget/AsyncDBus.h"
 #  endif
@@ -112,7 +112,8 @@ using namespace mozilla;
       return NS_ERROR_FILE_ACCESS_DENIED;                 \
   } while (0)
 
-#if defined(MOZ_ENABLE_DBUS) && defined(MOZ_WIDGET_GTK)
+#if defined(MOZ_ENABLE_DBUS) && defined(MOZ_WIDGET_GTK) && \
+    !defined(MOZ_NAIVEFOX)
 // Prefix for files exported through document portal when we are
 // in a sandboxed environment (Flatpak).
 static const nsCString& GetDocumentStorePath() {
@@ -687,6 +688,10 @@ nsLocalFile::HostPath(JSContext* aCx, dom::Promise** aPromise) {
   MOZ_ASSERT(aCx);
   MOZ_ASSERT(aPromise);
 
+#ifdef MOZ_NAIVEFOX
+  *aPromise = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   nsIGlobalObject* globalObject = xpc::CurrentNativeGlobal(aCx);
   if (NS_WARN_IF(!globalObject)) {
     return NS_ERROR_FAILURE;
@@ -698,7 +703,8 @@ nsLocalFile::HostPath(JSContext* aCx, dom::Promise** aPromise) {
     return result.StealNSResult();
   }
 
-#if defined(MOZ_ENABLE_DBUS) && defined(MOZ_WIDGET_GTK)
+#if defined(MOZ_ENABLE_DBUS) && defined(MOZ_WIDGET_GTK) && \
+    !defined(MOZ_NAIVEFOX)
   if (!widget::IsRunningUnderFlatpak() ||
       !StringBeginsWith(mPath, GetDocumentStorePath())) {
     retPromise->MaybeResolve(mPath);
@@ -820,6 +826,7 @@ nsLocalFile::HostPath(JSContext* aCx, dom::Promise** aPromise) {
 #endif
   retPromise.forget(aPromise);
   return NS_OK;
+#endif
 }
 
 nsCString nsLocalFile::NativePath() { return mPath; }

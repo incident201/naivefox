@@ -11,7 +11,9 @@
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/SyncRunnable.h"
-#include "mozilla/net/ChildDNSService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/ChildDNSService.h"
+#endif
 #include "mozilla/net/DNSListenerProxy.h"
 #include "mozilla/net/NeckoCommon.h"
 #include "nsCRT.h"
@@ -28,7 +30,9 @@
 #include "nsIObserverService.h"
 #include "nsIPrefBranch.h"
 #include "nsIProtocolProxyService.h"
-#include "nsIXPConnect.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIXPConnect.h"
+#endif
 #include "nsNetAddr.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
@@ -665,7 +669,11 @@ already_AddRefed<nsIDNSService> DNSServiceWrapper::GetSingleton() {
     gDNSServiceWrapper = new DNSServiceWrapper();
     // Not strictly needed, but simple and avoids bypassing lock-checking
     MutexAutoLock lock(gDNSServiceWrapper->mLock);
+#ifdef MOZ_NAIVEFOX
+    gDNSServiceWrapper->mDNSServiceInUse = nsDNSService::GetSingleton();
+#else
     gDNSServiceWrapper->mDNSServiceInUse = ChildDNSService::GetSingleton();
+#endif
     if (gDNSServiceWrapper->mDNSServiceInUse) {
       ClearOnShutdown(&gDNSServiceWrapper);
       nsDNSPrefetch::Initialize(gDNSServiceWrapper);
@@ -749,6 +757,13 @@ already_AddRefed<nsIDNSService> GetOrInitDNSService() {
 }
 
 already_AddRefed<nsIDNSService> nsDNSService::GetXPCOMSingleton() {
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIDNSService> dns = GetSingleton();
+  if (dns) {
+    gInited = true;
+  }
+  return dns.forget();
+#else
   auto getDNSHelper = []() -> already_AddRefed<nsIDNSService> {
     if (nsIOService::UseSocketProcess()) {
       if (XRE_IsSocketProcess()) {
@@ -786,6 +801,7 @@ already_AddRefed<nsIDNSService> nsDNSService::GetXPCOMSingleton() {
     gInited = true;
   }
   return dns.forget();
+#endif
 }
 
 already_AddRefed<nsDNSService> nsDNSService::GetSingleton() {
@@ -1066,11 +1082,14 @@ nsresult nsDNSService::AsyncResolveInternal(
     flags |= RESOLVE_OFFLINE;
   }
 
-  // make sure JS callers get notification on the main thread
+  // Make sure browser JS callers get notification on the main thread.
+  // NaiveFox has no script-facing DNS listener and keeps the caller's target.
+#ifndef MOZ_NAIVEFOX
   nsCOMPtr<nsIXPConnectWrappedJS> wrappedListener = do_QueryInterface(listener);
   if (wrappedListener && !target) {
     target = GetMainThreadSerialEventTarget();
   }
+#endif
 
   if (target) {
     listener = new DNSListenerProxy(listener, target);
@@ -1150,9 +1169,13 @@ nsDNSService::AsyncResolve(const nsACString& aHostname,
 
   LOG(("DNSService::AsyncResolve %s", PromiseFlatCString(aHostname).get()));
   if (aArgc == 1) {
+#ifdef MOZ_NAIVEFOX
+    return NS_ERROR_NOT_IMPLEMENTED;
+#else
     if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
       return NS_ERROR_INVALID_ARG;
     }
+#endif
   }
 
   return AsyncResolveInternal(aHostname, aType, flags, aInfo, listener, target_,
@@ -1188,9 +1211,13 @@ nsDNSService::CancelAsyncResolve(const nsACString& aHostname,
   OriginAttributes attrs;
 
   if (aArgc == 1) {
+#ifdef MOZ_NAIVEFOX
+    return NS_ERROR_NOT_IMPLEMENTED;
+#else
     if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
       return NS_ERROR_INVALID_ARG;
     }
+#endif
   }
 
   return CancelAsyncResolveInternal(aHostname, aType, aFlags, aInfo, aListener,
@@ -1215,9 +1242,13 @@ nsDNSService::Resolve(const nsACString& aHostname,
   OriginAttributes attrs;
 
   if (aArgc == 1) {
+#ifdef MOZ_NAIVEFOX
+    return NS_ERROR_NOT_IMPLEMENTED;
+#else
     if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
       return NS_ERROR_INVALID_ARG;
     }
+#endif
   }
 
   return ResolveNative(aHostname, flags, attrs, result);

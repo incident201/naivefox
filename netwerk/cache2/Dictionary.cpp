@@ -8,8 +8,6 @@
 
 #include "CacheFileUtils.h"
 #include "LoadContextInfo.h"
-#include "ReferrerInfo.h"
-#include "SerializedLoadContext.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Components.h"
 #include "mozilla/FlowMarkers.h"
@@ -19,21 +17,20 @@
 #include "mozilla/SchedulerGroup.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/dom/ContentParent.h"
-#include "mozilla/dom/Document.h"
-#include "mozilla/dom/InternalRequest.h"
-#include "mozilla/glean/GleanPings.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/InternalRequest.h"
+#  include "mozilla/glean/GleanPings.h"
+#endif
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/ipc/URIUtils.h"
-#include "mozilla/net/NeckoChild.h"
 #include "mozilla/net/NeckoCommon.h"
-#include "mozilla/net/NeckoParent.h"
 #include "mozilla/net/URLPatternGlue.h"
 #include "mozilla/net/urlpattern_glue.h"
 #include "nsAppDirectoryServiceDefs.h"
-#include "nsAttrValue.h"
-#include "nsContentPolicyUtils.h"
-#include "nsContentUtils.h"
+#include "nsComponentManagerUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentPolicyUtils.h"
+#endif
 #include "nsHTTPCompressConv.h"
 #include "nsIAsyncInputStream.h"
 #include "nsICacheEntry.h"
@@ -139,6 +136,9 @@ NS_IMPL_ISUPPORTS(DictionaryCacheEntry, nsICacheEntryOpenCallback,
 void DictionaryCacheEntry::ConvertMatchDestToEnumArray(
     const nsTArray<nsCString>& aMatchDest,
     nsTArray<dom::RequestDestination>& aMatchEnums) {
+#ifdef MOZ_NAIVEFOX
+  aMatchEnums.Clear();
+#else
   AutoTArray<dom::RequestDestination, 3> temp;
   for (auto& string : aMatchDest) {
     dom::RequestDestination dest =
@@ -149,6 +149,7 @@ void DictionaryCacheEntry::ConvertMatchDestToEnumArray(
     }
   }
   aMatchEnums.SwapElements(temp);
+#endif
 }
 
 // Returns true if the pattern for the dictionary matches the path given.
@@ -157,6 +158,9 @@ void DictionaryCacheEntry::ConvertMatchDestToEnumArray(
 bool DictionaryCacheEntry::Match(const nsACString& aFilePath,
                                  ExtContentPolicyType aType, uint32_t aNow,
                                  uint32_t& aLongest) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   MOZ_ASSERT(NS_IsMainThread());
   if (mHash.IsEmpty()) {
     // We don't have the file yet
@@ -205,6 +209,7 @@ bool DictionaryCacheEntry::Match(const nsACString& aFilePath,
     }  // else failed on match-dest
   }  // else failed on expiration
   return false;
+#endif
 }
 
 void DictionaryCacheEntry::InUse() {
@@ -510,9 +515,11 @@ void DictionaryCacheEntry::MakeMetadataEntry(nsCString& aNewValue) {
       EscapeMetadataString(mHash, aNewValue);
   EscapeMetadataString(mPattern, aNewValue);
   EscapeMetadataString(mId, aNewValue);
+#ifndef MOZ_NAIVEFOX
   for (auto& dest : mMatchDest) {
     EscapeMetadataString(dom::GetEnumString(dest), aNewValue);
   }
+#endif
   // List of match-dest values is terminated by an empty string
   EscapeMetadataString(""_ns, aNewValue);
   // Expiration time, as a CString
@@ -583,6 +590,7 @@ bool DictionaryCacheEntry::ParseMetadata(const char* aSrc) {
   // get match-dest values (list ended with empty string)
   do {
     aSrc = GetEncodedString(aSrc, temp);
+#ifndef MOZ_NAIVEFOX
     if (!temp.IsEmpty()) {
       dom::RequestDestination dest =
           dom::StringToEnum<dom::RequestDestination>(temp).valueOr(
@@ -591,6 +599,7 @@ bool DictionaryCacheEntry::ParseMetadata(const char* aSrc) {
         mMatchDest.AppendElement(dest);
       }
     }
+#endif
   } while (!temp.IsEmpty());
   if (*aSrc == '|') {
     char* newSrc;
@@ -600,19 +609,18 @@ bool DictionaryCacheEntry::ParseMetadata(const char* aSrc) {
   // XXX type - we assume and only support 'raw', may be missing
   aSrc = GetEncodedString(aSrc, temp);
 
-  DICTIONARY_LOG(
-      ("Parse entry %s: |%s| %s match-dest[0]=%s id=%s", mURI.get(),
-       mHash.get(), mPattern.get(),
-       mMatchDest.Length() > 0 ? dom::GetEnumString(mMatchDest[0]).get() : "",
-       mId.get()));
+  DICTIONARY_LOG(("Parse entry %s: |%s| %s id=%s", mURI.get(), mHash.get(),
+                  mPattern.get(), mId.get()));
   return true;
 }
 
 void DictionaryCacheEntry::AppendMatchDest(nsACString& aDest) const {
+#ifndef MOZ_NAIVEFOX
   for (auto& dest : mMatchDest) {
     aDest.Append(dom::GetEnumString(dest));
     aDest.Append(" ");
   }
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -1154,7 +1162,9 @@ DictionaryCache::Observe(nsISupports* subject, const char* topic,
   MOZ_ASSERT(NS_IsMainThread());
   if (!strcmp(topic, "idle-daily")) {
     // Submit the content decoding error ping once per day
+#ifndef MOZ_NAIVEFOX
     glean_pings::ContentDecodingError.Submit();
+#endif
   }
   return NS_OK;
 }
@@ -1789,6 +1799,9 @@ void DictionaryOrigin::RemoveEntry(DictionaryCacheEntry* aEntry) {
 }
 
 void DictionaryOrigin::DumpEntries() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   DICTIONARY_LOG(("*** Origin %s ***", mOrigin.get()));
   for (const auto& dict : mEntries) {
     DICTIONARY_LOG(
@@ -1811,6 +1824,7 @@ void DictionaryOrigin::DumpEntries() {
              : dom::GetEnumString(dict->mMatchDest[0]).get(),
          dict->GetHash().get(), dict->mExpiration));
   }
+#endif
 }
 
 void DictionaryOrigin::Clear() {
@@ -1836,7 +1850,7 @@ DictionaryCacheEntry* DictionaryOrigin::Match(const nsACString& aPath,
                                               ExtContentPolicyType aType) {
   uint32_t longest = 0;
   DictionaryCacheEntry* result = nullptr;
-  uint32_t now = mozilla::net::NowInSeconds();
+  uint32_t now = NowInSeconds();
 
   for (const auto& dict : mEntries) {
     if (dict->Match(aPath, aType, now, longest)) {

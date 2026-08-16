@@ -4,17 +4,20 @@
 
 #include "nsSimpleEnumerator.h"
 
-#include "mozilla/Try.h"
-#include "mozilla/dom/IteratorResultBinding.h"
-#include "mozilla/dom/RootedDictionary.h"
-#include "mozilla/dom/ToJSValue.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Try.h"
+#  include "mozilla/dom/IteratorResultBinding.h"
+#  include "mozilla/dom/RootedDictionary.h"
+#  include "mozilla/dom/ToJSValue.h"
+#  include "nsContentUtils.h"
+#endif
 
 using namespace mozilla;
 using namespace mozilla::dom;
 
 namespace {
 
+#ifndef MOZ_NAIVEFOX
 class JSEnumerator final : public nsIJSEnumerator {
   NS_DECL_ISUPPORTS
   NS_DECL_NSIJSENUMERATOR
@@ -28,8 +31,6 @@ class JSEnumerator final : public nsIJSEnumerator {
   nsCOMPtr<nsISimpleEnumerator> mEnumerator;
   const nsID mIID;
 };
-
-}  // anonymous namespace
 
 nsresult JSEnumerator::Iterator(nsIJSEnumerator** aResult) {
   RefPtr<JSEnumerator> result(this);
@@ -58,18 +59,29 @@ nsresult JSEnumerator::Next(JSContext* aCx, JS::MutableHandleValue aResult) {
 }
 
 NS_IMPL_ISUPPORTS(JSEnumerator, nsIJSEnumerator)
+#endif
+
+}  // anonymous namespace
 
 nsresult nsSimpleEnumerator::Iterator(nsIJSEnumerator** aResult) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   auto result = MakeRefPtr<JSEnumerator>(this, DefaultInterface());
   result.forget(aResult);
   return NS_OK;
+#endif
 }
 
 nsresult nsSimpleEnumerator::Entries(const nsIID& aIface,
                                      nsIJSEnumerator** aResult) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   auto result = MakeRefPtr<JSEnumerator>(this, aIface);
   result.forget(aResult);
   return NS_OK;
+#endif
 }
 
 NS_IMPL_ISUPPORTS(nsSimpleEnumerator, nsISimpleEnumerator,

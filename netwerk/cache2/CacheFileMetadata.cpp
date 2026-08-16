@@ -13,7 +13,9 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/ScopeExit.h"
-#include "mozilla/glean/NetwerkMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkMetrics.h"
+#endif
 #include "nsCRT.h"
 #include "nsICacheEntry.h"
 #include "nsICacheEntry.h"  // for nsICacheEntryMetaDataVisitor
@@ -797,6 +799,7 @@ nsresult CacheFileMetadata::OnDataRead(CacheFileHandle* aHandle, char* aBuf,
   }
 
 #ifndef ANDROID
+#ifndef MOZ_NAIVEFOX
   mozilla::TimeStamp readEnd = mozilla::TimeStamp::Now();
   if (mFirstRead) {
     mozilla::glean::networking::cache_metadata_first_read_time
@@ -805,6 +808,7 @@ nsresult CacheFileMetadata::OnDataRead(CacheFileHandle* aHandle, char* aBuf,
     mozilla::glean::networking::cache_metadata_second_read_time
         .AccumulateRawDuration(readEnd - mReadStart);
   }
+#endif
 #endif
 
   // Decode the trailer (always within this first tail read). The version word
@@ -900,7 +904,7 @@ nsresult CacheFileMetadata::OnDataRead(CacheFileHandle* aHandle, char* aBuf,
     return NS_OK;
   }
 
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   mozilla::glean::networking::cache_metadata_size.Accumulate(size - realOffset);
 #endif
 

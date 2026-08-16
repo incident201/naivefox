@@ -62,6 +62,9 @@ UNIFIED_SOURCES += [
     "XPCOMInit.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES.remove("LateWriteChecks.cpp")
+
 SOURCES += ["!Services.cpp"]
 
 if CONFIG["OS_ARCH"] != "WINNT":

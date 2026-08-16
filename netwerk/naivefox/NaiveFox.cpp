@@ -6,7 +6,6 @@
 #include <cstring>
 
 #include "NaiveFoxAPI.h"
-#include "mozilla/Bootstrap.h"
 
 namespace {
 
@@ -19,12 +18,6 @@ int main(int argc, char* argv[]) {
     std::printf("NaiveFox %s\n", kVersion);
     return 0;
   }
-
-  auto bootstrapResult = mozilla::GetBootstrap();
-  if (bootstrapResult.isErr()) {
-    return 1;
-  }
-  mozilla::Bootstrap::UniquePtr bootstrap = bootstrapResult.unwrap();
 
   return NaiveFoxMain(argc, argv);
 }

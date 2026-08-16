@@ -7,8 +7,9 @@
 #include <algorithm>
 
 #include "../protocol/http/nsHttpHandler.h"
-#include "mozilla/dom/ContentParent.h"
-#include "mozilla/net/NeckoChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoChild.h"
+#endif
 #include "nsBaseContentStream.h"
 #include "nsContentUtils.h"
 #include "nsDirectoryIndexStream.h"
@@ -544,6 +545,9 @@ nsFileChannel::GetFile(nsIFile** file) {
 }
 
 nsresult nsFileChannel::MaybeSendFileOpenNotification() {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   // We never send the notification unless we're in a content process.
   if (!IsNeckoChild()) {
     return NS_OK;
@@ -568,6 +572,7 @@ nsresult nsFileChannel::MaybeSendFileOpenNotification() {
                                   loadInfoArgs, mContentType, mChannelId);
   gNeckoChild->SendNotifyFileChannelOpened(fileChannelInfo);
   return NS_OK;
+#endif
 }
 
 /* static */
@@ -652,12 +657,16 @@ nsFileChannel::SetChannelId(uint64_t aChannelId) {
 
 NS_IMETHODIMP
 nsFileChannel::ConnectParent(uint32_t aId) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   if (!IsNeckoChild()) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
 
   gNeckoChild->SendConnectBaseChannel(aId);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

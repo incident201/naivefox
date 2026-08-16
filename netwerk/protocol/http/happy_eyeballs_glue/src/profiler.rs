@@ -9,6 +9,16 @@ use gecko_profiler::{
     gecko_profiler_category, FlowId, MarkerOptions, MarkerSchema, MarkerTiming, ProfilerMarker,
     ProfilerTime,
 };
+
+pub(crate) type FlowIdentifier = FlowId;
+
+pub(crate) fn initial_flow_id() -> FlowIdentifier {
+    0u64.into()
+}
+
+pub(crate) fn flow_id_from_ptr<T>(ptr: *const T) -> FlowIdentifier {
+    ptr.into()
+}
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -200,7 +210,7 @@ pub(crate) struct Profiler {
 
 impl Profiler {
     pub(crate) fn new(
-        flow_id: FlowId,
+        flow_id: FlowIdentifier,
         origin: &str,
         network_config: &happy_eyeballs::NetworkConfig,
     ) -> Self {
@@ -269,7 +279,7 @@ impl Profiler {
         }
     }
 
-    pub(crate) fn set_flow_id(&mut self, flow_id: FlowId) {
+    pub(crate) fn set_flow_id(&mut self, flow_id: FlowIdentifier) {
         self.flow_id = flow_id;
     }
 

@@ -36,8 +36,21 @@ enum class ReferrerPolicy : uint8_t;
 }
 
 namespace extensions {
+#ifdef MOZ_NAIVEFOX
+class WebExtensionPolicy {
+ public:
+  MozExternalRefCountType AddRef();
+  MozExternalRefCountType Release();
+};
+class WebExtensionPolicyCore {
+ public:
+  MozExternalRefCountType AddRef();
+  MozExternalRefCountType Release();
+};
+#else
 class WebExtensionPolicy;
 class WebExtensionPolicyCore;
+#endif
 }  // namespace extensions
 
 class BasePrincipal;
@@ -133,9 +146,15 @@ class BasePrincipal : public nsJSPrincipals {
   NS_IMETHOD CheckMayLoadWithReporting(nsIURI* uri,
                                        bool allowIfInheritsPrincipal,
                                        uint64_t innerWindowID) final;
+#ifdef MOZ_NAIVEFOX
+  NS_IMETHOD GetAddonPolicy(dom::WebExtensionPolicy** aResult) final;
+  NS_IMETHOD GetContentScriptAddonPolicy(
+      dom::WebExtensionPolicy** aResult) final;
+#else
   NS_IMETHOD GetAddonPolicy(extensions::WebExtensionPolicy** aResult) final;
   NS_IMETHOD GetContentScriptAddonPolicy(
       extensions::WebExtensionPolicy** aResult) final;
+#endif
   NS_IMETHOD GetIsNullPrincipal(bool* aResult) override;
   NS_IMETHOD GetIsContentPrincipal(bool* aResult) override;
   NS_IMETHOD GetIsExpandedPrincipal(bool* aResult) override;

@@ -21,9 +21,13 @@
 #include "mozilla/Services.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/StoragePrincipalHelper.h"
-#include "mozilla/glean/NetwerkCache2Metrics.h"
-#include "mozilla/glean/NetwerkMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/StoragePrincipalHelper.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkCache2Metrics.h"
+#  include "mozilla/glean/NetwerkMetrics.h"
+#endif
 #include "mozilla/net/MozURL.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
@@ -1251,8 +1255,10 @@ nsresult CacheFileIOManager::Shutdown() {
   DictionaryCache::Shutdown();
 
   if (CacheObserver::ClearCacheOnShutdown()) {
+#ifndef MOZ_NAIVEFOX
     auto totalTimer =
         glean::network::disk_cache2_shutdown_clear_private.Measure();
+#endif
     gInstance->SyncRemoveAllCacheFiles();
   }
 
@@ -1504,8 +1510,11 @@ nsresult CacheFileIOManager::OnIdleDaily() {
                 continue;
               }
               if (leafName.Find(kPurgeExtension) != kNotFound) {
+#ifndef MOZ_NAIVEFOX
                 mozilla::glean::networking::residual_cache_folder_count.Add(1);
+#endif
                 rv = subdir->Remove(true);
+#ifndef MOZ_NAIVEFOX
                 if (NS_SUCCEEDED(rv)) {
                   mozilla::glean::networking::residual_cache_folder_removal
                       .Get("success"_ns)
@@ -1515,6 +1524,7 @@ nsresult CacheFileIOManager::OnIdleDaily() {
                       .Get("failure"_ns)
                       .Add(1);
                 }
+#endif
               }
             }
 
@@ -3440,10 +3450,12 @@ nsresult CacheFileIOManager::EvictByContextInternal(
 
       // Filter by base domain.
       if (!aBaseDomain.IsEmpty()) {
+#ifndef MOZ_NAIVEFOX
         if (StoragePrincipalHelper::PartitionKeyHasBaseDomain(
                 info->OriginAttributesPtr()->mPartitionKey, aBaseDomain)) {
           return true;
         }
+#endif
 
         // If the partitionKey does not match, check the entry URI next.
 

@@ -1,0 +1,58 @@
+[package]
+edition = "2021"
+name = "gkrust-naivefox"
+version = "0.1.0"
+license = "MPL-2.0"
+description = "Firefox Rust dependency closure required by NaiveFox"
+
+[dependencies]
+abridged_certs = { path = "../../../../security/manager/ssl/abridged_certs" }
+app_collator_glue = { path = "../../../../intl/app_collator_glue" }
+binary_http = { path = "../../../../netwerk/protocol/http/binary_http" }
+cert_storage = { path = "../../../../security/manager/ssl/cert_storage" }
+crypto_hash = { path = "../../../../security/manager/ssl/crypto_hash" }
+data_storage = { path = "../../../../security/manager/ssl/data_storage" }
+encoding_glue = { path = "../../../../intl/encoding_glue" }
+gecko_logger = { path = "../../../../xpcom/rust/gecko_logger" }
+gecko_tracing = { path = "../../../../xpcom/rust/gecko_tracing" }
+gkrust_utils = { path = "../../../../xpcom/rust/gkrust_utils" }
+happy_eyeballs_glue = { path = "../../../../netwerk/protocol/http/happy_eyeballs_glue", default-features = false }
+http_sfv = { path = "../../../../netwerk/base/http-sfv" }
+idna_glue = { path = "../../../../netwerk/base/idna_glue" }
+ipcclientcerts = { path = "../../../../security/manager/ssl/ipcclientcerts" }
+ipdl_utils = { path = "../../../../ipc/rust/ipdl_utils" }
+icu_locale = { version = "~2.1.1", features = ["compiled_data"] }
+jsrust_shared = { path = "../../../../js/src/rust/shared", features = ["icu4x"] }
+locale_service_glue = { path = "../../../../intl/locale/rust/locale_service_glue" }
+fluent-langneg = { version = "0.13", features = ["cldr"] }
+fluent-langneg-ffi = { path = "../../../../intl/locale/rust/fluent-langneg-ffi" }
+log = { version = "0.4", features = ["release_max_level_info"] }
+mozurl = { path = "../../../../netwerk/base/mozurl" }
+netwerk_helper = { path = "../../../../netwerk/base/rust-helper" }
+neqo_glue = { path = "../../../../netwerk/socket/neqo_glue" }
+nserror = { path = "../../../../xpcom/rust/nserror" }
+nsstring = { path = "../../../../xpcom/rust/nsstring" }
+oblivious_http = { path = "../../../../netwerk/protocol/http/oblivious_http" }
+pdf-trust-anchors = { path = "../../../../security/manager/ssl/pdf_trust_anchors" }
+prefs_parser = { path = "../../../../modules/libpref/parser" }
+qwac-trust-anchors = { path = "../../../../security/manager/ssl/qwac_trust_anchors" }
+rusqlite = { workspace = true, features = ["modern_sqlite", "in_gecko"] }
+signature_cache = { path = "../../../../security/certverifier/signature_cache" }
+ssl_tokens_cache = { path = "../../../../netwerk/base/ssl_tokens_cache" }
+static_prefs = { path = "../../../../modules/libpref/init/static_prefs" }
+storage = { path = "../../../../storage/rust" }
+trust-anchors = { path = "../../../../security/manager/ssl/trust_anchors" }
+unicode-bidi-ffi = { path = "../../../../intl/bidi/rust/unicode-bidi-ffi" }
+unic-langid = { version = "0.9", features = ["likelysubtags"] }
+unic-langid-ffi = { path = "../../../../intl/locale/rust/unic-langid-ffi" }
+uritemplate_glue = { path = "../../../../netwerk/base/uritemplate_glue" }
+urlpattern_glue = { path = "../../../../netwerk/base/urlpattern_glue" }
+xpcom = { path = "../../../../xpcom/rust/xpcom" }
+
+[lib]
+path = "lib.rs"
+test = false
+doctest = false
+bench = false
+doc = false
+harness = false

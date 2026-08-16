@@ -18,7 +18,6 @@
 #include "mozilla/net/MozURL_ffi.h"
 #include "nsASCIIMask.h"
 #include "nsCRT.h"
-#include "nsContentUtils.h"
 #include "nsEscape.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIFile.h"
@@ -323,8 +322,10 @@ void nsStandardURL::SanityCheck() {
         (int32_t)mBasename.mLen, (uint32_t)mExtension.mPos,
         (int32_t)mExtension.mLen, (uint32_t)mQuery.mPos, (int32_t)mQuery.mLen,
         (uint32_t)mRef.mPos, (int32_t)mRef.mLen);
+#ifndef MOZ_NAIVEFOX
     CrashReporter::RecordAnnotationNSCString(
         CrashReporter::Annotation::URLSegments, msg);
+#endif
 
     MOZ_CRASH("nsStandardURL::SanityCheck failed");
   }
@@ -819,8 +820,10 @@ nsresult nsStandardURL::BuildNormalizedSpec(const char* spec,
         approxLen, mSpec.Length(), (uint32_t)mScheme.mPos,
         (int32_t)mScheme.mLen, (uint32_t)mHost.mPos, (int32_t)mHost.mLen,
         (uint32_t)mPath.mPos, (int32_t)mPath.mLen);
+#ifndef MOZ_NAIVEFOX
     CrashReporter::RecordAnnotationNSCString(
         CrashReporter::Annotation::URLSegments, msg);
+#endif
     MOZ_CRASH("nsStandardURL::BuildNormalizedSpec overflowed mSpec");
   }
 

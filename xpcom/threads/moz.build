@@ -94,7 +94,6 @@ SOURCES += [
 UNIFIED_SOURCES += [
     "AbstractThread.cpp",
     "BlockingResourceBase.cpp",
-    "CPUUsageWatcher.cpp",
     "DelayedRunnable.cpp",
     "EventQueue.cpp",
     "InputTaskManager.cpp",
@@ -125,6 +124,9 @@ UNIFIED_SOURCES += [
     "TimerThread.cpp",
     "VsyncTaskManager.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["CPUUsageWatcher.cpp"]
 
 if CONFIG["OS_ARCH"] == "WINNT":
     EXPORTS.mozilla += ["WinHandleWatcher.h"]

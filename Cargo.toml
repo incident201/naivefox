@@ -71,6 +71,7 @@ members = [
   "toolkit/crashreporter/mozwer-rust",
   "toolkit/library/gtest/rust",
   "toolkit/library/rust/",
+  "toolkit/library/rust/naivefox/",
   "toolkit/components/taskscheduler/rust",
   "toolkit/mozapps/msixcomserver-rust",
   "services/application-services/components/viaduct-necko",

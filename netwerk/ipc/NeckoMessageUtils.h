@@ -13,7 +13,9 @@
 #include "mozilla/net/DNS.h"
 #include "mozilla/net/HttpTrafficAnalyzer.h"
 #include "mozilla/net/HttpTransactionShell.h"
-#include "nsExceptionHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsICacheInfoChannel.h"
 #include "nsIDNSService.h"
 #include "nsIHttpChannel.h"
@@ -77,11 +79,13 @@ struct ParamTraits<mozilla::net::NetAddr> {
       aWriter->WriteBytes(aParam.local.path, sizeof(aParam.local.path));
 #endif
     } else {
+#ifndef MOZ_NAIVEFOX
       if (XRE_IsParentProcess()) {
         CrashReporter::RecordAnnotationU32(
             CrashReporter::Annotation::UnknownNetAddrSocketFamily,
             aParam.raw.family);
       }
+#endif
 
       MOZ_CRASH("Unknown socket family");
     }

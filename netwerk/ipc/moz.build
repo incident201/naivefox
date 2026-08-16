@@ -64,24 +64,55 @@ SOURCES += [
     "ProxyAutoConfigParent.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    # NaiveFox deliberately runs Necko in its single process. Keep only the
+    # non-actor helpers used by the in-process DNS/HTTP implementation.
+    for source in [
+        "DocumentChannel.cpp",
+        "DocumentChannelChild.cpp",
+        "DocumentChannelParent.cpp",
+        "DocumentLoadListener.cpp",
+        "InputChannelThrottleQueueChild.cpp",
+        "InputChannelThrottleQueueParent.cpp",
+        "NeckoChild.cpp",
+        "NeckoParent.cpp",
+        "ParentChannelWrapper.cpp",
+        "ParentProcessDocumentChannel.cpp",
+        "ProxyConfigLookupChild.cpp",
+        "ProxyConfigLookupParent.cpp",
+        "SocketProcessBackgroundChild.cpp",
+        "SocketProcessBackgroundParent.cpp",
+        "SocketProcessBridgeChild.cpp",
+        "SocketProcessBridgeParent.cpp",
+        "SocketProcessChild.cpp",
+        "SocketProcessHost.cpp",
+        "SocketProcessImpl.cpp",
+        "SocketProcessParent.cpp",
+    ]:
+        UNIFIED_SOURCES.remove(source)
+    SOURCES.remove("ProxyAutoConfigChild.cpp")
+    SOURCES.remove("ProxyAutoConfigParent.cpp")
+    # The PAC service keeps its existing parent-side helper ABI. No child or
+    # socket process is launched by NaiveFox, but generating this compact
+    # protocol avoids pulling the full PNecko protocol family back in.
+else:
+    PREPROCESSED_IPDL_SOURCES += [
+        "PNecko.ipdl",
+        "PSocketProcess.ipdl",
+        "PSocketProcessBridge.ipdl",
+    ]
 
-PREPROCESSED_IPDL_SOURCES += [
-    "PNecko.ipdl",
-    "PSocketProcess.ipdl",
-    "PSocketProcessBridge.ipdl",
-]
-
-IPDL_SOURCES = [
-    "NeckoChannelParams.ipdlh",
-    "PDocumentChannel.ipdl",
-    "PInputChannelThrottleQueue.ipdl",
-    "PProxyAutoConfig.ipdl",
-    "PProxyConfigLookup.ipdl",
-    "PSocketProcessBackground.ipdl",
-]
+    IPDL_SOURCES = [
+        "NeckoChannelParams.ipdlh",
+        "PDocumentChannel.ipdl",
+        "PInputChannelThrottleQueue.ipdl",
+        "PProxyAutoConfig.ipdl",
+        "PProxyConfigLookup.ipdl",
+        "PSocketProcessBackground.ipdl",
+    ]
 
 # needed so --disable-webrtc builds work (yes, a bit messy)
-if not CONFIG["MOZ_WEBRTC"]:
+if not CONFIG["MOZ_NAIVEFOX"] and not CONFIG["MOZ_WEBRTC"]:
     IPDL_SOURCES += [
         "../../dom/media/webrtc/transport/ipc/PStunAddrsRequest.ipdl",
         "../../dom/media/webrtc/transport/ipc/PWebrtcTCPSocket.ipdl",

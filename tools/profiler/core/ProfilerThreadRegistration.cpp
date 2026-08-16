@@ -4,7 +4,9 @@
 
 #include "mozilla/ProfilerThreadRegistration.h"
 
-#include "mozilla/FOGIPC.h"
+#if defined(NIGHTLY_BUILD) && !defined(MOZ_NAIVEFOX)
+#  include "mozilla/FOGIPC.h"
+#endif
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/ProfilerThreadRegistry.h"
 #include "nsString.h"
@@ -67,7 +69,7 @@ ThreadRegistration::~ThreadRegistration() {
     }
 
     profiler_mark_thread_asleep();
-#ifdef NIGHTLY_BUILD
+#if defined(NIGHTLY_BUILD) && !defined(MOZ_NAIVEFOX)
     // Not holding the ThreadRegistry lock here, so it is safe to report to
     // Glean directly.
     nsAutoCString threadName;

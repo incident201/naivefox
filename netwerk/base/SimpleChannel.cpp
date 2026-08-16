@@ -5,8 +5,10 @@
 #include "SimpleChannel.h"
 
 #include "mozilla/Try.h"
-#include "mozilla/dom/ContentChild.h"
-#include "mozilla/net/NeckoChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentChild.h"
+#  include "mozilla/net/NeckoChild.h"
+#endif
 #include "nsBaseChannel.h"
 #include "nsICancelable.h"
 #include "nsIChannel.h"
@@ -74,6 +76,9 @@ nsresult SimpleChannel::BeginAsyncRead(nsIStreamListener* listener,
 
 NS_IMETHODIMP
 SimpleChannel::ConnectParent(uint32_t aId) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   if (!IsNeckoChild()) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -86,6 +91,7 @@ SimpleChannel::ConnectParent(uint32_t aId) {
 
   gNeckoChild->SendConnectBaseChannel(aId);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

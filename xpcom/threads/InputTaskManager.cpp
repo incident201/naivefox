@@ -5,7 +5,9 @@
 #include "InputTaskManager.h"
 
 #include "VsyncTaskManager.h"
-#include "nsRefreshDriver.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsRefreshDriver.h"
+#endif
 
 namespace mozilla {
 
@@ -60,6 +62,9 @@ void InputTaskManager::WillRunTask() {
 
 int32_t
 InputTaskManager::GetPriorityModifierForEventLoopTurnForStrictVsyncAlignment() {
+#ifdef MOZ_NAIVEFOX
+  return 0;
+#else
   MOZ_ASSERT(!IsSuspended());
 
   size_t inputCount = PendingTaskCount();
@@ -76,6 +81,7 @@ InputTaskManager::GetPriorityModifierForEventLoopTurnForStrictVsyncAlignment() {
 
   return static_cast<int32_t>(EventQueuePriority::InputLow) -
          static_cast<int32_t>(EventQueuePriority::InputHigh);
+#endif
 }
 
 InputTaskManager::InputPriorityController::InputPriorityController()

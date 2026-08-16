@@ -14,10 +14,12 @@ interface nsILoadInfo;
 interface nsIWebTransport;
 interface nsISuspendableChannelWrapper;
 
-webidl Node;
+[ptr] native Node(nsINode);
 
 %{C++
 #include "mozilla/Maybe.h"
+
+class nsINode;
 
 namespace mozilla {
 namespace dom {
@@ -125,7 +127,7 @@ interface nsIIOService : nsISupports
      * Keep in mind that URIs coming from a webpage should *never* use the
      * systemPrincipal as the loadingPrincipal.
      */
-    nsIChannel newChannelFromURI(in nsIURI aURI,
+    [noscript] nsIChannel newChannelFromURI(in nsIURI aURI,
                                  in Node aLoadingNode,
                                  in nsIPrincipal aLoadingPrincipal,
                                  in nsIPrincipal aTriggeringPrincipal,
@@ -166,7 +168,7 @@ interface nsIIOService : nsISupports
     /**
      * Equivalent to newChannelFromURI(newURI(...))
      */
-    nsIChannel newChannel(in AUTF8String aSpec,
+    [noscript] nsIChannel newChannel(in AUTF8String aSpec,
                           in string aOriginCharset,
                           in nsIURI aBaseURI,
                           in Node aLoadingNode,
@@ -317,7 +319,7 @@ interface nsIIOService : nsISupports
      * then loadingPrincipal must be equal to loadingNode->NodePrincipal().
      * But less error prone is to just supply a loadingNode.
      */
-    nsIChannel newChannelFromURIWithProxyFlags(in nsIURI aURI,
+    [noscript] nsIChannel newChannelFromURIWithProxyFlags(in nsIURI aURI,
                                                in nsIURI aProxyURI,
                                                in unsigned long aProxyFlags,
                                                in Node aLoadingNode,

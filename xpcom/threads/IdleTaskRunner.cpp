@@ -6,7 +6,9 @@
 
 #include "mozilla/AppShutdown.h"
 #include "mozilla/TaskController.h"
-#include "nsRefreshDriver.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsRefreshDriver.h"
+#endif
 
 namespace mozilla {
 
@@ -113,7 +115,9 @@ void IdleTaskRunner::Run() {
     // If we find ourselves here we should usually be running from this task,
     // but there are exceptions. In any case we're doing the work now and don't
     // need our task going forward unless we're re-scheduled.
+#ifndef MOZ_NAIVEFOX
     nsRefreshDriver::CancelIdleTask(mTask);
+#endif
     // Extra safety, make sure a task can never have a dangling ptr.
     mTask->Cancel();
     mTask = nullptr;
@@ -203,6 +207,7 @@ void IdleTaskRunner::Schedule(bool aAllowIdleDispatch) {
   }
 
   bool useRefreshDriver = false;
+#ifndef MOZ_NAIVEFOX
   if (now >= mStartTime) {
     // Detect whether the refresh driver is ticking by checking if
     // GetIdleDeadlineHint returns its input parameter.
@@ -211,7 +216,9 @@ void IdleTaskRunner::Schedule(bool aAllowIdleDispatch) {
              now, nsRefreshDriver::IdleCheck::OnlyThisProcessRefreshDriver) !=
          now);
   }
+#endif
 
+#ifndef MOZ_NAIVEFOX
   if (useRefreshDriver) {
     if (!mTask) {
       // If a task was already scheduled, no point rescheduling.
@@ -221,7 +228,9 @@ void IdleTaskRunner::Schedule(bool aAllowIdleDispatch) {
     }
     // Ensure we get called at some point, even if RefreshDriver is stopped.
     SetTimerInternal(mMaxDelay);
-  } else {
+  } else
+#endif
+  {
     // RefreshDriver doesn't seem to be running.
     if (!mScheduleTimer) {
       mScheduleTimer = NS_NewTimer();
@@ -258,7 +267,9 @@ IdleTaskRunner::~IdleTaskRunner() { CancelTimer(); }
 
 void IdleTaskRunner::CancelTimer() {
   if (mTask) {
+#ifndef MOZ_NAIVEFOX
     nsRefreshDriver::CancelIdleTask(mTask);
+#endif
     mTask->Cancel();
     mTask = nullptr;
   }

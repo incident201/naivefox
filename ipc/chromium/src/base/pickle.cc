@@ -5,7 +5,6 @@
 #include "base/pickle.h"
 
 #include "mozilla/CheckedInt.h"
-#include "mozilla/Telemetry.h"
 #include "mozilla/ipc/ProtocolUtils.h"
 
 #include <stdlib.h>

@@ -21,11 +21,13 @@ UNIFIED_SOURCES += [
     "core/ProfilerBacktrace.cpp",
     "core/ProfilerCodeAddressService.cpp",
     "core/ProfilerMarkers.cpp",
-    "gecko/ChildProfilerController.cpp",
     "gecko/nsProfilerStartParams.cpp",
     "gecko/ProfilerChild.cpp",
     "gecko/ProfilerIOInterposeObserver.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["gecko/ChildProfilerController.cpp"]
 if CONFIG["MOZ_MEMORY"] and CONFIG["MOZ_PROFILER_MEMORY"]:
     UNIFIED_SOURCES += [
         "core/memory_counter.cpp",
@@ -40,9 +42,10 @@ if CONFIG["MOZ_REPLACE_MALLOC"] and CONFIG["MOZ_PROFILER_MEMORY"]:
         "core/memory_hooks.cpp",  # Non-unified because of order of #includes
     ]
 
-XPCOM_MANIFESTS += [
-    "gecko/components.conf",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    XPCOM_MANIFESTS += [
+        "gecko/components.conf",
+    ]
 
 # Keep in sync with ProfilerPlatformMacros.h
 if CONFIG["OS_TARGET"] == "Android" and CONFIG["TARGET_CPU"] in (
@@ -53,7 +56,6 @@ if CONFIG["OS_TARGET"] == "Android" and CONFIG["TARGET_CPU"] in (
 ):
     UNIFIED_SOURCES += [
         "core/ProfilerCPUFreq-linux-android.cpp",
-        "gecko/nsProfiler.cpp",
         "lul/AutoObjectMapper.cpp",
         "lul/LulCommon.cpp",
         "lul/LulDwarf.cpp",
@@ -62,6 +64,8 @@ if CONFIG["OS_TARGET"] == "Android" and CONFIG["TARGET_CPU"] in (
         "lul/LulMain.cpp",
         "lul/platform-linux-lul.cpp",
     ]
+    if not CONFIG["MOZ_NAIVEFOX"]:
+        UNIFIED_SOURCES += ["gecko/nsProfiler.cpp"]
     if CONFIG["TARGET_CPU"] == "aarch64":
         SOURCES += [
             "core/PowerCounters-android.cpp",
@@ -90,7 +94,6 @@ elif CONFIG["OS_TARGET"] == "Linux" and CONFIG["TARGET_CPU"] in (
 ):
     UNIFIED_SOURCES += [
         "core/ProfilerCPUFreq-linux-android.cpp",
-        "gecko/nsProfiler.cpp",
         "lul/AutoObjectMapper.cpp",
         "lul/LulCommon.cpp",
         "lul/LulDwarf.cpp",
@@ -99,6 +102,8 @@ elif CONFIG["OS_TARGET"] == "Linux" and CONFIG["TARGET_CPU"] in (
         "lul/LulMain.cpp",
         "lul/platform-linux-lul.cpp",
     ]
+    if not CONFIG["MOZ_NAIVEFOX"]:
+        UNIFIED_SOURCES += ["gecko/nsProfiler.cpp"]
     if CONFIG["TARGET_CPU"] == "x86_64":
         UNIFIED_SOURCES += [
             "core/PowerCounters-linux.cpp",
@@ -176,9 +181,10 @@ elif CONFIG["OS_TARGET"] == "WINNT" and CONFIG["TARGET_CPU"] in (
         "core/ProfilerCPUFreq-win.cpp",
     ]
 else:
-    UNIFIED_SOURCES += [
-        "gecko/nsProfiler.cpp",
-    ]
+    if not CONFIG["MOZ_NAIVEFOX"]:
+        UNIFIED_SOURCES += [
+            "gecko/nsProfiler.cpp",
+        ]
 
 LOCAL_INCLUDES += [
     "/caps",
@@ -202,7 +208,7 @@ if CONFIG["OS_TARGET"] == "Android":
         "/toolkit/crashreporter/google-breakpad/src/common/android/include",
     ]
 
-if CONFIG["MOZ_VTUNE"]:
+if CONFIG["MOZ_VTUNE"] and not CONFIG["MOZ_NAIVEFOX"]:
     DEFINES["MOZ_VTUNE_INSTRUMENTATION"] = True
     UNIFIED_SOURCES += [
         "core/VTuneProfiler.cpp",
@@ -215,7 +221,6 @@ TESTING_JS_MODULES += ["tests/ProfilerTestUtils.sys.mjs"]
 
 UNIFIED_SOURCES += [
     "core/MicroGeckoProfiler.cpp",
-    "core/ProfileAdditionalInformation.cpp",
     "core/ProfilerBindings.cpp",
     "core/ProfilerThreadRegistration.cpp",
     "core/ProfilerThreadRegistrationData.cpp",
@@ -223,6 +228,9 @@ UNIFIED_SOURCES += [
     "core/ProfilerUtils.cpp",
     "gecko/ProfilerParent.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["core/ProfileAdditionalInformation.cpp"]
 
 IPDL_SOURCES += [
     "gecko/PProfiler.ipdl",

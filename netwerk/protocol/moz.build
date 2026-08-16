@@ -2,13 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-DIRS += [
-    "about",
-    "data",
-    "file",
-    "http",
-    "res",
-    "viewsource",
-    "websocket",
-    "webtransport",
-]
+DIRS += ["http", "res"]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    DIRS += ["data", "file"]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    DIRS += ["about", "viewsource", "websocket", "webtransport"]

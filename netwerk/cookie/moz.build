@@ -69,9 +69,30 @@ MOCHITEST_MANIFESTS += [
     "test/mochitest/mochitest.toml",
 ]
 
-IPDL_SOURCES = [
-    "PCookieService.ipdl",
-]
+if CONFIG["MOZ_NAIVEFOX"]:
+    for source in (
+        "Cookie.cpp",
+        "CookieCommons.cpp",
+        "CookieJarSettings.cpp",
+        "CookieLogging.cpp",
+        "CookieNotification.cpp",
+        "CookieParser.cpp",
+        "CookiePersistentStorage.cpp",
+        "CookiePrefixes.cpp",
+        "CookiePrivateStorage.cpp",
+        "CookieService.cpp",
+        "CookieServiceChild.cpp",
+        "CookieServiceParent.cpp",
+        "CookieStorage.cpp",
+        "CookieValidation.cpp",
+        "PrefetchCookieCopier.cpp",
+        "ThirdPartyCookieBlockingExceptions.cpp",
+    ):
+        UNIFIED_SOURCES.remove(source)
+else:
+    IPDL_SOURCES = [
+        "PCookieService.ipdl",
+    ]
 
 LOCAL_INCLUDES += [
     "/dom/base",
@@ -80,18 +101,20 @@ LOCAL_INCLUDES += [
     "/netwerk/protocol/http",
 ]
 
-EXTRA_JS_MODULES += [
-    "ThirdPartyCookieBlockingExceptionListService.sys.mjs",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    EXTRA_JS_MODULES += [
+        "ThirdPartyCookieBlockingExceptionListService.sys.mjs",
+    ]
 
-TESTING_JS_MODULES += [
-    "CookieXPCShellUtils.sys.mjs",
-]
+    TESTING_JS_MODULES += [
+        "CookieXPCShellUtils.sys.mjs",
+    ]
 
-XPCOM_MANIFESTS += [
-    "components.conf",
-]
+    XPCOM_MANIFESTS += [
+        "components.conf",
+    ]
 
 include("/ipc/chromium/chromium-config.mozbuild")
 
-FINAL_LIBRARY = "xul"
+if not CONFIG["MOZ_NAIVEFOX"]:
+    FINAL_LIBRARY = "xul"

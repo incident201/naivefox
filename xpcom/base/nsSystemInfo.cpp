@@ -4,6 +4,50 @@
 
 #include "nsSystemInfo.h"
 
+#ifdef MOZ_NAIVEFOX
+
+uint32_t nsSystemInfo::gUserUmask = 0;
+
+NS_IMPL_ISUPPORTS_INHERITED(nsSystemInfo, nsHashPropertyBag, nsISystemInfo)
+
+nsSystemInfo::nsSystemInfo() = default;
+nsSystemInfo::~nsSystemInfo() = default;
+
+nsresult nsSystemInfo::Init() { return NS_OK; }
+
+nsresult CollectProcessInfo(ProcessInfo&) { return NS_ERROR_NOT_AVAILABLE; }
+
+NS_IMETHODIMP nsSystemInfo::GetDiskInfo(JSContext*,
+                                        mozilla::dom::Promise** aResult) {
+  *aResult = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+}
+
+NS_IMETHODIMP nsSystemInfo::GetCountryCode(JSContext*,
+                                           mozilla::dom::Promise** aResult) {
+  *aResult = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+}
+
+NS_IMETHODIMP nsSystemInfo::GetOsInfo(JSContext*,
+                                      mozilla::dom::Promise** aResult) {
+  *aResult = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+}
+
+NS_IMETHODIMP nsSystemInfo::GetProcessInfo(JSContext*,
+                                           mozilla::dom::Promise** aResult) {
+  *aResult = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+}
+
+NS_IMETHODIMP nsSystemInfo::IsWindows10BuildOrLater(uint32_t, bool* aResult) {
+  *aResult = false;
+  return NS_ERROR_NOT_AVAILABLE;
+}
+
+#else
+
 #include "js/PropertyAndElement.h"  // JS_SetProperty
 #include "jsapi.h"
 #include "mozilla/Hal.h"
@@ -2365,3 +2409,5 @@ nsSystemInfo::IsWindows10BuildOrLater(uint32_t aBuildNumber, bool* aResult) {
   return NS_ERROR_NOT_AVAILABLE;
 #endif
 }
+
+#endif  // MOZ_NAIVEFOX

@@ -16,11 +16,13 @@
 #include "mozilla/ArenaAllocator.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/Components.h"
-#include "mozilla/dom/PContent.h"
-#include "mozilla/dom/Promise.h"
-#include "mozilla/dom/RemoteType.h"
-#include "mozilla/dom/quota/ResultExtensions.h"
-#include "mozilla/glean/LibprefMetrics.h"
+#include "mozilla/dom/PrefsTypes.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/Promise.h"
+#  include "mozilla/dom/RemoteType.h"
+#  include "mozilla/dom/quota/ResultExtensions.h"
+#  include "mozilla/glean/LibprefMetrics.h"
+#endif
 #include "mozilla/HashFunctions.h"
 #include "mozilla/IdleTaskRunner.h"
 #include "mozilla/HashTable.h"
@@ -36,14 +38,18 @@
 #include "mozilla/ResultExtensions.h"
 #include "mozilla/SchedulerGroup.h"
 #include "mozilla/ScopeExit.h"
-#include "mozilla/ServoStyleSet.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ServoStyleSet.h"
+#endif
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPrefsAll.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/SyncRunnable.h"
 #include "mozilla/Try.h"
-#include "mozilla/URLPreloader.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/URLPreloader.h"
+#endif
 #include "mozilla/Variant.h"
 #include "mozilla/Vector.h"
 #include "nsAppDirectoryServiceDefs.h"
@@ -52,13 +58,16 @@
 #include "nsCOMArray.h"
 #include "nsCOMPtr.h"
 #include "nsComponentManagerUtils.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsCRT.h"
 #include "nsTHashMap.h"
 #include "nsTHashSet.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsIConsoleService.h"
 #include "nsIFile.h"
+#include "nsIInputStream.h"
 #include "nsIMemoryReporter.h"
 #include "nsIObserver.h"
 #include "nsIObserverService.h"
@@ -95,7 +104,7 @@
 #include "prlink.h"
 #include "xpcpublic.h"
 #include "js/RootingAPI.h"
-#ifdef MOZ_BACKGROUNDTASKS
+#if defined(MOZ_BACKGROUNDTASKS) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/BackgroundTasks.h"
 #endif
 
@@ -111,7 +120,7 @@
 #  include "windows.h"
 #endif
 
-#if defined(MOZ_WIDGET_GTK)
+#if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/WidgetUtilsGtk.h"
 #endif  // defined(MOZ_WIDGET_GTK)
 
@@ -121,6 +130,11 @@
 
 using namespace mozilla;
 
+#ifdef MOZ_NAIVEFOX
+namespace mozilla::dom {
+class Promise;
+}
+#endif
 using dom::Promise;
 using ipc::FileDescriptor;
 
@@ -703,10 +717,17 @@ class Pref {
 
   // Other operations.
 
+#ifdef MOZ_NAIVEFOX
+#  define RECORD_SANITIZED_PREF_USAGE(aName) ((void)0)
+#else
+#  define RECORD_SANITIZED_PREF_USAGE(aName)                              \
+    glean::security::pref_usage_content_process.Record(                   \
+        Some(glean::security::PrefUsageContentProcessExtra{Some(aName)}))
+#endif
+
 #define CHECK_SANITIZATION()                                                \
   if (IsPreferenceSanitized(this)) {                                        \
-    glean::security::pref_usage_content_process.Record(                     \
-        Some(glean::security::PrefUsageContentProcessExtra{Some(Name())})); \
+    RECORD_SANITIZED_PREF_USAGE(Name());                                    \
     if (sCrashOnBlocklistedPref) {                                          \
       MOZ_CRASH_UNSAFE_PRINTF(                                              \
           "Should not access the preference '%s' in the Content Processes", \
@@ -1227,8 +1248,7 @@ class MOZ_STACK_CLASS PrefWrapper : public PrefWrapperBase {
         // This check will be performed in the above functions; but for NoneType
         // we need to do it explicitly, then fall-through.
         if (IsPreferenceSanitized(Name())) {
-          glean::security::pref_usage_content_process.Record(Some(
-              glean::security::PrefUsageContentProcessExtra{Some(Name())}));
+          RECORD_SANITIZED_PREF_USAGE(Name());
 
           if (sCrashOnBlocklistedPref) {
             MOZ_CRASH_UNSAFE_PRINTF(
@@ -1249,8 +1269,7 @@ class MOZ_STACK_CLASS PrefWrapper : public PrefWrapperBase {
     // WantValueKind may short-circuit GetValue functions and cause them to
     // return early, before this check occurs in GetFooValue()
     if (this->is<Pref*>() && IsPreferenceSanitized(this->as<Pref*>())) {
-      glean::security::pref_usage_content_process.Record(
-          Some(glean::security::PrefUsageContentProcessExtra{Some(Name())}));
+      RECORD_SANITIZED_PREF_USAGE(Name());
 
       if (sCrashOnBlocklistedPref) {
         MOZ_CRASH_UNSAFE_PRINTF(
@@ -1339,7 +1358,15 @@ class MOZ_STACK_CLASS PrefWrapper : public PrefWrapperBase {
       }
       return GetValue();
     };
+#ifdef MOZ_NAIVEFOX
+    auto prefValueResult = getPrefValue();
+    if (prefValueResult.isErr()) {
+      return prefValueResult.unwrapErr();
+    }
+    PrefValue prefValue = prefValueResult.unwrap();
+#else
     PrefValue prefValue = MOZ_TRY(getPrefValue());
+#endif
 
     // Should we save the value, if present? Only if it does not match the
     // default value, or it is sticky.
@@ -2144,7 +2171,11 @@ using PrefsHashTable = HashSet<UniquePtr<Pref>, PrefHasher>;
 // accessed on the main thread. (That assertion can be avoided but only do so
 // with great care!)
 static inline PrefsHashTable*& HashTable(bool aOffMainThread = false) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_ASSERT(NS_IsMainThread());
+#else
   MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
+#endif
   static PrefsHashTable* sHashTable = nullptr;
   return sHashTable;
 }
@@ -2412,7 +2443,11 @@ constexpr size_t kHashTableInitialLengthParent = 3000;
 constexpr size_t kHashTableInitialLengthContent = 64;
 
 static Pref* pref_HashTableLookup(const char* aPrefName) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_ASSERT(NS_IsMainThread());
+#else
   MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
+#endif
 
   MOZ_ASSERT_IF(!XRE_IsParentProcess(),
                 Preferences::ArePrefsInitedInContentProcess());
@@ -2444,9 +2479,11 @@ static nsresult pref_SetPref(const nsCString& aPrefName, PrefType aType,
         "pref_SetPref: Attempt to write pref %s after XPCOMShutdownThreads "
         "started.\n",
         aPrefName.get());
+#ifndef MOZ_NAIVEFOX
     if (nsContentUtils::IsInitialized()) {
       xpc_DumpJSStack(true, true, false);
     }
+#endif
     MOZ_ASSERT(false, "Late preference writes should be avoided.");
     return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
   }
@@ -2582,8 +2619,10 @@ class Parser {
       // Since aFullMsg is a borrow of the string, we need to copy it
       // if we want to use it outside the lifetime of the prefs_parser_parse()
       // call, which I think Glean does. So don't use nsDependentCString here.
+#ifndef MOZ_NAIVEFOX
       glean::preferences::prefs_file_first_parse_error.Set(
           nsCString(aFullMsg + aStaticMsgOffset));
+#endif
     }
 #ifdef DEBUG
     NS_ERROR(aFullMsg);
@@ -3653,6 +3692,11 @@ void nsPrefBranch::FreeObserverList() {
 
 nsresult nsPrefBranch::GetDefaultFromPropertiesFile(const char* aPrefName,
                                                     nsAString& aReturn) {
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox ships no localized browser preference UI or string-bundle
+  // service. Networking defaults are literal values loaded from prefs files.
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   // The default value contains a URL to a .properties file.
 
   nsAutoCString propertyFileURL;
@@ -3676,6 +3720,7 @@ nsresult nsPrefBranch::GetDefaultFromPropertiesFile(const char* aPrefName,
   }
 
   return bundle->GetStringFromName(aPrefName, aReturn);
+#endif
 }
 
 nsPrefBranch::PrefName nsPrefBranch::GetPrefName(
@@ -3862,7 +3907,11 @@ PreferencesImpl::PreferencesImpl()
 
 Maybe<PrefWrapper> PreferencesImpl::Lookup(const char* aPrefName,
                                            bool aIncludeTypeNone) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_ASSERT(NS_IsMainThread());
+#else
   MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
+#endif
 
   AddAccessCount(aPrefName);
 
@@ -4676,7 +4725,11 @@ nsIPrefBranch* Preferences::GetRootBranch(PrefValueKind aKind) {
 
 /* static */
 bool Preferences::InitStaticMembers() {
+#ifdef MOZ_NAIVEFOX
+  MOZ_ASSERT(NS_IsMainThread());
+#else
   MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
+#endif
 
   if (MOZ_LIKELY(sPreferences)) {
     return true;
@@ -5136,6 +5189,10 @@ Preferences::SavePrefFile(nsIFile* aFile) {
 NS_IMETHODIMP
 Preferences::BackupPrefFile(nsIFile* aFile, nsIPrefOverrideMap* aJSOverrideMap,
                             JSContext* aCx, Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  *aPromise = nullptr;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_ASSERT(NS_IsMainThread());
 
   if (!aFile) {
@@ -5195,6 +5252,7 @@ Preferences::BackupPrefFile(nsIFile* aFile, nsIPrefOverrideMap* aJSOverrideMap,
 
   promise.forget(aPromise);
   return NS_OK;
+#endif
 }
 
 /* static */
@@ -5259,11 +5317,15 @@ void Preferences::GetPreference(dom::Pref* aDomPref,
                                 const GeckoProcessType aDestinationProcessType,
                                 const nsACString& aDestinationRemoteType) {
   MOZ_ASSERT(XRE_IsParentProcess());
+#ifdef MOZ_NAIVEFOX
+  bool destIsWebContent = false;
+#else
   bool destIsWebContent =
       aDestinationProcessType == GeckoProcessType_Content &&
       (StringBeginsWith(aDestinationRemoteType, WEB_REMOTE_TYPE) ||
        StringBeginsWith(aDestinationRemoteType, PREALLOC_REMOTE_TYPE) ||
        StringBeginsWith(aDestinationRemoteType, PRIVILEGEDMOZILLA_REMOTE_TYPE));
+#endif
 
   Pref* pref = pref_HashTableLookup(aDomPref->name().get());
   if (pref && pref->HasAdvisablySizedValues()) {
@@ -5455,7 +5517,9 @@ already_AddRefed<nsIFile> PreferencesImpl::ReadSavedPrefs() {
       // Save a backup copy of the current (invalid) prefs file, since all prefs
       // from the error line to the end of the file will be lost (bug 361102).
       // TODO we should notify the user about it (bug 523725).
+#ifndef MOZ_NAIVEFOX
       glean::preferences::prefs_file_was_invalid.Set(true);
+#endif
       MakeBackupPrefFile(file);
     }
   }
@@ -5691,7 +5755,14 @@ nsresult PreferencesImpl::WritePrefFile(
 static nsresult openPrefFile(nsIFile* aFile, PrefValueKind aKind) {
   MOZ_ASSERT(XRE_IsParentProcess());
 
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIInputStream> input;
+  MOZ_TRY(NS_NewLocalFileInputStream(getter_AddRefs(input), aFile));
+  nsCString data;
+  MOZ_TRY(NS_ReadInputStreamToString(input, data, -1));
+#else
   nsCString data = MOZ_TRY(URLPreloader::ReadFile(aFile));
+#endif
 
   nsAutoString path;
   aFile->GetPath(path);
@@ -5783,8 +5854,16 @@ static nsresult pref_LoadPrefsInDir(nsIFile* aDir) {
 
 static nsresult pref_ReadPrefFromJar(nsZipArchive* aJarReader,
                                      const char* aName) {
+#ifdef MOZ_NAIVEFOX
+  nsZipItemPtr<char> item(aJarReader, nsDependentCString(aName));
+  if (!item.Buffer()) {
+    return NS_ERROR_FILE_NOT_FOUND;
+  }
+  nsCString manifest(item.Buffer(), item.Length());
+#else
   nsCString manifest =
       MOZ_TRY(URLPreloader::ReadZip(aJarReader, nsDependentCString(aName)));
+#endif
 
   Parser parser;
   if (!parser.Parse(PrefValueKind::Default, aName, manifest)) {
@@ -6077,7 +6156,7 @@ nsresult PreferencesImpl::InitInitialObjects(bool aIsStartup) {
     rv = pref_ReadDefaultPrefs(jarReader, "defaults/pref/*.js$");
     NS_ENSURE_SUCCESS(rv, rv);
 
-#ifdef MOZ_BACKGROUNDTASKS
+#if defined(MOZ_BACKGROUNDTASKS) && !defined(MOZ_NAIVEFOX)
     if (BackgroundTasks::IsBackgroundTaskMode()) {
       rv = pref_ReadDefaultPrefs(jarReader, "defaults/backgroundtasks/*.js$");
       NS_ENSURE_SUCCESS(rv, rv);
@@ -6166,7 +6245,7 @@ nsresult PreferencesImpl::InitInitialObjects(bool aIsStartup) {
       }
     }
 
-#ifdef MOZ_BACKGROUNDTASKS
+#if defined(MOZ_BACKGROUNDTASKS) && !defined(MOZ_NAIVEFOX)
     if (BackgroundTasks::IsBackgroundTaskMode()) {
       rv = appJarReader->FindInit("defaults/backgroundtasks/*.js$",
                                   getter_Transfers(find));
@@ -6538,8 +6617,7 @@ nsIPrefBranch::PreferenceType Preferences::GetType(const char* aPrefName) {
 
     case PrefType::None:
       if (IsPreferenceSanitized(aPrefName)) {
-        glean::security::pref_usage_content_process.Record(Some(
-            glean::security::PrefUsageContentProcessExtra{Some(aPrefName)}));
+        RECORD_SANITIZED_PREF_USAGE(aPrefName);
 
         if (sCrashOnBlocklistedPref) {
           MOZ_CRASH_UNSAFE_PRINTF(

@@ -12,8 +12,9 @@
 #include "mozStorageService.h"
 #include "mozStorageConnection.h"
 #include "nsComponentManagerUtils.h"
-#include "nsEmbedCID.h"
-#include "nsExceptionHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsThreadUtils.h"
 #include "mozStoragePrivateHelpers.h"
 #include "nsIObserverService.h"
@@ -348,6 +349,7 @@ nsresult Service::initialize() {
     return convertResultCode(rc);
   }
 
+#ifndef MOZ_NAIVEFOX
   rc = mQuotaSqliteVFS.Init(quotavfs::ConstructVFS(basevfs::GetVFSName(
       StaticPrefs::storage_sqlite_exclusiveLock_enabled())));
   if (rc != SQLITE_OK) {
@@ -372,6 +374,7 @@ nsresult Service::initialize() {
   if (rc != SQLITE_OK) {
     return convertResultCode(rc);
   }
+#endif
 
   rc = mReadOnlyNoLockSqliteVFS.Init(ConstructReadOnlyNoLockVFS());
   if (rc != SQLITE_OK) {
@@ -403,7 +406,9 @@ nsresult Service::initialize() {
   // SyncRunnable-dispatch NSS init back to a main thread that may be blocked
   // awaiting the storage operation (which would deadlock). See
   // storage/SQLiteEncryption.cpp.
+#ifndef MOZ_NAIVEFOX
   InitEncryptionKeystore();
+#endif
 
   return NS_OK;
 }
@@ -693,9 +698,11 @@ Service::Observe(nsISupports*, const char* aTopic, const char16_t*) {
       if (!connections[i]->isClosed()) {
         // getFilename is only the leaf name for the database file,
         // so it shouldn't contain privacy-sensitive information.
+#ifndef MOZ_NAIVEFOX
         CrashReporter::RecordAnnotationNSCString(
             CrashReporter::Annotation::StorageConnectionNotClosed,
             connections[i]->getFilename());
+#endif
         printf_stderr("Storage connection not closed: %s",
                       connections[i]->getFilename().get());
         MOZ_CRASH();

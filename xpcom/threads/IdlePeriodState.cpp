@@ -6,8 +6,12 @@
 
 #include "mozilla/AppShutdown.h"
 #include "mozilla/StaticPrefs_idle_period.h"
-#include "mozilla/dom/ContentChild.h"
-#include "mozilla/ipc/IdleSchedulerChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentChild.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ipc/IdleSchedulerChild.h"
+#endif
 #include "nsIIdlePeriod.h"
 #include "nsThreadManager.h"
 #include "nsXPCOM.h"
@@ -26,9 +30,11 @@ IdlePeriodState::IdlePeriodState(already_AddRefed<nsIIdlePeriod> aIdlePeriod)
 IdlePeriodState::~IdlePeriodState() {
   MOZ_ASSERT(NS_IsMainThread(),
              "Why are we touching idle state off the main thread?");
+#ifndef MOZ_NAIVEFOX
   if (mIdleScheduler) {
     mIdleScheduler->Disconnect();
   }
+#endif
 }
 
 size_t IdlePeriodState::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const {
@@ -172,6 +178,7 @@ void IdlePeriodState::RequestIdleToken(TimeStamp aLocalIdlePeriodHint) {
              "Why are we touching idle state off the main thread?");
   MOZ_ASSERT(!mActive);
 
+#ifndef MOZ_NAIVEFOX
   if (!mIdleScheduler && ShouldGetIdleToken()) {
     // For now cross-process idle scheduler is supported only on the main
     // threads of the child processes.
@@ -191,6 +198,7 @@ void IdlePeriodState::RequestIdleToken(TimeStamp aLocalIdlePeriodHint) {
     mIdleScheduler->SendRequestIdleTime(mIdleRequestId,
                                         aLocalIdlePeriodHint - now);
   }
+#endif
 }
 
 void IdlePeriodState::SetIdleToken(uint64_t aId, TimeDuration aDuration) {
@@ -208,9 +216,11 @@ void IdlePeriodState::SetActive() {
   MOZ_ASSERT(NS_IsMainThread(),
              "Why are we touching idle state off the main thread?");
   MOZ_ASSERT(!mActive);
+#ifndef MOZ_NAIVEFOX
   if (mIdleScheduler) {
     mIdleScheduler->SetActive();
   }
+#endif
   mActive = true;
 }
 
@@ -218,6 +228,7 @@ void IdlePeriodState::SetPaused(const MutexAutoUnlock& aProofOfUnlock) {
   MOZ_ASSERT(NS_IsMainThread(),
              "Why are we touching idle state off the main thread?");
   MOZ_ASSERT(mActive);
+#ifndef MOZ_NAIVEFOX
   if (mIdleScheduler && mIdleScheduler->SetPaused()) {
     // We may have gotten a free cpu core for running idle tasks.
     // We don't try to catch the case when there are prioritized processes
@@ -227,6 +238,7 @@ void IdlePeriodState::SetPaused(const MutexAutoUnlock& aProofOfUnlock) {
     // IPC can do weird things with mutexes.
     mIdleScheduler->SendSchedule();
   }
+#endif
   mActive = false;
 }
 
@@ -235,6 +247,7 @@ void IdlePeriodState::ClearIdleToken() {
              "Why are we touching idle state off the main thread?");
 
   if (mIdleRequestId) {
+#ifndef MOZ_NAIVEFOX
     if (mIdleScheduler) {
       // This SendIdleTimeUsed call is why we need to not be holding
       // any locks here, because IPC can do weird things with mutexes.
@@ -242,15 +255,20 @@ void IdlePeriodState::ClearIdleToken() {
       // callers end up here while just not holding any locks at all.
       mIdleScheduler->SendIdleTimeUsed(mIdleRequestId);
     }
+#endif
     mIdleRequestId = 0;
     mIdleToken = TimeStamp();
   }
 }
 
 bool IdlePeriodState::ShouldGetIdleToken() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   return StaticPrefs::idle_period_cross_process_scheduling() &&
          dom::ContentChild::GetSingleton() &&
          dom::ContentChild::GetSingleton()->GetProcessPriority() <
              hal::ProcessPriority::PROCESS_PRIORITY_FOREGROUND;
+#endif
 }
 }  // namespace mozilla

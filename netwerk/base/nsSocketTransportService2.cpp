@@ -16,7 +16,9 @@
 #include "mozilla/ReverseIterator.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/Telemetry.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Telemetry.h"
+#endif
 #include "mozilla/Tokenizer.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "nsASocketHandler.h"
@@ -26,7 +28,6 @@
 #include "nsINetworkLinkService.h"
 #include "nsIOService.h"
 #include "nsIObserverService.h"
-#include "nsIWidget.h"
 #include "nsServiceManagerUtils.h"
 #include "nsSocketTransport2.h"
 #include "nsThreadUtils.h"
@@ -702,9 +703,11 @@ int32_t nsSocketTransportService::Poll(PRIntervalTime ts) {
   }
 
   TimeStamp pollStart;
+#ifndef MOZ_NAIVEFOX
   if (Telemetry::CanRecordPrereleaseData()) {
     pollStart = TimeStamp::NowLoRes();
   }
+#endif
 
   SOCKET_LOG(("    timeout = %i milliseconds\n",
               PR_IntervalToMilliseconds(pollTimeout)));
@@ -848,10 +851,12 @@ nsSocketTransportService::Init() {
   if (obsSvc) {
     MOZ_ALWAYS_SUCCEEDS(
         obsSvc->AddObserver(this, "last-pb-context-exited", false));
+#ifndef MOZ_NAIVEFOX
     MOZ_ALWAYS_SUCCEEDS(
         obsSvc->AddObserver(this, NS_WIDGET_SLEEP_OBSERVER_TOPIC, false));
     MOZ_ALWAYS_SUCCEEDS(
         obsSvc->AddObserver(this, NS_WIDGET_WAKE_OBSERVER_TOPIC, false));
+#endif
     MOZ_ALWAYS_SUCCEEDS(
         obsSvc->AddObserver(this, "xpcom-shutdown-threads", false));
     MOZ_ALWAYS_SUCCEEDS(
@@ -927,8 +932,10 @@ nsresult nsSocketTransportService::ShutdownThread() {
   nsCOMPtr<nsIObserverService> obsSvc = services::GetObserverService();
   if (obsSvc) {
     obsSvc->RemoveObserver(this, "last-pb-context-exited");
+#ifndef MOZ_NAIVEFOX
     obsSvc->RemoveObserver(this, NS_WIDGET_SLEEP_OBSERVER_TOPIC);
     obsSvc->RemoveObserver(this, NS_WIDGET_WAKE_OBSERVER_TOPIC);
+#endif
     obsSvc->RemoveObserver(this, "xpcom-shutdown-threads");
     obsSvc->RemoveObserver(this, NS_NETWORK_LINK_TOPIC);
   }
@@ -1190,10 +1197,12 @@ nsSocketTransportService::Run() {
 
   for (;;) {
     bool pendingEvents = false;
+#ifndef MOZ_NAIVEFOX
     if (Telemetry::CanRecordPrereleaseData()) {
       startOfCycleForLastCycleCalc = TimeStamp::NowLoRes();
       startOfNextIteration = TimeStamp::NowLoRes();
     }
+#endif
     // We pop out to this loop when there are no pending events.
     // If we don't reset these, we may not re-enter ProcessNextEvent()
     // until we have events to process, and it may seem like we have
@@ -1201,9 +1210,11 @@ nsSocketTransportService::Run() {
     mRawThread->SetRunningEventDelay(TimeDuration(), TimeStamp());
 
     do {
+#ifndef MOZ_NAIVEFOX
       if (Telemetry::CanRecordPrereleaseData()) {
         pollCycleStart = TimeStamp::NowLoRes();
       }
+#endif
 
       DoPollIteration();
 
@@ -1240,6 +1251,7 @@ nsSocketTransportService::Run() {
             mServingPendingQueue = true;
           }
 
+#ifndef MOZ_NAIVEFOX
           if (Telemetry::CanRecordPrereleaseData()) {
             startOfIteration = startOfNextIteration;
             // Everything that comes after this point will
@@ -1248,6 +1260,7 @@ nsSocketTransportService::Run() {
             // beginning of each for-loop.
             startOfNextIteration = TimeStamp::NowLoRes();
           }
+#endif
         }
         TimeStamp eventQueueStart = TimeStamp::NowLoRes();
         do {
@@ -1680,6 +1693,7 @@ nsSocketTransportService::Observe(nsISupports* subject, const char* topic,
     }
 #endif
 
+#ifndef MOZ_NAIVEFOX
   } else if (!strcmp(topic, NS_WIDGET_SLEEP_OBSERVER_TOPIC)) {
     mSleepPhase = true;
     if (mAfterWakeUpTimer) {
@@ -1691,6 +1705,7 @@ nsSocketTransportService::Observe(nsISupports* subject, const char* topic,
       NS_NewTimerWithObserver(getter_AddRefs(mAfterWakeUpTimer), this, 2000,
                               nsITimer::TYPE_ONE_SHOT);
     }
+#endif
   } else if (!strcmp(topic, "xpcom-shutdown-threads")) {
     ShutdownThread();
   } else if (!strcmp(topic, NS_NETWORK_LINK_TOPIC)) {
@@ -1858,7 +1873,11 @@ void nsSocketTransportService::GetSocketConnections(
 }
 
 bool nsSocketTransportService::IsTelemetryEnabledAndNotSleepPhase() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   return Telemetry::CanRecordPrereleaseData() && !mSleepPhase;
+#endif
 }
 
 #if defined(XP_WIN)

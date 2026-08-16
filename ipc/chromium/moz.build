@@ -78,6 +78,14 @@ if CONFIG["TARGET_KERNEL"] != "WINNT":
             "src/chrome/common/process_watcher_posix_sigchld.cc",
         ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    # No child process or IPC transport exists in the single-process product.
+    # Retain Chromium's event-loop primitives, but omit the Unix IPC channel.
+    for source in [
+        "src/chrome/common/process_watcher_posix_sigchld.cc",
+    ]:
+        UNIFIED_SOURCES.remove(source)
+
 if CONFIG["TARGET_KERNEL"] == "Darwin":
     UNIFIED_SOURCES += [
         "src/base/message_pump_kqueue.cc",

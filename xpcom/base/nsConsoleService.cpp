@@ -12,12 +12,17 @@
 #include "nsConsoleService.h"
 
 #include "js/friend/ErrorMessages.h"
-#include "mozilla/SchedulerGroup.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/SchedulerGroup.h"
+#endif
 #include "mozilla/Services.h"
-#include "mozilla/dom/BrowserParent.h"
-#include "mozilla/dom/ContentParent.h"
-#include "mozilla/dom/ScriptSettings.h"
-#include "mozilla/dom/WindowGlobalParent.h"
+#include "mozilla/Logging.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BrowserParent.h"
+#  include "mozilla/dom/ContentParent.h"
+#  include "mozilla/dom/ScriptSettings.h"
+#  include "mozilla/dom/WindowGlobalParent.h"
+#endif
 #include "nsCOMArray.h"
 #include "nsConsoleMessage.h"
 #include "nsIClassInfoImpl.h"
@@ -157,6 +162,9 @@ nsresult nsConsoleService::Init() {
 nsresult nsConsoleService::MaybeForwardScriptError(nsIConsoleMessage* aMessage,
                                                    bool* sent) {
   *sent = false;
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
 
   nsCOMPtr<nsIScriptError> scriptError = do_QueryInterface(aMessage);
   if (!scriptError) {
@@ -222,6 +230,7 @@ nsresult nsConsoleService::MaybeForwardScriptError(nsIConsoleMessage* aMessage,
                                          flags, category, fromPrivateWindow,
                                          innerWindowId, fromChromeContext);
   return NS_OK;
+#endif
 }
 
 namespace {
@@ -290,7 +299,7 @@ nsresult nsConsoleService::LogMessageWithMode(
     return NS_ERROR_FAILURE;
   }
 
-  if (XRE_IsParentProcess() && NS_IsMainThread()) {
+  if (NS_IsMainThread()) {
     // If mMessage is a scriptError with an innerWindowId set,
     // forward it to the matching ContentParent
     // This enables logging from parent to content process
@@ -416,7 +425,11 @@ nsresult nsConsoleService::LogMessageWithMode(
     // avoid failing in XPCShell tests
     nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
     if (mainThread) {
+#ifdef MOZ_NAIVEFOX
+      mainThread->Dispatch(r.forget(), NS_DISPATCH_NORMAL);
+#else
       SchedulerGroup::Dispatch(r.forget());
+#endif
     }
   }
 

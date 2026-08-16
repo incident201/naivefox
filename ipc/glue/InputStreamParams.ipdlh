@@ -5,8 +5,10 @@
 include ProtocolTypes;
 
 using struct mozilla::void_t from "mozilla/ipc/IPCCore.h";
+#ifndef MOZ_NAIVEFOX
 [RefCounted] using mozilla::ipc::DataPipeReceiver from "mozilla/ipc/DataPipe.h";
 [RefCounted] using mozilla::RemoteLazyInputStream from "mozilla/RemoteLazyInputStream.h";
+#endif
 
 namespace mozilla {
 namespace ipc {
@@ -46,6 +48,7 @@ struct SlicedInputStreamParams
   bool closed;
 };
 
+#ifndef MOZ_NAIVEFOX
 struct RemoteLazyInputStreamParams
 {
   RemoteLazyInputStream stream;
@@ -55,6 +58,7 @@ struct DataPipeReceiverStreamParams
 {
   DataPipeReceiver pipe;
 };
+#endif
 
 union InputStreamParams
 {
@@ -64,10 +68,14 @@ union InputStreamParams
   MIMEInputStreamParams;
   MultiplexInputStreamParams;
   SlicedInputStreamParams;
+#ifndef MOZ_NAIVEFOX
   RemoteLazyInputStreamParams;
+#endif
   InputStreamLengthWrapperParams;
   EncryptedFileInputStreamParams;
+#ifndef MOZ_NAIVEFOX
   DataPipeReceiverStreamParams;
+#endif
 };
 
 struct EncryptedFileInputStreamParams

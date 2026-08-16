@@ -14,33 +14,52 @@ MOCHITEST_MANIFESTS += ["test/mochitest/mochitest.toml"]
 
 XPCSHELL_TESTS_MANIFESTS += ["test/unit/xpcshell.toml"]
 
-XPIDL_SOURCES += [
-    "nsIJARChannel.idl",
-    "nsIJARURI.idl",
-    "nsIZipReader.idl",
-]
+if CONFIG["MOZ_NAIVEFOX"]:
+    XPIDL_SOURCES += [
+        "nsIJARURI.idl",
+        "nsIZipReader.idl",
+    ]
+else:
+    XPIDL_SOURCES += [
+        "nsIJARChannel.idl",
+        "nsIJARURI.idl",
+        "nsIZipReader.idl",
+    ]
 
 XPIDL_MODULE = "jar"
 
 EXPORTS += [
-    "nsJARProtocolHandler.h",
-    "nsJARURI.h",
     "nsZipArchive.h",
     "zipstruct.h",
 ]
 
+if not CONFIG["MOZ_NAIVEFOX"]:
+    EXPORTS += [
+        "nsJARProtocolHandler.h",
+        "nsJARURI.h",
+    ]
+else:
+    # resource:// keeps the nsIJARURI-shaped wrapper for compatibility, but
+    # the lean runtime does not register or build the jar: protocol/channel.
+    EXPORTS += ["nsJARURI.h"]
+
 UNIFIED_SOURCES += [
     "nsJAR.cpp",
-    "nsJARChannel.cpp",
     "nsJARInputStream.cpp",
-    "nsJARProtocolHandler.cpp",
-    "nsJARURI.cpp",
     "nsZipArchive.cpp",
 ]
 
-XPCOM_MANIFESTS += [
-    "components.conf",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "nsJARChannel.cpp",
+        "nsJARProtocolHandler.cpp",
+        "nsJARURI.cpp",
+    ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    XPCOM_MANIFESTS += ["components-naivefox.conf"]
+else:
+    XPCOM_MANIFESTS += ["components.conf"]
 
 include("/ipc/chromium/chromium-config.mozbuild")
 include("/tools/fuzzing/libfuzzer-config.mozbuild")

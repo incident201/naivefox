@@ -181,12 +181,17 @@ EXPORTS.mozilla.net += [
     "ThrottleQueue.h",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    # nsBaseChannel and the data: protocol use the WHATWG MIME parser, but the
+    # lean client does not otherwise build dom/base.
+    EXPORTS.mozilla.dom += ["MimeType.h"]
+    EXPORTS.mozilla.dom += ["/netwerk/naivefox/NativeThreadId.h"]
+    SOURCES += ["MimeType.cpp"]
+
 UNIFIED_SOURCES += [
     "ArrayBufferInputStream.cpp",
     "BackgroundFileSaver.cpp",
-    "CaptivePortalService.cpp",
     "ContentRange.cpp",
-    "Dashboard.cpp",
     "DefaultURI.cpp",
     "EventTokenBucket.cpp",
     "ExecuteIfOnMainThreadEventTarget.cpp",
@@ -245,7 +250,6 @@ UNIFIED_SOURCES += [
     "nsUDPSocket.cpp",
     "PollableEvent.cpp",
     "ProtocolHandlerInfo.cpp",
-    "ProxyAutoConfig.cpp",
     "RedirectChannelRegistrar.cpp",
     "RequestContextService.cpp",
     "SimpleBuffer.cpp",
@@ -258,6 +262,25 @@ UNIFIED_SOURCES += [
     "TLSServerSocket.cpp",
     "TRRLoadInfo.cpp",
 ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    # Local-network permission prompting is browser UI policy. NaiveFox has no
+    # document or permission-prompt frontend.
+    UNIFIED_SOURCES.remove("LNAPermissionRequest.cpp")
+    UNIFIED_SOURCES.remove("MockNetworkLayer.cpp")
+    UNIFIED_SOURCES.remove("nsIncrementalDownload.cpp")
+    UNIFIED_SOURCES.remove("ThrottleQueue.cpp")
+    UNIFIED_SOURCES.remove("MockNetworkLayerController.cpp")
+    UNIFIED_SOURCES.remove("NetworkConnectivityService.cpp")
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "CaptivePortalService.cpp",
+        "Dashboard.cpp",
+        "ProxyAutoConfig.cpp",
+    ]
+else:
+    pass
 
 if CONFIG["FUZZING"]:
     SOURCES += [
@@ -303,9 +326,20 @@ DIRS += [
     "http-sfv",
     "idna_glue",
     "ssl_tokens_cache",
-    "uritemplate_glue",
-    "urlpattern_glue",
 ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    # Compression dictionaries use URLPattern matching, but not the DOM
+    # URLPattern binding. Keep the small Rust matcher without restoring DOM.
+    DIRS += [
+        "uritemplate_glue",
+        "urlpattern_glue",
+    ]
+else:
+    DIRS += [
+        "uritemplate_glue",
+        "urlpattern_glue",
+    ]
 
 include("/ipc/chromium/chromium-config.mozbuild")
 

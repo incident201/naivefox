@@ -4,6 +4,7 @@
 
 // HttpLog.h should generally be included first
 #include "nsHttpResponseHead.h"
+#include "nsNetUtil.h"
 
 #include <algorithm>
 
@@ -11,7 +12,9 @@
 #include "HttpLog.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/TextUtils.h"
-#include "mozilla/dom/MimeType.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/MimeType.h"
+#endif
 #include "nsCRT.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsPrintfCString.h"
@@ -493,11 +496,17 @@ void nsHttpResponseHead::ParseContentTypeValue(const nsHttpAtom& aAtom,
   mContentTypeBuffer.Append(aValue);
   mContentType.Truncate();
   mContentCharset.Truncate();
+#ifdef MOZ_NAIVEFOX
+  bool dummy;
+  net_ParseContentType(mContentTypeBuffer, mContentType, mContentCharset,
+                       &dummy);
+#else
   if (CMimeType::Parse(mContentTypeBuffer, mContentType, mContentCharset)) {
   } else if (StaticPrefs::network_http_fallback_to_net_parse_ct()) {
     bool dummy;
     net_ParseContentType(aValue, mContentType, mContentCharset, &dummy);
   }
+#endif
   LOG(("ParseContentType [input=%s, type=%s, charset=%s]\n",
        nsPromiseFlatCString(aValue).get(), mContentType.get(),
        mContentCharset.get()));

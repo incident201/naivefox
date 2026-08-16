@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "mozilla/dom/ContentParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentParent.h"
+#endif
 #include "RegistryMessageUtils.h"
 #include "nsResProtocolHandler.h"
 
@@ -22,8 +24,6 @@
 #include "nsTextFormatter.h"
 #include "nsXPCOMCIDInternal.h"
 
-#include "mozilla/LookAndFeel.h"
-
 #include "nsIObserverService.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Components.h"
@@ -36,8 +36,10 @@
 #define SKIN "classic/1.0"_ns
 
 using namespace mozilla;
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::ContentParent;
 using mozilla::dom::PContentParent;
+#endif
 using mozilla::intl::LocaleService;
 
 // We use a "best-fit" algorithm for matching locales and themes.
@@ -226,6 +228,9 @@ static void SerializeURI(nsIURI* aURI, SerializedURI& aSerializedURI) {
 
 void nsChromeRegistryChrome::SendRegisteredChrome(
     mozilla::dom::PContentParent* aParent) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   nsTArray<ChromePackage> packages;
   nsTArray<SubstitutionMapping> resources;
   nsTArray<OverrideMapping> overrides;
@@ -283,6 +288,7 @@ void nsChromeRegistryChrome::SendRegisteredChrome(
                            "couldn't reset a child's registered chrome");
     }
   }
+#endif
 }
 
 /* static */
@@ -442,6 +448,12 @@ static void EnsureLowerCase(char* aBuf) {
   }
 }
 
+#ifdef MOZ_NAIVEFOX
+template <typename T>
+static void SendManifestEntry(const T& aItem) {
+  return;
+}
+#else
 static void SendManifestEntry(const ChromeRegistryItem& aItem) {
   nsTArray<ContentParent*> parents;
   ContentParent::GetAll(parents);
@@ -451,6 +463,7 @@ static void SendManifestEntry(const ChromeRegistryItem& aItem) {
     (void)parents[i]->SendRegisterChromeItem(aItem);
   }
 }
+#endif
 
 void nsChromeRegistryChrome::ManifestContent(ManifestProcessingContext& cx,
                                              int lineno, char* const* argv,

@@ -4,11 +4,13 @@
 
 #include "MainThreadIdlePeriod.h"
 
-#include "VRManagerChild.h"
-#include "mozilla/Preferences.h"
-#include "mozilla/StaticPrefs_idle_period.h"
-#include "mozilla/dom/Document.h"
-#include "nsRefreshDriver.h"
+#ifndef MOZ_NAIVEFOX
+#  include "VRManagerChild.h"
+#  include "mozilla/Preferences.h"
+#  include "mozilla/StaticPrefs_idle_period.h"
+#  include "mozilla/dom/Document.h"
+#  include "nsRefreshDriver.h"
+#endif
 #include "nsThreadUtils.h"
 
 // The amount of idle time (milliseconds) reserved for a long idle period.
@@ -35,6 +37,12 @@ MainThreadIdlePeriod::GetIdlePeriodHint(TimeStamp* aIdleDeadline) {
   TimeStamp currentGuess =
       now + TimeDuration::FromMilliseconds(kLongIdlePeriodMS);
 
+#ifdef MOZ_NAIVEFOX
+  currentGuess = NS_GetTimerDeadlineHintOnCurrentThread(currentGuess,
+                                                        kMaxTimerThreadBound);
+  *aIdleDeadline = mLastIdleDeadline = currentGuess;
+  return NS_OK;
+#else
   currentGuess = nsRefreshDriver::GetIdleDeadlineHint(
       currentGuess, nsRefreshDriver::IdleCheck::AllVsyncListeners);
   if (XRE_IsContentProcess()) {
@@ -66,6 +74,7 @@ MainThreadIdlePeriod::GetIdlePeriodHint(TimeStamp* aIdleDeadline) {
   }
 
   return NS_OK;
+#endif
 }
 
 /* static */

@@ -6,17 +6,23 @@
 
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/StaticPtr.h"
-#include "mozilla/dom/StructuredCloneTags.h"
-#include "mozilla/ipc/BackgroundUtils.h"
-#include "mozilla/ipc/PBackgroundSharedTypes.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/StructuredCloneTags.h"
+#  include "mozilla/ipc/BackgroundUtils.h"
+#  include "mozilla/ipc/PBackgroundSharedTypes.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsIPrincipal.h"
 #include "nsString.h"
-#include "xpcpublic.h"
+#ifndef MOZ_NAIVEFOX
+#  include "xpcpublic.h"
+#endif
 
 using namespace mozilla;
+#ifndef MOZ_NAIVEFOX
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
+#endif
 
 NS_IMETHODIMP_(MozExternalRefCountType)
 nsJSPrincipals::AddRef() {
@@ -93,6 +99,35 @@ JS_PUBLIC_API void JSPrincipals::dump() {
 bool nsJSPrincipals::ReadPrincipals(JSContext* aCx,
                                     JSStructuredCloneReader* aReader,
                                     JSPrincipals** aOutPrincipals) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+}
+
+/* static */
+bool nsJSPrincipals::ReadPrincipalInfo(
+    JSStructuredCloneReader* aReader, mozilla::ipc::PrincipalInfo& aInfo) {
+  return false;
+}
+
+/* static */
+bool nsJSPrincipals::ReadKnownPrincipalType(
+    JSContext* aCx, JSStructuredCloneReader* aReader, uint32_t aTag,
+    JSPrincipals** aOutPrincipals) {
+  return false;
+}
+
+/* static */
+bool nsJSPrincipals::WritePrincipalInfo(
+    JSStructuredCloneWriter* aWriter,
+    const mozilla::ipc::PrincipalInfo& aInfo) {
+  return false;
+}
+
+bool nsJSPrincipals::write(JSContext* aCx,
+                           JSStructuredCloneWriter* aWriter) {
+  return false;
+}
+#else
   uint32_t tag;
   uint32_t unused;
   if (!JS_ReadUint32Pair(aReader, &tag, &unused)) {
@@ -360,13 +395,18 @@ bool nsJSPrincipals::write(JSContext* aCx, JSStructuredCloneWriter* aWriter) {
 
   return WritePrincipalInfo(aWriter, info);
 }
+#endif
 
 bool nsJSPrincipals::isSystemPrincipal() {
+#ifndef MOZ_NAIVEFOX
   JS::AutoSuppressGCAnalysis suppress;
+#endif
   return this->IsSystemPrincipal();
 }
 
 bool nsJSPrincipals::isAddonPrincipal() {
+#ifndef MOZ_NAIVEFOX
   JS::AutoSuppressGCAnalysis suppress;
+#endif
   return this->GetIsAddonOrExpandedAddonPrincipal();
 }

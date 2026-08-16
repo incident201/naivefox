@@ -36,14 +36,22 @@
 #include "NSSCertDBTrustDomain.h"
 #include "cert_storage/src/cert_storage.h"
 #include "mozilla/Logging.h"
-#include "mozilla/dom/BrowsingContext.h"
-#include "mozilla/dom/CanonicalBrowsingContext.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BrowsingContext.h"
+#  include "mozilla/dom/CanonicalBrowsingContext.h"
+#endif
 #include "mozilla/glean/SecurityManagerSslMetrics.h"
 #include "mozilla/ipc/Endpoint.h"
-#include "mozilla/net/DocumentLoadListener.h"
-#include "mozilla/net/SocketProcessBackgroundChild.h"
-#include "mozilla/psm/SelectTLSClientAuthCertChild.h"
-#include "mozilla/psm/SelectTLSClientAuthCertParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/DocumentLoadListener.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessBackgroundChild.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/psm/SelectTLSClientAuthCertChild.h"
+#  include "mozilla/psm/SelectTLSClientAuthCertParent.h"
+#endif
 #include "mozpkix/pkix.h"
 #include "mozpkix/pkixnss.h"
 #include "mozpkix/pkixutil.h"
@@ -729,6 +737,10 @@ SelectClientAuthCertificate::Run() {
     return NS_ERROR_FAILURE;
   }
 
+#ifdef MOZ_NAIVEFOX
+  DispatchContinuation(std::move(selectedCertBytes));
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   RefPtr<mozilla::dom::BrowsingContext> browsingContext;
   if (mBrowserId) {
     browsingContext =
@@ -763,6 +775,7 @@ SelectClientAuthCertificate::Run() {
     return rv;
   }
   return NS_OK;
+#endif
 }
 
 SECStatus SSLGetClientAuthDataHook(void* arg, PRFileDesc* socket,
@@ -845,6 +858,7 @@ void DoSelectClientAuthCertificate(NSSSocketControl* info,
   // When those events finish, they will run the continuation, which gives the
   // appropriate information to the NSSSocketControl, which then calls
   // SSL_ClientCertCallbackComplete to continue the connection.
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsSocketProcess()) {
     RefPtr<SelectTLSClientAuthCertChild> selectClientAuthCertificate(
         new SelectTLSClientAuthCertChild(continuation));
@@ -899,6 +913,7 @@ void DoSelectClientAuthCertificate(NSSSocketControl* info,
     (void)NS_DispatchToMainThread(remoteSelectClientAuthCertificate);
     return;
   }
+#endif
 
   ClientAuthInfo authInfo(info->GetHostName(), info->GetOriginAttributes(),
                           info->GetPort(), info->GetProviderFlags(),
@@ -957,6 +972,7 @@ void DoSelectClientAuthCertificate(NSSSocketControl* info,
   (void)NS_DispatchToMainThread(selectClientAuthCertificate);
 }
 
+#ifndef MOZ_NAIVEFOX
 // Helper continuation for when a client authentication certificate has been
 // selected in the parent process and the information needs to be sent to the
 // socket process.
@@ -1114,3 +1130,4 @@ ipc::IPCResult SelectTLSClientAuthCertChild::RecvTLSClientAuthCertSelected(
 }
 
 }  // namespace mozilla::psm
+#endif

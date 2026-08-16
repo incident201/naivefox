@@ -8,7 +8,6 @@
 #include "Http3Session.h"
 #include "SharedCertVerifier.h"
 #include "nsISocketProvider.h"
-#include "nsIWebProgressListener.h"
 #include "nsNSSComponent.h"
 #include "nsSocketTransportService2.h"
 #include "nsThreadUtils.h"
@@ -57,7 +56,7 @@ void QuicSocketControl::CallAuthenticated() {
 
 void QuicSocketControl::HandshakeCompleted() {
   COMMON_SOCKET_CONTROL_ASSERT_ON_OWNING_THREAD();
-  uint32_t state = nsIWebProgressListener::STATE_IS_SECURE;
+  uint32_t state = 0x00000002;  // nsIWebProgressListener::STATE_IS_SECURE
 
   // If we're here, the TLS handshake has succeeded. If the overridable error
   // category is nonzero, the user has added an override for a certificate
@@ -65,7 +64,7 @@ void QuicSocketControl::HandshakeCompleted() {
   if (mOverridableErrorCategory.isSome() &&
       *mOverridableErrorCategory !=
           nsITransportSecurityInfo::OverridableErrorCategory::ERROR_UNSET) {
-    state |= nsIWebProgressListener::STATE_CERT_USER_OVERRIDDEN;
+    state |= 0x04000000;  // STATE_CERT_USER_OVERRIDDEN
   }
 
   SetSecurityState(state);

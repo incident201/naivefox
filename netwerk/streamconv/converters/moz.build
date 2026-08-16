@@ -21,6 +21,10 @@ UNIFIED_SOURCES += [
     "nsUnknownDecoder.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES.remove("nsMultiMixedConv.cpp")
+    UNIFIED_SOURCES.remove("nsIndexedToHTML.cpp")
+
 FINAL_LIBRARY = "xul"
 
 LOCAL_INCLUDES += [

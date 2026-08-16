@@ -195,6 +195,10 @@ nsHttpAuthNode* nsHttpAuthCache::LookupAuthNode(const nsACString& scheme,
 NS_IMETHODIMP
 nsHttpAuthCache::Observe(nsISupports* subject, const char* topic,
                          const char16_t* data_unicode) {
+#ifdef MOZ_NAIVEFOX
+  ClearAll();
+  return NS_OK;
+#else
   OriginAttributesPattern pattern;
   if (!pattern.Init(nsDependentString(data_unicode))) {
     NS_ERROR("Cannot parse origin attributes pattern");
@@ -203,6 +207,7 @@ nsHttpAuthCache::Observe(nsISupports* subject, const char* topic,
 
   ClearOriginData(pattern);
   return NS_OK;
+#endif
 }
 
 void nsHttpAuthCache::ClearOriginData(OriginAttributesPattern const& pattern) {

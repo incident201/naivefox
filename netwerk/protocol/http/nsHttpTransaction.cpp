@@ -30,7 +30,7 @@
 #include "nsHttpDigestAuth.h"
 #include "nsHttpHandler.h"
 #include "nsHttpNTLMAuth.h"
-#ifdef MOZ_AUTH_EXTENSION
+#if defined(MOZ_AUTH_EXTENSION) && !defined(MOZ_NAIVEFOX)
 #  include "nsHttpNegotiateAuth.h"
 #endif
 #include "SpeculativeTransaction.h"
@@ -2963,16 +2963,20 @@ bool nsHttpTransaction::IsStickyAuthSchemeAt(nsACString const& auth) {
     // using a new instance because of thread safety of auth modules refcnt
     nsCOMPtr<nsIHttpAuthenticator> authenticator;
     if (schema.EqualsLiteral("negotiate")) {
-#ifdef MOZ_AUTH_EXTENSION
+#if defined(MOZ_AUTH_EXTENSION) && !defined(MOZ_NAIVEFOX)
       authenticator = new nsHttpNegotiateAuth();
 #endif
     } else if (schema.EqualsLiteral("basic")) {
       authenticator = new nsHttpBasicAuth();
     } else if (schema.EqualsLiteral("digest")) {
       authenticator = new nsHttpDigestAuth();
-    } else if (schema.EqualsLiteral("ntlm")) {
+    }
+#ifndef MOZ_NAIVEFOX
+    else if (schema.EqualsLiteral("ntlm")) {
       authenticator = new nsHttpNTLMAuth();
-    } else if (schema.EqualsLiteral("mock_auth") &&
+    }
+#endif
+    else if (schema.EqualsLiteral("mock_auth") &&
                PR_GetEnv("XPCSHELL_TEST_PROFILE_DIR")) {
       authenticator = new MockHttpAuth();
     }

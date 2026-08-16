@@ -24,6 +24,7 @@
 #include "nsIHttpProtocolHandler.h"
 #include "nsIObserver.h"
 #include "nsISpeculativeConnect.h"
+#include "nsProxyRelease.h"
 #include "nsString.h"
 #include "nsTHashMap.h"
 #include "nsTHashSet.h"
@@ -348,7 +349,9 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
   //
   [[nodiscard]] nsresult GetIOService(nsIIOService** result);
   nsICookieService* GetCookieService();  // not addrefed
+#ifndef MOZ_NAIVEFOX
   nsISiteIntegrityService* GetSiteIntegrityService();
+#endif
   nsISiteSecurityService* GetSSService();
 
   // Called by the channel synchronously during asyncOpen
@@ -557,7 +560,9 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
   // cached services
   nsMainThreadPtrHandle<nsIIOService> mIOService;
   nsMainThreadPtrHandle<nsICookieService> mCookieService;
+#ifndef MOZ_NAIVEFOX
   nsMainThreadPtrHandle<nsISiteIntegrityService> mSiteIntegrityService;
+#endif
   nsMainThreadPtrHandle<nsISiteSecurityService> mSSService;
 
   // the authentication credentials cache

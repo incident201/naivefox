@@ -19,21 +19,24 @@
 #include "mozilla/EnumTypeTraits.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/Variant.h"
 
 #include "mozilla/Vector.h"
-#include "mozilla/dom/ipc/StructuredCloneData.h"
-#include "mozilla/dom/UserActivation.h"
-#include "gfxPlatform.h"
-#include "NonCustomCSSPropertyId.h"
-#include "nsContentPolicyType.h"
-#include "nsContentPermissionHelper.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ipc/StructuredCloneData.h"
+#  include "mozilla/dom/UserActivation.h"
+#  include "gfxPlatform.h"
+#  include "NonCustomCSSPropertyId.h"
+#  include "nsContentPolicyType.h"
+#  include "nsContentPermissionHelper.h"
+#  include "nsIContentPolicy.h"
+#  include "nsILoadInfo.h"
+#  include "nsNetUtil.h"
+#endif
 #include "nsDebug.h"
-#include "nsIContentPolicy.h"
 #include "nsID.h"
-#include "nsILoadInfo.h"
 #include "nsIThread.h"
 #include "nsLiteralString.h"
-#include "nsNetUtil.h"
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsTHashSet.h"
@@ -57,6 +60,8 @@ struct VariantTag;
 }  // namespace mozilla
 
 namespace mozilla::dom {
+template <typename T>
+class Sequence;
 template <typename T>
 class Optional;
 }
@@ -281,10 +286,12 @@ struct ParamTraits<float> {
   }
 };
 
+#ifndef MOZ_NAIVEFOX
 template <>
 struct ParamTraits<NonCustomCSSPropertyId>
     : public ContiguousEnumSerializer<
           NonCustomCSSPropertyId, eCSSProperty_FIRST, eCSSProperty_INVALID> {};
+#endif
 
 template <>
 struct ParamTraits<nsID> {
@@ -312,6 +319,7 @@ struct ParamTraits<nsID> {
   }
 };
 
+#ifndef MOZ_NAIVEFOX
 struct nsContentPolicyTypeValidator {
   using IntegralType = std::underlying_type_t<nsContentPolicyType>;
 
@@ -334,6 +342,7 @@ struct nsContentPolicyTypeValidator {
 template <>
 struct ParamTraits<nsContentPolicyType>
     : EnumSerializer<nsContentPolicyType, nsContentPolicyTypeValidator> {};
+#endif
 
 template <>
 struct ParamTraits<mozilla::TimeDuration> {
@@ -543,6 +552,7 @@ struct ParamTraits<nsAtom*> {
   static bool Read(MessageReader* aReader, RefPtr<paramType>* aResult);
 };
 
+#ifndef MOZ_NAIVEFOX
 struct CrossOriginOpenerPolicyValidator {
   using IntegralType =
       std::underlying_type_t<nsILoadInfo::CrossOriginOpenerPolicy>;
@@ -594,6 +604,7 @@ template <>
 struct ParamTraits<nsILoadInfo::CrossOriginEmbedderPolicy>
     : EnumSerializer<nsILoadInfo::CrossOriginEmbedderPolicy,
                      CrossOriginEmbedderPolicyValidator> {};
+#endif
 
 template <>
 struct ParamTraits<nsIThread::QoSPriority>
@@ -621,12 +632,15 @@ struct ParamTraits<mozilla::BitSet<N, Word>> {
   }
 };
 
+#ifndef MOZ_NAIVEFOX
 // Use TiedFields for LinkHeader serialization to ensure that all fields are
 // serialized.
 template <>
 struct ParamTraits<mozilla::net::LinkHeader>
     : ParamTraits_TiedFields<mozilla::net::LinkHeader> {};
+#endif
 
+#ifndef MOZ_NAIVEFOX
 DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::dom::UserActivation::Modifiers,
                                   mModifiers);
 
@@ -635,18 +649,23 @@ struct ParamTraits<gfxPlatform::GlobalReflowFlags>
     : public BitFlagsEnumSerializer<gfxPlatform::GlobalReflowFlags,
                                     gfxPlatform::GlobalReflowFlags::ALL_BITS> {
 };
+#endif
 
+#ifndef MOZ_NAIVEFOX
 template <>
 struct ParamTraits<nsILoadInfo::IPAddressSpace>
     : public ContiguousEnumSerializer<nsILoadInfo::IPAddressSpace,
                                       nsILoadInfo::IPAddressSpace::Unknown,
                                       nsILoadInfo::IPAddressSpace::Invalid> {};
+#endif
 
+#ifndef MOZ_NAIVEFOX
 using PromptResult = mozilla::dom::ContentPermissionRequestBase::PromptResult;
 template <>
 struct ParamTraits<PromptResult>
     : public ContiguousEnumSerializerInclusive<
           PromptResult, PromptResult::Granted, PromptResult::Pending> {};
+#endif
 
 } /* namespace IPC */
 

@@ -11,12 +11,19 @@
 #include "nsChromeProtocolHandler.h"
 #include "nsChromeRegistry.h"
 #include "nsCOMPtr.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#else
+#  include "nsIScriptSecurityManager.h"
+#  include "nsServiceManagerUtils.h"
+#endif
 #include "nsThreadUtils.h"
 #include "nsIChannel.h"
 #include "nsIChromeRegistry.h"
 #include "nsIFile.h"
-#include "nsIFileChannel.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIFileChannel.h"
+#endif
 #include "nsIStandardURL.h"
 #include "nsNetUtil.h"
 #include "nsNetCID.h"
@@ -101,7 +108,7 @@ nsChromeProtocolHandler::NewChannel(nsIURI* aURI, nsILoadInfo* aLoadInfo,
   rv = nsChromeRegistry::gChromeRegistry->ConvertChromeURL(
       aURI, getter_AddRefs(resolvedURI));
   if (NS_FAILED(rv)) {
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
     printf("Couldn't convert chrome URL: %s\n", aURI->GetSpecOrDefault().get());
 #endif
     return rv;
@@ -147,7 +154,17 @@ nsChromeProtocolHandler::NewChannel(nsIURI* aURI, nsILoadInfo* aLoadInfo,
   aURI->GetPathQueryRef(path);
   if (StringBeginsWith(path, "/content/"_ns) ||
       StringBeginsWith(path, "/skin/"_ns)) {
+#ifndef MOZ_NAIVEFOX
     result->SetOwner(nsContentUtils::GetSystemPrincipal());
+#else
+    nsCOMPtr<nsIScriptSecurityManager> securityManager =
+        do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID);
+    NS_ENSURE_TRUE(securityManager, NS_ERROR_FAILURE);
+    nsCOMPtr<nsIPrincipal> systemPrincipal;
+    rv = securityManager->GetSystemPrincipal(getter_AddRefs(systemPrincipal));
+    NS_ENSURE_SUCCESS(rv, rv);
+    result->SetOwner(systemPrincipal);
+#endif
   }
 
   // XXX Removed dependency-tracking code from here, because we're not

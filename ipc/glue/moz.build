@@ -65,17 +65,21 @@ EXPORTS.mozilla.ipc += [
     "TaskFactory.h",
     "TransportSecurityInfoUtils.h",
     "URIUtils.h",
-    "UtilityMediaService.h",
-    "UtilityMediaServiceChild.h",
-    "UtilityMediaServiceParent.h",
-    "UtilityProcessChild.h",
-    "UtilityProcessHost.h",
-    "UtilityProcessImpl.h",
-    "UtilityProcessManager.h",
-    "UtilityProcessParent.h",
-    "UtilityProcessSandboxing.h",
     "WindowsMessageLoop.h",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    EXPORTS.mozilla.ipc += [
+        "UtilityMediaService.h",
+        "UtilityMediaServiceChild.h",
+        "UtilityMediaServiceParent.h",
+        "UtilityProcessChild.h",
+        "UtilityProcessHost.h",
+        "UtilityProcessImpl.h",
+        "UtilityProcessManager.h",
+        "UtilityProcessParent.h",
+        "UtilityProcessSandboxing.h",
+    ]
 
 if CONFIG["OS_ARCH"] == "WINNT":
     SOURCES += ["WindowsMessageLoop.cpp"]
@@ -144,7 +148,6 @@ if CONFIG["OS_ARCH"] != "WINNT":
         "FileDescriptorShuffle.h",
     ]
     UNIFIED_SOURCES += [
-        "FileDescriptorShuffle.cpp",
     ]
 
 if CONFIG["TARGET_OS"] == "iOS":
@@ -163,13 +166,13 @@ EXPORTS.ipc += [
 
 UNIFIED_SOURCES += [
     "BackgroundImpl.cpp",
-    "BackgroundUtils.cpp",
     "BigBuffer.cpp",
     "CrashReporterClient.cpp",
     "CrashReporterHost.cpp",
     "DataPipe.cpp",
     "Endpoint.cpp",
     "FileDescriptor.cpp",
+    "FileDescriptorShuffle.cpp",
     "FileDescriptorUtils.cpp",
     "IdleSchedulerChild.cpp",
     "IdleSchedulerParent.cpp",
@@ -195,16 +198,25 @@ UNIFIED_SOURCES += [
     "StringUtil.cpp",
     "TransportSecurityInfoUtils.cpp",
     "URIUtils.cpp",
-    "UtilityMediaService.cpp",
-    "UtilityMediaServiceChild.cpp",
-    "UtilityMediaServiceParent.cpp",
-    "UtilityProcessChild.cpp",
-    "UtilityProcessHost.cpp",
-    "UtilityProcessImpl.cpp",
-    "UtilityProcessManager.cpp",
-    "UtilityProcessParent.cpp",
-    "UtilityProcessSandboxing.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "BackgroundUtils.cpp",
+    ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "UtilityMediaService.cpp",
+        "UtilityMediaServiceChild.cpp",
+        "UtilityMediaServiceParent.cpp",
+        "UtilityProcessChild.cpp",
+        "UtilityProcessHost.cpp",
+        "UtilityProcessImpl.cpp",
+        "UtilityProcessManager.cpp",
+        "UtilityProcessParent.cpp",
+        "UtilityProcessSandboxing.cpp",
+    ]
 
 SOURCES += [
     "BackgroundChildImpl.cpp",
@@ -242,13 +254,13 @@ LOCAL_INCLUDES += [
     "/xpcom/build",
 ]
 
-PREPROCESSED_IPDL_SOURCES = [
-    "PUtilityMediaService.ipdl",
-    "PUtilityProcess.ipdl",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    PREPROCESSED_IPDL_SOURCES = [
+        "PUtilityMediaService.ipdl",
+        "PUtilityProcess.ipdl",
+    ]
 
 IPDL_SOURCES = [
-    "InputStreamParams.ipdlh",
     "IPCStream.ipdlh",
     "PBackground.ipdl",
     "PBackgroundSharedTypes.ipdlh",
@@ -257,8 +269,56 @@ IPDL_SOURCES = [
     "PIdleScheduler.ipdl",
     "ProtocolTypes.ipdlh",
     "RandomAccessStreamParams.ipdlh",
+]
+
+PREPROCESSED_IPDL_SOURCES += [
+    "InputStreamParams.ipdlh",
     "URIParams.ipdlh",
 ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    IPDL_SOURCES.remove("RandomAccessStreamParams.ipdlh")
+    IPDL_SOURCES += [
+        "../../netwerk/naivefox/idl/RandomAccessStreamParams.ipdlh",
+    ]
+    for protocol in [
+        "PBackground.ipdl",
+        "PBackgroundSharedTypes.ipdlh",
+        "PBackgroundStarter.ipdl",
+        "PBackgroundTest.ipdl",
+        "PIdleScheduler.ipdl",
+    ]:
+        IPDL_SOURCES.remove(protocol)
+    # NaiveFox deliberately runs networking in one process.  Keep the IPC
+    # headers and the small IPDL data types required by public Necko APIs, but
+    # do not compile process/channel/actor implementations.  Besides being
+    # dead code for this executable, those implementations pull browser DOM,
+    # crash reporter, graphics and child-process hosting into libxul.
+    for source in [
+        "CrossProcessMutex_posix.cpp",
+        "CrossProcessSemaphore_posix.cpp",
+        "ProcessUtils_linux.cpp",
+        "SetProcessTitle.cpp",
+        "BackgroundImpl.cpp",
+        "CrashReporterClient.cpp",
+        "CrashReporterHost.cpp",
+        "DataPipe.cpp",
+        "IdleSchedulerChild.cpp",
+        "IdleSchedulerParent.cpp",
+        "IPCStreamUtils.cpp",
+        "ProcessChild.cpp",
+        "ProcessUtils_common.cpp",
+        "RandomAccessStreamUtils.cpp",
+        "SerializedStructuredCloneBuffer.cpp",
+        "GeckoChildProcessHost.cpp",
+    ]:
+        if source in UNIFIED_SOURCES:
+            UNIFIED_SOURCES.remove(source)
+    for source in [
+        "BackgroundChildImpl.cpp",
+        "BackgroundParentImpl.cpp",
+    ]:
+        SOURCES.remove(source)
 
 if CONFIG["MOZ_ENABLE_FORKSERVER"]:
     EXPORTS.mozilla.ipc += [

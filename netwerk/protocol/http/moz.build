@@ -209,18 +209,57 @@ SOURCES += [
     "nsHttpHandler.cpp",
 ]
 
-IPDL_SOURCES += [
-    "HttpChannelParams.ipdlh",
-    "PAltDataOutputStream.ipdl",
-    "PAltService.ipdl",
-    "PAltSvcTransaction.ipdl",
-    "PBackgroundDataBridge.ipdl",
-    "PCacheEntryWriteHandle.ipdl",
-    "PHttpBackgroundChannel.ipdl",
-    "PHttpChannel.ipdl",
-    "PHttpConnectionMgr.ipdl",
-    "PHttpTransaction.ipdl",
-]
+if CONFIG["MOZ_NAIVEFOX"]:
+    # Content- and socket-process actor implementations are unreachable in the
+    # intentionally single-process NaiveFox runtime. The direct nsHttpChannel,
+    # nsHttpConnectionMgr and H2/H3 implementations remain in this library.
+    for source in [
+        "AltDataOutputStreamChild.cpp",
+        "AltDataOutputStreamParent.cpp",
+        "AltServiceChild.cpp",
+        "AltServiceParent.cpp",
+        "AltSvcTransactionChild.cpp",
+        "AltSvcTransactionParent.cpp",
+        "BackgroundChannelRegistrar.cpp",
+        "BackgroundDataBridgeChild.cpp",
+        "BackgroundDataBridgeParent.cpp",
+        "EarlyHintPreconnect.cpp",
+        "EarlyHintPreloader.cpp",
+        "EarlyHintRegistrar.cpp",
+        "EarlyHintsService.cpp",
+        "HttpBackgroundChannelChild.cpp",
+        "HttpBackgroundChannelParent.cpp",
+        "HttpChannelChild.cpp",
+        "HttpChannelParent.cpp",
+        "HttpConnectionMgrChild.cpp",
+        "HttpConnectionMgrParent.cpp",
+        "HttpTransactionChild.cpp",
+        "HttpTransactionParent.cpp",
+        "InterceptedHttpChannel.cpp",
+        "NullHttpChannel.cpp",
+        "nsCORSListenerProxy.cpp",
+        "ObliviousHttpChannel.cpp",
+        "ObliviousHttpService.cpp",
+        "ParentChannelListener.cpp",
+        "ReplacedHttpResponse.cpp",
+    ]:
+        UNIFIED_SOURCES.remove(source)
+    UNIFIED_SOURCES.remove("OpaqueResponseUtils.cpp")
+    UNIFIED_SOURCES.remove("nsHttpNTLMAuth.cpp")
+    UNIFIED_SOURCES += ["OpaqueResponseUtilsNaiveFox.cpp"]
+else:
+    IPDL_SOURCES += [
+        "HttpChannelParams.ipdlh",
+        "PAltDataOutputStream.ipdl",
+        "PAltService.ipdl",
+        "PAltSvcTransaction.ipdl",
+        "PBackgroundDataBridge.ipdl",
+        "PCacheEntryWriteHandle.ipdl",
+        "PHttpBackgroundChannel.ipdl",
+        "PHttpChannel.ipdl",
+        "PHttpConnectionMgr.ipdl",
+        "PHttpTransaction.ipdl",
+    ]
 
 include("/ipc/chromium/chromium-config.mozbuild")
 

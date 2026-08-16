@@ -12,22 +12,24 @@
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/intl/AppDateTimeFormat.h"
 #include "mozilla/intl/Locale.h"
-#include "mozilla/intl/FluentBindings.h"
 #include "mozilla/intl/OSPreferences.h"
-#include "mozilla/intl/RegistryBindings.h"
 #include "mozilla/intl/locale_service_glue_generated.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsDirectoryService.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsIObserverService.h"
 #include "nsStringEnumerator.h"
-#include "nsRFPService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsRFPService.h"
+#endif
 #include "nsXULAppAPI.h"
 #include "nsZipArchive.h"
 #ifdef XP_WIN
 #  include "WinUtils.h"
 #endif
-#ifdef MOZ_WIDGET_GTK
+#if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/WidgetUtilsGtk.h"
 #endif
 
@@ -80,7 +82,7 @@ static void ReadRequestedLocales(nsTArray<nsCString>& aRetVal) {
   const bool isRepack =
 #ifdef XP_WIN
       !mozilla::widget::WinUtils::HasPackageIdentity();
-#elif defined(MOZ_WIDGET_GTK)
+#elif defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
       !widget::IsRunningUnderSnap();
 #else
       true;
@@ -536,11 +538,13 @@ LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
 
 NS_IMETHODIMP
 LocaleService::GetWebExposedLocales(nsTArray<nsCString>& aRetVal) {
+#ifndef MOZ_NAIVEFOX
   if (nsContentUtils::ShouldResistFingerprinting("No context",
                                                  RFPTarget::JSLocale)) {
     aRetVal = nsTArray<nsCString>({nsRFPService::GetSpoofedJSLocale()});
     return NS_OK;
   }
+#endif
 
   if (!mWebExposedLocales.IsEmpty()) {
     aRetVal = mWebExposedLocales.Clone();
@@ -680,9 +684,16 @@ LocaleService::IsLocalizedEnough(const nsACString& aFtlPath,
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  // The networking-only runtime does not package Fluent resources or the
+  // localization registry.  Its built-in messages are therefore complete by
+  // construction.
+  *aRetVal = true;
+#else
   float coverage = 1.0f;
   ffi::l10nregistry_get_coverage(&aFtlPath, &coverage);
   *aRetVal = static_cast<double>(coverage) >= aMinCoverage;
+#endif
   return NS_OK;
 }
 
@@ -696,7 +707,11 @@ LocaleService::AreMessagesLocalized(const nsACString& aFtlPath,
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  *aRetVal = true;
+#else
   *aRetVal = ffi::l10nregistry_are_messages_localized(&aFtlPath, &aRequiredIds);
+#endif
   return NS_OK;
 }
 

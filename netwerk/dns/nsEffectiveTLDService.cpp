@@ -14,7 +14,9 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/net/DNS.h"
 #include "nsCRT.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsIFile.h"
 #include "nsIURI.h"
 #include "nsNetCID.h"
@@ -29,6 +31,15 @@ namespace etld_dafsa {
 }  // namespace etld_dafsa
 
 using namespace mozilla;
+
+#ifdef MOZ_NAIVEFOX
+static void MaybeBracketIPv6(nsACString& aHost) {
+  if (aHost.FindChar(':') != kNotFound && !StringBeginsWith(aHost, "["_ns)) {
+    aHost.Insert('[', 0);
+    aHost.Append(']');
+  }
+}
+#endif
 
 NS_IMPL_ISUPPORTS(nsEffectiveTLDService, nsIEffectiveTLDService,
                   nsIMemoryReporter)
@@ -154,7 +165,14 @@ nsEffectiveTLDService::GetSchemelessSite(nsIURI* aURI, nsACString& aSite) {
   nsresult rv = GetBaseDomain(aURI, 0, aSite);
   if (rv == NS_ERROR_HOST_IS_IP_ADDRESS ||
       rv == NS_ERROR_INSUFFICIENT_DOMAIN_LEVELS) {
+#ifdef MOZ_NAIVEFOX
+    rv = aURI->GetHost(aSite);
+    if (NS_SUCCEEDED(rv)) {
+      MaybeBracketIPv6(aSite);
+    }
+#else
     rv = nsContentUtils::GetHostOrIPv6WithBrackets(aURI, aSite);
+#endif
   }
   return rv;
 }
@@ -169,7 +187,11 @@ nsEffectiveTLDService::GetSchemelessSiteFromHost(const nsACString& aHostname,
   if (rv == NS_ERROR_HOST_IS_IP_ADDRESS ||
       rv == NS_ERROR_INSUFFICIENT_DOMAIN_LEVELS) {
     aSite.Assign(aHostname);
+#ifdef MOZ_NAIVEFOX
+    MaybeBracketIPv6(aSite);
+#else
     nsContentUtils::MaybeFixIPv6Host(aSite);
+#endif
 
     return NS_OK;
   }

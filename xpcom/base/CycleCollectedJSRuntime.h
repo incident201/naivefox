@@ -28,6 +28,8 @@ class nsWrapperCache;
 
 namespace mozilla {
 
+class JSHolderKey;
+
 class JSGCThingParticipant : public nsCycleCollectionParticipant {
  public:
   constexpr JSGCThingParticipant() : nsCycleCollectionParticipant(false) {}

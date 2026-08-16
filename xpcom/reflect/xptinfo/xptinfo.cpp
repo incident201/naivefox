@@ -6,7 +6,9 @@
 
 #include "js/Symbol.h"
 #include "jsfriendapi.h"
-#include "mozilla/dom/BindingUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BindingUtils.h"
+#endif
 #include "mozilla/dom/DOMJSClass.h"
 #include "nsISupports.h"
 

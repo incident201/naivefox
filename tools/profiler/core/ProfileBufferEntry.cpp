@@ -16,7 +16,6 @@
 #include "jsapi.h"
 #include "jsfriendapi.h"
 #include "mozilla/Base64.h"
-#include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/Logging.h"
 #include "mozilla/JSONStringWriteFuncs.h"
 #include "mozilla/ScopeExit.h"

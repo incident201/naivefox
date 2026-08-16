@@ -18,14 +18,17 @@
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/StoragePrincipalHelper.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/StoragePrincipalHelper.h"
+#endif
 #include "mozilla/TimeStamp.h"
-#include "mozilla/glean/NetwerkCache2Metrics.h"
-#include "mozilla/glean/NetwerkMetrics.h"
-#include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkCache2Metrics.h"
+#  include "mozilla/glean/NetwerkMetrics.h"
+#  include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#endif
 #include "mozilla/net/NoVarySearchUtils.h"
 #include "nsCOMPtr.h"
-#include "nsContentUtils.h"
 #include "nsICacheStorageVisitor.h"
 #include "nsIFile.h"
 #include "nsIObserverService.h"
@@ -710,8 +713,14 @@ NS_IMETHODIMP CacheStorageService::ClearOriginsByPrincipal(
     return NS_ERROR_FAILURE;
   }
 
+#ifdef MOZ_NAIVEFOX
+  nsAutoCString originUtf8;
+  rv = aPrincipal->GetOrigin(originUtf8);
+  NS_ConvertUTF8toUTF16 origin(originUtf8);
+#else
   nsAutoString origin;
   rv = nsContentUtils::GetWebExposedOriginSerialization(aPrincipal, origin);
+#endif
   NS_ENSURE_SUCCESS(rv, rv);
   LOG(("CacheStorageService::ClearOriginsByPrincipal %s",
        NS_ConvertUTF16toUTF8(origin).get()));
@@ -727,6 +736,9 @@ NS_IMETHODIMP CacheStorageService::ClearOriginsByPrincipal(
 
 NS_IMETHODIMP CacheStorageService::ClearOriginsByOriginAttributes(
     const nsAString& aOriginAttributes) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   nsresult rv;
   LOG(("CacheStorageService::ClearOriginsByOriginAttributes %s",
        NS_ConvertUTF16toUTF8(aOriginAttributes).get()));
@@ -745,6 +757,7 @@ NS_IMETHODIMP CacheStorageService::ClearOriginsByOriginAttributes(
   NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
+#endif
 }
 
 static bool RemoveExactEntry(CacheEntryTable* aEntries, nsACString const& aKey,
@@ -785,12 +798,14 @@ NS_IMETHODIMP CacheStorageService::ClearBaseDomain(
       nsCOMPtr<nsILoadContextInfo> info =
           CacheFileUtils::ParseKey(globalEntry.GetKey());
 
+#ifndef MOZ_NAIVEFOX
       if (info &&
           StoragePrincipalHelper::PartitionKeyHasBaseDomain(
               info->OriginAttributesPtr()->mPartitionKey, aBaseDomain)) {
         keys.AppendElement(key);
         continue;
       }
+#endif
 
       // If we didn't get a partitionKey match, try to match by entry URI. This
       // requires us to iterate over all entries.
@@ -880,9 +895,10 @@ nsresult CacheStorageService::ClearOriginInternal(
         rv = NS_NewURI(getter_AddRefs(uri), entry->GetURI());
         NS_ENSURE_SUCCESS(rv, rv);
 
-        nsAutoString origin;
-        rv = nsContentUtils::GetWebExposedOriginSerialization(uri, origin);
+        nsAutoCString originUtf8;
+        rv = uri->GetPrePath(originUtf8);
         NS_ENSURE_SUCCESS(rv, rv);
+        NS_ConvertUTF8toUTF16 origin(originUtf8);
 
         if (origin != aOrigin) {
           continue;
@@ -1801,6 +1817,7 @@ nsresult CacheStorageService::AddStorageEntry(
 
   // Glean must not be called while holding sLock, so record the NVS outcome
   // here, after the lock has been released.
+#ifndef MOZ_NAIVEFOX
   if (nvsHadCandidates) {
     if (nvsMatched) {
       glean::network::no_vary_search_match.Get("matched"_ns).Add(1);
@@ -1810,6 +1827,7 @@ nsresult CacheStorageService::AddStorageEntry(
       glean::network::no_vary_search_match.Get("not_matched"_ns).Add(1);
     }
   }
+#endif
 
   handle.forget(aResult);
   return NS_OK;
@@ -2388,8 +2406,10 @@ void CacheStorageService::TelemetryRecordEntryCreation(
 
   mPurgeTimeStamps.Remove(key);
 
+#ifndef MOZ_NAIVEFOX
   glean::network::http_cache_entry_reload_time.AccumulateRawDuration(
       TimeStamp::NowLoRes() - timeStamp);
+#endif
 }
 
 void CacheStorageService::TelemetryRecordEntryRemoval(CacheEntry* entry) {
@@ -2412,12 +2432,14 @@ void CacheStorageService::TelemetryRecordEntryRemoval(CacheEntry* entry) {
   TelemetryPrune(now);
   mPurgeTimeStamps.InsertOrUpdate(key, now);
 
+#ifndef MOZ_NAIVEFOX
   glean::network::http_cache_entry_reuse_count.AccumulateSingleSample(
       entry->UseCount());
   if (Telemetry::CanRecordPrereleaseData()) {
     glean::network::http_cache_entry_alive_time.AccumulateRawDuration(
         TimeStamp::NowLoRes() - entry->LoadStart());
   }
+#endif
 }
 
 // nsIMemoryReporter

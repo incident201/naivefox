@@ -9,7 +9,6 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/UniquePtrExtensions.h"
-#include "mozilla/glean/GleanPings.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/net/Dictionary.h"
 #include "nsCOMPtr.h"

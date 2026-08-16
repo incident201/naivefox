@@ -4,7 +4,9 @@
 
 #include "InputStreamLengthHelper.h"
 
-#include "mozilla/dom/WorkerCommon.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/WorkerCommon.h"
+#endif
 #include "nsIAsyncInputStream.h"
 #include "nsIInputStream.h"
 #include "nsNetCID.h"
@@ -138,8 +140,10 @@ void InputStreamLengthHelper::GetAsyncLength(
 
   // We don't want to allow this class to be used on workers because we are not
   // using the correct Runnable types.
+#ifndef MOZ_NAIVEFOX
   MOZ_DIAGNOSTIC_ASSERT(NS_IsMainThread() ||
                         !dom::IsCurrentThreadRunningWorker());
+#endif
 
   RefPtr<InputStreamLengthHelper> helper =
       new InputStreamLengthHelper(aStream, aCallback);

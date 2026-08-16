@@ -168,7 +168,11 @@ class NodeChannel final : public IPC::Channel::Listener {
 #endif
 
   // WARNING: Must only be accessed on the IO thread.
+#ifdef MOZ_NAIVEFOX
+  GeckoChildProcessHost* mChildProcessHost;
+#else
   WeakPtr<mozilla::ipc::GeckoChildProcessHost> mChildProcessHost;
+#endif
 };
 
 }  // namespace mozilla::ipc

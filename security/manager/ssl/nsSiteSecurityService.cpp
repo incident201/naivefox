@@ -12,8 +12,9 @@
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_test.h"
 #include "mozilla/Tokenizer.h"
-#include "mozilla/dom/PContent.h"
-#include "mozilla/dom/ToJSValue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/PContent.h"
+#endif
 #include "nsCOMArray.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsISocketProvider.h"

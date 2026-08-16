@@ -12,10 +12,12 @@
 
 #include "mozStorageBindingParams.h"
 #include "mozStorageConnection.h"
-#include "mozStorageAsyncStatementJSHelper.h"
-#include "mozStorageAsyncStatementParams.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozStorageAsyncStatementJSHelper.h"
+#  include "mozStorageAsyncStatementParams.h"
+#  include "mozStorageStatementRow.h"
+#endif
 #include "mozStoragePrivateHelpers.h"
-#include "mozStorageStatementRow.h"
 #include "mozStorageStatement.h"
 
 #include "mozilla/Logging.h"
@@ -45,8 +47,12 @@ class AsyncStatementClassInfo : public nsIClassInfo {
 
   NS_IMETHOD
   GetScriptableHelper(nsIXPCScriptable** _helper) override {
+#ifdef MOZ_NAIVEFOX
+    *_helper = nullptr;
+#else
     static AsyncStatementJSHelper sJSHelper;
     *_helper = &sJSHelper;
+#endif
     return NS_OK;
   }
 
@@ -294,7 +300,9 @@ AsyncStatement::Finalize() {
   asyncFinalize();
 
   // Release the params holder, so it can release the reference to us.
+#ifndef MOZ_NAIVEFOX
   mStatementParamsHolder = nullptr;
+#endif
 
   return NS_OK;
 }

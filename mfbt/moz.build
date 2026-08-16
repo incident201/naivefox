@@ -91,6 +91,7 @@ EXPORTS.mozilla = [
     "RefCounted.h",
     "RefCountType.h",
     "RefPtr.h",
+    "RemoveParen.h",
     "Result.h",
     "ResultExtensions.h",
     "ResultVariant.h",

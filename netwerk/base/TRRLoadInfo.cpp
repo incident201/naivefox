@@ -5,10 +5,18 @@
 #include "TRRLoadInfo.h"
 
 #include "LoadInfo.h"
-#include "mozilla/dom/ClientSource.h"
-#include "mozilla/dom/DOMTypes.h"
-#include "mozilla/dom/FeaturePolicy.h"
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/ClientInfo.h"
+#else
+#  include "mozilla/dom/ClientSource.h"
+#endif
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/FeaturePolicy.h"
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "mozilla/dom/FeaturePolicy.h"
+#  include "nsContentUtils.h"
+#endif
 #include "nsIRedirectHistoryEntry.h"
 
 using namespace mozilla::dom;

@@ -21,7 +21,9 @@
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/Services.h"
-#include "mozilla/URLPreloader.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/URLPreloader.h"
+#endif
 #include "mozilla/UniquePtr.h"
 #include "mozilla/Variant.h"
 #include "nsArray.h"
@@ -353,6 +355,9 @@ nsresult nsComponentManagerImpl::Init() {
   xpc::ReadOnlyPage::Init();
 
   bool loadChromeManifests;
+#ifdef MOZ_NAIVEFOX
+  loadChromeManifests = false;
+#else
   switch (XRE_GetProcessType()) {
     // We are going to assume that only a select few (see below) process types
     // want to load chrome manifests, and that any new process types will not
@@ -369,6 +374,7 @@ nsresult nsComponentManagerImpl::Init() {
       loadChromeManifests = true;
       break;
   }
+#endif
 
   if (loadChromeManifests) {
     // This needs to be called very early, before anything in nsLayoutModule is
@@ -484,6 +490,11 @@ static void AssertNotStackAllocated(T* aPtr) {
 
 static void DoRegisterManifest(NSLocationType aType, FileLocation& aFile,
                                bool aChromeOnly) {
+#ifdef MOZ_NAIVEFOX
+  // The lean runtime has no dynamically registered chrome or JS components.
+  // All required native components are generated into StaticComponents.cpp.
+  return;
+#else
   auto result = URLPreloader::Read(aFile);
   if (result.isOk()) {
     nsCString buf(result.unwrap());
@@ -493,6 +504,7 @@ static void DoRegisterManifest(NSLocationType aType, FileLocation& aFile,
     aFile.GetURIString(uri);
     LogMessage("Could not read chrome manifest '%s'.", uri.get());
   }
+#endif
 }
 
 void nsComponentManagerImpl::RegisterManifest(NSLocationType aType,

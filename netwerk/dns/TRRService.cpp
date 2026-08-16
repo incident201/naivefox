@@ -9,13 +9,16 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/Telemetry.h"
 #include "mozilla/Tokenizer.h"
-#include "mozilla/dom/ContentParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentParent.h"
+#  include "mozilla/net/NeckoParent.h"
+#endif
 #include "mozilla/glean/NetwerkDnsMetrics.h"
 #include "mozilla/glean/NetwerkMetrics.h"
-#include "mozilla/net/NeckoParent.h"
-#include "mozilla/net/TRRServiceChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/TRRServiceChild.h"
+#endif
 #include "nsCharSeparatedTokenizer.h"
 #include "nsComponentManagerUtils.h"
 #include "nsDirectoryServiceUtils.h"
@@ -329,7 +332,9 @@ bool TRRService::MaybeSetPrivateURI(const nsACString& aURI) {
 
     mPrivateURI = newURI;
 
-    // Notify the content processes of the new TRR
+    // Notify the content processes of the new TRR.  NaiveFox is deliberately
+    // single-process and has no ContentParent/PNecko actor graph.
+#ifndef MOZ_NAIVEFOX
     for (auto* cp :
          dom::ContentParent::AllProcesses(dom::ContentParent::eLive)) {
       PNeckoParent* neckoParent =
@@ -339,6 +344,7 @@ bool TRRService::MaybeSetPrivateURI(const nsACString& aURI) {
       }
       (void)neckoParent->SendSetTRRDomain(host);
     }
+#endif
 
     // The URI has changed. We should trigger a new confirmation immediately.
     // We must do this here because the URI could also change because of
@@ -751,6 +757,7 @@ void TRRService::ConfirmationContext::SetState(
     return;
   }
 
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(XRE_IsSocketProcess());
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -759,6 +766,7 @@ void TRRService::ConfirmationContext::SetState(
     LOG(("TRRService::SendSetConfirmationState"));
     (void)child->SendSetConfirmationState(mState);
   }
+#endif
 }
 
 bool TRRService::ConfirmationContext::HandleEvent(ConfirmationEvent aEvent) {
@@ -1462,6 +1470,7 @@ void TRRService::InitTRRConnectionInfo(bool aForceReinit) {
     return;
   }
 
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(XRE_IsSocketProcess());
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -1470,6 +1479,7 @@ void TRRService::InitTRRConnectionInfo(bool aForceReinit) {
     LOG(("TRRService::SendInitTRRConnectionInfo"));
     (void)child->SendInitTRRConnectionInfo(aForceReinit);
   }
+#endif
 }
 
 }  // namespace mozilla::net

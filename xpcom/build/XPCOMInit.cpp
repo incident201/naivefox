@@ -5,7 +5,9 @@
 #include "ThreadEventTarget.h"
 #include "XPCOMModule.h"
 #include "base/basictypes.h"
-#include "mozJSModuleLoader.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozJSModuleLoader.h"
+#endif
 #include "mozilla/AbstractThread.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Assertions.h"
@@ -14,7 +16,7 @@
 #include "mozilla/TaskController.h"
 #include "nsXULAppAPI.h"
 
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "nsTerminator.h"
 #endif
 
@@ -24,23 +26,25 @@
 #include "base/at_exit.h"
 #include "base/command_line.h"
 #include "base/message_loop.h"
-#include "mozilla/AvailableMemoryTracker.h"
-#include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/CountingAllocatorBase.h"
-#include "mozilla/LateWriteChecks.h"
 #include "mozilla/Omnijar.h"
-#include "mozilla/PoisonIOInterposer.h"
-#include "mozilla/ScriptPreloader.h"
 #include "mozilla/Services.h"
-#include "mozilla/SharedStyleSheetCache.h"
-#include "mozilla/Telemetry.h"
-#include "mozilla/dom/JSExecutionManager.h"
-#include "mozilla/dom/SharedScriptCache.h"
 #include "mozilla/ipc/IOThread.h"
-#include "mozilla/layers/CompositorBridgeParent.h"
-#include "mozilla/layers/ImageBridgeChild.h"
-#include "mozilla/scache/StartupCache.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/AvailableMemoryTracker.h"
+#  include "mozilla/BackgroundHangMonitor.h"
+#  include "mozilla/LateWriteChecks.h"
+#  include "mozilla/PoisonIOInterposer.h"
+#  include "mozilla/ScriptPreloader.h"
+#  include "mozilla/SharedStyleSheetCache.h"
+#  include "mozilla/Telemetry.h"
+#  include "mozilla/dom/JSExecutionManager.h"
+#  include "mozilla/dom/SharedScriptCache.h"
+#  include "mozilla/layers/CompositorBridgeParent.h"
+#  include "mozilla/layers/ImageBridgeChild.h"
+#  include "mozilla/scache/StartupCache.h"
+#endif
 #include "nsAtomTable.h"
 #include "nsCategoryManager.h"
 #include "nsCategoryManagerUtils.h"
@@ -54,7 +58,11 @@
 #include "nsISupportsImpl.h"
 #include "nsLanguageAtomService.h"
 #include "nsLocalFile.h"
-#include "nsMemoryReporterManager.h"
+#ifdef MOZ_NAIVEFOX
+#  include "nsIMemoryReporter.h"
+#else
+#  include "nsMemoryReporterManager.h"
+#endif
 #include "nsMultiplexInputStream.h"
 #include "nsObserverService.h"
 #include "nsSystemInfo.h"
@@ -68,19 +76,23 @@
 #include "nss.h"
 #include "prlink.h"
 #include "ssl.h"
-#ifdef MOZ_PHC
+#if defined(MOZ_PHC) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/PHCManager.h"
 #endif
 #include "GeckoProfiler.h"
-#include "ProfilerControl.h"
-#include "XPCSelfHostedShmem.h"
-#include "gfxPlatform.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ProfilerControl.h"
+#  include "XPCSelfHostedShmem.h"
+#  include "gfxPlatform.h"
+#endif
 #include "js/Initialization.h"
 #include "jsapi.h"
-#include "mozilla/GeckoTrace.h"
-#include "mozilla/ServoStyleConsts.h"
-#include "mozilla/ipc/GeckoChildProcessHost.h"
-#include "ogg/ogg.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/GeckoTrace.h"
+#  include "mozilla/ServoStyleConsts.h"
+#  include "mozilla/ipc/GeckoChildProcessHost.h"
+#  include "ogg/ogg.h"
+#endif
 #ifdef XP_MACOSX
 #  include "mozilla/MacAutoreleasePool.h"
 #endif
@@ -97,7 +109,9 @@ namespace {
 static AtExitManager* sExitManager;
 static MessageLoop* sMessageLoop;
 static bool sCommandLineWasInitialized;
+#ifndef MOZ_NAIVEFOX
 static mozilla::BackgroundHangMonitor* sMainHangMonitor;
+#endif
 
 } /* anonymous namespace */
 
@@ -166,6 +180,7 @@ class ICUReporter final : public nsIMemoryReporter,
 
 NS_IMPL_ISUPPORTS(ICUReporter, nsIMemoryReporter)
 
+#ifndef MOZ_NAIVEFOX
 class OggReporter final : public nsIMemoryReporter,
                           public mozilla::CountingAllocatorBase<OggReporter> {
  public:
@@ -187,6 +202,7 @@ class OggReporter final : public nsIMemoryReporter,
 };
 
 NS_IMPL_ISUPPORTS(OggReporter, nsIMemoryReporter)
+#endif
 
 #define XPCOM_INIT_FATAL(message, res) \
   if (XRE_IsParentProcess()) {         \
@@ -266,7 +282,9 @@ NS_InitXPCOM(nsIServiceManager** aResult, nsIFile* aBinDirectory,
   }
 
   // Initialise the profiler
+#ifndef MOZ_NAIVEFOX
   AUTO_PROFILER_INIT2;
+#endif
 
   // Set up the timer globals/timer thread
   rv = nsTimerImpl::Startup();
@@ -383,9 +401,11 @@ NS_InitXPCOM(nsIServiceManager** aResult, nsIFile* aBinDirectory,
   mozilla::SetICUMemoryFunctions();
 
   // Do the same for libogg.
+#ifndef MOZ_NAIVEFOX
   ogg_set_mem_functions(
       OggReporter::CountingMalloc, OggReporter::CountingCalloc,
       OggReporter::CountingRealloc, OggReporter::CountingFree);
+#endif
 
   rv = nsComponentManagerImpl::gComponentManager->Init();
   if (NS_FAILED(rv)) {
@@ -397,7 +417,7 @@ NS_InitXPCOM(nsIServiceManager** aResult, nsIFile* aBinDirectory,
     NS_ADDREF(*aResult = nsComponentManagerImpl::gComponentManager);
   }
 
-#ifdef MOZ_PHC
+#if defined(MOZ_PHC) && !defined(MOZ_NAIVEFOX)
   // This is the earliest possible moment we can start PHC while still being
   // able to read prefs.
   mozilla::InitPHCState();
@@ -416,6 +436,7 @@ NS_InitXPCOM(nsIServiceManager** aResult, nsIFile* aBinDirectory,
   // Init mozilla::SharedThreadPool (which needs the service manager).
   mozilla::SharedThreadPool::InitStatics();
 
+#ifndef MOZ_NAIVEFOX
   mozilla::scache::StartupCache::GetSingleton();
   mozilla::AvailableMemoryTracker::Init();
 
@@ -443,6 +464,7 @@ NS_InitXPCOM(nsIServiceManager** aResult, nsIFile* aBinDirectory,
       loop->permanent_hang_timeout());
 
   mozilla::dom::JSExecutionManager::Initialize();
+#endif
 
   if (aInitJSContext) {
     xpc::InitializeJSContext();
@@ -494,9 +516,11 @@ NS_InitMinimalXPCOM() {
   }
 
   mozilla::SharedThreadPool::InitStatics();
+#ifndef MOZ_NAIVEFOX
   mozilla::gecko_trace::Init();
   mozilla::Telemetry::Init();
   mozilla::BackgroundHangMonitor::Startup();
+#endif
 
   return NS_OK;
 }
@@ -542,7 +566,9 @@ void SetICUMemoryFunctions() {
 
 nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
   // Make sure the hang monitor is enabled for shutdown.
+#ifndef MOZ_NAIVEFOX
   BackgroundHangMonitor().NotifyActivity();
+#endif
 
   if (!NS_IsMainThread()) {
     MOZ_CRASH("Shutdown on wrong thread");
@@ -570,7 +596,9 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
 
     // This must happen after the shutdown of media and widgets, which
     // are triggered by the NS_XPCOM_SHUTDOWN_OBSERVER_ID notification.
+#ifndef MOZ_NAIVEFOX
     gfxPlatform::ShutdownLayersIPC();
+#endif
 
     mozilla::AppShutdown::AdvanceShutdownPhase(
         mozilla::ShutdownPhase::XPCOMShutdownThreads);
@@ -598,7 +626,7 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
       observerService->Shutdown();
     }
 
-#ifdef NS_FREE_PERMANENT_DATA
+#if defined(NS_FREE_PERMANENT_DATA) && !defined(MOZ_NAIVEFOX)
     // In leak-checking / ASAN / etc. builds, shut down the Servo thread-pool,
     // which will wait for all the work to be done. For other builds, we don't
     // really want to wait on shutdown for possibly slow tasks.
@@ -616,9 +644,10 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
     nsThreadManager::get().ShutdownMainThread();
     gXPCOMMainThreadEventsAreDoomed = true;
 
+#ifndef MOZ_NAIVEFOX
     BackgroundHangMonitor().NotifyActivity();
-
     mozilla::dom::JSExecutionManager::Shutdown();
+#endif
   }
 
   // XPCOM is officially in shutdown mode NOW
@@ -649,14 +678,17 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
   // log files. We have to ignore them before we can move
   // the mozilla::PoisonWrite call before this point. See bug
   // 834945 for the details.
+#ifndef MOZ_NAIVEFOX
   mozJSModuleLoader::UnloadLoaders();
+#endif
 
   // Clear the profiler's JS context before cycle collection. The profiler will
   // notify the JS engine that it can let go of any data it's holding on to for
   // profiling purposes.
+#ifndef MOZ_NAIVEFOX
   PROFILER_CLEAR_JS_CONTEXT();
-
   mozilla::dom::SharedScriptCache::PrepareForLastCC();
+#endif
 
   bool shutdownCollect;
 #ifdef NS_FREE_PERMANENT_DATA
@@ -670,10 +702,12 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
   // shutdown. This is the phase for such global objects to correctly release.
   AppShutdown::AdvanceShutdownPhase(ShutdownPhase::CCPostLastCycleCollection);
 
+#ifndef MOZ_NAIVEFOX
   mozilla::scache::StartupCache::DeleteSingleton();
   mozilla::ScriptPreloader::DeleteSingleton();
 
   PROFILER_MARKER_UNTYPED("Shutdown xpcom", OTHER);
+#endif
 
   // Shutdown xpcom. This will release all loaders and cause others holding
   // a refcount to the component manager to release it.
@@ -685,6 +719,7 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
     NS_WARNING("Component Manager was never created ...");
   }
 
+#ifndef MOZ_NAIVEFOX
   mozilla::ScriptPreloader::DeleteCacheDataSingleton();
 
   mozilla::dom::SharedScriptCache::DeleteSingleton();
@@ -692,6 +727,7 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
 
   // Release shared memory which might be borrowed by the JS engine.
   xpc::SelfHostedShmem::Shutdown();
+#endif
 
   // After all threads have been joined and the component manager has been shut
   // down, any remaining objects that could be holding NSS resources (should)
@@ -736,7 +772,7 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
 
   GkRust_Shutdown();
 
-#ifdef NS_FREE_PERMANENT_DATA
+#if defined(NS_FREE_PERMANENT_DATA) && !defined(MOZ_NAIVEFOX)
   // As we do shutdown Servo only in leak-checking builds, there may still
   // be async parse tasks going on in the Servo thread-pool in other builds.
   // CSS parsing heavily uses the atom table, so we can safely drop it only
@@ -763,10 +799,11 @@ nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {
 
   Omnijar::CleanUp();
 
+#ifndef MOZ_NAIVEFOX
   BackgroundHangMonitor::Shutdown();
-
   delete sMainHangMonitor;
   sMainHangMonitor = nullptr;
+#endif
 
   NS_LogTerm();
 

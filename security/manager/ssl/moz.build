@@ -100,10 +100,8 @@ UNIFIED_SOURCES += [
     "DataStorageManager.cpp",
     "EnterpriseRoots.cpp",
     "FIPSUtils.cpp",
-    "IPCClientCertsChild.cpp",
     "IPCClientCertsParent.cpp",
     "md4.c",
-    "nsCertOverrideService.cpp",
     "nsCertTree.cpp",
     "nsNSSCallbacks.cpp",
     "nsNSSCertHelper.cpp",
@@ -117,7 +115,6 @@ UNIFIED_SOURCES += [
     "nsNTLMAuthModule.cpp",
     "nsPKCS12Blob.cpp",
     "nsRandomGenerator.cpp",
-    "nsSecureBrowserUI.cpp",
     "nsSecurityHeaderParser.cpp",
     "NSSErrorsService.cpp",
     "nsSiteSecurityService.cpp",
@@ -146,6 +143,21 @@ UNIFIED_SOURCES += [
     "X509CertValidity.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    # Browser-facing key-management APIs are not part of the proxy runtime.
+    # TLS trust and client connections continue to use nsNSSComponent/PSM.
+    UNIFIED_SOURCES.remove("OSKeyStore.cpp")
+    UNIFIED_SOURCES.remove("PKCS11ModuleDB.cpp")
+    UNIFIED_SOURCES.remove("ContentSignatureVerifier.cpp")
+    UNIFIED_SOURCES.remove("PDFSignatureVerification.cpp")
+    UNIFIED_SOURCES.remove("nsCertTree.cpp")
+    UNIFIED_SOURCES.remove("SecretDecoderRing.cpp")
+    UNIFIED_SOURCES.remove("VerifySSLServerCertChild.cpp")
+    UNIFIED_SOURCES.remove("VerifySSLServerCertParent.cpp")
+    UNIFIED_SOURCES.remove("AppSignatureVerification.cpp")
+    UNIFIED_SOURCES.remove("NSSKeyStore.cpp")
+    UNIFIED_SOURCES.remove("IPCClientCertsParent.cpp")
+
 if CONFIG["OS_ARCH"] == "Darwin":
     # On macOS this file includes CoreFoundation.h, which contains definitions
     # that conflict with headers included in other unified source files. We
@@ -158,19 +170,26 @@ else:
         "nsClientAuthRemember.cpp",
     ]
 
-if CONFIG["OS_ARCH"] == "WINNT":
+if CONFIG["OS_ARCH"] == "WINNT" and not CONFIG["MOZ_NAIVEFOX"]:
     # On Windows this file includes ntsecapi.h, which contains definitions that
     # conflict with headers included in other unified source files. We compile
     # this one independently to prevent that interference.
     SOURCES += [
         "OSReauthenticator.cpp",
     ]
-else:
+elif not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
         "OSReauthenticator.cpp",
     ]
 
-if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "IPCClientCertsChild.cpp",
+        "nsCertOverrideService.cpp",
+        "nsSecureBrowserUI.cpp",
+    ]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk" and not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
         "LibSecret.cpp",
     ]
@@ -190,12 +209,14 @@ if CONFIG["TARGET_KERNEL"] == "Darwin":
         "-framework Security",
     ]
 
-IPDL_SOURCES += [
-    "PIPCClientCerts.ipdl",
-    "PSelectTLSClientAuthCert.ipdl",
-    "PSMIPCTypes.ipdlh",
-    "PVerifySSLServerCert.ipdl",
-]
+IPDL_SOURCES += ["PSMIPCTypes.ipdlh"]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    IPDL_SOURCES += [
+        "PIPCClientCerts.ipdl",
+        "PSelectTLSClientAuthCert.ipdl",
+        "PVerifySSLServerCert.ipdl",
+    ]
 
 # Required by OSClientCerts, IPCClientCerts and CredentialManagerSecret.
 if CONFIG["OS_ARCH"] == "WINNT":

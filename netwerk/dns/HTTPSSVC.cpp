@@ -5,7 +5,9 @@
 #include "HTTPSSVC.h"
 
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#endif
 #include "mozilla/net/DNS.h"
 #include "nsHttp.h"
 #include "nsHttpHandler.h"
@@ -409,7 +411,7 @@ static nsTArray<SVCBWrapper> FlattenRecords(const nsACString& aHost,
 }
 
 static void TelemetryForServiceModeRecord(const nsACString& aKey) {
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   glean::networking::https_record_state.Get(aKey).Add(1);
 #endif
 }

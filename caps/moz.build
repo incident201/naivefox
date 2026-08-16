@@ -44,15 +44,23 @@ SOURCES += [
 ]
 
 UNIFIED_SOURCES += [
-    "ContentPrincipal.cpp",
-    "DomainPolicy.cpp",
-    "ExpandedPrincipal.cpp",
     "nsJSPrincipals.cpp",
-    "nsScriptSecurityManager.cpp",
-    "NullPrincipal.cpp",
     "OriginAttributes.cpp",
     "SystemPrincipal.cpp",
 ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "nsScriptSecurityManagerNaiveFox.cpp",
+    ]
+else:
+    UNIFIED_SOURCES += [
+        "ContentPrincipal.cpp",
+        "DomainPolicy.cpp",
+        "ExpandedPrincipal.cpp",
+        "NullPrincipal.cpp",
+        "nsScriptSecurityManager.cpp",
+    ]
 
 USE_LIBS += [
     "jsoncpp",

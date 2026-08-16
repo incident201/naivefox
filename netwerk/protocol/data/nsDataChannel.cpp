@@ -8,10 +8,14 @@
 
 #include "../protocol/http/nsHttpHandler.h"
 #include "mozilla/Base64.h"
-#include "mozilla/dom/ContentChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentChild.h"
+#endif
 #include "mozilla/dom/MimeType.h"
-#include "mozilla/net/NeckoChild.h"
-#include "mozilla/net/NeckoCommon.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoChild.h"
+#  include "mozilla/net/NeckoCommon.h"
+#endif
 #include "nsDataHandler.h"
 #include "nsEscape.h"
 #include "nsIInputStream.h"
@@ -183,6 +187,9 @@ nsDataChannel::SetChannelId(uint64_t aChannelId) {
 
 NS_IMETHODIMP
 nsDataChannel::ConnectParent(uint32_t aId) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   if (!IsNeckoChild()) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -195,6 +202,7 @@ nsDataChannel::ConnectParent(uint32_t aId) {
 
   gNeckoChild->SendConnectBaseChannel(aId);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

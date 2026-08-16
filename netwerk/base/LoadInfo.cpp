@@ -4,16 +4,21 @@
 
 #include "mozilla/LoadInfo.h"
 
-#include "ThirdPartyUtil.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ThirdPartyUtil.h"
+#endif
 #include "js/Array.h"               // JS::NewArrayObject
 #include "js/PropertyAndElement.h"  // JS_DefineElement
-#include "mozIThirdPartyUtil.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozIThirdPartyUtil.h"
+#endif
 #include "mozilla/Assertions.h"
 #include "mozilla/ExpandedPrincipal.h"
 #include "mozilla/NullPrincipal.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_security.h"
 #include "mozilla/StoragePrincipalHelper.h"
+#ifndef MOZ_NAIVEFOX
 #include "mozilla/dom/BrowserChild.h"
 #include "mozilla/dom/BrowsingContext.h"
 #include "mozilla/dom/CanonicalBrowsingContext.h"
@@ -50,21 +55,32 @@
 #include "nsMixedContentBlocker.h"
 #include "nsPIDOMWindowInlines.h"
 #include "nsQueryObject.h"
+#endif
 #include "nsRedirectHistoryEntry.h"
 #include "nsSandboxFlags.h"
+#ifdef MOZ_NAIVEFOX
+#  include "nsICookieJarSettings.h"
+#  include "nsIHttpChannel.h"
+#  include "nsIPolicyContainer.h"
+#endif
 
 using namespace mozilla::dom;
 
 namespace mozilla::net {
 
 static nsCString CurrentRemoteType() {
+#ifdef MOZ_NAIVEFOX
+  return nsCString();
+#else
   MOZ_ASSERT(XRE_IsParentProcess() || XRE_IsContentProcess());
   if (ContentChild* cc = ContentChild::GetSingleton()) {
     return nsCString(cc->GetRemoteType());
   }
   return NOT_REMOTE_TYPE;
+#endif
 }
 
+#ifndef MOZ_NAIVEFOX
 static nsContentPolicyType InternalContentPolicyTypeForFrame(
     CanonicalBrowsingContext* aBrowsingContext) {
   const auto& maybeEmbedderElementType =
@@ -78,6 +94,7 @@ static nsContentPolicyType InternalContentPolicyTypeForFrame(
              ? nsIContentPolicy::TYPE_INTERNAL_IFRAME
              : nsIContentPolicy::TYPE_INTERNAL_FRAME;
 }
+#endif
 
 /* static */ Result<already_AddRefed<LoadInfo>, nsresult> LoadInfo::Create(
     nsIPrincipal* aLoadingPrincipal, nsIPrincipal* aTriggeringPrincipal,
@@ -96,6 +113,9 @@ static nsContentPolicyType InternalContentPolicyTypeForFrame(
 }
 
 bool LoadInfo::IsDocumentMissingClientInfo() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   // Only check in the content process for now.
   if (!XRE_IsContentProcess() || mClientInfo.isSome()) {
     return false;
@@ -137,8 +157,10 @@ bool LoadInfo::IsDocumentMissingClientInfo() {
       "Prevented the creation of a LoadInfo for a document without a "
       "ClientInfo!");
   return true;
+#endif
 }
 
+#ifndef MOZ_NAIVEFOX
 /* static */ already_AddRefed<LoadInfo> LoadInfo::CreateForDocument(
     dom::CanonicalBrowsingContext* aBrowsingContext, nsIURI* aURI,
     nsIPrincipal* aTriggeringPrincipal, const nsACString& aTriggeringRemoteType,
@@ -169,7 +191,36 @@ bool LoadInfo::IsDocumentMissingClientInfo() {
 
 static_assert(uint8_t(ForceMediaDocument::None) == 0,
               "The default value of mForceMediaDocument depends on this.");
+#endif
 
+#ifdef MOZ_NAIVEFOX
+LoadInfo::LoadInfo(
+    nsIPrincipal* aLoadingPrincipal, nsIPrincipal* aTriggeringPrincipal,
+    nsINode*, nsSecurityFlags aSecurityFlags,
+    nsContentPolicyType aContentPolicyType,
+    const Maybe<mozilla::dom::ClientInfo>& aLoadingClientInfo,
+    const Maybe<mozilla::dom::ServiceWorkerDescriptor>& aController,
+    uint32_t aSandboxFlags)
+    : mLoadingPrincipal(aLoadingPrincipal),
+      mTriggeringPrincipal(aTriggeringPrincipal ? aTriggeringPrincipal
+                                                : aLoadingPrincipal),
+      mTriggeringRemoteType(CurrentRemoteType()),
+      mSandboxedNullPrincipalID(nsID::GenerateUUID()),
+      mClientInfo(aLoadingClientInfo),
+      mController(aController),
+      mSecurityFlags(aSecurityFlags),
+      mSandboxFlags(aSandboxFlags),
+      mInternalContentPolicyType(aContentPolicyType) {
+  MOZ_ASSERT(mLoadingPrincipal);
+  MOZ_ASSERT(mTriggeringPrincipal);
+  if (mSandboxFlags & SANDBOXED_ORIGIN) {
+    mForceInheritPrincipalDropped =
+        mSecurityFlags & nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL;
+    mSecurityFlags &= ~nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL;
+  }
+  mOriginAttributes = mLoadingPrincipal->OriginAttributesRef();
+}
+#else
 LoadInfo::LoadInfo(
     nsIPrincipal* aLoadingPrincipal, nsIPrincipal* aTriggeringPrincipal,
     nsINode* aLoadingContext, nsSecurityFlags aSecurityFlags,
@@ -395,7 +446,9 @@ LoadInfo::LoadInfo(
                "chrome docshell shouldn't have mPrivateBrowsingId set.");
   }
 }
+#endif
 
+#ifndef MOZ_NAIVEFOX
 /* Constructor takes an outer window, but no loadingNode or loadingPrincipal.
  * This constructor should only be used for TYPE_DOCUMENT loads, since they
  * have a null loadingNode and loadingPrincipal.
@@ -701,6 +754,7 @@ LoadInfo::LoadInfo(dom::CanonicalBrowsingContext* aBrowsingContext,
                aSecurityFlags, aSandboxFlags) {
   mFrameBrowsingContextID = aBrowsingContext->Id();
 }
+#endif
 
 LoadInfo::LoadInfo(const LoadInfo& rhs)
     : mLoadingPrincipal(rhs.mLoadingPrincipal),
@@ -804,7 +858,11 @@ LoadInfo::LoadInfo(
       mReservedClientInfo(aReservedClientInfo),
       mInitialClientInfo(aInitialClientInfo),
       mController(aController),
+#ifdef MOZ_NAIVEFOX
+      mLoadingContext(nullptr),
+#else
       mLoadingContext(do_GetWeakReference(aLoadingContext)),
+#endif
       mSecurityFlags(aSecurityFlags),
       mSandboxFlags(aSandboxFlags),
       mInternalContentPolicyType(aContentPolicyType),
@@ -845,6 +903,9 @@ void LoadInfo::ComputeAncestors(
     CanonicalBrowsingContext* aBC,
     nsTArray<nsCOMPtr<nsIPrincipal>>& aAncestorPrincipals,
     nsTArray<uint64_t>& aBrowsingContextIDs) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   MOZ_ASSERT(aAncestorPrincipals.IsEmpty());
   MOZ_ASSERT(aBrowsingContextIDs.IsEmpty());
   CanonicalBrowsingContext* ancestorBC = aBC;
@@ -859,9 +920,14 @@ void LoadInfo::ComputeAncestors(
     aAncestorPrincipals.AppendElement(parentPrincipal.forget());
     aBrowsingContextIDs.AppendElement(ancestorBC->Id());
   }
+#endif
 }
 
 void LoadInfo::ComputeIsThirdPartyContext(nsPIDOMWindowOuter* aOuterWindow) {
+#ifdef MOZ_NAIVEFOX
+  mIsThirdPartyContext = false;
+  return;
+#else
   ExtContentPolicyType type =
       nsContentUtils::InternalContentPolicyTypeToExternal(
           mInternalContentPolicyType);
@@ -877,9 +943,14 @@ void LoadInfo::ComputeIsThirdPartyContext(nsPIDOMWindowOuter* aOuterWindow) {
   }
 
   util->IsThirdPartyWindow(aOuterWindow, nullptr, &mIsThirdPartyContext);
+#endif
 }
 
 void LoadInfo::ComputeIsThirdPartyContext(dom::WindowGlobalParent* aGlobal) {
+#ifdef MOZ_NAIVEFOX
+  mIsThirdPartyContext = false;
+  return;
+#else
   if (nsILoadInfo::GetExternalContentPolicyType() ==
       ExtContentPolicy::TYPE_DOCUMENT) {
     // Top-level loads are never third-party.
@@ -892,6 +963,7 @@ void LoadInfo::ComputeIsThirdPartyContext(dom::WindowGlobalParent* aGlobal) {
     return;
   }
   thirdPartyUtil->IsThirdPartyGlobal(aGlobal, &mIsThirdPartyContext);
+#endif
 }
 
 NS_IMPL_ISUPPORTS(LoadInfo, nsILoadInfo)
@@ -998,10 +1070,14 @@ LoadInfo::SetTriggeringRemoteType(const nsACString& aTriggeringRemoteType) {
 
 NS_IMETHODIMP
 LoadInfo::GetLoadingDocument(Document** aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = nullptr;
+#else
   if (nsCOMPtr<nsINode> node = do_QueryReferent(mLoadingContext)) {
     RefPtr<Document> context = node->OwnerDoc();
     context.forget(aResult);
   }
+#endif
   return NS_OK;
 }
 NS_IMETHODIMP
@@ -1018,8 +1094,12 @@ LoadInfo::SetUserNavigationInvolvement(uint8_t aUserNavigationInvolvement) {
 }
 
 nsINode* LoadInfo::LoadingNode() {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   nsCOMPtr<nsINode> node = do_QueryReferent(mLoadingContext);
   return node;
+#endif
 }
 
 already_AddRefed<nsISupports> LoadInfo::ContextForTopLevelLoad() {
@@ -1036,7 +1116,9 @@ already_AddRefed<nsISupports> LoadInfo::GetLoadingContext() {
   if (mInternalContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
     context = ContextForTopLevelLoad();
   } else {
+#ifndef MOZ_NAIVEFOX
     context = LoadingNode();
+#endif
   }
   return context.forget();
 }
@@ -1062,7 +1144,16 @@ LoadInfo::GetSandboxFlags(uint32_t* aResult) {
 
 NS_IMETHODIMP
 LoadInfo::GetSecurityMode(uint32_t* aFlags) {
+#ifdef MOZ_NAIVEFOX
+  *aFlags = mSecurityFlags &
+            (nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_INHERITS_SEC_CONTEXT |
+             nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_IS_BLOCKED |
+             nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_INHERITS_SEC_CONTEXT |
+             nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+             nsILoadInfo::SEC_REQUIRE_CORS_INHERITS_SEC_CONTEXT);
+#else
   *aFlags = nsContentSecurityManager::ComputeSecurityMode(mSecurityFlags);
+#endif
 
   return NS_OK;
 }
@@ -1116,6 +1207,9 @@ namespace {
 already_AddRefed<nsICookieJarSettings> CreateCookieJarSettings(
     nsIPrincipal* aTriggeringPrincipal, nsContentPolicyType aContentPolicyType,
     bool aIsPrivate, bool aShouldResistFingerprinting) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   // Special treatment for resources injected by add-ons if not document,
   // iframe, workers.
   if (!nsContentUtils::IsNonSubresourceInternalPolicyType(aContentPolicyType) &&
@@ -1149,12 +1243,17 @@ already_AddRefed<nsICookieJarSettings> CreateCookieJarSettings(
   }
 
   return CookieJarSettings::GetBlockingAll(aShouldResistFingerprinting);
+#endif
 }
 
 }  // namespace
 
 NS_IMETHODIMP
 LoadInfo::GetCookieJarSettings(nsICookieJarSettings** aCookieJarSettings) {
+#ifdef MOZ_NAIVEFOX
+  *aCookieJarSettings = nullptr;
+  return NS_OK;
+#else
   if (!mCookieJarSettings) {
     bool isPrivate = mOriginAttributes.IsPrivateBrowsing();
     nsCOMPtr<nsIPrincipal> loadingPrincipal;
@@ -1172,6 +1271,7 @@ LoadInfo::GetCookieJarSettings(nsICookieJarSettings** aCookieJarSettings) {
   nsCOMPtr<nsICookieJarSettings> cookieJarSettings = mCookieJarSettings;
   cookieJarSettings.forget(aCookieJarSettings);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -1183,7 +1283,7 @@ LoadInfo::SetCookieJarSettings(nsICookieJarSettings* aCookieJarSettings) {
 }
 
 const Maybe<RFPTargetSet>& LoadInfo::GetOverriddenFingerprintingSettings() {
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
   RefPtr<BrowsingContext> browsingContext;
   GetTargetBrowsingContext(getter_AddRefs(browsingContext));
 
@@ -1300,41 +1400,64 @@ LoadInfo::GetTargetBrowsingContextID(uint64_t* aResult) {
 
 NS_IMETHODIMP
 LoadInfo::GetBrowsingContext(dom::BrowsingContext** aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = nullptr;
+#else
   *aResult = BrowsingContext::Get(mBrowsingContextID).take();
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 LoadInfo::GetAssociatedBrowsingContext(dom::BrowsingContext** aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = nullptr;
+#else
   *aResult = BrowsingContext::Get(mAssociatedBrowsingContextID).take();
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 LoadInfo::GetFrameBrowsingContext(dom::BrowsingContext** aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = nullptr;
+#else
   *aResult = BrowsingContext::Get(mFrameBrowsingContextID).take();
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 LoadInfo::GetTargetBrowsingContext(dom::BrowsingContext** aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = nullptr;
+#else
   uint64_t targetBrowsingContextID = 0;
   MOZ_ALWAYS_SUCCEEDS(GetTargetBrowsingContextID(&targetBrowsingContextID));
   *aResult = BrowsingContext::Get(targetBrowsingContextID).take();
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 LoadInfo::GetScriptableOriginAttributes(
     JSContext* aCx, JS::MutableHandle<JS::Value> aOriginAttributes) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (NS_WARN_IF(!ToJSValue(aCx, mOriginAttributes, aOriginAttributes))) {
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 LoadInfo::ResetPrincipalToInheritToNullPrincipal() {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   // take the originAttributes from the LoadInfo and create
   // a new NullPrincipal using those origin attributes.
   nsCOMPtr<nsIPrincipal> newNullPrincipal =
@@ -1348,11 +1471,15 @@ LoadInfo::ResetPrincipalToInheritToNullPrincipal() {
   mSecurityFlags |= SEC_FORCE_INHERIT_PRINCIPAL_OVERRULE_OWNER;
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 LoadInfo::SetScriptableOriginAttributes(
     JSContext* aCx, JS::Handle<JS::Value> aOriginAttributes) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   OriginAttributes attrs;
   if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
@@ -1360,6 +1487,7 @@ LoadInfo::SetScriptableOriginAttributes(
 
   mOriginAttributes = std::move(attrs);
   return NS_OK;
+#endif
 }
 
 nsresult LoadInfo::GetOriginAttributes(
@@ -1399,6 +1527,9 @@ LoadInfo::GetInitialSecurityCheckDone(bool* aResult) {
 // possible.
 already_AddRefed<nsIPrincipal> CreateTruncatedPrincipal(
     nsIPrincipal* aPrincipal) {
+#ifdef MOZ_NAIVEFOX
+  return do_AddRef(aPrincipal);
+#else
   nsCOMPtr<nsIPrincipal> truncatedPrincipal;
   // System Principal URIs don't need to be truncated as they don't contain any
   // sensitive browsing history information.
@@ -1502,6 +1633,12 @@ already_AddRefed<nsIPrincipal> CreateTruncatedPrincipal(
   // Expanded Principals shouldn't contain sensitive information but their
   // allowlists might so we truncate that information here.
   if (aPrincipal->GetIsExpandedPrincipal()) {
+#ifdef MOZ_NAIVEFOX
+    // The lean client never creates expanded principals.  Retain the
+    // interface contract without linking the browser-only implementation.
+    truncatedPrincipal = aPrincipal;
+    return truncatedPrincipal.forget();
+#else
     nsTArray<nsCOMPtr<nsIPrincipal>> truncatedAllowList;
 
     for (const auto& allowedPrincipal : BasePrincipal::Cast(aPrincipal)
@@ -1515,6 +1652,7 @@ already_AddRefed<nsIPrincipal> CreateTruncatedPrincipal(
 
     return ExpandedPrincipal::Create(truncatedAllowList,
                                      aPrincipal->OriginAttributesRef());
+#endif
   }
 
   // If we hit this assertion we need to update this function to add the
@@ -1523,6 +1661,7 @@ already_AddRefed<nsIPrincipal> CreateTruncatedPrincipal(
 
   truncatedPrincipal = aPrincipal;
   return truncatedPrincipal.forget();
+#endif
 }
 
 NS_IMETHODIMP
@@ -1568,6 +1707,9 @@ LoadInfo::AppendRedirectHistoryEntry(nsIChannel* aChannel,
 NS_IMETHODIMP
 LoadInfo::GetRedirects(JSContext* aCx, JS::MutableHandle<JS::Value> aRedirects,
                        const RedirectHistoryArray& aArray) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   JS::Rooted<JSObject*> redirects(aCx,
                                   JS::NewArrayObject(aCx, aArray.Length()));
   NS_ENSURE_TRUE(redirects, NS_ERROR_OUT_OF_MEMORY);
@@ -1591,6 +1733,7 @@ LoadInfo::GetRedirects(JSContext* aCx, JS::MutableHandle<JS::Value> aRedirects,
 
   aRedirects.setObject(*redirects);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -1762,9 +1905,13 @@ LoadInfo::SetIsUserTriggeredSave(bool aIsUserTriggeredSave) {
 
 NS_IMETHODIMP
 LoadInfo::GetIsTopLevelLoad(bool* aResult) {
+#ifdef MOZ_NAIVEFOX
+  *aResult = true;
+#else
   RefPtr<dom::BrowsingContext> bc;
   GetTargetBrowsingContext(getter_AddRefs(bc));
   *aResult = !bc || bc->IsTop();
+#endif
   return NS_OK;
 }
 
@@ -1896,6 +2043,9 @@ void LoadInfo::SetPerformanceStorage(PerformanceStorage* aPerformanceStorage) {
 }
 
 PerformanceStorage* LoadInfo::GetPerformanceStorage() {
+#ifdef MOZ_NAIVEFOX
+  return mPerformanceStorage;
+#else
   if (mPerformanceStorage) {
     return mPerformanceStorage;
   }
@@ -1923,6 +2073,7 @@ PerformanceStorage* LoadInfo::GetPerformanceStorage() {
   }
 
   return performance->AsPerformanceStorage();
+#endif
 }
 
 NS_IMETHODIMP
@@ -1945,13 +2096,20 @@ LoadInfo::GetInternalContentPolicyType(nsContentPolicyType* aResult) {
 
 NS_IMETHODIMP
 LoadInfo::GetFetchDestination(nsACString& aDestination) {
+#ifdef MOZ_NAIVEFOX
+  aDestination.Truncate();
+#else
   aDestination.Assign(
       GetEnumString(InternalRequest::MapContentPolicyTypeToRequestDestination(
-          mInternalContentPolicyType)));
+      mInternalContentPolicyType)));
+#endif
   return NS_OK;
 }
 
 already_AddRefed<nsIContentSecurityPolicy> LoadInfo::GetPreloadCsp() {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   if (mClientInfo.isNothing()) {
     return nullptr;
   }
@@ -1974,9 +2132,13 @@ already_AddRefed<nsIContentSecurityPolicy> LoadInfo::GetPreloadCsp() {
   nsCOMPtr<nsIContentSecurityPolicy> preloadCSP =
       CSPInfoToCSP(cspInfo.ref(), doc);
   return preloadCSP.forget();
+#endif
 }
 
 already_AddRefed<nsIPolicyContainer> LoadInfo::GetPolicyContainer() {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   // Before querying the CSP from the client we have to check if the
   // triggeringPrincipal originates from an addon and potentially
   // overrides the CSP stored within the client.
@@ -2021,6 +2183,7 @@ already_AddRefed<nsIPolicyContainer> LoadInfo::GetPolicyContainer() {
   PolicyContainer::FromArgs(policyContainerArgs.ref(), doc,
                             getter_AddRefs(clientPolicyContainer));
   return clientPolicyContainer.forget();
+#endif
 }
 
 void LoadInfo::SetPolicyContainerToInherit(
@@ -2076,6 +2239,10 @@ LoadInfo::SetSkipHTTPSUpgrade(bool aSkipHTTPSUpgrade) {
 }
 
 void LoadInfo::UpdateParentAddressSpaceInfo() {
+#ifdef MOZ_NAIVEFOX
+  mParentIpAddressSpace = nsILoadInfo::Local;
+  return;
+#else
   MOZ_ASSERT(mInternalContentPolicyType != nsContentPolicyType::TYPE_INVALID,
              "Content policy must be set before updating address spsace");
   ExtContentPolicyType externalType =
@@ -2115,6 +2282,7 @@ void LoadInfo::UpdateParentAddressSpaceInfo() {
     // IPAddress space of the browsing context
     mParentIpAddressSpace = bc->GetCurrentIPAddressSpace();
   }
+#endif
 }
 
 }  // namespace mozilla::net

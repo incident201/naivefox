@@ -5,12 +5,16 @@
 #include "nsUDPSocket.h"
 
 #include "HttpConnectionUDP.h"
-#include "MockNetworkLayer.h"
+#ifndef MOZ_NAIVEFOX
+#  include "MockNetworkLayer.h"
+#endif
 #include "mozilla/Components.h"
 #include "mozilla/HoldDropJSObjects.h"
 #include "mozilla/ProfilerBandwidthCounter.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/dom/TypedArray.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/TypedArray.h"
+#endif
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "nsError.h"
 #include "nsICancelable.h"
@@ -28,7 +32,9 @@
 #include "nsSocketTransport2.h"
 #include "nsStreamUtils.h"
 #include "nsThreadUtils.h"
-#include "nsWrapperCacheInlines.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsWrapperCacheInlines.h"
+#endif
 #include "prerror.h"
 #include "prio.h"
 #include "private/pprio.h"
@@ -202,7 +208,11 @@ nsUDPMessage::nsUDPMessage(NetAddr* aAddr, nsIOutputStream* aOutputStream,
                            FallibleTArray<uint8_t>&& aData)
     : mAddr(*aAddr), mOutputStream(aOutputStream), mData(std::move(aData)) {}
 
-nsUDPMessage::~nsUDPMessage() { DropJSObjects(this); }
+nsUDPMessage::~nsUDPMessage() {
+#ifndef MOZ_NAIVEFOX
+  DropJSObjects(this);
+#endif
+}
 
 NS_IMETHODIMP
 nsUDPMessage::GetFromAddr(nsINetAddr** aFromAddr) {
@@ -229,6 +239,10 @@ nsUDPMessage::GetOutputStream(nsIOutputStream** aOutputStream) {
 
 NS_IMETHODIMP
 nsUDPMessage::GetRawData(JSContext* cx, JS::MutableHandle<JS::Value> aRawData) {
+#ifdef MOZ_NAIVEFOX
+  aRawData.setNull();
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!mJsobj) {
     ErrorResult error;
     mJsobj = dom::Uint8Array::Create(cx, nullptr, mData, error);
@@ -240,6 +254,7 @@ nsUDPMessage::GetRawData(JSContext* cx, JS::MutableHandle<JS::Value> aRawData) {
   }
   aRawData.setObject(*mJsobj);
   return NS_OK;
+#endif
 }
 
 FallibleTArray<uint8_t>& nsUDPMessage::GetDataAsTArray() { return mData; }
@@ -669,6 +684,7 @@ nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,
 
   PRNetAddrToNetAddr(&addr, &mAddr);
 
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::network_socket_attach_mock_network_layer() &&
       xpc::AreNonLocalConnectionsDisabled()) {
     if (NS_FAILED(AttachMockNetworkLayer(mFD))) {
@@ -678,6 +694,7 @@ nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,
            this));
     }
   }
+#endif
 
   // wait until AsyncListen is called before polling the socket for
   // client connections.

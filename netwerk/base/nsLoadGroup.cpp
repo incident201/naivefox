@@ -13,12 +13,13 @@
 #include "mozilla/StoragePrincipalHelper.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
-#include "mozilla/net/NeckoChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoChild.h"
+#endif
 #include "mozilla/net/NeckoCommon.h"
 #include "nsArrayEnumerator.h"
 #include "nsCOMArray.h"
 #include "nsCOMPtr.h"
-#include "nsContentUtils.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInterfaceRequestor.h"
@@ -63,9 +64,11 @@ nsLoadGroup::~nsLoadGroup() {
 
   if (mRequestContext && !mExternalRequestContext) {
     mRequestContextService->RemoveRequestContext(mRequestContext->GetID());
+#ifndef MOZ_NAIVEFOX
     if (IsNeckoChild() && gNeckoChild && gNeckoChild->CanSend()) {
       gNeckoChild->SendRemoveRequestContext(mRequestContext->GetID());
     }
+#endif
   }
 
   nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();

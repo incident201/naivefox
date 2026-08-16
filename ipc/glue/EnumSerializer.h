@@ -5,11 +5,15 @@
 #ifndef IPC_GLUE_ENUMSERIALIZER_H_
 #define IPC_GLUE_ENUMSERIALIZER_H_
 
-#include "CrashAnnotations.h"
+#ifndef MOZ_NAIVEFOX
+#  include "CrashAnnotations.h"
+#endif
 #include "chrome/common/ipc_message_utils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/IntegerTypeTraits.h"
-#include "nsExceptionHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsLiteralString.h"
 #include "nsString.h"
 #include "nsTLiteralString.h"
@@ -63,13 +67,17 @@ struct EnumSerializer {
   static bool Read(MessageReader* aReader, paramType* aResult) {
     uintParamType value;
     if (!ReadParam(aReader, &value)) {
+#ifndef MOZ_NAIVEFOX
       CrashReporter::RecordAnnotationCString(
           CrashReporter::Annotation::IPCReadErrorReason, "Bad iter");
+#endif
       return false;
     }
     if (!EnumValidator::IsLegalValue(value)) {
+#ifndef MOZ_NAIVEFOX
       CrashReporter::RecordAnnotationCString(
           CrashReporter::Annotation::IPCReadErrorReason, "Illegal value");
+#endif
       return false;
     }
     *aResult = paramType(value);

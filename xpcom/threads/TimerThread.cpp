@@ -12,7 +12,9 @@
 #include "mozilla/OperatorNewExtensions.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_timer.h"
-#include "mozilla/glean/XpcomMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/XpcomMetrics.h"
+#endif
 #include "nsIObserverService.h"
 #include "nsIPropertyBag2.h"
 #include "nsThreadUtils.h"
@@ -724,6 +726,12 @@ uint64_t TimerThread::FireDueTimers(TimeDuration aAllowedEarlyFiring) {
 // Queue for tracking of how many timers are fired on each wake-up. We need to
 // buffer these locally and only send off to glean occasionally to avoid
 // performance problems.
+#ifdef MOZ_NAIVEFOX
+class TelemetryQueue {
+ public:
+  void AccumulateAndMaybeSendTelemetry(uint64_t) {}
+};
+#else
 class TelemetryQueue {
  public:
   TelemetryQueue() {
@@ -757,6 +765,7 @@ class TelemetryQueue {
   AutoTArray<uint64_t, kMaxQueuedTimersFired> mQueuedTimersFiredPerWakeup;
   size_t mQueuedTimersFiredCount = 0;
 };
+#endif
 
 void TimerThread::Wait(TimeDuration aWaitFor, TimeDuration aTolerance)
     MOZ_REQUIRES(mMonitor) {

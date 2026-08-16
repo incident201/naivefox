@@ -12,8 +12,10 @@
 #include "mozilla/Encoding.h"
 #include "mozilla/HashFunctions.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/dom/ToJSValue.h"
-#include "mozilla/glean/NetwerkMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ToJSValue.h"
+#  include "mozilla/glean/NetwerkMetrics.h"
+#endif
 #include "nsIURLParser.h"
 #include "nsURLHelper.h"
 
@@ -136,10 +138,12 @@ already_AddRefed<Cookie> Cookie::CreateValidated(
     uint64_t diffInSeconds =
         (cookie->mData.creationTimeInUSec() - currentTimeInUsec) /
         PR_USEC_PER_SEC;
+#ifndef MOZ_NAIVEFOX
     mozilla::glean::networking::cookie_creation_fixup_diff
         .AccumulateSingleSample(diffInSeconds);
     glean::networking::cookie_timestamp_fixed_count.Get("creationTime"_ns)
         .Add(1);
+#endif
 
     cookie->mData.creationTimeInUSec() =
         GenerateUniqueCreationTimeInUSec(currentTimeInUsec);
@@ -149,10 +153,12 @@ already_AddRefed<Cookie> Cookie::CreateValidated(
     uint64_t diffInSeconds =
         (cookie->mData.lastAccessedInUSec() - currentTimeInUsec) /
         PR_USEC_PER_SEC;
+#ifndef MOZ_NAIVEFOX
     mozilla::glean::networking::cookie_access_fixup_diff.AccumulateSingleSample(
         diffInSeconds);
     glean::networking::cookie_timestamp_fixed_count.Get("lastAccessed"_ns)
         .Add(1);
+#endif
 
     cookie->mData.lastAccessedInUSec() = currentTimeInUsec;
   }
@@ -161,9 +167,11 @@ already_AddRefed<Cookie> Cookie::CreateValidated(
     uint64_t diffInSeconds =
         (cookie->mData.updateTimeInUSec() - currentTimeInUsec) /
         PR_USEC_PER_SEC;
+#ifndef MOZ_NAIVEFOX
     mozilla::glean::networking::cookie_access_fixup_diff.AccumulateSingleSample(
         diffInSeconds);
     glean::networking::cookie_timestamp_fixed_count.Get("updateTime"_ns).Add(1);
+#endif
 
     cookie->mData.updateTimeInUSec() = currentTimeInUsec;
   }
@@ -259,10 +267,14 @@ NS_IMETHODIMP Cookie::GetSchemeMap(nsICookie::schemeType* aSchemeMap) {
 
 NS_IMETHODIMP
 Cookie::GetOriginAttributes(JSContext* aCx, JS::MutableHandle<JS::Value> aVal) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   if (NS_WARN_IF(!ToJSValue(aCx, mOriginAttributes, aVal))) {
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+#endif
 }
 
 const OriginAttributes& Cookie::OriginAttributesNative() {

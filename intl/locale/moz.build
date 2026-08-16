@@ -43,7 +43,6 @@ EXPORTS.mozilla.intl += [
 
 UNIFIED_SOURCES += [
     "AppCollator.cpp",
-    "AppDateTimeFormat.cpp",
     "EncodingToLang.cpp",
     "LocaleService.cpp",
     "nsLanguageAtomService.cpp",
@@ -51,6 +50,9 @@ UNIFIED_SOURCES += [
     "OSPreferences.cpp",
     "Quotes.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["AppDateTimeFormat.cpp"]
 
 MOZ_SRC_FILES += [
     "LangPackMatcher.sys.mjs",

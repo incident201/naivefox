@@ -951,8 +951,10 @@ generated output, never a hand-edited source of truth.
   Necko H2/H3 CONNECT has no dependency on it.
 - [x] Remove Gecko accessibility after a separate full regression gate; retain
   GTK/ATK as a documented system dependency for now.
-- [ ] Disable proven browser-only build groups in separate logical commits
-  while retaining the full Firefox source checkout.
+- [x] Disable the DOM/GFX implementation build graph while retaining the full
+  Firefox source checkout; generated binding metadata remains where required.
+  This is recorded as the Phase 2.4 cold-build checkpoint in
+  `MINIMISATION-REPORT.md`.
 - [ ] Produce machine-readable build/link dependency reports.
 - [ ] Reduce `libxul` and runtime libraries without replacing or weakening
   Necko, Neqo, NSS, PSM, NSPR, DNS, proxy, or required XPCOM services.

@@ -10,7 +10,6 @@
 #include "nsIObjectOutputStream.h"
 #include "nsReadableUtils.h"
 #include "nsURLHelper.h"
-#include "urlpattern_glue/URLPatternGlue.h"
 
 namespace mozilla {
 namespace net {

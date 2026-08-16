@@ -6,4 +6,7 @@
 // get link errors when linking libxul-gtest.  Add any |extern crate|
 // declarations or similar to the gkrust-shared crate in
 // toolkit/library/rust/shared/lib.rs.
+#[cfg(feature = "naivefox")]
+extern crate gkrust_naivefox;
+#[cfg(not(feature = "naivefox"))]
 extern crate gkrust_shared;

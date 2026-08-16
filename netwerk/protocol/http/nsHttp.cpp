@@ -18,7 +18,9 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "nsCRT.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsHttpHandler.h"
 #include "nsHttpRequestHead.h"
 #include "nsHttpResponseHead.h"
@@ -791,6 +793,9 @@ ParsedHeaderValueListList::ParsedHeaderValueListList(
 }
 
 Maybe<nsCString> CallingScriptLocationString() {
+#ifdef MOZ_NAIVEFOX
+  return Nothing();
+#else
   if (!LOG4_ENABLED() && !xpc::IsInAutomation()) {
     return Nothing();
   }
@@ -805,6 +810,7 @@ Maybe<nsCString> CallingScriptLocationString() {
   logString.AppendPrintf("%s:%u:%u", location.FileName().get(), location.mLine,
                          location.mColumn);
   return Some(logString);
+#endif
 }
 
 void LogCallingScriptLocation(void* instance) {

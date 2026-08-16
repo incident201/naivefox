@@ -9,12 +9,13 @@
 #include "MockHttpAuth.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Components.h"
-#include "mozilla/StoragePrincipalHelper.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/StoragePrincipalHelper.h"
+#endif
 #include "mozilla/Tokenizer.h"
 #include "netCore.h"
 #include "nsAuthInformationHolder.h"
 #include "nsCRT.h"
-#include "nsContentUtils.h"
 #include "nsEscape.h"
 #include "nsHttp.h"
 #include "nsHttpBasicAuth.h"
@@ -27,11 +28,10 @@
 #include "nsIHttpChannelInternal.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIInterfaceRequestorUtils.h"
-#include "nsIPromptService.h"
-#include "nsIStringBundle.h"
+#include "prenv.h"
 #include "nsIURI.h"
 #include "nsNetUtil.h"
-#ifdef MOZ_AUTH_EXTENSION
+#if defined(MOZ_AUTH_EXTENSION) && !defined(MOZ_NAIVEFOX)
 #  include "nsHttpNegotiateAuth.h"
 #endif
 #include "mozilla/StaticPrefs_network.h"
@@ -56,7 +56,9 @@ static void GetOriginAttributesSuffix(nsIChannel* aChan, nsACString& aSuffix) {
 
   // Deliberately ignoring the result and going with defaults
   if (aChan) {
+#ifndef MOZ_NAIVEFOX
     StoragePrincipalHelper::GetOriginAttributesForNetworkState(aChan, oa);
+#endif
   }
 
   oa.CreateSuffix(aSuffix);
@@ -1078,7 +1080,7 @@ nsresult nsHttpChannelAuthProvider::GetAuthenticator(
   GetAuthType(aChallenge, authType);
 
   nsCOMPtr<nsIHttpAuthenticator> authenticator;
-#ifdef MOZ_AUTH_EXTENSION
+#if defined(MOZ_AUTH_EXTENSION) && !defined(MOZ_NAIVEFOX)
   if (authType.EqualsLiteral("negotiate")) {
     authenticator = nsHttpNegotiateAuth::GetOrCreate();
   } else
@@ -1087,9 +1089,13 @@ nsresult nsHttpChannelAuthProvider::GetAuthenticator(
     authenticator = nsHttpBasicAuth::GetOrCreate();
   } else if (authType.EqualsLiteral("digest")) {
     authenticator = nsHttpDigestAuth::GetOrCreate();
-  } else if (authType.EqualsLiteral("ntlm")) {
+  }
+#ifndef MOZ_NAIVEFOX
+  else if (authType.EqualsLiteral("ntlm")) {
     authenticator = nsHttpNTLMAuth::GetOrCreate();
-  } else if (authType.EqualsLiteral("mock_auth") &&
+  }
+#endif
+  else if (authType.EqualsLiteral("mock_auth") &&
              PR_GetEnv("XPCSHELL_TEST_PROFILE_DIR")) {
     authenticator = MockHttpAuth::Create();
   } else {

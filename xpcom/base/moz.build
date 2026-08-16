@@ -22,7 +22,7 @@ XPIDL_SOURCES += [
     "nsrootidl.idl",
 ]
 
-if CONFIG["OS_TARGET"] == "Linux":
+if CONFIG["OS_TARGET"] == "Linux" and not CONFIG["MOZ_NAIVEFOX"]:
     XPIDL_SOURCES += [
         "nsIAvailableMemoryWatcherTestingLinux.idl",
     ]
@@ -164,24 +164,16 @@ SOURCES["nsDebugImpl.cpp"].no_pgo = True
 
 UNIFIED_SOURCES += [
     "AppShutdown.cpp",
-    "AvailableMemoryTracker.cpp",
-    "AvailableMemoryWatcher.cpp",
     "ClearOnShutdown.cpp",
-    "CycleCollectedJSContext.cpp",
-    "CycleCollectedJSRuntime.cpp",
     "CycleCollectorStats.cpp",
     "Debug.cpp",
-    "DebuggerOnGCRunnable.cpp",
-    "DeferredFinalize.cpp",
     "ErrorNames.cpp",
     "GkRustUtils.cpp",
-    "HoldDropJSObjects.cpp",
     "JSObjectHolder.cpp",
     "KeyedUUIDMapper.cpp",
     "LogCommandLineHandler.cpp",
     "Logging.cpp",
     "LogModulePrefWatcher.cpp",
-    "MemoryTelemetry.cpp",
     "nsClassInfoImpl.cpp",
     "nsCOMPtr.cpp",
     "nsConsoleMessage.cpp",
@@ -189,7 +181,6 @@ UNIFIED_SOURCES += [
     "nsCRTGlue.cpp",
     "nsCycleCollectionParticipant.cpp",
     "nsCycleCollector.cpp",
-    "nsCycleCollectorTraceJSHelpers.cpp",
     "nsGZFileWriter.cpp",
     "nsID.cpp",
     "nsIInterfaceRequestorUtils.cpp",
@@ -197,8 +188,6 @@ UNIFIED_SOURCES += [
     "nsInterfaceRequestorAgg.cpp",
     "nsISupportsImpl.cpp",
     "nsMemoryImpl.cpp",
-    "nsMemoryInfoDumper.cpp",
-    "nsMemoryReporterManager.cpp",
     "NSPRLogModulesParser.cpp",
     "nsSecurityConsoleMessage.cpp",
     "nsSystemInfo.cpp",
@@ -207,8 +196,30 @@ UNIFIED_SOURCES += [
     "nsVersionComparator.cpp",
     "nsVersionComparatorImpl.cpp",
     "nsWeakReference.cpp",
-    "RLBoxSandboxPool.cpp",
 ]
+
+if CONFIG["MOZ_USING_WASM_SANDBOXING"]:
+    UNIFIED_SOURCES += ["RLBoxSandboxPool.cpp"]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "AvailableMemoryTracker.cpp",
+        "AvailableMemoryWatcher.cpp",
+        "CycleCollectedJSContext.cpp",
+        "CycleCollectedJSRuntime.cpp",
+        "DeferredFinalize.cpp",
+        "DebuggerOnGCRunnable.cpp",
+        "HoldDropJSObjects.cpp",
+        "MemoryTelemetry.cpp",
+        "nsMemoryInfoDumper.cpp",
+        "nsMemoryReporterManager.cpp",
+        "nsCycleCollectorTraceJSHelpers.cpp",
+    ]
+else:
+    UNIFIED_SOURCES += [
+        "MemoryReportingMinimal.cpp",
+        "nsCycleCollectorTraceJSHelpers.cpp",
+    ]
 
 if CONFIG["OS_TARGET"] in ("Linux", "Android"):
     UNIFIED_SOURCES += [
@@ -229,7 +240,7 @@ if CONFIG["OS_TARGET"] == "Darwin":
         "MemoryPressureLevelMac.h",
     ]
 
-if CONFIG["OS_TARGET"] == "Linux":
+if CONFIG["OS_TARGET"] == "Linux" and not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
         "AvailableMemoryWatcherLinux.cpp",
     ]
@@ -237,7 +248,7 @@ if CONFIG["OS_TARGET"] == "Linux":
         "AvailableMemoryWatcherUtils.h",
     ]
 
-if CONFIG["MOZ_PHC"]:
+if CONFIG["MOZ_PHC"] and not CONFIG["MOZ_NAIVEFOX"]:
     DEFINES["MOZ_PHC"] = True
 
 extra_errors = []
@@ -306,7 +317,7 @@ LOCAL_INCLUDES += [
 if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
     CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
 
-if CONFIG["MOZ_PHC"]:
+if CONFIG["MOZ_PHC"] and not CONFIG["MOZ_NAIVEFOX"]:
     EXPORTS.mozilla += [
         "PHCManager.h",
     ]

@@ -16,6 +16,10 @@ ipdl_py_deps := \
     $(wildcard $(topsrcdir)/other-licenses/ply/ply/*.py) \
     $(NULL)
 
+ifdef MOZ_NAIVEFOX
+ipdl_optional_metadata_arg := --allow-undefined-metadata
+endif
+
 # NB: the IPDL compiler manages .ipdl-->.h/.cpp dependencies itself,
 # which is why we don't have explicit .h/.cpp targets here
 ipdl.track: $(ALL_IPDLSRCS) $(ALL_IPDLSRCS_FILE) $(srcdir)/sync-messages.ini $(srcdir)/message-metadata.ini $(ipdl_py_deps)
@@ -23,6 +27,7 @@ ipdl.track: $(ALL_IPDLSRCS) $(ALL_IPDLSRCS_FILE) $(srcdir)/sync-messages.ini $(s
 	$(PYTHON3) $(srcdir)/ipdl.py \
 	  --sync-msg-list=$(srcdir)/sync-messages.ini \
 	  --msg-metadata=$(srcdir)/message-metadata.ini \
+	  $(ipdl_optional_metadata_arg) \
 	  --outheaders-dir=_ipdlheaders \
 	  --outcpp-dir=. \
 	  $(IPDLDIRS:%=-I%) \
@@ -32,4 +37,3 @@ ipdl.track: $(ALL_IPDLSRCS) $(ALL_IPDLSRCS_FILE) $(srcdir)/sync-messages.ini $(s
 
 export:: ipdl.track
 endif
-

@@ -8,7 +8,9 @@
 #include "ipc/EnumSerializer.h"
 #include "mozilla/Logging.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsIContentPolicy.h"
 #include "nsIEncodedChannel.h"
@@ -43,7 +45,22 @@ enum class OpaqueResponseBlockedReason : uint32_t {
   BLOCKED_SHOULD_SNIFF
 };
 
+#ifdef MOZ_NAIVEFOX
+enum class OpaqueResponseBlockedTelemetryReason : uint8_t {
+  eAfterSniffCtFail,
+  eAfterSniffMedia,
+  eAfterSniffNosniff,
+  eAfterSniffStaCode,
+  eJsValidationFailed,
+  eMediaIncorrectResp,
+  eMediaNotInitial,
+  eMimeNeverSniffed,
+  eNosniffBlcOrTextp,
+  eResp206Blclisted,
+};
+#else
 using OpaqueResponseBlockedTelemetryReason = glean::orb::BlockReasonLabel;
+#endif
 
 enum class OpaqueResponse { Block, Allow, SniffCompressed, Sniff };
 
@@ -129,7 +146,9 @@ class OpaqueResponseBlocker final : public nsIStreamListener {
 
   TimeStamp mStartOfJavaScriptValidation;
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<dom::JSValidatorParent> mJSValidator;
+#endif
 
   Maybe<nsresult> mPendingOnStopRequestStatus{Nothing()};
 };

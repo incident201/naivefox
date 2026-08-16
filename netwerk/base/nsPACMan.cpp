@@ -8,14 +8,20 @@
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/Try.h"
 #include "nsComponentManagerUtils.h"
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "nsIAuthPrompt.h"
 #include "nsIDHCPClient.h"
 #include "nsIHttpChannel.h"
 #include "nsIOService.h"
 #include "nsIPrefBranch.h"
-#include "nsIPromptFactory.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIPromptFactory.h"
+#endif
 #include "nsIProtocolProxyService.h"
 #include "nsISystemProxySettings.h"
 #include "nsNetUtil.h"
@@ -377,6 +383,7 @@ nsPACMan::nsPACMan(nsISerialEventTarget* mainThreadEventTarget)
       mProxyConfigType(0) {
   MOZ_ASSERT(NS_IsMainThread(), "pacman must be created on main thread");
   mIncludePath = Preferences::GetBool(kPACIncludePath, false);
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::network_proxy_parse_pac_on_socket_process() &&
       gIOService->SocketProcessReady()) {
     mPAC = MakeUnique<RemoteProxyAutoConfig>();
@@ -388,6 +395,7 @@ nsPACMan::nsPACMan(nsISerialEventTarget* mainThreadEventTarget)
     }
     mPAC->SetThreadLocalIndex(sThreadLocalIndex);
   }
+#endif
 }
 
 nsPACMan::~nsPACMan() {
@@ -1006,6 +1014,9 @@ NS_IMETHODIMP
 nsPACMan::GetInterface(const nsIID& iid, void** result) {
   // In case loading the PAC file requires authentication.
   if (iid.Equals(NS_GET_IID(nsIAuthPrompt))) {
+#ifdef MOZ_NAIVEFOX
+    return NS_ERROR_NO_INTERFACE;
+#else
     nsCOMPtr<nsIPromptFactory> promptFac =
         do_GetService("@mozilla.org/prompter;1");
     NS_ENSURE_TRUE(promptFac, NS_ERROR_NO_INTERFACE);
@@ -1015,6 +1026,7 @@ nsPACMan::GetInterface(const nsIID& iid, void** result) {
       return NS_ERROR_NO_INTERFACE;
     }
     return NS_OK;
+#endif
   }
 
   // In case loading the PAC file results in a redirect.

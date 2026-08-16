@@ -20,9 +20,10 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/glean/NetwerkDnsMetrics.h"
 #include "nsCharSeparatedTokenizer.h"
-#include "nsContentUtils.h"
 #include "nsHostResolver.h"
-#include "nsHttpChannel.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsHttpChannel.h"
+#endif
 #include "nsHttpHandler.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
@@ -975,8 +976,15 @@ void TRR::Cancel(nsresult aStatus) {
     }
   }
   // nsHttpChannel can be only canceled on the main thread.
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox is parent-only.  Its generic channels use the main-thread
+  // cancellation rule, so no concrete nsHttpChannel RTTI is needed here.
+  constexpr bool hasHttpChannel = true;
+#else
   RefPtr<nsHttpChannel> httpChannel = do_QueryObject(mChannel);
-  if (isTRRServiceChannel && !XRE_IsSocketProcess() && !httpChannel) {
+  const bool hasHttpChannel = !!httpChannel;
+#endif
+  if (isTRRServiceChannel && !XRE_IsSocketProcess() && !hasHttpChannel) {
     if (TRRService::Get()) {
       nsCOMPtr<nsIThread> thread = TRRService::Get()->TRRThread();
       if (thread && !thread->IsOnCurrentThread()) {

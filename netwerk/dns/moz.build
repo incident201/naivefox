@@ -90,12 +90,28 @@ UNIFIED_SOURCES += [
     "TRRServiceParent.cpp",
 ]
 
-IPDL_SOURCES = [
-    "PDNSRequest.ipdl",
-    "PDNSRequestParams.ipdlh",
-    "PNativeDNSResolverOverride.ipdl",
-    "PTRRService.ipdl",
-]
+if CONFIG["MOZ_NAIVEFOX"]:
+    # Effective-TLD lookup needs only the generic read-only mmap helper, not
+    # the XPConnect script/URL preloaders which normally own it.
+    EXPORTS.mozilla += ["/js/xpconnect/loader/AutoMemMap.h"]
+    SOURCES += ["/js/xpconnect/loader/AutoMemMap.cpp"]
+    for source in [
+        "ChildDNSService.cpp",
+        "DNSRequestChild.cpp",
+        "DNSRequestParent.cpp",
+        "NativeDNSResolverOverrideChild.cpp",
+        "NativeDNSResolverOverrideParent.cpp",
+        "TRRServiceChild.cpp",
+        "TRRServiceParent.cpp",
+    ]:
+        UNIFIED_SOURCES.remove(source)
+else:
+    IPDL_SOURCES = [
+        "PDNSRequest.ipdl",
+        "PDNSRequestParams.ipdlh",
+        "PNativeDNSResolverOverride.ipdl",
+        "PTRRService.ipdl",
+    ]
 
 include("/ipc/chromium/chromium-config.mozbuild")
 

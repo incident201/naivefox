@@ -18,7 +18,9 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/StaticPrefs_browser.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/glean/NetwerkCache2Metrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkCache2Metrics.h"
+#endif
 #include "nsIFile.h"
 #include "nsITimer.h"
 #include "nsNetUtil.h"
@@ -3948,6 +3950,9 @@ void CacheIndex::UpdateTotalBytesWritten(uint32_t aBytesWritten) {
 }
 
 void CacheIndex::DoTelemetryReport() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   static const nsLiteralCString
       contentTypeNames[nsICacheEntry::CONTENT_TYPE_LAST] = {
           "UNKNOWN"_ns, "OTHER"_ns,      "JAVASCRIPT"_ns, "IMAGE"_ns,
@@ -3978,6 +3983,7 @@ void CacheIndex::DoTelemetryReport() {
   glean::network::cache_entry_count.Get(probeKey).AccumulateSingleSample(
       mIndexStats.Count());
   glean::network::cache_size.Get(probeKey).Accumulate(mIndexStats.Size() >> 10);
+#endif
 }
 
 // static

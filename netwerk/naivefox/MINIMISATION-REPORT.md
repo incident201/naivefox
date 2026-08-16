@@ -137,3 +137,42 @@ Firefox CONNECT tests, copied-package H2/H3/Auto verification, and the full
 H2/H3/config/robustness/capture suite in 305.2 seconds. This group is retained
 as a proven reduction, but further work should target an explicit lean
 application/link graph rather than repeatedly toggling small global features.
+
+## Phase 2.4: DOM/GFX implementation graph exclusion
+
+This checkpoint is the first large build-graph reduction. The full Firefox
+source checkout remains present and no upstream source directories were
+deleted, but the lean NaiveFox application no longer compiles implementation
+sources from `dom/` or `gfx/`. The networking, NSS/PSM, Neqo, NSPR, XPCOM, and
+required IPC paths remain in the build.
+
+The validation was performed from the empty `obj-naivefox-cold` directory with
+`MOZCONFIG=netwerk/naivefox/mozconfig-minimal`. The clean build initially
+exposed one missing generated IPDL input (`RandomAccessStreamParams.ipdlh`);
+the minimal project-owned IPDL definition was added, configuration was
+regenerated, and the same empty object directory was resumed to a successful
+`gmake -j4` completion. This was not an incremental build against the earlier
+product object directory.
+
+| Measure | Result |
+|---|---:|
+| Clean object directory | `obj-naivefox-cold`, 4.0 GiB |
+| `libxul.so` (opt/debug build output) | 638 MiB |
+| `naivefox` | 5.2 MiB |
+| Cold runtime smoke | PASS |
+| Compiled implementation sources under `dom/` | 0 |
+| Compiled implementation sources under `gfx/` | 0 |
+
+The closure audit found no `gfx` object subtree and no object/archive/shared
+library outputs under the cold `dom` subtree. The only remaining `dom`
+artifacts are generated binding metadata needed by the common build machinery;
+they are not compiled DOM implementation sources. The audit also found zero
+`/dom/` or `/gfx/` implementation includes in generated unified C/C++ sources
+and zero matching compiler source operands across the complete clean-build
+logs.
+
+This is a build-graph checkpoint, not yet a final package-size measurement:
+the 638 MiB `libxul.so` value is an unstripped development artifact and is not
+directly comparable with the stripped staged-package numbers above. Staged
+runtime measurement and further link-closure work are deliberately deferred
+until this checkpoint is reviewed.

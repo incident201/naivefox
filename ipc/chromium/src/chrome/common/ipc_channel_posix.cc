@@ -1123,8 +1123,10 @@ bool ChannelPosix::CreateRawPipe(ChannelHandle* server, ChannelHandle* client) {
 #endif
 
   if (socketpair(AF_UNIX, type, 0, fds) < 0) {
+#ifndef MOZ_NAIVEFOX
     mozilla::ipc::AnnotateCrashReportWithErrno(
         CrashReporter::Annotation::IpcCreatePipeSocketPairErrno, errno);
+#endif
     return false;
   }
 

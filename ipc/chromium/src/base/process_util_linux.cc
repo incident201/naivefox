@@ -14,7 +14,7 @@
 
 #include "mozilla/ipc/LaunchError.h"
 
-#if defined(XP_LINUX) && defined(MOZ_SANDBOX)
+#if defined(XP_LINUX) && defined(MOZ_SANDBOX) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/SandboxLaunch.h"
 #endif
 
@@ -48,7 +48,7 @@ Result<Ok, LaunchError> LaunchApp(const std::vector<std::string>& argv,
                                   ProcessHandle* process_handle) {
   mozilla::UniquePtr<char*[]> argv_cstr(new char*[argv.size() + 1]);
 
-#if defined(XP_LINUX) && defined(MOZ_SANDBOX)
+#if defined(XP_LINUX) && defined(MOZ_SANDBOX) && !defined(MOZ_NAIVEFOX)
   mozilla::SandboxLaunch launcher;
   if (!launcher.Prepare(&options)) {
     return Err(LaunchError("SL::Prepare", errno));

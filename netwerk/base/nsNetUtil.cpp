@@ -6,7 +6,9 @@
 #include "nsNetUtil.h"
 
 #include "../mime/nsMIMEHeaderParamImpl.h"
-#include "DecoderDoctorDiagnostics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "DecoderDoctorDiagnostics.h"
+#endif
 #include "DefaultURI.h"
 #include "HttpLog.h"
 #include "mozIThirdPartyUtil.h"
@@ -14,7 +16,9 @@
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Components.h"
 #include "mozilla/Encoding.h"
-#include "mozilla/LoadContext.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/LoadContext.h"
+#endif
 #include "mozilla/LoadInfo.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Monitor.h"
@@ -26,20 +30,29 @@
 #include "mozilla/StaticPrefs_urlclassifier.h"
 #include "mozilla/StoragePrincipalHelper.h"
 #include "mozilla/TaskQueue.h"
-#include "mozilla/dom/BlobURLProtocolHandler.h"
-#include "mozilla/dom/Document.h"
-#include "mozilla/dom/nsCSPUtils.h"
-#include "mozilla/dom/nsHTTPSOnlyUtils.h"
-#include "mozilla/dom/nsMixedContentBlocker.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BlobURLProtocolHandler.h"
+#  include "mozilla/dom/Document.h"
+#  include "mozilla/dom/nsCSPUtils.h"
+#  include "mozilla/dom/nsHTTPSOnlyUtils.h"
+#  include "mozilla/dom/nsMixedContentBlocker.h"
+#endif
 #include "mozilla/net/HttpBaseChannel.h"
 #include "mozilla/net/RedirectChannelRegistrar.h"
-#include "nsAboutProtocolUtils.h"
 #include "nsBufferedStreams.h"
 #include "nsCategoryCache.h"
-#include "nsChromeProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsChromeProtocolHandler.h"
+#endif
 #include "nsComponentManagerUtils.h"
-#include "nsContentUtils.h"
-#include "nsDataHandler.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "nsDataHandler.h"
+#endif
 #include "nsEscape.h"
 #include "nsFileStreams.h"
 #include "nsHashKeys.h"
@@ -56,7 +69,9 @@
 #include "nsIClassifiedChannel.h"
 #include "nsIContentSniffer.h"
 #include "nsIDownloader.h"
-#include "nsIEnterprisePolicies.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIEnterprisePolicies.h"
+#endif
 #include "nsIFileProtocolHandler.h"
 #include "nsIFileStreams.h"
 #include "nsIFileURL.h"
@@ -68,8 +83,6 @@
 #include "nsILoadContext.h"
 #include "nsIMIMEHeaderParam.h"
 #include "nsINestedURI.h"
-#include "nsINode.h"
-#include "nsIObjectLoadingContent.h"
 #include "nsIPrivateBrowsingChannel.h"
 #include "nsIPropertyBag2.h"
 #include "nsIProtocolProxyService.h"
@@ -85,8 +98,10 @@
 #include "nsIURIWithSpecialOrigin.h"
 #include "nsIViewSourceChannel.h"
 #include "nsInterfaceRequestorAgg.h"
-#include "nsJARURI.h"
-#include "nsJSProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsJARURI.h"
+#  include "nsJSProtocolHandler.h"
+#endif
 #include "nsMimeTypes.h"
 #include "nsNSSComponent.h"
 #include "nsPersistentProperties.h"
@@ -97,27 +112,41 @@
 #include "nsStreamUtils.h"
 #include "nsStringStream.h"
 #include "nsSyncStreamListener.h"
-#include "nsViewSourceHandler.h"
-#ifndef XP_IOS
+#ifndef MOZ_NAIVEFOX
+#  include "nsViewSourceHandler.h"
+#endif
+#if !defined(XP_IOS) && !defined(MOZ_NAIVEFOX)
 #  include "nsIconURI.h"
 #endif
-#include "DecoderTraits.h"
-#include "MediaContainerType.h"
-#include "imgLoader.h"
-#include "mozilla/dom/MediaList.h"
-#include "mozilla/net/CookieJarSettings.h"
-#include "mozilla/net/ExtensionProtocolHandler.h"
-#include "mozilla/net/MozNewTabWallpaperProtocolHandler.h"
-#include "mozilla/net/MozSrcProtocolHandler.h"
-#include "mozilla/net/PageThumbProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "DecoderTraits.h"
+#  include "MediaContainerType.h"
+#  include "imgLoader.h"
+#  include "mozilla/dom/MediaList.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/CookieJarSettings.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/ExtensionProtocolHandler.h"
+#  include "mozilla/net/MozNewTabWallpaperProtocolHandler.h"
+#  include "mozilla/net/MozSrcProtocolHandler.h"
+#  include "mozilla/net/PageThumbProtocolHandler.h"
+#endif
 #include "mozilla/net/SFV.h"
 #include "mozilla/net/SFVService.h"
-#include "nsAboutProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsAboutProtocolHandler.h"
+#endif
 #include "nsCRT.h"
 #include "nsICookieService.h"
 #include "nsIXPConnect.h"
-#include "nsParserConstants.h"
-#include "nsResProtocolHandler.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsParserConstants.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "nsResProtocolHandler.h"
+#endif
 #include "nsServiceManagerUtils.h"
 
 #if defined(MOZ_THUNDERBIRD) || defined(MOZ_SUITE)
@@ -126,12 +155,24 @@
 
 using namespace mozilla;
 using namespace mozilla::net;
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::BlobURLProtocolHandler;
+#endif
 using mozilla::dom::ClientInfo;
 using mozilla::dom::PerformanceStorage;
 using mozilla::dom::ServiceWorkerDescriptor;
 
 #define MAX_RECURSION_COUNT 50
+#ifdef MOZ_NAIVEFOX
+static constexpr char16_t kNullCh = 0;
+static constexpr char16_t kSemicolon = u';';
+static constexpr char16_t kComma = u',';
+static constexpr char16_t kQuote = u'\"';
+static constexpr char16_t kLessThan = u'<';
+static constexpr char16_t kGreaterThan = u'>';
+static constexpr char16_t kBackSlash = u'\\';
+static constexpr char16_t kEqual = u'=';
+#endif
 
 enum class ClassifierMode {
   Disabled = 0,
@@ -339,7 +380,7 @@ namespace {
 void AssertLoadingPrincipalAndClientInfoMatch(
     nsIPrincipal* aLoadingPrincipal, const ClientInfo& aLoadingClientInfo,
     nsContentPolicyType aType) {
-#ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
+#if defined(MOZ_DIAGNOSTIC_ASSERT_ENABLED) && !defined(MOZ_NAIVEFOX)
   // Verify that the provided loading ClientInfo matches the loading
   // principal.  Unfortunately we can't just use nsIPrincipal::Equals() here
   // because of some corner cases:
@@ -404,6 +445,9 @@ nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
                        nsLoadFlags aLoadFlags /* = nsIRequest::LOAD_NORMAL */,
                        nsIIOService* aIoService /* = nullptr */,
                        uint32_t aSandboxFlags /* = 0 */) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   return NS_NewChannelInternal(
       outChannel, aUri,
       nullptr,  // aLoadingNode,
@@ -638,6 +682,7 @@ nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
       aContentPolicyType, aLoadingNode->OwnerDoc()->CookieJarSettings(),
       aPerformanceStorage, aLoadGroup, aCallbacks, aLoadFlags, aIoService,
       aSandboxFlags);
+#endif
 }
 
 nsresult NS_GetIsDocumentChannel(nsIChannel* aChannel, bool* aIsDocument) {
@@ -663,6 +708,7 @@ nsresult NS_GetIsDocumentChannel(nsIChannel* aChannel, bool* aIsDocument) {
     *aIsDocument = false;
     return NS_OK;
   }
+#ifndef MOZ_NAIVEFOX
   nsAutoCString mimeType;
   rv = aChannel->GetContentType(mimeType);
   if (NS_FAILED(rv)) {
@@ -675,6 +721,7 @@ nsresult NS_GetIsDocumentChannel(nsIChannel* aChannel, bool* aIsDocument) {
     *aIsDocument = true;
     return NS_OK;
   }
+#endif
   *aIsDocument = false;
   return NS_OK;
 }
@@ -950,16 +997,20 @@ void NS_TrimHTTPWhitespace(const nsACString& aSource, nsACString& aDest) {
 }
 
 nsresult NS_NewLoadGroup(nsILoadGroup** aResult, nsIPrincipal* aPrincipal) {
+#ifndef MOZ_NAIVEFOX
   using mozilla::LoadContext;
+#endif
   nsresult rv;
 
   nsCOMPtr<nsILoadGroup> group =
       do_CreateInstance(NS_LOADGROUP_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<LoadContext> loadContext = new LoadContext(aPrincipal);
   rv = group->SetNotificationCallbacks(loadContext);
   NS_ENSURE_SUCCESS(rv, rv);
+#endif
 
   group.forget(aResult);
   return rv;
@@ -1045,6 +1096,9 @@ nsresult NS_NewStreamLoaderInternal(
     nsILoadGroup* aLoadGroup /* = nullptr */,
     nsIInterfaceRequestor* aCallbacks /* = nullptr */,
     nsLoadFlags aLoadFlags /* = nsIRequest::LOAD_NORMAL */) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   nsCOMPtr<nsIChannel> channel;
   nsresult rv = NS_NewChannelInternal(
       getter_AddRefs(channel), aUri, aLoadingNode, aLoadingPrincipal,
@@ -1059,6 +1113,7 @@ nsresult NS_NewStreamLoaderInternal(
   rv = NS_NewStreamLoader(outStream, aObserver);
   NS_ENSURE_SUCCESS(rv, rv);
   return channel->AsyncOpen(*outStream);
+#endif
 }
 
 nsresult NS_NewStreamLoader(
@@ -1068,11 +1123,15 @@ nsresult NS_NewStreamLoader(
     nsILoadGroup* aLoadGroup /* = nullptr */,
     nsIInterfaceRequestor* aCallbacks /* = nullptr */,
     nsLoadFlags aLoadFlags /* = nsIRequest::LOAD_NORMAL */) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   NS_ASSERTION(aLoadingNode,
                "Can not create stream loader without a loading Node!");
   return NS_NewStreamLoaderInternal(
       outStream, aUri, aObserver, aLoadingNode, aLoadingNode->NodePrincipal(),
       aSecurityFlags, aContentPolicyType, aLoadGroup, aCallbacks, aLoadFlags);
+#endif
 }
 
 nsresult NS_NewStreamLoader(
@@ -1927,6 +1986,7 @@ nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
         .Finalize(aURI);
   }
 
+#ifndef MOZ_NAIVEFOX
   if (scheme.EqualsLiteral("data")) {
     return nsDataHandler::CreateNewURI(aSpec, aCharset, aBaseURI, aURI);
   }
@@ -2019,8 +2079,12 @@ nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
   }
 
   if (scheme.EqualsLiteral("about")) {
+#ifdef MOZ_NAIVEFOX
+    return NS_ERROR_UNKNOWN_PROTOCOL;
+#else
     return nsAboutProtocolHandler::CreateNewURI(aSpec, aCharset, aBaseURI,
                                                 aURI);
+#endif
   }
 
   if (scheme.EqualsLiteral("jar")) {
@@ -2029,12 +2093,13 @@ nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
         .Finalize(aURI);
   }
 
-#ifndef XP_IOS
+#  ifndef XP_IOS
   if (scheme.EqualsLiteral("moz-icon")) {
     return NS_MutateURI(new nsMozIconURI::Mutator())
         .SetSpec(aSpec)
         .Finalize(aURI);
   }
+#  endif
 #endif
 
 #ifdef MOZ_WIDGET_GTK
@@ -2287,12 +2352,16 @@ bool NS_IsSafeMethodNav(nsIChannel* aChannel) {
 
 void NS_WrapAuthPrompt(nsIAuthPrompt* aAuthPrompt,
                        nsIAuthPrompt2** aAuthPrompt2) {
+#ifdef MOZ_NAIVEFOX
+  *aAuthPrompt2 = nullptr;
+#else
   nsCOMPtr<nsIAuthPromptAdapterFactory> factory;
   factory = mozilla::components::AuthPromptAdapter::Service();
   if (!factory) return;
 
   NS_WARNING("Using deprecated nsIAuthPrompt");
   factory->CreateAdapter(aAuthPrompt, aAuthPrompt2);
+#endif
 }
 
 void NS_QueryAuthPrompt2(nsIInterfaceRequestor* aCallbacks,
@@ -2460,6 +2529,7 @@ bool NS_SecurityCompareURIs(nsIURI* aSourceURI, nsIURI* aTargetURI,
   }
 #endif
 
+#ifndef MOZ_NAIVEFOX
   if (sourceBaseURI->SchemeIs(BLOBURI_SCHEME)) {
     // NOTE: OriginAttributes are discarded by GetURI, so can be default.
     nsCOMPtr<nsIPrincipal> sourceBlobPrincipal;
@@ -2481,6 +2551,7 @@ bool NS_SecurityCompareURIs(nsIURI* aSourceURI, nsIURI* aTargetURI,
     }
     targetBaseURI = targetBlobPrincipal->GetURI();
   }
+#endif
 
   if (!sourceBaseURI || !targetBaseURI) return false;
 
@@ -2789,12 +2860,15 @@ bool NS_IsAboutBlankAllowQueryAndFragment(nsIURI* uri) {
     return false;
   }
 
-  nsAutoCString name;
-  if (NS_FAILED(NS_GetAboutModuleName(uri, name))) {
+  nsAutoCString spec;
+  if (NS_FAILED(uri->GetSpec(spec))) {
     return false;
   }
-
-  return name.EqualsLiteral("blank");
+  int32_t end = spec.FindCharInSet("?#");
+  if (end >= 0) {
+    spec.Truncate(end);
+  }
+  return spec.EqualsLiteral("about:blank");
 }
 
 bool NS_IsAboutSrcdoc(nsIURI* uri) {
@@ -2953,6 +3027,9 @@ bool handleResultFunc(bool aAllowSTS, bool aIsStsHost) {
 // First, or an enterprise HttpsOnly site policy should upgrade the given
 // request.
 static bool ShouldSecureUpgradeNoHSTS(nsIURI* aURI, nsILoadInfo* aLoadInfo) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   // 2. CSP upgrade-insecure-requests
   if (aLoadInfo->GetUpgradeInsecureRequests()) {
     // let's log a message to the console that we are upgrading a request
@@ -3068,6 +3145,7 @@ static bool ShouldSecureUpgradeNoHSTS(nsIURI* aURI, nsILoadInfo* aLoadInfo) {
   }
 
   return false;
+#endif
 }
 
 // Check if channel should be upgraded. check in the following order:
@@ -3104,10 +3182,12 @@ nsresult NS_ShouldSecureUpgrade(
   }
   // If it is a mixed content trustworthy loopback, then we shouldn't upgrade
   // it.
+#ifndef MOZ_NAIVEFOX
   if (nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackURL(aURI)) {
     aShouldUpgrade = false;
     return NS_OK;
   }
+#endif
   // If no loadInfo exist there is nothing to upgrade here.
   if (!aLoadInfo) {
     aShouldUpgrade = false;
@@ -3235,6 +3315,9 @@ nsresult NS_GetSecureUpgradedURI(nsIURI* aURI, nsIURI** aUpgradedURI) {
 }
 
 nsresult NS_CompareLoadInfoAndLoadContext(nsIChannel* aChannel) {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
 
   nsCOMPtr<nsILoadContext> loadContext;
@@ -3295,6 +3378,7 @@ nsresult NS_CompareLoadInfoAndLoadContext(nsIChannel* aChannel) {
              "loadInfo are not the same!");
 
   return NS_OK;
+#endif
 }
 
 nsresult NS_SetRequestBlockingReason(nsIChannel* channel, uint32_t reason) {
@@ -3931,6 +4015,7 @@ bool IsFontMimeType(const nsAString& aType) {
   return false;
 }
 
+#ifndef MOZ_NAIVEFOX
 static constexpr nsAttrValue::EnumTableEntry kAsAttributeTable[] = {
     {"", DESTINATION_INVALID},      {"audio", DESTINATION_AUDIO},
     {"font", DESTINATION_FONT},     {"image", DESTINATION_IMAGE},
@@ -3938,8 +4023,10 @@ static constexpr nsAttrValue::EnumTableEntry kAsAttributeTable[] = {
     {"track", DESTINATION_TRACK},   {"video", DESTINATION_VIDEO},
     {"fetch", DESTINATION_FETCH},   {"json", DESTINATION_JSON},
     {"text", DESTINATION_TEXT}};
+#endif
 
 void ParseAsValue(const nsAString& aValue, nsAttrValue& aResult) {
+#ifndef MOZ_NAIVEFOX
   DebugOnly<bool> success =
       aResult.ParseEnumValue(aValue, kAsAttributeTable, false,
                              // default value is a empty string
@@ -3947,9 +4034,13 @@ void ParseAsValue(const nsAString& aValue, nsAttrValue& aResult) {
                              // understand
                              &kAsAttributeTable[0]);
   MOZ_ASSERT(success);
+#endif
 }
 
 nsContentPolicyType AsValueToContentPolicy(const nsAttrValue& aValue) {
+#ifdef MOZ_NAIVEFOX
+  return nsIContentPolicy::TYPE_INVALID;
+#else
   switch (aValue.GetEnumValue()) {
     case DESTINATION_INVALID:
       return nsIContentPolicy::TYPE_INVALID;
@@ -3975,6 +4066,7 @@ nsContentPolicyType AsValueToContentPolicy(const nsAttrValue& aValue) {
       return nsIContentPolicy::TYPE_TEXT;
   }
   return nsIContentPolicy::TYPE_INVALID;
+#endif
 }
 
 // TODO: implement this using nsAttrValue's destination enums when support for
@@ -3999,6 +4091,9 @@ bool IsScriptLikeOrInvalid(const nsAString& aAs) {
 bool CheckPreloadAttrs(const nsAttrValue& aAs, const nsAString& aType,
                        const nsAString& aMedia,
                        mozilla::dom::Document* aDocument) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   nsContentPolicyType policyType = AsValueToContentPolicy(aAs);
   if (policyType == nsIContentPolicy::TYPE_INVALID) {
     return false;
@@ -4055,10 +4150,12 @@ bool CheckPreloadAttrs(const nsAttrValue& aAs, const nsAString& aType,
     return nsContentUtils::IsJsonMimeType(type);
   }
   return false;
+#endif
 }
 
 void WarnIgnoredPreload(const mozilla::dom::Document& aDoc, nsIURI* aURI,
                         const nsAString& aSrcset) {
+#ifndef MOZ_NAIVEFOX
   AutoTArray<nsString, 1> params;
   if (aURI) {
     nsCString uri = nsContentUtils::TruncatedURLForDisplay(aURI);
@@ -4069,6 +4166,7 @@ void WarnIgnoredPreload(const mozilla::dom::Document& aDoc, nsIURI* aURI,
   nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "DOM"_ns, &aDoc,
                                   PropertiesFile::DOM_PROPERTIES,
                                   "PreloadIgnoredInvalidAttr", params);
+#endif
 }
 
 bool NS_ParseUseAsDictionary(const nsACString& aValue, nsACString& aMatch,

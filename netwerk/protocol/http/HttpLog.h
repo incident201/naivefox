@@ -15,7 +15,9 @@
  *  Yes, this is kludgy.
  *******************************************************************************/
 
-#include "mozilla/net/NeckoChild.h"
+#include "mozilla/Logging.h"
+#include "mozilla/Maybe.h"
+#include "nsString.h"
 
 // Get rid of Chromium's LOG definition
 #undef LOG

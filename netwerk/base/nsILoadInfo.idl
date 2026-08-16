@@ -25,7 +25,11 @@ native LoadContextRef(already_AddRefed<nsISupports>);
 #include "mozilla/LoadTainting.h"
 #include "mozilla/OriginAttributes.h"
 #include "mozilla/UniquePtr.h"
-#include "nsRFPService.h"
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla/NaiveFoxRFPTarget.h"
+#else
+#  include "nsRFPService.h"
+#endif
 #include "nsStringFwd.h"
 
 namespace mozilla {

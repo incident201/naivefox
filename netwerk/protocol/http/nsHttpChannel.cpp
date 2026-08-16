@@ -10,22 +10,30 @@
 #include "AlternateServices.h"
 #include "CacheControlParser.h"
 #include "CacheStorageService.h"
-#include "CookieService.h"
-#include "HttpChannelParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "CookieService.h"
+#endif
 #include "HttpLog.h"
 #include "HttpTrafficAnalyzer.h"
-#include "HttpTransactionParent.h"
-#include "InterceptedHttpChannel.h"
-#include "LNAPermissionRequest.h"
 #include "LoadContextInfo.h"
-#include "NetworkMarker.h"
-#include "ThirdPartyUtil.h"
-#include "mozilla/AntiTrackingRedirectHeuristic.h"
-#include "mozilla/AntiTrackingUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "HttpChannelParent.h"
+#  include "HttpTransactionParent.h"
+#  include "InterceptedHttpChannel.h"
+#  include "LNAPermissionRequest.h"
+#  include "NetworkMarker.h"
+#  include "ThirdPartyUtil.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/AntiTrackingRedirectHeuristic.h"
+#  include "mozilla/AntiTrackingUtils.h"
+#endif
 #include "mozilla/Attributes.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Components.h"
-#include "mozilla/ContentBlockingAllowList.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ContentBlockingAllowList.h"
+#endif
 #include "mozilla/DebugOnly.h"
 #include "mozilla/FlowMarkers.h"
 #include "mozilla/NullPrincipal.h"
@@ -39,39 +47,62 @@
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StaticPrefs_security.h"
-#include "mozilla/StoragePrincipalHelper.h"
-#include "mozilla/Telemetry.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../../naivefox/StoragePrincipalHelper.h"
+#else
+#  include "mozilla/StoragePrincipalHelper.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Telemetry.h"
+#endif
 #include "mozilla/TimeStamp.h"
 #include "mozilla/ToString.h"
 #include "mozilla/dom/ClientInfo.h"
-#include "mozilla/dom/Document.h"
-#include "mozilla/dom/NavigatorLogin.h"
-#include "mozilla/dom/PerformanceStorage.h"
-#include "mozilla/dom/PolicyContainer.h"
-#include "mozilla/dom/ReferrerInfo.h"
-#include "mozilla/dom/SecFetch.h"
-#include "mozilla/dom/ServiceWorkerUtils.h"
-#include "mozilla/dom/WindowGlobalParent.h"
-#include "mozilla/dom/nsCSPContext.h"
-#include "mozilla/dom/nsHTTPSOnlyStreamListener.h"
-#include "mozilla/dom/nsHTTPSOnlyUtils.h"
-#include "mozilla/extensions/StreamFilterParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/Document.h"
+#  include "mozilla/dom/NavigatorLogin.h"
+#  include "mozilla/dom/PerformanceStorage.h"
+#  include "mozilla/dom/PolicyContainer.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ReferrerInfo.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/SecFetch.h"
+#  include "mozilla/dom/ServiceWorkerUtils.h"
+#  include "mozilla/dom/WindowGlobalParent.h"
+#  include "mozilla/dom/nsCSPContext.h"
+#  include "mozilla/dom/nsHTTPSOnlyStreamListener.h"
+#  include "mozilla/dom/nsHTTPSOnlyUtils.h"
+#  include "mozilla/extensions/StreamFilterParent.h"
+#endif
 #include "mozilla/glean/AntitrackingMetrics.h"
 #include "mozilla/glean/DomSecurityMetrics.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
-#include "mozilla/net/AsyncUrlChannelClassifier.h"
-#include "mozilla/net/CaptivePortalService.h"
-#include "mozilla/net/ChannelClassifierUtils.h"
-#include "mozilla/net/CookieJarSettings.h"
-#include "mozilla/net/CookieServiceParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/AsyncUrlChannelClassifier.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/CaptivePortalService.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/ChannelClassifierUtils.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/CookieJarSettings.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/CookieServiceParent.h"
+#endif
 #include "mozilla/net/NeckoChannelParams.h"
 #include "mozilla/net/NoVarySearchUtils.h"
 #include "mozilla/net/OpaqueResponseUtils.h"
 #include "mozilla/net/SFVService.h"
-#include "mozilla/net/SocketProcessParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessParent.h"
+#endif
 #include "mozilla/net/TRRService.h"
-#include "mozilla/net/URLPatternGlue.h"
 #include "mozilla/net/urlpattern_glue.h"
 #include "netCore.h"
 #include "nsCOMPtr.h"
@@ -80,9 +111,17 @@
 #include "nsChannelClassifier.h"
 #include "nsCharSeparatedTokenizer.h"
 #include "nsComponentManagerUtils.h"
-#include "nsContentSecurityManager.h"
-#include "nsContentSecurityUtils.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentSecurityManager.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentSecurityUtils.h"
+#endif
+#ifdef MOZ_NAIVEFOX
+#  include "../../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsDNSPrefetch.h"
 #include "nsError.h"
 #include "nsEscape.h"
@@ -105,12 +144,15 @@
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsINetworkErrorLogging.h"
-#include "nsINetworkInterceptController.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsINetworkInterceptController.h"
+#endif
 #include "nsINetworkLinkService.h"
 #include "nsIOService.h"
 #include "nsIPrincipal.h"
 #include "nsIPrompt.h"
 #include "nsIProtocolProxyService2.h"
+#include "nsIProgressEventSink.h"
 #include "nsIRedirectResultListener.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
@@ -127,12 +169,15 @@
 #include "nsISystemInfo.h"
 #include "nsITransportSecurityInfo.h"
 #include "nsIURIMutator.h"
-#include "nsIURLQueryStringStripper.h"
-#include "nsIWebProgressListener.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIURLQueryStringStripper.h"
+#endif
 #include "nsIWebTransport.h"
 #include "nsInputStreamPump.h"
 #include "nsMimeTypes.h"
-#include "nsMixedContentBlocker.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsMixedContentBlocker.h"
+#endif
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsPrintfCString.h"
@@ -155,8 +200,10 @@
 #  include "mozilla/StaticPrefs_fuzzing.h"
 #endif
 
-#include "mozilla/dom/ReportDeliver.h"
-#include "mozilla/dom/ReportingHeader.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ReportDeliver.h"
+#  include "mozilla/dom/ReportingHeader.h"
+#endif
 
 namespace mozilla {
 
@@ -165,6 +212,14 @@ using namespace dom;
 namespace net {
 
 namespace {
+
+static bool BrowsingContextForcesOffline(dom::BrowsingContext* aContext) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
+  return aContext && aContext->Top()->GetForceOffline();
+#endif
+}
 
 // True if the local cache should be bypassed when processing a request.
 #define BYPASS_LOCAL_CACHE(loadFlags, isPreferCacheLoadOverBypass) \
@@ -267,6 +322,7 @@ nsresult Hash(const char* buf, nsACString& hash) {
   return NS_OK;
 }
 
+#ifndef MOZ_NAIVEFOX
 class CookieVisitor final {
  public:
   explicit CookieVisitor(nsHttpResponseHead* aResponseHead) {
@@ -408,6 +464,7 @@ void MaybeInitializeCookieProcessingGuard(
 
   aGuard.Initialize(cookieServiceParent);
 }
+#endif
 
 }  // unnamed namespace
 
@@ -558,6 +615,9 @@ nsHttpChannel::LogMimeTypeMismatch(const nsACString& aMessageName,
 //-----------------------------------------------------------------------------
 
 void nsHttpChannel::AddStorageAccessHeadersToRequest() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (!StaticPrefs::dom_storage_access_enabled() ||
       !StaticPrefs::dom_storage_access_headers_enabled()) {
     return;
@@ -593,6 +653,7 @@ void nsHttpChannel::AddStorageAccessHeadersToRequest() {
     case nsILoadInfo::NoStoragePermission:
       break;
   }
+#endif
 }
 
 bool nsHttpChannel::StorageAccessReloadedChannel() {
@@ -827,7 +888,9 @@ nsresult nsHttpChannel::ContinuePrepareToConnect() {
 
 void nsHttpChannel::HandleContinueCancellingByURLClassifier(
     nsresult aErrorCode) {
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(ChannelClassifierUtils::IsClassifierBlockingErrorCode(aErrorCode));
+#endif
   MOZ_ASSERT(!mCallOnResume, "How did that happen?");
 
   if (mSuspendCount) {
@@ -892,6 +955,7 @@ nsresult nsHttpChannel::OnBeforeConnect() {
   // header for *all* navigational requests instead of all requests as
   // defined in the spec, see:
   // https://www.w3.org/TR/upgrade-insecure-requests/#preference
+#ifndef MOZ_NAIVEFOX
   ExtContentPolicyType type = mLoadInfo->GetExternalContentPolicyType();
 
   if (type == ExtContentPolicy::TYPE_DOCUMENT ||
@@ -920,6 +984,7 @@ nsresult nsHttpChannel::OnBeforeConnect() {
       return AsyncCall(&nsHttpChannel::HandleAsyncRedirectToUnstrippedURI);
     }
   }
+#endif
 
   nsCOMPtr<nsIPrincipal> resultPrincipal;
   if (!mURI->SchemeIs("https")) {
@@ -942,14 +1007,16 @@ nsresult nsHttpChannel::OnBeforeConnect() {
   // SecurityInfo.sys.mjs
   mLoadInfo->SetHstsStatus(isSecureURI);
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
   // If bypassing the cache and we're forced offline
   // we can just return the error here.
-  if (bc && bc->Top()->GetForceOffline() &&
+  if (BrowsingContextForcesOffline(bc) &&
       BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass())) {
     return NS_ERROR_OFFLINE;
   }
+#endif
 
   // At this point it is no longer possible to call
   // HttpBaseChannel::UpgradeToSecure.
@@ -982,6 +1049,7 @@ nsresult nsHttpChannel::OnBeforeConnect() {
       rv = NS_ShouldSecureUpgrade(
           mURI, mLoadInfo, resultPrincipal, LoadAllowSTS(), originAttributes,
           shouldUpgrade, std::move(resultCallback), willCallback);
+#ifndef MOZ_NAIVEFOX
       // If the request gets upgraded because of the HTTPS-Only mode, but no
       // event listener has been registered so far, we want to do that here.
       uint32_t httpOnlyStatus = mLoadInfo->GetHttpsOnlyStatus();
@@ -996,6 +1064,7 @@ nsresult nsHttpChannel::OnBeforeConnect() {
         httpOnlyStatus |= nsILoadInfo::HTTPS_ONLY_UPGRADED_LISTENER_REGISTERED;
         mLoadInfo->SetHttpsOnlyStatus(httpOnlyStatus);
       }
+#endif
       LOG(
           ("nsHttpChannel::OnBeforeConnect "
            "[this=%p willCallback=%d rv=%" PRIx32 "]\n",
@@ -1066,9 +1135,13 @@ nsresult nsHttpChannel::MaybeUseHTTPSRRForUpgrade(bool aShouldUpgrade,
     return aStatus;
   }
 
+#ifdef MOZ_NAIVEFOX
+  bool forceOffline = false;
+#else
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-  bool forceOffline = bc && bc->Top()->GetForceOffline();
+  bool forceOffline = BrowsingContextForcesOffline(bc);
+#endif
 
   if (mURI->SchemeIs("https") || aShouldUpgrade || !LoadUseHTTPSSVC() ||
       forceOffline) {
@@ -1342,17 +1415,22 @@ nsresult nsHttpChannel::HandleOverrideResponse() {
   // This block parses the cookie header, collects any cookie changes,
   // and sends them to the parent actor.
   {
+#ifndef MOZ_NAIVEFOX
     RefPtr<HttpChannelParent> httpParent;
     RefPtr<CookieObserver> cookieObserver;
 
     CookieServiceParent::CookieProcessingGuard cookieProcessingGuard;
     MaybeInitializeCookieProcessingGuard(
         this, cookieProcessingGuard, cookieObserver, httpParent, statusCode);
+#endif
 
+#ifndef MOZ_NAIVEFOX
     // Handle Set-Cookie headers as if the response was from networking.
     CookieVisitor cookieVisitor(mResponseHead.get());
     SetCookieHeaders(cookieVisitor.CookieHeaders());
+#endif
 
+#ifndef MOZ_NAIVEFOX
     if (cookieObserver) {
       nsTArray<CookieChange> cookieChanges;
       cookieObserver->StealChanges(cookieChanges);
@@ -1362,6 +1440,7 @@ nsresult nsHttpChannel::HandleOverrideResponse() {
         httpParent->SetCookieChanges(std::move(cookieChanges));
       }
     }
+#endif
   }
 
   rv = ProcessWAICTHeader();
@@ -1532,25 +1611,34 @@ nsresult nsHttpChannel::ContinueConnect() {
   AUTO_PROFILER_FLOW_MARKER("nsHttpChannel::ContinueConnect", NETWORK,
                             Flow::FromPointer(this));
   if (!LoadIsCorsPreflightDone() && LoadRequireCORSPreflight()) {
+#ifdef MOZ_NAIVEFOX
+    return NS_ERROR_NOT_AVAILABLE;
+#else
     MOZ_ASSERT(!mPreflightChannel);
     nsresult rv = nsCORSListenerProxy::StartCORSPreflight(
         this, this, mUnsafeHeaders, getter_AddRefs(mPreflightChannel));
     return rv;
+#endif
   }
 
   MOZ_RELEASE_ASSERT(!LoadRequireCORSPreflight() || LoadIsCorsPreflightDone(),
                      "CORS preflight must have been finished by the time we "
                      "do the rest of ContinueConnect");
 
+#ifdef MOZ_NAIVEFOX
+  bool forceOffline = false;
+#else
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
+  bool forceOffline = BrowsingContextForcesOffline(bc);
+#endif
 
   // we may or may not have a cache entry at this point
   if (mCacheEntry) {
     // read straight from the cache if possible...
     if (CachedContentIsValid()) {
       // If we're forced offline, and set to bypass the cache, return offline.
-      if (bc && bc->Top()->GetForceOffline() &&
+      if (forceOffline &&
           BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass())) {
         return NS_ERROR_OFFLINE;
       }
@@ -1592,7 +1680,7 @@ nsresult nsHttpChannel::ContinueConnect() {
   }
 
   // We're about to hit the network. Don't if we're forced offline.
-  if (bc && bc->Top()->GetForceOffline()) {
+  if (forceOffline) {
     return NS_ERROR_OFFLINE;
   }
 
@@ -1700,12 +1788,17 @@ void nsHttpChannel::SpeculativeConnect() {
   // don't speculate if we are offline, when doing http upgrade (i.e.
   // websockets bootstrap), or if we can't do keep-alive (because then we
   // couldn't reuse the speculative connection anyhow).
+#ifdef MOZ_NAIVEFOX
+  bool forceOffline = false;
+#else
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
+  bool forceOffline = BrowsingContextForcesOffline(bc);
+#endif
 
   if (gIOService->IsOffline() || mUpgradeProtocolCallback ||
       !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) ||
-      (bc && bc->Top()->GetForceOffline())) {
+      forceOffline) {
     return;
   }
 
@@ -1744,15 +1837,19 @@ void nsHttpChannel::DoNotifyListenerCleanup() {
 void nsHttpChannel::ReleaseListeners() {
   HttpBaseChannel::ReleaseListeners();
 
+#ifndef MOZ_NAIVEFOX
   mChannelClassifier = nullptr;
+#endif
   mWarningReporter = nullptr;
   mEarlyHintObserver = nullptr;
   mWebTransportSessionEventListener = nullptr;
 
+#ifndef MOZ_NAIVEFOX
   for (StreamFilterRequest& request : mStreamFilterRequests) {
     request.mPromise->Reject(false, __func__);
   }
   mStreamFilterRequests.Clear();
+#endif
 }
 
 void nsHttpChannel::DoAsyncAbort(nsresult aStatus) {
@@ -1881,10 +1978,12 @@ nsresult nsHttpChannel::SetupChannelForTransaction() {
     mCaps |= NS_HTTP_LOAD_ANONYMOUS_CONNECT_ALLOW_CLIENT_CERT;
   }
 
+#ifndef MOZ_NAIVEFOX
   if (nsContentUtils::ShouldResistFingerprinting(this,
                                                  RFPTarget::HttpUserAgent)) {
     mCaps |= NS_HTTP_USE_RFP;
   }
+#endif
 
   // Use the URI path if not proxying (transparent proxying such as proxy
   // CONNECT does not count here). Also figure out what HTTP version to use.
@@ -2046,6 +2145,11 @@ nsresult nsHttpChannel::SetupChannelForTransaction() {
 // flags in load info
 LNAPermission nsHttpChannel::UpdateLocalNetworkAccessPermissions(
     const nsACString& aPermissionType) {
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox opens only privileged system-principal channels. There is no DOM
+  // permission prompt or browsing context in this single-process client.
+  return LNAPermission::Granted;
+#else
   // We should arrive at this point after LNA has been detected at the
   // transaction layer and has errored
 
@@ -2148,6 +2252,7 @@ LNAPermission nsHttpChannel::UpdateLocalNetworkAccessPermissions(
   // Ideally we should not hit this case once the feature is fully shipped
   userPerms = LNAPermission::Granted;
   return userPerms;
+#endif
 }
 
 nsresult nsHttpChannel::InitTransaction() {
@@ -2157,7 +2262,9 @@ nsresult nsHttpChannel::InitTransaction() {
   NS_NewNotificationCallbacksAggregation(mCallbacks, mLoadGroup,
                                          getter_AddRefs(callbacks));
 
-  // create the transaction object
+  // Create the transaction object. NaiveFox always owns networking in this
+  // process, so it never constructs the socket-process transaction actor.
+#ifndef MOZ_NAIVEFOX
   if (nsIOService::UseSocketProcess()) {
     if (NS_WARN_IF(!gIOService->SocketProcessReady())) {
       return NS_ERROR_NOT_AVAILABLE;
@@ -2193,7 +2300,9 @@ nsresult nsHttpChannel::InitTransaction() {
           socketProcess->SendPHttpTransactionConstructor(transParent));
     }
     mTransaction = transParent;
-  } else {
+  } else
+#endif
+  {
     mTransaction = new nsHttpTransaction();
     LOG1(("nsHttpChannel %p created nsHttpTransaction %p\n", this,
           mTransaction.get()));
@@ -2209,8 +2318,11 @@ nsresult nsHttpChannel::InitTransaction() {
   HttpTrafficCategory category = CreateTrafficCategory();
   mTransaction->SetIsForWebTransport(!!mWebTransportSessionEventListener);
 
+#ifndef MOZ_NAIVEFOX
+#ifndef MOZ_NAIVEFOX
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
+#endif
 
   nsILoadInfo::IPAddressSpace parentAddressSpace =
       nsILoadInfo::IPAddressSpace::Unknown;
@@ -2247,6 +2359,10 @@ nsresult nsHttpChannel::InitTransaction() {
   if (bc && bc->GetIsCaptivePortalTab()) {
     mLNAPermission.mLocalNetworkPermission = LNAPermission::Granted;
   }
+#else
+  nsILoadInfo::IPAddressSpace parentAddressSpace =
+      nsILoadInfo::IPAddressSpace::Unknown;
+#endif
 
   rv = mTransaction->Init(mCaps, mConnectionInfo, &mRequestHead, mUploadStream,
                           mReqContentLength, GetCurrentSerialEventTarget(),
@@ -2263,6 +2379,9 @@ nsresult nsHttpChannel::InitTransaction() {
 }
 
 HttpTrafficCategory nsHttpChannel::CreateTrafficCategory() {
+#ifdef MOZ_NAIVEFOX
+  return HttpTrafficCategory::eInvalid;
+#else
   MOZ_ASSERT(!mFirstPartyClassificationFlags ||
              !mThirdPartyClassificationFlags);
 
@@ -2309,6 +2428,7 @@ HttpTrafficCategory nsHttpChannel::CreateTrafficCategory() {
       mLoadInfo->GetLoadingPrincipal()->IsSystemPrincipal();
   return HttpTrafficAnalyzer::CreateTrafficCategory(
       NS_UsePrivateBrowsing(this), isSystemPrincipal, isThirdParty, cos, tc);
+#endif
 }
 
 void nsHttpChannel::SetCachedContentType() {
@@ -2399,6 +2519,7 @@ nsresult nsHttpChannel::CallOnStartRequest() {
 
   mEarlyHintObserver = nullptr;
 
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::network_http_network_error_logging_enabled() &&
       mResponseHead && mResponseHead->HasHeader(nsHttp::NEL) &&
       LoadUsedNetwork()) {
@@ -2411,6 +2532,7 @@ nsresult nsHttpChannel::CallOnStartRequest() {
       nel->RegisterPolicy(this);
     }
   }
+#endif
 
   if (LoadOnStartRequestCalled()) {
     // This can only happen when a range request loading rest of the data
@@ -2535,12 +2657,15 @@ nsresult nsHttpChannel::CallOnStartRequest() {
       RefPtr<nsInputStreamPump> pump = do_QueryObject(mTransactionPump);
       if (pump) {
         pump->PeekStream(CallTypeSniffers, thisChannel);
-      } else {
+      }
+#ifndef MOZ_NAIVEFOX
+      else {
         MOZ_ASSERT(nsIOService::UseSocketProcess());
         RefPtr<HttpTransactionParent> trans = do_QueryObject(mTransactionPump);
         MOZ_ASSERT(trans);
         trans->SetSniffedTypeToChannel(CallTypeSniffers, thisChannel);
       }
+#endif
     }
   }
 
@@ -2598,6 +2723,7 @@ nsresult nsHttpChannel::CallOnStartRequest() {
   //
   // We only do this for unwrapped document loads, since we might want to send
   // parts to the external protocol handler without leaving the parent process.
+#ifndef MOZ_NAIVEFOX
   bool mustRunStreamFilterInParent = false;
   nsCOMPtr<nsIParentChannel> parentChannel;
   NS_QueryNotificationCallbacks(this, parentChannel);
@@ -2652,6 +2778,7 @@ nsresult nsHttpChannel::CallOnStartRequest() {
     request.mPromise = nullptr;
   }
   mStreamFilterRequests.Clear();
+#endif
   StoreTracingEnabled(false);
 
   if (mResponseHead && !mResponseHead->HasContentCharset()) {
@@ -2868,6 +2995,9 @@ nsresult nsHttpChannel::ProcessHSTSHeader(nsITransportSecurityInfo* aSecInfo) {
 
 // https://github.com/rozbb/waict-integrity-draft/
 nsresult nsHttpChannel::ProcessWAICTHeader() {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
 #ifdef NIGHTLY_BUILD
   if (!StaticPrefs::security_waict_downgrade_protection_enable()) {
     return NS_OK;
@@ -2931,6 +3061,7 @@ nsresult nsHttpChannel::ProcessWAICTHeader() {
 #endif
 
   return NS_OK;
+#endif  // MOZ_NAIVEFOX
 }
 
 /**
@@ -2995,9 +3126,9 @@ void nsHttpChannel::ProcessSSLInformation() {
 
   uint32_t state;
   if (NS_SUCCEEDED(mSecurityInfo->GetSecurityState(&state)) &&
-      (state & nsIWebProgressListener::STATE_IS_BROKEN)) {
+      (state & 1U)) {
     // Send weak crypto warnings to the web console
-    if (state & nsIWebProgressListener::STATE_USES_WEAK_CRYPTO) {
+    if (state & 33554432U) {
       nsString consoleErrorTag = u"WeakCipherSuiteWarning"_ns;
       nsString consoleErrorCategory = u"SSL"_ns;
       (void)AddSecurityMessage(consoleErrorTag, consoleErrorCategory);
@@ -3109,6 +3240,7 @@ nsresult nsHttpChannel::ProcessResponse(nsHttpConnectionInfo* aConnInfo) {
         .Add();
   }
 
+#ifndef MOZ_NAIVEFOX
   if (Telemetry::CanRecordPrereleaseData()) {
     // Gather data on various response status to monitor any increased frequency
     // of auth failures due to Bug 1896350
@@ -3198,6 +3330,7 @@ nsresult nsHttpChannel::ProcessResponse(nsHttpConnectionInfo* aConnInfo) {
         break;
     }
   }
+#endif
 
   // We use GetReferringPage because mReferrerInfo may not be set at all(this is
   // especially useful in xpcshell tests, where we don't have an actual pageload
@@ -3260,6 +3393,7 @@ nsresult nsHttpChannel::ContinueProcessResponse1(
     // This block parses the cookie header, collects any cookie changes,
     // and sends them to the parent actor.
     {
+#ifndef MOZ_NAIVEFOX
       RefPtr<CookieObserver> cookieObserver;
       RefPtr<HttpChannelParent> httpParent;
       CookieServiceParent::CookieProcessingGuard cookieProcessingGuard;
@@ -3274,10 +3408,14 @@ nsresult nsHttpChannel::ContinueProcessResponse1(
                                              cookieObserver, httpParent,
                                              httpStatus);
       }
+#endif
 
+#ifndef MOZ_NAIVEFOX
       CookieVisitor cookieVisitor(mResponseHead.get());
       SetCookieHeaders(cookieVisitor.CookieHeaders());
+#endif
 
+#ifndef MOZ_NAIVEFOX
       if (cookieObserver) {
         nsTArray<CookieChange> cookieChanges;
         cookieObserver->StealChanges(cookieChanges);
@@ -3287,6 +3425,7 @@ nsresult nsHttpChannel::ContinueProcessResponse1(
           httpParent->SetCookieChanges(std::move(cookieChanges));
         }
       }
+#endif
     }
 
     rv = ProcessWAICTHeader();
@@ -3519,7 +3658,12 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
         // auth header if cached credentials should be attempted.
         rv = NS_ERROR_FAILURE;
       } else if (httpStatus == 401 &&
-                 !nsContentSecurityUtils::CheckCSPFrameAncestorAndXFO(this)) {
+#ifndef MOZ_NAIVEFOX
+                 !nsContentSecurityUtils::CheckCSPFrameAncestorAndXFO(this)
+#else
+                 false
+#endif
+      ) {
         // CSP Frame Ancestor and X-Frame-Options check has failed
         // Do not prompt http auth - Bug 1629307
         rv = NS_ERROR_FAILURE;
@@ -3551,7 +3695,7 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
              "credentials"));
         Suspend();
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
         // This is for test purposes only. See bug 1683176 for details.
         gHttpHandler->OnTransactionSuspendedDueToAuthentication(this);
 #endif
@@ -3650,10 +3794,12 @@ nsresult nsHttpChannel::ContinueProcessResponseAfterNotModified(nsresult aRv) {
 }
 
 static void ReportHttpResponseVersion(HttpVersion version) {
+#ifndef MOZ_NAIVEFOX
   if (Telemetry::CanRecordPrereleaseData()) {
     glean::http::response_version.AccumulateSingleSample(
         static_cast<uint32_t>(version));
   }
+#endif
   mozilla::glean::networking::http_response_version
       .Get(HttpVersionToTelemetryLabel(version))
       .Add(1);
@@ -3676,9 +3822,11 @@ void nsHttpChannel::UpdateCacheDisposition(bool aSuccessfulReval,
   }
   mCacheDisposition = cacheDisposition;
 
+#ifndef MOZ_NAIVEFOX
   if (Telemetry::CanRecordPrereleaseData()) {
     AccumulateCacheHitTelemetry(cacheDisposition, this);
   }
+#endif
 
   ReportHttpResponseVersion(mResponseHead->Version());
 }
@@ -4007,6 +4155,9 @@ nsresult nsHttpChannel::ContinueProcessNormal3() {
 }
 
 nsresult nsHttpChannel::PromptTempRedirect() {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!gHttpHandler->PromptTempRedirect()) {
     return NS_OK;
   }
@@ -4034,6 +4185,7 @@ nsresult nsHttpChannel::PromptTempRedirect() {
   }
 
   return rv;
+#endif
 }
 
 nsresult nsHttpChannel::ProxyFailover() {
@@ -4833,6 +4985,9 @@ bool nsHttpChannel::ShouldBypassProcessNotModified() {
 }
 
 void nsHttpChannel::MaybeGenerateNELReport() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (!StaticPrefs::network_http_network_error_logging_enabled()) {
     return;
   }
@@ -4900,6 +5055,7 @@ void nsHttpChannel::MaybeGenerateNELReport() {
 
   // Enqueue the report to be delivered by the reporting API
   ReportDeliver::Fetch(data);
+#endif
 }
 
 nsresult nsHttpChannel::ProcessNotModified(
@@ -5060,8 +5216,13 @@ nsresult nsHttpChannel::OpenCacheEntryInternal(bool isHttps) {
   uint32_t cacheEntryOpenFlags;
   bool offline = gIOService->IsOffline();
 
+#ifdef MOZ_NAIVEFOX
+  bool forceOffline = false;
+#else
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
+  bool forceOffline = bc && bc->Top()->GetForceOffline();
+#endif
 
   nsAutoCString cacheControlRequestHeader;
   (void)mRequestHead.GetHeader(nsHttp::Cache_Control,
@@ -5071,7 +5232,6 @@ nsresult nsHttpChannel::OpenCacheEntryInternal(bool isHttps) {
     return NS_OK;
   }
 
-  bool forceOffline = bc && bc->Top()->GetForceOffline();
   if (offline || (mLoadFlags & INHIBIT_CACHING) || forceOffline) {
     if (BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass()) &&
         !offline && !forceOffline) {
@@ -6691,6 +6851,7 @@ nsresult nsHttpChannel::SetupReplacementChannel(nsIURI* newURI,
        "[this=%p newChannel=%p preserveMethod=%d]",
        this, newChannel, preserveMethod));
 
+#ifndef MOZ_NAIVEFOX
   if (!mEndMarkerAdded && profiler_thread_is_being_profiled_for_markers()) {
     mEndMarkerAdded = true;
 
@@ -6731,6 +6892,7 @@ nsresult nsHttpChannel::SetupReplacementChannel(nsIURI* newURI,
         Some(nsDependentCString(contentType.get())), newURI, redirectFlags,
         channelId);
   }
+#endif
 
   nsresult rv = HttpBaseChannel::SetupReplacementChannel(
       newURI, newChannel, preserveMethod, redirectFlags);
@@ -6744,6 +6906,7 @@ nsresult nsHttpChannel::SetupReplacementChannel(nsIURI* newURI,
   //   1. the signal to upgrade all http requests to https,
   //   2. but also downgrading to http on https via redirects.
   // Add to exclude list for that reason
+#ifndef MOZ_NAIVEFOX
   if (!gHttpHandler->IsHostExcludedForHTTPSRR(uriHost) &&
       nsHTTPSOnlyUtils::IsUpgradeDowngradeEndlessLoop(
           mURI, newURI, mLoadInfo,
@@ -6755,6 +6918,7 @@ nsresult nsHttpChannel::SetupReplacementChannel(nsIURI* newURI,
     gHttpHandler->ExcludeHTTPSRRHost(uriHost);
     LOG(("[%p] skip HTTPS upgrade for host [%s]", this, uriHost.get()));
   }
+#endif
 
   rv = CheckRedirectLimit(newURI, redirectFlags);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -6854,14 +7018,17 @@ nsresult nsHttpChannel::AsyncProcessRedirection(uint32_t redirectType) {
       !mLoadInfo->GetAllowInsecureRedirectToDataURI() &&
       mRedirectURI->SchemeIs("data")) {
     LOG(("Invalid data URI for redirect!"));
+#ifndef MOZ_NAIVEFOX
     nsContentSecurityManager::ReportBlockedDataURI(mRedirectURI, mLoadInfo,
                                                    true);
+#endif
     return NS_ERROR_DOM_BAD_URI;
   }
 
   // Perform the URL query string stripping for redirects. We will only strip
   // the query string if it is redirecting to a third-party URI in the top
   // level.
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::privacy_query_stripping_redirect()) {
     ThirdPartyUtil* thirdPartyUtil = ThirdPartyUtil::GetInstance();
     bool isThirdPartyRedirectURI = true;
@@ -6912,8 +7079,10 @@ nsresult nsHttpChannel::AsyncProcessRedirection(uint32_t redirectType) {
       }
     }
   }
+#endif
 
   // if we have a Set-Login header, we should try to handle it here
+#ifndef MOZ_NAIVEFOX
   nsAutoCString setLogin;
   if (NS_SUCCEEDED(mResponseHead->GetHeader(nsHttp::Set_Login, setLogin))) {
     bool isDocument = mLoadInfo->GetExternalContentPolicyType() ==
@@ -6938,6 +7107,7 @@ nsresult nsHttpChannel::AsyncProcessRedirection(uint32_t redirectType) {
       }
     }
   }
+#endif
 
   if (NS_WARN_IF(!mRedirectURI)) {
     LOG(("Invalid redirect URI after performaing query string stripping"));
@@ -7235,7 +7405,7 @@ nsHttpChannel::Cancel(nsresult status) {
   MOZ_ASSERT(NS_IsMainThread());
   // We should never have a pump open while a CORS preflight is in progress.
   MOZ_ASSERT_IF(mPreflightChannel, !mCachePump);
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
   // We want to perform this check only when the chanel is being cancelled the
   // first time with a URL classifier blocking error code.  If mStatus is
   // already set to such an error code then Cancel() may be called for some
@@ -7278,7 +7448,9 @@ nsHttpChannel::Cancel(nsresult status) {
 
 NS_IMETHODIMP
 nsHttpChannel::CancelByURLClassifier(nsresult aErrorCode) {
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(ChannelClassifierUtils::IsClassifierBlockingErrorCode(aErrorCode));
+#endif
   MOZ_ASSERT(NS_IsMainThread());
   // We should never have a pump open while a CORS preflight is in progress.
   MOZ_ASSERT_IF(mPreflightChannel, !mCachePump);
@@ -7331,7 +7503,9 @@ nsHttpChannel::CancelByURLClassifier(nsresult aErrorCode) {
 }
 
 void nsHttpChannel::ContinueCancellingByURLClassifier(nsresult aErrorCode) {
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(ChannelClassifierUtils::IsClassifierBlockingErrorCode(aErrorCode));
+#endif
   MOZ_ASSERT(NS_IsMainThread());
   // We should never have a pump open while a CORS preflight is in progress.
   MOZ_ASSERT_IF(mPreflightChannel, !mCachePump);
@@ -7356,9 +7530,13 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
   LOG(("nsHttpChannel::CancelInternal [this=%p]\n", this));
   bool channelClassifierCancellationPending =
       !!LoadChannelClassifierCancellationPending();
+#ifndef MOZ_NAIVEFOX
   if (ChannelClassifierUtils::IsClassifierBlockingErrorCode(status)) {
     StoreChannelClassifierCancellationPending(0);
   }
+#else
+  StoreChannelClassifierCancellationPending(0);
+#endif
 
   mEarlyHintObserver = nullptr;
   mWebTransportSessionEventListener = nullptr;
@@ -7377,6 +7555,7 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
   // If we're waiting for LNA permission result and the channel is being
   // cancelled, we need to call OnPermissionPromptResult with permission denied
   // to resume the channel properly
+#ifndef MOZ_NAIVEFOX
   if (mWaitingForLNAPermission) {
     LOG(
         ("nsHttpChannel::CancelInternal [this=%p] cancelling while waiting for "
@@ -7391,6 +7570,7 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
     OnPermissionPromptResult(false, permissionKey);
     return NS_OK;
   }
+#endif
 
   if (LoadUsedNetwork() && !mReportedNEL) {
     MaybeGenerateNELReport();
@@ -7403,6 +7583,7 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
     mResponseHead->ClearHeaders();
   }
 
+#ifndef MOZ_NAIVEFOX
   if (mLastStatusReported && !mEndMarkerAdded &&
       profiler_thread_is_being_profiled_for_markers()) {
     // These do allocations/frees/etc; avoid if not active
@@ -7426,6 +7607,7 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
         mLoadInfo->GetOriginAttributes().IsPrivateBrowsing(), this, mStatus,
         &mTransactionTimings, std::move(mSource));
   }
+#endif
 
   // If we don't have mTransactionPump and mCachePump, we need to call
   // AsyncAbort to make sure this channel's listener got notified.
@@ -7705,12 +7887,16 @@ nsHttpChannel::AsyncOpen(nsIStreamListener* aListener) {
   AUTO_PROFILER_FLOW_MARKER("nsHttpChannel::AsyncOpen", NETWORK,
                             Flow::FromPointer(this));
   nsCOMPtr<nsIStreamListener> listener = aListener;
+#ifndef MOZ_NAIVEFOX
   nsresult rv =
       nsContentSecurityManager::doContentSecurityCheck(this, listener);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     ReleaseListeners();
     return rv;
   }
+#else
+  nsresult rv = NS_OK;
+#endif
 
   MOZ_ASSERT(
       mLoadInfo->GetSecurityMode() == 0 ||
@@ -7768,6 +7954,7 @@ nsHttpChannel::AsyncOpen(nsIStreamListener* aListener) {
   // Hence, we have to call UpdatePrivateBrowsing() here
   UpdatePrivateBrowsing();
 
+#ifndef MOZ_NAIVEFOX
   AntiTrackingUtils::UpdateAntiTrackingInfoForChannel(this);
 
   // Recalculate the default userAgent header after the AntiTrackingInfo gets
@@ -7784,6 +7971,7 @@ nsHttpChannel::AsyncOpen(nsIStreamListener* aListener) {
         false, nsHttpHeaderArray::eVarietyRequestEnforceDefault);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
+#endif
 
   if (WaitingForTailUnblock()) {
     // This channel is marked as Tail and is part of a request context
@@ -7847,6 +8035,7 @@ void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {
   mLastStatusReported = TimeStamp::Now();
   AUTO_PROFILER_FLOW_MARKER("nsHttpChannel::AsyncOpenFinal", NETWORK,
                             Flow::FromPointer(this));
+#ifndef MOZ_NAIVEFOX
   if (profiler_thread_is_being_profiled_for_markers()) {
     nsAutoCString requestMethod;
     GetRequestMethod(requestMethod);
@@ -7857,6 +8046,7 @@ void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {
         mLoadInfo->GetInnerWindowID(),
         mLoadInfo->GetOriginAttributes().IsPrivateBrowsing(), this, mStatus);
   }
+#endif
 
   // Added due to PauseTask/DelayHttpChannel
   if (mLoadGroup) mLoadGroup->AddRequest(this, nullptr);
@@ -7873,6 +8063,7 @@ void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {
   // just once and early, AsyncOpen is the best place.
   StoreCustomAuthHeader(mRequestHead.HasHeader(nsHttp::Authorization));
 
+#ifndef MOZ_NAIVEFOX
   bool willCallback = false;
   // We are about to do an async lookup to check if the URI is a tracker. If
   // yes, this channel will be canceled by channel classifier.  Chances are the
@@ -7902,6 +8093,9 @@ void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {
     // the caller will be responsible for handling it.
     MaybeResolveProxyAndBeginConnect();
   }
+#else
+  MaybeResolveProxyAndBeginConnect();
+#endif
 }
 
 void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {
@@ -7946,6 +8140,7 @@ nsresult nsHttpChannel::AsyncOpenOnTailUnblock() {
   return AsyncOpen(mListener);
 }
 
+#ifndef MOZ_NAIVEFOX
 already_AddRefed<nsChannelClassifier>
 nsHttpChannel::GetOrCreateChannelClassifier() {
   if (!mChannelClassifier) {
@@ -7957,6 +8152,7 @@ nsHttpChannel::GetOrCreateChannelClassifier() {
   RefPtr<nsChannelClassifier> classifier = mChannelClassifier;
   return classifier.forget();
 }
+#endif
 
 nsIHttpChannelInternal::ProxyDNSStrategy
 nsHttpChannel::ComputeProxyDNSStrategy() {
@@ -8323,6 +8519,7 @@ nsresult nsHttpChannel::BeginConnect() {
   }
   // skip classifier checks if this channel was the result of internal auth
   // redirect
+#ifndef MOZ_NAIVEFOX
   bool shouldBeClassifiedForTracker =
       NS_ShouldClassifyChannel(this, ClassifyType::ETP);
 
@@ -8337,12 +8534,15 @@ nsresult nsHttpChannel::BeginConnect() {
 
     ReEvaluateReferrerAfterTrackingStatusIsKnown();
   }
+#endif
 
   MaybeStartDNSPrefetch();
 
   // Update whether the channel is on the third-party cookie blocking exception
   // list.
+#ifndef MOZ_NAIVEFOX
   CookieService::Update3PCBExceptionInfo(this);
+#endif
 
   rv = CallOrWaitForResume(
       [](nsHttpChannel* self) { return self->PrepareToConnect(); });
@@ -8350,6 +8550,7 @@ nsresult nsHttpChannel::BeginConnect() {
     return rv;
   }
 
+#ifndef MOZ_NAIVEFOX
   bool shouldBeClassifiedForSafeBrowsing =
       NS_ShouldClassifyChannel(this, ClassifyType::SafeBrowsing);
 
@@ -8373,6 +8574,7 @@ nsresult nsHttpChannel::BeginConnect() {
          channelClassifier.get(), this));
     channelClassifier->Start();
   }
+#endif
 
   return NS_OK;
 }
@@ -8496,6 +8698,9 @@ nsHttpChannel::SetChannelIsForDownload(bool aChannelIsForDownload) {
 }
 
 base::ProcessId nsHttpChannel::ProcessId() {
+#ifdef MOZ_NAIVEFOX
+  return 0;
+#else
   nsCOMPtr<nsIParentChannel> parentChannel;
   NS_QueryNotificationCallbacks(this, parentChannel);
   if (RefPtr<HttpChannelParent> httpParent = do_QueryObject(parentChannel)) {
@@ -8505,8 +8710,10 @@ base::ProcessId nsHttpChannel::ProcessId() {
     return docParent->OtherPid();
   }
   return base::GetCurrentProcId();
+#endif
 }
 
+#ifndef MOZ_NAIVEFOX
 auto nsHttpChannel::AttachStreamFilter() -> RefPtr<ChildEndpointPromise> {
   LOG(("nsHttpChannel::AttachStreamFilter [this=%p]", this));
   MOZ_ASSERT(!LoadOnStartRequestCalled());
@@ -8543,6 +8750,7 @@ auto nsHttpChannel::AttachStreamFilter() -> RefPtr<ChildEndpointPromise> {
   extensions::StreamFilterParent::Attach(this, std::move(parent));
   return ChildEndpointPromise::CreateAndResolve(std::move(child), __func__);
 }
+#endif
 
 NS_IMETHODIMP
 nsHttpChannel::GetNavigationStartTimeStamp(TimeStamp* aTimeStamp) {
@@ -8583,12 +8791,14 @@ nsHttpChannel::SetPriority(int32_t value) {
 
   // If this channel is the real channel for an e10s channel, notify the
   // child side about the priority change as well.
+#ifndef MOZ_NAIVEFOX
   nsCOMPtr<nsIParentChannel> parentChannel;
   NS_QueryNotificationCallbacks(this, parentChannel);
   RefPtr<HttpChannelParent> httpParent = do_QueryObject(parentChannel);
   if (httpParent) {
     httpParent->DoSendSetPriority(newValue);
   }
+#endif
 
   return NS_OK;
 }
@@ -9116,6 +9326,9 @@ nsHttpChannel::GetEssentialDomainCategory(nsCString& domain) {
 static void ReportLNAAccessToConsole(nsHttpChannel* aChannel,
                                      const char* aMessageName,
                                      const nsACString& aPromptAction = ""_ns) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   // Send IPC to child process to log to console with script location
   nsCOMPtr<nsIParentChannel> parentChannel;
   NS_QueryNotificationCallbacks(aChannel, parentChannel);
@@ -9150,9 +9363,13 @@ static void ReportLNAAccessToConsole(nsHttpChannel* aChannel,
                                          nsCString(aPromptAction),
                                          topLevelSite);
   }
+#endif
 }
 
 nsresult nsHttpChannel::ProcessLNAActions() {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_LOCAL_NETWORK_ACCESS_DENIED;
+#else
   if (!mTransaction) {
     return NS_ERROR_LOCAL_NETWORK_ACCESS_DENIED;
   }
@@ -9216,6 +9433,7 @@ nsresult nsHttpChannel::ProcessLNAActions() {
   // nsHttpChannel::OnPermissionPromptResult is invoked asynchronously once
   // the user responds to the prompt
   return request->RequestPermission();
+#endif
 }
 
 void nsHttpChannel::UpdateCurrentIpAddressSpace() {
@@ -9234,6 +9452,7 @@ void nsHttpChannel::UpdateCurrentIpAddressSpace() {
 
   nsILoadInfo::IPAddressSpace docAddressSpace = mPeerAddr.GetIpAddressSpace();
   mLoadInfo->SetIpAddressSpace(docAddressSpace);
+#ifndef MOZ_NAIVEFOX
   ExtContentPolicyType type = mLoadInfo->GetExternalContentPolicyType();
   if (type == ExtContentPolicy::TYPE_DOCUMENT ||
       type == ExtContentPolicy::TYPE_SUBDOCUMENT) {
@@ -9255,6 +9474,7 @@ void nsHttpChannel::UpdateCurrentIpAddressSpace() {
       }
     }
   }
+#endif
 }
 
 NS_IMETHODIMP
@@ -9385,6 +9605,7 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
     // the response head may be null if the transaction was cancelled.  in
     // which case we just need to call OnStartRequest/OnStopRequest.
     if (mResponseHead) {
+#ifndef MOZ_NAIVEFOX
       if (AntiTrackingUtils::ProcessStorageAccessHeadersShouldRetry(this)) {
         // force reload. Doom cache to avoid redirect loop
         if (mCacheEntry) {
@@ -9407,6 +9628,7 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
         }
         return NS_OK;
       }
+#endif
       return ProcessResponse(connInfo);
     }
 
@@ -9473,6 +9695,9 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
 }
 
 void nsHttpChannel::MaybeUpdateDocumentIPAddressSpaceFromCache() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   MOZ_ASSERT(mLoadInfo);
   ExtContentPolicyType type = mLoadInfo->GetExternalContentPolicyType();
 
@@ -9504,10 +9729,14 @@ void nsHttpChannel::MaybeUpdateDocumentIPAddressSpaceFromCache() {
     mLoadInfo->SetIpAddressSpace(ipAddr.GetIpAddressSpace());
     bc->SetCurrentIPAddressSpace(ipAddr.GetIpAddressSpace());
   }
+#endif
 }
 
 nsresult nsHttpChannel::OnPermissionPromptResult(bool aGranted,
                                                  const nsACString& aType) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_LOCAL_NETWORK_ACCESS_DENIED;
+#else
   mWaitingForLNAPermission = false;
 
   if (aGranted) {
@@ -9574,6 +9803,7 @@ nsresult nsHttpChannel::OnPermissionPromptResult(bool aGranted,
     return self->ContinueOnStartRequest1(
         nsresult::NS_ERROR_LOCAL_NETWORK_ACCESS_DENIED);
   });
+#endif
 }
 
 nsresult nsHttpChannel::ContinueOnStartRequest1(nsresult result) {
@@ -9779,6 +10009,9 @@ nsresult nsHttpChannel::LogConsoleError(const char* aTag) {
 }
 
 static void RecordHTTPSUpgradeTelemetry(nsIURI* aURI, nsILoadInfo* aLoadInfo) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   // we record https telemetry only for top-level loads
   if (aLoadInfo->GetExternalContentPolicyType() !=
       ExtContentPolicy::TYPE_DOCUMENT) {
@@ -9900,6 +10133,7 @@ static void RecordHTTPSUpgradeTelemetry(nsIURI* aURI, nsILoadInfo* aLoadInfo) {
     default:
       MOZ_ASSERT(false, "what telemetry flag is set to end up here?");
   }
+#endif
 }
 
 static void RecordIPAddressSpaceTelemetry(bool aLoadSuccess, nsIURI* aURI,
@@ -9936,6 +10170,9 @@ static void RecordIPAddressSpaceTelemetry(bool aLoadSuccess, nsIURI* aURI,
 }
 
 static void RecordLNATelemetry(nsHttpChannel* aChannel, bool aLoadSuccess) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   // Extract data from channel
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
   nsCOMPtr<nsIURI> uri;
@@ -10086,6 +10323,7 @@ static void RecordLNATelemetry(nsHttpChannel* aChannel, bool aLoadSuccess) {
 
   ReportLNAAccessToConsole(aChannel, "LocalNetworkAccessDetected",
                            promptAction);
+#endif
 }
 
 NS_IMETHODIMP
@@ -10612,6 +10850,7 @@ nsresult nsHttpChannel::ContinueOnStopRequest(nsresult aStatus, bool aIsFromNet,
 
   MaybeFlushConsoleReports();
 
+#ifndef MOZ_NAIVEFOX
   if (!mEndMarkerAdded && profiler_thread_is_being_profiled_for_markers()) {
     // These do allocations/frees/etc; avoid if not active
     mEndMarkerAdded = true;
@@ -10648,6 +10887,7 @@ nsresult nsHttpChannel::ContinueOnStopRequest(nsresult aStatus, bool aIsFromNet,
             : httpVersion,
         responseStatus, Some(nsDependentCString(contentType.get())));
   }
+#endif
 
   if (mAuthRetryPending &&
       StaticPrefs::network_auth_use_redirect_for_retries()) {
@@ -11047,6 +11287,7 @@ nsHttpChannel::OnTransportStatus(nsITransport* trans, nsresult status,
     if (!(mLoadFlags & LOAD_BACKGROUND)) {
       progressSink->OnStatus(this, status, NS_ConvertUTF8toUTF16(host).get());
     } else {
+#ifndef MOZ_NAIVEFOX
       nsCOMPtr<nsIParentChannel> parentChannel;
       NS_QueryNotificationCallbacks(this, parentChannel);
       // If the event sink is |HttpChannelParent|, we have to send status
@@ -11058,6 +11299,7 @@ nsHttpChannel::OnTransportStatus(nsITransport* trans, nsresult status,
       if (SameCOMIdentity(parentChannel, mProgressSink)) {
         progressSink->OnStatus(this, status, NS_ConvertUTF8toUTF16(host).get());
       }
+#endif
     }
 
     if (progress > 0) {
@@ -11848,6 +12090,7 @@ nsresult nsHttpChannel::CallOrWaitForResume(
 
 // This is loosely based on:
 // https://fetch.spec.whatwg.org/#serializing-a-request-origin
+#ifndef MOZ_NAIVEFOX
 static bool HasNullRequestOrigin(nsHttpChannel* aChannel, nsIURI* aURI,
                                  bool isAddonRequest) {
   // Step 1. If request has a redirect-tainted origin, then return "null".
@@ -11877,6 +12120,7 @@ static bool HasNullRequestOrigin(nsHttpChannel* aChannel, nsIURI* aURI,
   // Step 2. Return request’s origin, serialized.
   return false;
 }
+#endif
 
 // Step 8.12. of HTTP-network-or-cache fetch
 //
@@ -11890,6 +12134,9 @@ void nsHttpChannel::SetOriginHeader() {
     // this means system requests use whatever Origin header was specified.
     return;
   }
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   bool isAddonRequest = triggeringPrincipal->AddonPolicy() ||
                         triggeringPrincipal->ContentScriptAddonPolicy();
 
@@ -12005,6 +12252,7 @@ void nsHttpChannel::SetOriginHeader() {
   // Step 4.2. Append (`Origin`, serializedOrigin) to request’s header list.
   MOZ_ALWAYS_SUCCEEDS(mRequestHead.SetHeader(nsHttp::Origin, serializedOrigin,
                                              false /* merge */));
+#endif
 }
 
 void nsHttpChannel::SetDoNotTrack() {
@@ -12481,6 +12729,9 @@ NS_IMPL_ISUPPORTS(CopyNonDefaultHeaderVisitor, nsIHttpHeaderVisitor)
 }  // anonymous namespace
 
 nsresult nsHttpChannel::RedirectToInterceptedChannel() {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   nsCOMPtr<nsINetworkInterceptController> controller;
   GetCallback(controller);
 
@@ -12532,9 +12783,13 @@ nsresult nsHttpChannel::RedirectToInterceptedChannel() {
   }
 
   return rv;
+#endif
 }
 
 void nsHttpChannel::ReEvaluateReferrerAfterTrackingStatusIsKnown() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   nsCOMPtr<nsICookieJarSettings> cjs;
   if (mLoadInfo) {
     (void)mLoadInfo->GetCookieJarSettings(getter_AddRefs(cjs));
@@ -12573,6 +12828,7 @@ void nsHttpChannel::ReEvaluateReferrerAfterTrackingStatusIsKnown() {
       }
     }
   }
+#endif
 }
 
 namespace {

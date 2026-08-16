@@ -78,7 +78,9 @@ class AsyncStatement final : public mozIStorageAsyncStatement,
   /**
    * Caches the JS 'params' helper for this statement.
    */
+#ifndef MOZ_NAIVEFOX
   nsMainThreadPtrHandle<AsyncStatementParamsHolder> mStatementParamsHolder;
+#endif
 
   /**
    * Have we been explicitly finalized by the user?

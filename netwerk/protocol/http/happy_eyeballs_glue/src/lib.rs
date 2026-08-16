@@ -5,6 +5,10 @@
 //! FFI glue layer between happy-eyeballs Rust crate and Firefox's C++ networking stack.
 
 mod metrics;
+#[cfg(feature = "profiler")]
+mod profiler;
+#[cfg(not(feature = "profiler"))]
+#[path = "profiler_noop.rs"]
 mod profiler;
 
 use nserror::{nsresult, NS_ERROR_INVALID_ARG, NS_ERROR_UNEXPECTED, NS_OK};
@@ -124,7 +128,8 @@ pub unsafe extern "C" fn happy_eyeballs_create(
         ..Default::default()
     };
 
-    let profiler = profiler::Profiler::new(0u64.into(), &origin_str, &network_config);
+    let profiler =
+        profiler::Profiler::new(profiler::initial_flow_id(), &origin_str, &network_config);
 
     let raw_ptr = match happy_eyeballs::HappyEyeballs::new_with_network_config(
         origin_str.as_str(),
@@ -140,7 +145,9 @@ pub unsafe extern "C" fn happy_eyeballs_create(
             });
             boxed
                 .profiler
-                .set_flow_id(std::ptr::from_ref(&boxed.refcnt).into());
+                .set_flow_id(profiler::flow_id_from_ptr(std::ptr::from_ref(
+                    &boxed.refcnt,
+                )));
             Box::into_raw(boxed)
         }
         Err(_) => return NS_ERROR_UNEXPECTED,

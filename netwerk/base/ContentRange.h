@@ -5,7 +5,11 @@
 #ifndef ContentRange_h_
 #define ContentRange_h_
 
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsISupportsImpl.h"
 #include "nsString.h"
 

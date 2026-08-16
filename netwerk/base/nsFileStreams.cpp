@@ -929,6 +929,9 @@ nsIOutputStream* nsFileRandomAccessStream::OutputStream() { return this; }
 
 RandomAccessStreamParams nsFileRandomAccessStream::Serialize(
     nsIInterfaceRequestor* aCallbacks) {
+#ifdef MOZ_NAIVEFOX
+  return RandomAccessStreamParams();
+#else
   FileRandomAccessStreamParams params;
 
   if (NS_SUCCEEDED(DoPendingOpen())) {
@@ -956,10 +959,14 @@ RandomAccessStreamParams nsFileRandomAccessStream::Serialize(
   params.behaviorFlags() = behaviorFlags;
 
   return params;
+#endif
 }
 
 bool nsFileRandomAccessStream::Deserialize(
     RandomAccessStreamParams& aStreamParams) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   MOZ_ASSERT(!mFD, "Already have a file descriptor?!");
   MOZ_ASSERT(mState == nsFileStreamBase::eUnitialized, "Deferring open?!");
 
@@ -992,6 +999,7 @@ bool nsFileRandomAccessStream::Deserialize(
   mBehaviorFlags = params.behaviorFlags();
 
   return true;
+#endif
 }
 
 NS_IMETHODIMP

@@ -160,6 +160,9 @@ struct SerialNumberRecord {
   mozilla::UniquePtr<char[]> jsStack;
 
   void SaveJSStack() {
+#ifdef MOZ_NAIVEFOX
+    return;
+#else
     // If this thread isn't running JS, there's nothing to do.
     if (!CycleCollectedJSContext::Get()) {
       return;
@@ -181,6 +184,7 @@ struct SerialNumberRecord {
     size_t len = strlen(chars.get());
     jsStack = mozilla::MakeUnique<char[]>(len + 1);
     memcpy(jsStack.get(), chars.get(), len + 1);
+#endif
   }
 };
 

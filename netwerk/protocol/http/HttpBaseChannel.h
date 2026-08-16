@@ -10,11 +10,16 @@
 #include <utility>
 
 #include "OpaqueResponseUtils.h"
+#include "ClassOfService.h"
 #include "mozilla/AtomicBitfields.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/CompactPair.h"
 #include "mozilla/DataMutex.h"
-#include "mozilla/dom/DOMTypes.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/DOMTypes.h"
+#else
+#  include "mozilla/dom/FeaturePolicy.h"
+#endif
 #include "mozilla/net/DNS.h"
 #include "mozilla/net/NeckoChannelParams.h"
 #include "mozilla/net/NeckoCommon.h"
@@ -59,7 +64,9 @@ namespace mozilla {
 namespace dom {
 class PerformanceStorage;
 class ContentParent;
+#ifndef MOZ_NAIVEFOX
 enum class NoCorsMediaRequestState : uint8_t;
+#endif
 }  // namespace dom
 
 class LogCollector;
@@ -558,21 +565,27 @@ class HttpBaseChannel : public nsHashPropertyBag,
 
   struct ReplacementChannelConfig {
     ReplacementChannelConfig() = default;
+#ifndef MOZ_NAIVEFOX
     explicit ReplacementChannelConfig(
         const dom::ReplacementChannelConfigInit& aInit);
+#endif
 
     uint32_t redirectFlags = 0;
     ClassOfService classOfService = {0, false};
     Maybe<bool> privateBrowsing = Nothing();
     Maybe<nsCString> method;
     nsCOMPtr<nsIReferrerInfo> referrerInfo;
+#ifndef MOZ_NAIVEFOX
     Maybe<dom::TimedChannelInfo> timedChannelInfo;
+#endif
     nsCOMPtr<nsIInputStream> uploadStream;
     uint64_t uploadStreamLength = 0;
     Maybe<nsCString> contentType;
     Maybe<nsCString> contentLength;
 
+#ifndef MOZ_NAIVEFOX
     dom::ReplacementChannelConfigInit Serialize();
+#endif
   };
 
   enum class ReplacementReason {
@@ -755,7 +768,9 @@ class HttpBaseChannel : public nsHashPropertyBag,
 
   RefPtr<OpaqueResponseBlocker> mORB;
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<mozilla::dom::ParentProcessChannelHandle> mParentProcessChannelHandle;
+#endif
 
  private:
   // Proxy release all members above on main thread.

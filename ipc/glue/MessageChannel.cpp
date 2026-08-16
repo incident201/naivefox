@@ -3,12 +3,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/ipc/MessageChannel.h"
+#include "mozilla/ipc/IOThread.h"
 
 #include <math.h>
 
 #include <utility>
 
-#include "CrashAnnotations.h"
+#ifndef MOZ_NAIVEFOX
+#  include "CrashAnnotations.h"
+#endif
 #include "base/waitable_event.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/CycleCollectedJSContext.h"
@@ -22,16 +25,22 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/glean/IpcMetrics.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/dom/ScriptSettings.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ScriptSettings.h"
+#endif
 #include "mozilla/ipc/NodeController.h"
-#include "mozilla/ipc/ProcessChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ipc/ProcessChild.h"
+#endif
 #include "mozilla/ipc/ProtocolUtils.h"
-#include "nsAppRunner.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsAppRunner.h"
+#else
+#  include "nsXULAppAPI.h"
+#endif
 #include "nsIDirectTaskDispatcher.h"
 #include "nsTHashMap.h"
 #include "nsDebug.h"
-#include "nsExceptionHandler.h"
 #include "nsIMemoryReporter.h"
 #include "nsISupportsImpl.h"
 #include "nsPrintfCString.h"
@@ -107,7 +116,9 @@ using namespace mozilla::ipc;
 
 using mozilla::MonitorAutoLock;
 using mozilla::MonitorAutoUnlock;
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::AutoNoJSAPI;
+#endif
 
 #define IPC_ASSERT(_cond, ...)                                           \
   do {                                                                   \
@@ -438,8 +449,10 @@ MessageChannel::~MessageChannel() {
   // would be unsafe to invoke our listener's callbacks, and we may be being
   // destroyed on a thread other than `mWorkerThread`.
   if (!IsClosedLocked()) {
+#ifndef MOZ_NAIVEFOX
     CrashReporter::RecordAnnotationCString(
         CrashReporter::Annotation::IPCFatalErrorProtocol, mName);
+#endif
     switch (mChannelState) {
       case ChannelConnected:
         MOZ_CRASH(
@@ -788,6 +801,9 @@ class BuildIDsMatchMessage : public IPC::Message {
 // buildIDs don't match. This is a minor variation on
 // MessageChannel::Send(Message* aMsg).
 bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   MOZ_ASSERT(!XRE_IsParentProcess());
 
   nsCString parentBuildID(aParentBuildID);
@@ -832,6 +848,7 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
 
   SendMessageToLink(std::move(msg));
   return true;
+#endif
 }
 
 class CancelMessage : public IPC::Message {
@@ -883,7 +900,9 @@ bool MessageChannel::MaybeInterceptSpecialIOMessage(const Message& aMsg) {
       return true;
     } else if (IMPENDING_SHUTDOWN_MESSAGE_TYPE == aMsg.type()) {
       IPC_LOG("Impending Shutdown received");
+#ifndef MOZ_NAIVEFOX
       ProcessChild::NotifiedImpendingShutdown();
+#endif
       return true;
     }
   }
@@ -1687,10 +1706,12 @@ void MessageChannel::DispatchMessage(ActorLifecycleProxy* aProxy,
   AssertWorkerThread();
   mMonitor->AssertCurrentThreadOwns();
 
+#ifndef MOZ_NAIVEFOX
   Maybe<AutoNoJSAPI> nojsapi;
   if (NS_IsMainThread() && CycleCollectedJSContext::Get()) {
     nojsapi.emplace();
   }
+#endif
 
   UniquePtr<Message> reply;
 
@@ -2001,7 +2022,9 @@ void MessageChannel::OnChannelErrorFromLink() {
     // when apps are backgrounded. We don't need to report a crash for
     // normal behavior in that case.
     printf_stderr("Exiting due to channel error.\n");
+#ifndef MOZ_NAIVEFOX
     ProcessChild::QuickExit();
+#endif
   }
   mChannelState = ChannelError;
   mMonitor->Notify();

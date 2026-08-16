@@ -15,7 +15,6 @@
 #include "mozilla/Base64.h"
 #include "mozilla/Components.h"
 #include "mozilla/IntegerPrintfMacros.h"
-#include "nsContentUtils.h"
 #include "nsIDirectoryEnumerator.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsIFile.h"
@@ -775,14 +774,15 @@ void CacheFileContextEvictor::EvictEntries() {
              uriSpec.get(), baseDomainUTF8.get()));
       } else {
         // Check origin match
-        nsAutoString urlOrigin;
-        rv = nsContentUtils::GetWebExposedOriginSerialization(uri, urlOrigin);
+        nsAutoCString urlOriginUtf8;
+        rv = uri->GetPrePath(urlOriginUtf8);
         if (NS_FAILED(rv)) {
           LOG(
               ("CacheFileContextEvictor::EvictEntries() - Skipping entry since "
                "We failed to extract an origin"));
           continue;
         }
+        NS_ConvertUTF8toUTF16 urlOrigin(urlOriginUtf8);
 
         if (!urlOrigin.Equals(mEntries[0]->mOrigin)) {
           LOG(

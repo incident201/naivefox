@@ -6,7 +6,9 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/FlowMarkers.h"
-#include "mozilla/dom/Document.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/Document.h"
+#endif
 #include "nsIChannel.h"
 #include "nsThreadUtils.h"
 
@@ -165,6 +167,11 @@ void ChannelEventQueue::ResumeInternal() {
 }
 
 bool ChannelEventQueue::MaybeSuspendIfEventsAreSuppressed() {
+#ifdef MOZ_NAIVEFOX
+  // There is no content document or script event suppression in NaiveFox's
+  // single-process networking runtime.
+  return false;
+#else
   // We only ever need to suppress events on the main thread, since this is
   // where content scripts can run.
   if (!NS_IsMainThread()) {
@@ -208,6 +215,7 @@ bool ChannelEventQueue::MaybeSuspendIfEventsAreSuppressed() {
   }
 
   return false;
+#endif
 }
 
 }  // namespace net

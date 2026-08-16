@@ -6,9 +6,11 @@
 #include "nsHttpActivityDistributor.h"
 
 #include "HttpLog.h"
-#include "NullHttpChannel.h"
-#include "mozilla/net/SocketProcessChild.h"
-#include "mozilla/net/SocketProcessParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "NullHttpChannel.h"
+#  include "mozilla/net/SocketProcessChild.h"
+#  include "mozilla/net/SocketProcessParent.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsHttpHandler.h"
 #include "nsIOService.h"
@@ -76,6 +78,7 @@ nsHttpActivityDistributor::ObserveActivityWithArgs(
     const nsACString& aExtraStringData) {
   HttpActivityArgs args(aArgs);
   nsCString extraStringData(aExtraStringData);
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsSocketProcess()) {
     auto task = [args{std::move(args)}, aActivityType, aActivitySubtype,
                  aTimestamp, aExtraSizeData,
@@ -89,10 +92,10 @@ nsHttpActivityDistributor::ObserveActivityWithArgs(
       return NS_DispatchToMainThread(NS_NewRunnableFunction(
           "net::nsHttpActivityDistributor::ObserveActivityWithArgs", task));
     }
-
     task();
     return NS_OK;
   }
+#endif
 
   MOZ_ASSERT(XRE_IsParentProcess());
 
@@ -109,6 +112,7 @@ nsHttpActivityDistributor::ObserveActivityWithArgs(
                                     extraStringData);
       }
     } else if (args.type() == HttpActivityArgs::THttpActivity) {
+#ifndef MOZ_NAIVEFOX
       nsCOMPtr<nsIURI> uri;
       nsAutoCString portStr(""_ns);
       int32_t port = args.get_HttpActivity().port();
@@ -133,6 +137,7 @@ nsHttpActivityDistributor::ObserveActivityWithArgs(
       (void)self->ObserveActivity(static_cast<nsIChannel*>(channel),
                                   aActivityType, aActivitySubtype, aTimestamp,
                                   aExtraSizeData, extraStringData);
+#endif
     } else if (args.type() == HttpActivityArgs::THttpConnectionActivity) {
       const HttpConnectionActivity& activity =
           args.get_HttpConnectionActivity();
@@ -204,6 +209,7 @@ nsHttpActivityDistributor::AddObserver(nsIHttpActivityObserver* aObserver) {
 
   if (wasEmpty) {
     mActivated = true;
+#ifndef MOZ_NAIVEFOX
     if (nsIOService::UseSocketProcess()) {
       auto task = []() {
         RefPtr<SocketProcessParent> parent =
@@ -214,6 +220,7 @@ nsHttpActivityDistributor::AddObserver(nsIHttpActivityObserver* aObserver) {
       };
       gIOService->CallOrWaitForSocketProcess(task);
     }
+#endif
   }
   return NS_OK;
 }
@@ -237,6 +244,7 @@ nsHttpActivityDistributor::RemoveObserver(nsIHttpActivityObserver* aObserver) {
     mActivated = mObservers.IsEmpty();
   }
 
+#ifndef MOZ_NAIVEFOX
   if (nsIOService::UseSocketProcess() && !mActivated) {
     auto task = []() {
       RefPtr<SocketProcessParent> parent = SocketProcessParent::GetSingleton();
@@ -246,6 +254,7 @@ nsHttpActivityDistributor::RemoveObserver(nsIHttpActivityObserver* aObserver) {
     };
     gIOService->CallOrWaitForSocketProcess(task);
   }
+#endif
   return NS_OK;
 }
 
@@ -266,6 +275,7 @@ nsHttpActivityDistributor::SetObserveProxyResponse(bool aObserveProxyResponse) {
   }
 
   mObserveProxyResponse = aObserveProxyResponse;
+#ifndef MOZ_NAIVEFOX
   if (nsIOService::UseSocketProcess()) {
     auto task = [aObserveProxyResponse]() {
       RefPtr<SocketProcessParent> parent = SocketProcessParent::GetSingleton();
@@ -276,6 +286,7 @@ nsHttpActivityDistributor::SetObserveProxyResponse(bool aObserveProxyResponse) {
     };
     gIOService->CallOrWaitForSocketProcess(task);
   }
+#endif
   return NS_OK;
 }
 
@@ -295,6 +306,7 @@ nsHttpActivityDistributor::SetObserveConnection(bool aObserveConnection) {
   }
 
   mObserveConnection = aObserveConnection;
+#ifndef MOZ_NAIVEFOX
   if (nsIOService::UseSocketProcess()) {
     auto task = [aObserveConnection]() {
       RefPtr<SocketProcessParent> parent = SocketProcessParent::GetSingleton();
@@ -305,6 +317,7 @@ nsHttpActivityDistributor::SetObserveConnection(bool aObserveConnection) {
     };
     gIOService->CallOrWaitForSocketProcess(task);
   }
+#endif
   return NS_OK;
 }
 

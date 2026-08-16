@@ -13,7 +13,9 @@
 #include "nsIFile.h"
 #include "nsSimpleEnumerator.h"
 #include "nsString.h"
-#include "nsXREDirProvider.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsXREDirProvider.h"
+#endif
 #include "prenv.h"
 #if defined(MOZ_WIDGET_COCOA)
 #  include <Carbon/Carbon.h>
@@ -212,7 +214,7 @@ nsresult nsAppFileLocationProvider::GetProductDirectory(nsIFile** aLocalFile,
     return rv;
   }
 
-#  if defined(MOZ_WIDGET_GTK)
+#  if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
   rv = nsXREDirProvider::GetLegacyOrXDGHomePath(homeDir,
                                                 getter_AddRefs(localDir));
   if (NS_FAILED(rv)) {
@@ -224,7 +226,7 @@ nsresult nsAppFileLocationProvider::GetProductDirectory(nsIFile** aLocalFile,
 #  error dont_know_how_to_get_product_dir_on_your_platform
 #endif
 
-#if defined(MOZ_WIDGET_GTK)
+#if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
   bool legacyExists = nsXREDirProvider::LegacyHomeExists(nullptr);
   if (legacyExists || nsXREDirProvider::IsForceLegacyHome()) {
     nsAutoCString productDir;

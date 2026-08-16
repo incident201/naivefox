@@ -7,11 +7,16 @@
 #include "TRRLoadInfo.h"
 #include "TRRServiceChannel.h"
 #include "mozilla/SyncRunnable.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsHttpHandler.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIIOService.h"
+#include "nsIPrincipal.h"
+#include "nsIScriptSecurityManager.h"
+#include "nsServiceManagerUtils.h"
 
 namespace mozilla {
 namespace net {
@@ -39,8 +44,18 @@ nsresult DNSUtils::CreateChannelHelper(nsIURI* aUri, nsIChannel** aResult) {
     nsCOMPtr<nsIIOService> ios(do_GetIOService(&rv));
     NS_ENSURE_SUCCESS(rv, rv);
 
+#ifdef MOZ_NAIVEFOX
+    nsCOMPtr<nsIScriptSecurityManager> securityManager =
+        do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsIPrincipal> principal;
+    rv = securityManager->GetSystemPrincipal(getter_AddRefs(principal));
+    NS_ENSURE_SUCCESS(rv, rv);
+#else
+    nsCOMPtr<nsIPrincipal> principal = nsContentUtils::GetSystemPrincipal();
+#endif
     return NS_NewChannel(
-        aResult, aUri, nsContentUtils::GetSystemPrincipal(),
+        aResult, aUri, principal,
         nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
         nsIContentPolicy::TYPE_OTHER,
         nullptr,  // nsICookieJarSettings

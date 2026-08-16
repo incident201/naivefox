@@ -8,7 +8,9 @@
 #include "SubstitutingURL.h"
 #include "mozilla/ModuleUtils.h"
 #include "mozilla/chrome/RegistryMessageUtils.h"
-#include "mozilla/dom/ContentParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentParent.h"
+#endif
 #include "mozilla/ipc/URIUtils.h"
 #include "nsEscape.h"
 #include "nsIChannel.h"
@@ -22,7 +24,9 @@
 #include "nsReadableUtils.h"
 #include "nsURLHelper.h"
 
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::ContentParent;
+#endif
 
 namespace mozilla {
 namespace net {
@@ -351,6 +355,9 @@ nsresult SubstitutingProtocolHandler::CollectSubstitutions(
 nsresult SubstitutingProtocolHandler::SendSubstitution(const nsACString& aRoot,
                                                        nsIURI* aBaseURI,
                                                        uint32_t aFlags) {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   if (GeckoProcessType_Content == XRE_GetProcessType()) {
     return NS_OK;
   }
@@ -375,6 +382,7 @@ nsresult SubstitutingProtocolHandler::SendSubstitution(const nsACString& aRoot,
   }
 
   return NS_OK;
+#endif
 }
 
 //----------------------------------------------------------------------------

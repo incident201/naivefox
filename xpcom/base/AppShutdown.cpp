@@ -14,24 +14,26 @@
 #include "AppShutdown.h"
 #include "ProfilerControl.h"
 #include "mozilla/ClearOnShutdown.h"
-#include "mozilla/CmdLineAndEnvUtils.h"
 #include "mozilla/LateWriteChecks.h"
 #include "mozilla/PoisonIOInterposer.h"
 #include "mozilla/Printf.h"
 #include "mozilla/Services.h"
 #include "mozilla/SpinEventLoopUntil.h"
-#include "mozilla/StartupTimeline.h"
 #include "mozilla/StaticPrefs_toolkit.h"
-#include "mozilla/scache/StartupCache.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/scache/StartupCache.h"
+#endif
 #include "nsAppDirectoryServiceDefs.h"
-#include "nsAppRunner.h"
 #include "nsDirectoryServiceUtils.h"
-#include "nsExceptionHandler.h"
+#ifdef MOZ_CRASHREPORTER
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsICertStorage.h"
+#include "nsIObserverService.h"
 #include "nsThreadUtils.h"
 
 // TODO: understand why on Android we cannot include this and if we should
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "nsTerminator.h"
 #endif
 #include "prenv.h"
@@ -76,7 +78,7 @@ const char* sPhaseReadableNames[] = {"NotInShutdown",
 static_assert(sizeof(sPhaseReadableNames) / sizeof(sPhaseReadableNames[0]) ==
               (size_t)ShutdownPhase::ShutdownPhase_Length);
 
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
 static nsTerminator* sTerminator = nullptr;
 #endif
 
@@ -147,6 +149,9 @@ const char* AppShutdown::GetShutdownPhaseName(ShutdownPhase aPhase) {
 }
 
 void AppShutdown::MaybeDoRestart() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (sShutdownMode == AppShutdownMode::Restart) {
     StopLateWriteChecks();
 
@@ -178,6 +183,7 @@ void AppShutdown::MaybeDoRestart() {
 
     LaunchChild(true);
   }
+#endif
 }
 
 #ifdef XP_WIN
@@ -207,7 +213,7 @@ void AppShutdown::Init(AppShutdownMode aMode, int aExitCode,
 
   sExitCode = aExitCode;
 
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   sTerminator = new nsTerminator();
 #endif
 
@@ -224,9 +230,11 @@ void AppShutdown::Init(AppShutdownMode aMode, int aExitCode,
 
   // Very early shutdowns can happen before the startup cache is even
   // initialized; don't bother initializing it during shutdown.
+#ifndef MOZ_NAIVEFOX
   if (auto* cache = scache::StartupCache::GetSingletonNoInit()) {
     cache->MaybeKickOffShutdownWrite();
   }
+#endif
 }
 
 void AppShutdown::MaybeFastShutdown(ShutdownPhase aPhase) {
@@ -234,9 +242,11 @@ void AppShutdown::MaybeFastShutdown(ShutdownPhase aPhase) {
   // the late write checking code. Anything that writes to disk and which
   // we don't want to skip should be listed out explicitly in this section.
   if (aPhase == sFastShutdownPhase || aPhase == sLateWriteChecksPhase) {
+#ifndef MOZ_NAIVEFOX
     if (auto* cache = scache::StartupCache::GetSingletonNoInit()) {
       cache->EnsureShutdownWriteComplete();
     }
+#endif
 
     nsresult rv;
     nsCOMPtr<nsICertStorage> certStorage =
@@ -254,7 +264,9 @@ void AppShutdown::MaybeFastShutdown(ShutdownPhase aPhase) {
   }
   if (aPhase == sFastShutdownPhase) {
     StopLateWriteChecks();
+#ifndef MOZ_NAIVEFOX
     RecordShutdownEndTimeStamp();
+#endif
     MaybeDoRestart();
 
     profiler_shutdown(IsFastShutdown::Yes);
@@ -312,6 +324,7 @@ bool AppShutdown::IsRestarting() {
 }
 
 void AppShutdown::AnnotateShutdownReason(AppShutdownReason aReason) {
+#ifdef MOZ_CRASHREPORTER
   auto key = CrashReporter::Annotation::ShutdownReason;
   const char* reasonStr;
   switch (aReason) {
@@ -336,6 +349,9 @@ void AppShutdown::AnnotateShutdownReason(AppShutdownReason aReason) {
       break;
   }
   CrashReporter::RecordAnnotationCString(key, reasonStr);
+#else
+  (void)aReason;
+#endif
 }
 
 #ifdef DEBUG
@@ -408,7 +424,7 @@ void AppShutdown::AdvanceShutdownPhaseInternal(
   // From now on any IsInOrBeyond checks will find the new phase set.
   sCurrentShutdownPhase = aPhase;
 
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   if (sTerminator) {
     sTerminator->AdvancePhase(aPhase);
   }

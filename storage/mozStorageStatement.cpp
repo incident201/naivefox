@@ -14,10 +14,12 @@
 
 #include "mozStorageBindingParams.h"
 #include "mozStorageConnection.h"
-#include "mozStorageStatementJSHelper.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozStorageStatementJSHelper.h"
+#  include "mozStorageStatementParams.h"
+#  include "mozStorageStatementRow.h"
+#endif
 #include "mozStoragePrivateHelpers.h"
-#include "mozStorageStatementParams.h"
-#include "mozStorageStatementRow.h"
 #include "mozStorageStatement.h"
 
 #include "mozilla/Logging.h"
@@ -50,8 +52,12 @@ class StatementClassInfo : public nsIClassInfo {
 
   NS_IMETHOD
   GetScriptableHelper(nsIXPCScriptable** _helper) override {
+#ifdef MOZ_NAIVEFOX
+    *_helper = nullptr;
+#else
     static StatementJSHelper sJSHelper;
     *_helper = &sJSHelper;
+#endif
     return NS_OK;
   }
 
@@ -392,8 +398,10 @@ void Statement::internalFinalize(bool aDestructing) {
   }
 
   // Release the holders, so they can release the reference to us.
+#ifndef MOZ_NAIVEFOX
   mStatementParamsHolder = nullptr;
   mStatementRowHolder = nullptr;
+#endif
 }
 
 NS_IMETHODIMP

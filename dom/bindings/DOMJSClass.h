@@ -11,7 +11,11 @@
 #include "jsfriendapi.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/OriginTrials.h"
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla/NaiveFoxOriginTrials.h"
+#else
+#  include "mozilla/OriginTrials.h"
+#endif
 #include "mozilla/dom/PrototypeList.h"  // auto-generated
 #include "mozilla/dom/WebIDLPrefs.h"    // auto-generated
 

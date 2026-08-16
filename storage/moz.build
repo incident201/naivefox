@@ -84,6 +84,19 @@ UNIFIED_SOURCES += [
     "Variant.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    for source in (
+        "mozStorageAsyncStatementJSHelper.cpp",
+        "mozStorageAsyncStatementParams.cpp",
+        "mozStorageStatementJSHelper.cpp",
+        "mozStorageStatementParams.cpp",
+        "mozStorageStatementRow.cpp",
+    ):
+        UNIFIED_SOURCES.remove(source)
+    UNIFIED_SOURCES.remove("ObfuscatingVFS.cpp")
+    UNIFIED_SOURCES.remove("QuotaVFS.cpp")
+    UNIFIED_SOURCES.remove("SQLiteEncryption.cpp")
+
 # These files need to be built separately because they #include variantToSQLiteT_impl.h.
 SOURCES += [
     "mozStorageBindingParams.cpp",

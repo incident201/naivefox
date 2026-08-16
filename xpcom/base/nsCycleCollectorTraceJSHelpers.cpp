@@ -6,7 +6,9 @@
 #include "jsfriendapi.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsString.h"
-#include "nsWrapperCacheInlines.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsWrapperCacheInlines.h"
+#endif
 
 void CycleCollectionNoteEdgeNameImpl(
     nsCycleCollectionTraversalCallback& aCallback, const char* aName,
@@ -52,10 +54,14 @@ void TraceCallbackFunc::Trace(JS::Heap<JSObject*>* aPtr, const char* aName,
 
 void TraceCallbackFunc::Trace(nsWrapperCache* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   JSObject* obj = aPtr->GetWrapperPreserveColor();
   if (obj) {
     mCallback(JS::GCCellPtr(obj), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::TenuredHeap<JSObject*>* aPtr,

@@ -62,4 +62,7 @@ AllowCompilerWarnings()
 
 CFLAGS += ['-DBROTLI_BUILD_PORTABLE']
 
-Library('brotli')
+if CONFIG["MOZ_NAIVEFOX"]:
+    FINAL_LIBRARY = "xul"
+else:
+    Library("brotli")

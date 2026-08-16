@@ -112,7 +112,6 @@ UNIFIED_SOURCES += [
     "AsyncPlatformPipes.cpp",
     "Base64.cpp",
     "crc32c.c",
-    "FileDescriptorFile.cpp",
     "FilePreferences.cpp",
     "FixedBufferOutputStream.cpp",
     "Hex.cpp",
@@ -140,11 +139,16 @@ UNIFIED_SOURCES += [
     "nsUnicharInputStream.cpp",
     "nsWildCard.cpp",
     "SlicedInputStream.cpp",
-    "SnappyCompressOutputStream.cpp",
-    "SnappyFrameUtils.cpp",
-    "SnappyUncompressInputStream.cpp",
     "SpecialSystemDirectory.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "FileDescriptorFile.cpp",
+        "SnappyCompressOutputStream.cpp",
+        "SnappyFrameUtils.cpp",
+        "SnappyUncompressInputStream.cpp",
+    ]
 
 if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
     UNIFIED_SOURCES += [

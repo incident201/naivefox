@@ -12,9 +12,15 @@
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/Tokenizer.h"
-#include "mozilla/dom/nsMixedContentBlocker.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/nsMixedContentBlocker.h"
+#endif
 #include "nsCRT.h"
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsDNSService2.h"
 #include "nsICancelable.h"
 #include "nsIChannel.h"
@@ -1182,7 +1188,12 @@ bool nsProtocolProxyService::CanUseProxy(nsIURI* aURI, int32_t defaultPort) {
       // otherwise it returns true if the host matches an address that's
       // hardcoded to the loopback address.
       (!StaticPrefs::network_proxy_allow_hijacking_localhost() &&
+#ifdef MOZ_NAIVEFOX
+       ((!is_ipaddr && host.EqualsLiteral("localhost")) ||
+        (is_ipaddr && PR_IsNetAddrType(&addr, PR_IpAddrLoopback))))) {
+#else
        nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackHost(host))) {
+#endif
     LOG(("Not using proxy for this local host [%s]!\n", host.get()));
     return false;  // don't allow proxying
   }

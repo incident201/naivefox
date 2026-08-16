@@ -5,7 +5,8 @@
 with Files("**"):
     BUG_COMPONENT = ("Core", "DOM: Bindings (WebIDL)")
 
-TEST_DIRS += ["test"]
+if CONFIG["MOZ_BUILD_APP"] != "netwerk/naivefox":
+    TEST_DIRS += ["test"]
 
 XPIDL_SOURCES += ["nsIScriptError.idl"]
 
@@ -104,7 +105,8 @@ LOCAL_INCLUDES += ["/third_party/msgpack/include"]
 DEFINES["GOOGLE_PROTOBUF_NO_RTTI"] = True
 DEFINES["GOOGLE_PROTOBUF_NO_STATIC_INITIALIZER"] = True
 
-UNIFIED_SOURCES += [
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
     "BindingUtils.cpp",
     "CallbackInterface.cpp",
     "CallbackObject.cpp",
@@ -118,7 +120,7 @@ UNIFIED_SOURCES += [
     "SimpleGlobalObject.cpp",
     "ToJSValue.cpp",
     "WebIDLGlobalNameHash.cpp",
-]
+    ]
 
 # Some tests, including those for for maplike and setlike, require bindings
 # to be built, which means they must be included in libxul. This breaks the
@@ -170,7 +172,8 @@ if CONFIG["MOZ_DEBUG"] and CONFIG["ENABLE_TESTS"]:
 
 include("/ipc/chromium/chromium-config.mozbuild")
 
-FINAL_LIBRARY = "xul"
+if not CONFIG["MOZ_NAIVEFOX"]:
+    FINAL_LIBRARY = "xul"
 
 SPHINX_TREES["webidl"] = "docs"
 
@@ -192,7 +195,7 @@ if CONFIG["CC_TYPE"] == "gcc":
         "-Wno-maybe-uninitialized",
     ]
 
-if CONFIG["COMPILE_ENVIRONMENT"]:
+if CONFIG["COMPILE_ENVIRONMENT"] and not CONFIG["MOZ_NAIVEFOX"]:
     GeneratedFile(
         "CSSStyleProperties.webidl",
         script="/layout/style/GenerateCSSProperties.py",

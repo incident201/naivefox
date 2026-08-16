@@ -4,7 +4,11 @@
 
 #include "ContentRange.h"
 
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 
 mozilla::net::ContentRange::ContentRange(
     const nsContentUtils::ParsedRange& aRangeHeader, uint64_t aSize) {

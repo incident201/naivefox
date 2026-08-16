@@ -136,6 +136,13 @@ def main():
         help="Predicted message sizes for reducing serialization malloc overhead.",
     )
     op.add_option(
+        "--allow-undefined-metadata",
+        dest="allowUndefinedMetadata",
+        default=False,
+        action="store_true",
+        help="Allow metadata entries for protocols omitted by a product build.",
+    )
+    op.add_option(
         "-v",
         "--verbose",
         dest="verbosity",
@@ -308,7 +315,7 @@ def main():
     # Check if we have undefined message names in segmentCapacityDict.
     # This is a fool-proof of the 'message-metadata.ini' file.
     undefinedMessages = set(segmentCapacityDict.keys()) - set(allmessageprognames)
-    if len(undefinedMessages) > 0:
+    if len(undefinedMessages) > 0 and not options.allowUndefinedMetadata:
         print(
             "Error: Undefined message names in message-metadata.ini:", file=sys.stderr
         )

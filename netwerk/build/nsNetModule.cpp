@@ -6,8 +6,6 @@
 #include "base/basictypes.h"
 #include "mozilla/Components.h"
 #include "mozilla/ModuleUtils.h"
-#include "mozilla/net/BackgroundChannelRegistrar.h"
-#include "mozilla/net/NeckoChild.h"
 #include "nsCOMPtr.h"
 #include "nsCategoryCache.h"
 #include "nsDNSPrefetch.h"
@@ -70,8 +68,9 @@ NS_IMPL_COMPONENT_FACTORY(net::nsHttpsHandler) {
   return handler.forget().downcast<nsIHttpProtocolHandler>();
 }
 
-#include "WebSocketChannel.h"
-#include "WebSocketChannelChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "WebSocketChannel.h"
+#  include "WebSocketChannelChild.h"
 namespace mozilla::net {
 static already_AddRefed<BaseWebSocketChannel> WebSocketChannelConstructor(
     bool aSecure) {
@@ -98,6 +97,16 @@ WEB_SOCKET_HANDLER_CONSTRUCTOR(WebSocketChannel, false)
 WEB_SOCKET_HANDLER_CONSTRUCTOR(WebSocketSSLChannel, true)
 #undef WEB_SOCKET_HANDLER_CONSTRUCTOR
 }  // namespace mozilla::net
+#else
+namespace mozilla::net {
+nsresult WebSocketChannelConstructor(REFNSIID, void**) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+nsresult WebSocketSSLChannelConstructor(REFNSIID, void**) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+}  // namespace mozilla::net
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -134,6 +143,12 @@ nsresult CreateNewStreamConvServiceFactory(REFNSIID aIID, void** aResult) {
 }
 
 nsresult CreateNewMultiMixedConvFactory(REFNSIID aIID, void** aResult) {
+#ifdef MOZ_NAIVEFOX
+  if (aResult) {
+    *aResult = nullptr;
+  }
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!aResult) {
     return NS_ERROR_INVALID_POINTER;
   }
@@ -148,6 +163,7 @@ nsresult CreateNewMultiMixedConvFactory(REFNSIID aIID, void** aResult) {
     *aResult = nullptr;
   }
   return rv;
+#endif
 }
 
 nsresult CreateNewTXTToHTMLConvFactory(REFNSIID aIID, void** aResult) {
@@ -225,12 +241,16 @@ void nsNetShutdown() {
   nsDNSPrefetch::Shutdown();
 
   // Release the Websocket Admission Manager
+#ifndef MOZ_NAIVEFOX
   mozilla::net::WebSocketChannel::Shutdown();
+#endif
 
   mozilla::net::Http2CompressionCleanup();
 
 #ifdef MOZ_AUTH_EXTENSION
+#ifndef MOZ_NAIVEFOX
   nsAuthGSSAPI::Shutdown();
+#endif
 #endif
 
   delete gNetSniffers;

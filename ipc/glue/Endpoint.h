@@ -6,7 +6,9 @@
 #define IPC_GLUE_ENDPOINT_H_
 
 #include <utility>
-#include "CrashAnnotations.h"
+#ifndef MOZ_NAIVEFOX
+#  include "CrashAnnotations.h"
+#endif
 #include "base/process.h"
 #include "base/process_util.h"
 #include "mozilla/Assertions.h"
@@ -142,11 +144,13 @@ class Endpoint final : public UntypedEndpoint {
   }
 };
 
-#if defined(XP_MACOSX)
+#ifndef MOZ_NAIVEFOX
+#  if defined(XP_MACOSX)
 void AnnotateCrashReportWithErrno(CrashReporter::Annotation tag, int error);
-#else
+#  else
 inline void AnnotateCrashReportWithErrno(CrashReporter::Annotation tag,
                                          int error) {}
+#  endif
 #endif
 
 // This function is used internally to create a pair of Endpoints. See the

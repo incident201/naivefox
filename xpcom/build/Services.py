@@ -6,7 +6,10 @@
 # is deprecated in favour of Components.h.
 
 
+import buildconfig
+
 services = []
+is_naivefox = bool(buildconfig.substs.get("MOZ_NAIVEFOX"))
 
 
 def service(name, iface, contractid):
@@ -19,12 +22,13 @@ def service(name, iface, contractid):
 service("ChromeRegistry", "nsIChromeRegistry", "@mozilla.org/chrome/chrome-registry;1")
 service("IOService", "nsIIOService", "@mozilla.org/network/io-service;1")
 service("ObserverService", "nsIObserverService", "@mozilla.org/observer-service;1")
-service("PermissionManager", "nsIPermissionManager", "@mozilla.org/permissionmanager;1")
-service(
-    "AsyncShutdownService",
-    "nsIAsyncShutdownService",
-    "@mozilla.org/async-shutdown-service;1",
-)
+if not is_naivefox:
+    service("PermissionManager", "nsIPermissionManager", "@mozilla.org/permissionmanager;1")
+    service(
+        "AsyncShutdownService",
+        "nsIAsyncShutdownService",
+        "@mozilla.org/async-shutdown-service;1",
+    )
 
 # The definition file needs access to the definitions of the particular
 # interfaces. If you add a new interface here, make sure the necessary includes
@@ -59,6 +63,18 @@ CPP_INCLUDES = """
 #include "nsIURIFixup.h"
 #include "nsIBits.h"
 #include "nsIXULRuntime.h"
+"""
+
+if is_naivefox:
+    CPP_INCLUDES = """
+#include "mozilla/Likely.h"
+#include "mozilla/Services.h"
+#include "nsComponentManager.h"
+#include "nsIObserverService.h"
+#include "nsObserverService.h"
+#include "nsXPCOMPrivate.h"
+#include "nsIIOService.h"
+#include "nsIChromeRegistry.h"
 """
 
 

@@ -11,13 +11,20 @@
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/dom/Document.h"
-#include "mozilla/net/NeckoChild.h"
-#include "mozilla/net/NeckoCommon.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/Document.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoChild.h"
+#  include "mozilla/net/NeckoCommon.h"
+#endif
 #include "nsComponentManagerUtils.h"
-#include "nsIDocShell.h"
-#include "nsIDocumentLoader.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIDocShell.h"
+#  include "nsIDocumentLoader.h"
+#endif
 #include "nsIObserverService.h"
+#include "nsILoadGroup.h"
 #include "nsITimer.h"
 #include "nsIXULRuntime.h"
 #include "nsServiceManagerUtils.h"
@@ -111,6 +118,7 @@ RequestContext::BeginLoad() {
 
   LOG(("RequestContext::BeginLoad %p", this));
 
+#ifndef MOZ_NAIVEFOX
   if (IsNeckoChild()) {
     // Tailing is not supported on the child process
     if (gNeckoChild) {
@@ -118,6 +126,7 @@ RequestContext::BeginLoad() {
     }
     return NS_OK;
   }
+#endif
 
   mAfterDOMContentLoaded = false;
   mBeginLoadTime = TimeStamp::NowLoRes();
@@ -130,6 +139,7 @@ RequestContext::DOMContentLoaded() {
 
   LOG(("RequestContext::DOMContentLoaded %p", this));
 
+#ifndef MOZ_NAIVEFOX
   if (IsNeckoChild()) {
     // Tailing is not supported on the child process
     if (gNeckoChild) {
@@ -137,6 +147,7 @@ RequestContext::DOMContentLoaded() {
     }
     return NS_OK;
   }
+#endif
 
   if (mAfterDOMContentLoaded) {
     // There is a possibility of a duplicate notification
@@ -205,7 +216,9 @@ RequestContext::RemoveNonTailRequest() {
 }
 
 void RequestContext::ScheduleUnblock() {
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(!IsNeckoChild());
+#endif
   MOZ_ASSERT(NS_IsMainThread());
 
   if (!gHttpHandler) {
@@ -570,6 +583,9 @@ RequestContextService::Observe(nsISupports* subject, const char* topic,
   }
 
   if (!strcmp("content-document-interactive", topic)) {
+#ifdef MOZ_NAIVEFOX
+    return NS_OK;
+#else
     nsCOMPtr<dom::Document> document(do_QueryInterface(subject));
     MOZ_ASSERT(document);
     // We want this be triggered also for iframes, since those track their
@@ -598,6 +614,7 @@ RequestContextService::Observe(nsISupports* subject, const char* topic,
     }
 
     return NS_OK;
+#endif
   }
 
   MOZ_ASSERT(false, "Unexpected observer topic");

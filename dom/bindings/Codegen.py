@@ -18975,7 +18975,12 @@ class CGGlobalNames(CGGeneric):
                 self,
                 define=dedent(
                     """
+                #ifdef MOZ_NAIVEFOX
+                // NaiveFox intentionally has no content globals.  It retains
+                // only dictionary WebIDL used by the networking ABI.
+                #else
                 static_assert(false, "No WebIDL global name entries!");
+                #endif
                 """
                 ),
             )

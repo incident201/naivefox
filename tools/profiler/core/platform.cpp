@@ -52,7 +52,6 @@
 #include "nsID.h"
 #include "nsIDUtils.h"
 #include "nsString.h"
-#include "nsCExternalHandlerService.h"
 #include "nsCOMPtr.h"
 #include "nsDebug.h"
 #include "nsISupports.h"
@@ -69,14 +68,18 @@
 #include "mozilla/BaseAndGeckoProfilerDetail.h"
 #include "mozilla/BaseProfiler.h"
 #include "mozilla/CycleCollectedJSContext.h"
-#include "mozilla/ExtensionPolicyService.h"
-#include "mozilla/extensions/WebExtensionPolicy.h"
-#include "mozilla/FOGIPC.h"
-#include "mozilla/glean/ProcesstoolsMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ExtensionPolicyService.h"
+#  include "mozilla/extensions/WebExtensionPolicy.h"
+#  include "mozilla/FOGIPC.h"
+#  include "mozilla/glean/ProcesstoolsMetrics.h"
+#endif
 #include "mozilla/Monitor.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Printf.h"
-#include "mozilla/ProcInfo.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ProcInfo.h"
+#endif
 #include "mozilla/ProfilerBufferSize.h"
 #include "mozilla/ProfileBufferChunkManagerSingle.h"
 #include "mozilla/ProfileBufferChunkManagerWithLocalLimit.h"
@@ -108,7 +111,6 @@
 #include "nsIXULRuntime.h"
 #include "nsJSPrincipals.h"
 #include "nsMemoryReporterManager.h"
-#include "nsPIDOMWindow.h"
 #include "nsProfilerStartParams.h"
 #include "nsScriptSecurityManager.h"
 #include "nsSystemInfo.h"
@@ -116,7 +118,9 @@
 #include "nsXULAppAPI.h"
 #include "xpcpublic.h"
 #include "nsDirectoryServiceUtils.h"
-#include "Tracing.h"
+#ifndef MOZ_NAIVEFOX
+#  include "Tracing.h"
+#endif
 #include "prdtoa.h"
 #include "prtime.h"
 
@@ -3507,7 +3511,11 @@ static void StreamMetaJSCustomObject(
   aWriter.IntProperty("debug", 0);
 #endif
 
+#ifdef MOZ_NAIVEFOX
+  aWriter.IntProperty("gcpoison", 0);
+#else
   aWriter.IntProperty("gcpoison", JS::IsGCPoisoning() ? 1 : 0);
+#endif
 
   aWriter.IntProperty("asyncstack", aPreRecordedMetaInformation.mAsyncStacks);
 
@@ -3584,6 +3592,7 @@ static void StreamMetaJSCustomObject(
     return;
   }
 
+#ifndef MOZ_NAIVEFOX
   // We should avoid collecting extension metadata for profiler when there is no
   // observer service, since a ExtensionPolicyService could not be created then.
   if (nsCOMPtr<nsIObserverService> os = services::GetObserverService()) {
@@ -3622,6 +3631,7 @@ static void StreamMetaJSCustomObject(
     }
     aWriter.EndObject();
   }
+#endif
 }
 
 static void StreamPages(PSLockRef aLock, SpliceableJSONWriter& aWriter) {
@@ -5491,6 +5501,9 @@ static nsAutoCString MakeThreadInfoMarkerName(base::ProcessId aThreadId,
 }
 
 void SamplerThread::SpyOnUnregisteredThreads() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   const TimeStamp unregisteredThreadSearchStart = TimeStamp::Now();
 
   const base::ProcessId currentProcessId =
@@ -5655,6 +5668,7 @@ void SamplerThread::SpyOnUnregisteredThreads() {
                                      MarkerTiming::IntervalUntilNowFrom(
                                          unregisteredThreadSearchStart)),
                        "Work to discover and record unregistered threads");
+#endif
 }
 
 // We #include these files directly because it means those files can use
@@ -7052,9 +7066,11 @@ static void locked_profiler_start(PSLockRef aLock, PowerOfTwo32 aCapacity,
   }
 #endif
 
+#ifndef MOZ_NAIVEFOX
   if (ProfilerFeature::HasAudioCallbackTracing(aFeatures)) {
     StartAudioCallbackTracing();
   }
+#endif
 
   // At the very end, set up RacyFeatures.
   RacyFeatures::SetActive(ActivePS::Features(aLock));
@@ -7177,9 +7193,11 @@ void profiler_ensure_started(PowerOfTwo32 aCapacity, double aInterval,
   // At the very start, clear RacyFeatures.
   RacyFeatures::SetInactive();
 
+#ifndef MOZ_NAIVEFOX
   if (ActivePS::FeatureAudioCallbackTracing(aLock)) {
     StopAudioCallbackTracing();
   }
+#endif
 
 #if defined(GP_OS_android)
   if (ActivePS::FeatureJava(aLock)) {
@@ -7366,6 +7384,9 @@ void profiler_lookup_async_signal_dump_directory() {
     return;
 #  endif
 
+#  ifdef MOZ_NAIVEFOX
+    return;
+#  else
     LOG("Defaulting to the user's Download directory for profile dumps");
     nsCOMPtr<nsIFile> tDownloadDir;
     nsresult rv;
@@ -7388,6 +7409,7 @@ void profiler_lookup_async_signal_dump_directory() {
       return;
     }
     CorePS::SetAsyncSignalDumpDirectory(lock, Some(tDownloadDir));
+#  endif
   }
 #endif
 }
@@ -7741,6 +7763,7 @@ namespace geckoprofiler::markers::detail {
 Maybe<uint64_t> profiler_get_inner_window_id_from_docshell(
     nsIDocShell* aDocshell) {
   Maybe<uint64_t> innerWindowID = Nothing();
+#ifndef MOZ_NAIVEFOX
   if (aDocshell) {
     auto outerWindow = aDocshell->GetWindow();
     if (outerWindow) {
@@ -7750,6 +7773,7 @@ Maybe<uint64_t> profiler_get_inner_window_id_from_docshell(
       }
     }
   }
+#endif
   return innerWindowID;
 }
 
@@ -7936,9 +7960,11 @@ void profiler_record_wakeup_count(const nsACString& aProcessType) {
   if (newWakeups > 0) {
     if (newWakeups < std::numeric_limits<int32_t>::max()) {
       int32_t newWakeups32 = int32_t(newWakeups);
+#ifndef MOZ_NAIVEFOX
       mozilla::glean::power::total_thread_wakeups.Add(newWakeups32);
       mozilla::glean::power::wakeups_per_process_type.Get(aProcessType)
           .Add(newWakeups32);
+#endif
       PROFILER_MARKER("Thread Wake-ups", OTHER, {}, WakeUpCountMarker,
                       newWakeups32, aProcessType);
     }
@@ -7973,8 +7999,10 @@ void profiler_record_wakeup_count(const nsACString& aProcessType) {
   }
 
   for (const ThreadWakeData& data : threadWakeData) {
+#ifndef MOZ_NAIVEFOX
     mozilla::glean::RecordThreadCpuUse(data.mThreadName, data.mCpuTimeMs,
                                        data.mWakeCount);
+#endif
   }
 #endif
 }

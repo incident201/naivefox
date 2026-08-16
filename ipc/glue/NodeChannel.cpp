@@ -7,7 +7,9 @@
 #include "chrome/common/ipc_message_utils.h"
 #include "mojo/core/ports/name.h"
 #include "mozilla/ipc/IOThread.h"
-#include "mozilla/ipc/GeckoChildProcessHost.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ipc/GeckoChildProcessHost.h"
+#endif
 #include "mozilla/ipc/ProtocolMessageUtils.h"
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "nsThreadUtils.h"
@@ -43,7 +45,11 @@ NodeChannel::NodeChannel(const NodeName& aName, IPC::Channel* aChannel,
       mName(aName),
       mOtherPid(aPid),
       mChannel(std::move(aChannel)),
+#ifdef MOZ_NAIVEFOX
+      mChildProcessHost(nullptr) {}
+#else
       mChildProcessHost(aChildProcessHost) {}
+#endif
 
 NodeChannel::~NodeChannel() { Close(); }
 
@@ -161,6 +167,7 @@ void NodeChannel::AcceptInvite(const NodeName& aRealName,
 
 void NodeChannel::SendMessage(UniquePtr<IPC::Message> aMessage) {
   if (aMessage->size() > IPC::Channel::kMaximumMessageSize) {
+#ifndef MOZ_NAIVEFOX
     CrashReporter::RecordAnnotationCString(
         CrashReporter::Annotation::IPCMessageName, aMessage->name());
     CrashReporter::RecordAnnotationU32(
@@ -168,6 +175,7 @@ void NodeChannel::SendMessage(UniquePtr<IPC::Message> aMessage) {
     CrashReporter::RecordAnnotationU32(
         CrashReporter::Annotation::IPCMessageLargeBufferShmemFailureSize,
         aMessage->LargeBufferShmemFailureSize());
+#endif
     MOZ_CRASH("IPC message size is too large");
   }
   aMessage->AssertAsLargeAsHeader();
@@ -274,9 +282,11 @@ void NodeChannel::OnChannelConnected(base::ProcessId aPeerPid) {
 
   // We may need to tell the GeckoChildProcessHost which we were created by that
   // the channel has been connected to unblock completing the process launch.
+#ifndef MOZ_NAIVEFOX
   if (mChildProcessHost) {
     mChildProcessHost->OnChannelConnected(aPeerPid);
   }
+#endif
 }
 
 void NodeChannel::OnChannelError() {

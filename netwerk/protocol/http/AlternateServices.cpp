@@ -10,15 +10,17 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/SyncRunnable.h"
-#include "mozilla/dom/PContent.h"
 #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
-#include "mozilla/net/AltSvcTransactionChild.h"
-#include "mozilla/net/AltSvcTransactionParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/AltSvcTransactionChild.h"
+#  include "mozilla/net/AltSvcTransactionParent.h"
+#endif
 #include "nsEscape.h"
 #include "nsHttpConnectionInfo.h"
 #include "nsHttpHandler.h"
 #include "nsHttpTransaction.h"
 #include "nsIOService.h"
+#include "nsNetUtil.h"
 #include "nsITLSSocketControl.h"
 #include "nsThreadUtils.h"
 #include "xpcpublic.h"
@@ -946,6 +948,7 @@ void AltSvcCache::UpdateAltServiceMapping(
   nsCOMPtr<nsIInterfaceRequestor> callbacks = new AltSvcOverride(aCallbacks);
   RefPtr<AltSvcMappingValidator> validator = new AltSvcMappingValidator(map);
   RefPtr<SpeculativeTransaction> transaction;
+#ifndef MOZ_NAIVEFOX
   if (nsIOService::UseSocketProcess()) {
     RefPtr<AltSvcTransactionParent> parent =
         new AltSvcTransactionParent(ci, aCallbacks, caps, validator);
@@ -953,7 +956,9 @@ void AltSvcCache::UpdateAltServiceMapping(
       return;
     }
     transaction = parent;
-  } else {
+  } else
+#endif
+  {
     transaction = new AltSvcTransaction<AltSvcMappingValidator>(
         ci, aCallbacks, caps, validator, map->IsHttp3());
   }
@@ -1152,7 +1157,9 @@ AltSvcOverride::GetAllow1918(bool* allow) {
   return NS_OK;
 }
 
+#ifndef MOZ_NAIVEFOX
 template class AltSvcTransaction<AltSvcTransactionChild>;
+#endif
 
 NS_IMPL_ISUPPORTS(AltSvcOverride, nsIInterfaceRequestor,
                   nsISpeculativeConnectionOverrider)

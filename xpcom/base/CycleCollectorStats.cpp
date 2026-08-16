@@ -12,7 +12,9 @@
 #include "mozilla/BaseProfilerMarkersPrerequisites.h"
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/glean/XpcomMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/XpcomMetrics.h"
+#endif
 #include "nsCycleCollector.h"
 #include "nsDebug.h"
 
@@ -112,7 +114,11 @@ void mozilla::CycleCollectorStats::AfterCycleCollectionSlice() {
 
     uint32_t percent =
         uint32_t(idleDuration.ToSeconds() / duration.ToSeconds() * 100);
+#ifndef MOZ_NAIVEFOX
     glean::cycle_collector::slice_during_idle.AccumulateSingleSample(percent);
+#else
+    (void)percent;
+#endif
   }
 
   TimeDuration sliceTime = TimeBetween(mBeginSliceTime, mEndSliceTime);
@@ -172,6 +178,10 @@ void mozilla::CycleCollectorStats::SendTelemetry(TimeDuration aCCNowDuration,
   // other threads' measures.
   MOZ_ASSERT(NS_IsMainThread());
 
+#ifdef MOZ_NAIVEFOX
+  (void)aCCNowDuration;
+  (void)aPrevCCEnd;
+#else
   glean::cycle_collector::finish_igc
       .EnumGet(
           static_cast<glean::cycle_collector::FinishIgcLabel>(mAnyLockedOut))
@@ -193,4 +203,5 @@ void mozilla::CycleCollectorStats::SendTelemetry(TimeDuration aCCNowDuration,
 
   glean::cycle_collector::forget_skippable_max.ProcessGet()
       .AccumulateRawDuration(mMaxForgetSkippableTime);
+#endif
 }

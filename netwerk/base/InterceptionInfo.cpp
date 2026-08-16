@@ -4,7 +4,11 @@
 
 #include "mozilla/net/InterceptionInfo.h"
 
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  include "../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 
 namespace mozilla::net {
 

@@ -5,13 +5,18 @@
 #include "nsBaseChannel.h"
 
 #include "LoadInfo.h"
-#include "mozilla/AntiTrackingUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/AntiTrackingUtils.h"
+#endif
 #include "mozilla/BasePrincipal.h"
-#include "mozilla/dom/ParentProcessChannelHandle.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ParentProcessChannelHandle.h"
+#endif
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "nsChannelClassifier.h"
-#include "nsContentSecurityManager.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentSecurityManager.h"
+#endif
 #include "nsICancelable.h"
 #include "nsIChannelEventSink.h"
 #include "nsIScriptSecurityManager.h"
@@ -281,6 +286,9 @@ void nsBaseChannel::ContinueHandleAsyncRedirect(nsresult result) {
 }
 
 void nsBaseChannel::ClassifyURI() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   // For channels created in the child process, delegate to the parent to
   // classify URIs.
   if (!XRE_IsParentProcess()) {
@@ -291,6 +299,7 @@ void nsBaseChannel::ClassifyURI() {
     auto classifier = MakeRefPtr<net::nsChannelClassifier>(this);
     classifier->Start();
   }
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -607,8 +616,12 @@ nsBaseChannel::SetContentLength(int64_t aContentLength) {
 NS_IMETHODIMP
 nsBaseChannel::Open(nsIInputStream** aStream) {
   nsCOMPtr<nsIStreamListener> listener;
+#ifdef MOZ_NAIVEFOX
+  nsresult rv = NS_OK;
+#else
   nsresult rv =
       nsContentSecurityManager::doContentSecurityCheck(this, listener);
+#endif
   NS_ENSURE_SUCCESS(rv, rv);
 
   NS_ENSURE_TRUE(mURI, NS_ERROR_NOT_INITIALIZED);
@@ -638,8 +651,12 @@ NS_IMETHODIMP
 nsBaseChannel::AsyncOpen(nsIStreamListener* aListener) {
   nsCOMPtr<nsIStreamListener> listener = aListener;
 
+#ifdef MOZ_NAIVEFOX
+  nsresult rv = NS_OK;
+#else
   nsresult rv =
       nsContentSecurityManager::doContentSecurityCheck(this, listener);
+#endif
   if (NS_FAILED(rv)) {
     mCallbacks = nullptr;
     return rv;
@@ -675,7 +692,9 @@ nsBaseChannel::AsyncOpen(nsIStreamListener* aListener) {
     return rv;
   }
 
+#ifndef MOZ_NAIVEFOX
   AntiTrackingUtils::UpdateAntiTrackingInfoForChannel(this);
+#endif
 
   // Store the listener and context early so that OpenContentStream and the
   // stream's AsyncWait method (called by AsyncRead) can have access to them
@@ -712,13 +731,20 @@ nsBaseChannel::AsyncOpen(nsIStreamListener* aListener) {
 NS_IMETHODIMP
 nsBaseChannel::GetParentProcessChannelHandle(
     mozilla::dom::ParentProcessChannelHandle** aValue) {
+#ifdef MOZ_NAIVEFOX
+  *aValue = nullptr;
+#else
   *aValue = do_AddRef(mParentProcessChannelHandle).take();
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 nsBaseChannel::SetParentProcessChannelHandle(
     mozilla::dom::ParentProcessChannelHandle* aValue) {
+#ifdef MOZ_NAIVEFOX
+  return aValue ? NS_ERROR_NOT_AVAILABLE : NS_OK;
+#else
   if (XRE_IsParentProcess()) {
     MOZ_ASSERT_UNREACHABLE(
         "SetParentProcessChannelHandle in the parent process would leak");
@@ -727,6 +753,7 @@ nsBaseChannel::SetParentProcessChannelHandle(
 
   mParentProcessChannelHandle = aValue;
   return NS_OK;
+#endif
 }
 
 //-----------------------------------------------------------------------------

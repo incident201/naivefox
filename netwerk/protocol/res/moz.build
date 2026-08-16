@@ -34,6 +34,16 @@ UNIFIED_SOURCES += [
     "SubstitutingProtocolHandler.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    for source in (
+        "ExtensionProtocolHandler.cpp",
+        "MozNewTabWallpaperProtocolHandler.cpp",
+        "MozSrcProtocolHandler.cpp",
+        "PageThumbProtocolHandler.cpp",
+        "RemoteStreamGetter.cpp",
+    ):
+        UNIFIED_SOURCES.remove(source)
+
 include("/ipc/chromium/chromium-config.mozbuild")
 
 FINAL_LIBRARY = "xul"

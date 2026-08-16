@@ -5,7 +5,9 @@
 #ifndef mozilla_RegistryMessageUtils_h
 #define mozilla_RegistryMessageUtils_h
 
-#include "ipc/IPCMessageUtilsSpecializations.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ipc/IPCMessageUtilsSpecializations.h"
+#endif
 #include "nsString.h"
 
 struct SerializedURI {
@@ -52,6 +54,7 @@ struct OverrideMapping {
   }
 };
 
+#ifndef MOZ_NAIVEFOX
 namespace IPC {
 
 DEFINE_IPC_SERIALIZER_WITH_FIELDS(SerializedURI, spec);
@@ -62,5 +65,6 @@ DEFINE_IPC_SERIALIZER_WITH_FIELDS(SubstitutionMapping, scheme, path,
 DEFINE_IPC_SERIALIZER_WITH_FIELDS(OverrideMapping, originalURI, overrideURI);
 
 }  // namespace IPC
+#endif
 
 #endif  // RegistryMessageUtils_h

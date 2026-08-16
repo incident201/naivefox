@@ -3,6 +3,18 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "CryptoTask.h"
+#ifdef MOZ_NAIVEFOX
+#  include "nsNSSCertificateDB.h"
+
+NS_IMETHODIMP
+nsNSSCertificateDB::AsyncVerifyQWAC(
+    QWACType, nsIX509Cert*, const nsACString&,
+    const nsTArray<RefPtr<nsIX509Cert>>&, JSContext*,
+    mozilla::dom::Promise**) {
+  return NS_ERROR_NOT_AVAILABLE;
+}
+#else
+
 #include "QWACTrustDomain.h"
 #include "mozilla/dom/Promise.h"
 #include "mozpkix/pkix.h"
@@ -369,3 +381,4 @@ nsNSSCertificateDB::AsyncVerifyQWAC(
   promise.forget(aPromise);
   return NS_OK;
 }
+#endif

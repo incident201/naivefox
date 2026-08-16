@@ -4,14 +4,19 @@
 
 #include "ProxyConfigLookup.h"
 
-#include "ProxyConfigLookupChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ProxyConfigLookupChild.h"
+#  include "nsContentUtils.h"
+#endif
 #include "mozilla/Components.h"
-#include "nsContentUtils.h"
 #include "nsICancelable.h"
 #include "nsIChannel.h"
 #include "nsIProtocolProxyService.h"
 #include "nsIProtocolProxyService2.h"
+#include "nsIPrincipal.h"
+#include "nsIScriptSecurityManager.h"
 #include "nsNetUtil.h"
+#include "nsServiceManagerUtils.h"
 #include "nsThreadUtils.h"
 
 namespace mozilla {
@@ -38,6 +43,7 @@ ProxyConfigLookup::ProxyConfigLookup(
 ProxyConfigLookup::~ProxyConfigLookup() = default;
 
 nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {
+#ifndef MOZ_NAIVEFOX
   if (!XRE_IsParentProcess()) {
     RefPtr<ProxyConfigLookup> self = this;
     bool result = ProxyConfigLookupChild::Create(
@@ -47,11 +53,21 @@ nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {
         });
     return result ? NS_OK : NS_ERROR_FAILURE;
   }
+#endif
 
   nsresult rv;
   nsCOMPtr<nsIChannel> channel;
-  rv = NS_NewChannel(getter_AddRefs(channel), mURI,
-                     nsContentUtils::GetSystemPrincipal(),
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIScriptSecurityManager> securityManager =
+      do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIPrincipal> principal;
+  rv = securityManager->GetSystemPrincipal(getter_AddRefs(principal));
+  NS_ENSURE_SUCCESS(rv, rv);
+#else
+  nsCOMPtr<nsIPrincipal> principal = nsContentUtils::GetSystemPrincipal();
+#endif
+  rv = NS_NewChannel(getter_AddRefs(channel), mURI, principal,
                      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
                      nsIContentPolicy::TYPE_OTHER);
   if (NS_FAILED(rv)) {

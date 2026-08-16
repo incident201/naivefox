@@ -7,14 +7,18 @@
 #include "nsIIPCSerializableInputStream.h"
 
 #include "mozilla/Assertions.h"
-#include "mozilla/dom/File.h"
-#include "mozilla/dom/quota/DecryptingInputStream_impl.h"
-#include "mozilla/dom/quota/IPCStreamCipherStrategy.h"
-#include "mozilla/ipc/DataPipe.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/File.h"
+#  include "mozilla/dom/quota/DecryptingInputStream_impl.h"
+#  include "mozilla/dom/quota/IPCStreamCipherStrategy.h"
+#  include "mozilla/ipc/DataPipe.h"
+#endif
 #include "mozilla/InputStreamLengthHelper.h"
-#include "mozilla/RemoteLazyInputStream.h"
-#include "mozilla/RemoteLazyInputStreamChild.h"
-#include "mozilla/RemoteLazyInputStreamStorage.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/RemoteLazyInputStream.h"
+#  include "mozilla/RemoteLazyInputStreamChild.h"
+#  include "mozilla/RemoteLazyInputStreamStorage.h"
+#endif
 #include "mozilla/SlicedInputStream.h"
 #include "mozilla/InputStreamLengthWrapper.h"
 #include "nsBufferedStreams.h"
@@ -78,6 +82,10 @@ void InputStreamHelper::SerializeInputStream(nsIInputStream* aInputStream,
 
 void InputStreamHelper::SerializeInputStreamAsPipe(nsIInputStream* aInputStream,
                                                    InputStreamParams& aParams) {
+#ifdef MOZ_NAIVEFOX
+  // Inter-process stream pipes are unreachable in the single-process client.
+  return;
+#else
   MOZ_ASSERT(aInputStream);
 
   // Let's try to take the length using InputStreamLengthHelper. If the length
@@ -110,10 +118,12 @@ void InputStreamHelper::SerializeInputStreamAsPipe(nsIInputStream* aInputStream,
   if (length != -1) {
     aParams = InputStreamLengthWrapperParams(aParams, length, false);
   }
+#endif
 }
 
 already_AddRefed<nsIInputStream> InputStreamHelper::DeserializeInputStream(
     const InputStreamParams& aParams) {
+#ifndef MOZ_NAIVEFOX
   if (aParams.type() == InputStreamParams::TRemoteLazyInputStreamParams) {
     const RemoteLazyInputStreamParams& params =
         aParams.get_RemoteLazyInputStreamParams();
@@ -136,6 +146,7 @@ already_AddRefed<nsIInputStream> InputStreamHelper::DeserializeInputStream(
         aParams.get_DataPipeReceiverStreamParams();
     return do_AddRef(pipeParams.pipe().get());
   }
+#endif
 
   nsCOMPtr<nsIIPCSerializableInputStream> serializable;
 
@@ -179,10 +190,12 @@ already_AddRefed<nsIInputStream> InputStreamHelper::DeserializeInputStream(
       serializable = new InputStreamLengthWrapper();
       break;
 
+#ifndef MOZ_NAIVEFOX
     case InputStreamParams::TEncryptedFileInputStreamParams:
       serializable = new dom::quota::DecryptingInputStream<
           dom::quota::IPCStreamCipherStrategy>();
       break;
+#endif
 
     default:
       MOZ_ASSERT(false, "Unknown params!");

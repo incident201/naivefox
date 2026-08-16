@@ -11,59 +11,90 @@
 #include "HttpBaseChannel.h"
 #include "HttpLog.h"
 #include "LoadInfo.h"
-#include "ReferrerInfo.h"
-#include "mozIRemoteLazyInputStream.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ReferrerInfo.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozIRemoteLazyInputStream.h"
+#endif
 #include "mozIThirdPartyUtil.h"
-#include "mozilla/AntiTrackingUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/AntiTrackingUtils.h"
+#endif
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/BinarySearch.h"
 #include "mozilla/CompactPair.h"
 #include "mozilla/Components.h"
-#include "mozilla/ConsoleReportCollector.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ConsoleReportCollector.h"
+#endif
 #include "mozilla/DebugOnly.h"
 #include "mozilla/InputStreamLengthHelper.h"
 #include "mozilla/LoadInfo.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/NullPrincipal.h"
-#include "mozilla/PermissionManager.h"
-#include "mozilla/RemoteLazyInputStreamChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/RemoteLazyInputStreamChild.h"
+#endif
 #include "mozilla/StaticPrefs_browser.h"
 #include "mozilla/StaticPrefs_fission.h"
 #include "mozilla/StaticPrefs_javascript.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_security.h"
-#include "mozilla/Telemetry.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Telemetry.h"
+#endif
 #include "mozilla/Tokenizer.h"
-#include "mozilla/browser/NimbusFeatures.h"
-#include "mozilla/dom/BrowsingContext.h"
-#include "mozilla/dom/CanonicalBrowsingContext.h"
-#include "mozilla/dom/ContentChild.h"
-#include "mozilla/dom/Document.h"
-#include "mozilla/dom/FetchPriority.h"
-#include "mozilla/dom/LoadURIOptionsBinding.h"
-#include "mozilla/dom/ParentProcessChannelHandle.h"
-#include "mozilla/dom/Performance.h"
-#include "mozilla/dom/PerformanceStorage.h"
-#include "mozilla/dom/PolicyContainer.h"
-#include "mozilla/dom/ProcessIsolation.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/browser/NimbusFeatures.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BrowsingContext.h"
+#  include "mozilla/dom/CanonicalBrowsingContext.h"
+#  include "mozilla/dom/ContentChild.h"
+#  include "mozilla/dom/Document.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/LoadURIOptionsBinding.h"
+#  include "mozilla/dom/ParentProcessChannelHandle.h"
+#  include "mozilla/dom/Performance.h"
+#  include "mozilla/dom/PerformanceStorage.h"
+#  include "mozilla/dom/PolicyContainer.h"
+#  include "mozilla/dom/ProcessIsolation.h"
+#endif
 #include "mozilla/dom/RequestBinding.h"
-#include "mozilla/dom/WindowGlobalParent.h"
-#include "mozilla/dom/nsHTTPSOnlyUtils.h"
-#include "mozilla/dom/nsMixedContentBlocker.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/WindowGlobalParent.h"
+#  include "mozilla/dom/nsHTTPSOnlyUtils.h"
+#  include "mozilla/dom/nsMixedContentBlocker.h"
+#endif
 #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
-#include "mozilla/net/ChannelClassifierUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/ChannelClassifierUtils.h"
+#endif
 #include "mozilla/net/OpaqueResponseUtils.h"
 #include "mozilla/net/SFV.h"
 #include "nsBufferedStreams.h"
 #include "nsCOMPtr.h"
+#include "nsComponentManagerUtils.h"
 #include "nsCRT.h"
-#include "nsContentSecurityManager.h"
-#include "nsContentSecurityUtils.h"
-#include "nsContentUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentSecurityManager.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentSecurityUtils.h"
+#endif
+#ifdef MOZ_NAIVEFOX
+#  include "../../naivefox/nsContentUtils.h"
+#else
+#  include "nsContentUtils.h"
+#endif
 #include "nsDebug.h"
 #include "nsEscape.h"
-#include "nsGlobalWindowInner.h"
-#include "nsGlobalWindowOuter.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsGlobalWindowInner.h"
+#  include "nsGlobalWindowOuter.h"
+#endif
 #include "nsHTTPCompressConv.h"
 #include "nsHttpChannel.h"
 #include "nsHttpHandler.h"
@@ -72,9 +103,9 @@
 #include "nsIChannelEventSink.h"
 #include "nsIConsoleService.h"
 #include "nsIContentPolicy.h"
+#include "nsICookieJarSettings.h"
 #include "nsICookieService.h"
 #include "nsIDNSService.h"
-#include "nsIDOMWindowUtils.h"
 #include "nsIDocShell.h"
 #include "nsIEncodedChannel.h"
 #include "nsIHttpHeaderVisitor.h"
@@ -82,11 +113,14 @@
 #include "nsIMIMEInputStream.h"
 #include "nsIMultiplexInputStream.h"
 #include "nsIMutableArray.h"
-#include "nsINetworkInterceptController.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsINetworkInterceptController.h"
+#endif
 #include "nsIOService.h"
 #include "nsIObserverService.h"
 #include "nsIPrincipal.h"
 #include "nsIProtocolProxyService.h"
+#include "nsIProgressEventSink.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsISecurityConsoleMessage.h"
@@ -99,7 +133,9 @@
 #include "nsMimeTypes.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
-#include "nsPIDOMWindow.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsPIDOMWindow.h"
+#endif
 #include "nsProxyRelease.h"
 #include "nsQueryObject.h"
 #include "nsReadableUtils.h"
@@ -212,7 +248,10 @@ static OpaqueResponseFilterFetch ConfiguredFilterFetchResponseBehaviour() {
 }
 
 HttpBaseChannel::HttpBaseChannel()
-    : mReportCollector(new ConsoleReportCollector()),
+    :
+#ifndef MOZ_NAIVEFOX
+      mReportCollector(new ConsoleReportCollector()),
+#endif
       mHttpHandler(gHttpHandler),
       mClassOfService(0, false),
       mRequestMode(RequestMode::No_cors),
@@ -323,9 +362,13 @@ void HttpBaseChannel::AddClassificationFlags(uint32_t aClassificationFlags,
 }
 
 static bool isSecureOrTrustworthyURL(nsIURI* aURI) {
-  return aURI->SchemeIs("https") ||
+  return aURI->SchemeIs("https")
+#ifndef MOZ_NAIVEFOX
+         ||
          (StaticPrefs::network_http_encoding_trustworthy_is_https() &&
-          nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackURL(aURI));
+          nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackURL(aURI))
+#endif
+      ;
 }
 
 nsresult HttpBaseChannel::Init(nsIURI* aURI, uint32_t aCaps,
@@ -379,6 +422,7 @@ nsresult HttpBaseChannel::Init(nsIURI* aURI, uint32_t aCaps,
   // Override the Accept header if a specific MediaDocument kind is forced.
   ExtContentPolicy contentPolicyType =
       mLoadInfo->GetExternalContentPolicyType();
+#ifndef MOZ_NAIVEFOX
   // TRRLoadInfo doesn't implement GetForceMediaDocument.
   ForceMediaDocument forceMediaDocument;
   if (NS_SUCCEEDED(mLoadInfo->GetForceMediaDocument(&forceMediaDocument))) {
@@ -403,11 +447,13 @@ nsresult HttpBaseChannel::Init(nsIURI* aURI, uint32_t aCaps,
   const nsCString& languageOverride =
       browsingContext ? browsingContext->Top()->GetLanguageOverride()
                       : EmptyCString();
+#else
+  const nsCString& languageOverride = EmptyCString();
+#endif
 
   rv = gHttpHandler->AddStandardRequestHeaders(
       &mRequestHead, aURI, isHTTPS, contentPolicyType,
-      nsContentUtils::ShouldResistFingerprinting(this,
-                                                 RFPTarget::HttpUserAgent),
+      false,
       languageOverride);
   if (NS_FAILED(rv)) return rv;
 
@@ -535,6 +581,9 @@ HttpBaseChannel::SetTRRMode(nsIRequest::TRRMode aTRRMode) {
 
 NS_IMETHODIMP
 HttpBaseChannel::SetDocshellUserAgentOverride() {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   RefPtr<dom::BrowsingContext> bc;
   MOZ_ALWAYS_SUCCEEDS(mLoadInfo->GetBrowsingContext(getter_AddRefs(bc)));
   if (!bc) {
@@ -556,6 +605,7 @@ HttpBaseChannel::SetDocshellUserAgentOverride() {
   }
 
   return NS_OK;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -700,10 +750,12 @@ HttpBaseChannel::SetContentCharset(const nsACString& aContentCharset) {
 
 NS_IMETHODIMP
 HttpBaseChannel::GetContentDisposition(uint32_t* aContentDisposition) {
+#ifndef MOZ_NAIVEFOX
   if (mLoadInfo->GetForceMediaDocument() != ForceMediaDocument::None) {
     *aContentDisposition = nsIChannel::DISPOSITION_FORCE_INLINE;
     return NS_OK;
   }
+#endif
 
   // See bug 1658877. If mContentDispositionHint is already
   // DISPOSITION_ATTACHMENT, it means this channel is created from a
@@ -829,9 +881,11 @@ HttpBaseChannel::Open(nsIInputStream** aStream) {
   }
 
   nsCOMPtr<nsIStreamListener> listener;
+#ifndef MOZ_NAIVEFOX
   nsresult rv =
       nsContentSecurityManager::doContentSecurityCheck(this, listener);
   NS_ENSURE_SUCCESS(rv, rv);
+#endif
 
   NS_ENSURE_TRUE(!LoadWasOpened(), NS_ERROR_IN_PROGRESS);
 
@@ -846,13 +900,20 @@ HttpBaseChannel::Open(nsIInputStream** aStream) {
 NS_IMETHODIMP
 HttpBaseChannel::GetParentProcessChannelHandle(
     mozilla::dom::ParentProcessChannelHandle** aValue) {
+#ifdef MOZ_NAIVEFOX
+  *aValue = nullptr;
+#else
   *aValue = do_AddRef(mParentProcessChannelHandle).take();
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 HttpBaseChannel::SetParentProcessChannelHandle(
     mozilla::dom::ParentProcessChannelHandle* aValue) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (XRE_IsParentProcess()) {
     MOZ_ASSERT_UNREACHABLE(
         "SetParentProcessChannelHandle in the parent process would leak");
@@ -861,6 +922,7 @@ HttpBaseChannel::SetParentProcessChannelHandle(
 
   mParentProcessChannelHandle = aValue;
   return NS_OK;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -990,6 +1052,7 @@ static nsresult NormalizeUploadStream(nsIInputStream* aUploadStream,
   *aReplacementStream = nullptr;
   *aReadyPromise = nullptr;
 
+#ifndef MOZ_NAIVEFOX
   // Unwrap RemoteLazyInputStream and normalize the contents as we're in the
   // parent process.
   if (nsCOMPtr<mozIRemoteLazyInputStream> lazyStream =
@@ -1010,6 +1073,7 @@ static nsresult NormalizeUploadStream(nsIInputStream* aUploadStream,
       return NS_OK;
     }
   }
+#endif
 
   // Preserve MIME information on the stream when normalizing.
   if (nsCOMPtr<nsIMIMEInputStream> mime = do_QueryInterface(aUploadStream)) {
@@ -1576,6 +1640,7 @@ nsresult HttpBaseChannel::DoApplyContentConversionsInternal(
       }
 
       LOG(("Adding converter for content-encoding '%s'", val));
+#ifndef MOZ_NAIVEFOX
       if (Telemetry::CanRecordPrereleaseData()) {
         int mode = 0;
         if (from.EqualsLiteral("gzip") || from.EqualsLiteral("x-gzip")) {
@@ -1594,6 +1659,7 @@ nsresult HttpBaseChannel::DoApplyContentConversionsInternal(
         }
         glean::http::content_encoding.AccumulateSingleSample(mode);
       }
+#endif
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
       if (from.EqualsLiteral("dcb") || from.EqualsLiteral("dcz")) {
         MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess());
@@ -1809,6 +1875,7 @@ HttpBaseChannel::SetChannelId(uint64_t aChannelId) {
 }
 
 NS_IMETHODIMP HttpBaseChannel::GetTopLevelContentWindowId(uint64_t* aWindowId) {
+#ifndef MOZ_NAIVEFOX
   if (!mContentWindowId) {
     nsCOMPtr<nsILoadContext> loadContext;
     GetCallback(loadContext);
@@ -1823,6 +1890,7 @@ NS_IMETHODIMP HttpBaseChannel::GetTopLevelContentWindowId(uint64_t* aWindowId) {
       }
     }
   }
+#endif
   *aWindowId = mContentWindowId;
   return NS_OK;
 }
@@ -1845,22 +1913,30 @@ NS_IMETHODIMP HttpBaseChannel::SetTopLevelContentWindowId(uint64_t aWindowId) {
 
 NS_IMETHODIMP
 HttpBaseChannel::IsThirdPartyTrackingResource(bool* aIsTrackingResource) {
+#ifdef MOZ_NAIVEFOX
+  *aIsTrackingResource = false;
+#else
   MOZ_ASSERT(
       !(mFirstPartyClassificationFlags && mThirdPartyClassificationFlags));
   *aIsTrackingResource = ChannelClassifierUtils::IsTrackingClassificationFlag(
       mThirdPartyClassificationFlags,
       mLoadInfo->GetOriginAttributes().IsPrivateBrowsing());
+#endif
   return NS_OK;
 }
 
 NS_IMETHODIMP
 HttpBaseChannel::IsThirdPartySocialTrackingResource(
     bool* aIsThirdPartySocialTrackingResource) {
+#ifdef MOZ_NAIVEFOX
+  *aIsThirdPartySocialTrackingResource = false;
+#else
   MOZ_ASSERT(!mFirstPartyClassificationFlags ||
              !mThirdPartyClassificationFlags);
   *aIsThirdPartySocialTrackingResource =
       ChannelClassifierUtils::IsSocialTrackingClassificationFlag(
           mThirdPartyClassificationFlags);
+#endif
   return NS_OK;
 }
 
@@ -1953,6 +2029,13 @@ HttpBaseChannel::GetReferrerInfo(nsIReferrerInfo** aReferrerInfo) {
 nsresult HttpBaseChannel::SetReferrerInfoInternal(
     nsIReferrerInfo* aReferrerInfo, bool aClone, bool aCompute,
     bool aRespectBeforeConnect) {
+#ifdef MOZ_NAIVEFOX
+  if (aRespectBeforeConnect) {
+    ENSURE_CALLED_BEFORE_CONNECT();
+  }
+  mReferrerInfo = aReferrerInfo;
+  return ClearReferrerHeader();
+#else
   LOG(
       ("HttpBaseChannel::SetReferrerInfoInternal [this=%p aClone(%d) "
        "aCompute(%d)]\n",
@@ -2011,6 +2094,7 @@ nsresult HttpBaseChannel::SetReferrerInfoInternal(
   }
 
   return SetReferrerHeader(spec, aRespectBeforeConnect);
+#endif
 }
 
 NS_IMETHODIMP
@@ -2083,6 +2167,9 @@ NS_IMETHODIMP
 HttpBaseChannel::SetNewReferrerInfo(const nsACString& aUrl,
                                     nsIReferrerInfo::ReferrerPolicyIDL aPolicy,
                                     bool aSendReferrer) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   nsresult rv;
   // Create URI from string
   nsCOMPtr<nsIURI> aURI;
@@ -2094,6 +2181,7 @@ HttpBaseChannel::SetNewReferrerInfo(const nsACString& aUrl,
   NS_ENSURE_SUCCESS(rv, rv);
   // Set ReferrerInfo
   return SetReferrerInfo(referrerInfo);
+#endif
 }
 
 NS_IMETHODIMP
@@ -2509,13 +2597,22 @@ HttpBaseChannel::SetTopWindowURIIfUnknown(nsIURI* aTopWindowURI) {
 
 NS_IMETHODIMP
 HttpBaseChannel::GetTopWindowURI(nsIURI** aTopWindowURI) {
+#ifdef MOZ_NAIVEFOX
+  return GetTopWindowURI(nullptr, aTopWindowURI);
+#else
   nsCOMPtr<nsIURI> uriBeingLoaded =
       AntiTrackingUtils::MaybeGetDocumentURIBeingLoaded(this);
   return GetTopWindowURI(uriBeingLoaded, aTopWindowURI);
+#endif
 }
 
 nsresult HttpBaseChannel::GetTopWindowURI(nsIURI* aURIBeingLoaded,
                                           nsIURI** aTopWindowURI) {
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIURI> uri = mTopWindowURI;
+  uri.forget(aTopWindowURI);
+  return NS_OK;
+#else
   nsresult rv = NS_OK;
   nsCOMPtr<mozIThirdPartyUtil> util;
   // Only compute the top window URI once. In e10s, this must be computed in the
@@ -2543,6 +2640,7 @@ nsresult HttpBaseChannel::GetTopWindowURI(nsIURI* aURIBeingLoaded,
   }
   *aTopWindowURI = do_AddRef(mTopWindowURI).take();
   return rv;
+#endif
 }
 
 NS_IMETHODIMP
@@ -2593,6 +2691,9 @@ HttpBaseChannel::GetResponseVersion(uint32_t* major, uint32_t* minor) {
 }
 
 bool HttpBaseChannel::IsBrowsingContextDiscarded() const {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   // If there is no loadGroup attached to the current channel, we check the
   // global private browsing state for the private channel instead. For
   // non-private channel, we will always return false here.
@@ -2610,10 +2711,14 @@ bool HttpBaseChannel::IsBrowsingContextDiscarded() const {
   }
 
   return mLoadGroup->GetIsBrowsingContextDiscarded();
+#endif
 }
 
 // https://mikewest.github.io/corpp/#process-navigation-response
 nsresult HttpBaseChannel::ProcessCrossOriginEmbedderPolicyHeader() {
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   nsresult rv;
   if (!StaticPrefs::browser_tabs_remote_useCrossOriginEmbedderPolicy()) {
     return NS_OK;
@@ -2650,6 +2755,7 @@ nsresult HttpBaseChannel::ProcessCrossOriginEmbedderPolicyHeader() {
   }
 
   return NS_OK;
+#endif
 }
 
 // https://mikewest.github.io/corpp/#corp-check
@@ -2787,6 +2893,10 @@ static bool CompareCrossOriginOpenerPolicies(
 // This runs steps 1-5 of the algorithm when navigating a top level document.
 // See https://gist.github.com/annevk/6f2dd8c79c77123f39797f6bdac43f3e
 nsresult HttpBaseChannel::ComputeCrossOriginOpenerPolicyMismatch() {
+#ifdef MOZ_NAIVEFOX
+  StoreHasCrossOriginOpenerPolicyMismatch(false);
+  return NS_OK;
+#else
   MOZ_ASSERT(XRE_IsParentProcess());
 
   StoreHasCrossOriginOpenerPolicyMismatch(false);
@@ -2900,6 +3010,7 @@ nsresult HttpBaseChannel::ComputeCrossOriginOpenerPolicyMismatch() {
   }
 
   return NS_OK;
+#endif
 }
 
 nsresult HttpBaseChannel::ProcessCrossOriginSecurityHeaders() {
@@ -2953,6 +3064,7 @@ nsresult ProcessXCTO(HttpBaseChannel* aChannel, nsIURI* aURI,
     // since we are getting here, the XCTO header was sent;
     // a non matching value most likely means a mistake happenend;
     // e.g. sending 'nosnif' instead of 'nosniff', let's log a warning.
+#ifndef MOZ_NAIVEFOX
     AutoTArray<nsString, 1> params;
     CopyUTF8toUTF16(contentTypeOptionsHeader, *params.AppendElement());
     RefPtr<dom::Document> doc;
@@ -2960,6 +3072,7 @@ nsresult ProcessXCTO(HttpBaseChannel* aChannel, nsIURI* aURI,
     nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "XCTO"_ns, doc,
                                     PropertiesFile::SECURITY_PROPERTIES,
                                     "XCTOHeaderValueMissing", params);
+#endif
     return NS_OK;
   }
 
@@ -3465,7 +3578,9 @@ OpaqueResponse HttpBaseChannel::BlockOrFilterOpaqueResponse(
     OpaqueResponseBlocker* aORB, const nsAString& aReason,
     const OpaqueResponseBlockedTelemetryReason aTelemetryReason,
     const char* aFormat, ...) {
+#ifndef MOZ_NAIVEFOX
   NimbusFeatures::RecordExposureEvent("opaqueResponseBlocking"_ns, true);
+#endif
 
   const bool shouldFilter =
       ShouldFilterOpaqueResponse(OpaqueResponseFilterFetch::BlockedByORB);
@@ -3503,6 +3618,9 @@ OpaqueResponse HttpBaseChannel::BlockOrFilterOpaqueResponse(
 }
 
 dom::NoCorsMediaRequestState HttpBaseChannel::NoCorsMediaRequestState() {
+#ifdef MOZ_NAIVEFOX
+  return dom::NoCorsMediaRequestState::NotAvailable;
+#else
   MOZ_ASSERT(XRE_IsParentProcess());
 
   if (!mLoadInfo->GetIsMediaRequest()) {
@@ -3517,9 +3635,13 @@ dom::NoCorsMediaRequestState HttpBaseChannel::NoCorsMediaRequestState() {
   }
 
   return wgp->NoCorsMediaRequestState(mURI);
+#endif
 }
 
 void HttpBaseChannel::RecordSubsequentNoCorsRequestState() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(mLoadInfo->GetIsMediaRequest());
 
@@ -3531,6 +3653,7 @@ void HttpBaseChannel::RecordSubsequentNoCorsRequestState() {
   }
 
   wgp->RecordSubsequentNoCorsRequestState(mURI);
+#endif
 }
 
 // The specification for ORB is currently being written:
@@ -3758,7 +3881,7 @@ void HttpBaseChannel::AllowOpaqueResponseAfterSniff() {
 
 void HttpBaseChannel::SetChannelBlockedByOpaqueResponse() {
   mChannelBlockedByOpaqueResponse = true;
-
+#ifndef MOZ_NAIVEFOX
   RefPtr<dom::BrowsingContext> browsingContext =
       dom::BrowsingContext::GetCurrentTopByBrowserId(mBrowserId);
   if (!browsingContext) {
@@ -3770,6 +3893,7 @@ void HttpBaseChannel::SetChannelBlockedByOpaqueResponse() {
     windowContext->Canonical()->SetShouldReportHasBlockedOpaqueResponse(
         mLoadInfo->InternalContentPolicyType());
   }
+#endif
 }
 
 NS_IMETHODIMP
@@ -4456,6 +4580,7 @@ void HttpBaseChannel::AddConsoleReport(
     PropertiesFile aPropertiesFile, const nsACString& aSourceFileURI,
     uint32_t aLineNumber, uint32_t aColumnNumber,
     const nsACString& aMessageName, const nsTArray<nsString>& aStringParams) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->AddConsoleReport(aErrorFlags, aCategory, aPropertiesFile,
                                      aSourceFileURI, aLineNumber, aColumnNumber,
                                      aMessageName, aStringParams);
@@ -4463,40 +4588,55 @@ void HttpBaseChannel::AddConsoleReport(
   // If this channel is already part of a loadGroup, we can flush this console
   // report immediately.
   HttpBaseChannel::MaybeFlushConsoleReports();
+#endif
 }
 
 void HttpBaseChannel::FlushReportsToConsole(uint64_t aInnerWindowID,
                                             ReportAction aAction) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->FlushReportsToConsole(aInnerWindowID, aAction);
+#endif
 }
 
 void HttpBaseChannel::FlushReportsToConsoleForServiceWorkerScope(
     const nsACString& aScope, ReportAction aAction) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->FlushReportsToConsoleForServiceWorkerScope(aScope, aAction);
+#endif
 }
 
 void HttpBaseChannel::FlushConsoleReports(dom::Document* aDocument,
                                           ReportAction aAction) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->FlushConsoleReports(aDocument, aAction);
+#endif
 }
 
 void HttpBaseChannel::FlushConsoleReports(nsILoadGroup* aLoadGroup,
                                           ReportAction aAction) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->FlushConsoleReports(aLoadGroup, aAction);
+#endif
 }
 
 void HttpBaseChannel::FlushConsoleReports(
     nsIConsoleReportCollector* aCollector) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->FlushConsoleReports(aCollector);
+#endif
 }
 
 void HttpBaseChannel::StealConsoleReports(
     nsTArray<net::ConsoleReportCollected>& aReports) {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->StealConsoleReports(aReports);
+#endif
 }
 
 void HttpBaseChannel::ClearConsoleReports() {
+#ifndef MOZ_NAIVEFOX
   mReportCollector->ClearConsoleReports();
+#endif
 }
 
 bool HttpBaseChannel::IsNavigation() {
@@ -4508,6 +4648,9 @@ bool HttpBaseChannel::BypassServiceWorker() const {
 }
 
 bool HttpBaseChannel::ShouldIntercept(nsIURI* aURI) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   nsCOMPtr<nsINetworkInterceptController> controller;
   GetCallback(controller);
   bool shouldIntercept = false;
@@ -4543,6 +4686,7 @@ bool HttpBaseChannel::ShouldIntercept(nsIURI* aURI) {
     }
   }
   return shouldIntercept;
+#endif
 }
 
 void HttpBaseChannel::AddAsNonTailRequest() {
@@ -4615,6 +4759,7 @@ already_AddRefed<nsILoadInfo> HttpBaseChannel::CloneLoadInfoForRedirect(
       mLoadInfo->GetExternalContentPolicyType();
   if (contentPolicyType == ExtContentPolicy::TYPE_DOCUMENT ||
       contentPolicyType == ExtContentPolicy::TYPE_SUBDOCUMENT) {
+#ifndef MOZ_NAIVEFOX
     // Reset PrincipalToInherit to a null principal. We'll credit the the
     // redirecting resource's result principal as the new principal's precursor.
     // This means that a data: URI will end up loading in a process based on the
@@ -4625,11 +4770,13 @@ already_AddRefed<nsILoadInfo> HttpBaseChannel::CloneLoadInfoForRedirect(
     nsCOMPtr<nsIPrincipal> nullPrincipalToInherit =
         NullPrincipal::CreateWithInheritedAttributes(redirectPrincipal);
     newLoadInfo->SetPrincipalToInherit(nullPrincipalToInherit);
+#endif
   }
 
   bool isTopLevelDoc = newLoadInfo->GetExternalContentPolicyType() ==
                        ExtContentPolicy::TYPE_DOCUMENT;
 
+#ifndef MOZ_NAIVEFOX
   if (isTopLevelDoc) {
     // re-compute the origin attributes of the loadInfo if it's top-level load.
     nsCOMPtr<nsILoadContext> loadContext;
@@ -4680,16 +4827,21 @@ already_AddRefed<nsILoadInfo> HttpBaseChannel::CloneLoadInfoForRedirect(
       }
     }
   }
+#endif
 
   // Clone a new cookieJarSettings from the old one for the new channel.
   // Otherwise, updating the new cookieJarSettings will affect the old one.
   nsCOMPtr<nsICookieJarSettings> oldCookieJarSettings;
   mLoadInfo->GetCookieJarSettings(getter_AddRefs(oldCookieJarSettings));
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<CookieJarSettings> newCookieJarSettings;
   newCookieJarSettings = CookieJarSettings::Cast(oldCookieJarSettings)->Clone();
 
   newLoadInfo->SetCookieJarSettings(newCookieJarSettings);
+#else
+  newLoadInfo->SetCookieJarSettings(oldCookieJarSettings);
+#endif
 
   // Clear the isThirdPartyContextToTopWindow flag for the new channel so that
   // it will be computed again when the new channel is opened.
@@ -4829,6 +4981,7 @@ void HttpBaseChannel::DoNotifyListener() {
   // document that started the navigation.  We want to show the reports on the
   // new document.  Otherwise the console is wiped and the user never sees
   // the information.
+#ifndef MOZ_NAIVEFOX
   if (!IsNavigation()) {
     if (mLoadGroup) {
       FlushConsoleReports(mLoadGroup);
@@ -4838,6 +4991,7 @@ void HttpBaseChannel::DoNotifyListener() {
       FlushConsoleReports(doc);
     }
   }
+#endif
 }
 
 void HttpBaseChannel::AddCookiesToRequest() {
@@ -4931,6 +5085,7 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
     config.privateBrowsing = Some(mPrivateBrowsing);
   }
 
+#ifndef MOZ_NAIVEFOX
   if (mReferrerInfo) {
     // When cloning for a document channel replacement (parent process
     // copying values for a new content process channel), this happens after
@@ -4975,7 +5130,9 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
       }
     }
   }
+#endif
 
+#ifndef MOZ_NAIVEFOX
   nsCOMPtr<nsITimedChannel> oldTimedChannel(
       do_QueryInterface(static_cast<nsIHttpChannel*>(this)));
   if (oldTimedChannel) {
@@ -5019,6 +5176,7 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
         mTransactionTimings.responseStart;
     config.timedChannelInfo->responseEnd() = mTransactionTimings.responseEnd;
   }
+#endif
 
   if (aPreserveMethod) {
     // since preserveMethod is true, we need to ensure that the appropriate
@@ -5073,8 +5231,11 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
     }
   }
 
+#ifndef MOZ_NAIVEFOX
   // Transfer the timing data (if we are dealing with an nsITimedChannel).
   nsCOMPtr<nsITimedChannel> newTimedChannel(do_QueryInterface(newChannel));
+#ifndef MOZ_NAIVEFOX
+#ifndef MOZ_NAIVEFOX
   if (config.timedChannelInfo && newTimedChannel) {
     // If we're an internal redirect, or a document channel replacement,
     // then we shouldn't record any new timing for this and just copy
@@ -5164,6 +5325,9 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
     newTimedChannel->SetHandleFetchEventEnd(
         config.timedChannelInfo->handleFetchEventEnd());
   }
+#endif
+#endif
+#endif
 
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(newChannel);
   if (!httpChannel) {
@@ -5202,6 +5366,7 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
   }
 }
 
+#ifndef MOZ_NAIVEFOX
 HttpBaseChannel::ReplacementChannelConfig::ReplacementChannelConfig(
     const dom::ReplacementChannelConfigInit& aInit) {
   redirectFlags = aInit.redirectFlags();
@@ -5233,6 +5398,7 @@ HttpBaseChannel::ReplacementChannelConfig::Serialize() {
 
   return config;
 }
+#endif
 
 nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
                                                   nsIChannel* newChannel,
@@ -5292,6 +5458,7 @@ nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
   // Check whether or not this was a cross-domain redirect.
   nsCOMPtr<nsITimedChannel> newTimedChannel(do_QueryInterface(newChannel));
   bool sameOriginWithOriginalUri = SameOriginWithOriginalUri(newURI);
+#ifndef MOZ_NAIVEFOX
   if (config.timedChannelInfo && newTimedChannel) {
     newTimedChannel->SetAllRedirectsSameOrigin(
         config.timedChannelInfo->allRedirectsSameOrigin() &&
@@ -5304,6 +5471,7 @@ nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
         (redirectType == ReplacementReason::InternalRedirect ||
          sameOriginWithOriginalUri));
   }
+#endif
 
   newChannel->SetLoadGroup(mLoadGroup);
   newChannel->SetNotificationCallbacks(mCallbacks);
@@ -5463,10 +5631,12 @@ nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
   // Pass the preferred alt-data type on to the new channel.
   nsCOMPtr<nsICacheInfoChannel> cacheInfoChan(do_QueryInterface(newChannel));
   if (cacheInfoChan) {
+#ifndef MOZ_NAIVEFOX
     for (auto& data : mPreferredCachedAltDataTypes) {
       cacheInfoChan->PreferAlternativeDataType(data.type(), data.contentType(),
                                                data.deliverAltData());
     }
+#endif
 
     if (LoadForceValidateCacheContent()) {
       (void)cacheInfoChan->SetForceValidateCacheContent(true);
@@ -5774,6 +5944,9 @@ HttpBaseChannel::SetAllRedirectsPassTimingAllowCheck(bool aPassesCheck) {
 
 // https://fetch.spec.whatwg.org/#cors-check
 bool HttpBaseChannel::PerformCORSCheck() {
+#ifdef MOZ_NAIVEFOX
+  return true;
+#else
   // Step 1
   // Let origin be the result of getting `Access-Control-Allow-Origin`
   // from response’s header list.
@@ -5828,6 +6001,7 @@ bool HttpBaseChannel::PerformCORSCheck() {
   // If credentials is `true`, then return success.
   // (else) return failure.
   return NS_SUCCEEDED(rv) && credentials.EqualsLiteral("true");
+#endif
 }
 
 NS_IMETHODIMP
@@ -5881,6 +6055,10 @@ HttpBaseChannel::BodyInfoAccessAllowedCheck(nsIPrincipal* aOrigin,
 // https://fetch.spec.whatwg.org/#tao-check
 NS_IMETHODIMP
 HttpBaseChannel::TimingAllowCheck(nsIPrincipal* aOrigin, bool* _retval) {
+#ifdef MOZ_NAIVEFOX
+  *_retval = true;
+  return NS_OK;
+#else
   nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
   nsCOMPtr<nsIPrincipal> resourcePrincipal;
   nsresult rv =
@@ -5934,6 +6112,7 @@ HttpBaseChannel::TimingAllowCheck(nsIPrincipal* aOrigin, bool* _retval) {
 
   *_retval = false;
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -6153,6 +6332,9 @@ IMPL_TIMING_ATTR(TransactionPending)
 #undef IMPL_TIMING_ATTR
 
 void HttpBaseChannel::MaybeReportTimingData() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   // There is no point in continuing, since the performance object in the parent
   // isn't the same as the one in the child which will be reporting resource
   // performance.
@@ -6199,6 +6381,7 @@ void HttpBaseChannel::MaybeReportTimingData() {
     child->SendReportFrameTimingData(loadInfoArgs, entryName, initiatorType,
                                      std::move(performanceTimingData));
   }
+#endif
 }
 
 NS_IMETHODIMP
@@ -6214,14 +6397,21 @@ HttpBaseChannel::GetReportResourceTiming(bool* _retval) {
 }
 
 nsIURI* HttpBaseChannel::GetReferringPage() {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   nsCOMPtr<nsPIDOMWindowInner> pDomWindow = GetInnerDOMWindow();
   if (!pDomWindow) {
     return nullptr;
   }
   return pDomWindow->GetDocumentURI();
+#endif
 }
 
 nsPIDOMWindowInner* HttpBaseChannel::GetInnerDOMWindow() {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   nsCOMPtr<nsILoadContext> loadContext;
   NS_QueryNotificationCallbacks(this, loadContext);
   if (!loadContext) {
@@ -6243,6 +6433,7 @@ nsPIDOMWindowInner* HttpBaseChannel::GetInnerDOMWindow() {
   }
 
   return innerWindow;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -6320,6 +6511,9 @@ bool HttpBaseChannel::EnsureRequestContext() {
 }
 
 void HttpBaseChannel::EnsureBrowserId() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (mBrowserId) {
     return;
   }
@@ -6330,6 +6524,7 @@ void HttpBaseChannel::EnsureBrowserId() {
   if (bc) {
     mBrowserId = bc->GetBrowserId();
   }
+#endif
 }
 
 void HttpBaseChannel::SetCorsPreflightParameters(
@@ -6443,6 +6638,7 @@ nsresult HttpBaseChannel::CheckRedirectLimit(nsIURI* aNewURI,
   // page to appear. Note that https-first mode breaks upgrade downgrade endless
   // loops within ShouldUpgradeHttpsFirstRequest because https-first does not
   // display an exception page but needs a soft fallback/downgrade.
+#ifndef MOZ_NAIVEFOX
   if (nsHTTPSOnlyUtils::IsUpgradeDowngradeEndlessLoop(
           mURI, aNewURI, mLoadInfo,
           {nsHTTPSOnlyUtils::UpgradeDowngradeEndlessLoopOptions::
@@ -6474,6 +6670,7 @@ nsresult HttpBaseChannel::CheckRedirectLimit(nsIURI* aNewURI,
                EnforceForHTTPSFirstMode})) {
     nsHTTPSOnlyUtils::AddHTTPSFirstException(mURI, mLoadInfo);
   }
+#endif
 
   return NS_OK;
 }
@@ -6563,7 +6760,9 @@ HttpBaseChannel::GetNativeServerTiming(
 
 NS_IMETHODIMP
 HttpBaseChannel::CancelByURLClassifier(nsresult aErrorCode) {
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(ChannelClassifierUtils::IsClassifierBlockingErrorCode(aErrorCode));
+#endif
   return Cancel(aErrorCode);
 }
 
@@ -6642,6 +6841,7 @@ NS_IMETHODIMP HttpBaseChannel::ComputeCrossOriginOpenerPolicy(
     bool isCoepCredentiallessEnabled;
     rv = mLoadInfo->GetIsOriginTrialCoepCredentiallessEnabledForTopLevel(
         &isCoepCredentiallessEnabled);
+#ifndef MOZ_NAIVEFOX
     if (!isCoepCredentiallessEnabled) {
       nsAutoCString originTrialToken;
       (void)mResponseHead->GetHeader(nsHttp::OriginTrial, originTrialToken);
@@ -6659,6 +6859,7 @@ NS_IMETHODIMP HttpBaseChannel::ComputeCrossOriginOpenerPolicy(
         }
       }
     }
+#endif
 
     NS_ENSURE_SUCCESS(rv, rv);
     if (NS_SUCCEEDED(
@@ -6969,6 +7170,9 @@ static void CollectORBBlockTelemetry(
 void HttpBaseChannel::LogORBError(
     const nsAString& aReason,
     const OpaqueResponseBlockedTelemetryReason aTelemetryReason) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   auto policy = mLoadInfo->GetExternalContentPolicyType();
   CollectORBBlockTelemetry(aTelemetryReason, policy);
 
@@ -7004,6 +7208,7 @@ void HttpBaseChannel::LogORBError(
   nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "ORB"_ns, doc,
                                   PropertiesFile::NECKO_PROPERTIES,
                                   "ResourceBlockedORB", params);
+#endif
 }
 
 NS_IMETHODIMP HttpBaseChannel::SetEarlyHintLinkType(

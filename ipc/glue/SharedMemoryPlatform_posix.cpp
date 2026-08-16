@@ -6,6 +6,7 @@
  * to the [Chromium license](ipc/chromium/src/LICENSE). */
 
 #include "SharedMemoryPlatform.h"
+#include "mozilla/DebugOnly.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -16,7 +17,7 @@
 #ifdef XP_LINUX
 #  include "base/linux_memfd_defs.h"
 #endif
-#ifdef MOZ_WIDGET_GTK
+#if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/WidgetUtilsGtk.h"
 #endif
 
@@ -201,7 +202,7 @@ bool AppendPosixShmPrefix(std::string* aStr, pid_t aPid) {
     return false;
   }
   *aStr += '/';
-#ifdef MOZ_WIDGET_GTK
+#if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
   // The Snap package environment doesn't provide a private /dev/shm
   // (it's used for communication with services like PulseAudio);
   // instead AppArmor is used to restrict access to it.  Anything with
@@ -209,7 +210,7 @@ bool AppendPosixShmPrefix(std::string* aStr, pid_t aPid) {
   if (const char* snap = mozilla::widget::GetSnapInstanceName()) {
     StringAppendF(aStr, "snap.%s.", snap);
   }
-#endif  // XP_LINUX
+#endif
   // Hopefully the "implementation defined" name length limit is long
   // enough for this.
   StringAppendF(aStr, "org.mozilla.ipc.%d.", static_cast<int>(aPid));

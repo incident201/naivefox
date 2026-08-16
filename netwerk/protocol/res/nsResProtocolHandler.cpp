@@ -7,7 +7,6 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Omnijar.h"
 #include "mozilla/chrome/RegistryMessageUtils.h"
-#include "mozilla/dom/ContentParent.h"
 #include "nsEscape.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
@@ -18,7 +17,6 @@
 #endif
 
 using mozilla::LogLevel;
-using mozilla::dom::ContentParent;
 
 #define kAPP "app"
 #define kGRE "gre"

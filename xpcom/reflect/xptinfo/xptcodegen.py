@@ -474,13 +474,34 @@ enum class nsXPTInterface : uint16_t {
 """
     )
 
-    # Include any bindings files which we need to include for webidl types
+    lean_naivefox = bool(buildconfig.substs.get("MOZ_NAIVEFOX"))
+
+    # NaiveFox retains compatibility IDLs needed by Necko headers, but has no
+    # XPConnect callers for their DOM-object arguments.  Do not instantiate
+    # the DOM reflector table (and therefore the DOM implementation graph).
+    if lean_naivefox:
+        includes.clear()
+        domobjects.clear()
+
+    # Include any bindings files which we need to include for webidl types.
     for include in sorted(includes):
         fd.write('#include "%s"\n' % include)
 
     # Write out our header
-    fd.write(
-        """
+    if lean_naivefox:
+        fd.write(
+            """
+#include "xptinfo.h"
+#include "mozilla/PerfectHash.h"
+
+namespace xpt {
+namespace detail {
+
+"""
+        )
+    else:
+        fd.write(
+            """
 #include "xptinfo.h"
 #include "mozilla/PerfectHash.h"
 #include "mozilla/dom/BindingUtils.h"
@@ -511,7 +532,7 @@ namespace xpt {
 namespace detail {
 
 """
-    )
+        )
 
     # Static data arrays
     def array(ty, name, els):

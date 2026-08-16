@@ -175,14 +175,18 @@
 #include "mozilla/SegmentedVector.h"
 #include "mozilla/ThreadLocal.h"
 #include "mozilla/UniquePtr.h"
-#include "mozilla/glean/XpcomMetrics.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/XpcomMetrics.h"
+#endif
 #include "nsContentUtils.h"
 #include "nsCycleCollectionNoteRootCallback.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsCycleCollector.h"
 #include "nsDeque.h"
 #include "nsDumpUtils.h"
-#include "nsExceptionHandler.h"
+#ifdef MOZ_CRASHREPORTER
+#  include "nsExceptionHandler.h"
+#endif
 #include "nsIConsoleService.h"
 #include "nsICycleCollectorListener.h"
 #include "nsIFile.h"
@@ -643,8 +647,10 @@ void PtrInfo::AnnotatedReleaseAssert(bool aCondition, const char* aMessage) {
   }
   nsPrintfCString msg("%s, for class %s", aMessage, piName);
   NS_WARNING(msg.get());
+#ifdef MOZ_CRASHREPORTER
   CrashReporter::RecordAnnotationNSCString(
       CrashReporter::Annotation::CycleCollector, msg);
+#endif
 
   MOZ_CRASH();
 }
@@ -2734,7 +2740,11 @@ class SnowWhiteKiller : public TraceCallbacks {
 
   virtual void Trace(nsWrapperCache* aWrapperCache, const char* aName,
                      void* aClosure) const override {
+#ifdef MOZ_NAIVEFOX
+    (void)aWrapperCache;
+#else
     AppendJSObjectToPurpleBuffer(aWrapperCache->GetWrapperPreserveColor());
+#endif
   }
 
   virtual void Trace(JS::TenuredHeap<JSObject*>* aObject, const char* aName,
@@ -3515,6 +3525,7 @@ void nsCycleCollector::CheckThreadSafety() {
 }
 
 static void SendNeedGCTelemetry(bool needGC) {
+#ifndef MOZ_NAIVEFOX
   if (NS_IsMainThread()) {
     glean::cycle_collector::need_gc
         .EnumGet(static_cast<glean::cycle_collector::NeedGcLabel>(needGC))
@@ -3525,6 +3536,7 @@ static void SendNeedGCTelemetry(bool needGC) {
   glean::cycle_collector::worker_need_gc
       .EnumGet(static_cast<glean::cycle_collector::WorkerNeedGcLabel>(needGC))
       .Add();
+#endif
 }
 
 // The cycle collector uses the mark bitmap to discover what JS objects are
@@ -3618,6 +3630,7 @@ void nsCycleCollector::CleanupAfterCollection() {
   printf(".\ncc: \n");
 #endif
 
+#ifndef MOZ_NAIVEFOX
   if (NS_IsMainThread()) {
     glean::cycle_collector::time.ProcessGet().AccumulateRawDuration(interval);
     glean::cycle_collector::visited_ref_counted.AccumulateSingleSample(
@@ -3635,6 +3648,7 @@ void nsCycleCollector::CleanupAfterCollection() {
     glean::cycle_collector::worker_collected.AccumulateSingleSample(
         mWhiteNodeCount);
   }
+#endif
 
   timeLog.Checkpoint("CleanupAfterCollection::telemetry");
 

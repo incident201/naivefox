@@ -121,6 +121,11 @@ class nsSOCKSSocketInfo : public nsIDNSListener {
   nsresult SetLocalProxyPath(const nsACString& aLocalProxyPath,
                              NetAddr* aProxyAddr) {
 #ifdef XP_UNIX
+#  ifdef MOZ_NAIVEFOX
+    (void)aLocalProxyPath;
+    (void)aProxyAddr;
+    return NS_ERROR_NOT_IMPLEMENTED;
+#  else
     nsresult rv;
     MOZ_ASSERT(aProxyAddr);
 
@@ -157,6 +162,7 @@ class nsSOCKSSocketInfo : public nsIDNSListener {
     strcpy(aProxyAddr->local.path, path.get());
 
     return NS_OK;
+#  endif
 #elif defined(XP_WIN)
     MOZ_ASSERT(aProxyAddr);
 

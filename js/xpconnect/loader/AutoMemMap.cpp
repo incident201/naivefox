@@ -10,7 +10,9 @@
 #include <private/pprio.h>
 
 #include "nsIFile.h"
-#include "ScriptPreloader-inl.h"
+#ifndef MOZ_NAIVEFOX
+#  include "ScriptPreloader-inl.h"
+#endif
 
 namespace mozilla {
 namespace loader {

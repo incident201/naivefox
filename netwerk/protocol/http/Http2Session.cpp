@@ -15,7 +15,9 @@
 
 #include <algorithm>
 
-#include "AltServiceChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "AltServiceChild.h"
+#endif
 #include "CacheControlParser.h"
 #include "Http2Session.h"
 #include "Http2Stream.h"
@@ -2268,6 +2270,7 @@ class UpdateAltSvcEvent : public Runnable {
     uri->GetHost(originHost);
     uri->GetPort(&originPort);
 
+#ifndef MOZ_NAIVEFOX
     if (XRE_IsSocketProcess()) {
       AltServiceChild::ProcessHeader(
           mHeader, originScheme, originHost, originPort, mCI->GetUsername(),
@@ -2275,6 +2278,7 @@ class UpdateAltSvcEvent : public Runnable {
           mCI->GetOriginAttributes(), mCI);
       return NS_OK;
     }
+#endif
 
     AltSvcMapping::ProcessHeader(mHeader, originScheme, originHost, originPort,
                                  mCI->GetUsername(), mCI->GetPrivate(), nullptr,

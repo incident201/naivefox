@@ -6,8 +6,10 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Preferences.h"
-#include "mozilla/dom/BlobURLProtocolHandler.h"
-#include "mozilla/dom/quota/QuotaManager.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BlobURLProtocolHandler.h"
+#  include "mozilla/dom/quota/QuotaManager.h"
+#endif
 #include "nsIEffectiveTLDService.h"
 #include "nsIURI.h"
 #include "nsNetCID.h"
@@ -17,6 +19,16 @@
 
 static const char kSourceChar = ':';
 static const char kSanitizedChar = '+';
+#ifdef MOZ_NAIVEFOX
+static constexpr char kQuotaReplaceChars[] =
+    "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
+    "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"
+    "/:*?\"<>|\\";
+static constexpr char16_t kQuotaReplaceChars16[] =
+    u"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
+    u"\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"
+    u"/:*?\"<>|\\";
+#endif
 
 namespace mozilla {
 
@@ -81,12 +93,16 @@ static void PopulateTopLevelInfoFromURI(const bool aIsTopLevelDocument,
 
   // Use the creator origin's URI if we're passed a blob URI.
   if (scheme.EqualsLiteral("blob")) {
+#ifndef MOZ_NAIVEFOX
     nsCOMPtr<nsIPrincipal> blobPrincipal;
     NS_ENSURE_TRUE_VOID(dom::BlobURLProtocolHandler::GetBlobURLPrincipal(
         uri, aOriginAttributes, getter_AddRefs(blobPrincipal)));
     uri = blobPrincipal->GetURI();
     NS_ENSURE_TRUE_VOID(uri);
     NS_ENSURE_SUCCESS_VOID(uri->GetScheme(scheme));
+#else
+    return;
+#endif
   }
 
   if (scheme.EqualsLiteral("about")) {
@@ -250,7 +266,12 @@ void OriginAttributes::CreateSuffix(nsACString& aStr) const {
   if (!mGeckoViewSessionContextId.IsEmpty()) {
     nsAutoString sanitizedGeckoViewUserContextId(mGeckoViewSessionContextId);
     sanitizedGeckoViewUserContextId.ReplaceChar(
-        dom::quota::QuotaManager::kReplaceChars16, kSanitizedChar);
+#ifdef MOZ_NAIVEFOX
+        kQuotaReplaceChars16,
+#else
+        dom::quota::QuotaManager::kReplaceChars16,
+#endif
+        kSanitizedChar);
     params.Set("geckoViewUserContextId"_ns,
                NS_ConvertUTF16toUTF8(sanitizedGeckoViewUserContextId));
   }
@@ -282,8 +303,12 @@ void OriginAttributes::CreateSuffix(nsACString& aStr) const {
 #ifdef DEBUG
   nsAutoCString str;
   str.Assign(aStr);
+#ifdef MOZ_NAIVEFOX
+  MOZ_ASSERT(str.FindCharInSet(kQuotaReplaceChars) == kNotFound);
+#else
   MOZ_ASSERT(str.FindCharInSet(dom::quota::QuotaManager::kReplaceChars) ==
              kNotFound);
+#endif
 #endif
 }
 

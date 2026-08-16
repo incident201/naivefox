@@ -20,13 +20,19 @@
 #include "mozilla/dom/Promise.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/ipc/ByteBuf.h"
-#include "mozilla/net/SocketProcessChild.h"
-#include "mozilla/net/SocketProcessParent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessChild.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/SocketProcessParent.h"
+#endif
 #include "mozilla/net/ssl_tokens_cache.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsIEventTarget.h"
-#include "nsIGlobalObject.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIGlobalObject.h"
+#endif
 #include "nsIOService.h"
 #include "nsIObserverService.h"
 #include "nsThreadUtils.h"
@@ -1083,6 +1089,9 @@ void SSLTokensCache::ClearPrivateBrowsing() {
   });
 }
 
+#ifdef MOZ_NAIVEFOX
+void SSLTokensCache::ForwardClearToSocketProcess() {}
+#else
 template <typename SendFn>
 static void ForwardToSocketProcess(SendFn aSend) {
   if (!XRE_IsParentProcess()) {
@@ -1104,6 +1113,7 @@ void SSLTokensCache::ForwardClearToSocketProcess() {
   ForwardToSocketProcess(
       [](SocketProcessParent* p) { (void)p->SendClearSessionCache(); });
 }
+#endif
 
 static void MaybeClearNSSSessionCache() {
   if (NSS_IsInitialized()) {
@@ -1120,9 +1130,13 @@ void SSLTokensCache::ClearSessionCacheAndTokens() {
 
 // static
 void SSLTokensCache::ForwardClearPrivateBrowsingToSocketProcess() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   ForwardToSocketProcess([](SocketProcessParent* p) {
     (void)p->SendClearPrivateBrowsingSessionCache();
   });
+#endif
 }
 
 // static
@@ -1179,12 +1193,16 @@ void SSLTokensCache::DoWrite(bool aSynchronous) {
     taskQueue = mWriteTaskQueue;
     if (backingFile) {
       serialized = SerializeSnapshotLocked();
-    } else if (XRE_IsSocketProcess()) {
+    }
+#ifndef MOZ_NAIVEFOX
+    else if (XRE_IsSocketProcess()) {
       CollectRecordInfosLocked(records, /* aFilterForPersistence */ true);
     }
+#endif
   }
 
   if (!backingFile) {
+#ifndef MOZ_NAIVEFOX
     if (XRE_IsSocketProcess() && !records.IsEmpty()) {
       NS_DispatchToMainThread(NS_NewRunnableFunction(
           "SSLTokensCache::SendToParent",
@@ -1195,6 +1213,7 @@ void SSLTokensCache::DoWrite(bool aSynchronous) {
             }
           }));
     }
+#endif
     return;
   }
 
@@ -1272,6 +1291,7 @@ void SSLTokensCache::OnLoadCompleteNotify(uint32_t aCount) {
   // Forward persisted tokens to the socket process. Uses
   // CallOrWaitForSocketProcess so it fires immediately if the socket process
   // is already up, or is deferred until it is ready.
+#ifndef MOZ_NAIVEFOX
   if (StaticPrefs::network_ssl_tokens_cache_persistence()) {
     NS_DispatchToMainThread(
         NS_NewRunnableFunction("SSLTokensCache::ForwardToSocketProcess", []() {
@@ -1302,6 +1322,7 @@ void SSLTokensCache::OnLoadCompleteNotify(uint32_t aCount) {
           });
         }));
   }
+#endif
 }
 
 // static
@@ -1622,6 +1643,10 @@ SSLTokensCache::BlockShutdown(nsIAsyncShutdownClient* /* aClient */) {
 
   // If the socket process is alive, flush its token cache first so the
   // persisted file reflects the most recent handshake data.
+#ifdef MOZ_NAIVEFOX
+  writeAndRelease(mozilla::ipc::ByteBuf{});
+  return NS_OK;
+#else
   RefPtr<SocketProcessParent> socketParent =
       SocketProcessParent::GetSingleton();
   if (!socketParent || !socketParent->CanSend()) {
@@ -1638,6 +1663,7 @@ SSLTokensCache::BlockShutdown(nsIAsyncShutdownClient* /* aClient */) {
         writeAndRelease(mozilla::ipc::ByteBuf{});
       });
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -1653,6 +1679,9 @@ SSLTokensCache::GetState(nsIPropertyBag** aState) {
 }
 
 void SSLTokensCache::RegisterShutdownBlocker() {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(XRE_IsParentProcess());
   {
@@ -1682,6 +1711,7 @@ void SSLTokensCache::RegisterShutdownBlocker() {
   LOG(("SSLTokensCache::RegisterShutdownBlocker"));
   client->AddBlocker(this, NS_LITERAL_STRING_FROM_CSTRING(__FILE__), __LINE__,
                      u""_ns);
+#endif
 }
 
 void SSLTokensCache::RemoveShutdownBlocker() {
@@ -1725,6 +1755,9 @@ SSLTokensCacheService::ClearSSLExternalAndInternalSessionCache() {
 NS_IMETHODIMP
 SSLTokensCacheService::AsyncClearSSLExternalAndInternalSessionCache(
     JSContext* aCx, mozilla::dom::Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   nsresult rv = EnsureParentProcess();
   if (NS_FAILED(rv)) {
     return rv;
@@ -1757,10 +1790,14 @@ SSLTokensCacheService::AsyncClearSSLExternalAndInternalSessionCache(
   SSLTokensCache::ClearSessionCacheAndTokens();
   promise.forget(aPromise);
   return NS_OK;
+#endif
 }
 
 template <typename F>
 static nsresult WithParsedOAPattern(const nsAString& aPatternJson, F&& aFunc) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   nsresult rv = EnsureParentProcess();
   if (NS_FAILED(rv)) {
     return rv;
@@ -1771,6 +1808,7 @@ static nsresult WithParsedOAPattern(const nsAString& aPatternJson, F&& aFunc) {
   }
   aFunc(pattern);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

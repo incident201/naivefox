@@ -9,7 +9,9 @@
 
 #include "mozilla/AbstractThread.h"
 #include "mozilla/Monitor.h"
-#include "mozilla/dom/JSExecutionManager.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/JSExecutionManager.h"
+#endif
 #include "nsThreadUtils.h"
 
 namespace mozilla {
@@ -64,7 +66,9 @@ class SyncRunnable : public Runnable {
       mozilla::MonitorAutoLock lock(mMonitor);
       // This could be synchronously dispatching to a thread currently waiting
       // for JS execution clearance. Yield JS execution.
+#ifndef MOZ_NAIVEFOX
       dom::AutoYieldJSThreadExecution yield;
+#endif
 
       while (!mDone) {
         lock.Wait();

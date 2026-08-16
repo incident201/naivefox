@@ -167,6 +167,9 @@ PKCS11Token::GetIsLoggedIn(bool* isLoggedIn) {
 
 NS_IMETHODIMP
 PKCS11Token::Login(JSContext* aCx, Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MOZ_ASSERT(NS_IsMainThread());
   if (!NS_IsMainThread()) {
     return NS_ERROR_NOT_SAME_THREAD;
@@ -199,10 +202,14 @@ PKCS11Token::Login(JSContext* aCx, Promise** aPromise) {
 
   promise.forget(aPromise);
   return NS_DispatchBackgroundTask(runnable.forget());
+#endif
 }
 
 NS_IMETHODIMP
 PKCS11Token::Logout(JSContext* aCx, Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MOZ_ASSERT(NS_IsMainThread());
   if (!NS_IsMainThread()) {
     return NS_ERROR_NOT_SAME_THREAD;
@@ -233,6 +240,7 @@ PKCS11Token::Logout(JSContext* aCx, Promise** aPromise) {
 
   promise.forget(aPromise);
   return NS_DispatchBackgroundTask(runnable.forget());
+#endif
 }
 
 nsresult DoReset(const UniquePK11SlotInfo& slot, bool isInternalKeyToken) {
@@ -253,6 +261,9 @@ nsresult DoReset(const UniquePK11SlotInfo& slot, bool isInternalKeyToken) {
 
 NS_IMETHODIMP
 PKCS11Token::Reset(JSContext* aCx, Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MOZ_ASSERT(NS_IsMainThread());
   if (!NS_IsMainThread()) {
     return NS_ERROR_NOT_SAME_THREAD;
@@ -285,6 +296,7 @@ PKCS11Token::Reset(JSContext* aCx, Promise** aPromise) {
 
   promise.forget(aPromise);
   return NS_DispatchBackgroundTask(runnable.forget());
+#endif
 }
 
 nsresult DoChangePassword(const UniquePK11SlotInfo& slot,
@@ -308,6 +320,9 @@ NS_IMETHODIMP
 PKCS11Token::ChangePassword(const nsACString& oldPassword,
                             const nsACString& newPassword, JSContext* aCx,
                             Promise** aPromise) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   MOZ_ASSERT(NS_IsMainThread());
   if (!NS_IsMainThread()) {
     return NS_ERROR_NOT_SAME_THREAD;
@@ -340,6 +355,7 @@ PKCS11Token::ChangePassword(const nsACString& oldPassword,
 
   promise.forget(aPromise);
   return NS_DispatchBackgroundTask(runnable.forget());
+#endif
 }
 
 // Two PKCS#11 flags are relevant here: CKF_LOGIN_REQUIRED and

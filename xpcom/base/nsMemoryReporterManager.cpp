@@ -8,11 +8,15 @@
 #include "nsAtomTable.h"
 #include "nsCOMArray.h"
 #include "nsCOMPtr.h"
-#include "nsIGlobalObject.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIGlobalObject.h"
+#endif
 #include "nsIOService.h"
 #include "nsIObserverService.h"
 #include "nsITimer.h"
-#include "nsIXPConnect.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIXPConnect.h"
+#endif
 #include "nsPIDOMWindow.h"
 #include "nsPrintfCString.h"
 #include "nsProxyRelease.h"
@@ -2323,6 +2327,7 @@ nsresult nsMemoryReporterManager::RegisterReporterHelper(
     CrashIfRefcountIsZero(aReporter);
   } else {
     CrashIfRefcountIsZero(aReporter);
+#ifndef MOZ_NAIVEFOX
     nsCOMPtr<nsIXPConnectWrappedJS> jsComponent = do_QueryInterface(aReporter);
     if (jsComponent) {
       // We cannot allow non-native reporters (WrappedJS), since we'll be
@@ -2332,6 +2337,7 @@ nsresult nsMemoryReporterManager::RegisterReporterHelper(
       // CollectReports().
       return NS_ERROR_XPC_BAD_CONVERT_JS;
     }
+#endif
     mWeakReporters->InsertOrUpdate(aReporter, aIsAsync);
   }
 
@@ -2813,6 +2819,9 @@ nsMemoryReporterManager::SizeOfTab(mozIDOMWindowProxy* aTopWindow,
                                    int64_t* aStyleSize, int64_t* aOtherSize,
                                    int64_t* aTotalSize, double* aJSMilliseconds,
                                    double* aNonJSMilliseconds) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aTopWindow);
   auto* piWindow = nsPIDOMWindowOuter::From(aTopWindow);
   if (NS_WARN_IF(!global) || NS_WARN_IF(!piWindow)) {
@@ -2859,6 +2868,7 @@ nsMemoryReporterManager::SizeOfTab(mozIDOMWindowProxy* aTopWindow,
   *aNonJSMilliseconds = (t3 - t2).ToMilliseconds();
 
   return NS_OK;
+#endif
 }
 
 namespace mozilla {
