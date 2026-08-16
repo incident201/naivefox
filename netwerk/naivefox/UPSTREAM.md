@@ -1180,7 +1180,7 @@ Tests:
 - Wine H2 fetch and malformed-config error smoke (Wine UDP H3 is unavailable,
   `WSAEOPNOTSUPP`, so it is not treated as a native H3 result).
 
-Commit: pending in the current Windows build milestone.
+Commit: `075ba4ffd620 build: add Windows x86_64 NaiveFox package`
 
 Notes for future sync: do not copy this platform graph into the normal Firefox
 build. Keep all behavior changes under `MOZ_NAIVEFOX`, preserve the exact
