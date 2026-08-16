@@ -643,6 +643,11 @@ object directory, with its own `libxul`/NSS path; the lean NaiveFox process used
 only the cold staged libraries. H3 capture proved UDP/QUIC and HTTP/3 without
 TCP fallback. Raw pcaps, key logs, profiles and bodies were deleted after
 sanitization; only aggregate reports remain under the ignored fixture state.
+The capture scripts accept `NAIVEFOX_CAPTURE_REFERENCE_BIN`,
+`NAIVEFOX_CAPTURE_REFERENCE_LIBDIR`, and `NAIVEFOX_CAPTURE_REFERENCE_OBJDIR`
+for that baseline, plus matching `NAIVEFOX_CAPTURE_NAIVEFOX_BIN` and
+`NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR` overrides for the lean process; this keeps
+the two Firefox library closures separate.
 
 One sequential full-suite attempt observed a transient libpref parser abort at
 the start of the second H3 capture pass after the first pass had completed.
