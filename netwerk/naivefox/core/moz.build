@@ -19,7 +19,10 @@ SOURCES += [
     "../SocksServer.cpp",
     "../TunnelSession.cpp",
     "../UnknownProtocolHandler.cpp",
+    "NaiveFoxComponents.cpp",
 ]
+
+XPCOM_MANIFESTS += ["components.conf"]
 
 SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
 SOURCES += ["/js/xpconnect/src/XPCString.cpp"]

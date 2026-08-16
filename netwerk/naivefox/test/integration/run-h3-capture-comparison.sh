@@ -94,14 +94,21 @@ source "$run_dir/fixture.env"
 [[ $NAIVEFOX_FIXTURE_MODE == h3 ]]
 
 BIN="$OBJDIR/dist/bin"
-for binary in firefox naivefox libssl3.so libxul.so; do
-  [[ -f $BIN/$binary ]] || {
-    printf 'required Firefox build artifact is missing: %s\n' "$BIN/$binary" >&2
+REFERENCE_BIN="${NAIVEFOX_CAPTURE_REFERENCE_BIN:-$BIN/firefox}"
+REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$BIN}"
+REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-$OBJDIR}"
+NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
+NAIVEFOX_LIBDIR="${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$BIN}"
+for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
+  "$REFERENCE_LIBDIR/libxul.so" "$NAIVEFOX_BIN" \
+  "$NAIVEFOX_LIBDIR/libssl3.so" "$NAIVEFOX_LIBDIR/libxul.so"; do
+  [[ -f $required ]] || {
+    printf 'required capture artifact is missing: %s\n' "$required" >&2
     exit 1
   }
 done
 if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
-  "$OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
+  "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
   printf 'this NSS build does not enable SSLKEYLOGFILE\n' >&2
   exit 1
 fi
@@ -110,7 +117,6 @@ capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 capture_dir="$STATE_ROOT/h3-captures/$capture_id"
 mkdir -m 0700 -p "$capture_dir"
 
-export LD_LIBRARY_PATH="$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export MOZ_CRASHREPORTER_DISABLE=1
 
 start_capture() {
@@ -177,17 +183,19 @@ run_reference() {
   local log="$capture_dir/$pass-reference-firefox.log"
   local screenshot="$capture_dir/$pass-reference.png"
   local keylog="$capture_dir/$pass-reference.keys"
-  local -a command_env=(env -u SSLKEYLOGFILE MOZ_HEADLESS=1)
+  local -a command_env=(env -u SSLKEYLOGFILE \
+    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
   if [[ $pass == decrypted ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
-    command_env=(env "SSLKEYLOGFILE=$keylog" MOZ_HEADLESS=1)
+    command_env=(env "SSLKEYLOGFILE=$keylog" \
+      "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
   fi
   : >"$log"
   chmod 0600 "$log"
   start_capture "$pcap" "$capture_dir/$pass-reference-dumpcap.log"
   timeout 35 "${command_env[@]}" \
-    "$BIN/firefox" --headless --new-instance --no-remote \
+    "$REFERENCE_BIN" --headless --new-instance --no-remote \
     --profile "$reference_profile" --screenshot "$screenshot" \
     "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass" \
     >"$log" 2>&1 &
@@ -209,14 +217,19 @@ run_naivefox() {
   local pcap="$capture_dir/$pass-naivefox.pcapng"
   local log="$capture_dir/$pass-naivefox.log"
   local keylog="$capture_dir/$pass-naivefox.keys"
-  local -a command_env=(env -u SSLKEYLOGFILE)
+  local profile="$capture_dir/$pass-naivefox-profile"
+  local -a command_env=(env -u SSLKEYLOGFILE \
+    "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR")
   if [[ $pass == decrypted ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
-    command_env=(env "SSLKEYLOGFILE=$keylog")
+    command_env=(env "SSLKEYLOGFILE=$keylog" \
+      "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR")
   fi
   : >"$log"
   chmod 0600 "$log"
+  mkdir -m 0700 "$profile"
+  cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$profile/"
   local socks_port
   socks_port=$(python3 -c \
     'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
@@ -224,8 +237,8 @@ run_naivefox() {
   "${command_env[@]}" \
     NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
     NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-    "$BIN/naivefox" \
-    --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
+    "$NAIVEFOX_BIN" \
+    --profile "$profile" \
     --protocol h3 \
     --socks-listen "127.0.0.1:$socks_port" \
     --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
@@ -697,11 +710,17 @@ chmod 0600 "$safe_dir/summary.txt"
   printf 'capture_revision=%s\n' "$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
   printf 'tshark_version=%s\n' "$(tshark --version | head -n 1)"
   printf 'reference_binary=%s\n' \
-    "$(readelf -n "$BIN/firefox" | sed -n 's/^ *Build ID: //p' | head -n 1)"
+    "$(readelf -n "$REFERENCE_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)"
   printf 'naivefox_binary=%s\n' \
-    "$(readelf -n "$BIN/naivefox" | sed -n 's/^ *Build ID: //p' | head -n 1)"
-  printf 'libxul_sha256=%s\n' "$(sha256sum "$BIN/libxul.so" | cut -d' ' -f1)"
-  printf 'libssl3_sha256=%s\n' "$(sha256sum "$BIN/libssl3.so" | cut -d' ' -f1)"
+    "$(readelf -n "$NAIVEFOX_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)"
+  printf 'reference_libxul_sha256=%s\n' \
+    "$(sha256sum "$REFERENCE_LIBDIR/libxul.so" | cut -d' ' -f1)"
+  printf 'reference_libssl3_sha256=%s\n' \
+    "$(sha256sum "$REFERENCE_LIBDIR/libssl3.so" | cut -d' ' -f1)"
+  printf 'naivefox_libxul_sha256=%s\n' \
+    "$(sha256sum "$NAIVEFOX_LIBDIR/libxul.so" | cut -d' ' -f1)"
+  printf 'naivefox_libssl3_sha256=%s\n' \
+    "$(sha256sum "$NAIVEFOX_LIBDIR/libssl3.so" | cut -d' ' -f1)"
   for side in reference naivefox; do
     pcap="$capture_dir/passive-$side.pcapng"
     syn_count=$(tshark -r "$pcap" \

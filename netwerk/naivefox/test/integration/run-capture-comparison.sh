@@ -80,14 +80,21 @@ run_dir=$(<"$ACTIVE_RUN_FILE")
 source "$run_dir/fixture.env"
 
 BIN="$OBJDIR/dist/bin"
-for binary in firefox naivefox libssl3.so libxul.so; do
-  [[ -f $BIN/$binary ]] || {
-    printf 'required Firefox build artifact is missing: %s\n' "$BIN/$binary" >&2
+REFERENCE_BIN="${NAIVEFOX_CAPTURE_REFERENCE_BIN:-$BIN/firefox}"
+REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$BIN}"
+REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-$OBJDIR}"
+NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
+NAIVEFOX_LIBDIR="${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$BIN}"
+for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
+  "$REFERENCE_LIBDIR/libxul.so" "$NAIVEFOX_BIN" \
+  "$NAIVEFOX_LIBDIR/libssl3.so" "$NAIVEFOX_LIBDIR/libxul.so"; do
+  [[ -f $required ]] || {
+    printf 'required capture artifact is missing: %s\n' "$required" >&2
     exit 1
   }
 done
 if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
-  "$OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
+  "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
   printf 'this NSS build does not enable SSLKEYLOGFILE\n' >&2
   exit 1
 fi
@@ -97,7 +104,6 @@ capture_dir="$STATE_ROOT/captures/$capture_id"
 mkdir -m 0700 -p "$capture_dir"
 chmod 0700 "$capture_dir"
 
-export LD_LIBRARY_PATH="$BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export MOZ_CRASHREPORTER_DISABLE=1
 
 start_capture() {
@@ -157,8 +163,9 @@ reference_log="$capture_dir/reference-firefox.log"
 chmod 0600 "$reference_keys" "$reference_log"
 start_capture "$reference_pcap" "$capture_dir/reference-dumpcap.log"
 
-timeout 25 env SSLKEYLOGFILE="$reference_keys" MOZ_HEADLESS=1 \
-  "$BIN/firefox" --headless --new-instance --no-remote \
+  timeout 25 env SSLKEYLOGFILE="$reference_keys" \
+  LD_LIBRARY_PATH="$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
+  "$REFERENCE_BIN" --headless --new-instance --no-remote \
   --profile "$reference_profile" \
   --screenshot "$capture_dir/reference.png" \
   "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/?capture=reference" \
@@ -186,9 +193,10 @@ socks_port=$(python3 -c \
 start_capture "$naivefox_pcap" "$capture_dir/naivefox-dumpcap.log"
 
 env SSLKEYLOGFILE="$naivefox_keys" \
+  LD_LIBRARY_PATH="$NAIVEFOX_LIBDIR" \
   NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
   NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-  "$BIN/naivefox" \
+  "$NAIVEFOX_BIN" \
   --profile "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE" \
   --socks-listen "127.0.0.1:$socks_port" \
   --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
@@ -419,10 +427,12 @@ for file in "${safe_files[@]}"; do
 done
 cat >"$safe_dir/summary.txt" <<EOF
 capture_revision=$(git -C "$SOURCE_ROOT" rev-parse HEAD)
-reference_binary=$(readelf -n "$BIN/firefox" | sed -n 's/^ *Build ID: //p' | head -n 1)
-naivefox_binary=$(readelf -n "$BIN/naivefox" | sed -n 's/^ *Build ID: //p' | head -n 1)
-libxul_sha256=$(sha256sum "$BIN/libxul.so" | cut -d' ' -f1)
-libssl3_sha256=$(sha256sum "$BIN/libssl3.so" | cut -d' ' -f1)
+reference_binary=$(readelf -n "$REFERENCE_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)
+naivefox_binary=$(readelf -n "$NAIVEFOX_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)
+reference_libxul_sha256=$(sha256sum "$REFERENCE_LIBDIR/libxul.so" | cut -d' ' -f1)
+reference_libssl3_sha256=$(sha256sum "$REFERENCE_LIBDIR/libssl3.so" | cut -d' ' -f1)
+naivefox_libxul_sha256=$(sha256sum "$NAIVEFOX_LIBDIR/libxul.so" | cut -d' ' -f1)
+naivefox_libssl3_sha256=$(sha256sum "$NAIVEFOX_LIBDIR/libssl3.so" | cut -d' ' -f1)
 endpoint=localhost:$NAIVEFOX_FIXTURE_PROXY_PORT
 reference_method=GET
 naivefox_method=CONNECT

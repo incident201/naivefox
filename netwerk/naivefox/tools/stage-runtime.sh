@@ -92,8 +92,6 @@ required_files=(
   naivefox
   dependentlibs.list
   application.ini
-  platform.ini
-  default.locale
   greprefs.js
 )
 

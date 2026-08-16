@@ -445,9 +445,6 @@ nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
                        nsLoadFlags aLoadFlags /* = nsIRequest::LOAD_NORMAL */,
                        nsIIOService* aIoService /* = nullptr */,
                        uint32_t aSandboxFlags /* = 0 */) {
-#ifdef MOZ_NAIVEFOX
-  return NS_ERROR_NOT_AVAILABLE;
-#else
   return NS_NewChannelInternal(
       outChannel, aUri,
       nullptr,  // aLoadingNode,
@@ -458,6 +455,7 @@ nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
       aCallbacks, aLoadFlags, aIoService, aSandboxFlags);
 }
 
+#ifndef MOZ_NAIVEFOX
 nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
                        nsIPrincipal* aLoadingPrincipal,
                        const ClientInfo& aLoadingClientInfo,
@@ -487,6 +485,8 @@ nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
       aCookieJarSettings, aPerformanceStorage, aLoadGroup, aCallbacks,
       aLoadFlags, aIoService, aSandboxFlags, aAssociatedBrowsingContextID);
 }
+
+#endif  // !MOZ_NAIVEFOX
 
 nsresult NS_NewChannelInternal(
     nsIChannel** outChannel, nsIURI* aUri, nsINode* aLoadingNode,
@@ -557,6 +557,7 @@ nsresult NS_NewChannelInternal(
     }
   }
 
+#ifndef MOZ_NAIVEFOX
   if (aLoadingNode) {
     nsCOMPtr<nsILoadInfo> loadInfo = channel->LoadInfo();
     ClassificationFlags flags =
@@ -565,10 +566,13 @@ nsresult NS_NewChannelInternal(
     loadInfo->SetTriggeringFirstPartyClassificationFlags(flags.firstPartyFlags);
     loadInfo->SetTriggeringThirdPartyClassificationFlags(flags.thirdPartyFlags);
   }
+#endif
 
   channel.forget(outChannel);
   return NS_OK;
 }
+
+#ifndef MOZ_NAIVEFOX
 
 nsresult /*NS_NewChannelWithNodeAndTriggeringPrincipal */
 NS_NewChannelWithTriggeringPrincipal(
@@ -682,8 +686,8 @@ nsresult NS_NewChannel(nsIChannel** outChannel, nsIURI* aUri,
       aContentPolicyType, aLoadingNode->OwnerDoc()->CookieJarSettings(),
       aPerformanceStorage, aLoadGroup, aCallbacks, aLoadFlags, aIoService,
       aSandboxFlags);
-#endif
 }
+#endif
 
 nsresult NS_GetIsDocumentChannel(nsIChannel* aChannel, bool* aIsDocument) {
   // Check if this channel is going to be used to create a document. If it has

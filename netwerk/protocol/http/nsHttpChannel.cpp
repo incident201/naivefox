@@ -1569,6 +1569,12 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   // Consider opening a TCP connection right away.
   SpeculativeConnect();
 
+#ifdef MOZ_NAIVEFOX
+  // The lean client has no browser cache component graph.  Network channels
+  // are intentionally uncached, so go directly to the transport path.
+  return TriggerNetwork();
+#endif
+
   // open a cache entry for this channel...
   rv = OpenCacheEntry(mURI->SchemeIs("https"));
 

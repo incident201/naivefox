@@ -133,7 +133,7 @@ wait "$client_pid" || [[ $? -eq 143 ]]
 client_pid=
 
 bind_address=$(ip -4 -o addr show scope global | awk '
-  { split($4, fields, "/"); print fields[1]; exit }
+  $2 != "lo" { split($4, fields, "/"); print fields[1]; exit }
 ')
 [[ -n $bind_address ]]
 address_port=$(free_port)

@@ -5,6 +5,9 @@
 #include "RequestContextService.h"
 
 #include "../protocol/http/nsHttpHandler.h"
+#ifdef MOZ_NAIVEFOX
+#  include "base/process_util.h"
+#endif
 #include "mozilla/Atomics.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Logging.h"
@@ -443,8 +446,15 @@ RequestContextService::RequestContextService() {
   MOZ_ASSERT(NS_IsMainThread());
   sSelf = this;
 
+#ifdef MOZ_NAIVEFOX
+  // The lean parent-only runtime intentionally does not register the browser
+  // nsIXULRuntime component.  The request-context namespace only needs a
+  // process-unique value, so use the same native PID source directly.
+  mRCIDNamespace = static_cast<uint32_t>(base::GetCurrentProcId());
+#else
   nsCOMPtr<nsIXULRuntime> runtime = do_GetService("@mozilla.org/xre/runtime;1");
   runtime->GetProcessID(&mRCIDNamespace);
+#endif
 }
 
 RequestContextService::~RequestContextService() {

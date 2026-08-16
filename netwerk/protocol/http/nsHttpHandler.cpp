@@ -394,8 +394,10 @@ nsresult nsHttpHandler::Init() {
   // This preference is only used in parent process.
   if (!IsNeckoChild()) {
     if (XRE_IsParentProcess()) {
+#ifndef MOZ_NAIVEFOX
       mDictionaryCache = DictionaryCache::GetInstance();
       // mDictionaryCache can be null if shutdown has occurred
+#endif
 
       std::bitset<3> usageOfHTTPSRRPrefs;
       usageOfHTTPSRRPrefs[0] = StaticPrefs::network_dns_upgrade_with_https_rr();
