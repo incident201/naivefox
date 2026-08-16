@@ -1060,3 +1060,31 @@ were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. The next
 minimisation work remains intentionally paused at this checkpoint: do not
 remove further subsystems until this result is reviewed.
+
+## Handoff checkpoint: Windows package and workspace cleanup (2026-08-16)
+
+The current handoff point is the annotated tag `minimization-handoff-v0.1` on
+the `minimal` branch. The full Firefox source tree remains in the repository;
+the NaiveFox DOM/GFX implementation build exclusion is the last validated
+minimisation change. H2, H3, Auto, config mode, SOCKS5, HTTP CONNECT, padding,
+staged Linux runtime, and the bounded native Windows x86_64 package smoke are
+the accepted baseline. No Firefox upstream refresh was performed here.
+
+Workspace-only cleanup removed stale object directories, ignored diagnostics,
+fixture copies, and the regenerable compiler cache. The retained incremental
+object directories are `obj-naivefox-minimal` and
+`obj-naivefox-windows-x86_64`; this cleanup did not change source files,
+commits, tags, or package contents. The Windows archive is outside Git under
+`D:\naivefox`.
+
+The next agent must not start with another broad source deletion or a blind
+full rebuild. First generate machine-readable build/link dependency reports
+from the retained object directory, review the DOM/GFX checkpoint, and propose
+one independently testable dependency group. Preserve Necko, Neqo, NSS/PSM,
+NSPR, DNS, proxy, XPCOM, config, SOCKS, HTTP CONNECT, and padding paths. After
+each approved group run the smallest affected incremental build plus focused
+gtests, H2/H3/config integration, staged-runtime smoke, and a bounded real
+Caddy check when networking or TLS closure changes. Only after the minimized
+build/runtime closure is stable should work proceed to an allowlist source
+manifest, deterministic export, isolated build, and the independent
+`minimal-source` branch described in Phase 14.
