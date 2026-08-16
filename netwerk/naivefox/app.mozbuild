@@ -96,7 +96,6 @@ if CONFIG["MOZ_USING_WASM_SANDBOXING"] and CONFIG["COMPILE_ENVIRONMENT"]:
     DIRS += ["/security/rlbox"]
 
 DIRS += [
-    "/config/external/abseil-cpp",
     "/intl",
     "/modules/brotli",
     "/modules/libpref",
@@ -113,8 +112,6 @@ DIRS += [
     "/security/certverifier",
     "/security/manager",
     "/testing/gtest",
-    "/toolkit/components/jsoncpp",
-    "/toolkit/components/jsoncpp/src/lib_json",
     "/toolkit/components/glean",
     "/toolkit/library",
     "/tools/profiler",

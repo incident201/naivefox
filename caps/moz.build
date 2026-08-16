@@ -62,9 +62,10 @@ else:
         "nsScriptSecurityManager.cpp",
     ]
 
-USE_LIBS += [
-    "jsoncpp",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    USE_LIBS += [
+        "jsoncpp",
+    ]
 
 LOCAL_INCLUDES += [
     "/docshell/base",
@@ -72,7 +73,6 @@ LOCAL_INCLUDES += [
     "/js/xpconnect/src",
     "/netwerk/base",
     "/netwerk/cookie",
-    "/toolkit/components/jsoncpp/include",
 ]
 
 TEST_DIRS += ["tests/gtest"]

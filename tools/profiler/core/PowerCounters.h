@@ -50,8 +50,8 @@ bool GetRailEnergyData(RailEnergyData*, size_t* size_of_arr);
 
 class PowerCounters {
  public:
-#if defined(GP_OS_windows) || defined(GP_OS_darwin) || \
-    defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_arm64_android)
+#if !defined(MOZ_NAIVEFOX) && (defined(GP_OS_windows) || defined(GP_OS_darwin) || \
+    defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_arm64_android))
   explicit PowerCounters();
 #else
   explicit PowerCounters() {};

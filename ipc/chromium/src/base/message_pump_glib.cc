@@ -7,7 +7,9 @@
 #include <unistd.h>
 #include <math.h>
 
+#ifndef MOZ_NAIVEFOX
 #include <gtk/gtk.h>
+#endif
 #include <glib.h>
 
 #include "base/eintr_wrapper.h"
@@ -136,8 +138,10 @@ MessagePumpForUI::MessagePumpForUI()
 }
 
 MessagePumpForUI::~MessagePumpForUI() {
+  #ifndef MOZ_NAIVEFOX
   gdk_event_handler_set(reinterpret_cast<GdkEventFunc>(gtk_main_do_event), this,
                         nullptr);
+#endif
   g_source_destroy(work_source_);
   g_source_unref(work_source_);
   close(wakeup_pipe_read_);

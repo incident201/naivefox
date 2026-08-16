@@ -229,11 +229,11 @@ BOOL WINAPI GetThreadInformation(
 #endif
 
 // Linux/BSD builds use LUL, which uses DWARF info to unwind stacks.
-#if defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux) ||       \
+#if !defined(MOZ_NAIVEFOX) && (defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux) || \
     defined(GP_PLAT_amd64_android) || defined(GP_PLAT_x86_android) ||   \
     defined(GP_PLAT_mips64_linux) || defined(GP_PLAT_arm64_linux) ||    \
     defined(GP_PLAT_arm64_android) || defined(GP_PLAT_amd64_freebsd) || \
-    defined(GP_PLAT_arm64_freebsd)
+    defined(GP_PLAT_arm64_freebsd))
 #  define HAVE_NATIVE_UNWIND
 #  define USE_LUL_STACKWALK
 #  include "lul/LulMain.h"
@@ -6165,7 +6165,7 @@ void profiler_init(void* aStackTop) {
   VTUNE_INIT();
   ETW::Init();
   InitPerfetto();
-#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY)
+#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY) && !defined(MOZ_NAIVEFOX)
   mozilla::profiler::memory_hooks_tls_init();
 #endif
 
@@ -7059,7 +7059,7 @@ static void locked_profiler_start(PSLockRef aLock, PowerOfTwo32 aCapacity,
   }
 #endif
 
-#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY)
+#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY) && !defined(MOZ_NAIVEFOX)
   if (ActivePS::FeatureNativeAllocations(aLock)) {
     if (isMainThreadBeingProfiled) {
       mozilla::profiler::enable_native_allocations();
@@ -7244,7 +7244,7 @@ void profiler_ensure_started(PowerOfTwo32 aCapacity, double aInterval,
     }
   }
 
-#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY)
+#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY) && !defined(MOZ_NAIVEFOX)
   if (ActivePS::FeatureNativeAllocations(aLock) &&
       ActivePS::ShouldInstallMemoryHooks(aLock)) {
     mozilla::profiler::disable_native_allocations();
@@ -7281,7 +7281,7 @@ RefPtr<GenericPromise> profiler_stop() {
 
   ProfilerParent::ProfilerWillStopIfStarted();
 
-#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY)
+#if defined(MOZ_REPLACE_MALLOC) && defined(MOZ_PROFILER_MEMORY) && !defined(MOZ_NAIVEFOX)
   // Remove the hooks early, as native allocations (if they are on) can be
   // quite expensive.
   mozilla::profiler::remove_memory_hooks();

@@ -200,3 +200,97 @@ browser binary is added to the lean staged package. A single sequential run
 hit a transient libpref parser abort at the start of a second H3 capture pass;
 fresh per-pass profiles fixed the environmental race and the independent H3
 suite passed without weakening any gate.
+
+
+## Phase 2.5: GTK3 and Desktop UI Linkage Exclusion
+
+Phase 2.5 decouples all desktop UI / X11 / GTK3 / Cairo / Pango / ATK dynamic
+shared library dependencies from the headless NaiveFox runtime on Linux.
+
+### Dependency Closure and Symbol Audit
+
+Symbol audit of `libxul.so` demonstrated that no Cairo, Pango, ATK, X11, or XCB
+functions are called by the headless application. Only two GTK calls
+(`gdk_event_handler_set` and `gtk_main_do_event`) existed inside the unused
+`MessagePumpForUI` destructor in `ipc/chromium/src/base/message_pump_glib.cc`.
+By guarding these calls under `MOZ_NAIVEFOX` and updating
+`toolkit/library/moz.build` to link only `GLIB_LIBS` instead of `MOZ_GTK3_LIBS`,
+`MOZ_X11_LIBS`, and `MOZ_PANGO_LIBS`, 16 desktop GUI libraries were eliminated
+from `DT_NEEDED`.
+
+| Dynamic Shared Libraries (`DT_NEEDED`) | Before Phase 2.5 | Phase 2.5 | Change |
+|---|---:|---:|---:|
+| System, NSPR, NSS, SQLite, GLib | 19 | 20 | +1 (explicit GLib) |
+| Desktop UI (GTK3, GDK, Cairo, Pango, ATK, X11, XCB) | 16 | 0 | -16 (100% removed) |
+| Total `DT_NEEDED` entries | 35 | 20 | -15 (-42.8%) |
+
+Eliminated libraries: `libgtk-3.so.0`, `libgdk-3.so.0`, `libgdk_pixbuf-2.0.so.0`,
+`libgio-2.0.so.0`, `libcairo.so.2`, `libcairo-gobject.so.2`, `libpango-1.0.so.0`,
+`libpangocairo-1.0.so.0`, `libatk-1.0.so.0`, `libX11.so.6`, `libX11-xcb.so.1`,
+`libXext.so.6`, `libXfixes.so.3`, `libXrandr.so.2`, `libxcb.so.1`, `libxcb-shm.so.0`.
+
+### Link Inputs and Staged Package
+
+- **Link input count**: 609 object files (305,209,024 bytes unstripped)
+- **`libxul.so` stripped**: 86,802,016 bytes (~82.8 MiB)
+- **Staged runtime package**: 93,153,920 bytes (~88.8 MiB) across 15 files
+- **Incremental compile time**: 4.5 seconds
+
+### Acceptance
+
+- `readelf -d` and `analyze-link-closure.py` verification;
+- Staged runtime verification outside build tree (`verify-staged-runtime.sh`);
+- H2, H3, Auto, SOCKS5, HTTP CONNECT, padding, robustness, and lifecycle suites green.
+
+
+## Phase 2.6: HarfBuzz Font Shaper Object Exclusion
+
+Phase 2.6 excluded HarfBuzz complex text shaping translation units from the `libxul` link graph.
+
+### Analysis & Implementation
+
+Symbol audit confirmed that `libxul.so` never calls any HarfBuzz shaper functions (`hb_shape`, `hb_font_*`, `hb_buffer_*`). The only usage in the headless tree is enum types (`hb_unicode_general_category_t`) in `nsUnicodeProperties.h`. By guarding `UNIFIED_SOURCES` in `gfx/harfbuzz/src/moz.build` under `if not CONFIG["MOZ_NAIVEFOX"]:`, the large font shaper object (`Unified_cpp_gfx_harfbuzz_src0.o`, 43.4 MB unstripped) was excluded from the link closure.
+
+- **Link input count**: 608 files (down from 609)
+- **Unstripped link inputs**: 261,856,704 bytes (down from 305,209,024 bytes, **-43.35 MB / -14.2%**)
+- **`gfx` group**: Reduced to 0 files / 0 bytes.
+
+
+## Phase 2.7: Google Abseil Elimination & Profiler Unwinder Trimming
+
+Phase 2.7 eliminated the unused Google Abseil C++ library and trimmed unnecessary DWARF stack unwinder (LUL) and Breakpad ELF parser components from `tools/profiler`.
+
+### Analysis & Implementation
+
+1. **Abseil Elimination**: `config/external/abseil-cpp` generated 75 object files under `third_party/abseil-cpp`. Symbol inspection of `libxul.so` demonstrated 0 unresolved or required Abseil symbols. Removed `abseil-cpp` from `netwerk/naivefox/app.mozbuild` and `toolkit/library/moz.build`.
+2. **Gecko Profiler Unwinder Trimming**: Guarded LUL DWARF unwinder, Breakpad ELF parser, CPU frequency sampling, and PowerCounter objects in `tools/profiler/moz.build` and `tools/profiler/core/platform.cpp` under `MOZ_NAIVEFOX`.
+
+### Link Inputs and Link Closure
+
+| Component Group | Before Phase 2.6 | Phase 2.6 | Phase 2.7 | Cumulative Delta |
+|---|---:|---:|---:|---:|
+| `netwerk` | 61 files (89.3 MB) | 61 files (89.3 MB) | 61 files (89.3 MB) | 0 |
+| `config` (ICU, SQLite, NSPR) | 369 files (47.4 MB) | 369 files (47.4 MB) | 369 files (47.4 MB) | 0 |
+| `xpcom` | 28 files (33.9 MB) | 28 files (33.9 MB) | 28 files (33.9 MB) | 0 |
+| `modules` (libpref, brotli, jar, zlib) | 23 files (16.3 MB) | 23 files (16.3 MB) | 23 files (16.3 MB) | 0 |
+| `tools` (profiler) | 8 files (18.8 MB) | 8 files (18.8 MB) | 2 files (15.5 MB) | -6 files (-3.3 MB) |
+| `third_party` (abseil, zstd) | 77 files (16.0 MB) | 77 files (16.0 MB) | 2 files (1.2 MB) | -75 files (-14.8 MB) |
+| `ipc` | 11 files (13.8 MB) | 11 files (13.8 MB) | 11 files (13.8 MB) | 0 |
+| `security` (PSM, mozpkix, CT) | 17 files (12.7 MB) | 17 files (12.7 MB) | 17 files (12.7 MB) | 0 |
+| `storage` | 4 files (6.0 MB) | 4 files (6.0 MB) | 4 files (6.0 MB) | 0 |
+| `intl` | 5 files (3.0 MB) | 5 files (3.0 MB) | 5 files (3.0 MB) | 0 |
+| `toolkit` | 2 files (2.7 MB) | 2 files (2.7 MB) | 2 files (2.7 MB) | 0 |
+| `caps` | 2 files (1.1 MB) | 2 files (1.1 MB) | 2 files (1.1 MB) | 0 |
+| `chrome` | 1 file (0.9 MB) | 1 file (0.9 MB) | 1 file (0.9 MB) | 0 |
+| `gfx` (HarfBuzz) | 1 file (43.4 MB) | 0 files (0 MB) | 0 files (0 MB) | -1 file (-43.4 MB) |
+| **Total Link Inputs** | **609 files (305.2 MB)** | **608 files (261.9 MB)** | **527 files (243.8 MB)** | **-82 files (-61.4 MB / -20.1%)** |
+
+- **Unstripped `libxul.so` size**: 655,196,824 bytes (down from 691.1 MB, **-35.9 MB**)
+- **Incremental compile/link time**: **1.7 seconds**
+
+### Phase 2.8: Gecko Profiler & JsonCPP Elimination
+- **Profiler engine replaced**: Replaced heavy Gecko Profiler source files with `tools/profiler/core/ProfilerNaiveFoxStub.cpp` providing lightweight no-op stubs.
+- **JsonCPP eliminated**: `toolkit/components/jsoncpp` completely removed from `libxul` link closure (**0 files / 0 MB** in `toolkit`).
+- **Closure impact**: Link closure reduced to **525 files / 216.04 MB** (unstripped).
+- **Binary size**: `libxul.so` unstripped size reduced to **616.0 MB**, stripped size **62 MB**.
+- **Build time**: Clean incremental build completes in **2.85 seconds**.

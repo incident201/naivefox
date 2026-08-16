@@ -8,7 +8,7 @@
 #include "mozilla/ProfilerPlatformMacros.h"
 #include "mozilla/Vector.h"
 
-#if defined(GP_OS_windows) || defined(GP_OS_linux) || defined(GP_OS_android)
+#if !defined(MOZ_NAIVEFOX) && (defined(GP_OS_windows) || defined(GP_OS_linux) || defined(GP_OS_android))
 #  define HAVE_CPU_FREQ_SUPPORT
 #endif
 

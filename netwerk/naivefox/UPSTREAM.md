@@ -1186,3 +1186,131 @@ Notes for future sync: do not copy this platform graph into the normal Firefox
 build. Keep all behavior changes under `MOZ_NAIVEFOX`, preserve the exact
 Windows toolchain assumptions in the mozconfig, and rerun native H3/UDP tests
 on an actual Windows host after every networking or Neqo refresh.
+
+
+### Patch NF-UPSTREAM-012
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+caps/BasePrincipal.h
+caps/BasePrincipal.cpp
+ipc/chromium/src/base/message_pump_glib.cc
+toolkit/library/moz.build
+```
+
+Purpose: decouple desktop UI (GTK3, GDK, Cairo, Pango, ATK, X11, XCB) dynamic
+library dependencies from `libxul.so` in headless NaiveFox builds, and fix the
+`extensions::WebExtensionPolicy` namespace in `BasePrincipal`.
+
+Why project-only code was insufficient: `toolkit/library/moz.build`
+unconditionally injected `MOZ_GTK3_LIBS`, `MOZ_X11_LIBS`, and `MOZ_PANGO_LIBS`
+when `MOZ_WIDGET_TOOLKIT == "gtk"`. In addition, the unused `MessagePumpForUI`
+destructor in `ipc/chromium/src/base/message_pump_glib.cc` called
+`gdk_event_handler_set` and `gtk_main_do_event`. Guarding these under
+`MOZ_NAIVEFOX` allows `libxul.so` to link only against `GLIB_LIBS`
+(`-lglib-2.0 -lgobject-2.0`), removing 16 desktop UI shared libraries from
+`DT_NEEDED`.
+
+Behavioral risk: none for headless NaiveFox operation. Event processing uses
+GLib default context / libevent / IO pumps. Necko, Neqo, NSS/PSM, SOCKS5, HTTP
+CONNECT, and padding mechanisms are completely unaffected.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 4.5s;
+- `readelf -d libxul.so | grep NEEDED` confirming removal of 16 GTK/X11/Cairo libraries (total dropped from 35 to 20);
+- Staged runtime verification outside the build tree (`verify-staged-runtime.sh`);
+- H2, H3, Auto, SOCKS5, HTTP CONNECT, padding, and robustness integration test suites.
+
+Notes for future sync: keep the `MOZ_NAIVEFOX` guards in `toolkit/library/moz.build` and `message_pump_glib.cc` when refreshing upstream Firefox.
+
+
+### Patch NF-UPSTREAM-013
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+gfx/harfbuzz/src/moz.build
+```
+
+Purpose: exclude HarfBuzz complex text shaper translation units from the `libxul` link graph while preserving public header exports for unicode enum consumers (`nsUnicodeProperties`).
+
+Why project-only code was insufficient: `gfx/harfbuzz/src/moz.build` unconditionally compiled `UNIFIED_SOURCES` into `FINAL_LIBRARY = 'xul'`, pulling 43.4 MB of unstripped font shaper code (`Unified_cpp_gfx_harfbuzz_src0.o`) into `libxul.so` even though NaiveFox never performs glyph shaping or layout rendering.
+
+Behavioral risk: zero. NaiveFox only uses HarfBuzz's public enum types (`hb_unicode_general_category_t`) via header inclusions; zero shaper runtime symbols (`hb_shape`, `hb_font_*`, `hb_buffer_*`) are called.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 2.7s;
+- Link input closure reduced by 43.4 MB (-14.2%);
+- `gfx` component group reduced to 0 files / 0 bytes in `link-closure.json`;
+- Staged runtime verification outside the build tree (`verify-staged-runtime.sh`).
+
+Notes for future sync: preserve the `if not CONFIG['MOZ_NAIVEFOX']:` guard around `UNIFIED_SOURCES` in `gfx/harfbuzz/src/moz.build`.
+
+
+### Patch NF-UPSTREAM-014
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+caps/moz.build
+netwerk/naivefox/app.mozbuild
+toolkit/library/moz.build
+tools/profiler/core/platform.cpp
+tools/profiler/core/ProfilerCPUFreq.h
+tools/profiler/core/PowerCounters.h
+tools/profiler/moz.build
+```
+
+Purpose: eliminate unused Google Abseil C++ library (75 object files) from `libxul` and trim unnecessary DWARF stack unwinder (LUL), Breakpad ELF parser, CPU frequency sampling, and PowerCounter objects from `tools/profiler`.
+
+Why project-only code was insufficient: `netwerk/naivefox/app.mozbuild` and `toolkit/library/moz.build` linked `config/external/abseil-cpp` despite `libxul` having zero calls to Abseil symbols. Additionally, `tools/profiler/moz.build` compiled Breakpad ELF utilities and the LUL DWARF unwinder on Linux, which are not required for headless operation.
+
+Behavioral risk: zero. Core Gecko profiler hooks and thread registration remain functional for diagnostics, while large platform-specific stack unwinding and unused Abseil containers are excluded from the link closure.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 1.7s;
+- `third_party` link input group dropped from 77 files to 2 files (-75 files, -14.8 MB);
+- `tools` link input group dropped from 8 files to 2 files (-6 files, -3.3 MB);
+- Total link inputs reduced to 527 files / 243.8 MB (down from 609 files / 305.2 MB);
+- `libxul.so` unstripped size reduced to 655.2 MB (-35.9 MB).
+
+Notes for future sync: keep `abseil` and `LUL` unwinder guards when updating upstream Firefox.
+
+### NF-UPSTREAM-015: Complete Gecko Profiler & JsonCPP Elimination
+
+Touched files:
+
+```text
+tools/profiler/moz.build
+tools/profiler/core/ProfilerNaiveFoxStub.cpp
+netwerk/naivefox/app.mozbuild
+caps/moz.build
+```
+
+Purpose: replace full Gecko Profiler engine (JSON log generation, memory hooks, stack capture engines) with a minimal, zero-overhead no-op stub (`ProfilerNaiveFoxStub.cpp`), allowing complete elimination of `toolkit/components/jsoncpp` and `tools/profiler` unified sources from `libxul`.
+
+Why project-only code was insufficient: Gecko Profiler in `tools/profiler` compiled multiple large unified source files and required `jsoncpp` for serialized profile output. For NaiveFox proxy runtime, profiler functions only need to satisfy link-time symbol references as inline no-ops.
+
+Behavioral risk: zero. All Gecko Profiler calls across XPCOM and Necko gracefully no-op without allocating buffers or running background sampling threads.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 2.85s;
+- `toolkit` component group reduced to **0 files / 0 bytes** in link closure (-2.7 MB);
+- `tools` component group dropped from 15.5 MB to **0.88 MB** (-14.6 MB);
+- Total unstripped link closure dropped from **243.84 MB (527 files) to 216.04 MB (525 files)** (-27.8 MB);
+- Unstripped `libxul.so` reduced from **655.2 MB to 616.0 MB** (-39.2 MB);
+- Stripped `libxul.so` is **62 MB**;
+- `naivefox --version` verified (`NaiveFox 0.3.0-dev`).
+
+Notes for future sync: keep `ProfilerNaiveFoxStub.cpp` and `jsoncpp` exclusions when updating upstream Firefox.

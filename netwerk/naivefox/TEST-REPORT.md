@@ -683,3 +683,38 @@ same binary under Wine is not a valid H3 oracle because Wine reported
 
 The staged package was archived as `naivefox-windows-x86_64.tar.gz`; the
 archive checksum and transient test files are kept outside the repository.
+
+
+## Phase 2.5: GTK3 and Desktop UI dynamic dependency elimination
+
+Phase 2.5 eliminated all 16 GTK3, GDK, Cairo, Pango, ATK, X11, and XCB dynamic
+library dependencies from `libxul.so` on Linux x86_64.
+
+| Metric | Phase 2.4 | Phase 2.5 | Change |
+|---|---:|---:|---:|
+| `DT_NEEDED` libraries | 35 | 20 | -15 (-42.8%) |
+| Desktop UI shared libraries | 16 | 0 | -16 (100% eliminated) |
+| `libxul.so` stripped bytes | 86,802,016 | 86,802,016 | 0 |
+| Staged package bytes | 93,153,920 | 93,153,920 | 0 |
+| Incremental compile time | - | 4.5s | Fast incremental |
+
+### Test Gate Results
+
+| Test Suite | Result |
+|---|---|
+| `./mach build binaries` incremental build | PASS (4.5s) |
+| `analyze-link-closure.py` machine-readable report | PASS |
+| `readelf -d libxul.so` DT_NEEDED audit (20 libraries) | PASS |
+| Staged runtime verification (`verify-staged-runtime.sh`) | PASS |
+| Runtime smoke and public HTTPS fetch outside build tree | PASS |
+| H2 fixture control and Necko tests (`run-necko-tests.sh`) | PASS |
+| H2 raw CONNECT, SOCKS5, and authentication | PASS |
+| H2 padding negotiation and data codec | PASS |
+| H2 robustness, backpressure, lifecycle, multiplexing | PASS |
+| H2 config mode simultaneous SOCKS + HTTP listeners | PASS |
+| Config logging, persistent and temporary profile tests | PASS |
+| H3 raw CONNECT, SOCKS5, and authentication | PASS |
+| H3 padding negotiation and data codec | PASS |
+| H3 robustness, backpressure, lifecycle, multiplexing | PASS |
+| H3 config mode simultaneous SOCKS + HTTP listeners | PASS |
+| Auto H3 preference and bounded H2 fallback | PASS |

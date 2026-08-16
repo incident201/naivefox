@@ -151,11 +151,15 @@ USE_LIBS += [
 ]
 
 USE_LIBS += [
-    "abseil",
     "nspr",
     "nss",
     "sqlite",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    USE_LIBS += [
+        "abseil",
+    ]
 
 if CONFIG["MOZ_BUILD_APP"] != "netwerk/naivefox":
     USE_LIBS += [
@@ -186,7 +190,9 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
         USE_LIBS += [
             "mozgtk",
         ]
-    OS_LIBS += CONFIG["MOZ_GTK3_LIBS"]
+        OS_LIBS += CONFIG["MOZ_GTK3_LIBS"]
+    else:
+        OS_LIBS += CONFIG["GLIB_LIBS"]
 
 if not CONFIG["MOZ_NAIVEFOX"] and CONFIG["MOZ_WAYLAND"]:
     USE_LIBS += [
@@ -331,7 +337,11 @@ if CONFIG["MOZ_ENABLE_DBUS"]:
 if CONFIG["MOZ_SYSTEM_LIBDRM"]:
     OS_LIBS += CONFIG["MOZ_LIBDRM_LIBS"]
 
-if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk" and CONFIG["COMPILE_ENVIRONMENT"]:
+if (
+    not CONFIG["MOZ_NAIVEFOX"]
+    and CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk"
+    and CONFIG["COMPILE_ENVIRONMENT"]
+):
     OS_LIBS += [l for l in CONFIG["MOZ_GTK3_LIBS"] if l not in ("-lgtk-3", "-lgdk-3")]
     OS_LIBS += CONFIG["MOZ_X11_LIBS"]
     OS_LIBS += CONFIG["MOZ_PANGO_LIBS"]

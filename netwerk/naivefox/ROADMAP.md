@@ -1088,3 +1088,18 @@ Caddy check when networking or TLS closure changes. Only after the minimized
 build/runtime closure is stable should work proceed to an allowlist source
 manifest, deterministic export, isolated build, and the independent
 `minimal-source` branch described in Phase 14.
+
+
+## Minimisation Phase 2.5: Desktop UI / GTK3 Linkage Decoupling (2026-08-16)
+
+Phase 2.5 eliminated all desktop UI dynamic dependencies (GTK3, GDK, Cairo,
+Pango, ATK, X11, XCB) from `libxul.so` on Linux x86_64 without altering
+Firefox networking (Necko/Neqo/NSS).
+
+Key achievements:
+- `DT_NEEDED` dependencies reduced from 35 to 20 libraries (16 GUI libraries eliminated);
+- `MessagePumpForUI` GTK calls safely guarded under `MOZ_NAIVEFOX`;
+- `toolkit/library/moz.build` links only `GLIB_LIBS` for `MOZ_NAIVEFOX`;
+- Machine-readable `link-closure.json` updated and verified;
+- Staged Linux package (88.8 MiB) verified outside build tree;
+- Complete H2, H3, Auto, SOCKS5, HTTP CONNECT, padding, and robustness integration suites passed.
