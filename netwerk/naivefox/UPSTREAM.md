@@ -1053,3 +1053,63 @@ a failure backward from `minimal` into the already validated reference branch
 without evidence that the full reference is also affected.
 
 The best downstream patch is one we can eventually remove.
+
+## Lean DOM/GFX-free runtime gate
+
+The following downstream files were required to make the validated lean
+application usable after excluding the browser implementation graph. They are
+kept as a separate refresh inventory and must be rechecked on every Firefox
+base update.
+
+### Patch NF-UPSTREAM-010
+
+Status: implemented in the lean staged-runtime milestone
+
+Files:
+
+```text
+netwerk/base/nsNetUtil.cpp
+netwerk/base/RequestContextService.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpHandler.cpp
+```
+
+Purpose:
+
+- retain the parent-only `NS_NewChannelInternal` path used by direct Necko
+  fetches and the NaiveFox carrier channel;
+- exclude DOM-only `NS_NewChannel` overloads and loading-node classification
+  from the lean translation unit;
+- obtain request-context identity without the browser-only XRE runtime
+  service;
+- skip optional browser dictionary and HTTP cache initialization while keeping
+  network channel transport active.
+
+Why project-only code was insufficient:
+
+The project creates real Necko channels, but the previous lean guards returned
+`NS_ERROR_NOT_AVAILABLE` or reached services whose registrations belong to the
+browser component graph. Reimplementing channel creation or adding a second
+network stack would violate the architecture; the minimal compatible change
+is to preserve Firefox's parent path and remove only browser-only branches.
+
+Behavioral risk:
+
+Lean NaiveFox channels are intentionally uncached and do not expose document
+loading-node overloads. Ordinary Firefox builds remain unchanged by the
+`MOZ_NAIVEFOX` guards. Future Firefox refreshes must verify cache-independent
+fetch, H2/H3 CONNECT, profile startup, and component registration.
+
+Tests:
+
+- cold lean link and direct HTTPS fetch (`example.com`, HTTP 200);
+- staged runtime smoke, public fetch, persistent/temporary/no-home profiles;
+- H2 and H3 raw, SOCKS, padding, robustness, Auto, config, and capture suites;
+- full Firefox baseline capture uses separate libraries and remains outside
+  the lean package.
+
+Commit: `daf76d468b89 min: validate lean staged runtime`
+
+Notes for future sync: if the lean component graph gains a supported parent
+cache/XRE registration, remove the corresponding workaround rather than
+retaining it by inertia.

@@ -602,3 +602,50 @@ The cold object directory is 4.0 GiB; its opt/debug `libxul.so` is 638 MiB and
 `naivefox` is 5.2 MiB. These are development-build figures, not stripped
 package measurements. No staged package, documentation refresh, or additional
 minimization phase was run after this checkpoint.
+
+## DOM/GFX-free staged-runtime milestone
+
+The reviewed lean cold build was linked again after restoring the parent-only
+Necko channel path needed by the standalone client. The lean runtime now
+registers its script-security manager explicitly, obtains a request-context
+PID without the browser XRE service, bypasses the browser-only dictionary and
+HTTP cache components, and keeps DOM-only `NS_NewChannel` overloads out of the
+application graph. No DOM or GFX implementation source was reintroduced.
+
+Staging and verification:
+
+```bash
+./netwerk/naivefox/tools/stage-runtime.sh \
+  naivefox-linux-x86_64-cold-milestone2
+./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  naivefox-linux-x86_64-cold-milestone2
+```
+
+Result: PASS. The package is 90,755,038 bytes (about 87 MiB) and contains an
+81 MiB stripped `libxul.so`. Verification copied it below `/tmp`, checked the
+manifest and ELF closure, ran runtime smoke and public `https://example.com/`,
+tested persistent and temporary profiles (including no `HOME`/XDG state), and
+passed staged config-mode H2, H3, and Auto workloads outside the object tree.
+
+The functional gates were rerun from the same cold binary:
+
+| Gate | Result |
+|---|---|
+| H2 local suite (`run-local-suite.sh`) | PASS |
+| H2 config and runtime-profile tests | PASS |
+| H3 local suite (`run-h3-suite.sh`) | PASS |
+| H3 config, padding, robustness and Auto | PASS |
+| Firefox-vs-NaiveFox H2 capture | PASS |
+| Firefox-vs-NaiveFox strict H3/QUIC capture | PASS |
+
+Capture used the separate full Firefox baseline from the pre-minimization
+object directory, with its own `libxul`/NSS path; the lean NaiveFox process used
+only the cold staged libraries. H3 capture proved UDP/QUIC and HTTP/3 without
+TCP fallback. Raw pcaps, key logs, profiles and bodies were deleted after
+sanitization; only aggregate reports remain under the ignored fixture state.
+
+One sequential full-suite attempt observed a transient libpref parser abort at
+the start of the second H3 capture pass after the first pass had completed.
+Fresh per-pass profiles and separate library paths were added; the isolated
+H2 and H3 suites, including both capture passes, then passed. This remains a
+diagnostic transient, not an accepted failure or a weakened test gate.

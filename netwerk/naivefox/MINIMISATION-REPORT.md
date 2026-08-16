@@ -176,3 +176,27 @@ the 638 MiB `libxul.so` value is an unstripped development artifact and is not
 directly comparable with the stripped staged-package numbers above. Staged
 runtime measurement and further link-closure work are deliberately deferred
 until this checkpoint is reviewed.
+
+## Phase 2.4 acceptance: lean staged runtime
+
+The cold object directory was linked after the parent-only Necko fixes were
+validated. The project-owned static component manifest restores the lean
+script-security manager; `RequestContextService` uses the native parent PID;
+the browser dictionary/cache paths and DOM-only channel overloads remain out
+of the lean graph. This preserves the network client without bringing DOM or
+GFX implementation code back into the build.
+
+The explicit staged package
+`obj-naivefox-cold/naivefox-linux-x86_64-cold-milestone2` is 90,755,038 bytes
+(about 87 MiB), including an 81 MiB stripped `libxul.so`. The package was
+copied outside the object directory and passed runtime smoke, public HTTPS
+fetch, profile/no-home checks, strict H2/H3 config workloads, and Auto.
+
+The final isolated H2 and H3 suites passed all raw CONNECT, SOCKS, padding,
+large-transfer integrity, backpressure, lifecycle, multiplexing, Auto,
+configuration, robustness, and capture checks. Capture uses an explicitly
+separate full Firefox baseline and per-runtime library paths; no Firefox
+browser binary is added to the lean staged package. A single sequential run
+hit a transient libpref parser abort at the start of a second H3 capture pass;
+fresh per-pass profiles fixed the environmental race and the independent H3
+suite passed without weakening any gate.

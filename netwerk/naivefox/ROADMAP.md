@@ -1042,3 +1042,19 @@ The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
 user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
 must not weaken any item in this H2 suite. Native Windows, Android, and size
 reduction remain future work.
+
+## Current minimisation checkpoint: lean staged runtime
+
+Phase 2.4 now has a measured staged-package gate in addition to the cold
+build-graph audit. The `obj-naivefox-cold` package is approximately 87 MiB,
+passes runtime smoke, public HTTPS fetch, no-home profile startup, strict H2,
+strict H3, and Auto config workloads outside the object directory, and passes
+the complete isolated H2/H3 functional, robustness, and capture suites.
+
+The capture gate uses a separate full Firefox baseline with its own runtime
+libraries; the browser binary is not bundled into the lean package. A
+non-reproducible libpref parser abort was observed once when two capture passes
+were run back-to-back. Per-pass profiles and separate runtime library paths
+were added, after which the H2 and H3 suites passed independently. The next
+minimisation work remains intentionally paused at this checkpoint: do not
+remove further subsystems until this result is reviewed.
