@@ -151,10 +151,10 @@ not aliases for a moving `main`:
 
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 075ba4ffd620610313f17d743aee2bfdc6b0e8b1
-Validated Minimal commit: minimal-graph-v0.1 (tag)
+Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Validated Minimal commit: 8e2d123c9a61
 Validated Minimal Source commit: NOT_CREATED
-Minimal graph tag: minimal-graph-v0.1
+Existing pre-audit graph tag: minimal-graph-v0.1 -> 60f2eede69da856daf2324fc90b2c2ab9cb86fd2
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -414,10 +414,10 @@ The agent must keep this section current.
 Upstream repository: https://github.com/mozilla-firefox/firefox
 Upstream branch: main
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 075ba4ffd620610313f17d743aee2bfdc6b0e8b1
-Validated Minimal commit: minimal-graph-v0.1 (tag)
+Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Validated Minimal commit: 8e2d123c9a61
 Validated Minimal Source commit: NOT_CREATED
-Minimal graph tag: minimal-graph-v0.1
+Existing pre-audit graph tag: minimal-graph-v0.1 -> 60f2eede69da856daf2324fc90b2c2ab9cb86fd2
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -1365,21 +1365,22 @@ Measured on standard 16-thread development workstation:
 
 ### Windows Target (Native Windows Acceptance Verification)
 
-Verified directly on native Windows x86_64 via `netwerk/naivefox/tools/verify-staged-windows-runtime.py`:
+Verified directly on native Windows x86_64 via `netwerk/naivefox/tools/verify-staged-windows-smoke.py`:
 - `--version` output check (`NaiveFox 0.3.0-dev`);
 - `--runtime-smoke` headless event-loop lifecycle;
 - `config.json` loading, parsing, and error validation;
-- SOCKS5 listener startup and protocol handshake (`0x05 0x00`);
-- 5 consecutive client SOCKS5 connections;
-- HTTP CONNECT listener startup and request handling;
+- Dynamic port SOCKS5 listener startup and protocol handshake (`0x05 0x00`);
+- 5 consecutive client SOCKS5 sessions;
+- Dynamic port HTTP CONNECT listener startup and request handling;
 - Clean process shutdown with zero dangling handles.
 
+*Documentation Status:* Windows build, launch, config parsing, local listener handshake and shutdown verified. End-to-end H2/H3 networking against live upstream proxy is tracked separately.
 
 ## Source-Export Allowlist Requirements for `minimal-source`
 
 For the upcoming source-export step (`export-minimal-source.sh`), the following rules are established:
 
-1. **Allowlist Boundary Definition:** Retain all modules verified in the link closure (NSPR, NSS/PSM, SQLite, Necko, Neqo, Cache2, Cookies, Storage, GLib event pump, SpiderMonkey JS runtime, XPConnect, and ICU).
-2. **Excluded Heavy Trees:** DOM layout, full Gecko DOM bindings, WebRTC media engines, DevTools, accessibility, and desktop widget backends.
-3. **Deterministic Tooling:** The exporter must reproduce identical source trees across platforms, verifying that `minimal-source` builds clean standalone Linux and Windows binaries matching the audited closure.
+1. **Boundary Definition:** DOM implementation and layout engines are excluded. Explicit minimal WebIDL, binding metadata, and code generator subsets are retained where required.
+2. **Build-Time Dependency Inclusion:** The source export manifest must include all build-time generators, python actions, and dependency metadata even if they do not compile into the final runtime binary.
+3. **Allowlist Integrity:** Do not generate export allowlists solely from the 525 direct object files. Retain all 934 C/C++ source units, 396 reachable Rust crates, and active code generators.
 
