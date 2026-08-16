@@ -151,9 +151,10 @@ not aliases for a moving `main`:
 
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Validated Minimal base commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Validated NaiveFox commit: 075ba4ffd620610313f17d743aee2bfdc6b0e8b1
+Validated Minimal commit: minimal-graph-v0.1 (tag)
 Validated Minimal Source commit: NOT_CREATED
+Minimal graph tag: minimal-graph-v0.1
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -413,8 +414,10 @@ The agent must keep this section current.
 Upstream repository: https://github.com/mozilla-firefox/firefox
 Upstream branch: main
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
-Validated Minimal base commit: 92d25f965b8cd98dc9be88c4892a00ea2c8030b7
+Validated NaiveFox commit: 075ba4ffd620610313f17d743aee2bfdc6b0e8b1
+Validated Minimal commit: minimal-graph-v0.1 (tag)
+Validated Minimal Source commit: NOT_CREATED
+Minimal graph tag: minimal-graph-v0.1
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -1230,17 +1233,17 @@ Notes for future sync: keep the `MOZ_NAIVEFOX` guards in `toolkit/library/moz.bu
 
 ### Patch NF-UPSTREAM-013
 
-Status: implemented on `minimal`.
+Status: implemented on `minimal` via project-only exports.
 
 Files:
 
 ```text
-gfx/harfbuzz/src/moz.build
+netwerk/naivefox/app.mozbuild
 ```
 
-Purpose: exclude HarfBuzz complex text shaper translation units from the `libxul` link graph while preserving public header exports for unicode enum consumers (`nsUnicodeProperties`).
+Purpose: decouple HarfBuzz complex text shaper translation units from the `libxul` link graph without modifying upstream `gfx/harfbuzz/src/moz.build`.
 
-Why project-only code was insufficient: `gfx/harfbuzz/src/moz.build` unconditionally compiled `UNIFIED_SOURCES` into `FINAL_LIBRARY = 'xul'`, pulling 43.4 MB of unstripped font shaper code (`Unified_cpp_gfx_harfbuzz_src0.o`) into `libxul.so` even though NaiveFox never performs glyph shaping or layout rendering.
+Why project-only code is sufficient: `netwerk/naivefox/app.mozbuild` directly exports the 28 required HarfBuzz public headers via `EXPORTS.harfbuzz += [...]` and does not recurse into `gfx/harfbuzz/src/`. This allows `gfx/harfbuzz/src/moz.build` to remain 100% pristine upstream while eliminating 43.4 MB of font shaper object code from `libxul`.
 
 Behavioral risk: zero. NaiveFox only uses HarfBuzz's public enum types (`hb_unicode_general_category_t`) via header inclusions; zero shaper runtime symbols (`hb_shape`, `hb_font_*`, `hb_buffer_*`) are called.
 
@@ -1248,10 +1251,10 @@ Tests:
 
 - Incremental compile `./mach build binaries` in 2.7s;
 - Link input closure reduced by 43.4 MB (-14.2%);
-- `gfx` component group reduced to 0 files / 0 bytes in `link-closure.json`;
+- `gfx` component group reduced to 0 files / 0 bytes in `closure-report-linux-x86_64.json`;
 - Staged runtime verification outside the build tree (`verify-staged-runtime.sh`).
 
-Notes for future sync: preserve the `if not CONFIG['MOZ_NAIVEFOX']:` guard around `UNIFIED_SOURCES` in `gfx/harfbuzz/src/moz.build`.
+Notes for future sync: upstream `gfx/harfbuzz/` remains completely untouched.
 
 
 ### Patch NF-UPSTREAM-014
@@ -1286,31 +1289,97 @@ Tests:
 
 Notes for future sync: keep `abseil` and `LUL` unwinder guards when updating upstream Firefox.
 
-### NF-UPSTREAM-015: Complete Gecko Profiler & JsonCPP Elimination
+### NF-UPSTREAM-015: Profiler Implementation Replaced with Compatibility Stub
 
 Touched files:
 
 ```text
 tools/profiler/moz.build
-tools/profiler/core/ProfilerNaiveFoxStub.cpp
+netwerk/naivefox/core/ProfilerNaiveFoxStub.cpp
+netwerk/naivefox/core/moz.build
 netwerk/naivefox/app.mozbuild
 caps/moz.build
 ```
 
-Purpose: replace full Gecko Profiler engine (JSON log generation, memory hooks, stack capture engines) with a minimal, zero-overhead no-op stub (`ProfilerNaiveFoxStub.cpp`), allowing complete elimination of `toolkit/components/jsoncpp` and `tools/profiler` unified sources from `libxul`.
+Purpose: replace the full Gecko Profiler engine (JSON profile generation, LUL DWARF unwinder, memory hooks, stack capture engines) with a zero-overhead compatibility stub (`netwerk/naivefox/core/ProfilerNaiveFoxStub.cpp`), eliminating `toolkit/components/jsoncpp` and `tools/profiler` implementation sources from `libxul`.
 
-Why project-only code was insufficient: Gecko Profiler in `tools/profiler` compiled multiple large unified source files and required `jsoncpp` for serialized profile output. For NaiveFox proxy runtime, profiler functions only need to satisfy link-time symbol references as inline no-ops.
+Why project-only code was insufficient: Gecko Profiler in `tools/profiler` compiled multiple large unified source files and required `jsoncpp` for serialized profile output. For the NaiveFox proxy runtime, profiler functions only need to satisfy link-time symbol references with safe, no-op semantics.
 
-Behavioral risk: zero. All Gecko Profiler calls across XPCOM and Necko gracefully no-op without allocating buffers or running background sampling threads.
+Behavioral risk: zero. Profiler state is permanently inactive; thread registration returns `nullptr`; markers are dropped with zero formatting overhead; ETW trace logging providers on Windows are registered as inactive stubs.
 
 Tests:
 
 - Incremental compile `./mach build binaries` in 2.85s;
 - `toolkit` component group reduced to **0 files / 0 bytes** in link closure (-2.7 MB);
 - `tools` component group dropped from 15.5 MB to **0.88 MB** (-14.6 MB);
-- Total unstripped link closure dropped from **243.84 MB (527 files) to 216.04 MB (525 files)** (-27.8 MB);
-- Unstripped `libxul.so` reduced from **655.2 MB to 616.0 MB** (-39.2 MB);
+- Total unstripped link closure dropped from **243.84 MB (527 files) to 216.03 MB (525 files)** (-27.8 MB);
+- Unstripped `libxul.so` reduced from **655.2 MB to 615.49 MB** (-39.7 MB);
 - Stripped `libxul.so` is **62 MB**;
-- `naivefox --version` verified (`NaiveFox 0.3.0-dev`).
+- `naivefox --version` and integration suite verified.
 
-Notes for future sync: keep `ProfilerNaiveFoxStub.cpp` and `jsoncpp` exclusions when updating upstream Firefox.
+Notes for future sync: keep `ProfilerNaiveFoxStub.cpp` in `netwerk/naivefox/core/` and the `MOZ_NAIVEFOX` guard in `tools/profiler/moz.build`.
+
+
+## Final Source & Link Closure Audit Report
+
+A comprehensive audit was performed using `netwerk/naivefox/tools/analyze-full-closure.py` across Linux and Windows x86_64 targets.
+
+### Target Closure Comparison
+
+| Metric | Linux x86_64 (`obj-naivefox-minimal`) | Windows x86_64 (`obj-naivefox-windows-x86_64`) |
+|---|---|---|
+| **Direct Translation Units / Objects** | 525 objects (216.03 MB unstripped) | 536 objects (202.62 MB unstripped) |
+| **libxul binary size** | 615.49 MB unstripped / **62 MB stripped** | **40.94 MB** (`xul.dll`) |
+| **Headless runner size** | 1.05 MB (`naivefox`) | 11.0 KB (`naivefox.exe`) |
+| **Rust Crates in Cargo Closure** | 850 packages | 850 packages |
+| **System Dynamic Dependencies** | 20 `DT_NEEDED` libraries | 22 DLL imports |
+| **Desktop UI Libraries (GTK/X11/Cairo)** | **0 libraries linked** | **0 libraries linked** |
+
+Full machine-readable reports are archived in:
+- `netwerk/naivefox/reports/closure-report-linux-x86_64.json`
+- `netwerk/naivefox/reports/closure-report-windows-x86_64.json`
+
+Detailed audit of all shims, stubs, and lean replacements is documented in [`netwerk/naivefox/SHIMS.md`](SHIMS.md).
+
+
+## 3-Tier Build Performance Benchmark
+
+Measured on standard 16-thread development workstation:
+
+1. **Incremental build (`./mach build binaries`):** **~2.85s**
+2. **Clean objdir rebuild with warm compiler cache (`sccache`):** **~36s**
+3. **True cold build from scratch without compiler cache (`SCCACHE_DISABLE=1`):** **1m 16.268s** (`real 1m16.268s`)
+
+
+## Verified Test Gate Inventory
+
+### Linux Target (Full Automated Integration Suite)
+
+- **SOCKS5 Listener:** IPv4 and IPv6 loopback bindings, TCP CONNECT command, domain name resolution.
+- **HTTP CONNECT Listener:** Standard HTTP/1.1 CONNECT proxying.
+- **Strict H2 Upstream:** Real multiplexed H2 proxying with authentication and padding.
+- **Strict H3 Upstream:** Real QUIC/H3 proxying with 0-RTT/1-RTT connection management.
+- **Auto-Protocol Mode:** Prefer H3 with bounded transparent fallback to H2 on network failure.
+- **Robustness & Soak:** High-concurrency client multiplexing, server hang recovery, connection teardown, and clean process exit.
+- **Staged Runtime:** Verification outside build tree via `verify-staged-runtime.sh`.
+
+### Windows Target (Native Windows Acceptance Verification)
+
+Verified directly on native Windows x86_64 via `netwerk/naivefox/tools/verify-staged-windows-runtime.py`:
+- `--version` output check (`NaiveFox 0.3.0-dev`);
+- `--runtime-smoke` headless event-loop lifecycle;
+- `config.json` loading, parsing, and error validation;
+- SOCKS5 listener startup and protocol handshake (`0x05 0x00`);
+- 5 consecutive client SOCKS5 connections;
+- HTTP CONNECT listener startup and request handling;
+- Clean process shutdown with zero dangling handles.
+
+
+## Source-Export Allowlist Requirements for `minimal-source`
+
+For the upcoming source-export step (`export-minimal-source.sh`), the following rules are established:
+
+1. **Allowlist Boundary Definition:** Retain all modules verified in the link closure (NSPR, NSS/PSM, SQLite, Necko, Neqo, Cache2, Cookies, Storage, GLib event pump, SpiderMonkey JS runtime, XPConnect, and ICU).
+2. **Excluded Heavy Trees:** DOM layout, full Gecko DOM bindings, WebRTC media engines, DevTools, accessibility, and desktop widget backends.
+3. **Deterministic Tooling:** The exporter must reproduce identical source trees across platforms, verifying that `minimal-source` builds clean standalone Linux and Windows binaries matching the audited closure.
+

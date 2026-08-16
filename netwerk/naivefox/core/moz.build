@@ -20,6 +20,7 @@ SOURCES += [
     "../TunnelSession.cpp",
     "../UnknownProtocolHandler.cpp",
     "NaiveFoxComponents.cpp",
+    "ProfilerNaiveFoxStub.cpp",
 ]
 
 XPCOM_MANIFESTS += ["components.conf"]

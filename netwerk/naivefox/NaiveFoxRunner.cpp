@@ -67,7 +67,6 @@ bool ParseProxyProtocol(const char* aValue,
 extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   AutoLogging logging;
   mozilla::LogModule::Init(aArgc, aArgv);
-  AUTO_PROFILER_INIT;
 
   const bool configMode = aArgc == 1 || (aArgc == 2 && aArgv[1][0] != '-' &&
                                          std::strlen(aArgv[1]) != 0);

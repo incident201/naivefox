@@ -12,10 +12,40 @@ include("/js/app.mozbuild")
 # single header without adding the graphics build graph.
 EXPORTS += ["/gfx/thebes/gfxSparseBitSet.h"]
 
-# nsUnicodeProperties uses HarfBuzz's public Unicode enums.  Build the small
-# upstream HarfBuzz component into xul, but keep the rest of gfx out of the
-# NaiveFox graph.
-DIRS += ["/gfx/harfbuzz/src"]
+# nsUnicodeProperties uses HarfBuzz's public Unicode enums and types for character
+# properties. Export only the required public headers into dist/include/harfbuzz
+# without compiling any font-shaping implementation objects into libxul.
+EXPORTS.harfbuzz += [
+    "/gfx/harfbuzz/src/hb-blob.h",
+    "/gfx/harfbuzz/src/hb-buffer.h",
+    "/gfx/harfbuzz/src/hb-common.h",
+    "/gfx/harfbuzz/src/hb-deprecated.h",
+    "/gfx/harfbuzz/src/hb-draw.h",
+    "/gfx/harfbuzz/src/hb-face.h",
+    "/gfx/harfbuzz/src/hb-font.h",
+    "/gfx/harfbuzz/src/hb-map.h",
+    "/gfx/harfbuzz/src/hb-ot-color.h",
+    "/gfx/harfbuzz/src/hb-ot-deprecated.h",
+    "/gfx/harfbuzz/src/hb-ot-fetch.h",
+    "/gfx/harfbuzz/src/hb-ot-font.h",
+    "/gfx/harfbuzz/src/hb-ot-layout.h",
+    "/gfx/harfbuzz/src/hb-ot-math.h",
+    "/gfx/harfbuzz/src/hb-ot-meta.h",
+    "/gfx/harfbuzz/src/hb-ot-metrics.h",
+    "/gfx/harfbuzz/src/hb-ot-name.h",
+    "/gfx/harfbuzz/src/hb-ot-shape.h",
+    "/gfx/harfbuzz/src/hb-ot-var.h",
+    "/gfx/harfbuzz/src/hb-ot.h",
+    "/gfx/harfbuzz/src/hb-paint.h",
+    "/gfx/harfbuzz/src/hb-script-list.h",
+    "/gfx/harfbuzz/src/hb-set.h",
+    "/gfx/harfbuzz/src/hb-shape-plan.h",
+    "/gfx/harfbuzz/src/hb-shape.h",
+    "/gfx/harfbuzz/src/hb-style.h",
+    "/gfx/harfbuzz/src/hb-unicode.h",
+    "/gfx/harfbuzz/src/hb-version.h",
+    "/gfx/harfbuzz/src/hb.h",
+]
 
 # The preference store uses this header-only compact string table even in the
 # parent-only runtime.  Exporting it does not add dom/ipc actors or sources.
