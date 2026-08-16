@@ -1113,3 +1113,76 @@ Commit: `daf76d468b89 min: validate lean staged runtime`
 Notes for future sync: if the lean component graph gains a supported parent
 cache/XRE registration, remove the corresponding workaround rather than
 retaining it by inertia.
+
+### Patch NF-UPSTREAM-011
+
+Status: implemented for the Windows x86_64 build profile; native smoke passed
+on Windows, while the existing Linux/H2/H3 reference remains unchanged.
+
+Files:
+
+```text
+netwerk/moz.build
+netwerk/naivefox/mozconfig-windows-x86_64
+netwerk/naivefox/Config.cpp
+netwerk/naivefox/GeckoRuntime.cpp
+netwerk/naivefox/HttpConnectParser.cpp
+netwerk/naivefox/app.mozbuild
+intl/locale/LocaleService.cpp
+ipc/chromium/moz.build
+ipc/chromium/src/base/message_pump_win.cc
+ipc/glue/MessageChannel.cpp
+ipc/glue/WindowsMessageLoop.cpp
+ipc/glue/moz.build
+mozglue/misc/moz.build
+netwerk/dns/moz.build
+netwerk/protocol/http/nsHttpConnectionMgr.cpp
+netwerk/system/win32/moz.build
+security/certverifier/NSSCertDBTrustDomain.cpp
+toolkit/library/moz.build
+tools/profiler/core/platform.cpp
+tools/profiler/moz.build
+widget/windows/WinRegistry.cpp
+xpcom/base/AppShutdown.cpp
+xpcom/base/moz.build
+xpcom/base/nsINIParser.cpp
+xpcom/build/components.conf
+xpcom/build/moz.build
+xpcom/io/moz.build
+xpcom/io/nsLocalFileWin.cpp
+xpcom/threads/moz.build
+```
+
+Purpose: make the existing single-process NaiveFox application and its real
+Necko/NSS/Neqo path compile for `x86_64-pc-windows-msvc`, without adding a
+Windows-specific network implementation or changing the Firefox base.
+
+Why project-only code was insufficient: the lean application graph normally
+gets Windows file, DNS, IPC message-loop, locale, shutdown, and native-path
+support from browser/widget components. The guarded additions retain only the
+small ABI and platform pieces required by the existing parent runtime; browser
+UI, DOM, graphics, and socket-process code remain excluded.
+
+Behavioral risk: Windows native file symlink resolution, restart environment
+restoration, IPC client-cert loading, and the native Windows message-loop
+window integration are intentionally reduced or disabled for the single
+process product. H2/H3 Necko transport, NSS trust validation, and local SOCKS
+and HTTP listeners are unchanged. Every Firefox refresh must recheck this
+inventory and remove guards when an upstream lean-compatible path appears.
+
+Tests:
+
+- Windows configure/backend regeneration and `./mach build binaries`;
+- PE32+ AMD64 headers for `naivefox.exe`, `xul.dll`, and NSS DLLs;
+- packaged `--version`/`--help` under Wine;
+- native Windows H3 config with simultaneous SOCKS5 and HTTP CONNECT listeners,
+  two public HTTPS fetches, and normal certificate validation;
+- Wine H2 fetch and malformed-config error smoke (Wine UDP H3 is unavailable,
+  `WSAEOPNOTSUPP`, so it is not treated as a native H3 result).
+
+Commit: pending in the current Windows build milestone.
+
+Notes for future sync: do not copy this platform graph into the normal Firefox
+build. Keep all behavior changes under `MOZ_NAIVEFOX`, preserve the exact
+Windows toolchain assumptions in the mozconfig, and rerun native H3/UDP tests
+on an actual Windows host after every networking or Neqo refresh.

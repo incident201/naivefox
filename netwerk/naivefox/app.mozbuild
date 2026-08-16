@@ -12,6 +12,11 @@ include("/js/app.mozbuild")
 # single header without adding the graphics build graph.
 EXPORTS += ["/gfx/thebes/gfxSparseBitSet.h"]
 
+# nsUnicodeProperties uses HarfBuzz's public Unicode enums.  Build the small
+# upstream HarfBuzz component into xul, but keep the rest of gfx out of the
+# NaiveFox graph.
+DIRS += ["/gfx/harfbuzz/src"]
+
 # The preference store uses this header-only compact string table even in the
 # parent-only runtime.  Exporting it does not add dom/ipc actors or sources.
 EXPORTS.mozilla.dom.ipc += ["/dom/ipc/StringTable.h"]
@@ -33,6 +38,41 @@ EXPORTS.mozilla.glean.bindings += [
     "/toolkit/components/glean/bindings/private/TimespanStandalone.h",
     "/toolkit/components/glean/bindings/private/TimingDistributionStandalone.h",
 ]
+
+if CONFIG["OS_TARGET"] == "WINNT":
+    EXPORTS.mozilla += [
+        "/widget/windows/WinHeaderOnlyUtils.h",
+    ]
+    EXPORTS.mozilla.widget += [
+        "/widget/windows/WinRegistry.h",
+    ]
+    EXPORTS.mozilla.mscom += [
+        "/ipc/mscom/Aggregation.h",
+        "/ipc/mscom/AgileReference.h",
+        "/ipc/mscom/ApartmentRegion.h",
+        "/ipc/mscom/COMWrappers.h",
+        "/ipc/mscom/EnsureMTA.h",
+        "/ipc/mscom/mozglue/ProcessRuntimeShared.h",
+        "/ipc/mscom/ProcessRuntime.h",
+        "/ipc/mscom/ProfilerMarkers.h",
+        "/ipc/mscom/Utils.h",
+    ]
+    EXPORTS.mozilla += [
+        "/toolkit/xre/dllservices/mozglue/CacheNtDllThunk.h",
+        "/toolkit/xre/dllservices/mozglue/nsWindowsDllInterceptor.h",
+        "/toolkit/xre/dllservices/mozglue/WindowsStackWalkInitialization.h",
+    ]
+    EXPORTS.mozilla.interceptor += [
+        "/toolkit/xre/dllservices/mozglue/interceptor/Arm64.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/MMPolicies.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/PatcherBase.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/PatcherDetour.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/PatcherNopSpace.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/RangeMap.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/TargetFunction.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/Trampoline.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/VMSharingPolicies.h",
+    ]
 
 DIRS += [
     "/xpcom/xpidl",

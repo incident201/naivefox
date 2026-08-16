@@ -3,10 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ShutdownPhase.h"
-#ifdef XP_WIN
+#if defined(XP_WIN) && !defined(MOZ_NAIVEFOX)
 #  include <windows.h>
 
 #  include "mozilla/PreXULSkeletonUI.h"
+#elif defined(XP_WIN)
+#  include <windows.h>
 #else
 #  include <unistd.h>
 #endif
@@ -93,7 +95,7 @@ static Atomic<bool> sShutdownImpending(false);
 // These environment variable strings are all deliberately copied and leaked
 // due to requirements of PR_SetEnv and similar.
 static char* sSavedXulAppFile = nullptr;
-#ifdef XP_WIN
+#if defined(XP_WIN) && !defined(MOZ_NAIVEFOX)
 static wchar_t* sSavedProfDEnvVar = nullptr;
 static wchar_t* sSavedProfLDEnvVar = nullptr;
 #else
@@ -164,7 +166,7 @@ void AppShutdown::MaybeDoRestart() {
       PR_SetEnv(sSavedXulAppFile);
     }
 
-#ifdef XP_WIN
+#  ifdef XP_WIN
     if (sSavedProfDEnvVar && !EnvHasValue("XRE_PROFILE_PATH")) {
       SetEnvironmentVariableW(L"XRE_PROFILE_PATH", sSavedProfDEnvVar);
     }
@@ -172,14 +174,14 @@ void AppShutdown::MaybeDoRestart() {
       SetEnvironmentVariableW(L"XRE_PROFILE_LOCAL_PATH", sSavedProfLDEnvVar);
     }
     (void)NotePreXULSkeletonUIRestarting();
-#else
+#  else
     if (sSavedProfDEnvVar && !EnvHasValue("XRE_PROFILE_PATH")) {
       PR_SetEnv(sSavedProfDEnvVar);
     }
     if (sSavedProfLDEnvVar && !EnvHasValue("XRE_PROFILE_LOCAL_PATH")) {
       PR_SetEnv(sSavedProfLDEnvVar);
     }
-#endif
+#  endif
 
     LaunchChild(true);
   }
@@ -281,6 +283,7 @@ void AppShutdown::MaybeFastShutdown(ShutdownPhase aPhase) {
 }
 
 void AppShutdown::OnShutdownConfirmed() {
+#ifndef MOZ_NAIVEFOX
   // If we're restarting, we need to save environment variables correctly
   // while everything is still alive to do so.
   if (sShutdownMode == AppShutdownMode::Restart) {
@@ -289,10 +292,10 @@ void AppShutdown::OnShutdownConfirmed() {
     NS_GetSpecialDirectory(NS_APP_USER_PROFILE_50_DIR, getter_AddRefs(profD));
     NS_GetSpecialDirectory(NS_APP_USER_PROFILE_LOCAL_50_DIR,
                            getter_AddRefs(profLD));
-#ifdef XP_WIN
+#  ifdef XP_WIN
     sSavedProfDEnvVar = CopyPathIntoNewWCString(profD);
     sSavedProfLDEnvVar = CopyPathIntoNewWCString(profLD);
-#else
+#  else
     nsAutoCString profDStr;
     profD->GetNativePath(profDStr);
     sSavedProfDEnvVar =
@@ -301,10 +304,11 @@ void AppShutdown::OnShutdownConfirmed() {
     profLD->GetNativePath(profLDStr);
     sSavedProfLDEnvVar =
         Smprintf("XRE_PROFILE_LOCAL_PATH=%s", profLDStr.get()).release();
-#endif
+#  endif
     MOZ_LSAN_INTENTIONALLY_LEAK_OBJECT(sSavedProfDEnvVar);
     MOZ_LSAN_INTENTIONALLY_LEAK_OBJECT(sSavedProfLDEnvVar);
   }
+#endif
 }
 
 void AppShutdown::DoImmediateExit(int aExitCode) {

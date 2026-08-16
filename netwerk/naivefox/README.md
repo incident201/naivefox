@@ -198,7 +198,7 @@ real-deployment, reference-client, and packaged-runtime results.
 The first prototype does **not** need:
 
 - Android support.
-- Windows-native support.
+- Windows-native packaging beyond the current x86_64 smoke-tested build.
 - TUN/TAP support.
 - Transparent proxying.
 - UDP ASSOCIATE.
@@ -790,3 +790,24 @@ The `minimal` branch uses an explicit resource allowlist and writes a hashed
 `runtime-manifest.json`; the verifier checks it before and after copying and
 exercising the package. Current measurements and remaining large components
 are recorded in [`MINIMISATION-REPORT.md`](MINIMISATION-REPORT.md).
+
+### Windows x86_64 build
+
+The lean tree also has a Windows/AMD64 build profile. It uses the Mozilla
+clang-cl toolchain with the Visual Studio x64 linker and Windows SDK; no
+Firefox upstream update is required:
+
+```bash
+MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64 \
+NAIVEFOX_OBJDIR=$PWD/obj-naivefox-windows-x86_64 \
+./mach build binaries
+./mach build misc
+NAIVEFOX_VC_RUNTIME_DIR='C:/Program Files/Microsoft Visual Studio/.../Common7/IDE' \
+  ./netwerk/naivefox/tools/stage-runtime-windows-x86_64.sh
+```
+
+The staged Windows package contains one `naivefox.exe`, the shared Gecko/NSS
+DLLs, GRE resources, and `run-naivefox.cmd`; it does not contain a profile,
+credentials, logs, or capture data. The package builder optionally bundles
+the matching Microsoft VC++ runtime DLLs when `NAIVEFOX_VC_RUNTIME_DIR` is set;
+otherwise the host's VC++ redistributable is used.

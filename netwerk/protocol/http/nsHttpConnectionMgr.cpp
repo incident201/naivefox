@@ -517,7 +517,11 @@ class SpeculativeConnectArgs : public ARefBase {
 nsresult nsHttpConnectionMgr::SpeculativeConnect(
     nsHttpConnectionInfo* ci, nsIInterfaceRequestor* callbacks, uint32_t caps,
     SpeculativeTransaction* aTransaction, bool aFetchHTTPSRR) {
-  if (!IsNeckoChild() && NS_IsMainThread()) {
+  if (NS_IsMainThread()
+#ifndef MOZ_NAIVEFOX
+      && !IsNeckoChild()
+#endif
+  ) {
     // HACK: make sure PSM gets initialized on the main thread.
     net_EnsurePSMInit();
   }

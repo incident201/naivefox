@@ -1697,6 +1697,7 @@ bool LoadUserModuleFromXul(const char* moduleName,
   return true;
 }
 
+#ifndef MOZ_NAIVEFOX
 extern "C" {
 // Extern function to call ipcclientcerts module C_GetFunctionList.
 // NSS calls it to obtain the list of functions comprising this module.
@@ -1731,6 +1732,11 @@ extern "C" {
 // ppFunctionList must be a valid pointer.
 CK_RV OSClientCerts_C_GetFunctionList(CK_FUNCTION_LIST_PTR_PTR ppFunctionList);
 }  // extern "C"
+#endif
+
+#if defined(MOZ_NAIVEFOX)
+bool LoadIPCClientCertsModule() { return false; }
+#endif
 
 bool LoadOSClientCertsModule() {
 // Corresponds to Rust cfg(any(
@@ -1738,7 +1744,9 @@ bool LoadOSClientCertsModule() {
 //  target_os = "ios",
 //  all(target_os = "windows", not(target_arch = "aarch64")),
 //  target_os = "android"))]
-#if defined(__APPLE__) || (defined WIN32 && !defined(__aarch64__)) || \
+#if defined(MOZ_NAIVEFOX)
+  return false;
+#elif defined(__APPLE__) || (defined WIN32 && !defined(__aarch64__)) || \
     defined(MOZ_WIDGET_ANDROID)
   return LoadUserModuleFromXul(kOSClientCertsModuleName.get(),
                                OSClientCerts_C_GetFunctionList);

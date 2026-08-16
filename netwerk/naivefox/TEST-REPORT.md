@@ -654,3 +654,32 @@ the start of the second H3 capture pass after the first pass had completed.
 Fresh per-pass profiles and separate library paths were added; the isolated
 H2 and H3 suites, including both capture passes, then passed. This remains a
 diagnostic transient, not an accepted failure or a weakened test gate.
+
+## Windows x86_64 build checkpoint
+
+The same DOM/GFX-free `minimal` source graph was configured and linked for
+`x86_64-pc-windows-msvc` with the Mozilla clang-cl toolchain, Visual Studio
+x64 linker, and Windows SDK. The build used
+`netwerk/naivefox/mozconfig-windows-x86_64`, kept the single-process socket
+architecture, and did not update Firefox upstream.
+
+| Check | Result |
+|---|---|
+| `./mach configure` / backend regeneration | PASS |
+| `./mach build export` | PASS |
+| `./mach build binaries` | PASS, final link succeeded with 5 non-fatal unused-only warnings |
+| PE architecture (`naivefox.exe`, `xul.dll`, NSS DLLs) | PASS, PE32+ AMD64 |
+| Wine executable smoke (`--help`) | PASS |
+| H2 real-Caddy smoke from the staged package | PASS, HTTPS fetch, `Outer protocol: h2`, padding negotiated |
+| Native Windows H3 SOCKS smoke | PASS, HTTPS fetch through H3-configured package |
+| Native Windows H3 HTTP CONNECT smoke | PASS, HTTPS fetch through the second listener |
+
+The native Windows smoke used the packaged executable on the Windows host,
+two simultaneous local listeners, normal certificate validation, and the
+supplied Caddy endpoint. Both local frontend paths returned the deterministic
+`example.com` body. Native H3/UDP was therefore tested on Windows itself; the
+same binary under Wine is not a valid H3 oracle because Wine reported
+`WSAEOPNOTSUPP` while creating the UDP socket before any fallback.
+
+The staged package was archived as `naivefox-windows-x86_64.tar.gz`; the
+archive checksum and transient test files are kept outside the repository.

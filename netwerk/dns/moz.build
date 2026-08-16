@@ -91,6 +91,12 @@ UNIFIED_SOURCES += [
 ]
 
 if CONFIG["MOZ_NAIVEFOX"]:
+    # Keep the Windows GetAddrInfo symbol from being renamed by a neighboring
+    # unified source that includes winsock headers with UNICODE enabled.
+    UNIFIED_SOURCES.remove("nsHostResolver.cpp")
+    SOURCES += ["nsHostResolver.cpp"]
+
+if CONFIG["MOZ_NAIVEFOX"]:
     # Effective-TLD lookup needs only the generic read-only mmap helper, not
     # the XPConnect script/URL preloaders which normally own it.
     EXPORTS.mozilla += ["/js/xpconnect/loader/AutoMemMap.h"]

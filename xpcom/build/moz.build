@@ -33,6 +33,8 @@ if CONFIG["OS_ARCH"] == "WINNT":
         "PoisonIOInterposerBase.cpp",
         "PoisonIOInterposerWin.cpp",
     ]
+    if CONFIG["MOZ_NAIVEFOX"]:
+        LOCAL_INCLUDES += ["/toolkit/xre/dllservices/mozglue"]
 elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
     UNIFIED_SOURCES += [
         "PoisonIOInterposerBase.cpp",

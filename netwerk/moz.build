@@ -21,7 +21,7 @@ DIRS += [
 if not CONFIG["MOZ_NAIVEFOX"]:
     DIRS += ["url-classifier"]
 
-if CONFIG["OS_TARGET"] == "Linux":
+if CONFIG["OS_TARGET"] in ("Linux", "WINNT"):
     DIRS += ["naivefox"]
 
 if CONFIG["MOZ_SCTP"]:

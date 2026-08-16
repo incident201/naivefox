@@ -26,7 +26,7 @@
 #endif
 #include "nsXULAppAPI.h"
 #include "nsZipArchive.h"
-#ifdef XP_WIN
+#if defined(XP_WIN) && !defined(MOZ_NAIVEFOX)
 #  include "WinUtils.h"
 #endif
 #if defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
@@ -80,7 +80,7 @@ static void ReadRequestedLocales(nsTArray<nsCString>& aRetVal) {
   // isRepack means this is a version of Firefox specifically
   // built for one language.
   const bool isRepack =
-#ifdef XP_WIN
+#if defined(XP_WIN) && !defined(MOZ_NAIVEFOX)
       !mozilla::widget::WinUtils::HasPackageIdentity();
 #elif defined(MOZ_WIDGET_GTK) && !defined(MOZ_NAIVEFOX)
       !widget::IsRunningUnderSnap();

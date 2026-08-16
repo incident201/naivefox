@@ -4,11 +4,13 @@
 
 if CONFIG["OS_ARCH"] == "WINNT":
     SOURCES += [
+        "/widget/windows/WinRegistry.cpp",
         "nsNotifyAddrListener.cpp",
     ]
 
 LOCAL_INCLUDES += [
     "/netwerk/base",
+    "/widget/windows",
 ]
 
 FINAL_LIBRARY = "xul"

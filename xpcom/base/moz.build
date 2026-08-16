@@ -226,11 +226,13 @@ if CONFIG["OS_TARGET"] in ("Linux", "Android"):
         "MemoryMapping.cpp",
     ]
 
-if CONFIG["OS_TARGET"] == "WINNT":
+if CONFIG["OS_TARGET"] == "WINNT" and not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
         "AvailableMemoryWatcherWin.cpp",
-        "MemoryInfo.cpp",
     ]
+
+if CONFIG["OS_TARGET"] == "WINNT":
+    UNIFIED_SOURCES += ["MemoryInfo.cpp"]
 
 if CONFIG["OS_TARGET"] == "Darwin":
     UNIFIED_SOURCES += [

@@ -15,8 +15,14 @@
 using namespace mozilla;
 
 nsresult nsINIParser::Init(nsIFile* aFile, bool* aContainedErrors) {
+#ifdef XP_WIN
+  nsAutoString path16;
+  MOZ_TRY(aFile->GetPath(path16));
+  NS_ConvertUTF16toUTF8 path(path16);
+#else
   nsAutoCString path;
   MOZ_TRY(aFile->GetNativePath(path));
+#endif
   PRFileDesc* file = PR_Open(path.get(), PR_RDONLY, 0);
   if (!file) {
     return NS_ERROR_FILE_NOT_FOUND;
@@ -35,9 +41,8 @@ nsresult nsINIParser::Init(nsIFile* aFile, bool* aContainedErrors) {
   }
   int32_t total = 0;
   while (total < info.size) {
-    const int32_t bytes =
-        PR_Read(file, result.BeginWriting() + total,
-                static_cast<int32_t>(info.size - total));
+    const int32_t bytes = PR_Read(file, result.BeginWriting() + total,
+                                  static_cast<int32_t>(info.size - total));
     if (bytes <= 0) {
       return NS_ERROR_FILE_CORRUPTED;
     }

@@ -101,7 +101,6 @@ UNIFIED_SOURCES += [
     "MainThreadIdlePeriod.cpp",
     "nsEnvironment.cpp",
     "nsMemoryPressure.cpp",
-    "nsProcessCommon.cpp",
     "nsProxyRelease.cpp",
     "nsThread.cpp",
     "nsThreadManager.cpp",
@@ -124,6 +123,9 @@ UNIFIED_SOURCES += [
     "TimerThread.cpp",
     "VsyncTaskManager.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["nsProcessCommon.cpp"]
 
 if not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += ["CPUUsageWatcher.cpp"]

@@ -118,7 +118,6 @@ UNIFIED_SOURCES += [
     "InputStreamLengthHelper.cpp",
     "InputStreamLengthWrapper.cpp",
     "NonBlockingAsyncInputStream.cpp",
-    "nsAnonymousTemporaryFile.cpp",
     "nsAppFileLocationProvider.cpp",
     "nsBinaryStream.cpp",
     "nsDirectoryService.cpp",
@@ -141,6 +140,9 @@ UNIFIED_SOURCES += [
     "SlicedInputStream.cpp",
     "SpecialSystemDirectory.cpp",
 ]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += ["nsAnonymousTemporaryFile.cpp"]
 
 if not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [

@@ -46,7 +46,7 @@
 #include "nsPrintfCString.h"
 #include "nsThreadUtils.h"
 
-#ifdef XP_WIN
+#if defined(XP_WIN) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/gfx/Logging.h"
 #endif
 
@@ -434,13 +434,21 @@ MessageChannel::~MessageChannel() {
     mEvent = nullptr;
 
     if (!ok) {
+#  if defined(MOZ_NAIVEFOX)
+      MOZ_CRASH("MessageChannel failed to close its Windows event");
+#  else
       gfxDevCrash(mozilla::gfx::LogReason::MessageChannelCloseFailure)
           << "MessageChannel failed to close. GetLastError: " << GetLastError();
+#  endif
     }
     MOZ_RELEASE_ASSERT(ok);
   } else {
+#  if defined(MOZ_NAIVEFOX)
+    MOZ_CRASH("MessageChannel destructor ran without a Windows event");
+#  else
     gfxDevCrash(mozilla::gfx::LogReason::MessageChannelCloseFailure)
         << "MessageChannel destructor ran without an mEvent Handle";
+#  endif
   }
 #endif
 
@@ -830,7 +838,7 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
     return false;
   }
 
-#if defined(MOZ_DEBUG) && defined(ENABLE_TESTS)
+#  if defined(MOZ_DEBUG) && defined(ENABLE_TESTS)
   // Technically, the behavior is interesting for any kind of process
   // but when exercising tests, we want to crash only a content process and
   // avoid making noise with other kind of processes crashing
@@ -844,7 +852,7 @@ bool MessageChannel::SendBuildIDsMatchMessage(const char* aParentBuildID) {
       }
     }
   }
-#endif
+#  endif
 
   SendMessageToLink(std::move(msg));
   return true;

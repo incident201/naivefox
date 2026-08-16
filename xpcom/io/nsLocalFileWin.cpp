@@ -13,29 +13,31 @@
 #include <windows.h>
 
 #include "SpecialSystemDirectory.h"
-#include "WinUtils.h"
-#include "mozIDOMWindow.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/FilePreferences.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/ProfilerLabels.h"
-#include "mozilla/ShellHeaderOnlyUtils.h"
+#if !defined(MOZ_NAIVEFOX)
+#  include "WinUtils.h"
+#  include "mozIDOMWindow.h"
+#  include "mozilla/ShellHeaderOnlyUtils.h"
+#  include "mozilla/WidgetUtils.h"
+#  include "nsIWidget.h"
+#  include "nsIWindowMediator.h"
+#  include "nsPIDOMWindow.h"
+#endif
 #include "mozilla/TextUtils.h"
 #include "mozilla/UniquePtrExtensions.h"
 #include "mozilla/Utf8.h"
-#include "mozilla/WidgetUtils.h"
 #include "mozilla/WinHeaderOnlyUtils.h"
 #include "nsCOMPtr.h"
 #include "nsHashKeys.h"
 #include "nsIDirectoryEnumerator.h"
-#include "nsIWidget.h"
-#include "nsIWindowMediator.h"
 #include "nsLocalFile.h"
 #include "nsLocalFileCommon.h"
 #include "nsNativeCharsetUtils.h"
-#include "nsPIDOMWindow.h"
 #include "nsReadableUtils.h"
 #include "nsSimpleEnumerator.h"
 #include "nsString.h"
@@ -88,6 +90,9 @@ nsresult NewLocalFile(const nsAString& aPath, bool aUseDOSDevicePathSyntax,
 }  // anonymous namespace
 
 static HWND GetMostRecentNavigatorHWND() {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   nsresult rv;
   nsCOMPtr<nsIWindowMediator> winMediator(
       do_GetService(NS_WINDOWMEDIATOR_CONTRACTID, &rv));
@@ -108,6 +113,7 @@ static HWND GetMostRecentNavigatorHWND() {
   }
 
   return reinterpret_cast<HWND>(widget->GetNativeData(NS_NATIVE_WINDOW));
+#endif
 }
 
 nsresult nsLocalFile::RevealFile(const nsString& aResolvedPath) {
@@ -974,12 +980,17 @@ nsLocalFile::nsLocalFile(const nsLocalFile& aOther)
       mWorkingPath(aOther.mWorkingPath) {}
 
 nsresult nsLocalFile::ResolveSymlink() {
+#ifdef MOZ_NAIVEFOX
+  mResolvedPath.Assign(mWorkingPath);
+  return NS_OK;
+#else
   std::wstring workingPath(mWorkingPath.get());
   if (!widget::WinUtils::ResolveJunctionPointsAndSymLinks(workingPath)) {
     return NS_ERROR_FAILURE;
   }
   mResolvedPath.Assign(workingPath.c_str(), workingPath.length());
   return NS_OK;
+#endif
 }
 
 // Resolve any shortcuts and stat the resolved path. After a successful return
@@ -3412,6 +3423,9 @@ nsLocalFile::SetWindowsFileAttributes(uint32_t aSetAttrs,
 
 NS_IMETHODIMP
 nsLocalFile::Launch() {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   // This API should be main thread only
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -3503,6 +3517,7 @@ nsLocalFile::Launch() {
   }
 
   return NS_OK;
+#endif
 }
 
 nsresult NS_NewLocalFile(const nsAString& aPath, nsIFile** aResult) {

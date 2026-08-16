@@ -12,7 +12,9 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/ProfilerThreadSleep.h"
-#include "WinUtils.h"
+#if !defined(MOZ_NAIVEFOX)
+#  include "WinUtils.h"
+#endif
 
 using base::Time;
 
@@ -247,7 +249,12 @@ void MessagePumpForUI::WaitForWork() {
   if (delay < 0)  // Negative value means no timers waiting.
     delay = INFINITE;
 
+#if defined(MOZ_NAIVEFOX)
+  MsgWaitForMultipleObjectsEx(0, nullptr, delay, QS_ALLINPUT,
+                              MWMO_INPUTAVAILABLE);
+#else
   mozilla::widget::WinUtils::WaitForMessage(delay);
+#endif
 }
 
 void MessagePumpForUI::HandleWorkMessage() {

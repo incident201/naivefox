@@ -132,6 +132,12 @@
 #include <string_view>
 #include <type_traits>
 
+#ifdef MOZ_NAIVEFOX
+namespace mozilla {
+inline int GetCycleTimeFrequencyMHz() { return 0; }
+}  // namespace mozilla
+#endif
+
 // To simplify other code in this file, define a helper definition to avoid
 // repeating the same preprocessor checks.
 
@@ -5516,10 +5522,10 @@ void SamplerThread::SpyOnUnregisteredThreads() {
       /* aWindowInfo = */ nsTArray<WindowInfo>{},
       /* aUtilityInfo = */ nsTArray<UtilityInfo>{},
       /* aChild = */ 0
-#ifdef XP_MACOSX
+#  ifdef XP_MACOSX
       ,
       /* aChildTask = */ MACH_PORT_NULL
-#endif  // XP_DARWIN
+#  endif  // XP_DARWIN
   );
 
   const ProcInfoPromise::ResolveOrRejectValue procInfoOrError =
@@ -7999,10 +8005,10 @@ void profiler_record_wakeup_count(const nsACString& aProcessType) {
   }
 
   for (const ThreadWakeData& data : threadWakeData) {
-#ifndef MOZ_NAIVEFOX
+#  ifndef MOZ_NAIVEFOX
     mozilla::glean::RecordThreadCpuUse(data.mThreadName, data.mCpuTimeMs,
                                        data.mWakeCount);
-#endif
+#  endif
   }
 #endif
 }

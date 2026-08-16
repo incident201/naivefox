@@ -4,10 +4,15 @@
 
 #include "GeckoRuntime.h"
 
+#ifdef XP_WIN
+#  include <windows.h>
+#else
+#  include <limits.h>
+#  include <unistd.h>
+#endif
+
 #include <cstdlib>
 #include <cstring>
-#include <limits.h>
-#include <unistd.h>
 
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
@@ -112,18 +117,30 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
     return NS_ERROR_INVALID_ARG;
   }
 
+#ifdef XP_WIN
+  if (_putenv_s("MOZ_HEADLESS", "1") != 0 ||
+      _putenv_s("MOZ_DISABLE_SOCKET_PROCESS", "1") != 0) {
+#else
   if (setenv("MOZ_HEADLESS", "1", 1) != 0 ||
       setenv("MOZ_DISABLE_SOCKET_PROCESS", "1", 1) != 0) {
+#endif
     return NS_ERROR_FAILURE;
   }
 
   (void)aArgc;
   (void)aArgv;
 
+#ifdef XP_WIN
+  char executablePath[MAX_PATH + 1];
+  const DWORD executableLength =
+      GetModuleFileNameA(nullptr, executablePath, MAX_PATH);
+  if (executableLength == 0 || executableLength >= MAX_PATH) {
+#else
   char executablePath[PATH_MAX + 1];
   const ssize_t executableLength =
       readlink("/proc/self/exe", executablePath, PATH_MAX);
   if (executableLength <= 0 || executableLength > PATH_MAX) {
+#endif
     return NS_ERROR_FAILURE;
   }
   executablePath[executableLength] = '\0';
@@ -223,9 +240,9 @@ GeckoChildID XRE_GetChildID() { return 0; }
 
 bool XRE_IsE10sParentProcess() { return false; }
 
-#  define GECKO_PROCESS_TYPE(enum_value, enum_name, string_name, proc_typename, \
-                             process_bin_type, procinfo_typename,              \
-                             webidl_typename, allcaps_name)                    \
+#  define GECKO_PROCESS_TYPE(enum_value, enum_name, string_name,               \
+                             proc_typename, process_bin_type,                  \
+                             procinfo_typename, webidl_typename, allcaps_name) \
     bool XRE_Is##proc_typename##Process() { return enum_value == 0; }
 #  include "mozilla/GeckoProcessTypes.h"
 #  undef GECKO_PROCESS_TYPE
@@ -239,10 +256,18 @@ nsISerialEventTarget* XRE_GetAsyncIOEventTarget() {
 }
 
 nsresult XRE_GetFileFromPath(const char* aPath, nsIFile** aResult) {
+#  ifdef XP_WIN
+  char fullPath[MAX_PATH + 1];
+  const DWORD length = GetFullPathNameA(aPath, MAX_PATH, fullPath, nullptr);
+  if (length == 0 || length >= MAX_PATH) {
+    return NS_ERROR_FAILURE;
+  }
+#  else
   char fullPath[PATH_MAX + 1];
   if (!realpath(aPath, fullPath)) {
     return NS_ERROR_FAILURE;
   }
+#  endif
   return NS_NewNativeLocalFile(nsDependentCString(fullPath), aResult);
 }
 #endif

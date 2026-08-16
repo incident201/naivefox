@@ -276,8 +276,8 @@ KeyWatcher::KeyWatcher(Key&& aKey,
   MOZ_ASSERT(mKey);
   MOZ_ASSERT(mEventTarget);
   MOZ_ASSERT(mCallback);
-  mEvent = CreateEvent(nullptr, /* bManualReset = */ FALSE,
-                       /* bInitialState = */ FALSE, nullptr);
+  mEvent = CreateEventW(nullptr, /* bManualReset = */ FALSE,
+                        /* bInitialState = */ FALSE, nullptr);
   if (NS_WARN_IF(!mEvent)) {
     return;
   }

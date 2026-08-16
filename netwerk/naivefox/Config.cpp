@@ -4,8 +4,15 @@
 
 #include "Config.h"
 
-#include <arpa/inet.h>
+#ifdef XP_WIN
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
+#endif
 
+#include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -21,6 +28,14 @@ namespace mozilla::naivefox {
 namespace {
 
 constexpr size_t kMaximumConfigSize = 1024 * 1024;
+
+int ParseNetworkAddress(int aFamily, const char* aText, void* aAddress) {
+#ifdef XP_WIN
+  return InetPtonA(aFamily, aText, aAddress);
+#else
+  return inet_pton(aFamily, aText, aAddress);
+#endif
+}
 
 nsresult Fail(nsACString& aError, const char* aMessage,
               nsresult aResult = NS_ERROR_INVALID_ARG) {
@@ -65,6 +80,28 @@ bool TryCreateTemporaryProfile(const std::filesystem::path& aBase,
     return false;
   }
 
+#ifdef XP_WIN
+  static std::atomic<uint64_t> counter{0};
+  const uint64_t stamp = static_cast<uint64_t>(
+      std::chrono::steady_clock::now().time_since_epoch().count());
+  std::filesystem::path profile;
+  for (uint32_t attempt = 0; attempt < 100; ++attempt) {
+    profile = absoluteBase /
+              ("naivefox-profile-" + std::to_string(stamp) + "-" +
+               std::to_string(counter.fetch_add(1, std::memory_order_relaxed)));
+    error.clear();
+    if (std::filesystem::create_directory(profile, error)) {
+      break;
+    }
+    if (error && error != std::make_error_code(std::errc::file_exists)) {
+      return false;
+    }
+    profile.clear();
+  }
+  if (profile.empty()) {
+    return false;
+  }
+#else
   std::string name = (absoluteBase / "naivefox-profile-XXXXXX").string();
   name.push_back('\0');
   char* created = ::mkdtemp(name.data());
@@ -73,6 +110,7 @@ bool TryCreateTemporaryProfile(const std::filesystem::path& aBase,
   }
 
   const std::filesystem::path profile(created);
+#endif
   std::filesystem::permissions(profile, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::replace, error);
   if (error) {
@@ -448,7 +486,8 @@ class JsonParser final {
       }
       aHost.Assign(Substring(aValue, 1, close - 1));
       in6_addr address{};
-      if (inet_pton(AF_INET6, PromiseFlatCString(aHost).get(), &address) != 1) {
+      if (ParseNetworkAddress(AF_INET6, PromiseFlatCString(aHost).get(),
+                              &address) != 1) {
         return Error("invalid IPv6 endpoint");
       }
       aIPv6 = true;
@@ -507,8 +546,8 @@ class JsonParser final {
                           aListener.mPort));
     in_addr ipv4Address{};
     if (!aListener.mIPv6 && !aListener.mHost.EqualsLiteral("localhost") &&
-        inet_pton(AF_INET, PromiseFlatCString(aListener.mHost).get(),
-                  &ipv4Address) != 1) {
+        ParseNetworkAddress(AF_INET, PromiseFlatCString(aListener.mHost).get(),
+                            &ipv4Address) != 1) {
       return Error("listener host must be an IPv4 or IPv6 address");
     }
     return NS_OK;
@@ -626,7 +665,8 @@ class JsonParser final {
         ParseHostPort(Substring(authority, at + 1), false, host, ipv6, port));
     in_addr ipv4Address{};
     if (!ipv6 &&
-        inet_pton(AF_INET, PromiseFlatCString(host).get(), &ipv4Address) != 1 &&
+        ParseNetworkAddress(AF_INET, PromiseFlatCString(host).get(),
+                            &ipv4Address) != 1 &&
         !IsDomainName(host)) {
       return Error("proxy URI contains an invalid host");
     }

@@ -147,8 +147,7 @@ if CONFIG["OS_ARCH"] != "WINNT":
     EXPORTS.mozilla.ipc += [
         "FileDescriptorShuffle.h",
     ]
-    UNIFIED_SOURCES += [
-    ]
+    UNIFIED_SOURCES += []
 
 if CONFIG["TARGET_OS"] == "iOS":
     EXPORTS.mozilla.ipc += [
@@ -199,6 +198,9 @@ UNIFIED_SOURCES += [
     "TransportSecurityInfoUtils.cpp",
     "URIUtils.cpp",
 ]
+
+if CONFIG["MOZ_NAIVEFOX"] and CONFIG["OS_ARCH"] == "WINNT":
+    UNIFIED_SOURCES.remove("FileDescriptorShuffle.cpp")
 
 if not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [

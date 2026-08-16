@@ -10,10 +10,15 @@
 
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
-#include "WinUtils.h"
+#include "nsXULAppAPI.h"
+#if !defined(MOZ_NAIVEFOX)
+#  include "WinUtils.h"
+#endif
 
-#include "mozilla/dom/JSExecutionManager.h"
-#include "mozilla/gfx/Logging.h"
+#if !defined(MOZ_NAIVEFOX)
+#  include "mozilla/dom/JSExecutionManager.h"
+#  include "mozilla/gfx/Logging.h"
+#endif
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/mscom/Utils.h"
 #include "mozilla/StaticPtr.h"
@@ -77,7 +82,11 @@ extern const wchar_t* kPropNameTabContent;
 #endif
 
 // widget related message id constants we need to defer, see nsAppShell.
+#if defined(MOZ_NAIVEFOX)
+static UINT sAppShellGeckoMsgId = 0;
+#else
 extern UINT sAppShellGeckoMsgId;
+#endif
 
 namespace {
 
@@ -208,7 +217,10 @@ static void DumpNeuteredMessage(HWND hwnd, UINT uMsg) {
   nsAutoCString log("Received \"nonqueued\" ");
   // classify messages
   if (uMsg < WM_USER) {
-    const char* msgText = mozilla::widget::WinUtils::WinEventToEventName(uMsg);
+    const char* msgText = nullptr;
+#  if !defined(MOZ_NAIVEFOX)
+    msgText = mozilla::widget::WinUtils::WinEventToEventName(uMsg);
+#  endif
     if (msgText) {
       log.AppendPrintf("ui message \"%s\"", msgText);
     } else {
@@ -598,7 +610,11 @@ void InitUIThread() {
   MOZ_ASSERT(gUIThreadId == GetCurrentThreadId(),
              "Called InitUIThread multiple times on different threads!");
 
-  if (!gWinEventHook && !mscom::IsCurrentThreadMTA()) {
+  if (!gWinEventHook
+#if !defined(MOZ_NAIVEFOX)
+      && !mscom::IsCurrentThreadMTA()
+#endif
+  ) {
     gWinEventHook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY,
                                     NULL, &WinEventHook, GetCurrentProcessId(),
                                     gUIThreadId, WINEVENT_OUTOFCONTEXT);
@@ -846,10 +862,14 @@ bool MessageChannel::WaitForSyncNotify() {
         // Our NotifyWorkerThread event was signaled
         BOOL success = ResetEvent(mEvent);
         if (!success) {
+#if !defined(MOZ_NAIVEFOX)
           gfxDevCrash(mozilla::gfx::LogReason::MessageChannelInvalidHandle)
               << "WindowsMessageChannel::WaitForSyncNotify failed to reset "
                  "event. GetLastError: "
               << GetLastError();
+#else
+          MOZ_CRASH("WindowsMessageChannel failed to reset event");
+#endif
         }
         break;
       } else if (result != (WAIT_OBJECT_0 + 1)) {
@@ -920,9 +940,13 @@ void MessageChannel::NotifyWorkerThread() {
   MOZ_RELEASE_ASSERT(mEvent, "No signal event to set, this is really bad!");
   if (!SetEvent(mEvent)) {
     NS_WARNING("Failed to set NotifyWorkerThread event!");
+#if !defined(MOZ_NAIVEFOX)
     gfxDevCrash(mozilla::gfx::LogReason::MessageChannelInvalidHandle)
         << "WindowsMessageChannel failed to SetEvent. GetLastError: "
         << GetLastError();
+#else
+    MOZ_CRASH("WindowsMessageChannel failed to set event");
+#endif
   }
 }
 

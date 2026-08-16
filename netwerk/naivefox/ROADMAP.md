@@ -1040,8 +1040,10 @@ Run all reproducible local H2 and H3 integration gates sequentially with:
 
 The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
 user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
-must not weaken any item in this H2 suite. Native Windows, Android, and size
-reduction remain future work.
+must not weaken any item in this H2 suite. Native Windows x86_64 now has a
+build profile, staged package, and bounded native SOCKS/HTTP smoke; broader
+Windows regression coverage, Android, and further size reduction remain
+future work.
 
 ## Current minimisation checkpoint: lean staged runtime
 

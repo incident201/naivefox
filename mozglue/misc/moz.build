@@ -35,11 +35,12 @@ EXPORTS.mozilla.glue += [
 if CONFIG["OS_ARCH"] == "WINNT":
     EXPORTS.mozilla += [
         "GetKnownFolderPath.h",
-        "PreXULSkeletonUI.h",
         "StackWalk_windows.h",
         "StackWalkThread.h",
         "WindowsDpiAwareness.h",
     ]
+    if not CONFIG["MOZ_NAIVEFOX"]:
+        EXPORTS.mozilla += ["PreXULSkeletonUI.h"]
 
 SOURCES += [
     "AwakeTimeStamp.cpp",
@@ -98,13 +99,18 @@ if CONFIG["OS_ARCH"] == "WINNT":
     ]
 
     OS_LIBS += ["dbghelp", "oleaut32", "ole32", "mincore"]
+    if CONFIG["MOZ_NAIVEFOX"]:
+        OS_LIBS += ["ntdll"]
 
     if not CONFIG["JS_STANDALONE"]:
         SOURCES += [
             "/ipc/mscom/COMWrappers.cpp",
+            "/ipc/mscom/mozglue/ProcessRuntimeShared.cpp",
             "/ipc/mscom/ProcessRuntime.cpp",
-            "PreXULSkeletonUI.cpp",
+            "/toolkit/xre/dllservices/mozglue/WindowsStackWalkInitialization.cpp",
         ]
+        if not CONFIG["MOZ_NAIVEFOX"]:
+            SOURCES += ["PreXULSkeletonUI.cpp"]
 
 if CONFIG["OS_ARCH"] == "WINNT":
     SOURCES += [

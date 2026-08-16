@@ -4,11 +4,24 @@
 
 #include "HttpConnectParser.h"
 
-#include <arpa/inet.h>
+#ifdef XP_WIN
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
+#endif
 
 namespace mozilla::naivefox {
 
 namespace {
+
+int ParseNetworkAddress(int aFamily, const char* aText, void* aAddress) {
+#ifdef XP_WIN
+  return InetPtonA(aFamily, aText, aAddress);
+#else
+  return inet_pton(aFamily, aText, aAddress);
+#endif
+}
 
 bool IsTokenCharacter(char aValue) {
   if ((aValue >= '0' && aValue <= '9') || (aValue >= 'A' && aValue <= 'Z') ||
@@ -187,7 +200,7 @@ bool HttpConnectParser::ParseAuthority(const nsACString& aAuthority) {
     mTarget.mHost.Assign(Substring(aAuthority, 1, close - 1));
     portText.Assign(Substring(aAuthority, close + 2));
     in6_addr address{};
-    if (inet_pton(AF_INET6, mTarget.mHost.get(), &address) != 1) {
+    if (ParseNetworkAddress(AF_INET6, mTarget.mHost.get(), &address) != 1) {
       return false;
     }
     mTarget.mIPv6 = true;
@@ -199,7 +212,7 @@ bool HttpConnectParser::ParseAuthority(const nsACString& aAuthority) {
     mTarget.mHost.Assign(Substring(aAuthority, 0, colon));
     portText.Assign(Substring(aAuthority, colon + 1));
     in_addr address{};
-    if (inet_pton(AF_INET, mTarget.mHost.get(), &address) != 1 &&
+    if (ParseNetworkAddress(AF_INET, mTarget.mHost.get(), &address) != 1 &&
         !IsDomain(mTarget.mHost)) {
       return false;
     }

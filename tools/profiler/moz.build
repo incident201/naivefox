@@ -171,8 +171,9 @@ elif CONFIG["OS_TARGET"] == "WINNT" and CONFIG["TARGET_CPU"] in (
 ):
     UNIFIED_SOURCES += [
         "core/PowerCounters-win.cpp",
-        "gecko/nsProfiler.cpp",
     ]
+    if not CONFIG["MOZ_NAIVEFOX"]:
+        UNIFIED_SOURCES += ["gecko/nsProfiler.cpp"]
     if CONFIG["CC_TYPE"] == "clang-cl":
         SOURCES += {
             "core/ETWTools.cpp",

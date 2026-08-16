@@ -48,8 +48,12 @@ if CONFIG["TARGET_KERNEL"] == "WINNT":
         "src/base/waitable_event_win.cc",
         "src/base/win_util.cc",
         "src/chrome/common/ipc_channel_win.cc",
-        "src/chrome/common/process_watcher_win.cc",
     ]
+
+    if not CONFIG["MOZ_NAIVEFOX"]:
+        SOURCES += ["src/chrome/common/process_watcher_win.cc"]
+    else:
+        OS_LIBS += ["user32"]
 
 elif CONFIG["TARGET_KERNEL"] != "Darwin":
     UNIFIED_SOURCES += [
@@ -78,7 +82,7 @@ if CONFIG["TARGET_KERNEL"] != "WINNT":
             "src/chrome/common/process_watcher_posix_sigchld.cc",
         ]
 
-if CONFIG["MOZ_NAIVEFOX"]:
+if CONFIG["MOZ_NAIVEFOX"] and CONFIG["TARGET_KERNEL"] != "WINNT":
     # No child process or IPC transport exists in the single-process product.
     # Retain Chromium's event-loop primitives, but omit the Unix IPC channel.
     for source in [
