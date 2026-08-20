@@ -341,6 +341,39 @@ for path in list(entries):
         if candidate.is_file():
             add(relative.as_posix(), "explicit:test-manifest")
 
+# XPCShell manifests keep shared helpers in a separate support-files array.
+# These are configure-time inputs even when product tests are disabled, and
+# topsrcdir-prefixed entries ("!/...") are not part of the ordinary table
+# name syntax handled above.
+for path in list(entries):
+    if not path.endswith(".toml"):
+        continue
+    manifest_path = repo / path
+    try:
+        text = manifest_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+    blocks = re.findall(
+        r"(?ms)^\s*support-files\s*=\s*\[(.*?)\]", text
+    )
+    for block in blocks:
+        for first, second in mozbuild_literal.findall(block):
+            value = first or second
+            if value.startswith("!/"):
+                candidate = (repo / value[2:]).resolve()
+            elif value.startswith("!"):
+                candidate = (repo / value[1:].lstrip("/")).resolve()
+            elif value.startswith("../"):
+                candidate = (manifest_path.parent / value).resolve()
+            else:
+                continue
+            try:
+                relative = candidate.relative_to(repo)
+            except ValueError:
+                continue
+            if candidate.is_file():
+                add(relative.as_posix(), "explicit:test-support")
+
 if missing:
     details = "\n".join(f"{path} ({kind})" for path, kind in sorted(set(missing)))
     raise SystemExit(f"closure references missing repository files:\n{details}")
