@@ -180,7 +180,9 @@ def assert_closure(report_path, topsrcdir):
             text=True,
         )
         changed_paths = {path for path in changed.stdout.splitlines() if path}
-        documentation_paths = {path for path in changed_paths if path.endswith(".md")}
+        documentation_paths = {
+            path for path in changed_paths if path.lower().endswith(".md")
+        }
         report_paths = {
             path
             for path in changed_paths
