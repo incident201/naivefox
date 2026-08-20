@@ -261,7 +261,12 @@ for path in list(entries):
             or value.startswith(("$", "-", "#"))
         ):
             continue
-        candidate = (mozbuild.parent / value).resolve()
+        # moz.build uses a leading slash for a topsrcdir-relative path; it is
+        # not an OS absolute input in this DSL.
+        if value.startswith("/"):
+            candidate = (repo / value.lstrip("/")).resolve()
+        else:
+            candidate = (mozbuild.parent / value).resolve()
         try:
             relative = candidate.relative_to(repo)
         except ValueError:
