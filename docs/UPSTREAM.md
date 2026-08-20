@@ -1,0 +1,1621 @@
+# NaiveFox upstream maintenance policy
+
+NaiveFox is a disciplined downstream of Firefox. The repository deliberately
+keeps a full reference implementation and a full-source minimization branch
+between Mozilla's source mirror and the generated compact product tree. This
+separates Firefox refresh regressions, minimization regressions, and source
+export defects.
+
+Upstream repository:
+
+https://github.com/mozilla-firefox/firefox
+
+This document is the authority for long-lived branch direction, validated
+base tracking, refresh gates, minimization policy, and every downstream change
+to an existing Firefox file.
+
+## Long-lived branch model
+
+```text
+mozilla-firefox/firefox:main
+             |
+             v
+main         clean Firefox upstream mirror
+             |
+             v
+naivefox     full Firefox + NaiveFox reference implementation
+             |
+             v
+minimal      full Firefox + minimized build/runtime rules
+             |
+             | deterministic allowlist export
+             v
+minimal-source  compact standalone generated product tree
+```
+
+These four branches have different responsibilities and are not peers.
+
+### `main`: upstream mirror only
+
+`main` contains only commits reachable from `mozilla-firefox/firefox:main`.
+It must never contain NaiveFox code, minimization changes, generated product
+artifacts, or merge commits from another project branch. Update it only by
+fast-forwarding from the explicit `upstream` remote:
+
+```bash
+git fetch upstream
+git switch main
+git merge --ff-only upstream/main
+git push origin main
+```
+
+Never merge `naivefox` or `minimal` into `main`. Do not rely on GitHub
+**Sync fork** after changing the default branch; the explicit command above is
+the only supported mirror update workflow.
+
+### `naivefox`: full reference and integration branch
+
+`naivefox` retains the entire Firefox source tree plus the complete NaiveFox
+reference implementation: H2, H3, Auto, config, SOCKS5 and HTTP CONNECT
+listeners, Naive padding, every downstream Necko/Neqo hook, all Firefox-focused
+regressions, integration fixtures, capture tooling, and staging scripts.
+
+Do not minimize this branch. It is the mandatory first integration layer for
+every new Firefox base and the control that distinguishes an upstream refresh
+problem from a product-minimization problem.
+
+### `minimal`: full-source minimization branch
+
+`minimal` is the working branch for build/runtime/link dependency reduction.
+It retains the complete upstream Firefox source tree so Mozilla changes can be
+integrated with ordinary Git ancestry and conflict resolution. It is created
+from the tagged, validated full-reference point recorded below. All
+minimization work happens on `minimal` or on `feature/min-*` branches based on
+it. Large upstream source directories are not deleted merely to reduce checkout
+size.
+
+`minimal` never receives Firefox commits directly from `main`. It receives a
+new Firefox base only after that base has passed the full `naivefox` refresh
+gate and then passed a second, minimization-specific refresh gate.
+
+### `minimal-source`: generated standalone product branch
+
+`minimal-source` contains only the explicit source and build dependency closure
+needed to build NaiveFox independently. It is generated from an already
+validated `minimal` checkout by `tools/export-minimal-source.sh`; it is never an
+upstream integration branch or a source of hand-edited project changes.
+
+Its history is independent of Firefox. The first published snapshot is an
+orphan commit and later snapshots form a compact linear history whose parent is
+only the previous generated snapshot. Every snapshot records the exact Firefox,
+NaiveFox, and minimal commits plus the export-manifest version in
+`UPSTREAM-BASE`.
+
+Never merge `main`, `naivefox`, or `minimal` into `minimal-source`. Never merge
+generated changes back from `minimal-source`; fix the source of truth in
+`minimal` or an upper layer, validate it, and regenerate.
+
+## Remotes, default branch, and merge direction
+
+Local remotes are:
+
+```text
+origin    https://github.com/incident201/naivefox.git
+upstream  https://github.com/mozilla-firefox/firefox.git
+```
+
+Allowed long-lived directions:
+
+```text
+upstream/main -> main
+main          -> refresh/firefox-YYYYMMDD -> naivefox
+naivefox      -> refresh/minimal-YYYYMMDD -> minimal
+minimal       -> validated export snapshot -> minimal-source
+```
+
+Forbidden directions:
+
+```text
+naivefox -> main
+minimal  -> main
+minimal  -> naivefox
+main     -> minimal directly
+main     -> minimal-source
+naivefox -> minimal-source directly
+minimal-source -> minimal
+minimal-source -> naivefox
+```
+
+Feature branch bases:
+
+```text
+feature/network-*  from naivefox, for shared/reference functionality
+feature/min-*      from minimal, for minimization-only changes
+```
+
+The project-facing GitHub default branch is `naivefox` until the standalone
+export has passed its clean-build and acceptance gates. Once `minimal-source`
+is stable, change the default branch to `minimal-source`. `main` is a service
+mirror, while `naivefox` and `minimal` are developer branches; none should
+represent the compact product tree to ordinary users.
+
+Protect all four long-lived branches against force-push and deletion where
+repository settings permit it. Require review or the relevant validation gate
+for refresh merges; branch protection must not make `main` accept non-upstream
+commits.
+
+## Validated base tracking
+
+The following values are immutable inputs to the first minimization milestone,
+not aliases for a moving `main`:
+
+```text
+Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
+Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+NaiveFox reference merge-base for export: e11c162e44703e8be50b619341c350f05b1b2623
+Standalone diagnostic build source commit: a020da3d5ba4 (full build and runtime smoke PASS)
+Audited Minimal evidence source commit: 745d58bf7dcb44df0b8be87b39fb7d21d19383f9
+Evidence report snapshot commit: bec198a62d422b1382315f335ef2965b429d9387
+Windows configure evidence source commit: af716bf57f83ebdb377c0f34cd20995faf41b641
+Validated exporter/code checkpoint: 4db1292e96ec97fa39575e936e76608a711dbdb5
+Published minimal-source commit: recorded in this full-tree document after orphan publication
+Historical pre-audit graph tag: not used for current provenance
+Pre-minimization baseline tag: pre-minimization-v0.3
+```
+
+### Current pre-export audit provenance
+
+The Linux configure, Linux/Windows build-input, and Linux/Windows linked-
+closure reports attest source `745d58bf7dcb`; report-only snapshot
+`bec198a62d42` freezes that original five-report set. The later Windows
+configure report attests source `af716bf57f83` and is consumed as the sixth
+target-specific evidence file. Exporter checkpoint `4db1292e96ec` adds no
+runtime/build behavior; it closes target-active configure auxiliaries and the
+recursive Windows `.rc` resource graph. The planner proves that intervening
+changes are report/document/export-only and verifies all collector hashes.
+Do not copy a working-tree SHA into its own commit documentation. The validated
+Firefox base remains `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
+upstream refresh was performed during this audit. Disposable diagnostic trees
+are not publication candidates; only the deterministic orphan snapshot is.
+
+The capture reference is no longer an optional in-tree Firefox binary:
+`tools/fetch-firefox-reference.sh` downloads and digest-records the clean
+official Mozilla release used by `CAPTURE.md`, `H3-CAPTURE.md`, and
+`OBSERVER-TRAFFIC-REPORT.md`. Exact cross-release TLS/QUIC field equality is
+diagnostic; Necko/NSS/Neqo ownership, strict protocol/no-fallback behavior,
+classic CONNECT, padding, and multiplexing remain acceptance gates.
+
+The `minimal` branch was initialized from that tagged NaiveFox line and then
+fast-forwarded through the validated config/profile corrections above; it has
+no minimization-only commit at this baseline. Every release or significant
+milestone must record concrete Firefox, NaiveFox, minimal, and generated-source
+SHAs. Phrases such as "current Firefox main" are not valid release provenance.
+
+## Two-gate Firefox refresh workflow
+
+There is no supported `main -> minimal` workflow. Every Firefox refresh must
+pass the following gates in order.
+
+### Gate 1: Firefox -> `naivefox`
+
+First fast-forward `main` as described above. Then create a dated temporary
+branch from the last validated `naivefox`:
+
+```bash
+git switch naivefox
+git switch -c refresh/firefox-YYYYMMDD
+git merge main
+```
+
+Resolve conflicts on the refresh branch. Before merging it into `naivefox`:
+
+1. inspect every downstream file in the patch inventory below, even if Git did
+   not report a textual conflict;
+2. build NaiveFox with the refreshed full Firefox tree;
+3. run all project gtests;
+4. run the focused Firefox CONNECT/H2/H3/Necko/Neqo regression set associated
+   with the active patches;
+5. run the complete H2/H3/Auto/config integration suite;
+6. stage and verify the runtime outside the object directory;
+7. rerun capture sanity/comparison when TLS, H2, H3, Neqo, NSS, PSM, or relevant
+   network preferences changed;
+8. run the bounded supplied-real-Caddy gate when networking behavior changed
+   materially.
+
+Only after every applicable check passes may the refresh branch be merged into
+`naivefox`. Update the three concrete validated SHA fields in this document as
+part of that milestone. If Firefox now exposes an equivalent supported API or
+fix, remove the downstream patch instead of carrying it forward by inertia.
+
+### Gate 2: `naivefox` -> `minimal`
+
+Only after Gate 1 is complete may a second dated refresh branch be created from
+the last validated `minimal`:
+
+```bash
+git switch minimal
+git switch -c refresh/minimal-YYYYMMDD
+git merge naivefox
+```
+
+Before merging it into `minimal`, verify the minimal build/runtime, package
+manifest, H2, H3, Auto, SOCKS5, HTTP CONNECT, config mode, padding,
+integrity/concurrency, size regression, and staged runtime outside the build
+tree. Add focused checks for any dependency or packaging area touched while
+resolving conflicts.
+
+If Gate 1 passes but Gate 2 fails, classify the failure as a minimization
+integration defect until evidence proves otherwise. Do not weaken `naivefox`
+or blame the Firefox refresh merely to make the minimized branch pass.
+
+### Gate 3: validated `minimal` -> `minimal-source`
+
+Only after Gate 2 passes may source-closure discovery begin. Compile/link
+reports are insufficient on their own because configure probes, generated
+actions, relative compiler prerequisites, Cargo build dependencies, and empty
+directory contracts are not all linked objects. Discovery therefore uses:
+
+- an attested successful configure file-access trace;
+- Linux and Windows backend/config-status inputs;
+- all compiler and generated-action depfiles;
+- generated Makefile prerequisites and active component manifests;
+- target-filtered Cargo normal/build/proc-macro closure;
+- explicit project, bootstrap, runtime-resource, and license inputs.
+
+Maintain one disposable diagnostic source tree and augment it in place by
+missing input *classes* until standalone configure and a full build pass. Do
+not create a new clean export after each failure. The clean export is a release
+gate, not dependency-discovery tooling.
+
+After the diagnostic build and fast `export-minimal-source.sh --plan-only`
+validation pass, the export gate must:
+
+1. start from a clean, validated `minimal` checkout;
+2. create exactly one empty export directory and copy only manifest entries;
+3. validate licenses, traceability, forbidden paths, stale manifest entries,
+   and absence of credentials, profiles, logs, captures, `.git`, and objdirs;
+4. copy the export to a clean location with no access to the full Firefox
+   source or original object directory;
+5. bootstrap, configure, and build NaiveFox from that export alone;
+6. run the required H2/H3/Auto/config/SOCKS/HTTP CONNECT and staged-runtime
+   acceptance gates;
+7. publish a new compact snapshot only after every check passes.
+
+If `minimal` passes but the export fails, the defect belongs to the source
+manifest/export tooling. It must not be worked around by editing
+`minimal-source` manually.
+
+## Refresh cadence
+
+Do not continuously chase Firefox `main` in product branches. The clean mirror
+may be synchronized frequently without rebuilding NaiveFox, but propagation to
+`naivefox` and `minimal` is an explicit, scheduled refresh milestone. Typical
+triggers are:
+
+- security fixes in NSS, PSM, Necko, or Neqo;
+- an upstream networking fix required by NaiveFox;
+- a meaningful Firefox TLS/H2/H3 wire-behavior change;
+- preparation of a NaiveFox release;
+- a planned periodic base update.
+
+Between refresh milestones, releases may intentionally remain on the concrete
+validated Firefox SHA recorded above.
+
+## Minimization policy relative to upstream
+
+> The goal of minimization is to reduce the build/runtime dependency closure,
+> not to reduce the Git checkout.
+
+Prefer leaving upstream source in the repository while changing NaiveFox build
+configuration so unused code and resources are not built or staged:
+
+```text
+source remains in repository
+        |
+        v
+NaiveFox build configuration stops building it
+        |
+        v
+code/resources do not enter the runtime package
+```
+
+Do not delete large upstream directories such as `dom/`, `gfx/`, or media
+trees merely because the minimized client does not use them. Physical source
+deletion is permitted only after measurements prove a material benefit that
+build-time exclusion cannot provide and a separate review accepts the cost to
+future Mozilla merges. Deletion must never be the first minimization tool.
+
+The compact checkout is produced separately and only after closure is known:
+
+```text
+runtime allowlist -> build graph -> link closure -> source manifest -> export
+```
+
+The source manifest is allowlist-based: the exporter starts from an empty
+directory and copies explicit inputs. A blacklist workflow that copies Firefox
+and deletes apparently unused directories is forbidden.
+
+## Source placement rule
+
+Almost all project code must live under:
+
+```text
+netwerk/naivefox/
+```
+
+This directory does not belong to upstream Firefox and therefore should rarely conflict during synchronization.
+
+Do not move the project across unrelated Firefox directories for convenience.
+
+## Existing upstream files
+
+Editing an existing Firefox file is an exception.
+
+Before doing so, the coding agent must establish:
+
+1. no suitable existing API exists,
+2. the change is actually required,
+3. the patch can remain small,
+4. normal Firefox behavior is unchanged,
+5. the patch has a focused test,
+6. the reason and exact files are recorded below.
+
+Keep upstream hooks in separate commits when practical.
+
+## Known likely integration points
+
+These are **anticipated**, not pre-approved exact patches. Re-check the current source before editing.
+
+### A. `netwerk/moz.build`
+
+Likely purpose:
+
+Include the new `netwerk/naivefox/` build directory.
+
+Preferred character:
+
+One isolated directory-registration change.
+
+Expected conflict risk:
+
+Very low.
+
+### B. raw CONNECT callback without synthetic Upgrade/ALPN
+
+Relevant current areas may include:
+
+```text
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/nsHttpConnection.cpp
+```
+
+Reason:
+
+Existing CONNECT-only machinery must be examined carefully. Historically it requires an `HTTPUpgrade()` callback, and the upgrade protocol can be propagated into an `ALPN` header on the proxy CONNECT request.
+
+NaiveFox must not emit a fake `ALPN: naivefox`, `ALPN: webrtc`, or similar wire marker.
+
+Preferred solution:
+
+First search for an existing raw CONNECT API that avoids this behavior.
+
+If none exists, add the smallest clean internal hook that exposes the CONNECT tunnel without inventing a protocol token.
+
+Do not decide the exact patch from this document alone.
+
+### C. Naive `padding` request header in proxy CONNECT
+
+Relevant current area:
+
+```text
+netwerk/protocol/http/nsHttpConnection.cpp
+```
+
+Reason:
+
+Firefox's proxy CONNECT request is constructed separately from the ordinary origin request. Arbitrary normal request headers may not be copied into the CONNECT request.
+
+Naive-compatible Caddy detects client padding capability from the presence of the `padding` CONNECT header.
+
+Preferred solution:
+
+Use an existing generic proxy-CONNECT-extra-header mechanism if one now exists.
+
+If not, implement the smallest maintainable mechanism.
+
+A project-specific one-line copy may produce fewer merge conflicts, while a generic API may be cleaner but touch more files. Choose based on current architecture and testability, and document the tradeoff.
+
+Do not modify HTTP/2 framing/HPACK itself merely to add the header.
+
+## Upstream behavior we should not patch speculatively
+
+Do not modify these merely to imitate original Chromium NaiveProxy:
+
+```text
+Http2Session SETTINGS
+RST_STREAM behavior
+HPACK implementation
+TLS cipher configuration
+TLS extension order
+Firefox connection pooling
+Firefox preambles/background traffic
+HTTP/2 priorities
+socket parameters
+```
+
+If capture comparison later proves a NaiveFox-specific deviation caused by our integration, document and evaluate it separately.
+
+The baseline goal is to preserve Firefox behavior, not transform Firefox into Chrome.
+
+## Patch inventory
+
+The agent must keep this section current.
+
+### Upstream base
+
+```text
+Upstream repository: https://github.com/mozilla-firefox/firefox
+Upstream branch: main
+Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
+Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Current Minimal/report/export provenance: see the canonical `Validated base
+tracking` block above; do not duplicate mutable report SHAs in this inventory.
+Pre-minimization baseline tag: pre-minimization-v0.3
+```
+
+The NaiveFox work began at project commit
+`7e26713ed7d05127188d2579d3c51afbe554db22`. Its merge base with the fetched
+Mozilla `main` was `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`.
+The remote `main` mirror and the first validated NaiveFox base share that exact
+Firefox commit. No upstream fetch or base update was performed while adopting
+the three-branch policy.
+
+## Baseline build
+
+On 2026-08-12 the untouched checkout was bootstrapped for a full Firefox
+Desktop build and built successfully.
+
+```text
+Source commit: 7e26713ed7d05127188d2579d3c51afbe554db22
+Object directory: `<objdir>` (machine-local, not part of the source tree)
+Build type: full Firefox Desktop, non-artifact
+Build time: 42 minutes 55 seconds
+Build log: artifacts/baseline-build.log (local, ignored)
+```
+
+Mozilla bootstrap used its managed Clang/Rust toolchains. The Ubuntu packages
+`watchman` and `gh` were added to the development environment; `gh` is not
+authenticated and is not required for local builds or tests.
+
+The minimal Ubuntu image did not contain Firefox's GTK/X11 runtime libraries.
+The normal GTK 3, X11, font, audio, D-Bus, and GLib runtime packages were
+installed before executing the dependent NaiveFox binary. Development runs
+set `LD_LIBRARY_PATH` to the build's `dist/bin` directory; Phase 11 will replace
+that build-tree convention with a staged runtime layout.
+
+### Patch NF-UPSTREAM-001
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/moz.build
+```
+
+Purpose:
+
+Register `netwerk/naivefox/` in the Firefox build.
+
+Why project-only code was insufficient:
+
+Firefox does not discover new top-level networking subdirectories
+automatically; the upstream `netwerk/moz.build` traversal must register the
+project directory.
+
+Behavioral risk:
+
+One isolated build-directory registration. Normal Firefox source selection and
+runtime behavior are unchanged.
+
+Tests:
+
+- full/build-system build,
+- `naivefox` target produced.
+
+Commit: `NF01 add NaiveFox build target`
+
+### Patch NF-UPSTREAM-002
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpConnection.cpp
+netwerk/test/unit/test_proxyconnect_raw.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Expose a raw successful HTTP proxy CONNECT tunnel without requiring an artificial NaiveFox-specific Upgrade/ALPN wire marker.
+
+Why project-only code was insufficient:
+
+Firefox exposes the successful CONNECT streams through `HTTPUpgrade()`, but
+the API rejected an empty protocol. A non-empty protocol becomes both normal
+Upgrade headers and an `ALPN` proxy-CONNECT header. In addition, a first-use
+HTTPS proxy negotiating H2 reset the connect-only transaction, then closed the
+outer connection before that transaction could be dispatched onto its H2
+tunnel stream.
+
+Implementation:
+
+- allow an empty `HTTPUpgrade()` protocol only after `setConnectOnly()`;
+- retain the upgrade callback/sticky transaction behavior without emitting
+  `Upgrade` or `Connection` for the empty value;
+- allow H2 for this raw connect-only case and continue to disallow H3;
+- require a callback before opening every connect-only channel;
+- do not take the connect-only early-close path while a fresh outer H2 proxy
+  connection is completing its transaction restart.
+
+Behavioral risk:
+
+Normal non-empty upgrade behavior and ordinary browsing channels are
+unchanged.
+
+Tests:
+
+- focused raw CONNECT test,
+- existing proxy CONNECT tests,
+- wire/decrypted-header verification that no synthetic marker is sent.
+
+The local Caddy integration additionally proves NSS TLS, outer H2, CONNECT
+200, Basic Auth failure modes, and bidirectional C++ stream use.
+
+Commit: `1fec4f92754c NF04 expose raw HTTP CONNECT streams`
+
+### Patch NF-UPSTREAM-003
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.h
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/nsHttpRequestHead.h
+netwerk/protocol/http/nsHttpRequestHead.cpp
+netwerk/protocol/http/PHttpChannelParams.h
+netwerk/protocol/http/nsHttpConnection.cpp
+netwerk/test/unit/test_proxyconnect_padding_header.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Provide a privileged, pre-open API for adding a validated header to the actual
+proxy CONNECT request without adding it to the origin request.
+
+Why project-only code was insufficient:
+
+Firefox constructs a new request head for proxy CONNECT and selectively copies
+headers into it. Setting a normal origin request header therefore cannot place
+Naive's `padding` header on either the HTTP/1.1 or HTTP/2 CONNECT wire path.
+
+Implementation:
+
+- store explicit CONNECT-only headers in a request-head sidecar that survives
+  copy/move and socket-process serialization;
+- copy the sidecar only in the common CONNECT construction path;
+- reject authority, framing, hop-by-hop, proxy-authentication, and ALPN
+  headers, as well as invalid tokens and values;
+- leave normal requests and channels unchanged unless the new internal method
+  is explicitly called.
+
+Behavioral risk:
+
+The sidecar is serialized with the request head, but is copied only into the
+separate proxy CONNECT head. Validation excludes authority, framing,
+hop-by-hop, authentication, and ALPN fields; callers that do not invoke the new
+internal method are unchanged.
+
+Tests:
+
+- validation rejects CR/LF injection and reserved headers;
+- HTTP/1.1 and HTTP/2 proxies receive the exact `padding` value;
+- CONNECT response `padding` is available through `nsIProxiedChannel`;
+- existing raw and proxy CONNECT tests pass.
+
+Commit: `da53c63336f5 NF06 add proxy CONNECT request headers`
+
+### Patch NF-UPSTREAM-004
+
+Status: implemented
+
+Files:
+
+```text
+toolkit/library/libxul.symbols
+```
+
+Purpose:
+
+Export the single C ABI entry point used by the small dependent `naivefox`
+executable. The implementation remains inside `libxul`, where Firefox internal
+Necko, PSM, preferences, event-loop, and shutdown APIs are available.
+
+Why project-only code was insufficient:
+
+Firefox intentionally hides all `libxul` symbols except its explicit export
+list. Compiling the implementation directly into the executable would lose
+`MOZILLA_INTERNAL_API` and cannot use the internal APIs required by this
+project.
+
+Behavioral risk:
+
+One otherwise-unused symbol becomes visible. Firefox startup and browser
+behavior are unchanged.
+
+Tests:
+
+- full binary build,
+- `naivefox --runtime-smoke`,
+- public HTTPS request through Necko/NSS,
+- fixture trusted/untrusted/hostname certificate validation.
+
+Commit: `NF02 initialize the headless Gecko runtime`
+
+### Patch NF-UPSTREAM-005
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http2Session.cpp
+netwerk/protocol/http/Http2StreamTunnel.cpp
+netwerk/protocol/http/Http2StreamTunnel.h
+```
+
+Purpose:
+
+Make a raw HTTP/2 tunnel obey bounded-stream backpressure and byte-stream
+half-close semantics during large and concurrent transfers.
+
+Why project-only code was insufficient:
+
+The tunnel callback could consume Firefox's internal slow-consumer buffer, but
+`CallToWriteData()` always reported zero consumed bytes to `Http2Session`.
+After roughly one receive window of data, no `WINDOW_UPDATE` was generated and
+the tunnel deadlocked. In addition, the existing output-stream close path could
+only cancel the whole H2 stream; it could not send an output `END_STREAM` while
+leaving input open. Finally, a peer `RST_STREAM(NO_ERROR)` discarded bytes
+already held in the slow-consumer buffer.
+
+Implementation:
+
+- bound each input callback to the session's requested byte count and report
+  the exact number consumed so normal H2 flow-control accounting advances;
+- treat successful output-stream close as a tunnel output half-close and use
+  the existing `mSendClosed` path to generate `END_STREAM`;
+- for tunnels only, treat peer `RST_STREAM(NO_ERROR)` as graceful EOF after
+  all already-buffered bytes have been delivered;
+- leave ordinary HTTP transactions and non-successful tunnel resets unchanged.
+
+Behavioral risk:
+
+This changes RST behavior only after a reproducible NaiveFox integration
+failure: a 32 MiB response was first stalled at the receive-window boundary,
+then truncated when Caddy closed the completed tunnel while bytes remained in
+Firefox's bounded slow-consumer buffer. It is not a fingerprinting change.
+
+Tests:
+
+- deterministic 32 MiB download and upload with integrity checks,
+- bounded-memory slow producer/consumer paths,
+- application half-close and target/proxy disconnects,
+- four simultaneous CONNECT streams on one H2 connection,
+- focused raw/proxy CONNECT xpcshell regressions.
+
+Commit: `a8ad15724cca NF09 harden H2 tunnel lifecycle`
+
+### Patch NF-UPSTREAM-006
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/base/nsIProxyInfo.idl
+netwerk/protocol/http/ConnectionAttemptPool.cpp
+netwerk/protocol/http/nsHttpConnectionInfo.h
+netwerk/protocol/http/nsHttpTransaction.cpp
+netwerk/test/unit/test_http3_proxy_strict.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Allow a privileged caller to require an HTTP/3 proxy without Necko opening or
+switching to an HTTPS/H2 fallback route.
+
+Why project-only code was insufficient:
+
+An H3 proxy transaction creates a timed HTTPS backup connection by default,
+and its generic restart path converts a `masque` proxy info into `https`.
+Rejecting H2 only after the channel completes would still put fallback TCP
+traffic on the wire and would not satisfy strict protocol selection.
+
+Implementation:
+
+- add an opt-in proxy flag which is preserved by the existing proxy-info clone
+  and IPC serialization;
+- suppress the H3-proxy backup timer and the `masque` to `https` conversion
+  only when that flag is present;
+- explicitly disable Happy Eyeballs selection for a flagged transaction and
+  reject that connection-attempt path defensively even if a caller supplied a
+  preconfigured connection info;
+- leave ordinary Firefox H3 fallback, origin H3, and unflagged proxy channels
+  unchanged.
+
+Behavioral risk:
+
+Only transactions carrying the new privileged strict-proxy flag lose Firefox's
+normal H3 backup/restart/Happy-Eyeballs routes. Unflagged Firefox traffic keeps
+its existing fallback behavior.
+
+Tests:
+
+- an unavailable UDP/H3 proxy with an available H2 proxy on the same port must
+  fail instead of returning the H2 target response, with Happy Eyeballs enabled
+  globally during the test;
+- the existing H3 proxy fallback suite remains enabled for unflagged channels.
+
+Commit: `a981e07b81ce NF-H3-03 require strict Necko H3 proxy selection`
+
+### Patch NF-UPSTREAM-007
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/test/http3server/src/main.rs
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Purpose:
+
+Make raw regular CONNECT over an HTTP/3 proxy reliably deliver its async input
+and output streams, including through the main-thread-safe pipes used by a JS
+upgrade listener.
+
+Why project-only code was insufficient:
+
+`InputStreamTunnel::AsyncWait()` and `OutputStreamTunnel::AsyncWait()` notified
+the H3 session before storing the new callback. That notification can reenter
+`Http3Session::SendData()` synchronously. The resulting callback-free
+`ReadSegments()` iteration reported success without moving a byte and
+immediately queued itself again, spinning the socket thread before the raw
+tunnel consumer could run.
+
+Implementation:
+
+- publish each async callback before notifying the H3 stream that input or
+  output is wanted;
+- preserve a callback consumed by a reentrant `OnSocketReady()` call instead
+  of accidentally restoring it after notification;
+- leave ordinary H3 transactions and callback-free waits unchanged.
+
+Behavioral risk:
+
+The test-only H3 proxy response echoes a fixed `padding` marker when that
+request header is present and rejects synthetic `ALPN`, `Upgrade`, or
+`Connection` markers in the same request. It does not change production proxy
+behavior.
+
+Tests:
+
+- focused empty-protocol raw H3 CONNECT obtains async streams, writes a known
+  HTTP request, and verifies the deterministic tunneled response;
+- request and response CONNECT `padding` metadata are checked;
+- the outer channel is asserted to be HTTP/3 and no synthetic upgrade marker
+  is accepted by the test proxy;
+- the existing H3 proxy transfer tests through large-data coverage remain
+  green before their pre-existing connection-refused timeout case.
+
+Commit: `5d889d177561 NF-H3-04 expose raw HTTP/3 CONNECT streams`
+
+### Patch NF-UPSTREAM-008
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/protocol/http/Http3StreamTunnel.h
+third_party/rust/neqo-http3/src/connection.rs
+third_party/rust/neqo-http3/.cargo-checksum.json
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+```
+
+Purpose:
+
+Give a raw regular HTTP/3 CONNECT tunnel byte-stream half-close semantics: a
+successful close of its output stream sends QUIC FIN while its input stream
+continues delivering the proxy response.
+
+Why project-only code was insufficient:
+
+The H3 tunnel output stream previously mapped every close to
+`CancelFetch()`, which resets both directions. Reusing the normal Neqo
+send-side close exposed a second issue: classic CONNECT and true extended
+CONNECT share `Http3StreamType::ExtendedConnect`, and Neqo removed the receive
+handler before checking whether the stream actually belonged to a
+WebTransport or CONNECT-UDP session. The server's response remained visible
+on the QUIC wire but could no longer produce `DataReadable`.
+
+Implementation:
+
+- map only a successful **connect-only** tunnel output close to Neqo's existing
+  `stream_close_send()` path; failed closes retain full-stream cancellation;
+- retain the opposite stream handler when closing one side of classic
+  CONNECT, while preserving coupled lifecycle for actual extended-connect
+  sessions;
+- update the vendored Cargo checksum for the changed Neqo source;
+- leave ordinary HTTP requests, WebTransport, CONNECT-UDP, and full tunnel
+  cancellation unchanged.
+
+Behavioral risk:
+
+The `NS_HTTP_CONNECT_ONLY` scope is intentional. Ordinary Firefox HTTP
+channels that happen to traverse an H3 proxy also use `Http3StreamTunnel`, but
+retain their pre-existing coupled transport lifecycle.
+
+Tests:
+
+- focused raw H3 xpcshell test closes the request send-side before reading and
+  still receives the deterministic response;
+- the strict local Caddy H3-only runner verifies request FIN, delayed response,
+  response FIN, marker integrity, and authentication failure over UDP/QUIC;
+- full `gkrust`, `libxul`, and NaiveFox binary builds pass.
+
+Commit: `43aa7e8a09ff NF-H3-05 preserve classic CONNECT input after H3 half-close`
+
+Scope correction:
+`f0da0115d59c NF-H3-15 scope tunnel lifecycle changes to raw CONNECT`
+
+### Patch NF-UPSTREAM-009
+
+Status: implemented
+
+Files:
+
+```text
+netwerk/protocol/http/Http3Session.cpp
+netwerk/protocol/http/Http3StreamTunnel.cpp
+netwerk/protocol/http/Http3StreamTunnel.h
+netwerk/test/unit/test_proxyconnect_h3_raw.js
+```
+
+Purpose:
+
+Bound raw HTTP/3 tunnel buffering under a slow consumer and preserve the
+receive direction when the CONNECT peer sends `STOP_SENDING` after completing
+its response.
+
+Why project-only code was insufficient:
+
+The application pump already bounded its own buffers, but the H3 tunnel could
+continue draining Neqo into an unbounded `SimpleBuffer`. During a 32 MiB slow
+download Caddy then sent `STOP_SENDING(H3_REQUEST_CANCELLED)` after target
+completion. The generic session path treated that send-direction signal as a
+full request-stream cancellation and discarded response bytes which the slow
+consumer had not yet read. The public tunnel input stream also returned an
+error from `Available()` instead of its buffered byte count.
+
+Implementation:
+
+- cap only a connect-only tunnel's slow-consumer buffer at 256 KiB and resume
+  Neqo reads after the application drains it;
+- for connect-only tunnels, retain a received FIN until all bytes already
+  buffered by the tunnel have reached the consumer;
+- treat `STOP_SENDING` on a connect-only regular CONNECT tunnel as closing
+  only its sending direction, while leaving the receive direction available;
+- report the current tunnel buffer size through `Available()`;
+- leave ordinary H3 requests, WebTransport, CONNECT-UDP, and non-tunnel reset
+  handling unchanged.
+
+Behavioral risk:
+
+The final scope guard uses the transaction's `NS_HTTP_CONNECT_ONLY` cap. A
+control build with these H3 tunnel changes fully reverted reproduced the
+frozen snapshot's ordinary-channel concurrent H3-proxy timeout identically;
+the scope guard nevertheless ensures NaiveFox lifecycle and buffering policy
+cannot alter normal Firefox proxy channels.
+
+The change is deliberately H3-specific and does not copy the H2 flow-control
+implementation. Neqo remains responsible for QUIC stream and connection flow
+control.
+
+Tests:
+
+- focused raw H3 xpcshell regression slowly drains a 512 KiB response in 4 KiB
+  callbacks after output half-close and verifies every byte;
+- deterministic 32 MiB slow download and upload integrity checks;
+- bounded-RSS gate after a warm-up tunnel;
+- local disconnect, response-after-half-close, target early close, timeout,
+  ACL denial, proxy loss, and four concurrent H3 CONNECT streams on one QUIC
+  connection;
+- the same full robustness workload passes in H2 mode.
+
+Commit: `17ca8b746802 NF-H3-09 bound H3 tunnel backpressure and receive lifecycle`
+
+Scope correction:
+`f0da0115d59c NF-H3-15 scope tunnel lifecycle changes to raw CONNECT`
+
+## Project-only config and local-listener stage
+
+Status: implemented; no new upstream Firefox modification
+
+Existing Firefox files changed by this stage: none.
+
+Project files:
+
+```text
+netwerk/naivefox/Config.cpp
+netwerk/naivefox/Config.h
+netwerk/naivefox/HttpConnectParser.cpp
+netwerk/naivefox/HttpConnectParser.h
+netwerk/naivefox/RuntimeLogging.cpp
+netwerk/naivefox/RuntimeLogging.h
+netwerk/naivefox/TunnelSession.cpp
+netwerk/naivefox/TunnelSession.h
+netwerk/naivefox/NaiveFox.cpp
+netwerk/naivefox/NaiveFoxRunner.cpp
+netwerk/naivefox/SocksServer.cpp
+netwerk/naivefox/SocksServer.h
+netwerk/naivefox/core/moz.build
+netwerk/naivefox/test/gtest/TestConfig.cpp
+netwerk/naivefox/test/gtest/TestHttpConnectParser.cpp
+netwerk/naivefox/test/gtest/moz.build
+netwerk/naivefox/test/integration/run-config-tests.sh
+netwerk/naivefox/test/integration/run-h2-config-tests.sh
+netwerk/naivefox/test/integration/run-h3-config-tests.sh
+netwerk/naivefox/test/integration/run-config-runtime-behavior-tests.sh
+netwerk/naivefox/test/integration/run-real-server-config-tests.sh
+netwerk/naivefox/test/integration/run-full-suite.sh
+netwerk/naivefox/tools/stage-runtime.sh
+netwerk/naivefox/tools/verify-staged-runtime.sh
+```
+
+Purpose:
+
+Add a strict NaiveProxy-compatible JSON subset, automatic persistent or
+temporary profile lifecycle, runtime logging policy, simultaneous local
+SOCKS5 and HTTP CONNECT-only
+listeners, string/array per-listener upstream mapping, explicit IPv4/IPv6 bind
+addresses, and packaged no-argument/positional config invocation.
+
+The compatibility correction was derived from
+`net/tools/naive/naive_config.cc` and `naive_proxy_bin.cc` at NaiveProxy tag
+`v150.0.7871.63-1`: one parsed proxy is shared by all listeners, while two or
+more proxy-array entries must match the listener count and are selected by
+listener index. Comma-separated multi-hop chains are a separate NaiveProxy
+feature and remain explicitly outside this project's current scope.
+
+Why no Firefox patch was needed:
+
+Both local frontends terminate only their small local protocols. The extracted
+project `TunnelSession` owns the already-tested `OpenNeckoTunnel` path,
+strict H2/H3/Auto policy, CONNECT metadata, Naive padding negotiation,
+transport lifecycle, and bounded `DuplexPump`. Multiple listeners initialize
+one `GeckoRuntime` and naturally share Firefox's existing Necko connection
+manager and pooling. No new CONNECT header, stream, IPC, QUIC, or TLS behavior
+was required.
+
+Behavioral risk:
+
+The refactor moves existing SOCKS tunnel state into a reusable project class.
+The complete pre-existing H2/H3 raw, padded, robustness, Auto, and capture
+suites were rerun to cover lifecycle and backpressure. HTTP parsing is bounded
+at 16 KiB and preserves post-header bytes as initial tunnel payload. Configured
+numeric IPv4/IPv6 addresses are passed to `nsIServerSocket::InitWithAddress`,
+so wildcard and LAN binds behave like NaiveProxy instead of being rewritten to
+loopback. Local listener authentication is still absent and external exposure
+is therefore an operator security decision documented in `README.md` and
+`KNOWN-ISSUES.md`.
+
+An explicit `NAIVEFOX_PROFILE` remains strict and persistent. Automatic
+XDG/HOME state preserves the previous behavior when writable; only its absent
+or unusable case now falls back to an atomically created mode-`0700` temporary
+directory. This changes no PSM/NSS preference or trust behavior and requires no
+Firefox hook.
+
+Tests:
+
+- warning-free `./mach build -j4 binaries`;
+- 49/49 project and padding gtests;
+- complete local H2/H3 suite, including prior robustness and capture gates;
+- strict H2 and H3 config workloads with simultaneous wildcard-bound SOCKS5
+  and HTTP CONNECT listeners and repeated per-listener proxy-array entries;
+- a concrete non-loopback interface bind and successful client connection;
+- disabled/console/file logging, persistent-profile checks, and real
+  config-mode startup without HOME/XDG/profile variables using a temporary
+  mode-`0700` profile;
+- copied staged package with adjacent no-argument and positional config;
+- supplied real Caddy over both strict protocols with public CA validation.
+
+Commits:
+
+- `29275f3d3f03 NF-CONFIG-01 add config-driven local proxy frontends`
+- `5a9cabd981ba NF-CONFIG-02 verify config mode locally and staged`
+- `92d25f965b8c NF-CONFIG-03 match NaiveProxy listener and proxy-array semantics`
+- `3e3ab3ddd466 NF-CONFIG-05 support users without home directories`
+
+## Rules for future upstream changes
+
+When adding another upstream patch, append:
+
+```text
+### Patch NF-UPSTREAM-XXX
+
+Status:
+Files:
+Purpose:
+Why project-only code was insufficient:
+Behavioral risk:
+Tests:
+Commit:
+Notes for future sync:
+```
+
+During every Mozilla synchronization:
+
+1. fast-forward only the clean `main` mirror from `upstream/main`;
+2. create `refresh/firefox-YYYYMMDD` from the validated `naivefox`;
+3. merge `main` there and inspect every inventory file, not only conflicts;
+4. pass the complete Gate 1 build, test, staging, and conditional capture/real
+   deployment checks;
+5. merge the validated refresh into `naivefox` and update the exact SHA record;
+6. create `refresh/minimal-YYYYMMDD` from the validated `minimal`;
+7. merge only the newly validated `naivefox` there and pass the complete Gate 2
+   minimal build, feature, package, size, and staged-runtime checks;
+8. remove downstream patches that became unnecessary because Firefox gained an
+   equivalent supported API or fix.
+
+Never bypass either refresh branch with `main -> minimal`, and never propagate
+a failure backward from `minimal` into the already validated reference branch
+without evidence that the full reference is also affected.
+
+The best downstream patch is one we can eventually remove.
+
+## Lean DOM/GFX-free runtime gate
+
+The following downstream files were required to make the validated lean
+application usable after excluding the browser implementation graph. They are
+kept as a separate refresh inventory and must be rechecked on every Firefox
+base update.
+
+### Patch NF-UPSTREAM-010
+
+Status: implemented in the lean staged-runtime milestone
+
+Files:
+
+```text
+netwerk/base/nsNetUtil.cpp
+netwerk/base/RequestContextService.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpHandler.cpp
+```
+
+Purpose:
+
+- retain the parent-only `NS_NewChannelInternal` path used by direct Necko
+  fetches and the NaiveFox carrier channel;
+- exclude DOM-only `NS_NewChannel` overloads and loading-node classification
+  from the lean translation unit;
+- obtain request-context identity without the browser-only XRE runtime
+  service;
+- skip optional browser dictionary and HTTP cache initialization while keeping
+  network channel transport active.
+
+Why project-only code was insufficient:
+
+The project creates real Necko channels, but the previous lean guards returned
+`NS_ERROR_NOT_AVAILABLE` or reached services whose registrations belong to the
+browser component graph. Reimplementing channel creation or adding a second
+network stack would violate the architecture; the minimal compatible change
+is to preserve Firefox's parent path and remove only browser-only branches.
+
+Behavioral risk:
+
+Lean NaiveFox channels are intentionally uncached and do not expose document
+loading-node overloads. Ordinary Firefox builds remain unchanged by the
+`MOZ_NAIVEFOX` guards. Future Firefox refreshes must verify cache-independent
+fetch, H2/H3 CONNECT, profile startup, and component registration.
+
+Tests:
+
+- cold lean link and direct HTTPS fetch (`example.com`, HTTP 200);
+- staged runtime smoke, public fetch, persistent/temporary/no-home profiles;
+- H2 and H3 raw, SOCKS, padding, robustness, Auto, config, and capture suites;
+- full Firefox baseline capture uses separate libraries and remains outside
+  the lean package.
+
+Commit: `daf76d468b89 min: validate lean staged runtime`
+
+Notes for future sync: if the lean component graph gains a supported parent
+cache/XRE registration, remove the corresponding workaround rather than
+retaining it by inertia.
+
+### Patch NF-UPSTREAM-011
+
+Status: implemented for the Windows x86_64 build profile; native smoke passed
+on Windows, while the existing Linux/H2/H3 reference remains unchanged.
+
+Files:
+
+```text
+netwerk/moz.build
+netwerk/naivefox/mozconfig-windows-x86_64
+netwerk/naivefox/Config.cpp
+netwerk/naivefox/GeckoRuntime.cpp
+netwerk/naivefox/HttpConnectParser.cpp
+netwerk/naivefox/app.mozbuild
+intl/locale/LocaleService.cpp
+ipc/chromium/moz.build
+ipc/chromium/src/base/message_pump_win.cc
+ipc/glue/MessageChannel.cpp
+ipc/glue/WindowsMessageLoop.cpp
+ipc/glue/moz.build
+mozglue/misc/moz.build
+netwerk/dns/moz.build
+netwerk/protocol/http/nsHttpConnectionMgr.cpp
+netwerk/system/win32/moz.build
+security/certverifier/NSSCertDBTrustDomain.cpp
+toolkit/library/moz.build
+tools/profiler/core/platform.cpp
+tools/profiler/moz.build
+widget/windows/WinRegistry.cpp
+xpcom/base/AppShutdown.cpp
+xpcom/base/moz.build
+xpcom/base/nsINIParser.cpp
+xpcom/build/components.conf
+xpcom/build/moz.build
+xpcom/io/moz.build
+xpcom/io/nsLocalFileWin.cpp
+xpcom/threads/moz.build
+```
+
+Purpose: make the existing single-process NaiveFox application and its real
+Necko/NSS/Neqo path compile for `x86_64-pc-windows-msvc`, without adding a
+Windows-specific network implementation or changing the Firefox base.
+
+Why project-only code was insufficient: the lean application graph normally
+gets Windows file, DNS, IPC message-loop, locale, shutdown, and native-path
+support from browser/widget components. The guarded additions retain only the
+small ABI and platform pieces required by the existing parent runtime; browser
+UI, DOM, graphics, and socket-process code remain excluded.
+
+Behavioral risk: Windows native file symlink resolution, restart environment
+restoration, IPC client-cert loading, and the native Windows message-loop
+window integration are intentionally reduced or disabled for the single
+process product. H2/H3 Necko transport, NSS trust validation, and local SOCKS
+and HTTP listeners are unchanged. Every Firefox refresh must recheck this
+inventory and remove guards when an upstream lean-compatible path appears.
+
+Tests:
+
+- Windows configure/backend regeneration and `./mach build binaries`;
+- PE32+ AMD64 headers for `naivefox.exe`, `xul.dll`, and NSS DLLs;
+- packaged `--version`/`--help` under Wine;
+- native Windows H3 config with simultaneous SOCKS5 and HTTP CONNECT listeners,
+  two public HTTPS fetches, and normal certificate validation;
+- Wine H2 fetch and malformed-config error smoke (Wine UDP H3 is unavailable,
+  `WSAEOPNOTSUPP`, so it is not treated as a native H3 result).
+
+Commit: `075ba4ffd620 build: add Windows x86_64 NaiveFox package`
+
+Notes for future sync: do not copy this platform graph into the normal Firefox
+build. Keep all behavior changes under `MOZ_NAIVEFOX`, preserve the exact
+Windows toolchain assumptions in the mozconfig, and rerun native H3/UDP tests
+on an actual Windows host after every networking or Neqo refresh.
+
+
+### Patch NF-UPSTREAM-012
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+caps/BasePrincipal.h
+caps/BasePrincipal.cpp
+ipc/chromium/src/base/message_pump_glib.cc
+toolkit/library/moz.build
+```
+
+Purpose: decouple desktop UI (GTK3, GDK, Cairo, Pango, ATK, X11, XCB) dynamic
+library dependencies from `libxul.so` in headless NaiveFox builds, and fix the
+`extensions::WebExtensionPolicy` namespace in `BasePrincipal`.
+
+Why project-only code was insufficient: `toolkit/library/moz.build`
+unconditionally injected `MOZ_GTK3_LIBS`, `MOZ_X11_LIBS`, and `MOZ_PANGO_LIBS`
+when `MOZ_WIDGET_TOOLKIT == "gtk"`. In addition, the unused `MessagePumpForUI`
+destructor in `ipc/chromium/src/base/message_pump_glib.cc` called
+`gdk_event_handler_set` and `gtk_main_do_event`. Guarding these under
+`MOZ_NAIVEFOX` allows `libxul.so` to link only against `GLIB_LIBS`
+(`-lglib-2.0 -lgobject-2.0`), removing 16 desktop UI shared libraries from
+`DT_NEEDED`.
+
+Behavioral risk: none for headless NaiveFox operation. Event processing uses
+GLib default context / libevent / IO pumps. Necko, Neqo, NSS/PSM, SOCKS5, HTTP
+CONNECT, and padding mechanisms are completely unaffected.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 4.5s;
+- `readelf -d libxul.so | grep NEEDED` confirming removal of 16 GTK/X11/Cairo libraries (total dropped from 35 to 20);
+- Staged runtime verification outside the build tree (`verify-staged-runtime.sh`);
+- H2, H3, Auto, SOCKS5, HTTP CONNECT, padding, and robustness integration test suites.
+
+Notes for future sync: keep the `MOZ_NAIVEFOX` guards in `toolkit/library/moz.build` and `message_pump_glib.cc` when refreshing upstream Firefox.
+
+
+### Patch NF-UPSTREAM-013
+
+Status: implemented on `minimal` via project-only exports.
+
+Files:
+
+```text
+netwerk/naivefox/app.mozbuild
+```
+
+Purpose: decouple HarfBuzz complex text shaper translation units from the `libxul` link graph without modifying upstream `gfx/harfbuzz/src/moz.build`.
+
+Why project-only code is sufficient: `netwerk/naivefox/app.mozbuild` directly exports the 28 required HarfBuzz public headers via `EXPORTS.harfbuzz += [...]` and does not recurse into `gfx/harfbuzz/src/`. This allows `gfx/harfbuzz/src/moz.build` to remain 100% pristine upstream while eliminating 43.4 MB of font shaper object code from `libxul`.
+
+Behavioral risk: zero. NaiveFox only uses HarfBuzz's public enum types (`hb_unicode_general_category_t`) via header inclusions; zero shaper runtime symbols (`hb_shape`, `hb_font_*`, `hb_buffer_*`) are called.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 2.7s;
+- Link input closure reduced by 43.4 MB (-14.2%);
+- `gfx` component group reduced to 0 files / 0 bytes in `closure-report-linux-x86_64.json`;
+- Staged runtime verification outside the build tree (`verify-staged-runtime.sh`).
+
+Notes for future sync: upstream `gfx/harfbuzz/` remains completely untouched.
+
+
+### Patch NF-UPSTREAM-014
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+caps/moz.build
+netwerk/naivefox/app.mozbuild
+toolkit/library/moz.build
+tools/profiler/core/platform.cpp
+tools/profiler/core/ProfilerCPUFreq.h
+tools/profiler/core/PowerCounters.h
+tools/profiler/moz.build
+```
+
+Purpose: eliminate unused Google Abseil C++ library (75 object files) from `libxul` and trim unnecessary DWARF stack unwinder (LUL), Breakpad ELF parser, CPU frequency sampling, and PowerCounter objects from `tools/profiler`.
+
+Why project-only code was insufficient: `netwerk/naivefox/app.mozbuild` and `toolkit/library/moz.build` linked `config/external/abseil-cpp` despite `libxul` having zero calls to Abseil symbols. Additionally, `tools/profiler/moz.build` compiled Breakpad ELF utilities and the LUL DWARF unwinder on Linux, which are not required for headless operation.
+
+Behavioral risk: zero. Core Gecko profiler hooks and thread registration remain functional for diagnostics, while large platform-specific stack unwinding and unused Abseil containers are excluded from the link closure.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 1.7s;
+- `third_party` link input group dropped from 77 files to 2 files (-75 files, -14.8 MB);
+- `tools` link input group dropped from 8 files to 2 files (-6 files, -3.3 MB);
+- Total link inputs reduced to 527 files / 243.8 MB (down from 609 files / 305.2 MB);
+- `libxul.so` unstripped size reduced to 655.2 MB (-35.9 MB).
+
+Notes for future sync: keep `abseil` and `LUL` unwinder guards when updating upstream Firefox.
+
+### NF-UPSTREAM-015: Profiler Implementation Replaced with Compatibility Stub
+
+Touched files:
+
+```text
+tools/profiler/moz.build
+netwerk/naivefox/core/ProfilerNaiveFoxStub.cpp
+netwerk/naivefox/core/moz.build
+netwerk/naivefox/app.mozbuild
+caps/moz.build
+```
+
+Purpose: replace the full Gecko Profiler engine (JSON profile generation, LUL DWARF unwinder, memory hooks, stack capture engines) with a zero-overhead compatibility stub (`netwerk/naivefox/core/ProfilerNaiveFoxStub.cpp`), eliminating `toolkit/components/jsoncpp` and `tools/profiler` implementation sources from `libxul`.
+
+Why project-only code was insufficient: Gecko Profiler in `tools/profiler` compiled multiple large unified source files and required `jsoncpp` for serialized profile output. For the NaiveFox proxy runtime, profiler functions only need to satisfy link-time symbol references with safe, no-op semantics.
+
+Behavioral risk: zero. Profiler state is permanently inactive; thread registration returns `nullptr`; markers are dropped with zero formatting overhead; ETW trace logging providers on Windows are registered as inactive stubs.
+
+Tests:
+
+- Incremental compile `./mach build binaries` in 2.85s;
+- `toolkit` component group reduced to **0 files / 0 bytes** in link closure (-2.7 MB);
+- `tools` component group dropped from 15.5 MB to **0.88 MB** (-14.6 MB);
+- Total unstripped link closure dropped from **243.84 MB (527 files) to 216.03 MB (525 files)** (-27.8 MB);
+- Unstripped `libxul.so` reduced from **655.2 MB to 615.49 MB** (-39.7 MB);
+- Stripped `libxul.so` is **62 MB**;
+- `naivefox --version` and integration suite verified.
+
+Notes for future sync: keep `ProfilerNaiveFoxStub.cpp` in `netwerk/naivefox/core/` and the `MOZ_NAIVEFOX` guard in `tools/profiler/moz.build`.
+
+
+### Patch NF-UPSTREAM-016
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+modules/libpref/Preferences.cpp
+```
+
+Purpose: preserve the EOF byte required by the Rust preferences parser when
+the lean `MOZ_NAIVEFOX` path reads `user.js`/`prefs.js` through an unknown-size
+input stream. Without this guard, the adopted exact-size buffer could be
+marked terminated without actually containing a NUL byte; a later process
+opening the same profile could abort in `prefs_parser_parse` before starting
+the network listener.
+
+Why project-only code was insufficient: the failure is in the Firefox
+preferences file adapter used by the lean runtime, before NaiveFox networking
+code runs. Replacing or bypassing the parser would diverge from Firefox's
+profile semantics. The six-line fix is guarded by `MOZ_NAIVEFOX`, reasserts the
+`nsCString` termination invariant, and leaves ordinary Firefox file loading
+unchanged.
+
+Behavioral risk: limited to the lean application's file-backed preference
+read. It does not change preference syntax, values, persistence, or the
+network stack. The change prevents a startup abort and is safe for repeated
+launches using one profile.
+
+Tests:
+
+- `./mach build binaries` in `obj-naivefox-minimal`, 0 warnings;
+- isolated `run-auto-protocol-tests.sh` after the fix, including repeated H3
+  starts with the same trusted profile and one establishment-only H2 fallback;
+- final full H2/H3/config/Auto suite and malformed-input gates.
+
+Commit: `d65f41c305abd9c9bc9f5ea7f80833d0b7df6aa5` (`fix: preserve pref parser EOF in lean runtime`)
+
+## Final Source & Link Closure Audit Report
+
+A comprehensive audit was performed using `netwerk/naivefox/tools/analyze-full-closure.py` across Linux and Windows x86_64 targets.
+
+### Target Closure Comparison
+
+| Metric | Linux x86_64 (`obj-naivefox-minimal`) | Windows x86_64 (`obj-naivefox-windows-x86_64`) |
+|---|---|---|
+| **Translation units / direct objects** | 545 TUs / 525 objects (216.05 MiB) | 468 TUs / 536 objects (202.63 MiB) |
+| **Current unstripped main library** | 479.34 MiB `libxul` | 40.60 MiB `xul.dll` |
+| **Headless runner size** | 5.19 MiB (`naivefox`) | 11.0 KiB (`naivefox.exe`) |
+| **Runtime-reachable Rust crates** | 271 packages | 287 packages |
+| **Source/build Cargo packages** | 311 packages | 325 packages |
+| **System Dynamic Dependencies** | 20 `DT_NEEDED` libraries | 22 DLL imports |
+| **Desktop UI Libraries (GTK/X11/Cairo)** | **0 libraries linked** | **0 libraries linked** |
+
+Full machine-readable reports are archived in:
+- `netwerk/naivefox/reports/closure-report-linux-x86_64.json`
+- `netwerk/naivefox/reports/closure-report-windows-x86_64.json`
+
+Detailed audit of all shims, stubs, and lean replacements is documented in [`netwerk/naivefox/SHIMS.md`](SHIMS.md).
+
+The low-risk closure trim also disables the global Firefox Glean metrics/pings
+index for `MOZ_NAIVEFOX`. Only the 23 retained metric schemas,
+`netwerk/pings.yaml`, and the shared tags file are generated. The active Cargo
+tree contains no `firefox-on-glean`/`glean-core` runtime crate. Five direct Rust
+dependencies proven unused were removed (`fluent-langneg`, `ipcclientcerts`,
+`ipdl_utils`, `oblivious_http`, and `rusqlite`); `jsrust_shared` remains because
+its removal caused unresolved SpiderMonkey encoding symbols. The Linux linker-map
+aggregate records `js_static` 225.86 MiB, `gkrust` 115.63 MiB, ICU 31.26 MiB,
+cache2 6.24 MiB, IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey
+and ICU are explicitly deferred to a future milestone.
+
+## NF-UPSTREAM-017 — selective Glean and target-correct Rust closure
+
+Status: implemented in the audited source commit; no Firefox base refresh was
+performed.
+
+Files:
+
+- `toolkit/components/glean/moz.build`
+- `security/manager/ssl/data_storage/{Cargo.toml,src/lib.rs}`
+- `netwerk/protocol/http/happy_eyeballs_glue/{Cargo.toml,src/lib.rs}`
+- `netwerk/socket/neqo_glue/{Cargo.toml,src/lib.rs}`
+- `toolkit/library/rust/naivefox/{Cargo.toml,lib.rs}`
+- `Cargo.lock`
+
+Purpose: disable the browser-wide Glean metrics/pings index for the parent-only
+NaiveFox application, provide ABI-compatible no-op metric shims where retained
+Firefox Rust code still calls telemetry sites, and remove only five direct Rust
+dependencies proven unused by a successful Linux/Windows link. The closure tool
+now follows the active target-specific Cargo tree rooted at `gkrust-naivefox`.
+
+Why project-only code was insufficient: these files are Firefox Rust/telemetry
+crate boundaries and Cargo feature edges. Leaving their default features active
+would keep the global Glean runtime reachable; deleting call sites in NaiveFox
+alone would not change the upstream crate graph. The no-op shims preserve the
+existing ABI at the retained call sites without introducing a new metrics stack.
+
+Behavioral risk: metrics are intentionally not recorded in this headless
+product; Necko/Neqo/NSS behavior is unchanged. `jsrust_shared` was tested for
+removal and restored after unresolved SpiderMonkey encoding symbols appeared.
+Future Firefox refreshes must re-check each listed Cargo feature and generated
+Glean header before accepting a new base.
+
+Tests: Linux `./mach build binaries` and config logging regression PASS;
+Windows target closure regenerated; active closure assertions PASS for both
+targets; no `firefox-on-glean`/`glean-core` package is reachable. Source commit:
+`559d487242b92526ef077cd9f520deedcb71f482`.
+
+## NF-UPSTREAM-018 — isolated product Rust root and ping generation
+
+Status: implemented on the frozen Firefox base; final target reports are
+regenerated from audited source `745d58bf7dcb`.
+
+Files:
+
+- `Cargo.toml`, `Cargo.lock`
+- `config/makefiles/rust.mk`
+- `python/mozbuild/mozbuild/frontend/emitter.py`
+- `toolkit/library/rust/{Cargo.toml,lib.rs}`
+- `toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py`
+
+Purpose: make the actual `gkrust` static-library package plus the one independent
+Cbindgen root the only top-level Cargo workspace roots. The NaiveFox product no
+longer resolves Firefox application/test roots, `gkrust-shared`, SWGL, Stylo
+test dev-dependencies, or the browser-wide workspace-hack feature union. The
+Glean ping generator also skips the global Firefox app/library ping index under
+`MOZ_NAIVEFOX`; retained local ping inputs remain generated normally.
+
+Why project-only code was insufficient: Cargo is invoked from Firefox's
+`toolkit/library/rust` package and the build frontend/make rules unconditionally
+required and enabled the Firefox-wide workspace-hack. The Glean generator
+itself imported the global ping index. Neither behavior can be changed from
+`netwerk/naivefox/moz.build` after graph evaluation.
+
+Behavioral risk: this is guarded by the NaiveFox product configuration or lives
+on the `minimal` branch's product Cargo root. Ordinary Firefox behavior on the
+full-tree `naivefox` reference is unchanged. A missing required Rust edge would
+fail Cargo/link; a missing retained ping would affect telemetry only, which is
+disabled for this headless product.
+
+Tests: Linux and Windows frozen Cargo metadata resolution PASS. Corrected
+reports separately record 271/287 runtime-reachable packages and 311/325
+normal/build/proc-macro source packages. Standalone diagnostic configure PASS;
+full standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke
+PASS; final six-report-union `--plan-only` PASS with 25,549 entries and 37
+directory contracts.
+Commits: `c8ad512671d6` (Rust workspace) and `a020da3d5ba4` (ping index).
+
+## NF-UPSTREAM-019 — explicit Windows Winsock feature ownership
+
+Status: implemented and present in the audited Windows evidence source.
+
+Files:
+
+- `netwerk/socket/neqo_glue/Cargo.toml`
+
+Purpose: declare the `winapi/winsock2` feature at the crate which directly uses
+`winapi::um::winsock2::INVALID_SOCKET`. The former Firefox-wide workspace-hack
+enabled that feature incidentally; the isolated NaiveFox Rust root correctly
+exposed the undeclared target-specific dependency.
+
+Why project-only code was insufficient: the failing symbol is used inside the
+Firefox-owned Neqo glue on Windows. A NaiveFox frontend dependency would only
+recreate feature-unification by accident instead of assigning the feature to
+its real owner.
+
+Behavioral risk: Windows compile-time feature exposure only. It does not add a
+library, change Linux code, or alter runtime QUIC behavior. Future Firefox
+refreshes should remove this downstream declaration if upstream Neqo glue owns
+the same feature explicitly.
+
+Tests: Windows x86-64 full build PASS. Corrected target evidence records 468
+TUs, 536 direct objects, 287 runtime-reachable Rust crates, and 325
+source/build Cargo packages. Reports are frozen in `bec198a62d42`. Commit:
+`ca77ac1a85ae`.
+
+## Project-owned pre-export stability changes
+
+These changes do not modify Firefox upstream files and therefore do not create
+new downstream Necko patch inventory entries:
+
+| Area | Files | Purpose / risk | Evidence |
+|---|---|---|---|
+| Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
+| Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
+| Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
+| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `tools/minimal-source-plan.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean/resource closure and strict repository-relative/provenance checks. | Six-report target union: five original reports frozen in `bec198a62d42` from source `745d58bf7dcb`, plus Windows configure trace from `af716bf57f83`; both target assertions and the 25,549-entry plan PASS. |
+
+Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
+stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate
+`main -> refresh/firefox-* -> naivefox -> refresh/minimal-* -> minimal`
+workflow above and rerun the full H2/H3/config/capture gates before export.
+
+
+## 3-Tier Build Performance Benchmark
+
+Measured on standard 16-thread development workstation:
+
+1. **Incremental build (`./mach build binaries`):** **~2.85s**
+2. **Clean objdir rebuild with warm compiler cache (`sccache`):** **~36s**
+3. **True cold build from scratch without compiler cache (`SCCACHE_DISABLE=1`):** **1m 16.268s** (`real 1m16.268s`)
+
+
+## Verified Test Gate Inventory
+
+### Linux Target (Full Automated Integration Suite)
+
+- **SOCKS5 Listener:** IPv4 and IPv6 loopback bindings, TCP CONNECT command, domain name resolution.
+- **HTTP CONNECT Listener:** Standard HTTP/1.1 CONNECT proxying.
+- **Strict H2 Upstream:** Real multiplexed H2 proxying with authentication and padding.
+- **Strict H3 Upstream:** Real QUIC/H3 proxying with 0-RTT/1-RTT connection management.
+- **Auto-Protocol Mode:** Prefer H3 with bounded transparent fallback to H2 on network failure.
+- **Robustness & Soak:** High-concurrency client multiplexing, server hang recovery, connection teardown, and clean process exit.
+- **Staged Runtime:** Verification outside build tree via `verify-staged-runtime.sh`.
+
+### Windows Target (Native Windows Acceptance Verification)
+
+Verified directly on native Windows x86_64 via `netwerk/naivefox/tools/verify-staged-windows-smoke.py`:
+- `--version` output check (`NaiveFox 0.3.0-dev`);
+- `--runtime-smoke` headless event-loop lifecycle;
+- `config.json` loading, parsing, and error validation;
+- Dynamic port SOCKS5 listener startup and protocol handshake (`0x05 0x00`);
+- 5 consecutive client SOCKS5 sessions;
+- Dynamic port HTTP CONNECT listener startup and request handling;
+- Clean process shutdown with zero dangling handles.
+- H2: 8/8 integrity requests through SOCKS5 and HTTP CONNECT, parallelism four,
+  strict outer H2 and padding for every tunnel.
+- H3: 8/8 integrity requests through SOCKS5 and HTTP CONNECT, parallelism four,
+  strict outer H3, no H2 fallback, and padding for every tunnel.
+- Auto: 8/8 integrity requests through SOCKS5, H3 selected, padding for every
+  tunnel.
+
+*Documentation Status:* standalone Windows build, launch, config parsing,
+logging, malformed-input handling, local listeners, H2/H3/Auto transfer, and
+shutdown are verified. The historical strict-H3 native soak remains valid and
+was not repeated for publication. Do not investigate hypothetical profiler/
+message-pump races without a new crash reproduction.
+
+## Source-Export Allowlist Requirements for `minimal-source`
+
+For deterministic source export (`export-minimal-source.sh`), the following rules are established:
+
+1. **Boundary Definition:** DOM implementation and layout engines are excluded. Explicit minimal WebIDL, binding metadata, and code generator subsets are retained where required.
+2. **Build-Time Dependency Inclusion:** The source export manifest must include all build-time generators, python actions, and dependency metadata even if they do not compile into the final runtime binary.
+3. **Allowlist Integrity:** Do not hard-code object or crate counts. Build the
+   export allowlist from the union of validated Linux and Windows
+   target-specific closure reports: translation units, headers, Rust source
+   paths/manifests, generated inputs, and runtime resources.
+4. **Diagnostic First:** Iterate one disposable tree in place until a complete
+   build succeeds. Run `--plan-only` for quick deterministic validation and
+   perform one physical clean export only after the closure is known.
+5. **Product Curation:** Export the NaiveFox product README, config example,
+   required build/test scripts, curated technical documentation, and licenses.
+   Exclude agent instructions, handoff notes, internal task/roadmap documents,
+   reports used only to generate the snapshot, and exporter maintenance tools.
+

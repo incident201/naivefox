@@ -1,0 +1,2 @@
+# The lean NaiveFox application embeds the runtime resources it needs and
+# intentionally produces no separate GRE resource files.

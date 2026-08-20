@@ -1,0 +1,45 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+SOURCES += [
+    "../AutoFallback.cpp",
+    "../Config.cpp",
+    "../GeckoRuntime.cpp",
+    "../HeaderPadding.cpp",
+    "../HttpClient.cpp",
+    "../HttpConnectParser.cpp",
+    "../LeanDOMBindings.cpp",
+    "../MemMapSnapshot.cpp",
+    "../NaiveFoxRunner.cpp",
+    "../NeckoTunnel.cpp",
+    "../PaddingNegotiation.cpp",
+    "../RuntimeLogging.cpp",
+    "../Socks5Parser.cpp",
+    "../SocksServer.cpp",
+    "../TunnelSession.cpp",
+    "../UnknownProtocolHandler.cpp",
+    "NaiveFoxComponents.cpp",
+    "ProfilerNaiveFoxStub.cpp",
+]
+
+XPCOM_MANIFESTS += ["components.conf"]
+
+SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
+SOURCES += ["/js/xpconnect/src/XPCString.cpp"]
+SOURCES += ["!/ipc/ipdl/PrefsTypes.cpp"]
+
+EXPORTS.mozilla += ["/toolkit/xre/AutoSQLiteLifetime.h"]
+EXPORTS.mozilla += ["/toolkit/xre/CmdLineAndEnvUtils.h"]
+EXPORTS.mozilla += ["/toolkit/xre/GeckoArgs.h"]
+EXPORTS.mozilla += ["../StoragePrincipalHelper.h"]
+EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
+EXPORTS += ["../nsContentUtils.h"]
+
+LOCAL_INCLUDES += ["/netwerk/base"]
+LOCAL_INCLUDES += ["/security/manager/ssl"]
+LOCAL_INCLUDES += ["/tools/profiler/core"]
+LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]
+LOCAL_INCLUDES += ["/ipc/chromium/src"]
+
+FINAL_LIBRARY = "xul"

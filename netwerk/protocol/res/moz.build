@@ -1,0 +1,54 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+XPIDL_SOURCES += [
+    "nsIResProtocolHandler.idl",
+    "nsISubstitutingProtocolHandler.idl",
+]
+
+XPIDL_MODULE = "necko_res"
+
+EXPORTS.mozilla.net += [
+    "ExtensionProtocolHandler.h",
+    "MozNewTabWallpaperProtocolHandler.h",
+    "MozSrcProtocolHandler.h",
+    "PageThumbProtocolHandler.h",
+    "RemoteStreamGetter.h",
+    "SubstitutingJARURI.h",
+    "SubstitutingProtocolHandler.h",
+    "SubstitutingURL.h",
+]
+
+EXPORTS += [
+    "nsResProtocolHandler.h",
+]
+
+UNIFIED_SOURCES += [
+    "ExtensionProtocolHandler.cpp",
+    "MozNewTabWallpaperProtocolHandler.cpp",
+    "MozSrcProtocolHandler.cpp",
+    "nsResProtocolHandler.cpp",
+    "PageThumbProtocolHandler.cpp",
+    "RemoteStreamGetter.cpp",
+    "SubstitutingProtocolHandler.cpp",
+]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    for source in (
+        "ExtensionProtocolHandler.cpp",
+        "MozNewTabWallpaperProtocolHandler.cpp",
+        "MozSrcProtocolHandler.cpp",
+        "PageThumbProtocolHandler.cpp",
+        "RemoteStreamGetter.cpp",
+    ):
+        UNIFIED_SOURCES.remove(source)
+
+include("/ipc/chromium/chromium-config.mozbuild")
+
+FINAL_LIBRARY = "xul"
+
+LOCAL_INCLUDES += [
+    "/netwerk/base",
+    "/xpcom/base",
+]

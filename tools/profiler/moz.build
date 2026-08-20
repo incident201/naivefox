@@ -1,0 +1,94 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+DEFINES["MOZ_REPLACE_MALLOC_PREFIX"] = "profiler"
+XPIDL_MODULE = "profiler"
+XPIDL_SOURCES += [
+    "gecko/nsIProfiler.idl",
+]
+EXPORTS += [
+    "public/ChildProfilerController.h",
+    "public/ETWTools.h",
+    "public/GeckoProfiler.h",
+    "public/GeckoProfilerReporter.h",
+    "public/MicroGeckoProfiler.h",
+    "public/ProfileAdditionalInformation.h",
+    "public/ProfilerBindings.h",
+    "public/ProfilerChild.h",
+    "public/ProfilerCodeAddressService.h",
+    "public/ProfilerControl.h",
+    "public/ProfilerNativeStack.h",
+    "public/ProfilerParent.h",
+    "public/ProfilerRustBindings.h",
+    "public/ProfilerStackWalk.h",
+]
+
+EXPORTS.mozilla += [
+    "public/FlowMarkers.h",
+    "public/ProfileBufferEntrySerializationGeckoExtensions.h",
+    "public/ProfileJSONWriter.h",
+    "public/ProfilerBandwidthCounter.h",
+    "public/ProfilerCounts.h",
+    "public/ProfilerDumpOrCrash.h",
+    "public/ProfilerLabels.h",
+    "public/ProfilerMarkers.h",
+    "public/ProfilerMarkersDetail.h",
+    "public/ProfilerMarkersPrerequisites.h",
+    "public/ProfilerMarkerTypes.h",
+    "public/ProfilerRunnable.h",
+    "public/ProfilerState.h",
+    "public/ProfilerThreadPlatformData.h",
+    "public/ProfilerThreadRegistration.h",
+    "public/ProfilerThreadRegistrationData.h",
+    "public/ProfilerThreadRegistrationInfo.h",
+    "public/ProfilerThreadRegistry.h",
+    "public/ProfilerThreadSleep.h",
+    "public/ProfilerThreadState.h",
+    "public/ProfilerUtils.h",
+]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "core/PageInformation.cpp",
+        "core/platform.cpp",
+        "core/ProfileBuffer.cpp",
+        "core/ProfileBufferEntry.cpp",
+        "core/ProfiledThreadData.cpp",
+        "core/ProfilerBacktrace.cpp",
+        "core/ProfilerCodeAddressService.cpp",
+        "core/ProfilerMarkers.cpp",
+        "gecko/nsProfilerStartParams.cpp",
+        "gecko/ProfilerChild.cpp",
+        "gecko/ProfilerIOInterposeObserver.cpp",
+        "gecko/ChildProfilerController.cpp",
+        "core/MicroGeckoProfiler.cpp",
+        "core/ProfilerBindings.cpp",
+        "core/ProfilerThreadRegistration.cpp",
+        "core/ProfilerThreadRegistrationData.cpp",
+        "core/ProfilerThreadRegistry.cpp",
+        "core/ProfilerUtils.cpp",
+        "gecko/ProfilerParent.cpp",
+        "core/ProfileAdditionalInformation.cpp",
+    ]
+    XPCOM_MANIFESTS += [
+        "gecko/components.conf",
+    ]
+    USE_LIBS += [
+        "jsoncpp",
+    ]
+    FINAL_LIBRARY = "xul"
+
+LOCAL_INCLUDES += [
+    "/caps",
+    "/docshell/base",
+    "/ipc/chromium/src",
+    "/mozglue/linker",
+    "/netwerk/base",
+    "/netwerk/protocol/http",
+    "/tools/profiler/core/",
+    "/tools/profiler/gecko/",
+    "/xpcom/base",
+]
+
+include("/ipc/chromium/chromium-config.mozbuild")

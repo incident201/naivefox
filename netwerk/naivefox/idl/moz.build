@@ -1,0 +1,115 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Necko's public XPIDL surface refers to these types, but NaiveFox does not
+# need their browser implementations.  Generate only the interface types so
+# the lean Rust/XPCOM bindings remain ABI-compatible without adding DOM,
+# docshell, layout, or XPConnect implementation directories to the build.
+XPIDL_SOURCES += [
+    "/docshell/base/nsIDocShell.idl",
+    "/docshell/base/nsIDocShellTreeItem.idl",
+    "/docshell/base/nsIDocShellTreeOwner.idl",
+    "/docshell/base/nsIDocumentViewer.idl",
+    "/docshell/base/nsILoadContext.idl",
+    "/docshell/base/nsILoadURIDelegate.idl",
+    "/docshell/base/nsIPrivacyTransitionObserver.idl",
+    "/docshell/base/nsIReflowObserver.idl",
+    "/dom/base/mozIDOMWindow.idl",
+    "/dom/base/nsIContentPolicy.idl",
+    "/dom/base/nsIDroppedLinkHandler.idl",
+    "/dom/base/nsISelectionController.idl",
+    "/dom/base/nsISelectionDisplay.idl",
+    "/dom/commandhandler/nsICommandParams.idl",
+    "/dom/interfaces/base/domstubs.idl",
+    "/dom/interfaces/base/nsIBrowserChild.idl",
+    "/dom/interfaces/base/nsIDOMWindow.idl",
+    "/dom/interfaces/base/nsIRemoteTab.idl",
+    "/dom/interfaces/geolocation/nsIDOMGeoPosition.idl",
+    "/dom/interfaces/geolocation/nsIDOMGeoPositionCoords.idl",
+    "/dom/interfaces/security/nsIContentSecurityPolicy.idl",
+    "/dom/interfaces/security/nsIPolicyContainer.idl",
+    "/dom/interfaces/security/nsIReferrerInfo.idl",
+    "/editor/composer/nsIEditingSession.idl",
+    "/editor/nsIDocumentStateListener.idl",
+    "/editor/nsIEditActionListener.idl",
+    "/editor/nsIEditor.idl",
+    "/editor/nsIEditorSpellCheck.idl",
+    "/editor/spellchecker/nsIInlineSpellChecker.idl",
+    "/intl/strres/nsIStringBundle.idl",
+    "/js/xpconnect/idl/nsIXPCScriptable.idl",
+    "/layout/base/nsILayoutHistoryState.idl",
+    "/layout/xul/tree/nsITreeSelection.idl",
+    "/layout/xul/tree/nsITreeView.idl",
+    "/netwerk/protocol/about/nsIAboutModule.idl",
+    "/netwerk/protocol/file/nsIFileChannel.idl",
+    "/netwerk/protocol/file/nsIFileProtocolHandler.idl",
+    "/netwerk/protocol/viewsource/nsIViewSourceChannel.idl",
+    "/netwerk/protocol/webtransport/nsIWebTransport.idl",
+    "/netwerk/protocol/webtransport/nsIWebTransportEventService.idl",
+    "/netwerk/protocol/webtransport/nsIWebTransportStream.idl",
+    "/netwerk/url-classifier/nsIChannelClassifierService.idl",
+    "/netwerk/url-classifier/nsIURIClassifier.idl",
+    "/netwerk/url-classifier/nsIUrlClassifierExceptionList.idl",
+    "/netwerk/url-classifier/nsIUrlClassifierExceptionListEntry.idl",
+    "/netwerk/url-classifier/nsIUrlClassifierExceptionListService.idl",
+    "/netwerk/url-classifier/nsIUrlClassifierFeature.idl",
+    "/toolkit/components/asyncshutdown/nsIAsyncShutdown.idl",
+    "/toolkit/components/kvstore/nsIKeyValue.idl",
+    "/uriloader/base/nsIWebProgress.idl",
+    "/uriloader/base/nsIWebProgressListener.idl",
+    "/widget/nsIFormatConverter.idl",
+    "/widget/nsIPrintSettings.idl",
+    "/widget/nsITransferable.idl",
+]
+
+XPIDL_MODULE = "naivefox_compat"
+
+# libpref's parent-process storage uses the small Pref/PrefValue data structs,
+# but not the PContent actor which normally carries them to child processes.
+IPDL_SOURCES += ["PrefsTypes.ipdlh"]
+
+WEBIDL_FILES += [
+    "../../../dom/chrome-webidl/OriginAttributes.webidl",
+]
+
+# These are header-only utilities used by generic XPCOM primitives.  Export
+# the individual headers without traversing their DOM/graphics directories.
+EXPORTS.mozilla.dom += [
+    "/dom/base/StructuredCloneTags.h",
+    "/dom/indexedDB/SafeRefPtr.h",
+    "/dom/navigation/UserNavigationInvolvement.h",
+    "/netwerk/naivefox/ClientInfo.h",
+    "/netwerk/naivefox/FeaturePolicy.h",
+    "/netwerk/naivefox/Promise.h",
+    "/netwerk/naivefox/RequestBinding.h",
+    "/netwerk/naivefox/ServiceWorkerDescriptor.h",
+]
+
+EXPORTS.mozilla.dom.ipc += [
+    "/dom/ipc/MemMapSnapshot.h",
+]
+
+EXPORTS.mozilla.gfx += [
+    "/gfx/2d/LoggingConstants.h",
+]
+
+EXPORTS.mozilla.net += [
+    "/netwerk/naivefox/NeckoChannelParams.h",
+]
+
+EXPORTS.mozilla += [
+    "/netwerk/naivefox/NaiveFoxOriginTrials.h",
+    "/netwerk/naivefox/NaiveFoxRFPTarget.h",
+    "/tools/performance/Perfetto.h",
+]
+
+EXPORTS += [
+    "/dom/base/nsDOMString.h",
+    "/dom/base/nsJSUtils.h",
+    "/dom/base/nsWrapperCache.h",
+    "/dom/console/nsIConsoleReportCollector.h",
+    "/gfx/src/nsRegionFwd.h",
+    "/js/xpconnect/src/nsIXPConnect.h",
+    "/js/xpconnect/src/xpcpublic.h",
+]

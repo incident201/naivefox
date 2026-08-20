@@ -1,0 +1,26 @@
+[package]
+edition = "2015"
+name = "gkrust"
+version = "0.1.0"
+authors = ["The Mozilla Project Developers"]
+license = "MPL-2.0"
+description = "Rust code for libxul"
+rust-version.workspace = true
+
+[dependencies]
+gkrust-naivefox = { path = "naivefox", optional = true }
+
+# Workarounds for https://github.com/rust-lang/rust/issues/58393
+mozglue-static = { path = "../../../mozglue/static/rust" }
+
+[features]
+naivefox = ["dep:gkrust-naivefox"]
+
+[lib]
+path = "lib.rs"
+crate-type = ["staticlib"]
+test = false
+doctest = false
+bench = false
+doc = false
+harness = false

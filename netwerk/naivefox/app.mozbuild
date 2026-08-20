@@ -1,0 +1,155 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# NaiveFox starts from the JavaScript/XPCOM platform foundation, not from
+# toolkit/toolkit.mozbuild. The latter is a browser-oriented superset which
+# unconditionally pulls DOM, layout, graphics, media, DevTools, and most
+# Toolkit components into libxul.
+include("/js/app.mozbuild")
+
+# Unicode normalization needs this header-only sparse table type.  Export the
+# single header without adding the graphics build graph.
+EXPORTS += ["/gfx/thebes/gfxSparseBitSet.h"]
+
+# A few retained platform headers include this friend declaration even in a
+# --disable-tests product build.  Export the single header without pulling
+# the gtest libraries or test registration graph into NaiveFox.
+EXPORTS.gtest += ["/testing/gtest/MozGtestFriend.h"]
+
+# nsUnicodeProperties uses HarfBuzz's public Unicode enums and types for character
+# properties. Export only the required public headers into dist/include/harfbuzz
+# without compiling any font-shaping implementation objects into libxul.
+EXPORTS.harfbuzz += [
+    "/gfx/harfbuzz/src/hb-blob.h",
+    "/gfx/harfbuzz/src/hb-buffer.h",
+    "/gfx/harfbuzz/src/hb-common.h",
+    "/gfx/harfbuzz/src/hb-deprecated.h",
+    "/gfx/harfbuzz/src/hb-draw.h",
+    "/gfx/harfbuzz/src/hb-face.h",
+    "/gfx/harfbuzz/src/hb-font.h",
+    "/gfx/harfbuzz/src/hb-map.h",
+    "/gfx/harfbuzz/src/hb-ot-color.h",
+    "/gfx/harfbuzz/src/hb-ot-deprecated.h",
+    "/gfx/harfbuzz/src/hb-ot-fetch.h",
+    "/gfx/harfbuzz/src/hb-ot-font.h",
+    "/gfx/harfbuzz/src/hb-ot-layout.h",
+    "/gfx/harfbuzz/src/hb-ot-math.h",
+    "/gfx/harfbuzz/src/hb-ot-meta.h",
+    "/gfx/harfbuzz/src/hb-ot-metrics.h",
+    "/gfx/harfbuzz/src/hb-ot-name.h",
+    "/gfx/harfbuzz/src/hb-ot-shape.h",
+    "/gfx/harfbuzz/src/hb-ot-var.h",
+    "/gfx/harfbuzz/src/hb-ot.h",
+    "/gfx/harfbuzz/src/hb-paint.h",
+    "/gfx/harfbuzz/src/hb-script-list.h",
+    "/gfx/harfbuzz/src/hb-set.h",
+    "/gfx/harfbuzz/src/hb-shape-plan.h",
+    "/gfx/harfbuzz/src/hb-shape.h",
+    "/gfx/harfbuzz/src/hb-style.h",
+    "/gfx/harfbuzz/src/hb-unicode.h",
+    "/gfx/harfbuzz/src/hb-version.h",
+    "/gfx/harfbuzz/src/hb.h",
+]
+
+# The preference store uses this header-only compact string table even in the
+# parent-only runtime.  Exporting it does not add dom/ipc actors or sources.
+EXPORTS.mozilla.dom.ipc += ["/dom/ipc/StringTable.h"]
+
+# SpiderMonkey links no-op standalone metric methods even when the browser
+# telemetry service is absent.  Export only their small ABI header set instead
+# of building Toolkit Glean and its DOM-facing bindings.
+EXPORTS.mozilla.glean.bindings += [
+    "/toolkit/components/glean/bindings/MetricStandaloneTypes.h",
+    "/toolkit/components/glean/bindings/private/BooleanStandalone.h",
+    "/toolkit/components/glean/bindings/private/CommonStandalone.h",
+    "/toolkit/components/glean/bindings/private/CounterStandalone.h",
+    "/toolkit/components/glean/bindings/private/CustomDistributionStandalone.h",
+    "/toolkit/components/glean/bindings/private/DenominatorStandalone.h",
+    "/toolkit/components/glean/bindings/private/MemoryDistributionStandalone.h",
+    "/toolkit/components/glean/bindings/private/NumeratorStandalone.h",
+    "/toolkit/components/glean/bindings/private/QuantityStandalone.h",
+    "/toolkit/components/glean/bindings/private/RateStandalone.h",
+    "/toolkit/components/glean/bindings/private/TimespanStandalone.h",
+    "/toolkit/components/glean/bindings/private/TimingDistributionStandalone.h",
+]
+
+if CONFIG["OS_TARGET"] == "WINNT":
+    EXPORTS.mozilla += [
+        "/widget/windows/WinHeaderOnlyUtils.h",
+    ]
+    EXPORTS.mozilla.widget += [
+        "/widget/windows/WinRegistry.h",
+    ]
+    EXPORTS.mozilla.mscom += [
+        "/ipc/mscom/Aggregation.h",
+        "/ipc/mscom/AgileReference.h",
+        "/ipc/mscom/ApartmentRegion.h",
+        "/ipc/mscom/COMWrappers.h",
+        "/ipc/mscom/EnsureMTA.h",
+        "/ipc/mscom/mozglue/ProcessRuntimeShared.h",
+        "/ipc/mscom/ProcessRuntime.h",
+        "/ipc/mscom/ProfilerMarkers.h",
+        "/ipc/mscom/Utils.h",
+    ]
+    EXPORTS.mozilla += [
+        "/toolkit/xre/dllservices/mozglue/CacheNtDllThunk.h",
+        "/toolkit/xre/dllservices/mozglue/nsWindowsDllInterceptor.h",
+        "/toolkit/xre/dllservices/mozglue/WindowsStackWalkInitialization.h",
+    ]
+    EXPORTS.mozilla.interceptor += [
+        "/toolkit/xre/dllservices/mozglue/interceptor/Arm64.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/MMPolicies.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/PatcherBase.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/PatcherDetour.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/PatcherNopSpace.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/RangeMap.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/TargetFunction.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/Trampoline.h",
+        "/toolkit/xre/dllservices/mozglue/interceptor/VMSharingPolicies.h",
+    ]
+
+DIRS += [
+    "/xpcom/xpidl",
+]
+
+if CONFIG["COMPILE_ENVIRONMENT"]:
+    DIRS += [
+        "/config/external/sqlite",
+        "/security",
+    ]
+
+if not CONFIG["MOZ_OVERRIDE_GKRUST"]:
+    if CONFIG["ENABLE_TESTS"]:
+        DIRS += ["/toolkit/library/gtest/rust"]
+    DIRS += ["/toolkit/library/rust"]
+
+if CONFIG["MOZ_SANDBOX"]:
+    DIRS += ["/security/sandbox"]
+
+if CONFIG["MOZ_USING_WASM_SANDBOXING"] and CONFIG["COMPILE_ENVIRONMENT"]:
+    DIRS += ["/security/rlbox"]
+
+DIRS += [
+    "/intl",
+    "/modules/brotli",
+    "/modules/libpref",
+    "/netwerk/naivefox/idl",
+    "/netwerk",
+    "/xpcom",
+    "/ipc/chromium",
+    "/ipc/glue",
+    "/ipc/ipdl",
+    "/dom/bindings",
+    "/modules/libjar",
+    "/storage",
+    "/caps",
+    "/security/certverifier",
+    "/security/manager",
+    "/toolkit/components/glean",
+    "/toolkit/library",
+    "/tools/profiler",
+]
+
+if CONFIG["ENABLE_TESTS"]:
+    DIRS += ["/testing/gtest"]

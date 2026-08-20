@@ -1,0 +1,133 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#ifndef MOZ_NAIVEFOX
+include "mozilla/dom/PermissionMessageUtils.h";
+#endif
+
+using struct mozilla::void_t from "mozilla/ipc/IPCCore.h";
+#ifndef MOZ_NAIVEFOX
+[RefCounted] using class nsIPrincipal from "nsIPrincipal.h";
+
+include PBackgroundSharedTypes;
+#endif
+
+namespace mozilla {
+namespace ipc {
+
+struct SimpleURIParams
+{
+  nsCString spec;
+};
+
+struct DefaultURIParams
+{
+  nsCString spec;
+};
+
+struct StandardURLSegment
+{
+  uint32_t position;
+  int32_t length;
+};
+
+struct StandardURLParams
+{
+  uint32_t urlType;
+  int32_t port;
+  int32_t defaultPort;
+  nsCString spec;
+  StandardURLSegment scheme;
+  StandardURLSegment authority;
+  StandardURLSegment username;
+  StandardURLSegment password;
+  StandardURLSegment host;
+  StandardURLSegment path;
+  StandardURLSegment filePath;
+  StandardURLSegment directory;
+  StandardURLSegment baseName;
+  StandardURLSegment extension;
+  StandardURLSegment query;
+  StandardURLSegment ref;
+  bool supportsFileURL;
+  bool isSubstituting;
+};
+
+struct JARURIParams
+{
+  URIParams jarFile;
+  URIParams jarEntry;
+  nsCString charset;
+};
+
+#ifndef MOZ_NAIVEFOX
+struct IconURIParams
+{
+  URIParams? uri;
+  uint32_t size;
+  nsCString contentType;
+  nsCString fileName;
+  nsCString stockIcon;
+  uint32_t iconScale;
+  bool? iconDark;
+};
+
+struct HostObjectURIParams
+{
+  SimpleURIParams simpleParams;
+  bool revoked;
+  nullable nsIPrincipal nullPrincipal;
+};
+#endif
+
+union URIParams
+{
+  SimpleURIParams;
+  StandardURLParams;
+  JARURIParams;
+#ifndef MOZ_NAIVEFOX
+  IconURIParams;
+  JSURIParams;
+#endif
+  SimpleNestedURIParams;
+#ifndef MOZ_NAIVEFOX
+  HostObjectURIParams;
+#endif
+  DefaultURIParams;
+#ifndef MOZ_NAIVEFOX
+  NestedAboutURIParams;
+#endif
+  SubstitutingJARURIParams;
+};
+
+#ifndef MOZ_NAIVEFOX
+struct JSURIParams
+{
+  SimpleURIParams simpleParams;
+  URIParams? baseURI;
+};
+#endif
+
+struct SimpleNestedURIParams
+{
+  SimpleURIParams simpleParams;
+  URIParams innerURI;
+};
+
+#ifndef MOZ_NAIVEFOX
+struct NestedAboutURIParams
+{
+  SimpleNestedURIParams nestedParams;
+  URIParams? baseURI;
+};
+#endif
+
+struct SubstitutingJARURIParams
+{
+  URIParams source;
+  JARURIParams resolved;
+};
+
+} // namespace ipc
+} // namespace mozilla
