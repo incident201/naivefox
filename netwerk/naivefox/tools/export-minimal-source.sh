@@ -261,6 +261,22 @@ for path in list(entries):
             or value.startswith(("$", "-", "#"))
         ):
             continue
+        if "%s" in value:
+            template = value.split("%s", 1)[0].rstrip("/")
+            if template.startswith("/"):
+                template_path = (repo / template.lstrip("/")).resolve()
+            else:
+                template_path = (mozbuild.parent / template).resolve()
+            try:
+                template_relative = template_path.relative_to(repo)
+            except ValueError:
+                continue
+            if template_path.is_dir():
+                tracked_under(
+                    template_relative.as_posix(),
+                    "explicit:mozbuild-dynamic",
+                )
+            continue
         # moz.build uses a leading slash for a topsrcdir-relative path; it is
         # not an OS absolute input in this DSL.
         if value.startswith("/"):
