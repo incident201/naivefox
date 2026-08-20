@@ -383,6 +383,39 @@ for path in list(entries):
             if candidate.is_file():
                 add(relative.as_posix(), "explicit:test-support")
 
+# GYP files form a small include/dependency graph which is not represented by
+# compiler depfiles.  Follow only quoted .gyp/.gypi references reachable from
+# the already selected GYP roots; do not import an entire third-party tree.
+gyp_queue = [
+    path for path in entries if path.endswith((".gyp", ".gypi"))
+]
+seen_gyp = set()
+while gyp_queue:
+    path = gyp_queue.pop()
+    if path in seen_gyp:
+        continue
+    seen_gyp.add(path)
+    gyp_path = repo / path
+    try:
+        text = gyp_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+    for first, second in mozbuild_literal.findall(text):
+        value = first or second
+        if not value.endswith((".gyp", ".gypi")):
+            continue
+        candidate = (gyp_path.parent / value).resolve()
+        try:
+            relative = candidate.relative_to(repo)
+        except ValueError:
+            continue
+        if not candidate.is_file():
+            continue
+        before = len(entries)
+        add(relative.as_posix(), "explicit:gyp-dependency")
+        if len(entries) != before:
+            gyp_queue.append(relative.as_posix())
+
 if missing:
     details = "\n".join(f"{path} ({kind})" for path, kind in sorted(set(missing)))
     raise SystemExit(f"closure references missing repository files:\n{details}")
