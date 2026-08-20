@@ -980,8 +980,16 @@ generated output, never a hand-edited source of truth.
 
 ### M14.3 Source manifest and deterministic export
 
-- [ ] Create an allowlist-based source manifest and exporter which starts from
-  an empty directory.
+- [x] Record an attested configure trace and target-specific Linux/Windows
+  backend, depfile, generated-action, Makefile, component, and Cargo input
+  classes. Do not treat linked objects alone as standalone source closure.
+- [x] Maintain one disposable diagnostic source tree in place; standalone
+  configure, a full Linux build, and runtime smoke pass without restarting a
+  clean export for every missing input.
+- [x] Implement an allowlist planner and deterministic exporter with a fast
+  `--plan-only` mode. The physical exporter starts from an empty directory.
+- [ ] Regenerate final clean provenance reports and pass `--plan-only` on their
+  union.
 - [ ] Generate NaiveFox root documentation, licenses/notices, build scripts,
   and exact `UPSTREAM-BASE` traceability.
 - [ ] Validate absence of Firefox browser product files, `.git`, objdirs,
@@ -1075,10 +1083,11 @@ The capture gate uses a separate full Firefox baseline with its own runtime
 libraries; the browser binary is not bundled into the lean package. A
 non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
-were added, after which the H2 and H3 suites passed independently. The next
-The next phase is allowlist design for `minimal-source`. Do not begin export
-until the provenance reports are regenerated on the final audited source and
-the standalone-build gates are explicitly scheduled. Do not reopen deep
+were added, after which the H2 and H3 suites passed independently. Source
+closure discovery now uses one in-place diagnostic tree and is complete for
+Linux. Next regenerate provenance on the final audited source, run the fast
+manifest plan, and create one clean export for isolated Linux/Windows gates.
+Do not return to repeated clean-export discovery or reopen deep
 SpiderMonkey/ICU minimization in this phase.
 
 ## Handoff checkpoint: Windows package and workspace cleanup (2026-08-16)

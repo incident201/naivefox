@@ -152,8 +152,9 @@ not aliases for a moving `main`:
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
 Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Audited Minimal source commit: 8fd1f47a67bcfe14471896c8bf488428a8a240ae
-Closure report snapshot commit: 6fa615ff8206108122c0ec9178c649ed5db43c41 (direct report-only child)
+Standalone diagnostic build source commit: a020da3d5ba4 (full build and runtime smoke PASS)
+Audited Minimal source commit: PENDING_FINAL_REPORT_REGENERATION
+Closure report snapshot commit: PENDING_FINAL_REPORT_REGENERATION
 Validated Minimal Source commit: NOT_CREATED
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
@@ -168,7 +169,8 @@ requires the report-only provenance relationship. Do not copy a working-tree
 SHA into a source commit's own documentation. The validated Firefox base
 remains the concrete snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no
 Mozilla upstream refresh was performed during this audit. `minimal-source` is
-still `NOT_CREATED` and `tools/export-minimal-source.sh` has not been run.
+still `NOT_CREATED`. Disposable diagnostic export attempts have run and are
+not publication candidates; the single clean release export has not run.
 
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean
@@ -242,11 +244,28 @@ or blame the Firefox refresh merely to make the minimized branch pass.
 
 ### Gate 3: validated `minimal` -> `minimal-source`
 
-Only after Gate 2 passes may the allowlist export be regenerated. The export
-gate must:
+Only after Gate 2 passes may source-closure discovery begin. Compile/link
+reports are insufficient on their own because configure probes, generated
+actions, relative compiler prerequisites, Cargo build dependencies, and empty
+directory contracts are not all linked objects. Discovery therefore uses:
+
+- an attested successful configure file-access trace;
+- Linux and Windows backend/config-status inputs;
+- all compiler and generated-action depfiles;
+- generated Makefile prerequisites and active component manifests;
+- target-filtered Cargo normal/build/proc-macro closure;
+- explicit project, bootstrap, runtime-resource, and license inputs.
+
+Maintain one disposable diagnostic source tree and augment it in place by
+missing input *classes* until standalone configure and a full build pass. Do
+not create a new clean export after each failure. The clean export is a release
+gate, not dependency-discovery tooling.
+
+After the diagnostic build and fast `export-minimal-source.sh --plan-only`
+validation pass, the export gate must:
 
 1. start from a clean, validated `minimal` checkout;
-2. create an empty export directory and copy only manifest entries;
+2. create exactly one empty export directory and copy only manifest entries;
 3. validate licenses, traceability, forbidden paths, stale manifest entries,
    and absence of credentials, profiles, logs, captures, `.git`, and objdirs;
 4. copy the export to a clean location with no access to the full Firefox
@@ -434,10 +453,8 @@ Upstream repository: https://github.com/mozilla-firefox/firefox
 Upstream branch: main
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
 Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Audited Minimal source commit: 8fd1f47a67bcfe14471896c8bf488428a8a240ae
-Closure report snapshot commit: 6fa615ff8206108122c0ec9178c649ed5db43c41 (direct report-only child)
-Validated Minimal Source commit: NOT_CREATED
-Historical pre-audit graph tag: not used for current provenance
+Current Minimal/report/export provenance: see the canonical `Validated base
+tracking` block above; do not duplicate mutable report SHAs in this inventory.
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -1447,6 +1464,45 @@ Windows target closure regenerated; active closure assertions PASS for both
 targets; no `firefox-on-glean`/`glean-core` package is reachable. Source commit:
 `559d487242b92526ef077cd9f520deedcb71f482`.
 
+## NF-UPSTREAM-018 — isolated product Rust root and ping generation
+
+Status: implemented on the frozen Firefox base; final target report
+regeneration is pending.
+
+Files:
+
+- `Cargo.toml`, `Cargo.lock`
+- `config/makefiles/rust.mk`
+- `python/mozbuild/mozbuild/frontend/emitter.py`
+- `toolkit/library/rust/{Cargo.toml,lib.rs}`
+- `toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py`
+
+Purpose: make the actual `gkrust` static-library package plus the one independent
+Cbindgen root the only top-level Cargo workspace roots. The NaiveFox product no
+longer resolves Firefox application/test roots, `gkrust-shared`, SWGL, Stylo
+test dev-dependencies, or the browser-wide workspace-hack feature union. The
+Glean ping generator also skips the global Firefox app/library ping index under
+`MOZ_NAIVEFOX`; retained local ping inputs remain generated normally.
+
+Why project-only code was insufficient: Cargo is invoked from Firefox's
+`toolkit/library/rust` package and the build frontend/make rules unconditionally
+required and enabled the Firefox-wide workspace-hack. The Glean generator
+itself imported the global ping index. Neither behavior can be changed from
+`netwerk/naivefox/moz.build` after graph evaluation.
+
+Behavioral risk: this is guarded by the NaiveFox product configuration or lives
+on the `minimal` branch's product Cargo root. Ordinary Firefox behavior on the
+full-tree `naivefox` reference is unchanged. A missing required Rust edge would
+fail Cargo/link; a missing retained ping would affect telemetry only, which is
+disabled for this headless product.
+
+Tests: Linux and Windows frozen Cargo metadata resolution PASS at this
+checkpoint; final reports will separately record runtime-reachable and
+normal/build/proc-macro source closures instead of treating all metadata
+packages as runtime dependencies. Standalone diagnostic configure PASS; full
+standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke PASS.
+Commits: `c8ad512671d6` (Rust workspace) and `a020da3d5ba4` (ping index).
+
 ## Project-owned pre-export stability changes
 
 These changes do not modify Firefox upstream files and therefore do not create
@@ -1509,4 +1565,11 @@ For the upcoming source-export step (`export-minimal-source.sh`), the following 
    export allowlist from the union of validated Linux and Windows
    target-specific closure reports: translation units, headers, Rust source
    paths/manifests, generated inputs, and runtime resources.
+4. **Diagnostic First:** Iterate one disposable tree in place until a complete
+   build succeeds. Run `--plan-only` for quick deterministic validation and
+   perform one physical clean export only after the closure is known.
+5. **Product Curation:** Export the NaiveFox product README, config example,
+   required build/test scripts, curated technical documentation, and licenses.
+   Exclude agent instructions, handoff notes, internal task/roadmap documents,
+   reports used only to generate the snapshot, and exporter maintenance tools.
 

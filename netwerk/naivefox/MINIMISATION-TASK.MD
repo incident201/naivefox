@@ -141,22 +141,46 @@ normally `netwerk/naivefox/minimal-source.manifest`. It includes:
 The exporter starts with an empty directory and copies manifest entries. A
 copy-everything-then-delete blacklist is not acceptable.
 
+Compile/link closure alone is not a standalone source closure. The manifest is
+derived from all of the following evidence classes:
+
+- an attested successful full-tree configure file-access trace;
+- target-specific `backend.RecursiveMakeBackend.in` and
+  `config_status_deps.in` inputs;
+- every linked compiler depfile plus generated-action depfiles and Makefile
+  prerequisites;
+- target-filtered Cargo normal, build, and proc-macro dependencies;
+- the union of validated Linux and Windows reports;
+- explicit product, bootstrap, runtime-resource, and license inputs.
+
+Discovery uses one disposable diagnostic tree. Add missing input *classes* to
+that tree in place until standalone configure and a full `mach build` pass.
+Never use repeated clean exports to discover one missing file at a time. The
+clean export is a release gate, not a debugging loop.
+
 ## Phase 5: deterministic source export
 
-`tools/export-minimal-source.sh` creates an export below the object/output
-directory. It must reject a dirty or unvalidated source unless an explicit
-diagnostic mode is selected, and must never overwrite an existing export.
+`tools/export-minimal-source.sh --plan-only` validates provenance, report
+coverage, content hashes, modes, directory contracts, licenses, and the exact
+allowlist without copying the source tree. Only after the diagnostic full build
+and this fast plan pass may `tools/export-minimal-source.sh` create one clean
+export outside the full checkout. It rejects a dirty or unvalidated source and
+never overwrites an existing export.
 
 The export contains no `.git`, objdir, build artifacts, profiles, credentials,
 logs, captures, or absolute development paths. Its root contains the NaiveFox
-`README.md`, this task, upstream policy, build instructions, licenses/notices,
-and a generated `UPSTREAM-BASE` with:
+product `README.md`, a credential-free config example, curated user/technical
+documents, upstream policy, build instructions, licenses/notices, and a
+generated `UPSTREAM-BASE`. Internal agent instructions, handoff notes, this
+task, the full development roadmap, and pre-export working notes are not
+product-source inputs. Traceability uses distinct fields:
 
 ```text
 Firefox base SHA: <sha>
-NaiveFox SHA: <sha>
-Minimal SHA: <sha>
-Export manifest version: <hash>
+NaiveFox reference SHA: <sha>
+Minimal export SHA: <sha>
+Build/closure report source SHA: <sha>
+Export manifest SHA-256: <hash>
 Generated at: <UTC date>
 ```
 

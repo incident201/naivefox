@@ -16,18 +16,43 @@ authorization value, packet payload, or TLS key material.
 
 ## Current pre-export audit update (2026-08-20)
 
-The current audit does not start `export-minimal-source.sh`; source export
-remains blocked until the final closure/provenance reports and standalone build
-gate are complete. The reproducible SOCKS terminal-state OOM/remote-DoS issue
+Disposable source-export diagnostics have run; the single clean release export
+has not. Source publication remains blocked until final reports, fast manifest
+planning, and isolated Linux/Windows gates are complete. The reproducible SOCKS
+terminal-state OOM/remote-DoS issue
 is fixed and covered by Linux `run-malformed-socks-tests.sh` plus the native
 Windows staged smoke. Both SOCKS and HTTP malformed inputs stop parsing after
 one bounded failure response and leave the listener usable for a subsequent
 normal connection.
 
-The audited source provenance is `8fd1f47a67bcfe14471896c8bf488428a8a240ae`.
-The closure JSON files were generated in report-only child
-`6fa615ff8206108122c0ec9178c649ed5db43c41`; later documentation commits do not
-change that source/report relationship.
+The previous closure report pair is now intentionally stale after the lean
+Cargo workspace/export-tool changes and is rejected by `assert-closure.py`.
+Final audited-source and report-only-child SHAs will be recorded only after the
+reports are regenerated; no commit tries to embed its own SHA.
+
+### Standalone source-closure discovery
+
+The old workflow repeatedly copied a nominally clean tree and stopped on one
+missing file. Root cause: link/compiler reports do not cover configure probes,
+generator prerequisites, relative depfile paths, component manifests, Cargo
+build dependencies, or directory-existence contracts. The corrected workflow
+used one disposable tree and augmented it in place by evidence class.
+
+| Diagnostic gate | Result |
+|---|---|
+| Attested full-tree configure trace | PASS; source inputs normalized repository-relative |
+| Linux/Windows backend + config-status inputs | collected |
+| Compiler/generated-action depfiles + Makefile prerequisites | collected |
+| Target-filtered Cargo build closure | Linux 335 / Windows 348 packages at the lean workspace checkpoint |
+| Standalone diagnostic configure | PASS |
+| Standalone full Linux `mach build -j4` | PASS, 5:38 |
+| Diagnostic runtime smoke | PASS |
+| Fresh diagnostic objdir inputs outside conservative Linux report | **0** |
+
+The diagnostic tree is contaminated discovery state and will not be
+published. `export-minimal-source.sh --plan-only` now performs the cheap
+provenance/hash/mode/license/list validation. Only after that passes will one
+new empty tree be populated for final acceptance.
 
 Windows file logging now uses the native wide-character API and passes relative,
 absolute, Unicode, append-after-restart, clean-shutdown, and credential-scan
@@ -777,8 +802,8 @@ SpiderMonkey encoding symbols.
 The reproducible Linux linker-map aggregate retains `js_static` 225.86 MiB,
 `gkrust` 115.63 MiB, ICU 31.26 MiB, cache2 6.24 MiB, IPC Chromium 4.09 MiB,
 and IPC glue 2.98 MiB. These are deliberate future SpiderMonkey/ICU work, not
-unreviewed removal candidates. The build closure is sufficient for beginning
-the allowlist design, but `minimal-source` export has not started.
+unreviewed removal candidates. The source-closure diagnostic build is now
+green; the publishable clean export remains a separate, not-yet-run gate.
 
 The closure JSON files are authoritative for provenance. Their
 `report_provenance.source_commit_sha` identifies the audited source tree; the

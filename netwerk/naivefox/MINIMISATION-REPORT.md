@@ -322,6 +322,26 @@ SpiderMonkey encoding symbols. The linker map records the remaining large Linux 
 IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey and ICU are a
 separate future milestone; no speculative removal is claimed here.
 
-This pass establishes a sufficient build-closure boundary for designing the
-allowlist. `minimal-source` export remains a separate gate and has not been
-started.
+This pass establishes a sufficient runtime/link boundary. SpiderMonkey and ICU
+remain explicitly deferred; source export does not reopen that minimization.
+
+### Phase 3.0: standalone source-closure discovery
+
+The first export attempts exposed a methodology defect: compiler/link closure
+does not enumerate configure probes, generated-action prerequisites, relative
+depfile paths, active component manifests, Cargo build/proc-macro packages, or
+directory contracts. Recreating an empty export for each newly missing file
+was both slow and incapable of proving whole classes.
+
+The corrected process maintains one disposable diagnostic tree, augmented in
+place from an attested configure trace and the union of Linux/Windows backend,
+config-status, depfile, Makefile, component, and target Cargo evidence. That
+tree now passes standalone configure, a full Linux build (5:38), and runtime
+smoke. A report from its fresh objdir contains no source file absent from the
+conservative Linux report.
+
+The exporter now has a fast `--plan-only` phase for provenance, exact file
+list, content hashes, modes, directory contracts, licenses, and product-doc
+curation. The one clean source export remains the next release gate; the
+diagnostic tree is never published. Final source-tree/archive size measurements
+will be recorded only from that clean export.

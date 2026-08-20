@@ -23,10 +23,18 @@ smoke runs and a strict 600-second H3 soak (45/45 integrity requests, 45
 padding/protocol records, no unexpected exit). A complete native Windows H2,
 H3, and Auto workload matrix beyond this H3 soak remains a follow-up gate.
 
-`minimal-source` export is intentionally still blocked. Closure reports and
-provenance must be regenerated on the final audited commit, and the standalone
-export validator/build gate has not been started. No generated source tree is
-an accepted artifact yet.
+`minimal-source` publication is intentionally still blocked. One disposable
+diagnostic tree now passes standalone configure, a full Linux build, and
+runtime smoke, but it contains discovery residue and is not an accepted
+artifact. Closure reports and provenance must be regenerated on the final
+audited commit; then the fast manifest plan, one clean export, isolated Linux
+acceptance, and Windows acceptance must pass.
+
+Maintenance constraint: after any Firefox refresh or build-graph/Cargo/
+generator change, regenerate both target build reports and the attested
+configure report. Do not debug closure by repeatedly starting clean exports;
+augment one diagnostic tree by missing input class and reserve clean export for
+the final gate.
 
 The previously reproducible Auto-suite startup abort on repeated H3 profile
 launches is resolved. The lean preferences file adapter now forces the EOF
@@ -132,9 +140,9 @@ H2, and the soak runner records such a failure rather than masking it.
   multi-hop proxy chains remain outside the current scope and fail explicitly.
 - The verified runtime/build closure is minimized through the current
   DOM/GFX/WebRTC/UI/profiler boundary. The remaining SpiderMonkey and ICU
-  closure is deliberately deferred, and `minimal-source` export has not yet
-  started; those are separate milestones, not an assertion that the current
-  runtime is unminimized.
+  closure is deliberately deferred. Source-closure diagnostics are green, but
+  the one publishable clean export and isolated acceptance remain separate
+  milestones; this is not an assertion that the runtime is unminimized.
 
 Detailed evidence is in `TEST-REPORT.md`, wire comparisons are in
 `H3-CAPTURE.md`, and every modified Firefox file is listed in `UPSTREAM.md`.

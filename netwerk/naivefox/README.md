@@ -64,6 +64,13 @@ at its repository root without modifying those files in the full-tree branches.
 See `MINIMISATION-TASK.MD` and `UPSTREAM.md` for the closure, export, and Firefox
 refresh gates.
 
+Source-export dependency discovery uses one disposable tree that is augmented
+in place from configure/backend/depfile/Cargo evidence until a full standalone
+build passes. `tools/export-minimal-source.sh --plan-only` then validates the
+deterministic allowlist without copying it. A new empty clean export is created
+once, only for isolated release acceptance; repeatedly rebuilding clean exports
+to discover individual files is prohibited.
+
 ## Goal
 
 The end-to-end prototype should provide a local SOCKS5 endpoint:

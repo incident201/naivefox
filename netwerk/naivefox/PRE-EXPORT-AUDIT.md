@@ -4,15 +4,27 @@ This document records the definitive technical and architectural audit of the `m
 
 ## Current gate status (2026-08-20)
 
-The source export is **not unlocked**. The stability blockers that motivated
-this audit are now closed: malformed SOCKS5/HTTP terminal parsing is bounded,
-Windows wide-path file logging works, and the native staged Windows package
-survived five repeated local stress runs plus a 600-second strict-H3 soak.
-The soak completed 45/45 integrity-checked requests, recorded 45 H3 and 45
-padding events, sampled the process for 593 seconds, and ended with RSS 27.5
-MiB (peak 28.3 MiB). The remaining gate is audit/provenance finalization and a
-clean standalone export/build; `tools/export-minimal-source.sh` has not been
-run.
+The stability blockers that motivated this audit are closed: malformed
+SOCKS5/HTTP terminal parsing is bounded, Windows wide-path file logging works,
+and the native staged Windows package survived five repeated local stress runs
+plus a 600-second strict-H3 soak. The soak completed 45/45 integrity-checked
+requests, recorded 45 H3 and 45 padding events, sampled the process for 593
+seconds, and ended with RSS 27.5 MiB (peak 28.3 MiB).
+
+Source-closure discovery has started, but the publishable clean export has not.
+Early attempts incorrectly used clean copy operations as a dependency-discovery
+loop. They produced a disposable, contaminated diagnostic tree and repeatedly
+stopped on inputs that compiler/link reports cannot observe. That workflow is
+retired. The current diagnostic tree is augmented in place by input *classes*;
+it completed standalone configure, a full Linux `mach build -j4` in 5:38, and
+runtime smoke at source content commit `a020da3d5ba4`. Its final depfile/backend
+report is a subset of the conservative full-tree Linux allowlist (zero new
+files), which closes the discovery loop. It is not a valid release export and
+will never be published.
+
+The remaining sequence is: commit and attest the Linux/Windows reports; pass
+the fast `export-minimal-source.sh --plan-only` gate; create exactly one clean
+export; then build/test it with the original checkout and objdirs unavailable.
 
 The capture reference policy is also final: both H2 and H3 capture runners
 fetch a clean official Mozilla Firefox release into ignored object storage via
@@ -53,8 +65,9 @@ the 271/287 count shown below.
 
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
-- **Audited Minimal Source Commit:** `8fd1f47a67bcfe14471896c8bf488428a8a240ae`; this is the exact source tree recorded by `report_provenance.source_commit_sha` in both closure reports.
-- **Minimal Report Snapshot Commit:** `6fa615ff8206108122c0ec9178c649ed5db43c41`, the direct report-only child of the audited source commit; it changes only the two closure JSON files.
+- **Standalone Diagnostic Source Commit:** `a020da3d5ba4`; standalone full build and runtime smoke passed from source content through this checkpoint.
+- **Audited Minimal Source Commit:** `PENDING_FINAL_REPORT_REGENERATION`; this will be the one exact clean source SHA shared by the configure, Linux/Windows build-input, and linked-closure reports.
+- **Minimal Report Snapshot Commit:** `PENDING_FINAL_REPORT_REGENERATION`; this will be a report-only child of the audited source commit.
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 
@@ -64,18 +77,13 @@ the 271/287 count shown below.
 
 Audited with `netwerk/naivefox/tools/analyze-full-closure.py` and strictly validated with `netwerk/naivefox/tools/assert-closure.py`.
 
-| Dimension | Linux x86_64 (`obj-naivefox-minimal`) | Windows x86_64 (`obj-naivefox-windows-x86_64`) |
-|---|---|---|
-| **Target Triple** | `x86_64-unknown-linux-gnu` | `x86_64-pc-windows-msvc` |
-| **C/C++ Translation Units** | **545 TUs** (clean audited depfiles) | **468 TUs** (clean audited depfiles) |
-| **Direct Link Objects** | **525 object files** (216.03 MB unstripped) | **536 object files** (202.62 MB unstripped) |
-| **Main Binary Size** | 477.67 MiB unstripped / **64.57 MiB `--strip-debug` / 53.61 MiB `--strip-all`** | measured `xul.dll` in the Windows report |
-| **Headless Executable** | 1.05 MB (`naivefox`) | 11.0 KB (`naivefox.exe`) |
-| **Static Libraries** | 3 archives (`js_static`, `gkrust`, `pure_virtual`) | 3 archives (`js_static.lib`, `gkrust.lib`, `pure_virtual.lib`) |
-| **Reachable Rust Crates** | **271 packages** (active `gkrust-naivefox` normal-edge tree) | **287 packages** (active `gkrust-naivefox` normal-edge tree) |
-| **Dynamic Dependencies** | **20 `DT_NEEDED`** (glibc, glib, dbus, nspr, nss, sqlite) | **22 DLL imports** (Win32 API, nspr, nss, sqlite) |
-| **Desktop UI Libraries (GTK/X11)** | **0 libraries linked** | **0 libraries linked** |
-| **Staged Runtime Package** | **18 files** (27.91 MB archive) | **21 files** (19.34 MB archive) |
+The previous linked-closure JSON files predate the isolated Rust workspace and
+are deliberately not quoted as current export evidence. Final reports will
+separate runtime-reachable Rust packages from the larger normal/build/
+proc-macro source closure needed by a clean build. Export policy uses the union
+of the validated target reports, not hard-coded translation-unit or crate
+counts. Linux and Windows reports must share the same audited source commit and
+must be regenerated before `--plan-only` can pass.
 
 ### Closure Report Archives
 - Linux: `netwerk/naivefox/reports/closure-report-linux-x86_64.json`
@@ -157,3 +165,14 @@ Automated smoke test executed via `tools/verify-staged-windows-smoke.py`:
    `cxx_translation_units`, headers, Rust `source_paths`, Cargo manifests,
    generated inputs, and runtime resource sources. The counts in each report
    are measurements, not an export contract.
+4. **Discovery Is Not Export:** Determine closure in one disposable diagnostic
+   tree, updated in place. A clean export must never be restarted merely to
+   discover another missing file.
+5. **Evidence Union:** Use the attested configure trace, Linux/Windows backend
+   and config-status inputs, all compiler/generated-action depfiles, generated
+   Makefile prerequisites, target-filtered Cargo build closure, project files,
+   bootstrap inputs, runtime resources, and licenses.
+6. **One Clean Gate:** The physical exporter runs once after diagnostic build
+   and `--plan-only` are green. That output is immutable and either passes the
+   isolated acceptance gate or invalidates the manifest as a class, never by
+   manual patching of generated source.
