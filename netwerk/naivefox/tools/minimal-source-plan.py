@@ -465,6 +465,7 @@ def main() -> int:
         "toolkit/content/license.html",
         "browser/config/version.txt",
         "browser/config/version_display.txt",
+        "toolkit/mozapps/installer/upload-files.mk",
     ):
         add(value, "explicit:bootstrap-license")
 
