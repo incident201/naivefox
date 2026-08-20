@@ -25,6 +25,8 @@ GYP_SOURCE_PATH = re.compile(r"[\"']([^\"']+\.gypi?)[\"']")
 PY_ACTION = re.compile(r"call\s+py_action,\s*([A-Za-z0-9_+-]+)")
 JAR_MANIFEST = re.compile(r"^JAR_MANIFEST\s*:?=\s*(.+)$", re.MULTILINE)
 JAR_SOURCE = re.compile(r"\((%?[^)]+)\)")
+ASSEMBLY_SOURCE = re.compile(r"^SSRCS\s*\+=\s*(.+)$", re.MULTILINE)
+CPP_INCLUDE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.MULTILINE)
 
 
 def git(repo: Path, *args: str) -> str:
@@ -364,13 +366,44 @@ def main() -> int:
 
     for backend in backends:
         text = backend.read_text(encoding="utf-8", errors="replace")
-        for match in INCLUDE_PATH.finditer(text):
+        expanded = text.replace("$(topsrcdir)", str(source_tree)).replace(
+            "$(topobjdir)", str(objdir)
+        )
+        include_directories = []
+        for match in INCLUDE_PATH.finditer(expanded):
             value = next(item for item in match.groups() if item is not None)
             path = Path(value)
+            if path.is_dir():
+                include_directories.append(path)
             relative = source_relative(path)
             if path.is_dir():
                 if relative is not None:
                     directory_contracts.add(relative)
+        assembly_inputs = []
+        for value in ASSEMBLY_SOURCE.findall(expanded):
+            path = Path(value.strip()).resolve()
+            add_path(path, "make:active-assembly-source")
+            if path.is_file():
+                assembly_inputs.append(path)
+        pending_headers = list(assembly_inputs)
+        visited_headers = set()
+        while pending_headers:
+            path = pending_headers.pop()
+            if path in visited_headers:
+                continue
+            visited_headers.add(path)
+            contents = path.read_text(encoding="utf-8", errors="replace")
+            for name in CPP_INCLUDE.findall(contents):
+                candidates = [path.parent / name]
+                candidates.extend(directory / name for directory in include_directories)
+                for candidate in candidates:
+                    if not candidate.is_file():
+                        continue
+                    relative = source_relative(candidate)
+                    if relative is not None:
+                        add_path(candidate, "make:active-assembly-include")
+                        pending_headers.append(candidate.resolve())
+                    break
 
     active_python_actions = set()
     python_action_fragments = list(make_fragments)
