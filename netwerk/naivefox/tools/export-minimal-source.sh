@@ -77,6 +77,11 @@ def add(source, category, destination=None):
     if not source:
         return
     source = norm(source)
+    # Firefox's documentation build inputs are not needed to compile or run
+    # the product.  NaiveFox technical docs are added separately under
+    # docs/naivefox by tracked_project().
+    if source.startswith("docs/"):
+        return
     # Closure reports intentionally retain a small amount of provenance from
     # generated depfile/backend inventories.  These are not source inputs and
     # must never be copied into a standalone tree.
