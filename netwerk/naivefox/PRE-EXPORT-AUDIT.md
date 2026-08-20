@@ -43,6 +43,9 @@ Rust dependencies proven unused were removed (`fluent-langneg`, `ipcclientcerts`
 retained because removing it produced unresolved SpiderMonkey encoding symbols.
 The remaining large closure is intentional: SpiderMonkey and ICU are recorded
 as a future size milestone, not guessed away in this audit.
+The older 366/379 counts came from Cargo's workspace-unified metadata and are
+stale for this parent-only build; the report's active target-specific tree is
+the 271/287 count shown below.
 
 ---
 
