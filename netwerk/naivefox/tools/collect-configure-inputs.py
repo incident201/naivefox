@@ -192,6 +192,9 @@ def main() -> int:
             "configure_environment": {
                 "MOZCONFIG": mozconfig.relative_to(repo).as_posix(),
                 "NAIVEFOX_OBJDIR": "<fresh-external-objdir>",
+                "NAIVEFOX_DISABLE_SCCACHE": environment.get(
+                    "NAIVEFOX_DISABLE_SCCACHE", "<unset>"
+                ),
             },
             "configure_exit_status": completed.returncode,
             "strace_version": subprocess.check_output(
