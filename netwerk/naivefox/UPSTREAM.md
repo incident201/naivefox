@@ -152,25 +152,28 @@ not aliases for a moving `main`:
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
 Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+NaiveFox reference merge-base for export: e11c162e44703e8be50b619341c350f05b1b2623
 Standalone diagnostic build source commit: a020da3d5ba4 (full build and runtime smoke PASS)
-Audited Minimal source commit: PENDING_FINAL_REPORT_REGENERATION
-Closure report snapshot commit: PENDING_FINAL_REPORT_REGENERATION
-Validated Minimal Source commit: NOT_CREATED
+Audited Minimal evidence source commit: 51528a58ad87912c6cfc7538c3595bff6166dd8b
+Corrected evidence report snapshot commit: 0cec25a1bc33593bad1b53ea4db6f4401be7da56
+Validated clean Minimal export source commit: NOT_CREATED
+Published minimal-source commit: NOT_CREATED
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
 ### Current pre-export audit provenance
 
-The audited source is always the exact SHA in each closure report's
-`report_provenance.source_commit_sha`; the report snapshot is a separate
-report-only child. `assert-closure.py` rejects stale/nonexistent source SHAs and
-requires the report-only provenance relationship. Do not copy a working-tree
-SHA into a source commit's own documentation. The validated Firefox base
-remains the concrete snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no
-Mozilla upstream refresh was performed during this audit. `minimal-source` is
-still `NOT_CREATED`. Disposable diagnostic export attempts have run and are
-not publication candidates; the single clean release export has not run.
+The configure, Linux/Windows build-input, and Linux/Windows linked-closure
+reports all attest source `51528a58ad87`; corrected snapshot `0cec25a1bc33`
+freezes that evidence. Later exporter-only descendants may consume the reports
+only while the planner proves that no build-affecting input changed and checks
+the exact collector hashes. Do not copy a working-tree SHA into a source
+commit's own documentation. The validated Firefox base remains the concrete
+snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla upstream refresh
+was performed during this audit. `minimal-source` is still `NOT_CREATED`.
+Disposable diagnostic export attempts are not publication candidates; the
+single clean release export has not run.
 
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean
@@ -1403,10 +1406,11 @@ A comprehensive audit was performed using `netwerk/naivefox/tools/analyze-full-c
 
 | Metric | Linux x86_64 (`obj-naivefox-minimal`) | Windows x86_64 (`obj-naivefox-windows-x86_64`) |
 |---|---|---|
-| **Direct Translation Units / Objects** | 525 objects (216.03 MB unstripped) | 536 objects (202.62 MB unstripped) |
-| **libxul binary size** | 477.67 MiB unstripped / **64.57 MiB `--strip-debug` / 53.61 MiB `--strip-all`** | measured `xul.dll` in the Windows report |
-| **Headless runner size** | 1.05 MB (`naivefox`) | 11.0 KB (`naivefox.exe`) |
-| **Rust Crates in Cargo Closure** | 271 active packages | 287 active packages |
+| **Translation units / direct objects** | 545 TUs / 525 objects (216.05 MiB) | 468 TUs / 536 objects (202.63 MiB) |
+| **Current unstripped main library** | 479.34 MiB `libxul` | 40.60 MiB `xul.dll` |
+| **Headless runner size** | 5.19 MiB (`naivefox`) | 11.0 KiB (`naivefox.exe`) |
+| **Runtime-reachable Rust crates** | 271 packages | 287 packages |
+| **Source/build Cargo packages** | 311 packages | 325 packages |
 | **System Dynamic Dependencies** | 20 `DT_NEEDED` libraries | 22 DLL imports |
 | **Desktop UI Libraries (GTK/X11/Cairo)** | **0 libraries linked** | **0 libraries linked** |
 
@@ -1466,8 +1470,8 @@ targets; no `firefox-on-glean`/`glean-core` package is reachable. Source commit:
 
 ## NF-UPSTREAM-018 — isolated product Rust root and ping generation
 
-Status: implemented on the frozen Firefox base; final target report
-regeneration is pending.
+Status: implemented on the frozen Firefox base; final target reports are
+regenerated from audited source `51528a58ad87`.
 
 Files:
 
@@ -1496,17 +1500,16 @@ full-tree `naivefox` reference is unchanged. A missing required Rust edge would
 fail Cargo/link; a missing retained ping would affect telemetry only, which is
 disabled for this headless product.
 
-Tests: Linux and Windows frozen Cargo metadata resolution PASS at this
-checkpoint; final reports will separately record runtime-reachable and
-normal/build/proc-macro source closures instead of treating all metadata
-packages as runtime dependencies. Standalone diagnostic configure PASS; full
-standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke PASS.
+Tests: Linux and Windows frozen Cargo metadata resolution PASS. Corrected
+reports separately record 271/287 runtime-reachable packages and 311/325
+normal/build/proc-macro source packages. Standalone diagnostic configure PASS;
+full standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke
+PASS; final `--plan-only` PASS with 19,725 entries and 35 directory contracts.
 Commits: `c8ad512671d6` (Rust workspace) and `a020da3d5ba4` (ping index).
 
 ## NF-UPSTREAM-019 — explicit Windows Winsock feature ownership
 
-Status: implemented on the frozen Firefox base; Windows rebuild validation is
-in progress.
+Status: implemented and present in the audited Windows evidence source.
 
 Files:
 
@@ -1527,8 +1530,10 @@ library, change Linux code, or alter runtime QUIC behavior. Future Firefox
 refreshes should remove this downstream declaration if upstream Neqo glue owns
 the same feature explicitly.
 
-Tests: Windows x86-64 full build and final target closure report pending at this
-source checkpoint. Commit: recorded by the implementing commit.
+Tests: Windows x86-64 full build PASS. Corrected target evidence records 468
+TUs, 536 direct objects, 287 runtime-reachable Rust crates, and 325
+source/build Cargo packages. Reports are frozen in `0cec25a1bc33`. Commit:
+`ca77ac1a85ae`.
 
 ## Project-owned pre-export stability changes
 
@@ -1540,7 +1545,7 @@ new downstream Necko patch inventory entries:
 | Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
 | Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
 | Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
-| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/closure-report-*.json` | Target-correct Linux/Windows C/C++/Rust/Glean closure and strict repository-relative/provenance checks. Reports are regenerated in a report-only child commit. | Both target assertions PASS; source export remains intentionally locked. |
+| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean closure and strict repository-relative/provenance checks. | Five-report set frozen in `0cec25a1bc33` from audited source `51528a58ad87`; both target assertions and plan-only PASS; physical clean export remains locked. |
 
 Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
 stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate

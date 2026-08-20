@@ -22,9 +22,12 @@ report is a subset of the conservative full-tree Linux allowlist (zero new
 files), which closes the discovery loop. It is not a valid release export and
 will never be published.
 
-The remaining sequence is: commit and attest the Linux/Windows reports; pass
-the fast `export-minimal-source.sh --plan-only` gate; create exactly one clean
-export; then build/test it with the original checkout and objdirs unavailable.
+Final evidence regeneration is complete: all five reports attest
+`51528a58ad87912c6cfc7538c3595bff6166dd8b` and are committed in corrected
+snapshot `0cec25a1bc33593bad1b53ea4db6f4401be7da56`. The fast
+`export-minimal-source.sh --plan-only` gate passes. The remaining sequence is
+exactly one clean export, then isolated build/test with the original checkout
+and objdirs unavailable.
 
 The capture reference policy is also final: both H2 and H3 capture runners
 fetch a clean official Mozilla Firefox release into ignored object storage via
@@ -56,8 +59,8 @@ retained because removing it produced unresolved SpiderMonkey encoding symbols.
 The remaining large closure is intentional: SpiderMonkey and ICU are recorded
 as a future size milestone, not guessed away in this audit.
 The older 366/379 counts came from Cargo's workspace-unified metadata and are
-stale for this parent-only build; the report's active target-specific tree is
-the 271/287 count shown below.
+stale for this parent-only build. The reports distinguish the 271/287
+runtime-reachable packages from the 311/325 source/build package closure.
 
 ---
 
@@ -66,8 +69,8 @@ the 271/287 count shown below.
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
 - **Standalone Diagnostic Source Commit:** `a020da3d5ba4`; standalone full build and runtime smoke passed from source content through this checkpoint.
-- **Audited Minimal Source Commit:** `PENDING_FINAL_REPORT_REGENERATION`; this will be the one exact clean source SHA shared by the configure, Linux/Windows build-input, and linked-closure reports.
-- **Minimal Report Snapshot Commit:** `PENDING_FINAL_REPORT_REGENERATION`; this will be a report-only child of the audited source commit.
+- **Audited Minimal Evidence Source Commit:** `51528a58ad87912c6cfc7538c3595bff6166dd8b`.
+- **Evidence Report Snapshot Commit:** `0cec25a1bc33593bad1b53ea4db6f4401be7da56`; this corrected snapshot contains the five configure/build/closure reports.
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 
@@ -77,15 +80,16 @@ the 271/287 count shown below.
 
 Audited with `netwerk/naivefox/tools/analyze-full-closure.py` and strictly validated with `netwerk/naivefox/tools/assert-closure.py`.
 
-The previous linked-closure JSON files predate the isolated Rust workspace and
-are deliberately not quoted as current export evidence. Final reports will
-separate runtime-reachable Rust packages from the larger normal/build/
-proc-macro source closure needed by a clean build. Export policy uses the union
-of the validated target reports, not hard-coded translation-unit or crate
-counts. Linux and Windows reports must share the same audited source commit and
-must be regenerated before `--plan-only` can pass.
+The final report set is current export evidence. Runtime-reachable Rust closure
+is 271/287 packages; the larger normal/build/proc-macro source closure is
+311/325 packages. Linux and Windows reports share audited source `51528a58`;
+counts are measurements, not manifest contracts. Export policy consumes the
+union of validated target-specific reports rather than hard-coded counts.
 
 ### Closure Report Archives
+- Configure: `netwerk/naivefox/reports/configure-inputs-linux-x86_64.json`
+- Linux build inputs: `netwerk/naivefox/reports/build-inputs-linux-x86_64.json`
+- Windows build inputs: `netwerk/naivefox/reports/build-inputs-windows-x86_64.json`
 - Linux: `netwerk/naivefox/reports/closure-report-linux-x86_64.json`
 - Windows: `netwerk/naivefox/reports/closure-report-windows-x86_64.json`
 

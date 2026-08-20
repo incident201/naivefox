@@ -127,8 +127,9 @@ implementations for size.
 
 ## Phase 4: source dependency closure
 
-After the minimized full-tree build is stable, create an allowlist manifest,
-normally `netwerk/naivefox/minimal-source.manifest`. It includes:
+After the minimized full-tree build is stable, generate an explicit allowlist
+as `minimal-source.manifest.json` from validated evidence. It is deterministic,
+but is not maintained as a handwritten file list. It includes:
 
 - NaiveFox sources and tests;
 - required Firefox/Gecko and Neqo sources;
@@ -180,9 +181,14 @@ Firefox base SHA: <sha>
 NaiveFox reference SHA: <sha>
 Minimal export SHA: <sha>
 Build/closure report source SHA: <sha>
+Evidence report snapshot SHA: <sha>
 Export manifest SHA-256: <hash>
 Generated at: <UTC date>
 ```
+
+A report snapshot may be consumed by later exporter/documentation commits only
+when the planner proves that changes since the audited source are restricted to
+approved non-build-affecting paths and verifies the exact collector hashes.
 
 File order, modes, report content, and source archive generation must be
 deterministic for a fixed source commit and declared timestamp.

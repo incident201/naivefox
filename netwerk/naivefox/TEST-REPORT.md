@@ -1,6 +1,8 @@
 # NaiveFox prototype test report
 
-Date: 2026-08-13
+Initial acceptance record: 2026-08-13
+
+Latest pre-export update: 2026-08-20
 
 Environment: `Ubuntu24Dev`, x86-64, Firefox opt build
 
@@ -25,10 +27,11 @@ Windows staged smoke. Both SOCKS and HTTP malformed inputs stop parsing after
 one bounded failure response and leave the listener usable for a subsequent
 normal connection.
 
-The previous closure report pair is now intentionally stale after the lean
-Cargo workspace/export-tool changes and is rejected by `assert-closure.py`.
-Final audited-source and report-only-child SHAs will be recorded only after the
-reports are regenerated; no commit tries to embed its own SHA.
+Final reports are no longer stale. The configure, Linux/Windows build-input,
+and Linux/Windows closure reports all attest audited source
+`51528a58ad87912c6cfc7538c3595bff6166dd8b`; corrected report snapshot
+`0cec25a1bc33593bad1b53ea4db6f4401be7da56` freezes them without trying to
+embed a commit's own SHA.
 
 ### Standalone source-closure discovery
 
@@ -43,16 +46,22 @@ used one disposable tree and augmented it in place by evidence class.
 | Attested full-tree configure trace | PASS; source inputs normalized repository-relative |
 | Linux/Windows backend + config-status inputs | collected |
 | Compiler/generated-action depfiles + Makefile prerequisites | collected |
-| Target-filtered Cargo build closure | Linux 335 / Windows 348 packages at the lean workspace checkpoint |
+| Target-filtered Cargo source/build closure | Linux 311 / Windows 325 packages |
+| Configure trace | 10,279 files; trace SHA-256 `f050c2f7d06faa226db6b41a65fd7a8094168626517890811dd495ba4cfc089a` |
+| Source directory contracts | Linux 35 / Windows 31; 35 in the target union |
+| Depfiles | Linux 1,949 / Windows 2,306 |
+| Generated Makefiles | Linux 441 / Windows 425 |
+| Evidence provenance | source `51528a58ad87`; corrected report snapshot `0cec25a1bc33` |
 | Standalone diagnostic configure | PASS |
 | Standalone full Linux `mach build -j4` | PASS, 5:38 |
 | Diagnostic runtime smoke | PASS |
 | Fresh diagnostic objdir inputs outside conservative Linux report | **0** |
 
 The diagnostic tree is contaminated discovery state and will not be
-published. `export-minimal-source.sh --plan-only` now performs the cheap
-provenance/hash/mode/license/list validation. Only after that passes will one
-new empty tree be populated for final acceptance.
+published. `export-minimal-source.sh --plan-only` performs the cheap
+provenance/hash/mode/license/list validation and now passes with 19,725 entries
+and 35 source directory contracts. One new empty tree will be populated only
+for final acceptance.
 
 Windows file logging now uses the native wide-character API and passes relative,
 absolute, Unicode, append-after-restart, clean-shutdown, and credential-scan
@@ -795,9 +804,10 @@ SpiderMonkey encoding symbols.
 |---|---:|---:|
 | C/C++ translation units | 545 | 468 |
 | Direct link objects | 525 | 536 |
-| Active Rust crates | 271 | 287 |
+| Runtime-reachable Rust crates | 271 | 287 |
+| Source/build Cargo packages | 311 | 325 |
 | Dynamic dependencies | 20 | 22 |
-| Main library size | 477.67 MiB debug; 64.57 MiB `--strip-debug`; 53.61 MiB `--strip-all` | report value |
+| Current unstripped main library | 479.34 MiB | 40.60 MiB |
 
 The reproducible Linux linker-map aggregate retains `js_static` 225.86 MiB,
 `gkrust` 115.63 MiB, ICU 31.26 MiB, cache2 6.24 MiB, IPC Chromium 4.09 MiB,
@@ -805,10 +815,11 @@ and IPC glue 2.98 MiB. These are deliberate future SpiderMonkey/ICU work, not
 unreviewed removal candidates. The source-closure diagnostic build is now
 green; the publishable clean export remains a separate, not-yet-run gate.
 
-The closure JSON files are authoritative for provenance. Their
-`report_provenance.source_commit_sha` identifies the audited source tree; the
-report snapshot is a separate report-only child. No current working-tree SHA
-is embedded in its own source commit.
+The authoritative JSON reports identify `51528a58ad87` as the audited evidence
+source; `0cec25a1bc33` is the corrected report snapshot. Later approved
+export-tool/documentation descendants are consumers of this evidence, not new
+audited build sources. No current working-tree SHA is embedded in its own
+source commit.
 
 
 ## Phase 2.5: GTK3 and Desktop UI dynamic dependency elimination

@@ -310,9 +310,10 @@ runtime closure.
 |---|---:|---:|
 | C/C++ translation units | 545 | 468 |
 | Direct link objects | 525 | 536 |
-| Active Rust crates | 271 | 287 |
+| Runtime-reachable Rust crates | 271 | 287 |
+| Source/build Cargo packages | 311 | 325 |
 | Dynamic dependencies | 20 | 22 |
-| `libxul`/`xul.dll` | 477.67 MiB debug; 64.57 MiB `--strip-debug`; 53.61 MiB `--strip-all` | report value |
+| Current unstripped `libxul`/`xul.dll` | 479.34 MiB | 40.60 MiB |
 
 Five direct Rust dependencies proven unused were removed (`fluent-langneg`,
 `ipcclientcerts`, `ipdl_utils`, `oblivious_http`, and `rusqlite`).
@@ -342,6 +343,10 @@ conservative Linux report.
 
 The exporter now has a fast `--plan-only` phase for provenance, exact file
 list, content hashes, modes, directory contracts, licenses, and product-doc
-curation. The one clean source export remains the next release gate; the
-diagnostic tree is never published. Final source-tree/archive size measurements
-will be recorded only from that clean export.
+curation. Final evidence attests source `51528a58ad87` and is frozen in report
+snapshot `0cec25a1bc33`: configure observed 10,279 files; target build evidence
+contains 1,949/2,306 depfiles and 311/325 source/build Cargo packages. The
+`--plan-only` union passes with 19,725 entries and 35 source directory
+contracts. The one clean source export remains the next release gate; the
+diagnostic tree is never published. Final source-tree/archive and normalized
+stripped package measurements will be recorded only from that clean export.

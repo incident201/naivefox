@@ -10,7 +10,10 @@ The prototype reuses Firefox's **real networking stack** instead of manually imi
   management, HPACK/QPACK, TLS parameters, and related network behavior.
 - A small NaiveFox-specific layer for the local SOCKS5 server, HTTP CONNECT tunnel orchestration, Naive padding compatibility, configuration, logging, and stream pumping.
 
-The first target is **Linux x86_64 only**. Development uses Firefox's normal `mach` build system and a supported Linux build environment.
+Linux x86_64 is the primary fully integrated prototype platform. Native
+Windows x86_64 build and staged H3 soak are validated; standalone
+`minimal-source` acceptance for both targets remains pending. Development uses
+Firefox's normal `mach` build system and a supported Linux build environment.
 
 The tagged `h2-prototype-v0.1` baseline is preserved. The `feature/h3` stage
 adds strict HTTP/3/QUIC through the same executable and project architecture;
@@ -59,7 +62,7 @@ netwerk/naivefox/
 Existing Firefox files should be modified only when no suitable existing internal API can solve the problem. Every upstream modification must be small, isolated, justified, tested, and documented in `UPSTREAM.md`.
 
 The root Firefox `README.md` and root Firefox `AGENTS.md` are upstream files and must not be replaced by this project.
-The generated `minimal-source` export deliberately places the NaiveFox README
+When generated, the `minimal-source` export places the NaiveFox product README
 at its repository root without modifying those files in the full-tree branches.
 See `MINIMISATION-TASK.MD` and `UPSTREAM.md` for the closure, export, and Firefox
 refresh gates.
@@ -70,6 +73,13 @@ build passes. `tools/export-minimal-source.sh --plan-only` then validates the
 deterministic allowlist without copying it. A new empty clean export is created
 once, only for isolated release acceptance; repeatedly rebuilding clean exports
 to discover individual files is prohibited.
+
+The frozen evidence set attests audited source
+`51528a58ad87912c6cfc7538c3595bff6166dd8b`; corrected reports are committed
+in snapshot `0cec25a1bc33593bad1b53ea4db6f4401be7da56`. The fast manifest
+`--plan-only` gate passes with 19,725 entries and 35 source directory
+contracts. The single clean export and isolated Linux/Windows acceptance are
+the remaining publication gates.
 
 ## Goal
 

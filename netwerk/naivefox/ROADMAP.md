@@ -988,8 +988,11 @@ generated output, never a hand-edited source of truth.
   clean export for every missing input.
 - [x] Implement an allowlist planner and deterministic exporter with a fast
   `--plan-only` mode. The physical exporter starts from an empty directory.
-- [ ] Regenerate final clean provenance reports and pass `--plan-only` on their
-  union.
+- [x] Regenerate configure, Linux/Windows build-input, and linked-closure
+  reports from audited source `51528a58ad87`; freeze the corrected evidence in
+  snapshot `0cec25a1bc33`.
+- [x] Pass `export-minimal-source.sh --plan-only` on the target union: 19,725
+  entries and 35 source directory contracts.
 - [ ] Generate NaiveFox root documentation, licenses/notices, build scripts,
   and exact `UPSTREAM-BASE` traceability.
 - [ ] Validate absence of Firefox browser product files, `.git`, objdirs,
@@ -1067,17 +1070,18 @@ Run all reproducible local H2 and H3 integration gates sequentially with:
 The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
 user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
 must not weaken any item in this H2 suite. Native Windows x86_64 now has a
-build profile, staged package, and bounded native SOCKS/HTTP smoke; broader
-Windows regression coverage, Android, and further size reduction remain
-future work.
+build profile, staged package, bounded native SOCKS/HTTP smoke, and a
+600-second strict-H3 soak. Standalone-export H2/Auto Windows gates, Android,
+and further size reduction remain future work.
 
 ## Current minimisation checkpoint: audited lean build/runtime closure
 
 The DOM/GFX-free product now has a target-aware machine-readable closure audit
-and a selective Glean/Rust trim. The current Linux `libxul` is 477.67 MiB in
-the debug build, 64.57 MiB with `--strip-debug`, and 53.61 MiB with
-`--strip-all`; the active closure is 271 Rust crates on Linux and 287 on
-Windows. The package and functional H2/H3/Auto/config gates remain green.
+and a selective Glean/Rust trim. The `51528a58` report records an unstripped
+Linux `libxul` of 479.34 MiB; normalized stripped/package measurements are
+reserved for the clean export. Runtime-reachable Rust closure is 271/287
+packages on Linux/Windows, while source/build Cargo closure is 311/325. The
+package and functional H2/H3/Auto/config gates remain green.
 
 The capture gate uses a separate full Firefox baseline with its own runtime
 libraries; the browser binary is not bundled into the lean package. A
@@ -1085,8 +1089,9 @@ non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. Source
 closure discovery now uses one in-place diagnostic tree and is complete for
-Linux. Next regenerate provenance on the final audited source, run the fast
-manifest plan, and create one clean export for isolated Linux/Windows gates.
+Linux. Final provenance is frozen from `51528a58` in report snapshot
+`0cec25a1`; the fast manifest plan passes. Next create one clean export for
+isolated Linux/Windows gates.
 Do not return to repeated clean-export discovery or reopen deep
 SpiderMonkey/ICU minimization in this phase.
 
