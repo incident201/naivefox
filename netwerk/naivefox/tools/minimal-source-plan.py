@@ -298,10 +298,15 @@ def main() -> int:
         candidates.extend(manifest_strings(data))
         for candidate in candidates:
             for token in candidate.split():
-                if token.startswith(("!", "/")) or "://" in token:
+                if "://" in token:
                     continue
-                pattern = manifest_path.parent / token
-                for match in glob.glob(str(pattern), recursive=False):
+                if token.startswith("!/"):
+                    pattern = repo / token[2:]
+                elif token.startswith(("!", "/")):
+                    continue
+                else:
+                    pattern = manifest_path.parent / token
+                for match in glob.glob(str(pattern), recursive=True):
                     path = Path(match)
                     if not path.is_file():
                         continue
