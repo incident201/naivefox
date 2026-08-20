@@ -55,6 +55,9 @@ FORBIDDEN_SUFFIXES = (
     ".pcapng",
     ".pdb",
 )
+TRACKED_SOURCE_FIXTURES = {
+    "memory/replace/logalloc/replay/expected_output_minimal.log",
+}
 ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
     r"(?:naivefox|obj-[^/\s\"']*)(?:/|\s|$)|"
@@ -90,7 +93,9 @@ def safe_path(value: str) -> str:
         raise SystemExit(f"generated/private path in source plan: {value}")
     if any(part == "objdir" or part.startswith("obj-") for part in path.parts):
         raise SystemExit(f"generated/private path in source plan: {value}")
-    if path.name.lower().endswith(FORBIDDEN_SUFFIXES):
+    if path.as_posix() not in TRACKED_SOURCE_FIXTURES and path.name.lower().endswith(
+        FORBIDDEN_SUFFIXES
+    ):
         raise SystemExit(f"build/capture/log artifact in source plan: {value}")
     if path.parts and path.parts[0] == "browser":
         if len(path.parts) < 2 or path.parts[1] != "config":

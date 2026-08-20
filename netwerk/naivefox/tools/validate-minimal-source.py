@@ -28,6 +28,9 @@ FORBIDDEN_SUFFIXES = (
     ".pcapng",
     ".pdb",
 )
+TRACKED_SOURCE_FIXTURES = {
+    pathlib.PurePosixPath("memory/replace/logalloc/replay/expected_output_minimal.log"),
+}
 FORBIDDEN_BASENAMES = {
     "AGENTS.md",
     "CLAUDE.md",
@@ -118,7 +121,9 @@ def main() -> int:
         if path.is_file():
             actual.add(path.relative_to(root))
             lower = path.name.lower()
-            if lower.endswith(FORBIDDEN_SUFFIXES):
+            if pathlib.PurePosixPath(
+                relative
+            ) not in TRACKED_SOURCE_FIXTURES and lower.endswith(FORBIDDEN_SUFFIXES):
                 fail(f"build/capture/log artifact present: {relative}")
 
     generated = {
