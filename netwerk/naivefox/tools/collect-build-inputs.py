@@ -435,7 +435,7 @@ def main() -> int:
         add_path(manifest, "cargo:target-manifest-parse-closure")
         target_entry_points = []
         for target in package.get("targets", []):
-            if not {"lib", "proc-macro", "custom-build"}.intersection(
+            if not {"lib", "proc-macro", "custom-build", "bin"}.intersection(
                 target.get("kind", [])
             ):
                 continue
@@ -467,7 +467,7 @@ def main() -> int:
         add_path(manifest, "cargo:cbindgen-manifest-parse-closure")
         target_entry_points = []
         for target in package.get("targets", []):
-            if not {"lib", "proc-macro", "custom-build"}.intersection(
+            if not {"lib", "proc-macro", "custom-build", "bin"}.intersection(
                 target.get("kind", [])
             ):
                 continue
