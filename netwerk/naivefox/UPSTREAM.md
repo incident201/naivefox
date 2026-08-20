@@ -1402,9 +1402,10 @@ Detailed audit of all shims, stubs, and lean replacements is documented in [`net
 The low-risk closure trim also disables the global Firefox Glean metrics/pings
 index for `MOZ_NAIVEFOX`. Only the 23 retained metric schemas,
 `netwerk/pings.yaml`, and the shared tags file are generated. The active Cargo
-tree contains no `firefox-on-glean`/`glean-core` runtime crate. Four direct Rust
-dependencies proven unused were removed; `jsrust_shared` remains because its
-removal caused unresolved SpiderMonkey encoding symbols. The Linux linker-map
+tree contains no `firefox-on-glean`/`glean-core` runtime crate. Five direct Rust
+dependencies proven unused were removed (`fluent-langneg`, `ipcclientcerts`,
+`ipdl_utils`, `oblivious_http`, and `rusqlite`); `jsrust_shared` remains because
+its removal caused unresolved SpiderMonkey encoding symbols. The Linux linker-map
 aggregate records `js_static` 225.86 MiB, `gkrust` 115.63 MiB, ICU 31.26 MiB,
 cache2 6.24 MiB, IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey
 and ICU are explicitly deferred to a future milestone.

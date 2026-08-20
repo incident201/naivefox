@@ -37,8 +37,9 @@ all passed.
 The cheap closure pass is now complete. The browser-wide Glean metrics/pings
 index is disabled for `MOZ_NAIVEFOX`; only the retained 23 metric schemas,
 `netwerk/pings.yaml`, and the shared tag vocabulary are generated. The active
-Cargo tree has no `firefox-on-glean`/`glean-core` runtime crates. Four direct
-Rust dependencies proven unused were removed; `jsrust_shared` was deliberately
+Cargo tree has no `firefox-on-glean`/`glean-core` runtime crates. Five direct
+Rust dependencies proven unused were removed (`fluent-langneg`, `ipcclientcerts`,
+`ipdl_utils`, `oblivious_http`, and `rusqlite`); `jsrust_shared` was deliberately
 retained because removing it produced unresolved SpiderMonkey encoding symbols.
 The remaining large closure is intentional: SpiderMonkey and ICU are recorded
 as a future size milestone, not guessed away in this audit.

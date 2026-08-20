@@ -756,7 +756,8 @@ After the DOM/GFX graph exclusion, the low-risk Glean/Rust pass completed on
 both targets. The browser-wide Glean index is disabled for `MOZ_NAIVEFOX`; only
 23 retained metric schemas, `netwerk/pings.yaml`, and the shared tags file are
 parsed. The active `gkrust-naivefox` Cargo tree contains no Glean runtime crate.
-Four direct Rust dependencies were removed after a successful link; the
+Five direct Rust dependencies (`fluent-langneg`, `ipcclientcerts`, `ipdl_utils`,
+`oblivious_http`, and `rusqlite`) were removed after a successful link; the
 attempted `jsrust_shared` removal was reverted because it caused unresolved
 SpiderMonkey encoding symbols.
 

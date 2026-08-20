@@ -313,9 +313,10 @@ runtime closure.
 | Dynamic dependencies | 20 | 22 |
 | `libxul`/`xul.dll` | 477.67 MiB debug; 64.57 MiB `--strip-debug`; 53.61 MiB `--strip-all` | report value |
 
-Four direct Rust dependencies proven unused were removed. `jsrust_shared` was
-retained after a removal attempt produced unresolved SpiderMonkey encoding
-symbols. The linker map records the remaining large Linux contributions:
+Five direct Rust dependencies proven unused were removed (`fluent-langneg`,
+`ipcclientcerts`, `ipdl_utils`, `oblivious_http`, and `rusqlite`).
+`jsrust_shared` was retained after a removal attempt produced unresolved
+SpiderMonkey encoding symbols. The linker map records the remaining large Linux contributions:
 `js_static` 225.86 MiB, `gkrust` 115.63 MiB, ICU 31.26 MiB, cache2 6.24 MiB,
 IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey and ICU are a
 separate future milestone; no speculative removal is claimed here.

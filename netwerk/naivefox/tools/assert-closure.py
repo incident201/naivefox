@@ -155,18 +155,18 @@ def assert_closure(report_path, topsrcdir):
     current_commit = _current_commit(topsrcdir)
     report_commit = provenance.get("source_commit_sha")
     if report_commit != current_commit:
-        # Reports are generated from a source commit and then committed as a
-        # report-only snapshot.  In that normal workflow HEAD is the report
-        # commit and HEAD^ is the audited source tree.  Accept exactly that
-        # case; any other stale report remains a hard failure.
-        parent = subprocess.run(
-            ["git", "rev-parse", f"{current_commit}^"],
+        # Reports are generated from an audited source commit and then
+        # committed as a report-only snapshot. Later documentation-only
+        # commits must not make valid evidence stale, but any source/build
+        # change after the audited point is a hard failure.
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", report_commit, current_commit],
             cwd=topsrcdir,
-            capture_output=True,
-            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         changed = subprocess.run(
-            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", current_commit],
+            ["git", "diff", "--name-only", f"{report_commit}..{current_commit}"],
             cwd=topsrcdir,
             capture_output=True,
             text=True,
@@ -175,15 +175,19 @@ def assert_closure(report_path, topsrcdir):
             "netwerk/naivefox/reports/closure-report-linux-x86_64.json",
             "netwerk/naivefox/reports/closure-report-windows-x86_64.json",
         }
-        parent_sha = parent.stdout.strip()
         changed_paths = {
             path for path in changed.stdout.splitlines() if path
         }
-        if report_commit != parent_sha or not changed_paths.issubset(report_only_paths):
+        documentation_paths = {
+            path for path in changed_paths if path.endswith(".md")
+        }
+        if ancestor.returncode != 0 or not changed_paths.issubset(
+            report_only_paths | documentation_paths
+        ):
             violations.append(
-                "stale provenance: source_commit_sha is neither current HEAD nor "
-                "the parent of a report-only commit "
-                f"({report_commit} != {current_commit})"
+                "stale provenance: source_commit_sha is not an ancestor of HEAD "
+                "with only report/documentation descendants "
+                f"({report_commit} -> {current_commit})"
             )
     if not _git_commit_exists(topsrcdir, provenance.get("source_commit_sha")):
         violations.append("source_commit_sha is not an existing commit")
