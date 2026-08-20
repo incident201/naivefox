@@ -160,9 +160,10 @@ Pre-minimization baseline tag: pre-minimization-v0.3
 
 ### Current pre-export audit provenance
 
-The last validated audit source is `4f9d5ac4d99f`.
-The closure reports were regenerated in the report-only commit
-`a8a7f1d18458`; `assert-closure.py` accepts that exact parent/report pair and
+The last validated audit source is `4238f0582b5a`.
+The closure reports are regenerated in a report-only child; the exact SHA is
+stored in each report's provenance. `assert-closure.py` accepts that exact
+parent/report pair and
 rejects any other stale provenance. The validated Firefox base remains the
 concrete snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
 upstream refresh was performed during this audit. `minimal-source` is still
