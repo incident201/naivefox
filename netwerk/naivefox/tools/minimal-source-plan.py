@@ -5,12 +5,14 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import json
 import os
 import re
 import stat
 import subprocess
+import tomllib
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -220,6 +222,7 @@ def main() -> int:
     build_source_commit = next(iter(build_source_commits))
     validate_commit(build_source_commit, "build-input reports")
     cargo_license_inventory = {}
+    active_manifests = set()
     build_collector_hash = sha256(
         repo / "netwerk/naivefox/tools/collect-build-inputs.py"
     )
@@ -246,6 +249,8 @@ def main() -> int:
             raise SystemExit(f"build-input report has stale mozconfig: {mozconfig}")
         for value in report.get("files", []):
             add(value, f"build:{report['target']}")
+            if value.endswith(".toml"):
+                active_manifests.add(value)
         directory_contracts.update(report.get("directory_contracts", []))
         for package in report.get("cargo_packages", []):
             manifest_path = package.get("manifest_path")
@@ -272,6 +277,40 @@ def main() -> int:
             if previous is not None and previous != package:
                 raise SystemExit(f"target Cargo license metadata differs for {key}")
             cargo_license_inventory[key] = package
+
+    def manifest_strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, list):
+            for item in value:
+                yield from manifest_strings(item)
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from manifest_strings(item)
+
+    for manifest in sorted(active_manifests):
+        manifest_path = repo / manifest
+        try:
+            data = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        candidates = [key for key in data if key != "DEFAULT"]
+        candidates.extend(manifest_strings(data))
+        for candidate in candidates:
+            for token in candidate.split():
+                if token.startswith(("!", "/")) or "://" in token:
+                    continue
+                pattern = manifest_path.parent / token
+                for match in glob.glob(str(pattern), recursive=False):
+                    path = Path(match)
+                    if not path.is_file():
+                        continue
+                    try:
+                        relative = path.resolve().relative_to(repo).as_posix()
+                    except ValueError:
+                        continue
+                    if relative in tracked:
+                        add(relative, "build:active-manifest-reference")
 
     closure_reports = [
         load_report(path, "linked-closure") for path in args.closure_report
