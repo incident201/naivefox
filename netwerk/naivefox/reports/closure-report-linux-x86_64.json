@@ -1,12 +1,12 @@
 {
   "report_provenance": {
-    "source_commit_sha": "51528a58ad87912c6cfc7538c3595bff6166dd8b",
+    "source_commit_sha": "745d58bf7dcb44df0b8be87b39fb7d21d19383f9",
     "source_worktree_clean": true,
     "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
     "analyzer_sha256": "c0d5e19814f88496ddf175e388c410d588909ba52cf8feef48d493e7076f8a65",
     "target_triple": "x86_64-unknown-linux-gnu",
     "mozconfig_path": "netwerk/naivefox/mozconfig-minimal",
-    "mozconfig_sha256": "e6c5d5f12e20e0131bd086dcd5dc1cc24563f51dc2de835b65237f6349d62533",
+    "mozconfig_sha256": "a6e9b6326d878b7ad3f2fc60c84d10e9ce7c970dea56d8bff96ebfad9362d127",
     "analyzer_version": "2.5.0-active-cargo-tree",
     "compiler_version": "Clang 18.1.8",
     "linker_version": "LLD 18.1.8",

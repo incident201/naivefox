@@ -11,15 +11,22 @@
     "./mach",
     "configure"
   ],
+  "configure_completion_evidence": {
+    "backend_sha256": "b59e47eaf8ad23ec685b76b34861048038778095c5286b3110f669f140a0d91f",
+    "config_status_sha256": "c798ab25580290ccf23837e959f70441e8b15b59d4c3ebef3633981ecd1a7665",
+    "kind": "completed-config-status-and-recursive-make-backend",
+    "trace_quiescent_before_termination": true,
+    "tracer_termination_reason": "strace followed the persistent sccache daemon after configure postconditions completed"
+  },
   "configure_environment": {
     "MOZCONFIG": "netwerk/naivefox/mozconfig-minimal",
-    "NAIVEFOX_DISABLE_SCCACHE": "1",
+    "NAIVEFOX_DISABLE_SCCACHE": "<unset>",
     "NAIVEFOX_OBJDIR": "<fresh-external-objdir>"
   },
   "configure_exit_status": 0,
   "counts": {
     "directories": 10922,
-    "files": 10279
+    "files": 10273
   },
   "files": [
     ".cargo/config.toml.in",
@@ -3861,10 +3868,8 @@
     "python/mozbuild/mozbuild/action/preprocessor.py",
     "python/mozbuild/mozbuild/backend/__init__.py",
     "python/mozbuild/mozbuild/backend/base.py",
-    "python/mozbuild/mozbuild/backend/clangd.py",
     "python/mozbuild/mozbuild/backend/common.py",
     "python/mozbuild/mozbuild/backend/configenvironment.py",
-    "python/mozbuild/mozbuild/backend/fastermake.py",
     "python/mozbuild/mozbuild/backend/make.py",
     "python/mozbuild/mozbuild/backend/recursivemake.py",
     "python/mozbuild/mozbuild/base.py",
@@ -3872,7 +3877,6 @@
     "python/mozbuild/mozbuild/build_commands.py",
     "python/mozbuild/mozbuild/buildversion.py",
     "python/mozbuild/mozbuild/compilation/__init__.py",
-    "python/mozbuild/mozbuild/compilation/database.py",
     "python/mozbuild/mozbuild/compilation/warnings.py",
     "python/mozbuild/mozbuild/config_status.py",
     "python/mozbuild/mozbuild/configure/__init__.py",
@@ -4085,9 +4089,6 @@
     "security/ct/metrics.yaml",
     "security/ct/moz.build",
     "security/generate_mapfile.py",
-    "security/manager/locales/en-US/chrome/pipnss/nsserrors.properties",
-    "security/manager/locales/en-US/chrome/pipnss/pipnss.properties",
-    "security/manager/locales/en-US/chrome/pippki/pippki.properties",
     "security/manager/locales/jar.mn",
     "security/manager/locales/moz.build",
     "security/manager/moz.build",
@@ -10304,7 +10305,7 @@
   ],
   "firefox_base_commit": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-  "mozconfig_sha256": "e6c5d5f12e20e0131bd086dcd5dc1cc24563f51dc2de835b65237f6349d62533",
+  "mozconfig_sha256": "a6e9b6326d878b7ad3f2fc60c84d10e9ce7c970dea56d8bff96ebfad9362d127",
   "observed_directories": [
     "browser",
     "build",
@@ -21231,11 +21232,11 @@
   ],
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "51528a58ad87912c6cfc7538c3595bff6166dd8b",
+  "source_commit": "745d58bf7dcb44df0b8be87b39fb7d21d19383f9",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "f050c2f7d06faa226db6b41a65fd7a8094168626517890811dd495ba4cfc089a",
-  "trace_size_bytes": 34170859
+  "trace_sha256": "8a522abb10923a0a5e4b0fb4fa56f5d03e10c0a2dc8e0aa1c8a325a9c1795dcb",
+  "trace_size_bytes": 41347861
 }
