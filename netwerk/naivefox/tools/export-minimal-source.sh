@@ -291,8 +291,13 @@ for path in list(entries):
                 )
             continue
         # moz.build uses a leading slash for a topsrcdir-relative path; it is
-        # not an OS absolute input in this DSL.
-        if value.startswith("/"):
+        # not an OS absolute input in this DSL.  Test manifests use the same
+        # convention with a leading "!" (for example
+        # !/services/common/tests/unit/head_global.js); normalize that marker
+        # before resolving the declaration.
+        if value.startswith("!/"):
+            candidate = (repo / value[2:]).resolve()
+        elif value.startswith("/"):
             candidate = (repo / value.lstrip("/")).resolve()
         else:
             candidate = (mozbuild.parent / value).resolve()
