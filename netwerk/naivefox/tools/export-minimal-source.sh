@@ -402,9 +402,10 @@ while gyp_queue:
         continue
     for first, second in mozbuild_literal.findall(text):
         value = first or second
-        if not value.endswith((".gyp", ".gypi")):
+        gyp_reference = value.split(":", 1)[0]
+        if not gyp_reference.endswith((".gyp", ".gypi")):
             continue
-        candidate = (gyp_path.parent / value).resolve()
+        candidate = (gyp_path.parent / gyp_reference).resolve()
         try:
             relative = candidate.relative_to(repo)
         except ValueError:
