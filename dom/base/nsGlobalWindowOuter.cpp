@@ -2068,6 +2068,10 @@ static nsresult CreateNativeGlobalForInner(
       aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),
       aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());
 
+  if (principal->IsSystemPrincipal()) {
+    creationOptions.setFreezeBuiltins(true);
+  }
+
   // Determine if we need the Components object.
   bool needComponents = principal->IsSystemPrincipal();
   uint32_t flags = needComponents ? 0 : xpc::OMIT_COMPONENTS_OBJECT;
@@ -3430,7 +3434,8 @@ CSSToLayoutDeviceScale nsGlobalWindowOuter::CSSToDevScaleForBaseWindow(
   return scale;
 }
 
-nsresult nsGlobalWindowOuter::GetInnerSize(CSSSize& aSize) {
+nsresult nsGlobalWindowOuter::GetInnerSize(CSSSize& aSize,
+                                           CallerType aCallerType) {
   if (mDoc && mDoc->IsTopLevelContentDocument() &&
       nsLayoutUtils::ShouldHandleMetaViewport(mDoc)) {
     // Window.inner{Width,Height} depend on minimum-scale size and to get the
@@ -3465,6 +3470,10 @@ nsresult nsGlobalWindowOuter::GetInnerSize(CSSSize& aSize) {
 
   aSize = CSSPixel::FromAppUnits(innerSize);
 
+  if (aCallerType == dom::CallerType::System) {
+    return NS_OK;
+  }
+
   switch (StaticPrefs::dom_innerSize_rounding()) {
     case 1:
       aSize.width = std::roundf(aSize.width);
@@ -3481,26 +3490,18 @@ nsresult nsGlobalWindowOuter::GetInnerSize(CSSSize& aSize) {
   return NS_OK;
 }
 
-double nsGlobalWindowOuter::GetInnerWidthOuter(ErrorResult& aError) {
+double nsGlobalWindowOuter::GetInnerWidthOuter(CallerType aCallerType,
+                                               ErrorResult& aError) {
   CSSSize size;
-  aError = GetInnerSize(size);
+  aError = GetInnerSize(size, aCallerType);
   return size.width;
 }
 
-nsresult nsGlobalWindowOuter::GetInnerWidth(double* aInnerWidth) {
-  FORWARD_TO_INNER_WITH_STRONG_REF(GetInnerWidth, (aInnerWidth),
-                                   NS_ERROR_UNEXPECTED);
-}
-
-double nsGlobalWindowOuter::GetInnerHeightOuter(ErrorResult& aError) {
+double nsGlobalWindowOuter::GetInnerHeightOuter(CallerType aCallerType,
+                                                ErrorResult& aError) {
   CSSSize size;
-  aError = GetInnerSize(size);
+  aError = GetInnerSize(size, aCallerType);
   return size.height;
-}
-
-nsresult nsGlobalWindowOuter::GetInnerHeight(double* aInnerHeight) {
-  FORWARD_TO_INNER_WITH_STRONG_REF(GetInnerHeight, (aInnerHeight),
-                                   NS_ERROR_UNEXPECTED);
 }
 
 CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,
@@ -3857,10 +3858,8 @@ bool nsGlobalWindowOuter::WindowExists(const nsAString& aName,
                                        bool aLookForCallerOnJSStack) {
   MOZ_ASSERT(mDocShell, "Must have docshell");
 
-  if (aForceNoOpener) {
-    return aName.LowerCaseEqualsLiteral("_self") ||
-           aName.LowerCaseEqualsLiteral("_top") ||
-           aName.LowerCaseEqualsLiteral("_parent");
+  if (aForceNoOpener && !nsContentUtils::IsSpecialName(aName)) {
+    return false;
   }
 
   if (WindowGlobalChild* wgc = mInnerWindow->GetWindowGlobalChild()) {

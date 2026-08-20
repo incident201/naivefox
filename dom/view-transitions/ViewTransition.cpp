@@ -72,7 +72,7 @@ static CSSToCSSMatrix4x4Flagged EffectiveTransform(nsIFrame* aFrame) {
       nsLayoutUtils::GetTransformToAncestor(
           RelativeTo{aFrame},
           RelativeTo{nsLayoutUtils::GetContainingBlockForClientRect(aFrame)},
-          nsIFrame::IN_CSS_UNITS, nullptr));
+          TransformMatrixFlag::InCSSUnits, nullptr));
 
   // Compensate for the default transform-origin of 50% 50% using border box
   // dimensions.
@@ -1432,8 +1432,8 @@ Maybe<SkipTransitionReason> ViewTransition::CaptureOldState() {
       // capturing of old content.
       if (RefPtr widget = ps->GetRootWidget()) {
         VT_LOG("ViewTransitions::CaptureOldState(), requesting composite");
-        ps->PaintAndRequestComposite(ps->GetRootFrame(),
-                                     widget->GetWindowRenderer(),
+        RefPtr<WindowRenderer> renderer = widget->GetWindowRenderer();
+        ps->PaintAndRequestComposite(ps->GetRootFrame(), renderer,
                                      PaintFlags::PaintCompositeOffscreen);
         VT_LOG("ViewTransitions::CaptureOldState(), requesting composite end");
       }

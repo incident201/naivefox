@@ -126,6 +126,8 @@ class ResponsiveUI extends EventEmitter {
     this.mouseScreenYWhilePressed = null;
   }
 
+  #reloadNotificationMessageElement;
+
   get toolWindow() {
     return this.rdmFrame.contentWindow;
   }
@@ -416,6 +418,11 @@ class ResponsiveUI extends EventEmitter {
       0
     );
 
+    if (this.#reloadNotificationMessageElement) {
+      this.#reloadNotificationMessageElement.close();
+      this.#reloadNotificationMessageElement = null;
+    }
+
     // Ensure the tab is reloaded if required when exiting RDM so that no emulated
     // settings are left in a customized state.
     if (!isTabContentDestroying) {
@@ -503,12 +510,16 @@ class ResponsiveUI extends EventEmitter {
   /**
    * Show one-time notification about reloads for responsive emulation.
    */
-  showReloadNotification() {
+  async showReloadNotification() {
     if (Services.prefs.getBoolPref(RELOAD_NOTIFICATION_PREF, false)) {
-      showNotification(this.browserWindow, this.tab, {
-        msg: l10n.getFormatStr("responsive.reloadNotification.description2"),
-      });
       Services.prefs.setBoolPref(RELOAD_NOTIFICATION_PREF, false);
+      this.#reloadNotificationMessageElement = await showNotification(
+        this.browserWindow,
+        this.tab,
+        {
+          msg: l10n.getFormatStr("responsive.reloadNotification.description2"),
+        }
+      );
     }
   }
 
@@ -897,7 +908,10 @@ class ResponsiveUI extends EventEmitter {
     // that will accomodate its height. We should also make sure to keep
     // the width value we're toggling against in sync with the media-query
     // in devtools/client/responsive/index.css
-    this.rdmFrame.classList.toggle("accomodate-ua", event.data.isNarrowLayout);
+    this.browserContainerEl.classList.toggle(
+      "accomodate-ua",
+      event.data.isNarrowLayout
+    );
   }
 
   async hasDeviceState() {

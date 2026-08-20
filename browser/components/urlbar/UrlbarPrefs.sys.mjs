@@ -130,6 +130,12 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // 0 - never resolve; 1 - use heuristics (default); 2 - always resolve
   ["dnsResolveSingleWordsAfterSearch", 0],
 
+  // Maximum time (ms) the event bufferer defers events for. In automation
+  // providers can be quite slow, thus we need a longer timeout to avoid
+  // intermittent failures. Must be larger than
+  // ProvidersManager.chunkResultsDelayMs.
+  ["eventBufferer.deferringTimeoutMs", Cu.isInAutomation ? 1500 : 300],
+
   // If Suggest is disabled before these seconds from a search, then send a
   // disable event.
   ["events.disableSuggest.maxSecondsFromLastSearch", 300],
@@ -253,6 +259,9 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // for mdn suggestions.
   ["mdn.showLessFrequentlyCount", 0],
 
+  // The maximum number of tab mentions the Smartbar suggests.
+  ["mentions.maxResults", 5],
+
   // Comma-separated list of client variants to send to Merino
   ["merino.clientVariants", ""],
 
@@ -277,6 +286,10 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
 
   // Set default NER threshold value of 0.5
   ["nerThreshold", [0.5, "float"]],
+
+  // Feature gate pref for the <moz-urlbar> on about:newtab and about:home. When
+  // enabled, it supersedes New Tab's handoff search bar.
+  ["newtab.featureGate", false],
 
   // Whether addresses and search results typed into the address bar
   // should be opened in new tabs by default.
@@ -463,6 +476,11 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // Allow searchmode to be persisted as the user navigates the
   // search host.
   ["scotchBonnet.persistSearchMode", false],
+
+  // Whether the search button declines to be the target of the toolbar tab
+  // stop in front of the input. The shipping default is set in firefox.js,
+  // where it's enabled on Nightly only.
+  ["searchModeSwitcher.skipTabStop", false],
 
   // Feature gate pref for search restrict keywords being shown in the urlbar.
   ["searchRestrictKeywords.featureGate", false],
@@ -763,7 +781,11 @@ const PREF_OTHER_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   ["browser.search.suggest.enabled", true],
   ["browser.search.suggest.enabled.private", false],
   ["browser.search.widget.new", true],
+  ["browser.settings-redesign.enabled", true],
+  ["browser.smartwindow.agent.enabled", false],
+  ["browser.smartwindow.smartbarMentions.loglevel", "Error"],
   ["keyword.enabled", true],
+  ["privacy.query_stripping.strip_on_share.enabled", true],
   ["security.insecure_connection_text.enabled", true],
   [TelemetryReportingPolicy.TOU_ACCEPTED_DATE_PREF, 0],
   ["ui.popup.disable_autohide", false],
@@ -1279,7 +1301,8 @@ class Preferences {
           })
         );
       }
-      case "searchbar": {
+      case "searchbar":
+      case "newtab_searchbar": {
         // This is a temporary placeholder until searchbar gets its own config.
         return this.#getOrCacheResultGroups(key, () =>
           makeDefaultResultGroups({

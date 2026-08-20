@@ -5196,15 +5196,24 @@ bool ScrollContainerFrame::ScrollSnap(const nsPoint& aDestination,
 }
 
 nsSize ScrollContainerFrame::GetLineScrollAmount() const {
-  RefPtr<nsFontMetrics> fm =
-      nsLayoutUtils::GetInflatedFontMetricsForFrame(this);
-  NS_ASSERTION(fm, "FontMetrics is null, assuming fontHeight == 1 appunit");
   int32_t appUnitsPerDevPixel = PresContext()->AppUnitsPerDevPixel();
   nscoord minScrollAmountInAppUnits =
       std::max(1, StaticPrefs::mousewheel_min_line_scroll_amount()) *
       appUnitsPerDevPixel;
-  nscoord horizontalAmount = fm ? fm->AveCharWidth() : 0;
-  nscoord verticalAmount = fm ? fm->MaxHeight() : 0;
+
+  nscoord horizontalAmount, verticalAmount;
+  const auto& lineScrollAmount = StyleUIReset()->mMozLineScrollAmount;
+  if (lineScrollAmount.IsLength()) {
+    // A list of items can call an item a line, on whichever axis it scrolls.
+    horizontalAmount = verticalAmount =
+        lineScrollAmount.AsLength().ToAppUnits();
+  } else {
+    RefPtr<nsFontMetrics> fm =
+        nsLayoutUtils::GetInflatedFontMetricsForFrame(this);
+    NS_ASSERTION(fm, "FontMetrics is null, assuming fontHeight == 1 appunit");
+    horizontalAmount = fm ? fm->AveCharWidth() : 0;
+    verticalAmount = fm ? fm->MaxHeight() : 0;
+  }
   return nsSize(std::max(horizontalAmount, minScrollAmountInAppUnits),
                 std::max(verticalAmount, minScrollAmountInAppUnits));
 }
@@ -7397,13 +7406,15 @@ UniquePtr<PresState> ScrollContainerFrame::SaveState() {
   }
 
   // Don't store a scroll state if we never have been scrolled or restored
-  // a previous scroll state, and we're not in the middle of a smooth scroll.
+  // a previous scroll state, we're not in the middle of a smooth scroll,
+  // and we have no overflow state.
   auto scrollAnimationState = ScrollAnimationState();
   bool isScrollAnimating =
       scrollAnimationState.contains(AnimationState::MainThread) ||
       scrollAnimationState.contains(AnimationState::APZPending) ||
       scrollAnimationState.contains(AnimationState::APZRequested);
-  if (!mHasBeenScrolled && !mDidHistoryRestore && !isScrollAnimating) {
+  if (!mHasBeenScrolled && !mDidHistoryRestore && !isScrollAnimating &&
+      !mHorizontalOverflow && !mVerticalOverflow) {
     return nullptr;
   }
 
@@ -7433,6 +7444,8 @@ UniquePtr<PresState> ScrollContainerFrame::SaveState() {
   }
   state->scrollState() = pt;
   state->allowScrollOriginDowngrade() = allowScrollOriginDowngrade;
+  state->horizontalOverflow() = mHorizontalOverflow;
+  state->verticalOverflow() = mVerticalOverflow;
   if (mIsRoot) {
     // Only save resolution properties for root scroll frames
     state->resolution() = PresShell()->GetResolution();
@@ -7444,6 +7457,8 @@ NS_IMETHODIMP ScrollContainerFrame::RestoreState(PresState* aState) {
   mRestorePos = aState->scrollState();
   MOZ_ASSERT(mLastScrollOrigin == ScrollOrigin::None);
   mAllowScrollOriginDowngrade = aState->allowScrollOriginDowngrade();
+  mHorizontalOverflow = aState->horizontalOverflow();
+  mVerticalOverflow = aState->verticalOverflow();
   // When restoring state, we promote mLastScrollOrigin to a stronger value
   // from the default of eNone, to restore the behaviour that existed when
   // the state was saved. If mLastScrollOrigin was a weaker value previously,

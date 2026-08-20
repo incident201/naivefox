@@ -7,12 +7,15 @@
 #include <comdef.h>
 
 #include "WMFUtils.h"
+#include "mozilla/AppShutdown.h"
+#include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Logging.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/WindowsProcessMitigations.h"
 #include "mozilla/dom/WebCodecsUtils.h"
 #include "mozilla/mscom/COMWrappers.h"
 #include "mozilla/mscom/Utils.h"
+#include "nsThreadUtils.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -386,11 +389,12 @@ static void PopulateEncoderInfo(const GUID& aSubtype,
 }
 
 Maybe<MFTEncoder::Info> MFTEncoder::GetInfo(const GUID& aSubtype) {
-  nsTArray<Info>& infos = Infos();
-
-  for (auto i : infos) {
-    if (IsEqualGUID(aSubtype, i.mSubtype)) {
-      return Some(i);
+  StaticMutexAutoLock lock(sInfoMutex);
+  if (auto* infos = Infos()) {
+    for (const auto& info : *infos) {
+      if (IsEqualGUID(aSubtype, info.mSubtype)) {
+        return Some(info);
+      }
     }
   }
   return Nothing();
@@ -418,9 +422,19 @@ nsTArray<MFTEncoder::Info> MFTEncoder::Enumerate() {
   return infos;
 }
 
-nsTArray<MFTEncoder::Info>& MFTEncoder::Infos() {
-  static nsTArray<Info> infos = Enumerate();
-  return infos;
+nsTArray<MFTEncoder::Info>* MFTEncoder::Infos() {
+  if (!sInfos && !AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdown)) {
+    sInfos = new nsTArray<Info>(Enumerate());
+    NS_DispatchToMainThread(NS_NewRunnableFunction("MFTEncoder::Infos", []() {
+      RunOnShutdown(
+          []() {
+            StaticMutexAutoLock lock(sInfoMutex);
+            sInfos = nullptr;
+          },
+          ShutdownPhase::XPCOMShutdownThreads);
+    }));
+  }
+  return sInfos.get();
 }
 
 static Result<Ok, nsCString> IsSupported(

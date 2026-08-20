@@ -661,12 +661,28 @@ urlbar:
         branch: user
         pref: places.semanticHistory.embeddingType
       description: >-
-        Embedding family used by Places semantic history: "static" (default,
-        lightweight) or "contextual" (transformer-based, larger). Changing
-        this on a live profile drops the embedding tables and rebuilds them
-        on next startup. Contextual model details (dimension, modelId,
-        wasm fallback) are controlled by the browser.ml.embedGen.* prefs and
-        are intentionally not exposed via Nimbus.
+        Embedding family used by Places semantic history: "static"
+        (lightweight) or "contextual" (transformer-based, larger). When unset
+        or empty, the family is derived from the home region, the app locale
+        and the OS: contextual in the markets listed in
+        `semanticHistoryMultilingualEmbeddingRegions` on Mac/Windows, static
+        everywhere else. Changing this on a live profile drops the embedding
+        tables and rebuilds them on next startup. Contextual model details
+        (dimension, modelId) are controlled by the browser.ml.embedGen.* prefs
+        and are intentionally not exposed via Nimbus.
+    semanticHistoryMultilingualEmbeddingRegions:
+      type: string
+      setPref:
+        branch: user
+        pref: places.semanticHistory.multilingualEmbeddingRegions
+      description: >-
+        map-like JSON of regions and locales that get multilingual (contextual)
+        embeddings, used when `semanticHistoryEmbeddingType` is unset or empty.
+        Same format as `semanticHistorySupportedRegions`, except that a "*"
+        region matches any region. The entries are OR-ed, so
+        '[["FR",["en-*","fr-*"]],["*",["fr-*"]]]' means France in English or
+        French, or a French locale anywhere. An empty value disables
+        multilingual embeddings everywhere.
     semanticHistoryInSeparateGroup:
       type: boolean
       setPref:
@@ -1346,13 +1362,6 @@ newtabPrivatePing:
         pref: browser.newtabpage.activity-stream.telemetry.privatePing.enabled
       description: >-
         Enables the private newtab-content ping sent through OHTTP
-    redactNewtabPing:
-      type: boolean
-      setPref:
-        branch: user
-        pref: browser.newtabpage.activity-stream.telemetry.privatePing.redactNewtabPing.enabled
-      description: >-
-        Provides an option to redact content ids of users from click, impression and related events in the NewTab ping. Should be enabled when data colection has shefted to the more private NewTab_content ping.
     includeInferredInterests:
       type: boolean
       setPref:
@@ -2787,6 +2796,19 @@ pbNewtab:
     path: "browser/components/asrouter/content-src/schemas/MessagingExperiment.schema.json"
   variables: {}
 
+privateWindowRedesign:
+  description: "Experimental features for the private browsing window redesign"
+  owner: omc-core@mozilla.com
+  hasExposure: false
+  variables:
+    pbwRedesignGate:
+      type: boolean
+      setPref:
+        branch: default
+        pref: "browser.privateWindowRedesign.enabled"
+      description: >-
+        Enables the new private browsing window redesign, including updated styling, promotions, animation and other visual improvements.
+
 backgroundTaskMessage:
   description: "A Firefox Messaging System message for the background task message channel"
   owner: nalexander@mozilla.com
@@ -3342,6 +3364,12 @@ localNetworkAccess:
       setPref:
         branch: default
         pref: "network.lna.enabled"
+    blockInsecureContexts:
+      description: Whether LNA requests from insecure contexts should be blocked outright, without prompting the user for permission.
+      type: boolean
+      setPref:
+        branch: default
+        pref: "network.lna.block_insecure_contexts"
 
 essentialFallbackDomains:
   description: "Whether to retry failing system requests with a backup domain"
@@ -6002,6 +6030,32 @@ smartWindow:
       description: >-
         Comma-separated list of screen ids that should be hidden in the Smart
         Window first run onboarding.
+
+smartWindowAgentWatch:
+  description: >-
+    Controls the Smart Window agent watch feature - whether users can create a
+    watch task (a task that monitors a page for changes). This gates the capability
+    itself, including its "/watch" command palette entry. Existing Smart Window
+    eligibility checks still apply.
+  owner: yjamora@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: default
+        pref: browser.smartwindow.agent.enabled
+      description: >-
+        Enables the Smart Window Agent Watch feature when true. Set to false
+        to disable the rollout.
+    supportedRegions:
+      type: string
+      setPref:
+        branch: default
+        pref: browser.smartwindow.agent.supportedRegions
+      description: >-
+        Comma-separated list of region codes where the agent watch command is
+        available, for example "US,CA".
 
 contentSharing:
   description: Controls the content sharing feature, which allows users to share browser content.

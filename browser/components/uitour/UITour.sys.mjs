@@ -466,9 +466,11 @@ export var UITour = {
             return data.email
               ? lazy.FxAccounts.config.promiseEmailURI(
                   data.email,
+                  "sync",
                   data.entrypoint || "uitour"
                 )
               : lazy.FxAccounts.config.promiseConnectAccountURI(
+                  "sync",
                   data.entrypoint || "uitour"
                 );
           })
@@ -515,7 +517,7 @@ export var UITour = {
 
       case "showConnectAnotherDevice": {
         lazy.FxAccounts.config
-          .promiseConnectDeviceURI(data.entrypoint || "uitour")
+          .promiseConnectDeviceURI("sync", data.entrypoint || "uitour")
           .then(uri => {
             const url = new URL(uri);
             // Call our helper to validate extraURLParams and populate URLSearchParams

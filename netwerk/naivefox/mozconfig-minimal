@@ -17,6 +17,7 @@ ac_add_options --disable-backgroundtasks
 ac_add_options --disable-sandbox
 ac_add_options --disable-updater
 ac_add_options --disable-webrtc
+ac_add_options --disable-ctypes
 ac_add_options --disable-accessibility
 ac_add_options --disable-necko-wifi
 ac_add_options --without-wasm-sandboxed-libraries

@@ -458,11 +458,11 @@ export class MLEngineParent extends JSProcessActorParent {
     const modelHub = this.modelHub;
     await Promise.all(
       [...this.#modelFilesInUse].map(async ([key, entry]) => {
-        await modelHub.deleteNonMatchingModelRevisions(
-          entry.taskName,
-          entry.modelWithHostname,
-          entry.revision
-        );
+        await modelHub.deleteNonMatchingModelRevisions({
+          taskName: entry.taskName,
+          modelWithHostname: entry.modelWithHostname,
+          targetRevision: entry.revision,
+        });
         this.#modelFilesInUse.delete(key);
       })
     );
@@ -1630,6 +1630,13 @@ export class MLEngine {
     const completionPromise = responseChunkResolvers.promise.finally(() => {
       completed = true;
     });
+
+    // A consumer can abandon this generator before the `await completionPromise`
+    // below runs (an early return from its `for await`, or a throw while
+    // handling a chunk). The engine still settles the request, so make sure its
+    // rejection always has a handler and isn't reported as an uncaught rejection
+    // that keeps the caller alive when nobody is awaiting it anymore.
+    completionPromise.catch(() => {});
 
     // Handle transferables for performance optimization
     const transferables = [];

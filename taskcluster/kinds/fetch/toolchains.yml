@@ -317,6 +317,15 @@ rust-size:
         repo: https://github.com/luser/rust-size
         revision: ab659d93b1faba95307df952aefe3fbed3583669
 
+rust-analyzer-linux64:
+    description: rust-analyzer 2026-08-10.1
+    fetch:
+        type: static-url
+        url: https://github.com/rust-lang/rust-analyzer/releases/download/2026-08-10.1/rust-analyzer-x86_64-unknown-linux-gnu.gz
+        sha256: d42908a7dc7b89250ae881a0919e477296843665c98574ecc8fe16ba60cecefb
+        size: 14805784
+        artifact-name: rust-analyzer.gz
+
 gn:
     description: GN source code
     fetch:
@@ -423,13 +432,13 @@ clang-trunk:
 # We build stable rust from source so the resulting compiler acts as a nightly
 # rust compiler, allowing to use unstable features like -Zbuild-std and
 # sanitizers.
-rust-1.94.1:
-    description: Rust 1.94.1 source code
+rust-1.95.0:
+    description: Rust 1.95.0 source code
     fetch:
         type: git
         include-dot-git: true
         repo: https://github.com/rust-lang/rust/
-        revision: e408947bfd200af42db322daf0fadfe7e26d3bd1
+        revision: 59807616e1fa2540724bfbac14d7976d7e4a3860
 
 rust-nightly:
     description: Rust nightly source code
@@ -574,7 +583,7 @@ samply:
     fetch:
         type: git
         repo: https://github.com/mstange/samply
-        revision: 49c072db1a88165c9ba92b7b0ee0d425bb6e7231
+        revision: bc0cd2fe29c9de471653c0891162569760fa0e5e
 
 nodejs-12-linux64:
     description: nodejs 12 for x64 linux
@@ -895,7 +904,7 @@ firefox-profiler:
     fetch:
         type: git
         repo: https://github.com/firefox-devtools/profiler
-        revision: 2063118de00e9f4e424f3ee18ad8b085afe7986c
+        revision: a04f7ea013f28042d203b2c2db3fc632506d2903
 
 # See https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads
 # We can't catch regressions from these updates in CI. Testing should focus on

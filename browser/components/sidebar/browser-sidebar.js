@@ -368,6 +368,7 @@ var SidebarController = {
   _windowRestoredObserverAdded: false,
   _mainResizeObserver: null,
   _ongoingAnimations: [],
+  _collapsedWidthMeasurementID: 0,
 
   /**
    * @type {MutationObserver | null}
@@ -1923,24 +1924,7 @@ var SidebarController = {
       return;
     }
 
-    const preferredHeight = this._state.launcherExpanded
-      ? this._state.expandedPinnedTabsHeight
-      : this._state.collapsedPinnedTabsHeight;
-
-    if (!preferredHeight) {
-      // Nothing stored for this state, so clear any height left over from the
-      // other state rather than leaving it stranded at the wrong size.
-      this._pinnedTabsContainer.style.height = "";
-      return;
-    }
-
-    let itemsWrapperHeight = window.windowUtils.getBoundsWithoutFlushing(
-      this._pinnedTabsItemsWrapper
-    ).height;
-
-    // Clamp for display only — never overwrite the user's saved preference
-    const clampedHeight = Math.min(preferredHeight, itemsWrapperHeight);
-    this._pinnedTabsContainer.style.height = `${clampedHeight}px`;
+    this._state.updatePinnedTabsHeight();
   },
 
   async updatePinnedTabsHeightAfterReflow() {
@@ -2713,17 +2697,37 @@ var SidebarController = {
     return this._mouseEnterDeferred?.promise || Promise.resolve();
   },
 
+  /**
+   * Record the launcher's collapsed width, which the content area's
+   * compensating margins are derived from while the launcher is expanded and
+   * therefore out of flow.
+   *
+   * The resize observer that drives this watches #sidebar-container, so a burst
+   * of resizes (e.g. a uidensity change) starts several overlapping
+   * runs, with each awaiting before measuring. Unless every run checks that
+   * it is still the most recent one, they can resolve out of order and leave a
+   * stale width recorded.
+   */
   async setLauncherCollapsedWidth() {
     let browserEl = document.getElementById("browser");
+    const measurementID = ++this._collapsedWidthMeasurementID;
     if (this.getUIState().launcherExpanded) {
       this._state.launcherExpanded = false;
     }
     await this.waitUntilStable();
-    let collapsedWidth = await new Promise(resolve => {
-      requestAnimationFrame(() => {
-        resolve(this._getRects([this.sidebarContainer])[0][1].width);
-      });
-    });
+    let collapsedWidth = await window.promiseDocumentFlushed(
+      () => this._getRects([this.sidebarContainer])[0][1].width
+    );
+
+    if (measurementID !== this._collapsedWidthMeasurementID) {
+      // A later run superseded us while we were waiting.
+      return;
+    }
+    if (this._state.launcherExpanded) {
+      // The launcher expanded again while we were waiting, so what we just
+      // measured isn't a collapsed width.
+      return;
+    }
 
     browserEl.style.setProperty(
       "--sidebar-launcher-collapsed-width",

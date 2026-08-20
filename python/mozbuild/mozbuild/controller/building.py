@@ -1253,6 +1253,7 @@ class BuildDriver(MozbuildObject):
         mach_context=None,
         append_env=None,
         allow_subdirectory_build=False,
+        no_completion_messages=False,
     ):
         self._ensure_build_log_dir_exists()
         warnings_path = self._get_build_log_filename(construct_log_filename("warnings"))
@@ -1270,6 +1271,7 @@ class BuildDriver(MozbuildObject):
             mach_context,
             append_env,
             allow_subdirectory_build,
+            no_completion_messages,
         )
 
         record_usage = True
@@ -1296,6 +1298,7 @@ class BuildDriver(MozbuildObject):
         mach_context=None,
         append_env=None,
         allow_subdirectory_build=False,
+        no_completion_messages=False,
     ):
         """Invoke the build backend.
 
@@ -1546,12 +1549,15 @@ class BuildDriver(MozbuildObject):
                 # If the backend doesn't specify a build() method, then just
                 # call client.mk directly.
                 # In automation, client.mk starts the sccache daemon, which
-                # only reads SCCACHE_BASEDIRS when it starts, so it needs the
-                # variable in its environment. config.mk covers the sub-makes.
+                # only reads its configuration from the environment when it
+                # starts, so it needs the sccache variables in its environment.
+                # config.mk covers the sub-makes.
                 client_mk_env = dict(append_env or {})
-                sccache_basedirs = config.substs.get("SCCACHE_BASEDIRS")
-                if sccache_basedirs:
-                    client_mk_env["SCCACHE_BASEDIRS"] = sccache_basedirs
+                client_mk_env.update(
+                    (name, value)
+                    for name, value in config.substs.items()
+                    if name.startswith("SCCACHE_")
+                )
                 status = self._run_client_mk(
                     line_handler=output.on_stdout_line,
                     stderr_line_handler=output.on_stderr_line,
@@ -1720,14 +1726,18 @@ class BuildDriver(MozbuildObject):
             # Just stick with the default
             pass
 
-        if monitor.elapsed > notify_minimum_time:
+        if not no_completion_messages and monitor.elapsed > notify_minimum_time:
             # Display a notification when the build completes.
             self.notify("Build complete" if not status else "Build failed")
 
         if status:
-            if what and any([
-                target for target in what if target not in ("faster", "binaries")
-            ]):
+            if (
+                not no_completion_messages
+                and what
+                and any([
+                    target for target in what if target not in ("faster", "binaries")
+                ])
+            ):
                 print(
                     "Hey! Builds initiated with `mach build "
                     "$A_SPECIFIC_TARGET` may not always work, even if the "
@@ -1736,6 +1746,12 @@ class BuildDriver(MozbuildObject):
                 )
             return status
 
+        if not no_completion_messages:
+            self._print_build_completion_messages(monitor, what, using_sccache)
+
+        return status
+
+    def _print_build_completion_messages(self, monitor, what, using_sccache):
         if monitor.have_resource_usage:
             excessive, swap_in, swap_out = monitor.have_excessive_swapping()
             # if excessive:
@@ -1796,8 +1812,6 @@ class BuildDriver(MozbuildObject):
                 # Ignore Exceptions in case we can't find config.status (such
                 # as when doing OSX Universal builds)
                 pass
-
-        return status
 
     def configure(
         self,

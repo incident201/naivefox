@@ -10,8 +10,9 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
  * @import {SearchEngine} from "moz-src:///toolkit/components/search/SearchEngine.sys.mjs"
  * @import {SapLocation, SmartbarInput} from "moz-src:///browser/components/urlbar/content/SmartbarInput.mjs"
  * @import {UrlbarView} from "chrome://browser/content/urlbar/UrlbarView.mjs"
- * @import {WindowMode} from "moz-src:///browser/components/urlbar/content/UrlbarInput.mjs"
+ * @import {WindowMode} from "moz-src:///browser/components/urlbar/content/UrlbarInputBase.mjs"
  * @import {SearchEngineInfo} from "chrome://browser/content/urlbar/SearchEngineStore.mjs"
+ * @import {UrlbarLoadRequest} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
  */
 
 const lazy = {};
@@ -154,6 +155,7 @@ export class UrlbarParentController {
 
     this.engagementEvent = new TelemetryEvent(this);
     lazy.UrlbarProviderTopSites.addTopSitesListener(this.#topSitesListener);
+    Services.obs.addObserver(this, "intl:app-locales-changed", true);
   }
 
   /**
@@ -299,8 +301,9 @@ export class UrlbarParentController {
    *   The id of the browser committed at Enter; its per-tab data and navigation
    *   epoch are read here, defaulting to the selected browser.
    * @returns {Promise<object>}
-   *   `{ heuristicResult }` to pick, `{ fixup: { url, postData, keywordAsSent } }`
-   *   to load, or `{}` when the browser navigated in the meanwhile.
+   *   `{ heuristicResult }` to pick,
+   *   `{ fixup: { url, postData: ?string, keywordAsSent } }` to load, or `{}`
+   *   when the browser navigated in the meanwhile.
    */
   async resolveFallbackNavigation({
     searchString,
@@ -371,7 +374,16 @@ export class UrlbarParentController {
           Services.uriFixup.getFixupURIInfo(searchString, flags);
         return navigated()
           ? {}
-          : { fixup: { url: preferredURI.spec, postData, keywordAsSent } };
+          : {
+              fixup: {
+                url: preferredURI.spec,
+                // Post data only happens if the default engine is POST (rare)
+                postData: postData
+                  ? lazy.UrlbarUtils.getPostDataString(postData)
+                  : null,
+                keywordAsSent,
+              },
+            };
       } catch (fixupEx) {
         // uriFixup can throw; swallow it so the resolve never rejects.
         console.error(fixupEx);
@@ -965,8 +977,8 @@ export class UrlbarParentController {
    * revert the input.
    *
    * @param {object} loadData
-   * @param {string} loadData.url
-   *   The URL to load.
+   * @param {UrlbarLoadRequest} loadData.loadRequest
+   *   What to load.
    * @param {string} loadData.where
    *   Where to open, per `openTrustedLinkIn`.
    * @param {object} loadData.params
@@ -983,10 +995,16 @@ export class UrlbarParentController {
    *   browser to hand `focusBrowser` on the deferred-Enter keyup -- a
    *   content-process input can't resolve the selected browser itself.
    */
-  loadURL({ url, where, params, browserId, userTypedValue }) {
+  loadURL({ loadRequest, where, params, browserId, userTypedValue }) {
     let browser =
       this.resolveTargetBrowser(browserId) ||
       this.browserWindow.gBrowser.selectedBrowser;
+
+    let { url, postData } = lazy.UrlbarUtils.loadRequestToUrl(loadRequest);
+    if (!url) {
+      return { reverted: true, browserId: browser.browserId };
+    }
+    params.postData = postData;
 
     if (this.#isAddressbar) {
       this.#prepareAddressbarLoad({
@@ -1093,12 +1111,8 @@ export class UrlbarParentController {
       if (!activeSplitView && prevTab.isEmpty) {
         gBrowser.removeTab(prevTab);
       }
-      if (!this.isPrivate && !heuristic) {
-        // We don't await this, because a rejection should not interrupt the
-        // load. Just reportError it.
-        lazy.UrlbarUtils.addToInputHistory(url, searchString).catch(
-          console.error
-        );
+      if (!heuristic) {
+        this.addToInputHistory(url, searchString);
       }
       return;
     }
@@ -1113,6 +1127,35 @@ export class UrlbarParentController {
       tabGroup,
       this.isPrivate
     );
+  }
+
+  /**
+   * Adds a (url, input) tuple to the input history that drives adaptive
+   * results. Places writes only happen in the parent, so callers route here.
+   * No-ops in private browsing.
+   *
+   * The write runs in the background and a failure is only reported to the
+   * console.
+   *
+   * @param {string} url
+   *   The picked URL.
+   * @param {string} input
+   *   The search string to associate with it.
+   * @param {object} [options]
+   * @param {boolean} [options.whenReady]
+   *   Whether to wait for the URL to land in moz_places before writing, for a
+   *   URL that only the imminent navigation will record a visit for. The
+   *   observer this needs is registered synchronously, so the caller can start
+   *   the navigation right after.
+   */
+  addToInputHistory(url, input, { whenReady = false } = {}) {
+    if (this.isPrivate) {
+      return;
+    }
+    let promise = whenReady
+      ? lazy.UrlbarUtils.addToInputHistoryWhenReady(url, input)
+      : lazy.UrlbarUtils.addToInputHistory(url, input);
+    promise.catch(console.error);
   }
 
   /**
@@ -1254,6 +1297,7 @@ export class UrlbarParentController {
       Services.obs.removeObserver(this, "browser-search-engine-modified");
       this.#engineObserverRegistered = false;
     }
+    Services.obs.removeObserver(this, "intl:app-locales-changed");
   }
 
   /**
@@ -1318,11 +1362,29 @@ export class UrlbarParentController {
   ]);
 
   /**
-   * @param {{wrappedJSObject: SearchEngine}} subject
-   * @param {"browser-search-engine-modified"} _topic
+   * @param {nsISupports} subject
+   * @param {"browser-search-engine-modified"|"intl:app-locales-changed"} topic
    * @param {string} data
    */
-  observe = (subject, _topic, data) => {
+  observe = (subject, topic, data) => {
+    switch (topic) {
+      case "browser-search-engine-modified":
+        this.#onSearchEngineModified(
+          /** @type {{wrappedJSObject: SearchEngine}} */ (subject),
+          data
+        );
+        break;
+      case "intl:app-locales-changed":
+        this.view.clearL10nCache();
+        break;
+    }
+  };
+
+  /**
+   * @param {{wrappedJSObject: SearchEngine}} subject
+   * @param {string} data
+   */
+  #onSearchEngineModified(subject, data) {
     let engine = subject.wrappedJSObject;
     let sortedEngines = lazy.SearchService.visibleEngines;
     let index = sortedEngines.findIndex(e => e == engine);
@@ -1358,7 +1420,7 @@ export class UrlbarParentController {
         }
         break;
     }
-  };
+  }
 }
 
 /**
@@ -1451,7 +1513,7 @@ export class TelemetryEvent {
     }
 
     this._startEventInfo = {
-      timeStamp: event.timeStamp || ChromeUtils.now(),
+      timeStamp: event.timeStamp,
       interactionType:
         interactionType ||
         lazy.UrlbarTelemetryUtils.startInteractionType(event, searchString),

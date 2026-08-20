@@ -211,6 +211,7 @@ export var SyncHelpers = new (class SyncHelpers {
           return;
         }
         const url = await window.FxAccounts.config.promiseConnectAccountURI(
+          "sync",
           this.getEntryPoint()
         );
         this.replaceTabWithUrl(url);
@@ -227,6 +228,7 @@ export var SyncHelpers = new (class SyncHelpers {
       return;
     }
     const url = await window.FxAccounts.config.promiseConnectAccountURI(
+      "sync",
       this.getEntryPoint()
     );
     this.replaceTabWithUrl(url);
@@ -241,8 +243,10 @@ export var SyncHelpers = new (class SyncHelpers {
    *        different entrypoints to accounts
    */
   async reSignIn(entrypoint) {
-    const url =
-      await window.FxAccounts.config.promiseConnectAccountURI(entrypoint);
+    const url = await window.FxAccounts.config.promiseConnectAccountURI(
+      "sync",
+      entrypoint
+    );
     this.replaceTabWithUrl(url);
   }
 
@@ -663,7 +667,7 @@ Preferences.addSetting({
   },
   setup(emitChange) {
     window.FxAccounts.config
-      .promiseConnectDeviceURI(SyncHelpers.getEntryPoint())
+      .promiseConnectDeviceURI("sync", SyncHelpers.getEntryPoint())
       .then(connectURI => {
         SyncHelpers.connectAnotherDeviceHref = connectURI;
         emitChange();
@@ -823,6 +827,9 @@ Preferences.addSetting({
   },
   visible() {
     return Referrals.isEnabled;
+  },
+  onUserClick: () => {
+    Referrals.openReferralsTab(window, "preferences");
   },
 });
 
@@ -1139,11 +1146,8 @@ SettingGroupManager.registerGroups({
     items: [
       {
         id: "referrals-link",
-        control: "moz-box-link",
+        control: "moz-box-button",
         l10nId: "referrals-link",
-        controlAttrs: {
-          href: "about:referrals",
-        },
       },
     ],
   },

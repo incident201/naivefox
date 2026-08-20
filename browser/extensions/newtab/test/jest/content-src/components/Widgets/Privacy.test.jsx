@@ -73,7 +73,39 @@ function renderPrivacy(dispatch = jest.fn(), props = {}, state = mockState) {
   };
 }
 
+// Returns the WIDGETS_USER_EVENT action dispatched for a given user_action.
+function findUserEvent(dispatch, userAction) {
+  return dispatch.mock.calls
+    .map(([action]) => action)
+    .find(
+      action =>
+        action.type === at.WIDGETS_USER_EVENT &&
+        action.data.user_action === userAction
+    );
+}
+
 describe("Privacy widget", () => {
+  // The impression-time telemetry now waits for the widget to be seen. The
+  // default jest IntersectionObserver mock never fires, so install one that
+  // reports the element as intersecting the moment it's observed.
+  let originalIntersectionObserver;
+  beforeEach(() => {
+    originalIntersectionObserver = global.IntersectionObserver;
+    global.IntersectionObserver = class {
+      constructor(callback) {
+        this.callback = callback;
+      }
+      observe(el) {
+        this.callback([{ isIntersecting: true, target: el }]);
+      }
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+  afterEach(() => {
+    global.IntersectionObserver = originalIntersectionObserver;
+  });
+
   it("renders the widget at the resolved size", () => {
     const { container } = renderPrivacy();
     const root = container.querySelector("article.privacy");
@@ -81,14 +113,27 @@ describe("Privacy widget", () => {
     expect(root.className).toContain("medium-widget");
   });
 
-  it("dispatches an impression once when it scrolls into view", () => {
+  it("names the widget region for screen readers", () => {
+    // The widget has no visible title, so the article carries the accessible
+    // name itself via an attribute-only Fluent message.
+    const { container } = renderPrivacy();
+    const root = container.querySelector("article.privacy");
+    expect(root.getAttribute("data-l10n-id")).toBe(
+      "newtab-privacy-widget-label"
+    );
+  });
+
+  it("fires widgets_impression once when the widget scrolls into view", () => {
+    // beforeEach installs a firing IntersectionObserver, so the hook's
+    // impression goes out on observe. This is the trigger the impression-time
+    // telemetry piggybacks on, so proving it fires anchors the timing fix.
     const dispatch = jest.fn();
     renderPrivacy(dispatch);
-    // useIntersectionObserver invokes the callback on observe in the test env.
-    const impressions = dispatch.mock.calls.filter(
-      ([action]) => action.type === at.WIDGETS_IMPRESSION
-    );
-    expect(impressions.length).toBeLessThanOrEqual(1);
+    const impressions = dispatch.mock.calls
+      .map(([action]) => action)
+      .filter(action => action.type === at.WIDGETS_IMPRESSION);
+    expect(impressions).toHaveLength(1);
+    expect(impressions[0].data.widget_name).toBe("privacy");
   });
 
   it("hides the widget by setting its enabled pref to false", () => {
@@ -124,6 +169,23 @@ describe("Privacy widget", () => {
     );
     expect(container.querySelector(".privacy-empty-message")).toBeTruthy();
     expect(container.querySelector(".privacy-count")).toBeFalsy();
+  });
+
+  it("keeps the count but drops the across-sites line at zero sites", () => {
+    // Bug 2063207: the count is real, so only the "Across 0 sites" line goes.
+    const { container } = renderPrivacy(
+      jest.fn(),
+      {},
+      stateWithTrackers(34, 0)
+    );
+    expect(container.querySelector("article.privacy").className).not.toContain(
+      "is-empty"
+    );
+    expect(container.querySelector(".privacy-count-number").textContent).toBe(
+      "34"
+    );
+    expect(container.querySelector(".privacy-count-label")).toBeTruthy();
+    expect(container.querySelector(".privacy-count-sites")).toBeFalsy();
   });
 
   it("leaves the empty state once the count climbs, even with a stale empty variant", () => {
@@ -208,6 +270,28 @@ describe("Privacy widget", () => {
     };
     const { container } = renderPrivacy(jest.fn(), {}, state);
     // trainhop (50) wins over the pref (200): 75 > 50 caps to "50+".
+    expect(container.querySelector(".privacy-count-number").textContent).toBe(
+      "50+"
+    );
+  });
+
+  it("lets the dedicated widgetPrivacy namespace win over the shared widgets key", () => {
+    const base = stateWithTrackers(75);
+    const state = {
+      ...base,
+      Prefs: {
+        ...base.Prefs,
+        values: {
+          ...base.Prefs.values,
+          "widgets.privacy.maxDisplayCount": 200,
+          trainhopConfig: {
+            widgetPrivacy: { maxDisplayCount: 50 },
+            widgets: { privacyMaxDisplayCount: 100 },
+          },
+        },
+      },
+    };
+    const { container } = renderPrivacy(jest.fn(), {}, state);
     expect(container.querySelector(".privacy-count-number").textContent).toBe(
       "50+"
     );
@@ -409,7 +493,7 @@ describe("Privacy widget", () => {
     expect(ctaAction[0].data.message_id).toBe("newtab-privacy-message-info-1");
   });
 
-  it("attributes blank-state CTA clicks to a stable id (not null)", () => {
+  it("makes a blank-state CTA click traceable via its impression", () => {
     const dispatch = jest.fn();
     const { container } = renderPrivacy(
       dispatch,
@@ -420,17 +504,284 @@ describe("Privacy widget", () => {
         cta: { type: "OPEN_ABOUT_PAGE", data: { args: "protections" } },
       })
     );
+    // Blank logs a message_impression under the stable blank id, so the click
+    // (whose action_value is the destination) can be joined back to "blank".
+    const impression = findUserEvent(dispatch, "message_impression");
+    expect(impression.data.action_value).toBe("newtab-privacy-blank");
     fireEvent.click(container.querySelector(".privacy-cta"));
     const ctaAction = dispatch.mock.calls.find(
       ([action]) => action.type === at.WIDGETS_PRIVACY_CTA
     );
     expect(ctaAction[0].data.message_id).toBe("newtab-privacy-blank");
-    const userEvent = dispatch.mock.calls.find(
-      ([action]) =>
-        action.type === at.WIDGETS_USER_EVENT &&
-        action.data.user_action === "message_cta"
-    );
-    expect(userEvent[0].data.action_value).toBe("newtab-privacy-blank");
+    const event = findUserEvent(dispatch, "message_cta_click");
+    expect(event.data.action_value).toBe("about:protections");
+  });
+  it("opens about:protections when the count block is clicked", () => {
+    const dispatch = jest.fn();
+    const { container } = renderPrivacy(dispatch, {}, stateWithTrackers(42));
+    const link = container.querySelector("a.privacy-count");
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("about:protections");
+    // The count number lives inside the same anchor, so it's clickable too.
+    expect(link.querySelector(".privacy-count-number")).toBeTruthy();
+    fireEvent.click(link);
+    const action = dispatch.mock.calls
+      .map(([call]) => call)
+      .find(call => call.type === at.WIDGETS_PRIVACY_CTA);
+    expect(action).toBeTruthy();
+    expect(action.data.action).toEqual({
+      type: "OPEN_ABOUT_PAGE",
+      data: { args: "protections", where: "tab" },
+    });
+    // The click is also logged as a tracking_message_click user event.
+    const clickEvent = findUserEvent(dispatch, "tracking_message_click");
+    expect(clickEvent).toBeTruthy();
+    expect(clickEvent.data.widget_source).toBe("widget");
+  });
+
+  it("opens about:protections when the empty-state message is clicked", () => {
+    const dispatch = jest.fn();
+    const { container } = renderPrivacy(dispatch, {}, stateWithTrackers(0));
+    const link = container.querySelector("a.privacy-empty-details");
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("about:protections");
+    fireEvent.click(link);
+    const action = dispatch.mock.calls
+      .map(([call]) => call)
+      .find(call => call.type === at.WIDGETS_PRIVACY_CTA);
+    expect(action).toBeTruthy();
+    expect(action.data.action).toEqual({
+      type: "OPEN_ABOUT_PAGE",
+      data: { args: "protections", where: "tab" },
+    });
+    const clickEvent = findUserEvent(dispatch, "tracking_message_click");
+    expect(clickEvent).toBeTruthy();
+    expect(clickEvent.data.widget_source).toBe("widget");
+  });
+
+  describe("telemetry", () => {
+    it("logs the trackers_blocked impression with 'blocked' when trackers are blocked", () => {
+      const dispatch = jest.fn();
+      renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({ variant: "blank", icon: "shieldCheck" }, 42)
+      );
+      const event = findUserEvent(dispatch, "trackers_blocked_impression");
+      expect(event).toBeTruthy();
+      expect(event.data.widget_name).toBe("privacy");
+      expect(event.data.widget_source).toBe("widget");
+      expect(event.data.action_value).toBe("blocked");
+    });
+
+    it("logs the trackers_blocked impression with 'none' when nothing was blocked", () => {
+      const dispatch = jest.fn();
+      renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({ variant: "empty", icon: "shield" }, 0)
+      );
+      const event = findUserEvent(dispatch, "trackers_blocked_impression");
+      expect(event).toBeTruthy();
+      expect(event.data.action_value).toBe("none");
+    });
+
+    it("waits for the widget to be seen before logging impressions", () => {
+      // With no IntersectionObserver, the widget is never "seen" and the
+      // impression-time signals stay unsent (preloaded / never-viewed tab).
+      const savedObserver = global.IntersectionObserver;
+      global.IntersectionObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+      try {
+        const dispatch = jest.fn();
+        renderPrivacy(
+          dispatch,
+          {},
+          stateWithMessage({ variant: "blank", icon: "shieldCheck" }, 42)
+        );
+        const firedImpression = dispatch.mock.calls
+          .map(([action]) => action)
+          .some(action => action.type === at.WIDGETS_IMPRESSION);
+        // Never seen: neither widgets_impression nor the impression-time
+        // user events go out.
+        expect(firedImpression).toBe(false);
+        expect(
+          findUserEvent(dispatch, "trackers_blocked_impression")
+        ).toBeUndefined();
+      } finally {
+        global.IntersectionObserver = savedObserver;
+      }
+    });
+
+    it("logs a message impression carrying the messageId when a message shows", () => {
+      const dispatch = jest.fn();
+      renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({
+          variant: "tip",
+          messageId: "newtab-privacy-message-promo-vpn-1",
+          icon: "star",
+        })
+      );
+      const event = findUserEvent(dispatch, "message_impression");
+      expect(event.data.widget_source).toBe("message");
+      expect(event.data.action_value).toBe(
+        "newtab-privacy-message-promo-vpn-1"
+      );
+    });
+
+    it("does not log a message impression in the empty state", () => {
+      // The selector sets messageId to "newtab-privacy-empty" in the empty
+      // state, so the fixture mirrors that — otherwise this passes vacuously and
+      // wouldn't catch a spurious empty-state impression (Dré).
+      const dispatch = jest.fn();
+      renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage(
+          {
+            variant: "empty",
+            messageId: "newtab-privacy-empty",
+            icon: "shield",
+          },
+          0
+        )
+      );
+      expect(findUserEvent(dispatch, "message_impression")).toBeUndefined();
+    });
+
+    it("logs a blank message impression under the stable blank id", () => {
+      const dispatch = jest.fn();
+      renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({ variant: "blank", icon: "shieldCheck" })
+      );
+      const event = findUserEvent(dispatch, "message_impression");
+      expect(event).toBeTruthy();
+      expect(event.data.action_value).toBe("newtab-privacy-blank");
+    });
+
+    it("does not log impressions until the feed is initialized", () => {
+      // Default mockState has PrivacyWidget.initialized = false.
+      const dispatch = jest.fn();
+      renderPrivacy(dispatch);
+      expect(findUserEvent(dispatch, "message_impression")).toBeUndefined();
+      expect(
+        findUserEvent(dispatch, "trackers_blocked_impression")
+      ).toBeUndefined();
+    });
+
+    it("does not log impressions on a counts-only update before a message is picked", () => {
+      // A SYSTEM_TICK refresh flips `initialized` with counts but no variant;
+      // the one-shot must not fire yet, or the message that renders next never
+      // logs its impression. stateWithTrackers sets no variant.
+      const dispatch = jest.fn();
+      renderPrivacy(dispatch, {}, stateWithTrackers(42));
+      expect(
+        findUserEvent(dispatch, "trackers_blocked_impression")
+      ).toBeUndefined();
+      expect(findUserEvent(dispatch, "message_impression")).toBeUndefined();
+    });
+
+    it("records widgets_enabled(false) from the context menu when hidden", () => {
+      const dispatch = jest.fn();
+      const { container } = renderPrivacy(dispatch);
+      fireEvent.click(
+        container.querySelector('[data-l10n-id="newtab-widget-menu-hide"]')
+      );
+      const enabled = dispatch.mock.calls
+        .map(([action]) => action)
+        .find(action => action.type === at.WIDGETS_ENABLED);
+      expect(enabled).toBeTruthy();
+      expect(enabled.data.widget_name).toBe("privacy");
+      expect(enabled.data.widget_source).toBe("context_menu");
+      expect(enabled.data.enabled).toBe(false);
+    });
+
+    it("records a learn_more user event from the context menu", () => {
+      const dispatch = jest.fn();
+      const { container } = renderPrivacy(dispatch);
+      fireEvent.click(
+        container.querySelector(
+          '[data-l10n-id="newtab-privacy-menu-learn-more"]'
+        )
+      );
+      const event = findUserEvent(dispatch, "learn_more");
+      expect(event).toBeTruthy();
+      expect(event.data.widget_source).toBe("context_menu");
+    });
+
+    it("records a change_size user event when a size is chosen", () => {
+      const dispatch = jest.fn();
+      const { container } = renderPrivacy(dispatch);
+      const largeItem = container.querySelector(
+        '#privacy-size-submenu panel-item[data-size="large"]'
+      );
+      fireEvent.click(largeItem);
+      const event = findUserEvent(dispatch, "change_size");
+      expect(event).toBeTruthy();
+      expect(event.data.action_value).toBe("large");
+      expect(event.data.widget_size).toBe("large");
+    });
+
+    it("records a message_cta_click carrying the about: destination", () => {
+      const dispatch = jest.fn();
+      const { container } = renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({
+          variant: "tip",
+          messageId: "newtab-privacy-message-info-1",
+          cta: { type: "OPEN_ABOUT_PAGE", data: { args: "protections" } },
+        })
+      );
+      fireEvent.click(container.querySelector(".privacy-cta"));
+      const event = findUserEvent(dispatch, "message_cta_click");
+      expect(event).toBeTruthy();
+      expect(event.data.widget_source).toBe("message");
+      expect(event.data.action_value).toBe("about:protections");
+    });
+
+    it("records the CTA's URL (with UTM params) as the message_cta_click value", () => {
+      // Monitor/Relay CTAs carry UTM params (Bug 2061524); the whole tagged URL
+      // is logged so campaign attribution survives.
+      const dispatch = jest.fn();
+      const taggedUrl =
+        "https://monitor.mozilla.org/?utm_medium=referral&utm_source=firefox-desktop&utm_campaign=widget&utm_content=get-breach-alerts-global";
+      const { container } = renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({
+          variant: "tip",
+          messageId: "newtab-privacy-message-promo-monitor-1",
+          cta: { type: "OPEN_URL", data: { args: taggedUrl } },
+        })
+      );
+      fireEvent.click(container.querySelector(".privacy-cta"));
+      const event = findUserEvent(dispatch, "message_cta_click");
+      expect(event.data.action_value).toBe(taggedUrl);
+    });
+
+    it("falls back to the action type for CTAs with no URL", () => {
+      const dispatch = jest.fn();
+      const { container } = renderPrivacy(
+        dispatch,
+        {},
+        stateWithMessage({
+          variant: "tip",
+          messageId: "newtab-privacy-message-info-9",
+          cta: { type: "SET_DEFAULT_BROWSER" },
+        })
+      );
+      fireEvent.click(container.querySelector(".privacy-cta"));
+      const event = findUserEvent(dispatch, "message_cta_click");
+      expect(event.data.action_value).toBe("SET_DEFAULT_BROWSER");
+    });
   });
 });
 
@@ -579,7 +930,7 @@ describe("Privacy widget celebration", () => {
     ).toBeTruthy();
     expect(
       cap.container.querySelectorAll(".privacy-celebration-sparkle")
-    ).toHaveLength(24);
+    ).toHaveLength(12);
   });
 
   it("keeps the tier and ring it started with when the message changes mid-animation", () => {
@@ -600,7 +951,7 @@ describe("Privacy widget celebration", () => {
     );
     expect(
       container.querySelectorAll(".privacy-celebration-sparkle")
-    ).toHaveLength(24);
+    ).toHaveLength(12);
     expect(container.querySelector(".privacy-celebration-ring")).toBeTruthy();
 
     // A refresh swaps an ordinary tip in under the running animation. Same
@@ -620,7 +971,7 @@ describe("Privacy widget celebration", () => {
 
     expect(
       container.querySelectorAll(".privacy-celebration-sparkle")
-    ).toHaveLength(24);
+    ).toHaveLength(12);
     expect(container.querySelector(".privacy-celebration-ring")).toBeTruthy();
     expect(container.querySelector("article.privacy").className).toContain(
       "is-major-celebration"
@@ -850,7 +1201,7 @@ describe("Privacy widget celebration tiers", () => {
       {},
       withCategory("milestoneMonth", "newtab-privacy-message-milestone-month")
     );
-    expect(sparkleCount(container)).toBe(24);
+    expect(sparkleCount(container)).toBe(12);
     expect(container.querySelector("article.privacy").className).toContain(
       "is-major-celebration"
     );
@@ -862,7 +1213,7 @@ describe("Privacy widget celebration tiers", () => {
       {},
       withCategory("firstProtection", "newtab-privacy-message-first-protection")
     );
-    expect(sparkleCount(container)).toBe(12);
+    expect(sparkleCount(container)).toBe(5);
     expect(container.querySelector("article.privacy").className).not.toContain(
       "is-major-celebration"
     );
@@ -874,7 +1225,7 @@ describe("Privacy widget celebration tiers", () => {
       {},
       withCategory("streak", "newtab-privacy-message-streak")
     );
-    expect(sparkleCount(container)).toBe(12);
+    expect(sparkleCount(container)).toBe(5);
   });
 
   it("still tilts the kit on the brief-tier earned moments", () => {

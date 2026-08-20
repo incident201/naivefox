@@ -1410,13 +1410,6 @@ static DWORD WindowStylesRemovedForBorderStyle(BorderStyle aStyle) {
   if (!(aStyle & BorderStyle::Title)) {
     toRemove |= WS_DLGFRAME;
   }
-  if (!(aStyle & (BorderStyle::Menu | BorderStyle::Close))) {
-    // Looks like getting rid of the system menu also does away with the close
-    // box. So, we only get rid of the system menu and the close box if you
-    // want neither. How does the Windows "Dialog" window class get just
-    // closebox and no sysmenu? Who knows.
-    toRemove |= WS_SYSMENU;
-  }
   if (!(aStyle & BorderStyle::ResizeH)) {
     toRemove |= WS_THICKFRAME;
   }
@@ -4425,6 +4418,7 @@ void nsWindow::DispatchFocusToTopLevelWindow(bool aIsActivate) {
   }
 }
 
+/* static */
 HWND nsWindow::WindowAtMouse() {
   DWORD pos = ::GetMessagePos();
   POINT mp;
@@ -4433,8 +4427,22 @@ HWND nsWindow::WindowAtMouse() {
   return ::WindowFromPoint(mp);
 }
 
+/* static */
+HWND nsWindow::NsWindowAtMouse() {
+  HWND curWnd = WindowAtMouse();
+
+  while (curWnd && !WinUtils::GetNSWindowPtr(curWnd)) {
+    curWnd = GetAncestor(curWnd, GA_PARENT);
+  }
+
+  return curWnd;
+}
+
+/* static */
 bool nsWindow::IsTopLevelMouseExit(HWND aWnd) {
-  HWND mouseWnd = WindowAtMouse();
+  // We are testing a mouseexit sent to Gecko.  Ignore non-Gecko child
+  // windows, like the one added to the titlebar by the Windows App SDK.
+  HWND mouseWnd = NsWindowAtMouse();
 
   // WinUtils::GetTopLevelHWND() will return a HWND for the window frame
   // (which includes the non-client area).  If the mouse has moved into

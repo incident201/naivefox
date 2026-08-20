@@ -157,7 +157,7 @@ class gfxDWriteFontFileStream final : public IDWriteFontFileStream {
 
 class gfxDWriteFontFileLoader : public IDWriteFontFileLoader {
  public:
-  gfxDWriteFontFileLoader() {}
+  gfxDWriteFontFileLoader() = default;
 
   // IUnknown interface
   IFACEMETHOD(QueryInterface)(IID const& iid, OUT void** ppObject) {

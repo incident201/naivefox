@@ -66,14 +66,15 @@ ChromeUtils.defineESModuleGetters(lazy, {
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   SelectableProfileService:
     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
-  SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
+  SessionStore:
+    "moz-src:///browser/components/sessionstore/SessionStore.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   Spotlight: "resource:///modules/asrouter/Spotlight.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   TaskbarTabs: "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs",
   UIState: "resource://services-sync/UIState.sys.mjs",
   UITour: "moz-src:///browser/components/uitour/UITour.sys.mjs",
-  WindowsLaunchOnLogin: "resource://gre/modules/WindowsLaunchOnLogin.sys.mjs",
+  LaunchOnLogin: "resource://gre/modules/LaunchOnLogin.sys.mjs",
 });
 
 export const SpecialMessageActions = {
@@ -398,7 +399,6 @@ export const SpecialMessageActions = {
       "browser.shell.setDefaultGuidanceNotifications",
       "browser.startup.homepage",
       "browser.startup.page",
-      "browser.startup.windowsLaunchOnLogin.disableLaunchOnLoginPrompt",
       "browser.privateWindowSeparation.enabled",
       "browser.firefox-view.feature-tour",
       "browser.pdfjs.feature-tour",
@@ -432,15 +432,18 @@ export const SpecialMessageActions = {
       "termsofuse.acceptedDate",
     ];
 
-    // The in-tree baseline allowlist can be extended off-train via Remote
-    // Settings, but not for onImpression prefs, which stay deliberately
-    // restricted to prefs reviewed in-tree. This check is synchronous and does
-    // not wait on the Remote Settings collection to load (see
-    // MessagingSystemAllowlists.ensureInit). Callers that dispatch SET_PREF
-    // outside of ASRouter's own message routing, namely about:welcome and
-    // Spotlight, do not await ASRouter's init sequence, so a pref granted only
-    // through Remote Settings may not be recognized yet if it fires before the
-    // collection has loaded for this session. If that happens the pref is
+    // allowedPrefs above is the in-tree baseline. It can be extended off-train
+    // via Remote Settings, but not for onImpression prefs, which stay
+    // deliberately restricted to prefs reviewed in-tree, and not for the prefs
+    // in MessagingSystemBlocklists.sys.mjs, which are filtered out before they
+    // reach this getter. MessagingSystemAllowlists.sys.mjs documents how the
+    // two in-tree lists and the collection resolve against each other. This
+    // check is synchronous and does not wait on the Remote Settings collection
+    // to load (see MessagingSystemAllowlists.ensureInit). Callers that dispatch
+    // SET_PREF outside of ASRouter's own message routing, namely about:welcome
+    // and Spotlight, do not await ASRouter's init sequence, so a pref granted
+    // only through Remote Settings may not be recognized yet if it fires before
+    // the collection has loaded for this session. If that happens the pref is
     // simply namespaced like any other unlisted pref rather than being set
     // under its real name. Note this case is unlikely outside of automated
     // scenarios since user action is required to fire a SET_PREF action in
@@ -517,10 +520,15 @@ export const SpecialMessageActions = {
     }
     // In practice, all FxA signin flows will have a "service", because that param dictates the
     // UI shown by FxA. But to be extra cautious, this code treats it as optional.
-    let neededService = data?.extraParams?.service;
+    let extraParams = data?.extraParams;
+    let neededService = extraParams?.service;
+    if (neededService) {
+      delete extraParams.service;
+    }
     const url = await lazy.FxAccounts.config.promiseConnectAccountURI(
+      neededService || "sync",
       data?.entrypoint || "activity-stream-firstrun",
-      data?.extraParams || {}
+      extraParams || {}
     );
 
     let window = browser.documentGlobal;
@@ -962,10 +970,10 @@ export const SpecialMessageActions = {
         );
         break;
       case "CONFIRM_LAUNCH_ON_LOGIN":
-        await lazy.WindowsLaunchOnLogin.createLaunchOnLogin();
+        await lazy.LaunchOnLogin.enable();
         break;
       case "REMOVE_LAUNCH_ON_LOGIN":
-        await lazy.WindowsLaunchOnLogin.removeLaunchOnLogin();
+        await lazy.LaunchOnLogin.disable();
         break;
       case "CREATE_GROUP_FROM_CURRENT_TAB": {
         let tab =
@@ -1013,7 +1021,12 @@ export const SpecialMessageActions = {
           break;
         }
         const data = action.data;
+        const service = data?.extraParams?.service;
+        if (service) {
+          delete data.extraParams.service;
+        }
         const url = await lazy.FxAccounts.config.promiseConnectAccountURI(
+          service || "sync",
           data && data.entrypoint,
           (data && data.extraParams) || {}
         );

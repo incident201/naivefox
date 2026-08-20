@@ -47,7 +47,7 @@ import:
             enabled: true
         - channel: release
           value:
-            enabled: false
+            enabled: true
 
 features:
   homescreen:
@@ -113,60 +113,6 @@ features:
         type: Option<Int>
         gecko-pref:
           pref: "gecko.nimbus.test.two"
-          branch: "user"
-  nimbus-qa-string-default:
-    description: "A feature for testing string pref-setting on the default branch."
-    variables:
-      value:
-        description: "The value to set for the pref."
-        type: Option<String>
-        gecko-pref:
-          pref: "nimbus.qa.pref-string-default"
-          branch: "default"
-  nimbus-qa-string-user:
-    description: "A feature for testing string pref-setting on the user branch."
-    variables:
-      value:
-        description: "The value to set for the pref."
-        type: Option<String>
-        gecko-pref:
-          pref: "nimbus.qa.pref-string-user"
-          branch: "user"
-  nimbus-qa-int-default:
-    description: "A feature for testing int pref-setting on the default branch."
-    variables:
-      value:
-        description: "The value to set for the pref."
-        type: Option<Int>
-        gecko-pref:
-          pref: "nimbus.qa.pref-int-default"
-          branch: "default"
-  nimbus-qa-int-user:
-    description: "A feature for testing int pref-setting on the user branch."
-    variables:
-      value:
-        description: "The value to set for the pref."
-        type: Option<Int>
-        gecko-pref:
-          pref: "nimbus.qa.pref-int-user"
-          branch: "user"
-  nimbus-qa-bool-default:
-    description: "A feature for testing boolean pref-setting on the default branch."
-    variables:
-      value:
-        description: "The value to set for the pref."
-        type: Option<Boolean>
-        gecko-pref:
-          pref: "nimbus.qa.pref-bool-default"
-          branch: "default"
-  nimbus-qa-bool-user:
-    description: "A feature for testing boolean pref-setting on the user branch."
-    variables:
-      value:
-        description: "The value to set for the pref."
-        type: Option<Boolean>
-        gecko-pref:
-          pref: "nimbus.qa.pref-bool-user"
           branch: "user"
 
   onboarding:
@@ -267,6 +213,23 @@ features:
           template-message: sent_from_firefox_template
           download-link: "[Download Link]"
           show-snackbar: true
+  listen-to-page:
+    description: A feature that allows audio listening of a page
+    variables:
+      enabled:
+        type: Boolean
+        description: If true, listen to page will be enabled
+        default: false
+    defaults:
+      - channel: developer
+        value:
+          enabled: false
+      - channel: nightly
+        value:
+          enabled: false
+      - channel: beta
+        value:
+          enabled: false
 
   shake-to-summarize:
     description: A feature that can summarize the content of a page when you shake the screen.
@@ -891,10 +854,6 @@ features:
         description: Whether to show the new AppLinksPromptFragment dialog when an app link is detected. If false, the old dialog is used.
         type: Boolean
         default: true
-    defaults:
-      - channel: release
-        value:
-          show-new-prompt: false
 
   tab-management-enhancements:
     description: Control the visibility of the tab management enhancements.
@@ -1013,6 +972,14 @@ features:
           Whether or not to turn on local network / device access blocking
         type: Boolean
         default: false
+      block-insecure-contexts:
+        description: >
+          Whether or not LNA requests coming from insecure contexts should be
+          blocked outright, without prompting the user for permission
+        type: Option<Boolean>
+        gecko-pref:
+          pref: "network.lna.block_insecure_contexts"
+          branch: "default"
 
   isolated-content-processes:
     description: Feature that controls content process isolation.
@@ -1110,7 +1077,7 @@ features:
       enabled:
         description: If true, Native Share Sheet is enabled.
         type: Boolean
-        default: false
+        default: true
     defaults:
       - channel: developer
         value:
@@ -1126,6 +1093,14 @@ features:
         description: If true, Add Shortcuts improvement is enabled.
         type: Boolean
         default: true
+
+  show-more-shortcuts:
+    description: Feature to show expand/collapse buttons for shortcuts on the homepage.
+    variables:
+      enabled:
+        description: If true, show the expand/collapse buttons on the homepage.
+        type: Boolean
+        default: false
 
   merino-client:
     description: Feature to enable the Merino Client for users on Firefox on Android.

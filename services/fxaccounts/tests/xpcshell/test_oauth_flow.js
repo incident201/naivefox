@@ -7,7 +7,6 @@
 
 const {
   FxAccountsOAuth,
-  ERROR_INVALID_SCOPES,
   ERROR_INVALID_SCOPED_KEYS,
   ERROR_INVALID_STATE,
   ERROR_OAUTH_FLOW_ABANDONED,
@@ -28,20 +27,6 @@ initTestLogging("Trace");
 
 add_task(function test_begin_oauth_flow() {
   const oauth = new FxAccountsOAuth();
-  add_task(async function test_begin_oauth_flow_invalid_scopes() {
-    try {
-      await oauth.beginOAuthFlow("foo,fi,fum", "foo");
-      Assert.fail("Should have thrown error, scopes must be an array");
-    } catch (e) {
-      Assert.equal(e.message, ERROR_INVALID_SCOPES);
-    }
-    try {
-      await oauth.beginOAuthFlow(["not-a-real-scope", SCOPE_PROFILE]);
-      Assert.fail("Should have thrown an error, must use a valid scope");
-    } catch (e) {
-      Assert.equal(e.message, ERROR_INVALID_SCOPES);
-    }
-  });
   add_task(async function test_begin_oauth_flow_ok() {
     const scopes = [SCOPE_PROFILE, SCOPE_APP_SYNC];
     const queryParams = await oauth.beginOAuthFlow(scopes);

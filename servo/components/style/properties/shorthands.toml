@@ -1,4 +1,5 @@
 [margin]
+flags = "SCROLL_LINKED_EFFECTIVE"
 sub_properties = ["margin-top", "margin-right", "margin-bottom", "margin-left"]
 spec = "https://drafts.csswg.org/css-box/#propdef-margin"
 rule_types_allowed = ["style", "keyframe", "page", "scope", "page", "position-try"]
@@ -241,13 +242,11 @@ spec = "https://drafts.fxtf.org/motion-1/#offset-shorthand"
 
 [-webkit-perspective]
 sub_properties = ["perspective"]
-derive_serialize = true
 flags = "IS_LEGACY_SHORTHAND"
 spec = "https://github.com/whatwg/compat/issues/100"
 
 [-webkit-transform]
 sub_properties = ["transform"]
-derive_serialize = true
 flags = "IS_LEGACY_SHORTHAND"
 spec = "https://github.com/whatwg/compat/issues/100"
 
@@ -387,6 +386,7 @@ sub_properties = ["list-style-position", "list-style-image", "list-style-type"]
 spec = "https://drafts.csswg.org/css-lists/#propdef-list-style"
 
 [background-position]
+flags = "SCROLL_LINKED_EFFECTIVE"
 sub_properties = ["background-position-x", "background-position-y"]
 spec = "https://drafts.csswg.org/css-backgrounds-4/#the-background-position"
 

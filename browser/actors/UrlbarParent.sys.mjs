@@ -175,6 +175,11 @@ export class UrlbarParent extends JSWindowActorParent {
       case "SwitchToTab":
         controller.switchToTab(message.data.loadData);
         break;
+      case "AddToInputHistory":
+        controller.addToInputHistory(message.data.url, message.data.input, {
+          whenReady: message.data.whenReady,
+        });
+        break;
       case "RemoveResult":
         controller.removeResult(
           lazy.UrlbarResult.fromWire(message.data.result),
@@ -373,6 +378,10 @@ class ViewProxy {
 
   acknowledgeFeedback(result) {
     this.#invoke("acknowledgeFeedback", [result.toWire()]);
+  }
+
+  clearL10nCache() {
+    this.#invoke("clearL10nCache", []);
   }
 
   clearTopSitesCache() {

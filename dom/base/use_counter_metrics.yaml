@@ -108,8 +108,8 @@ use.counter:
     send_in_pings:
       - use-counters
 
-# Total of 2626 use counter metrics (excludes denominators).
-# Total of 416 'page' use counters.
+# Total of 2620 use counter metrics (excludes denominators).
+# Total of 412 'page' use counters.
 use.counter.page:
   svgsvgelement_getelementbyid:
     type: counter
@@ -727,74 +727,6 @@ use.counter.page:
     type: counter
     description: >
       Whether a page recovered a small oom.
-      Compare against `use.counter.top_level_content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_generator_function_created:
-    type: counter
-    description: >
-      Whether a page created a generator function.
-      Compare against `use.counter.top_level_content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_async_generator_function_created:
-    type: counter
-    description: >
-      Whether a page created an async generator function.
-      Compare against `use.counter.top_level_content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_generator_function_ion_eligible:
-    type: counter
-    description: >
-      Whether a page created a generator function eligible for Ion compilation.
-      Compare against `use.counter.top_level_content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_async_generator_function_ion_eligible:
-    type: counter
-    description: >
-      Whether a page created an async generator function eligible for Ion compilation.
       Compare against `use.counter.top_level_content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -7183,7 +7115,7 @@ use.counter.page:
     send_in_pings:
       - use-counters
 
-# Total of 416 'document' use counters.
+# Total of 412 'document' use counters.
 use.counter.doc:
   svgsvgelement_getelementbyid:
     type: counter
@@ -7801,74 +7733,6 @@ use.counter.doc:
     type: counter
     description: >
       Whether a document recovered a small oom.
-      Compare against `use.counter.content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_generator_function_created:
-    type: counter
-    description: >
-      Whether a document created a generator function.
-      Compare against `use.counter.content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_async_generator_function_created:
-    type: counter
-    description: >
-      Whether a document created an async generator function.
-      Compare against `use.counter.content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_generator_function_ion_eligible:
-    type: counter
-    description: >
-      Whether a document created a generator function eligible for Ion compilation.
-      Compare against `use.counter.content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
-  js_async_generator_function_ion_eligible:
-    type: counter
-    description: >
-      Whether a document created an async generator function eligible for Ion compilation.
       Compare against `use.counter.content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -19843,7 +19707,7 @@ use.counter.deprecated_ops.doc:
     send_in_pings:
       - use-counters
 
-# Total of 733 'CSS (page)' use counters.
+# Total of 734 'CSS (page)' use counters.
 use.counter.css.page:
   css_align_items:
     type: counter
@@ -23143,23 +23007,6 @@ use.counter.css.page:
     send_in_pings:
       - use-counters
 
-  css_column_width:
-    type: counter
-    description: >
-      Whether a page used the CSS property column-width.
-      Compare against `use.counter.top_level_content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
   css_container_name:
     type: counter
     description: >
@@ -24898,6 +24745,40 @@ use.counter.css.page:
     type: counter
     description: >
       Whether a page used the CSS property transform.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_column_width:
+    type: counter
+    description: >
+      Whether a page used the CSS property column-width.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_moz_line_scroll_amount:
+    type: counter
+    description: >
+      Whether a page used the CSS property -moz-line-scroll-amount.
       Compare against `use.counter.top_level_content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -32306,7 +32187,7 @@ use.counter.css.page:
     send_in_pings:
       - use-counters
 
-# Total of 733 'CSS (document)' use counters.
+# Total of 734 'CSS (document)' use counters.
 use.counter.css.doc:
   css_align_items:
     type: counter
@@ -35606,23 +35487,6 @@ use.counter.css.doc:
     send_in_pings:
       - use-counters
 
-  css_column_width:
-    type: counter
-    description: >
-      Whether a document used the CSS property column-width.
-      Compare against `use.counter.content_documents_destroyed`
-      to calculate the rate.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    data_reviews:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
-    notification_emails:
-      - dom-core@mozilla.com
-      - emilio@mozilla.com
-    expires: never
-    send_in_pings:
-      - use-counters
-
   css_container_name:
     type: counter
     description: >
@@ -37361,6 +37225,40 @@ use.counter.css.doc:
     type: counter
     description: >
       Whether a document used the CSS property transform.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_column_width:
+    type: counter
+    description: >
+      Whether a document used the CSS property column-width.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_moz_line_scroll_amount:
+    type: counter
+    description: >
+      Whether a document used the CSS property -moz-line-scroll-amount.
       Compare against `use.counter.content_documents_destroyed`
       to calculate the rate.
     bugs:

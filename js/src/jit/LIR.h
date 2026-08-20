@@ -2313,11 +2313,11 @@ namespace jit {
 
 #define LIROP(name)                           \
   L##name* LNode::to##name() {                \
-    MOZ_ASSERT(is##name());                   \
+    MOZ_RELEASE_ASSERT(is##name());           \
     return static_cast<L##name*>(this);       \
   }                                           \
   const L##name* LNode::to##name() const {    \
-    MOZ_ASSERT(is##name());                   \
+    MOZ_RELEASE_ASSERT(is##name());           \
     return static_cast<const L##name*>(this); \
   }
 LIR_OPCODE_LIST(LIROP)
@@ -2325,12 +2325,12 @@ LIR_OPCODE_LIST(LIROP)
 
 #define LALLOC_CAST(type)               \
   L##type* LAllocation::to##type() {    \
-    MOZ_ASSERT(is##type());             \
+    MOZ_RELEASE_ASSERT(is##type());     \
     return static_cast<L##type*>(this); \
   }
 #define LALLOC_CONST_CAST(type)                  \
   const L##type* LAllocation::to##type() const { \
-    MOZ_ASSERT(is##type());                      \
+    MOZ_RELEASE_ASSERT(is##type());              \
     return static_cast<const L##type*>(this);    \
   }
 

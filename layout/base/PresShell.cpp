@@ -1159,7 +1159,14 @@ void PresShell::Destroy() {
 
   mUpdateApproximateFrameVisibilityEvent.Revoke();
 
-  ClearApproximatelyVisibleFramesList(Some(OnNonvisible::DiscardImages));
+  // Untrack (and thus unlock) this document's visible images as the pres shell
+  // goes away, but do not force-discard their decoded surfaces. Dropping a pres
+  // shell frequently precedes reusing the same cached images shortly after
+  // (reload, back/forward, same-site navigation), so we leave reclamation to
+  // the SurfaceCache expiration timer: a quick re-navigation can then reuse the
+  // decoded surfaces instead of re-decoding them, while surfaces that are not
+  // reused expire (or are dropped under memory pressure) on their own.
+  ClearApproximatelyVisibleFramesList();
 
   if (mOriginalCaret) {
     mOriginalCaret->Terminate();
@@ -3733,7 +3740,7 @@ nsresult PresShell::ScrollContentIntoView(nsIContent* aContent,
                                           ScrollFlags aScrollFlags) {
   NS_ENSURE_TRUE(aContent, NS_ERROR_NULL_POINTER);
   RefPtr<Document> composedDoc = aContent->GetComposedDoc();
-  NS_ENSURE_STATE(composedDoc);
+  NS_ENSURE_STATE(composedDoc == mDocument);
 
   NS_ASSERTION(mDidInitialize, "should have done initial reflow by now");
 
@@ -3835,8 +3842,9 @@ void PresShell::DoScrollContentIntoView() {
 
   nsIFrame* frame = mContentToScrollTo->GetPrimaryFrame();
 
-  if (!frame || frame->IsHiddenByContentVisibilityOnAnyAncestor(
-                    nsIFrame::IncludeContentVisibility::Hidden)) {
+  if (mContentToScrollTo->OwnerDoc() != mDocument || !frame ||
+      frame->IsHiddenByContentVisibilityOnAnyAncestor(
+          nsIFrame::IncludeContentVisibility::Hidden)) {
     mContentToScrollTo->RemoveProperty(nsGkAtoms::scrolling);
     mContentToScrollTo = nullptr;
     return;
@@ -13004,6 +13012,7 @@ void PresShell::EndPaint() {
       if (PerformanceMainThread* perf =
               presContext->GetPerformanceMainThread()) {
         perf->FinalizeLCPEntriesForText();
+        perf->FinalizeContainerTimingEntries();
       }
     }
   }

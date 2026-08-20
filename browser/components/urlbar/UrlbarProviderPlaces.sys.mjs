@@ -345,7 +345,7 @@ function makeUrlbarResult(queryContext, info) {
             url: action.params.url,
             title: info.title,
             icon: info.icon,
-            userContextId: info.userContextId,
+            userContext: UrlbarUtils.getUserContextData(info.userContextId),
             lastVisit: info.lastVisit,
             bookmarkDateMs: info.bookmarkDateMs,
             tabGroup: info.tabGroup,
@@ -460,7 +460,7 @@ class Search {
     // We want to store the original string for case sensitive searches.
     this.#originalSearchString = queryContext.searchString;
     this.#trimmedOriginalSearchString = queryContext.trimmedSearchString;
-    let unescapedSearchString = UrlbarUtils.unEscapeURIForUI(
+    let unescapedSearchString = lazy.UrlbarShared.unEscapeURIForUI(
       this.#trimmedOriginalSearchString
     );
     // We want to make sure "about:" is not stripped as a prefix so that the

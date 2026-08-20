@@ -219,6 +219,7 @@ smart_window:
       User is presented with one or more quick prompts
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2022629
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2062688
     data_reviews:
       - https://phabricator.services.mozilla.com/D282482
     data_sensitivity:
@@ -234,6 +235,11 @@ smart_window:
         unit: count
         description: >
           Number of prompts displayed
+      resume_prompts:
+        type: quantity
+        unit: count
+        description: >
+          Number of displayed prompts that were resume pills
 
   quick_prompt_clicked:
     type: event
@@ -241,6 +247,7 @@ smart_window:
       Recorded when the user selects a prompt suggestion in smart window mode
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2022629
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2062688
     data_reviews:
       - https://phabricator.services.mozilla.com/D282482
     data_sensitivity:
@@ -255,6 +262,10 @@ smart_window:
         type: boolean
         description: >
           Boolean indicating if the prompt is a conversation starter, as opposed to a follow-up
+      starter_type:
+        type: string
+        description: >
+          The type of prompt that was clicked: default, resume, or followup
 
   get_page_content:
     type: event
@@ -1250,6 +1261,21 @@ smart_window:
       - https://phabricator.services.mozilla.com/D291280
     data_sensitivity:
       - interaction
+    notification_emails: *emails
+    expires: never
+
+  enabled:
+    type: boolean
+    lifetime: application
+    description: |
+      Records if the user currently has Smart Window enabled.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2047007
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D319283
+    data_sensitivity:
+      - interaction
+      - technical
     notification_emails: *emails
     expires: never
 

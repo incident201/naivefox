@@ -172,6 +172,10 @@ class nsPIDOMWindowInner : public mozIDOMWindow {
 
   mozilla::dom::Performance* GetPerformance();
 
+  mozilla::dom::Performance* GetPerformanceIfExists() const {
+    return mPerformance;
+  }
+
   void QueuePerformanceNavigationTiming();
 
   /**
@@ -586,8 +590,10 @@ class nsPIDOMWindowInner : public mozIDOMWindow {
 
   virtual nsresult GetControllers(nsIControllers** aControllers) = 0;
 
-  MOZ_CAN_RUN_SCRIPT virtual nsresult GetInnerWidth(double* aWidth) = 0;
-  MOZ_CAN_RUN_SCRIPT virtual nsresult GetInnerHeight(double* aHeight) = 0;
+  MOZ_CAN_RUN_SCRIPT virtual nsresult GetInnerWidth(
+      mozilla::dom::CallerType aCallerType, double* aWidth) = 0;
+  MOZ_CAN_RUN_SCRIPT virtual nsresult GetInnerHeight(
+      mozilla::dom::CallerType aCallerType, double* aHeight) = 0;
 
   virtual already_AddRefed<nsDOMCSSDeclaration> GetComputedStyle(
       mozilla::dom::Element& aElt, const nsAString& aPseudoElt,
@@ -1087,9 +1093,6 @@ class nsPIDOMWindowOuter : public mozIDOMWindowProxy {
   virtual nsresult OpenDialog(const nsACString& aUrl, const nsAString& aName,
                               const nsAString& aOptions, nsIArray* aArguments,
                               mozilla::dom::BrowsingContext** _retval) = 0;
-
-  MOZ_CAN_RUN_SCRIPT virtual nsresult GetInnerWidth(double* aWidth) = 0;
-  MOZ_CAN_RUN_SCRIPT virtual nsresult GetInnerHeight(double* aHeight) = 0;
 
   virtual mozilla::dom::Element* GetFrameElement() = 0;
 

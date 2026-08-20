@@ -37,11 +37,14 @@ const SEMANTIC_HISTORY_PROVIDER_NAME = "UrlbarProviderSemanticHistorySearch";
  * @returns {string} map key
  */
 function makeMapKeyForTabResult(result) {
+  let userContextId =
+    result.type == lazy.UrlbarShared.RESULT_TYPE.TAB_SWITCH
+      ? result.payload.userContext?.id
+      : undefined;
   return UrlbarUtils.tupleString(
     result.payload.url,
-    result.type == lazy.UrlbarShared.RESULT_TYPE.TAB_SWITCH &&
-      lazy.UrlbarShared.isNonPrivateUserContextId(result.payload.userContextId)
-      ? result.payload.userContextId
+    lazy.UrlbarShared.isNonPrivateUserContextId(userContextId)
+      ? userContextId
       : undefined
   );
 }
@@ -1599,7 +1602,8 @@ class MuxerUnifiedComplete extends UrlbarMuxer {
   #setExposureTelemetryProperty(result) {
     const exposureResults = lazy.UrlbarPrefs.get("exposureResults");
     if (exposureResults.size) {
-      const telemetryType = UrlbarUtils.searchEngagementTelemetryType(result);
+      const telemetryType =
+        lazy.UrlbarShared.searchEngagementTelemetryType(result);
       if (exposureResults.has(telemetryType)) {
         result.exposureTelemetry = lazy.UrlbarPrefs.get("showExposureResults")
           ? lazy.UrlbarShared.EXPOSURE_TELEMETRY.SHOWN

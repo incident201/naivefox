@@ -554,7 +554,7 @@ WebCodecsConfigurationChangeList::ToPEMChangeList() const {
 RefPtr<TaskQueue> GetWebCodecsEncoderTaskQueue() {
   return TaskQueue::Create(
       GetMediaThreadPool(MediaThreadType::PLATFORM_ENCODER),
-      "WebCodecs encoding", false);
+      "WebCodecs encoding", TailDispatchPolicy::NoTailDispatch);
 }
 
 VideoColorSpaceInternal FallbackColorSpaceForVideoContent() {

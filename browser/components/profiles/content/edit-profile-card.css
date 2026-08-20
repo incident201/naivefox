@@ -24,7 +24,6 @@
   profile-avatar-selector {
     position: absolute;
     inset-inline-start: -140px;
-    z-index: 1;
   }
 }
 

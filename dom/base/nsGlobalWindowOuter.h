@@ -637,16 +637,14 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
   virtual bool IsInSyncOperation() override;
 
  public:
-  MOZ_CAN_RUN_SCRIPT double GetInnerWidthOuter(mozilla::ErrorResult& aError);
-
- protected:
-  MOZ_CAN_RUN_SCRIPT nsresult GetInnerWidth(double* aInnerWidth) override;
+  MOZ_CAN_RUN_SCRIPT double GetInnerWidthOuter(
+      mozilla::dom::CallerType aCallerType, mozilla::ErrorResult& aError);
 
  public:
-  MOZ_CAN_RUN_SCRIPT double GetInnerHeightOuter(mozilla::ErrorResult& aError);
+  MOZ_CAN_RUN_SCRIPT double GetInnerHeightOuter(
+      mozilla::dom::CallerType aCallerType, mozilla::ErrorResult& aError);
 
  protected:
-  MOZ_CAN_RUN_SCRIPT nsresult GetInnerHeight(double* aInnerHeight) override;
   int32_t GetScreenXOuter(mozilla::dom::CallerType aCallerType,
                           mozilla::ErrorResult& aError);
   int32_t GetScreenYOuter(mozilla::dom::CallerType aCallerType,
@@ -785,7 +783,8 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
   int32_t GetScrollBoundaryOuter(mozilla::Side aSide);
 
   // Outer windows only.
-  MOZ_CAN_RUN_SCRIPT nsresult GetInnerSize(mozilla::CSSSize& aSize);
+  MOZ_CAN_RUN_SCRIPT nsresult
+  GetInnerSize(mozilla::CSSSize& aSize, mozilla::dom::CallerType aCallerType);
   mozilla::CSSIntSize GetOuterSize(mozilla::dom::CallerType aCallerType,
                                    mozilla::ErrorResult& aError);
   nsRect GetInnerScreenRect();

@@ -435,9 +435,9 @@ appmenuitem-relay-description2 = Helps prevent spam in your inbox
 # Shown in place of appmenuitem-relay-title2 when the user has signed up for Relay.
 appmenuitem-relay-title-signed-in = View Email Masks
 appmenuitem-vpn-title2 = Hide Your Location with { -mozilla-vpn-brand-name }
-appmenuitem-vpn-description4 = Get extra protection across apps and devices
+appmenuitem-vpn-description5 = Get extra protection across devices
 # Shown in place of appmenuitem-vpn-title2 when the user has signed up for VPN.
-appmenuitem-vpn-title-signed-in = Open { -mozilla-vpn-brand-name }
+appmenuitem-vpn-title-signed-in1 = Download { -mozilla-vpn-brand-name }
 
 # "Mozilla" is intentionally hardcoded to prevent forks from replacing it
 # with their own vendor name, since these tools are created and maintained by

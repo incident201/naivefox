@@ -9,6 +9,7 @@
 #include "gfxFont.h"
 #include "gfxPlatform.h"
 #include "mozilla/Components.h"
+#include "mozilla/FileUtils.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Sprintf.h"
@@ -369,16 +370,29 @@ static already_AddRefed<FcPattern> CreatePatternForFace(FT_Face aFace) {
   return pattern.forget();
 }
 
-static already_AddRefed<SharedFTFace> CreateFaceForPattern(
-    FcPattern* aPattern) {
+static FcChar8* GetPatternFilename(FcPattern* aPattern) {
   FcChar8* filename;
   if (FcPatternGetString(aPattern, FC_FILE, 0, &filename) != FcResultMatch) {
-    return nullptr;
+    filename = nullptr;
   }
+  return filename;
+}
+
+static int GetPatternIndex(FcPattern* aPattern) {
   int index;
   if (FcPatternGetInteger(aPattern, FC_INDEX, 0, &index) != FcResultMatch) {
     index = 0;  // default to 0 if not found in pattern
   }
+  return index;
+}
+
+static already_AddRefed<SharedFTFace> CreateFaceForPattern(
+    FcPattern* aPattern) {
+  FcChar8* const filename = GetPatternFilename(aPattern);
+  if (!filename) {
+    return nullptr;
+  }
+  const int index = GetPatternIndex(aPattern);
   return Factory::NewSharedFTFace(nullptr, ToCharPtr(filename), index);
 }
 
@@ -537,7 +551,7 @@ gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {
 
 nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
   // attempt this once, if errors occur leave a blank cmap
-  if (mCharacterMap) {
+  if (HasCharacterMap()) {
     return NS_OK;
   }
 
@@ -576,13 +590,12 @@ nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
     } else {
       charmap = pfl->FindCharMap(charmap);
     }
-    mHasCmapTable = true;
   } else {
     // if error occurred, initialize to null cmap
     charmap = new gfxCharacterMap(0);
-    mHasCmapTable = false;
   }
   if (setCharMap) {
+    AutoWriteLock lock(mLock);
     if (mCharacterMap.compareExchange(nullptr, charmap.get())) {
       charmap.get()->AddRef();
     }
@@ -590,7 +603,7 @@ nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
 
   LOG_FONTLIST(("(fontlist-cmap) name: %s, size: %zu hash: %8.8x%s\n",
                 mName.get(), charmap->SizeOfIncludingThis(moz_malloc_size_of),
-                charmap->mHash, mCharacterMap == charmap ? " new" : ""));
+                charmap->mHash, GetCharacterMapRaw() == charmap ? " new" : ""));
   if (LOG_CMAPDATA_ENABLED()) {
     char prefix[256];
     SprintfLiteral(prefix, "(cmapdata) name: %.220s", mName.get());
@@ -626,7 +639,7 @@ bool gfxFontconfigFontEntry::TestCharacterMap(uint32_t aCh) {
   return HasChar(mFontPattern, aCh);
 }
 
-bool gfxFontconfigFontEntry::HasFontTable(uint32_t aTableTag) {
+bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {
   if (FTUserFontData* ufd = GetUserFontData()) {
     if (const auto* data = ufd->GetData()) {
       return !!gfxFontUtils::FindTableDirEntry(data, aTableTag);
@@ -635,7 +648,7 @@ bool gfxFontconfigFontEntry::HasFontTable(uint32_t aTableTag) {
   return gfxFT2FontEntryBase::FaceHasTable(GetFTFace(), aTableTag);
 }
 
-hb_blob_t* gfxFontconfigFontEntry::GetFontTable(uint32_t aTableTag) {
+hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {
   // for data fonts, read directly from the font data
   if (FTUserFontData* ufd = GetUserFontData()) {
     if (const auto* data = ufd->GetData()) {
@@ -645,7 +658,7 @@ hb_blob_t* gfxFontconfigFontEntry::GetFontTable(uint32_t aTableTag) {
 
   // Use the cache only if it has already been created.
   if (mFontTableCache) {
-    return gfxFontEntry::GetFontTable(aTableTag);
+    return gfxFontEntry::GetFontTableInternal(aTableTag);
   }
 
   auto* table = hb_face_reference_table(GetHBFace(), aTableTag);
@@ -1078,9 +1091,38 @@ gfxFont* gfxFontconfigFontEntry::CreateFontInstance(
   return newFont;
 }
 
+#ifdef MOZ_FONTATIONS
+void gfxFontconfigFontEntry::InitSkrifaFont(FcPattern* aPattern) {
+  using mozilla::MemoryMappedFile;
+  using mozilla::gfx::SkrifaFontRef;
+
+  // Try to load the file.
+  const FcChar8* const filenameBytes = GetPatternFilename(aPattern);
+  if (!filenameBytes) {
+    return;
+  }
+  AutoFDClose fd(PR_Open(ToCharPtr(filenameBytes), PR_RDONLY, 0));
+  MemoryMappedFile file = MemoryMappedFile::Open(fd.get());
+  if (!file.IsValid()) {
+    return;
+  }
+
+  const int index = GetPatternIndex(aPattern);
+  const uint8_t* data = static_cast<const uint8_t*>(file.Data());
+  const size_t size = file.Size();
+  if (SkrifaFontRef* font = skrifa_font_new_from_index(data, size, index)) {
+    SetSkrifaFont(font, std::move(file));
+  }
+}
+#endif
+
 SharedFTFace* gfxFontconfigFontEntry::GetFTFace() {
   if (!mFTFaceInitialized) {
+#ifdef MOZ_FONTATIONS
+    InitSkrifaFont(mFontPattern);
+#endif
     RefPtr<SharedFTFace> face = CreateFaceForPattern(mFontPattern);
+
     if (face) {
       if (mFTFace.compareExchange(nullptr, face.get())) {
         face.forget().leak();  // The reference is now owned by mFTFace.
@@ -2144,15 +2186,14 @@ FontVisibility gfxFcPlatformFontList::GetVisibilityForFamily(
       return FontVisibility::User;
 
     case Device::Linux_Fedora_any:
+      // We have no font list for this Fedora version
+      return FontVisibility::Unknown;
+
     case Device::Linux_Fedora_39:
       if (FamilyInList(aName, kBaseFonts_Fedora_39)) {
         return FontVisibility::Base;
       }
-      if (sFontVisibilityDevice == Device::Linux_Fedora_39) {
-        return FontVisibility::User;
-      }
-      // For Fedora_any, fall through to also check Fedora 38 list.
-      [[fallthrough]];
+      return FontVisibility::User;
 
     case Device::Linux_Fedora_38:
       if (FamilyInList(aName, kBaseFonts_Fedora_38)) {
@@ -2190,11 +2231,13 @@ gfxFcPlatformFontList::GetFilteredPlatformFontLists() {
       break;
 
     case Device::Linux_Fedora_any:
+      // No font list for this Fedora version; see GetVisibilityForFamily().
+      break;
+
     case Device::Linux_Fedora_39:
       fontLists.AppendElement(std::make_pair(kBaseFonts_Fedora_39,
                                              std::size(kBaseFonts_Fedora_39)));
-      // For Fedora_any, fall through to also check Fedora 38 list.
-      [[fallthrough]];
+      break;
 
     case Device::Linux_Fedora_38:
       fontLists.AppendElement(std::make_pair(kBaseFonts_Fedora_38,

@@ -562,7 +562,7 @@ nsresult nsXMLContentSink::CreateElement(
   // https://github.com/whatwg/html/pull/12000
   // Set null registry on elements with customelementregistry attribute.
   if (hasCustomElementRegistryAttr && element) {
-    element->SetKeepCustomElementRegistryNull();
+    element->SetNullCustomElementRegistry();
   }
 
   if (aNodeInfo->Equals(nsGkAtoms::script, kNameSpaceID_XHTML) ||

@@ -104,26 +104,13 @@ if (!Services.prefs.getBoolPref("layout.css.text-decoration-inset.enabled")) {
   });
 }
 
-if (!Services.prefs.getBoolPref("dom.viewTransitions.enabled")) {
-  // view-transition selectors
-  ignoreList.push({
-    sourceName: /\b(ua)\.css$/i,
-    errorMessage: /Unknown pseudo-class.*view-transition/i,
-    isFromDevTools: false,
-  });
-  ignoreList.push({
-    sourceName: /\b(ua)\.css$/i,
-    errorMessage: /Unknown property.*view-transition/i,
-    isFromDevTools: false,
-  });
-}
-
 if (
   !Services.prefs.getBoolPref("layout.css.scroll-driven-animations.enabled")
 ) {
   ignoreList.push({
-    sourceName: /smartbar\.css$/i,
-    errorMessage: /Unknown property .*animation-timeline/i,
+    sourceName: /\b(smartbar|ai-action-confirmation)\.css$/i,
+    errorMessage:
+      /Unknown property .*(animation-range|animation-timeline|scroll-timeline|view-timeline|timeline-scope)/i,
     isFromDevTools: false,
   });
 }
@@ -263,9 +250,6 @@ let propNameAllowlist = [
   { propName: "--tab-group-gray-hover", isFromDevTools: false },
   { propName: "--tab-group-gray-text", isFromDevTools: false },
   { propName: "--tab-group-gray-text-invert", isFromDevTools: false },
-
-  /* This variable is used in a radial-gradient function, which confuses the test. */
-  { propName: "--radio-indicator-background-color", isFromDevTools: false },
 
   /* Allow design tokens in devtools without all variables being used there */
   { sourceName: /\/design-system\/tokens-.*\.css$/, isFromDevTools: true },

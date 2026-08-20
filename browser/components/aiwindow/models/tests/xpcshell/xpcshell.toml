@@ -73,6 +73,10 @@ firefox-appdir = "browser"
 
 ["test_Utils_RemoteSettings_ChatModelChoice.js"]
 
+["test_aitab_parse.js"]
+
+["test_aitab_viewer.js"]
+
 ["test_engine_build_object_form.js"]
 
 ["test_intent_classifier.js"]

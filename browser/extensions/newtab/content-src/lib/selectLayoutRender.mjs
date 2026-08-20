@@ -176,8 +176,7 @@ export const selectLayoutRender = ({ state = {}, prefs = {} }) => {
 
     result.forEach(section => {
       const { sectionKey } = section;
-      const sectionRecs = sectionsMap[sectionKey] || [];
-      section.data = sectionRecs.filter(rec => !rec.isHeadline);
+      section.data = sectionsMap[sectionKey] || [];
     });
 
     return result;
@@ -253,13 +252,7 @@ export const selectLayoutRender = ({ state = {}, prefs = {} }) => {
 
                 smallestBreakpointLayout.tiles.forEach(tile => {
                   if (tile.hasAd && section.allowAds !== false) {
-                    const widgetsBeforeThisPosition =
-                      smallestBreakpointLayout.tiles.filter(
-                        t => t.allowsWidget && t.position < tile.position
-                      ).length;
-                    const adjustedPosition =
-                      tile.position - widgetsBeforeThisPosition;
-                    sectionsSpocsPositions.push({ index: adjustedPosition });
+                    sectionsSpocsPositions.push({ index: tile.position });
                   }
                 });
                 return {

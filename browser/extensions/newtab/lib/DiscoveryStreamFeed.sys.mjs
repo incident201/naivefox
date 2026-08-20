@@ -1921,30 +1921,11 @@ export class DiscoveryStreamFeed {
         }));
 
         if (sectionsEnabled) {
-          const dailyBriefEnabled =
-            prefs.trainhopConfig?.dailyBriefing?.enabled ||
-            this.store.getState().Prefs.values[
-              "discoverystream.dailyBrief.enabled"
-            ];
-          const dailyBriefSectionId =
-            prefs.trainhopConfig?.dailyBriefing?.sectionId ||
-            prefs["discoverystream.dailyBrief.sectionId"] ||
-            "top_stories_section";
-
           for (const [sectionKey, sectionData] of Object.entries(
             feedResponse.feeds
           )) {
             if (sectionData) {
-              let headlineCount = 0;
-              const shouldMarkHeadlines =
-                dailyBriefEnabled && sectionKey === dailyBriefSectionId;
-
               for (const item of sectionData.recommendations) {
-                const isHeadline = shouldMarkHeadlines && headlineCount < 3;
-                if (isHeadline) {
-                  headlineCount++;
-                }
-
                 recommendations.push({
                   id:
                     item.corpusItemId ||
@@ -1965,7 +1946,6 @@ export class DiscoveryStreamFeed {
                   section: sectionKey,
                   icon_src: item.iconUrl,
                   isTimeSensitive: item.isTimeSensitive,
-                  isHeadline,
                 });
               }
 

@@ -68,7 +68,14 @@ async function resetToolsHeight() {
   await BrowserTestUtils.waitForMutationCondition(
     SidebarController.sidebarMain.buttonsWrapper,
     { attributes: true, attributeFilter: ["overflowing"] },
-    () => !SidebarController.sidebarMain.shouldShowOverflowButton
+    () => !SidebarController.sidebarMain.shouldShowOverflowButton,
+    {
+      msg: "Tools stopped overflowing",
+      // resizeTools drives the resize a frame at a time, which runs past a
+      // minute under tsan. That leaves no room under the harness timeout for a
+      // bound of our own, so let the harness be the one that gives up.
+      timeout: Infinity,
+    }
   );
 }
 
@@ -326,7 +333,9 @@ add_task(
         Array.from(sidebar.toolButtons).some(
           button => button.style.visibility === "hidden"
         ),
-      "At least one tool button is hidden while overflowing in vertical tabs."
+      {
+        msg: "At least one tool button is hidden while overflowing in vertical tabs.",
+      }
     );
 
     info("Switch to horizontal tabs.");
@@ -341,7 +350,9 @@ add_task(
         Array.from(sidebar.toolButtons).every(
           button => button.style.visibility !== "hidden"
         ),
-      "No tool buttons remain hidden after switching to horizontal tabs."
+      {
+        msg: "No tool buttons remain hidden after switching to horizontal tabs.",
+      }
     );
     for (const button of sidebar.toolButtons) {
       is(

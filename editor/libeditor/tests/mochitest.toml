@@ -37,6 +37,8 @@ skip-if = [
 
 ["test_backspace_vs.html"]
 
+["test_blur_in_compositionend.html"]
+
 ["test_bug46555.html"]
 
 ["test_bug200416.html"]
@@ -480,6 +482,8 @@ skip-if = [
 ["test_dom_input_event_on_texteditor.html"]
 
 ["test_dragdrop.html"]
+
+["test_dragdrop_img_with_data_url.html"]
 
 ["test_dragend_target.html"]
 

@@ -34,7 +34,6 @@
 #include "mozilla/Result.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_extensions.h"
-#include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StoragePrincipalHelper.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/ClientHandle.h"
@@ -931,7 +930,7 @@ RefPtr<ServiceWorkerRegistrationPromise> ServiceWorkerManager::Register(
   auto lifetime = DetermineLifetimeForClient(aClientInfo);
 
   uint16_t ipAddressSpace = 0;
-  auto policyContainerArgs = aClientInfo.GetPolicyContainerArgs();
+  const auto& policyContainerArgs = aClientInfo.GetPolicyContainerArgs();
   if (policyContainerArgs.isSome()) {
     ipAddressSpace =
         static_cast<uint16_t>(policyContainerArgs->ipAddressSpace());
@@ -1871,7 +1870,7 @@ nsresult ServiceWorkerManager::PrincipalInfoToScopeKey(
     return NS_ERROR_FAILURE;
   }
 
-  auto content = aPrincipalInfo.get_ContentPrincipalInfo();
+  const auto& content = aPrincipalInfo.get_ContentPrincipalInfo();
 
   nsAutoCString suffix;
   content.attrs().CreateSuffix(suffix);
@@ -2247,11 +2246,9 @@ void ServiceWorkerManager::DispatchFetchEvent(nsIInterceptedChannel* aChannel,
 
     // non-subresource request means the URI contains the principal
     OriginAttributes attrs = loadInfo->GetOriginAttributes();
-    if (StaticPrefs::privacy_partition_serviceWorkers()) {
-      StoragePrincipalHelper::GetOriginAttributes(
-          internalChannel, attrs,
-          StoragePrincipalHelper::eForeignPartitionedPrincipal);
-    }
+    StoragePrincipalHelper::GetOriginAttributes(
+        internalChannel, attrs,
+        StoragePrincipalHelper::eForeignPartitionedPrincipal);
 
     nsCOMPtr<nsIPrincipal> principal =
         BasePrincipal::CreateContentPrincipal(uri, attrs);
@@ -2435,10 +2432,6 @@ bool ServiceWorkerManager::IsAvailable(nsIPrincipal* aPrincipal, nsIURI* aURI,
     nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
 
     if (storageAccess <= StorageAccess::eDeny) {
-      if (!StaticPrefs::privacy_partition_serviceWorkers()) {
-        return false;
-      }
-
       nsCOMPtr<nsICookieJarSettings> cookieJarSettings;
       loadInfo->GetCookieJarSettings(getter_AddRefs(cookieJarSettings));
 

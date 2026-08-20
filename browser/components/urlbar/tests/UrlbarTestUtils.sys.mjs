@@ -634,7 +634,7 @@ class UrlbarInputTestUtils {
     details.title = result.getDisplayableValueAndHighlights("title").value;
     details.tags = "tags" in result.payload ? result.payload.tags : [];
     details.isSponsored = result.payload.isSponsored;
-    details.userContextId = result.payload.userContextId;
+    details.userContextId = result.payload.userContext?.id;
     let actions = element.getElementsByClassName("urlbarView-action");
     let urls = element.getElementsByClassName("urlbarView-url");
     let typeIcon = element.querySelector(".urlbarView-type-icon");
@@ -1736,6 +1736,15 @@ class UrlbarInputTestUtils {
 
     let promisePanelOpen = lazy.BrowserTestUtils.waitForEvent(popup, "shown");
     let rebuildPromise = lazy.BrowserTestUtils.waitForEvent(popup, "rebuild");
+    // In XUL windows the panel-list is wrapped in a XUL panel, which it opens
+    // asynchronously, so its "shown" event can fire before the panel is open
+    // and its contents are interactive. Bug 2063011 will fix this in
+    // panel-list itself, and remove this wait.
+    let xulPanel = popup.parentElement;
+    let promisePopupShown =
+      xulPanel.localName == "panel"
+        ? lazy.BrowserTestUtils.waitForPopupEvent(xulPanel, "shown")
+        : null;
     if (openFn) {
       await openFn();
     } else {
@@ -1745,7 +1754,7 @@ class UrlbarInputTestUtils {
       );
       button.click();
     }
-    await Promise.all([promisePanelOpen, rebuildPromise]);
+    await Promise.all([promisePanelOpen, rebuildPromise, promisePopupShown]);
 
     return popup;
   }

@@ -57,6 +57,7 @@
 #include "mozilla/dom/InputEvent.h"
 #include "mozilla/dom/Link.h"
 #include "mozilla/dom/MouseEventBinding.h"
+#include "mozilla/dom/PerformanceContainerTiming.h"
 #include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/ShadowIncludingTreeIterator.h"
 #include "mozilla/dom/ToggleEvent.h"
@@ -793,13 +794,32 @@ void nsGenericHTMLElement::AfterSetAttr(int32_t aNamespaceID, nsAtom* aName,
       SetEventHandler(GetEventNameForAttr(aName),
                       nsAttrValueOrString(aValue).String());
     } else if (aNotify && aName == nsGkAtoms::spellcheck) {
-      SyncEditorsOnSubtree(this);
+      SyncSpellCheckerStateOfExtantEditorsOnSubtree(*this);
     } else if (aName == nsGkAtoms::popover) {
       nsContentUtils::AddScriptRunner(
           NewRunnableMethod("nsGenericHTMLElement::AfterSetPopoverAttr", this,
                             &nsGenericHTMLElement::AfterSetPopoverAttr));
     } else if (aName == nsGkAtoms::popovertarget) {
       ClearExplicitlySetAttrElement(aName);
+    } else if (aName == nsGkAtoms::containertiming ||
+               aName == nsGkAtoms::containerTimingIgnore) {
+      // Changing these attributes changes the cached container-timing root of
+      // this element's entire subtree.
+      if (StaticPrefs::dom_enable_container_timing()) {
+        if (aValue) {
+          OwnerDoc()->SetMayHaveContainerTimingAttributes();
+        }
+        if (IsInUncomposedDoc()) {
+          RecomputeContainerTimingRootForSubtree();
+          // Removing containertiming unregisters this element as a container
+          // root; drop its accumulated painted region so the record can't
+          // outlive the registration (and dangle), or be inherited if the
+          // attribute is added back later.
+          if (aName == nsGkAtoms::containertiming && !aValue) {
+            ContainerTimingHelpers::DropRecordForContainerRoot(this);
+          }
+        }
+      }
     } else if (aName == nsGkAtoms::dir) {
       auto dir = Directionality::Ltr;
       // A boolean tracking whether we need to recompute our directionality.
@@ -2533,28 +2553,55 @@ nsresult nsGenericHTMLElement::DispatchSimulatedClick(
   return EventDispatcher::Dispatch(aElement, aPresContext, &event);
 }
 
-already_AddRefed<EditorBase> nsGenericHTMLElement::GetAssociatedEditor() {
+EditorBase* nsGenericHTMLElement::GetAssociatedExtantEditor() const {
+  if (IsHTMLElement(nsGkAtoms::body)) {
+    // Make sure this is the actual body of the document
+    if (this != OwnerDoc()->GetBodyElement()) [[unlikely]] {
+      return nullptr;
+    }
+
+    // For designmode, try to get document's editor
+    nsPresContext* const presContext = GetPresContext(eForComposedDoc);
+    if (!presContext) [[unlikely]] {
+      return nullptr;
+    }
+
+    nsIDocShell* const docShell = presContext->GetDocShell();
+    if (!docShell) [[unlikely]] {
+      return nullptr;
+    }
+
+    return docShell->GetHTMLEditor();
+  }
+
   // If contenteditable is ever implemented, it might need to do something
   // different here?
 
-  RefPtr<TextEditor> textEditor = GetTextEditorInternal();
-  return textEditor.forget();
+  auto* const textControlElement = TextControlElement::FromNode(*this);
+  if (!textControlElement) {
+    return nullptr;
+  }
+
+  return textControlElement->GetExtantTextEditor();
 }
 
 // static
-void nsGenericHTMLElement::SyncEditorsOnSubtree(nsIContent* content) {
+void nsGenericHTMLElement::SyncSpellCheckerStateOfExtantEditorsOnSubtree(
+    nsIContent& aContent) {
   /* Sync this node */
-  nsGenericHTMLElement* element = FromNode(content);
-  if (element) {
-    if (RefPtr<EditorBase> editorBase = element->GetAssociatedEditor()) {
+  if (nsGenericHTMLElement* const element = FromNode(aContent)) {
+    // SyncRealTimeSpell may run chrome script (bug 2065014). So, for now, we
+    // should keep using strong pointer.
+    if (const RefPtr<EditorBase> editorBase =
+            element->GetAssociatedExtantEditor()) {
       editorBase->SyncRealTimeSpell();
     }
   }
 
   /* Sync all children */
-  for (nsIContent* child = content->GetFirstChild(); child;
+  for (nsIContent* child = aContent.GetFirstChild(); child;
        child = child->GetNextSibling()) {
-    SyncEditorsOnSubtree(child);
+    SyncSpellCheckerStateOfExtantEditorsOnSubtree(*child);
   }
 }
 

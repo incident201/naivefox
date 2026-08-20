@@ -174,8 +174,6 @@ class gfxDWriteFontEntry final : public gfxFontEntry {
 
   gfxFontEntry* Clone() const override;
 
-  hb_blob_t* GetFontTable(uint32_t aTableTag) override;
-
   nsresult ReadCMAP(FontInfoData* aFontInfoData = nullptr) override;
 
   bool IsCJKFont();
@@ -203,6 +201,8 @@ class gfxDWriteFontEntry final : public gfxFontEntry {
 
   // Protected destructor, to discourage deletion outside of Release():
   virtual ~gfxDWriteFontEntry();
+
+  hb_blob_t* GetFontTableInternal(uint32_t aTableTag) override;
 
   virtual nsresult CopyFontTable(uint32_t aTableTag,
                                  nsTArray<uint8_t>& aBuffer) override;
@@ -264,7 +264,7 @@ class DWriteFontFallbackRenderer final : public IDWriteTextRenderer {
     (void)hr;
   }
 
-  ~DWriteFontFallbackRenderer() {}
+  ~DWriteFontFallbackRenderer() = default;
 
   // If we don't have an mSystemFonts pointer, this renderer is unusable.
   bool IsValid() const { return mSystemFonts; }

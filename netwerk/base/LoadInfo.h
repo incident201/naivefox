@@ -202,6 +202,10 @@ nsresult LoadInfoArgsToLoadInfo(const mozilla::net::LoadInfoArgs& aLoadInfoArgs,
   GETTER(bool, IsMetaRefresh, isMetaRefresh, false)                            \
   SETTER(bool, IsMetaRefresh)                                                  \
                                                                                \
+  GETTER(bool, ActivatedFromNavigationalPrefetch,                              \
+         activatedFromNavigationalPrefetch, false)                             \
+  SETTER(bool, ActivatedFromNavigationalPrefetch)                              \
+                                                                               \
   GETTER(bool, IsFromProcessingFrameAttributes,                                \
          isFromProcessingFrameAttributes, false)                               \
                                                                                \

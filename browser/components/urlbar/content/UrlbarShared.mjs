@@ -9,6 +9,7 @@
  * its own copy of the module).
  */
 
+import UrlbarContentURIUtils from "chrome://browser/content/urlbar/UrlbarContentURIUtils.mjs";
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 
 /**
@@ -32,6 +33,30 @@ import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs"
  */
 
 /**
+ * @typedef {object} UrlLoad
+ *   A direct URL load.
+ * @property {string} url
+ *   The url to load.
+ * @property {?string} postData
+ *   The post data, or null for a GET.
+ */
+
+/**
+ * @typedef {object} EngineSearchLoad
+ *   A search to submit to an engine.
+ * @property {string} engineName
+ *   The name of the search engine.
+ * @property {string} query
+ *   The query.
+ */
+
+/**
+ * @typedef {{urlLoad: UrlLoad, engineSearch?: never} |
+ *           {engineSearch: EngineSearchLoad, urlLoad?: never}} UrlbarLoadRequest
+ *  Either a URL or an engine search.
+ */
+
+/**
  * @typedef {object} URIFixupPrimitives
  *   The parts of an `nsIURIFixupInfo` that survive the actor boundary, so a
  *   content-realm consumer never holds an XPCOM object. Produced by
@@ -48,7 +73,25 @@ import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs"
 // windows. Real container ids are non-negative, so -1 is a safe sentinel.
 const PRIVATE_USER_CONTEXT_ID = -1;
 
+// `nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID`, which a content realm has
+// no `Ci` to read it from.
+const DEFAULT_USER_CONTEXT_ID = 0;
+
 export const UrlbarShared = {
+  /**
+   * Measures an element without flushing layout where that is possible.
+   * `windowUtils` is chrome-only, so a content realm takes the flushing path.
+   *
+   * @param {Element} element
+   *   The element to measure.
+   * @returns {DOMRect}
+   */
+  getBoundsWithoutFlushing:
+    typeof ChromeUtils != "undefined"
+      ? element =>
+          element.documentGlobal.windowUtils.getBoundsWithoutFlushing(element)
+      : element => element.getBoundingClientRect(),
+
   // REGEXP_ constants are duplicated from UrlUtils.sys.mjs
   // Regex matching on whitespaces.
   REGEXP_SPACES: /\s+/,
@@ -66,6 +109,10 @@ export const UrlbarShared = {
     QUERY_FIRST_RESULT: "onFirstResult",
     QUERY_RESULTS: "onQueryResults",
     QUERY_RESULT_REMOVED: "onQueryResultRemoved",
+    // Fires when no further results will reach the listeners. The parent
+    // cancels a query when a new one supersedes it and when the view closes or
+    // freezes its rows; the child controller cancels one whose results it
+    // withholds.
     QUERY_CANCELLED: "onQueryCancelled",
     QUERY_FINISHED: "onQueryFinished",
     VIEW_OPEN: "onViewOpen",
@@ -429,7 +476,7 @@ export const UrlbarShared = {
       this.getUserContextIdForOpenPagesTable(
         userContextId,
         isInPrivateWindow
-      ) || Ci.nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID
+      ) || DEFAULT_USER_CONTEXT_ID
     );
   },
 
@@ -462,10 +509,13 @@ export const UrlbarShared = {
    * @param {object} [options]
    * @param {string} [options.prefix]
    *   Prefix to use for the logged messages.
+   * @param {string} [options.maxLogLevelPref]
+   *   The pref holding the maximum log level. It has to be known to
+   *   `UrlbarPrefs`, which is how the logger reads it outside chrome.
    * @returns {Console}
    *   The console logger.
    */
-  getLogger({ prefix = "" } = {}) {
+  getLogger({ prefix = "", maxLogLevelPref = "browser.urlbar.loglevel" } = {}) {
     let logger = loggers.get(prefix);
     if (logger) {
       return logger;
@@ -473,12 +523,53 @@ export const UrlbarShared = {
 
     let fullPrefix = `URLBar${prefix ? " - " + prefix : ""}`;
     if (console.createInstance) {
-      logger = createLoggerChrome(fullPrefix);
+      logger = createLoggerChrome(fullPrefix, maxLogLevelPref);
     } else {
-      logger = createLoggerContent(fullPrefix);
+      logger = createLoggerContent(fullPrefix, maxLogLevelPref);
     }
     loggers.set(prefix, logger);
     return logger;
+  },
+
+  /**
+   * Extracts the URL from a result.
+   *
+   * @param {UrlbarResult} result
+   *   The result to extract from.
+   * @param {object} options
+   *   Options object.
+   * @param {HTMLElement} [options.element]
+   *   The element associated with the result that was selected or picked, if
+   *   available. For results that have multiple selectable children, the URL
+   *   may be taken from a child element rather than the result.
+   * @returns {?UrlbarLoadRequest}
+   *   Null if the result has nothing to load.
+   */
+  getLoadRequestFromResult(result, { element = null } = {}) {
+    if (
+      result.payload.engine &&
+      (result.type == UrlbarShared.RESULT_TYPE.SEARCH ||
+        result.type == UrlbarShared.RESULT_TYPE.DYNAMIC)
+    ) {
+      let query =
+        element?.dataset.query ||
+        result.payload.suggestion ||
+        result.payload.query;
+      if (query) {
+        return { engineSearch: { query, engineName: result.payload.engine } };
+      }
+    }
+
+    if (!result.payload.url) {
+      return null;
+    }
+
+    return {
+      urlLoad: {
+        url: result.payload.url,
+        postData: result.payload.postData ?? null,
+      },
+    };
   },
 
   /**
@@ -645,6 +736,62 @@ export const UrlbarShared = {
   },
 
   /**
+   * Unescape the given uri to use as UI.
+   * NOTE: If the length of uri is over MAX_TEXT_LENGTH,
+   *       return the given uri as it is.
+   *
+   * @param {string} uri will be unescaped.
+   * @returns {string} Unescaped uri.
+   */
+  unEscapeURIForUI(uri) {
+    return uri.length > this.MAX_TEXT_LENGTH
+      ? uri
+      : UrlbarContentURIUtils.unEscapeURIForUI(uri);
+  },
+
+  /**
+   * Unescape, decode punycode, and trim (both protocol and trailing slash)
+   * the URL. Use for displaying purposes only!
+   *
+   * @param {string|URL} url The url that should be prepared for display.
+   * @param {object} [options] Preparation options.
+   * @param {boolean} [options.trimURL] Whether the displayed URL should be
+   *                  trimmed or not.
+   * @param {boolean} [options.schemeless] Trim `http(s)://`.
+   * @returns {string} Prepared url.
+   */
+  prepareUrlForDisplay(url, { trimURL = true, schemeless = false } = {}) {
+    // Some domains are encoded in punycode. The following ensures we display
+    // the url in utf-8. If the url can't be parsed we fall back to using the
+    // string as-is.
+    let spec = typeof url == "string" ? url : url.href;
+    let displayString = UrlbarContentURIUtils.getDisplaySpec(spec) ?? spec;
+
+    if (displayString) {
+      if (schemeless) {
+        displayString = this.stripPrefixAndTrim(displayString, {
+          stripHttp: true,
+          stripHttps: true,
+        })[0];
+      } else if (trimURL && UrlbarPrefs.get("trimURLs")) {
+        // Remove a single trailing slash for http/https/ftp URLs.
+        displayString = displayString.replace(
+          /^((?:http|https|ftp):\/\/[^/]+)\/$/,
+          "$1"
+        );
+        if (displayString.startsWith("https://")) {
+          displayString = displayString.substring(8);
+          if (displayString.startsWith("www.")) {
+            displayString = displayString.substring(4);
+          }
+        }
+      }
+    }
+
+    return this.unEscapeURIForUI(displayString);
+  },
+
+  /**
    * Returns whether a URL can be autofilled from a candidate string. This
    * function is specifically designed for origin and up-to-the-next-slash URL
    * autofill. It should not be used for other types of autofill.
@@ -808,6 +955,177 @@ export const UrlbarShared = {
         return 3;
     }
     return 1;
+  },
+
+  /**
+   * Extracts a type for search engagement telemetry from a result.
+   *
+   * @param {UrlbarResult} result The result to analyze.
+   * @param {string} [selType] An optional parameter for the selected type.
+   * @returns {string} Type as string.
+   */
+  searchEngagementTelemetryType(result, selType = null) {
+    if (!result) {
+      return selType === "oneoff" ? "search_shortcut_button" : "input_field";
+    }
+
+    // While product doesn't use experimental addons anymore, tests may still do
+    // for testing purposes.
+    if (
+      result.providerType === UrlbarShared.PROVIDER_TYPE.EXTENSION &&
+      result.providerName != "UrlbarProviderOmnibox"
+    ) {
+      return "experimental_addon";
+    }
+
+    if (result.providerName == "UrlbarProviderQuickSuggest") {
+      return this._getQuickSuggestTelemetryType(result);
+    }
+
+    // Appends subtype to certain result types.
+    function checkForSubType(type, res) {
+      if (res.providerName == "UrlbarProviderInputHistory") {
+        type += "_adaptive";
+      } else if (res.providerName == "UrlbarProviderSemanticHistorySearch") {
+        type += "_semantic";
+      }
+      if (
+        res.isSERP &&
+        [
+          UrlbarShared.RESULT_SOURCE.BOOKMARKS,
+          UrlbarShared.RESULT_SOURCE.HISTORY,
+          UrlbarShared.RESULT_SOURCE.TABS,
+        ].includes(res.source)
+      ) {
+        type += "_serp";
+      }
+      return type;
+    }
+
+    switch (result.type) {
+      case UrlbarShared.RESULT_TYPE.DYNAMIC:
+        switch (result.providerName) {
+          case "UrlbarProviderCalculator":
+            return "calc";
+          case "UrlbarProviderTabToSearch":
+            return "tab_to_search";
+          case "UrlbarProviderUnitConversion":
+            return "unit";
+          case "UrlbarProviderQuickSuggestContextualOptIn":
+            return "fxsuggest_data_sharing_opt_in";
+          case "UrlbarProviderGlobalActions":
+          case "UrlbarProviderActionsSearchMode":
+            return "action";
+        }
+        break;
+      case UrlbarShared.RESULT_TYPE.KEYWORD:
+        return "keyword";
+      case UrlbarShared.RESULT_TYPE.OMNIBOX:
+        return "addon";
+      case UrlbarShared.RESULT_TYPE.REMOTE_TAB:
+        return "remote_tab";
+      case UrlbarShared.RESULT_TYPE.SEARCH:
+        if (result.providerName === "UrlbarProviderTabToSearch") {
+          return "tab_to_search";
+        }
+        if (result.source == UrlbarShared.RESULT_SOURCE.HISTORY) {
+          return result.providerName == "UrlbarProviderRecentSearches"
+            ? "recent_search"
+            : "search_history";
+        }
+        if (result.providerName === "UrlbarProviderAiChat") {
+          return "ai_search_fallback";
+        }
+        if (result.payload.suggestion) {
+          let type = result.payload.trending
+            ? "trending_search"
+            : "search_suggest";
+          if (result.isRichSuggestion) {
+            type += "_rich";
+          }
+          return type;
+        }
+        return "search_engine";
+      case UrlbarShared.RESULT_TYPE.TAB_SWITCH:
+        return checkForSubType("tab", result);
+      case UrlbarShared.RESULT_TYPE.TIP:
+        if (result.providerName === "UrlbarProviderInterventions") {
+          switch (result.payload.type) {
+            case UrlbarShared.INTERVENTION_TIP_TYPE.CLEAR:
+              return "intervention_clear";
+            case UrlbarShared.INTERVENTION_TIP_TYPE.REFRESH:
+              return "intervention_refresh";
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_ASK:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_CHECKING:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_REFRESH:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_RESTART:
+            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_WEB:
+              return "intervention_update";
+            default:
+              return "intervention_unknown";
+          }
+        }
+        switch (result.payload.type) {
+          case UrlbarShared.SEARCH_TIP_TYPE.ONBOARD:
+            return "tip_onboard";
+          case UrlbarShared.SEARCH_TIP_TYPE.REDIRECT:
+            return "tip_redirect";
+          case "dismissalAcknowledgment":
+            return "tip_dismissal_acknowledgment";
+          default:
+            return "tip_unknown";
+        }
+      case UrlbarShared.RESULT_TYPE.URL:
+        if (
+          result.source === UrlbarShared.RESULT_SOURCE.OTHER_LOCAL &&
+          result.heuristic
+        ) {
+          return "url";
+        }
+        if (result.autofill) {
+          return `autofill_${result.autofill.type ?? "unknown"}`;
+        }
+        if (result.providerName === "UrlbarProviderTopSites") {
+          return "top_site";
+        }
+        if (result.providerName === "UrlbarProviderClipboard") {
+          return "clipboard";
+        }
+        if (result.payload.isAutofillFallback) {
+          return "history_autofill_fallback_origin";
+        }
+        if (result.source === UrlbarShared.RESULT_SOURCE.BOOKMARKS) {
+          return checkForSubType("bookmark", result);
+        }
+        return checkForSubType("history", result);
+      case UrlbarShared.RESULT_TYPE.RESTRICT:
+        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.BOOKMARK) {
+          return "restrict_keyword_bookmarks";
+        }
+        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.OPENPAGE) {
+          return "restrict_keyword_tabs";
+        }
+        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.HISTORY) {
+          return "restrict_keyword_history";
+        }
+        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.ACTION) {
+          return "restrict_keyword_actions";
+        }
+        break;
+      case UrlbarShared.RESULT_TYPE.AI_CHAT:
+        return "ai_chat";
+    }
+
+    return "unknown";
+  },
+
+  _getQuickSuggestTelemetryType(result) {
+    if (result.payload.telemetryType == "weather") {
+      // Return "weather" without the usual source prefix for consistency with
+      // past reporting of weather suggestions.
+      return "weather";
+    }
+    return result.payload.source + "_" + result.payload.telemetryType;
   },
 
   _compareIgnoringDiacritics: null,
@@ -1217,7 +1535,7 @@ export const UrlbarShared = {
     // generate "{n} weeks ago" UI strings, which aren't very precise anyway.
     if (this.__firstDayOfWeek === undefined) {
       this.__firstDayOfWeek = new Intl.Locale(
-        Services.locale.appLocaleAsBCP47
+        Intl.DateTimeFormat().resolvedOptions().locale
       ).getWeekInfo().firstDay;
 
       // Make sure we always have a valid value in case the locale doesn't
@@ -1232,13 +1550,11 @@ export const UrlbarShared = {
  * Create a logger that uses `console.createInstance`.
  *
  * @param {string} prefix
+ * @param {string} maxLogLevelPref
  * @returns {Console}
  */
-function createLoggerChrome(prefix) {
-  let logger = console.createInstance({
-    prefix,
-    maxLogLevelPref: "browser.urlbar.loglevel",
-  });
+function createLoggerChrome(prefix, maxLogLevelPref) {
+  let logger = console.createInstance({ prefix, maxLogLevelPref });
   // Casting from ConsoleInstance to Console. Note that it is technically not a
   // `Console` because it is missing the chrome-only property `createInstance`.
   return /** @type {Console} */ (/** @type {unknown} */ (logger));
@@ -1248,9 +1564,10 @@ function createLoggerChrome(prefix) {
  * Create a logger that uses the global `console`.
  *
  * @param {string} prefix
+ * @param {string} maxLogLevelPref
  * @returns {Console}
  */
-function createLoggerContent(prefix) {
+function createLoggerContent(prefix, maxLogLevelPref) {
   let tag = `[${prefix}]`;
   const LEVEL_NUMBERS = {
     all: 0,
@@ -1264,9 +1581,12 @@ function createLoggerContent(prefix) {
   };
   const LEVELS = ["debug", "log", "info", "trace", "warn", "error"];
 
+  // UrlbarPrefs names prefs in the `browser.urlbar.` branch relative to it.
+  let levelPref = maxLogLevelPref.replace(/^browser\.urlbar\./, "");
+
   let shouldLog = level => {
     let maxLevel =
-      LEVEL_NUMBERS[UrlbarPrefs.get("loglevel").toLowerCase()] ??
+      LEVEL_NUMBERS[UrlbarPrefs.get(levelPref).toLowerCase()] ??
       LEVEL_NUMBERS.warn;
     return maxLevel <= LEVEL_NUMBERS[level];
   };

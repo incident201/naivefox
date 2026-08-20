@@ -245,6 +245,7 @@ struct EmbedderColorSchemes {
    * top BCs. */                                                              \
   FIELD(AuthorStyleDisabledDefault, bool)                                     \
   FIELD(ServiceWorkersTestingEnabled, bool)                                   \
+  FIELD(ServiceWorkersDisabledByPolicy, bool)                                 \
   FIELD(MediumOverride, nsString)                                             \
   /* DevTools override for prefers-color-scheme */                            \
   FIELD(PrefersColorSchemeOverride, dom::PrefersColorSchemeOverride)          \
@@ -1090,6 +1091,10 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
     return GetServiceWorkersTestingEnabled();
   }
 
+  bool ServiceWorkersDisabledByPolicy() const {
+    return GetServiceWorkersDisabledByPolicy();
+  }
+
   void GetMediumOverride(nsAString& aOverride) const {
     aOverride = GetMediumOverride();
   }
@@ -1305,6 +1310,11 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
               nsILoadInfo::CrossOriginOpenerPolicy, ContentParent*);
 
   bool CanSet(FieldIndex<IDX_ServiceWorkersTestingEnabled>, bool,
+              ContentParent*) {
+    return IsTop();
+  }
+
+  bool CanSet(FieldIndex<IDX_ServiceWorkersDisabledByPolicy>, bool,
               ContentParent*) {
     return IsTop();
   }

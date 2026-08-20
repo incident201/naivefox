@@ -7,15 +7,14 @@ import { UrlbarResult } from "chrome://browser/content/urlbar/UrlbarResult.mjs";
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 import { L10nCache } from "chrome://browser/content/urlbar/L10nCache.mjs";
 
-const lazy = {};
+const lazy = typeof ChromeUtils != "undefined" ? {} : null;
 
-ChromeUtils.defineESModuleGetters(lazy, {
-  ContextualIdentityService:
-    "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
-  UrlbarSearchOneOffs:
-    "moz-src:///browser/components/urlbar/UrlbarSearchOneOffs.sys.mjs",
-  UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
-});
+if (lazy) {
+  ChromeUtils.defineESModuleGetters(lazy, {
+    UrlbarSearchOneOffs:
+      "moz-src:///browser/components/urlbar/UrlbarSearchOneOffs.sys.mjs",
+  });
+}
 
 // Query selector for selectable elements in results.
 const SELECTABLE_ELEMENT_SELECTOR = "[role=button], [selectable], a";
@@ -28,8 +27,7 @@ const RESULT_MENU_COMMANDS = {
   MANAGE: "manage",
 };
 
-const getBoundsWithoutFlushing = element =>
-  element.documentGlobal.windowUtils.getBoundsWithoutFlushing(element);
+const getBoundsWithoutFlushing = UrlbarShared.getBoundsWithoutFlushing;
 
 // Used to get a unique id to use for row elements, it wraps at 9999, that
 // should be plenty for our needs.
@@ -66,6 +64,7 @@ export class UrlbarView {
 
     this.resultMenu.addEventListener("click", this);
     this.resultMenu.addEventListener("showing", this);
+    this.resultMenu.addEventListener("hidden", this);
 
     this.input.toggleAttribute("noresults", true);
 
@@ -1283,6 +1282,10 @@ export class UrlbarView {
    * to avoid closing the overflow panel.
    */
   maybeRollupPopups() {
+    if (typeof ChromeUtils == "undefined") {
+      // There are no other chrome popups to roll up in a content document.
+      return;
+    }
     if (
       UrlbarPrefs.get("closeOtherPanelsOnOpen") &&
       !this.input.inOverflowPanel
@@ -1936,7 +1939,7 @@ export class UrlbarView {
     noWrap.appendChild(titleSeparator);
     item._elements.set("titleSeparator", titleSeparator);
 
-    if (Services.prefs.getBoolPref("browser.nova.enabled", false)) {
+    if (UrlbarPrefs.get("browser.nova.enabled")) {
       let userContext = this.#createElement("span");
       userContext.classList.add(
         "urlbarView-user-context",
@@ -2457,10 +2460,15 @@ export class UrlbarView {
       item.setAttribute("type", "semantic-history");
     } else if (result.providerName == "UrlbarProviderInputHistory") {
       item.setAttribute("type", "adaptive-history");
+    } else if (
+      result.providerName == "UrlbarProviderTopSites" &&
+      result.source == UrlbarShared.RESULT_SOURCE.HISTORY
+    ) {
+      item.setAttribute("type", "history");
     } else {
       item.setAttribute(
         "type",
-        lazy.UrlbarUtils.searchEngagementTelemetryType(result)
+        UrlbarShared.searchEngagementTelemetryType(result)
       );
     }
 
@@ -2926,7 +2934,7 @@ export class UrlbarView {
 
     item.setAttribute(
       "type",
-      lazy.UrlbarUtils.searchEngagementTelemetryType(result)
+      UrlbarShared.searchEngagementTelemetryType(result)
     );
     item.toggleAttribute("sponsored", result.payload.isSponsored);
 
@@ -2962,7 +2970,7 @@ export class UrlbarView {
     this.#l10nCache.setElementL10n(bottomLabel, result.payload.bottomTextL10n);
 
     let url = item._elements.get("url");
-    url.textContent = lazy.UrlbarUtils.prepareUrlForDisplay(result.payload.url);
+    url.textContent = UrlbarShared.prepareUrlForDisplay(result.payload.url);
   }
 
   /**
@@ -3660,7 +3668,7 @@ export class UrlbarView {
         : "urlbar-result-action-switch-tab",
     });
 
-    if (!Services.prefs.getBoolPref("browser.nova.enabled", false)) {
+    if (!UrlbarPrefs.get("browser.nova.enabled")) {
       this.#updateOtherActionChicletsProton(result, actionNode);
       return;
     }
@@ -3677,7 +3685,7 @@ export class UrlbarView {
 
     if (
       result.type == UrlbarShared.RESULT_TYPE.TAB_SWITCH &&
-      UrlbarShared.isContainerUserContextId(result.payload.userContextId)
+      UrlbarShared.isContainerUserContextId(result.payload.userContext?.id)
     ) {
       if (!contextualIdentityAction) {
         contextualIdentityAction = actionNode.cloneNode(true);
@@ -3719,9 +3727,7 @@ export class UrlbarView {
 
   // Proton only
   #addContextualIdentityToSwitchTabChiclet(result, actionNode) {
-    let label = lazy.ContextualIdentityService.getUserContextLabel(
-      result.payload.userContextId
-    );
+    let { color, iconUrl, label } = result.payload.userContext;
     // To avoid flicker don't update the label unless necessary.
     if (
       actionNode.classList.contains("urlbarView-userContext") &&
@@ -3731,42 +3737,33 @@ export class UrlbarView {
       return;
     }
     actionNode.innerHTML = "";
-    let identity = lazy.ContextualIdentityService.getPublicIdentityFromId(
-      result.payload.userContextId
-    );
-    if (identity) {
+    if (label) {
       actionNode.classList.add("urlbarView-userContext");
       actionNode.classList.remove("urlbarView-switchToTab");
-      if (identity.color) {
+      if (color) {
         actionNode.className = actionNode.className.replace(
           /identity-color-\w*/g,
           ""
         );
-        actionNode.classList.add("identity-color-" + identity.color);
+        actionNode.classList.add("identity-color-" + color);
       }
 
       let textModeLabel = this.#createElement("div");
       textModeLabel.classList.add("urlbarView-userContext-textMode");
+      textModeLabel.innerText = label;
+      actionNode.appendChild(textModeLabel);
 
-      if (label) {
-        textModeLabel.innerText = label;
-        actionNode.appendChild(textModeLabel);
-
-        let iconModeLabel = this.#createElement("div");
-        iconModeLabel.classList.add("urlbarView-userContext-iconMode");
-        actionNode.appendChild(iconModeLabel);
-        let iconURL = lazy.ContextualIdentityService.getContainerIconURL(
-          identity.icon
-        );
-        if (iconURL) {
-          let userContextIcon = this.#createElement("img");
-          userContextIcon.classList.add("urlbarView-userContext-icon");
-          userContextIcon.setAttribute("alt", label);
-          userContextIcon.src = iconURL;
-          iconModeLabel.appendChild(userContextIcon);
-        }
-        actionNode.setAttribute("tooltiptext", label);
+      let iconModeLabel = this.#createElement("div");
+      iconModeLabel.classList.add("urlbarView-userContext-iconMode");
+      actionNode.appendChild(iconModeLabel);
+      if (iconUrl) {
+        let userContextIcon = this.#createElement("img");
+        userContextIcon.classList.add("urlbarView-userContext-icon");
+        userContextIcon.setAttribute("alt", label);
+        userContextIcon.src = iconUrl;
+        iconModeLabel.appendChild(userContextIcon);
       }
+      actionNode.setAttribute("tooltiptext", label);
     }
   }
 
@@ -3825,23 +3822,14 @@ export class UrlbarView {
   }
 
   #updateUserContextAction(item, result) {
-    let identity;
+    let color;
     let iconUrl;
     let label;
     if (
       result.type == UrlbarShared.RESULT_TYPE.TAB_SWITCH &&
-      result.payload.userContextId &&
-      UrlbarShared.isContainerUserContextId(result.payload.userContextId)
+      UrlbarShared.isContainerUserContextId(result.payload.userContext?.id)
     ) {
-      identity = lazy.ContextualIdentityService.getPublicIdentityFromId(
-        result.payload.userContextId
-      );
-      iconUrl = identity?.icon
-        ? lazy.ContextualIdentityService.getContainerIconURL(identity.icon)
-        : null;
-      label = lazy.ContextualIdentityService.getUserContextLabel(
-        result.payload.userContextId
-      ).trim();
+      ({ color, iconUrl, label } = result.payload.userContext);
     }
 
     let contextNode = item._elements.get("userContext");
@@ -3865,8 +3853,8 @@ export class UrlbarView {
         break;
       }
     }
-    if (identity?.color) {
-      contextNode.classList.add("identity-color-" + identity.color);
+    if (color) {
+      contextNode.classList.add("identity-color-" + color);
     }
 
     if (label) {
@@ -4406,7 +4394,7 @@ export class UrlbarView {
 
     // Attaching the event listener to the window so we can capture `mouseup`
     // outside of the panel when the mouse is dragged.
-    this.panel.documentGlobal.addEventListener("mouseup", this);
+    this.window.addEventListener("mouseup", this);
 
     // Select the element and open a speculative connection unless it's a
     // button. Buttons are special in the two ways listed below. Some buttons
@@ -4447,7 +4435,7 @@ export class UrlbarView {
       return;
     }
 
-    this.panel.documentGlobal.removeEventListener("mouseup", this);
+    this.window.removeEventListener("mouseup", this);
 
     // Since the listener must be on the window use `event.composedPath()`
     // instead of `event.target` to handle shadow DOM encapsulation while
@@ -4544,6 +4532,10 @@ export class UrlbarView {
       ".urlbarView-splitbutton"
     );
 
+    this.resultMenu.lastAnchorNode
+      .closest(".urlbarView-row")
+      .toggleAttribute("menu-trigger", true);
+
     if (splitButton) {
       // Show the commands the are defined in its Split Button.
       let mainButton = splitButton.firstElementChild;
@@ -4574,13 +4566,13 @@ export class UrlbarView {
 
       // Set the context-menu-trigger attribute on the row so it can be styled
       // as if it were hovered while the context menu is open.
-      row.toggleAttribute("context-menu-trigger", true);
+      row.toggleAttribute("menu-trigger", true);
 
-      // Disable the context menu if the result does not return url.
-      let url = lazy.UrlbarUtils.getUrlFromResult(row.result, {
+      // Disable the context menu if the result does not return a load request.
+      let loadRequest = UrlbarShared.getLoadRequestFromResult(row.result, {
         element: row,
-      })?.url;
-      event.target.toggleAttribute("disabled", !url);
+      });
+      event.target.toggleAttribute("disabled", !loadRequest);
     } else if (
       event.target.id == "urlbarView-context-menu-open-in-container-tab-popup"
     ) {
@@ -4590,11 +4582,17 @@ export class UrlbarView {
     }
   }
 
+  on_hidden() {
+    this.resultMenu.lastAnchorNode
+      .closest(".urlbarView-row")
+      ?.toggleAttribute("menu-trigger", false);
+  }
+
   on_popuphiding(event) {
     if (event.target.id == "urlbarView-context-menu") {
       event.target.triggerNode
         .closest(".urlbarView-row")
-        ?.toggleAttribute("context-menu-trigger", false);
+        ?.toggleAttribute("menu-trigger", false);
     }
   }
 
@@ -4636,6 +4634,10 @@ export class UrlbarView {
 
   clearTopSitesCache() {
     this.queryContextCache.clearTopSitesCache();
+  }
+
+  clearL10nCache() {
+    this.#l10nCache.clear();
   }
 }
 

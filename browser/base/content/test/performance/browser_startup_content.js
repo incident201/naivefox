@@ -46,6 +46,10 @@ const known_scripts = {
     // Extensions
     "resource://gre/modules/ExtensionProcessScript.sys.mjs",
     "resource://gre/modules/ExtensionUtils.sys.mjs",
+
+    // Enterprise policies
+    "resource://gre/modules/EnterprisePolicies.sys.mjs",
+    "resource://gre/modules/EnterprisePoliciesContent.sys.mjs",
   ]),
   frameScripts: new Set([
     // Test related

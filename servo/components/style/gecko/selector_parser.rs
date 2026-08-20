@@ -218,12 +218,6 @@ impl NonTSPseudoClass {
     /// Returns whether the pseudo-class is enabled in content sheets.
     #[inline]
     fn is_enabled_in_content(&self) -> bool {
-        if matches!(
-            *self,
-            Self::ActiveViewTransition | Self::ActiveViewTransitionType(..)
-        ) {
-            return static_prefs::pref!("dom.viewTransitions.enabled");
-        }
         if matches!(*self, Self::Heading(..)) {
             return static_prefs::pref!("dom.headingoffset.enabled");
         }
@@ -387,7 +381,7 @@ impl<'a> SelectorParser<'a> {
     }
 
     fn is_pseudo_element_enabled(&self, pseudo_element: &PseudoElement) -> bool {
-        if pseudo_element.enabled_in_content(&self.url_data) {
+        if pseudo_element.enabled_in_content(&self.url_data, self.for_supports_rule) {
             return true;
         }
 

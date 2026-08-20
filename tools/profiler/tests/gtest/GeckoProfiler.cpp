@@ -1948,17 +1948,17 @@ TEST(GeckoProfiler, GetBacktrace)
     static const int N = 100;
     {
       UniqueProfilerBacktrace u[N];
-      for (int i = 0; i < N; i++) {
-        u[i] = profiler_get_backtrace();
-        ASSERT_TRUE(u[i]);
+      for (auto& i : u) {
+        i = profiler_get_backtrace();
+        ASSERT_TRUE(i);
       }
     }
 
     // These will be destroyed after the profiler stops.
     UniqueProfilerBacktrace u[N];
-    for (int i = 0; i < N; i++) {
-      u[i] = profiler_get_backtrace();
-      ASSERT_TRUE(u[i]);
+    for (auto& i : u) {
+      i = profiler_get_backtrace();
+      ASSERT_TRUE(i);
     }
 
     profiler_stop();
@@ -2654,6 +2654,8 @@ TEST(GeckoProfiler, Markers)
       /* bool aIsPrivateBrowsing */ false,
       /* nsIClassOfService* aClassOfService */ classOfService2,
       /* nsresult aRequestStatus */ NS_BINDING_ABORTED,
+      /* const nsACString& aSecPurpose */ ""_ns,
+      /* bool aActivatedFromPrefetch */ false,
       /* const mozilla::net::TimingStruct* aTimings = nullptr */ nullptr,
       /* mozilla::UniquePtr<mozilla::ProfileChunkedBuffer> aSource =
          nullptr */
@@ -2689,6 +2691,8 @@ TEST(GeckoProfiler, Markers)
       /* bool aIsPrivateBrowsing */ false,
       /* nsIClassOfService* aClassOfService */ classOfService3,
       /* nsresult aRequestStatus */ NS_ERROR_UNEXPECTED,
+      /* const nsACString& aSecPurpose */ ""_ns,
+      /* bool aActivatedFromPrefetch */ false,
       /* const mozilla::net::TimingStruct* aTimings = nullptr */ nullptr,
       /* mozilla::UniquePtr<mozilla::ProfileChunkedBuffer> aSource =
          nullptr */
@@ -2723,6 +2727,8 @@ TEST(GeckoProfiler, Markers)
       /* bool aIsPrivateBrowsing */ false,
       /* nsIClassOfService* aClassOfService */ classOfService4,
       /* nsresult aRequestStatus */ NS_ERROR_DOCSHELL_DYING,
+      /* const nsACString& aSecPurpose */ ""_ns,
+      /* bool aActivatedFromPrefetch */ false,
       /* const mozilla::net::TimingStruct* aTimings = nullptr */ nullptr,
       /* mozilla::UniquePtr<mozilla::ProfileChunkedBuffer> aSource =
          nullptr */
@@ -2757,6 +2763,8 @@ TEST(GeckoProfiler, Markers)
       /* bool aIsPrivateBrowsing */ false,
       /* nsIClassOfService* aClassOfService */ classOfService5,
       /* nsresult aRequestStatus */ NS_ERROR_DOM_CORP_FAILED,
+      /* const nsACString& aSecPurpose */ ""_ns,
+      /* bool aActivatedFromPrefetch */ false,
       /* const mozilla::net::TimingStruct* aTimings = nullptr */ nullptr,
       /* mozilla::UniquePtr<mozilla::ProfileChunkedBuffer> aSource =
          nullptr */
@@ -2791,6 +2799,8 @@ TEST(GeckoProfiler, Markers)
       /* bool aIsPrivateBrowsing */ false,
       /* nsIClassOfService* aClassOfService */ classOfService6,
       /* nsresult aRequestStatus */ NS_ERROR_BLOCKED_BY_POLICY,
+      /* const nsACString& aSecPurpose */ ""_ns,
+      /* bool aActivatedFromPrefetch */ false,
       /* const mozilla::net::TimingStruct* aTimings = nullptr */ nullptr,
       /* mozilla::UniquePtr<mozilla::ProfileChunkedBuffer> aSource =
          nullptr */
@@ -2856,6 +2866,47 @@ TEST(GeckoProfiler, Markers)
       /* bool aIsPrivateBrowsing */ false,
       /* nsIClassOfService* aClassOfService */ classOfService8,
       /* nsresult aRequestStatus */ NS_OK);
+
+  // The speculative fetch, and then the navigation that consumes it. These
+  // two fields are mutually exclusive in production, so each gets its own
+  // marker.
+  RefPtr<MockClassOfService> classOfService9 =
+      new MockClassOfService(nsIClassOfService::Leader);
+  profiler_add_network_marker(
+      /* nsIURI* aURI */ uri,
+      /* const nsACString& aRequestMethod */ "GET"_ns,
+      /* int32_t aPriority */ 34,
+      /* uint64_t aChannelId */ 9,
+      /* NetworkLoadType aType */ net::NetworkLoadType::LOAD_START,
+      /* mozilla::TimeStamp aStart */ ts1,
+      /* mozilla::TimeStamp aEnd */ ts2,
+      /* int64_t aCount */ 56,
+      /* nsICacheInfoChannel::CacheDisposition aCacheDisposition */
+      nsICacheInfoChannel::kCacheHit,
+      /* uint64_t aInnerWindowID */ 78,
+      /* bool aIsPrivateBrowsing */ false,
+      /* nsIClassOfService* aClassOfService */ classOfService9,
+      /* nsresult aRequestStatus */ NS_OK,
+      /* const nsACString& aSecPurpose */ "prefetch;anonymous-client-ip"_ns,
+      /* bool aActivatedFromPrefetch */ false);
+
+  profiler_add_network_marker(
+      /* nsIURI* aURI */ uri,
+      /* const nsACString& aRequestMethod */ "GET"_ns,
+      /* int32_t aPriority */ 34,
+      /* uint64_t aChannelId */ 10,
+      /* NetworkLoadType aType */ net::NetworkLoadType::LOAD_START,
+      /* mozilla::TimeStamp aStart */ ts1,
+      /* mozilla::TimeStamp aEnd */ ts2,
+      /* int64_t aCount */ 56,
+      /* nsICacheInfoChannel::CacheDisposition aCacheDisposition */
+      nsICacheInfoChannel::kCacheHit,
+      /* uint64_t aInnerWindowID */ 78,
+      /* bool aIsPrivateBrowsing */ false,
+      /* nsIClassOfService* aClassOfService */ classOfService9,
+      /* nsresult aRequestStatus */ NS_OK,
+      /* const nsACString& aSecPurpose */ ""_ns,
+      /* bool aActivatedFromPrefetch */ true);
 
   EXPECT_TRUE(profiler_add_marker_impl(
       "Text in main thread with stack", geckoprofiler::category::OTHER,
@@ -2958,6 +3009,8 @@ TEST(GeckoProfiler, Markers)
     S_NetworkMarkerPayload_redirect_internal_sts,
     S_NetworkMarkerPayload_private_browsing,
     S_NetworkMarkerPayload_priorityHeader,
+    S_NetworkMarkerPayload_prefetch,
+    S_NetworkMarkerPayload_prefetchActivation,
 
     S_TextWithStack,
     S_TextToMTWithStack,
@@ -3208,7 +3261,11 @@ TEST(GeckoProfiler, Markers)
                   ts2Double = marker[END_TIME].asDouble();
                   state = State(S_FirstMarker + 1);
                   EXPECT_EQ(typeString, "Text");
-                  EXPECT_EQ_JSON(payload["name"], String, "First Marker");
+                  // The Text marker's "name" field is a unique string.
+                  ASSERT_TRUE(payload["name"].isUInt());
+                  GET_JSON(firstMarkerName,
+                           stringTable[payload["name"].asUInt()], String);
+                  EXPECT_EQ(firstMarkerName.asString(), "First Marker");
 
                 } else if (nameString == "Gtest custom marker") {
                   EXPECT_EQ(state, S_CustomMarker);
@@ -3309,6 +3366,8 @@ TEST(GeckoProfiler, Markers)
                   EXPECT_TRUE(payload["isHttpToHttpsRedirect"].isNull());
                   EXPECT_TRUE(payload["redirectId"].isNull());
                   EXPECT_TRUE(payload["contentType"].isNull());
+                  EXPECT_TRUE(payload["secPurpose"].isNull());
+                  EXPECT_TRUE(payload["deliveryType"].isNull());
 
                 } else if (nameString == "Load 2: http://mozilla.org/") {
                   EXPECT_EQ(state, S_NetworkMarkerPayload_stop);
@@ -3477,20 +3536,46 @@ TEST(GeckoProfiler, Markers)
                   EXPECT_FALSE(payload["priorityHeader"].isNull());
                   EXPECT_EQ_JSON(payload["priorityHeader"], String, "u=4, i");
 
+                } else if (nameString == "Load 9: http://mozilla.org/") {
+                  EXPECT_EQ(state, S_NetworkMarkerPayload_prefetch);
+                  state = State(S_NetworkMarkerPayload_prefetch + 1);
+                  EXPECT_EQ(typeString, "Network");
+                  EXPECT_EQ_JSON(payload["id"], Int64, 9);
+                  EXPECT_EQ_JSON(payload["secPurpose"], String,
+                                 "prefetch;anonymous-client-ip");
+                  EXPECT_TRUE(payload["deliveryType"].isNull());
+
+                } else if (nameString == "Load 10: http://mozilla.org/") {
+                  EXPECT_EQ(state, S_NetworkMarkerPayload_prefetchActivation);
+                  state = State(S_NetworkMarkerPayload_prefetchActivation + 1);
+                  EXPECT_EQ(typeString, "Network");
+                  EXPECT_EQ_JSON(payload["id"], Int64, 10);
+                  EXPECT_TRUE(payload["secPurpose"].isNull());
+                  EXPECT_EQ_JSON(payload["deliveryType"], String,
+                                 "navigational-prefetch");
+
                 } else if (nameString == "Text in main thread with stack") {
                   EXPECT_EQ(state, S_TextWithStack);
                   state = State(S_TextWithStack + 1);
                   EXPECT_EQ(typeString, "Text");
                   EXPECT_FALSE(payload["stack"].isNull());
                   EXPECT_TIMING_INTERVAL_AT(ts1Double, ts2Double);
-                  EXPECT_EQ_JSON(payload["name"], String, "");
+                  // The Text marker's "name" field is a unique string.
+                  ASSERT_TRUE(payload["name"].isUInt());
+                  GET_JSON(textName, stringTable[payload["name"].asUInt()],
+                           String);
+                  EXPECT_EQ(textName.asString(), "");
 
                 } else if (nameString == "Text from main thread with stack") {
                   EXPECT_EQ(state, S_TextToMTWithStack);
                   state = State(S_TextToMTWithStack + 1);
                   EXPECT_EQ(typeString, "Text");
                   EXPECT_FALSE(payload["stack"].isNull());
-                  EXPECT_EQ_JSON(payload["name"], String, "");
+                  // The Text marker's "name" field is a unique string.
+                  ASSERT_TRUE(payload["name"].isUInt());
+                  GET_JSON(textName, stringTable[payload["name"].asUInt()],
+                           String);
+                  EXPECT_EQ(textName.asString(), "");
 
                 } else if (nameString ==
                            "Text in registered thread with stack") {
@@ -3503,7 +3588,11 @@ TEST(GeckoProfiler, Markers)
                   state = State(S_RegThread_TextToMTWithStack + 1);
                   EXPECT_EQ(typeString, "Text");
                   EXPECT_FALSE(payload["stack"].isNull());
-                  EXPECT_EQ_JSON(payload["name"], String, "");
+                  // The Text marker's "name" field is a unique string.
+                  ASSERT_TRUE(payload["name"].isUInt());
+                  GET_JSON(textName, stringTable[payload["name"].asUInt()],
+                           String);
+                  EXPECT_EQ(textName.asString(), "");
 
                 } else if (nameString ==
                            "Text in unregistered thread with stack") {
@@ -3516,7 +3605,11 @@ TEST(GeckoProfiler, Markers)
                   state = State(S_UnregThread_TextToMTWithStack + 1);
                   EXPECT_EQ(typeString, "Text");
                   EXPECT_TRUE(payload["stack"].isNull());
-                  EXPECT_EQ_JSON(payload["name"], String, "");
+                  // The Text marker's "name" field is a unique string.
+                  ASSERT_TRUE(payload["name"].isUInt());
+                  GET_JSON(textName, stringTable[payload["name"].asUInt()],
+                           String);
+                  EXPECT_EQ(textName.asString(), "");
                 }
               }  // marker with payload
             }  // for (marker : data)
@@ -3559,7 +3652,7 @@ TEST(GeckoProfiler, Markers)
             ASSERT_TRUE(data[0u].isObject());
             EXPECT_EQ_JSON(data[0u]["key"], String, "name");
             EXPECT_EQ_JSON(data[0u]["label"], String, "Details");
-            EXPECT_EQ_JSON(data[0u]["format"], String, "string");
+            EXPECT_EQ_JSON(data[0u]["format"], String, "unique-string");
 
           } else if (nameString == "NoPayloadUserData") {
             // TODO: Remove this when bug 1646714 lands.
@@ -5626,8 +5719,8 @@ struct LatencyHist {
 
   uint64_t Count() const {
     uint64_t count = 0;
-    for (int i = 0; i < kSlots; ++i) {
-      count += mBuckets[i];
+    for (unsigned long long mBucket : mBuckets) {
+      count += mBucket;
     }
     return count;
   }

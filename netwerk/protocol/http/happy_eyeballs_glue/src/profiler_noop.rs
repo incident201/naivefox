@@ -29,6 +29,7 @@ impl Profiler {
         &mut self,
         _id: happy_eyeballs::Id,
         _record_type: happy_eyeballs::DnsRecordType,
+        _allow_stale: bool,
     ) {
     }
 
@@ -36,6 +37,7 @@ impl Profiler {
         &mut self,
         _id: happy_eyeballs::Id,
         _addrs: &[impl std::fmt::Display],
+        _stale: bool,
     ) {
     }
 
@@ -43,6 +45,7 @@ impl Profiler {
         &mut self,
         _id: happy_eyeballs::Id,
         _infos: &[happy_eyeballs::ServiceInfo],
+        _stale: bool,
     ) {
     }
 

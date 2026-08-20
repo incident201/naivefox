@@ -627,7 +627,8 @@ nsIContent* nsHtml5TreeOperation::CreateHTMLElement(
   // fall back to aContextRegistry).
   Maybe<RefPtr<CustomElementRegistry>> customElementRegistry =
       nsContentUtils::GetCustomElementRegistry(aIntendedParent);
-  if (customElementRegistry.isNothing()) {
+  if (customElementRegistry.isNothing() &&
+      document == aBuilder->GetDocument()) {
     customElementRegistry = std::move(aContextRegistry);
   }
 
@@ -701,7 +702,7 @@ nsIContent* nsHtml5TreeOperation::CreateHTMLElement(
               customElementRegistry.value()) {
         element->SetCustomElementRegistry(registry);
       } else {
-        element->SetKeepCustomElementRegistryNull();
+        element->SetNullCustomElementRegistry();
       }
     }
 

@@ -3217,7 +3217,6 @@ const MESSAGES = () => [
                 raw: "One click launches your most used sites in a streamlined window with all of Firefox’s protections.",
                 textAlign: "initial",
                 marginInline: "40px",
-                marginInlineEnd: "6px",
                 fontSize: "13px",
               },
             },
