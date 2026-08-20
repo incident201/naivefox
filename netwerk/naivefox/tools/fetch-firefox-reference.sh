@@ -4,6 +4,7 @@ set -euo pipefail
 umask 077
 
 repo_root=$(git rev-parse --show-toplevel)
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 objdir=${NAIVEFOX_OBJDIR:-${MOZ_OBJDIR:-$repo_root/obj-naivefox-minimal}}
 objdir=$(realpath -m -- "$objdir")
 output=${1:-${NAIVEFOX_FIREFOX_REFERENCE_DIR:-$objdir/naivefox-capture-reference}}
@@ -16,9 +17,42 @@ case "$output" in
     ;;
 esac
 
+reference_manifest="$script_dir/firefox-reference-manifest"
+if [[ ! -f $reference_manifest ]]; then
+  printf 'committed Firefox reference manifest is missing: %s\n' \
+    "$reference_manifest" >&2
+  exit 1
+fi
+manifest_value() {
+  awk -F= -v key="$1" '$1 == key { print substr($0, index($0, "=") + 1); exit }' \
+    "$reference_manifest"
+}
+default_url=$(manifest_value url)
+default_sha256=$(manifest_value archive_sha256)
+default_version=$(manifest_value version)
+[[ $default_url == https://* && $default_sha256 =~ ^[0-9a-f]{64}$ && \
+  -n $default_version ]] || {
+  printf 'invalid committed Firefox reference manifest\n' >&2
+  exit 1
+}
+url=${NAIVEFOX_FIREFOX_URL:-$default_url}
+expected_sha256=${NAIVEFOX_FIREFOX_SHA256:-$default_sha256}
+expected_version=${NAIVEFOX_FIREFOX_VERSION:-$default_version}
+[[ $expected_sha256 =~ ^[0-9a-f]{64}$ && -n $expected_version ]] || {
+  printf 'invalid Firefox reference override\n' >&2
+  exit 2
+}
+
 if [[ -x "$output/firefox" && -f "$output/REFERENCE-MANIFEST" ]]; then
-  printf '%s\n' "$output"
-  exit 0
+  if grep -Fqx "url=$url" "$output/REFERENCE-MANIFEST" && \
+    grep -Fqx "archive_sha256=$expected_sha256" "$output/REFERENCE-MANIFEST" && \
+    grep -Fqx "version=$expected_version" "$output/REFERENCE-MANIFEST"; then
+    printf '%s\n' "$output"
+    exit 0
+  fi
+  printf 'cached Firefox reference does not match the pinned manifest: %s\n' \
+    "$output" >&2
+  exit 1
 fi
 if [[ -e "$output" ]]; then
   printf 'refusing to reuse incomplete reference directory: %s\n' "$output" >&2
@@ -33,7 +67,6 @@ mkdir -p "$objdir"
 tmp=$(mktemp -d "$objdir/naivefox-firefox-reference.XXXXXX")
 trap 'rm -rf -- "$tmp"' EXIT
 archive="$tmp/firefox.tar.bz2"
-url=${NAIVEFOX_FIREFOX_URL:-'https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US'}
 
 effective_url=$(curl --fail --location --silent --show-error --retry 3 \
   --proto '=https' --tlsv1.2 "$url" -o "$archive" -w '%{url_effective}')
@@ -54,6 +87,16 @@ fi
 
 version=$(LD_LIBRARY_PATH="$extracted" "$extracted/firefox" --version 2>/dev/null)
 sha256=$(sha256sum "$archive" | awk '{print $1}')
+if [[ $sha256 != "$expected_sha256" ]]; then
+  printf 'Firefox reference archive SHA-256 mismatch: expected %s, got %s\n' \
+    "$expected_sha256" "$sha256" >&2
+  exit 1
+fi
+if [[ $version != "$expected_version" ]]; then
+  printf 'Firefox reference version mismatch: expected %s, got %s\n' \
+    "$expected_version" "$version" >&2
+  exit 1
+fi
 mv -- "$extracted" "$output"
 {
   printf 'source=Mozilla official download\n'

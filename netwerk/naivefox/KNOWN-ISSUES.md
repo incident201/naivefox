@@ -40,6 +40,12 @@ kept as the other side; exact TLS/QUIC fingerprint equality is reported, not
 required across release versions. Strict protocol, no-fallback, marker,
 padding, and multiplexing assertions remain mandatory.
 
+There are two capture meanings: same-base mode (an explicitly supplied Firefox
+binary/library pair) is the strict minimalization regression gate; the default
+pinned Firefox 154.0 release is the standalone/minimal-source diagnostic mode.
+The committed `tools/firefox-reference-manifest` fixes its URL, version, and
+archive digest; a moving `latest` URL is not accepted.
+
 ## Single-process networking
 
 Single-process networking is the deliberate architecture of the current Linux
@@ -124,8 +130,11 @@ H2, and the soak runner records such a failure rather than masking it.
   and UDP ASSOCIATE are not implemented.
 - `proxy` accepts NaiveProxy-compatible string or array mapping. Comma-separated
   multi-hop proxy chains remain outside the current scope and fail explicitly.
-- The verified staged runtime prioritizes reproducibility over size and is not
-  yet minimized.
+- The verified runtime/build closure is minimized through the current
+  DOM/GFX/WebRTC/UI/profiler boundary. The remaining SpiderMonkey and ICU
+  closure is deliberately deferred, and `minimal-source` export has not yet
+  started; those are separate milestones, not an assertion that the current
+  runtime is unminimized.
 
 Detailed evidence is in `TEST-REPORT.md`, wire comparisons are in
 `H3-CAPTURE.md`, and every modified Firefox file is listed in `UPSTREAM.md`.

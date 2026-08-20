@@ -9,7 +9,7 @@ license = "MPL-2.0"
 name = "neqo_glue"
 
 [dependencies]
-firefox-on-glean = { path = "../../../toolkit/components/glean/api" }
+firefox-on-glean = { path = "../../../toolkit/components/glean/api", optional = true }
 neqo-udp = { tag = "v0.30.1", git = "https://github.com/mozilla/neqo" }
 neqo-http3 = { tag = "v0.30.1", git = "https://github.com/mozilla/neqo" }
 neqo-transport = { tag = "v0.30.1", git = "https://github.com/mozilla/neqo", features = ["gecko"] }
@@ -38,6 +38,9 @@ default-features = false
 features = ["gecko"]
 
 [features]
+default = ["glean"]
+glean = ["dep:firefox-on-glean"]
+naivefox = []
 bench = [] # no-op, see <https://github.com/mozilla/neqo/issues/2390>
 fuzzing = ["neqo-http3/disable-encryption"]
 

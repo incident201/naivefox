@@ -5,6 +5,7 @@
 extern crate byteorder;
 #[macro_use]
 extern crate cstr;
+#[cfg(not(feature = "naivefox"))]
 extern crate firefox_on_glean;
 #[macro_use]
 extern crate log;
@@ -20,7 +21,23 @@ extern crate xpcom;
 use wr_malloc_size_of as malloc_size_of;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+#[cfg(not(feature = "naivefox"))]
 use firefox_on_glean::metrics::data_storage;
+
+#[cfg(feature = "naivefox")]
+#[allow(non_upper_case_globals)]
+mod data_storage {
+    pub struct NoopMetric;
+
+    impl NoopMetric {
+        pub fn set<T>(&self, _value: T) {}
+    }
+
+    pub static alternate_services: NoopMetric = NoopMetric;
+    pub static client_auth_remember_list: NoopMetric = NoopMetric;
+    pub static site_security_service_state: NoopMetric = NoopMetric;
+    pub static site_integrity_service_state: NoopMetric = NoopMetric;
+}
 use malloc_size_of::{MallocSizeOf, MallocSizeOfOps};
 use moz_task::{create_background_task_queue, RunnableBuilder};
 use nserror::{

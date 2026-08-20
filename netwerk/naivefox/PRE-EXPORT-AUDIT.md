@@ -34,16 +34,25 @@ refreshed package: version/runtime startup, five SOCKS sessions, HTTP CONNECT,
 malformed-input bounded stress, and relative/absolute/Unicode append logging
 all passed.
 
+The cheap closure pass is now complete. The browser-wide Glean metrics/pings
+index is disabled for `MOZ_NAIVEFOX`; only the retained 23 metric schemas,
+`netwerk/pings.yaml`, and the shared tag vocabulary are generated. The active
+Cargo tree has no `firefox-on-glean`/`glean-core` runtime crates. Four direct
+Rust dependencies proven unused were removed; `jsrust_shared` was deliberately
+retained because removing it produced unresolved SpiderMonkey encoding symbols.
+The remaining large closure is intentional: SpiderMonkey and ICU are recorded
+as a future size milestone, not guessed away in this audit.
+
 ---
 
 ## 1. Release & Baseline Provenance
 
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
-- **Validated Minimal Audit Source Commit:** `3e395eb1aca9fc73af7bfeaa6076e929f80b8ff0`
-- **Validated Minimal Report Commit:** report-only child of the audit source commit (exact SHA is recorded in the report provenance)
+- **Audited Minimal Source Commit:** recorded as `report_provenance.source_commit_sha` in both closure reports; it is the exact source tree that was built and audited.
+- **Minimal Report Snapshot Commit:** the direct report-only child of that audited source commit; it changes only the two closure JSON files.
 - **Validated Minimal Source Commit:** `NOT_CREATED`
-- **Pre-Audit Graph Checkpoint Tag:** `minimal-graph-v0.1` (`60f2eede69da856daf2324fc90b2c2ab9cb86fd2`)
+- **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 
 ---
 
@@ -56,10 +65,10 @@ Audited with `netwerk/naivefox/tools/analyze-full-closure.py` and strictly valid
 | **Target Triple** | `x86_64-unknown-linux-gnu` | `x86_64-pc-windows-msvc` |
 | **C/C++ Translation Units** | **545 TUs** (clean audited depfiles) | **468 TUs** (clean audited depfiles) |
 | **Direct Link Objects** | **525 object files** (216.03 MB unstripped) | **536 object files** (202.62 MB unstripped) |
-| **Main Binary Size** | 615.49 MB unstripped / **62.0 MB stripped** | **40.94 MB** (`xul.dll`) |
+| **Main Binary Size** | 477.67 MiB unstripped / **64.57 MiB `--strip-debug` / 53.61 MiB `--strip-all`** | measured `xul.dll` in the Windows report |
 | **Headless Executable** | 1.05 MB (`naivefox`) | 11.0 KB (`naivefox.exe`) |
 | **Static Libraries** | 3 archives (`js_static`, `gkrust`, `pure_virtual`) | 3 archives (`js_static.lib`, `gkrust.lib`, `pure_virtual.lib`) |
-| **Reachable Rust Crates** | **366 packages** (filtered reachable from `gkrust`) | **379 packages** (filtered reachable from `gkrust`) |
+| **Reachable Rust Crates** | **271 packages** (active `gkrust-naivefox` normal-edge tree) | **287 packages** (active `gkrust-naivefox` normal-edge tree) |
 | **Dynamic Dependencies** | **20 `DT_NEEDED`** (glibc, glib, dbus, nspr, nss, sqlite) | **22 DLL imports** (Win32 API, nspr, nss, sqlite) |
 | **Desktop UI Libraries (GTK/X11)** | **0 libraries linked** | **0 libraries linked** |
 | **Staged Runtime Package** | **18 files** (27.91 MB archive) | **21 files** (19.34 MB archive) |
@@ -120,9 +129,11 @@ Automated smoke test executed via `tools/verify-staged-windows-smoke.py`:
 - `[PASS]` 600-second strict H3 real-Caddy soak: 45/45 integrity requests,
   45/45 H3 and padding records, 593 resource samples
 - `[PASS]` Clean process termination and shutdown
-- *Note:* strict H3 networking is now covered by the native soak. A separate
-  full native H2/Auto matrix and crash-dump-backed long churn run remain
-  follow-up evidence; no random crash recurred in the repeated smoke/soak gate.
+- *Note:* strict H3 networking is now covered by the native soak. Before the
+  first `minimal-source` Windows validation, run the existing native H2 and
+  Auto workload paths plus the long churn gate; no random crash recurred in
+  the repeated smoke/soak evidence, so no hypothetical profiler race is being
+  pursued without a new crash reproduction.
 
 ---
 
@@ -137,4 +148,8 @@ Automated smoke test executed via `tools/verify-staged-windows-smoke.py`:
 
 1. **Boundary Definition:** DOM implementation and layout engines are excluded. Explicit minimal WebIDL, binding metadata, and code generator subsets are retained where required.
 2. **Build-Time Dependency Inclusion:** The source export manifest must include all build-time generators, python actions, and dependency metadata even if they do not compile into the final runtime binary.
-3. **Allowlist Integrity:** Do not generate export allowlists solely from the 525 direct object files. Retain all 934 C/C++ source units, 396 reachable Rust crates, and active code generators.
+3. **Allowlist Integrity:** Do not hard-code object/crate counts. Generate the
+   allowlist from the union of the validated Linux and Windows reports:
+   `cxx_translation_units`, headers, Rust `source_paths`, Cargo manifests,
+   generated inputs, and runtime resource sources. The counts in each report
+   are measurements, not an export contract.

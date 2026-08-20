@@ -178,13 +178,18 @@ def get_dynamic_dependencies(binary_path):
     return sorted(set(deps))
 
 
-def get_reachable_rust_closure(topsrcdir, target_triple):
+def get_reachable_rust_closure(topsrcdir, target_triple, objdir=None):
     """
-    Run cargo metadata from toolkit/library/rust/Cargo.toml with features = ['naivefox'].
-    Traverse resolve graph starting from root 'gkrust' to extract only reachable crates.
+    Run cargo metadata from the actual NaiveFox Rust root. The outer
+    `gkrust` staticlib is only a wrapper which selects this package;
+    traversing the workspace root also pulls dev-only/browser feature graphs
+    into the audit. Traverse normal dependencies from `gkrust-naivefox` with
+    Cargo's target filtering and default-feature policy intact.
     Map all crates.io and in-tree crates to repository-relative paths inside third_party/rust or in-tree.
     """
-    manifest_path = os.path.join(topsrcdir, "toolkit", "library", "rust", "Cargo.toml")
+    manifest_path = os.path.join(
+        topsrcdir, "toolkit", "library", "rust", "naivefox", "Cargo.toml"
+    )
     if not os.path.exists(manifest_path):
         raise AuditConsistencyError(f"Rust root manifest not found: {manifest_path}")
 
@@ -194,11 +199,10 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
             "cargo is not on PATH; run the audit as the configured build user"
         )
 
-    # Cargo's resolver is the source of truth for cfg/platform filtering.  Do
-    # not try to reconstruct target predicates from strings in dep_kinds: that
-    # admitted Android, Darwin and Haiku crates into the old reports.  The
-    # filtered resolve graph already contains exactly the dependencies Cargo
-    # would use for this target.
+    # Cargo's resolver is the source of truth for package identity.  The
+    # metadata inventory intentionally includes host/build packages too (the
+    # Windows target is still resolved by a Linux host); the target-filtered
+    # `cargo tree` below decides which normal runtime edges are reachable.
     cmd = [
         cargo,
         "metadata",
@@ -206,17 +210,19 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
         manifest_path,
         "--format-version",
         "1",
-        "--features",
-        "naivefox",
         "--no-default-features",
-        "--filter-platform",
-        target_triple,
         "--locked",
         "--offline",
     ]
+    cargo_cwd = topsrcdir
+    if objdir and os.path.exists(os.path.join(objdir, ".cargo", "config.toml")):
+        # Mozilla's configured vendored-source replacement lives in the
+        # target objdir. Running Cargo from the checkout would try to fetch
+        # the pinned git crates even in offline mode.
+        cargo_cwd = objdir
     try:
         raw = subprocess.check_output(
-            cmd, stderr=subprocess.PIPE, text=True, cwd=topsrcdir
+            cmd, stderr=subprocess.PIPE, text=True, cwd=cargo_cwd
         )
     except subprocess.CalledProcessError as exc:
         detail = (exc.stderr or "").strip().splitlines()[-1:]
@@ -227,36 +233,103 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
     meta = json.loads(raw)
 
     packages_by_id = {p["id"]: p for p in meta.get("packages", [])}
-    nodes_by_id = {n["id"]: n for n in meta.get("resolve", {}).get("nodes", [])}
-    root_id = meta.get("resolve", {}).get("root")
-
-    if not root_id or root_id not in nodes_by_id:
-        raise AuditConsistencyError(f"Cannot resolve root crate 'gkrust' in Cargo metadata")
-    root_package = packages_by_id.get(root_id)
-    if not root_package or root_package.get("name") != "gkrust":
+    root_ids = [
+        package_id
+        for package_id, package in packages_by_id.items()
+        if package.get("name") == "gkrust-naivefox"
+    ]
+    if not root_ids:
         raise AuditConsistencyError(
-            "Cargo metadata root is not gkrust: "
-            f"{root_package.get('name') if root_package else root_id}"
+            "Cannot resolve root crate 'gkrust-naivefox' in Cargo metadata"
         )
 
-    visited_ids = set()
-    queue = [root_id]
-    while queue:
-        curr = queue.pop(0)
-        if curr in visited_ids:
-            continue
-        visited_ids.add(curr)
-        node = nodes_by_id.get(curr)
-        if not node:
-            continue
+    # Cargo metadata resolves the complete workspace and unifies features
+    # across members. Its resolve.nodes[].deps can therefore contain optional
+    # Glean/profiler dependencies inactive in the NaiveFox package. Ask Cargo
+    # for the target-specific, no-default-features normal-edge tree instead;
+    # retain metadata only for manifests and source paths.
+    tree_cmd = [
+        cargo,
+        "tree",
+        "--manifest-path",
+        manifest_path,
+        "--no-default-features",
+        "--edges",
+        "normal",
+        "--target",
+        target_triple,
+        "--locked",
+        "--offline",
+        "--prefix",
+        "none",
+        "--format",
+        "{p}",
+    ]
+    try:
+        tree_output = subprocess.check_output(
+            tree_cmd, stderr=subprocess.PIPE, text=True, cwd=cargo_cwd
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or "").strip().splitlines()[-1:]
+        raise AuditConsistencyError(
+            f"cargo tree failed for {target_triple}: "
+            + (detail[0] if detail else "unknown error")
+        ) from exc
 
-        for dep in node.get("deps", []):
-            dep_pkg_id = dep.get("pkg")
-            if dep_pkg_id and dep_pkg_id not in visited_ids:
-                queue.append(dep_pkg_id)
+    by_name_version = {}
+    for package_id, package in packages_by_id.items():
+        key = (package.get("name"), package.get("version"))
+        by_name_version.setdefault(key, []).append(package_id)
+
+    reachable_ids = set()
+    package_line = re.compile(
+        r"^(?P<name>\S+) v(?P<version>\S+)(?: \((?P<source>.*)\))?$"
+    )
+    for raw_line in tree_output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        match = package_line.match(line)
+        if not match:
+            raise AuditConsistencyError(
+                f"cannot parse cargo tree package line: {line}"
+            )
+        name = match.group("name")
+        version = match.group("version")
+        source = match.group("source")
+        candidates = list(by_name_version.get((name, version), []))
+        if source and candidates:
+            if source.startswith("/"):
+                exact = [
+                    package_id
+                    for package_id in candidates
+                    if Path(packages_by_id[package_id]["manifest_path"]).parent
+                    == Path(source)
+                ]
+                if exact:
+                    candidates = exact
+            else:
+                matching_source = [
+                    package_id
+                    for package_id in candidates
+                    if packages_by_id[package_id].get("source")
+                    and source in packages_by_id[package_id]["source"]
+                ]
+                if matching_source:
+                    candidates = matching_source
+        if not candidates:
+            raise AuditConsistencyError(
+                f"cargo tree package is absent from metadata: {line}"
+            )
+        reachable_ids.update(candidates)
+
+    if not set(root_ids).intersection(reachable_ids):
+        raise AuditConsistencyError(
+            "cargo tree did not include gkrust-naivefox root package"
+        )
 
     reachable_crates = []
-    for pkg_id in sorted(visited_ids):
+    for pkg_id in sorted(reachable_ids):
         pkg = packages_by_id.get(pkg_id)
         if not pkg:
             continue
@@ -417,10 +490,9 @@ def get_glean_inputs(topsrcdir, objdir):
     """Record the real Glean generator/cache/YAML inputs without exporting objdir paths."""
     glean_source_dir = os.path.join(topsrcdir, "toolkit", "components", "glean")
     generator_scripts = [
+        "toolkit/components/glean/build_scripts/glean_parser_ext/cache_yaml.py",
         "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py",
         "toolkit/components/glean/build_scripts/glean_parser_ext/metrics_header_names.py",
-        "toolkit/components/glean/metrics_index.py",
-        "toolkit/components/glean/pings_index.py",
     ]
     generator_scripts = [
         path for path in generator_scripts if os.path.exists(os.path.join(topsrcdir, path))
@@ -550,7 +622,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
     bin_naivefox = objdir_path / "dist" / "bin" / naivefox_name
     dynamic_deps = get_dynamic_dependencies(str(bin_xul))
 
-    rust_crates = get_reachable_rust_closure(topsrcdir, target_triple)
+    rust_crates = get_reachable_rust_closure(topsrcdir, target_triple, objdir)
     archive_member_names = [
         member
         for archive in static_libs
@@ -607,7 +679,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
-            "analyzer_version": "2.4.0-strict-target",
+            "analyzer_version": "2.5.0-active-cargo-tree",
             "compiler_version": compiler_ver,
             "linker_version": linker_ver,
             "sccache_state": "supported",
@@ -639,7 +711,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
         "dynamic_dependencies": dynamic_deps,
         "rust_closure": {
             "platform_filter": target_triple,
-            "root_package": "gkrust",
+            "root_package": "gkrust-naivefox",
             "reachable_crates_count": len(rust_crates),
             "crates": rust_crates,
         },
@@ -648,7 +720,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "cargo_manifests": sorted(
                 c["manifest_path"] for c in rust_crates
             ),
-            "cargo_root_manifest": "toolkit/library/rust/Cargo.toml",
+            "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
             "cargo_lockfile": "Cargo.lock",
             "cargo_config_template": ".cargo/config.toml.in",
             "depfiles_scanned": source_inputs["depfiles_scanned"],

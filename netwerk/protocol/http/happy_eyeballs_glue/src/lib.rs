@@ -4,7 +4,50 @@
 
 //! FFI glue layer between happy-eyeballs Rust crate and Firefox's C++ networking stack.
 
+#[cfg(not(feature = "naivefox"))]
 mod metrics;
+
+#[cfg(feature = "naivefox")]
+mod metrics {
+    pub(crate) struct Metrics;
+
+    impl Metrics {
+        pub(crate) fn new(_alt_svc: &[happy_eyeballs::AltSvc]) -> Self {
+            Self
+        }
+
+        pub(crate) fn dns_query_started(
+            &mut self,
+            _id: happy_eyeballs::Id,
+            _record_type: happy_eyeballs::DnsRecordType,
+        ) {
+        }
+
+        pub(crate) fn dns_response(
+            &mut self,
+            _id: happy_eyeballs::Id,
+            _positive: bool,
+            _is_trr: bool,
+        ) {
+        }
+
+        pub(crate) fn dns_response_https(
+            &mut self,
+            _id: happy_eyeballs::Id,
+            _infos: &[happy_eyeballs::ServiceInfo],
+            _is_trr: bool,
+        ) {
+        }
+
+        pub(crate) fn connection_attempt_started(&mut self, _id: happy_eyeballs::Id) {}
+
+        pub(crate) fn connection_cancelled(&mut self, _id: happy_eyeballs::Id) {}
+
+        pub(crate) fn connection_succeeded(&mut self, _id: happy_eyeballs::Id) {}
+
+        pub(crate) fn failed(&mut self) {}
+    }
+}
 #[cfg(feature = "profiler")]
 mod profiler;
 #[cfg(not(feature = "profiler"))]

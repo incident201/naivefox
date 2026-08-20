@@ -164,6 +164,11 @@ client_pid=
 file_port=$(free_port)
 file_config="$run_dir/file-config.json"
 runtime_log="$run_dir/runtime.log"
+# Regression: O_CREAT's mode argument does not tighten an existing file.
+# POSIX RuntimeLogging must fchmod it before fdopen; Windows uses its own
+# wide-path CRT implementation and is covered by the native smoke runner.
+: >"$runtime_log"
+chmod 0644 "$runtime_log"
 file_output="$run_dir/file-output.log"
 write_config "$file_config" "$file_port" file "$runtime_log"
 "${runtime_environment[@]}" -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \

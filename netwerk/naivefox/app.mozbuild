@@ -12,6 +12,11 @@ include("/js/app.mozbuild")
 # single header without adding the graphics build graph.
 EXPORTS += ["/gfx/thebes/gfxSparseBitSet.h"]
 
+# A few retained platform headers include this friend declaration even in a
+# --disable-tests product build.  Export the single header without pulling
+# the gtest libraries or test registration graph into NaiveFox.
+EXPORTS.gtest += ["/testing/gtest/MozGtestFriend.h"]
+
 # nsUnicodeProperties uses HarfBuzz's public Unicode enums and types for character
 # properties. Export only the required public headers into dist/include/harfbuzz
 # without compiling any font-shaping implementation objects into libxul.
@@ -141,8 +146,10 @@ DIRS += [
     "/caps",
     "/security/certverifier",
     "/security/manager",
-    "/testing/gtest",
     "/toolkit/components/glean",
     "/toolkit/library",
     "/tools/profiler",
 ]
+
+if CONFIG["ENABLE_TESTS"]:
+    DIRS += ["/testing/gtest"]

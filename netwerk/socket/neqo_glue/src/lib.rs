@@ -21,10 +21,27 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(not(feature = "naivefox"))]
 use firefox_on_glean::{
     metrics::networking,
     private::{LocalCustomDistribution, LocalMemoryDistribution},
 };
+
+#[cfg(feature = "naivefox")]
+mod naivefox_metrics {
+    /// Compile-time replacement for Neqo's telemetry distributions.  The
+    /// parent-only client has no Glean service, but the datagram accounting
+    /// remains a zero-cost ABI-compatible call site.
+    pub struct Distribution;
+
+    impl Distribution {
+        pub const fn new() -> Self {
+            Self
+        }
+
+        pub fn accumulate(&mut self, _value: u64) {}
+    }
+}
 #[cfg(not(windows))]
 use libc::{c_int, AF_INET, AF_INET6};
 use libc::{c_uchar, size_t};
@@ -132,12 +149,30 @@ pub struct NeqoHttp3Conn {
     /// WouldBlock. To be sent once UDP socket has write-availability again.
     buffered_outbound_datagram: Option<datagram::Batch>,
 
+    #[cfg(not(feature = "naivefox"))]
     datagram_segment_size_sent: LocalMemoryDistribution<'static>,
+    #[cfg(not(feature = "naivefox"))]
     datagram_segment_size_received: LocalMemoryDistribution<'static>,
+    #[cfg(not(feature = "naivefox"))]
     datagram_size_sent: LocalMemoryDistribution<'static>,
+    #[cfg(not(feature = "naivefox"))]
     datagram_size_received: LocalMemoryDistribution<'static>,
+    #[cfg(not(feature = "naivefox"))]
     datagram_segments_sent: LocalCustomDistribution<'static>,
+    #[cfg(not(feature = "naivefox"))]
     datagram_segments_received: LocalCustomDistribution<'static>,
+    #[cfg(feature = "naivefox")]
+    datagram_segment_size_sent: naivefox_metrics::Distribution,
+    #[cfg(feature = "naivefox")]
+    datagram_segment_size_received: naivefox_metrics::Distribution,
+    #[cfg(feature = "naivefox")]
+    datagram_size_sent: naivefox_metrics::Distribution,
+    #[cfg(feature = "naivefox")]
+    datagram_size_received: naivefox_metrics::Distribution,
+    #[cfg(feature = "naivefox")]
+    datagram_segments_sent: naivefox_metrics::Distribution,
+    #[cfg(feature = "naivefox")]
+    datagram_segments_received: naivefox_metrics::Distribution,
     would_block_counter: WouldBlockCounter,
     /// Maps the child-minted WebTransport send-group id (assigned synchronously in the
     /// content process) to the neqo-minted [`SendGroupId`].
@@ -152,6 +187,7 @@ pub struct NeqoHttp3Conn {
 
 impl Drop for NeqoHttp3Conn {
     fn drop(&mut self) {
+        #[cfg(not(feature = "naivefox"))]
         self.record_stats_in_glean();
     }
 }
@@ -608,15 +644,33 @@ impl NeqoHttp3Conn {
             local_addr: local,
             refcnt: unsafe { AtomicRefcnt::new() },
             socket,
+            #[cfg(not(feature = "naivefox"))]
             datagram_segment_size_sent: networking::http_3_udp_datagram_segment_size_sent
                 .start_buffer(),
+            #[cfg(not(feature = "naivefox"))]
             datagram_segment_size_received: networking::http_3_udp_datagram_segment_size_received
                 .start_buffer(),
+            #[cfg(not(feature = "naivefox"))]
             datagram_size_sent: networking::http_3_udp_datagram_size_sent.start_buffer(),
+            #[cfg(not(feature = "naivefox"))]
             datagram_size_received: networking::http_3_udp_datagram_size_received.start_buffer(),
+            #[cfg(not(feature = "naivefox"))]
             datagram_segments_sent: networking::http_3_udp_datagram_segments_sent.start_buffer(),
+            #[cfg(not(feature = "naivefox"))]
             datagram_segments_received: networking::http_3_udp_datagram_segments_received
                 .start_buffer(),
+            #[cfg(feature = "naivefox")]
+            datagram_segment_size_sent: naivefox_metrics::Distribution::new(),
+            #[cfg(feature = "naivefox")]
+            datagram_segment_size_received: naivefox_metrics::Distribution::new(),
+            #[cfg(feature = "naivefox")]
+            datagram_size_sent: naivefox_metrics::Distribution::new(),
+            #[cfg(feature = "naivefox")]
+            datagram_size_received: naivefox_metrics::Distribution::new(),
+            #[cfg(feature = "naivefox")]
+            datagram_segments_sent: naivefox_metrics::Distribution::new(),
+            #[cfg(feature = "naivefox")]
+            datagram_segments_received: naivefox_metrics::Distribution::new(),
             buffered_outbound_datagram: None,
             would_block_counter: WouldBlockCounter::new(),
             webtransport_send_groups: HashMap::new(),
@@ -630,7 +684,7 @@ impl NeqoHttp3Conn {
     /// per connection. Called from both the `Closing` and `Closed` state
     /// changes: closes that go through a closing handshake surface `Closing`
     /// first, while closes that skip it (idle timeout) surface only `Closed`.
-    #[cfg(not(target_os = "android"))]
+    #[cfg(all(not(target_os = "android"), not(feature = "naivefox")))]
     fn record_close_reason(&mut self, reason: &neqo_transport::CloseReason) {
         if self.close_reason_recorded {
             return;
@@ -646,6 +700,10 @@ impl NeqoHttp3Conn {
             .add(1);
     }
 
+    #[cfg(all(not(target_os = "android"), feature = "naivefox"))]
+    fn record_close_reason(&mut self, _reason: &neqo_transport::CloseReason) {}
+
+    #[cfg(not(feature = "naivefox"))]
     fn record_stats_in_glean(&self) {
         use firefox_on_glean::metrics::networking as glean;
         use neqo_common::Ecn;
@@ -1793,6 +1851,7 @@ impl From<TransportError> for CloseError {
 
 // Keep in sync with `netwerk/metrics.yaml` `http_3_connection_close_reason` metric labels.
 #[cfg(not(target_os = "android"))]
+#[cfg(not(feature = "naivefox"))]
 const fn transport_error_to_glean_label(error: &TransportError) -> &'static str {
     match error {
         TransportError::None => "NoError",

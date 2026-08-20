@@ -1,0 +1,5 @@
+mode=official-release
+product=Firefox
+version=Mozilla Firefox 154.0
+url=https://download-installer.cdn.mozilla.net/pub/firefox/releases/154.0/linux-x86_64/en-US/firefox-154.0.tar.xz
+archive_sha256=7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b

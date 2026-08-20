@@ -294,3 +294,32 @@ Phase 2.7 eliminated the unused Google Abseil C++ library and trimmed unnecessar
 - **Closure impact**: Link closure reduced to **525 files / 216.04 MB** (unstripped).
 - **Binary size**: `libxul.so` unstripped size reduced to **616.0 MB**, stripped size **62 MB**.
 - **Build time**: Clean incremental build completes in **2.85 seconds**.
+
+### Phase 2.9: Glean and active Rust closure trim
+
+This is the final low-risk closure pass before source-export preparation. The
+NaiveFox parent-only build no longer evaluates Firefox's global browser metrics
+and pings index. It generates only the 23 retained metric schemas,
+`netwerk/pings.yaml`, and the shared tags file. The target-aware audit now uses
+the active `cargo tree --edges normal --no-default-features` rooted at
+`gkrust-naivefox`; Cargo's workspace-unified metadata is not treated as a
+runtime closure.
+
+| Measure | Linux x86_64 | Windows x86_64 |
+|---|---:|---:|
+| C/C++ translation units | 545 | 468 |
+| Direct link objects | 525 | 536 |
+| Active Rust crates | 271 | 287 |
+| Dynamic dependencies | 20 | 22 |
+| `libxul`/`xul.dll` | 477.67 MiB debug; 64.57 MiB `--strip-debug`; 53.61 MiB `--strip-all` | report value |
+
+Four direct Rust dependencies proven unused were removed. `jsrust_shared` was
+retained after a removal attempt produced unresolved SpiderMonkey encoding
+symbols. The linker map records the remaining large Linux contributions:
+`js_static` 225.86 MiB, `gkrust` 115.63 MiB, ICU 31.26 MiB, cache2 6.24 MiB,
+IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey and ICU are a
+separate future milestone; no speculative removal is claimed here.
+
+This pass establishes a sufficient build-closure boundary for designing the
+allowlist. `minimal-source` export remains a separate gate and has not been
+started.

@@ -65,6 +65,14 @@ protocol, UDP/no-fallback, Necko/NSS ownership, classic CONNECT, padding, and
 multiplexing assertions remain mandatory. See `CAPTURE.md`, `H3-CAPTURE.md`,
 and `KNOWN-ISSUES.md` for the current policy.
 
+Capture has two deliberately separate modes. The strict same-Firefox-base mode
+uses an explicitly supplied reference binary/library directory and is the
+minimalization regression gate: it detects wire/fingerprint drift while the
+Firefox base is held constant. The default standalone mode downloads the
+committed `tools/firefox-reference-manifest` (Firefox 154.0 and its archive
+SHA-256) and is the future `minimal-source` diagnostic/control mode. A moving
+`firefox-latest-ssl` URL is not accepted as a reproducible reference.
+
 ## Build and focused automated tests
 
 | Command | Result |
@@ -96,7 +104,7 @@ duplex pumping to one shared `TunnelSession`.
 | HTTP CONNECT parser gtests | PASS, arbitrary fragmentation, split CRLF, authorities, non-CONNECT, oversized headers, and early payload |
 | `run-h2-config-tests.sh` | PASS, one process, 10 padded H2 tunnels, SOCKS5 + HTTP CONNECT, 3 MiB downloads, 2 MiB uploads, mixed concurrency |
 | `run-h3-config-tests.sh` | PASS, the same workload over an H3-only UDP fixture, 10 padded H3 tunnels and no TCP fallback |
-| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, file log is `0600`, persistent and no-home temporary profiles are `0700`, and a concrete non-loopback interface bind accepts traffic |
+| `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, an existing `0644` file is tightened to `0600`, persistent and no-home temporary profiles are `0700`, and a concrete non-loopback interface bind accepts traffic |
 | `run-full-suite.sh` | PASS in 311.5 seconds, including all pre-existing H2/H3, Auto, robustness, and capture gates plus config mode |
 
 The H2 and H3 config runs used two `0.0.0.0` listeners and a two-element
@@ -741,6 +749,35 @@ same binary under Wine is not a valid H3 oracle because Wine reported
 
 The staged package was archived as `naivefox-windows-x86_64.tar.gz`; the
 archive checksum and transient test files are kept outside the repository.
+
+## Current cheap-minimization closure gate (2026-08-20)
+
+After the DOM/GFX graph exclusion, the low-risk Glean/Rust pass completed on
+both targets. The browser-wide Glean index is disabled for `MOZ_NAIVEFOX`; only
+23 retained metric schemas, `netwerk/pings.yaml`, and the shared tags file are
+parsed. The active `gkrust-naivefox` Cargo tree contains no Glean runtime crate.
+Four direct Rust dependencies were removed after a successful link; the
+attempted `jsrust_shared` removal was reverted because it caused unresolved
+SpiderMonkey encoding symbols.
+
+| Measure | Linux x86_64 | Windows x86_64 |
+|---|---:|---:|
+| C/C++ translation units | 545 | 468 |
+| Direct link objects | 525 | 536 |
+| Active Rust crates | 271 | 287 |
+| Dynamic dependencies | 20 | 22 |
+| Main library size | 477.67 MiB debug; 64.57 MiB `--strip-debug`; 53.61 MiB `--strip-all` | report value |
+
+The reproducible Linux linker-map aggregate retains `js_static` 225.86 MiB,
+`gkrust` 115.63 MiB, ICU 31.26 MiB, cache2 6.24 MiB, IPC Chromium 4.09 MiB,
+and IPC glue 2.98 MiB. These are deliberate future SpiderMonkey/ICU work, not
+unreviewed removal candidates. The build closure is sufficient for beginning
+the allowlist design, but `minimal-source` export has not started.
+
+The closure JSON files are authoritative for provenance. Their
+`report_provenance.source_commit_sha` identifies the audited source tree; the
+report snapshot is a separate report-only child. No current working-tree SHA
+is embedded in its own source commit.
 
 
 ## Phase 2.5: GTK3 and Desktop UI dynamic dependency elimination

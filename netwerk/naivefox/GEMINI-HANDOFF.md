@@ -7,6 +7,11 @@
 **Environment:** WSL2 `Ubuntu24Dev` (`/home/zubastik/src/naivefox`)  
 **Publication Target:** `D:\naivefox` (`/mnt/d/naivefox`)
 
+> Historical handoff snapshot. The 62.0 MiB stripped figure below predates
+> the later Glean/Rust closure trim. Current authoritative sizes and target
+> crate counts are in `PRE-EXPORT-AUDIT.md` and the closure reports; do not use
+> this handoff table as exporter provenance.
+
 ---
 
 ## 1. Executive Summary

@@ -967,10 +967,16 @@ generated output, never a hand-edited source of truth.
   Firefox source checkout; generated binding metadata remains where required.
   This is recorded as the Phase 2.4 cold-build checkpoint in
   `MINIMISATION-REPORT.md`.
-- [ ] Produce machine-readable build/link dependency reports.
-- [ ] Reduce `libxul` and runtime libraries without replacing or weakening
+- [x] Produce machine-readable target-aware build/link dependency reports for
+  Linux and Windows, including the active Rust tree, generated inputs, and
+  provenance assertions.
+- [x] Reduce `libxul` and runtime libraries without replacing or weakening
   Necko, Neqo, NSS, PSM, NSPR, DNS, proxy, or required XPCOM services.
-- [ ] Pass the full regression and staged-runtime gate after every group.
+- [x] Disable the global Glean metrics/pings index for the parent-only build,
+  remove only proven-unused direct Rust dependencies, and record a linker-map
+  aggregate. SpiderMonkey and ICU remain a separate future milestone.
+- [x] Pass the full regression and staged-runtime gate after the cheap closure
+  group; the existing report files are the acceptance evidence.
 
 ### M14.3 Source manifest and deterministic export
 
@@ -1057,30 +1063,33 @@ build profile, staged package, and bounded native SOCKS/HTTP smoke; broader
 Windows regression coverage, Android, and further size reduction remain
 future work.
 
-## Current minimisation checkpoint: lean staged runtime
+## Current minimisation checkpoint: audited lean build/runtime closure
 
-Phase 2.4 now has a measured staged-package gate in addition to the cold
-build-graph audit. The `obj-naivefox-cold` package is approximately 87 MiB,
-passes runtime smoke, public HTTPS fetch, no-home profile startup, strict H2,
-strict H3, and Auto config workloads outside the object directory, and passes
-the complete isolated H2/H3 functional, robustness, and capture suites.
+The DOM/GFX-free product now has a target-aware machine-readable closure audit
+and a selective Glean/Rust trim. The current Linux `libxul` is 477.67 MiB in
+the debug build, 64.57 MiB with `--strip-debug`, and 53.61 MiB with
+`--strip-all`; the active closure is 271 Rust crates on Linux and 287 on
+Windows. The package and functional H2/H3/Auto/config gates remain green.
 
 The capture gate uses a separate full Firefox baseline with its own runtime
 libraries; the browser binary is not bundled into the lean package. A
 non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. The next
-minimisation work remains intentionally paused at this checkpoint: do not
-remove further subsystems until this result is reviewed.
+The next phase is allowlist design for `minimal-source`. Do not begin export
+until the provenance reports are regenerated on the final audited source and
+the standalone-build gates are explicitly scheduled. Do not reopen deep
+SpiderMonkey/ICU minimization in this phase.
 
 ## Handoff checkpoint: Windows package and workspace cleanup (2026-08-16)
 
-The current handoff point is the annotated tag `minimization-handoff-v0.1` on
-the `minimal` branch. The full Firefox source tree remains in the repository;
-the NaiveFox DOM/GFX implementation build exclusion is the last validated
-minimisation change. H2, H3, Auto, config mode, SOCKS5, HTTP CONNECT, padding,
-staged Linux runtime, and the bounded native Windows x86_64 package smoke are
-the accepted baseline. No Firefox upstream refresh was performed here.
+The historical handoff point was the annotated tag `minimization-handoff-v0.1`.
+The full Firefox source tree remains in the repository; the current validated
+minimisation boundary additionally includes the target-aware Glean/Rust/link
+closure audit described above. H2, H3, Auto, config mode, SOCKS5, HTTP
+CONNECT, padding, staged Linux runtime, and the bounded native Windows x86_64
+package smoke are the accepted baseline. No Firefox upstream refresh was
+performed here.
 
 Workspace-only cleanup removed stale object directories, ignored diagnostics,
 fixture copies, and the regenerable compiler cache. The retained incremental

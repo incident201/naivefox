@@ -13,6 +13,7 @@
 #  include <io.h>
 #else
 #  include <fcntl.h>
+#  include <sys/stat.h>
 #  include <unistd.h>
 #endif
 
@@ -85,9 +86,16 @@ nsresult ConfigureRuntimeLogging(RuntimeLogMode aMode, const nsACString& aPath,
 #  endif
     const int fd = open(path.get(), flags, 0600);
     if (fd >= 0) {
-      gRuntimeLogFile = fdopen(fd, "a");
-      if (!gRuntimeLogFile) {
+      // O_CREAT applies the mode only to a newly-created file.  An existing
+      // log may have been created by another process with broader bits, so
+      // enforce the private logging contract on every successful open.
+      if (fchmod(fd, 0600) != 0) {
         close(fd);
+      } else {
+        gRuntimeLogFile = fdopen(fd, "a");
+        if (!gRuntimeLogFile) {
+          close(fd);
+        }
       }
     }
 #endif

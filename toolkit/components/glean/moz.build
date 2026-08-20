@@ -99,8 +99,43 @@ if not CONFIG["MOZ_NAIVEFOX"]:
     "!ScalarGIFFTMap.cpp",
     ]
 
-# Provides us the list of dependent metrics|pings.yaml.
-include("metrics_index.py")
+# The browser build consumes the complete metrics index.  NaiveFox is a
+# parent-only networking product and has no telemetry/ping surface.  Keep only
+# the small set of metric schemas referenced by the retained Necko/XPCOM/PSM
+# sources; this prevents the global browser/DOM/media metrics pipeline from
+# entering the build graph while preserving the generated C++ metric ABI.
+if CONFIG["MOZ_NAIVEFOX"]:
+    metrics_yamls = [
+        "intl/locale/metrics.yaml",
+        "ipc/metrics.yaml",
+        "modules/libjar/metrics.yaml",
+        "modules/libpref/metrics.yaml",
+        "dom/security/metrics.yaml",
+        "netwerk/cache2/metrics.yaml",
+        "netwerk/dns/metrics.yaml",
+        "netwerk/metrics.yaml",
+        "netwerk/protocol/http/metrics.yaml",
+        "netwerk/protocol/websocket/metrics.yaml",
+        "security/certverifier/metrics.yaml",
+        "security/ct/metrics.yaml",
+        "security/manager/ssl/metrics.yaml",
+        "security/sandbox/metrics.yaml",
+        "storage/metrics.yaml",
+        "toolkit/components/antitracking/metrics.yaml",
+        "toolkit/components/processtools/metrics.yaml",
+        "toolkit/components/startup/metrics.yaml",
+        "toolkit/components/url-classifier/metrics.yaml",
+        "toolkit/profile/metrics.yaml",
+        "toolkit/xre/metrics.yaml",
+        "xpcom/metrics.yaml",
+    ]
+    pings_yamls = ["netwerk/pings.yaml"]
+    # The shared tag vocabulary is required for glinter validation but does
+    # not generate any product metric/ping output by itself.
+    tags_yamls = ["toolkit/components/glean/tags.yaml"]
+else:
+    # Provides the full Firefox list of dependent metrics|pings.yaml.
+    include("metrics_index.py")
 
 # Provides the function to convert a metrics.yaml path to the name of a header.
 include("build_scripts/glean_parser_ext/metrics_header_names.py")
@@ -126,6 +161,8 @@ metrics_headers = sorted({
     for path in metrics_yamls
     if path != "toolkit/components/glean/metrics.yaml"
 })
+if CONFIG["MOZ_NAIVEFOX"]:
+    EXPORTS.mozilla.glean += ["!GleanPings.h"]
 EXPORTS.mozilla.glean += [("!" + filename) for filename in metrics_headers]
 
 # GeneratedFile's `inputs` are relative to our dir.

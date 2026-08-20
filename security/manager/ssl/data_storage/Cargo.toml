@@ -7,7 +7,7 @@ license = "MPL-2.0"
 [dependencies]
 byteorder = "1"
 cstr = "0.2"
-firefox-on-glean = { path = "../../../../toolkit/components/glean/api" }
+firefox-on-glean = { path = "../../../../toolkit/components/glean/api", optional = true }
 log = "0.4"
 malloc_size_of_derive = { path = "../../../../xpcom/rust/malloc_size_of_derive" }
 moz_task = { path = "../../../../xpcom/rust/moz_task" }
@@ -16,3 +16,8 @@ nsstring = { path = "../../../../xpcom/rust/nsstring" }
 thin-vec = { version = "0.2.1", features = ["gecko-ffi"] }
 wr_malloc_size_of = { path = "../../../../gfx/wr/wr_malloc_size_of" }
 xpcom = { path = "../../../../xpcom/rust/xpcom" }
+
+[features]
+default = ["glean"]
+glean = ["dep:firefox-on-glean"]
+naivefox = []

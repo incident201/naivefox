@@ -152,24 +152,23 @@ not aliases for a moving `main`:
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
 Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Validated Minimal commit: 8e2d123c9a61
+Audited Minimal source commit: see `report_provenance.source_commit_sha` in the closure reports
+Minimal report snapshot commit: direct report-only child of the audited source commit
 Validated Minimal Source commit: NOT_CREATED
-Existing pre-audit graph tag: minimal-graph-v0.1 -> 60f2eede69da856daf2324fc90b2c2ab9cb86fd2
+Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
 ### Current pre-export audit provenance
 
-The last validated audit source is the post-stability documentation checkpoint
-`3e395eb1aca9fc73af7bfeaa6076e929f80b8ff0` (the full SHA is recorded in the
-closure reports).
-The closure reports are regenerated in a report-only child; the exact SHA is
-stored in each report's provenance. `assert-closure.py` accepts that exact
-parent/report pair and
-rejects any other stale provenance. The validated Firefox base remains the
-concrete snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
-upstream refresh was performed during this audit. `minimal-source` is still
-`NOT_CREATED` and `tools/export-minimal-source.sh` has not been run.
+The audited source is always the exact SHA in each closure report's
+`report_provenance.source_commit_sha`; the report snapshot is a separate
+report-only child. `assert-closure.py` rejects stale/nonexistent source SHAs and
+requires the report-only provenance relationship. Do not copy a working-tree
+SHA into a source commit's own documentation. The validated Firefox base
+remains the concrete snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no
+Mozilla upstream refresh was performed during this audit. `minimal-source` is
+still `NOT_CREATED` and `tools/export-minimal-source.sh` has not been run.
 
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean
@@ -435,9 +434,10 @@ Upstream repository: https://github.com/mozilla-firefox/firefox
 Upstream branch: main
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
 Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Validated Minimal commit: 8e2d123c9a61
+Audited Minimal source commit: see `report_provenance.source_commit_sha` in the closure reports
+Minimal report snapshot commit: direct report-only child of the audited source commit
 Validated Minimal Source commit: NOT_CREATED
-Existing pre-audit graph tag: minimal-graph-v0.1 -> 60f2eede69da856daf2324fc90b2c2ab9cb86fd2
+Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
@@ -1387,9 +1387,9 @@ A comprehensive audit was performed using `netwerk/naivefox/tools/analyze-full-c
 | Metric | Linux x86_64 (`obj-naivefox-minimal`) | Windows x86_64 (`obj-naivefox-windows-x86_64`) |
 |---|---|---|
 | **Direct Translation Units / Objects** | 525 objects (216.03 MB unstripped) | 536 objects (202.62 MB unstripped) |
-| **libxul binary size** | 615.49 MB unstripped / **62 MB stripped** | **40.94 MB** (`xul.dll`) |
+| **libxul binary size** | 477.67 MiB unstripped / **64.57 MiB `--strip-debug` / 53.61 MiB `--strip-all`** | measured `xul.dll` in the Windows report |
 | **Headless runner size** | 1.05 MB (`naivefox`) | 11.0 KB (`naivefox.exe`) |
-| **Rust Crates in Cargo Closure** | 850 packages | 850 packages |
+| **Rust Crates in Cargo Closure** | 271 active packages | 287 active packages |
 | **System Dynamic Dependencies** | 20 `DT_NEEDED` libraries | 22 DLL imports |
 | **Desktop UI Libraries (GTK/X11/Cairo)** | **0 libraries linked** | **0 libraries linked** |
 
@@ -1398,6 +1398,16 @@ Full machine-readable reports are archived in:
 - `netwerk/naivefox/reports/closure-report-windows-x86_64.json`
 
 Detailed audit of all shims, stubs, and lean replacements is documented in [`netwerk/naivefox/SHIMS.md`](SHIMS.md).
+
+The low-risk closure trim also disables the global Firefox Glean metrics/pings
+index for `MOZ_NAIVEFOX`. Only the 23 retained metric schemas,
+`netwerk/pings.yaml`, and the shared tags file are generated. The active Cargo
+tree contains no `firefox-on-glean`/`glean-core` runtime crate. Four direct Rust
+dependencies proven unused were removed; `jsrust_shared` remains because its
+removal caused unresolved SpiderMonkey encoding symbols. The Linux linker-map
+aggregate records `js_static` 225.86 MiB, `gkrust` 115.63 MiB, ICU 31.26 MiB,
+cache2 6.24 MiB, IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey
+and ICU are explicitly deferred to a future milestone.
 
 ## Project-owned pre-export stability changes
 
@@ -1449,7 +1459,7 @@ Verified directly on native Windows x86_64 via `netwerk/naivefox/tools/verify-st
 - Dynamic port HTTP CONNECT listener startup and request handling;
 - Clean process shutdown with zero dangling handles.
 
-*Documentation Status:* Windows build, launch, config parsing, local listener handshake and shutdown verified. End-to-end H2/H3 networking against live upstream proxy is tracked separately.
+*Documentation Status:* Windows build, launch, config parsing, local listener handshake and shutdown verified. The strict-H3 native soak is green; native H2 and Auto workload paths remain mandatory before the first standalone `minimal-source` Windows acceptance gate. Do not investigate hypothetical profiler/message-pump races without a new crash reproduction.
 
 ## Source-Export Allowlist Requirements for `minimal-source`
 
@@ -1457,5 +1467,8 @@ For the upcoming source-export step (`export-minimal-source.sh`), the following 
 
 1. **Boundary Definition:** DOM implementation and layout engines are excluded. Explicit minimal WebIDL, binding metadata, and code generator subsets are retained where required.
 2. **Build-Time Dependency Inclusion:** The source export manifest must include all build-time generators, python actions, and dependency metadata even if they do not compile into the final runtime binary.
-3. **Allowlist Integrity:** Do not generate export allowlists solely from the 525 direct object files. Retain all 934 C/C++ source units, 396 reachable Rust crates, and active code generators.
+3. **Allowlist Integrity:** Do not hard-code object or crate counts. Build the
+   export allowlist from the union of validated Linux and Windows
+   target-specific closure reports: translation units, headers, Rust source
+   paths/manifests, generated inputs, and runtime resources.
 
