@@ -77,10 +77,21 @@ def add(source, category, destination=None):
     if not source:
         return
     source = norm(source)
+    if pathlib.PurePosixPath(source).name in {
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI-HANDOFF.md",
+        "MINIMISATION-TASK.MD",
+    }:
+        return
     # Firefox's documentation build inputs are not needed to compile or run
     # the product.  NaiveFox technical docs are added separately under
     # docs/naivefox by tracked_project().
     if source.startswith("docs/"):
+        return
+    if category.startswith("explicit:") and source.lower().endswith(
+        (".md", ".markdown")
+    ):
         return
     # Closure reports intentionally retain a small amount of provenance from
     # generated depfile/backend inventories.  These are not source inputs and
