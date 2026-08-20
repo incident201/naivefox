@@ -2,6 +2,22 @@
 
 Last reviewed: 2026-08-20, for the pre-export audit on `minimal`.
 
+## Current refresh/export result
+
+The controlled upstream refresh and one clean export are complete. The audited
+source is `a533411d0c4940f3063d1d01313a3e4fc24ba53d`, the final report/export
+snapshot is `a7251b0ea7fd530d1d23fada8e3217514aa1399c`, and the Firefox base is
+`17e93ad5d3261e20104c7f6f2ec867ecc138ca1a`. The export has 25,558 files, 37
+directory contracts, and manifest SHA-256
+`f1b59074a8287f9b244b2fad908103c8e95e69fa120e6d33f77b8c42b9bd4228`.
+
+The exported source was configured, generated, built with the lean NaiveFox
+`binaries` target, staged, and tested outside the original checkout and
+objdir. H2, H3, Auto, config, malformed-SOCKS, padding/integrity, and finite
+robustness gates passed. A full Firefox browser build is intentionally out of
+scope and is not required for this product gate. The remaining publication
+action is creating/updating the orphan `minimal-source` branch.
+
 This document separates active architectural constraints, frozen Firefox
 snapshot limitations, and non-reproducible observations from the acceptance
 results in `TEST-REPORT.md`. None of the items below invalidates the completed
@@ -27,7 +43,8 @@ stability evidence but was not repeated for this source-publication gate.
 
 Standalone closure validation is complete. The disposable diagnostic tree is
 still contaminated discovery state and is never published, but it has now
-passed full Linux and Windows builds with the original Firefox checkout hidden.
+passed the lean Linux and Windows product evidence gates with the original
+Firefox checkout hidden.
 An independent clean Linux export passed the full H2/H3/Auto/config suite and
 staged-runtime verification; the native Windows package passed the short
 matrix above. Publication uses one newly generated clean manifest snapshot and
@@ -145,9 +162,9 @@ H2, and the soak runner records such a failure rather than masking it.
   multi-hop proxy chains remain outside the current scope and fail explicitly.
 - The verified runtime/build closure is minimized through the current
   DOM/GFX/WebRTC/UI/profiler boundary. The remaining SpiderMonkey and ICU
-  closure is deliberately deferred. Source-closure diagnostics are green, but
-  the one publishable clean export and isolated acceptance remain separate
-  milestones; this is not an assertion that the runtime is unminimized.
+  closure is deliberately deferred. Source-closure diagnostics, the clean
+  export, and isolated acceptance are complete; this is not an assertion that
+  the remaining runtime closure is fully minimized.
 
 Detailed evidence is in `TEST-REPORT.md`, wire comparisons are in
 `H3-CAPTURE.md`, and every modified Firefox file is listed in `UPSTREAM.md`.

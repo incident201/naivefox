@@ -1012,10 +1012,35 @@ generated output, never a hand-edited source of truth.
   only validated generated snapshots.
 - [x] Make `minimal-source` the GitHub default branch after standalone
   acceptance.
-- [ ] Complete one controlled Firefox refresh through `main -> naivefox ->
+- [x] Complete one controlled Firefox refresh through `main -> naivefox ->
   minimal -> export -> minimal-source`.
 
 ---
+
+# Current controlled refresh/export status (2026-08-20)
+
+The upstream synchronization cycle is complete through a validated standalone
+source export. `main` is the clean Firefox mirror at
+`17e93ad5d3261e20104c7f6f2ec867ecc138ca1a`; the refresh was integrated into
+`naivefox` and then `minimal` without changing the Firefox base beyond that
+fast-forward. The product gate intentionally does not build the full Firefox
+browser. It uses the lean NaiveFox graph (`./mach build export`,
+`./mach build -j4 binaries`, and `./mach build misc`) plus focused network and
+staged-runtime tests.
+
+The final exporter plan and clean export passed with 25,558 files and 37
+directory contracts. The exported tree built independently with the original
+Firefox checkout and object directory unavailable. Its staged runtime passed
+H2, H3, Auto, config, public-fetch, malformed-SOCKS, padding/integrity, and
+finite robustness gates. The next publication action is only the orphan
+`minimal-source` commit; source discovery and repeated clean exports are not
+required.
+
+The remaining large SpiderMonkey/ICU/cache2/IPC closure is deliberately a
+future minimisation milestone. Do not reopen it as part of source export or
+upstream synchronization.
+
+# Final prototype acceptance suite
 
 # Final prototype acceptance suite
 
