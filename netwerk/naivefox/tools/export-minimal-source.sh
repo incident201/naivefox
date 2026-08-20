@@ -319,6 +319,13 @@ for path in list(entries):
             continue
         if candidate.is_file():
             add(relative.as_posix(), "explicit:mozbuild-declared")
+        elif candidate.is_dir() and value.startswith(("/", "!/")):
+            # LOCAL_INCLUDES and similar declarations require the directory
+            # itself to exist even when no file beneath it appears in a
+            # compiler depfile.  Keep this restricted to explicit
+            # topsrcdir-rooted declarations; arbitrary relative directories
+            # would pull in unrelated build trees.
+            tracked_under(relative.as_posix(), "explicit:mozbuild-directory")
 
 # TOML test manifests use bare table names such as ["test_name.js"], which
 # are deliberately not treated as arbitrary string-valued build settings.
