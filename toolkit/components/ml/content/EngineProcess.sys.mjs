@@ -214,6 +214,9 @@ export const FEATURES = {
   "title-generation": {
     engineId: "title-generation-engine",
   },
+  "tab-group-naming": {
+    engineId: "smart-openai",
+  },
   "conversation-suggestions-sidebar-starter": {
     engineId: "smart-openai",
   },
@@ -239,6 +242,9 @@ export const FEATURES = {
   // see browser/components/aiwindow/models/search/SearchAgent.sys.mjs
   "search-answer-generation": {
     engineId: "smart-openai",
+  },
+  aitab: {
+    engineId: "aitab-engine",
   },
 };
 

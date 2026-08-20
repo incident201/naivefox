@@ -3027,7 +3027,11 @@ pref("signon.firefoxRelay.privacy_policy_url", "https://www.mozilla.org/%LOCALE%
 pref("signon.signupDetection.confidenceThreshold",     "0.75");
 
 // Logins Rust storage backend is enabled by default
-pref("signon.storage.rust.enabled", true);
+#if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr
+  pref("signon.storage.rust.enabled", true);
+#else
+  pref("signon.storage.rust.enabled", false);
+#endif
 // The following two prefs are managed by Fx internally:
 pref("signon.storage.rust.active", false);
 pref("signon.storage.rust.migrationAttempts", 0);
@@ -4051,7 +4055,11 @@ pref("extensions.formautofill.addresses.supported", "detect");
 
 // Use ML for address form field detection.
 #if defined(XP_WIN) || defined(XP_MACOSX)
-pref("extensions.formautofill.useml", true);
+  #if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr
+    pref("extensions.formautofill.useml", true);
+  #else
+    pref("extensions.formautofill.useml", false);
+  #endif
 #else
 pref("extensions.formautofill.useml", false);
 #endif

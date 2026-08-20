@@ -2,13 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  MozAdsClientBuilder:
+  MozAdsCallbackOptions:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAdsClient.sys.mjs",
-  MozAdsContextIdProvider:
+  MozAdsClientBuilder:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAdsClient.sys.mjs",
   MozAdsEnvironment:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAdsClient.sys.mjs",
@@ -52,11 +50,6 @@ ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
 export class _AdsClient {
   #client;
 
-  // Bug 2059281: remove once the ads-client owns context_id directly. Boxed so
-  // the provider reads it without capturing `this`, which would pin the client
-  // (and the telemetry callback it holds) and leak them past xpcom-shutdown.
-  #contextId = { value: "" };
-
   /**
    * @param {object} prefValues The New Tab store's Prefs.values.
    * @returns {boolean}
@@ -81,7 +74,7 @@ export class _AdsClient {
   }
 
   /**
-   * Options for requestTileAds/requestSpocAds/record*, with the OHTTP channel
+   * Options for requestTileAds/requestSpocAds, with the OHTTP channel
    * configured from prefs, and flags from passed in prefValues.
    *
    * @param {object} prefValues The New Tab store's Prefs.values.
@@ -95,13 +88,15 @@ export class _AdsClient {
   }
 
   /**
-   * Refresh the cached context id the provider returns synchronously.
-   * Fed by AdsFeed from ContextId.request().
+   * Options for recordClick/recordImpression/reportAd, with the OHTTP channel
+   * configured from prefs.
    *
-   * @param {string} contextId
+   * @returns {MozAdsCallbackOptions}
    */
-  updateContextId(contextId) {
-    this.#contextId.value = contextId;
+  callbackOptions() {
+    return new lazy.MozAdsCallbackOptions({
+      ohttp: this.#configureOhttp(),
+    });
   }
 
   /**
@@ -137,7 +132,7 @@ export class _AdsClient {
    * The Glean-backed MozAdsTelemetry the client reports through, mirroring the
    * Android wrapper in AdsClientTelemetry.kt. The class is declared inside the
    * method rather than at module scope so the lazily-loaded bindings are only
-   * touched once the version guard in #build has passed.
+   * touched when a client is actually built.
    *
    * Recording from JS through a callback interface is a workaround for the
    * component not being able to record its own metrics; bug 2012752 is adding
@@ -190,29 +185,10 @@ export class _AdsClient {
   }
 
   #build() {
-    // @backward-compat { version 154 }
-    // The ads-client bindings only exist on Fx154+, and the New Tab add-on can
-    // train-hop onto older Beta/Release builds. Bail out before touching the
-    // lazily-loaded lazy.MozAds* bindings. Remove once 154 reaches Release.
-    if (Services.vc.compare(AppConstants.MOZ_APP_VERSION, "154.0a1") < 0) {
-      return null;
-    }
-
     try {
-      // Bug 2059281: remove this provider once the ads-client owns context_id directly.
-      // contextId() is a Sync foreign-callback returning the cached context id which AdsFeed refreshes.
-      // Capture the box, not `this`, so this Rust-held callback doesn't retain the client.
-      const contextId = this.#contextId;
-      class HntContextIdProvider extends lazy.MozAdsContextIdProvider {
-        contextId() {
-          return contextId.value;
-        }
-      }
-
       return lazy.MozAdsClientBuilder.init()
         .environment(lazy.MozAdsEnvironment.PROD)
         .telemetry(this.buildTelemetry())
-        .contextIdProvider(new HntContextIdProvider())
         .build();
     } catch (error) {
       console.error("MozAdsClient failed to initialize", error);

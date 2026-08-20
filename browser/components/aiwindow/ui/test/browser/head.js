@@ -17,6 +17,8 @@ ChromeUtils.defineESModuleGetters(this, {
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   IntentClassifier:
     "moz-src:///browser/components/aiwindow/models/IntentClassifier.sys.mjs",
+  MemoriesManager:
+    "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
   MENTION_TYPE:
     "moz-src:///browser/components/urlbar/SmartbarMentionsPanelSearch.sys.mjs",
   openAIEngine: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
@@ -24,8 +26,10 @@ ChromeUtils.defineESModuleGetters(this, {
     "moz-src:///browser/components/urlbar/SmartbarMentionsPanelSearch.sys.mjs",
   PlacesTestUtils: "resource://testing-common/PlacesTestUtils.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
-  SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
-  SessionWindowUI: "resource:///modules/sessionstore/SessionWindowUI.sys.mjs",
+  SessionStore:
+    "moz-src:///browser/components/sessionstore/SessionStore.sys.mjs",
+  SessionWindowUI:
+    "moz-src:///browser/components/sessionstore/SessionWindowUI.sys.mjs",
   sinon: "resource://testing-common/Sinon.sys.mjs",
 });
 
@@ -37,6 +41,16 @@ const { _setRemoteClientForTesting, _clearRemoteClientForTesting } =
   ChromeUtils.importESModule(
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
   );
+
+// Aliased to avoid colliding with ChatConversation.sys.mjs's own _setLoadPromptForTesting above.
+const {
+  _setLoadPromptForTesting: _setConversationSuggestionsLoadPromptForTesting,
+  _setBuildConversationForTesting,
+  _setGetConversationsByIdForTesting,
+  _clearResumeActivityCacheForTesting,
+} = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs"
+);
 
 /**
  * @import { SmartbarAction } from "chrome://browser/content/aiwindow/components/input-cta/input-cta.mjs"
@@ -56,6 +70,7 @@ let gIntentEngineStub;
 const MOCK_RS_RECORDS = [
   ["chat", 11],
   ["title-generation", 1],
+  ["tab-group-naming", 1],
   ["conversation-starters-sidebar-system", 1],
   ["conversation-suggestions-sidebar-starter", 3],
   ["conversation-suggestions-followup", 1],
@@ -69,7 +84,6 @@ const MOCK_RS_RECORDS = [
   ["memories-quality-filter-user", 1],
   ["memories-message-classification-system", 1],
   ["memories-message-classification-user", 1],
-  ["memories-relevant-context", 2],
   ["search-answer-generation", 1],
 ]
   .map(([feature, major]) => ({
@@ -86,17 +100,6 @@ const MOCK_RS_RECORDS = [
     version: `v${major}.0`,
     is_default: true,
   }))
-  // The memories relevant context prompt renders the retrieved memory list, so
-  // it needs the placeholder the real prompt has.
-  .map(record =>
-    record.feature === "memories-relevant-context"
-      ? {
-          ...record,
-          prompts:
-            "# Existing Memories\n\n## Existing Memories\n{relevantMemoriesList}",
-        }
-      : record
-  )
   // Chat resolves model+params from v2 kind:"params" records (one generic
   // fallback + one per model choice).
   .concat([
@@ -230,6 +233,61 @@ const MOCK_RS_RECORDS = [
       purpose: "chat",
       parameters: {},
       version: "v11.0",
+    },
+    // The relevant-memories module is loaded for the chat model, so it resolves
+    // via the "generic" fallback rather than is_default like the v1 records.
+    {
+      kind: "params",
+      feature: "memories-context",
+      model: "generic",
+      service_type: "memories",
+      parameters: {},
+      is_default: true,
+      modules: [{ name: "relevant-memories", version: "1.0" }],
+      version: "v1.0",
+    },
+    {
+      kind: "module",
+      feature: "memories-context",
+      module: "relevant-memories",
+      model: "generic",
+      // The prompt renders the retrieved memory list, so it needs the
+      // placeholder the real prompt has.
+      prompts:
+        "# Existing Memories\n\n## Existing Memories\n{relevantMemoriesList}",
+      version: "v1.0",
+    },
+    // tab-group-naming resolves through the v2 modular path: a params manifest
+    // plus one module record per prompt module (system-instructions, user-data).
+    {
+      kind: "params",
+      feature: "tab-group-naming",
+      model: "test-model",
+      service_type: "ai",
+      purpose: "auto-tab-grouping",
+      parameters: {},
+      modules: [
+        { name: "system-instructions", version: "v1.0" },
+        { name: "user-data", version: "v1.0" },
+      ],
+      version: "v1.0",
+      is_default: true,
+    },
+    {
+      kind: "module",
+      feature: "tab-group-naming",
+      module: "system-instructions",
+      model: "test-model",
+      prompts: "Name this group of tabs.",
+      version: "v1.0",
+    },
+    {
+      kind: "module",
+      feature: "tab-group-naming",
+      module: "user-data",
+      model: "test-model",
+      prompts: "Tabs:\n{titles}",
+      version: "v1.0",
     },
   ]);
 
@@ -411,6 +469,126 @@ async function getConversationId(browser) {
     "Wait for ai-window element"
   );
   return aiWindow.conversationId.toString();
+}
+
+async function stubResumeActivityGeneration(sb) {
+  const urls = [1, 2, 3, 4, 5].map(id => ({
+    url: `https://example.com/${id}`,
+    title: `Example ${id}`,
+  }));
+  for (const [index, page] of urls.entries()) {
+    await PlacesUtils.history.insert({
+      ...page,
+      visits: [
+        {
+          date: new Date(Date.now() - (urls.length - index) * 60_000),
+          transition: PlacesUtils.history.TRANSITIONS.LINK,
+        },
+      ],
+    });
+  }
+
+  const memories = [
+    {
+      id: "memory-1",
+      memory_summary: "Research project",
+      source_ids: {
+        history_source_ids: urls
+          .slice(0, 4)
+          .map(({ url }) => PlacesUtils.history.hashURL(url)),
+      },
+    },
+    {
+      id: "memory-2",
+      memory_summary: "Trip planning",
+      source_ids: {
+        history_source_ids: [PlacesUtils.history.hashURL(urls[4].url)],
+      },
+    },
+  ];
+
+  const getMemoriesStub = sb
+    .stub(MemoriesManager, "getMemoriesByAttribute")
+    .resolves(memories);
+  // Keep cached results from being filtered as deleted.
+  sb.stub(MemoriesManager, "getAllMemories").resolves(memories);
+  // Prevent cached results from leaking between tests.
+  _clearResumeActivityCacheForTesting();
+  _setGetConversationsByIdForTesting(async () => []);
+  _setConversationSuggestionsLoadPromptForTesting(async () => ({
+    prompt: "Test prompt",
+  }));
+  _setBuildConversationForTesting(async () => ({
+    setSystemMessage() {},
+    addUserMessage() {},
+    securityProperties: {
+      setPrivateData() {},
+      setUntrustedInput() {},
+      commit() {},
+    },
+    run: sb.stub().resolves({
+      finalOutput: JSON.stringify([
+        {
+          id: 0,
+          headline: "Pick up your research",
+          status: "Continue reading",
+        },
+      ]),
+    }),
+  }));
+  sb.stub(openAIEngine, "getFxAccountToken").resolves(null);
+
+  return {
+    getMemoriesStub,
+    memories,
+    async cleanup() {
+      _setGetConversationsByIdForTesting(null);
+      _setConversationSuggestionsLoadPromptForTesting(null);
+      _setBuildConversationForTesting(null);
+      _clearResumeActivityCacheForTesting();
+      for (const { url } of urls) {
+        await PlacesUtils.history.remove(url);
+      }
+    },
+  };
+}
+
+/**
+ * Shared setup/teardown for tests that click a resume pill: enables the
+ * memories prefs, stubs resume-activity generation so a real pill renders,
+ * opens the AI Window, and hands the caller its buttons to click. `run`
+ * supplies whatever additional stubs it needs (engine build, fetchWithHistory,
+ * etc.) via its own sandbox before calling this.
+ *
+ * @param {object} sb - Sinon sandbox, owned and restored by the caller
+ * @param {Function} run - Async callback invoked with
+ *   {win, browser, aiWindow, buttons}
+ */
+async function testResumeActivityClick(sb, run) {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.smartwindow.memories.generateFromConversation", true],
+      ["browser.smartwindow.memories.generateFromHistory", true],
+    ],
+  });
+  const resumeActivityStubs = await stubResumeActivityGeneration(sb);
+  let win;
+  try {
+    win = await openAIWindow();
+    const browser = win.gBrowser.selectedBrowser;
+    const aiWindow = browser.contentDocument.querySelector("ai-window");
+    const buttons = await TestUtils.waitForCondition(async () => {
+      const found = await getPromptButtons(browser);
+      return found.length ? found : false;
+    }, "Wait for prompt buttons to replace loading skeletons");
+    await run({ win, browser, aiWindow, buttons });
+  } finally {
+    if (win) {
+      await BrowserTestUtils.closeWindow(win);
+    }
+    await resumeActivityStubs.cleanup();
+    await SpecialPowers.popPrefEnv();
+  }
 }
 
 /**
@@ -806,9 +984,9 @@ async function stubLoadURL(browser, { captureURL = false } = {}) {
     if (capture) {
       content._stubLoadURLCalled = false;
       content._stubLoadedURL = null;
-      smartbar.controller.loadURL = ({ url }) => {
+      smartbar.controller.loadURL = ({ loadRequest }) => {
         content._stubLoadURLCalled = true;
-        content._stubLoadedURL = url;
+        content._stubLoadedURL = loadRequest.urlLoad?.url ?? null;
         return {};
       };
     } else {
@@ -1256,40 +1434,6 @@ async function getSidebarChatMessages(sidebarBrowser) {
 const RENDER_TIMEOUT_MS = 15000;
 
 /**
- * Bounded wrapper around BrowserTestUtils.waitForMutationCondition, which on its
- * own never rejects. Races the (event-driven) mutation wait against a timeout so
- * a missing element fails fast with a clear message instead of hanging until the
- * harness aborts the task.
- *
- * @param {Node} target - The node on which to observe mutations
- * @param {MutationObserverInit} options - Options for MutationObserver.observe()
- * @param {Function} checkFn - Returns the awaited value once it is truthy
- * @param {string} label - Description used in the timeout error message
- * @param {number} [timeoutMs=RENDER_TIMEOUT_MS]
- *
- * @returns {Promise<any>} The value returned by checkFn
- */
-function waitForMutationBounded(
-  target,
-  options,
-  checkFn,
-  label,
-  timeoutMs = RENDER_TIMEOUT_MS
-) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`Timed out waiting for: ${label}`)),
-      timeoutMs
-    );
-  });
-  return Promise.race([
-    BrowserTestUtils.waitForMutationCondition(target, options, checkFn),
-    timeout,
-  ]).finally(() => clearTimeout(timer));
-}
-
-/**
  * Resolves the #aichat-browser frame for the AI Window hosted in the given
  * browser. By the time the post-response helpers below run, both ai-window and
  * #aichat-browser already exist, so the check resolves immediately; the bound
@@ -1300,14 +1444,14 @@ function waitForMutationBounded(
  * @returns {Promise<MozBrowser>} The #aichat-browser frame
  */
 function getAIChatBrowser(browser) {
-  return waitForMutationBounded(
+  return BrowserTestUtils.waitForMutationCondition(
     browser.contentDocument.documentElement,
     { childList: true, subtree: true },
     () =>
       browser.contentDocument
         ?.querySelector("ai-window")
         ?.shadowRoot?.querySelector("#aichat-browser"),
-    "ai-window #aichat-browser"
+    { msg: "ai-window #aichat-browser", timeout: RENDER_TIMEOUT_MS }
   );
 }
 

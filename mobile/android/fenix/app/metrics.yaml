@@ -8372,10 +8372,11 @@ tracking_protection:
       source:
         description: |
           The surface the user opened the privacy dashboard from. Possible
-          values are: `home`, `tabs_tray` or `trust_panel`.
+          values are: `home`, `tabs_tray`, `trust_panel` or `deeplink`.
         type: string
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2044067
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2051483
     data_reviews:
       - https://phabricator.services.mozilla.com/D304862
     data_sensitivity:
@@ -11661,24 +11662,6 @@ progressive_web_app:
       - https://github.com/mozilla-mobile/fenix/pull/23783#issuecomment-1041863879
       - https://github.com/mozilla-mobile/fenix/pull/28709#issuecomment-1410276888
       - https://github.com/mozilla-mobile/firefox-android/pull/2597
-      - https://github.com/mozilla-mobile/firefox-android/pull/4039
-    data_sensitivity:
-      - interaction
-    notification_emails:
-      - android-probes@mozilla.com
-    expires: never
-    metadata:
-      tags:
-        - PWA
-  onboarding_cancel:
-    type: event
-    description: |
-      User interacts with the onboarding PWA dialog cancel button which takes
-      them to the website.
-    bugs:
-      - https://bugzilla.mozilla.org/show_bug.cgi?id=1821030
-    data_reviews:
-      - https://github.com/mozilla-mobile/firefox-android/pull/1164
       - https://github.com/mozilla-mobile/firefox-android/pull/4039
     data_sensitivity:
       - interaction
@@ -16270,6 +16253,30 @@ browser:
       - android-probes@mozilla.com
     expires: never
 
+referrals:
+  code:
+    type: string
+    lifetime: ping
+    send_in_pings:
+      - referrals
+    description: |
+      The referral code extracted from the install referrer's `utm_content`
+      parameter on first run. Recorded and submitted via the separate `referrals`
+      ping so that the referral code is kept out of regular attribution data
+      (bug 2062793; desktop equivalent bug 2055255).
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2062793
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2062793
+    data_sensitivity:
+      - highly_sensitive
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+    metadata:
+      tags:
+        - Attribution
+
 vpn:
   onboarding_shown:
     type: event
@@ -16658,6 +16665,53 @@ native_share_sheet:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010858
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010858
+    notification_emails:
+      - android-probes@mozilla.com
+    data_sensitivity:
+      - interaction
+    expires: never
+    metadata:
+      tags:
+        - Sharing
+
+pdf_viewer:
+  download_tapped:
+    type: event
+    description: |
+      A user tapped the download button in the PDF viewer tools.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2054916
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D319233
+    notification_emails:
+      - android-probes@mozilla.com
+    data_sensitivity:
+      - interaction
+    expires: never
+    metadata:
+      tags:
+        - Download
+  print_tapped:
+    type: event
+    description: |
+      A user tapped the print button in the PDF viewer tools.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2054917
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D319739
+    notification_emails:
+      - android-probes@mozilla.com
+    data_sensitivity:
+      - interaction
+    expires: never
+  share_tapped:
+    type: event
+    description: |
+      A user tapped the share button in the PDF viewer tools.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2054918
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D319812
     notification_emails:
       - android-probes@mozilla.com
     data_sensitivity:

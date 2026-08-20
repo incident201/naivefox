@@ -995,6 +995,34 @@ describe("ASRouter", () => {
         assert.notCalled(FakeSpecialMessageActions.handleAction);
         assert.notCalled(addImpressionStub);
       });
+      it("rejects a nested MULTI_ACTION even if MULTI_ACTION is allowlisted", () => {
+        // MULTI_ACTION is not blocklisted, so Remote Settings can grant it. It
+        // is still only valid as the top level action.
+        FakeMessagingSystemAllowlists.getActionOnlyActions.returns([
+          "MULTI_ACTION",
+        ]);
+        const nestedMulti = {
+          id: "NESTED_MULTI",
+          template: "action_only",
+          content: {
+            action: {
+              type: "MULTI_ACTION",
+              data: {
+                actions: [
+                  {
+                    type: "MULTI_ACTION",
+                    data: { actions: [{ type: "OPEN_URL" }] },
+                  },
+                ],
+              },
+            },
+          },
+        };
+        Router.routeCFRMessage(nestedMulti, browser, {});
+
+        assert.notCalled(FakeSpecialMessageActions.handleAction);
+        assert.notCalled(addImpressionStub);
+      });
       it("rejects a MULTI_ACTION with no nested actions", () => {
         const emptyMulti = {
           id: "EMPTY_MULTI",
@@ -3334,6 +3362,56 @@ describe("ASRouter", () => {
         2: [],
         3: [0, 1, 2],
       });
+    });
+    it("should update multiprofile message impressions in shared storage", async () => {
+      sandbox.stub(ASRouterPreferences, "devtoolsEnabled").get(() => true);
+      await Router.setState({
+        multiProfileMessageImpressions: { 1: [0, 1, 2], 2: [0, 1, 2] },
+      });
+
+      await Router.editState("multiProfileMessageImpressions", {
+        1: [3, 4],
+        3: [0, 1, 2],
+      });
+
+      // State reflects the edited value
+      assert.deepEqual(Router.state.multiProfileMessageImpressions, {
+        1: [3, 4],
+        3: [0, 1, 2],
+      });
+      // Added/changed entries are persisted to shared storage
+      assert.calledWithExactly(
+        Router._storage.setSharedMessageImpressions,
+        "1",
+        [3, 4]
+      );
+      assert.calledWithExactly(
+        Router._storage.setSharedMessageImpressions,
+        "3",
+        [0, 1, 2]
+      );
+      // Removed entry is deleted from shared storage
+      assert.calledWithExactly(
+        Router._storage.setSharedMessageImpressions,
+        "2",
+        undefined
+      );
+      // Regular storage is not used for multiprofile impressions
+      assert.neverCalledWith(
+        Router._storage.set,
+        "multiProfileMessageImpressions"
+      );
+    });
+    it("should throw for invalid state key", async () => {
+      sandbox.stub(ASRouterPreferences, "devtoolsEnabled").get(() => true);
+      let error;
+      try {
+        await Router.editState("notARealKey", {});
+      } catch (e) {
+        error = e;
+      }
+      assert.instanceOf(error, Error);
+      assert.equal(error.message, "Invalid state key");
     });
   });
 

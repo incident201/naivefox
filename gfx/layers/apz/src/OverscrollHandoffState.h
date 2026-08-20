@@ -30,7 +30,7 @@ class AsyncPanZoomController;
 class OverscrollHandoffChain {
  protected:
   // Reference-counted classes cannot have public destructors.
-  ~OverscrollHandoffChain();
+  ~OverscrollHandoffChain() = default;
 
  public:
   // Threadsafe so that the controller and sampler threads can both maintain

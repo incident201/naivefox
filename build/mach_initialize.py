@@ -250,6 +250,10 @@ def initialize(topsrcdir, args=()):
             return None
 
     def pre_dispatch_handler(context, handler, args):
+        from mozbuild.path_performance import check_path_performance
+
+        check_path_performance(topsrcdir, driver.settings)
+
         # If --disable-tests flag was enabled in the mozconfig used to compile
         # the build, tests will be disabled. Instead of trying to run
         # nonexistent tests then reporting a failure, this will prevent mach
@@ -363,9 +367,7 @@ def initialize(topsrcdir, args=()):
         distro, distro_version = get_distro_and_version()
         vscode_terminal, ssh_connection = get_shell_info()
         vscode_running = get_vscode_running()
-        is_employee = resolve_is_employee(
-            Path(topsrcdir), Path(state_dir), driver.settings
-        )
+        is_employee = resolve_is_employee(Path(topsrcdir), driver.settings)
         fleet_running = get_fleet_running() if is_employee else None
         crowdstrike_running = get_crowdstrike_running() if is_employee else None
         psutil_stats = get_psutil_stats()

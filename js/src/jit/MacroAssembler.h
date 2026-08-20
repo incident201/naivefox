@@ -1441,8 +1441,12 @@ class MacroAssembler : public MacroAssemblerSpecific {
                                   Register dest) PER_ARCH;
 
   inline void lshift64(Imm32 imm, Register64 dest) PER_ARCH;
+  inline void lshift64(Imm32 imm, Register64 src, Register64 dest) PER_ARCH;
   inline void rshift64(Imm32 imm, Register64 dest) PER_ARCH;
+  inline void rshift64(Imm32 imm, Register64 src, Register64 dest) PER_ARCH;
   inline void rshift64Arithmetic(Imm32 imm, Register64 dest) PER_ARCH;
+  inline void rshift64Arithmetic(Imm32 imm, Register64 src,
+                                 Register64 dest) PER_ARCH;
 
   // On x86_shared these have the constraint that shift must be in CL.
   inline void lshift32(Register shift, Register srcDest) PER_SHARED_ARCH;

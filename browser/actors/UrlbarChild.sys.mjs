@@ -2,12 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
-  UrlbarQueryContext: "chrome://browser/content/urlbar/UrlbarQueryContext.mjs",
   UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
 
@@ -18,6 +20,7 @@ const INVOKABLE_CONTENT_ACTIONS = {
   input: new Set(["search", "setValue", "startQuery"]),
   view: new Set([
     "acknowledgeFeedback",
+    "clearL10nCache",
     "clearTopSitesCache",
     "close",
     "updateResultMenuCommands",
@@ -118,6 +121,22 @@ export class UrlbarChild extends JSWindowActorChild {
   }
 
   /**
+   * Clones a payload the parent sent into the content realm, so content code can
+   * read it: an object left in this realm reaches content as an Xray, which
+   * denies even `Symbol.iterator`. In the parent both sides share a realm and the
+   * payload passes through as it is.
+   *
+   * @param {any[]} args
+   *   The arguments to hand to content.
+   * @returns {any[]}
+   */
+  #forContent(args) {
+    return this.manager.parentActor
+      ? args
+      : Cu.cloneInto(args, Cu.waiveXrays(this.contentWindow));
+  }
+
+  /**
    * Exposes the actor's content-facing surface on the window for a content-realm
    * `<moz-urlbar>`, which can't reach the `[ChromeOnly]`
    * `windowGlobalChild.getActor` nor hold the system-principal actor. Such an
@@ -148,7 +167,12 @@ export class UrlbarChild extends JSWindowActorChild {
         getFixupPrimitives: (searchString, isPrivate) =>
           Cu.cloneInto(this.getFixupPrimitives(searchString, isPrivate), win),
         getDisplaySpec: url => this.getDisplaySpec(url),
+        unEscapeURIForUI: uri => this.unEscapeURIForUI(uri),
         getSupportUrl: topic => this.getSupportUrl(topic),
+        getPlatform: () => this.getPlatform(),
+        isWindowPrivate: lazy.PrivateBrowsingUtils.isContentWindowPrivate(
+          this.contentWindow
+        ),
         isTextDirectionRTL: (value, window) =>
           this.isTextDirectionRTL(value, window),
         getPref: name => Cu.cloneInto(lazy.UrlbarPrefs.get(name), win),
@@ -161,7 +185,12 @@ export class UrlbarChild extends JSWindowActorChild {
     );
   }
 
-  actorCreated() {
+  /**
+   * `DOMDocElementInserted`, the actor's only registered event, fires as the
+   * document is created, which is early enough to publish the port before page
+   * script runs.
+   */
+  handleEvent() {
     // Only a content realm reads the port; chrome holds the actor and imports
     // UrlbarPrefs directly, so don't publish it on every chrome window.
     if (!this.manager.parentActor) {
@@ -210,6 +239,16 @@ export class UrlbarChild extends JSWindowActorChild {
    */
   whereToOpenLink(event) {
     return lazy.BrowserUtils.whereToOpenLink(event, false, false);
+  }
+
+  /**
+   * Forwards `AppConstants.platform`, which a content-realm consumer can't read
+   * for itself: `AppConstants` is a system module.
+   *
+   * @returns {string} The platform name.
+   */
+  getPlatform() {
+    return AppConstants.platform;
   }
 
   /**
@@ -283,6 +322,20 @@ export class UrlbarChild extends JSWindowActorChild {
     }
   }
 
+  /**
+   * Unescapes a URI's percent-encoding for display, applying the spoofing
+   * protections `nsITextToSubURI` implements. Lets content-realm code render a
+   * URL without reaching `Services.textToSubURI`.
+   *
+   * @param {string} uri
+   *   The URI fragment to unescape.
+   * @returns {string}
+   *   The unescaped fragment.
+   */
+  unEscapeURIForUI(uri) {
+    return Services.textToSubURI.unEscapeURIForUI(uri);
+  }
+
   receiveMessage(message) {
     switch (message.name) {
       case "Notify":
@@ -316,12 +369,11 @@ export class UrlbarChild extends JSWindowActorChild {
     if (!this.manager.parentActor) {
       child = Cu.waiveXrays(child);
     }
-    let deserialized = params.map(param =>
-      param?.serializedQueryContext
-        ? lazy.UrlbarQueryContext.fromWire(param.serializedQueryContext)
-        : param
-    );
-    child.notify(name, ...deserialized);
+    // The wire form crosses as plain data and the child controller builds the
+    // query context from it, so the object is born in the realm that reads it.
+    // Deserializing here would leave content an Xray over it, whose properties
+    // all read `undefined`.
+    child.notifyFromWire(name, ...this.#forContent(params));
   }
 
   /**
@@ -350,7 +402,7 @@ export class UrlbarChild extends JSWindowActorChild {
     if (!this.manager.parentActor) {
       child = Cu.waiveXrays(child);
     }
-    child[target]?.[method](...args);
+    child[target]?.[method](...this.#forContent(args));
   }
 
   #updateEngineStore({ instanceId, args }) {
@@ -364,6 +416,6 @@ export class UrlbarChild extends JSWindowActorChild {
     if (!this.manager.parentActor) {
       child = Cu.waiveXrays(child);
     }
-    child.updateEngineStore(...args);
+    child.updateEngineStore(...this.#forContent(args));
   }
 }

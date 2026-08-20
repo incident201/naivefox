@@ -904,7 +904,8 @@ export class ChatConversation extends Conversation {
   ) {
     const memoriesContext = await constructMemories(
       prompt,
-      this.#getPreviousRelevantMemories(messageCount)
+      this.#getPreviousRelevantMemories(messageCount),
+      this.engine?.model
     );
     if (memoriesContext == null) {
       return;

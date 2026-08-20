@@ -1502,7 +1502,7 @@ nsresult GeckoMediaPluginServiceParent::GetNodeId(
     return NS_OK;
   }
   // The union contains a NodeIdParts, convert it to a node ID string.
-  NodeIdParts nodeIdParts{aNodeIdVariant.get_NodeIdParts()};
+  const NodeIdParts& nodeIdParts = aNodeIdVariant.get_NodeIdParts();
   return GetNodeId(nodeIdParts.mOrigin(), nodeIdParts.mTopLevelOrigin(),
                    nodeIdParts.mGMPName(), aOutId);
 }

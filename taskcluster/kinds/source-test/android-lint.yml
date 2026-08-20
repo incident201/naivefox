@@ -4,9 +4,7 @@
 ---
 task-defaults:
     description: 'Run lint over all modules'
-    run-on-repo-type: [hg]
     run:
-        clone-with: hg
         using: gradlew
         gradlew: ['lint']
     worker:
@@ -39,7 +37,6 @@ task-defaults:
 
 android-components:
     run:
-        clone-with: hg
         pre-gradlew:
             - ["cd", "mobile/android/android-components"]
         gradlew: ["--no-parallel"]
@@ -55,8 +52,8 @@ focus:
     when:
         files-changed:
             - "mobile/android/focus-android/**"
+            - "mobile/android/shared-lint.xml"
     run:
-        clone-with: hg
         pre-gradlew:
             - ["cd", "mobile/android/focus-android"]
     treeherder:
@@ -71,8 +68,8 @@ fenix:
     when:
         files-changed:
             - "mobile/android/fenix/**"
+            - "mobile/android/shared-lint.xml"
     run:
-        clone-with: hg
         pre-gradlew:
             - ["cd", "mobile/android/fenix"]
         gradlew: ['lintDebug']

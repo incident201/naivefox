@@ -3,20 +3,20 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
+import { UrlbarQueryContext } from "chrome://browser/content/urlbar/UrlbarQueryContext.mjs";
 import { UrlbarChildTelemetry } from "chrome://browser/content/urlbar/UrlbarChildTelemetry.mjs";
 import { UrlbarParentControllerProxy } from "chrome://browser/content/urlbar/UrlbarParentControllerProxy.mjs";
+import { getPlatform } from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 
-const { AppConstants } = ChromeUtils.importESModule(
-  "resource://gre/modules/AppConstants.sys.mjs"
-);
+const lazy = typeof ChromeUtils != "undefined" ? {} : null;
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  UrlbarParentController:
-    "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs",
-});
+if (lazy) {
+  ChromeUtils.defineESModuleGetters(lazy, {
+    UrlbarParentController:
+      "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs",
+  });
+}
 
 /**
  * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
@@ -74,15 +74,9 @@ export class UrlbarChildController {
 
   #userSelectionBehavior = /** @type {"arrow"|"tab"|"none"} */ ("none");
 
-  // The id of the query whose results still have a consumer. Notifications
+  // The id of the query the listeners are still hearing about. Notifications
   // carrying an older id belong to a query nobody is waiting for anymore.
   #queryId = 0;
-
-  // The id of the last query started here, which a query has to be older than
-  // to count as superseded. Distinct from `#queryId`, which also moves when the
-  // input discards the running query's results: that query is still the one the
-  // listeners track, and its end has to reach them.
-  #startedQueryId = 0;
 
   // Whether the query identified by `#queryId` was cancelled. Only meaningful
   // while it's held back waiting for the engine store; a cancel can't be taken
@@ -176,9 +170,6 @@ export class UrlbarChildController {
       (this.#childTelemetry ??= new UrlbarChildTelemetry(this))
     );
   }
-  get platform() {
-    return AppConstants.platform;
-  }
   /**
    * The selection behavior that the user has used to select a result. The
    * setter ignores a change to "arrow" once "tab" has been recorded, since we
@@ -232,22 +223,47 @@ export class UrlbarChildController {
   removeListener(listener) {
     this.#listeners.delete(listener);
   }
+  /**
+   * Takes a notification off the wire, building the query context in this realm
+   * before anything reads it.
+   *
+   * @param {string} notification
+   *   The notification, one of `UrlbarShared.NOTIFICATIONS`.
+   * @param {...any} params
+   *   The notification's arguments, the query context in its wire form.
+   */
+  notifyFromWire(notification, ...params) {
+    this.notify(
+      notification,
+      ...params.map(param =>
+        param?.serializedQueryContext
+          ? UrlbarQueryContext.fromWire(param.serializedQueryContext)
+          : param
+      )
+    );
+  }
+  /**
+   * Hands a notification to the listeners, dropping the results and the end of
+   * a query they have moved on from.
+   *
+   * @param {string} notification
+   *   The notification, one of `UrlbarShared.NOTIFICATIONS`.
+   * @param {...any} params
+   *   The notification's arguments. The query lifecycle ones take the query
+   *   context.
+   */
   notify(notification, ...params) {
+    // Drop the results and the end of a query nobody is waiting for anymore.
+    // Its end, read against results the listeners never saw, would tell the
+    // view that the query produced nothing: the view would clear its rows and
+    // close, cancelling the query that took over. QUERY_STARTED still goes
+    // through -- it carries the per-query state the listeners reset, and the
+    // query they do track resets it again when it starts.
     if (
       (notification === UrlbarShared.NOTIFICATIONS.QUERY_FIRST_RESULT ||
-        notification === UrlbarShared.NOTIFICATIONS.QUERY_RESULTS) &&
+        notification === UrlbarShared.NOTIFICATIONS.QUERY_RESULTS ||
+        notification === UrlbarShared.NOTIFICATIONS.QUERY_FINISHED) &&
       params[0].id < this.#queryId
-    ) {
-      return;
-    }
-    // A superseded query's end would tell the view that the query produced
-    // nothing, since its results were dropped above, and the view would close
-    // -- cancelling the query that superseded it. The rest of the lifecycle
-    // still goes through: those notifications carry the per-query state the
-    // listeners reset, and the newer query resets it again when it starts.
-    if (
-      notification === UrlbarShared.NOTIFICATIONS.QUERY_FINISHED &&
-      params[0].id < this.#startedQueryId
     ) {
       return;
     }
@@ -331,7 +347,6 @@ export class UrlbarChildController {
    */
   startQuery(queryContext) {
     this.#queryId = queryContext.id;
-    this.#startedQueryId = queryContext.id;
     this.#queryCancelled = false;
 
     if (this.engineStore.initialized || this.engineStore.failed) {
@@ -391,14 +406,19 @@ export class UrlbarChildController {
     return this.#parentController.cancelQuery();
   }
   /**
-   * Keeps the running query's results from reaching the listeners. The input
-   * calls this when it takes the query over after the first result -- entering
-   * search mode and restarting it -- since the results are about to be
-   * replaced. The query keeps running until the restart cancels it, which over
-   * the message path takes a round trip.
+   * Takes the running query away from the listeners, reporting it to them as
+   * cancelled: nothing more of it reaches them, results or end. The input calls
+   * this when it takes the query over after the first result -- entering search
+   * mode and restarting it -- since the results are about to be replaced. The
+   * query keeps running until the restart cancels it, which over the message
+   * path takes a round trip.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query being discarded.
    */
-  discardResults() {
+  discardResults(queryContext) {
     this.#queryId++;
+    this.notify(UrlbarShared.NOTIFICATIONS.QUERY_CANCELLED, queryContext);
   }
   receiveResults(queryContext) {
     return this.#parentController.receiveResults(queryContext);
@@ -431,7 +451,7 @@ export class UrlbarChildController {
       return;
     }
 
-    const isMac = AppConstants.platform == "macosx";
+    const isMac = getPlatform() == "macosx";
     // Handle readline/emacs-style navigation bindings on Mac.
     if (
       isMac &&
@@ -773,7 +793,7 @@ export class UrlbarChildController {
     if (this.view.isOpen) {
       return false;
     }
-    if (AppConstants.platform != "macosx" && AppConstants.platform != "linux") {
+    if (getPlatform() != "macosx" && getPlatform() != "linux") {
       return false;
     }
     let isArrowUp = event.keyCode == KeyEvent.DOM_VK_UP;
@@ -813,6 +833,10 @@ export class UrlbarChildController {
     return this.#parentController.switchToTab(loadData);
   }
 
+  addToInputHistory(url, input, options) {
+    return this.#parentController.addToInputHistory(url, input, options);
+  }
+
   /**
    * Returns whether the passed-in event represents a canonization request.
    *
@@ -828,7 +852,7 @@ export class UrlbarChildController {
     return (
       KeyboardEvent.isInstance(event) &&
       event.keyCode == KeyEvent.DOM_VK_RETURN &&
-      (AppConstants.platform == "macosx" ? event.metaKey : event.ctrlKey) &&
+      (getPlatform() == "macosx" ? event.metaKey : event.ctrlKey) &&
       !(/** @type {any} */ (event)._disableCanonization) &&
       UrlbarPrefs.get("ctrlCanonizesURLs")
     );
@@ -958,8 +982,6 @@ export class UrlbarChildController {
 
     /** @type {HTMLElement} */
     const switcher = this.input.querySelector(".searchmode-switcher");
-    // Set tabindex to be focusable.
-    switcher.setAttribute("tabindex", "-1");
     // Remove blur listener to avoid closing urlbar view panel.
     this.input.inputField.removeEventListener("blur", this.input);
     // Move the focus.
@@ -970,8 +992,6 @@ export class UrlbarChildController {
       "blur",
       /** @type {(e: FocusEvent) => void} */
       e => {
-        switcher.removeAttribute("tabindex");
-
         let relatedTarget = /** @type {HTMLElement} */ (e.relatedTarget);
         if (
           this.input.hasAttribute("focused") &&

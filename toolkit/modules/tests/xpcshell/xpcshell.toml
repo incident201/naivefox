@@ -118,6 +118,8 @@ skip-if = [
 
 ["test_Region.js"]
 
+["test_RegionLocaleMap.js"]
+
 ["test_Region_geocoding.js"]
 requesttimeoutfactor = 4  # Slow and high CPU use on debug builds
 
@@ -129,6 +131,8 @@ skip-if = [
 ["test_ScheduledTask.js"]
 
 ["test_Services.js"]
+
+["test_URLKeywordAnalyzer.js"]
 
 ["test_UpdateUtils_updatechannel.js"]
 skip-if = [

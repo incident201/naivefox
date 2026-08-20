@@ -117,7 +117,6 @@
 #  include "detect_win32k_conflicts.h"
 #  include "mozilla/PreXULSkeletonUI.h"
 #  include "mozilla/DllPrefetchExperimentRegistryInfo.h"
-#  include "mozilla/WindowsBCryptInitialization.h"
 #  include "mozilla/WindowsDllBlocklist.h"
 #  include "mozilla/WindowsMsctfInitialization.h"
 #  include "mozilla/WindowsOleAut32Initialization.h"
@@ -2799,6 +2798,13 @@ static nsresult ProfileMissingDialog(nsINativeAppSupport* aNative) {
   }
 #  endif  // MOZ_BACKGROUNDTASKS
 
+  if (gfxPlatform::IsHeadless()) {
+    // Nothing can dismiss a modal dialog in headless mode, so report the
+    // failure on stderr and exit instead of spinning in the event loop.
+    Output(true, "Could not find profile folder.\n");
+    return NS_ERROR_ABORT;
+  }
+
   nsresult rv;
 
   ScopedXPCOMStartup xpcom;
@@ -2864,6 +2870,12 @@ static nsresult ProfileEncryptionMismatchDialog(const char* aMsgKey,
     return NS_ERROR_ABORT;
   }
 #  endif  // MOZ_BACKGROUNDTASKS
+
+  if (gfxPlatform::IsHeadless()) {
+    // Nothing can dismiss a modal dialog in headless mode.
+    Output(true, "Profile encryption state does not match launching build.\n");
+    return NS_ERROR_ABORT;
+  }
 
   nsresult rv;
 
@@ -6495,11 +6507,6 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
 #  if defined(MOZ_SANDBOX)
   mAppData->sandboxBrokerServices = aConfig.sandboxBrokerServices;
 #  endif  // defined(MOZ_SANDBOX)
-
-  {
-    DebugOnly<bool> result = WindowsBCryptInitialization();
-    MOZ_ASSERT(result);
-  }
 
 #  if defined(_M_IX86) || defined(_M_X64)
   {

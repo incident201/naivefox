@@ -17,6 +17,11 @@
 #include FT_TRUETYPE_TABLES_H
 #include FT_MULTIPLE_MASTERS_H
 
+#ifdef MOZ_FONTATIONS
+#  include "mozilla/MemoryMappedFile.h"
+#  include "mozilla/gfx/fontations_glue_generated.h"
+#endif
+
 #if defined(MOZ_SANDBOX) && defined(XP_LINUX)
 #  include "mozilla/SandboxBroker.h"
 #endif
@@ -102,9 +107,7 @@ class gfxFontconfigFontEntry final : public gfxFT2FontEntryBase {
   void GetVariationInstances(
       nsTArray<gfxFontVariationInstance>& aInstances) override;
 
-  bool HasFontTable(uint32_t aTableTag) override;
   nsresult CopyFontTable(uint32_t aTableTag, nsTArray<uint8_t>&) override;
-  hb_blob_t* GetFontTable(uint32_t aTableTag) override;
   FontTableCache* GetFontTableCache(bool aCreate) override {
     return mFontTableCache;
   };
@@ -116,10 +119,17 @@ class gfxFontconfigFontEntry final : public gfxFT2FontEntryBase {
 
   gfxFont* CreateFontInstance(const gfxFontStyle* aFontStyle) override;
 
+  bool HasFontTableInternal(uint32_t aTableTag) override;
+  hb_blob_t* GetFontTableInternal(uint32_t aTableTag) override;
+
   void GetUserFontFeatures(FcPattern* aPattern);
 
   // pattern for a single face of a family
   RefPtr<FcPattern> mFontPattern;
+
+#ifdef MOZ_FONTATIONS
+  void InitSkrifaFont(FcPattern* aPattern);
+#endif
 
   // FTFace - initialized when needed. Once mFTFaceInitialized is true,
   // the face can be accessed without locking.

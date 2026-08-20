@@ -16,6 +16,7 @@ MozAdsContextIdProvider = "Sync"
 MozAdsTelemetry = "FireAndForget"
 
 [autofill.async_wrappers]
+AddressesBridgedEngine = "AsyncWrapped"
 # Store opens the SQLite DB and runs migrations in its constructor, and every
 # method performs DB I/O, so the whole interface (including the constructor) is
 # async-wrapped to keep that work off the main thread (cf. logins LoginStore).
@@ -241,7 +242,7 @@ lower = "{}.getTime() / 1000"
 "LoginsBridgedEngine.last_sync" = "AsyncWrapped"
 "LoginsBridgedEngine.reset" = "AsyncWrapped"
 "LoginsBridgedEngine.reset_sync_id" = "AsyncWrapped"
-"LoginsBridgedEngine.set_last_sync" = "AsyncWrapped"
+"LoginsBridgedEngine.reset_last_sync" = "AsyncWrapped"
 "LoginsBridgedEngine.set_uploaded" = "AsyncWrapped"
 "LoginsBridgedEngine.store_incoming" = "AsyncWrapped"
 "LoginsBridgedEngine.sync_finished" = "AsyncWrapped"

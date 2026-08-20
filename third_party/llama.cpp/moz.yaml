@@ -2,7 +2,7 @@ schema: 1
 
 bugzilla:
   product: Core
-  component: "xul"
+  component: "Machine Learning: General"
 
 origin:
   name: llama.cpp
@@ -89,3 +89,4 @@ vendoring:
      - profiler-hooks.patch # add thread callbacks for Firefox Profiler integration
      - missing-includes.patch # missing include cerrno in gguf.cpp, include mutex in llama-model-loader.cpp
      - skip-metadata-dump.patch # skip dumping metadata strings that proved costly in profiling
+     - include-order.patch # include system headers before models.h, which pulls in moz-overrides.h

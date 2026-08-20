@@ -849,16 +849,6 @@ class FunctionCompiler {
   }
 
   template <class T>
-  MDefinition* binary(MDefinition* lhs, MDefinition* rhs) {
-    if (inDeadCode()) {
-      return nullptr;
-    }
-    T* ins = T::New(alloc(), lhs, rhs);
-    curBlock_->add(ins);
-    return ins;
-  }
-
-  template <class T>
   MDefinition* binary(MDefinition* lhs, MDefinition* rhs, MIRType type) {
     if (inDeadCode()) {
       return nullptr;
@@ -1756,9 +1746,10 @@ class FunctionCompiler {
     return load;
   }
 
-  void store(MDefinition* base, MemoryAccessDesc* access, MDefinition* v) {
+  [[nodiscard]] bool store(MDefinition* base, MemoryAccessDesc* access,
+                           MDefinition* v) {
     if (inDeadCode()) {
-      return;
+      return true;
     }
 
     MDefinition* memoryBase = maybeLoadMemoryBase(access->memoryIndex());
@@ -1769,9 +1760,10 @@ class FunctionCompiler {
     MInstruction* store =
         MWasmStore::New(alloc(), memoryBase, base, *access, v);
     if (!store) {
-      return;
+      return false;
     }
     curBlock_->add(store);
+    return true;
   }
 
   MDefinition* atomicCompareExchangeHeap(MDefinition* base,
@@ -1977,11 +1969,11 @@ class FunctionCompiler {
     return load;
   }
 
-  void storeLaneSimd128(uint32_t laneSize,
-                        const LinearMemoryAddress<MDefinition*>& addr,
-                        uint32_t laneIndex, MDefinition* src) {
+  [[nodiscard]] bool storeLaneSimd128(
+      uint32_t laneSize, const LinearMemoryAddress<MDefinition*>& addr,
+      uint32_t laneIndex, MDefinition* src) {
     if (inDeadCode()) {
-      return;
+      return true;
     }
     MemoryAccessDesc access(addr.memoryIndex, Scalar::Simd128, addr.align,
                             addr.offset, trapSiteDesc(),
@@ -1995,9 +1987,10 @@ class FunctionCompiler {
     MInstruction* store = MWasmStoreLaneSimd128::New(
         alloc(), memoryBase, base, access, laneSize, laneIndex, src);
     if (!store) {
-      return;
+      return false;
     }
     curBlock_->add(store);
+    return true;
   }
 #endif  // ENABLE_WASM_SIMD
 
@@ -5813,6 +5806,8 @@ class FunctionCompiler {
 #ifdef ENABLE_WASM_JSPI
   bool emitContNew();
   bool emitContBind();
+  [[nodiscard]] bool makeSwitchStackResultArea(const ValTypeVector& types,
+                                               MWasmStackResultArea** out);
   bool emitStoreSuspendParams(MDefinition* paramsArea,
                               const ValTypeVector& suspendTagParams,
                               const DefVector& suspendParams,
@@ -5831,14 +5826,9 @@ class FunctionCompiler {
   bool emitSetGlobal();
   bool emitTeeGlobal();
   template <typename MIRClass>
-  bool emitUnary(ValType operandType);
-  template <typename MIRClass>
   bool emitConversion(ValType operandType, ValType resultType);
   template <typename MIRClass>
   bool emitUnaryWithType(ValType operandType, MIRType mirType);
-  template <typename MIRClass>
-  bool emitConversionWithType(ValType operandType, ValType resultType,
-                              MIRType mirType);
   bool emitTruncate(ValType operandType, ValType resultType, bool isUnsigned,
                     bool isSaturating);
   bool emitSignExtend(uint32_t srcSize, uint32_t targetSize);
@@ -6682,17 +6672,6 @@ bool FunctionCompiler::emitSetGlobal() {
 }
 
 template <typename MIRClass>
-bool FunctionCompiler::emitUnary(ValType operandType) {
-  MDefinition* input;
-  if (!iter().readUnary(operandType, &input)) {
-    return false;
-  }
-
-  iter().setResult(unary<MIRClass>(input));
-  return true;
-}
-
-template <typename MIRClass>
 bool FunctionCompiler::emitConversion(ValType operandType, ValType resultType) {
   MDefinition* input;
   if (!iter().readConversion(operandType, resultType, &input)) {
@@ -6707,19 +6686,6 @@ template <typename MIRClass>
 bool FunctionCompiler::emitUnaryWithType(ValType operandType, MIRType mirType) {
   MDefinition* input;
   if (!iter().readUnary(operandType, &input)) {
-    return false;
-  }
-
-  iter().setResult(unary<MIRClass>(input, mirType));
-  return true;
-}
-
-template <typename MIRClass>
-bool FunctionCompiler::emitConversionWithType(ValType operandType,
-                                              ValType resultType,
-                                              MIRType mirType) {
-  MDefinition* input;
-  if (!iter().readConversion(operandType, resultType, &input)) {
     return false;
   }
 
@@ -6991,8 +6957,7 @@ bool FunctionCompiler::emitStore(ValType resultType, Scalar::Type viewType) {
   MemoryAccessDesc access(addr.memoryIndex, viewType, addr.align, addr.offset,
                           trapSiteDesc(), hugeMemoryEnabled(addr.memoryIndex));
 
-  store(addr.base, &access, value);
-  return true;
+  return store(addr.base, &access, value);
 }
 
 bool FunctionCompiler::tryInlineUnaryBuiltin(SymbolicAddress callee,
@@ -7170,8 +7135,7 @@ bool FunctionCompiler::emitAtomicStore(ValType type, Scalar::Type viewType) {
   MemoryAccessDesc access(addr.memoryIndex, viewType, addr.align, addr.offset,
                           trapSiteDesc(), hugeMemoryEnabled(addr.memoryIndex),
                           Synchronization::Store());
-  store(addr.base, &access, value);
-  return true;
+  return store(addr.base, &access, value);
 }
 
 bool FunctionCompiler::emitWait(ValType type, uint32_t byteSize) {
@@ -7438,7 +7402,9 @@ bool FunctionCompiler::emitMemCopyInline(uint32_t memoryIndex, MDefinition* dst,
     MemoryAccessDesc access(memoryIndex, Scalar::Uint8, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
     auto* value = loadedValues.popCopy();
-    store(dst, &access, value);
+    if (!store(dst, &access, value)) {
+      return false;
+    }
   }
 
   if (numCopies2) {
@@ -7447,7 +7413,9 @@ bool FunctionCompiler::emitMemCopyInline(uint32_t memoryIndex, MDefinition* dst,
     MemoryAccessDesc access(memoryIndex, Scalar::Uint16, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
     auto* value = loadedValues.popCopy();
-    store(dst, &access, value);
+    if (!store(dst, &access, value)) {
+      return false;
+    }
   }
 
   for (uint32_t i = 0; i < numCopies4; i++) {
@@ -7456,7 +7424,9 @@ bool FunctionCompiler::emitMemCopyInline(uint32_t memoryIndex, MDefinition* dst,
     MemoryAccessDesc access(memoryIndex, Scalar::Uint32, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
     auto* value = loadedValues.popCopy();
-    store(dst, &access, value);
+    if (!store(dst, &access, value)) {
+      return false;
+    }
   }
 
 #ifdef JS_64BIT
@@ -7466,7 +7436,9 @@ bool FunctionCompiler::emitMemCopyInline(uint32_t memoryIndex, MDefinition* dst,
     MemoryAccessDesc access(memoryIndex, Scalar::Int64, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
     auto* value = loadedValues.popCopy();
-    store(dst, &access, value);
+    if (!store(dst, &access, value)) {
+      return false;
+    }
   }
 #endif
 
@@ -7477,7 +7449,9 @@ bool FunctionCompiler::emitMemCopyInline(uint32_t memoryIndex, MDefinition* dst,
     MemoryAccessDesc access(memoryIndex, Scalar::Simd128, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
     auto* value = loadedValues.popCopy();
-    store(dst, &access, value);
+    if (!store(dst, &access, value)) {
+      return false;
+    }
   }
 #endif
 
@@ -7638,7 +7612,9 @@ bool FunctionCompiler::emitMemFillInline(uint32_t memoryIndex,
 
     MemoryAccessDesc access(memoryIndex, Scalar::Uint8, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
-    store(start, &access, val);
+    if (!store(start, &access, val)) {
+      return false;
+    }
   }
 
   if (numCopies2) {
@@ -7646,7 +7622,9 @@ bool FunctionCompiler::emitMemFillInline(uint32_t memoryIndex,
 
     MemoryAccessDesc access(memoryIndex, Scalar::Uint16, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
-    store(start, &access, val2);
+    if (!store(start, &access, val2)) {
+      return false;
+    }
   }
 
   for (uint32_t i = 0; i < numCopies4; i++) {
@@ -7654,7 +7632,9 @@ bool FunctionCompiler::emitMemFillInline(uint32_t memoryIndex,
 
     MemoryAccessDesc access(memoryIndex, Scalar::Uint32, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
-    store(start, &access, val4);
+    if (!store(start, &access, val4)) {
+      return false;
+    }
   }
 
 #ifdef JS_64BIT
@@ -7663,7 +7643,9 @@ bool FunctionCompiler::emitMemFillInline(uint32_t memoryIndex,
 
     MemoryAccessDesc access(memoryIndex, Scalar::Int64, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
-    store(start, &access, val8);
+    if (!store(start, &access, val8)) {
+      return false;
+    }
   }
 #endif
 
@@ -7673,7 +7655,9 @@ bool FunctionCompiler::emitMemFillInline(uint32_t memoryIndex,
 
     MemoryAccessDesc access(memoryIndex, Scalar::Simd128, 1, offset,
                             trapSiteDesc(), hugeMemoryEnabled(memoryIndex));
-    store(start, &access, val16);
+    if (!store(start, &access, val16)) {
+      return false;
+    }
   }
 #endif
 
@@ -8402,8 +8386,7 @@ bool FunctionCompiler::emitStoreLaneSimd128(uint32_t laneSize) {
     return false;
   }
 
-  storeLaneSimd128(laneSize, addr, laneIndex, src);
-  return true;
+  return storeLaneSimd128(laneSize, addr, laneIndex, src);
 }
 
 #endif  // ENABLE_WASM_SIMD
@@ -9350,22 +9333,23 @@ bool FunctionCompiler::emitContNew() {
     return false;
   }
 
-  const TypeDef& typeDef = codeMeta().types->type(typeIndex);
-  const ContType& contType = typeDef.contType();
-
-  // TODO: Temporary restriction that cont type cannot have params or results.
-  if (!contType.funcType().args().empty() ||
-      !contType.funcType().results().empty()) {
-    unimplementedTrap();
-    return true;
-  }
-
   if (inDeadCode()) {
     return true;
   }
 
+  // Load the type-specific base frame stub pointer from TypeDefInstanceData.
+  uint32_t stubOffset = wasm::Instance::offsetInData(
+      codeMeta().offsetOfContBaseFrameStub(typeIndex));
+  auto* stub = MWasmLoadInstance::New(alloc(), instancePointer_, stubOffset,
+                                      MIRType::Pointer, AliasSet::None());
+  if (!stub) {
+    return false;
+  }
+  curBlock_->add(stub);
+
   MDefinition* result = nullptr;
-  if (!emitInstanceCall1(readBytecodeOffset(), SASigContNew, func, &result)) {
+  if (!emitInstanceCall2(readBytecodeOffset(), SASigContNew, func, stub,
+                         &result)) {
     return false;
   }
   iter().setResult(result);
@@ -9431,6 +9415,26 @@ bool FunctionCompiler::emitStoreSuspendParams(
   return true;
 }
 
+// Always returns a (possibly empty) area, so switch nodes can hold it as a
+// fixed operand. An empty area reserves no stack and byteSize() is 0.
+bool FunctionCompiler::makeSwitchStackResultArea(const ValTypeVector& types,
+                                                 MWasmStackResultArea** out) {
+  *out = nullptr;
+  auto* area = MWasmStackResultArea::New(alloc());
+  if (!area || !area->init(alloc(), types.length())) {
+    return false;
+  }
+  size_t offset = 0;
+  for (uint32_t i = 0; i < types.length(); i++) {
+    MWasmStackResultArea::StackResult loc(offset, types[i].toMIRType());
+    area->initResult(i, loc);
+    offset = loc.endOffset();
+  }
+  curBlock_->add(area);
+  *out = area;
+  return true;
+}
+
 bool FunctionCompiler::emitSuspend() {
   uint32_t tagIndex;
   DefVector suspendParams;
@@ -9444,12 +9448,6 @@ bool FunctionCompiler::emitSuspend() {
 
   const TagDesc& tagDesc = codeMeta().tags[tagIndex];
   const TagType& tagType = *tagDesc.type;
-
-  // TODO: Temporary restriction that suspend tags cannot have results.
-  if (!tagType.resultTypes().empty()) {
-    unimplementedTrap();
-    return true;
-  }
 
   // TODO: Temporary restriction that we can't be in a try block yet. A
   // resume_throw will be able to trigger an exception that we need to handle.
@@ -9500,14 +9498,40 @@ bool FunctionCompiler::emitSuspend() {
     return false;
   }
 
+  // The suspendResultsArea is always present (empty when the tag has no
+  // results) so MWasmSuspend has a fixed operand set. After re-resume, the tag
+  // results are read from it.
+  const ValTypeVector& tagResults = tagType.resultTypes();
+  MWasmStackResultArea* suspendResultsArea = nullptr;
+  if (!makeSwitchStackResultArea(tagResults, &suspendResultsArea)) {
+    return false;
+  }
+
   // Emit the suspend instruction.
-  MWasmSuspend* suspend =
-      MWasmSuspend::New(alloc(), instancePointer_, suspendedCont, handler,
-                        callSiteDesc(CallSiteKind::StackSwitch));
+  MWasmSuspend* suspend = MWasmSuspend::New(
+      alloc(), instancePointer_, suspendedCont, handler, suspendResultsArea,
+      callSiteDesc(CallSiteKind::StackSwitch));
   if (!suspend) {
     return false;
   }
   curBlock_->add(suspend);
+
+  // After re-resume, read tag results from the suspendResultsArea.
+  if (!tagResults.empty()) {
+    DefVector resultDefs;
+    for (uint32_t i = 0; i < tagResults.length(); i++) {
+      if (!mirGen().ensureBallast()) {
+        return false;
+      }
+      MWasmStackResult* stackResult =
+          MWasmStackResult::New(alloc(), suspendResultsArea, i);
+      if (!stackResult || !resultDefs.append(stackResult)) {
+        return false;
+      }
+      curBlock_->add(stackResult);
+    }
+    iter().setResults(resultDefs.length(), resultDefs);
+  }
 
   return true;
 }
@@ -9525,26 +9549,16 @@ bool FunctionCompiler::emitResume() {
     return true;
   }
 
-  // TODO: Temporary restriction that cont type cannot have params or results.
-  const TypeDef& typeDef = codeMeta().types->type(typeIndex);
-  const ContType& contType = typeDef.contType();
-  if (!contType.funcType().args().empty() ||
-      !contType.funcType().results().empty()) {
-    unimplementedTrap();
-    return true;
-  }
-
-  // TODO: Temporary restriction that suspend tags cannot have params or
-  // results.
+  // TODO: Temporary restriction that suspend tags cannot have switch handlers.
   for (const HandlerExpr& handler : handlers) {
-    const TagDesc& tagDesc = codeMeta().tags[handler.tagIndex()];
-    const TagType& tagType = *tagDesc.type;
-
-    if (handler.isSwitch() || !tagType.resultTypes().empty()) {
+    if (handler.isSwitch()) {
       unimplementedTrap();
       return true;
     }
   }
+
+  const TypeDef& contTypeDef = codeMeta().types->type(typeIndex);
+  const FuncType& contFuncType = contTypeDef.contType().funcType();
 
   // Start with a resume barrier which will mark the stack if it hasn't yet and
   // we're in an incremental GC.
@@ -9554,6 +9568,43 @@ bool FunctionCompiler::emitResume() {
     return false;
   }
   curBlock_->add(barrier);
+
+  // Allocate the cont params area (empty when the cont takes none) and emit
+  // MWasmPrepareResume unconditionally. It validates the continuation (trapping
+  // if it is not resumable) and computes where the args go: the resumer's own
+  // resumeParamsArea for a fresh continuation, or the suspender's advertised
+  // suspendResultsArea for a suspended one, so the args are written straight
+  // there without an extra copy. Emitting it for every resume also means the
+  // resumability check happens once here rather than again in EmitResume.
+  MWasmStackResultArea* resumeParamsArea = nullptr;
+  if (!makeSwitchStackResultArea(contFuncType.args(), &resumeParamsArea)) {
+    return false;
+  }
+  MWasmPrepareResume* prepareResume =
+      MWasmPrepareResume::New(alloc(), cont, resumeParamsArea, trapSiteDesc());
+  if (!prepareResume) {
+    return false;
+  }
+  curBlock_->add(prepareResume);
+  for (uint32_t i = 0; i < args.length(); i++) {
+    if (!mirGen().ensureBallast()) {
+      return false;
+    }
+    size_t argOffset = resumeParamsArea->result(i).offset();
+    MWasmStoreStackResult* store =
+        MWasmStoreStackResult::New(alloc(), prepareResume, argOffset, args[i]);
+    if (!store) {
+      return false;
+    }
+    curBlock_->add(store);
+  }
+
+  // If the cont has results, allocate a stack area for them so the typed base
+  // frame stub can store them; results are read after the fallthrough.
+  MWasmStackResultArea* contResultsArea = nullptr;
+  if (!makeSwitchStackResultArea(contFuncType.results(), &contResultsArea)) {
+    return false;
+  }
 
   MBasicBlock* fallthroughBlock = nullptr;
   MBasicBlock* prePadBlock = nullptr;
@@ -9582,19 +9633,18 @@ bool FunctionCompiler::emitResume() {
         1 + codeMeta().getTagType(handler.tagIndex()).argTypes().length();
   }
 
-  MWasmStackResultArea* handlersResultArea = nullptr;
-  if (numResultsAreaItems) {
-    handlersResultArea = MWasmStackResultArea::New(alloc());
-    if (!handlersResultArea ||
-        !handlersResultArea->init(alloc(), numResultsAreaItems)) {
-      return false;
-    }
-    curBlock_->add(handlersResultArea);
+  // Always present (empty when the resume has no handlers) so MWasmResume has a
+  // fixed operand set.
+  MWasmStackResultArea* handlersResultArea = MWasmStackResultArea::New(alloc());
+  if (!handlersResultArea ||
+      !handlersResultArea->init(alloc(), numResultsAreaItems)) {
+    return false;
   }
+  curBlock_->add(handlersResultArea);
 
-  MWasmResume* resume =
-      MWasmResume::New(alloc(), callSiteDesc(CallSiteKind::StackSwitch),
-                       tryNote, instancePointer_, cont, handlersResultArea);
+  MWasmResume* resume = MWasmResume::New(
+      alloc(), callSiteDesc(CallSiteKind::StackSwitch), tryNote,
+      instancePointer_, cont, handlersResultArea, contResultsArea);
   if (!resume ||
       !resume->init(fallthroughBlock, prePadBlock, handlers.length())) {
     return false;
@@ -9687,6 +9737,25 @@ bool FunctionCompiler::emitResume() {
 
   // Compilation continues in the fallthroughBlock.
   curBlock_ = fallthroughBlock;
+
+  // Read cont results from contResultsArea into the value stack.
+  if (!contFuncType.results().empty()) {
+    size_t numResults = contFuncType.results().length();
+    DefVector resultDefs;
+    for (uint32_t i = 0; i < numResults; i++) {
+      if (!mirGen().ensureBallast()) {
+        return false;
+      }
+      MWasmStackResult* stackResult =
+          MWasmStackResult::New(alloc(), contResultsArea, i);
+      if (!stackResult || !resultDefs.append(stackResult)) {
+        return false;
+      }
+      curBlock_->add(stackResult);
+    }
+    iter().setResults(resultDefs.length(), resultDefs);
+  }
+
   return true;
 }
 
@@ -11143,6 +11212,16 @@ bool wasm::IonCompileFunctions(const CodeMetadata& codeMeta,
             "# wasm::IonCompileFunctions: starting on function index %d",
             (int)func.index);
 
+#ifdef DEBUG
+    // Snapshot the "frontier" of the trapsite vectors so we can determine
+    // which ones are added to during compilation of this function.
+    mozilla::EnumeratedArray<Trap, uint32_t, size_t(Trap::Limit)>
+        trapSitesBefore;
+    for (Trap kind : mozilla::MakeEnumeratedRange(Trap::Limit)) {
+      trapSitesBefore[kind] = uint32_t(masm.trapSites().length(kind));
+    }
+#endif
+
     Decoder d(func.begin, func.end, func.bytecodeOffset, error);
 
     // Build the local types vector.
@@ -11215,6 +11294,24 @@ bool wasm::IonCompileFunctions(const CodeMetadata& codeMeta,
     if (!code->funcs.emplaceBack(func.index, observedFeatures)) {
       return false;
     }
+
+#ifdef DEBUG
+    // Get a second snapshot of the frontier of the TrapSite vectors, and
+    // use this to check that traps that need a stackmap, actually have one.
+    mozilla::EnumeratedArray<Trap, uint32_t, size_t(Trap::Limit)>
+        trapSitesAfter;
+    for (Trap kind : mozilla::MakeEnumeratedRange(Trap::Limit)) {
+      trapSitesAfter[kind] = uint32_t(masm.trapSites().length(kind));
+    }
+
+    // Do the check.  This asserts if the check fails.
+    auto checkThisTrapKind = [](Trap t) -> bool {
+      // Temporary setting, to make all of this a no-op.
+      return false;
+    };
+    CheckStackMapsForTraps(masm, code->stackMaps, trapSitesBefore,
+                           trapSitesAfter, checkThisTrapKind);
+#endif
 
     JitSpew(JitSpew_Codegen,
             "# wasm::IonCompileFunctions: completed function index %d",

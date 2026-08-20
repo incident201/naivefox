@@ -11,15 +11,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
 import {
   ERROR_AUTH_ERROR,
   OAUTH_CLIENT_ID,
-  SCOPE_PROFILE,
-  SCOPE_PROFILE_WRITE,
   SCOPE_APP_SYNC,
   log,
 } from "resource://gre/modules/FxAccountsCommon.sys.mjs";
 
-const VALID_SCOPES = [SCOPE_PROFILE, SCOPE_PROFILE_WRITE, SCOPE_APP_SYNC];
-
-export const ERROR_INVALID_SCOPES = "INVALID_SCOPES";
 export const ERROR_INVALID_STATE = "INVALID_STATE";
 export const ERROR_SYNC_SCOPE_NOT_GRANTED = "ERROR_SYNC_SCOPE_NOT_GRANTED";
 export const ERROR_NO_KEYS_JWE = "ERROR_NO_KEYS_JWE";
@@ -113,12 +108,6 @@ export class FxAccountsOAuth {
    *          to generate a JWE
    */
   async beginOAuthFlow(scopes) {
-    if (
-      !Array.isArray(scopes) ||
-      scopes.some(scope => !VALID_SCOPES.includes(scope))
-    ) {
-      throw new Error(ERROR_INVALID_SCOPES);
-    }
     const queryParams = {
       client_id: OAUTH_CLIENT_ID,
       action: "email",

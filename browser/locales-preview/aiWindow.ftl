@@ -62,7 +62,7 @@ ai-tasks-alert-weekday-saturday =
 
 ai-tasks-alert-create-button = Create task
 ai-tasks-alert-cancel-button = Cancel
-ai-tasks-alert-save-button = Save
+ai-tasks-alert-save-button = Save changes
 ai-tasks-alert-delete-button =
   .aria-label = Delete alert
 ai-tasks-alert-edit-button = Edit
@@ -218,3 +218,9 @@ ai-tasks-alert-last-result-not-met = Last result: No match
 
 ai-tasks-alert-condition-met = Match
 ai-tasks-alert-condition-not-met = No match
+
+## AI Tab - A page generated from the content of the user's tabs
+
+# Title given to a generated page when the model returns no title of its own and
+# the user did not say what the page should focus on.
+ai-tab-default-page-title = Generated page

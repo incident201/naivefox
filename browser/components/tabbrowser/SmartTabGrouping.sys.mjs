@@ -23,7 +23,11 @@ import {
 } from "chrome://global/content/ml/ClusterAlgos.sys.mjs";
 
 import { AIFeature } from "chrome://global/content/ml/AIFeature.sys.mjs";
-import { EmbeddingsGenerator } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
+import { embeddingsGeneratorFactory } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
+
+/**
+ * @typedef {import("chrome://global/content/ml/EmbeddingsGenerator.sys.mjs").EmbeddingsGenerator} EmbeddingsGenerator
+ */
 
 const lazy = {};
 
@@ -129,8 +133,8 @@ const LABEL_REASONS = {
 };
 
 export const SMART_TAB_GROUPING_CONFIG = {
-  // Embeddings use the shared EmbeddingsGenerator.forGeneral() model; see
-  // _generateEmbeddings.
+  // Embeddings use the shared embeddingsGeneratorFactory.forGeneral() model;
+  // see _generateEmbeddings.
   topicGeneration: {
     dtype: "q8",
     timeoutMS: 2 * 60 * 1000, // 2 minutes
@@ -421,7 +425,7 @@ export class SmartTabGroupingManager extends AIFeature {
    */
   getEmbeddingsGenerator() {
     if (!this.embeddingsGenerator) {
-      this.embeddingsGenerator = EmbeddingsGenerator.forGeneral();
+      this.embeddingsGenerator = embeddingsGeneratorFactory.forGeneral();
     }
     return this.embeddingsGenerator;
   }
@@ -1320,7 +1324,9 @@ export class SmartTabGroupingManager extends AIFeature {
       this.docEmbeddings = precomputedEmbeddings;
     } else {
       this.docEmbeddings = await this._generateEmbeddings(
-        structuredData.map(a => a[EMBED_TEXT_KEY])
+        structuredData.map(a =>
+          SmartTabGroupingManager.preprocessText(a[EMBED_TEXT_KEY])
+        )
       );
     }
     let bestResultCluster;
@@ -1378,8 +1384,9 @@ export class SmartTabGroupingManager extends AIFeature {
   /**
    * Utility function that loads all required engines for Smart Tab Grouping and any dependent models
    *
-   * @param {(progress: { percentage: number }) => void} progressCallback callback function to call.
+   * @param {(progress: { percentage: number }) => void} [progressCallback] callback function to call.
    * Callback passes a dict with percentage indicating best effort 0.0-100.0 progress in model download.
+   * Optional: callers that don't surface progress can omit it.
    */
   async preloadAllModels(progressCallback) {
     let previousProgress = -1;
@@ -1409,7 +1416,7 @@ export class SmartTabGroupingManager extends AIFeature {
           Math.abs(previousProgress - progress) > UPDATE_THRESHOLD_PERCENTAGE
         ) {
           // Update only once changes are above a threshold to avoid throttling the UI with events.
-          progressCallback({
+          progressCallback?.({
             percentage: progress,
           });
           previousProgress = progress;

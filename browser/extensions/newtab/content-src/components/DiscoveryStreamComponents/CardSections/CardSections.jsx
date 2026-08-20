@@ -22,13 +22,11 @@ import { AdBanner } from "../AdBanner/AdBanner.jsx";
 import { PersonalizedCard } from "../PersonalizedCard/PersonalizedCard";
 import { FollowSectionButtonHighlight } from "../FeatureHighlight/FollowSectionButtonHighlight";
 import { MessageWrapper } from "content-src/components/MessageWrapper/MessageWrapper";
-import { BriefingCard } from "../BriefingCard/BriefingCard.jsx";
 
 // Prefs
 const PREF_SECTIONS_CARDS_ENABLED = "discoverystream.sections.cards.enabled";
 const PREF_SECTIONS_PERSONALIZATION_ENABLED =
   "discoverystream.sections.personalization.enabled";
-const PREF_TOPICS_ENABLED = "discoverystream.topicLabels.enabled";
 const PREF_TOPICS_SELECTED = "discoverystream.topicSelection.selectedTopics";
 const PREF_TOPICS_AVAILABLE = "discoverystream.topicSelection.topics";
 const PREF_INTEREST_PICKER_ENABLED =
@@ -41,16 +39,10 @@ const PREF_LEADERBOARD_ENABLED = "newtabAdSize.leaderboard";
 const PREF_LEADERBOARD_POSITION = "newtabAdSize.leaderboard.position";
 const PREF_INFERRED_PERSONALIZATION_USER =
   "discoverystream.sections.personalization.inferred.user.enabled";
-const PREF_DAILY_BRIEF_SECTIONID = "discoverystream.dailyBrief.sectionId";
-const PREF_DAILY_BRIEF_ENABLED = "discoverystream.dailyBrief.enabled";
 const PREF_SPOCS_STARTUPCACHE_ENABLED =
   "discoverystream.spocs.startupCache.enabled";
 // @nova-cleanup(remove-pref): Remove PREF_NOVA_ENABLED
 const PREF_NOVA_ENABLED = "nova.enabled";
-
-// Feed URL
-const CURATED_RECOMMENDATIONS_FEED_URL =
-  "https://merino.services.mozilla.com/api/v1/curated-recommendations";
 
 // Divides evenly by 2, 3, and 4 to avoid orphan cards in any column layout.
 const DEFAULT_MAX_TILES = 12;
@@ -105,7 +97,6 @@ function getLayoutData(responsiveLayouts, index) {
     classNames: [],
     imageSizes: {},
     cardPositions: {},
-    allowsWidget: false,
   };
 
   responsiveLayouts.forEach(layout => {
@@ -121,10 +112,6 @@ function getLayoutData(responsiveLayouts, index) {
         );
         layoutData.imageSizes[layout.columnCount] = tile.size;
         layoutData.cardPositions[layout.columnCount] = tileIndex;
-
-        if (tile.allowsWidget) {
-          layoutData.allowsWidget = true;
-        }
 
         // The API tells us whether the tile should show the excerpt or not.
         // Apply extra styles accordingly.
@@ -190,7 +177,7 @@ function CardSection({
   const Messages = useSelector(state => state.Messages);
   const { messageData } = Messages;
 
-  const { sectionPersonalization, feeds } = useSelector(
+  const { sectionPersonalization } = useSelector(
     state => state.DiscoveryStream
   );
   const { isForStartupCache } = useSelector(state => state.App);
@@ -253,17 +240,10 @@ function CardSection({
     }
   };
 
-  const showTopics = prefs[PREF_TOPICS_ENABLED];
   const mayHaveSectionsCards = prefs[PREF_SECTIONS_CARDS_ENABLED];
   const selectedTopics = prefs[PREF_TOPICS_SELECTED];
   const availableTopics = prefs[PREF_TOPICS_AVAILABLE];
   const spocsStartupCacheEnabled = prefs[PREF_SPOCS_STARTUPCACHE_ENABLED];
-  const dailyBriefEnabled =
-    prefs.trainhopConfig?.dailyBriefing?.enabled ||
-    prefs[PREF_DAILY_BRIEF_ENABLED];
-  const dailyBriefSectionId =
-    prefs.trainhopConfig?.dailyBriefing?.sectionId ||
-    prefs[PREF_DAILY_BRIEF_SECTIONID];
 
   const mayHaveSectionsPersonalization =
     prefs[PREF_SECTIONS_PERSONALIZATION_ENABLED];
@@ -377,34 +357,8 @@ function CardSection({
     maxTile = getMaxTiles(responsiveLayouts);
   }
 
-  const shouldShowBriefingCard =
-    sectionKey === dailyBriefSectionId && dailyBriefEnabled;
-
-  const getBriefingData = () => {
-    const EMPTY_BRIEFING = { headlines: [], lastUpdated: null };
-
-    if (!shouldShowBriefingCard) {
-      return EMPTY_BRIEFING;
-    }
-
-    const sections = feeds?.data[CURATED_RECOMMENDATIONS_FEED_URL];
-    if (!sections) {
-      return EMPTY_BRIEFING;
-    }
-
-    const headlines = sections.data.recommendations.filter(
-      rec => rec.section === dailyBriefSectionId && rec.isHeadline
-    );
-    return { headlines, lastUpdated: sections.lastUpdated };
-  };
-
-  const { headlines: briefingHeadlines, lastUpdated: briefingLastUpdated } =
-    getBriefingData();
-  const hasBriefingHeadlines = briefingHeadlines.length === 3;
-
   const displaySections = section.data.slice(0, maxTile);
   const isSectionEmpty = !displaySections?.length;
-  const shouldShowLabels = sectionKey === dailyBriefSectionId && showTopics;
 
   if (isSectionEmpty) {
     return null;
@@ -422,24 +376,6 @@ function CardSection({
     for (let position = 0; position < maxTile; position++) {
       const layoutData = getLayoutData(responsiveLayouts, position);
       const { classNames, imageSizes, cardPositions } = layoutData;
-      const shouldRenderWidget =
-        shouldShowBriefingCard &&
-        layoutData.allowsWidget &&
-        hasBriefingHeadlines;
-
-      if (shouldRenderWidget) {
-        cards.push(
-          <BriefingCard
-            key="briefing-card"
-            sectionClassNames={classNames.join(" ")}
-            headlines={briefingHeadlines}
-            lastUpdated={briefingLastUpdated}
-            selectedTopics={selectedTopics}
-            isFollowed={following}
-          />
-        );
-        continue;
-      }
 
       if (dataIndex >= displaySections.length) {
         break;
@@ -521,7 +457,6 @@ function CardSection({
           pocket_id={rec.pocket_id}
           context_type={rec.context_type}
           bookmarkGuid={rec.bookmarkGuid}
-          recommendation_id={rec.recommendation_id}
           corpus_item_id={rec.corpus_item_id}
           scheduled_corpus_item_id={rec.scheduled_corpus_item_id}
           recommended_at={rec.recommended_at}
@@ -529,7 +464,6 @@ function CardSection({
           format={rec.format}
           alt_text={rec.alt_text}
           mayHaveSectionsCards={mayHaveSectionsCards}
-          showTopics={shouldShowLabels}
           selectedTopics={selectedTopics}
           availableTopics={availableTopics}
           ctaButtonSponsors={ctaButtonSponsors}
@@ -544,7 +478,6 @@ function CardSection({
           tabIndex={activeFocusPosition === activeRovingIndex ? 0 : -1}
           onFocus={() => onCardFocus(activeFocusPosition)}
           attribution={rec.attribution}
-          isDailyBrief={shouldShowBriefingCard}
         />
       );
     });

@@ -1604,9 +1604,6 @@ class gfxFont {
     return mFUnitsConvFactor;
   }
 
-  // check whether this is an sfnt we can potentially use with harfbuzz
-  bool FontCanSupportHarfBuzz() const { return mFontEntry->HasCmapTable(); }
-
   // check whether this is an sfnt we can potentially use with Graphite
   bool FontCanSupportGraphite() const {
     return mFontEntry->HasGraphiteTables();
@@ -1718,24 +1715,21 @@ class gfxFont {
   }
 
   struct Baselines {
-    std::atomic<gfxFloat> mAlphabetic;
-    std::atomic<gfxFloat> mHanging;
-    std::atomic<gfxFloat> mIdeographicUnder;
-    std::atomic<gfxFloat> mIdeographicOver;
-    std::atomic<gfxFloat> mIdeographicInkUnder;
-    std::atomic<gfxFloat> mIdeographicInkOver;
-    std::atomic<gfxFloat> mCentral;
-    std::atomic<gfxFloat> mMath;
+    std::atomic<gfxFloat> mAlphabetic{
+        std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mHanging{std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mIdeographicUnder{
+        std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mIdeographicOver{
+        std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mIdeographicInkUnder{
+        std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mIdeographicInkOver{
+        std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mCentral{std::numeric_limits<gfxFloat>::quiet_NaN()};
+    std::atomic<gfxFloat> mMath{std::numeric_limits<gfxFloat>::quiet_NaN()};
 
-    Baselines()
-        : mAlphabetic(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mHanging(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mIdeographicUnder(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mIdeographicOver(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mIdeographicInkUnder(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mIdeographicInkOver(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mCentral(std::numeric_limits<gfxFloat>::quiet_NaN()),
-          mMath(std::numeric_limits<gfxFloat>::quiet_NaN()) {}
+    Baselines() = default;
   };
 
   typedef std::atomic<gfxFloat> Baselines::* BaselinePtr;
@@ -2408,6 +2402,12 @@ class gfxFont {
   // Returns FALSE if the font does not appear to be an sfnt at all,
   // and should be handled (if possible) using other APIs.
   bool InitMetricsFromSfntTables(Metrics& aMetrics);
+
+#if MOZ_FONTATIONS
+  // Initialize metrics using the font entry's Skrifa font reference.
+  // Returns false if unsuccessful (e.g. the entry has no Skrifa font).
+  bool InitMetricsFromSkrifa(Metrics& aMetrics);
+#endif
 
   // Helper to calculate various derived metrics from the results of
   // InitMetricsFromSfntTables or equivalent platform code

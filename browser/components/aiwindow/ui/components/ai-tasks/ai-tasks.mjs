@@ -897,6 +897,8 @@ export class AITasks extends MozLitElement {
                 </div>
 
                 <moz-button
+                  iconSrc="chrome://global/skin/icons/plus.svg"
+                  type="primary"
                   class="add-task-button"
                   data-l10n-id="ai-tasks-add-alert-button"
                   ?disabled=${this.isMaxMonitorsReached}

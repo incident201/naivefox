@@ -3079,8 +3079,6 @@ const QUERY_CONTENT_FLAG_SELECTION_URLSTRIKEOUT = 0x0200;
 
 const QUERY_CONTENT_FLAG_OFFSET_RELATIVE_TO_INSERTION_POINT = 0x0400;
 
-const SELECTION_SET_FLAG_USE_NATIVE_LINE_BREAK = 0x0000;
-const SELECTION_SET_FLAG_USE_XP_LINE_BREAK = 0x0001;
 const SELECTION_SET_FLAG_REVERSE = 0x0002;
 
 /**
@@ -3169,13 +3167,15 @@ function synthesizeQueryCaretRect(aOffset, aWindow) {
  * @param aReverse If true, the selection is from |aOffset + aLength| to
  *                 |aOffset|.  Otherwise, from |aOffset| to |aOffset + aLength|.
  * @param aWindow  Optional (If null, current |window| will be used)
+ * @param aFlags   Additional eSetSelection event flags.
  * @return         True, if succeeded.  Otherwise false.
  */
 async function synthesizeSelectionSet(
   aOffset,
   aLength,
   aReverse,
-  aWindow = window
+  aWindow = window,
+  aFlags = 0
 ) {
   const utils = _getDOMWindowUtils(aWindow);
   if (!utils) {
@@ -3187,7 +3187,7 @@ async function synthesizeSelectionSet(
   await new Promise(resolve =>
     aWindow.requestAnimationFrame(() => aWindow.requestAnimationFrame(resolve))
   );
-  const flags = aReverse ? SELECTION_SET_FLAG_REVERSE : 0;
+  const flags = aFlags | (aReverse ? SELECTION_SET_FLAG_REVERSE : 0);
   return utils.sendSelectionSetEvent(aOffset, aLength, flags);
 }
 
@@ -3508,14 +3508,16 @@ function synthesizeDropAfterDragOver(
     );
     sendDragEvent(event, aDestElement, aDestWindow);
   }
-  // Don't run accessibility checks for this click, since we're not actually
+  // Don't run the click checks for this click, since we're not actually
   // clicking. It's just generated as part of the drop.
-  // this.AccessibilityUtils might not be set if this isn't a browser test or
-  // if a browser test has loaded its own copy of EventUtils for some reason.
-  // In the latter case, the test probably shouldn't do that.
+  // this.ClickChecks and this.AccessibilityUtils might not be set if this isn't
+  // a browser test or if a browser test has loaded its own copy of EventUtils
+  // for some reason. In the latter case, the test probably shouldn't do that.
   this.AccessibilityUtils?.suppressClickHandling(true);
+  this.ClickChecks?.suppressClickHandling(true);
   synthesizeMouse(aDestElement, 2, 2, { type: "mouseup" }, aDestWindow);
   this.AccessibilityUtils?.suppressClickHandling(false);
+  this.ClickChecks?.suppressClickHandling(false);
 
   return effect;
 }

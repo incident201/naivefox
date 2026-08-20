@@ -413,9 +413,6 @@
             android:id="@+id/action_browserFragment_to_createXiaomiShortcutFragment"
             app:destination="@id/createXiaomiShortcutFragment" />
         <action
-            android:id="@+id/action_browserFragment_to_pwaOnboardingDialogFragment"
-            app:destination="@id/pwaOnboardingDialogFragment" />
-        <action
             android:id="@+id/action_browserFragment_to_trustPanelFragment"
             app:destination="@id/trust_panel_graph" />
         <action
@@ -1230,10 +1227,6 @@
         android:id="@+id/createXiaomiShortcutFragment"
         android:name="org.mozilla.fenix.shortcut.CreateXiaomiShortcutFragment"
         tools:layout="@layout/fragment_create_xiaomi_shortcut" />
-    <dialog
-        android:id="@+id/pwaOnboardingDialogFragment"
-        android:name="org.mozilla.fenix.shortcut.PwaOnboardingDialogFragment"
-        tools:layout="@layout/fragment_pwa_onboarding" />
 
     <dialog
         android:id="@+id/shareFragment"
@@ -1655,6 +1648,11 @@
         android:id="@+id/translationsDialogFragment"
         android:name="org.mozilla.fenix.translations.TranslationsDialogFragment">
         <argument
+            android:name="sessionId"
+            android:defaultValue="@null"
+            app:nullable="true"
+            app:argType="string" />
+        <argument
             android:name="translationsDialogAccessPoint"
             android:defaultValue="Translations"
             app:argType="org.mozilla.fenix.translations.TranslationsDialogAccessPoint" />
@@ -1666,6 +1664,11 @@
     <dialog
         android:id="@+id/summarizationFragment"
         android:name="org.mozilla.fenix.summarization.SummarizationFragment">
+        <argument
+            android:name="sessionId"
+            android:defaultValue="@null"
+            app:nullable="true"
+            app:argType="string" />
         <argument
             android:name="fromShake"
             android:defaultValue="false"
@@ -1903,9 +1906,6 @@
             android:name="customTabSessionId"
             app:argType="string"
             app:nullable="true" />
-        <argument
-            android:name="source"
-            app:argType="string" />
     </dialog>
 
     <dialog

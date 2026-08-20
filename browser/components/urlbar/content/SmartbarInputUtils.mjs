@@ -5,6 +5,8 @@
 import { MultilineEditor } from "chrome://browser/content/multilineeditor/multiline-editor.mjs";
 import { createMentionsPlugin } from "chrome://browser/content/multilineeditor/plugins/MentionsPlugin.mjs";
 import { createCommandsPlugin } from "chrome://browser/content/multilineeditor/plugins/CommandsPlugin.mjs";
+import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
+import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 
 /**
  * @import {SmartbarInput} from "chrome://browser/content/urlbar/SmartbarInput.mjs"
@@ -18,27 +20,18 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
   MENTION_TYPE:
     "moz-src:///browser/components/urlbar/SmartbarMentionsPanelSearch.sys.mjs",
+  MonitorUIUtils:
+    "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
   SkippableTimer: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
   SmartbarMentionsPanelSearch:
     "moz-src:///browser/components/urlbar/SmartbarMentionsPanelSearch.sys.mjs",
 });
 
-const { XPCOMUtils } = ChromeUtils.importESModule(
-  "resource://gre/modules/XPCOMUtils.sys.mjs"
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "maxResults",
-  "browser.urlbar.mentions.maxResults"
-);
-
-ChromeUtils.defineLazyGetter(lazy, "log", function () {
-  return console.createInstance({
+const logger = () =>
+  UrlbarShared.getLogger({
     prefix: "SmartbarMentionsPanel",
     maxLogLevelPref: "browser.smartwindow.smartbarMentions.loglevel",
   });
-});
 
 // Debounce delay for the mention suggestions query.
 const MENTION_QUERY_DEBOUNCE_MS = 150;
@@ -59,12 +52,27 @@ const AGENT_COMMAND_ITEMS = [
 const COMMAND_TRIGGER = "inline-command";
 
 /**
+ * Whether agent command can run right now
+ *
+ * @returns {boolean}
+ */
+function isAgentCommandAvailable() {
+  return (
+    UrlbarPrefs.get("browser.smartwindow.agent.enabled") &&
+    lazy.MonitorUIUtils.isMonitorRegionSupported()
+  );
+}
+
+/**
  * Whether the input begins with a known agent command, e.g. "/watch ...".
  *
  * @param {string} value - Raw smartbar input
  * @returns {boolean}
  */
 export function isAgentCommand(value) {
+  if (!isAgentCommandAvailable()) {
+    return false;
+  }
   const match = /^\/(\w{1,20})/.exec(String(value ?? "").trimStart());
   return (
     !!match &&
@@ -79,6 +87,9 @@ export function isAgentCommand(value) {
  * @returns {Array<{header: string, items: Array}>} Panel groups, empty when nothing matches
  */
 function getCommandSuggestions(query) {
+  if (!isAgentCommandAvailable()) {
+    return [];
+  }
   const normalized = query.trim().toLowerCase();
   const items = AGENT_COMMAND_ITEMS.filter(command =>
     command.id.startsWith(normalized)
@@ -142,7 +153,7 @@ function getMentionSuggestions(mentionSearch, searchString) {
         seen.add(item.url);
         return true;
       })
-      .slice(0, lazy.maxResults)
+      .slice(0, UrlbarPrefs.get("mentions.maxResults"))
       .map(({ url, title, icon }) => ({
         id: url,
         label: title,
@@ -159,7 +170,7 @@ function getMentionSuggestions(mentionSearch, searchString) {
       totalCount: deduplicated.length,
     };
   } catch (e) {
-    lazy.log.error("Error querying tabs:", e);
+    logger().error("Error querying tabs:", e);
     return { groups: [], totalCount: 0 };
   }
 }

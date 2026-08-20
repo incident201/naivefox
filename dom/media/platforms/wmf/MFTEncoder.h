@@ -17,6 +17,8 @@
 #include "mozilla/MozPromise.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/ResultVariant.h"
+#include "mozilla/StaticMutex.h"
+#include "mozilla/StaticPtr.h"
 #include "nsDeque.h"
 #include "nsISupportsImpl.h"
 #include "nsTArray.h"
@@ -97,7 +99,10 @@ class MFTEncoder final {
 
   ~MFTEncoder() { Destroy(); };
 
-  static nsTArray<Info>& Infos();
+  static inline StaticMutex sInfoMutex;
+  static inline StaticAutoPtr<nsTArray<Info>> sInfos MOZ_GUARDED_BY(sInfoMutex);
+
+  static nsTArray<Info>* Infos() MOZ_REQUIRES(sInfoMutex);
   static nsTArray<Info> Enumerate();
   static Maybe<Info> GetInfo(const GUID& aSubtype);
 

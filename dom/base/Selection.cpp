@@ -2528,8 +2528,6 @@ already_AddRefed<StaticRange> Selection::GetComposedRange(
 
   RefPtr<StaticRange> composedRange = StaticRange::Create(
       startNode, startOffset, endNode, endOffset, IgnoreErrors());
-  NS_WARNING(mozilla::ToString(composedRange->StartRef()).c_str());
-  NS_WARNING(mozilla::ToString(composedRange->EndRef()).c_str());
   return composedRange.forget();
 }
 
@@ -2894,6 +2892,23 @@ void Selection::CollapseInternal(InLimiter aInLimiter,
     return;
   }
 
+  RefPtr<nsRange> range = nsRange::Create(aPoint.GetContainer());
+  result = range->CollapseTo(aPoint);
+  if (NS_FAILED(result)) {
+    aRv.Throw(result);
+    return;
+  }
+
+  // Register before Clear() drops the current ranges: if they share the new
+  // range's closest common inclusive ancestor, its range list never becomes
+  // empty, so neither UnmarkDescendants() nor the following MarkDescendants()
+  // walks its flattened subtree.
+  result = range->RegisterSelection(*this);
+  if (NS_FAILED(result)) {
+    aRv.Throw(result);
+    return;
+  }
+
   // Delete all of the current ranges
   Clear(presContext);
 
@@ -2903,13 +2918,6 @@ void Selection::CollapseInternal(InLimiter aInLimiter,
   // Hack to display the caret on the right line (bug 1237236).
   frameSelection->SetHint(ComputeCaretAssociationHint(
       frameSelection->GetHint(), frameSelection->GetCaretBidiLevel(), aPoint));
-
-  RefPtr<nsRange> range = nsRange::Create(aPoint.GetContainer());
-  result = range->CollapseTo(aPoint);
-  if (NS_FAILED(result)) {
-    aRv.Throw(result);
-    return;
-  }
 
 #ifdef DEBUG_SELECTION
   nsCOMPtr<nsIContent> content = do_QueryInterface(aPoint.GetContainer());
@@ -2924,8 +2932,16 @@ void Selection::CollapseInternal(InLimiter aInLimiter,
   result = AddRangesForSelectableNodes(range, &maybeRangeIndex,
                                        DispatchSelectstartEvent::Maybe);
   if (NS_FAILED(result)) {
+    range->UnregisterSelection(*this);
     aRv.Throw(result);
     return;
+  }
+  if (maybeRangeIndex.isNothing()) {
+    // Clear() left no ranges, so range would have taken index 0 had it been
+    // added.  AddRangesForUserSelectableNodes() adds nothing when no part of it
+    // is selectable, which would leave the registration above backed by no
+    // range of this selection.
+    range->UnregisterSelection(*this);
   }
   SetAnchorFocusRange(0);
   SelectFrames(presContext, *range, true);
@@ -2962,22 +2978,27 @@ void Selection::CollapseToStart(ErrorResult& aRv) {
   }
 
   // Get the first range
-  const AbstractRange* firstRange = mStyledRanges.GetAbstractRangeAt(0);
+  const RefPtr<AbstractRange> firstRange = mStyledRanges.GetAbstractRangeAt(0);
   if (!firstRange) {
     aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
 
+  CollapseToStartOf(*firstRange, aRv);
+}
+
+void Selection::CollapseToStartOf(const AbstractRange& aRange,
+                                  ErrorResult& aRv) {
   if (mFrameSelection) {
     mFrameSelection->AddChangeReasons(
         nsISelectionListener::COLLAPSETOSTART_REASON);
   }
-  nsINode* container = firstRange->GetStartContainer();
+  nsINode* container = aRange.GetStartContainer();
   if (!container) {
     aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
-  const uint32_t offset = firstRange->StartOffset();
+  const uint32_t offset = aRange.StartOffset();
   if (MOZ_UNLIKELY(!IsValidNodeAndOffsetForBoundary(*container, offset, aRv))) {
     return;
   }

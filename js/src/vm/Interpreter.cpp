@@ -3354,13 +3354,13 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
           // MaybeEnterInterpreterTrampoline so we can generate an
           // entry trampoline for the new frame.
           if (jit::JitOptions.emitInterpreterEntryTrampoline) {
-            if (MaybeEnterInterpreterTrampoline(cx, state)) {
-              interpReturnOK = true;
-              CHECK_BRANCH();
-              REGS.sp = args.spAfterCall();
-              goto jit_return;
+            if (!MaybeEnterInterpreterTrampoline(cx, state)) {
+              goto error;
             }
-            goto error;
+            interpReturnOK = true;
+            CHECK_BRANCH();
+            REGS.sp = args.spAfterCall();
+            goto jit_return;
           }
 #endif
         }
@@ -4286,6 +4286,20 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
             case jit::EnterJitStatus::NotEntered:
               break;
           }
+
+#ifdef NIGHTLY_BUILD
+          // If entry trampolines are enabled, call back into
+          // MaybeEnterInterpreterTrampoline so we can generate an entry
+          // trampoline for the new frame.
+          if (jit::JitOptions.emitInterpreterEntryTrampoline) {
+            if (!MaybeEnterInterpreterTrampoline(cx, state)) {
+              goto error;
+            }
+            REGS.sp -= 2;
+            interpReturnOK = true;
+            goto jit_return;
+          }
+#endif
         }
 
         // popInlineFrame expects there to be an additional value on the stack

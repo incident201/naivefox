@@ -351,11 +351,16 @@ pref("browser.startup.couldRestoreSession.count", 0);
 // users as it is not implemented anywhere else.
 #if defined(XP_WIN)
 pref("browser.startup.preXulSkeletonUI", true);
+#endif
 
-// Whether the checkbox to enable Windows launch on login is shown
+#ifndef XP_LINUX
+// These are called browser.startup.windowsLaunchOnLogin.* because they originated
+// on Windows, but they now operate on macOS as well.
+// They can't be changed until there are no experiments running that are using the
+// old name - https://bugzilla.mozilla.org/show_bug.cgi?id=2059749
+
+// Whether the checkbox to enable Launch on login is shown
 pref("browser.startup.windowsLaunchOnLogin.enabled", true);
-// Whether to show the launch on login infobar notification
-pref("browser.startup.windowsLaunchOnLogin.disableLaunchOnLoginPrompt", false);
 // Whether new installs default to launching Firefox on Windows login when the
 // user is not enrolled in Nimbus for this feature. When false, launch-on-login
 // is enabled only by a Nimbus rollout or experiment; when true, it is enabled
@@ -453,6 +458,10 @@ pref("browser.urlbar.focusContentDocumentOnEsc", true);
 // pref-on CI variant and local testing of the actor path.
 pref("browser.urlbar.ipc.chromeMessagePassing", false);
 
+// Feature gate for the <moz-urlbar> on about:newtab and about:home. When
+// enabled, it supersedes New Tab's handoff search bar.
+pref("browser.urlbar.newtab.featureGate", false);
+
 // Enable a certain level of urlbar logging to the Browser Console. See
 // ConsoleInstance.webidl.
 pref("browser.urlbar.loglevel", "Error");
@@ -485,6 +494,15 @@ pref("browser.urlbar.allowSearchSuggestionsForSimpleOrigins", true);
 pref("browser.urlbar.deduplication.enabled", true);
 
 pref("browser.urlbar.scotchBonnet.enableOverride", true);
+
+// Whether the search button declines to be the target of the toolbar tab stop
+// in front of the address bar and the search bar, so that Tab lands on the
+// input and the button is reached with Shift+Tab from there.
+#ifdef NIGHTLY_BUILD
+pref("browser.urlbar.searchModeSwitcher.skipTabStop", true);
+#else
+pref("browser.urlbar.searchModeSwitcher.skipTabStop", false);
+#endif
 
 pref("browser.urlbar.trackerCount.featureGate", true);
 pref("browser.urlbar.trackerCount.enabled", true);
@@ -770,11 +788,17 @@ pref("places.semanticHistory.featureGate", true);
 #else
 pref("places.semanticHistory.featureGate", false);
 #endif
-pref("places.semanticHistory.supportedRegions", "[[\"AU\",[\"en-*\"]],[\"CA\",[\"en-*\"]],[\"GB\",[\"en-*\"]],[\"IE\",[\"en-*\"]],[\"NZ\",[\"en-*\"]],[\"PH\",[\"en-*\"]],[\"US\",[\"en-*\"]]]");
+pref("places.semanticHistory.supportedRegions", "[[\"AU\",[\"en-*\"]],[\"CA\",[\"en-*\"]],[\"GB\",[\"en-*\"]],[\"IE\",[\"en-*\"]],[\"NZ\",[\"en-*\"]],[\"PH\",[\"en-*\"]],[\"US\",[\"en-*\"]],[\"FR\",[\"en-*\",\"fr-*\"]]]");
 
 // Embedding family used by Places semantic history. "static" or "contextual".
-// Settable via Nimbus (semanticHistoryEmbeddingType).
-pref("places.semanticHistory.embeddingType", "static");
+// Settable via Nimbus (semanticHistoryEmbeddingType). An empty (or invalid)
+// value lets the family be picked from the home region, the locale and the OS.
+pref("places.semanticHistory.embeddingType", "");
+
+// Region / locale pairs that get multilingual (contextual) embeddings. Same
+// format as supportedRegions, except a "*" region matches any region, so the
+// entries below read as "France in English or French, or French anywhere".
+pref("places.semanticHistory.multilingualEmbeddingRegions", "[[\"FR\",[\"en-*\",\"fr-*\"]],[\"*\",[\"fr-*\"]]]");
 
 // Dev / debug overrides for the contextual engine. Not exposed via Nimbus.
 pref("browser.ml.embedGen.textEmbeddingSize", 384);
@@ -1084,18 +1108,17 @@ pref("browser.tabs.closeTabByDblclick", false);
 pref("browser.tabs.closeWindowWithLastTab", true);
 pref("browser.tabs.allowTabDetach", true);
 // Open related links to a tab, e.g., link in current tab, at next to the
-// current tab if |insertRelatedAfterCurrent| is true.  Otherwise, always
-// append new tab to the end.
+// current tab if |insertRelatedAfterCurrent| is true, chaining consecutive
+// related tabs behind their opener. Otherwise, position related tabs like
+// any other new tab, as governed by |insertAfterCurrent|.
 pref("browser.tabs.insertRelatedAfterCurrent", true);
 // Open all links, e.g., bookmarks, history items at next to current tab
 // if |insertAfterCurrent| is true.  Otherwise, append new tab to the end
-// for non-related links. Note that if this is set to true, it will trump
-// the value of browser.tabs.insertRelatedAfterCurrent.
+// for non-related links.
 pref("browser.tabs.insertAfterCurrent", false);
-// When |insertRelatedAfterCurrent| is true opening a link from a pinned tab
-// results in the tabbar scrolling back to the beginning. Setting
-// |insertAfterCurrentExceptPinned| to true will add tabs at the end of the
-// tabbar.
+// When a new tab is inserted next to a pinned tab, the tabbar scrolls
+// back to the beginning. Setting |insertAfterCurrentExceptPinned| to true
+// will add such tabs at the end of the tabbar instead.
 pref("browser.tabs.insertAfterCurrentExceptPinned", false);
 pref("browser.tabs.warnOnClose", false);
 pref("browser.tabs.warnOnCloseOtherTabs", true);
@@ -1168,7 +1191,7 @@ pref("browser.tabs.groups.smart.nearestNeighborThresholdInt", 275);
 pref("browser.tabs.groups.smart.clusterMethod", "AGGLOMERATIVE");
 // AGGLOMERATIVE cosine-distance cutoff in thousandths (825 -> 0.825). Lower is
 // stricter (more, smaller groups); higher is more lenient (fewer, larger).
-pref("browser.tabs.groups.smart.agglomerativeThresholdInt", 825);
+pref("browser.tabs.groups.smart.agglomerativeThresholdInt", 650);
 pref("browser.tabs.groups.smart.optin", false);
 
 pref("browser.tabs.dragDrop.createGroup.enabled", true);
@@ -1432,6 +1455,13 @@ pref("browser.xul.error_pages.show_safe_browsing_details_on_load", false);
 // Enable the one-click search call-to-action on the online dnsNotFound error
 // page. Disabled by default; consumers land in later bugs (meta bug 2055374).
 pref("browser.netError.searchCTA.enabled", false);
+
+// Freshness window for the search CTA's connectivity signal. If the last
+// captive-portal check is older than this, an authoritative re-check runs
+// before the CTA is shown (bug 2055712). connectivityRecheckTimeoutMs bounds
+// that re-check so the CTA can never hang.
+pref("browser.netError.searchCTA.connectivityFreshnessMs", 60000);
+pref("browser.netError.searchCTA.connectivityRecheckTimeoutMs", 3000);
 
 // Enable captive portal detection.
 pref("network.captive-portal-service.enabled", true);
@@ -2124,8 +2154,11 @@ pref("browser.newtabpage.activity-stream.discoverystream.merino-feed-experiment"
 
 pref("browser.newtabpage.activity-stream.telemetry.privatePing.enabled", true);
 
-// Redacts content interaction ids from original New Tab ping once data processing migrated to the Newtab_content private ping
+// This preference isn't read anymore, but kept around until we eventually end
+// the rollout that's been setting it. Then we can remove the default here, and
+// not leave any lingering preferences lying around.
 pref("browser.newtabpage.activity-stream.telemetry.privatePing.redactNewtabPing.enabled", true);
+
 pref("browser.newtabpage.activity-stream.telemetry.privatePing.maxSubmissionDelayMs", 5000);
 
   // Include differentialy private inferred New Tab interests with New Tab content Ping. Only used when user has enabled personalization.
@@ -2351,8 +2384,15 @@ pref("browser.smartwindow.mistralRelease", true);
 // Semantic distance threshold for Smart Window history search only.
 pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
+// Smart Window: AITab
+pref("browser.smartwindow.aitab.enabled", false);
+// Base URL of the external AITab viewer used for development prototyping.
+// The generate_aitab tool returns a link to this viewer with the page config in the URL hash.
+pref("browser.smartwindow.aitab.viewerURL", "");
+
 // Smart Window: Auto Tab Grouping (bug 2054500).
 pref("browser.smartwindow.autoTabGrouping.enabled", true);
+pref("browser.smartwindow.autoTabGrouping.preloadModels", true);
 pref("browser.smartwindow.autoTabGrouping.maxGroups", 3);
 pref("browser.smartwindow.autoTabGrouping.minTabsPerGroup", 2);
 pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 4);
@@ -2366,7 +2406,7 @@ pref("browser.smartwindow.smartformfill.enabled", false);
 pref("browser.smartwindow.smartformfill.disallowedRegions", "FR");
 
 // Smart Window Agent
-pref("browser.smartwindow.agent.enabled", false);
+pref("browser.smartwindow.agent.enabled", true);
 pref("browser.smartwindow.agent.supportedRegions", "US,CA");
 
 
@@ -2378,6 +2418,10 @@ pref("browser.smartwindow.worldcup.timeoutMs", 2000);
 // Smart Window: Exa search endpoint, used by the search_the_web agentic flow (bug 2037948)
 pref("browser.smartwindow.searchQuery.endpointURL", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1/search");
 pref("browser.smartwindow.searchQuery.apiKey", "");
+
+// Smart Window: when true, search_the_web returns Exa snippets straight to the
+// main assistant instead of generating an answer from background page reads.
+pref("browser.smartwindow.searchTheWebFast", true);
 
 // Smart Window Logging
 pref("browser.smartwindow.chatHistory.loglevel", "Error");
@@ -2671,6 +2715,9 @@ pref("browser.contentblocking.report.vpn_regions", "as,at,au,bd,be,bg,br,ca,ch,c
 
 // Default to enabling pin promos to be shown where allowed.
 pref("browser.promo.pin.enabled", true);
+
+// Default to enabling Relay promos to be shown where allowed.
+pref("browser.promo.relay.enabled", true);
 
 pref("browser.contentblocking.report.hide_vpn_banner", false);
 pref("browser.contentblocking.report.vpn_sub_id", "sub_HrfCZF7VPHzZkA");
@@ -3643,6 +3690,20 @@ pref("browser.ipProtection.userEnabled", false);
 pref("browser.ipProtection.userEnableCount", 0);
 // Pref to track if user has ever opened the VPN panel
 pref("browser.ipProtection.everOpenedPanel", false);
+// Pref to track if the VPN UI has ever been exposed to the user. Once it is
+// true the UI is shown regardless of the l10n coverage of
+// browser/ipProtection.ftl. A profile data upgrade sets it to true on profiles
+// that predate the gate, so the gate only applies to new profiles. On Nightly
+// the gate is off: translations always lag there.
+#ifdef NIGHTLY_BUILD
+pref("browser.ipProtection.hasSeenFeature", true);
+#else
+pref("browser.ipProtection.hasSeenFeature", false);
+#endif
+// Firefox major version that the l10n coverage gate was last enforced for, 0
+// when it never hid the feature. The gate stops applying as soon as the browser
+// is updated to a different major version.
+pref("browser.ipProtection.l10nGateVersion", 0);
 // Pref to track if user has opened the VPN panel since location controls were introduced
 pref("browser.ipProtection.openedPanelWithLocation", false);
 // Pref to enable support for site exceptions

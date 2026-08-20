@@ -330,7 +330,6 @@
 #include "nsILoadGroup.h"
 #include "nsILoadInfo.h"
 #include "nsIMIMEService.h"
-#include "nsIMemoryReporter.h"
 #include "nsINetUtil.h"
 #include "nsINode.h"
 #include "nsIObjectLoadingContent.h"
@@ -680,41 +679,15 @@ static constexpr nsAttrValue::EnumTableEntry
 
 namespace {
 
-static StaticAutoPtr<nsTHashMap<const nsINode*, RefPtr<EventListenerManager>>>
-    sEventListenerManagersHash;
+// Non-owning list of the managers nodes store themselves; the managers remove
+// themselves from it when deleted.  Documents keep their manager in
+// Document::mListenerManager and are not in this list.
+constinit DoublyLinkedList<EventListenerManager> sNodeEventListenerManagers;
 
 // A global hashtable to for keeping the arena alive for cross docGroup node
 // adoption.
 static nsRefPtrHashtable<nsPtrHashKey<const nsINode>, mozilla::dom::DOMArena>*
     sDOMArenaHashtable;
-
-class DOMEventListenerManagersHashReporter final : public nsIMemoryReporter {
-  MOZ_DEFINE_MALLOC_SIZE_OF(MallocSizeOf)
-
-  ~DOMEventListenerManagersHashReporter() = default;
-
- public:
-  NS_DECL_ISUPPORTS
-
-  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                            nsISupports* aData, bool aAnonymize) override {
-    // We don't measure the |EventListenerManager| objects pointed to by the
-    // entries because those references are non-owning.
-    int64_t amount =
-        sEventListenerManagersHash
-            ? sEventListenerManagersHash->ShallowSizeOfIncludingThis(
-                  MallocSizeOf)
-            : 0;
-
-    MOZ_COLLECT_REPORT(
-        "explicit/dom/event-listener-managers-hash", KIND_HEAP, UNITS_BYTES,
-        amount, "Memory used by the event listener manager's hash table.");
-
-    return NS_OK;
-  }
-};
-
-NS_IMPL_ISUPPORTS(DOMEventListenerManagersHashReporter, nsIMemoryReporter)
 
 class SameOriginCheckerImpl final : public nsIChannelEventSink,
                                     public nsIInterfaceRequestor {
@@ -961,18 +934,6 @@ struct GetParentBrowserParent {
     return false;
   }
 };
-
-template <TreeKind aKind>
-static bool AreNodesInSameSlot(const nsINode* aNode1, const nsINode* aNode2) {
-  if (const auto* content1 = nsIContent::FromNodeOrNull(aNode1)) {
-    if (auto* slot = content1->GetAssignedSlot<aKind>()) {
-      if (const auto* content2 = nsIContent::FromNodeOrNull(aNode2)) {
-        return slot == content2->GetAssignedSlot<aKind>();
-      }
-    }
-  }
-  return false;
-}
 
 template <TreeKind aKind>
 static bool ChildNodeIsInShadowDOMHostedByParent(const nsINode* aParent,
@@ -1288,14 +1249,6 @@ nsresult nsContentUtils::Init() {
   fingerprintingProtectionPrincipal.forget(&sFingerprintingProtectionPrincipal);
 
   if (!InitializeEventTable()) return NS_ERROR_FAILURE;
-
-  if (!sEventListenerManagersHash) {
-    sEventListenerManagersHash =
-        new nsTHashMap<const nsINode*, RefPtr<EventListenerManager>>();
-
-    RegisterStrongMemoryReporter(
-        MakeAndAddRef<DOMEventListenerManagersHashReporter>());
-  }
 
   sBlockedScriptRunners = new AutoTArray<nsCOMPtr<nsIRunnable>, 8>;
 
@@ -2460,23 +2413,10 @@ void nsContentUtils::Shutdown() {
   delete sUserDefinedEvents;
   sUserDefinedEvents = nullptr;
 
-  if (sEventListenerManagersHash) {
-    NS_ASSERTION(sEventListenerManagersHash->Count() == 0,
-                 "Event listener manager hash not empty at shutdown!");
-
-    // See comment above.
-
-    // However, we have to handle this table differently.  If it still
-    // has entries, we want to leak it too, so that we can keep it alive
-    // in case any elements are destroyed.  Because if they are, we need
-    // their event listener managers to be destroyed too, or otherwise
-    // it could leave dangling references in DOMClassInfo's preserved
-    // wrapper table.
-
-    if (sEventListenerManagersHash->Count() == 0) {
-      sEventListenerManagersHash = nullptr;
-    }
-  }
+  // Managers left in the list remove themselves from it when they're deleted,
+  // which can happen after this point.
+  NS_ASSERTION(sNodeEventListenerManagers.isEmpty(),
+               "Node event listener manager list not empty at shutdown!");
 
   MOZ_ASSERT_IF(sDOMArenaHashtable, sDOMArenaHashtable->Count() == 0);
   delete sDOMArenaHashtable;
@@ -2900,6 +2840,28 @@ inline bool SchemeSaysShouldNotResistFingerprinting(nsIPrincipal* aPrincipal) {
   return !isContentAccessibleAboutURI;
 }
 
+// mFirstPartyDomain and mPartitionKey are serialized either as a bare host
+// ("example.com") or in site format ("(https,example.com[,port][,f])"),
+// depending on privacy.firstparty.isolate.use_site and
+// privacy.dynamic_firstparty.use_site respectively. Those two prefs are
+// independent, and ParsePartitionKey() only consults the latter, so detect the
+// format here instead of letting it decide for a first-party domain.
+inline void TopLevelInfoToBaseDomain(const nsAString& aInfo,
+                                     nsAString& aBaseDomain) {
+  if (aInfo.IsEmpty() || aInfo.First() != '(') {
+    aBaseDomain = aInfo;
+    return;
+  }
+
+  nsAutoString scheme;
+  int32_t port;
+  bool foreignByAncestorContext;
+  if (!OriginAttributes::ParsePartitionKey(aInfo, scheme, aBaseDomain, port,
+                                           foreignByAncestorContext)) {
+    aBaseDomain.Truncate();
+  }
+}
+
 inline bool PartionKeyIsAlsoExempted(
     const mozilla::OriginAttributes& aOriginAttributes) {
   // If we've gotten here we have (probably) passed the CookieJarSettings
@@ -2910,15 +2872,18 @@ inline bool PartionKeyIsAlsoExempted(
   // instatiated from a state where we could have been partitioned.
   // So perform this last-ditch check for that scenario.
   // We arbitrarily use https as the scheme, but it doesn't matter.
-  nsresult rv = NS_ERROR_NOT_INITIALIZED;
-  nsCOMPtr<nsIURI> uri;
+  nsAutoString baseDomain;
   if (StaticPrefs::privacy_firstparty_isolate() &&
       !aOriginAttributes.mFirstPartyDomain.IsEmpty()) {
-    rv = NS_NewURI(getter_AddRefs(uri),
-                   u"https://"_ns + aOriginAttributes.mFirstPartyDomain);
+    TopLevelInfoToBaseDomain(aOriginAttributes.mFirstPartyDomain, baseDomain);
   } else if (!aOriginAttributes.mPartitionKey.IsEmpty()) {
-    rv = NS_NewURI(getter_AddRefs(uri),
-                   u"https://"_ns + aOriginAttributes.mPartitionKey);
+    TopLevelInfoToBaseDomain(aOriginAttributes.mPartitionKey, baseDomain);
+  }
+
+  nsresult rv = NS_ERROR_NOT_INITIALIZED;
+  nsCOMPtr<nsIURI> uri;
+  if (!baseDomain.IsEmpty()) {
+    rv = NS_NewURI(getter_AddRefs(uri), u"https://"_ns + baseDomain);
   }
 
   if (!NS_FAILED(rv)) {
@@ -6710,73 +6675,29 @@ void nsContentUtils::NotifyDevToolsOfNodeRemoval(nsINode& aRemovingNode) {
 }
 
 void nsContentUtils::UnmarkGrayJSListenersInCCGenerationDocuments() {
-  if (!sEventListenerManagersHash) {
-    return;
-  }
-
-  for (EventListenerManager* mgr : sEventListenerManagersHash->Values()) {
-    nsINode* n = static_cast<nsINode*>(mgr->GetTarget());
+  for (EventListenerManager& mgr : sNodeEventListenerManagers) {
+    nsINode* n = static_cast<nsINode*>(mgr.GetTarget());
     if (n && n->IsInComposedDoc() &&
         nsCCUncollectableMarker::InGeneration(
             n->OwnerDoc()->GetMarkedCCGeneration())) {
-      mgr->MarkForCC();
+      mgr.MarkForCC();
     }
   }
 }
 
 /* static */
-void nsContentUtils::TraverseListenerManager(
-    nsINode* aNode, nsCycleCollectionTraversalCallback& cb) {
-  if (!sEventListenerManagersHash) {
-    // We're already shut down, just return.
-    return;
-  }
-
-  auto entry = sEventListenerManagersHash->Lookup(aNode);
-  if (entry) {
-    CycleCollectionNoteChild(cb, entry->get(), "[via hash] mListenerManager");
-  }
+void nsContentUtils::AddNodeListenerManager(EventListenerManager* aManager) {
+  MOZ_ASSERT(NS_IsMainThread());
+  sNodeEventListenerManagers.pushBack(aManager);
 }
 
-EventListenerManager* nsContentUtils::GetListenerManagerForNode(
-    nsINode* aNode) {
-  if (!sEventListenerManagersHash) {
-    // We're already shut down, don't bother creating an event listener
-    // manager.
-
-    return nullptr;
+/* static */
+void nsContentUtils::RemoveNodeListenerManager(EventListenerManager* aManager) {
+  MOZ_ASSERT(NS_IsMainThread());
+  // ~EventListenerManager passes here managers which are not in the list.
+  if (sNodeEventListenerManagers.ElementProbablyInList(aManager)) {
+    sNodeEventListenerManagers.remove(aManager);
   }
-
-  auto& entry = sEventListenerManagersHash->LookupOrInsert(aNode);
-
-  if (!entry) {
-    entry = new EventListenerManager(aNode);
-
-    aNode->SetFlags(NODE_HAS_LISTENERMANAGER);
-  }
-
-  return entry;
-}
-
-EventListenerManager* nsContentUtils::GetExistingListenerManagerForNode(
-    const nsINode* aNode) {
-  if (!aNode->HasFlag(NODE_HAS_LISTENERMANAGER)) {
-    return nullptr;
-  }
-
-  if (!sEventListenerManagersHash) {
-    // We're already shut down, don't bother creating an event listener
-    // manager.
-
-    return nullptr;
-  }
-
-  auto entry = sEventListenerManagersHash->Lookup(aNode);
-  if (entry) {
-    return entry.Data();
-  }
-
-  return nullptr;
 }
 
 void nsContentUtils::AddEntryToDOMArenaTable(nsINode* aNode,
@@ -6804,19 +6725,6 @@ already_AddRefed<DOMArena> nsContentUtils::TakeEntryFromDOMArenaTable(
   RefPtr<DOMArena> arena;
   sDOMArenaHashtable->Remove(aNode, getter_AddRefs(arena));
   return arena.forget();
-}
-
-/* static */
-void nsContentUtils::RemoveListenerManager(nsINode* aNode) {
-  if (sEventListenerManagersHash) {
-    // Remove the entry and *then* do operations that could cause further
-    // modification of sEventListenerManagersHash.  See bug 334177.
-    Maybe<RefPtr<EventListenerManager>> listenerManager =
-        sEventListenerManagersHash->Extract(aNode);
-    if (listenerManager && *listenerManager) {
-      (*listenerManager)->Disconnect();
-    }
-  }
 }
 
 /* static */
@@ -12303,7 +12211,7 @@ nsresult nsContentUtils::NewXULOrHTMLElement(
       if (registry) {
         (*aResult)->SetCustomElementRegistry(registry);
       } else {
-        (*aResult)->SetKeepCustomElementRegistryNull();
+        (*aResult)->SetNullCustomElementRegistry();
       }
     } else {
       Document* doc = (*aResult)->OwnerDoc();
@@ -12435,7 +12343,7 @@ nsresult nsContentUtils::NewXULOrHTMLElement(
                     aCustomElementRegistry.ref()) {
               (*aResult)->SetCustomElementRegistry(registry);
             } else {
-              (*aResult)->SetKeepCustomElementRegistryNull();
+              (*aResult)->SetNullCustomElementRegistry();
             }
           }
         }
@@ -14049,6 +13957,13 @@ nsIContent* nsContentUtils::AttachDeclarativeShadowRoot(
   if (shadowRoot) {
     shadowRoot->SetIsDeclarative(
         nsGenericHTMLFormControlElement::ShadowRootDeclarative::Yes);
+    // https://html.spec.whatwg.org/#parsing-main-inhead
+    // 7. If templateStartTag has a shadowrootcustomelementregistry attribute,
+    //    set shadow's keep custom element registry null to true.
+    if (StaticPrefs::dom_scoped_custom_element_registries_enabled() &&
+        aCustomElementRegistry) {
+      shadowRoot->SetKeepCustomElementRegistryNull();
+    }
     // https://html.spec.whatwg.org/#parsing-main-inhead:available-to-element-internals
     shadowRoot->SetAvailableToElementInternals();
     shadowRoot->SetReferenceTarget(aReferenceTarget);

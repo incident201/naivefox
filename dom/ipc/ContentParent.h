@@ -91,6 +91,7 @@ class PageloadEventData;
 namespace ipc {
 class CrashReporterHost;
 class TestShellParent;
+class UtilityProcessKeepAlive;
 class SharedPreferenceSerializer;
 }  // namespace ipc
 
@@ -664,6 +665,8 @@ class ContentParent final : public PContentParent,
       nsIPrincipal* aPrincipal,
       const EnumSet<ValidatePrincipalOptions>& aOptions = {});
 
+  nsIDOMProcessParent* ProcessParent() override { return this; }
+
   void OnCompositorDeviceReset() override;
 
   // Control the priority of the IPC messages for input events.
@@ -1114,6 +1117,13 @@ class ContentParent final : public PContentParent,
   mozilla::ipc::IPCResult RecvCreateAudioIPCConnection(
       CreateAudioIPCConnectionResolver&& aResolver);
 
+#ifndef ANDROID
+  mozilla::ipc::IPCResult RecvRequestHWInferenceConnection(
+      Endpoint<PHWInferenceManagerParent>&& aEndpoint);
+
+  mozilla::ipc::IPCResult RecvReleaseHWInferenceConnection();
+#endif  // !ANDROID
+
   already_AddRefed<extensions::PExtensionsParent> AllocPExtensionsParent();
 
 #ifdef MOZ_WEBRTC
@@ -1511,6 +1521,12 @@ class ContentParent final : public PContentParent,
   // track the identity and other relevant information about the content process
   // they're attached to.
   const RefPtr<ThreadsafeContentParentHandle> mThreadsafeHandle;
+
+#ifndef ANDROID
+  // One keep-alive held for as long as this process has a connection.
+  uint32_t mHWInferenceConnections = 0;
+  RefPtr<mozilla::ipc::UtilityProcessKeepAlive> mHWInferenceKeepAlive;
+#endif  // !ANDROID
 
   // The process starts in the LAUNCHING state, and transitions to
   // ALIVE once it can accept IPC messages.  It remains ALIVE only

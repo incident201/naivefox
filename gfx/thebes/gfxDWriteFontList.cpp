@@ -61,7 +61,7 @@ static __inline void BuildKeyNameFromFontName(nsACString& aName) {
 ////////////////////////////////////////////////////////////////////////////////
 // gfxDWriteFontFamily
 
-gfxDWriteFontFamily::~gfxDWriteFontFamily() {}
+gfxDWriteFontFamily::~gfxDWriteFontFamily() = default;
 
 static bool GetNameAsUtf8(nsACString& aName, IDWriteLocalizedStrings* aStrings,
                           UINT32 aIndex) {
@@ -493,12 +493,12 @@ static void DestroyBlobFunc(void* aUserData) {
   delete ftr;
 }
 
-hb_blob_t* gfxDWriteFontEntry::GetFontTable(uint32_t aTag) {
+hb_blob_t* gfxDWriteFontEntry::GetFontTableInternal(uint32_t aTag) {
   // try to avoid potentially expensive DWrite call if we haven't actually
   // created the font face yet, by using the gfxFontEntry method that will
   // use CopyFontTable and then cache the data
   if (!mFontFace) {
-    return gfxFontEntry::GetFontTable(aTag);
+    return gfxFontEntry::GetFontTableInternal(aTag);
   }
 
   const void* data;
@@ -532,7 +532,7 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
   AUTO_PROFILER_LABEL("gfxDWriteFontEntry::ReadCMAP", GRAPHICS);
 
   // attempt this once, if errors occur leave a blank cmap
-  if (mCharacterMap || mShmemCharacterMap) {
+  if (HasCharacterMap()) {
     return NS_OK;
   }
 
@@ -579,15 +579,14 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
     } else {
       charmap = pfl->FindCharMap(charmap);
     }
-    mHasCmapTable = true;
   } else {
     // if error occurred, initialize to null cmap
     charmap = new gfxCharacterMap(0);
-    mHasCmapTable = false;
   }
   if (setCharMap) {
     // Temporarily retain charmap, until the shared version is
     // ready for use.
+    AutoWriteLock lock(mLock);
     if (mCharacterMap.compareExchange(nullptr, charmap.get())) {
       charmap.get()->AddRef();
     }
@@ -595,7 +594,7 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
 
   LOG_FONTLIST(("(fontlist-cmap) name: %s, size: %zu hash: %8.8x%s\n",
                 mName.get(), charmap->SizeOfIncludingThis(moz_malloc_size_of),
-                charmap->mHash, mCharacterMap == charmap ? " new" : ""));
+                charmap->mHash, GetCharacterMapRaw() == charmap ? " new" : ""));
   if (LOG_CMAPDATA_ENABLED()) {
     char prefix[256];
     SprintfLiteral(prefix, "(cmapdata) name: %.220s", mName.get());
@@ -2670,7 +2669,7 @@ class BundledFontLoader : public IDWriteFontCollectionLoader {
   NS_INLINE_DECL_REFCOUNTING(BundledFontLoader)
 
  public:
-  BundledFontLoader() {}
+  BundledFontLoader() = default;
 
   IFACEMETHODIMP CreateEnumeratorFromKey(
       IDWriteFactory* aFactory, const void* aCollectionKey,

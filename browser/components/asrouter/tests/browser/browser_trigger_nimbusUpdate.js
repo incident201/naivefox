@@ -165,6 +165,9 @@ add_task(async function test_nimbusUpdate_reach_experiment() {
     "Reach message will not be sent again"
   );
 
+  // Routing the message showed a CFR doorhanger; take it down again.
+  await hideCFRDoorhanger();
+
   ExperimentAPI.manager.store._deleteForTests("nimbus_update_test");
   await client.db.importChanges({}, Date.now(), [], { clear: true });
   await ExperimentAPI._rsLoader.updateRecipes("test");

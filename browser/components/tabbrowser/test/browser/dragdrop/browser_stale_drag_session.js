@@ -43,6 +43,19 @@ async function startTabDragWithoutEnding() {
   return tab;
 }
 
+/**
+ * @param {string} msg  Describes what is expected to leave moving-tab mode.
+ * @returns {Promise}
+ */
+function waitForMovingTabToEnd(msg) {
+  return BrowserTestUtils.waitForMutationCondition(
+    gBrowser.tabContainer,
+    { attributes: true, attributeFilter: ["movingtab"] },
+    () => !gBrowser.tabContainer.hasAttribute("movingtab"),
+    { msg }
+  );
+}
+
 function assertNotMovingTab(why) {
   Assert.ok(
     !gBrowser.tabContainer.hasAttribute("movingtab"),
@@ -83,8 +96,7 @@ add_task(async function test_session_disappears_without_dragend() {
   info("End the drag session the way a lost dragend would.");
   dragService.getCurrentSession(window).endDragSession(false);
 
-  await TestUtils.waitForCondition(
-    () => !gBrowser.tabContainer.hasAttribute("movingtab"),
+  await waitForMovingTabToEnd(
     "Waiting for the stale drag session to be noticed"
   );
   assertNotMovingTab("after the drag session disappeared");
@@ -122,11 +134,16 @@ add_task(async function test_session_outlives_the_drag() {
   );
   assertRecoveryRecorded("session_live");
 
+  // The press landed on the toolbox, because moving-tab mode makes #nav-bar
+  // inert, while the release lands on the input. The click then goes to the two
+  // targets' common ancestor, the toolbox, which is no control.
+  AccessibilityUtils.setEnv({ mustHaveAccessibleRule: false });
   EventUtils.synthesizeMouseAtCenter(
     gURLBar.inputField,
     { type: "mouseup" },
     window
   );
+  AccessibilityUtils.resetEnv();
   BrowserTestUtils.removeTab(tab);
 });
 
@@ -158,10 +175,7 @@ add_task(async function test_drop_doesnt_taint_the_next_drag() {
     gBrowser.tabs[0]
   );
   EventUtils._getDOMWindowUtils(window).dragSession?.endDragSession(true);
-  await TestUtils.waitForCondition(
-    () => !gBrowser.tabContainer.hasAttribute("movingtab"),
-    "Waiting for the drop to leave moving-tab mode"
-  );
+  await waitForMovingTabToEnd("Waiting for the drop to leave moving-tab mode");
 
   // Only the next drag's label matters here, so the drop's own outcome is
   // deliberately not asserted.
@@ -170,8 +184,7 @@ add_task(async function test_drop_doesnt_taint_the_next_drag() {
   let tab = await startTabDragWithoutEnding();
   dragService.getCurrentSession(window).endDragSession(false);
 
-  await TestUtils.waitForCondition(
-    () => !gBrowser.tabContainer.hasAttribute("movingtab"),
+  await waitForMovingTabToEnd(
     "Waiting for the stale drag session to be noticed"
   );
   assertRecoveryRecorded("session_ended");

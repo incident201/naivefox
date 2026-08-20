@@ -291,6 +291,11 @@ pub struct VariableValue {
 
     /// var(), env(), attr() or non-custom property (e.g. through `em`) references.
     pub references: References,
+
+    /// Was this variable value attr tainted before. Used to keep attr tainting
+    /// information when uncomputing a style that needs to be put back into the
+    /// cascade.
+    pub explicitly_attr_tainted: bool,
 }
 
 trivial_to_computed_value!(VariableValue);
@@ -872,6 +877,7 @@ impl VariableValue {
             first_token_type: Default::default(),
             url_data: url_data.clone(),
             references: Default::default(),
+            explicitly_attr_tainted: false,
         }
     }
 
@@ -889,6 +895,7 @@ impl VariableValue {
             first_token_type,
             last_token_type,
             references: References::default(),
+            explicitly_attr_tainted: false,
         }
     }
 
@@ -979,12 +986,13 @@ impl VariableValue {
             first_token_type,
             last_token_type,
             references,
+            explicitly_attr_tainted: false,
         })
     }
 
     /// Returns whether this value is tainted by `attr()`.
     pub fn is_attr_tainted(&self) -> bool {
-        self.references.flags.intersects(ReferenceFlags::ATTR)
+        self.references.flags.intersects(ReferenceFlags::ATTR) | self.explicitly_attr_tainted
     }
 
     /// Create VariableValue from an int.
@@ -1057,6 +1065,7 @@ impl VariableValue {
             first_token_type: token_type,
             last_token_type: token_type,
             references: Default::default(),
+            explicitly_attr_tainted: false,
         }
     }
 
@@ -1763,7 +1772,7 @@ fn do_substitute_chunk<'a>(
         // Optimize the property: var(--...) case to avoid allocating at all.
         if reference.start == start && reference.end == end {
             if let Some(taint) = attr_taint.filter(|_| substitution.attr_tainted) {
-                taint.push(start, end);
+                taint.push(start, substitution.css.len());
             }
             return Ok(substitution);
         }

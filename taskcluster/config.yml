@@ -87,6 +87,7 @@ treeherder:
         'Btime-100M_40ms': 'Browsertime network benchmark tests with 100M_40ms condition'
         'Btime-ChR-100M_40ms': 'Browsertime network benchmark tests with 100M_40ms condition'
         'Btime-CaR-100M_40ms': 'Browsertime network benchmark tests with 100M_40ms condition'
+        'DTbc': 'DevTools remote debugging backward compatibility tests'
         'Fetch': 'Fetch and store content'
         'Fxfn': 'Firefox functional tests'
         'l10n-bump': 'L10n Bumper'
@@ -206,6 +207,7 @@ treeherder:
         'py': 'Python checks'
         'java': 'Java checks'
         'rust': 'Rust checks'
+        'vendor': 'Vendoring checks'
         'tests': 'Test verification'
         'android': 'Android checks'
         'Static-Analysis': 'Full tree static-analysis'
@@ -238,7 +240,6 @@ treeherder:
         'buildconfig': 'Make sure the content of .buildconfig.yml matches what gradle knows about its projects'
         'compare-locales': 'Validate strings.xml with compare-locales'
         'detekt': 'detekt linter'
-        'ktlint': 'ktlint linter'
         'lint': 'gradle lint linter'
 
         'focus': 'Focus general tasks no matter the variant'

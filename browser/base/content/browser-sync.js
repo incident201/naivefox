@@ -38,6 +38,23 @@ var { DEVICE_TYPE_MOBILE, DEVICE_TYPE_TABLET } = ChromeUtils.importESModule(
 
 const MIN_STATUS_ANIMATION_DURATION = 1600;
 
+// Campaign params shared by every product CTA in the Mozilla account toolbar
+// panel. The per-variant utm_content is added by gSync._ctaURL.
+const FXA_CTA_UTM_PARAMS = {
+  utm_medium: "referral",
+  utm_source: "firefox-desktop",
+  utm_campaign: "toolbar",
+};
+
+// Locales are intentionally omitted: all three sites redirect to the visitor's
+// locale, and hardcoding one would send non-English users to English pages.
+const MONITOR_NEW_USER_URL = "https://monitor.mozilla.org/";
+const MONITOR_EXISTING_USER_URL = "https://monitor.mozilla.org/user/dashboard/";
+const RELAY_NEW_USER_URL = "https://relay.firefox.com/";
+const RELAY_EXISTING_USER_URL = "https://relay.firefox.com/accounts/profile/";
+const VPN_NEW_USER_URL = "https://www.mozilla.org/products/vpn/";
+const VPN_EXISTING_USER_URL = "https://www.mozilla.org/products/vpn/download/";
+
 this.SyncedTabsPanelList = class SyncedTabsPanelList {
   static sRemoteTabsDeckIndices = {
     DECKINDEX_TABS: 0,
@@ -488,6 +505,11 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
     this._updateDevicesPromise = Promise.resolve();
 
     this._initDeviceList();
+
+    // Refresh the FxA devices list.  This won't affect the current menu items,
+    // but it helps ensure the menu is up-to-date the next time the menu loads.
+    // This can help the user get unstuck when the device list is stale (#1664954)
+    gSync.refreshFxaDevices();
   }
 
   observe(subject, topic) {
@@ -1473,9 +1495,30 @@ var gSync = {
     );
     signOutButtonEl.hidden = !this.isSignedIn;
 
-    panelview.syncedTabsPanelList = new FxAMenuDeviceList(
-      PanelMultiView.getViewNode(document, "PanelUI-fxa-menu-devices-list")
+    const devicesListEl = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-devices-list"
     );
+    const signOutSeparatorEl = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-sign-out-separator"
+    );
+
+    // The FxA panelview is shared between the account (toolbar) menu and the
+    // app (hamburger) menu, so the sign-out button's position is set per show.
+    // In the app menu the sign-out button sits directly below the sync status
+    // section and above the connected devices list, with a separator either
+    // side. In the account menu it stays at the bottom, below the devices list.
+    const inAppMenu = document
+      .getElementById("appMenu-popup")
+      ?.contains(devicesListEl);
+    if (inAppMenu) {
+      signOutButtonEl.after(devicesListEl);
+    } else {
+      signOutSeparatorEl.before(devicesListEl);
+    }
+
+    panelview.syncedTabsPanelList = new FxAMenuDeviceList(devicesListEl);
 
     // Any variant on the CTA will have been applied inside of updateFxAPanel,
     // but now that the panel is showing, we record exposure.
@@ -1925,6 +1968,10 @@ var gSync = {
       document,
       "PanelUI-fxa-menu-signed-out-card"
     );
+    const signedOutSeparatorEl = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-signed-out-separator"
+    );
     const signedInContainer = PanelMultiView.getViewNode(
       document,
       "PanelUI-signedin-panel"
@@ -1933,25 +1980,9 @@ var gSync = {
       document,
       "PanelUI-sign-out-separator"
     );
-    const profilesHeaderLabel = PanelMultiView.getViewNode(
-      document,
-      "PanelUI-fxa-menu-profiles-header-label"
-    );
-    const profileButtonsContainer = PanelMultiView.getViewNode(
-      document,
-      "PanelUI-fxa-menu-profile-buttons"
-    );
-    const profilesSeparator = PanelMultiView.getViewNode(
-      document,
-      "PanelUI-fxa-menu-profiles-separator"
-    );
     const manageAccountSeparator = PanelMultiView.getViewNode(
       document,
       "PanelUI-fxa-menu-manage-account-separator"
-    );
-    const secureSyncHeader = PanelMultiView.getViewNode(
-      document,
-      "PanelUI-fxa-menu-secure-sync-header"
     );
     const syncSetupEl = PanelMultiView.getViewNode(
       document,
@@ -1980,6 +2011,7 @@ var gSync = {
     manageAccountSeparator.hidden = true;
     signInPromoEl.hidden = true;
     signedOutCardEl.hidden = true;
+    signedOutSeparatorEl.hidden = true;
     menuHeaderDescriptionEl.hidden = false;
 
     // Expanded sign in copy experiment is only for signed out users
@@ -2018,10 +2050,6 @@ var gSync = {
     let headerTitleL10nId;
     let headerDescription;
 
-    // The profiles section (header and buttons) is only populated when the
-    // profiles feature is enabled; its surrounding separators follow suit.
-    const profilesShown = !!SelectableProfileService?.isEnabled;
-
     switch (state.status) {
       case UIState.STATUS_NOT_CONFIGURED:
         signOutSeparator.hidden = true;
@@ -2050,24 +2078,7 @@ var gSync = {
           }
         }
 
-        // Reposition profiles elements
-        profilesHeaderLabel.remove();
-        profileButtonsContainer.remove();
-        profilesSeparator.remove();
-        secureSyncHeader.remove();
-
-        // When signed out this is the single separator below the sign-in promo:
-        // it sits above the secure sync section, with the profiles section (when
-        // shown) slotting in between, so it stays visible regardless of profiles.
-        profilesSeparator.hidden = false;
-        secureSyncHeader.hidden = false;
-
-        signedInContainer.after(secureSyncHeader);
-        signedInContainer.after(profilesSeparator);
-        signedInContainer.after(profileButtonsContainer);
-        signedInContainer.after(profilesHeaderLabel);
-
-        secureSyncHeader.after(syncStatusBtn);
+        this._positionSecureSyncSection(signedInContainer);
 
         break;
 
@@ -2078,6 +2089,7 @@ var gSync = {
         headerDescription = state.displayName || state.email;
         mainWindowEl.style.removeProperty("--avatar-image-url");
         this._showFxASignedOutCard(signedOutCardEl, state);
+        this._positionSecureSyncSection(signedInContainer);
         break;
 
       case UIState.STATUS_NOT_VERIFIED:
@@ -2086,6 +2098,7 @@ var gSync = {
         headerTitleL10nId = "account-finish-account-setup";
         headerDescription = state.displayName || state.email;
         this._showFxASignedOutCard(signedOutCardEl, state);
+        this._positionSecureSyncSection(signedInContainer);
         break;
 
       case UIState.STATUS_SIGNED_IN:
@@ -2110,22 +2123,10 @@ var gSync = {
 
         // Reposition profiles elements
         manageAccountSeparator.remove();
-        profilesHeaderLabel.remove();
-        profileButtonsContainer.remove();
-        profilesSeparator.remove();
-        secureSyncHeader.remove();
-
+        this._positionSecureSyncSection(manageAccountButtonEl);
         // Single separator below the manage account button, above whichever
         // section comes next (profiles when shown, otherwise secure sync).
         manageAccountSeparator.hidden = false;
-        // Only divide the profiles section from secure sync when profiles show.
-        profilesSeparator.hidden = !profilesShown;
-        secureSyncHeader.hidden = false;
-
-        manageAccountButtonEl.after(secureSyncHeader);
-        manageAccountButtonEl.after(profilesSeparator);
-        manageAccountButtonEl.after(profileButtonsContainer);
-        manageAccountButtonEl.after(profilesHeaderLabel);
         // Inserted last so it lands directly below the manage account button,
         // separating it from the profiles section.
         manageAccountButtonEl.after(manageAccountSeparator);
@@ -2160,6 +2161,46 @@ var gSync = {
     menuHeaderDescriptionEl.removeAttribute("data-l10n-id");
   },
 
+  // Moves the Profiles and Secure sync sections directly below the header
+  // anchored by anchorEl, so the visible sync status button lands under the
+  // "Secure sync" header instead of above the Profiles section.
+  _positionSecureSyncSection(anchorEl) {
+    const profilesHeaderLabel = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-profiles-header-label"
+    );
+    const profileButtonsContainer = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-profile-buttons"
+    );
+    const profilesSeparator = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-profiles-separator"
+    );
+    const secureSyncHeader = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-secure-sync-header"
+    );
+    const syncStatusBtn = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-sync-status-button"
+    );
+
+    profilesHeaderLabel.remove();
+    profileButtonsContainer.remove();
+    profilesSeparator.remove();
+    secureSyncHeader.remove();
+
+    secureSyncHeader.hidden = false;
+
+    anchorEl.after(secureSyncHeader);
+    anchorEl.after(profilesSeparator);
+    anchorEl.after(profileButtonsContainer);
+    anchorEl.after(profilesHeaderLabel);
+
+    secureSyncHeader.after(syncStatusBtn);
+  },
+
   // Shows a card with the remembered account's email, a status-specific reason,
   // and a button to sign back in.
   _showFxASignedOutCard(cardEl, state) {
@@ -2171,6 +2212,10 @@ var gSync = {
       document,
       "PanelUI-fxa-menu-signed-out-message"
     );
+    const separatorEl = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-signed-out-separator"
+    );
 
     emailEl.value = state.email ?? "";
     document.l10n.setAttributes(
@@ -2181,6 +2226,7 @@ var gSync = {
     );
 
     cardEl.hidden = false;
+    separatorEl.hidden = false;
   },
 
   updateAvatarURL(mainWindowEl, avatarURL, avatarIsDefault) {
@@ -2397,7 +2443,10 @@ var gSync = {
     if (!(await FxAccounts.canConnectAccount())) {
       return;
     }
-    const url = await FxAccounts.config.promiseConnectAccountURI(entryPoint);
+    const url = await FxAccounts.config.promiseConnectAccountURI(
+      "sync",
+      entryPoint
+    );
     switchToTabHavingURI(url, true, {
       replaceQueryString: true,
       triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
@@ -2413,7 +2462,10 @@ var gSync = {
   },
 
   async openConnectAnotherDevice(entryPoint) {
-    const url = await FxAccounts.config.promiseConnectDeviceURI(entryPoint);
+    const url = await FxAccounts.config.promiseConnectDeviceURI(
+      "sync",
+      entryPoint
+    );
     openTrustedLinkIn(url, "tab");
   },
 
@@ -2484,6 +2536,7 @@ var gSync = {
       return;
     }
     const url = await FxAccounts.config.promiseConnectAccountURI(
+      "sync",
       entryPoint,
       extraParams
     );
@@ -2674,6 +2727,11 @@ var gSync = {
     }
 
     devicesPopup.appendChild(fragment);
+
+    // Refresh the FxA devices list.  This won't affect the current menu items,
+    // but it helps ensure the menu is up-to-date the next time the menu loads.
+    // This can help the user get unstuck when the device list is stale (#1664954)
+    this.refreshFxaDevices();
   },
 
   _appendSendTabDeviceList(
@@ -3444,7 +3502,11 @@ var gSync = {
       this._getEntryPointForElement(sourceElement) === "fxa_app_menu"
         ? "send-tab-app-menu"
         : "send-tab-account-menu";
-    var url = await FxAccounts.config.promiseConnectAccountURI(entryPoint, {});
+    var url = await FxAccounts.config.promiseConnectAccountURI(
+      "sync",
+      entryPoint,
+      {}
+    );
     switchToTabHavingURI(url, true, {});
   },
 
@@ -3702,8 +3764,8 @@ var gSync = {
     this.updateCTAButtonStrings(VpnPanelEl, {
       inUse: vpnInUse,
       titleId: "appmenuitem-vpn-title2",
-      inUseTitleId: "appmenuitem-vpn-title-signed-in",
-      descriptionId: "appmenuitem-vpn-description4",
+      inUseTitleId: "appmenuitem-vpn-title-signed-in1",
+      descriptionId: "appmenuitem-vpn-description5",
     });
 
     // Share Firefox checks
@@ -3756,60 +3818,71 @@ var gSync = {
     }
   },
 
-  async openMonitorLink(sourceElement) {
+  openMonitorLink(sourceElement) {
     this.emitFxaToolbarTelemetry("monitor_cta", sourceElement);
-    await this.openCtaLink(
+    this.openCtaLink(
       FX_MONITOR_OAUTH_CLIENT_ID,
-      new URL("https://monitor.firefox.com"),
-      new URL("https://monitor.firefox.com/user/breaches")
+      this._ctaURL(MONITOR_NEW_USER_URL, "new-user-global"),
+      this._ctaURL(MONITOR_EXISTING_USER_URL, "existing-user-global")
     );
   },
 
-  async openRelayLink(sourceElement) {
+  openRelayLink(sourceElement) {
     this.emitFxaToolbarTelemetry("relay_cta", sourceElement);
-    await this.openCtaLink(
+    this.openCtaLink(
       FX_RELAY_OAUTH_CLIENT_ID,
-      new URL("https://relay.firefox.com"),
-      new URL("https://relay.firefox.com/accounts/profile")
+      this._ctaURL(RELAY_NEW_USER_URL, "new-user-global"),
+      this._ctaURL(RELAY_EXISTING_USER_URL, "existing-user-global")
     );
   },
 
-  async openVPNLink(sourceElement) {
+  openVPNLink(sourceElement) {
     this.emitFxaToolbarTelemetry("vpn_cta", sourceElement);
-    await this.openCtaLink(
+    this.openCtaLink(
       VPN_OAUTH_CLIENT_ID,
-      new URL("https://www.mozilla.org/en-US/products/vpn/"),
-      new URL("https://www.mozilla.org/en-US/products/vpn/")
+      this._ctaURL(VPN_NEW_USER_URL, "new-user-global"),
+      this._ctaURL(VPN_EXISTING_USER_URL, "existing-user-global")
     );
   },
 
   openShareFirefoxLink() {
-    Referrals.openReferralsTab(window);
+    Referrals.openReferralsTab(window, "accounts_menu");
     PanelUI.hide();
   },
 
-  // A generic opening based on
-  async openCtaLink(clientId, defaultUrl, signedInUrl) {
-    const params = {
-      utm_medium: "firefox-desktop",
-      utm_source: "toolbar",
-      utm_campaign: "discovery",
-    };
-    const searchParams = new URLSearchParams(params);
-
-    if (!this.isSignedIn) {
-      // Add the base params + not signed in
-      defaultUrl.search = searchParams.toString();
-      defaultUrl.searchParams.append("utm_content", "notsignedin");
-      this.openLink(defaultUrl);
-      PanelUI.hide();
-      return;
+  /**
+   * Builds a product CTA URL, attaching the shared campaign params plus a
+   * variant-specific utm_content.
+   *
+   * @param {string} baseUrl
+   * @param {string} utmContent
+   *   Identifies which CTA variant the user saw, e.g. "new-user-global".
+   * @returns {URL}
+   */
+  _ctaURL(baseUrl, utmContent) {
+    const url = new URL(baseUrl);
+    for (const [key, value] of Object.entries(FXA_CTA_UTM_PARAMS)) {
+      url.searchParams.set(key, value);
     }
+    url.searchParams.set("utm_content", utmContent);
+    return url;
+  },
 
-    const url = this.hasClientForId(clientId) ? signedInUrl : defaultUrl;
-    // Add base params + signed in
-    url.search = searchParams.toString();
-    url.searchParams.append("utm_content", "signedIn");
+  /**
+   * Opens a product CTA, deep-linking users who already have the service
+   * attached to their Mozilla account and sending everyone else to the
+   * product's landing page.
+   *
+   * @param {string} clientId
+   *   The FxA OAuth client Id for the product being opened.
+   * @param {URL} defaultUrl
+   * @param {URL} signedInUrl
+   */
+  openCtaLink(clientId, defaultUrl, signedInUrl) {
+    const url =
+      this.isSignedIn && this.hasClientForId(clientId)
+        ? signedInUrl
+        : defaultUrl;
 
     this.openLink(url);
     PanelUI.hide();

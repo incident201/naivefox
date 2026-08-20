@@ -346,8 +346,7 @@ nsINode::nsINode(already_AddRefed<mozilla::dom::NodeInfo> aNodeInfo)
       ,
       mChildCount(0),
       mPreviousOrLastSibling(nullptr),
-      mSubtreeRoot(this),
-      mSlots(nullptr) {
+      mSubtreeRoot(this) {
   SetIsOnMainThread();
 }
 #endif
@@ -586,14 +585,18 @@ class ChildIndexCache {
 nsClassHashtable<nsPtrHashKey<const nsINode>, ChildIndexCache::Entry>
     ChildIndexCache::sCache;
 const nsINode* ChildIndexCache::sLastAccessedParent = nullptr;
+const nsINode* nsINode::sObserverChainStart = nullptr;
+nsINode* nsINode::sObserverChainSkipTo = nullptr;
 ChildIndexCache::Entry* ChildIndexCache::sLastAccessedEntry = nullptr;
 
 nsINode::~nsINode() {
+  ForgetObserverChainIfCached(this);
   MOZ_ASSERT(!ChildIndexCache::Contains(this),
              "Node still in ChildIndexCache at destruction?");
   MOZ_ASSERT(ChildIndexCache::LastAccessedParent() != this,
              "ChildIndexCache still memoizing a node being destroyed?");
-  MOZ_ASSERT(!HasSlots(), "LastRelease was not called?");
+  MOZ_ASSERT(mSlotsOrListenerManager == kListenerManagerBit,
+             "LastRelease was not called?");
   MOZ_ASSERT(mSubtreeRoot == this, "Didn't restore state properly?");
 }
 
@@ -668,6 +671,48 @@ void* nsINode::AllocateSlots(size_t aSize) {
 nsINode::nsSlots* nsINode::CreateSlots() {
   void* mem = AllocateSlots(sizeof(nsSlots));
   return new (mem) nsSlots();
+}
+
+void nsINode::SetSlots(nsSlots* aSlots) {
+  MOZ_ASSERT(aSlots);
+  MOZ_ASSERT(!HasSlots());
+  MOZ_ASSERT(!(reinterpret_cast<uintptr_t>(aSlots) & kListenerManagerBit));
+  aSlots->mListenerManager = dont_AddRef(GetInlineListenerManager());
+  mSlotsOrListenerManager = reinterpret_cast<uintptr_t>(aSlots);
+}
+
+EventListenerManager* nsINode::GetNodeListenerManager() const {
+  EventListenerManager* elm;
+  if (nsSlots* slots = GetExistingSlots()) {
+    elm = slots->mListenerManager;
+  } else {
+    elm = GetInlineListenerManager();
+  }
+  MOZ_ASSERT(!elm || !IsDocument(),
+             "Document keeps its manager in Document::mListenerManager");
+  return elm;
+}
+
+void nsINode::DropNodeListenerManager() {
+  RefPtr<EventListenerManager> elm;
+  if (nsSlots* slots = GetExistingSlots()) {
+    elm = slots->mListenerManager.forget();
+  } else {
+    elm = dont_AddRef(GetInlineListenerManager());
+    mSlotsOrListenerManager = kListenerManagerBit;
+  }
+
+  if (!elm) {
+    // The flag matches the storage, except on documents which keep their
+    // manager in Document::mListenerManager.
+    MOZ_ASSERT_IF(!IsDocument(), !HasFlag(NODE_HAS_LISTENERMANAGER));
+    return;
+  }
+  UnsetFlags(NODE_HAS_LISTENERMANAGER);
+
+  // Disconnect only once out of the node, since it can run code which touches
+  // this node.  See bug 334177.
+  elm->Disconnect();
 }
 
 static const nsINode* GetClosestCommonInclusiveAncestorForRangeInSelection(
@@ -1248,8 +1293,12 @@ void nsINode::LastRelease() {
       }
     }
 
+    // The manager may live in the slots, so drop it before deleting those.
+    DropNodeListenerManager();
+    MOZ_ASSERT(!slots->mListenerManager);
+
     slots->~nsSlots();
-    mSlots = nullptr;
+    mSlotsOrListenerManager = kListenerManagerBit;
     free(slots);
   }
 
@@ -1278,22 +1327,8 @@ void nsINode::LastRelease() {
         imageElem->ClearForm(true);
       }
     }
-    if (HasFlag(NODE_HAS_LISTENERMANAGER)) {
-#ifdef DEBUG
-      if (nsContentUtils::IsInitialized()) {
-        EventListenerManager* manager =
-            nsContentUtils::GetExistingListenerManagerForNode(this);
-        if (!manager) {
-          NS_ERROR(
-              "Huh, our bit says we have a listener manager list, "
-              "but there's nothing in the hash!?!!");
-        }
-      }
-#endif
-
-      nsContentUtils::RemoveListenerManager(this);
-      UnsetFlags(NODE_HAS_LISTENERMANAGER);
-    }
+    // Drops the inline manager; nodes with slots dropped theirs above.
+    DropNodeListenerManager();
 
     if (Element* element = Element::FromNode(this)) {
       element->ClearAttributes();
@@ -1998,11 +2033,41 @@ nsresult nsINode::PostHandleEvent(EventChainPostVisitor& /*aVisitor*/) {
 }
 
 EventListenerManager* nsINode::GetOrCreateListenerManager() {
-  return nsContentUtils::GetListenerManagerForNode(this);
+  MOZ_ASSERT(!IsDocument(),
+             "Document should have created its own manager, see "
+             "Document::GetOrCreateListenerManager");
+  MOZ_ASSERT(GetNodeListenerManager() == GetExistingListenerManager(),
+             "A subclass which overrides GetExistingListenerManager must "
+             "override GetOrCreateListenerManager too");
+
+  if (EventListenerManager* elm = GetNodeListenerManager()) {
+    return elm;
+  }
+
+  if (!nsContentUtils::IsInitialized()) {
+    // We're already shut down, don't bother creating a manager.
+    return nullptr;
+  }
+
+  RefPtr<EventListenerManager> elm = new EventListenerManager(this);
+  nsContentUtils::AddNodeListenerManager(elm);
+
+  EventListenerManager* manager = elm;
+  MOZ_ASSERT(!(reinterpret_cast<uintptr_t>(manager) & kListenerManagerBit));
+  if (nsSlots* slots = GetExistingSlots()) {
+    slots->mListenerManager = std::move(elm);
+  } else {
+    MOZ_ASSERT(mSlotsOrListenerManager == kListenerManagerBit);
+    mSlotsOrListenerManager =
+        reinterpret_cast<uintptr_t>(elm.forget().take()) | kListenerManagerBit;
+  }
+
+  SetFlags(NODE_HAS_LISTENERMANAGER);
+  return manager;
 }
 
 EventListenerManager* nsINode::GetExistingListenerManager() const {
-  return nsContentUtils::GetExistingListenerManagerForNode(this);
+  return GetNodeListenerManager();
 }
 
 Nullable<WindowProxyHolder> nsINode::GetDocumentGlobalForBindings() {
@@ -2092,9 +2157,8 @@ bool nsINode::Traverse(nsINode* tmp, nsCycleCollectionTraversalCallback& cb) {
 #endif
   }
 
-  if (tmp->NodeType() != DOCUMENT_NODE &&
-      tmp->HasFlag(NODE_HAS_LISTENERMANAGER)) {
-    nsContentUtils::TraverseListenerManager(tmp, cb);
+  if (EventListenerManager* elm = tmp->GetNodeListenerManager()) {
+    CycleCollectionNoteChild(cb, elm, "mListenerManager");
   }
 
   return true;
@@ -2108,11 +2172,7 @@ void nsINode::Unlink(nsINode* tmp) {
     slots->Unlink(*tmp);
   }
 
-  if (tmp->NodeType() != DOCUMENT_NODE &&
-      tmp->HasFlag(NODE_HAS_LISTENERMANAGER)) {
-    nsContentUtils::RemoveListenerManager(tmp);
-    tmp->UnsetFlags(NODE_HAS_LISTENERMANAGER);
-  }
+  tmp->DropNodeListenerManager();
 
   if (tmp->HasProperties()) {
     tmp->RemoveProperty(nsGkAtoms::accessiblenode);
@@ -2311,6 +2371,11 @@ void nsINode::DisconnectChild(nsIContent* aKid) {
   MOZ_ASSERT(GetChildCount() > 0);
 
   RemoveFromCache(this);
+  // Clear the cache if there is a chance the start node is in the disconnected
+  // subtree.
+  if (!nsINode::IsObserverChainStart(this) && IsInComposedDoc()) {
+    nsINode::ForgetObserverChain();
+  }
   ChildIndexCache::Invalidate(this, aKid);
 
   nsIContent* previousSibling = aKid->GetPreviousSibling();
@@ -4196,11 +4261,11 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
           cloneElem->SetCustomElementRegistry(registry);
         } else if (elem->GetCustomElementRegistryState() ==
                    CustomElementRegistryState::Null) {
-          cloneElem->SetKeepCustomElementRegistryNull();
+          cloneElem->SetNullCustomElementRegistry();
         } else if (cloneElem->OwnerDoc()->HasScopedCustomElementRegistry()) {
           // Keep the clone from inheriting the destination document's scoped
           // registry; a global-registry element must not resolve to it.
-          cloneElem->SetKeepCustomElementRegistryNull();
+          cloneElem->SetNullCustomElementRegistry();
         }
       }
 
@@ -4272,12 +4337,102 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
     }
 
     aNode->mNodeInfo.swap(newNodeInfo);
+
+    // https://dom.spec.whatwg.org/#concept-node-adopt 3.3. onward
+    // 3.3. Otherwise, if inclusiveDescendant is an element:
+    // 3.3.1. Set the node document of each attribute in inclusiveDescendant's
+    //        attribute list to document.
     aNode->NodeInfoChanged(oldDoc);
 
     MOZ_ASSERT(newDoc != oldDoc);
-    if (elem) {
-      // Adopted callback must be enqueued whenever a node’s
-      // shadow-including inclusive descendants that is custom.
+
+    // https://dom.spec.whatwg.org/#concept-node-adopt
+    // 3.2. If inclusiveDescendant is a shadow root and if any of the
+    //      following are true:
+    if (ShadowRoot* shadow = ShadowRoot::FromNode(aNode)) {
+      if (StaticPrefs::dom_scoped_custom_element_registries_enabled()) {
+        //   - inclusiveDescendant's custom element registry is null and
+        //     inclusiveDescendant's keep custom element registry null is false;
+        //     or
+        //   - inclusiveDescendant's custom element registry is a global custom
+        //     element registry...
+        const CustomElementRegistryState state =
+            shadow->GetCustomElementRegistryState();
+        const bool isNullNonKeep = state == CustomElementRegistryState::Null &&
+                                   !shadow->KeepCustomElementRegistryNull();
+        const bool isGlobal = state == CustomElementRegistryState::Global;
+        if (isNullNonKeep || isGlobal) {
+          // ...then set inclusiveDescendant's custom element registry to
+          // document's custom element registry's effective global custom
+          // element registry.
+          if (newDoc->GetEffectiveGlobalCustomElementRegistry()) {
+            shadow->SetCustomElementRegistryState(
+                CustomElementRegistryState::Global);
+          } else {
+            shadow->SetCustomElementRegistryState(
+                CustomElementRegistryState::Null);
+          }
+        }
+      }
+      // 3.3. Otherwise, if inclusiveDescendant is an element:
+    } else if (elem) {
+      if (StaticPrefs::dom_scoped_custom_element_registries_enabled()) {
+        const CustomElementRegistryState state =
+            elem->GetCustomElementRegistryState();
+        // 3.3.2. If inclusiveDescendant's custom element registry is null
+        //        or inclusiveDescendant's custom element registry's is scoped
+        //        is false:
+        // (A non-null scoped registry is kept as-is; additionally append the
+        // new document to the registry's scoped document set per
+        // https://html.spec.whatwg.org/#scoped-document-set.)
+        if (state == CustomElementRegistryState::Scoped) {
+          RefPtr<CustomElementRegistry> scopedRegistry =
+              CustomElementRegistry::GetScopedRegistry(*elem);
+          MOZ_ASSERT(scopedRegistry,
+                     "How did we get a Scoped state without a registry?");
+          scopedRegistry->AddToScopedDocumentSet(newDoc);
+        } else {
+          // 3.3.2.1. Let registry be null.
+          CustomElementRegistry* registry = nullptr;
+
+          nsINode* parent = elem->GetParentNode();
+          // 3.3.2.2. If inclusiveDescendant's custom element registry is
+          //          non-null, inclusiveDescendant's parent is null, or
+          //          inclusiveDescendant's parent is an exclusive
+          //          DocumentFragment node, then set registry to document's
+          //          custom element registry.
+          // 3.3.2.3. Otherwise, set registry to the result of looking up a
+          //          custom element registry given inclusiveDescendant's
+          //          parent.
+          if (state != CustomElementRegistryState::Null || !parent ||
+              (parent->IsDocumentFragment() && !parent->IsShadowRoot())) {
+            registry = newDoc->GetCustomElementRegistry();
+          } else {
+            Maybe<RefPtr<CustomElementRegistry>> parentRegistry =
+                nsContentUtils::GetCustomElementRegistry(parent);
+            registry = parentRegistry ? parentRegistry->get()
+                                      : newDoc->GetCustomElementRegistry();
+          }
+
+          // 3.3.2.4. Set inclusiveDescendant's custom element registry to
+          //          registry's effective global custom element registry.
+          //
+          // (A scoped registry's effective global registry is null, a global
+          // one's is itself.)
+          CustomElementRegistry* effectiveGlobal =
+              (registry && !registry->IsScoped()) ? registry : nullptr;
+          if (effectiveGlobal) {
+            elem->SetCustomElementRegistry(effectiveGlobal);
+          } else if (state == CustomElementRegistryState::Global &&
+                     elem->OwnerDoc()->HasScopedCustomElementRegistry()) {
+            elem->SetNullCustomElementRegistry();
+          }
+        }
+      }
+
+      // 3.3.3. If inclusiveDescendant is custom, then enqueue a custom element
+      //        callback reaction with inclusiveDescendant, callback name
+      //        "adoptedCallback", and « oldDocument, document ».
       CustomElementData* data = elem->GetCustomElementData();
       if (data && data->mState == CustomElementData::State::eCustom) {
         LifecycleCallbackArgs args;
@@ -4349,6 +4504,10 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
 
     if (oldDoc->MayHaveAnimationObservers()) {
       newDoc->SetMayHaveAnimationObservers();
+    }
+
+    if (oldDoc->MayHaveContainerTimingAttributes()) {
+      newDoc->SetMayHaveContainerTimingAttributes();
     }
 
     if (elem) {
@@ -4475,6 +4634,12 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
         return nullptr;
       }
       newShadowRoot->SetIsDeclarative(originalShadowRoot->IsDeclarative());
+      // https://dom.spec.whatwg.org/#concept-node-clone step 6.6: copy the
+      // source shadow root's keep custom element registry null.
+      if (StaticPrefs::dom_scoped_custom_element_registries_enabled() &&
+          originalShadowRoot->KeepCustomElementRegistryNull()) {
+        newShadowRoot->SetKeepCustomElementRegistryNull();
+      }
       if (originalShadowRoot->IsAvailableToElementInternals()) {
         newShadowRoot->SetAvailableToElementInternals();
       }

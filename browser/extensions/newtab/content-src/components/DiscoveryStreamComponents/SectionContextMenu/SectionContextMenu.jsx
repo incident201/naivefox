@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import React, { useState } from "react";
-import { LinkMenu } from "../../LinkMenu/LinkMenu";
+import React, { useRef } from "react";
+import { actionCreators as ac } from "common/Actions.mjs";
+import { getLinkMenuOptions } from "content-src/lib/link-menu-options";
+import { PanelListItems } from "content-src/components/LinkMenu/PanelListItems";
+import { usePanelListIsOpen } from "content-src/lib/panel-list-utils";
 
 /**
  * A context menu for blocking, following and unfollowing sections.
@@ -31,46 +34,46 @@ export function SectionContextMenu({
   SECTIONS_CONTEXT_MENU_OPTIONS.push("SectionBlock");
   SECTIONS_CONTEXT_MENU_OPTIONS.push("Separator");
   SECTIONS_CONTEXT_MENU_OPTIONS.push("SectionLearnMore");
-  const [showContextMenu, setShowContextMenu] = useState(false);
 
-  const onClick = e => {
-    e.preventDefault();
-    setShowContextMenu(!showContextMenu);
-  };
+  const panelListRef = useRef(null);
+  const contextMenuOpen = usePanelListIsOpen(panelListRef);
 
-  const onUpdate = () => {
-    setShowContextMenu(!showContextMenu);
-  };
+  const menuId = `section-context-menu-${sectionKey ?? index}`;
+
+  const options = getLinkMenuOptions({
+    dispatch,
+    index,
+    source: type.toUpperCase(),
+    options: SECTIONS_CONTEXT_MENU_OPTIONS,
+    shouldSendImpressionStats: true,
+    // Section menu telemetry has always gone through the getLinkMenuOptions
+    // ac.UserEvent default, unlike the card/ad menus which use
+    // ac.DiscoveryStreamUserEvent. Keep ac.UserEvent to preserve that behavior.
+    userEvent: ac.UserEvent,
+    site: {
+      sectionPersonalization,
+      sectionKey,
+      sectionPosition,
+      title,
+      learnMoreUrl,
+    },
+  });
 
   return (
     <div
-      className={`section-context-menu${showContextMenu ? " context-menu-open" : ""}`}
+      className={`section-context-menu${contextMenuOpen ? " context-menu-open" : ""}`}
     >
       <moz-button
         type={buttonType}
         size="default"
         iconsrc="chrome://global/skin/icons/more.svg"
-        title={title || source}
-        aria-expanded={showContextMenu}
-        onClick={onClick}
+        data-l10n-id="newtab-menu-content-tooltip"
+        data-l10n-args={JSON.stringify({ title: title || source })}
+        menuId={menuId}
       />
-      {showContextMenu && (
-        <LinkMenu
-          onUpdate={onUpdate}
-          dispatch={dispatch}
-          index={index}
-          source={type.toUpperCase()}
-          options={SECTIONS_CONTEXT_MENU_OPTIONS}
-          shouldSendImpressionStats={true}
-          site={{
-            sectionPersonalization,
-            sectionKey,
-            sectionPosition,
-            title,
-            learnMoreUrl,
-          }}
-        />
-      )}
+      <panel-list id={menuId} ref={panelListRef}>
+        <PanelListItems options={options} />
+      </panel-list>
     </div>
   );
 }

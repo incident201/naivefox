@@ -2414,7 +2414,8 @@ void BrowserChild::RequestEditCommands(NativeKeyBindingsType aType,
 
   // Don't send aEvent to the parent process directly because it'll be marked
   // as posted to remote process.
-  WidgetKeyboardEvent localEvent(aEvent);
+  WidgetKeyboardEvent localEvent(
+      aEvent);  // NOLINT(performance-unnecessary-copy-initialization)
   SendRequestNativeKeyBindings(aType, localEvent, &aCommands);
 }
 
@@ -3163,8 +3164,8 @@ mozilla::ipc::IPCResult BrowserChild::RecvRenderLayers(const bool& aEnabled) {
   } else {
     // NOTE: We want to call in even without a root frame (we might paint the
     // canvas background in that case).
-    presShell->PaintAndRequestComposite(presShell->GetRootFrame(),
-                                        mPuppetWidget->GetWindowRenderer(),
+    RefPtr<WindowRenderer> renderer = mPuppetWidget->GetWindowRenderer();
+    presShell->PaintAndRequestComposite(presShell->GetRootFrame(), renderer,
                                         PaintFlags::None);
   }
   presShell->SuppressDisplayport(false);

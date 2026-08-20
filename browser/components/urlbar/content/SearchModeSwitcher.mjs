@@ -13,33 +13,30 @@
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 
-const lazy = {};
+const lazy = typeof ChromeUtils != "undefined" ? {} : null;
 
-ChromeUtils.defineESModuleGetters(lazy, {
-  BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
-  OpenSearchManager:
-    "moz-src:///browser/components/search/OpenSearchManager.sys.mjs",
-  SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
-});
+if (lazy) {
+  ChromeUtils.defineESModuleGetters(lazy, {
+    BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+    OpenSearchManager:
+      "moz-src:///browser/components/search/OpenSearchManager.sys.mjs",
+    SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+  });
+}
 
-ChromeUtils.defineLazyGetter(lazy, "SearchModeSwitcherL10n", () => {
-  return new Localization(["browser/browser.ftl"]);
-});
+/** @type {Localization} */
+let l10n;
 
-const { XPCOMUtils } = ChromeUtils.importESModule(
-  "resource://gre/modules/XPCOMUtils.sys.mjs"
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "settingsRedesignEnabled",
-  "browser.settings-redesign.enabled",
-  true
-);
+function getL10n() {
+  l10n ??= new Localization(["browser/browser.ftl"]);
+  return l10n;
+}
 
 // Default icon used for engines that do not have icons loaded.
 const DEFAULT_ENGINE_ICON =
   "chrome://browser/skin/search-engine-placeholder@2x.png";
+
+const SKIP_TAB_STOP_PREF = "searchModeSwitcher.skipTabStop";
 
 /**
  * Implements the SearchModeSwitcher in the urlbar.
@@ -77,11 +74,6 @@ export class SearchModeSwitcher {
    */
   constructor(input) {
     this.#input = input;
-
-    this.QueryInterface = ChromeUtils.generateQI([
-      "nsIObserver",
-      "nsISupportsWeakReference",
-    ]);
 
     this.#panelList = input.querySelector(".searchmode-switcher-panel-list");
     this.#button = input.querySelector(".searchmode-switcher");
@@ -208,6 +200,16 @@ export class SearchModeSwitcher {
     }
     if (event.type == "focus") {
       this.#input.setUnifiedSearchButtonAvailability(true);
+      return;
+    }
+    if (event.type == "focusin") {
+      this.#button.tabIndex = 0;
+      return;
+    }
+    if (event.type == "focusout") {
+      if (!this.#input.contains(event.relatedTarget)) {
+        this.#button.tabIndex = -1;
+      }
       return;
     }
     if (event.type == "showing") {
@@ -358,8 +360,19 @@ export class SearchModeSwitcher {
       return;
     }
 
+    if (pref == SKIP_TAB_STOP_PREF) {
+      if (this.#isEnabled()) {
+        if (UrlbarPrefs.get(pref)) {
+          this.#enableSkipTabStop();
+        } else {
+          this.#disableSkipTabStop();
+        }
+      }
+      return;
+    }
+
     if (this.#input.sapName == "searchbar") {
-      // The searchbar cares about neither of the two prefs.
+      // The searchbar cares about neither of the two remaining prefs.
       return;
     }
 
@@ -459,7 +472,9 @@ export class SearchModeSwitcher {
       // all local search modes regardless of the prefs.
       this.#engines = searchEngines.concat(
         UrlbarShared.LOCAL_SEARCH_MODES.filter(
-          engine => lazy.settingsRedesignEnabled || UrlbarPrefs.get(engine.pref)
+          engine =>
+            UrlbarPrefs.get("browser.settings-redesign.enabled") ||
+            UrlbarPrefs.get(engine.pref)
         )
       );
     }
@@ -573,9 +588,7 @@ export class SearchModeSwitcher {
 
   async #getSearchModeLabel(source) {
     let mode = UrlbarShared.LOCAL_SEARCH_MODES.find(m => m.source == source);
-    let [str] = await lazy.SearchModeSwitcherL10n.formatMessages([
-      { id: mode.uiLabel },
-    ]);
+    let [str] = await getL10n().formatMessages([{ id: mode.uiLabel }]);
     return str.value;
   }
 
@@ -850,6 +863,10 @@ export class SearchModeSwitcher {
     this.#button.addEventListener("focus", this);
     this.#button.addEventListener("keydown", this);
 
+    if (UrlbarPrefs.get(SKIP_TAB_STOP_PREF)) {
+      this.#enableSkipTabStop();
+    }
+
     this.#panelList.addEventListener("showing", this);
     this.#panelList.addEventListener("hidden", this);
 
@@ -867,6 +884,8 @@ export class SearchModeSwitcher {
     this.#button.removeEventListener("focus", this);
     this.#button.removeEventListener("keydown", this);
 
+    this.#disableSkipTabStop();
+
     this.#panelList.removeEventListener("showing", this);
     this.#panelList.removeEventListener("hidden", this);
 
@@ -874,6 +893,25 @@ export class SearchModeSwitcher {
     this.#closebutton.removeEventListener("mousedown", this);
 
     this.#input.removeEventListener("searchmodechanged", this);
+  }
+
+  /**
+   * The button precedes the input, so it's what the toolbar tab stop in front
+   * of the widget redirects to. Declining that redirect and joining the tab
+   * order only while the widget has focus makes Tab land on the input, with
+   * the button reached by Shift+Tab from there.
+   */
+  #enableSkipTabStop() {
+    this.#button.setAttribute("keyNav", "skipTabStop");
+    this.#input.addEventListener("focusin", this);
+    this.#input.addEventListener("focusout", this);
+  }
+
+  #disableSkipTabStop() {
+    this.#button.removeAttribute("keyNav");
+    this.#button.tabIndex = -1;
+    this.#input.removeEventListener("focusin", this);
+    this.#input.removeEventListener("focusout", this);
   }
 
   /**

@@ -11,6 +11,9 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.spyk
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import mozilla.components.concept.sync.OAuthAccount
 import mozilla.components.concept.sync.TabData
 import mozilla.components.concept.sync.TabPrivacy
@@ -20,8 +23,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mozilla.fenix.R
 import org.robolectric.RobolectricTestRunner
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class SendToDevicesDialogFragmentTest {
 
@@ -30,13 +35,14 @@ class SendToDevicesDialogFragmentTest {
 
     @Before
     fun setUp() {
-        fragment = spyk(
-            SendToDevicesDialogFragment.newInstance(
-                urls = listOf("https://example.com"),
-                titles = listOf("Title"),
-                isPrivate = false,
-            ),
-        )
+        fragment =
+            spyk(
+                SendToDevicesDialogFragment.newInstance(
+                    urls = listOf("https://example.com"),
+                    titles = listOf("Title"),
+                    isPrivate = false,
+                )
+            )
         every { fragment.navigateToSignIn() } just runs
         every { fragment.onAuthenticated() } just runs
     }
@@ -45,10 +51,11 @@ class SendToDevicesDialogFragmentTest {
 
     @Test
     fun `GIVEN bundle with PRIVATE privacy WHEN loadTabData is called THEN tabs use Private privacy`() {
-        val bundle = Bundle().apply {
-            putStringArrayList("urls", arrayListOf("https://example.com"))
-            putString("privacy", "PRIVATE")
-        }
+        val bundle =
+            Bundle().apply {
+                putStringArrayList("urls", arrayListOf("https://example.com"))
+                putString("privacy", "PRIVATE")
+            }
 
         fragment.loadTabData(bundle)
 
@@ -66,10 +73,11 @@ class SendToDevicesDialogFragmentTest {
 
     @Test
     fun `GIVEN bundle with urls and titles WHEN loadTabData is called THEN tabs are updated`() {
-        val bundle = Bundle().apply {
-            putStringArrayList("urls", arrayListOf("https://mozilla.org", "https://example.com"))
-            putStringArrayList("titles", arrayListOf("Mozilla", "Example"))
-        }
+        val bundle =
+            Bundle().apply {
+                putStringArrayList("urls", arrayListOf("https://mozilla.org", "https://example.com"))
+                putStringArrayList("titles", arrayListOf("Mozilla", "Example"))
+            }
 
         fragment.loadTabData(bundle)
 
@@ -84,9 +92,10 @@ class SendToDevicesDialogFragmentTest {
 
     @Test
     fun `GIVEN a url with a missing title WHEN loadTabData is called THEN the tab title defaults to empty`() {
-        val bundle = Bundle().apply {
-            putStringArrayList("urls", arrayListOf("https://mozilla.org"))
-        }
+        val bundle =
+            Bundle().apply {
+                putStringArrayList("urls", arrayListOf("https://mozilla.org"))
+            }
 
         fragment.loadTabData(bundle)
 
@@ -131,6 +140,103 @@ class SendToDevicesDialogFragmentTest {
 
         verify(exactly = 1) { fragment.navigateToSignIn() }
     }
+
+    // endregion
+
+    // region showSendResult
+
+    @Test
+    fun `GIVEN a single tab WHEN showSendResult is called with success THEN the single-tab message is shown`() =
+        runTest(UnconfinedTestDispatcher()) {
+            fragment.loadTabData(Bundle().apply { putStringArrayList("urls", arrayListOf("https://example.com")) })
+            var shownText: Int? = null
+
+            fragment.showSendResult(
+                retryScope = backgroundScope,
+                onSuccess = { text -> shownText = text },
+                onFailure = {},
+                send = { true },
+            )
+
+            assertEquals(R.string.sync_sent_tab_snackbar_2, shownText)
+        }
+
+    @Test
+    fun `GIVEN multiple tabs WHEN showSendResult is called with success THEN the multi-tab message is shown`() =
+        runTest(UnconfinedTestDispatcher()) {
+            fragment.loadTabData(
+                Bundle().apply {
+                    putStringArrayList("urls", arrayListOf("https://mozilla.org", "https://example.com"))
+                }
+            )
+            var shownText: Int? = null
+
+            fragment.showSendResult(
+                retryScope = backgroundScope,
+                onSuccess = { text -> shownText = text },
+                onFailure = {},
+                send = { true },
+            )
+
+            assertEquals(R.string.sync_sent_tabs_snackbar_2, shownText)
+        }
+
+    @Test
+    fun `WHEN showSendResult is called with failure THEN a retry action is offered`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var retry: (() -> Unit)? = null
+
+            fragment.showSendResult(
+                retryScope = backgroundScope,
+                onSuccess = {},
+                onFailure = { onRetry -> retry = onRetry },
+                send = { false },
+            )
+
+            kotlin.test.assertNotNull(retry)
+        }
+
+    @Test
+    fun `GIVEN a failed send WHEN the retry action is invoked and succeeds THEN the success message is shown`() =
+        runTest(UnconfinedTestDispatcher()) {
+            fragment.loadTabData(Bundle().apply { putStringArrayList("urls", arrayListOf("https://example.com")) })
+            var retry: (() -> Unit)? = null
+            var shownText: Int? = null
+            var callCount = 0
+
+            fragment.showSendResult(
+                retryScope = backgroundScope,
+                onSuccess = { text -> shownText = text },
+                onFailure = { onRetry -> retry = onRetry },
+                send = {
+                    callCount++
+                    callCount > 1
+                },
+            )
+            retry?.invoke()
+
+            assertEquals(R.string.sync_sent_tab_snackbar_2, shownText)
+        }
+
+    @Test
+    fun `GIVEN a failed send WHEN the retry action is invoked and fails again THEN a new retry action is offered`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var failureCount = 0
+            var retry: (() -> Unit)? = null
+
+            fragment.showSendResult(
+                retryScope = backgroundScope,
+                onSuccess = {},
+                onFailure = { onRetry ->
+                    failureCount++
+                    retry = onRetry
+                },
+                send = { false },
+            )
+            retry?.invoke()
+
+            assertEquals(2, failureCount)
+        }
 
     // endregion
 }

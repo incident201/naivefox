@@ -339,7 +339,7 @@ tasks:
                         .*-wayland.*: []
                         .*-32.*: []
                         linux2404-64(-shippable)?/opt: ['trunk']
-                        macosx.*-64(-shippable)?(-qr)?/opt: ['trunk']
+                        macosx1500-aarch64(-shippable)?/opt: ['trunk']
                         windows11-64-25h2(-shippable)?/opt: ['trunk']
                         default: []
                 trainhop-release:
@@ -347,7 +347,7 @@ tasks:
                         .*-wayland.*: []
                         .*-32.*: []
                         linux2404-64(-shippable)?/opt: ['trunk']
-                        macosx.*-64(-shippable)?(-qr)?/opt: ['trunk']
+                        macosx1500-aarch64(-shippable)?/opt: ['trunk']
                         windows11-64-25h2(-shippable)?/opt: ['trunk']
                         default: []
                 webrender-sw:
@@ -601,6 +601,7 @@ tasks:
             product: test
             job-name: mochitest-browser-screenshots
         loopback-video: true
+        variants: ["no-nova"]
         run-on-projects:
             by-test-platform:
                 linux2404-64.*/opt: ['trunk']
@@ -610,6 +611,8 @@ tasks:
         max-run-time: 3600
         mozharness:
             mochitest-flavor: browser
+            extra-options:
+                - "--setpref=layout.css.devPixelsPerPx=1.0"
         allow-software-gl-layers: false
 
     mochitest-browser-translations:
@@ -642,6 +645,25 @@ tasks:
                 - tr8ns.T.esen.lex
                 - tr8ns.T.esen.model
                 - tr8ns.T.esen.vocab
+
+    mochitest-browser-chrome-ml-models:
+        description: "Mochitest browser-chrome tests that download real ML models from model-hub.mozilla.org"
+        suite:
+            name: mochitest-browser-chrome-ml-models
+        treeherder-symbol: M(bc-ml)
+        schedules-component: mochitest-browser-chrome-ml-models
+        loopback-video: true
+        run-on-projects:
+            by-test-platform:
+                # Shippable Linux opt only. The `.*` glob previously also
+                # matched sanitizer variants (asan/tsan), which abort on
+                # upstream ggml UB in the native llama.cpp backend.
+                linux2404-64-shippable/opt: ['mozilla-central']
+                default: []
+        max-run-time: 1800
+        mozharness:
+            mochitest-flavor: browser
+        allow-software-gl-layers: false
 
     mochitest-chrome:
         description: "Mochitest chrome run"

@@ -8,7 +8,7 @@
  */
 
 /**
- * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
+ * @import {UrlbarLoadRequest, URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
  * @import {Query} from "./UrlbarProvidersManager.sys.mjs"
  * @import {SearchEngine} from "moz-src:///toolkit/components/search/SearchEngine.sys.mjs"
  * @import {SmartbarInput} from "chrome://browser/content/urlbar/SmartbarInput.mjs"
@@ -20,7 +20,6 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 const lazy = XPCOMUtils.declareLazy({
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
-  BrowserUIUtils: "resource:///modules/BrowserUIUtils.sys.mjs",
   ContextualIdentityService:
     "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
   CustomizableUI:
@@ -38,8 +37,6 @@ const lazy = XPCOMUtils.declareLazy({
   SearchSuggestionController:
     "moz-src:///toolkit/components/search/SearchSuggestionController.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
-  UrlbarSearchUtils:
-    "moz-src:///browser/components/urlbar/UrlbarSearchUtils.sys.mjs",
   UrlUtils: "resource://gre/modules/UrlUtils.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
@@ -187,6 +184,22 @@ export var UrlbarUtils = {
   },
 
   /**
+   * Converts nsIInputStream to string. Throws unless the stream is a MIME
+   * stream wrapping a string stream, as built by `getPostDataStream` and by
+   * search engine submissions.
+   *
+   * @param {nsIInputStream} postData
+   *   The stream to unwrap.
+   * @returns {string}
+   *  The wrapped post data.
+   */
+  getPostDataString(postData) {
+    return postData
+      .QueryInterface(Ci.nsIMIMEInputStream)
+      .data.QueryInterface(Ci.nsISupportsCString).data;
+  },
+
+  /**
    * Returns the group for a result.
    *
    * @param {UrlbarResult} result
@@ -299,34 +312,44 @@ export var UrlbarUtils = {
    *   The element associated with the result that was selected or picked, if
    *   available. For results that have multiple selectable children, the URL
    *   may be taken from a child element rather than the result.
-   * @returns {object}
-   *   An object: `{ url, postData }`
+   * @returns {{url: ?string, postData: ?nsIInputStream}}
    *   `url` will be null if the result doesn't have a URL. `postData` will be
    *   null if the result doesn't have post data.
    */
   getUrlFromResult(result, { element = null } = {}) {
-    if (
-      result.payload.engine &&
-      (result.type == UrlbarShared.RESULT_TYPE.SEARCH ||
-        result.type == UrlbarShared.RESULT_TYPE.DYNAMIC)
-    ) {
-      let query =
-        element?.dataset.query ||
-        result.payload.suggestion ||
-        result.payload.query;
-      if (query) {
-        const engine = lazy.SearchService.getEngineByName(
-          result.payload.engine
-        );
-        let [url, postData] = this.getSearchQueryUrl(engine, query);
-        return { url, postData };
+    let loadRequest = UrlbarShared.getLoadRequestFromResult(result, {
+      element,
+    });
+    if (!loadRequest) {
+      return { url: null, postData: null };
+    }
+
+    return this.loadRequestToUrl(loadRequest);
+  },
+
+  /**
+   * Resolves a load request to the url and post data to load.
+   *
+   * @param {UrlbarLoadRequest} loadRequest
+   *   What to load.
+   * @returns {{url: ?string, postData: ?nsIInputStream}}
+   *   `url` will be null when the search engine wasn't found.
+   */
+  loadRequestToUrl(loadRequest) {
+    if (loadRequest.engineSearch) {
+      let { engineName, query } = loadRequest.engineSearch;
+      let engine = lazy.SearchService.getEngineByName(engineName);
+      if (!engine) {
+        return { url: null, postData: null };
       }
+      let [url, postData] = this.getSearchQueryUrl(engine, query);
+      return { url, postData };
     }
 
     return {
-      url: result.payload.url ?? null,
-      postData: result.payload.postData
-        ? this.getPostDataStream(result.payload.postData)
+      url: loadRequest.urlLoad.url,
+      postData: loadRequest.urlLoad.postData
+        ? this.getPostDataStream(loadRequest.urlLoad.postData)
         : null,
     };
   },
@@ -1178,68 +1201,6 @@ export var UrlbarUtils = {
   },
 
   /**
-   * Unescape the given uri to use as UI.
-   * NOTE: If the length of uri is over MAX_TEXT_LENGTH,
-   *       return the given uri as it is.
-   *
-   * @param {string} uri will be unescaped.
-   * @returns {string} Unescaped uri.
-   */
-  unEscapeURIForUI(uri) {
-    return uri.length > UrlbarShared.MAX_TEXT_LENGTH
-      ? uri
-      : Services.textToSubURI.unEscapeURIForUI(uri);
-  },
-
-  /**
-   * Unescape, decode punycode, and trim (both protocol and trailing slash)
-   * the URL. Use for displaying purposes only!
-   *
-   * @param {string|URL} url The url that should be prepared for display.
-   * @param {object} [options] Preparation options.
-   * @param {boolean} [options.trimURL] Whether the displayed URL should be
-   *                  trimmed or not.
-   * @param {boolean} [options.schemeless] Trim `http(s)://`.
-   * @returns {string} Prepared url.
-   */
-  prepareUrlForDisplay(url, { trimURL = true, schemeless = false } = {}) {
-    // Some domains are encoded in punycode. The following ensures we display
-    // the url in utf-8.
-    let displayString;
-    if (typeof url == "string") {
-      try {
-        displayString = new URL(url).URI.displaySpec;
-      } catch {
-        // In some cases url is not a valid url, so we fallback to using the
-        // string as-is.
-        displayString = url;
-      }
-    } else {
-      displayString = url.URI.displaySpec;
-    }
-
-    if (displayString) {
-      if (schemeless) {
-        displayString = UrlbarShared.stripPrefixAndTrim(displayString, {
-          stripHttp: true,
-          stripHttps: true,
-        })[0];
-      } else if (trimURL && lazy.UrlbarPrefs.get("trimURLs")) {
-        displayString =
-          lazy.BrowserUIUtils.removeSingleTrailingSlashFromURL(displayString);
-        if (displayString.startsWith("https://")) {
-          displayString = displayString.substring(8);
-          if (displayString.startsWith("www.")) {
-            displayString = displayString.substring(4);
-          }
-        }
-      }
-    }
-
-    return this.unEscapeURIForUI(displayString);
-  },
-
-  /**
    * Extracts a group for search engagement telemetry from a result.
    *
    * @param {UrlbarResult} result The result to analyze.
@@ -1311,167 +1272,6 @@ export var UrlbarUtils = {
     return result.heuristic ? "heuristic" : "unknown";
   },
 
-  /**
-   * Extracts a type for search engagement telemetry from a result.
-   *
-   * @param {UrlbarResult} result The result to analyze.
-   * @param {string} [selType] An optional parameter for the selected type.
-   * @returns {string} Type as string.
-   */
-  searchEngagementTelemetryType(result, selType = null) {
-    if (!result) {
-      return selType === "oneoff" ? "search_shortcut_button" : "input_field";
-    }
-
-    // While product doesn't use experimental addons anymore, tests may still do
-    // for testing purposes.
-    if (
-      result.providerType === UrlbarShared.PROVIDER_TYPE.EXTENSION &&
-      result.providerName != "UrlbarProviderOmnibox"
-    ) {
-      return "experimental_addon";
-    }
-
-    if (result.providerName == "UrlbarProviderQuickSuggest") {
-      return this._getQuickSuggestTelemetryType(result);
-    }
-
-    // Appends subtype to certain result types.
-    function checkForSubType(type, res) {
-      if (res.providerName == "UrlbarProviderInputHistory") {
-        type += "_adaptive";
-      } else if (res.providerName == "UrlbarProviderSemanticHistorySearch") {
-        type += "_semantic";
-      }
-      if (
-        lazy.UrlbarSearchUtils.resultIsSERP(res, [
-          UrlbarShared.RESULT_SOURCE.BOOKMARKS,
-          UrlbarShared.RESULT_SOURCE.HISTORY,
-          UrlbarShared.RESULT_SOURCE.TABS,
-        ])
-      ) {
-        type += "_serp";
-      }
-      return type;
-    }
-
-    switch (result.type) {
-      case UrlbarShared.RESULT_TYPE.DYNAMIC:
-        switch (result.providerName) {
-          case "UrlbarProviderCalculator":
-            return "calc";
-          case "UrlbarProviderTabToSearch":
-            return "tab_to_search";
-          case "UrlbarProviderUnitConversion":
-            return "unit";
-          case "UrlbarProviderQuickSuggestContextualOptIn":
-            return "fxsuggest_data_sharing_opt_in";
-          case "UrlbarProviderGlobalActions":
-          case "UrlbarProviderActionsSearchMode":
-            return "action";
-        }
-        break;
-      case UrlbarShared.RESULT_TYPE.KEYWORD:
-        return "keyword";
-      case UrlbarShared.RESULT_TYPE.OMNIBOX:
-        return "addon";
-      case UrlbarShared.RESULT_TYPE.REMOTE_TAB:
-        return "remote_tab";
-      case UrlbarShared.RESULT_TYPE.SEARCH:
-        if (result.providerName === "UrlbarProviderTabToSearch") {
-          return "tab_to_search";
-        }
-        if (result.source == UrlbarShared.RESULT_SOURCE.HISTORY) {
-          return result.providerName == "UrlbarProviderRecentSearches"
-            ? "recent_search"
-            : "search_history";
-        }
-        if (result.providerName === "UrlbarProviderAiChat") {
-          return "ai_search_fallback";
-        }
-        if (result.payload.suggestion) {
-          let type = result.payload.trending
-            ? "trending_search"
-            : "search_suggest";
-          if (result.isRichSuggestion) {
-            type += "_rich";
-          }
-          return type;
-        }
-        return "search_engine";
-      case UrlbarShared.RESULT_TYPE.TAB_SWITCH:
-        return checkForSubType("tab", result);
-      case UrlbarShared.RESULT_TYPE.TIP:
-        if (result.providerName === "UrlbarProviderInterventions") {
-          switch (result.payload.type) {
-            case UrlbarShared.INTERVENTION_TIP_TYPE.CLEAR:
-              return "intervention_clear";
-            case UrlbarShared.INTERVENTION_TIP_TYPE.REFRESH:
-              return "intervention_refresh";
-            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_ASK:
-            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_CHECKING:
-            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_REFRESH:
-            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_RESTART:
-            case UrlbarShared.INTERVENTION_TIP_TYPE.UPDATE_WEB:
-              return "intervention_update";
-            default:
-              return "intervention_unknown";
-          }
-        }
-        switch (result.payload.type) {
-          case UrlbarShared.SEARCH_TIP_TYPE.ONBOARD:
-            return "tip_onboard";
-          case UrlbarShared.SEARCH_TIP_TYPE.REDIRECT:
-            return "tip_redirect";
-          case "dismissalAcknowledgment":
-            return "tip_dismissal_acknowledgment";
-          default:
-            return "tip_unknown";
-        }
-      case UrlbarShared.RESULT_TYPE.URL:
-        if (
-          result.source === UrlbarShared.RESULT_SOURCE.OTHER_LOCAL &&
-          result.heuristic
-        ) {
-          return "url";
-        }
-        if (result.autofill) {
-          return `autofill_${result.autofill.type ?? "unknown"}`;
-        }
-        if (result.providerName === "UrlbarProviderTopSites") {
-          return "top_site";
-        }
-        if (result.providerName === "UrlbarProviderClipboard") {
-          return "clipboard";
-        }
-        if (result.payload.isAutofillFallback) {
-          return "history_autofill_fallback_origin";
-        }
-        if (result.source === UrlbarShared.RESULT_SOURCE.BOOKMARKS) {
-          return checkForSubType("bookmark", result);
-        }
-        return checkForSubType("history", result);
-      case UrlbarShared.RESULT_TYPE.RESTRICT:
-        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.BOOKMARK) {
-          return "restrict_keyword_bookmarks";
-        }
-        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.OPENPAGE) {
-          return "restrict_keyword_tabs";
-        }
-        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.HISTORY) {
-          return "restrict_keyword_history";
-        }
-        if (result.payload.keyword === UrlbarShared.RESTRICT_TOKENS.ACTION) {
-          return "restrict_keyword_actions";
-        }
-        break;
-      case UrlbarShared.RESULT_TYPE.AI_CHAT:
-        return "ai_chat";
-    }
-
-    return "unknown";
-  },
-
   searchEngagementTelemetryAction(result, pickedActionKey = null) {
     if (result.providerName != "UrlbarProviderGlobalActions") {
       return result.payload.action?.key ?? "none";
@@ -1480,15 +1280,6 @@ export var UrlbarUtils = {
       return pickedActionKey;
     }
     return result.payload.actionsResults.map(({ key }) => key).join(",");
-  },
-
-  _getQuickSuggestTelemetryType(result) {
-    if (result.payload.telemetryType == "weather") {
-      // Return "weather" without the usual source prefix for consistency with
-      // past reporting of weather suggestions.
-      return "weather";
-    }
-    return result.payload.source + "_" + result.payload.telemetryType;
   },
 
   /**
@@ -1572,6 +1363,37 @@ export var UrlbarUtils = {
     }
 
     return action;
+  },
+
+  /**
+   * Builds the `userContext` payload of a tab-switch result: the container id
+   * the tab lives in, plus the container's display data, resolved here because
+   * the view can't reach ContextualIdentityService.
+   *
+   * @param {number} userContextId
+   *   The container id for the tab.
+   * @returns {{id: number, label?: string, color?: string, iconUrl?: string}}
+   *   The display data is absent when the id has no public identity. The label
+   *   is trimmed.
+   */
+  getUserContextData(userContextId) {
+    let identity =
+      lazy.ContextualIdentityService.getPublicIdentityFromId(userContextId);
+    if (!identity) {
+      return { id: userContextId };
+    }
+
+    return {
+      id: userContextId,
+      label:
+        lazy.ContextualIdentityService.getUserContextLabel(
+          userContextId
+        ).trim(),
+      color: identity.color,
+      iconUrl: lazy.ContextualIdentityService.getContainerIconURL(
+        identity.icon
+      ),
+    };
   },
 
   /**
@@ -1733,8 +1555,23 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
       url: {
         type: "string",
       },
-      userContextId: {
-        type: "number",
+      userContext: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          color: {
+            type: "string",
+          },
+          iconUrl: {
+            type: "string",
+          },
+          id: {
+            type: "number",
+          },
+          label: {
+            type: "string",
+          },
+        },
       },
     },
   },

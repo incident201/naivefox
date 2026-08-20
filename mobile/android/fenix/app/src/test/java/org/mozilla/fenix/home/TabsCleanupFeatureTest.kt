@@ -31,6 +31,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.browser.browsingmode.BrowsingModeManager
 import org.mozilla.fenix.components.usecases.FenixBrowserUseCases
 import org.mozilla.fenix.ext.tabsClosedUndoMessage
+import org.mozilla.fenix.home.HomeScreenViewModel.Companion.ALL_ACTIVE_NORMAL_TABS
 import org.mozilla.fenix.home.HomeScreenViewModel.Companion.ALL_NORMAL_TABS
 import org.mozilla.fenix.home.HomeScreenViewModel.Companion.ALL_PRIVATE_TABS
 import org.mozilla.fenix.utils.Settings
@@ -42,26 +43,19 @@ class TabsCleanupFeatureTest {
     private val testDispatcher = StandardTestDispatcher()
     private val testCoroutineScope = CoroutineScope(testDispatcher)
 
-    @RelaxedMockK
-    private lateinit var viewModel: HomeScreenViewModel
+    @RelaxedMockK private lateinit var viewModel: HomeScreenViewModel
 
-    @RelaxedMockK
-    private lateinit var browserStore: BrowserStore
+    @RelaxedMockK private lateinit var browserStore: BrowserStore
 
-    @RelaxedMockK
-    private lateinit var browsingModeManager: BrowsingModeManager
+    @RelaxedMockK private lateinit var browsingModeManager: BrowsingModeManager
 
-    @RelaxedMockK
-    private lateinit var navController: NavController
+    @RelaxedMockK private lateinit var navController: NavController
 
-    @RelaxedMockK
-    private lateinit var tabsUseCases: TabsUseCases
+    @RelaxedMockK private lateinit var tabsUseCases: TabsUseCases
 
-    @RelaxedMockK
-    private lateinit var fenixBrowserUseCases: FenixBrowserUseCases
+    @RelaxedMockK private lateinit var fenixBrowserUseCases: FenixBrowserUseCases
 
-    @RelaxedMockK
-    private lateinit var settings: Settings
+    @RelaxedMockK private lateinit var settings: Settings
 
     private val snackbarHostState = SnackbarHostState()
 
@@ -71,32 +65,88 @@ class TabsCleanupFeatureTest {
     fun setup() {
         MockKAnnotations.init(this)
 
-        feature = spyk(
-            TabsCleanupFeature(
-                context = testContext,
-                viewModel = viewModel,
-                browserStore = browserStore,
-                browsingModeManager = browsingModeManager,
-                navController = navController,
-                settings = settings,
-                tabsUseCases = tabsUseCases,
-                fenixBrowserUseCases = fenixBrowserUseCases,
-                snackbarHostState = snackbarHostState,
-                viewLifecycleScope = testCoroutineScope,
-            ),
-        )
+        feature =
+            spyk(
+                TabsCleanupFeature(
+                    context = testContext,
+                    viewModel = viewModel,
+                    browserStore = browserStore,
+                    browsingModeManager = browsingModeManager,
+                    navController = navController,
+                    settings = settings,
+                    tabsUseCases = tabsUseCases,
+                    fenixBrowserUseCases = fenixBrowserUseCases,
+                    snackbarHostState = snackbarHostState,
+                    viewLifecycleScope = testCoroutineScope,
+                )
+            )
 
         every { feature.showUndoSnackbar(any(), any()) } just Runs
     }
 
     @Test
+    fun `GIVEN all active normal tabs to delete WHEN feature is started THEN remove all active normal tabs and show undo snackbar`() {
+        val tabs =
+            listOf(
+                createTab(
+                    id = "1",
+                    url = "https://mozilla.org/1",
+                    private = false,
+                    lastAccess = System.currentTimeMillis(),
+                    createdAt = System.currentTimeMillis(),
+                ),
+                createTab(
+                    id = "2",
+                    url = "https://mozilla.org/2",
+                    private = false,
+                    lastAccess = System.currentTimeMillis(),
+                    createdAt = System.currentTimeMillis(),
+                ),
+                createTab(
+                    id = "3",
+                    url = "https://mozilla.org/3",
+                    private = false,
+                    lastAccess = System.currentTimeMillis(),
+                    createdAt = System.currentTimeMillis(),
+                ),
+                createTab(
+                    id = "inactive_tab",
+                    url = "https://mozilla.org/4",
+                    private = false,
+                    lastAccess = 0L,
+                    createdAt = 0L,
+                ),
+            )
+
+        every { settings.inactiveTabsAreEnabled } returns true
+        every { browserStore.state } returns BrowserState(tabs = tabs)
+        every { viewModel.sessionToDelete } returns ALL_ACTIVE_NORMAL_TABS
+
+        feature.start()
+
+        verify {
+            tabsUseCases.removeTabs(listOf("1", "2", "3"), setOf("inactive_tab"))
+
+            feature.showUndoSnackbar(
+                testContext.tabsClosedUndoMessage(3),
+                any(),
+            )
+
+            viewModel.sessionToDelete = null
+        }
+
+        verify(exactly = 0) { tabsUseCases.removeNormalTabs() }
+    }
+
+    @Test
     fun `GIVEN all normal tabs to delete WHEN feature is started THEN remove all normal tabs and show undo snackbar`() {
         val tabsCount = 3
-        val mockTabs = List(tabsCount) {
-            mockk<TabSessionState> {
-                every { content.private } returns false
+        val mockTabs =
+            List(tabsCount) {
+                mockk<TabSessionState> {
+                    every { content.private } returns false
+                }
             }
-        }
 
         every { browserStore.state } returns BrowserState(tabs = mockTabs)
         every { viewModel.sessionToDelete } returns ALL_NORMAL_TABS
@@ -118,11 +168,12 @@ class TabsCleanupFeatureTest {
     @Test
     fun `GIVEN all private tabs to delete WHEN feature is started THEN remove all private tabs and show undo snackbar`() {
         val tabsCount = 4
-        val mockTabs = List(tabsCount) {
-            mockk<TabSessionState> {
-                every { content.private } returns true
+        val mockTabs =
+            List(tabsCount) {
+                mockk<TabSessionState> {
+                    every { content.private } returns true
+                }
             }
-        }
 
         every { viewModel.sessionToDelete } returns ALL_PRIVATE_TABS
         every { browserStore.state } returns BrowserState(tabs = mockTabs)
@@ -157,9 +208,7 @@ class TabsCleanupFeatureTest {
         verifyOrder {
             tabsUseCases.removeNormalTabs()
 
-            fenixBrowserUseCases.addNewHomepageTab(
-                private = browsingModeManager.mode.isPrivate,
-            )
+            fenixBrowserUseCases.addNewHomepageTab(private = browsingModeManager.mode.isPrivate)
 
             feature.showUndoSnackbar(
                 testContext.tabsClosedUndoMessage(2),
@@ -176,11 +225,12 @@ class TabsCleanupFeatureTest {
         every { viewModel.sessionToDelete } returns ALL_PRIVATE_TABS
 
         val tabsCount = 3
-        val mockTabs = List(tabsCount) {
-            mockk<TabSessionState> {
-                every { content.private } returns true
+        val mockTabs =
+            List(tabsCount) {
+                mockk<TabSessionState> {
+                    every { content.private } returns true
+                }
             }
-        }
 
         every { browserStore.state } returns BrowserState(tabs = mockTabs)
         every { browsingModeManager.mode.isPrivate } returns true
@@ -190,9 +240,7 @@ class TabsCleanupFeatureTest {
         verifyOrder {
             tabsUseCases.removePrivateTabs()
 
-            fenixBrowserUseCases.addNewHomepageTab(
-                private = true,
-            )
+            fenixBrowserUseCases.addNewHomepageTab(private = true)
 
             feature.showUndoSnackbar(
                 testContext.tabsClosedUndoMessage(tabsCount),
@@ -206,11 +254,12 @@ class TabsCleanupFeatureTest {
     @Test
     fun `GIVEN all private tabs to delete WHEN remove tabs is called THEN remove all normal tabs and show undo snackbar`() {
         val tabsCount = 5
-        val mockTabs = List(tabsCount) {
-            mockk<TabSessionState> {
-                every { content.private } returns true
+        val mockTabs =
+            List(tabsCount) {
+                mockk<TabSessionState> {
+                    every { content.private } returns true
+                }
             }
-        }
 
         every { viewModel.sessionToDelete } returns ALL_PRIVATE_TABS
         every { browserStore.state } returns BrowserState(tabs = mockTabs)
@@ -278,9 +327,7 @@ class TabsCleanupFeatureTest {
         verifyOrder {
             tabsUseCases.removeTab(sessionId)
 
-            fenixBrowserUseCases.addNewHomepageTab(
-                private = private,
-            )
+            fenixBrowserUseCases.addNewHomepageTab(private = private)
 
             feature.showUndoSnackbar(
                 testContext.getString(R.string.snackbar_private_tab_closed),
@@ -327,9 +374,7 @@ class TabsCleanupFeatureTest {
         }
 
         verify(exactly = 0) {
-            fenixBrowserUseCases.addNewHomepageTab(
-                private = private,
-            )
+            fenixBrowserUseCases.addNewHomepageTab(private = private)
         }
     }
 
@@ -340,9 +385,7 @@ class TabsCleanupFeatureTest {
         verify {
             tabsUseCases.undo.invoke()
 
-            navController.navigate(
-                HomeFragmentDirections.actionGlobalBrowser(null),
-            )
+            navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
         }
     }
 
@@ -355,9 +398,7 @@ class TabsCleanupFeatureTest {
         verifyOrder {
             tabsUseCases.undo.invoke()
             tabsUseCases.removeTab.invoke(tabId)
-            navController.navigate(
-                HomeFragmentDirections.actionGlobalBrowser(null),
-            )
+            navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
         }
     }
 
@@ -368,9 +409,7 @@ class TabsCleanupFeatureTest {
         verify {
             tabsUseCases.undo.invoke()
 
-            navController.navigate(
-                HomeFragmentDirections.actionGlobalBrowser(null),
-            )
+            navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
         }
     }
 
@@ -383,9 +422,7 @@ class TabsCleanupFeatureTest {
         verifyOrder {
             tabsUseCases.undo.invoke()
             tabsUseCases.removeTab.invoke(tabId)
-            navController.navigate(
-                HomeFragmentDirections.actionGlobalBrowser(null),
-            )
+            navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
         }
     }
 
@@ -403,21 +440,23 @@ class TabsCleanupFeatureTest {
 
     @Test
     fun `GIVEN a session ID to delete and inactive tabs exist WHEN feature is started THEN remove tab excluding inactive tabs`() {
-        val activeTab = createTab(
-            id = "1",
-            url = "https://mozilla.org",
-            private = false,
-            lastAccess = System.currentTimeMillis(),
-            createdAt = System.currentTimeMillis(),
-        )
+        val activeTab =
+            createTab(
+                id = "1",
+                url = "https://mozilla.org",
+                private = false,
+                lastAccess = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+            )
 
-        val inactiveTab = createTab(
-            id = "99",
-            url = "https://mozilla.org",
-            private = false,
-            lastAccess = 0L,
-            createdAt = 0L,
-        )
+        val inactiveTab =
+            createTab(
+                id = "99",
+                url = "https://mozilla.org",
+                private = false,
+                lastAccess = 0L,
+                createdAt = 0L,
+            )
 
         every { browserStore.state } returns BrowserState(tabs = listOf(activeTab, inactiveTab))
         every { viewModel.sessionToDelete } returns "1"
@@ -437,13 +476,14 @@ class TabsCleanupFeatureTest {
 
     @Test
     fun `GIVEN a session ID to delete and no inactive tabs exist WHEN feature is started THEN remove tab excluding empty set`() {
-        val activeTab = createTab(
-            id = "1",
-            url = "https://mozilla.org",
-            private = false,
-            lastAccess = System.currentTimeMillis(),
-            createdAt = System.currentTimeMillis(),
-        )
+        val activeTab =
+            createTab(
+                id = "1",
+                url = "https://mozilla.org",
+                private = false,
+                lastAccess = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+            )
 
         every { browserStore.state } returns BrowserState(tabs = listOf(activeTab))
 

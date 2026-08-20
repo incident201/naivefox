@@ -1112,7 +1112,7 @@ nsStylePosition::nsStylePosition()
       mJustifyItems({{StyleAlignFlags::LEGACY}, {StyleAlignFlags::NORMAL}}),
       mJustifySelf({StyleAlignFlags::AUTO}),
       mFlexDirection(StyleFlexDirection::Row),
-      mFlexWrap(StyleFlexWrap::Nowrap),
+      mFlexWrap(StyleFlexWrap::NOWRAP),
       mObjectFit(StyleObjectFit::Fill),
       mBoxSizing(StyleBoxSizing::ContentBox),
       mOrder(0),
@@ -2089,14 +2089,6 @@ bool nsStyleImageLayers::Layer::
          mRepeat.DependsOnPositioningAreaSize();
 }
 
-bool nsStyleImageLayers::Layer::operator==(const Layer& aOther) const {
-  return mAttachment == aOther.mAttachment && mClip == aOther.mClip &&
-         mOrigin == aOther.mOrigin && mRepeat == aOther.mRepeat &&
-         mBlendMode == aOther.mBlendMode && mPosition == aOther.mPosition &&
-         mSize == aOther.mSize && mImage == aOther.mImage &&
-         mMaskMode == aOther.mMaskMode && mComposite == aOther.mComposite;
-}
-
 template <class ComputedValueItem>
 static void FillImageLayerList(
     nsStyleAutoArray<nsStyleImageLayers::Layer>& aLayers,
@@ -2235,23 +2227,7 @@ bool nsStyleBackground::IsTransparent(const ComputedStyle* aStyle) const {
 
 StyleTransition::StyleTransition(const StyleTransition& aCopy) = default;
 
-bool StyleTransition::operator==(const StyleTransition& aOther) const {
-  return mTimingFunction == aOther.mTimingFunction &&
-         mDuration == aOther.mDuration && mDelay == aOther.mDelay &&
-         mProperty == aOther.mProperty && mBehavior == aOther.mBehavior;
-}
-
 StyleAnimation::StyleAnimation(const StyleAnimation& aCopy) = default;
-
-bool StyleAnimation::operator==(const StyleAnimation& aOther) const {
-  return mTimingFunction == aOther.mTimingFunction &&
-         mDuration == aOther.mDuration && mDelay == aOther.mDelay &&
-         mName == aOther.mName && mDirection == aOther.mDirection &&
-         mFillMode == aOther.mFillMode && mPlayState == aOther.mPlayState &&
-         mIterationCount == aOther.mIterationCount &&
-         mComposition == aOther.mComposition && mTimeline == aOther.mTimeline &&
-         mRangeStart == aOther.mRangeStart && mRangeEnd == aOther.mRangeEnd;
-}
 
 // --------------------
 // nsStyleDisplay
@@ -3365,6 +3341,7 @@ nsStyleUIReset::nsStyleUIReset()
       mWindowDragging(StyleWindowDragging::Default),
       mWindowShadow(StyleWindowShadow::Auto),
       mFieldSizing(StyleFieldSizing::Fixed),
+      mMozLineScrollAmount(NonNegativeLengthOrAuto::Auto()),
       mMozWindowInputRegionMargin(StyleLength::Zero()),
       mTransitions(
           nsStyleAutoArray<StyleTransition>::WITH_SINGLE_INITIAL_ELEMENT),
@@ -3410,6 +3387,7 @@ nsStyleUIReset::nsStyleUIReset(const nsStyleUIReset& aSource)
       mWindowDragging(aSource.mWindowDragging),
       mWindowShadow(aSource.mWindowShadow),
       mFieldSizing(aSource.mFieldSizing),
+      mMozLineScrollAmount(aSource.mMozLineScrollAmount),
       mMozWindowInputRegionMargin(aSource.mMozWindowInputRegionMargin),
       mMozWindowTransform(aSource.mMozWindowTransform),
       mTransitions(aSource.mTransitions.Clone()),
@@ -3520,6 +3498,7 @@ nsChangeHint nsStyleUIReset::CalcDifference(
        mAnimationRangeEndCount != aNewData.mAnimationRangeEndCount ||
        mIMEMode != aNewData.mIMEMode ||
        mWindowOpacity != aNewData.mWindowOpacity ||
+       mMozLineScrollAmount != aNewData.mMozLineScrollAmount ||
        mMozWindowInputRegionMargin != aNewData.mMozWindowInputRegionMargin ||
        mMozWindowTransform != aNewData.mMozWindowTransform ||
        mScrollTimelines != aNewData.mScrollTimelines ||

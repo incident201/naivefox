@@ -964,6 +964,10 @@ class DesktopUnittest(TestingMixin, MercurialScript, MozbaseMixin, CodeCoverageM
                 ("mochitest-browser-a11y.*", "browser-a11y"),
                 ("mochitest-browser-media.*", "browser-media"),
                 ("mochitest-browser-translations.*", "browser-translations"),
+                (
+                    "mochitest-browser-chrome-ml-models.*",
+                    "browser-chrome-ml-models",
+                ),
                 ("mochitest-devtools-chrome.*", "devtools-chrome"),
                 ("chrome", "chrome"),
             ],
@@ -1467,6 +1471,8 @@ class DesktopUnittest(TestingMixin, MercurialScript, MozbaseMixin, CodeCoverageM
                             output_parser=parser,
                             env=final_env,
                         )
+
+                    self.append_test_summary(dirs["abs_blob_upload_dir"])
 
                     if self.per_test_coverage:
                         self.add_per_test_coverage_report(

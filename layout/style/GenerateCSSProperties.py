@@ -353,6 +353,7 @@ def exposed_on_getcs(prop):
 def cpp_flags(prop):
     RUST_TO_CPP_FLAGS = {
       "CAN_ANIMATE_ON_COMPOSITOR": "CanAnimateOnCompositor",
+      "SCROLL_LINKED_EFFECTIVE": "ScrollLinkedEffective",
       "AFFECTS_LAYOUT": "AffectsLayout",
       "AFFECTS_PAINT": "AffectsPaint",
       "AFFECTS_OVERFLOW": "AffectsOverflow",
@@ -579,6 +580,7 @@ def gen_css_properties_js(output):
         "-moz-top-layer",                     # parsed by UA sheets only
         "-moz-min-font-size-ratio",           # parsed by UA sheets only
         "-moz-box-collapse",                  # chrome-only internal properties
+        "-moz-line-scroll-amount",            # chrome-only internal properties
         "-moz-image-decoding",                # chrome-only internal properties
         "-moz-subtree-hidden-only-visually",  # chrome-only internal properties
         "-moz-user-focus",                    # chrome-only internal properties

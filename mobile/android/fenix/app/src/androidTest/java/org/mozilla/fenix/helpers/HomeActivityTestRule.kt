@@ -32,12 +32,12 @@ import org.mozilla.fenix.settings.PhoneFeature
  * @param initialTouchMode See [ActivityTestRule]
  * @param launchActivity See [ActivityTestRule]
  */
-
 class HomeActivityTestRule(
     initialTouchMode: Boolean = false,
     launchActivity: Boolean = true,
     private val skipOnboarding: Boolean = true,
-) : ActivityTestRule<HomeActivity>(HomeActivity::class.java, initialTouchMode, launchActivity),
+) :
+    ActivityTestRule<HomeActivity>(HomeActivity::class.java, initialTouchMode, launchActivity),
     FeatureSettingsHelper by FeatureSettingsHelperDelegate() {
 
     // Using a secondary constructor allows us to easily delegate the settings to FeatureSettingsHelperDelegate.
@@ -50,12 +50,12 @@ class HomeActivityTestRule(
         isPocketEnabled: Boolean = settings.showPocketRecommendationsFeature,
         isRecentTabsFeatureEnabled: Boolean = settings.showRecentTabsFeature,
         isRecentlyVisitedFeatureEnabled: Boolean = settings.historyMetadataUIFeature,
-        isPWAsPromptEnabled: Boolean = !settings.userKnowsAboutPwas,
         isWallpaperOnboardingEnabled: Boolean = settings.showWallpaperOnboarding,
         isDeleteSitePermissionsEnabled: Boolean = settings.deleteSitePermissions,
         isOpenInAppBannerEnabled: Boolean = settings.shouldShowOpenInAppBanner,
         etpPolicy: ETPPolicy = getETPPolicy(settings),
-        isLocationPermissionEnabled: SitePermissionsRules.Action = getFeaturePermission(PhoneFeature.LOCATION, settings),
+        isLocationPermissionEnabled: SitePermissionsRules.Action =
+            getFeaturePermission(PhoneFeature.LOCATION, settings),
         isPageLoadTranslationsPromptEnabled: Boolean = false,
         isMicrosurveyEnabled: Boolean = settings.microsurveyFeatureEnabled,
         shouldUseBottomToolbar: Boolean = settings.shouldUseBottomToolbar,
@@ -75,7 +75,6 @@ class HomeActivityTestRule(
         this.isPocketEnabled = isPocketEnabled
         this.isRecentTabsFeatureEnabled = isRecentTabsFeatureEnabled
         this.isRecentlyVisitedFeatureEnabled = isRecentlyVisitedFeatureEnabled
-        this.isPWAsPromptEnabled = isPWAsPromptEnabled
         this.isWallpaperOnboardingEnabled = isWallpaperOnboardingEnabled
         this.isDeleteSitePermissionsEnabled = isDeleteSitePermissionsEnabled
         this.isOpenInAppBannerEnabled = isOpenInAppBannerEnabled
@@ -98,9 +97,7 @@ class HomeActivityTestRule(
         this.isHomepageTrendingRecentSearchEnabled = isHomepageTrendingRecentSearchEnabled
     }
 
-    /**
-     * Update settings after the activity was created.
-     */
+    /** Update settings after the activity was created. */
     fun applySettingsExceptions(settings: (FeatureSettingsHelper) -> Unit) {
         Log.i(TAG, "applySettingsExceptions: Trying to update the settings after the activity was created")
         FeatureSettingsHelperDelegate().also {
@@ -118,7 +115,9 @@ class HomeActivityTestRule(
         Log.i(TAG, "beforeActivityLaunched: Trying to apply the feature flags updates")
         applyFlagUpdates()
         Log.i(TAG, "beforeActivityLaunched: Successfully applied the feature flag updates")
-        if (skipOnboarding) { skipOnboardingBeforeLaunch() }
+        if (skipOnboarding) {
+            skipOnboardingBeforeLaunch()
+        }
     }
 
     override fun afterActivityFinished() {
@@ -131,53 +130,54 @@ class HomeActivityTestRule(
 
     companion object {
         /**
-         * Create a new instance of [HomeActivityTestRule] which by default will disable specific
-         * app features that would otherwise negatively impact most tests.
+         * Create a new instance of [HomeActivityTestRule] which by default will disable specific app features that
+         * would otherwise negatively impact most tests.
          *
          * The disabled features are:
-         *  - the PWA prompt dialog,
-         *  - the wallpaper onboarding.
+         * - the PWA prompt dialog,
+         * - the wallpaper onboarding.
          */
         fun withDefaultSettingsOverrides(
             initialTouchMode: Boolean = false,
             launchActivity: Boolean = true,
             skipOnboarding: Boolean = true,
             useNewCrashReporterFlow: Boolean = false,
-        ) = HomeActivityTestRule(
-            initialTouchMode = initialTouchMode,
-            launchActivity = launchActivity,
-            skipOnboarding = skipOnboarding,
-            isPWAsPromptEnabled = false,
-            isWallpaperOnboardingEnabled = false,
-            isOpenInAppBannerEnabled = false,
-            isMicrosurveyEnabled = false,
-            // workaround for toolbar at top position by default
-            // remove with https://bugzilla.mozilla.org/show_bug.cgi?id=1917640
-            shouldUseBottomToolbar = true,
-            isPageLoadTranslationsPromptEnabled = false,
-            isIPProtectionEnabled = false,
-            isTabSwipeCFREnabled = true,
-            hasSeenShakeToSummarizeToolbarCfr = true,
-            isTermsOfServiceAccepted = true,
-            isPrivateModeAndStoriesEntryPointEnabled = false,
-            isTabStripEnabled = false,
-        )
+        ) =
+            HomeActivityTestRule(
+                initialTouchMode = initialTouchMode,
+                launchActivity = launchActivity,
+                skipOnboarding = skipOnboarding,
+                isWallpaperOnboardingEnabled = false,
+                isOpenInAppBannerEnabled = false,
+                isMicrosurveyEnabled = false,
+                // workaround for toolbar at top position by default
+                // remove with https://bugzilla.mozilla.org/show_bug.cgi?id=1917640
+                shouldUseBottomToolbar = true,
+                isPageLoadTranslationsPromptEnabled = false,
+                isIPProtectionEnabled = false,
+                isTabSwipeCFREnabled = true,
+                hasSeenShakeToSummarizeToolbarCfr = true,
+                isTermsOfServiceAccepted = true,
+                isPrivateModeAndStoriesEntryPointEnabled = false,
+                isTabStripEnabled = false,
+            )
     }
 }
 
 /**
- * A [org.junit.Rule] to handle shared test set up for tests on [HomeActivity]. This adds
- * functionality for using the Espresso-intents api, and extends from ActivityTestRule.
+ * A [org.junit.Rule] to handle shared test set up for tests on [HomeActivity]. This adds functionality for using the
+ * Espresso-intents api, and extends from ActivityTestRule.
  *
  * @param initialTouchMode See [IntentsTestRule]
  * @param launchActivity See [IntentsTestRule]
  */
-
-class HomeActivityIntentTestRule internal constructor(
+class HomeActivityIntentTestRule
+internal constructor(
     initialTouchMode: Boolean = false,
     launchActivity: Boolean = true,
     private val skipOnboarding: Boolean = true,
-) : IntentsTestRule<HomeActivity>(HomeActivity::class.java, initialTouchMode, launchActivity),
+) :
+    IntentsTestRule<HomeActivity>(HomeActivity::class.java, initialTouchMode, launchActivity),
     FeatureSettingsHelper by FeatureSettingsHelperDelegate() {
     // Using a secondary constructor allows us to easily delegate the settings to FeatureSettingsHelperDelegate.
     // Otherwise if wanting to use the same names we would have to override these settings in the primary
@@ -189,12 +189,12 @@ class HomeActivityIntentTestRule internal constructor(
         isPocketEnabled: Boolean = settings.showPocketRecommendationsFeature,
         isRecentTabsFeatureEnabled: Boolean = settings.showRecentTabsFeature,
         isRecentlyVisitedFeatureEnabled: Boolean = settings.historyMetadataUIFeature,
-        isPWAsPromptEnabled: Boolean = !settings.userKnowsAboutPwas,
         isWallpaperOnboardingEnabled: Boolean = settings.showWallpaperOnboarding,
         isDeleteSitePermissionsEnabled: Boolean = settings.deleteSitePermissions,
         isOpenInAppBannerEnabled: Boolean = settings.shouldShowOpenInAppBanner,
         etpPolicy: ETPPolicy = getETPPolicy(settings),
-        isLocationPermissionEnabled: SitePermissionsRules.Action = getFeaturePermission(PhoneFeature.LOCATION, settings),
+        isLocationPermissionEnabled: SitePermissionsRules.Action =
+            getFeaturePermission(PhoneFeature.LOCATION, settings),
         isPageLoadTranslationsPromptEnabled: Boolean = false,
         isMicrosurveyEnabled: Boolean = settings.microsurveyFeatureEnabled,
         shouldUseBottomToolbar: Boolean = settings.shouldUseBottomToolbar,
@@ -216,7 +216,6 @@ class HomeActivityIntentTestRule internal constructor(
         this.isPocketEnabled = isPocketEnabled
         this.isRecentTabsFeatureEnabled = isRecentTabsFeatureEnabled
         this.isRecentlyVisitedFeatureEnabled = isRecentlyVisitedFeatureEnabled
-        this.isPWAsPromptEnabled = isPWAsPromptEnabled
         this.isWallpaperOnboardingEnabled = isWallpaperOnboardingEnabled
         this.isDeleteSitePermissionsEnabled = isDeleteSitePermissionsEnabled
         this.isOpenInAppBannerEnabled = isOpenInAppBannerEnabled
@@ -245,9 +244,7 @@ class HomeActivityIntentTestRule internal constructor(
 
     private lateinit var intent: Intent
 
-    /**
-     * Update settings after the activity was created.
-     */
+    /** Update settings after the activity was created. */
     fun applySettingsExceptions(settings: (FeatureSettingsHelper) -> Unit) {
         Log.i(TAG, "applySettingsExceptions: Trying to update the settings after the activity was created")
         FeatureSettingsHelperDelegate().apply {
@@ -276,7 +273,9 @@ class HomeActivityIntentTestRule internal constructor(
         Log.i(TAG, "beforeActivityLaunched: Trying to apply the feature flag updates")
         applyFlagUpdates()
         Log.i(TAG, "beforeActivityLaunched: Successfully applied the feature flag updates")
-        if (skipOnboarding) { skipOnboardingBeforeLaunch() }
+        if (skipOnboarding) {
+            skipOnboardingBeforeLaunch()
+        }
     }
 
     override fun afterActivityFinished() {
@@ -288,16 +287,14 @@ class HomeActivityIntentTestRule internal constructor(
     }
 
     /**
-     * Update the settings values from when this rule was first instantiated to account for any changes
-     * done while running the tests.
-     * Useful in the scenario about the activity being restarted which would otherwise set the initial
-     * settings and override any changes made in the meantime.
+     * Update the settings values from when this rule was first instantiated to account for any changes done while
+     * running the tests. Useful in the scenario about the activity being restarted which would otherwise set the
+     * initial settings and override any changes made in the meantime.
      */
     fun updateCachedSettings() {
         isPocketEnabled = settings.showPocketRecommendationsFeature
         isRecentTabsFeatureEnabled = settings.showRecentTabsFeature
         isRecentlyVisitedFeatureEnabled = settings.historyMetadataUIFeature
-        isPWAsPromptEnabled = !settings.userKnowsAboutPwas
         isWallpaperOnboardingEnabled = settings.showWallpaperOnboarding
         isDeleteSitePermissionsEnabled = settings.deleteSitePermissions
         isOpenInAppBannerEnabled = settings.shouldShowOpenInAppBanner
@@ -318,37 +315,37 @@ class HomeActivityIntentTestRule internal constructor(
 
     companion object {
         /**
-         * Create a new instance of [HomeActivityIntentTestRule] which by default will disable specific
-         * app features that would otherwise negatively impact most tests.
+         * Create a new instance of [HomeActivityIntentTestRule] which by default will disable specific app features
+         * that would otherwise negatively impact most tests.
          *
          * The disabled features are:
-         *  - the PWA prompt dialog,
-         *  - the wallpaper onboarding.
+         * - the PWA prompt dialog,
+         * - the wallpaper onboarding.
          */
         fun withDefaultSettingsOverrides(
             initialTouchMode: Boolean = false,
             launchActivity: Boolean = true,
             skipOnboarding: Boolean = true,
-        ) = HomeActivityIntentTestRule(
-            initialTouchMode = initialTouchMode,
-            launchActivity = launchActivity,
-            skipOnboarding = skipOnboarding,
-            isPWAsPromptEnabled = false,
-            isWallpaperOnboardingEnabled = false,
-            isOpenInAppBannerEnabled = false,
-            isMicrosurveyEnabled = false,
-            // workaround for toolbar at top position by default
-            // remove with https://bugzilla.mozilla.org/show_bug.cgi?id=1917640
-            shouldUseBottomToolbar = true,
-            isPageLoadTranslationsPromptEnabled = false,
-            isIPProtectionEnabled = false,
-            isTabSwipeCFREnabled = true,
-            hasSeenShakeToSummarizeToolbarCfr = true,
-            isTermsOfServiceAccepted = true,
-            tabManagerOpeningAnimationEnabled = false,
-            isPrivateModeAndStoriesEntryPointEnabled = false,
-            isTabStripEnabled = false,
-        )
+        ) =
+            HomeActivityIntentTestRule(
+                initialTouchMode = initialTouchMode,
+                launchActivity = launchActivity,
+                skipOnboarding = skipOnboarding,
+                isWallpaperOnboardingEnabled = false,
+                isOpenInAppBannerEnabled = false,
+                isMicrosurveyEnabled = false,
+                // workaround for toolbar at top position by default
+                // remove with https://bugzilla.mozilla.org/show_bug.cgi?id=1917640
+                shouldUseBottomToolbar = true,
+                isPageLoadTranslationsPromptEnabled = false,
+                isIPProtectionEnabled = false,
+                isTabSwipeCFREnabled = true,
+                hasSeenShakeToSummarizeToolbarCfr = true,
+                isTermsOfServiceAccepted = true,
+                tabManagerOpeningAnimationEnabled = false,
+                isPrivateModeAndStoriesEntryPointEnabled = false,
+                isTabStripEnabled = false,
+            )
     }
 }
 
