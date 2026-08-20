@@ -153,9 +153,9 @@ Validated Firefox base commit: 17e93ad5d3261e20104c7f6f2ec867ecc138ca1a
 Validated full-tree NaiveFox reference commit: 73a1ae3e49a069dc7bc97090c00af6e0b9e61376
 Audited Minimal evidence source commit: a533411d0c4940f3063d1d01313a3e4fc24ba53d
 Evidence/configure report snapshot commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
-Validated Minimal export source commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
+Validated Minimal evidence/export source commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
 Export manifest entries: 25558 (37 directory contracts)
-Export manifest SHA-256: f1b59074a8287f9b244b2fad908103c8e95e69fa120e6d33f77b8c42b9bd4228
+Export manifest SHA-256: recorded in each generated snapshot's `UPSTREAM-BASE`
 Published minimal-source root commit: pending publication from this export
 Published source tag: pending publication
 Historical pre-audit graph tag: not used for current provenance
@@ -166,7 +166,8 @@ Pre-minimization baseline tag: pre-minimization-v0.3
 
 The Linux/Windows configure, build-input, and linked-closure reports used by
 the current export attest one audited source `a533411d0c4940f3063d1d01313a3e4fc24ba53d`;
-the final report-only/export-tool snapshot is `a7251b0ea7fd530d1d23fada8e3217514aa1399c`.
+the final report-only/export-tool evidence snapshot is
+`a7251b0ea7fd530d1d23fada8e3217514aa1399c`.
 The target union passed strict provenance, repository-relative path, license,
 mode, and content checks. The clean export was built and tested without access
 to the full Firefox checkout or its object directory. A full Firefox browser

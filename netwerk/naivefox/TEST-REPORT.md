@@ -37,10 +37,9 @@ browser build was run or required; the product gate is the lean NaiveFox graph.
 | Target-aware closure assertions | PASS; Linux and Windows |
 | Deterministic export plan | PASS; 25,558 files / 37 directory contracts |
 
-The clean export was generated once at Minimal commit
-`a7251b0ea7fd530d1d23fada8e3217514aa1399c`. Its manifest SHA-256 is
-`f1b59074a8287f9b244b2fad908103c8e95e69fa120e6d33f77b8c42b9bd4228` and the
-export size is 523 MiB. The exported tree was copied to a fresh `/tmp`
+The clean export was generated once from the validated Minimal evidence
+snapshot; each generated `UPSTREAM-BASE` records the exact export commit and
+manifest hash. The export size is 523 MiB. The exported tree was copied to a fresh `/tmp`
 directory with the original checkout and object directory unavailable. In
 that tree, `./mach configure`, `./mach build export`, `./mach build -j4
 binaries`, `./mach build misc`, staging, and staged-runtime verification all

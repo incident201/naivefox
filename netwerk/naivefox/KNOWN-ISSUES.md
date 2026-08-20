@@ -6,10 +6,10 @@ Last reviewed: 2026-08-20, for the pre-export audit on `minimal`.
 
 The controlled upstream refresh and one clean export are complete. The audited
 source is `a533411d0c4940f3063d1d01313a3e4fc24ba53d`, the final report/export
-snapshot is `a7251b0ea7fd530d1d23fada8e3217514aa1399c`, and the Firefox base is
-`17e93ad5d3261e20104c7f6f2ec867ecc138ca1a`. The export has 25,558 files, 37
-directory contracts, and manifest SHA-256
-`f1b59074a8287f9b244b2fad908103c8e95e69fa120e6d33f77b8c42b9bd4228`.
+evidence snapshot is `a7251b0ea7fd530d1d23fada8e3217514aa1399c`, and the
+Firefox base is `17e93ad5d3261e20104c7f6f2ec867ecc138ca1`. The export has
+25,558 files and 37 directory contracts; each generated `UPSTREAM-BASE`
+records its exact manifest SHA-256.
 
 The exported source was configured, generated, built with the lean NaiveFox
 `binaries` target, staged, and tested outside the original checkout and
