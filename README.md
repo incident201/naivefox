@@ -59,23 +59,25 @@ once if this machine has not been prepared for Mozilla builds:
   --application-choice "Firefox for Desktop" --no-system-changes
 ```
 
-On Linux, build NaiveFox into an objdir outside the source tree. A clean source
-build must use the full `build` target; `build binaries` alone does not run all
-early code generators:
+On Linux, build the lean NaiveFox product into an objdir outside the source
+tree. Generate the product headers first, then build only the product binaries
+and runtime metadata; a full Firefox browser build is not required:
 
 ```sh
 export NAIVEFOX_OBJDIR="$PWD/../naivefox-objdir"
 export MOZCONFIG="$PWD/netwerk/naivefox/mozconfig-minimal"
 ./mach configure
-./mach build -j4
+./mach build export
+./mach build -j4 binaries
+./mach build misc
 ```
 
 The resulting executable is in `$NAIVEFOX_OBJDIR/dist/bin/naivefox`. For a
 relocatable package, use `netwerk/naivefox/tools/stage-runtime.sh` and verify
 it with `verify-staged-runtime.sh` before distributing it.
 
-For Windows x86-64, run the same `mach configure` and full `mach build` flow
-from MozillaBuild with `MOZCONFIG` set to
+For Windows x86-64, run the same product-only `mach configure`, `export`,
+`binaries`, and `misc` flow from MozillaBuild with `MOZCONFIG` set to
 `netwerk/naivefox/mozconfig-windows-x86_64` and `NAIVEFOX_OBJDIR` set to an
 external Windows objdir. Use PowerShell `$env:NAME = "value"` syntax rather
 than the POSIX `export` commands above.

@@ -16,6 +16,39 @@ real Caddy deployment, the staged runtime, and the official NaiveProxy control
 client. It intentionally contains no endpoint, username, password, proxy
 authorization value, packet payload, or TLS key material.
 
+## Current controlled upstream refresh and standalone export (2026-08-20)
+
+This is the authoritative result for the current synchronization cycle. Mozilla
+`upstream/main` was fast-forwarded into local `main` at Firefox base
+`17e93ad5d3261e20104c7f6f2ec867ecc138ca1a`, then merged through the validated
+`refresh/firefox-20260820` and `refresh/minimal-20260820` paths. No full Firefox
+browser build was run or required; the product gate is the lean NaiveFox graph.
+
+| Gate | Result |
+|---|---|
+| Lean `./mach build binaries` after refresh | PASS; incremental product link |
+| Malformed SOCKS/HTTP terminal-state and bounded-memory tests | PASS |
+| H2 config SOCKS + HTTP CONNECT | PASS |
+| H3 config SOCKS + HTTP CONNECT | PASS |
+| Auto preference and bounded H2 fallback | PASS |
+| H2 padded HTTP/HTTPS/integrity workload | PASS |
+| H3 padded HTTP/HTTPS/integrity workload | PASS |
+| Robustness/backpressure/lifecycle/multiplexing workload | PASS |
+| Target-aware closure assertions | PASS; Linux and Windows |
+| Deterministic export plan | PASS; 25,558 files / 37 directory contracts |
+
+The clean export was generated once from the validated Minimal evidence
+snapshot; each generated `UPSTREAM-BASE` records the exact export commit and
+manifest hash. The export size is 523 MiB. The exported tree was copied to a fresh `/tmp`
+directory with the original checkout and object directory unavailable. In
+that tree, `./mach configure`, `./mach build export`, `./mach build -j4
+binaries`, `./mach build misc`, staging, and staged-runtime verification all
+passed. The staged verifier covered H2, H3, Auto, config listeners, profile
+fallback, runtime smoke, and public HTTPS fetch. Additional malformed-SOCKS,
+H2/H3 padding-integrity, and finite robustness suites passed from the exported
+build. The generated source snapshot is therefore ready for orphan
+`minimal-source` publication; no discovery export loop remains.
+
 ## Standalone source publication update (2026-08-20)
 
 Source-closure discovery and isolated target validation are complete. The
@@ -31,6 +64,28 @@ the original five reports. The later Windows configure trace attests
 `af716bf57f83ebdb377c0f34cd20995faf41b641`. This six-report model avoids
 pretending that every evidence file must share one SHA and never embeds a
 commit's own SHA inside itself.
+
+The final clean export was generated from Minimal commit
+`b7f3b5bc67fcf155b569a0d0d2ad0f7f28cd45be`. Its 25,549-entry manifest has
+SHA-256 `04da2cd33beda6dca9727a5b681f7b0f2cc8f30b2417ceaa386ede43c5cdf140`.
+After removing build-created Python bytecode not present in that manifest, an
+exact hash audit reported 25,551 actual/allowed files, zero extras, zero
+missing files, and zero content mismatches. The product tree is published as
+independent root commit `31c1813e26cf652835dc73eaafef9f0fa84002f9`, tag
+`minimal-source-v0.1`, and GitHub default branch `minimal-source`.
+
+Release archives copied to `D:\\naivefox`:
+
+| Archive | SHA-256 |
+|---|---|
+| `naivefox-linux-x86_64-minimal-source-v0.1.tar.gz` | `0985a19cef94ec4005546a354684c2836253b54f2561fdf6032e9646d777bde7` |
+| `naivefox-windows-x86_64-minimal-source-v0.1.tar.gz` | `a8a09ba78edd073029ef3815f132b577a110c20f22122c1b6c6d59aa7953562f` |
+| `naivefox-minimal-source-v0.1.tar.gz` | `f97a82d689fbbcc0b0375e2e86e9787c446ee5766ef8a4069f671fb11bfef099` |
+
+The Linux binary archive was extracted to a fresh `/tmp` directory and passed
+`--runtime-smoke`. The Windows binary package is byte-identical to the staged
+package used by the native smoke and bounded H2/H3/Auto matrix below. No new
+long soak was run for publication.
 
 ### Standalone source-closure discovery
 

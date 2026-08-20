@@ -63,6 +63,9 @@ MACH_COMMANDS = {
     "bhr-aggregate": MachCommandReference(
         "toolkit/components/backgroundhangmonitor/mach_commands.py"
     ),
+    "bhr-timeseries": MachCommandReference(
+        "toolkit/components/backgroundhangmonitor/mach_commands.py"
+    ),
     "bootstrap": MachCommandReference(
         "python/mozboot/mozboot/mach_commands.py",
     ),
@@ -98,6 +101,7 @@ MACH_COMMANDS = {
     "data-review": MachCommandReference(
         "toolkit/components/glean/build_scripts/mach_commands.py"
     ),
+    "devtools-compat-test": MachCommandReference("devtools/mach_commands.py"),
     "devtools-node-test": MachCommandReference("devtools/mach_commands.py"),
     "doc": MachCommandReference("tools/moztreedocs/mach_commands.py"),
     "doctor": MachCommandReference("python/mozbuild/mozbuild/mach_commands.py"),

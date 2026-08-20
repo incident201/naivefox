@@ -370,6 +370,11 @@ nsDNSRecord::GetLastUpdate(mozilla::TimeStamp* aLastUpdate) {
   return mHostRecord->GetLastUpdate(aLastUpdate);
 }
 
+NS_IMETHODIMP
+nsDNSRecord::GetFromStaleCache(bool* aResult) {
+  return mHostRecord->GetFromStaleCache(aResult);
+}
+
 class nsDNSByTypeRecord : public nsIDNSByTypeRecord,
                           public nsIDNSTXTRecord,
                           public nsIDNSHTTPSSVCRecord {
@@ -463,6 +468,11 @@ NS_IMETHODIMP
 nsDNSByTypeRecord::GetResults(mozilla::net::TypeRecordResultType* aResults) {
   *aResults = mHostRecord->GetResults();
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDNSByTypeRecord::GetFromStaleCache(bool* aResult) {
+  return mHostRecord->GetFromStaleCache(aResult);
 }
 
 NS_IMETHODIMP

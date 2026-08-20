@@ -1030,6 +1030,12 @@ BasePrincipal::GetIsSystemPrincipal(bool* aResult) {
 }
 
 NS_IMETHODIMP
+BasePrincipal::GetIsAddonPrincipal(bool* aResult) {
+  *aResult = !!AddonPolicyCore();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 BasePrincipal::GetIsAddonOrExpandedAddonPrincipal(bool* aResult) {
 #ifdef MOZ_NAIVEFOX
   *aResult = false;

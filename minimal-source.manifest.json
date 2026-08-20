@@ -1,5 +1,5 @@
 {
-  "build_report_source_commit": "745d58bf7dcb44df0b8be87b39fb7d21d19383f9",
+  "build_report_source_commit": "a533411d0c4940f3063d1d01313a3e4fc24ba53d",
   "cargo_license_inventory": [
     {
       "license": "MPL-2.0",
@@ -1860,6 +1860,18 @@
       "version": "2.11.4"
     },
     {
+      "license": "MPL2.0",
+      "license_candidates": [],
+      "license_coverage": [
+        "LICENSE"
+      ],
+      "license_file": null,
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "version": "0.14.999"
+    },
+    {
       "license": "MIT OR Apache-2.0",
       "license_candidates": [
         "third_party/rust/itertools/LICENSE-APACHE",
@@ -1873,7 +1885,7 @@
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -4725,12 +4737,11 @@
     }
   ],
   "closure_report_source_commits": [
-    "745d58bf7dcb44df0b8be87b39fb7d21d19383f9"
+    "a533411d0c4940f3063d1d01313a3e4fc24ba53d"
   ],
-  "commit_epoch": 1787247296,
+  "commit_epoch": 1787257568,
   "configure_report_source_commits": [
-    "745d58bf7dcb44df0b8be87b39fb7d21d19383f9",
-    "af716bf57f83ebdb377c0f34cd20995faf41b641"
+    "9dfb200b4539ced1b012cf559d737a76b505bf2a"
   ],
   "entries": [
     {
@@ -4741,9 +4752,9 @@
         "closure:x86_64-unknown-linux-gnu:cargo_config_template",
         "explicit:bootstrap-license"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": ".cargo/config.toml.in",
-      "sha256": "92c8d18b91bd27eb1ee3dbc9603e676be670811afe62736466665a830d7bfdad",
+      "sha256": "cfedae06e4a1173ff90b07c784f0515ced5e48b612d5cbbf3f6dd854dd39014d",
       "source": ".cargo/config.toml.in"
     },
     {
@@ -4766,7 +4777,7 @@
       ],
       "mode": "0644",
       "path": "CLOBBER",
-      "sha256": "ec889250b9fff8a71ba4fee80fb393511cb6c96598db10b6b631c1d40012f068",
+      "sha256": "b2d5b6d21a4e87459ce44dba38f7c33ba38b033876d23575086d01e3f0232248",
       "source": "CLOBBER"
     },
     {
@@ -4775,11 +4786,13 @@
         "build:windows-x86_64",
         "closure:x86_64-pc-windows-msvc:cargo_lockfile",
         "closure:x86_64-unknown-linux-gnu:cargo_lockfile",
+        "configure:linux-x86_64:active-build-input",
+        "configure:windows-x86_64:active-build-input",
         "explicit:bootstrap-license"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "Cargo.lock",
-      "sha256": "77346927f3f24c1a68eb0fef3313839c1fed3f8a2493a08f7d7c5bdab811946c",
+      "sha256": "a585729ae351a20cab97526bbc415d8f9a1c7a0b296e96bc068900a0f5ac4976",
       "source": "Cargo.lock"
     },
     {
@@ -4788,9 +4801,9 @@
         "build:windows-x86_64",
         "explicit:bootstrap-license"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "Cargo.toml",
-      "sha256": "664bedb07d8d4cf2f4c43610874e9c413020385e07283635d9512d917c666846",
+      "sha256": "9d3131ddf62da15dc92b02afae6927bbe418788efd7c0b4894572e1595f24ca1",
       "source": "Cargo.toml"
     },
     {
@@ -4823,7 +4836,7 @@
       ],
       "mode": "0644",
       "path": "README.md",
-      "sha256": "e7d239bc1111211a8389551c38ad0ef38803504b6f197faa36edb9aec4967e61",
+      "sha256": "de8e2d1c45672361a4d12a11e92a8054b2b674738ff2713b184bc59534d37445",
       "source": "netwerk/naivefox/PRODUCT-README.md"
     },
     {
@@ -4834,7 +4847,7 @@
       ],
       "mode": "0644",
       "path": "browser/config/version.txt",
-      "sha256": "3f5052e9f40fc332ebacab5edc54396ac62dcb77892cdd4b7b500bb3bc72b162",
+      "sha256": "239286e69a2221091bd7079384087823e402b979cfe8cab9ac9efb3110dbf192",
       "source": "browser/config/version.txt"
     },
     {
@@ -4845,7 +4858,7 @@
       ],
       "mode": "0644",
       "path": "browser/config/version_display.txt",
-      "sha256": "3f5052e9f40fc332ebacab5edc54396ac62dcb77892cdd4b7b500bb3bc72b162",
+      "sha256": "239286e69a2221091bd7079384087823e402b979cfe8cab9ac9efb3110dbf192",
       "source": "browser/config/version_display.txt"
     },
     {
@@ -4855,7 +4868,7 @@
       ],
       "mode": "0644",
       "path": "build.gradle",
-      "sha256": "2f43000101d8958d5360655ce1b5c1e8ed4b432dc9f64931c88d3cfb4390b20e",
+      "sha256": "fe983299db5ed31b7a8cb26b5476d9526bdd5514dd188a824a8444f5fafa55e2",
       "source": "build.gradle"
     },
     {
@@ -5048,7 +5061,7 @@
       ],
       "mode": "0644",
       "path": "build/build-clang/clang-tidy.json",
-      "sha256": "eaf3265abab31b0e746deb2ce41b49c030bcb99ea6f3180dc599f7aaf4522eff",
+      "sha256": "3f685cfc83976f4a436f1c1b02ec281684201c978f5bd0a5ebe079a25779f81c",
       "source": "build/build-clang/clang-tidy.json"
     },
     {
@@ -5228,7 +5241,7 @@
       ],
       "mode": "0644",
       "path": "build/build-rust/Zprofile.patch",
-      "sha256": "628e9a6d3c9733659b0ac5f590679d8389f87be80dcc34241eab89534188deb4",
+      "sha256": "a7510fa27bc30dbc32d1ee56387e671be3342de0d649751df1e14784224a2eeb",
       "source": "build/build-rust/Zprofile.patch"
     },
     {
@@ -5580,7 +5593,7 @@
       ],
       "mode": "0644",
       "path": "build/clang-plugin/FinalCycleCollectingIsupportsChecker.cpp",
-      "sha256": "abb454a60ff89d6d7f1ead3c3e6bab6ddb7c6cf48a6a6a4a141fa942fa0d44ff",
+      "sha256": "692db546db78d7d12a154be24b5c5a0c5d59f2c474e11da1bc7f8e9284b7fa7b",
       "source": "build/clang-plugin/FinalCycleCollectingIsupportsChecker.cpp"
     },
     {
@@ -6560,7 +6573,7 @@
       ],
       "mode": "0644",
       "path": "build/clang-plugin/mozsearch-plugin/MozsearchIndexer.cpp",
-      "sha256": "a918770835e8ad51b9b6c423c0d23443987ade47a853bf9569e3ff7100b17e0c",
+      "sha256": "88342c3fcd4171018afa1a346a1bfea0d9f42dc20bb4be0540b884d4695bedb3",
       "source": "build/clang-plugin/mozsearch-plugin/MozsearchIndexer.cpp"
     },
     {
@@ -7217,7 +7230,7 @@
       ],
       "mode": "0644",
       "path": "build/mach_initialize.py",
-      "sha256": "445749e519c6a7cbce325ff89bcfa53a72a829ed56a54d831565f031b8de6c31",
+      "sha256": "9d9333cfee633ece2bceba40beb2829b8a77a3f1225105b6d6102a2e07061cbc",
       "source": "build/mach_initialize.py"
     },
     {
@@ -7320,7 +7333,7 @@
       ],
       "mode": "0644",
       "path": "build/moz.configure/bootstrap.configure",
-      "sha256": "bb8346530e03d97dd59f6640f43ebd7e1c2c4c9a06a90180d2f072518777c319",
+      "sha256": "6043ffec9c890d4a2fd07e7087e786f10a5342d1bdb26110cbbf6d6caf35df8c",
       "source": "build/moz.configure/bootstrap.configure"
     },
     {
@@ -7356,7 +7369,7 @@
       ],
       "mode": "0644",
       "path": "build/moz.configure/compile-checks.configure",
-      "sha256": "b0c7e8c58ac78e75347d5a01b30c91a15265ad4616899a46bf89adf4a7d3e06b",
+      "sha256": "efe4a68133d5e44348d4a8a03fbe0ceb080b0f02b27075680901ba81b5205571",
       "source": "build/moz.configure/compile-checks.configure"
     },
     {
@@ -7474,7 +7487,7 @@
       ],
       "mode": "0644",
       "path": "build/moz.configure/lto-pgo.configure",
-      "sha256": "f483e0fe3706bf284e6be55ecd2f11ddac72980c5cebdbef6f72e4e5dc37b528",
+      "sha256": "caf7a3b3d1d971b101733935d18b5fb2101824c3a2b15ff5251bd474c4e5a429",
       "source": "build/moz.configure/lto-pgo.configure"
     },
     {
@@ -7486,7 +7499,7 @@
       ],
       "mode": "0644",
       "path": "build/moz.configure/memory.configure",
-      "sha256": "ebb978b3248850d31dd344d184914942f0c4fcedf5cd0dbbf2763108fbf67dcd",
+      "sha256": "9e786cd6c9b35a26ba92bb2ef73ad2ffef692771f18da0413f5b8d197aff573e",
       "source": "build/moz.configure/memory.configure"
     },
     {
@@ -7546,7 +7559,7 @@
       ],
       "mode": "0644",
       "path": "build/moz.configure/rust.configure",
-      "sha256": "1e00fbb9a0a99d96c26950db99701bfd9f26434d310b5489fff75b5a81e6c080",
+      "sha256": "9dfb10b40e3e7eddf7afa9a1973f989378a2b236b66bcbae3fee0dd718434f14",
       "source": "build/moz.configure/rust.configure"
     },
     {
@@ -7556,9 +7569,9 @@
         "configure:linux-x86_64:bootstrap",
         "configure:windows-x86_64:bootstrap"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "build/moz.configure/toolchain.configure",
-      "sha256": "4b53a0cf36ce6f6f83256a6e2733d791cb60ca7f97b42e6f2a413c2b9b4e261b",
+      "sha256": "e24cd3fee0482ca9f9eb4cb2788d15250484e960dc6b13c3954ccdf15e1bdffe",
       "source": "build/moz.configure/toolchain.configure"
     },
     {
@@ -7927,7 +7940,9 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64"
+        "build:windows-x86_64",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
       "path": "build/rust/goblin/Cargo.toml",
@@ -7938,7 +7953,9 @@
       "categories": [
         "build:active-manifest-reference",
         "build:linux-x86_64",
-        "build:windows-x86_64"
+        "build:windows-x86_64",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
       "path": "build/rust/goblin/lib.rs",
@@ -8013,7 +8030,9 @@
         "build:linux-x86_64",
         "build:windows-x86_64",
         "closure:x86_64-pc-windows-msvc:cargo_manifests",
-        "closure:x86_64-unknown-linux-gnu:cargo_manifests"
+        "closure:x86_64-unknown-linux-gnu:cargo_manifests",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
       "path": "build/rust/hashbrown/Cargo.toml",
@@ -8024,7 +8043,9 @@
       "categories": [
         "build:active-manifest-reference",
         "build:linux-x86_64",
-        "build:windows-x86_64"
+        "build:windows-x86_64",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
       "path": "build/rust/hashbrown/lib.rs",
@@ -8079,8 +8100,29 @@
         "build:windows-x86_64"
       ],
       "mode": "0644",
-      "path": "build/rust/itertools/Cargo.toml",
+      "path": "build/rust/itertools-0.13/Cargo.toml",
       "sha256": "3df03e2201690542c17810850e35ccfd65f4cef409ad86f7b05bcbdb64b0c7bf",
+      "source": "build/rust/itertools-0.13/Cargo.toml"
+    },
+    {
+      "categories": [
+        "build:active-manifest-reference",
+        "build:linux-x86_64",
+        "build:windows-x86_64"
+      ],
+      "mode": "0644",
+      "path": "build/rust/itertools-0.13/lib.rs",
+      "sha256": "dd1a49420b5ed4c3f5b3d4a0b7dabdecdb80ba192cc7b4a40688438675509f1b",
+      "source": "build/rust/itertools-0.13/lib.rs"
+    },
+    {
+      "categories": [
+        "build:linux-x86_64",
+        "build:windows-x86_64"
+      ],
+      "mode": "0644",
+      "path": "build/rust/itertools/Cargo.toml",
+      "sha256": "f1f2572cbe70631667ae58bba972d265778e5a19a962fe36d87a99e7aa5b235c",
       "source": "build/rust/itertools/Cargo.toml"
     },
     {
@@ -8447,7 +8489,9 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64"
+        "build:windows-x86_64",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
       "path": "build/rust/toml/Cargo.toml",
@@ -8458,7 +8502,9 @@
       "categories": [
         "build:active-manifest-reference",
         "build:linux-x86_64",
-        "build:windows-x86_64"
+        "build:windows-x86_64",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
       "path": "build/rust/toml/lib.rs",
@@ -8795,7 +8841,7 @@
       ],
       "mode": "0644",
       "path": "build/workspace-hack/Cargo.toml",
-      "sha256": "9eeda1722ec0a88a85cb9b4c224895bf075fbc5c32fa7ed5dba520b2328dec99",
+      "sha256": "037ba3f906c2d6656d3f9962a784821df280ceedd75ca072ab51b6af83855256",
       "source": "build/workspace-hack/Cargo.toml"
     },
     {
@@ -8829,7 +8875,7 @@
       ],
       "mode": "0644",
       "path": "caps/BasePrincipal.cpp",
-      "sha256": "2d916d1e888ec5d63584cc3a589554637aed7561d04cceffb7e38b69e2f71938",
+      "sha256": "48fda64908d1a90112aac31a1c618025b98472e1093bf8addbaf8f5d33d03888",
       "source": "caps/BasePrincipal.cpp"
     },
     {
@@ -8841,7 +8887,7 @@
       ],
       "mode": "0644",
       "path": "caps/BasePrincipal.h",
-      "sha256": "4d18fb4d33884570b9997b0622fd36fab1d90d730d86e6b18111e1ce8c50cbb1",
+      "sha256": "e6ef67604d3b3b542b53020da4940a8402f41464ec65a339881673fed088cd30",
       "source": "caps/BasePrincipal.h"
     },
     {
@@ -8999,7 +9045,7 @@
       ],
       "mode": "0644",
       "path": "caps/nsIPrincipal.idl",
-      "sha256": "453b56c4c363d287ba9d5d4688094e59a11f8fa0109cffab8e7ac7a1327d14e5",
+      "sha256": "38637d369a3358db9636a81d9a0003c6fe59856f2f59f0e6e5f8bf9fec861a75",
       "source": "caps/nsIPrincipal.idl"
     },
     {
@@ -9462,7 +9508,7 @@
       ],
       "mode": "0644",
       "path": "chrome/nsChromeRegistryChrome.h",
-      "sha256": "b34fa045590be9c125de9462a9b8052fd64e9519490c9b1735859dfe5309b539",
+      "sha256": "8eb6a77f88036bad64775bbc48fd8b1ce3479d9cd65e46f4c8973d0d21bb2283",
       "source": "chrome/nsChromeRegistryChrome.h"
     },
     {
@@ -9602,7 +9648,7 @@
       ],
       "mode": "0644",
       "path": "config/config.mk",
-      "sha256": "0ce382b9b109da6e995d9717a275b8e48b70aa413f12c0a87c6bbca4db5dcd96",
+      "sha256": "3a68b6799b039755d70d269a9c360e01ac0a2d30225e30bd2b865c42bbc330f6",
       "source": "config/config.mk"
     },
     {
@@ -9651,10 +9697,7 @@
     },
     {
       "categories": [
-        "build:linux-x86_64",
-        "build:windows-x86_64",
-        "configure:linux-x86_64:bootstrap",
-        "configure:windows-x86_64:bootstrap"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "config/external/ffi/moz.build",
@@ -9663,8 +9706,7 @@
     },
     {
       "categories": [
-        "build:windows-x86_64",
-        "configure:windows-x86_64:bootstrap"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "config/external/ffi/preprocess_libffi_asm.py",
@@ -9674,13 +9716,11 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "configure:linux-x86_64:bootstrap",
-        "configure:windows-x86_64:bootstrap"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "config/external/ffi/subst_header.py",
-      "sha256": "262366bfa8871051cd932ce62fc77563d6257920c7e2e1d34b1281f4eb4da47c",
+      "sha256": "07eecaadee9252138c976c46434a98d0d29e47d2d1033e6227283d1bce501863",
       "source": "config/external/ffi/subst_header.py"
     },
     {
@@ -10008,7 +10048,7 @@
       ],
       "mode": "0644",
       "path": "config/makefiles/rust.mk",
-      "sha256": "e4dbae2c5a96e96a4458abb54f9955b12e8167c295d8f9e8f57cc85e6ac5e479",
+      "sha256": "ed93c5ffedc2bd77e7584184e5e1b418baa99d5ad305bb875176f8953f1e839f",
       "source": "config/makefiles/rust.mk"
     },
     {
@@ -10043,7 +10083,7 @@
       ],
       "mode": "0644",
       "path": "config/milestone.txt",
-      "sha256": "a9b1b901c4354771a24c7addc0dc46c5138b674e5d21dbb690b5ef341f2e6b14",
+      "sha256": "7d3f1a04e67f70ceac4c96181093c748963228f0975f4ee279cafc471a89388b",
       "source": "config/milestone.txt"
     },
     {
@@ -10422,7 +10462,7 @@
       ],
       "mode": "0644",
       "path": "docs/KNOWN-ISSUES.md",
-      "sha256": "d38aa6e8fbaf2b81ee0a8fd9137ba8209ea55d168f4e751f67ad4f522d33a092",
+      "sha256": "0f4f28c818c3dd8c989fcd49a57b9ba094b9f90cd551d3af58d489e14fd5dc79",
       "source": "netwerk/naivefox/KNOWN-ISSUES.md"
     },
     {
@@ -10431,7 +10471,7 @@
       ],
       "mode": "0644",
       "path": "docs/MINIMISATION-REPORT.md",
-      "sha256": "1eb363914f28aa4a6ee4516c1934f1268d82f88d98ff2e08d7f49a638587f4a8",
+      "sha256": "304cffc049de4faf0c103b788ec4a5b2e3a17fca26627a677f0cdce68972ed17",
       "source": "netwerk/naivefox/MINIMISATION-REPORT.md"
     },
     {
@@ -10458,7 +10498,7 @@
       ],
       "mode": "0644",
       "path": "docs/TEST-REPORT.md",
-      "sha256": "73ee8472cc2de9f9d90b08230a6c787bbf420ef4d94d07acb8280f68a2362973",
+      "sha256": "7dd8c861e3ed29b13e68ee291186691f604651bbb4b2061f1c6de75673340c08",
       "source": "netwerk/naivefox/TEST-REPORT.md"
     },
     {
@@ -10467,7 +10507,7 @@
       ],
       "mode": "0644",
       "path": "docs/UPSTREAM.md",
-      "sha256": "45531fa6c774f159f11178efe907485ccf0eb7d81ce2f5debc593dcd0f05ac00",
+      "sha256": "b8557307988598cfd2fe2c2e7c48ae2efe5b75bc3e67a56c2570111efe20691c",
       "source": "netwerk/naivefox/UPSTREAM.md"
     },
     {
@@ -10743,7 +10783,7 @@
       ],
       "mode": "0644",
       "path": "dom/bindings/BindingUtils.h",
-      "sha256": "2df5b0a05b9418dc9e6ad17fedf896e3ad7da24d756056b11bcd166ac1bd9d29",
+      "sha256": "4b60ed215d327027916373df4e7505fbd6268749c8073681e6cb0dca1fba7193",
       "source": "dom/bindings/BindingUtils.h"
     },
     {
@@ -10751,7 +10791,7 @@
         "build:linux-x86_64",
         "build:windows-x86_64"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "dom/bindings/Bindings.conf",
       "sha256": "87fe7b230017c61e239723ba787da79258464e110b3a54cb2f2fe5146555c224",
       "source": "dom/bindings/Bindings.conf"
@@ -10799,7 +10839,7 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "dom/bindings/Codegen.py",
       "sha256": "7078dd90d9eaa75d9e54e7ba48ac3674cafb133ebd0d48c1a4c6026bfcd20007",
       "source": "dom/bindings/Codegen.py"
@@ -11537,7 +11577,7 @@
       ],
       "mode": "0644",
       "path": "dom/security/metrics.yaml",
-      "sha256": "9cc46ba3b0f74260f6ac1e08692c1554fb9a884bac7f8c8b961ac5f280d5d1ee",
+      "sha256": "64edc653f4b9bf8bfc0c558dd69499816d30c454949750d1c85f1035cac4009c",
       "source": "dom/security/metrics.yaml"
     },
     {
@@ -12338,7 +12378,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/OT/Var/VARC/VARC.hh",
-      "sha256": "54a52b2ec2a65e11831971e7a82d420995f42833b8a5766c569b011c6f2e6d73",
+      "sha256": "f046f732d81983f7947cef72bfd83901ba190f2793b0f61a87e644a2da65ccd6",
       "source": "gfx/harfbuzz/src/OT/Var/VARC/VARC.hh"
     },
     {
@@ -12419,7 +12459,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/OT/glyf/glyf.hh",
-      "sha256": "c5cc57589e1a9d17e66977f008b72e3bea68f3be0715492a0b8198a1f572c8fb",
+      "sha256": "5c21bb60b2499862be522b1c53afe6c75e5fc64b500a6ec3a13c12e35d0c202b",
       "source": "gfx/harfbuzz/src/OT/glyf/glyf.hh"
     },
     {
@@ -12473,7 +12513,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/graph/graph.hh",
-      "sha256": "f8da812ba8099b082964ac5d9bcd670d0a7d0b1e4fde902202bf67f479d77eb1",
+      "sha256": "ffd8e6b94799a5f4a8eb697eb299609925c635219b219159407f6d8817fa3e3e",
       "source": "gfx/harfbuzz/src/graph/graph.hh"
     },
     {
@@ -12572,7 +12612,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-aat-layout-common.hh",
-      "sha256": "120fae187319111fdb528c1ad93ba667af23e31190f71541ba83c0abc251abcc",
+      "sha256": "fa86f218e7cd0f607bc72c71f8a83d7d3f6d479858e2817bea22d613aa58d4bf",
       "source": "gfx/harfbuzz/src/hb-aat-layout-common.hh"
     },
     {
@@ -12853,7 +12893,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-cff-interp-cs-common.hh",
-      "sha256": "6bb1f058cb80474a99b9f635bebe08c9545458adb79ec9c85a8c5642dde1a9cf",
+      "sha256": "7d504cc65521e6f87a6a936c48589cbae5b814f8881b81a9fef94fc417d649ba",
       "source": "gfx/harfbuzz/src/hb-cff-interp-cs-common.hh"
     },
     {
@@ -12971,7 +13011,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-depend.cc",
-      "sha256": "f00c4bf7e584b687666e69195204f9dcc656b9ac91f9c0aac033795ef70af7ae",
+      "sha256": "f67f5ff82c6fc68e92c9716e5855d9261d6879a885e66ab0b2aac4acb7968de1",
       "source": "gfx/harfbuzz/src/hb-depend.cc"
     },
     {
@@ -13128,7 +13168,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-kern.hh",
-      "sha256": "7d161b47616b37c22897f491b1eebd922b52b295ed32c85da6f530faa60f39af",
+      "sha256": "5f7db413a03df5e32627bd226274e670921827fa1e5ffa0e8f0b0315262a9242",
       "source": "gfx/harfbuzz/src/hb-kern.hh"
     },
     {
@@ -13137,7 +13177,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-limits.hh",
-      "sha256": "a523e008b203823d7420060638d916d3146b0759ca9216e6d990367c3ec449a8",
+      "sha256": "bb31067a672b4adfb9e28a9b724abe34b9d82b73c2e9342da2fad51f4f85425b",
       "source": "gfx/harfbuzz/src/hb-limits.hh"
     },
     {
@@ -13291,7 +13331,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-ot-cff1-table.cc",
-      "sha256": "a8373ba299d64e1dc15663357e483caf71c018e3155e20e3cf38cb8754d23e4f",
+      "sha256": "8859011ffc1d8c0d7122501f3cc4870b3afe23d45f20cd1016c3351d729d0780",
       "source": "gfx/harfbuzz/src/hb-ot-cff1-table.cc"
     },
     {
@@ -13300,7 +13340,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-ot-cff1-table.hh",
-      "sha256": "82823ed9037326504cfc44d55ddd17affeb11ce609882d620206af595668daca",
+      "sha256": "4a03ab9f11d9293e45db2bc528035cdaa138f047833ff6eb3aafe729ae614884",
       "source": "gfx/harfbuzz/src/hb-ot-cff1-table.hh"
     },
     {
@@ -13309,7 +13349,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-ot-cff2-table.cc",
-      "sha256": "7d97afd5cb834e67a0ace6c98c0644617af72544c891ebc34328b6dae8966559",
+      "sha256": "c6f98a2c49d69e74ed0fa8bc1d674c3335050c75d8e1a1e4e9bbf35a015bc834",
       "source": "gfx/harfbuzz/src/hb-ot-cff2-table.cc"
     },
     {
@@ -13318,7 +13358,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-ot-cff2-table.hh",
-      "sha256": "e5995b1199cf1cc2a1c32a2c73518dc58ef831ae0207efc6591fe8c5bda12b15",
+      "sha256": "36b657dc84d680ed68d6d0369113c1d484ff85de0cf8aacc39932cb5d61d88e6",
       "source": "gfx/harfbuzz/src/hb-ot-cff2-table.hh"
     },
     {
@@ -14093,7 +14133,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-ot-tag-table.hh",
-      "sha256": "1e09d65678e866d2f105f6cb84f630fae3198f8f29e146e1b8bdb42e421e1b8a",
+      "sha256": "2aa80e3fe65f262c602e58ef1ece8152cd221cfa1549da5bf0e78d084161a375",
       "source": "gfx/harfbuzz/src/hb-ot-tag-table.hh"
     },
     {
@@ -14111,7 +14151,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-ot-var-avar-table.hh",
-      "sha256": "0c5380275f40b970e434f5a3830160c8f5c8b24cb1f17f93c051391d97c1acda",
+      "sha256": "ac748bccea270ab65a0be9839552cf6980e1af21e57cd077d0596642ae0552e9",
       "source": "gfx/harfbuzz/src/hb-ot-var-avar-table.hh"
     },
     {
@@ -14248,7 +14288,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-paint-extents.hh",
-      "sha256": "f2172825341dc848ef35c830bcb72bd7e4fe4ce3805ba0178de04c8ddd43137d",
+      "sha256": "1b1a65952f898b4162037bf87789f8869d368156d5fdc686fbf9fca23e4bd47f",
       "source": "gfx/harfbuzz/src/hb-paint-extents.hh"
     },
     {
@@ -14614,7 +14654,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-subset-plan-var.cc",
-      "sha256": "37ec39ded25fd62662079b2307fbbd5319bf93c86cb026e71f7e0212db1ce339",
+      "sha256": "d7b92f00404348cc3ef93cfdb154f559f23d008ede99665e80f6a2962f5c50a6",
       "source": "gfx/harfbuzz/src/hb-subset-plan-var.cc"
     },
     {
@@ -14796,7 +14836,7 @@
       ],
       "mode": "0644",
       "path": "gfx/harfbuzz/src/hb-version.h",
-      "sha256": "39bd2e8a2f26123bb9a331a5079b1e56ee5a443b49d1653c253279b74a0c45f9",
+      "sha256": "0023d25fcc88368d599a432f54bd4e9837d6037d6fa587d42b40963cb4638ad2",
       "source": "gfx/harfbuzz/src/hb-version.h"
     },
     {
@@ -14908,7 +14948,7 @@
       ],
       "mode": "0644",
       "path": "gradle.properties",
-      "sha256": "d7e6503fa6dc3f1f691e28b786878b95dde68b301b25a1fdc378cba1cd2fdb5d",
+      "sha256": "d077df03d0f780537c14f26df1041e9567b3b822369c6205e41af479da8d0014",
       "source": "gradle.properties"
     },
     {
@@ -15097,7 +15137,7 @@
       ],
       "mode": "0644",
       "path": "intl/components/src/Bidi.cpp",
-      "sha256": "0346e3237f30e294515cd8c25b09bd4cfe3d8f5a7a6086716de7478a1a08d695",
+      "sha256": "7a73759d5f7862d1572a0f09895cbbaf0bb31c3c7599016714e81e10a7353ad4",
       "source": "intl/components/src/Bidi.cpp"
     },
     {
@@ -15107,7 +15147,7 @@
       ],
       "mode": "0644",
       "path": "intl/components/src/Bidi.h",
-      "sha256": "7604700c2ae7d7f266a91cc712059377e31556cc369fd2d11d991ccfac2000d5",
+      "sha256": "2f1fb184dd44edc6354ae5f52d0a1ec724edfa4c8edb56333cffe09ca67892b2",
       "source": "intl/components/src/Bidi.h"
     },
     {
@@ -15317,7 +15357,7 @@
       ],
       "mode": "0644",
       "path": "intl/components/src/FormatBuffer.h",
-      "sha256": "2c0882b25bcaea4ee1ac5595e1e673b605660a6c0ebe4b631a8501edccf0820d",
+      "sha256": "10ffbab77829cecd91ecca0127c7ae8ef8a4f0313b7617e2ab33cf124c0192dd",
       "source": "intl/components/src/FormatBuffer.h"
     },
     {
@@ -15347,7 +15387,7 @@
       ],
       "mode": "0644",
       "path": "intl/components/src/ICU4CGlue.h",
-      "sha256": "3bc4007a163be50f78029eda3e5b40a605f5c6bc9aa7caf05d33ae8970cae222",
+      "sha256": "be2dd6818e0179a22096b55a63aa143404aa626d0adee03f49c6b4e148d07b68",
       "source": "intl/components/src/ICU4CGlue.h"
     },
     {
@@ -37381,7 +37421,7 @@
       ],
       "mode": "0644",
       "path": "intl/locale/windows/OSPreferences_win.cpp",
-      "sha256": "bb49afc1b588f21bee533c2d376ca7f45912c52472aa371c32903a5bc630f661",
+      "sha256": "759ae859eb3a2c2cc8db7a0776e1b85a83bc48f5e59d2d1435c44c7b9a7b25e6",
       "source": "intl/locale/windows/OSPreferences_win.cpp"
     },
     {
@@ -37959,7 +37999,7 @@
       ],
       "mode": "0644",
       "path": "ipc/chromium/src/base/command_line.cc",
-      "sha256": "1fa909eaf4657f763367e9ed236e150b27af3cebc41a2c57b6bf9a5fcc89d3f4",
+      "sha256": "c80ea28707d764ac7a4ea20a33d9219441e02600f0b2acb3d544b3ba48e29a6f",
       "source": "ipc/chromium/src/base/command_line.cc"
     },
     {
@@ -39833,7 +39873,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/Endpoint.h",
-      "sha256": "27fddcf9bbcf22c80a67f70b8eb3d5a62ea480bba89ed5a391dbbf11fe545aa9",
+      "sha256": "0d1c6c864b325bfac24115be4459152019e31f0ba8ca5e55e1b83aff7eecb7cc",
       "source": "ipc/glue/Endpoint.h"
     },
     {
@@ -39937,7 +39977,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/GeckoChildProcessHost.h",
-      "sha256": "92ec20bbf30597001c6d33051b023a83aa6d3a2b9c2fd8b858d1629d563eb7b5",
+      "sha256": "480e6b29fb833e01cd4172ce83e63a296bb1b885d1397cdd55c623fcf9337333",
       "source": "ipc/glue/GeckoChildProcessHost.h"
     },
     {
@@ -39997,7 +40037,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/IPCMessageUtils.h",
-      "sha256": "75ee2404a34e76b5189ca882bba9d4f9513ab8a6682f267af93640f10d8d9a53",
+      "sha256": "0b7ce4e9281d48a048334400b6600fd26a57571099113930195e797ceb1f00e5",
       "source": "ipc/glue/IPCMessageUtils.h"
     },
     {
@@ -40328,7 +40368,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/ProtocolMessageUtils.h",
-      "sha256": "182f3b6ad9e1985cd3dd894fbfbe0f3a38681846ff532e441831ef4f66e9c4f3",
+      "sha256": "8d6894ecf77b0bfec12d74355a4acc0e16f3e2a989d1c6e3c5d7ef9df8823743",
       "source": "ipc/glue/ProtocolMessageUtils.h"
     },
     {
@@ -40350,7 +40390,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/ProtocolUtils.cpp",
-      "sha256": "3ee6be17529e366942473100ce4b263c46fa9765b78bab2dca5ae038f130de09",
+      "sha256": "87a643f0ce625f5b298c68af1c3907b3887900ad0423b9ec5f3b947fca11a496",
       "source": "ipc/glue/ProtocolUtils.cpp"
     },
     {
@@ -40363,7 +40403,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/ProtocolUtils.h",
-      "sha256": "3b3733c7de31d64fcde5b89da95ba703021d085673f425f861df840dad42ef4b",
+      "sha256": "7ba3ac7f815b881170428df9a071487c0227bf3470c6223336081f93764a38d7",
       "source": "ipc/glue/ProtocolUtils.h"
     },
     {
@@ -40537,7 +40577,7 @@
       ],
       "mode": "0644",
       "path": "ipc/glue/SharedMemoryPlatform_posix.cpp",
-      "sha256": "ca8cdcddb7e62727cbd6401016587986e8cb6f42209c73a3ad78327cfdfd75b1",
+      "sha256": "577786db26987150af04c8273f1d96e26282f791a17049b6f45ae5ecfb3286da",
       "source": "ipc/glue/SharedMemoryPlatform_posix.cpp"
     },
     {
@@ -40698,7 +40738,7 @@
         "closure:x86_64-pc-windows-msvc:cxx_translation_units",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "ipc/glue/WindowsMessageLoop.cpp",
       "sha256": "ca04af546ec94f8814e672508a4d59d7b97b1f651bc4059c34d39bf039410426",
       "source": "ipc/glue/WindowsMessageLoop.cpp"
@@ -40902,7 +40942,7 @@
       ],
       "mode": "0644",
       "path": "ipc/ipdl/ipdl/lower.py",
-      "sha256": "b367afaac6f4a13ee1865f1057f33ab361537ff7581ce8dd05c6f49d26234e4d",
+      "sha256": "212adee9551a0d7cdae7af7b30f621fd03a8bda43ea590ed15a2bc79b5640fc8",
       "source": "ipc/ipdl/ipdl/lower.py"
     },
     {
@@ -42832,9 +42872,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/moz.configure",
-      "sha256": "61b3e47ce57f5d1f61e00e97331f37870e2c8f829bb73b3a5eb7ff45a13ca5a6",
+      "sha256": "bcdc7ece0d22453a7553f8e2d9b7395f197a90976a7f2c46593a55a84d843c31",
       "source": "js/moz.configure"
     },
     {
@@ -44204,7 +44244,7 @@
       ],
       "mode": "0644",
       "path": "js/public/friend/UsageStatistics.h",
-      "sha256": "7f68c874da3312170b82ee8d6af72e62f1ec42d65ed4d5addb249ca3360ae2d2",
+      "sha256": "6f928956ad2aa067098b834ae91d7118a39d3ff3c3bd8a064a3e141094e37cfa",
       "source": "js/public/friend/UsageStatistics.h"
     },
     {
@@ -46619,34 +46659,27 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units",
-        "configure:linux-x86_64:active-build-input",
-        "configure:windows-x86_64:active-build-input"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/CTypes.cpp",
-      "sha256": "d6b2d5c7712af6ed8bde508a7cbd89940326a5d4b1568f09fdb8cf1caeb9bae9",
+      "sha256": "bc2f3556d20566dfef69986ef52b6a7ef49ab8f6221a127a460e04db8c59311a",
       "source": "js/src/ctypes/CTypes.cpp"
     },
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/CTypes.h",
-      "sha256": "2a02ca7c8d10a28a3e260b92789976ffbf9b803af1ba02a20ecc015563513221",
+      "sha256": "c55e165abefd7249a66eacd83c0a02fa169869dbf75bf07b2fb126a21b75d6db",
       "source": "js/src/ctypes/CTypes.h"
     },
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units",
-        "configure:linux-x86_64:active-build-input",
-        "configure:windows-x86_64:active-build-input"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/Library.cpp",
@@ -46656,8 +46689,7 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/Library.h",
@@ -46691,23 +46723,13 @@
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/include/ffi.h.in",
-      "sha256": "f6f9d63403cc0d4bcb805a54e7000070f414fa02b8ee57bf1540b6c0c75c8c0a",
+      "sha256": "decd0f2f39008aedf424f54a5f15f32328cd9a5c4384c7d4a347a244f5da4705",
       "source": "js/src/ctypes/libffi/include/ffi.h.in"
     },
     {
       "categories": [
-        "build:linux-x86_64"
-      ],
-      "mode": "0644",
-      "path": "js/src/ctypes/libffi/include/ffi_cfi.h",
-      "sha256": "13ed26eeafad029ec04b802bea0d86c68a1a09c0a71b90ee69992c4cfbc8d310",
-      "source": "js/src/ctypes/libffi/include/ffi_cfi.h"
-    },
-    {
-      "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/include/ffi_common.h",
@@ -46717,8 +46739,7 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/include/tramp.h",
@@ -46728,8 +46749,7 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/closures.c",
@@ -46739,8 +46759,7 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/dlmalloc.c",
@@ -46750,30 +46769,27 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/prep_cif.c",
-      "sha256": "32e6d8ff9d5c28391a17a6e4e57e4d40e6c37a96959ef4e08cf39ee87131d412",
+      "sha256": "37431a8b5f848007c5a80465b76a06eb6ce0d6485bd5c5480d7609dde852a230",
       "source": "js/src/ctypes/libffi/src/prep_cif.c"
     },
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/tramp.c",
-      "sha256": "3a913712b936dd7ce2519906a463524e7ddec935d9efe510997e70df4b153788",
+      "sha256": "803ae4e289003cbd38659dad39bf15cfdfc06a18406cf9f8f7d190b703d942d0",
       "source": "js/src/ctypes/libffi/src/tramp.c"
     },
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/types.c",
@@ -46785,36 +46801,24 @@
         "build:linux-x86_64"
       ],
       "mode": "0644",
-      "path": "js/src/ctypes/libffi/src/x86/asmnames.h",
-      "sha256": "b1a0c704a97aa9bb3a998f7d55cae8bf8181e355249da19a53269a10d03edb8e",
-      "source": "js/src/ctypes/libffi/src/x86/asmnames.h"
-    },
-    {
-      "categories": [
-        "build:linux-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
-      ],
-      "mode": "0644",
       "path": "js/src/ctypes/libffi/src/x86/ffi64.c",
-      "sha256": "a044c67576b4e5842a01654d454e8e7996818694b3e26eed080cae09c9cab6ab",
+      "sha256": "0c39dedcab0c65f2198f63b714f36f65a50df3cad5217869ecc1312f4a5d9641",
       "source": "js/src/ctypes/libffi/src/x86/ffi64.c"
     },
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/x86/ffitarget.h",
-      "sha256": "ffa1ea3b6f179405b3b1170c5b7c6d440c7d23298fb8d549311164ececdcbf97",
+      "sha256": "0fbd9298a33dddf98467d739c6245a5415d9ec6132564cb36b7ae4069ff04a1b",
       "source": "js/src/ctypes/libffi/src/x86/ffitarget.h"
     },
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/x86/ffiw64.c",
@@ -46823,8 +46827,7 @@
     },
     {
       "categories": [
-        "build:linux-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:linux-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/x86/internal64.h",
@@ -46833,37 +46836,16 @@
     },
     {
       "categories": [
-        "build:linux-x86_64"
-      ],
-      "mode": "0644",
-      "path": "js/src/ctypes/libffi/src/x86/unix64.S",
-      "sha256": "2e080d88d51a378da718515f268329f8566a8b0cf217b608bc68da3b9eb14e15",
-      "source": "js/src/ctypes/libffi/src/x86/unix64.S"
-    },
-    {
-      "categories": [
-        "build:linux-x86_64"
-      ],
-      "mode": "0644",
-      "path": "js/src/ctypes/libffi/src/x86/win64.S",
-      "sha256": "628326b2ecb84a0ac6d214643a10b444e640090cb80c355bc54d51e0262dbd2f",
-      "source": "js/src/ctypes/libffi/src/x86/win64.S"
-    },
-    {
-      "categories": [
         "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/libffi/src/x86/win64_intel.S",
-      "sha256": "5de4b429b230bc3a6e2fe070f4bd4700beeea5f938655f3c207131f0e7b232af",
+      "sha256": "632468a38e719d444b1708368952a0b3133c41be66a0f1e2cbe074fb6d400846",
       "source": "js/src/ctypes/libffi/src/x86/win64_intel.S"
     },
     {
       "categories": [
-        "build:linux-x86_64",
-        "build:windows-x86_64",
-        "configure:linux-x86_64:active-build-input",
-        "configure:windows-x86_64:active-build-input"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/moz.build",
@@ -46873,8 +46855,7 @@
     {
       "categories": [
         "build:linux-x86_64",
-        "build:windows-x86_64",
-        "closure:x86_64-unknown-linux-gnu:headers"
+        "build:windows-x86_64"
       ],
       "mode": "0644",
       "path": "js/src/ctypes/typedefs.h",
@@ -46946,7 +46927,7 @@
       ],
       "mode": "0644",
       "path": "js/src/debugger/Debugger.cpp",
-      "sha256": "edbb3768668a8c60d834b3925b337125cafe153b2ef700a0c76214098026ba02",
+      "sha256": "cc8f604ee6d2aa6be9ac5fa6c2fe167bb7c820282d57a0cb7725abc00afe1e67",
       "source": "js/src/debugger/Debugger.cpp"
     },
     {
@@ -47342,7 +47323,7 @@
       ],
       "mode": "0644",
       "path": "js/src/ds/SlimLinkedList.h",
-      "sha256": "964e8b644b7f40b8c37e9f01ff79f4e8d8715be928c241117fc9e063ed553958",
+      "sha256": "7cda86f3532b45e77f7c0dc68a9e3a87e1399439743d90ea8e5226309bb7ad82",
       "source": "js/src/ds/SlimLinkedList.h"
     },
     {
@@ -47491,7 +47472,7 @@
       ],
       "mode": "0644",
       "path": "js/src/frontend/BytecodeEmitter.cpp",
-      "sha256": "7b4e4f2d44047e6be42bab644b2ac6b5962434931f516fada92233f14b37c0a8",
+      "sha256": "0745946d280df14345e22e8b695c7e121fc16fd2a53afe3a4d2b3099403b090c",
       "source": "js/src/frontend/BytecodeEmitter.cpp"
     },
     {
@@ -47502,7 +47483,7 @@
       ],
       "mode": "0644",
       "path": "js/src/frontend/BytecodeEmitter.h",
-      "sha256": "d4d0ab70ab620187d7eed6bfedc4b7278f60d5877f5e8590e07b1f009fef52e1",
+      "sha256": "175b89aab297ddb8f4c2bbae6ea4122d4c0d2775b067023bf25625d624f97cc8",
       "source": "js/src/frontend/BytecodeEmitter.h"
     },
     {
@@ -47525,7 +47506,7 @@
       ],
       "mode": "0644",
       "path": "js/src/frontend/BytecodeSection.cpp",
-      "sha256": "53ca20731fe52724392dcb2de3651e86cc865449e94301683a3ea5d83a44413d",
+      "sha256": "ead46cc8a7844ee078a0885c9383085ac4e392865b33b6caa84ea1aed4db7bb5",
       "source": "js/src/frontend/BytecodeSection.cpp"
     },
     {
@@ -47536,7 +47517,7 @@
       ],
       "mode": "0644",
       "path": "js/src/frontend/BytecodeSection.h",
-      "sha256": "0cb9851cf7b15885d1ce14b4c571177528ecc7f902192f6975dbdafb95fa8160",
+      "sha256": "2a84c0661663d68b5769ca91e56735bbc56c740de7c5445df48160b808d9a5b0",
       "source": "js/src/frontend/BytecodeSection.h"
     },
     {
@@ -48290,7 +48271,7 @@
       ],
       "mode": "0644",
       "path": "js/src/frontend/Parser.cpp",
-      "sha256": "0e9c5ff043b7e3791838fa536a0ffbcb47a8c0090b6aa61edebf4eec5391477a",
+      "sha256": "e2bbbacb54dffe8f498731d2c9456bc8219b657015e3825de487273afd4a5f02",
       "source": "js/src/frontend/Parser.cpp"
     },
     {
@@ -48552,7 +48533,7 @@
       ],
       "mode": "0644",
       "path": "js/src/frontend/SwitchEmitter.cpp",
-      "sha256": "02580dc0ea1f461cbf7c692b5a39b22811d878a82fd67d4975237945eeb87237",
+      "sha256": "fc06afa5158f674c5ca5ccfc4262bf4d4ba295fce37cebd6f9c9b84e4006fa7d",
       "source": "js/src/frontend/SwitchEmitter.cpp"
     },
     {
@@ -48865,7 +48846,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/AtomMarking-inl.h",
-      "sha256": "28a3e6a1380baaa996d37c4b465bf1ee9cb3b6286cfb8c8436815a76ad24042d",
+      "sha256": "29bad245c66e1deeced71ae9dacb07201c6ab9cb2961a9d79b5aaa597e4c4738",
       "source": "js/src/gc/AtomMarking-inl.h"
     },
     {
@@ -48934,7 +48915,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/BufferAllocator.cpp",
-      "sha256": "4ecdacf024c7ce3cf4c25e6aac592c2d980be556a6fbc333eecc39ae8e606715",
+      "sha256": "c807b76c4f4b8a4470bc42c13c573bdb451cc01e53f57ea65b45bc2b58cad503",
       "source": "js/src/gc/BufferAllocator.cpp"
     },
     {
@@ -48945,7 +48926,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/BufferAllocator.h",
-      "sha256": "3c09729b8c53142eada623e6cdcc22e8e1a268f08a523fd9278a0afd638baba8",
+      "sha256": "64544d5243cedbea6804a3b432545d2ea6d5ddfe27f98d113ca3a0feb7978996",
       "source": "js/src/gc/BufferAllocator.h"
     },
     {
@@ -48956,7 +48937,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/BufferAllocatorInternals.h",
-      "sha256": "499993326276959f28bea44fc1989955765c28a789c0965f3e7672a7d5a556e8",
+      "sha256": "902245c6823eaff068728a436f9ae5d581515702f2644208dfe4991f78fc15bb",
       "source": "js/src/gc/BufferAllocatorInternals.h"
     },
     {
@@ -48967,7 +48948,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/Cell.h",
-      "sha256": "65df2b11594f25b3b2696f1c4e4ea6943f6418ac58d79f16b51e5bd62b65bf19",
+      "sha256": "b53d1c2e2a7b3498f825503c17779916489b30531c663e82db0127e6901e94eb",
       "source": "js/src/gc/Cell.h"
     },
     {
@@ -49158,7 +49139,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/GCMarker.h",
-      "sha256": "0e4d5a5bfda3d0e26c270a6dd129f4b1714cac268d0dfa7efeef17770c7f53c9",
+      "sha256": "eb08fd33968ebf46f255532f46d7cd516f5ec2122d557415da00b6241f33e84b",
       "source": "js/src/gc/GCMarker.h"
     },
     {
@@ -49201,9 +49182,9 @@
         "build:windows-x86_64",
         "closure:x86_64-unknown-linux-gnu:headers"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/gc/GCRuntime.h",
-      "sha256": "fa62267952752a3f22b566f5003ee95d953c47113e086e7ad2e9c59f779fb3b1",
+      "sha256": "7c268fdbd74bd4db4697f7b735e5b302927dacd079b18f76522860b028c0734f",
       "source": "js/src/gc/GCRuntime.h"
     },
     {
@@ -49283,7 +49264,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/LightLock.cpp",
-      "sha256": "da398cb878d4e91a0bb98ddb11aa32a1b91821eefdcc5aa0e5698b15cd18e028",
+      "sha256": "4fcf52be980385fd35cc5196a777fff292c616de2c3b6738db5c6ed44132fb25",
       "source": "js/src/gc/LightLock.cpp"
     },
     {
@@ -49294,7 +49275,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/LightLock.h",
-      "sha256": "388ec23ffbc3c61b90c88cd20c49ea6f25b21294a4ee33bb0b29d7fbc3dba6ee",
+      "sha256": "1cfd36e0b0dadb9254a6514f9c04b3d4b3470c12afb0e4958d3d2c3156db3608",
       "source": "js/src/gc/LightLock.h"
     },
     {
@@ -49317,7 +49298,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/Marking.cpp",
-      "sha256": "590832a6462575e2f077dc40c728608cbf362749cd6ed18505891acc36291b81",
+      "sha256": "10660d161d10097cfd41cd811f1b6b198c832b058afa4e92371901cd5f009c71",
       "source": "js/src/gc/Marking.cpp"
     },
     {
@@ -49386,7 +49367,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/Nursery.cpp",
-      "sha256": "0267bd5a84c147ce86e3dbcb51d914607525b5cb5d071cd3b23e053c65553403",
+      "sha256": "c36667d5fe848f479034a1fffe0243ec990bd1a262118bd71acc8ccad5f819d6",
       "source": "js/src/gc/Nursery.cpp"
     },
     {
@@ -49657,9 +49638,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/gc/Sweeping.cpp",
-      "sha256": "2cb1681ed0655be99ded83613e744886b12b1de08199e4919062d7f3b04fa777",
+      "sha256": "de6f8b2cc2126d3e46252375ffdbfd0bfdcdf4cc524a5769ece9de116c55b8e9",
       "source": "js/src/gc/Sweeping.cpp"
     },
     {
@@ -49737,9 +49718,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/gc/Verifier.cpp",
-      "sha256": "c972149bd472eb80fa7ae0b1e28ebeab3cc3a56dfa264d2334f1c6e68ea07221",
+      "sha256": "73b11cc429d9755880f78b376e5370a7da0661cf715a84fcb30be9657be5c35c",
       "source": "js/src/gc/Verifier.cpp"
     },
     {
@@ -49750,7 +49731,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/WeakMap-inl.h",
-      "sha256": "3ec76823ccabd29eceb31e4b6aed1ba57d32355afe963791fa33df37261a5ff7",
+      "sha256": "8b6913d18d496f75336d55ab620baef20fdd6cb56aeca1c3645bf9df1ab21a3d",
       "source": "js/src/gc/WeakMap-inl.h"
     },
     {
@@ -49762,7 +49743,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/WeakMap.cpp",
-      "sha256": "120c3cf56ebd23b4038455ee0d24668d0e42f9b7d07a8d333f0aaf76a53be15e",
+      "sha256": "13304132ad1524f69beb3bacc3cb19a6ccd464b893f7bd193c9e7e6bc7c0bfa6",
       "source": "js/src/gc/WeakMap.cpp"
     },
     {
@@ -49773,7 +49754,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/WeakMap.h",
-      "sha256": "131a5bf36bdc0846470ca4560cee4ec5c885813f754450c8f6ef5628c5034121",
+      "sha256": "697ceb4bf3272709129bf6e38bfd55a74d09f15cda258a4ed64bf4fca91d9d9e",
       "source": "js/src/gc/WeakMap.h"
     },
     {
@@ -49797,7 +49778,7 @@
       ],
       "mode": "0644",
       "path": "js/src/gc/Zone.cpp",
-      "sha256": "ad7742f209041838e62680205c9c356e41078506fa15828538e38ea45fb26027",
+      "sha256": "0d84570476cdd40a48ed960fb972f3c8a4e8168f077cfdc2c9f0bf5ab0316605",
       "source": "js/src/gc/Zone.cpp"
     },
     {
@@ -50734,7 +50715,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineBailouts.cpp",
-      "sha256": "a0e79a57f7a793919c0a436f97aa20c6105d2b59e969ae8b8a2c347117a849a4",
+      "sha256": "efc1ff8f223dae6650d8b22e1cbf8c4445d9722bd3a7f7b43cceeece8e145286",
       "source": "js/src/jit/BaselineBailouts.cpp"
     },
     {
@@ -50746,7 +50727,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineCacheIRCompiler.cpp",
-      "sha256": "ea52be046e7422e0d8bb3ae970256ebaa30fc80aaa43e46800bc293b23c3bd04",
+      "sha256": "515c1de7dd87cb32fc6f6716509f933214d7846ac5ac154a1b8060a22fa49505",
       "source": "js/src/jit/BaselineCacheIRCompiler.cpp"
     },
     {
@@ -50757,7 +50738,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineCacheIRCompiler.h",
-      "sha256": "8c7af3c00a7a0602f01e18040ba4b81882117e8168485317ee7da98a5b736513",
+      "sha256": "a448ec252b518a8d620838e97c065b0de872b2b20e7f9f88e092efb8fdfe024c",
       "source": "js/src/jit/BaselineCacheIRCompiler.h"
     },
     {
@@ -50769,7 +50750,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineCodeGen.cpp",
-      "sha256": "e7bda1ec84b6ad302d0735d8b592f2393f1238b5d80643e38ae7cac28e50cd77",
+      "sha256": "0fa0959ed6cebeb753985c52916405f667fb5d248ad99caf98994f0d6841a647",
       "source": "js/src/jit/BaselineCodeGen.cpp"
     },
     {
@@ -50780,7 +50761,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineCodeGen.h",
-      "sha256": "4a62472f881d81095cb96b73b9e12013e17a6fd9f74fd85e1b49b5857fa88ca0",
+      "sha256": "3ee3a4bdd49439b79e98490d5d30cb781edc812ed408c036ff37d4f7ad0e9ea4",
       "source": "js/src/jit/BaselineCodeGen.h"
     },
     {
@@ -50951,7 +50932,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineJIT.cpp",
-      "sha256": "1e525711808e0118bf234bbb375f94c0f060ded7806020358fb453e826499306",
+      "sha256": "bb6240f41bfd28f443d98623ad5a0c7fc9ac913b70b15d4fb20d79e263cc8868",
       "source": "js/src/jit/BaselineJIT.cpp"
     },
     {
@@ -50962,7 +50943,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BaselineJIT.h",
-      "sha256": "fbc39cffd6c6df69986c7f1dc8f90eba246f9e29761f256b17aa38bb2207ef3f",
+      "sha256": "3db4aedda0b700ce55d0e5a627a417f95395605560074fa4334a999f060dc0fe",
       "source": "js/src/jit/BaselineJIT.h"
     },
     {
@@ -51043,7 +51024,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BytecodeAnalysis.cpp",
-      "sha256": "37640cd049e475e72931b8e7a64607043c0fffdb7bc3a47d45b45df64978122f",
+      "sha256": "d59a01421734163e73383b54b52d790e09a5b11da91a35ee2c188dd8b1ed9c15",
       "source": "js/src/jit/BytecodeAnalysis.cpp"
     },
     {
@@ -51054,7 +51035,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/BytecodeAnalysis.h",
-      "sha256": "344075829bf3bde59fec6cc1a29c882067791b4fbda5237c58db0ca5a9d00973",
+      "sha256": "6d9ccae7fb65e1f90c0412f3325b900d90fcb719ad8abe00a6e5741aacdb9093",
       "source": "js/src/jit/BytecodeAnalysis.h"
     },
     {
@@ -51246,9 +51227,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/jit/CodeGenerator.cpp",
-      "sha256": "441ad40dd8205b1cb3a6c9723882b83abc3cebd5fa4d6e60a9dbe70002b82c32",
+      "sha256": "d47bb859bdd284460a5a745bee3dbd4e306062dd374ba3fe3ee85917bd5e7232",
       "source": "js/src/jit/CodeGenerator.cpp"
     },
     {
@@ -51570,8 +51551,29 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/GenerateMIRFiles.py",
-      "sha256": "264e91ad79964fac0d10af7560e84120e1e3ea015628e0c704ce56f14ca1e60f",
+      "sha256": "bc3622e5980a40b0f0acb21751463b51e30cf5fe917cd5d11241fb1660f3d168",
       "source": "js/src/jit/GenerateMIRFiles.py"
+    },
+    {
+      "categories": [
+        "build:linux-x86_64",
+        "configure:linux-x86_64:active-build-input",
+        "configure:windows-x86_64:active-build-input"
+      ],
+      "mode": "0644",
+      "path": "js/src/jit/GeneratorResumeAnalysis.cpp",
+      "sha256": "6d0dee9e502e4168585369d70d9d030d0a8c5466a0df4b38adc06dc399f757f3",
+      "source": "js/src/jit/GeneratorResumeAnalysis.cpp"
+    },
+    {
+      "categories": [
+        "build:linux-x86_64",
+        "closure:x86_64-unknown-linux-gnu:headers"
+      ],
+      "mode": "0644",
+      "path": "js/src/jit/GeneratorResumeAnalysis.h",
+      "sha256": "d17ece63c1a9ef7ff6b52a603dcbb9bec0a4f9d54c4f874742087f187490c7d2",
+      "source": "js/src/jit/GeneratorResumeAnalysis.h"
     },
     {
       "categories": [
@@ -51683,7 +51685,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/InstructionReordering.cpp",
-      "sha256": "e805f2459e4b03d69b776d37305f8e9bcb4879c47c2b6ad2c880da2710003cd7",
+      "sha256": "2031c665c52428df67d04aaf810d0fd0c070314e6be1243fee65b4bc729bbde2",
       "source": "js/src/jit/InstructionReordering.cpp"
     },
     {
@@ -51740,7 +51742,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/Ion.cpp",
-      "sha256": "dad95b867e0828c631aabe50a32b6d9947d8ef1c31cec7cd5ec698673764b0b9",
+      "sha256": "d014fcbd8d47e755a489d36147959b510278e41a13955775ef6f5e2107ff846c",
       "source": "js/src/jit/Ion.cpp"
     },
     {
@@ -51899,7 +51901,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/IonTypes.h",
-      "sha256": "d47b59f22da5bc6485bcaced211fe56cc33429a99e18f4884510f7d063d04ccf",
+      "sha256": "0f9e0cc89f9b60f182818c16ff2a6e6240990d034f322dd28623d2d829160172",
       "source": "js/src/jit/IonTypes.h"
     },
     {
@@ -51945,7 +51947,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/Jit.cpp",
-      "sha256": "6cb4ee30c3d2cb6a85ff075d845adc96bc7f69c6979fc8b9aeef997bb947d36c",
+      "sha256": "0b9be053ad1d529e0771e240cd6a0463bb1f83f72c8ba855d8694274b2a00dbb",
       "source": "js/src/jit/Jit.cpp"
     },
     {
@@ -52046,7 +52048,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/JitFrames.cpp",
-      "sha256": "60b41614a8de06f900e52ffcac7d9e36ea5d0a45d727417bec8a43eed4b035a8",
+      "sha256": "073cfe7c6e8deb9dfac4fb78543ccafa6f908af7b5e7e228614f4b230f491318",
       "source": "js/src/jit/JitFrames.cpp"
     },
     {
@@ -52170,7 +52172,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/JitSpewChannelList.h",
-      "sha256": "2344706ad147431b1796e2bcdcbaccf484515e4efbc6b4e782c36150a68b82c0",
+      "sha256": "283b16a67eea0e7fc4789a6d0506e2e9fd3cb658f71cedb9479a656bfc91d38a",
       "source": "js/src/jit/JitSpewChannelList.h"
     },
     {
@@ -52307,7 +52309,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/LIR.h",
-      "sha256": "9ff54eef2792c9d52603bfcd76fd91606cfdeeca1a433978f5ffc666b0872f42",
+      "sha256": "81dccb77d6b8e3d35e1c4767c34b4f92fc47b8c3d8f5ea78f38ec72fe661314a",
       "source": "js/src/jit/LIR.h"
     },
     {
@@ -52317,9 +52319,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/jit/LIROps.yaml",
-      "sha256": "478bdcc40149a24a49dddbf028d1af1442f38b55e15eafa2f552f9affd48caea",
+      "sha256": "c4d87b9daabb6008fd9a4f7f26e26308a29a0e4f85e695074515e6c1be3feca3",
       "source": "js/src/jit/LIROps.yaml"
     },
     {
@@ -52377,7 +52379,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/Lowering.cpp",
-      "sha256": "f6820ff715ded3f0630c120d5002cad54e6dd0100e30b5b6daf9dad0ffd14294",
+      "sha256": "0367d81b5464c376876e73230c36c254e47795aff1d7c5ec0d3844b0b06b9539",
       "source": "js/src/jit/Lowering.cpp"
     },
     {
@@ -52388,7 +52390,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/Lowering.h",
-      "sha256": "c2a1dc53a59d53c1c49147e8b721b7d0cfbaf4ac78d9ed4a57d42e518cb29ff9",
+      "sha256": "7085b9df06b222b591f8017bc94f42b4ef06f45b7c4cb6a77300a1a46e7f6f32",
       "source": "js/src/jit/Lowering.h"
     },
     {
@@ -52398,9 +52400,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/jit/MIR-wasm.cpp",
-      "sha256": "52f55c582a17c5e4720df5e9ab32274bd034e7d2e45a6a3e447d9354795e68d3",
+      "sha256": "2b39b3da67ed441d45afde81808dd6716157f9c31ccde063af425ba3fa71366e",
       "source": "js/src/jit/MIR-wasm.cpp"
     },
     {
@@ -52411,7 +52413,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/MIR-wasm.h",
-      "sha256": "03805dda9207be8fefa41485e74bb4454c294dd043486aa469b6442d8eb664db",
+      "sha256": "f25ab77e5a67bc9020ed3869112be0e76e09ce90b81ef4f44e99fc60311cd88e",
       "source": "js/src/jit/MIR-wasm.h"
     },
     {
@@ -52434,7 +52436,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/MIR.h",
-      "sha256": "65e3a5acb74f60920bc48b12bb21f3164932f5ab4e80d4380b41cb4404906e2d",
+      "sha256": "36cc5fc393ac887a8644aafaead194cb91add7a20a3091afaa5f3a89fef90ff2",
       "source": "js/src/jit/MIR.h"
     },
     {
@@ -52480,7 +52482,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/MIROps.yaml",
-      "sha256": "d375996d4fed041b3e93c19a0d485dd6ee14816721d025e7ddd268c9ddcd349e",
+      "sha256": "d6a9967cea13af908a5753a2f01501ec4d7bdeb84f5a00571bda73f10ed0c405",
       "source": "js/src/jit/MIROps.yaml"
     },
     {
@@ -52512,9 +52514,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/jit/MacroAssembler.cpp",
-      "sha256": "0fc920b4bf15d81a9d3e7f8d37b5e63c0945349541bc89d6dac994f9717825b5",
+      "sha256": "755ec3adf4d17b0cdc6f2617219946b644185b5bc8a974939e5e5496d0c34624",
       "source": "js/src/jit/MacroAssembler.cpp"
     },
     {
@@ -52523,9 +52525,9 @@
         "build:windows-x86_64",
         "closure:x86_64-unknown-linux-gnu:headers"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/jit/MacroAssembler.h",
-      "sha256": "9c375ccde62835b79094bb8be1ecb4c5af2b31eb0e7e8eb050b1388d74adf6f0",
+      "sha256": "4924609a95cf8007fce3f740d5723d8c6c27dc3153384ed92901f60cc2ebd907",
       "source": "js/src/jit/MacroAssembler.h"
     },
     {
@@ -52582,7 +52584,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/PerfSpewer.cpp",
-      "sha256": "9439bb17b8c29fd4baf2ed41fa2d8146dae7fa6b8b481240dd8aea9b0ec8d185",
+      "sha256": "be05284862c0d1f2e0a11ef9a51545991697ab13ebdfd41244e1e01df2cf27cb",
       "source": "js/src/jit/PerfSpewer.cpp"
     },
     {
@@ -52593,7 +52595,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/PerfSpewer.h",
-      "sha256": "b02865a8fa5c720337753a62435dff6a5ed5eab71c1515455b5b433b99ed97a9",
+      "sha256": "cc81fbc1c1f5a21a02f1f34ad2da2dd2c38fab53a41ee5eb11bbf885fa7b5163",
       "source": "js/src/jit/PerfSpewer.h"
     },
     {
@@ -52945,7 +52947,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/ShuffleAnalysis.cpp",
-      "sha256": "7496bf42cc1e723bd15f16c017a2179477db580b682bac65470a70e509782719",
+      "sha256": "39072c6a11190a24fa930fe1a8862adbbc3606d459da8a2eae8ec7533102094e",
       "source": "js/src/jit/ShuffleAnalysis.cpp"
     },
     {
@@ -53070,7 +53072,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/StubFolding.cpp",
-      "sha256": "4824507eb51cdfa8049500339ef1e725ee15553c9dabd25174f65ae8887aeb2e",
+      "sha256": "64c1d569c8d58eac010cb36da67b27de095b8cedf6737ec5a1de2df5f0cf260d",
       "source": "js/src/jit/StubFolding.cpp"
     },
     {
@@ -53081,7 +53083,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/StubFolding.h",
-      "sha256": "51ea22959ad2711501adc181a6e43d4b1512479db69eca559e069cf19df470b4",
+      "sha256": "06f76ba9d75b9f075e5d76ffb0851502c3941d7af1d08274deced8cc4a7afc74",
       "source": "js/src/jit/StubFolding.h"
     },
     {
@@ -53150,7 +53152,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/TrialInlining.cpp",
-      "sha256": "014cc188be715ab6ed5787e10582b74318204e94b45720d4ed3cd11c740d2b8e",
+      "sha256": "0ffe696dcbf9a3ed199432e710998681b2daf9279b15eb854dcad51ee18f9fd0",
       "source": "js/src/jit/TrialInlining.cpp"
     },
     {
@@ -53161,7 +53163,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/TrialInlining.h",
-      "sha256": "efb0eb7ea0beadb47d466fd53790fdd505bef26a2f5b80c43dcc2bdefe4e4116",
+      "sha256": "545639351e8cf78afa9b8a96be4e7f67f23a8780667702db6ad37ad21d68332c",
       "source": "js/src/jit/TrialInlining.h"
     },
     {
@@ -53252,7 +53254,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/VMFunctionList-inl.h",
-      "sha256": "6d72af6d82226fb5f60f813982f5c5952a345e59de8dab4c2929519cdf14b524",
+      "sha256": "959265289270db954fdb911c2937742842c78e5878b9d5526adaaaf41478fe71",
       "source": "js/src/jit/VMFunctionList-inl.h"
     },
     {
@@ -53264,7 +53266,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/VMFunctions.cpp",
-      "sha256": "bde836be160d5ba80c82c15bf068edb17de6ea27ed09a2bf4fa118c5e7e8124b",
+      "sha256": "675304e9f74ca61e65f65d05650edec3c9b9af8e5038fd2d77451365b6919c77",
       "source": "js/src/jit/VMFunctions.cpp"
     },
     {
@@ -53275,7 +53277,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/VMFunctions.h",
-      "sha256": "70a4bca888150efaa9ee1a7276a02b0d91dd20536141f4cb96964f7c328779f3",
+      "sha256": "df09832e3882ad15a8dbe77c703c0ad01852b4b2ec7de76a73f587b0f39797c7",
       "source": "js/src/jit/VMFunctions.h"
     },
     {
@@ -53287,7 +53289,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/ValueNumbering.cpp",
-      "sha256": "4435d4f94ba31c513053a53fac27b5f0e7dc9a60b99cd274bf0cb39ac69709a8",
+      "sha256": "2d6abb2c9d78e90fba67e65fbf263786a12dbb23fc777bd9793d5c6b642773ad",
       "source": "js/src/jit/ValueNumbering.cpp"
     },
     {
@@ -53310,7 +53312,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/WarpBuilder.cpp",
-      "sha256": "5d94ad8c73a5c5b5e9487a571de4bab7554b8a28010ab59172da07a5a65b6072",
+      "sha256": "df93e102a67d87f6e03bf2639f4fb018f9bb97852bb36fcc69b8aa378147d3eb",
       "source": "js/src/jit/WarpBuilder.cpp"
     },
     {
@@ -53321,7 +53323,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/WarpBuilder.h",
-      "sha256": "d7263300d339a507182d3709fd594b02f092349b05468da6b191c21f236f8d38",
+      "sha256": "5dccf805858a40fe31fc0d235ec272db300491c0b46faf77d6464e2730c4c56f",
       "source": "js/src/jit/WarpBuilder.h"
     },
     {
@@ -53379,7 +53381,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/WarpOracle.cpp",
-      "sha256": "20a0ae6f1a43976fec731a9a3ba877ed666116e2bac825346faf9a1650a0a8ae",
+      "sha256": "78c9975241d32281d9e06385e249f5018191a155525a043018b5126cd7d6b208",
       "source": "js/src/jit/WarpOracle.cpp"
     },
     {
@@ -53448,7 +53450,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/WasmRefTypeAnalysis.cpp",
-      "sha256": "56cc214c1629393606ac3ad9e7dfd8c8fadaf39f5fa54e933174deb159f60419",
+      "sha256": "29b73e931a528ff8ff7bd6e5b82f53e545360add01ca331f0481234049afc41c",
       "source": "js/src/jit/WasmRefTypeAnalysis.cpp"
     },
     {
@@ -53483,7 +53485,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/moz.build",
-      "sha256": "99cb1ab9f74682c1ac29c8bae035fe602c738ff4690964f447c9b09ad2d60fe3",
+      "sha256": "eca248a4744d6a715b78e36b370b745a2d81eeb5c7b25357e40ab1504ad694a6",
       "source": "js/src/jit/moz.build"
     },
     {
@@ -53515,7 +53517,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/shared/Assembler-shared.h",
-      "sha256": "b47e6df6ae75478b26d6e90f35b0cc9cb369b47560a41a75ba86a5febaa283de",
+      "sha256": "3b65186358a0f299f4213b6852bb3af8d885c078ec43216a7c0ea1d9d9ea4d03",
       "source": "js/src/jit/shared/Assembler-shared.h"
     },
     {
@@ -53611,7 +53613,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/shared/LIR-shared.h",
-      "sha256": "c95c367cc99565867eafe9be08d60540f10670b904450b0e2f710f811821cbeb",
+      "sha256": "023d151207a12dfd27fbeb36ed902a160107836d057ca68ec7bfd4f482f5c4cd",
       "source": "js/src/jit/shared/LIR-shared.h"
     },
     {
@@ -53622,7 +53624,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/shared/Lowering-shared-inl.h",
-      "sha256": "b2d4cdb8e58acac28c349196d6c4266de170ef2caf0c501b34c63cdf71749484",
+      "sha256": "b0447b25f3c8eaefd16c817b3adb1aea2b40374c2edd1eabf05c88504c3e1e2d",
       "source": "js/src/jit/shared/Lowering-shared-inl.h"
     },
     {
@@ -53643,7 +53645,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/shared/Lowering-shared.h",
-      "sha256": "db884c337abb5867b0bdb5bf47937d804c3ba9d1415919c91d84692ebfbb626e",
+      "sha256": "f7c5660e48c37708260d0f0b77168a55c6c62fcdfa378d44d3eddde6f93c47f9",
       "source": "js/src/jit/shared/Lowering-shared.h"
     },
     {
@@ -53717,7 +53719,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/x64/Lowering-x64.cpp",
-      "sha256": "12dc624e71fc491ed929a9381fdd2aab73570024c903e02f026410f40d22c34a",
+      "sha256": "a998fc778b8e5a8d9dd1273f07b750a60a822d05ef5f0c7d71fc33ee8d29c5f0",
       "source": "js/src/jit/x64/Lowering-x64.cpp"
     },
     {
@@ -53739,7 +53741,7 @@
       ],
       "mode": "0644",
       "path": "js/src/jit/x64/MacroAssembler-x64-inl.h",
-      "sha256": "83ad124d5b3eb56535887ad9163458f95a871deadbb0980cbef5964fcf88ea82",
+      "sha256": "747f23501883d5a2ca35248c9ae43bd6c62737b0ec799df425fe6f25ed7febcf",
       "source": "js/src/jit/x64/MacroAssembler-x64-inl.h"
     },
     {
@@ -54276,7 +54278,7 @@
       ],
       "mode": "0644",
       "path": "js/src/proxy/Proxy.cpp",
-      "sha256": "28a0fa4195923030b318222355d969b72f8cdcf7b4737f2ced1349cbd6163d83",
+      "sha256": "5fab3da60c345256f37ed27110ca6965945598cf8e298cbc9b05a88421d20d29",
       "source": "js/src/proxy/Proxy.cpp"
     },
     {
@@ -54380,7 +54382,7 @@
       ],
       "mode": "0644",
       "path": "js/src/threading/ConditionVariable.h",
-      "sha256": "9b32fa57bd21f4533b73b70c7f86dd97d79bd069b84713346d3528af90d48877",
+      "sha256": "6ccb738c8b0ec008c68075dbc9c986f94817520b65d7294b20a532ee11fea45a",
       "source": "js/src/threading/ConditionVariable.h"
     },
     {
@@ -54425,7 +54427,7 @@
       ],
       "mode": "0644",
       "path": "js/src/threading/Mutex.cpp",
-      "sha256": "1dbc885866a4ed9ad30c724408b631d6c6efb9241e7b9736f92df2da1a3ca072",
+      "sha256": "7b4326980854ca6155d42a5c4cafd8bcee01d1f1f55afbb19e2b37a51fb1c3d4",
       "source": "js/src/threading/Mutex.cpp"
     },
     {
@@ -54436,7 +54438,7 @@
       ],
       "mode": "0644",
       "path": "js/src/threading/Mutex.h",
-      "sha256": "881e6adef72bc8d9166ce042b552baf383de7a282d2e4944b49cf356e244618d",
+      "sha256": "0f8192ed682bebdca61b14451da761c40c32a0eb81dd9a8549f6eab8f3084829",
       "source": "js/src/threading/Mutex.h"
     },
     {
@@ -55725,7 +55727,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/EnvironmentObject.cpp",
-      "sha256": "d2dc3842b843324be79cd7019508439ea3d08b2a37263043eec82c5cda76e966",
+      "sha256": "c80b04119894225f48ec40c0643ddcd88924230fc1ec8c415f300a7eea3ad6d6",
       "source": "js/src/vm/EnvironmentObject.cpp"
     },
     {
@@ -55988,7 +55990,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/GeneratorObject.cpp",
-      "sha256": "b3141be738db7fe762cceafe3a2868e36b209c9eb8234cec4be9c41167ac3644",
+      "sha256": "824383cba7d585d2466bcf14c05b1fc9151391cbe71ce5fda9f34f53ce2b1602",
       "source": "js/src/vm/GeneratorObject.cpp"
     },
     {
@@ -56147,7 +56149,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Initialization.cpp",
-      "sha256": "b389d10808057674bbaccc082f5ee660cd16910a7f8c73c4455ee27a06086d1f",
+      "sha256": "0b47c7e00603c117c0aaadd94bdb7aeb3e22ce2e893e8cf2dfb5691800761b2b",
       "source": "js/src/vm/Initialization.cpp"
     },
     {
@@ -56217,7 +56219,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Interpreter.cpp",
-      "sha256": "f7ed6bfbcdb0c78cf322254ff15af333baf3b11d3cb53d536d4afa611c48d5bf",
+      "sha256": "a66e8f09fc8d7c9f2fabfc0bc4c1a2860922ca9d1b30b3931e00e4b671a8f698",
       "source": "js/src/vm/Interpreter.cpp"
     },
     {
@@ -56433,7 +56435,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/JSONParser.h",
-      "sha256": "d97dab08347df5d841ebeba964e9306b45c1bd320709245d7dcdc25dca25b226",
+      "sha256": "27a44074880f9bae1eff6c10c63c8dc1e6fdd368564807ec95ea95813963518e",
       "source": "js/src/vm/JSONParser.h"
     },
     {
@@ -56513,7 +56515,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/JSScript.cpp",
-      "sha256": "61f23a39472dde74cc869372fe4bd69fdbca11813044018ba68e936fac69c369",
+      "sha256": "15a1aaabbaec149e6475347422d31cbf4606a1101f86ae9e37135ece4afd046e",
       "source": "js/src/vm/JSScript.cpp"
     },
     {
@@ -56683,7 +56685,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/MutexIDs.h",
-      "sha256": "935ea9ea5047b5c7117c42896642f0016253a26438007eb4befec77ceaef8869",
+      "sha256": "37d17ed0e7858e723a5817f75d886c226dd56dad0ba54dbc9e5c880941fc8d47",
       "source": "js/src/vm/MutexIDs.h"
     },
     {
@@ -56852,7 +56854,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Opcodes.h",
-      "sha256": "c855c700760ad41bef01243ca82c5009b224b36048251d8316d98da89f5080c2",
+      "sha256": "d2fba15416fbfbf3088781a52a56a5869c359ce9962ab3b56eceb090aa2c7be4",
       "source": "js/src/vm/Opcodes.h"
     },
     {
@@ -57116,7 +57118,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Realm.cpp",
-      "sha256": "facba0742d05c521b5c42cfa19ca34f0f22a1ff3523e313cfe93cfd8fe264fde",
+      "sha256": "ffcde5c6c7140fd1a5031557413dcec23760061ca7ff634ff2915c213c65bc62",
       "source": "js/src/vm/Realm.cpp"
     },
     {
@@ -57219,7 +57221,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Runtime.cpp",
-      "sha256": "294817fd3c5165deb657c6a9e46d793cf9ea6c3221d50cf47b771f19922a8d39",
+      "sha256": "1a125c5a495f10cdf5ff72681c54ffa6cc5cb7a2925b4a895ebccdfeaecc945f",
       "source": "js/src/vm/Runtime.cpp"
     },
     {
@@ -57230,7 +57232,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Runtime.h",
-      "sha256": "d71c0e37ce6596bbff935ac999986e7915146639638570fc1aeb4700ba90eb3c",
+      "sha256": "47d173f2ce3b4fe5f8e2061bd2f63afa7a3f62dcc353b84da5ec6ddc9f9100c2",
       "source": "js/src/vm/Runtime.h"
     },
     {
@@ -57310,7 +57312,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/Scope.cpp",
-      "sha256": "76fa3e51df0b09880767476c939dd175c53608f0d07987531e2541beb3effc70",
+      "sha256": "d3f8b5afe5c389ea0dc34659b967b43e576a5ee2d44898ac7aef1750affbef67",
       "source": "js/src/vm/Scope.cpp"
     },
     {
@@ -57344,7 +57346,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/SelfHosting.cpp",
-      "sha256": "acbe74ddaa6f8c6ab8a02ab9614c161cab6a80da97c638afc63a618e26287f96",
+      "sha256": "601c7a6954e7f232d3aebfcbac6b6245afedcdcc6ed57e4d508cf6ddb365a5e0",
       "source": "js/src/vm/SelfHosting.cpp"
     },
     {
@@ -57673,7 +57675,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/StringType.cpp",
-      "sha256": "2e7d70d1e8451731ff5aa57ace55c3657f45f2b7141179efbdc47411b5e72f7c",
+      "sha256": "d138550c381befce55e70190ac7cf239ed08d921d0bd51f9e5ecb023e5be8b71",
       "source": "js/src/vm/StringType.cpp"
     },
     {
@@ -57684,7 +57686,7 @@
       ],
       "mode": "0644",
       "path": "js/src/vm/StringType.h",
-      "sha256": "70b143588c2740541e0d50b7733345004be9fdd6d80dd13d815934c8a4e7a5c3",
+      "sha256": "64b03bebf857be5696aa745ac7a4ae07d4a9e6512af1de99f11c5ca730f88cff",
       "source": "js/src/vm/StringType.h"
     },
     {
@@ -58245,7 +58247,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmBCClass.h",
-      "sha256": "e7b0c523640ab9a90df5cfb8d3511b0764c2c07b7f0e819be47faf660c074d19",
+      "sha256": "477acde25c63002512c92673c1170da509fcc3c6945c709d5f14e39194d08c1b",
       "source": "js/src/wasm/WasmBCClass.h"
     },
     {
@@ -58256,7 +58258,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmBCCodegen-inl.h",
-      "sha256": "d401024dda5eba265a6daf6727baa4646136d88277d6f409be5274c177b58c88",
+      "sha256": "4ddcf55b506d5708fe6292eb20f04c147cf09b42ab74c77da7748541c5fc2cac",
       "source": "js/src/wasm/WasmBCCodegen-inl.h"
     },
     {
@@ -58277,9 +58279,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/wasm/WasmBCFrame.cpp",
-      "sha256": "e6436219608e9450245fb78ca446dedaf2134517a688fba1c62516a17d5ed5de",
+      "sha256": "d7b331a674ed5320f64f69e183e7e149641dd232688b2bf3239ed40487d2b8b0",
       "source": "js/src/wasm/WasmBCFrame.cpp"
     },
     {
@@ -58290,7 +58292,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmBCFrame.h",
-      "sha256": "906d0a39af33683662b1abe892ec3fadeb35555e93e1d6727edca593b55ddc19",
+      "sha256": "fed80827f659d5e2c3ada10974e7009c289e618457d1ba76a291723f8e47ac56",
       "source": "js/src/wasm/WasmBCFrame.h"
     },
     {
@@ -58300,9 +58302,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/wasm/WasmBCMemory.cpp",
-      "sha256": "29705423b73d71c40037da351f2c4f1ecbd3ab31250ca225e0f3c0dcfbaa830f",
+      "sha256": "9b4585ddccea0d2bec5673bfdd35b9017fb3f20f13830fba265658cef8cecf9a",
       "source": "js/src/wasm/WasmBCMemory.cpp"
     },
     {
@@ -58369,7 +58371,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmBaselineCompile.cpp",
-      "sha256": "5190cfab84f2dccc169c0b41db398b680e3e0febcfa305e1720c279c5a9f6c4c",
+      "sha256": "75d621861913f481185e97f9c9b29d09893213814b3df028652b1d9c2e33bd6b",
       "source": "js/src/wasm/WasmBaselineCompile.cpp"
     },
     {
@@ -58461,7 +58463,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmBuiltins.cpp",
-      "sha256": "e6f6b43b046b08e7232ee34a5b9839b5fcdca34ac657177a0d152ced53bfcf65",
+      "sha256": "2afcb137eb50151e5d7e928cac7dded30ff04ed42435f6a96060f81446b64bf1",
       "source": "js/src/wasm/WasmBuiltins.cpp"
     },
     {
@@ -58484,7 +58486,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmCode.cpp",
-      "sha256": "4207507a321107d728077bfa733b8c13e9b3a6120a91e0cbe01686f581ff66e5",
+      "sha256": "d9c92c67a13e6b2506b993dfad85c083ee4376954858adc2501591e59b4051e9",
       "source": "js/src/wasm/WasmCode.cpp"
     },
     {
@@ -58495,7 +58497,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmCode.h",
-      "sha256": "aca304ac8167eb5b2423c85f85fc1d369ef87270a33d24e920e4a8705013510b",
+      "sha256": "a707301208aa41a01e8b5ab4f4ebe9eb579dc9edfcd23043402ce1d946bd9bd0",
       "source": "js/src/wasm/WasmCode.h"
     },
     {
@@ -58529,7 +58531,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmCodegenTypes.h",
-      "sha256": "e7a44dfdc8b90ceaaeaff2365f5e091c405170d6214e024cbf916f90852516b3",
+      "sha256": "f430470c6dac3f9ba25da7cc7ad58ba78687544de8f72413395c9888287fb5ea",
       "source": "js/src/wasm/WasmCodegenTypes.h"
     },
     {
@@ -58541,7 +58543,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmCompile.cpp",
-      "sha256": "e06f0ddc6818c4c6c3ba3c114fe9f491cad88a82d9f9da8795a87534d0971d4d",
+      "sha256": "46d9fb6168c6a0a8489edf998cf04d650df1bd66fba5c42ce0941d612543531b",
       "source": "js/src/wasm/WasmCompile.cpp"
     },
     {
@@ -58575,7 +58577,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmComponent.cpp",
-      "sha256": "33ac0c405a8d3304f5df3abdca8c1cffd8a28b4c386ca4899ec54cbd9bdeb237",
+      "sha256": "b535f6975b445938e42a7fa30010b66e7bacf34640c30a22bc5a54021e0b663e",
       "source": "js/src/wasm/WasmComponent.cpp"
     },
     {
@@ -58586,7 +58588,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmComponent.h",
-      "sha256": "8ecf1108a7f199ec308455989faf2f7e94d0b5cad681fbfa2c5d61818a6ab1f9",
+      "sha256": "14d41de7638ee3b3f3cfa0d8053e7a7a468cce54f788fe5a1d262fb3e265e6f5",
       "source": "js/src/wasm/WasmComponent.h"
     },
     {
@@ -58597,7 +58599,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmConstants.h",
-      "sha256": "3251a9b2176a3f25fdcfc97d2149d1d8594178f89c48e9d9888f4db1b6af8784",
+      "sha256": "e336315de921f80a530eb7e2ec71abbaa5fe2319a72026f166433424ffe2ba69",
       "source": "js/src/wasm/WasmConstants.h"
     },
     {
@@ -58780,7 +58782,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmGC.cpp",
-      "sha256": "e071149e85d9c548c8a2c02a2f0a4632d808b5fd1b1fe31d2f46ad57a63e1c10",
+      "sha256": "6d854715fd57f84624c5bc30a29694522aedde8cb0aca87325914e43a83a6470",
       "source": "js/src/wasm/WasmGC.cpp"
     },
     {
@@ -58791,7 +58793,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmGC.h",
-      "sha256": "5b8cfb0010d9616ae8807633ff185d4c491477549fcc4f538e306e9d425b242d",
+      "sha256": "78cbf0b3b49870476597d1a1c6cb5a865872086df9d91b06454dc797d88c1c90",
       "source": "js/src/wasm/WasmGC.h"
     },
     {
@@ -58802,7 +58804,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmGcObject-inl.h",
-      "sha256": "82145531cb301eafb697c5cb631b1b3bb8bde26c65b1b92cc03baf66c9b4ac2c",
+      "sha256": "19c5dd78fa7a296a8de96931e70b3b791927cacd3d9361515ef5a70fdd1e7b50",
       "source": "js/src/wasm/WasmGcObject-inl.h"
     },
     {
@@ -58837,7 +58839,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmGenerator.cpp",
-      "sha256": "0c63b735fd1a0a8e7a5fd353b988e8ae1cea56368cadfca91505e989d22fac05",
+      "sha256": "11f366e231ec27e27e68202ef19a9bd711a54329691438f98afb4743aacdfe96",
       "source": "js/src/wasm/WasmGenerator.cpp"
     },
     {
@@ -58848,7 +58850,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmGenerator.h",
-      "sha256": "16384a13ced519e7dee5c9089e25bc29bba5a220a15118b8c5110dfe737fad5f",
+      "sha256": "be5aae22f7e14500b717706f1cd7b50e244ebdcd6c558e8b07de637f39d99fbd",
       "source": "js/src/wasm/WasmGenerator.h"
     },
     {
@@ -58871,7 +58873,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmInitExpr.cpp",
-      "sha256": "a8693ae8e6a3f6cf00f3726282cf8d2852eacb05a546bca94a8502b377499f00",
+      "sha256": "fbef14b3ef2a3449af25beceb39f73426b01cb5e568d92566e9ceac29d01fd40",
       "source": "js/src/wasm/WasmInitExpr.cpp"
     },
     {
@@ -58905,7 +58907,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmInstance.cpp",
-      "sha256": "922311a6f175dc5d1859491af8f2a902dba6b5cc308cd58ae97ce42e8ab656d6",
+      "sha256": "a4616071cd0ffb6adbfeae625dbf631de1605eef17e40ef542c38b291c83bc73",
       "source": "js/src/wasm/WasmInstance.cpp"
     },
     {
@@ -58916,7 +58918,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmInstance.h",
-      "sha256": "156a5acc3523316ce37c967800a3793506b02feb0ef6bd9ac8ee48ec0a978a38",
+      "sha256": "b705b844aa0171ad8236bca4ef08262c0a8c085358c221b22d3e832563ce404a",
       "source": "js/src/wasm/WasmInstance.h"
     },
     {
@@ -58927,7 +58929,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmInstanceData.h",
-      "sha256": "da25fb1c020468f8a1ff183dbe8fdc3c80cc7840f2d49d349db498260bcd4d84",
+      "sha256": "67308833f0db5684a1a41546652ba8595a5a5ec63582bc240897265d49d4f65c",
       "source": "js/src/wasm/WasmInstanceData.h"
     },
     {
@@ -58939,7 +58941,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmIonCompile.cpp",
-      "sha256": "433ddfa5f89affa37d60d77f1edb0a574419510ecd87455130346e3d78a970d9",
+      "sha256": "e4c0fc2512824e157c93a6f843fd6cec51c6420d91ffe94eb3dd4f53032ec362",
       "source": "js/src/wasm/WasmIonCompile.cpp"
     },
     {
@@ -59042,7 +59044,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmMetadata.h",
-      "sha256": "356d02a91cf47760c46dff0da634200d433d591687e198d17f76098ebd455ee6",
+      "sha256": "49df018aceb073c18b907b15cf273827779049dc1fe82fde6899abd472b683d9",
       "source": "js/src/wasm/WasmMetadata.h"
     },
     {
@@ -59123,7 +59125,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmPI.cpp",
-      "sha256": "c2b09f785b63a0bdc3a5c2b6003f3272fb6833e1c4377ddbc34b4a7961e7f7d6",
+      "sha256": "5c5cefcf0b2eb592743b706e620fe3ac9ea4ce6a89520ea6b297709ab0ee4366",
       "source": "js/src/wasm/WasmPI.cpp"
     },
     {
@@ -59169,7 +59171,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmRealm.cpp",
-      "sha256": "38dfbb11fe67af686abf7c3da2d660c5d658cb5940e0478c0b917125c6a0e6e3",
+      "sha256": "b23c922bb4e40486080b49f533f672885a82fa17b72b323124fbe9b0a3a862e8",
       "source": "js/src/wasm/WasmRealm.cpp"
     },
     {
@@ -59180,7 +59182,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmRealm.h",
-      "sha256": "41b3971b883f412806dcb9e48b8c33b035a40e07a3853eb723e171afb279565b",
+      "sha256": "015c1e9de42c1c6c96043ce46d9a9e355d5615c24fc0b391f6018cd8287f84db",
       "source": "js/src/wasm/WasmRealm.h"
     },
     {
@@ -59192,7 +59194,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmSerialize.cpp",
-      "sha256": "360d13774623211e0d3dba25b2b99978d84e38436b8f7e83d2a8a5c88c8fdf83",
+      "sha256": "ab907c80263fd89faf0da240594b2a2ed262d2e249752ee915d7137e1cdd008d",
       "source": "js/src/wasm/WasmSerialize.cpp"
     },
     {
@@ -59249,7 +59251,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmStacks.cpp",
-      "sha256": "203bff212e69913d6a49c5da87f3ab493c0101302b1c84ac13204d13c330f730",
+      "sha256": "93fc5565a5b28f0065870eb4a02d6299d0ad911b9bc2c32102ba1a8f6394fb47",
       "source": "js/src/wasm/WasmStacks.cpp"
     },
     {
@@ -59260,7 +59262,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmStacks.h",
-      "sha256": "e7fd3a25691bcb7fd16a4df248025d60dcae01ab326c9ccfdcf347c4f4db975a",
+      "sha256": "2cba69fdd13e70d84bffb36a9b055c0ff461aeb61aaf2f98561a63161e615a90",
       "source": "js/src/wasm/WasmStacks.h"
     },
     {
@@ -59318,7 +59320,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmStubs.cpp",
-      "sha256": "9542da85f98be06b4acf634fbdd846f046d7d8f537d709c03ed7f2be0150636f",
+      "sha256": "80df04d8d2f21b43002e9ea4d3d27026ffe0347b3901545d5f8950c0dd184922",
       "source": "js/src/wasm/WasmStubs.cpp"
     },
     {
@@ -59329,7 +59331,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmStubs.h",
-      "sha256": "1851e934fdfe957ec11bc474e76f243f5aa21587a88abecbca3ab94949daa465",
+      "sha256": "79348367b97a54a4a2af61b899409502ff806023728ecb4a70288b98ca0df1e0",
       "source": "js/src/wasm/WasmStubs.h"
     },
     {
@@ -59339,9 +59341,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/src/wasm/WasmSummarizeInsn.cpp",
-      "sha256": "891971c86aa5c55b1df517e39ec99e1509503a77083a9feb21051db2604fd45b",
+      "sha256": "e0985efc591e596e79e57c468049cb358df2dffcda742c830f4c453395047b53",
       "source": "js/src/wasm/WasmSummarizeInsn.cpp"
     },
     {
@@ -59352,7 +59354,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmSummarizeInsn.h",
-      "sha256": "8ba0bbbc30ced3b1d45cd5bbbb8e6cdf8cbf451c28127aabddf30851c0836f1e",
+      "sha256": "49b14c4975cf98e349fa45a78a75911ab99f2bdfbc5d0c2bbf8a8db7fe4cff98",
       "source": "js/src/wasm/WasmSummarizeInsn.h"
     },
     {
@@ -59386,7 +59388,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmTypeDecls.h",
-      "sha256": "acb4d6891e19e5c0dc5bf57981d3ce37a03c044af4c39ffec5aee693524be33d",
+      "sha256": "6d80cccf0d3a2ee796a78cd42a1bbbbeafe9343258c1251cb70ce99aae3aad1e",
       "source": "js/src/wasm/WasmTypeDecls.h"
     },
     {
@@ -59432,7 +59434,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmValType.cpp",
-      "sha256": "847ba0705d296667e190f37b43f0e65bbf6b47b3547459c124770ecea4cb3c9a",
+      "sha256": "e99d23719bb7a2ea99ff482d1fb90e8634a675900affb7fac4b8e43cfd3f9fb8",
       "source": "js/src/wasm/WasmValType.cpp"
     },
     {
@@ -59455,7 +59457,7 @@
       ],
       "mode": "0644",
       "path": "js/src/wasm/WasmValidate.cpp",
-      "sha256": "60ab19951aed2bd174d5273a7cac637ff90261fad91597febfa597f3e487f8fd",
+      "sha256": "0340267d466725074680d0e045613a4d8462077c4fa177466d15e37176ceb6df",
       "source": "js/src/wasm/WasmValidate.cpp"
     },
     {
@@ -59557,7 +59559,7 @@
         "closure:x86_64-pc-windows-msvc:cxx_translation_units",
         "closure:x86_64-unknown-linux-gnu:cxx_translation_units"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "js/xpconnect/loader/AutoMemMap.cpp",
       "sha256": "9ce771ef604197da1bbd62a76fec600dc77ced3907e018db69d78894a736a4e7",
       "source": "js/xpconnect/loader/AutoMemMap.cpp"
@@ -59995,7 +59997,7 @@
       ],
       "mode": "0644",
       "path": "memory/build/moz.build",
-      "sha256": "e0396a9f2cb5e6f67838560b431011502da4f51e031a743524f66446634aea70",
+      "sha256": "2a413e71e590e79000a54d99485948acd2cca8ed775644a4abff1a7a62dcf260",
       "source": "memory/build/moz.build"
     },
     {
@@ -60005,9 +60007,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "memory/build/mozjemalloc.cpp",
-      "sha256": "b7a5f403ab90739d7fb012671dcc0b0ce8a2777fa0c0f500def7be85f83fec58",
+      "sha256": "88dc756e80f15240c44f30794f4e7ab775e81464372ae570d4bbda69a594b301",
       "source": "memory/build/mozjemalloc.cpp"
     },
     {
@@ -60409,7 +60411,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/Array.h",
-      "sha256": "85270d920fe444b1c604cdf2766a5bcef669724a329e5bdbf5b6b553a47c7e4f",
+      "sha256": "49ea06248e485f149037dde27fabdd545c0e40bf9988aca6333914dde0bac23f",
       "source": "mfbt/Array.h"
     },
     {
@@ -60481,7 +60483,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/Attributes.h",
-      "sha256": "1da5943ae1d63222c38e3904a6063756b39ba21c013515dcfd88b5b0902eef56",
+      "sha256": "4b2cba2c6fbb690dfa631edff28b1c43e8c42b8862859729531517714c836a88",
       "source": "mfbt/Attributes.h"
     },
     {
@@ -60505,7 +60507,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/BitSet.h",
-      "sha256": "36f2abdcbb8aa2286e63f5dd9ba12305e69d2b16399cf10073900a853330928f",
+      "sha256": "7f180a1fd8bddfa6587cc3cd637e9691be4b51d3a030b1eefb35240de70599aa",
       "source": "mfbt/BitSet.h"
     },
     {
@@ -60601,7 +60603,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/Char16.h",
-      "sha256": "994bc64f4aec6cb5365b5805a0f327ea9a61b2c6d949e150c339af9e89158aba",
+      "sha256": "275e10c80d413694b7ccaa66306dd9ef284b5d562c1c7fb4f420f3475bf000b3",
       "source": "mfbt/Char16.h"
     },
     {
@@ -60637,7 +60639,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/CompactPair.h",
-      "sha256": "ddae67ab686e39ed39a71b7ea64f75ec857cd1d13a0ea8170e05a735e9471905",
+      "sha256": "995e4a22246a875a281145369001a70242efbce6feacadbdf0c53b01c4d99dca",
       "source": "mfbt/CompactPair.h"
     },
     {
@@ -60709,7 +60711,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/DoublyLinkedList.h",
-      "sha256": "dd9336843c90fe9f7f996eadc2e4c64745bc34446cef9a8b87dec43ea3811826",
+      "sha256": "ef2ba482cceb90ac9862e77b1c7f2d8b5ec274e15e96ed0ab83f2482ce819015",
       "source": "mfbt/DoublyLinkedList.h"
     },
     {
@@ -60733,7 +60735,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/EnumSet.h",
-      "sha256": "53df43d448391948bf6be946325c781b0744b0de55ea7b5db609def8c17b9dd1",
+      "sha256": "69130738e7c774f9627aacb5f4ca4861e6894124701af735f46c1e092b857fc0",
       "source": "mfbt/EnumSet.h"
     },
     {
@@ -60769,7 +60771,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/EnumeratedRange.h",
-      "sha256": "f37dd07ba706fa62c8b3790e74dcaf04749177e74cd9a588452bdd13d3adeb35",
+      "sha256": "d5bc227ac1cc3ea8aa5b0cef6270e41561b0b35500538932c0734b87ac76326d",
       "source": "mfbt/EnumeratedRange.h"
     },
     {
@@ -60877,7 +60879,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/HashTable.h",
-      "sha256": "34804e322a2ad9b7916dcf73acdebd225aad965a00e564d90b67c533ed40f74a",
+      "sha256": "f1863eb91ee43fbc69e58448b0d6f486b99edbfa1c0a13676bb7f56014db415f",
       "source": "mfbt/HashTable.h"
     },
     {
@@ -60913,7 +60915,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/IntegerRange.h",
-      "sha256": "90b40966b3fd7ae2e20bc1417e06f60689ad222325ae1276964f297eda68ee2a",
+      "sha256": "0cd95529849b44e622aea0cb87c2175fde5c8b1186641bbd7e06a92def167343",
       "source": "mfbt/IntegerRange.h"
     },
     {
@@ -60985,7 +60987,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/LinkedList.h",
-      "sha256": "814da8e9fd9b94e087ff81c110f06b746c53df96721b13cea80c9566c0899015",
+      "sha256": "1f7679686936c286d2a256380cb245c7c2ce370802c816d55ddf82cb5e187f8c",
       "source": "mfbt/LinkedList.h"
     },
     {
@@ -61165,7 +61167,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/Opaque.h",
-      "sha256": "897ca30746272ede19534b704fe30b2c78e2b4e1b6179dd1a03835e4f2a653ea",
+      "sha256": "d2f7e61a6169ecaefb6e4da36e52f072b8c03494f70bb7f6a93fd00d3eaa0522",
       "source": "mfbt/Opaque.h"
     },
     {
@@ -61489,7 +61491,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/Saturate.h",
-      "sha256": "1ccb2cb3ce63f492c4a4226ca5b6c625e872026000355f66f54aa264828d4d03",
+      "sha256": "5a272a0774ebe1faf3040257c88ff1d2312c04e34e4245307b4392febd6cda10",
       "source": "mfbt/Saturate.h"
     },
     {
@@ -61657,7 +61659,7 @@
       ],
       "mode": "0644",
       "path": "mfbt/ThreadSafeWeakPtr.h",
-      "sha256": "94c421b0abeaacc49208db2cc477dcb124e372e72a804a4f7d6ff3eb513c34c9",
+      "sha256": "b27f24df08bbac52811a1a01ba9d0d4b5228f3844347dbcc808755a6ce70cfd4",
       "source": "mfbt/ThreadSafeWeakPtr.h"
     },
     {
@@ -61763,9 +61765,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "mfbt/UniquePtrExtensions.h",
-      "sha256": "d039650be53054f2537709ba2bcf48503d4279cac90acb182f1af7c8d6a1077a",
+      "sha256": "c1848e66fb82f6f3a4499f9c3d3938aa09f26e901f55550dcf0979b773307140",
       "source": "mfbt/UniquePtrExtensions.h"
     },
     {
@@ -61835,9 +61837,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "mfbt/Vector.h",
-      "sha256": "77fa30044cd8eb67d7703ad3f5fd7a650fd5cc5a7e7777b76347bb3e35b69094",
+      "sha256": "d386dbcb16c6a7268247f872ad9e1b1cddf68cea9d90782bbb3fae65965c40fb",
       "source": "mfbt/Vector.h"
     },
     {
@@ -63946,7 +63948,7 @@
       ],
       "mode": "0644",
       "path": "modules/libjar/metrics.yaml",
-      "sha256": "c956b5893df4295d94761c626b2e4968f2069854d8fc72ec7937d8bb96221a27",
+      "sha256": "cc153aa353d2f0f5810ad07279dd89b0bf21d7b335bee77a98f70dc1af8d0a15",
       "source": "modules/libjar/metrics.yaml"
     },
     {
@@ -63994,7 +63996,7 @@
       ],
       "mode": "0644",
       "path": "modules/libjar/nsJAR.cpp",
-      "sha256": "f30ce1390aa50a6ffc3bc6ae1d1a2e0ded277342f04ef3c3a82f56dcfa0c6d96",
+      "sha256": "d371ee019fd0ef2af8ab543849e6745653d0e27d63ba8c7cd9e915f019e0333c",
       "source": "modules/libjar/nsJAR.cpp"
     },
     {
@@ -64540,7 +64542,7 @@
       ],
       "mode": "0644",
       "path": "modules/libjar/test/unit/test_empty_jar_telemetry.js",
-      "sha256": "d89b4148cc714da614af20fb0b04c7b444a860ef484e9b164d154b2fbfc2560b",
+      "sha256": "b8affb6f337a4013f4370a1b7ebdc19278c01354582b4b0833d5761ef39fc96e",
       "source": "modules/libjar/test/unit/test_empty_jar_telemetry.js"
     },
     {
@@ -65263,9 +65265,9 @@
         "build:linux-x86_64",
         "build:windows-x86_64"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "modules/libpref/init/StaticPrefList.yaml",
-      "sha256": "2b077de47a2a46da7921d316583d0b0e29724fed6fe5f6edd32798ea8037356e",
+      "sha256": "b9da860268228f68d8f42b99c52316a1a53250305cfa7ada079c9ada0b7e4948",
       "source": "modules/libpref/init/StaticPrefList.yaml"
     },
     {
@@ -65295,9 +65297,9 @@
         "closure:x86_64-pc-windows-msvc:runtime_resource_sources",
         "closure:x86_64-unknown-linux-gnu:runtime_resource_sources"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "modules/libpref/init/all.js",
-      "sha256": "f13740b542684a92ce391031675b4e4c8db587cb504e4bb1425b443cf451403d",
+      "sha256": "2334b373145d5af6089e0c87c38f78841687d54dd936843c85351022555cd6dc",
       "source": "modules/libpref/init/all.js"
     },
     {
@@ -66629,7 +66631,7 @@
       ],
       "mode": "0644",
       "path": "mozglue/baseprofiler/public/BaseAndGeckoProfilerDetail.h",
-      "sha256": "25965a99ea2fac22f4addd8f8f9639e94f752c14395ea1d7b51c2cfe79d6e615",
+      "sha256": "3f4587f03f8464ef8e4d8f8a3d10da5f28dbc78023ed1c0fa36334f2a5d37b50",
       "source": "mozglue/baseprofiler/public/BaseAndGeckoProfilerDetail.h"
     },
     {
@@ -66699,7 +66701,7 @@
       ],
       "mode": "0644",
       "path": "mozglue/baseprofiler/public/BaseProfilerMarkers.h",
-      "sha256": "02eccd45e7beb1b9e7330e1658c2a9a306def54b150a81d921bfe8fb3798373a",
+      "sha256": "f94f56f15fed94640292d22853be97b07a3505a48b212713f9da970014db114b",
       "source": "mozglue/baseprofiler/public/BaseProfilerMarkers.h"
     },
     {
@@ -68484,7 +68486,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/LoadInfo.cpp",
-      "sha256": "d4278c6a1ffbb2ce7fa3fa187e58e5d55ee7a70c0fe8110a99ceace1d6096454",
+      "sha256": "4797a4c0c2ad7d2fc04e544fdeca9b1683e2192887b4324538da648754fcf0f8",
       "source": "netwerk/base/LoadInfo.cpp"
     },
     {
@@ -68498,7 +68500,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/LoadInfo.h",
-      "sha256": "f43d42c79e2f94e83ba804d5f39513e2888766d646e5ece22a64772f1b2f8dfa",
+      "sha256": "c181809177aa295662324c4b81c5b9037ba8dc63979f5b11a61a4fcead013230",
       "source": "netwerk/base/LoadInfo.h"
     },
     {
@@ -68811,7 +68813,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/SimpleChannel.cpp",
-      "sha256": "e8386715adc9b83d0e9e2370e52bc8a8a112cc16f20328ca062fbd4a90bede6d",
+      "sha256": "359007326d8b05b862b491ae88efb5957182daa806f028bca0d7ce64880dc6b7",
       "source": "netwerk/base/SimpleChannel.cpp"
     },
     {
@@ -69421,7 +69423,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/nsBaseChannel.cpp",
-      "sha256": "d0582ee11ae552b36b81465e6f59ca68fcca7bfa55b8003cae78076e3550fb85",
+      "sha256": "a98858bd3667f674e8cbcc550b369db6f169ecdcb64f42fb8e7448a46ba31f41",
       "source": "netwerk/base/nsBaseChannel.cpp"
     },
     {
@@ -70165,7 +70167,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/nsILoadInfo.idl",
-      "sha256": "1ed97b4fc84435f7acb2a4df43b6140182ae09ec9e68184e11de790f60029547",
+      "sha256": "655227e3ad1d0179559a258a92f93781c89bebfe0b2eae00e39070860569a461",
       "source": "netwerk/base/nsILoadInfo.idl"
     },
     {
@@ -71227,7 +71229,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/nsNetUtil.cpp",
-      "sha256": "d45577eed4af85adfd03cd03917e4f7728d344ed279bb725877acfccfbb6d5a1",
+      "sha256": "84de9a969b20833845a1db5103f3f1aa38e7092cd97a67790d9df89349945f04",
       "source": "netwerk/base/nsNetUtil.cpp"
     },
     {
@@ -71547,7 +71549,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/base/nsSocketTransport2.cpp",
-      "sha256": "16b591241e5b299e2fef070d898432a6b23d2f37d84a4c6c243b529289570c90",
+      "sha256": "c9ad47c15b9d172b0bb7a1083dd68ee02265b6e49ef0a357986e504c64a77a93",
       "source": "netwerk/base/nsSocketTransport2.cpp"
     },
     {
@@ -72141,7 +72143,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/build/components.conf",
-      "sha256": "9a92fd45b5cd42d7598521cc56eeaf744508e9a5ad3f616c43201ebb8e48221f",
+      "sha256": "91eafc78698fe323c593252fe611ae8472d6bae79666bfaf960e3e31ecb6b239",
       "source": "netwerk/build/components.conf"
     },
     {
@@ -72193,7 +72195,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/build/nsNetModule.h",
-      "sha256": "0e93941eb083c1ba7236814e1630a23feefb01ab874983bf162454df68914dd2",
+      "sha256": "ce9bc7f83619d8fb2a842118f6c5af53dc7e42fc40f40be7802f8c776526985d",
       "source": "netwerk/build/nsNetModule.h"
     },
     {
@@ -72231,7 +72233,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheEntry.cpp",
-      "sha256": "1e8e08ebb866d479b3083175d441b71fd85bee9527e9e14eeb6e8c763bdc7cbd",
+      "sha256": "40b210311b8196f9101c3395615891fbb89d9880e065a8d148f1646c1c09b4b5",
       "source": "netwerk/cache2/CacheEntry.cpp"
     },
     {
@@ -72243,7 +72245,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheEntry.h",
-      "sha256": "a8fc7f83706215b61df9d8b42915702c8532df3f2555fdd4638b65c6152b9ca5",
+      "sha256": "fd15ebd99d7f6a3b619f29a4218a6c4cc37c973f2b754d31736ab32564671776",
       "source": "netwerk/cache2/CacheEntry.h"
     },
     {
@@ -72499,7 +72501,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheIndex.h",
-      "sha256": "2422cd45bae772f90a6542d0167c0474f1a0b975cc55aba8a36066d486128c8a",
+      "sha256": "e8f4cd7121e32f3881c486747fa19c3a27ea7adbbca95ba3dfd98fbd15388249",
       "source": "netwerk/cache2/CacheIndex.h"
     },
     {
@@ -72619,7 +72621,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheStorage.cpp",
-      "sha256": "e9a29e17562e5ff7d92194168d9907d08b70fd8d516d902a11e79ed24365ec27",
+      "sha256": "044ea31f1d396aa6dc7197e6ec78b854880922bd7a2494f6ef92f7fcddd0d143",
       "source": "netwerk/cache2/CacheStorage.cpp"
     },
     {
@@ -72631,7 +72633,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheStorage.h",
-      "sha256": "83d645e9e7ee2502ee5d4876ec6d86575b3f94b79536d325e80cbfb09893d42e",
+      "sha256": "a94a78cecca5083c4f1d8006f522d0b56b0ea7f38c5b353d8a890c3c5a89efcb",
       "source": "netwerk/cache2/CacheStorage.h"
     },
     {
@@ -72643,7 +72645,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheStorageService.cpp",
-      "sha256": "7a5df9b7d8aa1bdc03fa3106ce7a35828abec9cc6663b750bf1c29dd71044597",
+      "sha256": "f7a9f5412904b70d873cc31bb86c2ece451e5707160e547757d7369793162edc",
       "source": "netwerk/cache2/CacheStorageService.cpp"
     },
     {
@@ -72657,7 +72659,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/CacheStorageService.h",
-      "sha256": "b8618fa0a7fd3657e9414c4854cfff949ce7cf306b1ced8d7652dead61cb5304",
+      "sha256": "c23e87cb663c466196777a8d14934094fb4ac2f311b25288657339343fb6a7ac",
       "source": "netwerk/cache2/CacheStorageService.h"
     },
     {
@@ -72697,7 +72699,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/cache2/metrics.yaml",
-      "sha256": "0d2706b3ff772fc030c44bbb1e177e112d2a5326e3b88392339b68ba5db604f4",
+      "sha256": "dddf463d1134deb5540ad240eaee9a9643f1264dc55e6cb13b43b710e5c00d46",
       "source": "netwerk/cache2/metrics.yaml"
     },
     {
@@ -73990,7 +73992,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/DNSByTypeRecord.h",
-      "sha256": "11052fd23f458ec0e697655172c5a1da1b09ed8ae3f0efe3b1427b9129fb0719",
+      "sha256": "c53d4a426caa32e94451b7032df175b1daec08b4785780a52bcf535454d5714c",
       "source": "netwerk/dns/DNSByTypeRecord.h"
     },
     {
@@ -74350,7 +74352,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/TRRService.cpp",
-      "sha256": "b46175ebc07322f27936b890f9fc771de7f23ca2fb1d62294cea9265157ee184",
+      "sha256": "168f2b12f0ae927afe90f9bd6c215aee0060b5256b4b7046ff94c9c62921a28f",
       "source": "netwerk/dns/TRRService.cpp"
     },
     {
@@ -74426,7 +74428,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/effective_tld_names.dat",
-      "sha256": "084a5674d77c1d14900b16da5fc8afee9765af2f00a638552a8c7aa18f44ae81",
+      "sha256": "155b43d46932e933f622365225e7861288c36a45380b1f7d00b3d09748926226",
       "source": "netwerk/dns/effective_tld_names.dat"
     },
     {
@@ -74440,7 +74442,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/metrics.yaml",
-      "sha256": "646306757bf9c6e1cb30ba7dc377c64a09cb9b49c49a189610bc347e6bc149e7",
+      "sha256": "164dcac0d6e6426d82817ef547282f7a7cdeb7ad70c5b1e0589ec550365dc8f9",
       "source": "netwerk/dns/metrics.yaml"
     },
     {
@@ -74464,7 +74466,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsDNSService2.cpp",
-      "sha256": "3fddb018b206567b1cf660112e0ebb22e5aa6e9cd2e10b25f3f4f9702e26778c",
+      "sha256": "3fc9cb8365dfe9a9c0921cd682ad9237c31c5408f2ec5be462a1d2272be3b358",
       "source": "netwerk/dns/nsDNSService2.cpp"
     },
     {
@@ -74516,7 +74518,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsHostRecord.cpp",
-      "sha256": "4062cf1921936dd80e91920ac3672d88d019b539ae275a1c2811957b88d3509e",
+      "sha256": "9b910cdcd19c46118154304328375ffbd5d359640cfe7b3f07368627ae548f55",
       "source": "netwerk/dns/nsHostRecord.cpp"
     },
     {
@@ -74528,7 +74530,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsHostRecord.h",
-      "sha256": "74dd3f44d01a4a722364bc8a6a88258ea1172b526473ac255711f802cda85fab",
+      "sha256": "b29d348d3ca0e2451ffbdc17dc797ca42356a9928b70a357546b6ffa4910ab72",
       "source": "netwerk/dns/nsHostRecord.h"
     },
     {
@@ -74542,7 +74544,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsHostResolver.cpp",
-      "sha256": "802c8f4e9e66578abe47bbf79b27d4d9d6a72c8319f2574699a162d09d33825b",
+      "sha256": "8e088d134e1224328277a8c31faaaaa5e8e335353623a20ead154e04ac0d9187",
       "source": "netwerk/dns/nsHostResolver.cpp"
     },
     {
@@ -74554,7 +74556,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsHostResolver.h",
-      "sha256": "9dd4eccf129217b571590f0cbe6bac65bcd145bb8638a28e837be909ee89a7ce",
+      "sha256": "6c2ac4b831a85d2ee8c9360045770abc7e87c56c82b717b0fd98c8b5f13cba68",
       "source": "netwerk/dns/nsHostResolver.h"
     },
     {
@@ -74578,7 +74580,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsIDNSByTypeRecord.idl",
-      "sha256": "7a11d7b88f444d789d6cfe580cbab738c186989787dc9bb7b446b5dc09dd3d5c",
+      "sha256": "03838100d808f6d06760052466f62a8690c375b08517145936340571985e9f3e",
       "source": "netwerk/dns/nsIDNSByTypeRecord.idl"
     },
     {
@@ -74602,7 +74604,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/dns/nsIDNSRecord.idl",
-      "sha256": "7859f5ba6dd51ef27dd0a16fb0ba03effe05536bb5c74bb7e4e946315764bf95",
+      "sha256": "c80f728d7b7f66ee928ceae8adf1d1b696a869a636f15a18bdc7a7d7c8568233",
       "source": "netwerk/dns/nsIDNSRecord.idl"
     },
     {
@@ -75091,7 +75093,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/ipc/SocketProcessChild.h",
-      "sha256": "23912d4e900c490cc52d0ad57d1a1963eca455082e9e49eb6a676cf34321d9bc",
+      "sha256": "d2c2fa807f8eb7b7ea63d94e82ce1a53cefa6ad37ec84d61361a085d981687b8",
       "source": "netwerk/ipc/SocketProcessChild.h"
     },
     {
@@ -75185,9 +75187,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "netwerk/metrics.yaml",
-      "sha256": "819ed1a429124b81e41338586d860b9b98586b2eea434cd5b2fb2a472dd4d763",
+      "sha256": "e5877f6f68870e6a0d79edc3ddcd664a6fc9d0bb1e605918c8316ecd2e7388b0",
       "source": "netwerk/metrics.yaml"
     },
     {
@@ -76097,7 +76099,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/naivefox/mozconfig-minimal",
-      "sha256": "a6e9b6326d878b7ad3f2fc60c84d10e9ce7c970dea56d8bff96ebfad9362d127",
+      "sha256": "a22f8bb886ad53b082ccfa576203405f614efa1655a9a3ddf7d2fa2e300ab4bc",
       "source": "netwerk/naivefox/mozconfig-minimal"
     },
     {
@@ -76108,7 +76110,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/naivefox/mozconfig-windows-x86_64",
-      "sha256": "3e35ca6e2eca2936412138bfb82ea226549cbe5b6c10bf9f3006e491844b07b0",
+      "sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c",
       "source": "netwerk/naivefox/mozconfig-windows-x86_64"
     },
     {
@@ -76797,7 +76799,7 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "netwerk/protocol/http/AlternateServices.cpp",
       "sha256": "9f49c35704583450803b9d92553f9d24ee806cbf23b7c29c9276b7481b1d0256",
       "source": "netwerk/protocol/http/AlternateServices.cpp"
@@ -77115,7 +77117,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/ConnectionEstablisher.cpp",
-      "sha256": "c2a44fbf3392fb0cad43468ebabd2302eac72c852a762152ef8653adacda5d55",
+      "sha256": "5bc2d7bf15e8626bf2371ffa6a9762df360eb32bb15f780906bc2abea801efbb",
       "source": "netwerk/protocol/http/ConnectionEstablisher.cpp"
     },
     {
@@ -77263,7 +77265,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsConnectionAttempt.cpp",
-      "sha256": "d3fb3fd2eb3b0e4b9f92dde7e1a1d183e9946369b7ed8c5627316a00f58472d1",
+      "sha256": "9689e87f7f447508e25e733209238b3d2a472fae5dfea2c360aefe8da4c6b659",
       "source": "netwerk/protocol/http/HappyEyeballsConnectionAttempt.cpp"
     },
     {
@@ -77273,7 +77275,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsConnectionAttempt.h",
-      "sha256": "adf7b7e966ae80d9cd638e7babd6f374beb20ef082d7984ece8d53033e9dcabe",
+      "sha256": "ea00fb66fb999f06dab37b063b90b38a45fd3782fe5102b7f7b9fcc8c5995ee9",
       "source": "netwerk/protocol/http/HappyEyeballsConnectionAttempt.h"
     },
     {
@@ -77285,7 +77287,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsTransaction.cpp",
-      "sha256": "2e7fb80ae9d2280278ba6451ea34563d1ddbeef27e809bb60313c7bc0e48a797",
+      "sha256": "0e58a6afa404ef6aeba83a0f254db0999f56a5c35d954faa6f717f07906b5b4b",
       "source": "netwerk/protocol/http/HappyEyeballsTransaction.cpp"
     },
     {
@@ -77673,9 +77675,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "netwerk/protocol/http/HttpBaseChannel.cpp",
-      "sha256": "e823b2d965501ebe24d97c92bce9d63a10728dcb40ca3afc2a787d3fb3bf97f1",
+      "sha256": "459f628ced2941852c2bf64a8bf5e9107e0f97c3bebfa21e6b46a98c7444fbbd",
       "source": "netwerk/protocol/http/HttpBaseChannel.cpp"
     },
     {
@@ -77689,7 +77691,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpBaseChannel.h",
-      "sha256": "379479a1cec200f2cae3a9bc33a58f14339be27093cb87e745d002e559093f75",
+      "sha256": "64ca467b5006f04b404e648945fa1b863b36efef4e143f8ec244d3034a203e0f",
       "source": "netwerk/protocol/http/HttpBaseChannel.h"
     },
     {
@@ -77966,7 +77968,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/NetworkMarker.cpp",
-      "sha256": "d67b2cb3f23737e4331c416a5353ddb5377edf36568267a2bc8b546d64d3a554",
+      "sha256": "b4a0868fb5d8ab0ce9d853d56ee40cafcc349f17203b03e1846230a0b16eb217",
       "source": "netwerk/protocol/http/NetworkMarker.cpp"
     },
     {
@@ -77976,7 +77978,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/NetworkMarker.h",
-      "sha256": "0919bba9a4ce9cf69c35cdcf10fd16e1d4f44ea177ced1e6540b132de1813b97",
+      "sha256": "99842237f46325afbbc0c18a9eeefb986bb3d1d2aab8c4ce5fb74119227cdafd",
       "source": "netwerk/protocol/http/NetworkMarker.h"
     },
     {
@@ -78523,7 +78525,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/happy_eyeballs_glue/src/lib.rs",
-      "sha256": "451abd5e87920d0f9231e16a0eee7d0e5c52338d96967ce9b8a749325c670e2e",
+      "sha256": "51be6717793695afc6c84862217d2f404557016ece1bf4e002f2e430988b8c3d",
       "source": "netwerk/protocol/http/happy_eyeballs_glue/src/lib.rs"
     },
     {
@@ -78543,7 +78545,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/happy_eyeballs_glue/src/profiler.rs",
-      "sha256": "0ba524e429eaaceefafd930564eb93ced06b9a5137083fe16e166aa3e7e2028c",
+      "sha256": "701dc9d5b5c5c9679f80af828f1d73d9745c1d8ba8e224cc53e779288f869c87",
       "source": "netwerk/protocol/http/happy_eyeballs_glue/src/profiler.rs"
     },
     {
@@ -78553,7 +78555,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/happy_eyeballs_glue/src/profiler_noop.rs",
-      "sha256": "ed0b9d42faf7641e8a4bcaa57fe6044bd851065c386e6f09766ef333c839be03",
+      "sha256": "5e6a82e8e0e496a9a2d8d73eb63e02cc7369a4b18fc95917bc5b25b66473c498",
       "source": "netwerk/protocol/http/happy_eyeballs_glue/src/profiler_noop.rs"
     },
     {
@@ -78565,9 +78567,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "netwerk/protocol/http/metrics.yaml",
-      "sha256": "8df5a449b00c69e3ed5c08baf26c20af77b701d198e2197acfdc8bd86610b062",
+      "sha256": "46be3a2cc6cf3e27d4b22e3b301b53f32eb373f279588c0f31e851db4cebb99f",
       "source": "netwerk/protocol/http/metrics.yaml"
     },
     {
@@ -78691,7 +78693,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpAtomList.inc",
-      "sha256": "cf8eba89f8ba67cc906d00666c3db769ba0f06d0bc46df04644362a6730e1bbf",
+      "sha256": "752c0fbb370ce0af325353a58cc277c9e43315f6e955794a1b123c6edc860301",
       "source": "netwerk/protocol/http/nsHttpAtomList.inc"
     },
     {
@@ -78773,9 +78775,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpChannel.cpp",
-      "sha256": "52c81dfd70984e33c8657115ba78c8085a57a40bdd69f0e4af117a931604f404",
+      "sha256": "a433211ce04167eb758e5ab49e536dd8d01c240021de5547b148a7005d96951f",
       "source": "netwerk/protocol/http/nsHttpChannel.cpp"
     },
     {
@@ -78787,7 +78789,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpChannel.h",
-      "sha256": "9510ff1c3da468ac1589024dbecee627535e04ee6343e7af843fedad1c2923e3",
+      "sha256": "c3e30dde848ede53211a1e828983f4a9079ce27a27ed9a9f5088211566391692",
       "source": "netwerk/protocol/http/nsHttpChannel.h"
     },
     {
@@ -78825,7 +78827,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpChunkedDecoder.cpp",
-      "sha256": "9ea8c64c43800602989db677a814751c0fd1b6e42cb4e47edc65f9e575c186fe",
+      "sha256": "c9b47910ed70b23e0a35c841d884941dfc39a1afd9c9a40fbbc61f3210218f12",
       "source": "netwerk/protocol/http/nsHttpChunkedDecoder.cpp"
     },
     {
@@ -79071,7 +79073,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpTransaction.h",
-      "sha256": "b8246482b1d2f21d815c18ef7dfa6ed938321dc6b98c74c75dde6f33729b384b",
+      "sha256": "09bc431e4f260bc4ed3a3a3b227aabcc58533623ff155fd76b683864956cd8da",
       "source": "netwerk/protocol/http/nsHttpTransaction.h"
     },
     {
@@ -79725,7 +79727,7 @@
       ],
       "mode": "0644",
       "path": "netwerk/socket/neqo_glue/src/lib.rs",
-      "sha256": "6b8ba2ec65a9aaae864acb5074c078c6ed7ea802427f53de7b97b53a4cc328ac",
+      "sha256": "5239a0bf18b1e172c474a648665fbb87803b814cc44d6083a6d716e76f7de21c",
       "source": "netwerk/socket/neqo_glue/src/lib.rs"
     },
     {
@@ -82251,7 +82253,7 @@
       ],
       "mode": "0644",
       "path": "python/mach/mach/command_util.py",
-      "sha256": "fb5c7be55957604e66c58152a59f338caef069d9e377499ba92712a8df1a48eb",
+      "sha256": "c0b39d1624749e1b25658fc4d822afb1752551e756d5780eb3b7ff0eb530cca2",
       "source": "python/mach/mach/command_util.py"
     },
     {
@@ -82327,7 +82329,7 @@
       ],
       "mode": "0644",
       "path": "python/mach/mach/main.py",
-      "sha256": "bc761fff4114f06685f75f87eb7a60bb03ce36d378deaa6d8fd9d59e324d6016",
+      "sha256": "90e6166865c1ca470898c076aeae13351f78bb191dabbe5aa1a00fb308803a01",
       "source": "python/mach/mach/main.py"
     },
     {
@@ -82427,7 +82429,7 @@
       ],
       "mode": "0644",
       "path": "python/mach/mach/telemetry.py",
-      "sha256": "b8760abb73bad047f730ed446d268c4c88a1738aea0967b6ec8419123094ad3b",
+      "sha256": "53c349d532620429823974f9006f9870e30b684a8dfbe124b72dfa7ee2697de8",
       "source": "python/mach/mach/telemetry.py"
     },
     {
@@ -82624,9 +82626,9 @@
         "configure:linux-x86_64:bootstrap",
         "configure:windows-x86_64:bootstrap"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "python/mach/mach/util.py",
-      "sha256": "7b7af37bbfec624c3f134e1cf31a24ab0e2e786fca4fd8af14d459e712708a8e",
+      "sha256": "fe4933c003dbfb635e34fe6239caa4d061ac57a3c77d21797250af8ed829ae2b",
       "source": "python/mach/mach/util.py"
     },
     {
@@ -82831,7 +82833,7 @@
       ],
       "mode": "0644",
       "path": "python/mozboot/mozboot/bootstrap.py",
-      "sha256": "25646fa9e755b78f50cedb331a4a9bc778a1b6af39f572d85f4cccd27f6004d6",
+      "sha256": "cee7e26223e9949570538882d56bc405c737acfd37ec40176860b83e32aa2b3c",
       "source": "python/mozboot/mozboot/bootstrap.py"
     },
     {
@@ -82974,7 +82976,7 @@
       ],
       "mode": "0644",
       "path": "python/mozboot/mozboot/test/python.toml",
-      "sha256": "c2d323bb41956ed6d56bbe7354dab0a9e02f791b18856ca9de595a9e6fc34dda",
+      "sha256": "01e6b68aeb98ad7a19a19be974b83269ae0f1076eebf0011191a036a1bef758a",
       "source": "python/mozboot/mozboot/test/python.toml"
     },
     {
@@ -82988,6 +82990,18 @@
       "path": "python/mozboot/mozboot/test/test_android.py",
       "sha256": "e350fa220a84a571d99aba0dcccef9f56a6660bd629e6b816bd2a0e313854183",
       "source": "python/mozboot/mozboot/test/test_android.py"
+    },
+    {
+      "categories": [
+        "build:active-manifest-reference",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap",
+        "explicit:mach-bootstrap"
+      ],
+      "mode": "0644",
+      "path": "python/mozboot/mozboot/test/test_bootstrap.py",
+      "sha256": "6084690f52eaa627cfb592b9f6aa968e89f02b811f07d70623e552fe0c18cb4f",
+      "source": "python/mozboot/mozboot/test/test_bootstrap.py"
     },
     {
       "categories": [
@@ -83251,7 +83265,7 @@
       ],
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/action/test_archive.py",
-      "sha256": "99a08a21c34ec32d7248af0686b094f0670110626b4462c2d2261cc7e6cd198e",
+      "sha256": "284bc1260821c47e43ade2e5734d330e32e8564c9962536a519b384706764413",
       "source": "python/mozbuild/mozbuild/action/test_archive.py"
     },
     {
@@ -83385,7 +83399,7 @@
       ],
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/build_commands.py",
-      "sha256": "30408ff69e3fdf34a57389dacc2fe7d29be83a4dc5c16598a628910d1fa2f57a",
+      "sha256": "8481454888445f7e32322121c7a379f70685198947e2badec1d89793cf646499",
       "source": "python/mozbuild/mozbuild/build_commands.py"
     },
     {
@@ -83521,9 +83535,9 @@
         "configure:linux-x86_64:bootstrap",
         "configure:windows-x86_64:bootstrap"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "python/mozbuild/mozbuild/controller/building.py",
-      "sha256": "75af99d89f6c23871b54ffaa6962b506d46bfcb3c383a70de78a6159448c3ab3",
+      "sha256": "b78335525745f7b36a2234ab122126f2af165c0a6380c269db7fb16f9439f35e",
       "source": "python/mozbuild/mozbuild/controller/building.py"
     },
     {
@@ -83593,7 +83607,7 @@
         "configure:linux-x86_64:bootstrap",
         "configure:windows-x86_64:bootstrap"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "python/mozbuild/mozbuild/frontend/emitter.py",
       "sha256": "888ac26a773a2650bc8ac2095a8c08c8ef3c4c83371fd08cd5bc5e30f80188b8",
       "source": "python/mozbuild/mozbuild/frontend/emitter.py"
@@ -83729,6 +83743,27 @@
     {
       "categories": [
         "build:linux-x86_64",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
+      ],
+      "mode": "0644",
+      "path": "python/mozbuild/mozbuild/packaging.py",
+      "sha256": "3005d063646d7fbec82ff481c60eeb38534b693e2f00956ed2f98022a6ac6144",
+      "source": "python/mozbuild/mozbuild/packaging.py"
+    },
+    {
+      "categories": [
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
+      ],
+      "mode": "0644",
+      "path": "python/mozbuild/mozbuild/path_performance.py",
+      "sha256": "c2862d5635e136508c27fa00d2c395e5c1c22ab70e57a17f5720068f806af1a4",
+      "source": "python/mozbuild/mozbuild/path_performance.py"
+    },
+    {
+      "categories": [
+        "build:linux-x86_64",
         "build:windows-x86_64",
         "configure:linux-x86_64:bootstrap",
         "configure:windows-x86_64:bootstrap"
@@ -83782,7 +83817,7 @@
       ],
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/schedules.py",
-      "sha256": "eedfbc4909a9621c0a8e0b2fac45fb3370b34d68653e0b072a99bfdf85dc318c",
+      "sha256": "05188d0aab55828fc1f67e1d580ea7a2dae95be0e131f617e89e1d3fbb04c7dc",
       "source": "python/mozbuild/mozbuild/schedules.py"
     },
     {
@@ -84278,7 +84313,7 @@
       ],
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/test/python.toml",
-      "sha256": "4919d8a03de311ad953568d1a1b784bfc6f4d1ec6e03bb458d322c30e74bc3be",
+      "sha256": "89b17695bd45bd60254d743dded3ab37c1b7142158bdbf7f8f6ae3467bf83733",
       "source": "python/mozbuild/mozbuild/test/python.toml"
     },
     {
@@ -84333,7 +84368,7 @@
       ],
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/test/test_artifacts.py",
-      "sha256": "4fbe036952df7f852903da4dc8d060a4be4f61e9ebf4a4586265e7ba2ebd5a45",
+      "sha256": "838639a554b33351f95c7dce3b0c9060437e74cc92aa1f866333b654854b223b",
       "source": "python/mozbuild/mozbuild/test/test_artifacts.py"
     },
     {
@@ -84497,6 +84532,28 @@
         "configure:windows-x86_64:bootstrap"
       ],
       "mode": "0644",
+      "path": "python/mozbuild/mozbuild/test/test_packaging.py",
+      "sha256": "8a2c59f393d3932b23c9874685887b5369968675b85cabcc5b62b6885e551866",
+      "source": "python/mozbuild/mozbuild/test/test_packaging.py"
+    },
+    {
+      "categories": [
+        "build:active-manifest-reference",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
+      ],
+      "mode": "0644",
+      "path": "python/mozbuild/mozbuild/test/test_path_performance.py",
+      "sha256": "32c59e26084f6754c0c205ad0ae1ca5884c5affb582c70e6a68af82c78285f8b",
+      "source": "python/mozbuild/mozbuild/test/test_path_performance.py"
+    },
+    {
+      "categories": [
+        "build:active-manifest-reference",
+        "configure:linux-x86_64:bootstrap",
+        "configure:windows-x86_64:bootstrap"
+      ],
+      "mode": "0644",
       "path": "python/mozbuild/mozbuild/test/test_preprocessor.py",
       "sha256": "9e0a39ed5f9facdd4954c6a25ffe5f7448867c86ee2a5741aa54304193a68a47",
       "source": "python/mozbuild/mozbuild/test/test_preprocessor.py"
@@ -84553,7 +84610,7 @@
       ],
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/test/test_telemetry_settings.py",
-      "sha256": "740412b015c97af81b5f0af4752859bf7508775ea2a99b2f16d171e408039bbf",
+      "sha256": "149bad826d37ee6e0a8471f32e71cbcc539892c9e719f0d9444afea1c2595fe4",
       "source": "python/mozbuild/mozbuild/test/test_telemetry_settings.py"
     },
     {
@@ -85752,9 +85809,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "security/ct/CTKnownLogs.h",
-      "sha256": "ebc629af55251b3d7745f753b54e621c450a97eee92e7dc2b9449800c69e43d2",
+      "sha256": "5515ac2e41508fa30ef1c17bc8be30c5a529dadc3e89700f11a55a15fd2a52a2",
       "source": "security/ct/CTKnownLogs.h"
     },
     {
@@ -86432,7 +86489,7 @@
         "closure:x86_64-pc-windows-msvc:headers",
         "closure:x86_64-unknown-linux-gnu:headers"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "security/manager/ssl/PKCS11ModuleDB.h",
       "sha256": "210cbeb4ea64e0b202f36f1f09e1cedba7be68de99ee9591f537d3c31a5340cf",
       "source": "security/manager/ssl/PKCS11ModuleDB.h"
@@ -86466,7 +86523,7 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "security/manager/ssl/PKCS11Token.cpp",
       "sha256": "49de6e8b69823e29e88faeb41f6bee073f5da3e9d538327cb5d48ed2c6987522",
       "source": "security/manager/ssl/PKCS11Token.cpp"
@@ -86742,7 +86799,7 @@
       ],
       "mode": "0644",
       "path": "security/manager/ssl/StaticHPKPins.h",
-      "sha256": "b6356357c21bcc12859d1b94a3195e55b5b152ab2c24283ff692fbf93f612ec4",
+      "sha256": "62db2dd28d144d96352cb256aa310c82735e8f885151b8d409e64794735f6628",
       "source": "security/manager/ssl/StaticHPKPins.h"
     },
     {
@@ -87189,7 +87246,7 @@
       ],
       "mode": "0644",
       "path": "security/manager/ssl/metrics.yaml",
-      "sha256": "6d456af806311eda6474438ed74edfdc4273bcaf9033f3e12bbd016e23200899",
+      "sha256": "c7789b72916b815c68c3466aa13669f297cfe9b0c3614bb904f3d0215ff2ecff",
       "source": "security/manager/ssl/metrics.yaml"
     },
     {
@@ -87583,9 +87640,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "security/manager/ssl/nsNSSCallbacks.cpp",
-      "sha256": "31a84d4e2bfc827360fc54d7cb2f4fc91c1fa21ac48641ad2f934c0ec2e0f7c3",
+      "sha256": "7fbf279c8456498275cc60535a59e46bbd95e81526029192e1f6a2cb2072cfaa",
       "source": "security/manager/ssl/nsNSSCallbacks.cpp"
     },
     {
@@ -87895,7 +87952,7 @@
       ],
       "mode": "0644",
       "path": "security/manager/ssl/nsSTSPreloadList.inc",
-      "sha256": "ffd1a082d7d4979204fe4857ee920bb2476f6dc50ed63540b37402268982d38a",
+      "sha256": "c3803a4e096aff6bb52699d03b84e4e56cb66a9ede15a4b955484a24deddb254",
       "source": "security/manager/ssl/nsSTSPreloadList.inc"
     },
     {
@@ -92958,7 +93015,7 @@
       ],
       "mode": "0644",
       "path": "security/nss/lib/nss/nss.h",
-      "sha256": "2dad7be16cb1e215a53f06202984a6c033354c2c0bf05f2cbc5f4227ed701e1c",
+      "sha256": "48b257b144821d1ec543c29ddafb925e07ae1f1b1801dd43b2f07315413b34dc",
       "source": "security/nss/lib/nss/nss.h"
     },
     {
@@ -94578,7 +94635,7 @@
       ],
       "mode": "0644",
       "path": "security/nss/lib/softoken/pkcs11.c",
-      "sha256": "d0595a7249aa9922e46dc4940129d7ad284fb480802d5accb143c747352e7fc6",
+      "sha256": "98a636e79add4487fc4e0ee5fdaaa9da3743a620780d229b91866c7af9034fac",
       "source": "security/nss/lib/softoken/pkcs11.c"
     },
     {
@@ -94788,7 +94845,7 @@
       ],
       "mode": "0644",
       "path": "security/nss/lib/softoken/softkver.h",
-      "sha256": "d12b2a27a79b1aa8593a1c8147da0cb17f1c0ae89abe8ef4ab5d577d336d6822",
+      "sha256": "f46150533ccb5f00cee4856c7cf70259753afb9c5421993185c607172bf24af1",
       "source": "security/nss/lib/softoken/softkver.h"
     },
     {
@@ -95558,7 +95615,7 @@
       ],
       "mode": "0644",
       "path": "security/nss/lib/ssl/tls13ech.c",
-      "sha256": "50fab5a2f644c84b1b7765098ff1fa5a10f87513168c4683c0a91036bb77d16e",
+      "sha256": "f63a1f110d898849d1ebbbc8baa46d326a589b55e278f6453c5ac541ae8d152a",
       "source": "security/nss/lib/ssl/tls13ech.c"
     },
     {
@@ -96082,7 +96139,7 @@
       ],
       "mode": "0644",
       "path": "security/nss/lib/util/nssutil.h",
-      "sha256": "8899df3a44b9b95b6b3789d23df356b6069114d97c6451f74067ddae523212ff",
+      "sha256": "30ba78841e301809d1936a45d54b587051cb8cab19e84dcedcc5614e8784d983",
       "source": "security/nss/lib/util/nssutil.h"
     },
     {
@@ -97282,7 +97339,7 @@
       ],
       "mode": "0644",
       "path": "storage/build/mozStorageCID.h",
-      "sha256": "fe481bf5dd42c9c2c52487d0c5b29ea5e12ebcab73574a597216f898c9dfe94f",
+      "sha256": "1a58cd3d94e91a0fb9f18ee17f2555b13888c5a953a2cefc77f26aa1e2f35490",
       "source": "storage/build/mozStorageCID.h"
     },
     {
@@ -98006,7 +98063,7 @@
       ],
       "mode": "0644",
       "path": "taskcluster/config.yml",
-      "sha256": "f593b13cfc1a40c94f242276969b899fb943fa60e85b7091420c80e1c3b61287",
+      "sha256": "d61a0567ac3bed252588c799e3b797024ad76258f0f072639d6c969956e09c77",
       "source": "taskcluster/config.yml"
     },
     {
@@ -98088,7 +98145,7 @@
       ],
       "mode": "0644",
       "path": "taskcluster/gecko_taskgraph/test/test_target_tasks.py",
-      "sha256": "95c5e41fe5dc87a99b3206bc9000f76231403463862778f253b1c7758c845063",
+      "sha256": "d9fb98ed41cf30a66a730963d204664173fd225a71b094c66fdceae7e9731025",
       "source": "taskcluster/gecko_taskgraph/test/test_target_tasks.py"
     },
     {
@@ -98133,7 +98190,7 @@
       ],
       "mode": "0644",
       "path": "taskcluster/gecko_taskgraph/test/test_transforms_task.py",
-      "sha256": "7260e5d0233fae66db0e70cedf0caed078e9518c06e0895d9ebd877b39c7eece",
+      "sha256": "15158b095ee845f601927c5090f85824cf8f01943b2277832dedba7c17504cd5",
       "source": "taskcluster/gecko_taskgraph/test/test_transforms_task.py"
     },
     {
@@ -98142,7 +98199,7 @@
       ],
       "mode": "0644",
       "path": "taskcluster/gecko_taskgraph/test/test_transforms_test.py",
-      "sha256": "c7842ffe52cd55aeeed2cb15d8dd09c9f7265517891f9c567f544a28a4a7a3a3",
+      "sha256": "52074554b03e52659834f8f170dac7b366a01a2dfeca8b8a6526addb8bc6f913",
       "source": "taskcluster/gecko_taskgraph/test/test_transforms_test.py"
     },
     {
@@ -98178,7 +98235,7 @@
       ],
       "mode": "0644",
       "path": "taskcluster/gecko_taskgraph/test/test_util_chunking.py",
-      "sha256": "6260c3d14d5895f3c83561e7c2f56f3c63c054f1d4ff8009026dce6d3950bf5f",
+      "sha256": "b94439547ef1b197df11baed4f48747f7114424b70bdd34881cad4db03da3abc",
       "source": "taskcluster/gecko_taskgraph/test/test_util_chunking.py"
     },
     {
@@ -98435,7 +98492,7 @@
       ],
       "mode": "0644",
       "path": "testing/gtest/rungtests.py",
-      "sha256": "8c88231b2139f477e8baac48f423429d28c3c3e95cf21cb6b6581712f559f08d",
+      "sha256": "8f4724e19d6ba7ee46d9228fb99a96ed04bf92bc0f88f093f4b125507cefa7cd",
       "source": "testing/gtest/rungtests.py"
     },
     {
@@ -99481,7 +99538,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozbase/mozcrash/mozcrash/mozcrash.py",
-      "sha256": "5da084b110d63903e0a55dcd581969a24590b8f444d2cd7e8ee2d9eab88a940f",
+      "sha256": "047888a0230db1db5c3d942d2a82b191d171ab356cdb36b7dd14fffe70577391",
       "source": "testing/mozbase/mozcrash/mozcrash/mozcrash.py"
     },
     {
@@ -100993,7 +101050,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozbase/mozlog/mozlog/handlers/statushandler.py",
-      "sha256": "6574bb66f207d53cbd2c90e539a8f825b8c3624658c15ffae0c290181c49f329",
+      "sha256": "6f60b65512bcd01e512e85d1fbb989ed6db551c909c06c36f968005feeba77c6",
       "source": "testing/mozbase/mozlog/mozlog/handlers/statushandler.py"
     },
     {
@@ -101293,7 +101350,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozbase/mozlog/tests/test_structured.py",
-      "sha256": "ad9d234e9ef2e2c6b949bf4aa47f12b0bba2c3a2962509d046c29cff37c912d0",
+      "sha256": "3923900c5cb52eb9a894bc56d3c33886d2233ddb706af534faa5f84d836f8430",
       "source": "testing/mozbase/mozlog/tests/test_structured.py"
     },
     {
@@ -103652,7 +103709,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozbase/moztest/moztest/resolve.py",
-      "sha256": "1cb743c1f50853ad5a058c8ae97fca2ac4b39ef7b036cfede20b851a963234eb",
+      "sha256": "d26e7ae6a1696bff1953327c4c1806a8c4d7ad05c3e36c3f552680cec6d59bad",
       "source": "testing/mozbase/moztest/moztest/resolve.py"
     },
     {
@@ -103931,7 +103988,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozbase/moztest/tests/test_resolve.py",
-      "sha256": "a091c8f485fb9663dd8e8ce439ee8c153d460a9549f6076a57d2be1034a83631",
+      "sha256": "5bad717a4e09f52423b24a49d7a2f6573db007f0de12bf21787521f6b2fba3e6",
       "source": "testing/mozbase/moztest/tests/test_resolve.py"
     },
     {
@@ -104212,7 +104269,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozbase/rust/mozrunner/src/runner.rs",
-      "sha256": "46a813397b12f38f3d2a270fcd469863888efb71c4a5cd405d3870de682316ee",
+      "sha256": "febad49dc85d61c9cc4145d7aa1f8731aecd0734a70e05b71396d499533d523d",
       "source": "testing/mozbase/rust/mozrunner/src/runner.rs"
     },
     {
@@ -104276,7 +104333,7 @@
       ],
       "mode": "0644",
       "path": "testing/mozharness/test/python.toml",
-      "sha256": "12dcb7caef11b3e17dd1be24360dd60d71c93a56730a3246565b0f37e0c117b1",
+      "sha256": "c1e4024e804bbdc857c7fa20d81fd3b2450b4270a1c98804a57eb6f9e086f8b8",
       "source": "testing/mozharness/test/python.toml"
     },
     {
@@ -104368,6 +104425,15 @@
       "path": "testing/mozharness/test/test_mozilla_merkle.py",
       "sha256": "3ffa5998554b4d058b9768a9dc0e476431b9b71ed9ce34f4f57fda7f1d432711",
       "source": "testing/mozharness/test/test_mozilla_merkle.py"
+    },
+    {
+      "categories": [
+        "build:active-manifest-reference"
+      ],
+      "mode": "0644",
+      "path": "testing/mozharness/test/test_mozilla_per_test_base.py",
+      "sha256": "345df675eea496b797985ecb689002dd8acce6d2266a2d02aabbbd3edc528bb8",
+      "source": "testing/mozharness/test/test_mozilla_per_test_base.py"
     },
     {
       "categories": [
@@ -108039,7 +108105,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/ads-client/src/lib.rs",
-      "sha256": "7ba7f91202fe3c96b52b5845fdab6c06fbb22291201d42877bad24603e1ae57b",
+      "sha256": "8f5d8bdf194d37a4109239365b29f1f1b667ad80f690d2138b6931d1156e2095",
       "source": "third_party/application-services/components/ads-client/src/lib.rs"
     },
     {
@@ -108069,7 +108135,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/autofill/src/lib.rs",
-      "sha256": "d86e3f364cff59c7557a7278539753204469ae4d7e8e04e70373856ad1be7d60",
+      "sha256": "c37dc8042ad48469fb2c5c6b9476f13f00f19c9c3c9242da7ae0a2701c1a1051",
       "source": "third_party/application-services/components/autofill/src/lib.rs"
     },
     {
@@ -108169,7 +108235,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/logins/Cargo.toml",
-      "sha256": "030c60805efa0c97020a4ed33061663302fcd793ea6f950e91ff5102642d3526",
+      "sha256": "3618980dfdff29d2cd9578022c6091707119a7227be77afd3ffeb7672f816746",
       "source": "third_party/application-services/components/logins/Cargo.toml"
     },
     {
@@ -108309,7 +108375,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/support/error/android/build.gradle",
-      "sha256": "42409a12e53780ba3b8c50960a02b7e26c31673418a56c5bdf921eafc5a8bd69",
+      "sha256": "bee71bbd6b4c5eb961f9b3948fbb4d350906622fce19911dc1d1564fb4c8a0c6",
       "source": "third_party/application-services/components/support/error/android/build.gradle"
     },
     {
@@ -108471,7 +108537,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/support/error/tests/macro_arguments.stderr",
-      "sha256": "5c65e7dbd6f0332f7d399bf5b3c2b5532896192414f8b775154c8b4f61d2d98c",
+      "sha256": "3e6eb7feba3ce4613e83e38f850ccc665065e8ee4e5e4f847e282a878652aba5",
       "source": "third_party/application-services/components/support/error/tests/macro_arguments.stderr"
     },
     {
@@ -108634,7 +108700,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/support/tracing/android/build.gradle",
-      "sha256": "7eb3991c22ae47043c9754db53091493192a76ca4709f040a13aa8b5cd5bc64f",
+      "sha256": "bf546ac3794dc54cf1b8d1ddc4bef466c4c4ad7d0fe8b66280d5408dfa424807",
       "source": "third_party/application-services/components/support/tracing/android/build.gradle"
     },
     {
@@ -108734,7 +108800,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/tabs/src/lib.rs",
-      "sha256": "3a73ec1a8f27396cff576a7f5f0b7f01d59ede8e702b1a279436b0865b1c1a41",
+      "sha256": "0601e9dac605242cedec7212326b99cccd4b05a474df880f646fbda7ef4967b0",
       "source": "third_party/application-services/components/tabs/src/lib.rs"
     },
     {
@@ -108744,7 +108810,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/viaduct/Cargo.toml",
-      "sha256": "3950f7c11cf47b3930b856aa66d453313d2a213fb604dfe82930a803283c19be",
+      "sha256": "d0578289279cc40a963e2903721eaa1933584bc71d0c8e2597d8596e396c94ea",
       "source": "third_party/application-services/components/viaduct/Cargo.toml"
     },
     {
@@ -108754,7 +108820,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/viaduct/src/lib.rs",
-      "sha256": "7cde99130384e9526a0ac574b966d5123ca8385fd9036dda2772f2d80fe99ed1",
+      "sha256": "6c297740310ba1824154005d0492519d0258ed65bb39b8d4a14706669ed99b7a",
       "source": "third_party/application-services/components/viaduct/src/lib.rs"
     },
     {
@@ -108784,7 +108850,7 @@
       ],
       "mode": "0644",
       "path": "third_party/application-services/components/webext-storage/src/lib.rs",
-      "sha256": "78d0388e4a21ab39ecd8e6f653e97d181ca0fa9c57b92050c7946b543d828a05",
+      "sha256": "186565db2580363cc6d8ed5da51cc30af615375b5fc4265022ce6a40188b7318",
       "source": "third_party/application-services/components/webext-storage/src/lib.rs"
     },
     {
@@ -153800,7 +153866,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/h2/.cargo-checksum.json",
-      "sha256": "da048046f4aaa72d43ef6d3f89ae591ff53574f0216455e64708d3ad0f5ca961",
+      "sha256": "267aaebcfb74db41412319f3e5685360ae330a9c9f941fd32db8431c55bcba91",
       "source": "third_party/rust/h2/.cargo-checksum.json"
     },
     {
@@ -157136,7 +157202,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/icu_collator/src/comparison.rs",
-      "sha256": "406299a4fc6feaddeb4d2e80ef7d7ecb49e50084b949c50a89fdc7eb63a43bb1",
+      "sha256": "82080358b0073dc872c0b20164b8fa0f2e0857a2f164b368ed780ab467994ae9",
       "source": "third_party/rust/icu_collator/src/comparison.rs"
     },
     {
@@ -157158,7 +157224,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/icu_collator/src/elements.rs",
-      "sha256": "44b76568a8439e9be9be2327d218fbaafb391153f1f01626445e484c54e6351a",
+      "sha256": "6c6c503966f9f9d5b362996311667862f3082cd836f76e1d6b61e114ce6eae52",
       "source": "third_party/rust/icu_collator/src/elements.rs"
     },
     {
@@ -164518,7 +164584,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/.cargo-checksum.json",
-      "sha256": "9d31e0aaa3aeb935ba0d1e196c438d6a9e8d62c56252d26a2f51a77750b0f3db",
+      "sha256": "ec00760220471d2d02b39fd9d20f0bbedf01612acb044fb896c7dd5b3ec5fdf9",
       "source": "third_party/rust/itertools/.cargo-checksum.json"
     },
     {
@@ -164528,7 +164594,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/.cargo_vcs_info.json",
-      "sha256": "c44891b3a83326c2d0434099194ceee3d75eb1f850a58f611b1c85a788938512",
+      "sha256": "4392e2c0996dbbdfdc3aaf5a8f7173a58c1e72a118ed89e31c4585c8df5da1de",
       "source": "third_party/rust/itertools/.cargo_vcs_info.json"
     },
     {
@@ -164578,7 +164644,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/CHANGELOG.md",
-      "sha256": "60ec9a1801e015e49f7fbb299b608ac730d5b1a3fb298e6cf7935c0695ddf7fe",
+      "sha256": "26b83b8f6206e5fa67139ac1b8e8b803f34ead29cdd8ff9c449f38b166ad1bf2",
       "source": "third_party/rust/itertools/CHANGELOG.md"
     },
     {
@@ -164598,7 +164664,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/Cargo.lock",
-      "sha256": "4422e732d4ce6f650afb53a1dcffb1e53c86dd066c3dcd66bc9620acd898b99e",
+      "sha256": "1c5a169dc68a4c74a5126754e1b18f31e5097a17f993856730cadef2e2a7a9c5",
       "source": "third_party/rust/itertools/Cargo.lock"
     },
     {
@@ -164608,7 +164674,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/Cargo.toml",
-      "sha256": "77735549383196a4156a2246dd1cd6742029b223679b3004531456d33562b0ce",
+      "sha256": "62dea4c41dff0c454c3198715885ca13ae6cdf1a5d3b5a5ec68ef42750ccbaf2",
       "source": "third_party/rust/itertools/Cargo.toml"
     },
     {
@@ -164618,7 +164684,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/Cargo.toml.orig",
-      "sha256": "1fb9c3c002924032d84c3a39dddfeb171724c413c1d5215d7a720598eb922a58",
+      "sha256": "974a5d0983829082ef3219c52db21e8e12374e9d64996561736bf0f5bafc9bd2",
       "source": "third_party/rust/itertools/Cargo.toml.orig"
     },
     {
@@ -164651,7 +164717,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/README.md",
-      "sha256": "7dba3f55ea54eff2606f8b9f005e369cf9885dd972cb481432fce00234ee7750",
+      "sha256": "b05ce16c04a2e8ad346540e4c3b2ffa5c6b6795797ebc27adfeca8c0f5a1f969",
       "source": "third_party/rust/itertools/README.md"
     },
     {
@@ -164684,7 +164750,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/benches/combinations_with_replacement.rs",
-      "sha256": "11f29160652a2d90ce7ca4b1c339c4457888ab6867e2456ce1c62e3adf9be737",
+      "sha256": "0a83451abefad1b14c02effceaf2b13c4b56cc763816bff29c8cd481c40b0a56",
       "source": "third_party/rust/itertools/benches/combinations_with_replacement.rs"
     },
     {
@@ -164717,7 +164783,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/benches/powerset.rs",
-      "sha256": "dc1fd729584147e5d8e4d19c6ca6f8706087d41c3c5beb7293d9ea43b4beab14",
+      "sha256": "20cd76d5fc4817f1d3a14068aca82315cfd2c02aeeaf0e6288ef72ab12b033cd",
       "source": "third_party/rust/itertools/benches/powerset.rs"
     },
     {
@@ -164728,7 +164794,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/benches/specializations.rs",
-      "sha256": "daa989877d83ccd58e8de529184d50905b3d6fa60a9eeae917f38bd570d72fa4",
+      "sha256": "f35d04a56ed51a36bbad2674a7b296061cf77d9e22e698e5fc985a89e3af65c9",
       "source": "third_party/rust/itertools/benches/specializations.rs"
     },
     {
@@ -164739,7 +164805,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/benches/tree_reduce.rs",
-      "sha256": "fa4f22f042b76df89094ddf6e925ba42c4c3992f8195e719ed035f2e7cfa05bd",
+      "sha256": "b7e56a6def9b7fa93c90dbfa2938d2df6c85fb837d32c6bb4d657cd659482ace",
       "source": "third_party/rust/itertools/benches/tree_reduce.rs"
     },
     {
@@ -164750,7 +164816,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/benches/tuple_combinations.rs",
-      "sha256": "16366158743307a0289fc1df423a3cec45009807d410a9fe9922d5b6f8b7d002",
+      "sha256": "9e255700b0a8afc38131026e43c7367db843363f29463ede3e0b3671aa87bdf7",
       "source": "third_party/rust/itertools/benches/tuple_combinations.rs"
     },
     {
@@ -164782,7 +164848,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/examples/iris.rs",
-      "sha256": "42c1b2fc148df52a050b013a57b577ad19911f1fe85b9525863df501979b5cd1",
+      "sha256": "a9e1c771e5d75defa285c7e7dc32f4fed74d81c104ba054427bc59ef38d99dc8",
       "source": "third_party/rust/itertools/examples/iris.rs"
     },
     {
@@ -164792,7 +164858,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/adaptors/coalesce.rs",
-      "sha256": "b57157c205ae077dd398740b61c7f49023aa80868abd8a071a6fe89ae6ecc9ad",
+      "sha256": "b9ddc210df82073e70dd41436eb84b207c1ef1c82cdefffb14be73299b3f6b17",
       "source": "third_party/rust/itertools/src/adaptors/coalesce.rs"
     },
     {
@@ -164812,7 +164878,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/adaptors/mod.rs",
-      "sha256": "1e0cf7409c7291a923cf87f1c6d27cc57bd9f71ca52f7dd08a429aa994daa6ce",
+      "sha256": "1a031acb216c34489475e841622181c6c54521a76a3f9280312cceac897dbbf0",
       "source": "third_party/rust/itertools/src/adaptors/mod.rs"
     },
     {
@@ -164831,8 +164897,28 @@
         "build:windows-x86_64"
       ],
       "mode": "0644",
+      "path": "third_party/rust/itertools/src/all_equal_value_err.rs",
+      "sha256": "0cc6f2215012087e15b07edc390b7939daaaaa06fe26e84614e6ebe3beb1274c",
+      "source": "third_party/rust/itertools/src/all_equal_value_err.rs"
+    },
+    {
+      "categories": [
+        "build:linux-x86_64",
+        "build:windows-x86_64"
+      ],
+      "mode": "0644",
+      "path": "third_party/rust/itertools/src/array_impl.rs",
+      "sha256": "4eb99b5385e3f3b68f134c5d6073485b8d6558544ab2067a19b2789de3939d3c",
+      "source": "third_party/rust/itertools/src/array_impl.rs"
+    },
+    {
+      "categories": [
+        "build:linux-x86_64",
+        "build:windows-x86_64"
+      ],
+      "mode": "0644",
       "path": "third_party/rust/itertools/src/combinations.rs",
-      "sha256": "9c4490bc4c7488fe9a8dba656a30493d90abb33006f7abbe3e266c237ffc986b",
+      "sha256": "9b2d1d92b0b049ae655d6b2b271d4edcb7af05c1fb44fecdd71ff0be2c0120dd",
       "source": "third_party/rust/itertools/src/combinations.rs"
     },
     {
@@ -164842,7 +164928,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/combinations_with_replacement.rs",
-      "sha256": "c7d6b7a122057e9aab075b2de41440ccd2973a6985fba75c2e93af13de55ef90",
+      "sha256": "bfe41c0fcd1512ab581a3e7521e3b417b311d29b037dc63aed41d3262af60fcb",
       "source": "third_party/rust/itertools/src/combinations_with_replacement.rs"
     },
     {
@@ -164882,7 +164968,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/duplicates_impl.rs",
-      "sha256": "1be37249b4566edc8da611ed9766ec851a526e7513bd13d80fe97482dcfcf7f3",
+      "sha256": "a8ee2930e0d5825e4efd2a200e825a330925d177b79232b5d14eb0519ded6d9c",
       "source": "third_party/rust/itertools/src/duplicates_impl.rs"
     },
     {
@@ -164892,7 +164978,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/either_or_both.rs",
-      "sha256": "cac278666b5d3c1fd103d97d15ce4c40960ea459441aeae83c6502087fd2ad8d",
+      "sha256": "8b3c54326d748106ec91a6a882da2750e3049ab759646914475ffa44ed4e9301",
       "source": "third_party/rust/itertools/src/either_or_both.rs"
     },
     {
@@ -164902,7 +164988,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/exactly_one_err.rs",
-      "sha256": "90b6204551161d27394af72107765dbfe3b51a77f4770c2e506fa4938985a184",
+      "sha256": "2ade8409f31c47d583894f69fc0556c13a1b3b0f4dc01fcd74a4c3de11476daf",
       "source": "third_party/rust/itertools/src/exactly_one_err.rs"
     },
     {
@@ -164942,7 +165028,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/free.rs",
-      "sha256": "00ec21acee2ae2b30bf99e62472f9684c0a1719fbafc8dd2e4195ea8377c5b5d",
+      "sha256": "1c7f7b08681b71694c2f82c66bb0d388795628f90b618c57e29d63ef7a70f0af",
       "source": "third_party/rust/itertools/src/free.rs"
     },
     {
@@ -164952,7 +165038,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/group_map.rs",
-      "sha256": "c9da201137c6bb479b9308bfc38398b76950e39905f4ce8bc435c5318371522c",
+      "sha256": "a34116bc64f73ebff084077843157a11c23b8245f6efac73ff93ff9376156dd8",
       "source": "third_party/rust/itertools/src/group_map.rs"
     },
     {
@@ -164962,7 +165048,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/groupbylazy.rs",
-      "sha256": "5862629719258703aad47977ba1060f20fff15e962e18e6142758ebf6cd4a61c",
+      "sha256": "d68308d1ecc642cb42c021a4052265cbb4a961cc7c5241424bfe76e9853e144e",
       "source": "third_party/rust/itertools/src/groupbylazy.rs"
     },
     {
@@ -164972,7 +165058,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/grouping_map.rs",
-      "sha256": "3896c46ba4bd8ea886e5344a245658235626a104758d5ccecf223544a9ba471b",
+      "sha256": "1c943a4d61a034ab8a6eeea0b8714383258705bbb8ebd72e5273db724e259728",
       "source": "third_party/rust/itertools/src/grouping_map.rs"
     },
     {
@@ -165022,7 +165108,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/kmerge_impl.rs",
-      "sha256": "3f999d55d7def904f71f2ca88b36707461f7f23b32966e0ccaf31d808886d843",
+      "sha256": "40bda0a09a178ba95a397f294d5ed4896776d1abedf793c44475d4ee41afabb9",
       "source": "third_party/rust/itertools/src/kmerge_impl.rs"
     },
     {
@@ -165043,7 +165129,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/lib.rs",
-      "sha256": "e7f144351cca5018dc12270b4c33f0562afddb92452acfa85153cb276aebd6e9",
+      "sha256": "cac2e34f5b83156078fbbb0137e173c1b4aa63528259f82100e16d7501692ee8",
       "source": "third_party/rust/itertools/src/lib.rs"
     },
     {
@@ -165063,7 +165149,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/minmax.rs",
-      "sha256": "0ec34b172ca8efc4aacb96f3e5771bdc5e8ac882876ee0f59d698c3924717c48",
+      "sha256": "57a8b9463f0c059f9d2b95229373fe9b9791193458c07955977ea9868b2c1bb0",
       "source": "third_party/rust/itertools/src/minmax.rs"
     },
     {
@@ -165093,7 +165179,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/pad_tail.rs",
-      "sha256": "e6bb5b086478600b0dbb8726cae8364bf83ab36d989ef467e1264eea43933b50",
+      "sha256": "ff1e0fd1355367df079b3dabb0fc7b6df4db3c515bcb42225697f527ba1762f9",
       "source": "third_party/rust/itertools/src/pad_tail.rs"
     },
     {
@@ -165113,7 +165199,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/peeking_take_while.rs",
-      "sha256": "075ce13475c84e2cfdfaf1a7a0d0695332102c82a61914ed4c00a7d2634b1d34",
+      "sha256": "9c2db32f04c2b25db3a1d5f1977f6a10531bcadc0a8a974d3a25ee83e087d824",
       "source": "third_party/rust/itertools/src/peeking_take_while.rs"
     },
     {
@@ -165133,7 +165219,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/powerset.rs",
-      "sha256": "7ab24fefc914b339dd92a6c8e639d0cad34479e09293b3346078856d6bc02d34",
+      "sha256": "2bcca88409a7db66bfa1f2ed81cc1e98c979ac739594578927ca84e722aa44e1",
       "source": "third_party/rust/itertools/src/powerset.rs"
     },
     {
@@ -165183,7 +165269,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/size_hint.rs",
-      "sha256": "6022c2327ddc6df7e7b939eb60a93ee66ea9aa4d3aab49b9952e663ff4bff10b",
+      "sha256": "bfc6da72b88d62138649b0b1377d59f6c66d4d78b1c321be37219fa13821a33b",
       "source": "third_party/rust/itertools/src/size_hint.rs"
     },
     {
@@ -165223,7 +165309,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/tuple_impl.rs",
-      "sha256": "0213261109e7c65746ccc22425d19141907bf7ea1e3dd4c40e9f278e6148e272",
+      "sha256": "310e24bbbefe21492ab0de9e1a38b587c1b07977bd78c12ef8871f607723f343",
       "source": "third_party/rust/itertools/src/tuple_impl.rs"
     },
     {
@@ -165233,7 +165319,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/unique_impl.rs",
-      "sha256": "1efc280226f13ddd7dd5f7eedeec0093b704596652c942f3a0b2f8c90fa2e2f7",
+      "sha256": "25f233599cdfe092f826e1cf4ec7cd5c9d17cd3659a31205ff3e0a9ff2b49744",
       "source": "third_party/rust/itertools/src/unique_impl.rs"
     },
     {
@@ -165253,7 +165339,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/with_position.rs",
-      "sha256": "9ca1eb195d04690b0c3a62a6c0eea349b8042e11c4ca4b80744f54103e1c7355",
+      "sha256": "8af0bfe147ebda1eedaf2afcef4ba5d80e845853031dad36844ffc683fdb3629",
       "source": "third_party/rust/itertools/src/with_position.rs"
     },
     {
@@ -165283,7 +165369,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/src/ziptuple.rs",
-      "sha256": "d3a12221d39c8a5514574adb3ad2ccd1803d514b1cb09fbcd9253e3ddd628310",
+      "sha256": "94cedabf2fe48e0c90615338240029749faa3c9f48c02cf3bac9d0ebc4bf6f5b",
       "source": "third_party/rust/itertools/src/ziptuple.rs"
     },
     {
@@ -165294,8 +165380,19 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/adaptors_no_collect.rs",
-      "sha256": "7e6240878b1fc13b6384fdde0317d5d7ccca3e417b10a201ba61eb5255400fda",
+      "sha256": "0b0512425f9b3d864398cf8c487e1d2bd76a06e5188e4a0f37922a5bf1e4f595",
       "source": "third_party/rust/itertools/tests/adaptors_no_collect.rs"
+    },
+    {
+      "categories": [
+        "build:active-manifest-reference",
+        "build:linux-x86_64",
+        "build:windows-x86_64"
+      ],
+      "mode": "0644",
+      "path": "third_party/rust/itertools/tests/arrays.rs",
+      "sha256": "bfafdfb27adc6239361be55120f660ae9991f1a5500acd2a37b6f71ef97c6629",
+      "source": "third_party/rust/itertools/tests/arrays.rs"
     },
     {
       "categories": [
@@ -165316,7 +165413,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/laziness.rs",
-      "sha256": "89e6caec10da3d7aeadf9e30d5caf03cda36d07cee8415ff134b5b8e2a2cf144",
+      "sha256": "b2644ce9d78438bd2be4e833bf245b20281a900700e65cb7e761fc0ba6a7ea19",
       "source": "third_party/rust/itertools/tests/laziness.rs"
     },
     {
@@ -165360,7 +165457,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/quick.rs",
-      "sha256": "d463bf8712b32742c93bc2cf3993031aeaba1f5b0505ca0ecd347313c3da0582",
+      "sha256": "dc822c7461b560ccaa42b1aab2f2ed9b10efbbe7243b15c4f1bcddf1b7b7e61a",
       "source": "third_party/rust/itertools/tests/quick.rs"
     },
     {
@@ -165371,7 +165468,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/specializations.rs",
-      "sha256": "fefbdac83bb774186882e3d31be619c9ce1dbfc4191a99ed2ac90aa764737a8f",
+      "sha256": "39817f342e9f9da24653f600897a73a46a6f29ceb792083e0575ffbc7de8899f",
       "source": "third_party/rust/itertools/tests/specializations.rs"
     },
     {
@@ -165382,7 +165479,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/test_core.rs",
-      "sha256": "9bbc6772e97a60d93d4021c184b9e4de1c0440a1c48b991a92edc189699fd20d",
+      "sha256": "94e786ea94f2862b167d4c13785ca57bf8d27055fc4117257fc70ee764ce6247",
       "source": "third_party/rust/itertools/tests/test_core.rs"
     },
     {
@@ -165393,7 +165490,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/test_std.rs",
-      "sha256": "b0e56deefe309b9c11804bd069c744b5caea7960cd4b68244531f6edf38b9741",
+      "sha256": "58654b9dbaaa8ea213c913e9e44eb8d7939689fca9f92096b7d0a90901bfa4fd",
       "source": "third_party/rust/itertools/tests/test_std.rs"
     },
     {
@@ -165415,7 +165512,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/itertools/tests/zip.rs",
-      "sha256": "457e34761d9bf2943a43abd9020d2b1a4492ebff9e4d94efe4c730652fbf62af",
+      "sha256": "1ac8ff7b1a60298957748764e0231c1d740d06e5ccfacf727bafa3f9eee4a860",
       "source": "third_party/rust/itertools/tests/zip.rs"
     },
     {
@@ -165841,7 +165938,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/jxl/.cargo-checksum.json",
-      "sha256": "e743c648646f43c7afce77ca76ee5645304df9cd5f10eb7875d819d2d2d219ba",
+      "sha256": "fb82e9155f69b19650afa792510f41ea0b727a309f6e20c84296b72cf0d16782",
       "source": "third_party/rust/jxl/.cargo-checksum.json"
     },
     {
@@ -165851,7 +165948,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/jxl_macros/.cargo-checksum.json",
-      "sha256": "73502aeb0a78a26874aefc93280f536bf9ec785a28f1e74a67f215fdfb4a26e0",
+      "sha256": "5950b20a3e51e77b1b1f9e73cf33097aab10c5b57ebf071a3f036ec102832541",
       "source": "third_party/rust/jxl_macros/.cargo-checksum.json"
     },
     {
@@ -165861,7 +165958,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/jxl_simd/.cargo-checksum.json",
-      "sha256": "75a6550c54af682e5773f904ad8443f12b6929745fa842736e91918d2b991021",
+      "sha256": "ed5d7cc142d26a04180aa5f400d167bada8734681df172d58b5c4cae3108c3f9",
       "source": "third_party/rust/jxl_simd/.cargo-checksum.json"
     },
     {
@@ -165871,7 +165968,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/jxl_simd/Cargo.toml",
-      "sha256": "5da5fd066f8e0aa77733692740ca71fc48405263c78431d4bee1eedb2e949266",
+      "sha256": "f3df7489f0b5369fcd1b9cec34353c28be0dd316ba755a9fe42ad8b82c9642b3",
       "source": "third_party/rust/jxl_simd/Cargo.toml"
     },
     {
@@ -165880,7 +165977,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/jxl_simd/README.md",
-      "sha256": "81778f9b33e09bc1f41178a55924cbe87b53b7a9999da7dcfd1b624584e42404",
+      "sha256": "eb591118c8d418563d8cdbe100681bb7de87010ded9d9aad250e151e81b45bcc",
       "source": "third_party/rust/jxl_simd/README.md"
     },
     {
@@ -165901,7 +165998,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/jxl_transforms/.cargo-checksum.json",
-      "sha256": "9f298ba515ca628e108c88f4b0497ee1b05b0e15c3a0442ec0bba080e25dc539",
+      "sha256": "65df2690de10a8821fc1ca7f7baf4e7fb491d2e818318f34b6d55b69c3b97401",
       "source": "third_party/rust/jxl_transforms/.cargo-checksum.json"
     },
     {
@@ -178602,7 +178699,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/mp4parse/.cargo-checksum.json",
-      "sha256": "5f4ccc39cba0ceea54e1312d1f82b8b12376c1d813acb15e3078d6f1a86a4924",
+      "sha256": "2f4a746ab0d12bf75148a43e02cd4f8be1ff33c029844d7d6cadc22920273d30",
       "source": "third_party/rust/mp4parse/.cargo-checksum.json"
     },
     {
@@ -178612,7 +178709,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/mp4parse_capi/.cargo-checksum.json",
-      "sha256": "47f3868d54f8d6f78cdb205c7dc85db0a8d620813910bc5fd969c562cbcaa9d7",
+      "sha256": "27d94940bea4ef4b22f770681e4a3825df72eb4c7a7b19363441ec1b4875c13f",
       "source": "third_party/rust/mp4parse_capi/.cargo-checksum.json"
     },
     {
@@ -219243,7 +219340,7 @@
       ],
       "mode": "0644",
       "path": "third_party/rust/webrtc-sdp/.cargo-checksum.json",
-      "sha256": "aee75201eadc1cf07a80b79777423c86ac8917c4810d2f6a16f58c440e426261",
+      "sha256": "af11a089014bf84b9f880d6650e2b6a30028b9fe14caf40e75f1b6bf6448ae05",
       "source": "third_party/rust/webrtc-sdp/.cargo-checksum.json"
     },
     {
@@ -259722,9 +259819,9 @@
         "explicit:bootstrap-license",
         "license:cargo-package"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "toolkit/content/license.html",
-      "sha256": "47c398277f01bfb6006a3dbd12228a43533bbda0c45e6d373cec8dc637a41663",
+      "sha256": "98a49870ad450c2855545f95e5637d9f3b154dd71509f29c4f569abf0fc3b61f",
       "source": "toolkit/content/license.html"
     },
     {
@@ -259851,7 +259948,7 @@
       ],
       "mode": "0644",
       "path": "toolkit/library/moz.build",
-      "sha256": "fb79943beb25d0269d40698fb713f00b2beeac5f7a47d84743d42c984e18c27e",
+      "sha256": "f23a415e6f23d0572b6bd2606d47c6a8cd83dfe029e881a7192be347ada31358",
       "source": "toolkit/library/moz.build"
     },
     {
@@ -259942,7 +260039,7 @@
       ],
       "mode": "0644",
       "path": "toolkit/library/rust/shared/Cargo.toml",
-      "sha256": "ffe6b011b77deaf590d4aff7c963c974b965b45261d0b0bb0e4205c4ee392776",
+      "sha256": "0a1b59c335a61b4a85c297441c1580620c8edeb6fd4079368a5cc7b7861d24d6",
       "source": "toolkit/library/rust/shared/Cargo.toml"
     },
     {
@@ -259970,9 +260067,9 @@
         "build:linux-x86_64",
         "build:windows-x86_64"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "toolkit/moz.configure",
-      "sha256": "c3cf6adfd1c76d4f4fe4efce7a4ebd44725c13a504e66bee37697d4b3925077c",
+      "sha256": "ff98c9cf7a6ac3efa91e153c05dd898268e2a002332427d438ce276e2ba593d9",
       "source": "toolkit/moz.configure"
     },
     {
@@ -259980,9 +260077,9 @@
         "build:linux-x86_64",
         "build:windows-x86_64"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "toolkit/mozapps/installer/package-name.mk",
-      "sha256": "169ae8c69a33f5104c63d222096dc9dba9172c5ec82b50f607a6ceb0e5b75740",
+      "sha256": "1fa1e60fab162673d4d316bee89200c58b7bab080f65aef677d6a5307403fd84",
       "source": "toolkit/mozapps/installer/package-name.mk"
     },
     {
@@ -259991,9 +260088,9 @@
         "build:windows-x86_64",
         "explicit:bootstrap-license"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "toolkit/mozapps/installer/upload-files.mk",
-      "sha256": "77b58bfd3253f8bbaa172f38036a45b2fd0ced367ee37945236b63fc8645c9df",
+      "sha256": "7671f38a7888c038bac84ebecd21e3c9f4b61aff2aa3c1e539464e7db864be95",
       "source": "toolkit/mozapps/installer/upload-files.mk"
     },
     {
@@ -260039,7 +260136,7 @@
       ],
       "mode": "0644",
       "path": "toolkit/xre/CmdLineAndEnvUtils.h",
-      "sha256": "6c026fca8649039cc05df242c24a1c097eec07e562fd40826ecc297b3380c849",
+      "sha256": "b1095345858a4cd4f32e0c1f120e6234b8cf511173c422c56b4d06223f5d31e1",
       "source": "toolkit/xre/CmdLineAndEnvUtils.h"
     },
     {
@@ -260611,7 +260708,7 @@
       ],
       "mode": "0644",
       "path": "tools/profiler/core/PageInformation.cpp",
-      "sha256": "537e06219ccefea015df3c9840d072cbde79f09281cf573af2e7fdddec93b991",
+      "sha256": "b33af5450b9be647f6e27f1dba093e40877f8414c7dc72169ab5c49a1d5f6901",
       "source": "tools/profiler/core/PageInformation.cpp"
     },
     {
@@ -260620,7 +260717,7 @@
       ],
       "mode": "0644",
       "path": "tools/profiler/core/PageInformation.h",
-      "sha256": "ef55b9d76d36449ab4b23926c9e9973032b66592d82e1c6547606223617a4fcb",
+      "sha256": "a67d1076442d9f4d84901a19c578032f1c8dfedfe551e03a0de7681dc1a659e0",
       "source": "tools/profiler/core/PageInformation.h"
     },
     {
@@ -260872,7 +260969,7 @@
       ],
       "mode": "0644",
       "path": "tools/profiler/core/platform.cpp",
-      "sha256": "546a76d40916568191058730d55d27dc3f309d3f516aeea635c7c849f0e21531",
+      "sha256": "6b20a1740a0e1cbaebe701ae875896df793c79969043ff2640cc1a0117c58601",
       "source": "tools/profiler/core/platform.cpp"
     },
     {
@@ -260917,7 +261014,7 @@
       ],
       "mode": "0644",
       "path": "tools/profiler/gecko/ProfilerParent.cpp",
-      "sha256": "391bd097f249774b588188fe7d7d65a4dc79eb06af51f540b141f723f6c1185a",
+      "sha256": "d53e6b31e495f01c08efad9acad769f981fba4dfe69d3997ef771249dd47c22b",
       "source": "tools/profiler/gecko/ProfilerParent.cpp"
     },
     {
@@ -261004,7 +261101,7 @@
       ],
       "mode": "0644",
       "path": "tools/profiler/public/FlowMarkers.h",
-      "sha256": "f56df055bfc99f6ae4a98ce35530cc54636428b8323aba650c24e48149aa7f9e",
+      "sha256": "ab081f147ec50c4e47cc134596c8917fc8c41e0f4052a80e29da493f0b8e384a",
       "source": "tools/profiler/public/FlowMarkers.h"
     },
     {
@@ -263169,7 +263266,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/base/CycleCollectedJSContext.h",
-      "sha256": "86800be9b664749c83a31327ab47df20237559bcc3b9a60f6e34f277d9a3c664",
+      "sha256": "2bafee403fe79c554b470b6ca9c602ff5fa36d1aeaf3abed9d8dc7ba77625afb",
       "source": "xpcom/base/CycleCollectedJSContext.h"
     },
     {
@@ -263179,7 +263276,7 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "xpcom/base/CycleCollectedJSRuntime.h",
       "sha256": "2b80b9cb88b03aa42b8f3bc36a1183eeaacad379658e3ad6e1c5ba9957a5a429",
       "source": "xpcom/base/CycleCollectedJSRuntime.h"
@@ -263468,7 +263565,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/base/Logging.cpp",
-      "sha256": "e7804edb7daa918297d502f8d25d0e910075cf6735ceb41ee8f31ffbdd36c42e",
+      "sha256": "fa7942aef5acf216e9a977383e9a698c1c02a618c57ad5f48644b8c8f6ae8bab",
       "source": "xpcom/base/Logging.cpp"
     },
     {
@@ -263952,7 +264049,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/base/nsCycleCollectionParticipant.h",
-      "sha256": "047c97b8651a2f3543ad3b5a6a132e949402e1ac1eceab0a6654a99f2b7f13e6",
+      "sha256": "9d25ccf022dab740a1761c957cbca6581e649593ac08236e75fb5458c9c54851",
       "source": "xpcom/base/nsCycleCollectionParticipant.h"
     },
     {
@@ -264596,7 +264693,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/base/nsSystemInfo.cpp",
-      "sha256": "6afdd80dd65e3bb3f4851d5ca7e92a50627b06dbe9a980b4c1a9b6ee6b946173",
+      "sha256": "05da0b3108bd08e06a85e983efffde4f3c46fb0f268bc72322ec029e062fe5ff",
       "source": "xpcom/base/nsSystemInfo.cpp"
     },
     {
@@ -265392,7 +265489,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/components/nsComponentManager.cpp",
-      "sha256": "a5b652cd222f36ef8dda65861045d853d271e97ade5743d6ea270084fcbb2d1e",
+      "sha256": "3b2b70602ddf4e7a3bb4c7ca09b86a23591ed40eebc9e33aea4b5eb372011c36",
       "source": "xpcom/components/nsComponentManager.cpp"
     },
     {
@@ -265404,7 +265501,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/components/nsComponentManager.h",
-      "sha256": "719f87fc1d9d5f4e7eb2b6acd2f2e084a7ff52730ad3bdee7d779d5bd6e47772",
+      "sha256": "bfb960d4743589bd5dfb8ca57a6f8628209bc16e51bc8486d98b0c486e41e22a",
       "source": "xpcom/components/nsComponentManager.h"
     },
     {
@@ -265753,7 +265850,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/ds/StaticAtoms.py",
-      "sha256": "f8a50889b3ab7c3d6f5bbbc9b05f53efe5dd9507fda2bd958d76b4930a68901c",
+      "sha256": "bdfa7bdced2ec5d0a0a248fb23e3e0cfa9f648b8877ade6d37a9de8b66e41898",
       "source": "xpcom/ds/StaticAtoms.py"
     },
     {
@@ -265927,7 +266024,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/ds/nsAtomTable.cpp",
-      "sha256": "15b6e4b4d89c44de2c10eb63f600dce44e1dfef1105528450befbb95c411faf4",
+      "sha256": "91635eb4b15b8eb4781b4fbe3d6f7aa65513f9fe1602f7399a2aa25934ff2041",
       "source": "xpcom/ds/nsAtomTable.cpp"
     },
     {
@@ -266067,7 +266164,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/ds/nsDeque.cpp",
-      "sha256": "762b9621a5a1d5efeaf684a6c8d93a276eca7193a9af52d8c9441772099088c7",
+      "sha256": "ebc3c87ed89f8d50eaaa56134b9450f1ecdb29bb767195a29b2bb18a898e85be",
       "source": "xpcom/ds/nsDeque.cpp"
     },
     {
@@ -266533,7 +266630,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/ds/nsObserverService.cpp",
-      "sha256": "2ee3fe2a9dcf26bd92e51a6c949710e36af18ac21de9aeb9757abb89e51b3d27",
+      "sha256": "6a05803a860423dc49b31c52cdae954dc0e95aa36c539f36824f00904d4650cf",
       "source": "xpcom/ds/nsObserverService.cpp"
     },
     {
@@ -266545,7 +266642,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/ds/nsObserverService.h",
-      "sha256": "4de3bec19099801b78992c725aa56efa28aee6d2449209f804bbc75de316a510",
+      "sha256": "fa84049bc66737348d660befefdbef051e293dcd16adace3d880ed4ee5e5b34d",
       "source": "xpcom/ds/nsObserverService.h"
     },
     {
@@ -266807,7 +266904,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/ds/nsTHashtable.h",
-      "sha256": "16223f029d686f8cc2a43706b0f653e927239498da85ef8a14f8ce1fdcac957d",
+      "sha256": "215ef65e258e2d8bf30c62ff02dd5335ad57397b926a7cf5a3a6a1b179ae146f",
       "source": "xpcom/ds/nsTHashtable.h"
     },
     {
@@ -267597,7 +267694,7 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "xpcom/io/moz.build",
       "sha256": "b0f8748e1ce43bbd1212c80ffb7a0bbe391ececfc7c0e2d44289ea4e5e3b9395",
       "source": "xpcom/io/moz.build"
@@ -268429,7 +268526,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/io/nsSegmentedBuffer.cpp",
-      "sha256": "a8fcf8a0d6a88ee4bb81339bb8a6a33ac4adc48c53ed75730f440e7a9d17e62f",
+      "sha256": "b094ce86847581603573604b1d8c5be5a8b004bcab2fe6187284a88ca5abbffc",
       "source": "xpcom/io/nsSegmentedBuffer.cpp"
     },
     {
@@ -269500,7 +269597,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/string/nsTDependentString.h",
-      "sha256": "3d166df29fd1ff3991d384e9f1c8c18ae71e025bdb67ad73d13e76b0ed57bad4",
+      "sha256": "f16e9a7c5672d741d99c43a9ff6f4f5defa1af7a5cd6d797d9dfe8493062a29d",
       "source": "xpcom/string/nsTDependentString.h"
     },
     {
@@ -269644,7 +269741,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/string/nsTStringRepr.h",
-      "sha256": "f219464bdd4a0f367cdc7c5d379e99cd72ac4734571427384afe818fa2c35d3d",
+      "sha256": "537805c63a2917a60d744cb2bf6a94ed69dc5f7c0eadff5506ca94b9c7e8db1a",
       "source": "xpcom/string/nsTStringRepr.h"
     },
     {
@@ -269860,7 +269957,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/threads/AbstractThread.cpp",
-      "sha256": "64b3607ad2656259ec5833a31dd4947e176e3ea13063aa31db3eea2417068159",
+      "sha256": "7f274a63bb83f7768f154d9d85d2a1077a628f65812d56a12c6077ed69278acd",
       "source": "xpcom/threads/AbstractThread.cpp"
     },
     {
@@ -269872,7 +269969,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/threads/AbstractThread.h",
-      "sha256": "34b352c37402266205bad86598fd10c6bc8c736f6ccc02ec1ad1f4190f7d0a0d",
+      "sha256": "fb587e01fb65f55de4ddc93ad3092c7d776ed8ab383487c90cdcf87095748367",
       "source": "xpcom/threads/AbstractThread.h"
     },
     {
@@ -270190,9 +270287,9 @@
         "configure:linux-x86_64:active-build-input",
         "configure:windows-x86_64:active-build-input"
       ],
-      "mode": "0664",
+      "mode": "0644",
       "path": "xpcom/threads/MozPromise.h",
-      "sha256": "4996b26f96e6ed31bb7676e71064b6e5982d07f2a8a55e1a946d53eb8767b308",
+      "sha256": "a9058b4f40d0305a58c93984a43538a19b0ce899b8c5cf04f0da3fd43ba5d775",
       "source": "xpcom/threads/MozPromise.h"
     },
     {
@@ -270504,7 +270601,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/threads/TaskDispatcher.h",
-      "sha256": "9a55f8929fe06b9415922ce77e6ff83ea6b69f4f52947be0f2fb17e04becc1d6",
+      "sha256": "4a2965c52e16f091f7ae466a049fa70bbec7ee48747b3dccef617440f8ca25b8",
       "source": "xpcom/threads/TaskDispatcher.h"
     },
     {
@@ -270516,7 +270613,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/threads/TaskQueue.cpp",
-      "sha256": "01e7ebabadaa04d73f01ca63985794bf08c0a91f97817f1cbdd3f60574edd322",
+      "sha256": "30fa73ab83da30490969b890739ce209cd7307d640c32119325c795c1b3b5163",
       "source": "xpcom/threads/TaskQueue.cpp"
     },
     {
@@ -270528,7 +270625,7 @@
       ],
       "mode": "0644",
       "path": "xpcom/threads/TaskQueue.h",
-      "sha256": "c90e0f3cbca67dbdce4648f19866baf85522ddfdcc597dd6669a661a43a36140",
+      "sha256": "e260770c3288d25762be5b6be3eb10ec1f56a6c82a8b8a76fec7b0d5d8561767",
       "source": "xpcom/threads/TaskQueue.h"
     },
     {
@@ -271232,38 +271329,38 @@
     {
       "kind": "build-inputs",
       "path": "netwerk/naivefox/reports/build-inputs-linux-x86_64.json",
-      "sha256": "4c8f86fd6cdd23aaf201e6017169212e45b38e8694a6909a26df2ca57f25c3ec"
+      "sha256": "09c4e7c9c303dd6e71ffc0e7091d9ce4d92181daaea2ba16b48b54accd25e0f8"
     },
     {
       "kind": "build-inputs",
       "path": "netwerk/naivefox/reports/build-inputs-windows-x86_64.json",
-      "sha256": "d936715102c5ebc4db0a46f5951d112b65eb7c5a1fa4674f5f18394143636d1f"
+      "sha256": "6c98fcf71fe1a35292b3a9b2d53c04bce7bb845da72a6c47809e65c07bd3d596"
     },
     {
       "kind": "configure-trace",
       "path": "netwerk/naivefox/reports/configure-inputs-linux-x86_64.json",
-      "sha256": "dae5dbe32512de116640718554ffb4f03be57c800fd043a430b71523148e1b1a"
+      "sha256": "c413c689e04fc2b43278e2293ffeb1f2ce16e690dab267f956412770662b0c7f"
     },
     {
       "kind": "configure-trace",
       "path": "netwerk/naivefox/reports/configure-inputs-windows-x86_64.json",
-      "sha256": "5c877be1b2269da62539f58961a62e82e8840bf82d4266a6cf3927b9acc8db63"
+      "sha256": "391fe431716b97cea3cb1dd634da908c0c249617f1a787150543bbf21e02e41d"
     },
     {
       "kind": "linked-closure",
       "path": "netwerk/naivefox/reports/closure-report-linux-x86_64.json",
-      "sha256": "5931c6ec5f03da1191c05045c0c210b3299e3634b574bb37f49232619ab50d08"
+      "sha256": "f395ba8789ad4418b19a3bc8ef12bf6f54d636c952f484c5ea4f8661fcdae925"
     },
     {
       "kind": "linked-closure",
       "path": "netwerk/naivefox/reports/closure-report-windows-x86_64.json",
-      "sha256": "5e44a4f5a96bd70b08c52424a1be9395767477bdd1f9eccbeb6ddcc64759ca3a"
+      "sha256": "3b1972df400594971e79579235791b54a1df5d223d86c99fdfac572412aa3e51"
     }
   ],
-  "firefox_base_commit": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
-  "generated_at": "2026-08-20T17:34:56Z",
-  "manifest_sha256": "04da2cd33beda6dca9727a5b681f7b0f2cc8f30b2417ceaa386ede43c5cdf140",
+  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
+  "generated_at": "2026-08-20T20:26:08Z",
+  "manifest_sha256": "4bb7a4848f14f67302dabfdfa4ba2c6a8ea98af9963d99f9d9c6763ee5c54bba",
   "manifest_version": 1,
-  "minimal_export_commit": "b7f3b5bc67fcf155b569a0d0d2ad0f7f28cd45be",
-  "naivefox_reference_commit": "e11c162e44703e8be50b619341c350f05b1b2623"
+  "minimal_export_commit": "d78485c3bd43797428cd2e2bd27c8a209f6ab7df",
+  "naivefox_reference_commit": "73a1ae3e49a069dc7bc97090c00af6e0b9e61376"
 }

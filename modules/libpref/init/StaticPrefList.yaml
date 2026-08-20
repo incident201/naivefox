@@ -1837,6 +1837,15 @@
   value: false
   mirror: always
 
+# When set, the HWInference parent resolves model availability and install
+# requests from an in-process mock instead of the ModelHub (no network,
+# IndexedDB or downloads). The full content->utility->parent IPC chain is
+# still exercised. Used by tests.
+- name: browser.ml.modelHub.testing
+  type: bool
+  value: false
+  mirror: always
+
 - name: browser.navigation.requireUserInteraction
   type: bool
   value: true
@@ -2934,6 +2943,12 @@
 - name: dom.enable_event_timing
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+
+# Whether the ContainerTiming API is enabled
+- name: dom.enable_container_timing
+  type: RelaxedAtomicBool
+  value: false
   mirror: always
 
 # Whether the LargestContentfulPaint API will be gathered and returned by performance observer*
@@ -5701,13 +5716,6 @@
   value: 128
   mirror: always
 
-# Is support for View Transitions Level 1 enabled?
-- name: dom.viewTransitions.enabled
-  type: RelaxedAtomicBool
-  value: true
-  mirror: always
-  rust: true
-
 - name: dom.viewTransitions.cross-document.enabled
   type: RelaxedAtomicBool
   value: false
@@ -6020,6 +6028,11 @@
 - name: dom.webkitBlink.dirPicker.enabled
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+
+- name: dom.range.cut_contents.use_flat_tree
+  type: bool
+  value: false
   mirror: always
 
 # If true, when user selects a range, `Selection` will split the range to
@@ -8656,7 +8669,7 @@
 #ifdef XP_MACOSX
 - name: gfx.webrender.enable-client-storage
   type: bool
-  value: true
+  value: false
   mirror: once
 #endif
 
@@ -8983,6 +8996,22 @@
 - name: image.downscale-during-decode.enabled
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+
+# Whether to use libjpeg-turbo DCT scaling to produce a reduced-size
+# intermediate image before the downscaling filter.
+- name: image.jpeg.dct-scaling.enabled
+  type: RelaxedAtomicBool
+  value: true
+  mirror: always
+
+# Minimum remaining scale factor to leave for the downscaling filter (Lanczos3)
+# after IDCT scaling. 1.0 means scale as close to the target as the discrete
+# IDCT factors allow; 2.0 means only take an IDCT step if at least 2x of
+# downscaling remains for Lanczos. Values below 1.0 are clamped.
+- name: image.jpeg.dct-scaling.min-factor
+  type: AtomicFloat
+  value: 2.5f
   mirror: always
 
 # Whether EXIF density metadata is sanity checked against PixelXDimension and PixelYDimension
@@ -9951,7 +9980,11 @@
 
 -   name: javascript.options.wasm_compact_imports
     type: bool
+#if defined(ENABLE_WASM_COMPACT_IMPORTS)
+    value: true
+#else
     value: false
+#endif
     mirror: always
     set_spidermonkey_pref: always
 
@@ -10092,7 +10125,15 @@
 # Support for the Wide Arithmetic proposal (i64.add/sub128, i64.mul_wide_s/u)
 - name: javascript.options.wasm_wide_arithmetic
   type: bool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
+  mirror: always
+  set_spidermonkey_pref: always
+
+# When true, causes wasm baseline to generate code that can be navigated by the
+# JS debugger.  This is mostly for testing only.
+- name: javascript.options.wasm_baseline_debug
+  type: bool
+  value: false
   mirror: always
   set_spidermonkey_pref: always
 
@@ -10623,6 +10664,14 @@
 - name: layout.css.alpha-color-function.enabled
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+  rust: true
+
+# Whether anchor positioning takes the anchor element's transforms into account.
+# https://drafts.csswg.org/css-anchor-position-1/#determining
+- name: layout.css.anchor-positioning.follows-transforms.enabled
+  type: RelaxedAtomicBool
+  value: false
   mirror: always
   rust: true
 
@@ -11459,6 +11508,13 @@
   value: false
   mirror: always
 
+# Whether we respect <button> and <input> align-content on blocks.
+# See https://github.com/w3c/csswg-drafts/issues/14190
+- name: layout.forms.button-input-align-content-block.enabled
+  type: bool
+  value: true
+  mirror: always
+
 # If enabled, textareas won't include 'overflow:auto' scrollbars in their
 # block-axis size (usually height).
 - name: layout.forms.textarea-sizing-excludes-auto-scrollbar.enabled
@@ -11774,7 +11830,7 @@
 # so an empty value disables it everywhere. "*" enables it on every domain.
 - name: layout.css.fake-webkit-scrollbar.enabled-domains
   type: DataMutexString
-  value: "mail.google.com"
+  value: "mail.google.com,docs.google.com,play.google.com,polymarket.com,www.beterbed.nl,www.shazam.com,www.tiktok.com"
   mirror: always
   rust: true
 
@@ -13049,6 +13105,11 @@
 
 - name: media.hardware-video-decoding-vulkan.enabled
   type: bool
+  value: @IS_NIGHTLY_BUILD@
+  mirror: once
+
+- name: media.hardware-video-decoding-vulkan.force-enabled
+  type: bool
   value: false
   mirror: once
 
@@ -13656,11 +13717,14 @@
   # acceleration for decoding.
 -   name: media.navigator.mediadatadecoder_h264_enabled
     type: RelaxedAtomicBool
-  #if defined(_ARM64_) && defined(XP_WIN)
-    value: false
-  #else
     value: true
-  #endif
+    mirror: always
+
+  # Use MediaDataDecoder API for AV1 in WebRTC. This includes hardware
+  # acceleration for decoding.
+-   name: media.navigator.mediadatadecoder_av1_enabled
+    type: RelaxedAtomicBool
+    value: true
     mirror: always
 
 #if defined(MOZ_WIDGET_GTK)
@@ -15679,9 +15743,11 @@
 # When true, block LNA requests from insecure contexts (http:// origins that
 # are not localhost or .local). Uses IsPotentiallyTrustworthyOrigin to
 # determine if the origin is trustworthy.
+# The spec requires this, but it is disabled by default until Chrome ships the
+# same restriction, to avoid breaking sites that only work in Firefox.
 - name: network.lna.block_insecure_contexts
   type: RelaxedAtomicBool
-  value: true
+  value: false
   mirror: always
 
 
@@ -15999,6 +16065,14 @@
   type: bool
   value: true
   mirror: never
+
+# On Android, we use a lower timeout to avoid waiting on a broken
+# DoH connection before we fallback to native. 250 ms is higher than 99th
+# percentile for DoH resolutions on Nightly.
+- name: network.android_doh.rollout_request_timeout_ms
+  type: RelaxedAtomicUint32
+  value: 250
+  mirror: always
 
 # Use GET (rather than POST)
 - name: network.trr.useGET
@@ -16576,7 +16650,7 @@
 
 - name: network.http.http3.version_negotiation.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
 
 # When a Http/3 connection failed, whether to retry with a different IP address.
@@ -17005,7 +17079,11 @@
 
 - name: network.http.happy_eyeballs_enabled
   type: RelaxedAtomicBool
+#if defined(ANDROID)
   value: @IS_NIGHTLY_BUILD@
+#else
+  value: true
+#endif
   mirror: always
 
 # When true, Happy Eyeballs is also used for requests carrying an HTTP
@@ -18218,12 +18296,6 @@
 - name: privacy.partition.network_state.connection_with_proxy
   type: bool
   value: false
-  mirror: always
-
-# Partition the service workers unconditionally when dFPI is enabled.
-- name: privacy.partition.serviceWorkers
-  type: RelaxedAtomicBool
-  value: true
   mirror: always
 
 # Enables / disables the strip on share feature which strips query parameters

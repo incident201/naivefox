@@ -632,6 +632,12 @@ class HttpBaseChannel : public nsHashPropertyBag,
   }
 
  protected:
+  nsCString GetSecPurpose() const {
+    nsCString secPurpose;
+    (void)mRequestHead.GetHeader(nsHttp::Sec_Purpose, secPurpose);
+    return secPurpose;
+  }
+
   nsresult GetTopWindowURI(nsIURI* aURIBeingLoaded, nsIURI** aTopWindowURI);
 
   // Handle notifying listener, removing from loadgroup if request failed.

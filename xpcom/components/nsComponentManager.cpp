@@ -152,20 +152,12 @@ class MOZ_STACK_CLASS EntryWrapper final {
 
   explicit EntryWrapper(const StaticModule* aEntry) : mEntry(aEntry) {}
 
-#define MATCH(type, ifFactory, ifStatic)                     \
-  struct Matcher {                                           \
-    type operator()(nsFactoryEntry* entry) { ifFactory; }    \
-    type operator()(const StaticModule* entry) { ifStatic; } \
-  };                                                         \
-  return mEntry.match((Matcher()))
-
-  const nsID& CID() {
-    MATCH(const nsID&, return entry->mCID, return entry->CID());
+  const nsID& CID() const {
+    return mEntry.match([](const auto* e) -> const nsID& { return e->CID(); });
   }
 
-  already_AddRefed<nsIFactory> GetFactory() {
-    MATCH(already_AddRefed<nsIFactory>, return entry->GetFactory(),
-          return entry->GetFactory());
+  already_AddRefed<nsIFactory> GetFactory() const {
+    return mEntry.match([](const auto* e) { return e->GetFactory(); });
   }
 
   /**
@@ -174,35 +166,28 @@ class MOZ_STACK_CLASS EntryWrapper final {
    * side-steps the necessity of creating a nsIFactory instance for static
    * modules.
    */
-  nsresult CreateInstance(const nsIID& aIID, void** aResult) {
-    if (mEntry.is<nsFactoryEntry*>()) {
-      return mEntry.as<nsFactoryEntry*>()->CreateInstance(aIID, aResult);
-    }
-    return mEntry.as<const StaticModule*>()->CreateInstance(aIID, aResult);
+  nsresult CreateInstance(const nsIID& aIID, void** aResult) const {
+    return mEntry.match(
+        [&](const auto* e) { return e->CreateInstance(aIID, aResult); });
   }
 
   /**
    * Returns the cached service instance for this entry, if any. This should
    * only be accessed while mLock is held.
    */
-  nsISupports* ServiceInstance() {
-    MATCH(nsISupports*, return entry->mServiceObject,
-          return entry->ServiceInstance());
+  nsISupports* ServiceInstance() const {
+    return mEntry.match([](const auto* e) { return e->ServiceInstance(); });
   }
   void SetServiceInstance(already_AddRefed<nsISupports> aInst) {
-    if (mEntry.is<nsFactoryEntry*>()) {
-      mEntry.as<nsFactoryEntry*>()->mServiceObject = aInst;
-    } else {
-      return mEntry.as<const StaticModule*>()->SetServiceInstance(
-          std::move(aInst));
-    }
+    mEntry.match(
+        [&](const auto& e) { e->SetServiceInstance(std::move(aInst)); });
   }
 
   /**
    * Returns the description string for the module this entry belongs to.
    * Currently always returns "<unknown module>".
    */
-  nsCString ModuleDescription() { return "<unknown module>"_ns; }
+  nsCString ModuleDescription() const { return "<unknown module>"_ns; }
 
  private:
   Variant<nsFactoryEntry*, const StaticModule*> mEntry;
@@ -457,37 +442,6 @@ nsresult nsComponentManagerImpl::Init() {
   return NS_OK;
 }
 
-template <typename T>
-static void AssertNotStackAllocated(T* aPtr) {
-  // On all of our supported platforms, the stack grows down. Any address
-  // located below the address of our argument is therefore guaranteed not to be
-  // stack-allocated by the caller.
-  //
-  // For addresses above our argument, things get trickier. The main thread
-  // stack is traditionally placed at the top of the program's address space,
-  // but that is becoming less reliable as more and more systems adopt address
-  // space layout randomization strategies, so we have to guess how much space
-  // above our argument pointer we need to care about.
-  //
-  // On most systems, we're guaranteed at least several KiB at the top of each
-  // stack for TLS. We'd probably be safe assuming at least 4KiB in the stack
-  // segment above our argument address, but safer is... well, safer.
-  //
-  // For threads with huge stacks, it's theoretically possible that we could
-  // wind up being passed a stack-allocated string from farther up the stack,
-  // but this is a best-effort thing, so we'll assume we only care about the
-  // immediate caller. For that case, max 2KiB per stack frame is probably a
-  // reasonable guess most of the time, and is less than the ~4KiB that we
-  // expect for TLS, so go with that to avoid the risk of bumping into heap
-  // data just above the stack.
-#ifdef DEBUG
-  static constexpr size_t kFuzz = 2048;
-
-  MOZ_ASSERT(uintptr_t(aPtr) < uintptr_t(&aPtr) ||
-             uintptr_t(aPtr) > uintptr_t(&aPtr) + kFuzz);
-#endif
-}
-
 static void DoRegisterManifest(NSLocationType aType, FileLocation& aFile,
                                bool aChromeOnly) {
 #ifdef MOZ_NAIVEFOX
@@ -625,7 +579,7 @@ Maybe<EntryWrapper> nsComponentManagerImpl::LookupByContractID(
     // UnregisterFactory might have left a stale nsFactoryEntry in
     // mContractIDs, so we should check to see whether this entry has
     // anything useful.
-    if (entry->mFactory || entry->mServiceObject) {
+    if (entry->mFactory || entry->ServiceInstance()) {
       return Some(EntryWrapper(entry));
     }
   }
@@ -868,7 +822,7 @@ nsresult nsComponentManagerImpl::FreeServices() {
 
   for (nsFactoryEntry* entry : mFactories.Values()) {
     entry->mFactory = nullptr;
-    entry->mServiceObject = nullptr;
+    entry->SetServiceInstance(nullptr);
   }
 
   for (const auto& module : gStaticModules) {
@@ -1357,14 +1311,15 @@ size_t nsComponentManagerImpl::SizeOfIncludingThis(
 nsFactoryEntry::nsFactoryEntry(const nsCID& aCID, nsIFactory* aFactory)
     : mCID(aCID), mFactory(aFactory) {}
 
-already_AddRefed<nsIFactory> nsFactoryEntry::GetFactory() {
+already_AddRefed<nsIFactory> nsFactoryEntry::GetFactory() const {
   nsComponentManagerImpl::gComponentManager->mLock.AssertNotCurrentThreadOwns();
 
   nsCOMPtr<nsIFactory> factory = mFactory;
   return factory.forget();
 }
 
-nsresult nsFactoryEntry::CreateInstance(const nsIID& aIID, void** aResult) {
+nsresult nsFactoryEntry::CreateInstance(const nsIID& aIID,
+                                        void** aResult) const {
   nsCOMPtr<nsIFactory> factory = GetFactory();
   NS_ENSURE_TRUE(factory, NS_ERROR_FAILURE);
   return factory->CreateInstance(aIID, aResult);

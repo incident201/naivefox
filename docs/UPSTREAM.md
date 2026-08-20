@@ -133,11 +133,10 @@ feature/network-*  from naivefox, for shared/reference functionality
 feature/min-*      from minimal, for minimization-only changes
 ```
 
-The project-facing GitHub default branch is `naivefox` until the standalone
-export has passed its clean-build and acceptance gates. Once `minimal-source`
-is stable, change the default branch to `minimal-source`. `main` is a service
-mirror, while `naivefox` and `minimal` are developer branches; none should
-represent the compact product tree to ordinary users.
+The project-facing GitHub default branch is `minimal-source` after a validated
+standalone export. `main` is a service mirror, while `naivefox` and `minimal`
+remain the full-source developer branches. Generated product snapshots must
+never be treated as upstream integration bases.
 
 Protect all four long-lived branches against force-push and deletion where
 repository settings permit it. Require review or the relevant validation gate
@@ -150,33 +149,32 @@ The following values are immutable inputs to the first minimization milestone,
 not aliases for a moving `main`:
 
 ```text
-Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-NaiveFox reference merge-base for export: e11c162e44703e8be50b619341c350f05b1b2623
-Standalone diagnostic build source commit: a020da3d5ba4 (full build and runtime smoke PASS)
-Audited Minimal evidence source commit: 745d58bf7dcb44df0b8be87b39fb7d21d19383f9
-Evidence report snapshot commit: bec198a62d422b1382315f335ef2965b429d9387
-Windows configure evidence source commit: af716bf57f83ebdb377c0f34cd20995faf41b641
-Validated exporter/code checkpoint: 4db1292e96ec97fa39575e936e76608a711dbdb5
-Published minimal-source commit: recorded in this full-tree document after orphan publication
+Validated Firefox base commit: 17e93ad5d3261e20104c7f6f2ec867ecc138ca1a
+Validated full-tree NaiveFox reference commit: 73a1ae3e49a069dc7bc97090c00af6e0b9e61376
+Audited Minimal evidence source commit: a533411d0c4940f3063d1d01313a3e4fc24ba53d
+Evidence/configure report snapshot commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
+Validated Minimal evidence/export source commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
+Export manifest entries: 25558 (37 directory contracts)
+Export manifest SHA-256: recorded in each generated snapshot's `UPSTREAM-BASE`
+Published minimal-source root commit: pending publication from this export
+Published source tag: pending publication
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
 ### Current pre-export audit provenance
 
-The Linux configure, Linux/Windows build-input, and Linux/Windows linked-
-closure reports attest source `745d58bf7dcb`; report-only snapshot
-`bec198a62d42` freezes that original five-report set. The later Windows
-configure report attests source `af716bf57f83` and is consumed as the sixth
-target-specific evidence file. Exporter checkpoint `4db1292e96ec` adds no
-runtime/build behavior; it closes target-active configure auxiliaries and the
-recursive Windows `.rc` resource graph. The planner proves that intervening
-changes are report/document/export-only and verifies all collector hashes.
-Do not copy a working-tree SHA into its own commit documentation. The validated
-Firefox base remains `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
-upstream refresh was performed during this audit. Disposable diagnostic trees
-are not publication candidates; only the deterministic orphan snapshot is.
+The Linux/Windows configure, build-input, and linked-closure reports used by
+the current export attest one audited source `a533411d0c4940f3063d1d01313a3e4fc24ba53d`;
+the final report-only/export-tool evidence snapshot is
+`a7251b0ea7fd530d1d23fada8e3217514aa1399c`.
+The target union passed strict provenance, repository-relative path, license,
+mode, and content checks. The clean export was built and tested without access
+to the full Firefox checkout or its object directory. A full Firefox browser
+build is intentionally not an acceptance gate: `./mach build export`, the
+NaiveFox `binaries` target, staged runtime, and focused H2/H3/Auto/config gates
+are the product gates. Do not copy a working-tree SHA into its own commit
+documentation.
 
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean

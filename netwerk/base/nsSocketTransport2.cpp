@@ -60,6 +60,7 @@
 #endif
 
 #if defined(MOZ_WIDGET_ANDROID)
+#  include "AndroidLocalNetworkPermission.h"
 #  include "AndroidNetworkBlockedReason.h"
 #endif
 
@@ -1622,6 +1623,15 @@ nsresult nsSocketTransport::InitiateSocket() {
            "AttachMockNetworkLayer failed [this=%p]\n",
            this));
     }
+  }
+#endif
+
+#if defined(MOZ_WIDGET_ANDROID)
+  // Android 17+ refuses connections to the local network unless the app holds
+  // ACCESS_LOCAL_NETWORK. Ask for it here, as the connection is made, rather
+  // than after a 30 second connect timeout.
+  if (mNetAddr.GetIpAddressSpace() == nsILoadInfo::IPAddressSpace::Private) {
+    RequestAndroidLocalNetworkPermission();
   }
 #endif
 

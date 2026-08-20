@@ -430,10 +430,13 @@ class AliasSet {
     // The SharedArrayRawBuffer::length field.
     SharedArrayRawBufferLength = 1 << 28,
 
-    Last = SharedArrayRawBufferLength,
+    // The frame descriptor's IsResumingGenerator bit.
+    GeneratorResumeState = 1 << 29,
+
+    Last = GeneratorResumeState,
 
     Any = Last | (Last - 1),
-    NumCategories = 29,
+    NumCategories = 30,
 
     // Indicates load or store.
     Store_ = 1 << 31
@@ -896,12 +899,12 @@ class MDefinition : public MNode {
   }
   template <typename MIRType>
   MIRType* to() {
-    MOZ_ASSERT(this->is<MIRType>());
+    MOZ_RELEASE_ASSERT(this->is<MIRType>());
     return static_cast<MIRType*>(this);
   }
   template <typename MIRType>
   const MIRType* to() const {
-    MOZ_ASSERT(this->is<MIRType>());
+    MOZ_RELEASE_ASSERT(this->is<MIRType>());
     return static_cast<const MIRType*>(this);
   }
 #define OPCODE_CASTS(opcode)                                \

@@ -352,4 +352,8 @@ Target evidence contains 1,949/2,306 depfiles and 311/325 source/build Cargo
 packages. At exporter checkpoint `4db1292e96ec`, the target union passes with
 25,549 entries and 37 source directory contracts. Clean export is a release
 snapshot operation only; it must never again be used as a per-file discovery
-loop. The diagnostic tree is never published.
+loop. The diagnostic tree is never published. Minimal source input
+`b7f3b5bc67fc` produced manifest SHA-256
+`04da2cd33beda6dca9727a5b681f7b0f2cc8f30b2417ceaa386ede43c5cdf140`;
+the validated tree is published as independent root commit `31c1813e26cf` and
+tag `minimal-source-v0.1`.
