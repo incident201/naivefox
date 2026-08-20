@@ -273,6 +273,7 @@ def main() -> int:
     # but not necessarily the root named by an active GYP_DIRS declaration.
     # Recover those target entry points from the already target-filtered
     # moz.build inputs instead of walking every GYP file in the checkout.
+    active_gyp_roots = set()
     active_mozbuilds = sorted(
         value
         for value in set().union(*categories.values())
@@ -289,6 +290,9 @@ def main() -> int:
                 else path.parent / raw
             )
             add_path(candidate, "mozbuild:active-gyp-entry")
+            relative = source_relative(candidate)
+            if relative is not None:
+                active_gyp_roots.add(Path(relative).parent.as_posix())
 
     metadata = json.loads(
         subprocess.check_output(
@@ -438,6 +442,7 @@ def main() -> int:
             packages_by_id[value]["name"] for value in root_ids
         ),
         "cargo_workspace_member_count": len(metadata["workspace_members"]),
+        "active_gyp_roots": sorted(active_gyp_roots),
         "cargo_packages": sorted(
             cargo_packages,
             key=lambda package: (

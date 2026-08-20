@@ -223,6 +223,7 @@ def main() -> int:
     validate_commit(build_source_commit, "build-input reports")
     cargo_license_inventory = {}
     active_manifests = set()
+    active_gyp_roots = set()
     build_collector_hash = sha256(
         repo / "netwerk/naivefox/tools/collect-build-inputs.py"
     )
@@ -251,6 +252,11 @@ def main() -> int:
             add(value, f"build:{report['target']}")
             if value.endswith(".toml"):
                 active_manifests.add(value)
+        for value in report.get("active_gyp_roots", []):
+            value = safe_path(value).rstrip("/")
+            if not (repo / value).is_dir():
+                raise SystemExit(f"active GYP source root is absent: {value}")
+            active_gyp_roots.add(value)
         directory_contracts.update(report.get("directory_contracts", []))
         for package in report.get("cargo_packages", []):
             manifest_path = package.get("manifest_path")
@@ -402,6 +408,10 @@ def main() -> int:
     for value in configure_report.get("files", []):
         if value.startswith(configure_bootstrap_prefixes):
             add(value, "configure:bootstrap")
+        elif any(
+            value == root or value.startswith(f"{root}/") for root in active_gyp_roots
+        ):
+            add(value, "configure:active-gyp-input")
 
     project_raw = subprocess.check_output([
         "git",
