@@ -1,6 +1,6 @@
 {
   "report_provenance": {
-    "source_commit_sha": "53203dfa241fe7db70e26df9211b169d2e6daddc",
+    "source_commit_sha": "e3a1d9ed929b4db26193daabeb7322112cd14283",
     "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
     "target_triple": "x86_64-pc-windows-msvc",
     "mozconfig_path": "netwerk/naivefox/mozconfig-windows-x86_64",

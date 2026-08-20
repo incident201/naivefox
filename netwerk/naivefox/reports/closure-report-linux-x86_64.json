@@ -1,6 +1,6 @@
 {
   "report_provenance": {
-    "source_commit_sha": "53203dfa241fe7db70e26df9211b169d2e6daddc",
+    "source_commit_sha": "e3a1d9ed929b4db26193daabeb7322112cd14283",
     "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
     "target_triple": "x86_64-unknown-linux-gnu",
     "mozconfig_path": "netwerk/naivefox/mozconfig-minimal",
@@ -14,10 +14,10 @@
   "summary": {
     "cxx_translation_units_count": 545,
     "direct_link_objects_count": 525,
-    "unstripped_link_objects_bytes": 226540408,
+    "unstripped_link_objects_bytes": 226540640,
     "unstripped_link_objects_mb": 216.05,
     "static_libraries_count": 3,
-    "libxul_size_bytes": 645398128,
+    "libxul_size_bytes": 645398272,
     "naivefox_bin_size_bytes": 5437168,
     "reachable_rust_crates_count": 366,
     "dynamic_dependencies_count": 20,
@@ -41,7 +41,7 @@
     },
     "modules": {
       "files": 23,
-      "bytes": 16262216,
+      "bytes": 16262448,
       "mb": 15.51
     },
     "ipc": {
@@ -10975,7 +10975,7 @@
       },
       {
         "name": "libxul.so",
-        "size_bytes": 645398128
+        "size_bytes": 645398272
       },
       {
         "name": "libxul.so-gdb.py",
@@ -11138,7 +11138,7 @@
     },
     {
       "path": "objdir/modules/libpref/Unified_cpp_modules_libpref0.o",
-      "size_bytes": 10057968
+      "size_bytes": 10058200
     },
     {
       "path": "objdir/netwerk/base/MimeType.o",
