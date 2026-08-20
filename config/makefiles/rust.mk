@@ -554,7 +554,11 @@ endef
 
 ifdef RUST_LIBRARY_FILE
 
+ifdef MOZ_NAIVEFOX
+rust_features_flag := --features '$(RUST_LIBRARY_FEATURES)'
+else
 rust_features_flag := --features '$(addsuffix $(COMMA),$(RUST_LIBRARY_FEATURES))mozilla-central-workspace-hack'
+endif
 
 ifeq (WASI,$(OS_ARCH))
 # The rust wasi target defaults to statically link the wasi crt, but when we

@@ -557,6 +557,13 @@ class TreeMetadataEmitter(LoggingMixin):
                 f"{cargo_file} doesn't contain a crate name?!?", context
             )
 
+        # The NaiveFox product has one deliberately isolated gkrust closure.
+        # Requiring Firefox's cross-invocation workspace unification crate here
+        # would resolve its full browser feature union even though this build
+        # has no other gkrust invocation with which to share artifacts.
+        if self.config.substs.get("MOZ_NAIVEFOX") and crate_name == "gkrust":
+            return content, cargo_file
+
         hack_name = "mozilla-central-workspace-hack"
         dep = f'{hack_name} = {{ version = "0.1", features = ["{crate_name}"], optional = true }}'
         dep_dict = toml.loads(dep)[hack_name]
