@@ -1410,6 +1410,43 @@ aggregate records `js_static` 225.86 MiB, `gkrust` 115.63 MiB, ICU 31.26 MiB,
 cache2 6.24 MiB, IPC Chromium 4.09 MiB, and IPC glue 2.98 MiB. SpiderMonkey
 and ICU are explicitly deferred to a future milestone.
 
+## NF-UPSTREAM-017 — selective Glean and target-correct Rust closure
+
+Status: implemented in the audited source commit; no Firefox base refresh was
+performed.
+
+Files:
+
+- `toolkit/components/glean/moz.build`
+- `security/manager/ssl/data_storage/{Cargo.toml,src/lib.rs}`
+- `netwerk/protocol/http/happy_eyeballs_glue/{Cargo.toml,src/lib.rs}`
+- `netwerk/socket/neqo_glue/{Cargo.toml,src/lib.rs}`
+- `toolkit/library/rust/naivefox/{Cargo.toml,lib.rs}`
+- `Cargo.lock`
+
+Purpose: disable the browser-wide Glean metrics/pings index for the parent-only
+NaiveFox application, provide ABI-compatible no-op metric shims where retained
+Firefox Rust code still calls telemetry sites, and remove only five direct Rust
+dependencies proven unused by a successful Linux/Windows link. The closure tool
+now follows the active target-specific Cargo tree rooted at `gkrust-naivefox`.
+
+Why project-only code was insufficient: these files are Firefox Rust/telemetry
+crate boundaries and Cargo feature edges. Leaving their default features active
+would keep the global Glean runtime reachable; deleting call sites in NaiveFox
+alone would not change the upstream crate graph. The no-op shims preserve the
+existing ABI at the retained call sites without introducing a new metrics stack.
+
+Behavioral risk: metrics are intentionally not recorded in this headless
+product; Necko/Neqo/NSS behavior is unchanged. `jsrust_shared` was tested for
+removal and restored after unresolved SpiderMonkey encoding symbols appeared.
+Future Firefox refreshes must re-check each listed Cargo feature and generated
+Glean header before accepting a new base.
+
+Tests: Linux `./mach build binaries` and config logging regression PASS;
+Windows target closure regenerated; active closure assertions PASS for both
+targets; no `firefox-on-glean`/`glean-core` package is reachable. Source commit:
+`559d487242b92526ef077cd9f520deedcb71f482`.
+
 ## Project-owned pre-export stability changes
 
 These changes do not modify Firefox upstream files and therefore do not create
