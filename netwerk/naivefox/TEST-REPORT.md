@@ -47,7 +47,9 @@ passed. The staged verifier covered H2, H3, Auto, config listeners, profile
 fallback, runtime smoke, and public HTTPS fetch. Additional malformed-SOCKS,
 H2/H3 padding-integrity, and finite robustness suites passed from the exported
 build. The generated source snapshot is therefore ready for orphan
-`minimal-source` publication; no discovery export loop remains.
+`minimal-source` publication; no discovery export loop remains. The validated
+snapshot is published at `0df131ea63ae0d2dc1bbefb9e811fcd038168f70` as
+`minimal-source-v0.2`.
 
 ## Standalone source publication update (2026-08-20)
 

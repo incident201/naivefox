@@ -156,8 +156,8 @@ Evidence/configure report snapshot commit: a7251b0ea7fd530d1d23fada8e3217514aa13
 Validated Minimal evidence/export source commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
 Export manifest entries: 25558 (37 directory contracts)
 Export manifest SHA-256: recorded in each generated snapshot's `UPSTREAM-BASE`
-Published minimal-source root commit: pending publication from this export
-Published source tag: pending publication
+Published minimal-source root commit: 0df131ea63ae0d2dc1bbefb9e811fcd038168f70
+Published source tag: minimal-source-v0.2
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
@@ -176,6 +176,8 @@ NaiveFox `binaries` target, staged runtime, and focused H2/H3/Auto/config gates
 are the product gates. Do not copy a working-tree SHA into its own commit
 documentation.
 
+The validated generated snapshot is published on `minimal-source` at
+`0df131ea63ae0d2dc1bbefb9e811fcd038168f70` (tag `minimal-source-v0.2`).
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean
 official Mozilla release used by `CAPTURE.md`, `H3-CAPTURE.md`, and

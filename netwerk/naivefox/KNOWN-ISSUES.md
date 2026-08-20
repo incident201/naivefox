@@ -15,8 +15,9 @@ The exported source was configured, generated, built with the lean NaiveFox
 `binaries` target, staged, and tested outside the original checkout and
 objdir. H2, H3, Auto, config, malformed-SOCKS, padding/integrity, and finite
 robustness gates passed. A full Firefox browser build is intentionally out of
-scope and is not required for this product gate. The remaining publication
-action is creating/updating the orphan `minimal-source` branch.
+scope and is not required for this product gate. The validated snapshot is
+published on `minimal-source` at
+`0df131ea63ae0d2dc1bbefb9e811fcd038168f70` as `minimal-source-v0.2`.
 
 This document separates active architectural constraints, frozen Firefox
 snapshot limitations, and non-reproducible observations from the acceptance

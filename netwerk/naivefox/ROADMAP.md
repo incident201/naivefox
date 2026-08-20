@@ -1032,8 +1032,9 @@ The final exporter plan and clean export passed with 25,558 files and 37
 directory contracts. The exported tree built independently with the original
 Firefox checkout and object directory unavailable. Its staged runtime passed
 H2, H3, Auto, config, public-fetch, malformed-SOCKS, padding/integrity, and
-finite robustness gates. The next publication action is only the orphan
-`minimal-source` commit; source discovery and repeated clean exports are not
+finite robustness gates. The validated snapshot is published on
+`minimal-source` at `0df131ea63ae0d2dc1bbefb9e811fcd038168f70` as
+`minimal-source-v0.2`; source discovery and repeated clean exports are not
 required.
 
 The remaining large SpiderMonkey/ICU/cache2/IPC closure is deliberately a
