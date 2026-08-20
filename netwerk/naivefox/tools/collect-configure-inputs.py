@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 
-FIREFOX_BASE = "17e93ad5d3261e20104c7f6f2ec867ecc138ca1"
+FIREFOX_BASE = "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a"
 QUOTED_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
 FORBIDDEN_PARTS = {
     ".git",
