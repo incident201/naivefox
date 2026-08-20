@@ -63,7 +63,7 @@ def safe_relative(value: str) -> pathlib.PurePosixPath:
     if any(part == "objdir" or part.startswith("obj-") for part in path.parts):
         fail(f"generated object directory leaked into export: {value}")
     if path.parts and path.parts[0] == "browser":
-        if len(path.parts) < 2 or path.parts[1] != "config":
+        if len(path.parts) >= 2 and path.parts[1] != "config":
             fail(f"Firefox browser product source leaked into export: {value}")
     return path
 
