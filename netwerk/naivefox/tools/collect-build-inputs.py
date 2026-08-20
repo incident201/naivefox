@@ -149,7 +149,13 @@ def main() -> int:
         raise SystemExit(
             f"objdir install manifests are missing: {install_manifest_dir}"
         )
-    product_install_manifest_names = {
+    source_install_manifest_names = {
+        # The mozbuild frontend validates test manifests and
+        # TEST_HARNESS_FILES while generating the product backend even when
+        # tests are disabled.  Keep the exact target manifests rather than
+        # walking test directories broadly.
+        "_test_files",
+        "_tests",
         "dist_bin",
         "dist_include",
         "dist_private",
@@ -159,7 +165,7 @@ def main() -> int:
     install_manifests = sorted(
         path
         for path in install_manifest_dir.iterdir()
-        if path.is_file() and path.name in product_install_manifest_names
+        if path.is_file() and path.name in source_install_manifest_names
     )
     manifest_names = {path.name for path in install_manifests}
     if not {"dist_bin", "dist_include"}.issubset(manifest_names):
