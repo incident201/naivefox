@@ -22006,11 +22006,11 @@
   ],
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "52f5ef03eb6614992b661ef96a47821b43f8f000",
+  "source_commit": "9dfb200b4539ced1b012cf559d737a76b505bf2a",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "windows-x86_64",
   "target_triple": "x86_64-pc-mingw32",
-  "trace_sha256": "7146421c29c61d5dc423ed7df615c50b99f06b8fc7f12bec19e3211d0de9e74f",
-  "trace_size_bytes": 25812017
+  "trace_sha256": "b0f6e969abe5c7ce47f85828b4ce2e7fb379c10fe1d278ac4c95978f073f1ee9",
+  "trace_size_bytes": 25794758
 }
