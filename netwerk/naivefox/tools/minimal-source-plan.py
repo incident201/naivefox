@@ -66,7 +66,7 @@ ABSOLUTE_TEXT = re.compile(
 )
 REPORT_ONLY_PATHS = (
     re.compile(r"^netwerk/naivefox/reports/"),
-    re.compile(r"^netwerk/naivefox/[^/]+\.md$"),
+    re.compile(r"^netwerk/naivefox/[^/]+\.md$", re.IGNORECASE),
     re.compile(r"^netwerk/naivefox/config\.example\.json$"),
     re.compile(
         r"^netwerk/naivefox/tools/(?:assert-closure\.py|"
