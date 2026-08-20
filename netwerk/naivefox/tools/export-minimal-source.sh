@@ -70,8 +70,6 @@ def norm(value):
     p = pathlib.PurePosixPath(value)
     if p.is_absolute() or value.startswith("/") or ".." in p.parts:
         raise SystemExit(f"unsafe repository path in closure: {value}")
-    if value.startswith("objdir/") or value.startswith("obj-"):
-        raise SystemExit(f"objdir path leaked into closure: {value}")
     return value
 
 def add(source, category, destination=None):
