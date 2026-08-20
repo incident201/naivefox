@@ -307,17 +307,26 @@ def main() -> int:
     active_jar_manifests = set()
     for makefile in makefiles:
         text = makefile.read_text(encoding="utf-8", errors="replace")
+        source_dir = source_tree / makefile.parent.relative_to(objdir)
         makefile_digest.update(makefile.relative_to(objdir).as_posix().encode())
         makefile_digest.update(b"\0")
         makefile_digest.update(text.encode())
         makefile_digest.update(b"\0")
         for match in JAR_MANIFEST.findall(text):
-            manifest = Path(match.strip()).resolve()
+            manifest_value = match.strip()
+            manifest_value = manifest_value.replace("$(topsrcdir)", str(source_tree))
+            manifest_value = manifest_value.replace("$(srcdir)", str(source_dir))
+            manifest_value = manifest_value.replace("$(topobjdir)", str(objdir))
+            if "$(" in manifest_value:
+                raise SystemExit(
+                    f"unresolved JAR_MANIFEST make variable in {makefile}: "
+                    f"{manifest_value}"
+                )
+            manifest = Path(manifest_value).resolve()
             relative = source_relative(manifest)
             if relative is not None:
                 add_path(manifest, "make:active-jar-manifest")
                 active_jar_manifests.add(relative)
-        source_dir = source_tree / makefile.parent.relative_to(objdir)
         for match in MAKE_SOURCE_PATH.finditer(text):
             root = source_tree if match.group(1) != "srcdir" else source_dir
             add_make_path(
