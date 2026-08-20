@@ -343,10 +343,10 @@ conservative Linux report.
 
 The exporter now has a fast `--plan-only` phase for provenance, exact file
 list, content hashes, modes, directory contracts, licenses, and product-doc
-curation. Final evidence attests source `51528a58ad87` and is frozen in report
-snapshot `0cec25a1bc33`: configure observed 10,279 files; target build evidence
+curation. Final evidence attests source `745d58bf7dcb` and is frozen in
+report-only snapshot `bec198a62d42`: configure observed 10,273 files; target build evidence
 contains 1,949/2,306 depfiles and 311/325 source/build Cargo packages. The
-`--plan-only` union passes with 19,725 entries and 35 source directory
+`--plan-only` union passes with 25,518 entries and 37 source directory
 contracts. The one clean source export remains the next release gate; the
 diagnostic tree is never published. Final source-tree/archive and normalized
 stripped package measurements will be recorded only from that clean export.

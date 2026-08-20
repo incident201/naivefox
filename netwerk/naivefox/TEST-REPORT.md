@@ -29,8 +29,8 @@ normal connection.
 
 Final reports are no longer stale. The configure, Linux/Windows build-input,
 and Linux/Windows closure reports all attest audited source
-`51528a58ad87912c6cfc7538c3595bff6166dd8b`; corrected report snapshot
-`0cec25a1bc33593bad1b53ea4db6f4401be7da56` freezes them without trying to
+`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; direct report-only snapshot
+`bec198a62d422b1382315f335ef2965b429d9387` freezes them without trying to
 embed a commit's own SHA.
 
 ### Standalone source-closure discovery
@@ -47,11 +47,11 @@ used one disposable tree and augmented it in place by evidence class.
 | Linux/Windows backend + config-status inputs | collected |
 | Compiler/generated-action depfiles + Makefile prerequisites | collected |
 | Target-filtered Cargo source/build closure | Linux 311 / Windows 325 packages |
-| Configure trace | 10,279 files; trace SHA-256 `f050c2f7d06faa226db6b41a65fd7a8094168626517890811dd495ba4cfc089a` |
-| Source directory contracts | Linux 35 / Windows 31; 35 in the target union |
+| Configure trace | 10,273 files; trace SHA-256 `8a522abb10923a0a5e4b0fb4fa56f5d03e10c0a2dc8e0aa1c8a325a9c1795dcb` |
+| Source directory contracts | Linux 37 / Windows 33; 37 in the target union |
 | Depfiles | Linux 1,949 / Windows 2,306 |
 | Generated Makefiles | Linux 441 / Windows 425 |
-| Evidence provenance | source `51528a58ad87`; corrected report snapshot `0cec25a1bc33` |
+| Evidence provenance | source `745d58bf7dcb`; report-only snapshot `bec198a62d42` |
 | Standalone diagnostic configure | PASS |
 | Standalone full Linux `mach build -j4` | PASS, 5:38 |
 | Diagnostic runtime smoke | PASS |
@@ -59,8 +59,8 @@ used one disposable tree and augmented it in place by evidence class.
 
 The diagnostic tree is contaminated discovery state and will not be
 published. `export-minimal-source.sh --plan-only` performs the cheap
-provenance/hash/mode/license/list validation and now passes with 19,725 entries
-and 35 source directory contracts. One new empty tree will be populated only
+provenance/hash/mode/license/list validation and now passes with 25,518 entries
+and 37 source directory contracts. One new empty tree will be populated only
 for final acceptance.
 
 Windows file logging now uses the native wide-character API and passes relative,
@@ -815,8 +815,8 @@ and IPC glue 2.98 MiB. These are deliberate future SpiderMonkey/ICU work, not
 unreviewed removal candidates. The source-closure diagnostic build is now
 green; the publishable clean export remains a separate, not-yet-run gate.
 
-The authoritative JSON reports identify `51528a58ad87` as the audited evidence
-source; `0cec25a1bc33` is the corrected report snapshot. Later approved
+The authoritative JSON reports identify `745d58bf7dcb` as the audited evidence
+source; `bec198a62d42` is the direct report-only snapshot. Later approved
 export-tool/documentation descendants are consumers of this evidence, not new
 audited build sources. No current working-tree SHA is embedded in its own
 source commit.

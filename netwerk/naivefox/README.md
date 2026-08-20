@@ -75,9 +75,9 @@ once, only for isolated release acceptance; repeatedly rebuilding clean exports
 to discover individual files is prohibited.
 
 The frozen evidence set attests audited source
-`51528a58ad87912c6cfc7538c3595bff6166dd8b`; corrected reports are committed
-in snapshot `0cec25a1bc33593bad1b53ea4db6f4401be7da56`. The fast manifest
-`--plan-only` gate passes with 19,725 entries and 35 source directory
+`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; reports are committed in
+snapshot `bec198a62d422b1382315f335ef2965b429d9387`. The fast manifest
+`--plan-only` gate passes with 25,518 entries and 37 source directory
 contracts. The single clean export and isolated Linux/Windows acceptance are
 the remaining publication gates.
 

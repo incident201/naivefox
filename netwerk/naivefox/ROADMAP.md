@@ -989,10 +989,10 @@ generated output, never a hand-edited source of truth.
 - [x] Implement an allowlist planner and deterministic exporter with a fast
   `--plan-only` mode. The physical exporter starts from an empty directory.
 - [x] Regenerate configure, Linux/Windows build-input, and linked-closure
-  reports from audited source `51528a58ad87`; freeze the corrected evidence in
-  snapshot `0cec25a1bc33`.
-- [x] Pass `export-minimal-source.sh --plan-only` on the target union: 19,725
-  entries and 35 source directory contracts.
+  reports from audited source `745d58bf7dcb`; freeze the evidence in report-only
+  snapshot `bec198a62d42`.
+- [x] Pass `export-minimal-source.sh --plan-only` on the target union: 25,518
+  entries and 37 source directory contracts.
 - [ ] Generate NaiveFox root documentation, licenses/notices, build scripts,
   and exact `UPSTREAM-BASE` traceability.
 - [ ] Validate absence of Firefox browser product files, `.git`, objdirs,
@@ -1077,7 +1077,7 @@ and further size reduction remain future work.
 ## Current minimisation checkpoint: audited lean build/runtime closure
 
 The DOM/GFX-free product now has a target-aware machine-readable closure audit
-and a selective Glean/Rust trim. The `51528a58` report records an unstripped
+and a selective Glean/Rust trim. The `745d58bf` report records an unstripped
 Linux `libxul` of 479.34 MiB; normalized stripped/package measurements are
 reserved for the clean export. Runtime-reachable Rust closure is 271/287
 packages on Linux/Windows, while source/build Cargo closure is 311/325. The
@@ -1089,8 +1089,8 @@ non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. Source
 closure discovery now uses one in-place diagnostic tree and is complete for
-Linux. Final provenance is frozen from `51528a58` in report snapshot
-`0cec25a1`; the fast manifest plan passes. Next create one clean export for
+Linux. Final provenance is frozen from `745d58bf` in report-only snapshot
+`bec198a6`; the fast manifest plan passes. Next create one clean export for
 isolated Linux/Windows gates.
 Do not return to repeated clean-export discovery or reopen deep
 SpiderMonkey/ICU minimization in this phase.

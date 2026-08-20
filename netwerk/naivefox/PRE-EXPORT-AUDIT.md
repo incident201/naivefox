@@ -23,8 +23,8 @@ files), which closes the discovery loop. It is not a valid release export and
 will never be published.
 
 Final evidence regeneration is complete: all five reports attest
-`51528a58ad87912c6cfc7538c3595bff6166dd8b` and are committed in corrected
-snapshot `0cec25a1bc33593bad1b53ea4db6f4401be7da56`. The fast
+`745d58bf7dcb44df0b8be87b39fb7d21d19383f9` and are committed in report-only
+snapshot `bec198a62d422b1382315f335ef2965b429d9387`. The fast
 `export-minimal-source.sh --plan-only` gate passes. The remaining sequence is
 exactly one clean export, then isolated build/test with the original checkout
 and objdirs unavailable.
@@ -69,8 +69,8 @@ runtime-reachable packages from the 311/325 source/build package closure.
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
 - **Standalone Diagnostic Source Commit:** `a020da3d5ba4`; standalone full build and runtime smoke passed from source content through this checkpoint.
-- **Audited Minimal Evidence Source Commit:** `51528a58ad87912c6cfc7538c3595bff6166dd8b`.
-- **Evidence Report Snapshot Commit:** `0cec25a1bc33593bad1b53ea4db6f4401be7da56`; this corrected snapshot contains the five configure/build/closure reports.
+- **Audited Minimal Evidence Source Commit:** `745d58bf7dcb44df0b8be87b39fb7d21d19383f9`.
+- **Evidence Report Snapshot Commit:** `bec198a62d422b1382315f335ef2965b429d9387`; this direct report-only child contains the five configure/build/closure reports.
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 
@@ -82,7 +82,7 @@ Audited with `netwerk/naivefox/tools/analyze-full-closure.py` and strictly valid
 
 The final report set is current export evidence. Runtime-reachable Rust closure
 is 271/287 packages; the larger normal/build/proc-macro source closure is
-311/325 packages. Linux and Windows reports share audited source `51528a58`;
+311/325 packages. Linux and Windows reports share audited source `745d58bf`;
 counts are measurements, not manifest contracts. Export policy consumes the
 union of validated target-specific reports rather than hard-coded counts.
 

@@ -154,8 +154,8 @@ Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
 Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
 NaiveFox reference merge-base for export: e11c162e44703e8be50b619341c350f05b1b2623
 Standalone diagnostic build source commit: a020da3d5ba4 (full build and runtime smoke PASS)
-Audited Minimal evidence source commit: 51528a58ad87912c6cfc7538c3595bff6166dd8b
-Corrected evidence report snapshot commit: 0cec25a1bc33593bad1b53ea4db6f4401be7da56
+Audited Minimal evidence source commit: 745d58bf7dcb44df0b8be87b39fb7d21d19383f9
+Evidence report snapshot commit: bec198a62d422b1382315f335ef2965b429d9387
 Validated clean Minimal export source commit: NOT_CREATED
 Published minimal-source commit: NOT_CREATED
 Historical pre-audit graph tag: not used for current provenance
@@ -165,7 +165,7 @@ Pre-minimization baseline tag: pre-minimization-v0.3
 ### Current pre-export audit provenance
 
 The configure, Linux/Windows build-input, and Linux/Windows linked-closure
-reports all attest source `51528a58ad87`; corrected snapshot `0cec25a1bc33`
+reports all attest source `745d58bf7dcb`; report-only snapshot `bec198a62d42`
 freezes that evidence. Later exporter-only descendants may consume the reports
 only while the planner proves that no build-affecting input changed and checks
 the exact collector hashes. Do not copy a working-tree SHA into a source
@@ -1471,7 +1471,7 @@ targets; no `firefox-on-glean`/`glean-core` package is reachable. Source commit:
 ## NF-UPSTREAM-018 — isolated product Rust root and ping generation
 
 Status: implemented on the frozen Firefox base; final target reports are
-regenerated from audited source `51528a58ad87`.
+regenerated from audited source `745d58bf7dcb`.
 
 Files:
 
@@ -1504,7 +1504,7 @@ Tests: Linux and Windows frozen Cargo metadata resolution PASS. Corrected
 reports separately record 271/287 runtime-reachable packages and 311/325
 normal/build/proc-macro source packages. Standalone diagnostic configure PASS;
 full standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke
-PASS; final `--plan-only` PASS with 19,725 entries and 35 directory contracts.
+PASS; final `--plan-only` PASS with 25,518 entries and 37 directory contracts.
 Commits: `c8ad512671d6` (Rust workspace) and `a020da3d5ba4` (ping index).
 
 ## NF-UPSTREAM-019 — explicit Windows Winsock feature ownership
@@ -1532,7 +1532,7 @@ the same feature explicitly.
 
 Tests: Windows x86-64 full build PASS. Corrected target evidence records 468
 TUs, 536 direct objects, 287 runtime-reachable Rust crates, and 325
-source/build Cargo packages. Reports are frozen in `0cec25a1bc33`. Commit:
+source/build Cargo packages. Reports are frozen in `bec198a62d42`. Commit:
 `ca77ac1a85ae`.
 
 ## Project-owned pre-export stability changes
@@ -1545,7 +1545,7 @@ new downstream Necko patch inventory entries:
 | Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
 | Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
 | Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
-| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean closure and strict repository-relative/provenance checks. | Five-report set frozen in `0cec25a1bc33` from audited source `51528a58ad87`; both target assertions and plan-only PASS; physical clean export remains locked. |
+| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean closure and strict repository-relative/provenance checks. | Five-report set frozen in `bec198a62d42` from audited source `745d58bf7dcb`; both target assertions and plan-only PASS; physical clean export remains locked. |
 
 Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
 stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate

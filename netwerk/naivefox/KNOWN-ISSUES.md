@@ -26,8 +26,8 @@ H3, and Auto workload matrix beyond this H3 soak remains a follow-up gate.
 `minimal-source` publication is intentionally still blocked. One disposable
 diagnostic tree now passes standalone configure, a full Linux build, and
 runtime smoke, but it contains discovery residue and is not an accepted
-artifact. Evidence regeneration is complete at audited source `51528a58ad87`
-with corrected report snapshot `0cec25a1bc33`, and the fast manifest plan
+artifact. Evidence regeneration is complete at audited source `745d58bf7dcb`
+with report-only snapshot `bec198a62d42`, and the fast manifest plan
 passes. Publication remains blocked on the single clean export, isolated Linux
 acceptance, and standalone Windows acceptance.
 
