@@ -280,6 +280,27 @@ for path in list(entries):
         if candidate.is_file():
             add(relative.as_posix(), "explicit:mozbuild-declared")
 
+# TOML test manifests use bare table names such as ["test_name.js"], which
+# are deliberately not treated as arbitrary string-valued build settings.
+# Resolve those table names directly so the configure-time manifest validator
+# sees the same test files that the full checkout sees.
+for path in list(entries):
+    if not path.endswith(".toml"):
+        continue
+    manifest_path = repo / path
+    try:
+        text = manifest_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+    for value in re.findall(r'^\s*\["([^"/]+\.(?:js|jsm|mjs|py|xhtml|html))"\]\s*$', text, re.MULTILINE):
+        candidate = (manifest_path.parent / value).resolve()
+        try:
+            relative = candidate.relative_to(repo)
+        except ValueError:
+            continue
+        if candidate.is_file():
+            add(relative.as_posix(), "explicit:test-manifest")
+
 if missing:
     details = "\n".join(f"{path} ({kind})" for path, kind in sorted(set(missing)))
     raise SystemExit(f"closure references missing repository files:\n{details}")
