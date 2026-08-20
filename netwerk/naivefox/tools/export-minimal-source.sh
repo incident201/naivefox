@@ -405,7 +405,12 @@ while gyp_queue:
         gyp_reference = value.split(":", 1)[0]
         if not gyp_reference.endswith((".gyp", ".gypi")):
             continue
-        candidate = (gyp_path.parent / gyp_reference).resolve()
+        if gyp_reference.startswith("<(DEPTH)/"):
+            candidate = (
+                repo / "security/nss" / gyp_reference[len("<(DEPTH)/") :]
+            ).resolve()
+        else:
+            candidate = (gyp_path.parent / gyp_reference).resolve()
         try:
             relative = candidate.relative_to(repo)
         except ValueError:
