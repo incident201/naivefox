@@ -455,7 +455,7 @@ Desktop build and built successfully.
 
 ```text
 Source commit: 7e26713ed7d05127188d2579d3c51afbe554db22
-Object directory: /home/zubastik/src/naivefox/obj-x86_64-pc-linux-gnu
+Object directory: `<objdir>` (machine-local, not part of the source tree)
 Build type: full Firefox Desktop, non-artifact
 Build time: 42 minutes 55 seconds
 Build log: artifacts/baseline-build.log (local, ignored)
