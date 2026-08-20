@@ -446,6 +446,11 @@ def main() -> int:
     for value in sorted(path for path in tracked if path.startswith("python/mozboot/")):
         add(value, "explicit:mach-bootstrap")
 
+    for value in sorted(
+        path for path in tracked if path.startswith("config/") and path.endswith(".mk")
+    ):
+        add(value, "explicit:make-build-infrastructure")
+
     for value in (
         "mach",
         "client.mk",
