@@ -170,6 +170,9 @@ for path in (
     # The configure graph reads this even for the non-browser NaiveFox
     # application; it is a small tracked version input, not browser runtime.
     "browser/config/version.txt", "browser/config/version_display.txt",
+    # toolkit/moz.configure probes this header before the selected NSS build
+    # graph is evaluated.
+    "security/nss/lib/nss/nss.h",
     "netwerk/naivefox/moz.configure", "toolkit/moz.configure", "js/moz.configure",
     "js/ffi.configure", "memory/moz.configure",
 ):
