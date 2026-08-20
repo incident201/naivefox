@@ -331,6 +331,38 @@ def main() -> int:
     )
     packages_by_id = {package["id"]: package for package in metadata["packages"]}
     nodes_by_id = {node["id"]: node for node in metadata["resolve"]["nodes"]}
+    manifest_parse_packages = []
+    for package in metadata["packages"]:
+        manifest = Path(package["manifest_path"]).resolve()
+        relative = source_relative(manifest)
+        if relative is None:
+            raise SystemExit(
+                "Cargo metadata package manifest is outside the source tree: "
+                f"{package['name']} {manifest}"
+            )
+        add_path(manifest, "cargo:target-manifest-parse-closure")
+        target_entry_points = []
+        for target in package.get("targets", []):
+            if not {"lib", "proc-macro", "custom-build"}.intersection(
+                target.get("kind", [])
+            ):
+                continue
+            entry = Path(target["src_path"]).resolve()
+            relative_entry = source_relative(entry)
+            if relative_entry is None:
+                raise SystemExit(
+                    "Cargo metadata target entry is outside the source tree: "
+                    f"{package['name']} {entry}"
+                )
+            add_path(entry, "cargo:target-manifest-parse-entry")
+            target_entry_points.append(relative_entry)
+        manifest_parse_packages.append({
+            "name": package["name"],
+            "version": package["version"],
+            "manifest_path": relative,
+            "source": package.get("source"),
+            "target_entry_points": sorted(target_entry_points),
+        })
     root_ids = {
         package["id"]
         for package in metadata["packages"]
@@ -453,6 +485,15 @@ def main() -> int:
         "install_manifests_sha256": install_manifest_digest.hexdigest(),
         "depfile_count": len(depfiles),
         "cargo_package_count": len(reachable_package_ids),
+        "cargo_manifest_parse_package_count": len(manifest_parse_packages),
+        "cargo_manifest_parse_packages": sorted(
+            manifest_parse_packages,
+            key=lambda package: (
+                package["name"],
+                package["version"],
+                package["source"] or "",
+            ),
+        ),
         "cargo_build_roots": sorted(
             packages_by_id[value]["name"] for value in root_ids
         ),
