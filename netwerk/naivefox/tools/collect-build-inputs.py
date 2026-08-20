@@ -73,10 +73,21 @@ def main() -> int:
     categories: dict[str, set[str]] = defaultdict(set)
     directory_contracts = set()
 
-    def add_path(path: Path, category: str) -> None:
+    def source_relative(path: Path) -> str | None:
         try:
-            relative = path.resolve().relative_to(source_tree).as_posix()
+            resolved = path.resolve()
+            if resolved == objdir or objdir in resolved.parents:
+                return None
+            relative = resolved.relative_to(source_tree)
         except (OSError, ValueError):
+            return None
+        if any(part == "objdir" or part.startswith("obj-") for part in relative.parts):
+            return None
+        return relative.as_posix()
+
+    def add_path(path: Path, category: str) -> None:
+        relative = source_relative(path)
+        if relative is None:
             return
         if relative in tracked and (source_tree / relative).is_file():
             categories[category].add(relative)
@@ -88,11 +99,9 @@ def main() -> int:
         for match in matches:
             path = Path(match)
             if path.is_dir():
-                try:
-                    relative = path.resolve().relative_to(source_tree).as_posix()
-                except (OSError, ValueError):
-                    continue
-                directory_contracts.add(relative)
+                relative = source_relative(path)
+                if relative is not None:
+                    directory_contracts.add(relative)
             else:
                 add_path(path, category)
 

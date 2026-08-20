@@ -482,24 +482,11 @@ def get_source_and_build_inputs(
                     except Exception:
                         pass
 
+    # Exact target-specific moz.build/moz.configure inputs are collected from
+    # backend.RecursiveMakeBackend.in by collect-build-inputs.py.  A broad
+    # checkout walk here used to include inactive test/product definitions and
+    # even ignored objdirs when they lived below the source root.
     mozbuild_files = set()
-    for root, dirs, files in os.walk(str(topsrcdir)):
-        rel_root = normalize_path(root, topsrcdir)
-        if any(
-            rel_root.startswith(skip)
-            for skip in [
-                "browser",
-                "devtools",
-                "mobile",
-                "accessible",
-                "layout",
-                "editor",
-            ]
-        ):
-            continue
-        for f in files:
-            if f == "moz.build" or f == "moz.configure":
-                mozbuild_files.add(normalize_path(os.path.join(root, f), topsrcdir))
 
     runtime_resources = [
         "netwerk/naivefox/tools/runtime-resources.manifest",
