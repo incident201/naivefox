@@ -395,7 +395,7 @@ limitations are in [`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md).
 The same 64 MiB/three-trial workload was then run in strict H3 mode:
 
 ```bash
-NAIVEFOX_BENCHMARK_REFERENCE_BINARY=/tmp/naiveproxy-source-v150/src/out/Release/naive \
+NAIVEFOX_BENCHMARK_REFERENCE_BINARY=<official-naiveproxy-reference> \
   netwerk/naivefox/test/integration/run-h3-throughput-benchmark.sh
 ```
 

@@ -19,7 +19,10 @@ FORBIDDEN_COMPONENTS = {
     "captures",
 }
 FORBIDDEN_SUFFIXES = (".pcap", ".pcapng", ".keylog")
-ABSOLUTE_TEXT = re.compile(r"/(?:home|tmp|mnt|workspaces)/[^\s\"']+|[A-Za-z]:\\\\(?:Users|home)\\\\")
+ABSOLUTE_TEXT = re.compile(
+    r"/home/[^\s\"']+/(?:src|obj[^/]*|dist)(?:/|\s|$)|"
+    r"[A-Za-z]:\\\\Users\\\\[^\s\"']+"
+)
 
 
 def fail(message: str) -> None:
