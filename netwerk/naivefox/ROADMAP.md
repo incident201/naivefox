@@ -1000,7 +1000,7 @@ generated output, never a hand-edited source of truth.
   and exact `UPSTREAM-BASE` traceability.
 - [x] Validate absence of Firefox browser product files, `.git`, objdirs,
   artifacts, credentials, profiles, logs, captures, and absolute build paths.
-- [ ] Generate a deterministic source archive from the same export tree.
+- [x] Generate a deterministic source archive from the same export tree.
 
 ### M14.4 Isolated build and publication
 
@@ -1008,9 +1008,9 @@ generated output, never a hand-edited source of truth.
   unavailable.
 - [x] Pass the complete networking/config/package acceptance suite from the
   exported build.
-- [ ] Create the independent orphan-history `minimal-source` branch and publish
+- [x] Create the independent orphan-history `minimal-source` branch and publish
   only validated generated snapshots.
-- [ ] Make `minimal-source` the GitHub default branch after standalone
+- [x] Make `minimal-source` the GitHub default branch after standalone
   acceptance.
 - [ ] Complete one controlled Firefox refresh through `main -> naivefox ->
   minimal -> export -> minimal-source`.

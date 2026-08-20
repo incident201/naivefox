@@ -32,6 +32,28 @@ the original five reports. The later Windows configure trace attests
 pretending that every evidence file must share one SHA and never embeds a
 commit's own SHA inside itself.
 
+The final clean export was generated from Minimal commit
+`b7f3b5bc67fcf155b569a0d0d2ad0f7f28cd45be`. Its 25,549-entry manifest has
+SHA-256 `04da2cd33beda6dca9727a5b681f7b0f2cc8f30b2417ceaa386ede43c5cdf140`.
+After removing build-created Python bytecode not present in that manifest, an
+exact hash audit reported 25,551 actual/allowed files, zero extras, zero
+missing files, and zero content mismatches. The product tree is published as
+independent root commit `31c1813e26cf652835dc73eaafef9f0fa84002f9`, tag
+`minimal-source-v0.1`, and GitHub default branch `minimal-source`.
+
+Release archives copied to `D:\\naivefox`:
+
+| Archive | SHA-256 |
+|---|---|
+| `naivefox-linux-x86_64-minimal-source-v0.1.tar.gz` | `0985a19cef94ec4005546a354684c2836253b54f2561fdf6032e9646d777bde7` |
+| `naivefox-windows-x86_64-minimal-source-v0.1.tar.gz` | `a8a09ba78edd073029ef3815f132b577a110c20f22122c1b6c6d59aa7953562f` |
+| `naivefox-minimal-source-v0.1.tar.gz` | `f97a82d689fbbcc0b0375e2e86e9787c446ee5766ef8a4069f671fb11bfef099` |
+
+The Linux binary archive was extracted to a fresh `/tmp` directory and passed
+`--runtime-smoke`. The Windows binary package is byte-identical to the staged
+package used by the native smoke and bounded H2/H3/Auto matrix below. No new
+long soak was run for publication.
+
 ### Standalone source-closure discovery
 
 The old workflow repeatedly copied a nominally clean tree and stopped on one

@@ -158,7 +158,10 @@ Audited Minimal evidence source commit: 745d58bf7dcb44df0b8be87b39fb7d21d19383f9
 Evidence report snapshot commit: bec198a62d422b1382315f335ef2965b429d9387
 Windows configure evidence source commit: af716bf57f83ebdb377c0f34cd20995faf41b641
 Validated exporter/code checkpoint: 4db1292e96ec97fa39575e936e76608a711dbdb5
-Published minimal-source commit: recorded in this full-tree document after orphan publication
+Validated Minimal export source commit: b7f3b5bc67fcf155b569a0d0d2ad0f7f28cd45be
+Published minimal-source root commit: 31c1813e26cf652835dc73eaafef9f0fa84002f9
+Published source tag: minimal-source-v0.1
+Export manifest SHA-256: 04da2cd33beda6dca9727a5b681f7b0f2cc8f30b2417ceaa386ede43c5cdf140
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
@@ -176,7 +179,8 @@ changes are report/document/export-only and verifies all collector hashes.
 Do not copy a working-tree SHA into its own commit documentation. The validated
 Firefox base remains `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
 upstream refresh was performed during this audit. Disposable diagnostic trees
-are not publication candidates; only the deterministic orphan snapshot is.
+are not publication candidates. The deterministic snapshot is published as
+root commit `31c1813e26cf`; `minimal-source` is the GitHub default branch.
 
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean

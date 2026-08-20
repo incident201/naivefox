@@ -31,8 +31,9 @@ passed full Linux and Windows builds with the original Firefox checkout hidden.
 An independent clean Linux export passed the full H2/H3/Auto/config suite and
 staged-runtime verification; the native Windows package passed the short
 matrix above. Publication uses one newly generated clean manifest snapshot and
-an orphan history. The remaining repository action is switching GitHub's
-default branch after the published product branch is reviewed.
+an orphan history. GitHub's default branch is now `minimal-source`; fixes must
+still be made in `minimal` or an upper layer and regenerated, never edited in
+the product branch.
 
 Maintenance constraint: after any Firefox refresh or build-graph/Cargo/
 generator change, regenerate both target build reports and both attested

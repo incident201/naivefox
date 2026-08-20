@@ -83,9 +83,10 @@ set. The later attested Windows configure trace records source
 `af716bf57f83ebdb377c0f34cd20995faf41b641`. The planner consumes this explicit
 six-report target union and, at exporter checkpoint `4db1292e96ec`, validates
 25,549 files and 37 source directory contracts. Standalone Linux build/full
-suite/staging and native Windows build/acceptance are green. The publication
-step creates the validated clean snapshot as an independent orphan history;
-its generated `UPSTREAM-BASE` is the authoritative snapshot provenance.
+suite/staging and native Windows build/acceptance are green. The first product
+snapshot is published as independent root commit `31c1813e26cf` and tag
+`minimal-source-v0.1`; GitHub's default branch is now `minimal-source`. Its
+generated `UPSTREAM-BASE` is the authoritative snapshot provenance.
 
 ## Goal
 

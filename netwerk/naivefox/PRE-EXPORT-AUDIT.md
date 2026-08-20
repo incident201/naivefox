@@ -74,8 +74,10 @@ runtime-reachable packages from the 311/325 source/build package closure.
 - **Audited Minimal Evidence Source Commit:** `745d58bf7dcb44df0b8be87b39fb7d21d19383f9`.
 - **Evidence Report Snapshot Commit:** `bec198a62d422b1382315f335ef2965b429d9387`; this direct report-only child contains the five configure/build/closure reports.
 - **Validated exporter/code checkpoint:** `4db1292e96ec97fa39575e936e76608a711dbdb5`
-- **Published Minimal Source Commit:** generated as an orphan snapshot after
-  this audit; its `UPSTREAM-BASE` records the exact Minimal source commit.
+- **Validated Minimal export source:** `b7f3b5bc67fcf155b569a0d0d2ad0f7f28cd45be`
+- **Published Minimal Source Commit:** `31c1813e26cf652835dc73eaafef9f0fa84002f9`
+  (independent root commit; tag `minimal-source-v0.1`).
+- **Export manifest SHA-256:** `04da2cd33beda6dca9727a5b681f7b0f2cc8f30b2417ceaa386ede43c5cdf140`
 - **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 
 ---
