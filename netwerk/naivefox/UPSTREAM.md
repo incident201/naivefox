@@ -158,6 +158,23 @@ Existing pre-audit graph tag: minimal-graph-v0.1 -> 60f2eede69da856daf2324fc90b2
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
+### Current pre-export audit provenance
+
+The last validated audit source is `0357743f7d9e10d676a5a4c6c8846e89248c7ede`.
+The closure reports were regenerated in the report-only commit
+`f0ef52681d2b`; `assert-closure.py` accepts that exact parent/report pair and
+rejects any other stale provenance. The validated Firefox base remains the
+concrete snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
+upstream refresh was performed during this audit. `minimal-source` is still
+`NOT_CREATED` and `tools/export-minimal-source.sh` has not been run.
+
+The capture reference is no longer an optional in-tree Firefox binary:
+`tools/fetch-firefox-reference.sh` downloads and digest-records the clean
+official Mozilla release used by `CAPTURE.md`, `H3-CAPTURE.md`, and
+`OBSERVER-TRAFFIC-REPORT.md`. Exact cross-release TLS/QUIC field equality is
+diagnostic; Necko/NSS/Neqo ownership, strict protocol/no-fallback behavior,
+classic CONNECT, padding, and multiplexing remain acceptance gates.
+
 The `minimal` branch was initialized from that tagged NaiveFox line and then
 fast-forwarded through the validated config/profile corrections above; it has
 no minimization-only commit at this baseline. Every release or significant
@@ -1340,6 +1357,23 @@ Full machine-readable reports are archived in:
 - `netwerk/naivefox/reports/closure-report-windows-x86_64.json`
 
 Detailed audit of all shims, stubs, and lean replacements is documented in [`netwerk/naivefox/SHIMS.md`](SHIMS.md).
+
+## Project-owned pre-export stability changes
+
+These changes do not modify Firefox upstream files and therefore do not create
+new downstream Necko patch inventory entries:
+
+| Area | Files | Purpose / risk | Evidence |
+|---|---|---|---|
+| Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
+| Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
+| Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
+| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/closure-report-*.json` | Target-correct Linux/Windows C/C++/Rust/Glean closure and strict repository-relative/provenance checks. Reports are regenerated in a report-only child commit. | Both target assertions PASS; source export remains intentionally locked. |
+
+No Firefox source update was made for these project-owned changes. If a future
+Firefox refresh touches an inventoried upstream file, follow the two-gate
+`main -> refresh/firefox-* -> naivefox -> refresh/minimal-* -> minimal`
+workflow above and rerun the full H2/H3/config/capture gates before export.
 
 
 ## 3-Tier Build Performance Benchmark

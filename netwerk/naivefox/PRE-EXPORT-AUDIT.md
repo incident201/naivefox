@@ -26,8 +26,9 @@ transport assertions remain gates.
 ## 1. Release & Baseline Provenance
 
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
-- **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c`
-- **Validated Minimal Base Commit:** `8e2d123c9a61`
+- **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
+- **Validated Minimal Audit Source Commit:** `0357743f7d9e10d676a5a4c6c8846e89248c7ede`
+- **Validated Minimal Report Commit:** `f0ef52681d2b` (report-only child of the audit source commit)
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** `minimal-graph-v0.1` (`60f2eede69da856daf2324fc90b2c2ab9cb86fd2`)
 
