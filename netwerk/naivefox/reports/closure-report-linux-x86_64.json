@@ -1,11 +1,11 @@
 {
   "report_provenance": {
-    "source_commit_sha": "b390951540dd286a054456155d1af8f8639f2d98",
+    "source_commit_sha": "559d487242b92526ef077cd9f520deedcb71f482",
     "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
     "target_triple": "x86_64-unknown-linux-gnu",
     "mozconfig_path": "netwerk/naivefox/mozconfig-minimal",
     "mozconfig_sha256": "ed777efad659f9bdd30194e84c32ccc13042f7a38510b9628d1111298c459b91",
-    "analyzer_version": "2.4.0-strict-target",
+    "analyzer_version": "2.5.0-active-cargo-tree",
     "compiler_version": "Clang 18.1.8",
     "linker_version": "LLD 18.1.8",
     "sccache_state": "supported",
@@ -14,19 +14,19 @@
   "summary": {
     "cxx_translation_units_count": 545,
     "direct_link_objects_count": 525,
-    "unstripped_link_objects_bytes": 226540640,
+    "unstripped_link_objects_bytes": 226541056,
     "unstripped_link_objects_mb": 216.05,
     "static_libraries_count": 3,
-    "libxul_size_bytes": 645398272,
+    "libxul_size_bytes": 500877728,
     "naivefox_bin_size_bytes": 5437168,
-    "reachable_rust_crates_count": 366,
+    "reachable_rust_crates_count": 271,
     "dynamic_dependencies_count": 20,
     "staged_runtime_files_count": 18
   },
   "component_groups": {
     "netwerk": {
       "files": 62,
-      "bytes": 90227600,
+      "bytes": 90228016,
       "mb": 86.05
     },
     "config": {
@@ -1192,8 +1192,8 @@
     },
     {
       "path": "objdir/x86_64-unknown-linux-gnu/release/libgkrust.a",
-      "size_bytes": 502668414,
-      "member_count": 970,
+      "size_bytes": 245632320,
+      "member_count": 890,
       "members": [
         "45c91108d938afe8-absvdi2.o",
         "45c91108d938afe8-absvsi2.o",
@@ -1256,7 +1256,7 @@
         "allocator_api2-ad86e7d9427140ee.allocator_api2.8332e04fb552552e-cgu.0.rcgu.o",
         "anyhow-87a75112aebff8ff.anyhow.8a2773d178514295-cgu.0.rcgu.o",
         "anyhow-87a75112aebff8ff.anyhow.8a2773d178514295-cgu.1.rcgu.o",
-        "app_collator_glue-97d09d911562c976.app_collator_glue.7d231c1c6bbf81b0-cgu.0.rcgu.o",
+        "app_collator_glue-ea2c93c83bc57747.app_collator_glue.c71b8b112edc2979-cgu.0.rcgu.o",
         "app_units-2283aac5a870ba27.app_units.7784528bbc43f54c-cgu.0.rcgu.o",
         "arrayref-c1084c1cd431ee63.arrayref.885605e07c9ed785-cgu.0.rcgu.o",
         "arraystring-2e25282820ce88e3.arraystring.124c50889f99ebbe-cgu.0.rcgu.o",
@@ -1276,24 +1276,13 @@
         "bytes-d420e66a095248ff.bytes.f5df772d91f6fe64-cgu.1.rcgu.o",
         "calendrical_calculations-4bcee0166b47f7c1.calendrical_calculations.d851439460bcda2e-cgu.0.rcgu.o",
         "calendrical_calculations-4bcee0166b47f7c1.calendrical_calculations.d851439460bcda2e-cgu.1.rcgu.o",
-        "cert_storage-6899046f6b84d559.cert_storage.135e052435c8c1c1-cgu.0.rcgu.o",
-        "cert_storage-6899046f6b84d559.cert_storage.135e052435c8c1c1-cgu.1.rcgu.o",
-        "cert_storage-6899046f6b84d559.cert_storage.135e052435c8c1c1-cgu.2.rcgu.o",
-        "cert_storage-6899046f6b84d559.cert_storage.135e052435c8c1c1-cgu.3.rcgu.o",
-        "cert_storage-6899046f6b84d559.cert_storage.135e052435c8c1c1-cgu.4.rcgu.o",
+        "cert_storage-46aeef8210975aee.cert_storage.9fe827702b5ec4cd-cgu.0.rcgu.o",
+        "cert_storage-46aeef8210975aee.cert_storage.9fe827702b5ec4cd-cgu.1.rcgu.o",
+        "cert_storage-46aeef8210975aee.cert_storage.9fe827702b5ec4cd-cgu.2.rcgu.o",
+        "cert_storage-46aeef8210975aee.cert_storage.9fe827702b5ec4cd-cgu.3.rcgu.o",
+        "cert_storage-46aeef8210975aee.cert_storage.9fe827702b5ec4cd-cgu.4.rcgu.o",
         "cfg_if-6d9c70a2544d0227.cfg_if.7487f7edeab9d86-cgu.0.rcgu.o",
         "cfg_if-c966e4159bd8bc70.cfg_if.ca8a76409977a004-cgu.0.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.00.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.01.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.02.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.03.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.04.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.05.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.06.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.07.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.08.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.09.rcgu.o",
-        "chrono-91b49229deb83951.chrono.24d0e941549ce160-cgu.10.rcgu.o",
         "clubcard-94928259cba52c6a.clubcard.3de3a07daaf407f2-cgu.0.rcgu.o",
         "clubcard_crlite-abbce1db589ead2a.clubcard_crlite.797d05f2ae9c867d-cgu.00.rcgu.o",
         "clubcard_crlite-abbce1db589ead2a.clubcard_crlite.797d05f2ae9c867d-cgu.01.rcgu.o",
@@ -1585,16 +1574,14 @@
         "core-b5d59729c8525f07.core.37f591cfbe66b0b1-cgu.0.rcgu.o",
         "core_maths-43d839f6952350c7.core_maths.2005660801a24cc3-cgu.0.rcgu.o",
         "cpufeatures-9f349ca1e4d614eb.cpufeatures.d8b1bd543e81cb66-cgu.0.rcgu.o",
-        "crc32fast-46a210009f8419c4.crc32fast.5091e41f7374c094-cgu.0.rcgu.o",
-        "crossbeam_channel-58ce6437fa54177e.crossbeam_channel.f54b1ca324b1f5e1-cgu.0.rcgu.o",
         "crossbeam_utils-c7e0a473591eac05.crossbeam_utils.e18bbb20fc44d581-cgu.0.rcgu.o",
         "crypto_common-6d24e23e77cf4321.crypto_common.61187e286ebd948-cgu.0.rcgu.o",
         "crypto_hash-a0c733ea6a9aaf99.crypto_hash.1211d5b59edf3988-cgu.0.rcgu.o",
         "crypto_hash-a0c733ea6a9aaf99.crypto_hash.1211d5b59edf3988-cgu.1.rcgu.o",
-        "data_storage-666548530929197d.data_storage.8c1dcd9a7719264e-cgu.0.rcgu.o",
-        "data_storage-666548530929197d.data_storage.8c1dcd9a7719264e-cgu.1.rcgu.o",
-        "data_storage-666548530929197d.data_storage.8c1dcd9a7719264e-cgu.2.rcgu.o",
-        "data_storage-666548530929197d.data_storage.8c1dcd9a7719264e-cgu.3.rcgu.o",
+        "data_storage-e842c49f9f9328ef.data_storage.2a0d3f89a7022ac8-cgu.0.rcgu.o",
+        "data_storage-e842c49f9f9328ef.data_storage.2a0d3f89a7022ac8-cgu.1.rcgu.o",
+        "data_storage-e842c49f9f9328ef.data_storage.2a0d3f89a7022ac8-cgu.2.rcgu.o",
+        "data_storage-e842c49f9f9328ef.data_storage.2a0d3f89a7022ac8-cgu.3.rcgu.o",
         "deranged-92a6ca10218315ff.deranged.353e695bb2e5dc13-cgu.0.rcgu.o",
         "digest-44f3669b0796f7ac.digest.8be37ded5c0418e-cgu.0.rcgu.o",
         "diplomat_runtime-944405809281ee40.diplomat_runtime.a11d663a8f35295e-cgu.0.rcgu.o",
@@ -1623,23 +1610,6 @@
         "equivalent-a7a4b2dfe0fa36c8.equivalent.fb20eca82bb233e8-cgu.0.rcgu.o",
         "euclid-0a2e164e106ec039.euclid.4c25f8dfad22550b-cgu.0.rcgu.o",
         "fastrand-3aaceb6322fa70d0.fastrand.db42e08b5988884-cgu.0.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.00.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.01.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.02.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.03.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.04.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.05.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.06.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.07.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.08.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.09.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.10.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.11.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.12.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.13.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.14.rcgu.o",
-        "firefox_on_glean-4d4d06a795985151.firefox_on_glean.e4aa44c9a5cd73ed-cgu.15.rcgu.o",
-        "flate2-0242e76de3df3d52.flate2.3ad5f37f073a3faf-cgu.0.rcgu.o",
         "fluent_langneg-b663c212701647b7.fluent_langneg.aa824a65561b4d3d-cgu.0.rcgu.o",
         "fluent_langneg_ffi-478999fac3b240f7.fluent_langneg_ffi.6e4342d6954eb583-cgu.0.rcgu.o",
         "foldhash-e29a53d0e3a32b1a.foldhash.815571337744eafc-cgu.0.rcgu.o",
@@ -1654,32 +1624,10 @@
         "getrandom-56f3d1fa625f818a.getrandom.120b033337489cec-cgu.0.rcgu.o",
         "getrandom-9d47f91b03d7145e.getrandom.a049f7b73014814b-cgu.0.rcgu.o",
         "gimli-34f31eace0d7245f.gimli.dfc0009c5daac8ab-cgu.0.rcgu.o",
-        "gkrust-c53d8d75c3191750.crnfthi8i6qhit1c3zq8yifn0.rcgu.o",
-        "gkrust-c53d8d75c3191750.gkrust.8e27809ae5ae1470-cgu.0.rcgu.o",
-        "gkrust_naivefox-72d1fe0fe03ab3db.gkrust_naivefox.f734f6e1bc16969a-cgu.0.rcgu.o",
+        "gkrust-6eabd33e09552bac.9u4x8bi0993fjprgkoxpl1v7j.rcgu.o",
+        "gkrust-6eabd33e09552bac.gkrust.dcd3e2c06dfeb76d-cgu.0.rcgu.o",
+        "gkrust_naivefox-099e2a1a46edad69.gkrust_naivefox.b63318c6efdd2c64-cgu.0.rcgu.o",
         "gkrust_utils-688d8f0f1553366e.gkrust_utils.f8c52a7392ae2869-cgu.0.rcgu.o",
-        "glean-44717486492187ae.glean.dc634ca633b5d51b-cgu.0.rcgu.o",
-        "glean-44717486492187ae.glean.dc634ca633b5d51b-cgu.1.rcgu.o",
-        "glean-44717486492187ae.glean.dc634ca633b5d51b-cgu.2.rcgu.o",
-        "glean-44717486492187ae.glean.dc634ca633b5d51b-cgu.3.rcgu.o",
-        "glean-44717486492187ae.glean.dc634ca633b5d51b-cgu.4.rcgu.o",
-        "glean-44717486492187ae.glean.dc634ca633b5d51b-cgu.5.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.00.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.01.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.02.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.03.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.04.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.05.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.06.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.07.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.08.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.09.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.10.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.11.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.12.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.13.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.14.rcgu.o",
-        "glean_core-06ddab8c4ae6e3b1.glean_core.6777a46aacfb367f-cgu.15.rcgu.o",
         "happy_eyeballs-07398b306543d17a.happy_eyeballs.12595b1640f0ae7c-cgu.0.rcgu.o",
         "happy_eyeballs-07398b306543d17a.happy_eyeballs.12595b1640f0ae7c-cgu.1.rcgu.o",
         "happy_eyeballs-07398b306543d17a.happy_eyeballs.12595b1640f0ae7c-cgu.2.rcgu.o",
@@ -1687,14 +1635,11 @@
         "happy_eyeballs-07398b306543d17a.happy_eyeballs.12595b1640f0ae7c-cgu.4.rcgu.o",
         "happy_eyeballs-07398b306543d17a.happy_eyeballs.12595b1640f0ae7c-cgu.5.rcgu.o",
         "happy_eyeballs-07398b306543d17a.happy_eyeballs.12595b1640f0ae7c-cgu.6.rcgu.o",
-        "happy_eyeballs_glue-8fbf5c3e702e2acc.happy_eyeballs_glue.34ba37e45e225a5f-cgu.0.rcgu.o",
-        "happy_eyeballs_glue-8fbf5c3e702e2acc.happy_eyeballs_glue.34ba37e45e225a5f-cgu.1.rcgu.o",
-        "happy_eyeballs_glue-8fbf5c3e702e2acc.happy_eyeballs_glue.34ba37e45e225a5f-cgu.2.rcgu.o",
+        "happy_eyeballs_glue-55ae047b9f591ffd.happy_eyeballs_glue.5d0ca18b9e0971c4-cgu.0.rcgu.o",
         "hashbrown-51d9ae21a16391ba.hashbrown.c42db024a0c43d25-cgu.0.rcgu.o",
         "hashbrown-ae5c34ed0630a0f8.hashbrown.e08ffcff5d7c83a8-cgu.0.rcgu.o",
         "hashbrown-dd019af3807ea407.hashbrown.a7378b4e8d812dea-cgu.0.rcgu.o",
         "hashlink-692373f595e962db.hashlink.724cbcbd7c97208-cgu.0.rcgu.o",
-        "hex-fbac61ae97a2537a.hex.b274e15969c4e58f-cgu.0.rcgu.o",
         "http-1de0ecd9b35d9396.http.aae4d13c9e568c7f-cgu.0.rcgu.o",
         "http-1de0ecd9b35d9396.http.aae4d13c9e568c7f-cgu.1.rcgu.o",
         "http-1de0ecd9b35d9396.http.aae4d13c9e568c7f-cgu.2.rcgu.o",
@@ -1704,7 +1649,6 @@
         "http_sfv-80b9f825054371e3.http_sfv.f880846a5aa7facc-cgu.1.rcgu.o",
         "http_sfv-80b9f825054371e3.http_sfv.f880846a5aa7facc-cgu.2.rcgu.o",
         "http_sfv-80b9f825054371e3.http_sfv.f880846a5aa7facc-cgu.3.rcgu.o",
-        "iana_time_zone-f5c9cd39052471ae.iana_time_zone.e6e0758e3ee6f15-cgu.0.rcgu.o",
         "icu_calendar-8a69714e241d035e.icu_calendar.c0374cc337df6aa7-cgu.0.rcgu.o",
         "icu_calendar-8a69714e241d035e.icu_calendar.c0374cc337df6aa7-cgu.1.rcgu.o",
         "icu_calendar-8a69714e241d035e.icu_calendar.c0374cc337df6aa7-cgu.2.rcgu.o",
@@ -1803,12 +1747,6 @@
         "idna_glue-04fb52e4ba4b5faf.idna_glue.1687fb14174988f7-cgu.0.rcgu.o",
         "idna_glue-04fb52e4ba4b5faf.idna_glue.1687fb14174988f7-cgu.1.rcgu.o",
         "indexmap-e5c6132a1ef5be5c.indexmap.b84449e3a13ecd68-cgu.0.rcgu.o",
-        "ipcclientcerts-34cd744bd0b91adb.ipcclientcerts.24a592998bfb88d3-cgu.0.rcgu.o",
-        "ipcclientcerts-34cd744bd0b91adb.ipcclientcerts.24a592998bfb88d3-cgu.1.rcgu.o",
-        "ipcclientcerts-34cd744bd0b91adb.ipcclientcerts.24a592998bfb88d3-cgu.2.rcgu.o",
-        "ipcclientcerts-34cd744bd0b91adb.ipcclientcerts.24a592998bfb88d3-cgu.3.rcgu.o",
-        "ipcclientcerts-34cd744bd0b91adb.ipcclientcerts.24a592998bfb88d3-cgu.4.rcgu.o",
-        "ipdl_utils-cf32bcd31df60fa3.ipdl_utils.3603d1d98c88dafa-cgu.0.rcgu.o",
         "itoa-3b8d8cba8d2e735e.itoa.f328cfafac8d32e3-cgu.0.rcgu.o",
         "ixdtf-a6b03b98ed1e987a.ixdtf.b0486390547136dd-cgu.0.rcgu.o",
         "jsrust_shared-a81916bbcedf4299.jsrust_shared.6dd6dbe15ef9d941-cgu.0.rcgu.o",
@@ -1819,7 +1757,7 @@
         "libm-60753ba0fa35d828.libm.88ffa5fb7e600d32-cgu.1.rcgu.o",
         "libm-60753ba0fa35d828.libm.88ffa5fb7e600d32-cgu.2.rcgu.o",
         "libm-60753ba0fa35d828.libm.88ffa5fb7e600d32-cgu.3.rcgu.o",
-        "libsqlite3_sys-c54bccf1d370f77a.libsqlite3_sys.8a125ce6209bdcb2-cgu.0.rcgu.o",
+        "libsqlite3_sys-cd173ef575746179.libsqlite3_sys.d346d6bf445da6f3-cgu.0.rcgu.o",
         "linux_raw_sys-ba97724c0543b398.linux_raw_sys.14a943d30a13990e-cgu.0.rcgu.o",
         "litemap-e4c97e9168b8a5f1.litemap.b4ecf65c252caa00-cgu.0.rcgu.o",
         "locale_glue-e3db02c06c957d3e.locale_glue.2c5fb3027dd56d09-cgu.0.rcgu.o",
@@ -1830,9 +1768,6 @@
         "memchr-5338843b9da46083.memchr.c3052ed117561fcc-cgu.0.rcgu.o",
         "memchr-72aefc4607409b3c.memchr.cbe117dba05af251-cgu.0.rcgu.o",
         "memchr-72aefc4607409b3c.memchr.cbe117dba05af251-cgu.1.rcgu.o",
-        "miniz_oxide-09c7ac96091462e1.miniz_oxide.fcb1d3e54b31f27e-cgu.0.rcgu.o",
-        "miniz_oxide-09c7ac96091462e1.miniz_oxide.fcb1d3e54b31f27e-cgu.1.rcgu.o",
-        "miniz_oxide-09c7ac96091462e1.miniz_oxide.fcb1d3e54b31f27e-cgu.2.rcgu.o",
         "miniz_oxide-24b69c27fbe9064f.miniz_oxide.25d2ac20fa75ff7a-cgu.0.rcgu.o",
         "moz_task-1a88394a731421ed.moz_task.8302916292ff31b6-cgu.0.rcgu.o",
         "moz_task-1a88394a731421ed.moz_task.8302916292ff31b6-cgu.1.rcgu.o",
@@ -1843,17 +1778,16 @@
         "neqo_common-f909300e30ff42f5.neqo_common.36cabeb6e8c1ebe5-cgu.0.rcgu.o",
         "neqo_common-f909300e30ff42f5.neqo_common.36cabeb6e8c1ebe5-cgu.1.rcgu.o",
         "neqo_common-f909300e30ff42f5.neqo_common.36cabeb6e8c1ebe5-cgu.2.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.00.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.01.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.02.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.03.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.04.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.05.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.06.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.07.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.08.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.09.rcgu.o",
-        "neqo_glue-8285a464306696bc.neqo_glue.355e522f3d6db2b-cgu.10.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.00.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.01.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.02.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.03.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.04.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.05.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.06.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.07.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.08.rcgu.o",
+        "neqo_glue-dbe798e0f3e4f3d4.neqo_glue.ea1b8b928007baf7-cgu.09.rcgu.o",
         "neqo_http3-ee8e15ba979c9946.neqo_http3.f56e580197b52fcc-cgu.00.rcgu.o",
         "neqo_http3-ee8e15ba979c9946.neqo_http3.f56e580197b52fcc-cgu.01.rcgu.o",
         "neqo_http3-ee8e15ba979c9946.neqo_http3.f56e580197b52fcc-cgu.02.rcgu.o",
@@ -1911,10 +1845,6 @@
         "num_conv-5165fffb19ef3ff8.num_conv.2aba9d9b08516ba-cgu.0.rcgu.o",
         "num_traits-079049f51e1a70b7.num_traits.b15b74c913550e5e-cgu.0.rcgu.o",
         "object-f810d9e1ec7b3602.object.a94530f7628a2afe-cgu.0.rcgu.o",
-        "oblivious_http-38e0880c90c871ad.oblivious_http.203c16eef08d6235-cgu.0.rcgu.o",
-        "ohttp-7e88dd3ce9c3a581.ohttp.9f761a0b5209d726-cgu.0.rcgu.o",
-        "ohttp-7e88dd3ce9c3a581.ohttp.9f761a0b5209d726-cgu.1.rcgu.o",
-        "ohttp-7e88dd3ce9c3a581.ohttp.9f761a0b5209d726-cgu.2.rcgu.o",
         "once_cell-fb710c2c7cd13ed9.once_cell.a2bf45d153d486cd-cgu.0.rcgu.o",
         "ordered_float-310c55c0d77fd765.ordered_float.2313e853302b603d-cgu.0.rcgu.o",
         "panic_abort-ccef00ac2e243a21.panic_abort.24cfb153538e0488-cgu.0.rcgu.o",
@@ -1928,7 +1858,6 @@
         "pkcs11_bindings-c4d5d6be014b4693.pkcs11_bindings.29681821bffbbfe-cgu.0.rcgu.o",
         "potential_utf-86b4baed0f058d0a.potential_utf.127c073db74c2ada-cgu.0.rcgu.o",
         "powerfmt-fa1f930089114191.powerfmt.79dffd9145c811ad-cgu.0.rcgu.o",
-        "ppv_lite86-3eea37e13434d27c.ppv_lite86.4a905a9cdc12d34e-cgu.0.rcgu.o",
         "prefs_parser-d02067c08f4e4864.prefs_parser.93b5e1206f4b52cb-cgu.0.rcgu.o",
         "properties_glue-16f1f70e0f5e7a3c.properties_glue.92a16b24c662f9c6-cgu.0.rcgu.o",
         "qlog-ab9d87575fa2f7b1.qlog.da48cf333246fec3-cgu.00.rcgu.o",
@@ -1945,9 +1874,6 @@
         "qlog-ab9d87575fa2f7b1.qlog.da48cf333246fec3-cgu.11.rcgu.o",
         "quinn_udp-52fae0050afa0a8e.quinn_udp.4af159920ca4b22b-cgu.0.rcgu.o",
         "qwac_trust_anchors-f93b4a8d345f7274.qwac_trust_anchors.26b8769a20a19005-cgu.0.rcgu.o",
-        "rand-13188d3e5413cc9e.rand.59bc936fe2609318-cgu.0.rcgu.o",
-        "rand_chacha-9fd47d0612353837.rand_chacha.fbdf49b727eb5ee2-cgu.0.rcgu.o",
-        "rand_core-c9d567dc2b82b730.rand_core.9b9f9fd1f8881f66-cgu.0.rcgu.o",
         "ref_cast-a319ccb4e15397cd.ref_cast.203e80e5cf7a4a62-cgu.0.rcgu.o",
         "regex-2f546dee6c706e83.regex.95fcd14b7d9c34bc-cgu.0.rcgu.o",
         "regex-2f546dee6c706e83.regex.95fcd14b7d9c34bc-cgu.1.rcgu.o",
@@ -1984,19 +1910,16 @@
         "regex_syntax-86f3efd6e9b59488.regex_syntax.ba338e477ad80008-cgu.13.rcgu.o",
         "regex_syntax-86f3efd6e9b59488.regex_syntax.ba338e477ad80008-cgu.14.rcgu.o",
         "regex_syntax-86f3efd6e9b59488.regex_syntax.ba338e477ad80008-cgu.15.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.00.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.01.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.02.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.03.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.04.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.05.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.06.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.07.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.08.rcgu.o",
-        "rkv-5dfdf4b5debe9684.rkv.ab0d29a16999c0fa-cgu.09.rcgu.o",
-        "rsclientcerts-8358a37771360e93.rsclientcerts.bbc13ccf5a72408-cgu.0.rcgu.o",
-        "rsclientcerts-8358a37771360e93.rsclientcerts.bbc13ccf5a72408-cgu.1.rcgu.o",
-        "rsclientcerts_util-8e3162a8f70c000b.rsclientcerts_util.3a4f1d673fec6be3-cgu.0.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.00.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.01.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.02.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.03.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.04.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.05.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.06.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.07.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.08.rcgu.o",
+        "rkv-d40db234a66f1531.rkv.75912b6db12867e4-cgu.09.rcgu.o",
         "rustc_demangle-73bcb43673848f30.rustc_demangle.ef7cce9dbef1cca7-cgu.0.rcgu.o",
         "rustc_hash-23b99a0bdd791fe2.rustc_hash.90de69cd613c0410-cgu.0.rcgu.o",
         "rustc_std_workspace_alloc-99955b4d3549c390.rustc_std_workspace_alloc.72f1d2b17b1ec12d-cgu.0.rcgu.o",
@@ -2033,7 +1956,6 @@
         "sharded_slab-e6a3a2a9f0788e04.sharded_slab.b05eb2f401a3350b-cgu.0.rcgu.o",
         "signature_cache-bd164bc94b483f38.signature_cache.da8ffaf1bb8f9468-cgu.0.rcgu.o",
         "signature_cache-bd164bc94b483f38.signature_cache.da8ffaf1bb8f9468-cgu.1.rcgu.o",
-        "simd_adler32-7b61dc584cb56a1d.simd_adler32.46b71f9103247ef7-cgu.0.rcgu.o",
         "smallvec-0768b7bfdd9c4574.smallvec.6e7b671315bd9183-cgu.0.rcgu.o",
         "socket2-3ef553b80c91afbf.socket2.9fa2eebd8ce0fb3d-cgu.0.rcgu.o",
         "socket2-3ef553b80c91afbf.socket2.9fa2eebd8ce0fb3d-cgu.1.rcgu.o",
@@ -2139,14 +2061,12 @@
         "utf16_iter-42744fa2af66adf1.utf16_iter.cd6eecd4913c6e9e-cgu.0.rcgu.o",
         "utf8_iter-7e5c39cd88758f58.utf8_iter.2087eacf6fbc02b5-cgu.0.rcgu.o",
         "uuid-d1868ef7992f6af3.uuid.9a8f146db281938-cgu.0.rcgu.o",
-        "whatsys-103396fbb022f8cb.whatsys.d8d5ab0950a90305-cgu.0.rcgu.o",
-        "wr_malloc_size_of-15aace0b41387b1d.wr_malloc_size_of.357b33b3b3343d77-cgu.0.rcgu.o",
+        "wr_malloc_size_of-ac064b34da2fb23e.wr_malloc_size_of.82e72b0faa2cd837-cgu.0.rcgu.o",
         "write16-96571df6d7131db9.write16.9d05a4a13fa724e2-cgu.0.rcgu.o",
         "writeable-1c62229fd38d0436.writeable.5c2ec26606b46c1b-cgu.0.rcgu.o",
         "xmldecl-c53f6525ae9c2ec1.xmldecl.ad27f41ae1d23491-cgu.0.rcgu.o",
         "xpcom-4385068d029def2b.xpcom.ac7bab049bc2c97e-cgu.0.rcgu.o",
         "yoke-8b577b1a5bbb8648.yoke.3501ff94b4ce1d44-cgu.0.rcgu.o",
-        "zeitstempel-989f71083b65becf.zeitstempel.fad602ccbe1d5c61-cgu.0.rcgu.o",
         "zerofrom-50b8f5f06ea1a66b.zerofrom.414f2b58e47339bb-cgu.0.rcgu.o",
         "zeroize-c6a8728e427ef458.zeroize.ec39e8d570fb4cb4-cgu.0.rcgu.o",
         "zerotrie-854ddd93f07ce052.zerotrie.4a013a0376b9c28b-cgu.0.rcgu.o",
@@ -2202,8 +2122,8 @@
   ],
   "rust_closure": {
     "platform_filter": "x86_64-unknown-linux-gnu",
-    "root_package": "gkrust",
-    "reachable_crates_count": 366,
+    "root_package": "gkrust-naivefox",
+    "reachable_crates_count": 271,
     "crates": [
       {
         "name": "abridged_certs",
@@ -2230,24 +2150,6 @@
         "manifest_path": "third_party/rust/aho-corasick/Cargo.toml",
         "source_paths": [
           "third_party/rust/aho-corasick/src/lib.rs"
-        ]
-      },
-      {
-        "name": "allocator-api2",
-        "version": "0.2.21",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/allocator-api2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/allocator-api2/src/lib.rs"
-        ]
-      },
-      {
-        "name": "anstyle",
-        "version": "1.0.8",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/anstyle/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/anstyle/src/lib.rs"
         ]
       },
       {
@@ -2306,57 +2208,12 @@
         ]
       },
       {
-        "name": "askama",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/askama/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/askama/src/lib.rs"
-        ]
-      },
-      {
-        "name": "askama_derive",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/askama_derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/askama_derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "askama_parser",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/askama_parser/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/askama_parser/src/lib.rs"
-        ]
-      },
-      {
         "name": "async-task",
         "version": "4.3.0",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/async-task/Cargo.toml",
         "source_paths": [
           "third_party/rust/async-task/src/lib.rs"
-        ]
-      },
-      {
-        "name": "atomic_refcell",
-        "version": "0.1.9",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/atomic_refcell/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/atomic_refcell/src/lib.rs"
-        ]
-      },
-      {
-        "name": "autocfg",
-        "version": "1.1.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/autocfg/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/autocfg/src/lib.rs"
         ]
       },
       {
@@ -2375,15 +2232,6 @@
         "manifest_path": "third_party/rust/base64/Cargo.toml",
         "source_paths": [
           "third_party/rust/base64/src/lib.rs"
-        ]
-      },
-      {
-        "name": "basic-toml",
-        "version": "0.1.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/basic-toml/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/basic-toml/src/lib.rs"
         ]
       },
       {
@@ -2411,25 +2259,6 @@
         "manifest_path": "third_party/rust/bincode/Cargo.toml",
         "source_paths": [
           "third_party/rust/bincode/src/lib.rs"
-        ]
-      },
-      {
-        "name": "bindgen",
-        "version": "0.72.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/bindgen/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/bindgen/build.rs",
-          "third_party/rust/bindgen/lib.rs"
-        ]
-      },
-      {
-        "name": "bindgen",
-        "version": "0.69.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/bindgen/Cargo.toml",
-        "source_paths": [
-          "build/rust/bindgen/lib.rs"
         ]
       },
       {
@@ -2506,15 +2335,6 @@
         ]
       },
       {
-        "name": "cc",
-        "version": "1.2.30",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/cc/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/cc/src/lib.rs"
-        ]
-      },
-      {
         "name": "cert_storage",
         "version": "0.0.1",
         "source_type": "in-tree-component",
@@ -2524,86 +2344,12 @@
         ]
       },
       {
-        "name": "cexpr",
-        "version": "0.6.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/cexpr/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/cexpr/src/lib.rs"
-        ]
-      },
-      {
         "name": "cfg-if",
         "version": "1.0.0",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/cfg-if/Cargo.toml",
         "source_paths": [
           "third_party/rust/cfg-if/src/lib.rs"
-        ]
-      },
-      {
-        "name": "cfg_aliases",
-        "version": "0.2.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/cfg_aliases/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/cfg_aliases/src/lib.rs"
-        ]
-      },
-      {
-        "name": "chrono",
-        "version": "0.4.42",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/chrono/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/chrono/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clang-sys",
-        "version": "1.7.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clang-sys/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clang-sys/build.rs",
-          "third_party/rust/clang-sys/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap",
-        "version": "4.5.16",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap/src/bin/stdio-fixture.rs",
-          "third_party/rust/clap/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap_builder",
-        "version": "4.5.15",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap_builder/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap_builder/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap_derive",
-        "version": "4.5.13",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap_derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap_derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap_lex",
-        "version": "0.7.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap_lex/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap_lex/src/lib.rs"
         ]
       },
       {
@@ -2649,43 +2395,6 @@
         "manifest_path": "third_party/rust/cpufeatures/Cargo.toml",
         "source_paths": [
           "third_party/rust/cpufeatures/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crc32fast",
-        "version": "1.4.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crc32fast/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crc32fast/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crossbeam-channel",
-        "version": "0.5.15",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crossbeam-channel/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crossbeam-channel/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crossbeam-deque",
-        "version": "0.8.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crossbeam-deque/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crossbeam-deque/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crossbeam-epoch",
-        "version": "0.9.20",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crossbeam-epoch/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crossbeam-epoch/build.rs",
-          "third_party/rust/crossbeam-epoch/src/lib.rs"
         ]
       },
       {
@@ -2852,15 +2561,6 @@
         ]
       },
       {
-        "name": "dom",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "dom/base/rust/Cargo.toml",
-        "source_paths": [
-          "dom/base/rust/lib.rs"
-        ]
-      },
-      {
         "name": "dtoa",
         "version": "0.4.8",
         "source_type": "vendored",
@@ -2876,15 +2576,6 @@
         "manifest_path": "third_party/rust/dtoa-short/Cargo.toml",
         "source_paths": [
           "third_party/rust/dtoa-short/src/lib.rs"
-        ]
-      },
-      {
-        "name": "either",
-        "version": "1.8.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/either/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/either/src/lib.rs"
         ]
       },
       {
@@ -2980,15 +2671,6 @@
         ]
       },
       {
-        "name": "errno",
-        "version": "0.3.14",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/errno/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/errno/src/lib.rs"
-        ]
-      },
-      {
         "name": "error-support",
         "version": "0.1.0",
         "source_type": "in-tree",
@@ -3016,48 +2698,12 @@
         ]
       },
       {
-        "name": "fallible-iterator",
-        "version": "0.3.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/fallible-iterator/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/fallible-iterator/src/lib.rs"
-        ]
-      },
-      {
-        "name": "fallible-streaming-iterator",
-        "version": "0.1.9",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/fallible-streaming-iterator/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/fallible-streaming-iterator/src/lib.rs"
-        ]
-      },
-      {
         "name": "fastrand",
         "version": "2.1.1",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/fastrand/Cargo.toml",
         "source_paths": [
           "third_party/rust/fastrand/src/lib.rs"
-        ]
-      },
-      {
-        "name": "firefox-on-glean",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "toolkit/components/glean/api/Cargo.toml",
-        "source_paths": [
-          "toolkit/components/glean/api/src/lib.rs"
-        ]
-      },
-      {
-        "name": "flate2",
-        "version": "1.1.4",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/flate2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/flate2/src/lib.rs"
         ]
       },
       {
@@ -3115,16 +2761,6 @@
         ]
       },
       {
-        "name": "gecko-profiler",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "tools/profiler/rust-api/Cargo.toml",
-        "source_paths": [
-          "tools/profiler/rust-api/build.rs",
-          "tools/profiler/rust-api/src/lib.rs"
-        ]
-      },
-      {
         "name": "gecko_logger",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -3172,15 +2808,6 @@
         ]
       },
       {
-        "name": "gkrust",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "toolkit/library/rust/Cargo.toml",
-        "source_paths": [
-          "toolkit/library/rust/lib.rs"
-        ]
-      },
-      {
         "name": "gkrust-naivefox",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -3196,52 +2823,6 @@
         "manifest_path": "xpcom/rust/gkrust_utils/Cargo.toml",
         "source_paths": [
           "xpcom/rust/gkrust_utils/src/lib.rs"
-        ]
-      },
-      {
-        "name": "glean",
-        "version": "68.0.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/glean/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/glean/src/lib.rs"
-        ]
-      },
-      {
-        "name": "glean-core",
-        "version": "68.0.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/glean-core/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/glean-core/build.rs",
-          "third_party/rust/glean-core/src/lib.rs"
-        ]
-      },
-      {
-        "name": "glob",
-        "version": "0.3.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/glob/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/glob/src/lib.rs"
-        ]
-      },
-      {
-        "name": "goblin",
-        "version": "0.8.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/goblin/Cargo.toml",
-        "source_paths": [
-          "build/rust/goblin/lib.rs"
-        ]
-      },
-      {
-        "name": "goblin",
-        "version": "0.9.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/goblin/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/goblin/src/lib.rs"
         ]
       },
       {
@@ -3263,15 +2844,6 @@
         ]
       },
       {
-        "name": "harfbuzz-traits",
-        "version": "0.6.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/harfbuzz-traits/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/harfbuzz-traits/src/lib.rs"
-        ]
-      },
-      {
         "name": "hashbrown",
         "version": "0.16.999",
         "source_type": "in-tree",
@@ -3287,15 +2859,6 @@
         "manifest_path": "third_party/rust/hashbrown/Cargo.toml",
         "source_paths": [
           "third_party/rust/hashbrown/src/lib.rs"
-        ]
-      },
-      {
-        "name": "hashlink",
-        "version": "0.10.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/hashlink/Cargo.toml",
-        "source_paths": [
-          "build/rust/hashlink/lib.rs"
         ]
       },
       {
@@ -3341,15 +2904,6 @@
         "manifest_path": "netwerk/base/http-sfv/Cargo.toml",
         "source_paths": [
           "netwerk/base/http-sfv/src/lib.rs"
-        ]
-      },
-      {
-        "name": "iana-time-zone",
-        "version": "0.1.64",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/iana-time-zone/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/iana-time-zone/src/lib.rs"
         ]
       },
       {
@@ -3593,42 +3147,6 @@
         ]
       },
       {
-        "name": "inherent",
-        "version": "1.0.7",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/inherent/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/inherent/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ipcclientcerts",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/ipcclientcerts/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/ipcclientcerts/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ipdl_utils",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "ipc/rust/ipdl_utils/Cargo.toml",
-        "source_paths": [
-          "ipc/rust/ipdl_utils/lib.rs"
-        ]
-      },
-      {
-        "name": "itertools",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/itertools/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/itertools/src/lib.rs"
-        ]
-      },
-      {
         "name": "itoa",
         "version": "1.0.15",
         "source_type": "vendored",
@@ -3672,15 +3190,6 @@
         "source_paths": [
           "third_party/rust/libc/build.rs",
           "third_party/rust/libc/src/lib.rs"
-        ]
-      },
-      {
-        "name": "libloading",
-        "version": "0.8.6",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/libloading/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/libloading/src/lib.rs"
         ]
       },
       {
@@ -3792,24 +3301,6 @@
         "manifest_path": "third_party/rust/memchr/Cargo.toml",
         "source_paths": [
           "third_party/rust/memchr/src/lib.rs"
-        ]
-      },
-      {
-        "name": "minimal-lexical",
-        "version": "0.2.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/minimal-lexical/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/minimal-lexical/src/lib.rs"
-        ]
-      },
-      {
-        "name": "miniz_oxide",
-        "version": "0.8.9",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/miniz_oxide/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/miniz_oxide/src/lib.rs"
         ]
       },
       {
@@ -3936,15 +3427,6 @@
         ]
       },
       {
-        "name": "nom",
-        "version": "7.1.3",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/nom/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/nom/src/lib.rs"
-        ]
-      },
-      {
         "name": "normalizer_glue",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -3991,24 +3473,6 @@
         ]
       },
       {
-        "name": "num-derive",
-        "version": "0.4.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/num-derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/num-derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "num-integer",
-        "version": "0.1.46",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/num-integer/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/num-integer/src/lib.rs"
-        ]
-      },
-      {
         "name": "num-traits",
         "version": "0.2.19",
         "source_type": "vendored",
@@ -4016,34 +3480,6 @@
         "source_paths": [
           "third_party/rust/num-traits/build.rs",
           "third_party/rust/num-traits/src/lib.rs"
-        ]
-      },
-      {
-        "name": "num_cpus",
-        "version": "1.16.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/num_cpus/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/num_cpus/src/lib.rs"
-        ]
-      },
-      {
-        "name": "oblivious_http",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "netwerk/protocol/http/oblivious_http/Cargo.toml",
-        "source_paths": [
-          "netwerk/protocol/http/oblivious_http/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ohttp",
-        "version": "0.7.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/ohttp/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/ohttp/build.rs",
-          "third_party/rust/ohttp/src/lib.rs"
         ]
       },
       {
@@ -4112,15 +3548,6 @@
         ]
       },
       {
-        "name": "phf_codegen",
-        "version": "0.13.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/phf_codegen/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/phf_codegen/src/lib.rs"
-        ]
-      },
-      {
         "name": "phf_generator",
         "version": "0.13.1",
         "source_type": "vendored",
@@ -4168,24 +3595,6 @@
         ]
       },
       {
-        "name": "pkg-config",
-        "version": "0.3.26",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/pkg-config/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/pkg-config/src/lib.rs"
-        ]
-      },
-      {
-        "name": "plain",
-        "version": "0.2.3",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/plain/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/plain/src/lib.rs"
-        ]
-      },
-      {
         "name": "potential_utf",
         "version": "0.1.4",
         "source_type": "vendored",
@@ -4201,15 +3610,6 @@
         "manifest_path": "third_party/rust/powerfmt/Cargo.toml",
         "source_paths": [
           "third_party/rust/powerfmt/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ppv-lite86",
-        "version": "0.2.17",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/ppv-lite86/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/ppv-lite86/src/lib.rs"
         ]
       },
       {
@@ -4238,15 +3638,6 @@
         "source_paths": [
           "third_party/rust/proc-macro2/build.rs",
           "third_party/rust/proc-macro2/src/lib.rs"
-        ]
-      },
-      {
-        "name": "profiler-macros",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "tools/profiler/rust-api/macros/Cargo.toml",
-        "source_paths": [
-          "tools/profiler/rust-api/macros/src/lib.rs"
         ]
       },
       {
@@ -4294,52 +3685,6 @@
         "source_paths": [
           "security/manager/ssl/qwac_trust_anchors/build.rs",
           "security/manager/ssl/qwac_trust_anchors/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rand",
-        "version": "0.8.6",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rand/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rand/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rand_chacha",
-        "version": "0.3.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rand_chacha/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rand_chacha/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rand_core",
-        "version": "0.6.4",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rand_core/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rand_core/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rayon",
-        "version": "1.10.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rayon/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rayon/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rayon-core",
-        "version": "1.12.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rayon-core/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rayon-core/build.rs",
-          "third_party/rust/rayon-core/src/lib.rs"
         ]
       },
       {
@@ -4398,48 +3743,12 @@
         ]
       },
       {
-        "name": "rsclientcerts",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/rsclientcerts/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/rsclientcerts/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rsclientcerts-util",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/rsclientcerts-util/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/rsclientcerts-util/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rusqlite",
-        "version": "0.37.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rusqlite/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rusqlite/src/lib.rs"
-        ]
-      },
-      {
         "name": "rustc-hash",
         "version": "2.1.1",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/rustc-hash/Cargo.toml",
         "source_paths": [
           "third_party/rust/rustc-hash/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rustc_version",
-        "version": "0.4.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rustc_version/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rustc_version/src/lib.rs"
         ]
       },
       {
@@ -4463,39 +3772,12 @@
         ]
       },
       {
-        "name": "same-file",
-        "version": "1.0.6",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/same-file/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/same-file/src/lib.rs"
-        ]
-      },
-      {
         "name": "scopeguard",
         "version": "1.1.0",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/scopeguard/Cargo.toml",
         "source_paths": [
           "third_party/rust/scopeguard/src/lib.rs"
-        ]
-      },
-      {
-        "name": "scroll",
-        "version": "0.12.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/scroll/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/scroll/src/lib.rs"
-        ]
-      },
-      {
-        "name": "scroll_derive",
-        "version": "0.12.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/scroll_derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/scroll_derive/src/lib.rs"
         ]
       },
       {
@@ -4630,30 +3912,12 @@
         ]
       },
       {
-        "name": "shlex",
-        "version": "1.3.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/shlex/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/shlex/src/lib.rs"
-        ]
-      },
-      {
         "name": "signature_cache",
         "version": "0.1.0",
         "source_type": "in-tree-component",
         "manifest_path": "security/certverifier/signature_cache/Cargo.toml",
         "source_paths": [
           "security/certverifier/signature_cache/src/lib.rs"
-        ]
-      },
-      {
-        "name": "simd-adler32",
-        "version": "0.3.7",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/simd-adler32/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/simd-adler32/src/lib.rs"
         ]
       },
       {
@@ -4681,15 +3945,6 @@
         "manifest_path": "third_party/rust/smallvec/Cargo.toml",
         "source_paths": [
           "third_party/rust/smallvec/src/lib.rs"
-        ]
-      },
-      {
-        "name": "smawk",
-        "version": "0.3.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/smawk/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/smawk/src/lib.rs"
         ]
       },
       {
@@ -4792,43 +4047,6 @@
         ]
       },
       {
-        "name": "style",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/style/Cargo.toml",
-        "source_paths": [
-          "servo/components/style/build.rs",
-          "servo/components/style/lib.rs"
-        ]
-      },
-      {
-        "name": "style_derive",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/style_derive/Cargo.toml",
-        "source_paths": [
-          "servo/components/style_derive/lib.rs"
-        ]
-      },
-      {
-        "name": "style_traits",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/style_traits/Cargo.toml",
-        "source_paths": [
-          "servo/components/style_traits/lib.rs"
-        ]
-      },
-      {
-        "name": "stylo_tests",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/ports/geckolib/tests/Cargo.toml",
-        "source_paths": [
-          "servo/ports/geckolib/tests/lib.rs"
-        ]
-      },
-      {
         "name": "syn",
         "version": "2.0.106",
         "source_type": "vendored",
@@ -4862,24 +4080,6 @@
         "manifest_path": "third_party/rust/termcolor/Cargo.toml",
         "source_paths": [
           "third_party/rust/termcolor/src/lib.rs"
-        ]
-      },
-      {
-        "name": "terminal_size",
-        "version": "0.3.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/terminal_size/Cargo.toml",
-        "source_paths": [
-          "build/rust/terminal_size/lib.rs"
-        ]
-      },
-      {
-        "name": "textwrap",
-        "version": "0.16.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/textwrap/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/textwrap/src/lib.rs"
         ]
       },
       {
@@ -4947,48 +4147,12 @@
         ]
       },
       {
-        "name": "time-macros",
-        "version": "0.2.27",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/time-macros/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/time-macros/src/lib.rs"
-        ]
-      },
-      {
         "name": "tinystr",
         "version": "0.8.1",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/tinystr/Cargo.toml",
         "source_paths": [
           "third_party/rust/tinystr/src/lib.rs"
-        ]
-      },
-      {
-        "name": "to_shmem",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/to_shmem/Cargo.toml",
-        "source_paths": [
-          "servo/components/to_shmem/lib.rs"
-        ]
-      },
-      {
-        "name": "to_shmem_derive",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/to_shmem_derive/Cargo.toml",
-        "source_paths": [
-          "servo/components/to_shmem_derive/lib.rs"
-        ]
-      },
-      {
-        "name": "toml",
-        "version": "0.5.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/toml/Cargo.toml",
-        "source_paths": [
-          "build/rust/toml/lib.rs"
         ]
       },
       {
@@ -5073,15 +4237,6 @@
         ]
       },
       {
-        "name": "trust-anchor-build-util",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/trust-anchor-build-util/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/trust-anchor-build-util/src/lib.rs"
-        ]
-      },
-      {
         "name": "trust-anchors",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -5099,15 +4254,6 @@
         "source_paths": [
           "third_party/rust/typenum/build/main.rs",
           "third_party/rust/typenum/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uluru",
-        "version": "3.0.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uluru/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uluru/src/lib.rs"
         ]
       },
       {
@@ -5178,24 +4324,6 @@
         ]
       },
       {
-        "name": "uniffi_bindgen",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_bindgen/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_bindgen/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uniffi_build",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_build/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_build/src/lib.rs"
-        ]
-      },
-      {
         "name": "uniffi_core",
         "version": "0.31.0",
         "source_type": "vendored",
@@ -5238,24 +4366,6 @@
         "manifest_path": "third_party/rust/uniffi_pipeline/Cargo.toml",
         "source_paths": [
           "third_party/rust/uniffi_pipeline/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uniffi_testing",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_testing/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_testing/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uniffi_udl",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_udl/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_udl/src/lib.rs"
         ]
       },
       {
@@ -5331,58 +4441,12 @@
         ]
       },
       {
-        "name": "vcpkg",
-        "version": "0.2.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/vcpkg/Cargo.toml",
-        "source_paths": [
-          "build/rust/vcpkg/lib.rs"
-        ]
-      },
-      {
-        "name": "version_check",
-        "version": "0.9.4",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/version_check/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/version_check/src/lib.rs"
-        ]
-      },
-      {
         "name": "void",
         "version": "1.0.2",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/void/Cargo.toml",
         "source_paths": [
           "third_party/rust/void/src/lib.rs"
-        ]
-      },
-      {
-        "name": "walkdir",
-        "version": "2.3.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/walkdir/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/walkdir/src/lib.rs"
-        ]
-      },
-      {
-        "name": "weedle2",
-        "version": "5.0.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/weedle2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/weedle2/src/lib.rs"
-        ]
-      },
-      {
-        "name": "whatsys",
-        "version": "0.3.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/whatsys/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/whatsys/build.rs",
-          "third_party/rust/whatsys/src/lib.rs"
         ]
       },
       {
@@ -5464,15 +4528,6 @@
         "manifest_path": "third_party/rust/yoke-derive/Cargo.toml",
         "source_paths": [
           "third_party/rust/yoke-derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "zeitstempel",
-        "version": "0.2.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/zeitstempel/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/zeitstempel/src/lib.rs"
         ]
       },
       {
@@ -6109,16 +5164,9 @@
     ],
     "cargo_manifests": [
       "build/rust/base64/Cargo.toml",
-      "build/rust/bindgen/Cargo.toml",
       "build/rust/getrandom/Cargo.toml",
-      "build/rust/goblin/Cargo.toml",
       "build/rust/hashbrown/Cargo.toml",
-      "build/rust/hashlink/Cargo.toml",
       "build/rust/mozbuild/Cargo.toml",
-      "build/rust/terminal_size/Cargo.toml",
-      "build/rust/toml/Cargo.toml",
-      "build/rust/vcpkg/Cargo.toml",
-      "dom/base/rust/Cargo.toml",
       "gfx/wr/wr_malloc_size_of/Cargo.toml",
       "intl/app_collator_glue/Cargo.toml",
       "intl/bidi/rust/unicode-bidi-ffi/Cargo.toml",
@@ -6128,7 +5176,6 @@
       "intl/locale/rust/fluent-langneg-ffi/Cargo.toml",
       "intl/locale/rust/locale_service_glue/Cargo.toml",
       "intl/locale/rust/unic-langid-ffi/Cargo.toml",
-      "ipc/rust/ipdl_utils/Cargo.toml",
       "js/src/builtin/intl/collator_glue/Cargo.toml",
       "js/src/builtin/intl/locale_glue/Cargo.toml",
       "js/src/builtin/normalizer_glue/Cargo.toml",
@@ -6146,29 +5193,18 @@
       "netwerk/base/urlpattern_glue/Cargo.toml",
       "netwerk/protocol/http/binary_http/Cargo.toml",
       "netwerk/protocol/http/happy_eyeballs_glue/Cargo.toml",
-      "netwerk/protocol/http/oblivious_http/Cargo.toml",
       "netwerk/socket/neqo_glue/Cargo.toml",
       "security/certverifier/signature_cache/Cargo.toml",
       "security/manager/ssl/abridged_certs/Cargo.toml",
       "security/manager/ssl/cert_storage/Cargo.toml",
       "security/manager/ssl/crypto_hash/Cargo.toml",
       "security/manager/ssl/data_storage/Cargo.toml",
-      "security/manager/ssl/ipcclientcerts/Cargo.toml",
       "security/manager/ssl/pdf_trust_anchors/Cargo.toml",
       "security/manager/ssl/qwac_trust_anchors/Cargo.toml",
-      "security/manager/ssl/rsclientcerts-util/Cargo.toml",
-      "security/manager/ssl/rsclientcerts/Cargo.toml",
-      "security/manager/ssl/trust-anchor-build-util/Cargo.toml",
       "security/manager/ssl/trust_anchors/Cargo.toml",
       "servo/components/malloc_size_of/Cargo.toml",
       "servo/components/selectors/Cargo.toml",
       "servo/components/servo_arc/Cargo.toml",
-      "servo/components/style/Cargo.toml",
-      "servo/components/style_derive/Cargo.toml",
-      "servo/components/style_traits/Cargo.toml",
-      "servo/components/to_shmem/Cargo.toml",
-      "servo/components/to_shmem_derive/Cargo.toml",
-      "servo/ports/geckolib/tests/Cargo.toml",
       "storage/rust/Cargo.toml",
       "storage/variant/Cargo.toml",
       "third_party/application-services/components/support/error/Cargo.toml",
@@ -6176,24 +5212,15 @@
       "third_party/application-services/components/support/tracing/Cargo.toml",
       "third_party/rust/adler2/Cargo.toml",
       "third_party/rust/aho-corasick/Cargo.toml",
-      "third_party/rust/allocator-api2/Cargo.toml",
-      "third_party/rust/anstyle/Cargo.toml",
       "third_party/rust/anyhow/Cargo.toml",
       "third_party/rust/app_units/Cargo.toml",
       "third_party/rust/arrayref/Cargo.toml",
       "third_party/rust/arraystring/Cargo.toml",
       "third_party/rust/arrayvec/Cargo.toml",
-      "third_party/rust/askama/Cargo.toml",
-      "third_party/rust/askama_derive/Cargo.toml",
-      "third_party/rust/askama_parser/Cargo.toml",
       "third_party/rust/async-task/Cargo.toml",
-      "third_party/rust/atomic_refcell/Cargo.toml",
-      "third_party/rust/autocfg/Cargo.toml",
       "third_party/rust/base64/Cargo.toml",
-      "third_party/rust/basic-toml/Cargo.toml",
       "third_party/rust/bhttp/Cargo.toml",
       "third_party/rust/bincode/Cargo.toml",
-      "third_party/rust/bindgen/Cargo.toml",
       "third_party/rust/bitflags/Cargo.toml",
       "third_party/rust/block-buffer/Cargo.toml",
       "third_party/rust/byteorder/Cargo.toml",
@@ -6202,24 +5229,11 @@
       "third_party/rust/camino/Cargo.toml",
       "third_party/rust/cargo-platform/Cargo.toml",
       "third_party/rust/cargo_metadata/Cargo.toml",
-      "third_party/rust/cc/Cargo.toml",
-      "third_party/rust/cexpr/Cargo.toml",
       "third_party/rust/cfg-if/Cargo.toml",
-      "third_party/rust/cfg_aliases/Cargo.toml",
-      "third_party/rust/chrono/Cargo.toml",
-      "third_party/rust/clang-sys/Cargo.toml",
-      "third_party/rust/clap/Cargo.toml",
-      "third_party/rust/clap_builder/Cargo.toml",
-      "third_party/rust/clap_derive/Cargo.toml",
-      "third_party/rust/clap_lex/Cargo.toml",
       "third_party/rust/clubcard-crlite/Cargo.toml",
       "third_party/rust/clubcard/Cargo.toml",
       "third_party/rust/core_maths/Cargo.toml",
       "third_party/rust/cpufeatures/Cargo.toml",
-      "third_party/rust/crc32fast/Cargo.toml",
-      "third_party/rust/crossbeam-channel/Cargo.toml",
-      "third_party/rust/crossbeam-deque/Cargo.toml",
-      "third_party/rust/crossbeam-epoch/Cargo.toml",
       "third_party/rust/crossbeam-utils/Cargo.toml",
       "third_party/rust/crypto-common/Cargo.toml",
       "third_party/rust/cssparser-macros/Cargo.toml",
@@ -6238,7 +5252,6 @@
       "third_party/rust/displaydoc/Cargo.toml",
       "third_party/rust/dtoa-short/Cargo.toml",
       "third_party/rust/dtoa/Cargo.toml",
-      "third_party/rust/either/Cargo.toml",
       "third_party/rust/encoding_c/Cargo.toml",
       "third_party/rust/encoding_c_mem/Cargo.toml",
       "third_party/rust/encoding_rs/Cargo.toml",
@@ -6248,12 +5261,8 @@
       "third_party/rust/enumset_derive/Cargo.toml",
       "third_party/rust/env_logger/Cargo.toml",
       "third_party/rust/equivalent/Cargo.toml",
-      "third_party/rust/errno/Cargo.toml",
       "third_party/rust/euclid/Cargo.toml",
-      "third_party/rust/fallible-iterator/Cargo.toml",
-      "third_party/rust/fallible-streaming-iterator/Cargo.toml",
       "third_party/rust/fastrand/Cargo.toml",
-      "third_party/rust/flate2/Cargo.toml",
       "third_party/rust/fluent-langneg/Cargo.toml",
       "third_party/rust/fnv/Cargo.toml",
       "third_party/rust/foldhash/Cargo.toml",
@@ -6261,18 +5270,12 @@
       "third_party/rust/fs-err/Cargo.toml",
       "third_party/rust/generic-array/Cargo.toml",
       "third_party/rust/getrandom/Cargo.toml",
-      "third_party/rust/glean-core/Cargo.toml",
-      "third_party/rust/glean/Cargo.toml",
-      "third_party/rust/glob/Cargo.toml",
-      "third_party/rust/goblin/Cargo.toml",
       "third_party/rust/happy-eyeballs/Cargo.toml",
-      "third_party/rust/harfbuzz-traits/Cargo.toml",
       "third_party/rust/hashbrown/Cargo.toml",
       "third_party/rust/hashlink/Cargo.toml",
       "third_party/rust/heck/Cargo.toml",
       "third_party/rust/hex/Cargo.toml",
       "third_party/rust/http/Cargo.toml",
-      "third_party/rust/iana-time-zone/Cargo.toml",
       "third_party/rust/icu_calendar/Cargo.toml",
       "third_party/rust/icu_calendar_data/Cargo.toml",
       "third_party/rust/icu_casemap/Cargo.toml",
@@ -6296,13 +5299,10 @@
       "third_party/rust/idna/Cargo.toml",
       "third_party/rust/idna_adapter/Cargo.toml",
       "third_party/rust/indexmap/Cargo.toml",
-      "third_party/rust/inherent/Cargo.toml",
-      "third_party/rust/itertools/Cargo.toml",
       "third_party/rust/itoa/Cargo.toml",
       "third_party/rust/ixdtf/Cargo.toml",
       "third_party/rust/lazy_static/Cargo.toml",
       "third_party/rust/libc/Cargo.toml",
-      "third_party/rust/libloading/Cargo.toml",
       "third_party/rust/libm/Cargo.toml",
       "third_party/rust/libsqlite3-sys/Cargo.toml",
       "third_party/rust/linux-raw-sys/Cargo.toml",
@@ -6311,8 +5311,6 @@
       "third_party/rust/log/Cargo.toml",
       "third_party/rust/md-5/Cargo.toml",
       "third_party/rust/memchr/Cargo.toml",
-      "third_party/rust/minimal-lexical/Cargo.toml",
-      "third_party/rust/miniz_oxide/Cargo.toml",
       "third_party/rust/mtu/Cargo.toml",
       "third_party/rust/neqo-common/Cargo.toml",
       "third_party/rust/neqo-http3/Cargo.toml",
@@ -6320,56 +5318,37 @@
       "third_party/rust/neqo-transport/Cargo.toml",
       "third_party/rust/neqo-udp/Cargo.toml",
       "third_party/rust/new_debug_unreachable/Cargo.toml",
-      "third_party/rust/nom/Cargo.toml",
       "third_party/rust/nss-rs/Cargo.toml",
       "third_party/rust/num-conv/Cargo.toml",
-      "third_party/rust/num-derive/Cargo.toml",
-      "third_party/rust/num-integer/Cargo.toml",
       "third_party/rust/num-traits/Cargo.toml",
-      "third_party/rust/num_cpus/Cargo.toml",
-      "third_party/rust/ohttp/Cargo.toml",
       "third_party/rust/once_cell/Cargo.toml",
       "third_party/rust/ordered-float/Cargo.toml",
       "third_party/rust/parking_lot/Cargo.toml",
       "third_party/rust/parking_lot_core/Cargo.toml",
       "third_party/rust/percent-encoding/Cargo.toml",
       "third_party/rust/phf/Cargo.toml",
-      "third_party/rust/phf_codegen/Cargo.toml",
       "third_party/rust/phf_generator/Cargo.toml",
       "third_party/rust/phf_macros/Cargo.toml",
       "third_party/rust/phf_shared/Cargo.toml",
       "third_party/rust/pin-project-lite/Cargo.toml",
       "third_party/rust/pkcs11-bindings/Cargo.toml",
-      "third_party/rust/pkg-config/Cargo.toml",
-      "third_party/rust/plain/Cargo.toml",
       "third_party/rust/potential_utf/Cargo.toml",
       "third_party/rust/powerfmt/Cargo.toml",
-      "third_party/rust/ppv-lite86/Cargo.toml",
       "third_party/rust/precomputed-hash/Cargo.toml",
       "third_party/rust/proc-macro2/Cargo.toml",
       "third_party/rust/qlog/Cargo.toml",
       "third_party/rust/quinn-udp/Cargo.toml",
       "third_party/rust/quote/Cargo.toml",
-      "third_party/rust/rand/Cargo.toml",
-      "third_party/rust/rand_chacha/Cargo.toml",
-      "third_party/rust/rand_core/Cargo.toml",
-      "third_party/rust/rayon-core/Cargo.toml",
-      "third_party/rust/rayon/Cargo.toml",
       "third_party/rust/ref-cast-impl/Cargo.toml",
       "third_party/rust/ref-cast/Cargo.toml",
       "third_party/rust/regex-automata/Cargo.toml",
       "third_party/rust/regex-syntax/Cargo.toml",
       "third_party/rust/regex/Cargo.toml",
       "third_party/rust/rkv/Cargo.toml",
-      "third_party/rust/rusqlite/Cargo.toml",
       "third_party/rust/rustc-hash/Cargo.toml",
-      "third_party/rust/rustc_version/Cargo.toml",
       "third_party/rust/rustix/Cargo.toml",
       "third_party/rust/rustversion/Cargo.toml",
-      "third_party/rust/same-file/Cargo.toml",
       "third_party/rust/scopeguard/Cargo.toml",
-      "third_party/rust/scroll/Cargo.toml",
-      "third_party/rust/scroll_derive/Cargo.toml",
       "third_party/rust/semver/Cargo.toml",
       "third_party/rust/serde/Cargo.toml",
       "third_party/rust/serde_core/Cargo.toml",
@@ -6382,12 +5361,9 @@
       "third_party/rust/sha1/Cargo.toml",
       "third_party/rust/sha2/Cargo.toml",
       "third_party/rust/sharded-slab/Cargo.toml",
-      "third_party/rust/shlex/Cargo.toml",
-      "third_party/rust/simd-adler32/Cargo.toml",
       "third_party/rust/siphasher/Cargo.toml",
       "third_party/rust/smallbitvec/Cargo.toml",
       "third_party/rust/smallvec/Cargo.toml",
-      "third_party/rust/smawk/Cargo.toml",
       "third_party/rust/socket2/Cargo.toml",
       "third_party/rust/stable_deref_trait/Cargo.toml",
       "third_party/rust/static_assertions/Cargo.toml",
@@ -6399,14 +5375,12 @@
       "third_party/rust/synstructure/Cargo.toml",
       "third_party/rust/tempfile/Cargo.toml",
       "third_party/rust/termcolor/Cargo.toml",
-      "third_party/rust/textwrap/Cargo.toml",
       "third_party/rust/thin-vec/Cargo.toml",
       "third_party/rust/thiserror-impl/Cargo.toml",
       "third_party/rust/thiserror/Cargo.toml",
       "third_party/rust/thread_local/Cargo.toml",
       "third_party/rust/threadbound/Cargo.toml",
       "third_party/rust/time-core/Cargo.toml",
-      "third_party/rust/time-macros/Cargo.toml",
       "third_party/rust/time/Cargo.toml",
       "third_party/rust/tinystr/Cargo.toml",
       "third_party/rust/toml/Cargo.toml",
@@ -6418,39 +5392,29 @@
       "third_party/rust/tracing-subscriber/Cargo.toml",
       "third_party/rust/tracing/Cargo.toml",
       "third_party/rust/typenum/Cargo.toml",
-      "third_party/rust/uluru/Cargo.toml",
       "third_party/rust/unic-langid-impl/Cargo.toml",
       "third_party/rust/unic-langid/Cargo.toml",
       "third_party/rust/unicode-bidi/Cargo.toml",
       "third_party/rust/unicode-ident/Cargo.toml",
       "third_party/rust/uniffi/Cargo.toml",
-      "third_party/rust/uniffi_bindgen/Cargo.toml",
-      "third_party/rust/uniffi_build/Cargo.toml",
       "third_party/rust/uniffi_core/Cargo.toml",
       "third_party/rust/uniffi_internal_macros/Cargo.toml",
       "third_party/rust/uniffi_macros/Cargo.toml",
       "third_party/rust/uniffi_meta/Cargo.toml",
       "third_party/rust/uniffi_pipeline/Cargo.toml",
-      "third_party/rust/uniffi_testing/Cargo.toml",
-      "third_party/rust/uniffi_udl/Cargo.toml",
       "third_party/rust/uritemplate-next/Cargo.toml",
       "third_party/rust/url/Cargo.toml",
       "third_party/rust/urlpattern/Cargo.toml",
       "third_party/rust/utf16_iter/Cargo.toml",
       "third_party/rust/utf8_iter/Cargo.toml",
       "third_party/rust/uuid/Cargo.toml",
-      "third_party/rust/version_check/Cargo.toml",
       "third_party/rust/void/Cargo.toml",
-      "third_party/rust/walkdir/Cargo.toml",
-      "third_party/rust/weedle2/Cargo.toml",
-      "third_party/rust/whatsys/Cargo.toml",
       "third_party/rust/winnow/Cargo.toml",
       "third_party/rust/write16/Cargo.toml",
       "third_party/rust/writeable/Cargo.toml",
       "third_party/rust/xmldecl/Cargo.toml",
       "third_party/rust/yoke-derive/Cargo.toml",
       "third_party/rust/yoke/Cargo.toml",
-      "third_party/rust/zeitstempel/Cargo.toml",
       "third_party/rust/zerofrom-derive/Cargo.toml",
       "third_party/rust/zerofrom/Cargo.toml",
       "third_party/rust/zeroize/Cargo.toml",
@@ -6460,11 +5424,7 @@
       "third_party/rust/zerovec/Cargo.toml",
       "third_party/rust/zlib-rs/Cargo.toml",
       "third_party/rust/zmij/Cargo.toml",
-      "toolkit/components/glean/api/Cargo.toml",
-      "toolkit/library/rust/Cargo.toml",
       "toolkit/library/rust/naivefox/Cargo.toml",
-      "tools/profiler/rust-api/Cargo.toml",
-      "tools/profiler/rust-api/macros/Cargo.toml",
       "xpcom/rust/gecko_logger/Cargo.toml",
       "xpcom/rust/gecko_tracing/Cargo.toml",
       "xpcom/rust/gkrust_utils/Cargo.toml",
@@ -6475,7 +5435,7 @@
       "xpcom/rust/xpcom/Cargo.toml",
       "xpcom/rust/xpcom/xpcom_macros/Cargo.toml"
     ],
-    "cargo_root_manifest": "toolkit/library/rust/Cargo.toml",
+    "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
     "cargo_lockfile": "Cargo.lock",
     "cargo_config_template": ".cargo/config.toml.in",
     "depfiles_scanned": 694,
@@ -10591,91 +9551,18 @@
     "glean": {
       "enabled": true,
       "generator_scripts": [
+        "toolkit/components/glean/build_scripts/glean_parser_ext/cache_yaml.py",
         "toolkit/components/glean/build_scripts/glean_parser_ext/metrics_header_names.py",
-        "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py",
-        "toolkit/components/glean/metrics_index.py"
+        "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py"
       ],
       "cache_inputs": [
         "objdir/toolkit/components/glean/metrics_yamls.cached",
         "objdir/toolkit/components/glean/pings_yamls.cached"
       ],
       "metrics_yaml_inputs": [
-        "accessible/metrics.yaml",
-        "browser/actors/metrics.yaml",
-        "browser/base/content/metrics.yaml",
-        "browser/components/aiwindow/metrics.yaml",
-        "browser/components/asrouter/metrics.yaml",
-        "browser/components/attribution/metrics.yaml",
-        "browser/components/backup/metrics.yaml",
-        "browser/components/contextualidentity/metrics.yaml",
-        "browser/components/controlcenter/metrics.yaml",
-        "browser/components/customkeys/metrics.yaml",
-        "browser/components/downloads/metrics.yaml",
-        "browser/components/extensions/metrics.yaml",
-        "browser/components/firefoxview/metrics.yaml",
-        "browser/components/genai/metrics.yaml",
-        "browser/components/ipprotection/metrics.yaml",
-        "browser/components/metrics.yaml",
-        "browser/components/migration/metrics.yaml",
-        "browser/components/newtab/metrics.yaml",
-        "browser/components/places/metrics.yaml",
-        "browser/components/preferences/metrics.yaml",
-        "browser/components/privatebrowsing/metrics.yaml",
-        "browser/components/profiles/metrics.yaml",
-        "browser/components/protections/metrics.yaml",
-        "browser/components/protocolhandler/metrics.yaml",
-        "browser/components/referrals/metrics.yaml",
-        "browser/components/screenshots/metrics.yaml",
-        "browser/components/search/metrics.yaml",
-        "browser/components/sessionstore/metrics.yaml",
-        "browser/components/sharing/metrics.yaml",
-        "browser/components/shell/metrics.yaml",
-        "browser/components/sidebar/metrics.yaml",
-        "browser/components/tabbrowser/metrics.yaml",
-        "browser/components/tabnotes/metrics.yaml",
-        "browser/components/taskbartabs/metrics.yaml",
-        "browser/components/textrecognition/metrics.yaml",
-        "browser/components/urlbar/metrics.yaml",
-        "browser/extensions/search-detection/metrics.yaml",
-        "browser/modules/metrics.yaml",
-        "devtools/client/accessibility/metrics.yaml",
-        "devtools/client/framework/metrics.yaml",
-        "devtools/client/inspector/metrics.yaml",
-        "devtools/client/responsive/metrics.yaml",
-        "devtools/client/shared/metrics.yaml",
-        "devtools/client/webconsole/metrics.yaml",
-        "devtools/shared/heapsnapshot/metrics.yaml",
-        "docshell/base/metrics.yaml",
-        "dom/base/use_counter_metrics.yaml",
-        "dom/canvas/metrics.yaml",
-        "dom/geolocation/metrics.yaml",
-        "dom/indexedDB/metrics.yaml",
-        "dom/localstorage/metrics.yaml",
-        "dom/media/eme/metrics.yaml",
-        "dom/media/hls/metrics.yaml",
-        "dom/media/metrics.yaml",
-        "dom/media/mp4/metrics.yaml",
-        "dom/media/platforms/wmf/metrics.yaml",
-        "dom/media/webrtc/metrics.yaml",
-        "dom/metrics.yaml",
-        "dom/notification/metrics.yaml",
-        "dom/performance/metrics.yaml",
-        "dom/push/metrics.yaml",
-        "dom/quota/metrics.yaml",
         "dom/security/metrics.yaml",
-        "dom/serviceworkers/metrics.yaml",
-        "dom/webauthn/metrics.yaml",
-        "dom/workers/metrics.yaml",
-        "editor/libeditor/metrics.yaml",
-        "extensions/permissions/metrics.yaml",
-        "gfx/metrics.yaml",
-        "image/decoders/metrics.yaml",
         "intl/locale/metrics.yaml",
         "ipc/metrics.yaml",
-        "js/src/metrics.yaml",
-        "js/xpconnect/metrics.yaml",
-        "layout/base/metrics.yaml",
-        "mobile/shared/modules/geckoview/metrics.yaml",
         "modules/libjar/metrics.yaml",
         "modules/libpref/metrics.yaml",
         "netwerk/cache2/metrics.yaml",
@@ -10683,210 +9570,62 @@
         "netwerk/metrics.yaml",
         "netwerk/protocol/http/metrics.yaml",
         "netwerk/protocol/websocket/metrics.yaml",
-        "parser/htmlparser/metrics.yaml",
         "security/certverifier/metrics.yaml",
         "security/ct/metrics.yaml",
         "security/manager/ssl/metrics.yaml",
         "security/sandbox/metrics.yaml",
-        "services/fxaccounts/metrics.yaml",
-        "services/settings/metrics.yaml",
-        "services/sync/modules/metrics.yaml",
-        "startupcache/metrics.yaml",
         "storage/metrics.yaml",
-        "toolkit/components/antitracking/bouncetrackingprotection/metrics.yaml",
         "toolkit/components/antitracking/metrics.yaml",
-        "toolkit/components/backgroundhangmonitor/metrics.yaml",
-        "toolkit/components/backgroundtasks/metrics.yaml",
-        "toolkit/components/captchadetection/metrics.yaml",
-        "toolkit/components/cleardata/metrics.yaml",
-        "toolkit/components/contentanalysis/metrics.yaml",
-        "toolkit/components/contentrelevancy/metrics.yaml",
-        "toolkit/components/crashes/metrics.yaml",
-        "toolkit/components/doh/metrics.yaml",
-        "toolkit/components/downloads/metrics.yaml",
-        "toolkit/components/enterprisepolicies/metrics.yaml",
-        "toolkit/components/extensions/metrics.yaml",
-        "toolkit/components/formautofill/metrics.yaml",
-        "toolkit/components/gecko-trace/generated-metrics.yaml",
-        "toolkit/components/glean/metrics.yaml",
         "toolkit/components/glean/tags.yaml",
-        "toolkit/components/glean/tests/test_metrics.yaml",
-        "toolkit/components/ipprotection/metrics.yaml",
-        "toolkit/components/mediasniffer/metrics.yaml",
-        "toolkit/components/messaging-system/metrics.yaml",
-        "toolkit/components/ml/metrics.yaml",
-        "toolkit/components/nimbus/metrics.yaml",
-        "toolkit/components/normandy/metrics.yaml",
-        "toolkit/components/passwordmgr/metrics.yaml",
-        "toolkit/components/pdfjs/metrics.yaml",
-        "toolkit/components/pictureinpicture/metrics.yaml",
-        "toolkit/components/places/metrics.yaml",
-        "toolkit/components/printing/metrics.yaml",
         "toolkit/components/processtools/metrics.yaml",
-        "toolkit/components/reader/metrics.yaml",
-        "toolkit/components/reportbrokensite/metrics.yaml",
-        "toolkit/components/reputationservice/metrics.yaml",
-        "toolkit/components/resistfingerprinting/metrics.yaml",
-        "toolkit/components/satchel/megalist/metrics.yaml",
-        "toolkit/components/search/metrics.yaml",
         "toolkit/components/startup/metrics.yaml",
-        "toolkit/components/telemetry/metrics.yaml",
-        "toolkit/components/telemetry/tests/test_metrics.yaml",
-        "toolkit/components/thumbnails/metrics.yaml",
-        "toolkit/components/translations/metrics.yaml",
         "toolkit/components/url-classifier/metrics.yaml",
-        "toolkit/content/metrics.yaml",
-        "toolkit/content/widgets/metrics.yaml",
-        "toolkit/modules/gecko_metrics.yaml",
-        "toolkit/modules/metrics.yaml",
-        "toolkit/mozapps/defaultagent/metrics.yaml",
-        "toolkit/mozapps/extensions/metrics.yaml",
-        "toolkit/mozapps/handling/metrics.yaml",
-        "toolkit/mozapps/update/background_task_metrics.yaml",
-        "toolkit/mozapps/update/metrics.yaml",
-        "toolkit/mozapps/update/shared_metrics.yaml",
         "toolkit/profile/metrics.yaml",
         "toolkit/xre/metrics.yaml",
-        "widget/cocoa/metrics.yaml",
-        "widget/gtk/metrics.yaml",
-        "widget/metrics.yaml",
-        "widget/windows/metrics.yaml",
         "xpcom/metrics.yaml"
       ],
       "pings_yaml_inputs": [
-        "browser/components/asrouter/pings.yaml",
-        "browser/components/backup/pings.yaml",
-        "browser/components/newtab/pings.yaml",
-        "browser/components/profiles/pings.yaml",
-        "browser/components/referrals/pings.yaml",
-        "browser/components/search/pings.yaml",
-        "browser/components/urlbar/pings.yaml",
-        "browser/modules/pings.yaml",
-        "dom/pings.yaml",
         "netwerk/pings.yaml",
-        "services/fxaccounts/pings.yaml",
-        "services/sync/pings.yaml",
-        "toolkit/components/antitracking/bouncetrackingprotection/pings.yaml",
-        "toolkit/components/backgroundhangmonitor/pings.yaml",
-        "toolkit/components/backgroundtasks/pings.yaml",
-        "toolkit/components/captchadetection/pings.yaml",
-        "toolkit/components/gecko-trace/pings.yaml",
-        "toolkit/components/glean/pings.yaml",
-        "toolkit/components/glean/tags.yaml",
-        "toolkit/components/glean/tests/test_pings.yaml",
-        "toolkit/components/nimbus/pings.yaml",
-        "toolkit/components/reportbrokensite/pings.yaml",
-        "toolkit/components/resistfingerprinting/pings.yaml",
-        "toolkit/components/telemetry/pings.yaml",
-        "toolkit/modules/pings.yaml",
-        "toolkit/mozapps/defaultagent/pings.yaml",
-        "toolkit/mozapps/extensions/pings.yaml",
-        "toolkit/mozapps/update/pings.yaml",
-        "toolkit/mozapps/update/shared_pings.yaml",
-        "toolkit/profile/pings.yaml"
+        "toolkit/components/glean/tags.yaml"
       ],
-      "generated_outputs_count": 159,
+      "generated_outputs_count": 36,
       "generated_outputs_sample": [
-        "toolkit/components/glean/AccessibleMetrics.h",
-        "toolkit/components/glean/AiwindowMetrics.h",
-        "toolkit/components/glean/AntitrackingBouncetrackingprotectionMetrics.h",
         "toolkit/components/glean/AntitrackingMetrics.h",
-        "toolkit/components/glean/AsrouterMetrics.h",
-        "toolkit/components/glean/AttributionMetrics.h",
-        "toolkit/components/glean/BackgroundhangmonitorMetrics.h",
-        "toolkit/components/glean/BackgroundtasksMetrics.h",
-        "toolkit/components/glean/BackupMetrics.h",
-        "toolkit/components/glean/BrowserActorsMetrics.h",
-        "toolkit/components/glean/BrowserComponentsMetrics.h",
-        "toolkit/components/glean/BrowserContentMetrics.h",
-        "toolkit/components/glean/BrowserExtensionsSearchDetectionMetrics.h",
-        "toolkit/components/glean/BrowserModulesMetrics.h",
-        "toolkit/components/glean/CaptchadetectionMetrics.h",
-        "toolkit/components/glean/CleardataMetrics.h",
-        "toolkit/components/glean/ContentanalysisMetrics.h",
-        "toolkit/components/glean/ContentrelevancyMetrics.h",
-        "toolkit/components/glean/ContextualidentityMetrics.h",
-        "toolkit/components/glean/ControlcenterMetrics.h",
-        "toolkit/components/glean/CrashesMetrics.h",
-        "toolkit/components/glean/CustomkeysMetrics.h",
-        "toolkit/components/glean/DevtoolsClientAccessibilityMetrics.h",
-        "toolkit/components/glean/DevtoolsClientFrameworkMetrics.h",
-        "toolkit/components/glean/DevtoolsClientInspectorMetrics.h",
-        "toolkit/components/glean/DevtoolsClientResponsiveMetrics.h",
-        "toolkit/components/glean/DevtoolsClientSharedMetrics.h",
-        "toolkit/components/glean/DevtoolsClientWebconsoleMetrics.h",
-        "toolkit/components/glean/DevtoolsSharedHeapsnapshotMetrics.h",
-        "toolkit/components/glean/DocshellMetrics.h",
-        "toolkit/components/glean/DohMetrics.h",
-        "toolkit/components/glean/DomCanvasMetrics.h",
-        "toolkit/components/glean/DomGeolocationMetrics.h",
-        "toolkit/components/glean/DomIndexedDBMetrics.h",
-        "toolkit/components/glean/DomLocalstorageMetrics.h",
-        "toolkit/components/glean/DomMediaEmeMetrics.h",
-        "toolkit/components/glean/DomMediaHlsMetrics.h",
-        "toolkit/components/glean/DomMediaMetrics.h",
-        "toolkit/components/glean/DomMediaMp4Metrics.h",
-        "toolkit/components/glean/DomMediaPlatformsWmfMetrics.h",
-        "toolkit/components/glean/DomMediaWebrtcMetrics.h",
-        "toolkit/components/glean/DomMetrics.h",
-        "toolkit/components/glean/DomNotificationMetrics.h",
-        "toolkit/components/glean/DomPerformanceMetrics.h",
-        "toolkit/components/glean/DomPushMetrics.h",
-        "toolkit/components/glean/DomQuotaMetrics.h",
         "toolkit/components/glean/DomSecurityMetrics.h",
-        "toolkit/components/glean/DomServiceworkersMetrics.h",
-        "toolkit/components/glean/DomUseCounterMetrics.h",
-        "toolkit/components/glean/DomWebauthnMetrics.h",
-        "toolkit/components/glean/DomWorkersMetrics.h",
-        "toolkit/components/glean/DownloadsMetrics.h",
-        "toolkit/components/glean/EditorLibeditorMetrics.h",
-        "toolkit/components/glean/EnterprisepoliciesMetrics.h",
         "toolkit/components/glean/EventGIFFTMap.cpp",
-        "toolkit/components/glean/ExtensionsMetrics.h",
-        "toolkit/components/glean/ExtensionsPermissionsMetrics.h",
-        "toolkit/components/glean/FirefoxviewMetrics.h",
-        "toolkit/components/glean/FormautofillMetrics.h",
-        "toolkit/components/glean/GeckoTraceGeneratedMetrics.h",
-        "toolkit/components/glean/GeckoviewMetrics.h",
-        "toolkit/components/glean/GenaiMetrics.h",
-        "toolkit/components/glean/GfxMetrics.h",
         "toolkit/components/glean/GleanJSMetricsLookup.cpp",
         "toolkit/components/glean/GleanJSMetricsLookup.h",
         "toolkit/components/glean/GleanJSPingsLookup.cpp",
         "toolkit/components/glean/GleanJSPingsLookup.h",
         "toolkit/components/glean/GleanMetrics.h",
         "toolkit/components/glean/GleanPings.h",
-        "toolkit/components/glean/GleanTestsTestMetrics.h",
         "toolkit/components/glean/HistogramGIFFTMap.cpp",
-        "toolkit/components/glean/ImageDecodersMetrics.h",
         "toolkit/components/glean/IntlLocaleMetrics.h",
         "toolkit/components/glean/IpcMetrics.h",
-        "toolkit/components/glean/IpprotectionMetrics.h",
-        "toolkit/components/glean/JsSrcMetrics.h",
-        "toolkit/components/glean/JsXpconnectMetrics.h",
-        "toolkit/components/glean/LayoutMetrics.h",
         "toolkit/components/glean/LibjarMetrics.h",
         "toolkit/components/glean/LibprefMetrics.h",
-        "toolkit/components/glean/MediasnifferMetrics.h",
-        "toolkit/components/glean/MessagingSystemMetrics.h",
-        "toolkit/components/glean/MigrationMetrics.h",
-        "toolkit/components/glean/MlMetrics.h",
         "toolkit/components/glean/NetwerkCache2Metrics.h",
         "toolkit/components/glean/NetwerkDnsMetrics.h",
         "toolkit/components/glean/NetwerkMetrics.h",
         "toolkit/components/glean/NetwerkProtocolHttpMetrics.h",
         "toolkit/components/glean/NetwerkProtocolWebsocketMetrics.h",
-        "toolkit/components/glean/NewtabMetrics.h",
-        "toolkit/components/glean/NimbusMetrics.h",
-        "toolkit/components/glean/NormandyMetrics.h",
-        "toolkit/components/glean/ParserHtmlparserMetrics.h",
-        "toolkit/components/glean/PasswordmgrMetrics.h",
-        "toolkit/components/glean/PdfjsMetrics.h",
-        "toolkit/components/glean/PictureinpictureMetrics.h",
-        "toolkit/components/glean/PlacesMetrics.h",
-        "toolkit/components/glean/PreferencesMetrics.h",
-        "toolkit/components/glean/PrintingMetrics.h",
-        "toolkit/components/glean/PrivatebrowsingMetrics.h"
+        "toolkit/components/glean/ProcesstoolsMetrics.h",
+        "toolkit/components/glean/ScalarGIFFTMap.cpp",
+        "toolkit/components/glean/SecurityCertverifierMetrics.h",
+        "toolkit/components/glean/SecurityCtMetrics.h",
+        "toolkit/components/glean/SecurityManagerSslMetrics.h",
+        "toolkit/components/glean/SecuritySandboxMetrics.h",
+        "toolkit/components/glean/StartupMetrics.h",
+        "toolkit/components/glean/StorageMetrics.h",
+        "toolkit/components/glean/ToolkitProfileMetrics.h",
+        "toolkit/components/glean/ToolkitXreMetrics.h",
+        "toolkit/components/glean/UrlClassifierMetrics.h",
+        "toolkit/components/glean/XpcomMetrics.h",
+        "toolkit/components/glean/api/src/factory.rs",
+        "toolkit/components/glean/api/src/metrics.rs",
+        "toolkit/components/glean/api/src/pings.rs",
+        "toolkit/components/glean/metrics_yamls.cached",
+        "toolkit/components/glean/pings_yamls.cached"
       ]
     }
   },
@@ -10975,7 +9714,7 @@
       },
       {
         "name": "libxul.so",
-        "size_bytes": 645398272
+        "size_bytes": 500877728
       },
       {
         "name": "libxul.so-gdb.py",
@@ -11150,19 +9889,19 @@
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base0.o",
-      "size_bytes": 2697200
+      "size_bytes": 2697208
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base1.o",
-      "size_bytes": 4693944
+      "size_bytes": 4693920
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base2.o",
-      "size_bytes": 5605584
+      "size_bytes": 5605568
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base3.o",
-      "size_bytes": 5399344
+      "size_bytes": 5399352
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base4.o",
@@ -11202,11 +9941,11 @@
     },
     {
       "path": "objdir/netwerk/dns/nsHostResolver.o",
-      "size_bytes": 1370904
+      "size_bytes": 1370928
     },
     {
       "path": "objdir/netwerk/dns/Unified_cpp_netwerk_dns0.o",
-      "size_bytes": 5424752
+      "size_bytes": 5424720
     },
     {
       "path": "objdir/config/external/icu/common/appendable.o",
@@ -12702,7 +11441,7 @@
     },
     {
       "path": "objdir/netwerk/streamconv/converters/Unified_cpp_converters0.o",
-      "size_bytes": 1137824
+      "size_bytes": 1137960
     },
     {
       "path": "objdir/third_party/zstd/Unified_c_third_party_zstd0.o",
@@ -12726,7 +11465,7 @@
     },
     {
       "path": "objdir/netwerk/cache2/Unified_cpp_netwerk_cache21.o",
-      "size_bytes": 3777944
+      "size_bytes": 3777928
     },
     {
       "path": "objdir/netwerk/protocol/http/nsHttpChannelAuthProvider.o",
@@ -12746,7 +11485,7 @@
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http2.o",
-      "size_bytes": 6856200
+      "size_bytes": 6856192
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http3.o",
@@ -12834,7 +11573,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/RuntimeLogging.o",
-      "size_bytes": 173160
+      "size_bytes": 173496
     },
     {
       "path": "objdir/netwerk/naivefox/core/Socks5Parser.o",

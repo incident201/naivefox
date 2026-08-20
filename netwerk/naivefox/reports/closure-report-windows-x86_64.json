@@ -1,11 +1,11 @@
 {
   "report_provenance": {
-    "source_commit_sha": "b390951540dd286a054456155d1af8f8639f2d98",
+    "source_commit_sha": "559d487242b92526ef077cd9f520deedcb71f482",
     "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
     "target_triple": "x86_64-pc-windows-msvc",
     "mozconfig_path": "netwerk/naivefox/mozconfig-windows-x86_64",
     "mozconfig_sha256": "3080ab7f31cb1a3799d3587092c999ecbf5c7e962de676e8c92b18bd1fd32c94",
-    "analyzer_version": "2.4.0-strict-target",
+    "analyzer_version": "2.5.0-active-cargo-tree",
     "compiler_version": "Clang 18.1.8",
     "linker_version": "LLD 18.1.8",
     "sccache_state": "supported",
@@ -17,9 +17,9 @@
     "unstripped_link_objects_bytes": 212488304,
     "unstripped_link_objects_mb": 202.64,
     "static_libraries_count": 3,
-    "libxul_size_bytes": 42932224,
+    "libxul_size_bytes": 42580992,
     "naivefox_bin_size_bytes": 11264,
-    "reachable_rust_crates_count": 379,
+    "reachable_rust_crates_count": 287,
     "dynamic_dependencies_count": 22,
     "staged_runtime_files_count": 21
   },
@@ -1110,8 +1110,8 @@
     },
     {
       "path": "objdir/x86_64-pc-windows-msvc/release/gkrust.lib",
-      "size_bytes": 611059308,
-      "member_count": 2194,
+      "size_bytes": 262543872,
+      "member_count": 1821,
       "members": [
         "abridged_certs-2c7d37c0f0d9fcc0.0rfcqhq6c9936zhf18lrg6d4a.09vxg87.rcgu.o",
         "abridged_certs-2c7d37c0f0d9fcc0.1hesk8pkdkuxgzjyi7xk3v4p6.09vxg87.rcgu.o",
@@ -1164,11 +1164,11 @@
         "api-ms-win-core-synch-l1-2-0.dll",
         "api-ms-win-core-synch-l1-2-0.dll",
         "api-ms-win-core-synch-l1-2-0.dll",
-        "app_collator_glue-83148f6e7d1941b0.076kazjy9dxgfygsnt8w4o0df.1nagl75.rcgu.o",
-        "app_collator_glue-83148f6e7d1941b0.0daylq17ehky8959otgds18e6.1nagl75.rcgu.o",
-        "app_collator_glue-83148f6e7d1941b0.2ng7m4m94zskarydbkwxskacz.1nagl75.rcgu.o",
-        "app_collator_glue-83148f6e7d1941b0.4f0bieeupnw7fpofkjmsormbt.1nagl75.rcgu.o",
-        "app_collator_glue-83148f6e7d1941b0.4solalwaprz2npffzbn77xhg3.1nagl75.rcgu.o",
+        "app_collator_glue-b0dcd6462cae1053.0hu13il11luxjys3tkekqsy2s.01ou8gl.rcgu.o",
+        "app_collator_glue-b0dcd6462cae1053.8qbqi8z6q1kd0ejz9aro1g6fb.01ou8gl.rcgu.o",
+        "app_collator_glue-b0dcd6462cae1053.c04l9wlhmvhkt6en9b5tum97k.01ou8gl.rcgu.o",
+        "app_collator_glue-b0dcd6462cae1053.el9v05rnng9r0gt14fjnpx1pm.01ou8gl.rcgu.o",
+        "app_collator_glue-b0dcd6462cae1053.et23x4lmmn4y92p2qlv3ooec6.01ou8gl.rcgu.o",
         "app_units-61fee79f6f6f37a3.app_units.78c2af4258360a89-cgu.0.rcgu.o",
         "arrayref-9c1acad2af8d4137.arrayref.18d33362044b6727-cgu.0.rcgu.o",
         "arraystring-3570777a9774e05b.arraystring.c17cdabf8f0cb40c-cgu.0.rcgu.o",
@@ -1212,66 +1212,59 @@
         "bytes-a49e2e072e945c10.bytes.5d70548c36644616-cgu.1.rcgu.o",
         "calendrical_calculations-3aab17c4dbc5de1f.calendrical_calculations.359c38f333d7f99f-cgu.0.rcgu.o",
         "calendrical_calculations-3aab17c4dbc5de1f.calendrical_calculations.359c38f333d7f99f-cgu.1.rcgu.o",
-        "cert_storage-db59afde59b5ff53.07lggi96oyozai5gcgru619xj.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.0nhtvfib9sh03j1gx5l3nfi6p.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.16ykae1q3dmo75cpnozw7dnlo.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.17bpphnez78x6nkwrjp0wlcvx.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.1ar7t65pp5rfyqy9hub3bl9ff.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.2299vrg0e7712ikbsblygp5x6.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.2dxa3xv6ph0i7k3uemeehoj2e.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.2gt811tif693i3eotzye6oeuz.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.2jvvk82rvk1bp1df8o49krelf.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.3u7su3knxserc4odplv3nfre5.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.4a3moqpwcmsdetyp7goymc9lp.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.4lg9744v8ov4jhodup09aij48.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.4xf4xmiqmk1gxntzcqyyrxw4b.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.59ile0usepd4pjtvv86tt4qlw.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.5j6gk9rka0a3orleuirfq80p7.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.5l83c9n5uiwcnjhrv342xawjk.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.5vfygyvnakss77u78ss10d8ne.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.5xu251ozm42ccaq7h9jn7rejc.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.69ddkag37xllejf2obxqx9137.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.6f5ipbypdp9a4pjbtnen0g2ls.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.6fzpub3fx2ayjpbgxaxjt28l2.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.6jk43yokeqxxv9w481xufgr6d.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.6pmbq0texfuze919hvnlg9e0h.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.6q84nrincbpvim41ihnkk8iw8.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.6tuyrk57tbj54z8sdticpqyw5.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.71cutsoyibk3jjm0x0u62jvtp.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.7a8vmz1fyswp48ntdfeta6vjp.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.9trpeatacdhuqa428tkowom45.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.9v25wg4dx29yd16zzneztrizo.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.a5vpzqzlmv8xknz6ttugdk3dy.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.akytpicojm5436y38c7jn9o3c.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.av0voxdrr81mbtw7hqnvw5xgh.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.b0ggr0f6y8vhdsn5il4m8ap0w.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.bec8awnhw178x00vgvvu7ev71.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.bh6hw6lt8p1susow5dc63n3zk.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.bmzh197dhg0c4yl47g6t35tsk.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.c0rksamp8kcyda07qwj9vijq1.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.c2ytlu6c95b5ev5le599h5p7t.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.c4d3rdpz9a8h8cejsfi0qcyly.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.cfkqo0t61x6vj8ny92u5ey4be.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.cm4idj8op0kcbly23mmt2014b.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.ctcy0awkp8c4ttwzr7w07t2le.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.d101rtx6ot8cyf7s6row9pa03.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.d187s92gr6sy5e7v8eaypsr0r.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.d4bow3r2nvvmwpeask3rhcyfo.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.dzag9arl747n4wcbwaacxrqwf.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.edzwm6uxwdprpifk7n10rnub9.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.efordo4ububy3wnht0geooqpn.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.ermuvnihwv2yl0tscn7co1p62.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.f4khksseltbrmajsxpap58pij.0cuie3i.rcgu.o",
-        "cert_storage-db59afde59b5ff53.f547jfmylfludpto43yf3u4xx.0cuie3i.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.07bvhuaei8j8p2519cnnfu3lr.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.0t2eld7o9kl9buzh4og3b3pgl.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.1iyli7jgx8srwqf748wndxe6b.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.1mksqhyqn1dwhsze2zhnjwdas.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.2c53cmrre7juy09g9ct6u6l0k.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.2fvuhc9tg4zwpmsnb5k8sgyoz.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.2gyaek8euwupc7ulaeqldihfq.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.35gju0mxcvyrgatahs31v9xgx.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.39zdl94yadmunilpgl1a1mnvo.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.3lg7im5qclxq4rsy8oiqn7oi4.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.449gfvu820asdplkyeh32s99n.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.4akb96mbqlapbuoyf3t62314s.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.520my31y58ax5m6qkx6ri9zy1.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.52plw8ntq93vvfyp1qqzlyvhs.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.5o4l2e3r37d4lx6pasrzm33zc.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.5s1igs1qftjfnq77dz9bvauxg.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.5uio9qg98hiorqc4dx8fm3115.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.6klpya4tvc428eo41zypurzht.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.70npmhuqow8rxgrcrtazfj37y.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.76hwtg3u59c5zdsbvrlfbqmma.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.786dthnzex8xtyx0sxgdedhw6.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.7id832ldkx8diro2tzqvq8sc7.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.7jp1i9tdf7y1ipk089ifz7xxo.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.7szk9aqofd1fgs4jiv0umloo1.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.7x6tbgmbdd5sgjnbz35y9jtia.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.85tqxvfs24jm5ky465avptcfq.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.8b170m9kefpchz63eht2e70ef.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.8peo7064902k96rfdvlkwxahu.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.8qiea0vhhdqh4n7vjy4e2xmml.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.9m2jpi5aomscjovc3p0co76ry.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.9oxuq018kmramyb5bykk3ufg2.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.a46r5mlrvfc5zuc77a92atpfc.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.aaf61b0t7slzr3657x8kqop9n.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.abe1i16wh9i5zk7rgjl6m090c.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.amckeby5bk9pxe0b5tap7ylrt.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.aul3uw1j9z3h5wjdtn6uqrnr1.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.b10r02rtzr90cwrnq0nmj8c76.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.b4jhaz14jujbkd80y3wdtpvk4.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.bh28nezj177fu993jgjdyk098.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.bjtsae27koekaum7jh4k1bn1n.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.bkpgyaqab5zhu5qp3s1t3mw43.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.bom8wz19hjca48maiw36338tc.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.c119we78yp4ekanfowtkajbqi.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.cck2xwtvvmyqrw4llxxpk08bs.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.cumov4bucdlp9cq7zycoqs1w6.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.cwiqvfrpj7611rect9l6r10pn.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.drs5tigypifledahquujhrwu7.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.dxegqavbgzuzfry196hy9hw9m.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.e3wx1kpiqgp5favhg63zodz6n.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.e93j25qkn8vud48wd36eqhll5.1nuv4rp.rcgu.o",
+        "cert_storage-ce2907fcbf02f2ba.eerq7xep3418bitfj9p856b86.1nuv4rp.rcgu.o",
         "cfg_if-17b5feb2688e8da7.cfg_if.55ca86135df43f48-cgu.0.rcgu.o",
         "cfg_if-911628ce815e616d.cfg_if.d5da7554b91217ca-cgu.0.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.0.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.1.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.2.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.3.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.4.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.5.rcgu.o",
-        "chrono-5875183fd41c8bd7.chrono.2bcf5ccbcd8ff406-cgu.6.rcgu.o",
         "clubcard-75b5a93962b157ba.clubcard.35303a993abb5474-cgu.0.rcgu.o",
         "clubcard_crlite-e62f294a9c3ad9c2.clubcard_crlite.a268075fed58d2e6-cgu.0.rcgu.o",
         "clubcard_crlite-e62f294a9c3ad9c2.clubcard_crlite.a268075fed58d2e6-cgu.1.rcgu.o",
@@ -1557,8 +1550,6 @@
         "core-cf5ef8f9edb2b6bd.core.3b42104b74debb2e-cgu.0.rcgu.o",
         "core_maths-a4e1c5cde161df09.core_maths.112faf616faa2f5e-cgu.0.rcgu.o",
         "cpufeatures-f49ae4b47126f2db.cpufeatures.a0ade189e1a8d8ac-cgu.0.rcgu.o",
-        "crc32fast-341b783ee01f9f3a.crc32fast.43fcbbce7807ed65-cgu.0.rcgu.o",
-        "crossbeam_channel-265e42cc80d46530.crossbeam_channel.92ae71ab5e0aeaa3-cgu.0.rcgu.o",
         "crossbeam_utils-59e139fb33095eac.crossbeam_utils.ded23a183dfaa8ae-cgu.0.rcgu.o",
         "crypto_common-a48631e1c7fa51ca.crypto_common.d1138906e6b642cc-cgu.0.rcgu.o",
         "crypto_hash-d25f1a7487a29bb2.0dpzpghrq3munwjonqn12iipr.0qnizo8.rcgu.o",
@@ -1619,48 +1610,48 @@
         "d067f95df2315da6-subvti3.o",
         "d067f95df2315da6-ucmpdi2.o",
         "d067f95df2315da6-ucmpti2.o",
-        "data_storage-9005b01dee202d43.05rhd07ggh8i9jrbglh3kpqza.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.06hc4z3p3tgmdi03yltt2pkxz.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.0a6u8ezrvfzmxr7rrw9ybtzxe.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.0ex6zyug60kzoezxs0e249rky.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.1ujln4sig99cp8b9hpv01heo0.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.23g85vj8878yl90ltfe9n8f06.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.25g2si0pxjx9yhb02k9f54199.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.3c171qq0dmn84zf55lxrdywjc.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.3de9zdyehqgm35sj9scr1f8ct.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.3qdfxk1r9mv12ni3pw0t7c2xu.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.3shotkzp6moy10iw1qtyxy4l3.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.50ecpm3c9npjvsshzvf88qiik.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.59ide21v482hy9r9d1fa783av.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.5omzs0co453pn8s9kicb9wqf8.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.640nwilin6xi6wi4uiioh6a5k.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.698qhgrtxfeafop646xhiafsb.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.6zjmum0o0ulrgyhdeefqs4j0u.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.6zvu7g5w846emodcbxe9ste68.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.74h06su7fczvfdzd0g9qc74o9.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.77aarivzqqv1vfoz5di5tzj6u.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.7hweblq5bak8prv1o8scy9fdd.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.7w33yejeoql2wczbuwemripbl.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.8f65g8j9hi35f1hsijilc45og.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.8j7mlcy80a9mt9cb8kt183wt2.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.92ails2nuwjrnrxds0rqmteyr.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.abbzpbwe1cot0v3bq49np4yp5.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.au2dcqdbwwsd8tclr5weuuo3w.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.ay3mk9znbmucryqzysnmduklj.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.az53ntpydinvdqsaq62lrp699.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.b1rhzo2zpncuz5zr224le21fj.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.bc6tddzx8s456wkmrhp83994v.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.bqdq8v6g6rssb4xbz083r5gqd.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.bygv1y1m44gncou9x2x8dmprm.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.csrwb6j7utalv9i16dm2x13xo.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.ddvzrxm20ge5i4o7xfsz7tky5.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.dlbbk8zfiuxvekh8m4e408jls.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.dqebyotxyfn5yv88b61mc7jln.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.dyhfzj9j5msflsh0yjzl697pf.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.e0pnp19o1n09p7wr9rzgheijt.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.e987e363kup1le95cgv6ev85o.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.ez80jjkld6w57znbpic5y61g3.16ry7l0.rcgu.o",
-        "data_storage-9005b01dee202d43.f00yikccnil0g4f9r1zttrt03.16ry7l0.rcgu.o",
+        "data_storage-36bb43300cbd43c2.0178ev8uw3uhgakoxay04222c.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.052zt7mc4za4vhi9lo89hyk1g.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.0i18zhsc98ucv397lnck12lil.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.0newyockk7l7etpuk1s9mzvri.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.16jxavsbmspdog2hhqemwbchs.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.1d2gw91ukzqts18vo1d3a5ngs.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.1fv4bkd3oluhlsslqa6g7jyqc.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.1x2fjcoi77k97rf35k5ij7qm3.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.1y5w94tb9s0sz28dcdl4581je.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.1zhirgfjp5qhqzejo43ve24ia.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.21br0qjbskxfync42z19ew9e5.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.24gpih03r0gqlw9x51dm5okd0.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.26s7yuv5y4svzp5l0qmkh73as.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.2plk7v5rana9m06g521z39f7n.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.2txmw19hju61jg94lpzzjkcim.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.31prkdy5ngn5oou62i3zwb0eu.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.3jy0n1et9kda2hmtfmgai8aij.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.46ggjwd9bv0smctmjvegeae38.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.4c6a4vuewi73qoqdq9n33w4pg.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.4g8lk3x675gnote7xe4bvjnyt.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.5keo0z7vx04ozv3xsy9m6991g.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.5kvmy5ob79mx7vltczt9xplur.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.680z8qe5cyhap64yiqgjlwbfu.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.6ac8j93wosvauqri4tmzijcca.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.6c3zbdvwyocoy48e0e1uqgv57.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.6m46n9zifvrgwfxy0499t2a5o.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.6n7ic9bwijrni0bw7zuuvveo7.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.8d7g3lv1hkaytrmza11dl8l7v.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.8kemovoaah227i87dpe2psffu.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.8vda6kcje0vtyx65fwtois0pv.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.9aua6qvjvpxid9xd4i6b056uq.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.alwhtswr0kitolv4aw46seoe0.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.an6z532bm0hmbcc3b4t958l2l.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.azp0agkivzms30aoarvuahnhc.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.bhvfyymez6ao3anf7yangsnqj.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.cffjrgmh1r3q7gi7w4qeewop8.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.cmqivw6ixyz1vca82nob0h4zi.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.cznlngufb616nfjsy30imio67.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.do947cow21j61hu9mgc2458zn.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.dz5gl5dw0n8s0yf49n2edti04.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.e6wmlfdp9t7w9xspbeaot4v9v.04w59nz.rcgu.o",
+        "data_storage-36bb43300cbd43c2.edpy14j2e0hiyh4ytqten2otf.04w59nz.rcgu.o",
         "deranged-f9087e62807c7612.deranged.fa676bbabfc3b298-cgu.0.rcgu.o",
         "digest-67fe025d62b74a30.digest.88b8631536bafc40-cgu.0.rcgu.o",
         "diplomat_runtime-28c1e3671e005e91.diplomat_runtime.c63bb80ad3ade39b-cgu.0.rcgu.o",
@@ -1683,272 +1674,15 @@
         "encoding_rs-0eb29006dfd858e3.encoding_rs.9bb83e97fd1e4637-cgu.10.rcgu.o",
         "enum_map-1ca668adc1e4d19d.enum_map.8cf8b9a80142aee3-cgu.0.rcgu.o",
         "enumset-d1250f12d54f8732.enumset.272b9d824bcca0ed-cgu.0.rcgu.o",
-        "env_logger-7273f1d467028efc.env_logger.39ebd8839aefafc1-cgu.0.rcgu.o",
-        "env_logger-7273f1d467028efc.env_logger.39ebd8839aefafc1-cgu.1.rcgu.o",
-        "env_logger-7273f1d467028efc.env_logger.39ebd8839aefafc1-cgu.2.rcgu.o",
-        "env_logger-7273f1d467028efc.env_logger.39ebd8839aefafc1-cgu.3.rcgu.o",
-        "env_logger-7273f1d467028efc.env_logger.39ebd8839aefafc1-cgu.4.rcgu.o",
-        "env_logger-7273f1d467028efc.env_logger.39ebd8839aefafc1-cgu.5.rcgu.o",
+        "env_logger-c05acaf67a9dc89b.env_logger.3f59c011f274dc74-cgu.0.rcgu.o",
+        "env_logger-c05acaf67a9dc89b.env_logger.3f59c011f274dc74-cgu.1.rcgu.o",
+        "env_logger-c05acaf67a9dc89b.env_logger.3f59c011f274dc74-cgu.2.rcgu.o",
+        "env_logger-c05acaf67a9dc89b.env_logger.3f59c011f274dc74-cgu.3.rcgu.o",
+        "env_logger-c05acaf67a9dc89b.env_logger.3f59c011f274dc74-cgu.4.rcgu.o",
+        "env_logger-c05acaf67a9dc89b.env_logger.3f59c011f274dc74-cgu.5.rcgu.o",
         "equivalent-a079adceff6e7539.equivalent.ac15ee75c089f903-cgu.0.rcgu.o",
         "euclid-21f5407b41b25704.euclid.4b8e9365a4f9ea14-cgu.0.rcgu.o",
         "fastrand-c915524067a1b1e3.fastrand.de5ac7da9e407e2-cgu.0.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.01gb1fe1rhfwnpje609escjjv.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0217ninidnx1vo75n4rmcqnn6.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.03y6ehw5zgf6ekm54ioiomyog.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0bl0wr6pcfypc0umk367mlrx5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0h5kew46f5aybrddvhg67785v.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0h6qbnofkjew716fpgqpmes3s.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0hfvllf9ht20n7qn1404dg6u5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0kyleqisa3y08cqgq9rgpdmrp.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0mahp59ctna4pwr7b16r2i1vn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0pvdkya2fcvguf07cq4b67m38.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0rcx074930logj51p9ojf9et3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0rpqbjvfo6pbszs92r98n5z69.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0sqst0x2h5bi3kj0tvoqyfkli.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0to0zan7hcxil6n9zorm9dmyz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0tzy78b50l44m4uvpc5vmhvrr.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0wjom3w3vusc2ibkme8m88cms.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0yqa8m14xv0wqbuj6jo5f2fus.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.0zah8dd4t957gk1yfc662gdxa.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.10kpuotu28wu0aijze91txkvq.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.117619txcpaxhsuc4jc0x9zms.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.133xwyvfnb0om7fw9ununpw4q.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.149r147f01n1tlhlh1eg4i2gt.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.14zdt2dguhevrv92f7t6vo45p.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.154dr5sgi9opo2gp5apfdfqsk.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.17k1fzzc1tnjh5zdra39y7673.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.17pl9ypu9xrjsr4za435fxazt.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1abaxvlgiwlnoi7y5xjy64roz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1hhus8ylzeqgb48us542rk5kd.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1jt1myv83fji84lor5biokk4i.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1lmqw8dzaqcpblpn7n7gn4mte.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1lt694xuottjzyim6197yjvom.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1mwhllp2ds4bg98ej7q8u5au6.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1p2ll0vbqta8ylcnh8ptvef9t.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1rnvh8xcojitqwtchphvfz41t.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1twa7ib2hs90el22u47jgfg45.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1vzwtfdbhg570v6mr0eiwohj8.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1w3gkhgbuq0ag51k8tmwqamfs.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.1yl5497o2fo13m8yrwe8vp4qw.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.200j7kzrlv1fw6wfg26jqas6c.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2114k86ep158p1p1jvurcwwuj.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.21tb1o5q0hw1frhe8vs7klrf3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.22jz5azcow2aobnnyc39c0mlu.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.24b86dmrid5oe4spbyq6ir9y5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.24xadnjvhzr6rsufpkr0ff4sf.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.29s3kdrcebxbp85y6csjpk6lb.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2elnlxd3m6i13666hxssh588r.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2fxtylvxf76dfzjp6lup5zg8z.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2gzo5umaq7o2z9ho2yjtovn2g.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2jhf0rm7oso6pw2ezv91l7ato.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2kow2mbci3ewpgd46fkm0acee.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2n2yfjw89ftoqv7u0t9rss5hf.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2oexy6fng9wkb13ow53sp309w.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2ouhxkh4klhk55v0io9cm6afo.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2s25sp45v57txo8rnzc9mbp5o.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2u17e4xbns9opgn1gsv74n3cj.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2vs3udkv932n19imh05s47e8u.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.2wuuwv5p4airlr3zq8gmynjjd.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3d06srmkz7wkqszc1pnlqim14.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3dt17qs178v7naq88dr5vx3j5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3dwkixcwi8n0m9ap9vrgf9k2y.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3jat81hfu2631ggwsp3g4cgnm.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3jffmo6tgirllbf9385fdfiks.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3o2v2xaucs3aoz9ty78u0qm1r.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3tkemkwx31oz19uh09gnanbd5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3vb2qenwnb71su07tm6nzpd83.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3vwx4jydun0zu8jtepb7rjc09.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.3z3d0shwvmq2zsvntt6p5h6it.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.41a9soqcw7asqsdwa0y7u1bhc.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.43ewkfuz6dp1qmllsnsbtspqf.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.481mzltqnf3qd56mzvi7s16pb.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.482rj4ndx9j9zq7vqmrjme8s0.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4afz7lstd30fimq1ixcf4y2l0.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4f0raqk33x958bpu0gh3jq55t.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4ggmnjq9rwdgwsihwby3v711k.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4gu0bt2lc94jki6p845pldroz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4jzknbjnsg8i5ideefb8jq0n7.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4ow12mflr1ufimn8dv5r1bjss.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4qqq9grkfta43pgyjaskkyw99.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4rrg1kj57mkhi29besnqa0ol3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4tqoxv608ttmzppg3w37ga1vy.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4w281f3iqguy3u9r0v9rj0x82.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.4wgroq6w0v6v2123i73hjymvk.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.51p1a2m9i5nauw7il75fa1oe1.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.52dj5neezhgs3hcgeh9ezkz7y.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.53rgtxkgplrhkfa8x04f6yjm6.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.54cwr1mxcyun34gowldffku7k.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.55ozsm39oi51eug0ogrk99tmi.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.55xp6i5jjuc0tle6062o3p5df.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.582lpjdvb866rbwge33nlekyn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.58zzomy3oqbul1kachkmlwxhy.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5bzx9vlzn7mri6ko8fkrspith.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5fgy4pqa59tvmin6fcifuqfat.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5fmo78wo4ljedbgom6dajitfh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5heo2xb14jkx8qrbb47jrw702.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5k7ukmz212q2x5tmc1f235vhh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5l7pidn4xkhv08zo9els1oou3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5mq4eafe2thwksr8hmnwh7dzy.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5nqtao9c0d1b0bonpuk9my4le.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5rxb7kh729o0pdz9kvkg6tits.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5snibzk2146lkwvyyrnhvo1n2.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5syjwmpm07bjnwmljemse9ugf.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5vtrxmk0tcz1mtus4f8a6km9y.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.5yj7h6iqiq5euzhedv72ujp7f.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.610es3z94ht4m2m0k1aj1j0q4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.62znhml42v3cvzz4i4ssufhyi.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.63obotzniccue9farkn3pnsgu.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.649lsn1d17okfj0dxv5ruguoh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.649qagih8nsgfzj2et19qt46x.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.675lnq7xy2qwlbd276obzgr8o.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.684lys73q81zxlwnguebg2ec7.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6agutrxp5pqtkzhe2mk0c3g6u.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6av1yj9muc3fhkrohk7jsahzy.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6bgmuyxjs25oxwed8oxuan7ul.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6bq1flkxwxib4lrdqjqhgmxgf.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6c4pys2de4jv1oqbrprc27nez.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6i25kfgy8rmk28rwc5j262y2f.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6l8n5hehyzl8y4mr46yksg8qo.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6niuysyox4ccfbjwu8yof1a0p.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6or2235vzulc46ay7jlya7uek.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6who2bzmvzcr4nuqy3y59uvi9.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.6xmomihgfcn7ecldwjmv5a4ab.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.72dpzi3u6skqh6hzhgc49irbn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.72peh07zbtm5x4tnfaoijsdgu.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.73pm0a6r6ejgmcjxpwltxttlc.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.75ayo8dwxdmcc2mzf1qee6u0r.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.76p8q7vuxu22eb3ilm8ft0irk.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.78fmb45m7wbjlwokap5fklxvs.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7adycf1oymn0ib98x57e16o5c.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7c7r9845pfiksdtxuh8rd2b0q.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7d20na21ysqybrznagcyd62ru.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7d94wsizqxx38g9ee3sxb0l0m.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7epwnf0y71wrms1tqeyc7tyau.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7it2hmljiiuvtj6bk42wrnvux.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7pw130zswbrzxlgm5n0awi7z3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7sxuodxzdekjyoifwie5h7leo.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.7u8ydz8gr3nb3kfzx3pq4anza.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.86hheweoo34nnzvlwkkzvnw3w.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.86tth40dd0ddp9kz9vxuavk10.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.86zgc7c5inos1s46d1thei3mz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.89ixqvno00ujwhak4e0e6tqxw.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8a1nztwtriokxuqkacdgwd7m6.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8a56preeblwr60pipl8xzhlfq.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8bmis2i5f0obo3puoy37upkl5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8bsq6ucqow9bb2r5z2neizob2.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8dspvupx1w0zst1kuic3emkv4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8f7820mgmt3wicl81f8vv2keg.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8fmunyal0xx8f3zvpqingl4zm.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8jp76ng7eqwd6o0yhwhgr2nuy.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8lumrgn7spm9r3bgvifhbojfg.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8meupqkxhfkfej856bc1yl09f.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8t5932tp1g1y4y06raemcyerc.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8vespdlc33om0y4icqn1t7j7u.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8wcus4xth6vez8vr12b45l2y9.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8x869jhmnndzm35plo0itlyf9.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.8zlq0kcwghjvvanl3rrmvuw45.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.92p8u0yyq18qk54gviyex13zx.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.92pwdjufmkog5qdoz2ylq0uhn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.92sg2v1o213ohshmb3rxex5wo.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.93lqe480oxx3097fcmc1z9bor.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.93nolqnwnfgvfj60pum9339gb.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.956tgrz95qzezhd9hr3ipf5ht.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9605ad910s8ad3qgm9gyc70bq.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.96t3m3dibsp4m2u5yenms6wlb.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.97lwrbr08caw3deyn7uioflzh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.992u8hz9hr5sdjzwv7j2ztsgn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9b8mh4hnnxw01c8bbrwdzhigy.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9chp9n6fd0xd9ejvtawv3n4mk.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9d5f3c08dognpsas4i3l3k7bo.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9fcwmcpepf72xs12ayw3mn5kp.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9fv6zdx2vaby3qxahfeycpgv3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9gn9hf6x20r8cjugk21vu4zkz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9jqwn70m7gdgingr96fgspgbf.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9l7lp715zc031m7uszucw13lz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9n50qovqw60znlk6lnsfnprh4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9olcluaeq0x5rq3dshrd7l4yz.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9qfgnf4vsuqn3113v5pxw58qh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9sizgtggb8wix4s61o9tqc1mv.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9uzl93oz0nq0zq4lcopd5lgr7.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.9yj2r66d50i2lhv53nbyqrmkn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.a2bkx985wk4cxyhe5veo5kknc.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.a4trjut8960fn5syreljvpswl.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.a5kjdfkdyghhzq62cyyf3tyrk.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ab5r0es5o1i2zukmut5k7w3yx.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.aceddjppergc9lev9legiwevn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.adprj7m1bg4ahr7o604q76uz9.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.aem7yiiprb5dsseh3rbwap1wr.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.af9lmwsveijskfblpjuiu555x.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ags9c5swi8ewa2d65hvzdcp22.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.agwcap9599y985ogm7bpbqzxe.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ao6xmbjho12ikry50tw3s6mhi.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.atblhohmsqrageej1331tdo7u.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.au3a2z57hua63v7flrdxnrtkp.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.auk3a9neqqi6powg7dyulxlgr.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.axub0mcybj3zkwz4m4fdnlpqk.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.b1s26ie3afesn1d45e0hzkqx6.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.b20dadv3z14va655j9dtlmvne.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.b4i7235x6fxq3bccx0lduflv9.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.b4ko9o2b360ru2yp7lq92hapw.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.b5ozf3ce5sjrqe09wjw1vpq3v.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.b84ot4s1qhsftczp9r55fgwll.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bbl9u1njws04gah1c3712arl7.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bjt0b6u2zoozlwpvj3wr0uzks.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bmcigx3o44g41xv7drd2e2j5y.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bomzgoe38j0kh2if3trd9s9p0.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bpiiprfdwslidg9shstirl7ft.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bpjee74ljtsirnx82srhin94l.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.bvoowjtjmh03p46v5w8bn400i.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c09inowdpk05uz0q3qfg1zmmw.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c0y8aqd8zhsm066tiqb3zo25b.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c1b5qi2nexmazplcknjygww3l.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c2ozj692t8us6n5im3b4ijit2.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c52y4bvo5fo6g9bl5ttz2aqb0.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c54rwkskgd374kgo10oelge1m.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c722jbbzw7qm4tu8oqkwu7dso.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.c7ptnsiab0vrui84kaqfhbh5f.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cb24i2comi4hhrjygn41phpa3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cbrhpvpwlqr6t539qk6yzvs66.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cc2b9gp4r6qdbdx9xoxsf0cy4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cf9adyw5rg3ucrwgz884clcld.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cjzldgbndxwvsw9ywv4bt1uux.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cl0544lys9f56vhgj0dzk4akp.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cq3c8kfmut4to37c5xdtea5z8.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ct72lrfq7mwmjhzncyg8ixkkd.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cur2onk8wv2b9qnuhxqrintyq.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cw9jeg7liv39598wwkfg9h3bh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.cwtqhmnt184ywcl46uvti6jzs.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.czngg7itg54i8vd9ajww1jbl4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d2f77b3glefr19qjcqzky20oc.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d3los6vap69g40o2hi0jwreye.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d4l9h86bq4g794vs8tn0ebwyl.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d5k6bmzoptmsya35pqawvnogo.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d6lui0pdmbt349i63zqn4b2i5.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d6ly14ilh1v27nhi8103qcfsu.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d6n8i5je1ptxd7jfi2dunw845.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d8i5ms1z5ov6xdl189w597ki3.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.d8z4d7b5viw2t3din1a2ajyzd.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.db2j3t69t6hwcbgllxta4uatx.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.dcumensjqtc3fc4fghl8w9qgw.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ddg4ba6k35i73rpinjrrq1ux4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.dgctpi1g8ofcnsx8bd0tjo8wj.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.dol20puwamjfggnddl5xjnpjh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.drr34hn7z43kly71ddmefnz2a.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.dvnbabcl18omdakcqkx0s4rh1.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.dyrwe6uibg810gjghh62imtgw.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.dzfuy6zqh9cgdadebgdz0e961.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.e7e87xkgdpzq02ir2cqabzaof.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.e9pgmjcr9urpku327uk68dhz8.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ec00ahy0vtu6gfv1eksfij7vh.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ehgyb6oeni7pdnakxzu6gvix6.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.ejpjp6slf7q2jf0inpg5541mn.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.em50ityiypgr0bpnttyoj16r4.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.enfb9w46tlmiz1jjvhufstwdl.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.eqp47f4ys3pvel9t8t6z00vm9.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.etr8fd2j0huqg6pboi1w4vium.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.f12s4ywxgi61loj9uuokg1oww.0w92xcv.rcgu.o",
-        "firefox_on_glean-63589f3bf047204b.f2rhk1myepqol8vgoux7pd1p0.0w92xcv.rcgu.o",
-        "flate2-dd54d773ef239945.flate2.4bb9dbd15cd35b79-cgu.0.rcgu.o",
         "fluent_langneg-f949860e24beaaa3.fluent_langneg.43dcf8c3d022da57-cgu.0.rcgu.o",
         "fluent_langneg_ffi-a2eb420302efd187.0is9mrzwhux1e7wqmlyarzkdp.0zg21l1.rcgu.o",
         "fluent_langneg_ffi-a2eb420302efd187.0qxqm3qp5ullipxccbtlk393d.0zg21l1.rcgu.o",
@@ -1965,113 +1699,91 @@
         "fluent_langneg_ffi-a2eb420302efd187.d7nf8pn1qaeeuvad5e3q1hzug.0zg21l1.rcgu.o",
         "foldhash-db1d0edc697b1a85.foldhash.9fb46bfdcb1220d4-cgu.0.rcgu.o",
         "form_urlencoded-1aabb5cd3ab27f2c.form_urlencoded.7c82efae23dbab80-cgu.0.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.1e0b5n0hvfyd9nzbxj8etgkar.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.1jpx2s46fut7i3bw41jhtumcg.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.2al6b0x8bpx6kgbh40pwvataj.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.2l1t5mdkcnxkewa479s00nyv0.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.37qrs3ucsp1sjsqxbdkq7tby7.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.4y2ihm0evszhyylls6z5ee3gf.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.56mspozqgw1lv3yiexpqaqrei.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.5svgipn5gvc4hzhjfb1nrx99x.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.5wmccid0k4yqa121p7ynr88n6.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.62nhve5nbt91yaoe7gzom8xam.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.6p3zwza8blnvf7f5qsfhjgchd.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.7uevkx311bqj5i07whlcjh02k.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.83akyye1qwjqxepssp526iclt.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.8awdccii42qcoyr6a7rm1d9eh.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.ay18wre8b37y7lm8dboenmk89.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.b9h3yrwsvv8afrg60a0lsdqne.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.bkir15v5o7weqfh5w553zrkqb.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.byx8v7inhq5vjppepr2vcha8d.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.c0asdhhryft3547eyiq8fc6ha.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.csuh12116tpidlr9zrvrxdxng.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.cw809ln4frx4r78hz4lwlqn6c.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.cx7ds8zfqqw6jxswr46zu1wp8.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.d1wwj5zbtxb74tanaj3ybsc9x.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.dn5dbl4wdubj6fovjofpvdeyl.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.dpajprib3sjv9icecagby7njq.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.e3femhvv8ezfobi59csw4aim7.0rwu3je.rcgu.o",
-        "gecko_logger-b6de0fb0d2b38a0a.e8cztwdgr4gxinhjeggqblw83.0rwu3je.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.0q7rkptrmp9tsts8onie7580q.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.1934olyfyidpwktnsetp6rqqt.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.27kikoq8orsdctfy1guthpc52.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.2fuis2xn2dexo78jdd0apoonx.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.2q9t3ejhss4to6lluv71p101s.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.2zc7vcxdplsyzksc9bcn8o4ql.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.31h9nzsl12zvy1t4cu39eznkg.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.3dy032sp3b71z77ik2579y6aq.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.3nc2c9edp9bfne3vagkm2dy41.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.3q10or2u369dcvancfm60i77f.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.4060nndp1451rp8os8ohwsqsv.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.43bsuzcm8rrfc8jkwiopleqdk.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.4m18h4y0mxjvgbzgyott486rn.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.5d35c7sxupb4t0y74qcgbezu5.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.5fkqidsyfdyez7gyjmz0u4koz.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.5xgufl2eeuhcvkyomuna0x1ta.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.5zgq3wr3hf9mkoe9w801a3ka2.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.663fnmc9ee1qtjwmptqxumw6d.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.68bqwcag2j79t0lier1vf9h4l.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.6vrut8ab99gsjg1swykc715ij.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.77q1354rw5gxs79yu7idlym0k.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.7kt3muol835sutg8mvhcgbyz1.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.85e305cotss9i6uqj0o38q7zw.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.8607axcq4qko8gdzqax43b9rt.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.8cdkp0k7753yg2azdv6pffz09.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.8y3mk6oo6kkda3x9a0bwl42pz.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.9a6t20puc51c84h7xb4qrdlsj.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.ag4ex459aj6dlkoijskp4jfhl.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.anjbeofemwtd1jd6mhb4jx9s6.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.as6ckkvztdkfhuhlyp30tabxg.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.bcc61g3w5nmfeq3vt66vg74c3.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.bjpak4hmtm6qppsz89fa67una.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.bkkyaouia8mucsf4q4v7t9p2h.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.cg6av1v7azrytrfr74gxgy7rh.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.ckcg7p51n9poo1gcdw5ho5c91.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.crfd42hrgm214v36o2am2uea6.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.d2u66nse8kgp3ezitlwwpucld.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.ddoies20q69dg6so4ogcverik.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.dske00rgn2ejw5lncx9qqpzf5.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.dxl6eku2twhhirhx7ndke92a8.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.ecfsx56hj6mf2sjkpwh912k5l.1ai4m99.rcgu.o",
-        "gecko_tracing-1a177cf73a16117b.f2lzr55z8r47pxys2duaa43wg.1ai4m99.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.05k0nht4bxbbxywjjgglph3qp.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.0kxlgdgu3el8oqve3j39uk6u2.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.0kygu16j1li23fhie018scaul.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.0rnt1n9fcj6ne5ehm9qufhw9c.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.0xtpg3rk0hsmw0yct4hr8ecjz.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.19ll05yq6llx913wcksba8es7.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.1b1k5wckmcwfzp8zzy1udb5ur.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.2488vv1yw9ojznbgayzdleu70.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.2mkbudkefoppr8n74ahjpkniy.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.52256a7kdazu45n4dydgjngrz.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.54pnp2dhk19u7808c540m7dbe.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.5n8yi9agd3wwomtasqz55w3sg.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.6f0l73s1qkxz8yek48m33q3ax.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.6k65aryqql015d73p920c1m4z.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.6ozz0xeb37eds4trmk4633tvc.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.7se10gt72jjjj96geh74m88by.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.7tthbfdlubpnl7ah6qa7jdshh.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.80bhb584fwkyjqtftxdztmqib.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.9k8kaxtieao1dazr6zx1iuiw3.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.9qy81gyk68a6ohe9t9sh42lfq.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.9z33r8317mjzcz7yk8w631koy.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.a70u8hkudhfrjmub42wcqhtfo.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.b8d876cro0vqglltm5q1bfotg.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.d7c5ksip0la7jntexrjz7rl55.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.e1oq3rnpjh6j962lqf0d15exa.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.ebcmz38swymwyswka9m9infix.0qjh9km.rcgu.o",
+        "gecko_logger-b55bcdeea779f34b.ezdozg3bha9hq9a3bbrhc0jwf.0qjh9km.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.0biakpjonupoamijfddaw0695.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.0h2ppk9t908fgl4d91it8k3s6.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.1p0pvbrkx2udcvm7i9ttrwz8r.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.2ysi5onpuuy42cbaq4gwd5j1k.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.3apz6qhsmcusptyt1ss33o3mw.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.42cy2zqtq4mp5ugpabmah4cdo.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.4af2kwsfiph5wd5jsw2kaznfg.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.4ivbki4yqn2bijcpflr9kglhs.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.4mohmec89k687tt47jzrwp7lq.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.4svgb4nkzexl7pop4akfy4pmc.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.4ykkihdptkqi586h9u1iqjst6.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.5e0sc4wgva1zzksqjoeu6znxo.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.5osk51vndb9x59l6wh0hn6zd3.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.5p679azwiln669md3uuhtgw3h.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.60en1esluiuzhqk7ce5v8m8co.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.6ek27rwr5g8q5vn0nlfaihjz4.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.6sak18yj6d95ek89he3qmxfl6.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.798dfcqpxu0tufbiyxbtw4yzd.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.7ojua14xsa3q46otyngktpd83.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.7p0oljy9suzemngbtkisnyety.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.8aanwows7mvc73ofz13agysji.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.8g4yad85paay3oq34ofklln3i.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.8jxbsqhdgbz5osci1mrug4ss4.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.8w2w7vla06hh3ty1rrkse8lmj.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.98wkdweddfhsl0tp9m3o3ja19.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.afjag6rz9t9x247g753s9q0g3.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.ahoe6lz4gvqrlobnrwia1ghgm.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.aqggo0g50xpck3aa8qxisv91f.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.blhzlk1pqjobshs3q84nc0bd8.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.blthwhhassepcetlc0h1z337s.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.bu7zxmxle6385lpo0766hhdmi.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.bxi90bzex37of3uf74r31aqc8.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.c4m6tw6ctembvcg773dp0z0o1.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.co6w0vgkpztbnia65c757o793.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.cq5mnxrqh5mz7rm8kytb8aniu.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.cwfjkriu9pyk0ptfmn5joks2q.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.d8rdi68pu3pobjf3ikkekdm9v.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.dgd9pxsvitn3om1bu7qwft7vx.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.doczc7foagcjs2ljz6nij9x3y.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.ehthb5dvnzugv0kucb5eoxu47.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.ejiqsc4pdctxd918ou9dooj3m.08198vu.rcgu.o",
+        "gecko_tracing-0860e3ecc9625daf.euk6bsm38tbbekwua7u3u4tgs.08198vu.rcgu.o",
         "generic_array-e1e048c55ebf803f.generic_array.de9a006deef18c7b-cgu.0.rcgu.o",
         "getrandom-8165c1ae93579290.getrandom.2502a849dcf7119b-cgu.0.rcgu.o",
         "getrandom-f1b2a4f0c8b89eb6.755yejd23rqlk3jmj7uet81gf.1pi2img.rcgu.o",
-        "gkrust-328989f61b3afd3c.2hronnwi2fu1nc9ifptbblkpg.1tgy1k7.rcgu.o",
-        "gkrust-328989f61b3afd3c.7jnqbmuc2jc4pkwyffxjfobyc.1tgy1k7.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.0mjkn0bulfut5um35t6f88os2.0ena837.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.77id3ol52d7ucxcyev64muhkc.0ena837.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.8uul3rm7yixk0oisqw4yleo6g.0ena837.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.aj0ogduuao1g4krtjj6c3njc6.0ena837.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.b033d45phgwnh5uzibdbg5f3l.0ena837.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.d4ltn34k8wx4bkfqh9h7pzskg.0ena837.rcgu.o",
-        "gkrust_naivefox-a63361c922d10083.ewi0im72xbzbbmamr865r4usd.0ena837.rcgu.o",
+        "gkrust-6a8a20f338120e6e.5uoscghyprtu2wd7ohsh5zx4z.14z2x5y.rcgu.o",
+        "gkrust-6a8a20f338120e6e.c5dpks2rcya71kslxxjxq7bam.14z2x5y.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.1qbn6gjpxk42nqv2zvswtr4jx.1bxn0xk.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.5l8qh0grx9h9qepqk6ed21322.1bxn0xk.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.99bbvezo0hpzu7gwszzl63q83.1bxn0xk.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.ax334uw2tboqrv5bo6fqr2h32.1bxn0xk.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.dkig7ge5jlhi19odzrghgaula.1bxn0xk.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.dr4zhfv7a7ku9nnz1glsosomc.1bxn0xk.rcgu.o",
+        "gkrust_naivefox-05b28bc365c67491.dvsndrpca8b8qfrhxu61amuef.1bxn0xk.rcgu.o",
         "gkrust_utils-81bfd27432904725.5gt6ztthln9qq2pdsjacqg9oq.0rz8xzl.rcgu.o",
         "gkrust_utils-81bfd27432904725.92m0q33zomik1ex4x5m4dff8q.0rz8xzl.rcgu.o",
         "gkrust_utils-81bfd27432904725.edll66gxuwsusazvwmpw967if.0rz8xzl.rcgu.o",
         "gkrust_utils-81bfd27432904725.eyhga4dpevp0bsz943uyr1uox.0rz8xzl.rcgu.o",
-        "glean-0fa8d1da5af3682a.glean.d35b34efa6a0fa49-cgu.0.rcgu.o",
-        "glean-0fa8d1da5af3682a.glean.d35b34efa6a0fa49-cgu.1.rcgu.o",
-        "glean-0fa8d1da5af3682a.glean.d35b34efa6a0fa49-cgu.2.rcgu.o",
-        "glean-0fa8d1da5af3682a.glean.d35b34efa6a0fa49-cgu.3.rcgu.o",
-        "glean-0fa8d1da5af3682a.glean.d35b34efa6a0fa49-cgu.4.rcgu.o",
-        "glean-0fa8d1da5af3682a.glean.d35b34efa6a0fa49-cgu.5.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.00.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.01.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.02.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.03.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.04.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.05.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.06.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.07.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.08.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.09.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.10.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.11.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.12.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.13.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.14.rcgu.o",
-        "glean_core-fb04b5cdb0296ccb.glean_core.151578cc272f6e85-cgu.15.rcgu.o",
         "happy_eyeballs-f4c6fea0730cb710.happy_eyeballs.2ce00b6345fb3437-cgu.0.rcgu.o",
         "happy_eyeballs-f4c6fea0730cb710.happy_eyeballs.2ce00b6345fb3437-cgu.1.rcgu.o",
         "happy_eyeballs-f4c6fea0730cb710.happy_eyeballs.2ce00b6345fb3437-cgu.2.rcgu.o",
@@ -2079,36 +1791,30 @@
         "happy_eyeballs-f4c6fea0730cb710.happy_eyeballs.2ce00b6345fb3437-cgu.4.rcgu.o",
         "happy_eyeballs-f4c6fea0730cb710.happy_eyeballs.2ce00b6345fb3437-cgu.5.rcgu.o",
         "happy_eyeballs-f4c6fea0730cb710.happy_eyeballs.2ce00b6345fb3437-cgu.6.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.02fcruvlt4sedrs2507zd95uc.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.118r1esow5v54y4vkx4uv6h35.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.1n453rvpdycg6yxzvy04lci24.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.1wf2ovrd5ff1j82prld460ulm.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.2r24odkq632swmx9rsajx3h46.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.3n03tvvjs12qi8wqzjhlci1l5.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.3q4j60qgwa7svkjcscst7j17f.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.46d3w0sshsribhoj7oxlzsmt6.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.5tjloxdzwzuil95ic45je46v1.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.5wqykyzzgpn1rmcabp60kxi6t.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.69u85d2qyj7u6hlmy3uc98scb.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.6l57tkctax01k0u7bldm9h2g0.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.6zo4f1teyzitn85zmz4yco2zc.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.8cul15l46d7zkx1mqe57cynl8.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.8l775uc2jy93i5x3gyfdy94sq.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.92ln89k8zvpjde72byj2a4huy.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.a7vizlm1kwybtroh6wl8eawkf.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.az1spqws5vd98cmy1eb6e6os9.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.b2vnscb8515iml1zw1lyta270.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.b45v7ceb54knvxya0lgpmqoqx.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.bxkzy2g78l1n0jes3wpu03vs4.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.c9lg03ekgyxca1yc5s4v2tvm1.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.csrapkbsdnihl9w5vfkrs8wg9.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.ei9547cyrbum9q0advc6hyzz4.08spqs1.rcgu.o",
-        "happy_eyeballs_glue-d15ffc45440e65e9.f2pz7fgomsbxw0ln0e4a0ljzk.08spqs1.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.03k5m89t72kbad3nwfb3m0pku.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.119fsxfv7emt5eqv9r4az45ns.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.1c7ynm1scqk2b4fksusoad8c4.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.1tgne8gcpe6lfg1afrwkro3yj.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.3hs394lq70g2jhzf156kzkcib.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.3n0gmua4i049xb0cdrytmdod9.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.4a4rbqyx345hgpu8nm0q7oe8c.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.798w9w8fftxc29gizzig8xznc.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.7bhccg4dj8el7idmglfq1p851.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.7fviqc514d8dd7aizlgx86oky.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.80x16dou1ut138hfcu5gixs7g.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.8fwly4bm48glwexilqbnkm62t.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.8jl7xidt6jveqi88b1vpjvmjk.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.9felvizz7m30q9w9ojfy10jz1.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.ab9eryv3cs1wsr1yqg5ozhpgx.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.aeji8tfqhdlf99vu8uenix8qy.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.bsiy2obtnxztj9myfaniapkma.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.c8lr7slvdmzk90i9b4nxqnp7a.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.e7ae88fr1ktlc7mv4s8a3ihfz.036a0nk.rcgu.o",
+        "happy_eyeballs_glue-61c9708e1c91a563.f2by3ftbxdkwf1xx97xsoiah5.036a0nk.rcgu.o",
         "hashbrown-8f90a12d6c21e57e.hashbrown.91b572a9a6a6fa52-cgu.0.rcgu.o",
         "hashbrown-97f0f800a4027d46.1qnhixn11iavo34qqf4k73kgd.1dpy0ve.rcgu.o",
         "hashbrown-d36d08601ec23735.hashbrown.b80bb9581ca00aa9-cgu.0.rcgu.o",
         "hashlink-6180108e477e7cdb.hashlink.19a2404c14e3633b-cgu.0.rcgu.o",
-        "hex-bf888aac36e3f0eb.hex.b7876431258a3d84-cgu.0.rcgu.o",
         "http-075a3c7f57ae62fe.http.67ed7754ef586143-cgu.0.rcgu.o",
         "http-075a3c7f57ae62fe.http.67ed7754ef586143-cgu.1.rcgu.o",
         "http-075a3c7f57ae62fe.http.67ed7754ef586143-cgu.2.rcgu.o",
@@ -2404,33 +2110,6 @@
         "idna_glue-b877c4e48a06fb48.ep622a77xuuwog2uwsdzfb7jb.0np9x0s.rcgu.o",
         "idna_glue-b877c4e48a06fb48.eyvjw9b8p4wgccuyaf3irp36w.0np9x0s.rcgu.o",
         "indexmap-89a0e43d3493016a.indexmap.22421df177a980af-cgu.0.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.0khcahydda5rxg1swgd0ovwqi.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.0kj0l74h8crlzgyvvzvqxmu3z.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.1bhk4p30hraypvk1pj02zvo4p.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.1e6c4d6ks3zl96wi18ss1qvqa.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.1mqh6aajw2vqowa63lzvsc7yt.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.2elong4mo7m7h3yg1lwvmvxya.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.33gxeijktad3uu5mn8iqawnam.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.387yzeahuvbm9t217j34h912a.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.4a3h83bb6i4bvg15hi43m7q92.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.4jfznwn2919g9m2gkqub2jyyg.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.4kcyvwud5sp7gzne5vudu894r.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.59b9y0ei9m9wz0o528m9pwcb0.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.5qj6x7p7xklqvs5k7hb9ff8mt.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.6nlynwv5wg75kkcrn4n5tbg6n.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.7tg0ubasi05xpyl3wsnwehhfq.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.8hxg3lzhjdlgq3qjtonlec2g0.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.92vw4sij9kppxoi9h1b4sygk2.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.aca7dawh4rbjbynha672xq8g8.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.avw2dsxt1o4vzyo6twrzft5fy.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.bp45a5mr19h822o0av6t63beq.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.bsawvfctim4m5cgtjt4ukfhwm.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.c1wkctlaaz67jk6fffcz51yw9.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.c6hhma9ytjcj4ji2eri0bvirf.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.e7lzig072ymp97ncyje87y7tm.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.eng0ic39zbcwdzrt0rfyx07sp.1419t0y.rcgu.o",
-        "ipcclientcerts-167dc8052610df26.etfthkkrfusld087negadvvx8.1419t0y.rcgu.o",
-        "ipdl_utils-be5577982de1ab98.8qbtqknrxs4jsipoyvrxo8ggv.1si999e.rcgu.o",
         "itoa-a7b727b885e3ff5d.itoa.7fba6e85ed07f88-cgu.0.rcgu.o",
         "ixdtf-a8723ece82991283.ixdtf.74f61d2fdf522423-cgu.0.rcgu.o",
         "jsrust_shared-6760abe57516e8ab.1ltseu1w2njg6rizxh8xmhs4g.1cmr2vs.rcgu.o",
@@ -2440,7 +2119,7 @@
         "libm-b8167ae71d2ec15f.libm.f708603e465de3f8-cgu.1.rcgu.o",
         "libm-b8167ae71d2ec15f.libm.f708603e465de3f8-cgu.2.rcgu.o",
         "libm-b8167ae71d2ec15f.libm.f708603e465de3f8-cgu.3.rcgu.o",
-        "libsqlite3_sys-fda82e89874afbca.libsqlite3_sys.94d3adf00da9edeb-cgu.0.rcgu.o",
+        "libsqlite3_sys-ca50063355f4317e.libsqlite3_sys.b278874b95a764cc-cgu.0.rcgu.o",
         "litemap-0d51593cce356012.litemap.d97b3ab54116589-cgu.0.rcgu.o",
         "locale_glue-9a0499ef08fa7452.00j9s93d9wk80wgtwyito5902.06si3pf.rcgu.o",
         "locale_glue-9a0499ef08fa7452.10jvsqj6hm979sl8vpuyud8cn.06si3pf.rcgu.o",
@@ -2459,9 +2138,6 @@
         "md5-dd26c529679618eb.md5.e5df5f71389b880-cgu.0.rcgu.o",
         "memchr-1432332e0b6da630.memchr.943786008f3669bb-cgu.0.rcgu.o",
         "memchr-1432332e0b6da630.memchr.943786008f3669bb-cgu.1.rcgu.o",
-        "miniz_oxide-5644aff46edf4359.miniz_oxide.5faecbc418f596f8-cgu.0.rcgu.o",
-        "miniz_oxide-5644aff46edf4359.miniz_oxide.5faecbc418f596f8-cgu.1.rcgu.o",
-        "miniz_oxide-5644aff46edf4359.miniz_oxide.5faecbc418f596f8-cgu.2.rcgu.o",
         "moz_task-7e864f79cc97e4ae.0cszs6y93bt00uahcwxb1q5lt.1rqnwg6.rcgu.o",
         "moz_task-7e864f79cc97e4ae.0occnyjgs5kgl203e4lqdeq1c.1rqnwg6.rcgu.o",
         "moz_task-7e864f79cc97e4ae.1h3l8bo8cx909zda5gn6chmr5.1rqnwg6.rcgu.o",
@@ -2506,142 +2182,138 @@
         "mozurl-15e021984508b3b7.eekvzrf2u7xmm1l84zqq2yt2s.1odz78y.rcgu.o",
         "mozurl-15e021984508b3b7.erdn7m143hxnoa4kcc1ld18ag.1odz78y.rcgu.o",
         "mtu-2b641da4bdfc14c6.mtu.23a626fb56b579c6-cgu.0.rcgu.o",
-        "neqo_common-9030b0ea84f90f5b.neqo_common.70457b4826f92294-cgu.0.rcgu.o",
-        "neqo_common-9030b0ea84f90f5b.neqo_common.70457b4826f92294-cgu.1.rcgu.o",
-        "neqo_common-9030b0ea84f90f5b.neqo_common.70457b4826f92294-cgu.2.rcgu.o",
-        "neqo_common-9030b0ea84f90f5b.neqo_common.70457b4826f92294-cgu.3.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.01nupk0mjbndx4q58lrvkw7de.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.05kfrv28qw0ncmm7vun4mr408.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.07um433uifaai0efweenwu4cx.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.0ycril9afoa7t0an6hub57sem.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.13qjgyicf5fff54pmixqh5sbo.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.1f21c9ttmsvnn3je3synqnwv1.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.1nspwwka98c5eldhogn3ts3wq.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.1o7nq9epxh2a50kriue7tryw5.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.1qknmftdbhcmqfanbw9bx37zy.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.1st49ov64yzh9sm5miwto2usw.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.2adnemtooidulb5qfamkvcyor.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.2k67oqwqdamtmlgjpc7aai5p9.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.2k7wuy5o26hglj3iv34ij4qvb.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.2rlnlzjf9bddqxbshuztkfvmk.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3422f5uw6f9ep3ftio6jwk57h.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.37cphgqf75dbjc47wsos451ln.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.38dhykey7c0nhzi5q1mjs78mt.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.393hp8g19mbk9vtijwc6ca4v3.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3alc60c977fc7ax36ecsj2e01.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3cbbahea96iolymplwna3rh9z.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3dhy6v7wzbrwl8z1t523bxzfv.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3ejgdwmwhbsbx4twipm576pib.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3or2b40oa4rnggm375pvmi4qv.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3rixlpjbjcvk8ftuoluylkyai.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3xsm0tl0ak6fmcy6gl7tqprzg.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.3zrc5e5t7yh1l7gv0ax3uvxv0.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.404001p14664uf9kkc5wrl09h.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.47o18w1owih14mco63m2ie0hr.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.4d6888dvkzh42awwu5bkblv9n.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.4f582p1d5kbdsyayrxy3ai02t.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.4knm7wjv77cg8mplnmqxv1sbq.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.4sbpsk1sg5vsnblvmod3k2e00.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.4v589chi94icviodsiv1k7bsx.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.52czmwb250pio2d2ig4pqprb0.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.56uf8uqpuc9m8pjyiwnwzayta.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.58yhfkglbsmh1ynhb63hcgsxp.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.592dstknwyx7q1djcuylmxe5s.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.59yui30uvc5zjtvkefqjvnttm.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.5cf95wkmn2surih7rqabxcy90.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.5ils6iu1xllantjvo7k9g2s4n.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.5oiz5r4ixric4sfy3xed5firr.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.5uvp4n7koc2d0a39gwtzh3z01.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.63jnc3p7el5vzj6mtt2hdeuwl.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.69m3d1yr9nl9dtb2fmyyxok0u.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.6mf6q3qqoo44eb5cek2x4po1p.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.6t4eyr7hqbxngdb0taw25797r.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.6yj61ayuc5gctlmcasgx2z85x.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.6yv3nwb70ghl6w5hsw6vep21b.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.708lmuqorn01m6geuy506i2qr.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.74g6yhdml1ldw9p2gm3n32f19.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.79gpctimeqe8utjoyf84imns0.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.79uqhlaj6l1uoo9hk4xp0mroy.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.7h9ef3xh4qyeomjxueqhdf4a4.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.7isd06a8m1npfgjbzh5sgoza8.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.7ojq4qx54ut7gxx2hosdm908l.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.7paxaykmz63pfyb6a95l7a5vh.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.80q0z1v6r4bnib095aotqjxdo.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.85i9zj257nyvjgaol6srrd9oi.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.89323uskb7sdilc92s64ib42z.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.8dg5in6ebb1e97c77ed2rjvuj.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.8zsy3b4zcdmv1frn5fniqsxbl.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.99e2mcexeu96uw81jgpgwxnup.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.9b7fgfhy8b3aw8ub94svchh1p.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.9b8znyynsrhs10gbv2tb2jjh5.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.9pwekfwn4uk4fgwdc75qw5ag8.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.9u08h2gu4p78arkoy7youyemi.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.a19d20rmt6uxef0d3dn6878zf.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.a5zt9gxkyg2dmtlfpt4laoq42.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.ad2yrjebbdoi0jd3hjb8al5y6.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.ad5zbln4lflgjjygt9cqvej5f.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.ak9hyji06555xh0e83z2y8m88.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.ak9neo0u1xwkk0u30iyzn3cfg.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.ap2kljq68uzfu8j2nry9bp7vq.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.aviev9w74748zek5qspknkksb.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.b85sgdl0xfi4lh0x9ryyy64wn.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.b9l1z2slzruzs9dz0dftz3sdw.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.bd1xb1yd95ewwqvv3xtbktlkd.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.bgtas9zvdr6tx87s61w8m0uec.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.bwtj6upic36wt71lzteonuy2e.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.cezzp9zd6zbo1x9xjujy80x66.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.coj57hbtqdodqm595g4yz0u9e.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.cpohbdba3rd7f83z5ssi6lfyy.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.cvzsfno8c7t1hkj0t6i4kbcpa.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.cxs4xzj9cq7nxh2zibmuvitej.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.d9eikjfa7q1t1mmuec3v5vxw2.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.dbcz9yn6pfzeuh3m3ul1ze7qn.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.dd25un1e7enbr56i1f6cuio21.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.dqcirmsorhi767j5qdr77ivgv.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.drq9ubkb8wuddj6i0hh4d7tyd.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.dzzze3usly4rhzwkf0cv83g0j.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.e1unskriwbfnrfz5z06pswra6.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.e83snmb73xgojrz578r53y615.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.echaj3wkbnkcvvknbl2uwdvi7.16ge3vm.rcgu.o",
-        "neqo_glue-ecc13a389c7d4919.f0uymruqzrf5hthjc1ckxn4u2.16ge3vm.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.00.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.01.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.02.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.03.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.04.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.05.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.06.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.07.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.08.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.09.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.10.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.11.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.12.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.13.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.14.rcgu.o",
-        "neqo_http3-df894664c4a03542.neqo_http3.e67b9b0e59f60d7d-cgu.15.rcgu.o",
-        "neqo_qpack-a0c470370068b3ff.neqo_qpack.764f9c7bd1638e55-cgu.0.rcgu.o",
-        "neqo_qpack-a0c470370068b3ff.neqo_qpack.764f9c7bd1638e55-cgu.1.rcgu.o",
-        "neqo_qpack-a0c470370068b3ff.neqo_qpack.764f9c7bd1638e55-cgu.2.rcgu.o",
-        "neqo_qpack-a0c470370068b3ff.neqo_qpack.764f9c7bd1638e55-cgu.3.rcgu.o",
-        "neqo_qpack-a0c470370068b3ff.neqo_qpack.764f9c7bd1638e55-cgu.4.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.00.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.01.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.02.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.03.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.04.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.05.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.06.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.07.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.08.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.09.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.10.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.11.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.12.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.13.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.14.rcgu.o",
-        "neqo_transport-b22e65cffba5a84e.neqo_transport.324f3c0de5e9fe61-cgu.15.rcgu.o",
-        "neqo_udp-b01004edbdbc0775.neqo_udp.15f9aac72b0f5182-cgu.0.rcgu.o",
+        "neqo_common-8f5c842330e4c54e.neqo_common.23beeb738fc0b0a1-cgu.0.rcgu.o",
+        "neqo_common-8f5c842330e4c54e.neqo_common.23beeb738fc0b0a1-cgu.1.rcgu.o",
+        "neqo_common-8f5c842330e4c54e.neqo_common.23beeb738fc0b0a1-cgu.2.rcgu.o",
+        "neqo_common-8f5c842330e4c54e.neqo_common.23beeb738fc0b0a1-cgu.3.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.08fdazaxgd3zuju6fvo89wsvm.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.08leyhwsk1wlascjfve5cqg2f.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.0hndtzzece66tcc35etjxiusi.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.0jrqxw1mx268zhq973hehym95.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.0taj2n87ne42lsrng0yu0b4y1.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.0vy1994zhcxcxjfxtfxvof9o1.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.11nskwod19bnm27vsc55c1l3v.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.131cut7xrto0d6d4ry6grmzss.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.139qlkrnthng5xyugfoxtx2a2.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.14a7b7kt4nz5g8j4qjstd5dn2.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.182hbr8iub88v2bhhf167jkhd.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.1l3tglk4ytl4snxs87gj4t3ky.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.1owzqqz4uly41wjppc9gbxn15.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.1qoj0lfn9ytvu5h7s5k3uqwwi.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.1sg7s7wq447g1n2m4wt9lt0gn.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.1tuqq4hv2z27ctr8m2t74qigq.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.1vy5yaoph9mkts9fm4japs84h.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.27i2zhmwdfgliocj4w9c2lzx6.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.28ikpmgf3qezgywe6qyluvh9o.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.29mxjyde6zn8xniozp42925ma.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2b6d5mrz1llzccxesb2bextpr.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2bh2sppe1pvlski03gebssb6k.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2d6wd6jh761pxbhwxubiie6gp.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2n30nn7dojfll5bss4zaaxnw8.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2pzen4onys9twa62kbyk2kllo.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2sqbkdtu8mmgflp5z5f445lxh.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2v3druq6lvq07z22u7xeoo1ac.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.2xpzwnbstar8vitl4zknzy81j.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.309w7qaehmn354yf07t9qlngt.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.3g8fnzmlh1e9060jq4oqqihrd.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.3woczvitgpm7525r4857tl43b.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.44knkxml31ojb7x1qft9pho7o.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.47z71p8yogpj7wln1kijrzk10.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.4autjxm9lypf2edgp1bvmpm6z.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.4n301j7ye5eh3vc8jg6z73vdk.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.52qb028em2zu0m2xugcpygb1b.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.53xkry2tmis7a9g1ti875qqyg.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.54wqaq9a18aoe0fn1ez6hh5jk.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.5e6momtq4iyyttit5xwago7sq.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.5ek4jccxbgbc3ialb61zzx42b.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.5emmadk0sqtw2qxorf54wpisa.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.5k8yv7s5eb53obzz5go8bu1tv.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.5kbnt2itfeqt93fool2gjwmpp.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.6hqr5dv1vby1v6w6yxpx6j9m3.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.6s69hxqfax4wyb083pd9zg4hx.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.73tog3kqc4b4ttpepcz8t64sp.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.7cmwtpeliexncxuwan78j1xoa.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.7dfzdxg27yo1geriu9gt8vcek.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.7jocm3x01rghm1056sc8qfc3z.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.7pldd151kriu36qxfb0qnv3fk.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.7xhbuh459y6qniokel95pkkqh.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.8638j012mr1a0pd36ii6x5sle.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.8ntg48lrlgfg7sbmpueht1czn.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.8pixd8xckv9bxg163vuh0chos.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.902qvvtltsfzdzk7yhkapifmz.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.957nvmss9ccq0izvev6as2ski.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.992hn274nl6tzf95ydq60ifnt.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.99xkeljm2qx5by1zj1eeamxtb.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.9dxw39wnl1c2omhn74zxb4msx.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.9g9jds1p7kkelcxak8ko9sn57.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.9kcs9ix706pjhhc89knc3bqd9.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.9p8jbbs82lztgig7sq8shiwj8.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.9wy0u4qs2kg9ke3hw9oglxgi1.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.a754ax5qhfbj1493jtpe73tzz.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ad80w2ron5f75lb89w8jt4c6n.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.agawcv4ap55ue5m0pt25bvkgy.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ani1jzwhjon2pkwvep303mv7i.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.b0l6bl4lztyz862lkbeiefc1x.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.b7rvner5negzvrw3o561rx8zj.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.bad07zgz8jz5qwcms71fnk8tq.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.bo2prmgfxylqz4c7ii2frdutt.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.bq7djkwfc6utfb7znh4l3v967.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.bth45j5b3994sy2wl001woerb.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.by33gsy3e4h0awsfogqu0ikjv.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.c8qc0wcg6omig293n0ss9sjkv.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.cc97fjl5lhps02tpuq5sdkaok.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ce0mi9lq00t1hcj9d3nxzb1tv.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ch0buvmo95m6gb4ig8bwrkt3b.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ctym2efoxd4yqglhe8jcj1gw3.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.d0f5dnmrzdqj2f97v0mnzj3da.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.d1ko73yrgxw5jq5nokjqma5jf.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.dgvaqbvu9xcgzw4xhj60eklww.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.dv7leytia4lpvwd7fm095n699.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ensfaab0i1wdwv1mputlf1vjt.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.epup7tl79izkxtsg1cg5au6xj.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.ew05c316itay8nfw4d4pgsnlt.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.f016b73sesepafyk0g6bbpssv.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.f2l9iffmdu2tf1xdk4ujb2jee.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.f33v9ix5awxnbpyvk1f3vxtw0.1wx5loc.rcgu.o",
+        "neqo_glue-60cb2f61045fad9c.f5lnwif6iordds9zv2bsb2keg.1wx5loc.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.00.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.01.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.02.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.03.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.04.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.05.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.06.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.07.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.08.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.09.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.10.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.11.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.12.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.13.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.14.rcgu.o",
+        "neqo_http3-7e884f825d15f5f9.neqo_http3.be63cbaded4e577b-cgu.15.rcgu.o",
+        "neqo_qpack-98a3e2759159d1ee.neqo_qpack.c8f849c9f168ed89-cgu.0.rcgu.o",
+        "neqo_qpack-98a3e2759159d1ee.neqo_qpack.c8f849c9f168ed89-cgu.1.rcgu.o",
+        "neqo_qpack-98a3e2759159d1ee.neqo_qpack.c8f849c9f168ed89-cgu.2.rcgu.o",
+        "neqo_qpack-98a3e2759159d1ee.neqo_qpack.c8f849c9f168ed89-cgu.3.rcgu.o",
+        "neqo_qpack-98a3e2759159d1ee.neqo_qpack.c8f849c9f168ed89-cgu.4.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.00.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.01.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.02.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.03.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.04.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.05.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.06.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.07.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.08.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.09.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.10.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.11.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.12.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.13.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.14.rcgu.o",
+        "neqo_transport-f567adcbcc6faf88.neqo_transport.4f202e918ec24959-cgu.15.rcgu.o",
+        "neqo_udp-235a468af3fff950.neqo_udp.2a5ac1751d8b6f64-cgu.0.rcgu.o",
         "netwerk_helper-b7328be8c8502535.1y0cm46mnxw3md3kup9lep2xa.0unmg5p.rcgu.o",
         "netwerk_helper-b7328be8c8502535.2rhoqdmatoyjf84fdax92hz1v.0unmg5p.rcgu.o",
         "netwerk_helper-b7328be8c8502535.39t1a1ifodrqkghaq8biah5dp.0unmg5p.rcgu.o",
@@ -2708,23 +2380,6 @@
         "num_conv-cb6c388ba872774a.num_conv.8be9409e27259ef1-cgu.0.rcgu.o",
         "num_traits-76370b7b537423f0.num_traits.b90627dab448e857-cgu.0.rcgu.o",
         "objdir/x86_64-pc-windows-msvc/release/build/mozglue-static-11f8fe1ebdf516ae/out/97cc2182c72ccc3b-wrappers.o",
-        "objdir/x86_64-pc-windows-msvc/release/build/whatsys-d374d7972aed36b0/out/a1edd97dd51cd48d-windows.o",
-        "oblivious_http-f35ce79439954635.0pzquaai3bktftdsb77uw4x9u.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.0xg25t8xrgapykjq12qyus4nf.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.1gmaqvxxgvc52h4c4u2n881ku.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.25kyhibeufflpiablbzgx5njl.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.45j89690dhoe4bhccnurbppg3.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.49m6va6cxt7xv3c9r1hjdltlb.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.6bl76hfhvbxs0hy19633w89h4.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.8aufc0k5xvv87e7hlzd6fz9hs.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.8d6yy8kf1vhegfyob1cloe8bz.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.9l5qb5k1308acbbvlbt52k7lv.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.bozm0xkrux5waj34utxd9jrwq.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.bwl7rzr8xvve1jzdj83ve1cky.0z78j1z.rcgu.o",
-        "oblivious_http-f35ce79439954635.ctp413953d5pgamcssmascvey.0z78j1z.rcgu.o",
-        "ohttp-5a36ce129fc7ac07.ohttp.ac2db92557599fb0-cgu.0.rcgu.o",
-        "ohttp-5a36ce129fc7ac07.ohttp.ac2db92557599fb0-cgu.1.rcgu.o",
-        "ohttp-5a36ce129fc7ac07.ohttp.ac2db92557599fb0-cgu.2.rcgu.o",
         "once_cell-a5d8ae6491b791d3.once_cell.e5579fd666f76ad7-cgu.0.rcgu.o",
         "ordered_float-dd13ce93e0bb9f21.ordered_float.e80e83b568ff883b-cgu.0.rcgu.o",
         "panic_abort-7bee198819d30888.panic_abort.bc71c2efa37fc702-cgu.0.rcgu.o",
@@ -2746,7 +2401,6 @@
         "pkcs11_bindings-9b6ee3a7af928e64.pkcs11_bindings.b4abf5b47ee495d4-cgu.0.rcgu.o",
         "potential_utf-35a43cb7fd160962.potential_utf.75519a0de6abd111-cgu.0.rcgu.o",
         "powerfmt-a8043a42b2636952.powerfmt.57d9182840a1b740-cgu.0.rcgu.o",
-        "ppv_lite86-dcff3488d5867925.ppv_lite86.77359fec4db6ef6b-cgu.0.rcgu.o",
         "prefs_parser-18b38087dc702890.0h3ggogmrns3vy181su4i7dgm.1penhqt.rcgu.o",
         "prefs_parser-18b38087dc702890.0tx67oyfgz3vbqvn7drs2n2gx.1penhqt.rcgu.o",
         "prefs_parser-18b38087dc702890.1f2xnwommnyau1u09iy57z8tt.1penhqt.rcgu.o",
@@ -2786,9 +2440,6 @@
         "qwac_trust_anchors-52c04d8de08e42a8.7d3ci68vtsxnp531hgfdpb1bg.0nwqx10.rcgu.o",
         "qwac_trust_anchors-52c04d8de08e42a8.9pd8jz9ye570pwl24qhu0uaz3.0nwqx10.rcgu.o",
         "qwac_trust_anchors-52c04d8de08e42a8.d30vdislc108wdqixvbxqn8l9.0nwqx10.rcgu.o",
-        "rand-83aee6d9efe970fd.rand.5167511aae6aeb91-cgu.0.rcgu.o",
-        "rand_chacha-bdb0bdb1d9e6da28.rand_chacha.5583aa97154ed4f-cgu.0.rcgu.o",
-        "rand_core-3b6a4af2e13c4d27.rand_core.c7adc2a46975dd92-cgu.0.rcgu.o",
         "ref_cast-741c7cdf2c75e8f3.ref_cast.540cbe29c7644be-cgu.0.rcgu.o",
         "regex-64f7f47738c9474b.regex.c9e70b8792a4926-cgu.0.rcgu.o",
         "regex-64f7f47738c9474b.regex.c9e70b8792a4926-cgu.1.rcgu.o",
@@ -2825,37 +2476,16 @@
         "regex_syntax-a84465732cc2f3c9.regex_syntax.d4b9e9ab0dbc9ea9-cgu.13.rcgu.o",
         "regex_syntax-a84465732cc2f3c9.regex_syntax.d4b9e9ab0dbc9ea9-cgu.14.rcgu.o",
         "regex_syntax-a84465732cc2f3c9.regex_syntax.d4b9e9ab0dbc9ea9-cgu.15.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.00.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.01.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.02.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.03.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.04.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.05.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.06.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.07.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.08.rcgu.o",
-        "rkv-a3399aab8aa99faa.rkv.1d9e76413f2ccc80-cgu.09.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.0c40v0ehng5xy9gny835q01z8.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.2zj7jsy2k16bddgxc00cyterq.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.453tu40q75ofvo0mgrj9e1he9.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.5bi0h4oiduet5z3b14zxryivo.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.6hzbbe3td2lrk39hbwxh6pw3w.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.6mxfbfpjut47nzkj9tn3prymc.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.7c2mwghh88lf6jnjqg967mryv.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.8l9scm9xf0365yx6egm5kzqmu.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.b6fgya1e5fxrbmnktiqrzus11.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.bot9wj9r7khdhldjts54hda0j.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.dnw89xmf302b2fhyo0otiwewq.1eleucu.rcgu.o",
-        "rsclientcerts-48202e31e3d4aa5b.f0tewsfak3a4xxuyd2m1lgjah.1eleucu.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.4rptvgbwfk3bde4t4rx725pfr.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.55d5v9n531znazjshxeay40re.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.7mn5vhdy9hdwyxb1ysgtijk2e.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.82v14paggi2hkjdhpzo3cvfgo.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.956sna2qmpggvhmzs954zrqmr.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.aaqsw7cjodjq7j6g0pz6rozzo.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.bjllgcn7xh014rvvazqpo8zd4.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.c3n2dtkuxhanmtrulgnff41pq.1iqfjzk.rcgu.o",
-        "rsclientcerts_util-2d74f67c314aa007.dtvl22u8zsm1nuc0z7poyypmo.1iqfjzk.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.00.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.01.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.02.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.03.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.04.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.05.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.06.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.07.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.08.rcgu.o",
+        "rkv-7e21f0543d3b2b19.rkv.44c0caacadda3a1d-cgu.09.rcgu.o",
         "rustc_demangle-2b049fac4bb9f18a.rustc_demangle.a86e901d3fc4c5a7-cgu.0.rcgu.o",
         "rustc_hash-cf35a2e9659663e9.rustc_hash.1c74e6287810193f-cgu.0.rcgu.o",
         "rustc_std_workspace_alloc-b37431f0b8bc51d4.rustc_std_workspace_alloc.53bb822297a374b8-cgu.0.rcgu.o",
@@ -2894,7 +2524,6 @@
         "signature_cache-92113ddfa50f4480.ddkk9fhfk55v1zcclidgq2ti9.15f03o8.rcgu.o",
         "signature_cache-92113ddfa50f4480.djhv0z1owktok3kws9hejolwk.15f03o8.rcgu.o",
         "signature_cache-92113ddfa50f4480.dkmfef36x9ounup4rvvg8a96t.15f03o8.rcgu.o",
-        "simd_adler32-6db66bfc38fac4f2.simd_adler32.a101692a13fb0c50-cgu.0.rcgu.o",
         "smallvec-3b7fddaa50a5033b.smallvec.d00e7ea45ef42cdb-cgu.0.rcgu.o",
         "socket2-daed272a40ec30d0.socket2.ca0625e87d117d4b-cgu.0.rcgu.o",
         "socket2-daed272a40ec30d0.socket2.ca0625e87d117d4b-cgu.1.rcgu.o",
@@ -2943,7 +2572,7 @@
         "tempfile-cab9fa04d044bd88.tempfile.5d56e5f30e765ba8-cgu.0.rcgu.o",
         "tempfile-cab9fa04d044bd88.tempfile.5d56e5f30e765ba8-cgu.1.rcgu.o",
         "tempfile-cab9fa04d044bd88.tempfile.5d56e5f30e765ba8-cgu.2.rcgu.o",
-        "termcolor-f9f60dd435b4e033.termcolor.bb42fa86813bbc92-cgu.0.rcgu.o",
+        "termcolor-18e1513e487a2102.termcolor.fca3146257e17b2b-cgu.0.rcgu.o",
         "thin_vec-72dd2c4e149a1e47.thin_vec.614f2a915f886be1-cgu.0.rcgu.o",
         "thiserror-b597fa6fd68f2338.thiserror.aca9b35c96216b4b-cgu.0.rcgu.o",
         "thread_local-6ecd23978120ea1a.thread_local.d3d876435aadc283-cgu.0.rcgu.o",
@@ -3180,9 +2809,8 @@
         "utf8_iter-571803fa5dc06696.2nu2xnlky5hsabbts3swhbofy.18sac9s.rcgu.o",
         "utf8_iter-571803fa5dc06696.9a7jp4ds18cnzcl64yyq1adf3.18sac9s.rcgu.o",
         "uuid-9c97eb80fbdf4864.uuid.e4b3681a2cf3acba-cgu.0.rcgu.o",
-        "whatsys-5d5533cfa9c3d748.whatsys.637f246f98fd991d-cgu.0.rcgu.o",
-        "winapi-a4a3bb3588af5e86.winapi.e6a0ace42d87ac0b-cgu.0.rcgu.o",
-        "winapi_util-03ddfaf99c6087b5.winapi_util.63fb002daa85f016-cgu.0.rcgu.o",
+        "winapi-2d9e00bed8748202.winapi.98556754a6ecfb6a-cgu.0.rcgu.o",
+        "winapi_util-07be452830646b2b.winapi_util.be404e86fda3b4df-cgu.0.rcgu.o",
         "windows-7a62772fe6790e02.0r63pd4udi5jzdjse166kt4nw.0uc6sjm.rcgu.o",
         "windows-7a62772fe6790e02.1sd89s8y06vi6tsjhlf1214oj.0uc6sjm.rcgu.o",
         "windows-7a62772fe6790e02.1zl4kk733uiz9jys5gyze8w3d.0uc6sjm.rcgu.o",
@@ -3225,10 +2853,10 @@
         "windows_strings-825bf42c3426fa9a.windows_strings.e97940a1e0a59fb7-cgu.0.rcgu.o",
         "windows_sys-8e9e4133caa34e9e.windows_sys.a6cea81d2afd71c1-cgu.0.rcgu.o",
         "windows_targets-b95189aeef0c3c13.1d3q4s5lldfnqpotj9fmniy8g.0l398fw.rcgu.o",
-        "wr_malloc_size_of-0c276b51ecc6e26e.1c1nnbcrn41d3wocm9c6y8dvt.0inwzeh.rcgu.o",
-        "wr_malloc_size_of-0c276b51ecc6e26e.1o9nr6ir6ppaazptba8xbde9e.0inwzeh.rcgu.o",
-        "wr_malloc_size_of-0c276b51ecc6e26e.1weh2enw1gz8etuhwrllz9elj.0inwzeh.rcgu.o",
-        "wr_malloc_size_of-0c276b51ecc6e26e.9rg9mq611zxmmqlgn15f3ookq.0inwzeh.rcgu.o",
+        "wr_malloc_size_of-3e2f3f918b681672.54pe5rijiuwmtzed9cseendx2.1a1dc0h.rcgu.o",
+        "wr_malloc_size_of-3e2f3f918b681672.97alwddc3mt6ciewynp7s4xxv.1a1dc0h.rcgu.o",
+        "wr_malloc_size_of-3e2f3f918b681672.b6zjcz2x9r3spkz3loage1xdr.1a1dc0h.rcgu.o",
+        "wr_malloc_size_of-3e2f3f918b681672.evmi6yo16r41xmpozf6doikp2.1a1dc0h.rcgu.o",
         "write16-3f5d4c173c51825e.write16.908e7aba2c2a75b7-cgu.0.rcgu.o",
         "writeable-299f606dfa4c814b.writeable.2f2b70e949a52702-cgu.0.rcgu.o",
         "xmldecl-c6f4a1e6d804d6ea.xmldecl.d5cbc6b6108c1562-cgu.0.rcgu.o",
@@ -3237,7 +2865,6 @@
         "xpcom-7b6df5fae01ea2fa.9pkua4o0v1jckcrlm8ub2nhgv.0ve0cr3.rcgu.o",
         "xpcom-7b6df5fae01ea2fa.exi7jvvhh713pcwerluem5w26.0ve0cr3.rcgu.o",
         "yoke-7e8a26673cc4eaf6.yoke.c34b8872cf2bd97-cgu.0.rcgu.o",
-        "zeitstempel-c018d25d846649cb.zeitstempel.59a4024b54b2ec39-cgu.0.rcgu.o",
         "zerofrom-43baee2514fdb708.zerofrom.d6aed603cbe8d52f-cgu.0.rcgu.o",
         "zeroize-5589f5a1883bcdb6.zeroize.e5f218477c8a1533-cgu.0.rcgu.o",
         "zerotrie-cc92662ba652cf99.zerotrie.dfe73bfc90ba70a5-cgu.0.rcgu.o",
@@ -3340,8 +2967,8 @@
   ],
   "rust_closure": {
     "platform_filter": "x86_64-pc-windows-msvc",
-    "root_package": "gkrust",
-    "reachable_crates_count": 379,
+    "root_package": "gkrust-naivefox",
+    "reachable_crates_count": 287,
     "crates": [
       {
         "name": "abridged_certs",
@@ -3368,24 +2995,6 @@
         "manifest_path": "third_party/rust/aho-corasick/Cargo.toml",
         "source_paths": [
           "third_party/rust/aho-corasick/src/lib.rs"
-        ]
-      },
-      {
-        "name": "allocator-api2",
-        "version": "0.2.21",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/allocator-api2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/allocator-api2/src/lib.rs"
-        ]
-      },
-      {
-        "name": "anstyle",
-        "version": "1.0.8",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/anstyle/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/anstyle/src/lib.rs"
         ]
       },
       {
@@ -3444,57 +3053,12 @@
         ]
       },
       {
-        "name": "askama",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/askama/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/askama/src/lib.rs"
-        ]
-      },
-      {
-        "name": "askama_derive",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/askama_derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/askama_derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "askama_parser",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/askama_parser/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/askama_parser/src/lib.rs"
-        ]
-      },
-      {
         "name": "async-task",
         "version": "4.3.0",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/async-task/Cargo.toml",
         "source_paths": [
           "third_party/rust/async-task/src/lib.rs"
-        ]
-      },
-      {
-        "name": "atomic_refcell",
-        "version": "0.1.9",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/atomic_refcell/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/atomic_refcell/src/lib.rs"
-        ]
-      },
-      {
-        "name": "autocfg",
-        "version": "1.1.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/autocfg/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/autocfg/src/lib.rs"
         ]
       },
       {
@@ -3513,15 +3077,6 @@
         "manifest_path": "third_party/rust/base64/Cargo.toml",
         "source_paths": [
           "third_party/rust/base64/src/lib.rs"
-        ]
-      },
-      {
-        "name": "basic-toml",
-        "version": "0.1.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/basic-toml/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/basic-toml/src/lib.rs"
         ]
       },
       {
@@ -3549,25 +3104,6 @@
         "manifest_path": "third_party/rust/bincode/Cargo.toml",
         "source_paths": [
           "third_party/rust/bincode/src/lib.rs"
-        ]
-      },
-      {
-        "name": "bindgen",
-        "version": "0.72.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/bindgen/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/bindgen/build.rs",
-          "third_party/rust/bindgen/lib.rs"
-        ]
-      },
-      {
-        "name": "bindgen",
-        "version": "0.69.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/bindgen/Cargo.toml",
-        "source_paths": [
-          "build/rust/bindgen/lib.rs"
         ]
       },
       {
@@ -3644,15 +3180,6 @@
         ]
       },
       {
-        "name": "cc",
-        "version": "1.2.30",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/cc/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/cc/src/lib.rs"
-        ]
-      },
-      {
         "name": "cert_storage",
         "version": "0.0.1",
         "source_type": "in-tree-component",
@@ -3662,86 +3189,12 @@
         ]
       },
       {
-        "name": "cexpr",
-        "version": "0.6.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/cexpr/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/cexpr/src/lib.rs"
-        ]
-      },
-      {
         "name": "cfg-if",
         "version": "1.0.0",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/cfg-if/Cargo.toml",
         "source_paths": [
           "third_party/rust/cfg-if/src/lib.rs"
-        ]
-      },
-      {
-        "name": "cfg_aliases",
-        "version": "0.2.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/cfg_aliases/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/cfg_aliases/src/lib.rs"
-        ]
-      },
-      {
-        "name": "chrono",
-        "version": "0.4.42",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/chrono/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/chrono/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clang-sys",
-        "version": "1.7.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clang-sys/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clang-sys/build.rs",
-          "third_party/rust/clang-sys/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap",
-        "version": "4.5.16",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap/src/bin/stdio-fixture.rs",
-          "third_party/rust/clap/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap_builder",
-        "version": "4.5.15",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap_builder/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap_builder/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap_derive",
-        "version": "4.5.13",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap_derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap_derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "clap_lex",
-        "version": "0.7.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/clap_lex/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/clap_lex/src/lib.rs"
         ]
       },
       {
@@ -3787,43 +3240,6 @@
         "manifest_path": "third_party/rust/cpufeatures/Cargo.toml",
         "source_paths": [
           "third_party/rust/cpufeatures/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crc32fast",
-        "version": "1.4.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crc32fast/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crc32fast/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crossbeam-channel",
-        "version": "0.5.15",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crossbeam-channel/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crossbeam-channel/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crossbeam-deque",
-        "version": "0.8.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crossbeam-deque/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crossbeam-deque/src/lib.rs"
-        ]
-      },
-      {
-        "name": "crossbeam-epoch",
-        "version": "0.9.20",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/crossbeam-epoch/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/crossbeam-epoch/build.rs",
-          "third_party/rust/crossbeam-epoch/src/lib.rs"
         ]
       },
       {
@@ -3990,15 +3406,6 @@
         ]
       },
       {
-        "name": "dom",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "dom/base/rust/Cargo.toml",
-        "source_paths": [
-          "dom/base/rust/lib.rs"
-        ]
-      },
-      {
         "name": "dtoa",
         "version": "0.4.8",
         "source_type": "vendored",
@@ -4014,15 +3421,6 @@
         "manifest_path": "third_party/rust/dtoa-short/Cargo.toml",
         "source_paths": [
           "third_party/rust/dtoa-short/src/lib.rs"
-        ]
-      },
-      {
-        "name": "either",
-        "version": "1.8.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/either/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/either/src/lib.rs"
         ]
       },
       {
@@ -4154,48 +3552,12 @@
         ]
       },
       {
-        "name": "fallible-iterator",
-        "version": "0.3.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/fallible-iterator/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/fallible-iterator/src/lib.rs"
-        ]
-      },
-      {
-        "name": "fallible-streaming-iterator",
-        "version": "0.1.9",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/fallible-streaming-iterator/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/fallible-streaming-iterator/src/lib.rs"
-        ]
-      },
-      {
         "name": "fastrand",
         "version": "2.1.1",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/fastrand/Cargo.toml",
         "source_paths": [
           "third_party/rust/fastrand/src/lib.rs"
-        ]
-      },
-      {
-        "name": "firefox-on-glean",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "toolkit/components/glean/api/Cargo.toml",
-        "source_paths": [
-          "toolkit/components/glean/api/src/lib.rs"
-        ]
-      },
-      {
-        "name": "flate2",
-        "version": "1.1.4",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/flate2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/flate2/src/lib.rs"
         ]
       },
       {
@@ -4253,16 +3615,6 @@
         ]
       },
       {
-        "name": "gecko-profiler",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "tools/profiler/rust-api/Cargo.toml",
-        "source_paths": [
-          "tools/profiler/rust-api/build.rs",
-          "tools/profiler/rust-api/src/lib.rs"
-        ]
-      },
-      {
         "name": "gecko_logger",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -4310,15 +3662,6 @@
         ]
       },
       {
-        "name": "gkrust",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "toolkit/library/rust/Cargo.toml",
-        "source_paths": [
-          "toolkit/library/rust/lib.rs"
-        ]
-      },
-      {
         "name": "gkrust-naivefox",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -4334,52 +3677,6 @@
         "manifest_path": "xpcom/rust/gkrust_utils/Cargo.toml",
         "source_paths": [
           "xpcom/rust/gkrust_utils/src/lib.rs"
-        ]
-      },
-      {
-        "name": "glean",
-        "version": "68.0.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/glean/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/glean/src/lib.rs"
-        ]
-      },
-      {
-        "name": "glean-core",
-        "version": "68.0.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/glean-core/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/glean-core/build.rs",
-          "third_party/rust/glean-core/src/lib.rs"
-        ]
-      },
-      {
-        "name": "glob",
-        "version": "0.3.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/glob/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/glob/src/lib.rs"
-        ]
-      },
-      {
-        "name": "goblin",
-        "version": "0.8.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/goblin/Cargo.toml",
-        "source_paths": [
-          "build/rust/goblin/lib.rs"
-        ]
-      },
-      {
-        "name": "goblin",
-        "version": "0.9.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/goblin/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/goblin/src/lib.rs"
         ]
       },
       {
@@ -4401,15 +3698,6 @@
         ]
       },
       {
-        "name": "harfbuzz-traits",
-        "version": "0.6.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/harfbuzz-traits/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/harfbuzz-traits/src/lib.rs"
-        ]
-      },
-      {
         "name": "hashbrown",
         "version": "0.16.999",
         "source_type": "in-tree",
@@ -4425,15 +3713,6 @@
         "manifest_path": "third_party/rust/hashbrown/Cargo.toml",
         "source_paths": [
           "third_party/rust/hashbrown/src/lib.rs"
-        ]
-      },
-      {
-        "name": "hashlink",
-        "version": "0.10.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/hashlink/Cargo.toml",
-        "source_paths": [
-          "build/rust/hashlink/lib.rs"
         ]
       },
       {
@@ -4722,42 +4001,6 @@
         ]
       },
       {
-        "name": "inherent",
-        "version": "1.0.7",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/inherent/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/inherent/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ipcclientcerts",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/ipcclientcerts/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/ipcclientcerts/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ipdl_utils",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "ipc/rust/ipdl_utils/Cargo.toml",
-        "source_paths": [
-          "ipc/rust/ipdl_utils/lib.rs"
-        ]
-      },
-      {
-        "name": "itertools",
-        "version": "0.14.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/itertools/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/itertools/src/lib.rs"
-        ]
-      },
-      {
         "name": "itoa",
         "version": "1.0.15",
         "source_type": "vendored",
@@ -4804,15 +4047,6 @@
         ]
       },
       {
-        "name": "libloading",
-        "version": "0.8.6",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/libloading/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/libloading/src/lib.rs"
-        ]
-      },
-      {
         "name": "libm",
         "version": "0.2.6",
         "source_type": "vendored",
@@ -4830,6 +4064,15 @@
         "source_paths": [
           "third_party/rust/libsqlite3-sys/build.rs",
           "third_party/rust/libsqlite3-sys/src/lib.rs"
+        ]
+      },
+      {
+        "name": "linux-raw-sys",
+        "version": "0.12.1",
+        "source_type": "vendored",
+        "manifest_path": "third_party/rust/linux-raw-sys/Cargo.toml",
+        "source_paths": [
+          "third_party/rust/linux-raw-sys/src/lib.rs"
         ]
       },
       {
@@ -4912,24 +4155,6 @@
         "manifest_path": "third_party/rust/memchr/Cargo.toml",
         "source_paths": [
           "third_party/rust/memchr/src/lib.rs"
-        ]
-      },
-      {
-        "name": "minimal-lexical",
-        "version": "0.2.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/minimal-lexical/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/minimal-lexical/src/lib.rs"
-        ]
-      },
-      {
-        "name": "miniz_oxide",
-        "version": "0.8.9",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/miniz_oxide/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/miniz_oxide/src/lib.rs"
         ]
       },
       {
@@ -5056,15 +4281,6 @@
         ]
       },
       {
-        "name": "nom",
-        "version": "7.1.3",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/nom/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/nom/src/lib.rs"
-        ]
-      },
-      {
         "name": "normalizer_glue",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -5111,24 +4327,6 @@
         ]
       },
       {
-        "name": "num-derive",
-        "version": "0.4.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/num-derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/num-derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "num-integer",
-        "version": "0.1.46",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/num-integer/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/num-integer/src/lib.rs"
-        ]
-      },
-      {
         "name": "num-traits",
         "version": "0.2.19",
         "source_type": "vendored",
@@ -5136,34 +4334,6 @@
         "source_paths": [
           "third_party/rust/num-traits/build.rs",
           "third_party/rust/num-traits/src/lib.rs"
-        ]
-      },
-      {
-        "name": "num_cpus",
-        "version": "1.16.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/num_cpus/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/num_cpus/src/lib.rs"
-        ]
-      },
-      {
-        "name": "oblivious_http",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "netwerk/protocol/http/oblivious_http/Cargo.toml",
-        "source_paths": [
-          "netwerk/protocol/http/oblivious_http/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ohttp",
-        "version": "0.7.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/ohttp/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/ohttp/build.rs",
-          "third_party/rust/ohttp/src/lib.rs"
         ]
       },
       {
@@ -5232,15 +4402,6 @@
         ]
       },
       {
-        "name": "phf_codegen",
-        "version": "0.13.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/phf_codegen/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/phf_codegen/src/lib.rs"
-        ]
-      },
-      {
         "name": "phf_generator",
         "version": "0.13.1",
         "source_type": "vendored",
@@ -5288,24 +4449,6 @@
         ]
       },
       {
-        "name": "pkg-config",
-        "version": "0.3.26",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/pkg-config/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/pkg-config/src/lib.rs"
-        ]
-      },
-      {
-        "name": "plain",
-        "version": "0.2.3",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/plain/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/plain/src/lib.rs"
-        ]
-      },
-      {
         "name": "potential_utf",
         "version": "0.1.4",
         "source_type": "vendored",
@@ -5321,15 +4464,6 @@
         "manifest_path": "third_party/rust/powerfmt/Cargo.toml",
         "source_paths": [
           "third_party/rust/powerfmt/src/lib.rs"
-        ]
-      },
-      {
-        "name": "ppv-lite86",
-        "version": "0.2.17",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/ppv-lite86/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/ppv-lite86/src/lib.rs"
         ]
       },
       {
@@ -5358,15 +4492,6 @@
         "source_paths": [
           "third_party/rust/proc-macro2/build.rs",
           "third_party/rust/proc-macro2/src/lib.rs"
-        ]
-      },
-      {
-        "name": "profiler-macros",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "tools/profiler/rust-api/macros/Cargo.toml",
-        "source_paths": [
-          "tools/profiler/rust-api/macros/src/lib.rs"
         ]
       },
       {
@@ -5414,52 +4539,6 @@
         "source_paths": [
           "security/manager/ssl/qwac_trust_anchors/build.rs",
           "security/manager/ssl/qwac_trust_anchors/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rand",
-        "version": "0.8.6",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rand/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rand/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rand_chacha",
-        "version": "0.3.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rand_chacha/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rand_chacha/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rand_core",
-        "version": "0.6.4",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rand_core/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rand_core/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rayon",
-        "version": "1.10.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rayon/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rayon/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rayon-core",
-        "version": "1.12.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rayon-core/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rayon-core/build.rs",
-          "third_party/rust/rayon-core/src/lib.rs"
         ]
       },
       {
@@ -5518,48 +4597,12 @@
         ]
       },
       {
-        "name": "rsclientcerts",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/rsclientcerts/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/rsclientcerts/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rsclientcerts-util",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/rsclientcerts-util/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/rsclientcerts-util/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rusqlite",
-        "version": "0.37.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rusqlite/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rusqlite/src/lib.rs"
-        ]
-      },
-      {
         "name": "rustc-hash",
         "version": "2.1.1",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/rustc-hash/Cargo.toml",
         "source_paths": [
           "third_party/rust/rustc-hash/src/lib.rs"
-        ]
-      },
-      {
-        "name": "rustc_version",
-        "version": "0.4.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/rustc_version/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/rustc_version/src/lib.rs"
         ]
       },
       {
@@ -5583,39 +4626,12 @@
         ]
       },
       {
-        "name": "same-file",
-        "version": "1.0.6",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/same-file/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/same-file/src/lib.rs"
-        ]
-      },
-      {
         "name": "scopeguard",
         "version": "1.1.0",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/scopeguard/Cargo.toml",
         "source_paths": [
           "third_party/rust/scopeguard/src/lib.rs"
-        ]
-      },
-      {
-        "name": "scroll",
-        "version": "0.12.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/scroll/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/scroll/src/lib.rs"
-        ]
-      },
-      {
-        "name": "scroll_derive",
-        "version": "0.12.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/scroll_derive/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/scroll_derive/src/lib.rs"
         ]
       },
       {
@@ -5750,30 +4766,12 @@
         ]
       },
       {
-        "name": "shlex",
-        "version": "1.3.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/shlex/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/shlex/src/lib.rs"
-        ]
-      },
-      {
         "name": "signature_cache",
         "version": "0.1.0",
         "source_type": "in-tree-component",
         "manifest_path": "security/certverifier/signature_cache/Cargo.toml",
         "source_paths": [
           "security/certverifier/signature_cache/src/lib.rs"
-        ]
-      },
-      {
-        "name": "simd-adler32",
-        "version": "0.3.7",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/simd-adler32/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/simd-adler32/src/lib.rs"
         ]
       },
       {
@@ -5801,15 +4799,6 @@
         "manifest_path": "third_party/rust/smallvec/Cargo.toml",
         "source_paths": [
           "third_party/rust/smallvec/src/lib.rs"
-        ]
-      },
-      {
-        "name": "smawk",
-        "version": "0.3.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/smawk/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/smawk/src/lib.rs"
         ]
       },
       {
@@ -5912,43 +4901,6 @@
         ]
       },
       {
-        "name": "style",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/style/Cargo.toml",
-        "source_paths": [
-          "servo/components/style/build.rs",
-          "servo/components/style/lib.rs"
-        ]
-      },
-      {
-        "name": "style_derive",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/style_derive/Cargo.toml",
-        "source_paths": [
-          "servo/components/style_derive/lib.rs"
-        ]
-      },
-      {
-        "name": "style_traits",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/style_traits/Cargo.toml",
-        "source_paths": [
-          "servo/components/style_traits/lib.rs"
-        ]
-      },
-      {
-        "name": "stylo_tests",
-        "version": "0.0.1",
-        "source_type": "in-tree",
-        "manifest_path": "servo/ports/geckolib/tests/Cargo.toml",
-        "source_paths": [
-          "servo/ports/geckolib/tests/lib.rs"
-        ]
-      },
-      {
         "name": "syn",
         "version": "2.0.106",
         "source_type": "vendored",
@@ -5982,24 +4934,6 @@
         "manifest_path": "third_party/rust/termcolor/Cargo.toml",
         "source_paths": [
           "third_party/rust/termcolor/src/lib.rs"
-        ]
-      },
-      {
-        "name": "terminal_size",
-        "version": "0.3.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/terminal_size/Cargo.toml",
-        "source_paths": [
-          "build/rust/terminal_size/lib.rs"
-        ]
-      },
-      {
-        "name": "textwrap",
-        "version": "0.16.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/textwrap/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/textwrap/src/lib.rs"
         ]
       },
       {
@@ -6067,48 +5001,12 @@
         ]
       },
       {
-        "name": "time-macros",
-        "version": "0.2.27",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/time-macros/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/time-macros/src/lib.rs"
-        ]
-      },
-      {
         "name": "tinystr",
         "version": "0.8.1",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/tinystr/Cargo.toml",
         "source_paths": [
           "third_party/rust/tinystr/src/lib.rs"
-        ]
-      },
-      {
-        "name": "to_shmem",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/to_shmem/Cargo.toml",
-        "source_paths": [
-          "servo/components/to_shmem/lib.rs"
-        ]
-      },
-      {
-        "name": "to_shmem_derive",
-        "version": "0.1.0",
-        "source_type": "in-tree",
-        "manifest_path": "servo/components/to_shmem_derive/Cargo.toml",
-        "source_paths": [
-          "servo/components/to_shmem_derive/lib.rs"
-        ]
-      },
-      {
-        "name": "toml",
-        "version": "0.5.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/toml/Cargo.toml",
-        "source_paths": [
-          "build/rust/toml/lib.rs"
         ]
       },
       {
@@ -6193,15 +5091,6 @@
         ]
       },
       {
-        "name": "trust-anchor-build-util",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "security/manager/ssl/trust-anchor-build-util/Cargo.toml",
-        "source_paths": [
-          "security/manager/ssl/trust-anchor-build-util/src/lib.rs"
-        ]
-      },
-      {
         "name": "trust-anchors",
         "version": "0.1.0",
         "source_type": "in-tree-component",
@@ -6219,15 +5108,6 @@
         "source_paths": [
           "third_party/rust/typenum/build/main.rs",
           "third_party/rust/typenum/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uluru",
-        "version": "3.0.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uluru/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uluru/src/lib.rs"
         ]
       },
       {
@@ -6298,24 +5178,6 @@
         ]
       },
       {
-        "name": "uniffi_bindgen",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_bindgen/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_bindgen/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uniffi_build",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_build/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_build/src/lib.rs"
-        ]
-      },
-      {
         "name": "uniffi_core",
         "version": "0.31.0",
         "source_type": "vendored",
@@ -6358,24 +5220,6 @@
         "manifest_path": "third_party/rust/uniffi_pipeline/Cargo.toml",
         "source_paths": [
           "third_party/rust/uniffi_pipeline/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uniffi_testing",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_testing/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_testing/src/lib.rs"
-        ]
-      },
-      {
-        "name": "uniffi_udl",
-        "version": "0.31.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/uniffi_udl/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/uniffi_udl/src/lib.rs"
         ]
       },
       {
@@ -6451,58 +5295,12 @@
         ]
       },
       {
-        "name": "vcpkg",
-        "version": "0.2.999",
-        "source_type": "in-tree",
-        "manifest_path": "build/rust/vcpkg/Cargo.toml",
-        "source_paths": [
-          "build/rust/vcpkg/lib.rs"
-        ]
-      },
-      {
-        "name": "version_check",
-        "version": "0.9.4",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/version_check/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/version_check/src/lib.rs"
-        ]
-      },
-      {
         "name": "void",
         "version": "1.0.2",
         "source_type": "vendored",
         "manifest_path": "third_party/rust/void/Cargo.toml",
         "source_paths": [
           "third_party/rust/void/src/lib.rs"
-        ]
-      },
-      {
-        "name": "walkdir",
-        "version": "2.3.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/walkdir/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/walkdir/src/lib.rs"
-        ]
-      },
-      {
-        "name": "weedle2",
-        "version": "5.0.0",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/weedle2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/weedle2/src/lib.rs"
-        ]
-      },
-      {
-        "name": "whatsys",
-        "version": "0.3.2",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/whatsys/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/whatsys/build.rs",
-          "third_party/rust/whatsys/src/lib.rs"
         ]
       },
       {
@@ -6720,15 +5518,6 @@
         "manifest_path": "third_party/rust/yoke-derive/Cargo.toml",
         "source_paths": [
           "third_party/rust/yoke-derive/src/lib.rs"
-        ]
-      },
-      {
-        "name": "zeitstempel",
-        "version": "0.2.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/zeitstempel/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/zeitstempel/src/lib.rs"
         ]
       },
       {
@@ -7288,19 +6077,12 @@
     ],
     "cargo_manifests": [
       "build/rust/base64/Cargo.toml",
-      "build/rust/bindgen/Cargo.toml",
       "build/rust/getrandom/Cargo.toml",
-      "build/rust/goblin/Cargo.toml",
       "build/rust/hashbrown/Cargo.toml",
-      "build/rust/hashlink/Cargo.toml",
       "build/rust/mozbuild/Cargo.toml",
-      "build/rust/terminal_size/Cargo.toml",
-      "build/rust/toml/Cargo.toml",
-      "build/rust/vcpkg/Cargo.toml",
       "build/rust/windows-link/Cargo.toml",
       "build/rust/windows-targets/Cargo.toml",
       "build/rust/windows/Cargo.toml",
-      "dom/base/rust/Cargo.toml",
       "gfx/wr/wr_malloc_size_of/Cargo.toml",
       "intl/app_collator_glue/Cargo.toml",
       "intl/bidi/rust/unicode-bidi-ffi/Cargo.toml",
@@ -7310,7 +6092,6 @@
       "intl/locale/rust/fluent-langneg-ffi/Cargo.toml",
       "intl/locale/rust/locale_service_glue/Cargo.toml",
       "intl/locale/rust/unic-langid-ffi/Cargo.toml",
-      "ipc/rust/ipdl_utils/Cargo.toml",
       "js/src/builtin/intl/collator_glue/Cargo.toml",
       "js/src/builtin/intl/locale_glue/Cargo.toml",
       "js/src/builtin/normalizer_glue/Cargo.toml",
@@ -7328,29 +6109,18 @@
       "netwerk/base/urlpattern_glue/Cargo.toml",
       "netwerk/protocol/http/binary_http/Cargo.toml",
       "netwerk/protocol/http/happy_eyeballs_glue/Cargo.toml",
-      "netwerk/protocol/http/oblivious_http/Cargo.toml",
       "netwerk/socket/neqo_glue/Cargo.toml",
       "security/certverifier/signature_cache/Cargo.toml",
       "security/manager/ssl/abridged_certs/Cargo.toml",
       "security/manager/ssl/cert_storage/Cargo.toml",
       "security/manager/ssl/crypto_hash/Cargo.toml",
       "security/manager/ssl/data_storage/Cargo.toml",
-      "security/manager/ssl/ipcclientcerts/Cargo.toml",
       "security/manager/ssl/pdf_trust_anchors/Cargo.toml",
       "security/manager/ssl/qwac_trust_anchors/Cargo.toml",
-      "security/manager/ssl/rsclientcerts-util/Cargo.toml",
-      "security/manager/ssl/rsclientcerts/Cargo.toml",
-      "security/manager/ssl/trust-anchor-build-util/Cargo.toml",
       "security/manager/ssl/trust_anchors/Cargo.toml",
       "servo/components/malloc_size_of/Cargo.toml",
       "servo/components/selectors/Cargo.toml",
       "servo/components/servo_arc/Cargo.toml",
-      "servo/components/style/Cargo.toml",
-      "servo/components/style_derive/Cargo.toml",
-      "servo/components/style_traits/Cargo.toml",
-      "servo/components/to_shmem/Cargo.toml",
-      "servo/components/to_shmem_derive/Cargo.toml",
-      "servo/ports/geckolib/tests/Cargo.toml",
       "storage/rust/Cargo.toml",
       "storage/variant/Cargo.toml",
       "third_party/application-services/components/support/error/Cargo.toml",
@@ -7358,24 +6128,15 @@
       "third_party/application-services/components/support/tracing/Cargo.toml",
       "third_party/rust/adler2/Cargo.toml",
       "third_party/rust/aho-corasick/Cargo.toml",
-      "third_party/rust/allocator-api2/Cargo.toml",
-      "third_party/rust/anstyle/Cargo.toml",
       "third_party/rust/anyhow/Cargo.toml",
       "third_party/rust/app_units/Cargo.toml",
       "third_party/rust/arrayref/Cargo.toml",
       "third_party/rust/arraystring/Cargo.toml",
       "third_party/rust/arrayvec/Cargo.toml",
-      "third_party/rust/askama/Cargo.toml",
-      "third_party/rust/askama_derive/Cargo.toml",
-      "third_party/rust/askama_parser/Cargo.toml",
       "third_party/rust/async-task/Cargo.toml",
-      "third_party/rust/atomic_refcell/Cargo.toml",
-      "third_party/rust/autocfg/Cargo.toml",
       "third_party/rust/base64/Cargo.toml",
-      "third_party/rust/basic-toml/Cargo.toml",
       "third_party/rust/bhttp/Cargo.toml",
       "third_party/rust/bincode/Cargo.toml",
-      "third_party/rust/bindgen/Cargo.toml",
       "third_party/rust/bitflags/Cargo.toml",
       "third_party/rust/block-buffer/Cargo.toml",
       "third_party/rust/byteorder/Cargo.toml",
@@ -7384,24 +6145,11 @@
       "third_party/rust/camino/Cargo.toml",
       "third_party/rust/cargo-platform/Cargo.toml",
       "third_party/rust/cargo_metadata/Cargo.toml",
-      "third_party/rust/cc/Cargo.toml",
-      "third_party/rust/cexpr/Cargo.toml",
       "third_party/rust/cfg-if/Cargo.toml",
-      "third_party/rust/cfg_aliases/Cargo.toml",
-      "third_party/rust/chrono/Cargo.toml",
-      "third_party/rust/clang-sys/Cargo.toml",
-      "third_party/rust/clap/Cargo.toml",
-      "third_party/rust/clap_builder/Cargo.toml",
-      "third_party/rust/clap_derive/Cargo.toml",
-      "third_party/rust/clap_lex/Cargo.toml",
       "third_party/rust/clubcard-crlite/Cargo.toml",
       "third_party/rust/clubcard/Cargo.toml",
       "third_party/rust/core_maths/Cargo.toml",
       "third_party/rust/cpufeatures/Cargo.toml",
-      "third_party/rust/crc32fast/Cargo.toml",
-      "third_party/rust/crossbeam-channel/Cargo.toml",
-      "third_party/rust/crossbeam-deque/Cargo.toml",
-      "third_party/rust/crossbeam-epoch/Cargo.toml",
       "third_party/rust/crossbeam-utils/Cargo.toml",
       "third_party/rust/crypto-common/Cargo.toml",
       "third_party/rust/cssparser-macros/Cargo.toml",
@@ -7420,7 +6168,6 @@
       "third_party/rust/displaydoc/Cargo.toml",
       "third_party/rust/dtoa-short/Cargo.toml",
       "third_party/rust/dtoa/Cargo.toml",
-      "third_party/rust/either/Cargo.toml",
       "third_party/rust/encoding_c/Cargo.toml",
       "third_party/rust/encoding_c_mem/Cargo.toml",
       "third_party/rust/encoding_rs/Cargo.toml",
@@ -7432,10 +6179,7 @@
       "third_party/rust/equivalent/Cargo.toml",
       "third_party/rust/errno/Cargo.toml",
       "third_party/rust/euclid/Cargo.toml",
-      "third_party/rust/fallible-iterator/Cargo.toml",
-      "third_party/rust/fallible-streaming-iterator/Cargo.toml",
       "third_party/rust/fastrand/Cargo.toml",
-      "third_party/rust/flate2/Cargo.toml",
       "third_party/rust/fluent-langneg/Cargo.toml",
       "third_party/rust/fnv/Cargo.toml",
       "third_party/rust/foldhash/Cargo.toml",
@@ -7443,12 +6187,7 @@
       "third_party/rust/fs-err/Cargo.toml",
       "third_party/rust/generic-array/Cargo.toml",
       "third_party/rust/getrandom/Cargo.toml",
-      "third_party/rust/glean-core/Cargo.toml",
-      "third_party/rust/glean/Cargo.toml",
-      "third_party/rust/glob/Cargo.toml",
-      "third_party/rust/goblin/Cargo.toml",
       "third_party/rust/happy-eyeballs/Cargo.toml",
-      "third_party/rust/harfbuzz-traits/Cargo.toml",
       "third_party/rust/hashbrown/Cargo.toml",
       "third_party/rust/hashlink/Cargo.toml",
       "third_party/rust/heck/Cargo.toml",
@@ -7477,22 +6216,18 @@
       "third_party/rust/idna/Cargo.toml",
       "third_party/rust/idna_adapter/Cargo.toml",
       "third_party/rust/indexmap/Cargo.toml",
-      "third_party/rust/inherent/Cargo.toml",
-      "third_party/rust/itertools/Cargo.toml",
       "third_party/rust/itoa/Cargo.toml",
       "third_party/rust/ixdtf/Cargo.toml",
       "third_party/rust/lazy_static/Cargo.toml",
       "third_party/rust/libc/Cargo.toml",
-      "third_party/rust/libloading/Cargo.toml",
       "third_party/rust/libm/Cargo.toml",
       "third_party/rust/libsqlite3-sys/Cargo.toml",
+      "third_party/rust/linux-raw-sys/Cargo.toml",
       "third_party/rust/litemap/Cargo.toml",
       "third_party/rust/lock_api/Cargo.toml",
       "third_party/rust/log/Cargo.toml",
       "third_party/rust/md-5/Cargo.toml",
       "third_party/rust/memchr/Cargo.toml",
-      "third_party/rust/minimal-lexical/Cargo.toml",
-      "third_party/rust/miniz_oxide/Cargo.toml",
       "third_party/rust/mtu/Cargo.toml",
       "third_party/rust/neqo-common/Cargo.toml",
       "third_party/rust/neqo-http3/Cargo.toml",
@@ -7500,56 +6235,37 @@
       "third_party/rust/neqo-transport/Cargo.toml",
       "third_party/rust/neqo-udp/Cargo.toml",
       "third_party/rust/new_debug_unreachable/Cargo.toml",
-      "third_party/rust/nom/Cargo.toml",
       "third_party/rust/nss-rs/Cargo.toml",
       "third_party/rust/num-conv/Cargo.toml",
-      "third_party/rust/num-derive/Cargo.toml",
-      "third_party/rust/num-integer/Cargo.toml",
       "third_party/rust/num-traits/Cargo.toml",
-      "third_party/rust/num_cpus/Cargo.toml",
-      "third_party/rust/ohttp/Cargo.toml",
       "third_party/rust/once_cell/Cargo.toml",
       "third_party/rust/ordered-float/Cargo.toml",
       "third_party/rust/parking_lot/Cargo.toml",
       "third_party/rust/parking_lot_core/Cargo.toml",
       "third_party/rust/percent-encoding/Cargo.toml",
       "third_party/rust/phf/Cargo.toml",
-      "third_party/rust/phf_codegen/Cargo.toml",
       "third_party/rust/phf_generator/Cargo.toml",
       "third_party/rust/phf_macros/Cargo.toml",
       "third_party/rust/phf_shared/Cargo.toml",
       "third_party/rust/pin-project-lite/Cargo.toml",
       "third_party/rust/pkcs11-bindings/Cargo.toml",
-      "third_party/rust/pkg-config/Cargo.toml",
-      "third_party/rust/plain/Cargo.toml",
       "third_party/rust/potential_utf/Cargo.toml",
       "third_party/rust/powerfmt/Cargo.toml",
-      "third_party/rust/ppv-lite86/Cargo.toml",
       "third_party/rust/precomputed-hash/Cargo.toml",
       "third_party/rust/proc-macro2/Cargo.toml",
       "third_party/rust/qlog/Cargo.toml",
       "third_party/rust/quinn-udp/Cargo.toml",
       "third_party/rust/quote/Cargo.toml",
-      "third_party/rust/rand/Cargo.toml",
-      "third_party/rust/rand_chacha/Cargo.toml",
-      "third_party/rust/rand_core/Cargo.toml",
-      "third_party/rust/rayon-core/Cargo.toml",
-      "third_party/rust/rayon/Cargo.toml",
       "third_party/rust/ref-cast-impl/Cargo.toml",
       "third_party/rust/ref-cast/Cargo.toml",
       "third_party/rust/regex-automata/Cargo.toml",
       "third_party/rust/regex-syntax/Cargo.toml",
       "third_party/rust/regex/Cargo.toml",
       "third_party/rust/rkv/Cargo.toml",
-      "third_party/rust/rusqlite/Cargo.toml",
       "third_party/rust/rustc-hash/Cargo.toml",
-      "third_party/rust/rustc_version/Cargo.toml",
       "third_party/rust/rustix/Cargo.toml",
       "third_party/rust/rustversion/Cargo.toml",
-      "third_party/rust/same-file/Cargo.toml",
       "third_party/rust/scopeguard/Cargo.toml",
-      "third_party/rust/scroll/Cargo.toml",
-      "third_party/rust/scroll_derive/Cargo.toml",
       "third_party/rust/semver/Cargo.toml",
       "third_party/rust/serde/Cargo.toml",
       "third_party/rust/serde_core/Cargo.toml",
@@ -7562,12 +6278,9 @@
       "third_party/rust/sha1/Cargo.toml",
       "third_party/rust/sha2/Cargo.toml",
       "third_party/rust/sharded-slab/Cargo.toml",
-      "third_party/rust/shlex/Cargo.toml",
-      "third_party/rust/simd-adler32/Cargo.toml",
       "third_party/rust/siphasher/Cargo.toml",
       "third_party/rust/smallbitvec/Cargo.toml",
       "third_party/rust/smallvec/Cargo.toml",
-      "third_party/rust/smawk/Cargo.toml",
       "third_party/rust/socket2/Cargo.toml",
       "third_party/rust/stable_deref_trait/Cargo.toml",
       "third_party/rust/static_assertions/Cargo.toml",
@@ -7579,14 +6292,12 @@
       "third_party/rust/synstructure/Cargo.toml",
       "third_party/rust/tempfile/Cargo.toml",
       "third_party/rust/termcolor/Cargo.toml",
-      "third_party/rust/textwrap/Cargo.toml",
       "third_party/rust/thin-vec/Cargo.toml",
       "third_party/rust/thiserror-impl/Cargo.toml",
       "third_party/rust/thiserror/Cargo.toml",
       "third_party/rust/thread_local/Cargo.toml",
       "third_party/rust/threadbound/Cargo.toml",
       "third_party/rust/time-core/Cargo.toml",
-      "third_party/rust/time-macros/Cargo.toml",
       "third_party/rust/time/Cargo.toml",
       "third_party/rust/tinystr/Cargo.toml",
       "third_party/rust/toml/Cargo.toml",
@@ -7598,32 +6309,23 @@
       "third_party/rust/tracing-subscriber/Cargo.toml",
       "third_party/rust/tracing/Cargo.toml",
       "third_party/rust/typenum/Cargo.toml",
-      "third_party/rust/uluru/Cargo.toml",
       "third_party/rust/unic-langid-impl/Cargo.toml",
       "third_party/rust/unic-langid/Cargo.toml",
       "third_party/rust/unicode-bidi/Cargo.toml",
       "third_party/rust/unicode-ident/Cargo.toml",
       "third_party/rust/uniffi/Cargo.toml",
-      "third_party/rust/uniffi_bindgen/Cargo.toml",
-      "third_party/rust/uniffi_build/Cargo.toml",
       "third_party/rust/uniffi_core/Cargo.toml",
       "third_party/rust/uniffi_internal_macros/Cargo.toml",
       "third_party/rust/uniffi_macros/Cargo.toml",
       "third_party/rust/uniffi_meta/Cargo.toml",
       "third_party/rust/uniffi_pipeline/Cargo.toml",
-      "third_party/rust/uniffi_testing/Cargo.toml",
-      "third_party/rust/uniffi_udl/Cargo.toml",
       "third_party/rust/uritemplate-next/Cargo.toml",
       "third_party/rust/url/Cargo.toml",
       "third_party/rust/urlpattern/Cargo.toml",
       "third_party/rust/utf16_iter/Cargo.toml",
       "third_party/rust/utf8_iter/Cargo.toml",
       "third_party/rust/uuid/Cargo.toml",
-      "third_party/rust/version_check/Cargo.toml",
       "third_party/rust/void/Cargo.toml",
-      "third_party/rust/walkdir/Cargo.toml",
-      "third_party/rust/weedle2/Cargo.toml",
-      "third_party/rust/whatsys/Cargo.toml",
       "third_party/rust/winapi-util/Cargo.toml",
       "third_party/rust/winapi/Cargo.toml",
       "third_party/rust/windows-collections/Cargo.toml",
@@ -7642,7 +6344,6 @@
       "third_party/rust/xmldecl/Cargo.toml",
       "third_party/rust/yoke-derive/Cargo.toml",
       "third_party/rust/yoke/Cargo.toml",
-      "third_party/rust/zeitstempel/Cargo.toml",
       "third_party/rust/zerofrom-derive/Cargo.toml",
       "third_party/rust/zerofrom/Cargo.toml",
       "third_party/rust/zeroize/Cargo.toml",
@@ -7652,11 +6353,7 @@
       "third_party/rust/zerovec/Cargo.toml",
       "third_party/rust/zlib-rs/Cargo.toml",
       "third_party/rust/zmij/Cargo.toml",
-      "toolkit/components/glean/api/Cargo.toml",
-      "toolkit/library/rust/Cargo.toml",
       "toolkit/library/rust/naivefox/Cargo.toml",
-      "tools/profiler/rust-api/Cargo.toml",
-      "tools/profiler/rust-api/macros/Cargo.toml",
       "xpcom/rust/gecko_logger/Cargo.toml",
       "xpcom/rust/gecko_tracing/Cargo.toml",
       "xpcom/rust/gkrust_utils/Cargo.toml",
@@ -7667,7 +6364,7 @@
       "xpcom/rust/xpcom/Cargo.toml",
       "xpcom/rust/xpcom/xpcom_macros/Cargo.toml"
     ],
-    "cargo_root_manifest": "toolkit/library/rust/Cargo.toml",
+    "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
     "cargo_lockfile": "Cargo.lock",
     "cargo_config_template": ".cargo/config.toml.in",
     "depfiles_scanned": 533,
@@ -10886,91 +9583,18 @@
     "glean": {
       "enabled": true,
       "generator_scripts": [
+        "toolkit/components/glean/build_scripts/glean_parser_ext/cache_yaml.py",
         "toolkit/components/glean/build_scripts/glean_parser_ext/metrics_header_names.py",
-        "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py",
-        "toolkit/components/glean/metrics_index.py"
+        "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py"
       ],
       "cache_inputs": [
         "objdir/toolkit/components/glean/metrics_yamls.cached",
         "objdir/toolkit/components/glean/pings_yamls.cached"
       ],
       "metrics_yaml_inputs": [
-        "accessible/metrics.yaml",
-        "browser/actors/metrics.yaml",
-        "browser/base/content/metrics.yaml",
-        "browser/components/aiwindow/metrics.yaml",
-        "browser/components/asrouter/metrics.yaml",
-        "browser/components/attribution/metrics.yaml",
-        "browser/components/backup/metrics.yaml",
-        "browser/components/contextualidentity/metrics.yaml",
-        "browser/components/controlcenter/metrics.yaml",
-        "browser/components/customkeys/metrics.yaml",
-        "browser/components/downloads/metrics.yaml",
-        "browser/components/extensions/metrics.yaml",
-        "browser/components/firefoxview/metrics.yaml",
-        "browser/components/genai/metrics.yaml",
-        "browser/components/ipprotection/metrics.yaml",
-        "browser/components/metrics.yaml",
-        "browser/components/migration/metrics.yaml",
-        "browser/components/newtab/metrics.yaml",
-        "browser/components/places/metrics.yaml",
-        "browser/components/preferences/metrics.yaml",
-        "browser/components/privatebrowsing/metrics.yaml",
-        "browser/components/profiles/metrics.yaml",
-        "browser/components/protections/metrics.yaml",
-        "browser/components/protocolhandler/metrics.yaml",
-        "browser/components/referrals/metrics.yaml",
-        "browser/components/screenshots/metrics.yaml",
-        "browser/components/search/metrics.yaml",
-        "browser/components/sessionstore/metrics.yaml",
-        "browser/components/sharing/metrics.yaml",
-        "browser/components/shell/metrics.yaml",
-        "browser/components/sidebar/metrics.yaml",
-        "browser/components/tabbrowser/metrics.yaml",
-        "browser/components/tabnotes/metrics.yaml",
-        "browser/components/taskbartabs/metrics.yaml",
-        "browser/components/textrecognition/metrics.yaml",
-        "browser/components/urlbar/metrics.yaml",
-        "browser/extensions/search-detection/metrics.yaml",
-        "browser/modules/metrics.yaml",
-        "devtools/client/accessibility/metrics.yaml",
-        "devtools/client/framework/metrics.yaml",
-        "devtools/client/inspector/metrics.yaml",
-        "devtools/client/responsive/metrics.yaml",
-        "devtools/client/shared/metrics.yaml",
-        "devtools/client/webconsole/metrics.yaml",
-        "devtools/shared/heapsnapshot/metrics.yaml",
-        "docshell/base/metrics.yaml",
-        "dom/base/use_counter_metrics.yaml",
-        "dom/canvas/metrics.yaml",
-        "dom/geolocation/metrics.yaml",
-        "dom/indexedDB/metrics.yaml",
-        "dom/localstorage/metrics.yaml",
-        "dom/media/eme/metrics.yaml",
-        "dom/media/hls/metrics.yaml",
-        "dom/media/metrics.yaml",
-        "dom/media/mp4/metrics.yaml",
-        "dom/media/platforms/wmf/metrics.yaml",
-        "dom/media/webrtc/metrics.yaml",
-        "dom/metrics.yaml",
-        "dom/notification/metrics.yaml",
-        "dom/performance/metrics.yaml",
-        "dom/push/metrics.yaml",
-        "dom/quota/metrics.yaml",
         "dom/security/metrics.yaml",
-        "dom/serviceworkers/metrics.yaml",
-        "dom/webauthn/metrics.yaml",
-        "dom/workers/metrics.yaml",
-        "editor/libeditor/metrics.yaml",
-        "extensions/permissions/metrics.yaml",
-        "gfx/metrics.yaml",
-        "image/decoders/metrics.yaml",
         "intl/locale/metrics.yaml",
         "ipc/metrics.yaml",
-        "js/src/metrics.yaml",
-        "js/xpconnect/metrics.yaml",
-        "layout/base/metrics.yaml",
-        "mobile/shared/modules/geckoview/metrics.yaml",
         "modules/libjar/metrics.yaml",
         "modules/libpref/metrics.yaml",
         "netwerk/cache2/metrics.yaml",
@@ -10978,210 +9602,62 @@
         "netwerk/metrics.yaml",
         "netwerk/protocol/http/metrics.yaml",
         "netwerk/protocol/websocket/metrics.yaml",
-        "parser/htmlparser/metrics.yaml",
         "security/certverifier/metrics.yaml",
         "security/ct/metrics.yaml",
         "security/manager/ssl/metrics.yaml",
         "security/sandbox/metrics.yaml",
-        "services/fxaccounts/metrics.yaml",
-        "services/settings/metrics.yaml",
-        "services/sync/modules/metrics.yaml",
-        "startupcache/metrics.yaml",
         "storage/metrics.yaml",
-        "toolkit/components/antitracking/bouncetrackingprotection/metrics.yaml",
         "toolkit/components/antitracking/metrics.yaml",
-        "toolkit/components/backgroundhangmonitor/metrics.yaml",
-        "toolkit/components/backgroundtasks/metrics.yaml",
-        "toolkit/components/captchadetection/metrics.yaml",
-        "toolkit/components/cleardata/metrics.yaml",
-        "toolkit/components/contentanalysis/metrics.yaml",
-        "toolkit/components/contentrelevancy/metrics.yaml",
-        "toolkit/components/crashes/metrics.yaml",
-        "toolkit/components/doh/metrics.yaml",
-        "toolkit/components/downloads/metrics.yaml",
-        "toolkit/components/enterprisepolicies/metrics.yaml",
-        "toolkit/components/extensions/metrics.yaml",
-        "toolkit/components/formautofill/metrics.yaml",
-        "toolkit/components/gecko-trace/generated-metrics.yaml",
-        "toolkit/components/glean/metrics.yaml",
         "toolkit/components/glean/tags.yaml",
-        "toolkit/components/glean/tests/test_metrics.yaml",
-        "toolkit/components/ipprotection/metrics.yaml",
-        "toolkit/components/mediasniffer/metrics.yaml",
-        "toolkit/components/messaging-system/metrics.yaml",
-        "toolkit/components/ml/metrics.yaml",
-        "toolkit/components/nimbus/metrics.yaml",
-        "toolkit/components/normandy/metrics.yaml",
-        "toolkit/components/passwordmgr/metrics.yaml",
-        "toolkit/components/pdfjs/metrics.yaml",
-        "toolkit/components/pictureinpicture/metrics.yaml",
-        "toolkit/components/places/metrics.yaml",
-        "toolkit/components/printing/metrics.yaml",
         "toolkit/components/processtools/metrics.yaml",
-        "toolkit/components/reader/metrics.yaml",
-        "toolkit/components/reportbrokensite/metrics.yaml",
-        "toolkit/components/reputationservice/metrics.yaml",
-        "toolkit/components/resistfingerprinting/metrics.yaml",
-        "toolkit/components/satchel/megalist/metrics.yaml",
-        "toolkit/components/search/metrics.yaml",
         "toolkit/components/startup/metrics.yaml",
-        "toolkit/components/telemetry/metrics.yaml",
-        "toolkit/components/telemetry/tests/test_metrics.yaml",
-        "toolkit/components/thumbnails/metrics.yaml",
-        "toolkit/components/translations/metrics.yaml",
         "toolkit/components/url-classifier/metrics.yaml",
-        "toolkit/content/metrics.yaml",
-        "toolkit/content/widgets/metrics.yaml",
-        "toolkit/modules/gecko_metrics.yaml",
-        "toolkit/modules/metrics.yaml",
-        "toolkit/mozapps/defaultagent/metrics.yaml",
-        "toolkit/mozapps/extensions/metrics.yaml",
-        "toolkit/mozapps/handling/metrics.yaml",
-        "toolkit/mozapps/update/background_task_metrics.yaml",
-        "toolkit/mozapps/update/metrics.yaml",
-        "toolkit/mozapps/update/shared_metrics.yaml",
         "toolkit/profile/metrics.yaml",
         "toolkit/xre/metrics.yaml",
-        "widget/cocoa/metrics.yaml",
-        "widget/gtk/metrics.yaml",
-        "widget/metrics.yaml",
-        "widget/windows/metrics.yaml",
         "xpcom/metrics.yaml"
       ],
       "pings_yaml_inputs": [
-        "browser/components/asrouter/pings.yaml",
-        "browser/components/backup/pings.yaml",
-        "browser/components/newtab/pings.yaml",
-        "browser/components/profiles/pings.yaml",
-        "browser/components/referrals/pings.yaml",
-        "browser/components/search/pings.yaml",
-        "browser/components/urlbar/pings.yaml",
-        "browser/modules/pings.yaml",
-        "dom/pings.yaml",
         "netwerk/pings.yaml",
-        "services/fxaccounts/pings.yaml",
-        "services/sync/pings.yaml",
-        "toolkit/components/antitracking/bouncetrackingprotection/pings.yaml",
-        "toolkit/components/backgroundhangmonitor/pings.yaml",
-        "toolkit/components/backgroundtasks/pings.yaml",
-        "toolkit/components/captchadetection/pings.yaml",
-        "toolkit/components/gecko-trace/pings.yaml",
-        "toolkit/components/glean/pings.yaml",
-        "toolkit/components/glean/tags.yaml",
-        "toolkit/components/glean/tests/test_pings.yaml",
-        "toolkit/components/nimbus/pings.yaml",
-        "toolkit/components/reportbrokensite/pings.yaml",
-        "toolkit/components/resistfingerprinting/pings.yaml",
-        "toolkit/components/telemetry/pings.yaml",
-        "toolkit/modules/pings.yaml",
-        "toolkit/mozapps/defaultagent/pings.yaml",
-        "toolkit/mozapps/extensions/pings.yaml",
-        "toolkit/mozapps/update/pings.yaml",
-        "toolkit/mozapps/update/shared_pings.yaml",
-        "toolkit/profile/pings.yaml"
+        "toolkit/components/glean/tags.yaml"
       ],
-      "generated_outputs_count": 159,
+      "generated_outputs_count": 36,
       "generated_outputs_sample": [
-        "toolkit/components/glean/AccessibleMetrics.h",
-        "toolkit/components/glean/AiwindowMetrics.h",
-        "toolkit/components/glean/AntitrackingBouncetrackingprotectionMetrics.h",
         "toolkit/components/glean/AntitrackingMetrics.h",
-        "toolkit/components/glean/AsrouterMetrics.h",
-        "toolkit/components/glean/AttributionMetrics.h",
-        "toolkit/components/glean/BackgroundhangmonitorMetrics.h",
-        "toolkit/components/glean/BackgroundtasksMetrics.h",
-        "toolkit/components/glean/BackupMetrics.h",
-        "toolkit/components/glean/BrowserActorsMetrics.h",
-        "toolkit/components/glean/BrowserComponentsMetrics.h",
-        "toolkit/components/glean/BrowserContentMetrics.h",
-        "toolkit/components/glean/BrowserExtensionsSearchDetectionMetrics.h",
-        "toolkit/components/glean/BrowserModulesMetrics.h",
-        "toolkit/components/glean/CaptchadetectionMetrics.h",
-        "toolkit/components/glean/CleardataMetrics.h",
-        "toolkit/components/glean/ContentanalysisMetrics.h",
-        "toolkit/components/glean/ContentrelevancyMetrics.h",
-        "toolkit/components/glean/ContextualidentityMetrics.h",
-        "toolkit/components/glean/ControlcenterMetrics.h",
-        "toolkit/components/glean/CrashesMetrics.h",
-        "toolkit/components/glean/CustomkeysMetrics.h",
-        "toolkit/components/glean/DevtoolsClientAccessibilityMetrics.h",
-        "toolkit/components/glean/DevtoolsClientFrameworkMetrics.h",
-        "toolkit/components/glean/DevtoolsClientInspectorMetrics.h",
-        "toolkit/components/glean/DevtoolsClientResponsiveMetrics.h",
-        "toolkit/components/glean/DevtoolsClientSharedMetrics.h",
-        "toolkit/components/glean/DevtoolsClientWebconsoleMetrics.h",
-        "toolkit/components/glean/DevtoolsSharedHeapsnapshotMetrics.h",
-        "toolkit/components/glean/DocshellMetrics.h",
-        "toolkit/components/glean/DohMetrics.h",
-        "toolkit/components/glean/DomCanvasMetrics.h",
-        "toolkit/components/glean/DomGeolocationMetrics.h",
-        "toolkit/components/glean/DomIndexedDBMetrics.h",
-        "toolkit/components/glean/DomLocalstorageMetrics.h",
-        "toolkit/components/glean/DomMediaEmeMetrics.h",
-        "toolkit/components/glean/DomMediaHlsMetrics.h",
-        "toolkit/components/glean/DomMediaMetrics.h",
-        "toolkit/components/glean/DomMediaMp4Metrics.h",
-        "toolkit/components/glean/DomMediaPlatformsWmfMetrics.h",
-        "toolkit/components/glean/DomMediaWebrtcMetrics.h",
-        "toolkit/components/glean/DomMetrics.h",
-        "toolkit/components/glean/DomNotificationMetrics.h",
-        "toolkit/components/glean/DomPerformanceMetrics.h",
-        "toolkit/components/glean/DomPushMetrics.h",
-        "toolkit/components/glean/DomQuotaMetrics.h",
         "toolkit/components/glean/DomSecurityMetrics.h",
-        "toolkit/components/glean/DomServiceworkersMetrics.h",
-        "toolkit/components/glean/DomUseCounterMetrics.h",
-        "toolkit/components/glean/DomWebauthnMetrics.h",
-        "toolkit/components/glean/DomWorkersMetrics.h",
-        "toolkit/components/glean/DownloadsMetrics.h",
-        "toolkit/components/glean/EditorLibeditorMetrics.h",
-        "toolkit/components/glean/EnterprisepoliciesMetrics.h",
         "toolkit/components/glean/EventGIFFTMap.cpp",
-        "toolkit/components/glean/ExtensionsMetrics.h",
-        "toolkit/components/glean/ExtensionsPermissionsMetrics.h",
-        "toolkit/components/glean/FirefoxviewMetrics.h",
-        "toolkit/components/glean/FormautofillMetrics.h",
-        "toolkit/components/glean/GeckoTraceGeneratedMetrics.h",
-        "toolkit/components/glean/GeckoviewMetrics.h",
-        "toolkit/components/glean/GenaiMetrics.h",
-        "toolkit/components/glean/GfxMetrics.h",
         "toolkit/components/glean/GleanJSMetricsLookup.cpp",
         "toolkit/components/glean/GleanJSMetricsLookup.h",
         "toolkit/components/glean/GleanJSPingsLookup.cpp",
         "toolkit/components/glean/GleanJSPingsLookup.h",
         "toolkit/components/glean/GleanMetrics.h",
         "toolkit/components/glean/GleanPings.h",
-        "toolkit/components/glean/GleanTestsTestMetrics.h",
         "toolkit/components/glean/HistogramGIFFTMap.cpp",
-        "toolkit/components/glean/ImageDecodersMetrics.h",
         "toolkit/components/glean/IntlLocaleMetrics.h",
         "toolkit/components/glean/IpcMetrics.h",
-        "toolkit/components/glean/IpprotectionMetrics.h",
-        "toolkit/components/glean/JsSrcMetrics.h",
-        "toolkit/components/glean/JsXpconnectMetrics.h",
-        "toolkit/components/glean/LayoutMetrics.h",
         "toolkit/components/glean/LibjarMetrics.h",
         "toolkit/components/glean/LibprefMetrics.h",
-        "toolkit/components/glean/MediasnifferMetrics.h",
-        "toolkit/components/glean/MessagingSystemMetrics.h",
-        "toolkit/components/glean/MigrationMetrics.h",
-        "toolkit/components/glean/MlMetrics.h",
         "toolkit/components/glean/NetwerkCache2Metrics.h",
         "toolkit/components/glean/NetwerkDnsMetrics.h",
         "toolkit/components/glean/NetwerkMetrics.h",
         "toolkit/components/glean/NetwerkProtocolHttpMetrics.h",
         "toolkit/components/glean/NetwerkProtocolWebsocketMetrics.h",
-        "toolkit/components/glean/NewtabMetrics.h",
-        "toolkit/components/glean/NimbusMetrics.h",
-        "toolkit/components/glean/NormandyMetrics.h",
-        "toolkit/components/glean/ParserHtmlparserMetrics.h",
-        "toolkit/components/glean/PasswordmgrMetrics.h",
-        "toolkit/components/glean/PdfjsMetrics.h",
-        "toolkit/components/glean/PictureinpictureMetrics.h",
-        "toolkit/components/glean/PlacesMetrics.h",
-        "toolkit/components/glean/PreferencesMetrics.h",
-        "toolkit/components/glean/PrintingMetrics.h",
-        "toolkit/components/glean/PrivatebrowsingMetrics.h"
+        "toolkit/components/glean/ProcesstoolsMetrics.h",
+        "toolkit/components/glean/ScalarGIFFTMap.cpp",
+        "toolkit/components/glean/SecurityCertverifierMetrics.h",
+        "toolkit/components/glean/SecurityCtMetrics.h",
+        "toolkit/components/glean/SecurityManagerSslMetrics.h",
+        "toolkit/components/glean/SecuritySandboxMetrics.h",
+        "toolkit/components/glean/StartupMetrics.h",
+        "toolkit/components/glean/StorageMetrics.h",
+        "toolkit/components/glean/ToolkitProfileMetrics.h",
+        "toolkit/components/glean/ToolkitXreMetrics.h",
+        "toolkit/components/glean/UrlClassifierMetrics.h",
+        "toolkit/components/glean/XpcomMetrics.h",
+        "toolkit/components/glean/api/src/factory.rs",
+        "toolkit/components/glean/api/src/metrics.rs",
+        "toolkit/components/glean/api/src/pings.rs",
+        "toolkit/components/glean/metrics_yamls.cached",
+        "toolkit/components/glean/pings_yamls.cached"
       ]
     }
   },
@@ -11258,7 +9734,7 @@
       },
       {
         "name": "xul.dll",
-        "size_bytes": 42932224
+        "size_bytes": 42580992
       }
     ],
     "staged_package_manifest": [
