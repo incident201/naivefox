@@ -350,6 +350,7 @@ def main() -> int:
         "config/",
         "python/",
         "tools/",
+        "testing/mozbase/",
         "third_party/python/",
         "other-licenses/ply/",
         "nsprpub/",
