@@ -228,6 +228,7 @@ def main() -> int:
     active_manifests = set()
     active_build_definition_dirs = set()
     active_gyp_roots = set()
+    active_resource_scripts = set()
     build_collector_hash = sha256(
         repo / "netwerk/naivefox/tools/collect-build-inputs.py"
     )
@@ -258,6 +259,8 @@ def main() -> int:
                 active_manifests.add(value)
             if value.endswith("moz.build") or value.endswith(".mozbuild"):
                 active_build_definition_dirs.add(Path(value).parent.as_posix())
+            if value.endswith((".rc", ".rc.in")):
+                active_resource_scripts.add(value)
         for value in report.get("active_gyp_roots", []):
             value = safe_path(value).rstrip("/")
             if not (repo / value).is_dir():
@@ -289,6 +292,48 @@ def main() -> int:
             if previous is not None and previous != package:
                 raise SystemExit(f"target Cargo license metadata differs for {key}")
             cargo_license_inventory[key] = package
+
+    # Windows resource compilation does not emit the C/C++ depfiles consumed by
+    # the build-input collector.  Follow the quoted include/resource graph from
+    # target-active RC roots so nested scripts, headers, cursors and icons are
+    # exported as one class instead of being discovered one file at a time.
+    resource_suffixes = {
+        ".bmp",
+        ".cur",
+        ".h",
+        ".ico",
+        ".manifest",
+        ".png",
+        ".rc",
+    }
+    resource_files_by_name = defaultdict(list)
+    for value in tracked:
+        if Path(value).suffix.lower() in resource_suffixes:
+            resource_files_by_name[Path(value).name].append(value)
+    pending_resource_scripts = list(active_resource_scripts)
+    scanned_resource_scripts = set()
+    while pending_resource_scripts:
+        resource_script = pending_resource_scripts.pop()
+        if resource_script in scanned_resource_scripts:
+            continue
+        scanned_resource_scripts.add(resource_script)
+        text = (repo / resource_script).read_text(
+            encoding="utf-8", errors="surrogateescape"
+        )
+        for raw_reference in re.findall(r'"([^"\r\n]+)"', text):
+            reference = raw_reference.replace("\\", "/")
+            if Path(reference).suffix.lower() not in resource_suffixes:
+                continue
+            direct = (Path(resource_script).parent / reference).as_posix()
+            candidates = [direct] if direct in tracked else []
+            if not candidates and "/" not in reference:
+                candidates = resource_files_by_name[Path(reference).name]
+            if len(candidates) != 1:
+                continue
+            dependency = candidates[0]
+            add(dependency, "build:windows-resource-include")
+            if dependency.endswith((".rc", ".rc.in")):
+                pending_resource_scripts.append(dependency)
 
     def manifest_strings(value):
         if isinstance(value, str):
