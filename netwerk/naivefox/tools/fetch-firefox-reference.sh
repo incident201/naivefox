@@ -3,8 +3,8 @@
 set -euo pipefail
 umask 077
 
-repo_root=$(git rev-parse --show-toplevel)
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(cd "$script_dir/../../.." && pwd)
 objdir=${NAIVEFOX_OBJDIR:-${MOZ_OBJDIR:-$repo_root/obj-naivefox-minimal}}
 objdir=$(realpath -m -- "$objdir")
 output=${1:-${NAIVEFOX_FIREFOX_REFERENCE_DIR:-$objdir/naivefox-capture-reference}}
