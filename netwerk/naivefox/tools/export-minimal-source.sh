@@ -231,6 +231,7 @@ for path in (
     # toolkit/moz.configure probes this header before the selected NSS build
     # graph is evaluated.
     "security/nss/lib/nss/nss.h",
+    "security/nss/coreconf/config.gypi",
     "netwerk/naivefox/moz.configure", "toolkit/moz.configure", "js/moz.configure",
     "js/ffi.configure", "memory/moz.configure",
 ):
