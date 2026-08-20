@@ -572,6 +572,46 @@ def main() -> int:
     root_manifest = tomllib.loads(
         (source_tree / "Cargo.toml").read_text(encoding="utf-8")
     )
+
+    def add_cargo_manifest_targets(manifest: Path, category: str) -> None:
+        data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        package = data.get("package", {})
+        library = data.get("lib")
+        if isinstance(library, dict):
+            add_path(manifest.parent / library.get("path", "src/lib.rs"), category)
+        elif package.get("autolib", True):
+            add_path(manifest.parent / "src" / "lib.rs", category)
+        build_script = package.get("build")
+        if isinstance(build_script, str):
+            add_path(manifest.parent / build_script, category)
+        elif build_script is not False:
+            add_path(manifest.parent / "build.rs", category)
+        target_kinds = (
+            ("bin", "src/bin", "autobins"),
+            ("example", "examples", "autoexamples"),
+            ("test", "tests", "autotests"),
+            ("bench", "benches", "autobenches"),
+        )
+        for key, directory, automatic in target_kinds:
+            for target in data.get(key, []):
+                if "path" in target:
+                    add_path(manifest.parent / target["path"], category)
+                elif "name" in target:
+                    add_path(
+                        manifest.parent / directory / f"{target['name']}.rs",
+                        category,
+                    )
+                    add_path(
+                        manifest.parent / directory / target["name"] / "main.rs",
+                        category,
+                    )
+            if package.get(automatic, True):
+                for pattern in (f"{directory}/*.rs", f"{directory}/*/main.rs"):
+                    for entry in manifest.parent.glob(pattern):
+                        add_path(entry, category)
+        if package.get("autobins", True):
+            add_path(manifest.parent / "src" / "main.rs", category)
+
     vendored_packages: dict[str, list[Path]] = defaultdict(list)
     for manifest in (source_tree / "third_party" / "rust").glob("*/Cargo.toml"):
         try:
@@ -592,13 +632,9 @@ def main() -> int:
                 continue
             if "path" in specification:
                 directory = (source_tree / specification["path"]).resolve()
-                for name in (
-                    "Cargo.toml",
-                    "build.rs",
-                    "src/lib.rs",
-                    "src/main.rs",
-                ):
-                    add_path(directory / name, "cargo:local-patch-metadata")
+                manifest = directory / "Cargo.toml"
+                add_path(manifest, "cargo:local-patch-metadata")
+                add_cargo_manifest_targets(manifest, "cargo:local-patch-target-entry")
                 continue
             if "git" not in specification:
                 continue
@@ -611,30 +647,7 @@ def main() -> int:
             git_patch_packages.add(package_name)
             for manifest in manifests:
                 add_path(manifest, "cargo:git-patch-manifest")
-                data = tomllib.loads(manifest.read_text(encoding="utf-8"))
-                package = data.get("package", {})
-                library = data.get("lib")
-                if isinstance(library, dict):
-                    add_path(
-                        manifest.parent / library.get("path", "src/lib.rs"),
-                        "cargo:git-patch-entry",
-                    )
-                elif package.get("autolib", True):
-                    add_path(
-                        manifest.parent / "src" / "lib.rs",
-                        "cargo:git-patch-entry",
-                    )
-                build_script = package.get("build")
-                if isinstance(build_script, str):
-                    add_path(
-                        manifest.parent / build_script,
-                        "cargo:git-patch-entry",
-                    )
-                elif build_script is not False:
-                    add_path(
-                        manifest.parent / "build.rs",
-                        "cargo:git-patch-entry",
-                    )
+                add_cargo_manifest_targets(manifest, "cargo:git-patch-entry")
 
     files = sorted(set().union(*categories.values()))
     missing_contracts = sorted(
