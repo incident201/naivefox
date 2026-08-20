@@ -260,6 +260,12 @@ for path in list(entries):
         # root README entry.
         if relative.as_posix() in {"README.md", "netwerk/naivefox/README.md"}:
             continue
+        # Markdown is documentation, not a build input.  The curated
+        # product/technical documentation set is mapped explicitly above;
+        # this prevents incidental README/agent files from moz.build strings
+        # leaking into the generated source tree.
+        if relative.suffix.lower() in {".md", ".markdown"}:
+            continue
         if candidate.is_file():
             add(relative.as_posix(), "explicit:mozbuild-declared")
 

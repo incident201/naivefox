@@ -19,6 +19,12 @@ FORBIDDEN_COMPONENTS = {
     "captures",
 }
 FORBIDDEN_SUFFIXES = (".pcap", ".pcapng", ".keylog")
+FORBIDDEN_BASENAMES = {
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI-HANDOFF.md",
+    "MINIMISATION-TASK.MD",
+}
 ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
     r"(?:naivefox|obj-[^/\s\"']*)(?:/|\s|$)|"
@@ -34,6 +40,8 @@ def safe_relative(value: str) -> pathlib.PurePosixPath:
     path = pathlib.PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts or value.startswith("/"):
         fail(f"unsafe absolute/parent path: {value}")
+    if any(part in FORBIDDEN_BASENAMES for part in path.parts):
+        fail(f"agent/task documentation leaked into export: {value}")
     if any(part in FORBIDDEN_COMPONENTS for part in path.parts if part != "objdir"):
         fail(f"forbidden path component: {value}")
     if path.parts and (path.parts[0] == "objdir" or path.parts[0].startswith("obj-")):
