@@ -238,7 +238,11 @@ for path in list(entries):
 # build definitions, not whole Firefox directories.
 mozbuild_literal = re.compile(r"(?:\"([^\"]+)\"|'([^']+)')")
 for path in list(entries):
-    if not (path.endswith("/moz.build") or path == "moz.build"):
+    if not (
+        path.endswith("/moz.build")
+        or path == "moz.build"
+        or path.endswith(".mozbuild")
+    ):
         continue
     mozbuild = repo / path
     try:
