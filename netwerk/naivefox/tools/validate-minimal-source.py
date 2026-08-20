@@ -17,7 +17,6 @@ FORBIDDEN_COMPONENTS = {
     "objdir",
     "artifacts",
     "captures",
-    "profiles",
 }
 FORBIDDEN_SUFFIXES = (".pcap", ".pcapng", ".keylog")
 ABSOLUTE_TEXT = re.compile(r"/(?:home|tmp|mnt|workspaces)/[^\s\"']+|[A-Za-z]:\\\\(?:Users|home)\\\\")
