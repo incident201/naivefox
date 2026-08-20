@@ -28,6 +28,12 @@ its trailing EOF byte. NF-UPSTREAM-016 fixes that invariant; the minimal
 binary was rebuilt and the isolated Auto matrix passed with no parser panic or
 segmentation fault.
 
+The cross-platform rebuild of `xul.dll` after NF-UPSTREAM-016 completed with
+zero compiler warnings. The native Windows smoke was repeated against the
+refreshed package: version/runtime startup, five SOCKS sessions, HTTP CONNECT,
+malformed-input bounded stress, and relative/absolute/Unicode append logging
+all passed.
+
 ---
 
 ## 1. Release & Baseline Provenance

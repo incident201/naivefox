@@ -50,6 +50,11 @@ incremental minimal rebuild, the isolated Auto matrix passed (H3 preference,
 one establishment-only H2 fallback, logical 407/target failures, and repeated
 same-profile starts) with no panic or segmentation fault.
 
+The Windows x86_64 `xul.dll` was then rebuilt from the same source checkpoint
+with zero compiler warnings. Native smoke against the refreshed package again
+passed version/runtime startup, five consecutive SOCKS sessions, HTTP CONNECT,
+malformed bounded stress, and relative/absolute/Unicode append logging.
+
 The capture gate now downloads a clean official Mozilla Firefox 154.0 release
 (`firefox-154.0.tar.xz`, archive SHA-256
 `7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b`) through
