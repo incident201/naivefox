@@ -193,8 +193,12 @@ def assert_closure(report_path, topsrcdir):
             "netwerk/naivefox/tools/collect-build-inputs.py",
             "netwerk/naivefox/tools/collect-configure-inputs.py",
             "netwerk/naivefox/tools/export-minimal-source.sh",
+            "netwerk/naivefox/tools/fetch-naiveproxy-reference.sh",
             "netwerk/naivefox/tools/minimal-source-plan.py",
+            "netwerk/naivefox/tools/stage-runtime.sh",
+            "netwerk/naivefox/tools/stage-runtime-windows-x86_64.sh",
             "netwerk/naivefox/tools/validate-minimal-source.py",
+            "netwerk/naivefox/tools/verify-staged-runtime.sh",
         }
         if ancestor.returncode != 0 or not changed_paths.issubset(
             report_paths | documentation_paths | export_tool_paths
