@@ -1,5 +1,5 @@
 {
-  "collector_sha256": "852288e45cf89f953172881c6052844b452168d4093ab094f2defa6d6a5e4afa",
+  "collector_sha256": "243ad76c3fca440c3320709d59155c4e02abee598cfac9eb6e9048d1ce0c059b",
   "configure_command": [
     "strace",
     "-f",
@@ -10893,7 +10893,7 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
+  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "a22f8bb886ad53b082ccfa576203405f614efa1655a9a3ddf7d2fa2e300ab4bc",
   "observed_directories": [
@@ -21958,11 +21958,11 @@
   ],
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "22e6508f82af6bc5c5bce417376e2167c532e965",
+  "source_commit": "349645ea561d871080d0cb0589e10e68becd749c",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "5833a20a5d92efc938b869153977ae18102901e70562f8472dbfbe2c4ea68578",
-  "trace_size_bytes": 34048330
+  "trace_sha256": "62a9abe8a9c88db040752568236b442a61f95f257a7231aaaaa394fcde049e71",
+  "trace_size_bytes": 34063795
 }
