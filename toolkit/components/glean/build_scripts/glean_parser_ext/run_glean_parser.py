@@ -13,7 +13,7 @@ import jinja2
 import jog
 import rust
 import typescript
-from buildconfig import topsrcdir
+from buildconfig import substs, topsrcdir
 from glean_parser import lint, metrics, parser, translate, util
 from glean_parser.lint import METRIC_CHECKS, CheckType, GlinterNit
 from glean_parser.pings import Ping
@@ -314,15 +314,16 @@ def pings(cpp_fd, *args):
             js.output_js(all_objs, js_fd, js_cpp_fd, options)
 
     ping_names_by_app_id = {}
-    from os import path
+    if not substs.get("MOZ_NAIVEFOX"):
+        from os import path
 
-    sys.path.append(path.join(path.dirname(__file__), path.pardir, path.pardir))
-    from metrics_index import pings_by_app_or_lib_id
+        sys.path.append(path.join(path.dirname(__file__), path.pardir, path.pardir))
+        from metrics_index import pings_by_app_or_lib_id
 
-    for app_id, ping_yamls in pings_by_app_or_lib_id.items():
-        input_files = [Path(path.join(topsrcdir, x)) for x in ping_yamls]
-        ping_objs, _ = parse_with_options(input_files, options)
-        ping_names_by_app_id[app_id] = sorted(ping_objs["pings"].keys())
+        for app_id, ping_yamls in pings_by_app_or_lib_id.items():
+            input_files = [Path(path.join(topsrcdir, x)) for x in ping_yamls]
+            ping_objs, _ = parse_with_options(input_files, options)
+            ping_names_by_app_id[app_id] = sorted(ping_objs["pings"].keys())
 
     with open_output(rust_path) as rust_fd:
         rust.output_rust(all_objs, rust_fd, ping_names_by_app_id, options)
