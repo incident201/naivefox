@@ -20,6 +20,7 @@ SOURCE_PATH = re.compile(r"(?:^|[\s(])(/[^\s)]+)")
 INCLUDE_PATH = re.compile(r"-I(?:\"([^\"]+)\"|'([^']+)'|([^\s]+))")
 MAKE_SOURCE_PATH = re.compile(r"\$\((topsrcdir|TOPSRCDIR|srcdir)\)(/[^\s\\'\"():;,]+)")
 GYP_SOURCE_PATH = re.compile(r"[\"']([^\"']+\.gypi?)[\"']")
+PY_ACTION = re.compile(r"call\s+py_action,\s*([A-Za-z0-9_+-]+)")
 
 
 def git(repo: Path, *args: str) -> str:
@@ -121,6 +122,7 @@ def main() -> int:
     makefiles = []
     manifest_lists = []
     backends = []
+    make_fragments = []
     for root, directories, names in os.walk(objdir):
         directories[:] = [
             directory for directory in directories if directory != "naivefox-fixture"
@@ -132,6 +134,8 @@ def main() -> int:
                 depfiles.append(path)
             if name in {"Makefile", "backend.mk"}:
                 makefiles.append(path)
+            if name == "Makefile" or name.endswith(".mk"):
+                make_fragments.append(path)
             if name == "backend.mk":
                 backends.append(path)
             if name == "manifest-lists.json":
@@ -140,6 +144,7 @@ def main() -> int:
     makefiles.sort()
     manifest_lists.sort()
     backends.sort()
+    make_fragments.sort()
 
     # Installed headers and resources are generated from EXPORTS and related
     # moz.build declarations.  They do not necessarily occur in linker object
@@ -268,6 +273,16 @@ def main() -> int:
             if path.is_dir():
                 if relative is not None:
                     directory_contracts.add(relative)
+
+    active_python_actions = set()
+    for fragment in make_fragments:
+        text = fragment.read_text(encoding="utf-8", errors="replace")
+        for action in PY_ACTION.findall(text):
+            path = source_tree / "python" / "mozbuild" / "mozbuild" / "action"
+            path /= f"{action}.py"
+            if path.is_file():
+                add_path(path, "make:active-python-action")
+                active_python_actions.add(action)
 
     # backend.RecursiveMakeBackend.in records recursively loaded GYP files,
     # but not necessarily the root named by an active GYP_DIRS declaration.
@@ -443,6 +458,7 @@ def main() -> int:
         ),
         "cargo_workspace_member_count": len(metadata["workspace_members"]),
         "active_gyp_roots": sorted(active_gyp_roots),
+        "active_python_actions": sorted(active_python_actions),
         "cargo_packages": sorted(
             cargo_packages,
             key=lambda package: (
