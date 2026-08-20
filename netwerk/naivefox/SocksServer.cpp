@@ -5,6 +5,7 @@
 #include "SocksServer.h"
 
 #include <array>
+#include <cstring>
 #include <functional>
 #include <utility>
 
@@ -56,6 +57,8 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult Start() { return WaitForInput(); }
 
  private:
+  static constexpr size_t kMaxReplyBytes = 32;
+
   ~SocksConnection() { Close(NS_BASE_STREAM_CLOSED); }
 
   nsresult WaitForInput();
@@ -74,7 +77,8 @@ class SocksConnection final : public nsIInputStreamCallback,
   TunnelConfig mTunnelConfig;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   Socks5Parser mParser;
-  nsTArray<uint8_t> mReplies;
+  std::array<uint8_t, kMaxReplyBytes> mReplies{};
+  size_t mReplyLength = 0;
   size_t mReplyOffset = 0;
   RefPtr<TunnelSession> mSession;
   std::function<void()> mOnClose;
@@ -84,6 +88,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
   bool mFailureQueued = false;
+  bool mInputTerminal = false;
   bool mClosed = false;
 };
 
@@ -107,17 +112,28 @@ nsresult SocksConnection::WaitForOutput() {
 
 nsresult SocksConnection::QueueReply(Span<const uint8_t> aBytes,
                                      bool aCloseAfter) {
-  mReplies.AppendElements(aBytes);
+  if (mReplyOffset != 0) {
+    const size_t pending = mReplyLength - mReplyOffset;
+    std::memmove(mReplies.data(), mReplies.data() + mReplyOffset, pending);
+    mReplyLength = pending;
+    mReplyOffset = 0;
+  }
+  if (aBytes.Length() > kMaxReplyBytes - mReplyLength) {
+    return NS_ERROR_FILE_TOO_BIG;
+  }
+  std::memcpy(mReplies.data() + mReplyLength, aBytes.Elements(),
+              aBytes.Length());
+  mReplyLength += aBytes.Length();
   mCloseAfterWrite |= aCloseAfter;
   return WaitForOutput();
 }
 
 nsresult SocksConnection::FlushReplies() {
-  while (mReplyOffset < mReplies.Length()) {
+  while (mReplyOffset < mReplyLength) {
     uint32_t written = 0;
     nsresult rv = mLocalOut->Write(
-        reinterpret_cast<const char*>(mReplies.Elements() + mReplyOffset),
-        mReplies.Length() - mReplyOffset, &written);
+        reinterpret_cast<const char*>(mReplies.data() + mReplyOffset),
+        mReplyLength - mReplyOffset, &written);
     if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
       return WaitForOutput();
     }
@@ -126,7 +142,7 @@ nsresult SocksConnection::FlushReplies() {
     }
     mReplyOffset += written;
   }
-  mReplies.Clear();
+  mReplyLength = 0;
   mReplyOffset = 0;
   if (mCloseAfterWrite) {
     Close(NS_OK);
@@ -179,7 +195,7 @@ void SocksConnection::TunnelFailed(nsresult aStatus) {
 
 NS_IMETHODIMP SocksConnection::OnInputStreamReady(
     nsIAsyncInputStream* aStream) {
-  if (mClosed || mOpening) {
+  if (mClosed || mOpening || mInputTerminal) {
     return NS_OK;
   }
   std::array<uint8_t, 4096> buffer;
@@ -199,7 +215,7 @@ NS_IMETHODIMP SocksConnection::OnInputStreamReady(
   }
 
   size_t offset = 0;
-  while (offset < read && !mOpening && !mClosed) {
+  while (offset < read && !mOpening && !mClosed && !mInputTerminal) {
     size_t consumed = 0;
     auto event =
         mParser.Consume(Span(buffer.data() + offset, read - offset), consumed);
@@ -213,6 +229,7 @@ NS_IMETHODIMP SocksConnection::OnInputStreamReady(
       rv = BeginTunnel(mParser.Target().Authority(),
                        Span(buffer.data() + offset, read - offset));
     } else if (event != Socks5Parser::Event::NeedMore) {
+      mInputTerminal = true;
       mFailureQueued = true;
       nsTArray<uint8_t> reply;
       if (event == Socks5Parser::Event::RejectMethods) {
@@ -231,7 +248,7 @@ NS_IMETHODIMP SocksConnection::OnInputStreamReady(
       return NS_OK;
     }
   }
-  if (!mOpening && !mClosed) {
+  if (!mOpening && !mClosed && !mInputTerminal) {
     rv = WaitForInput();
     if (NS_FAILED(rv)) {
       Close(rv);
@@ -318,6 +335,7 @@ class HttpConnectConnection final : public nsIInputStreamCallback,
   bool mPumpStarted = false;
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
+  bool mInputTerminal = false;
   bool mClosed = false;
 };
 
@@ -414,6 +432,10 @@ void HttpConnectConnection::TunnelFailed(nsresult aStatus) {
 }
 
 void HttpConnectConnection::Reject(HttpConnectParser::Event aEvent) {
+  if (mClosed || mInputTerminal) {
+    return;
+  }
+  mInputTerminal = true;
   nsAutoCString response(
       "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: "
       "0\r\n\r\n"_ns);
@@ -434,7 +456,7 @@ void HttpConnectConnection::Reject(HttpConnectParser::Event aEvent) {
 
 NS_IMETHODIMP HttpConnectConnection::OnInputStreamReady(
     nsIAsyncInputStream* aStream) {
-  if (mClosed || mOpening) {
+  if (mClosed || mOpening || mInputTerminal) {
     return NS_OK;
   }
   std::array<uint8_t, 4096> buffer;
@@ -679,6 +701,11 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
                config.mType == ListenerType::Socks5 ? "SOCKS5" : "HTTP CONNECT",
                config.mIPv6 ? "[" : "", config.mHost.get(),
                config.mIPv6 ? "]" : "", static_cast<unsigned>(config.mPort));
+    RuntimeLogEvent("Listening on %s://%s%s%s:%u\n",
+                    config.mType == ListenerType::Socks5 ? "socks" : "http",
+                    config.mIPv6 ? "[" : "", config.mHost.get(),
+                    config.mIPv6 ? "]" : "",
+                    static_cast<unsigned>(config.mPort));
   }
   while ((!aMaxConnections || !state->Complete()) &&
          NS_ProcessNextEvent(nullptr, true)) {

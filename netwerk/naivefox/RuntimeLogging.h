@@ -16,6 +16,10 @@ nsresult ConfigureRuntimeLogging(RuntimeLogMode aMode, const nsACString& aPath,
 void ShutdownRuntimeLogging();
 void RuntimeLog(const char* aFormat, ...) MOZ_FORMAT_PRINTF(1, 2);
 
+// Emits a Chromium/NaiveProxy-style timestamped INFO record.  The legacy
+// RuntimeLog form remains line-stable for machine-readable integration gates.
+void RuntimeLogEvent(const char* aFormat, ...) MOZ_FORMAT_PRINTF(1, 2);
+
 }  // namespace mozilla::naivefox
 
 #endif

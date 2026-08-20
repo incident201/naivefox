@@ -62,6 +62,18 @@ bool ParseProxyProtocol(const char* aValue,
   return false;
 }
 
+const char* ProxyProtocolName(mozilla::naivefox::ProxyProtocol aProtocol) {
+  switch (aProtocol) {
+    case mozilla::naivefox::ProxyProtocol::H2:
+      return "HTTPS (h2)";
+    case mozilla::naivefox::ProxyProtocol::H3:
+      return "QUIC (h3)";
+    case mozilla::naivefox::ProxyProtocol::Auto:
+      return "auto";
+  }
+  return "unknown";
+}
+
 }  // namespace
 
 extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
@@ -100,6 +112,17 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     mozilla::naivefox::GeckoRuntime runtime;
     rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol);
     if (NS_SUCCEEDED(rv)) {
+      mozilla::naivefox::RuntimeLogEvent(
+          "NaiveFox started listeners=%u upstreams=%u\n",
+          static_cast<unsigned>(config.mListeners.Length()),
+          static_cast<unsigned>(config.mProxies.Length()));
+      for (size_t index = 0; index < config.mProxies.Length(); ++index) {
+        mozilla::naivefox::RuntimeLogEvent(
+            "Proxying via %s endpoint=%s upstream=%u\n",
+            ProxyProtocolName(config.mProxies[index].mProtocol),
+            config.mProxies[index].mUrl.get(),
+            static_cast<unsigned>(index + 1));
+      }
       nsTArray<mozilla::naivefox::TunnelConfig> tunnelConfigs;
       for (const auto& proxy : config.mProxies) {
         auto& tunnelConfig = *tunnelConfigs.AppendElement();

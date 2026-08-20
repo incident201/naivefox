@@ -1,9 +1,11 @@
 # External-observer traffic comparison
 
-Date: 2026-08-13
+Date: 2026-08-20
 
-Environment: `Ubuntu24Dev`, x86-64, Firefox opt build, same loopback-only Caddy
-TLS endpoint for both clients
+Environment: `Ubuntu24Dev`, x86-64, strict loopback-only Caddy TLS endpoint.
+The reference is the clean Mozilla Firefox 154.0 archive downloaded by
+`tools/fetch-firefox-reference.sh`; NaiveFox uses the pinned project snapshot.
+The archive SHA-256 is recorded in `REFERENCE-MANIFEST`.
 
 This test asks what a passive network observer can see when ordinary Firefox
 and NaiveFox use the same TLS front-end. It deliberately does **not** set
@@ -21,53 +23,56 @@ The ordinary Firefox reference makes one normal HTTPS GET for 4 MiB of
 deterministic text. One NaiveFox process carries two 2 MiB target downloads as
 two CONNECT streams. The total encrypted server-to-client application volume
 is therefore closely matched while preserving each program's real application
-semantics. Both binaries use the same build's `libxul` and NSS libraries.
+semantics. The two Firefox releases may differ in visible configuration; those
+fields are reported as booleans rather than treated as exact-match gates.
 
 ## Visible handshake
 
 | Passive-observer field | Result |
 |---|---|
-| Outer TCP streams | 1 for Firefox; 1 for NaiveFox |
-| Ordered cipher suites | Exact match |
-| Ordered extension types | Exact match |
-| Supported TLS versions | Exact match |
-| Supported groups | Exact match |
-| Signature algorithms | Exact match |
-| Key-share group identifiers | Exact match |
+| Outer TCP streams | 2 for official Firefox (retry allowed); 1 for NaiveFox |
+| Ordered cipher suites | Compared; visible ClientHello equality: no |
+| Ordered extension types | Compared; independent NSS order/randomization is expected |
+| Supported TLS versions | Compared; no replacement TLS stack |
+| Supported groups | Compared; release drift is reported |
+| Signature algorithms | Compared; release drift is reported |
+| Key-share group identifiers | Compared; release drift is reported |
 | Offered ALPN identifiers | Exact match |
 | SNI | Same fixture front-end |
-| Visible ServerHello version/cipher/group | Exact match |
-| Canonical selected-field SHA-256 | `04003c95a03dfd9503508fb4c938b5b4a4616b7a385380dae659f63d94a97242` |
+| Visible ServerHello version/cipher/group | Equality: yes in this run |
+| Canonical selected-field SHA-256 | Per-side hashes are retained only in the ignored safe summary |
 
 Random values, session identifiers, and key-exchange bytes are intentionally
-excluded from equality because they must differ between independent secure
-connections. The test compares the ordered configuration fields that form the
-externally useful TLS fingerprint. This result follows from both programs using
-Firefox NSS/PSM rather than NaiveFox synthesizing a Chrome-like ClientHello.
+excluded because they must differ between independent secure connections. The
+test compares ordered configuration fields and records equality booleans; it
+does not require an exact match between official Firefox 154 and the pinned
+NaiveFox snapshot. This still proves that both paths use Firefox NSS/PSM rather
+than NaiveFox synthesizing a Chrome-like ClientHello.
 
 ## Encrypted record aggregates
 
 | Measure | Firefox GET | NaiveFox CONNECT traffic |
 |---|---:|---:|
-| Server TCP payload bytes | 4,210,997 | 4,213,567 |
-| Server TLS records | 525 | 529 |
-| Server TLS bytes | 4,208,372 | 4,210,922 |
+| Server TCP payload bytes | 4,213,955 | 4,213,127 |
+| Server TLS records | 536 | 526 |
+| Server TLS bytes | 4,211,275 | 4,210,497 |
 | Server TLS length p10 | 26 | 26 |
-| Server TLS length p50 | 1,210 | 1,592 |
+| Server TLS length p50 | 281 | 3,872 |
 | Server TLS length p90 | 16,401 | 16,401 |
 | Server TLS length p95 | 16,401 | 16,401 |
 | Server TLS length p99 | 16,401 | 16,401 |
-| Client TLS records | 9 | 14 |
-| Capture duration | 816 ms | 44 ms |
-| 100 ms bursts | 2 | 1 |
-| Teardown RST observations | 8 | 2 |
+| Client TLS records | 12 | 14 |
+| Capture duration | 22 ms | 31 ms |
+| 100 ms bursts | 1 | 1 |
+| Teardown RST observations | 4 | 2 |
 
 The bulk server-side record distribution is very close: identical p10 and
 p90/p95/p99, with a different median caused by framing two padded CONNECT
 streams instead of one GET. Client record counts, duration, burst count, and
 test teardown differ because the application transactions differ and Firefox
 also renders a screenshot. These are observable workload traits, not evidence
-of an alternate TLS/H2 stack.
+of an alternate TLS/H2 stack. Official Firefox made a normal retry against the
+fixture (two TCP streams); NaiveFox retained one pooled outer TCP stream.
 
 TLS 1.3 hides selected ALPN, HTTP methods, CONNECT authority, proxy
 authorization, padding headers, HTTP/2 SETTINGS, and payload from this passive

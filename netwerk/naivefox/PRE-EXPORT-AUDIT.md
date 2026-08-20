@@ -2,6 +2,25 @@
 
 This document records the definitive technical and architectural audit of the `minimal` branch prior to code tree export (`minimal-source`).
 
+## Current gate status (2026-08-20)
+
+The source export is **not unlocked**. The stability blockers that motivated
+this audit are now closed: malformed SOCKS5/HTTP terminal parsing is bounded,
+Windows wide-path file logging works, and the native staged Windows package
+survived five repeated local stress runs plus a 600-second strict-H3 soak.
+The soak completed 45/45 integrity-checked requests, recorded 45 H3 and 45
+padding events, sampled the process for 593 seconds, and ended with RSS 27.5
+MiB (peak 28.3 MiB). The remaining gate is audit/provenance finalization and a
+clean standalone export/build; `tools/export-minimal-source.sh` has not been
+run.
+
+The capture reference policy is also final: both H2 and H3 capture runners
+fetch a clean official Mozilla Firefox release into ignored object storage via
+`tools/fetch-firefox-reference.sh`. They do not require a full Firefox package
+or source objdir to be present. Exact TLS/QUIC field equality against the
+pinned NaiveFox snapshot is diagnostic only; protocol ownership and strict
+transport assertions remain gates.
+
 ---
 
 ## 1. Release & Baseline Provenance
@@ -21,12 +40,12 @@ Audited with `netwerk/naivefox/tools/analyze-full-closure.py` and strictly valid
 | Dimension | Linux x86_64 (`obj-naivefox-minimal`) | Windows x86_64 (`obj-naivefox-windows-x86_64`) |
 |---|---|---|
 | **Target Triple** | `x86_64-unknown-linux-gnu` | `x86_64-pc-windows-msvc` |
-| **C/C++ Translation Units** | **934 TUs** (parsed from compiler `.deps`) | **957 TUs** (parsed from compiler `.deps`) |
+| **C/C++ Translation Units** | **545 TUs** (clean audited depfiles) | **468 TUs** (clean audited depfiles) |
 | **Direct Link Objects** | **525 object files** (216.03 MB unstripped) | **536 object files** (202.62 MB unstripped) |
 | **Main Binary Size** | 615.49 MB unstripped / **62.0 MB stripped** | **40.94 MB** (`xul.dll`) |
 | **Headless Executable** | 1.05 MB (`naivefox`) | 11.0 KB (`naivefox.exe`) |
 | **Static Libraries** | 3 archives (`js_static`, `gkrust`, `pure_virtual`) | 3 archives (`js_static.lib`, `gkrust.lib`, `pure_virtual.lib`) |
-| **Reachable Rust Crates** | **396 packages** (filtered reachable from `gkrust`) | **396 packages** (filtered reachable from `gkrust`) |
+| **Reachable Rust Crates** | **366 packages** (filtered reachable from `gkrust`) | **379 packages** (filtered reachable from `gkrust`) |
 | **Dynamic Dependencies** | **20 `DT_NEEDED`** (glibc, glib, dbus, nspr, nss, sqlite) | **22 DLL imports** (Win32 API, nspr, nss, sqlite) |
 | **Desktop UI Libraries (GTK/X11)** | **0 libraries linked** | **0 libraries linked** |
 | **Staged Runtime Package** | **18 files** (27.91 MB archive) | **21 files** (19.34 MB archive) |
@@ -79,8 +98,17 @@ Automated smoke test executed via `tools/verify-staged-windows-smoke.py`:
 - `[PASS]` Dynamic port SOCKS5 listener startup & handshake (`0x05 0x00`)
 - `[PASS]` 5 consecutive client SOCKS5 sessions
 - `[PASS]` Dynamic port HTTP CONNECT listener startup & request validation
+- `[PASS]` malformed SOCKS/HTTP bounded stress, including 2 MiB same-write tail,
+  200 non-reading rejects, and post-stress normal handshake
+- `[PASS]` relative, absolute, and Unicode file logging with append/restart and
+  credential scan
+- `[PASS]` five repeated native Windows smoke iterations without unexpected exit
+- `[PASS]` 600-second strict H3 real-Caddy soak: 45/45 integrity requests,
+  45/45 H3 and padding records, 593 resource samples
 - `[PASS]` Clean process termination and shutdown
-- *Note:* Windows build, launch, config parsing, local listener handshake and shutdown are fully verified. End-to-end H2/H3 networking against live upstream proxy is tracked separately.
+- *Note:* strict H3 networking is now covered by the native soak. A separate
+  full native H2/Auto matrix and crash-dump-backed long churn run remain
+  follow-up evidence; no random crash recurred in the repeated smoke/soak gate.
 
 ---
 

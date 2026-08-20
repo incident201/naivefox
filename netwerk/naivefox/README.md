@@ -366,7 +366,17 @@ and unsafe endpoints are rejected rather than ignored.
 
 Logging is disabled when `log` is absent, goes to the console when it is an
 empty string, and appends to a mode-`0600` file for any non-empty path. The
-normal config mode first creates or reuses a writable persistent Firefox/NSS
+timestamped event records use the compact NaiveProxy/Chromium-style form
+`[MMDD/HHMMSS.uuuuuu:INFO:naivefox] message`. They identify listener startup,
+proxy endpoint (with URI userinfo removed), connection id, target authority,
+outer protocol, padding negotiation, status, and close events. The stable
+unprefixed `Outer protocol: ...` and `Padding negotiated: ...` lines remain for
+machine-readable integration checks. Credentials and `Proxy-Authorization`
+are never emitted. On Windows, file paths use the native wide-character CRT
+API; POSIX files are created atomically with mode `0600` rather than repaired
+after creation.
+
+The normal config mode first creates or reuses a writable persistent Firefox/NSS
 profile at `$XDG_STATE_HOME/naivefox/profile`, or
 `$HOME/.local/state/naivefox/profile` when XDG state is unset. Set
 `NAIVEFOX_PROFILE` to require an explicit persistent location; an invalid
@@ -715,7 +725,10 @@ The prototype is complete when all of the following are demonstrated on Linux x8
 14. End-to-end traffic works with payload padding enabled.
 15. Large transfers and multiple concurrent SOCKS connections work without corruption or unbounded buffering.
 16. Tests cover the padding codec and critical SOCKS/tunnel state transitions.
-17. A packet-capture comparison documents how the outer TLS/H2 setup compares with ordinary Firefox from the same revision.
+17. A packet-capture comparison documents how the outer TLS/H2/H3 setup
+    compares with a clean official Firefox reference. Exact fingerprint
+    equality is diagnostic across release versions; protocol ownership and
+    marker/multiplexing assertions are strict.
 18. The complete local integration suite passes from one documented command.
 19. The same core path is confirmed against the supplied real Caddy server.
 20. All changes to existing Firefox files are documented in `UPSTREAM.md`.
@@ -742,7 +755,8 @@ The capture phase requires the restricted `dumpcap` capabilities documented
 in `CAPTURE.md`. The H3-specific decrypted and no-keylog comparison is in
 `H3-CAPTURE.md` and is reproduced by
 `test/integration/run-h3-capture-comparison.sh`. The commands build or reuse
-the pinned fixture dependencies, run local functional and failure-path suites
+the pinned fixture dependencies, download/reuse the official Firefox reference
+under the ignored object directory, run local functional and failure-path suites
 sequentially, and delete sensitive run material after every successful phase.
 
 Additional repeatable test entry points are:
@@ -759,6 +773,10 @@ NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
 NAIVEFOX_REAL_PROXY_USER=user \
 NAIVEFOX_REAL_PROXY_PASS=secret \
 ./netwerk/naivefox/test/integration/run-real-server-h3-soak.sh
+# Native Windows staged-package soak (PowerShell; URI is environment-only)
+py -3 netwerk/naivefox/tools/run-windows-soak.py \
+  --package-dir D:\\naivefox\\naivefox-windows-x86_64-audit \
+  --protocol h3 --duration 600
 ```
 
 The committed outcomes and limitations are recorded in

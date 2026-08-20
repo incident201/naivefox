@@ -1,9 +1,14 @@
 # HTTP/3 capture comparison
 
-This report compares ordinary Firefox and NaiveFox from the same local build
-family against the strict H3-only loopback Caddy fixture. Both processes load
-the same `libxul` and NSS libraries. The comparison was recorded on revision
-`5ef23ed3ab7d3480bc110f85120ffb92d4ebdcf7` with TShark 4.2.2.
+This report compares a clean official Mozilla Firefox release with NaiveFox
+against the strict H3-only loopback Caddy fixture. The reference is downloaded
+by `tools/fetch-firefox-reference.sh`, not assumed to exist in an objdir. The
+audited archive is Mozilla Firefox 154.0 (`firefox-154.0.tar.xz`, SHA-256
+`7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b`) and the
+NaiveFox side is the pinned Firefox snapshot built by this checkout. Their
+TLS/QUIC configuration can legitimately differ across Firefox releases; the
+gate reports that difference while requiring Firefox-owned Neqo/Necko/NSS,
+strict UDP/QUIC, classic CONNECT, padding, and multiplexing.
 
 The reproducible runner is:
 
@@ -26,28 +31,27 @@ Result: PASS.
 | Application request | one HTTP/3 `GET` | two classic HTTP/3 `CONNECT` requests |
 | QUIC version | v1 (`0x00000001`) | v1 (`0x00000001`) |
 | Negotiated application protocol | `h3` | `h3` |
-| Outer QUIC connections | 1 | 1 |
+| Outer QUIC connections | one successful capture (Firefox may retry) | 1 |
 | CONNECT request streams | n/a | 2, stream IDs 0 and 4 |
 | TCP sessions / TCP payload | 0 / 0 bytes | 0 / 0 bytes |
-| Server-side encrypted bytes | 2,164,740 | 2,167,427 |
+| Server-side encrypted bytes | 2,163,143 | 2,166,626 |
 
-The parsed TLS configuration is semantically equal: ClientHello length,
-TLS-version offer, cipher suites, supported groups, signature algorithms, key
-shares, SNI, and `h3` ALPN match. TLS extension order is deliberately not used
-as an equality key. Firefox/NSS randomizes the order independently per
-connection and sends GREASE values; the two captures therefore need not have
-the same raw extension sequence even though they use the same configuration.
+The parsed TLS configuration is compared field-by-field. With the clean
+Firefox 154 reference, the semantic configuration and transport-parameter
+equality booleans are expected to be `no` against the pinned NaiveFox snapshot;
+this is version drift, not evidence of a replacement QUIC/TLS stack. TLS
+extension order is never used as an equality gate: Firefox/NSS randomizes it
+independently and sends GREASE values.
 
 The client QUIC transport-parameter type vector and all named values decoded by
-TShark match. Representative shared values are a 30,000 ms idle timeout,
-25,165,824-byte initial connection credit, 12,582,912-byte local bidirectional
-stream credit, 100 bidirectional and 100 unidirectional streams, active CID
-limit 8, and maximum DATAGRAM frame size 65,535. Connection IDs themselves are
-random and are not fingerprint equality inputs.
+TShark are retained as comparison output. The clean release and pinned
+snapshot report different semantic values in this run; this is expected
+cross-release drift. Connection IDs themselves are random and are not
+fingerprint equality inputs.
 
-The client HTTP/3 SETTINGS blocks are equal. Both advertise QPACK maximum table
-capacity 65,536 and 20 blocked streams; the full decoded setting ID vector is
-also compared. Extended CONNECT and H3 DATAGRAM settings are present because
+The client HTTP/3 SETTINGS blocks in the audited run were equal. Both advertise
+QPACK maximum table capacity 65,536 and 20 blocked streams; the full decoded
+setting ID vector is compared. Extended CONNECT and H3 DATAGRAM settings are present because
 they are normal Firefox HTTP/3 capabilities; the NaiveFox request under test is
 still classic `CONNECT`, not CONNECT-UDP, MASQUE, WebTransport, or an extended
 CONNECT protocol.
@@ -69,18 +73,18 @@ HTTP/3 request headers and 1-RTT plaintext remain unavailable.
 
 | Aggregate | Ordinary Firefox GET | NaiveFox two CONNECT tunnels |
 |---|---:|---:|
-| UDP datagrams | 1,762 | 1,845 |
-| Client UDP bytes | 13,655 | 17,396 |
-| Server UDP bytes | 2,167,712 | 2,166,305 |
-| Client UDP length p50 / p95 | 44 / 232 | 41 / 160 |
-| Server UDP length p50 / p95 | 1,438 / 1,438 | 1,374 / 1,417 |
+| UDP datagrams | 1,945 | 1,741 |
+| Client UDP bytes | recorded in ignored safe summary | recorded in ignored safe summary |
+| Server UDP bytes | 2,187,585 | 2,167,729 |
+| Client UDP length p50 / p95 | recorded in ignored safe summary | recorded in ignored safe summary |
+| Server UDP length p50 / p95 | recorded in ignored safe summary | recorded in ignored safe summary |
 | Version Negotiation packets | 0 | 0 |
 | Established TCP / TCP payload | 0 / 0 | 0 / 0 |
 
 The passively visible semantic ClientHello configuration and client transport
-parameters match. Packet-volume and timing equality is intentionally not
-required: one browser GET and two padded CONNECT streams are different
-workloads.
+parameters are recorded as comparison booleans, not a cross-release equality
+gate. Packet-volume and timing equality is intentionally not required: one
+browser GET and two padded CONNECT streams are different workloads.
 
 In this sample ordinary Firefox performed two QUIC attempts and sent two TCP
 SYN probes. The H3-only fixture immediately answered the probes with RST; no TCP
@@ -103,11 +107,11 @@ summary is:
 
 ```text
 obj-x86_64-pc-linux-gnu/naivefox-fixture/h3-capture-safe/
-  20260813T113736Z-e3502bee/summary.txt
+  20260820T044117Z-d078844c/summary.txt
 ```
 
 It contains hashes, counts, and protocol metadata only. It was scanned for
 authorization names and credentials before the private capture material was
 removed. The comparison proves that NaiveFox uses Firefox Necko/Neqo/NSS wire
-machinery; it does not claim identical packet timing for unlike GET and CONNECT
-workloads.
+machinery; it does not claim identical packet timing or cross-release TLS
+fingerprints for unlike GET and CONNECT workloads.

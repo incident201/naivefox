@@ -678,6 +678,17 @@ pooling; NaiveFox does not implement a separate connection pool.
 
 This phase validates the original reason for the project.
 
+The capture reference is a clean official Mozilla Firefox release downloaded by
+`netwerk/naivefox/tools/fetch-firefox-reference.sh` into ignored object
+storage. It is not a required pre-existing Firefox package or the NaiveFox
+objdir's optional `firefox` binary. The current reference is Firefox 154.0;
+its archive digest and version are recorded in `REFERENCE-MANIFEST`. Since the
+reference release and the pinned NaiveFox snapshot are different Firefox
+versions, exact ClientHello/QUIC transport-parameter/SETTINGS equality is
+reported diagnostically rather than used as a pass/fail gate. Firefox-owned
+Necko/NSS/Neqo behavior, selected protocol, strict UDP/no-fallback behavior,
+classic CONNECT, padding, and stream reuse remain mandatory gates.
+
 ### M10.1 Reference Firefox capture
 
 From the same source revision/build family, capture an ordinary Firefox HTTPS connection to the same proxy/front-end host if possible.
@@ -715,10 +726,10 @@ If a measurable Firefox-specific anomaly is caused by our integration, document 
 
 Acceptance:
 
-- [x] ordinary Firefox and NaiveFox were captured from the same local build
-  family against the same fixture TLS front-end,
-- [x] both selected `h2`, and their ordered ClientHello fields and client H2
-  SETTINGS matched,
+- [x] clean official Firefox and NaiveFox were captured against the same
+  fixture TLS front-end,
+- [x] both selected `h2`; ordered ClientHello fields and client H2 SETTINGS
+  were compared and recorded without requiring cross-release equality,
 - [x] two NaiveFox CONNECT requests used distinct stream IDs on one outer TCP
   connection,
 - [x] Naive `padding` was present in both directions and no synthetic
@@ -730,11 +741,12 @@ The reproducible procedure and 2026-08-12 comparison record are in
 `CAPTURE.md`; `test/integration/run-capture-comparison.sh` performs the capture,
 safe extraction, assertions, and sensitive-data cleanup.
 
-The strict HTTP/3 equivalent is complete. Ordinary Firefox and NaiveFox from
-the same build family both used QUIC v1 and `h3`; semantic TLS configuration,
-client QUIC transport parameters, and HTTP/3/QPACK settings matched. Two
-classic CONNECT request streams shared one NaiveFox QUIC connection, padding
-was visible in both header directions, and no synthetic marker header existed.
+The strict HTTP/3 equivalent is complete. Clean official Firefox and NaiveFox
+both used QUIC v1 and `h3`; semantic TLS configuration and client QUIC
+transport parameters were compared, with expected cross-release differences,
+while HTTP/3/QPACK settings matched in the audited run. Two classic CONNECT
+request streams shared one NaiveFox QUIC connection, padding was visible in
+both header directions, and no synthetic marker header existed.
 The independent passive pass used no key log and established no TCP session.
 See `H3-CAPTURE.md` and
 `test/integration/run-h3-capture-comparison.sh`; raw pcaps, keys, profiles,

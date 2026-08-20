@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -60,7 +61,12 @@ def map_crate_manifest(raw_manifest, pkg_name, topsrcdir):
     top = os.path.normpath(str(topsrcdir)).replace("\\", "/")
     raw = os.path.normpath(str(raw_manifest)).replace("\\", "/")
     if raw.startswith(top + "/"):
-        return raw[len(top) + 1 :]
+        mapped = raw[len(top) + 1 :]
+        if not os.path.exists(os.path.join(topsrcdir, mapped)):
+            raise AuditConsistencyError(
+                f"Rust manifest is inside the checkout but does not exist: {mapped}"
+            )
+        return mapped
     vendored_candidate = os.path.join(topsrcdir, "third_party", "rust", pkg_name, "Cargo.toml")
     if os.path.exists(vendored_candidate):
         return f"third_party/rust/{pkg_name}/Cargo.toml"
@@ -68,7 +74,10 @@ def map_crate_manifest(raw_manifest, pkg_name, topsrcdir):
     vendored_alt = os.path.join(topsrcdir, "third_party", "rust", alt_name, "Cargo.toml")
     if os.path.exists(vendored_alt):
         return f"third_party/rust/{alt_name}/Cargo.toml"
-    return f"third_party/rust/{pkg_name}/Cargo.toml"
+    raise AuditConsistencyError(
+        "Reachable Rust crate is not vendored in the repository: "
+        f"{pkg_name} ({raw_manifest})"
+    )
 
 
 def parse_response_file(rsp_path, topsrcdir):
@@ -179,8 +188,19 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
     if not os.path.exists(manifest_path):
         raise AuditConsistencyError(f"Rust root manifest not found: {manifest_path}")
 
+    cargo = shutil.which("cargo")
+    if not cargo:
+        raise AuditConsistencyError(
+            "cargo is not on PATH; run the audit as the configured build user"
+        )
+
+    # Cargo's resolver is the source of truth for cfg/platform filtering.  Do
+    # not try to reconstruct target predicates from strings in dep_kinds: that
+    # admitted Android, Darwin and Haiku crates into the old reports.  The
+    # filtered resolve graph already contains exactly the dependencies Cargo
+    # would use for this target.
     cmd = [
-        "cargo",
+        cargo,
         "metadata",
         "--manifest-path",
         manifest_path,
@@ -189,8 +209,21 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
         "--features",
         "naivefox",
         "--no-default-features",
+        "--filter-platform",
+        target_triple,
+        "--locked",
+        "--offline",
     ]
-    raw = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True, cwd=topsrcdir)
+    try:
+        raw = subprocess.check_output(
+            cmd, stderr=subprocess.PIPE, text=True, cwd=topsrcdir
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or "").strip().splitlines()[-1:]
+        raise AuditConsistencyError(
+            f"cargo metadata failed for {target_triple}: "
+            + (detail[0] if detail else "unknown error")
+        ) from exc
     meta = json.loads(raw)
 
     packages_by_id = {p["id"]: p for p in meta.get("packages", [])}
@@ -199,6 +232,12 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
 
     if not root_id or root_id not in nodes_by_id:
         raise AuditConsistencyError(f"Cannot resolve root crate 'gkrust' in Cargo metadata")
+    root_package = packages_by_id.get(root_id)
+    if not root_package or root_package.get("name") != "gkrust":
+        raise AuditConsistencyError(
+            "Cargo metadata root is not gkrust: "
+            f"{root_package.get('name') if root_package else root_id}"
+        )
 
     visited_ids = set()
     queue = [root_id]
@@ -213,32 +252,7 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
 
         for dep in node.get("deps", []):
             dep_pkg_id = dep.get("pkg")
-            if not dep_pkg_id or dep_pkg_id in visited_ids:
-                continue
-
-            is_active = False
-            dep_kinds = dep.get("dep_kinds", [])
-            if not dep_kinds:
-                is_active = True
-            for dk in dep_kinds:
-                target_cfg = dk.get("target")
-                if not target_cfg:
-                    is_active = True
-                    break
-                if "windows" in target_triple and ("windows" in target_cfg or "win32" in target_cfg):
-                    is_active = True
-                    break
-                elif "linux" in target_triple and ("unix" in target_cfg or "linux" in target_cfg):
-                    is_active = True
-                    break
-                elif "cfg(" not in target_cfg and target_triple in target_cfg:
-                    is_active = True
-                    break
-                elif "cfg(fuzzing)" not in target_cfg and "cfg(test)" not in target_cfg and "cfg(target_arch = \"arm\")" not in target_cfg:
-                    is_active = True
-                    break
-
-            if is_active:
+            if dep_pkg_id and dep_pkg_id not in visited_ids:
                 queue.append(dep_pkg_id)
 
     reachable_crates = []
@@ -255,18 +269,49 @@ def get_reachable_rust_closure(topsrcdir, target_triple):
         elif any(norm_manifest.startswith(p) for p in ["toolkit/", "netwerk/", "xpcom/", "security/", "intl/", "storage/", "js/"]):
             source_type = "in-tree-component"
 
+        source_paths = []
+        for target in pkg.get("targets", []):
+            target_kinds = set(target.get("kind", []))
+            if target_kinds and target_kinds.issubset({"example", "test", "bench"}):
+                continue
+            raw_source = target.get("src_path")
+            if not raw_source:
+                continue
+            # Cargo metadata can resolve a git/registry package from a cache
+            # even when the same crate is vendored in-tree.  Preserve the
+            # path relative to Cargo.toml, then apply it to the audited
+            # repository manifest directory instead of leaking that cache
+            # path into the report.
+            raw_relative = os.path.relpath(
+                raw_source, os.path.dirname(pkg.get("manifest_path", raw_source))
+            )
+            mapped_source = os.path.normpath(
+                os.path.join(os.path.dirname(norm_manifest), raw_relative)
+            ).replace("\\", "/")
+            if mapped_source.startswith("../") or not os.path.exists(
+                os.path.join(topsrcdir, mapped_source)
+            ):
+                raise AuditConsistencyError(
+                    "Reachable Rust target source is outside the checkout or missing: "
+                    f"{raw_source} (mapped to {mapped_source})"
+                )
+            source_paths.append(mapped_source)
+
         reachable_crates.append({
             "name": name,
             "version": pkg.get("version"),
             "source_type": source_type,
             "manifest_path": norm_manifest,
+            "source_paths": sorted(set(source_paths)),
         })
 
     reachable_crates.sort(key=lambda x: x["name"])
     return reachable_crates
 
 
-def get_source_and_build_inputs(topsrcdir, objdir):
+def get_source_and_build_inputs(
+    topsrcdir, objdir, active_object_paths, archive_member_names
+):
     """Gather complete source translation units, headers, IDL files, and generator scripts from build outputs."""
     objdir_path = Path(objdir)
     cxx_sources = set()
@@ -274,15 +319,32 @@ def get_source_and_build_inputs(topsrcdir, objdir):
     xpidl_inputs = set()
     ipdl_inputs = set()
     generators = set()
+    depfiles_scanned = 0
 
     top_prefix = os.path.normpath(str(topsrcdir)).replace("\\", "/") + "/"
+    active_objects = {os.path.normpath(str(path)) for path in active_object_paths}
+    archive_members = set(archive_member_names)
 
     for root, dirs, files in os.walk(str(objdir_path)):
         if ".deps" in root:
             for f in files:
                 if f.endswith(".pp") or f.endswith(".d"):
                     pp_path = os.path.join(root, f)
+                    # Reusable objdirs retain dependency files for objects
+                    # removed by a later lean build graph.  Restrict parsing
+                    # to depfiles whose corresponding object is in the
+                    # current libxul response file.
+                    suffix = ".pp" if f.endswith(".pp") else ".d"
+                    object_path = os.path.normpath(
+                        os.path.join(os.path.dirname(root), f[: -len(suffix)])
+                    )
+                    if (
+                        object_path not in active_objects
+                        and os.path.basename(object_path) not in archive_members
+                    ):
+                        continue
                     try:
+                        depfiles_scanned += 1
                         with open(pp_path, "r", encoding="utf-8", errors="ignore") as pf:
                             content = pf.read()
                             for token in content.replace("\\\n", " ").split():
@@ -294,7 +356,9 @@ def get_source_and_build_inputs(topsrcdir, objdir):
                                 norm = normalize_path(token_norm, topsrcdir, objdir)
                                 if norm.startswith("objdir/"):
                                     continue
-                                if norm.endswith(".cpp") or norm.endswith(".c") or norm.endswith(".cc"):
+                                if norm.endswith(
+                                    (".cpp", ".c", ".cc", ".cxx", ".mm", ".S", ".s", ".asm", ".rc")
+                                ):
                                     cxx_sources.add(norm)
                                 elif norm.endswith(".h") or norm.endswith(".hpp"):
                                     headers.add(norm)
@@ -319,7 +383,6 @@ def get_source_and_build_inputs(topsrcdir, objdir):
     runtime_resources = [
         "netwerk/naivefox/tools/runtime-resources.manifest",
         "netwerk/naivefox/tools/runtime-chrome.manifest",
-        "toolkit/locales/en-US/chrome/global/intl.properties",
         "modules/libpref/init/all.js",
     ]
 
@@ -331,19 +394,84 @@ def get_source_and_build_inputs(topsrcdir, objdir):
 
     return {
         "cxx_translation_units": sorted(cxx_sources),
+        "headers": sorted(headers),
         "headers_count": len(headers),
         "headers_sample": sorted(headers)[:50],
+        "depfiles_scanned": depfiles_scanned,
         "xpidl_inputs": sorted(xpidl_inputs),
         "ipdl_inputs": sorted(ipdl_inputs),
         "webidl_binding_inputs": [
             "dom/bindings/parser/WebIDL.py",
             "dom/bindings/Configuration.py",
-            "dom/webidl/OriginAttributes.webidl",
+            "dom/chrome-webidl/OriginAttributes.webidl",
         ],
         "generators_and_python_scripts": sorted(generators),
+        "mozbuild_definition_inputs": sorted(mozbuild_files),
         "mozbuild_definition_inputs_count": len(mozbuild_files),
         "runtime_resource_sources": runtime_resources,
         "licenses_and_notices": [l for l in licenses if os.path.exists(os.path.join(topsrcdir, l))],
+    }
+
+
+def get_glean_inputs(topsrcdir, objdir):
+    """Record the real Glean generator/cache/YAML inputs without exporting objdir paths."""
+    glean_source_dir = os.path.join(topsrcdir, "toolkit", "components", "glean")
+    generator_scripts = [
+        "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py",
+        "toolkit/components/glean/build_scripts/glean_parser_ext/metrics_header_names.py",
+        "toolkit/components/glean/metrics_index.py",
+        "toolkit/components/glean/pings_index.py",
+    ]
+    generator_scripts = [
+        path for path in generator_scripts if os.path.exists(os.path.join(topsrcdir, path))
+    ]
+
+    yaml_inputs = {"metrics": set(), "pings": set()}
+    cache_inputs = []
+    glean_objdir = os.path.join(objdir, "toolkit", "components", "glean")
+    for kind in ("metrics", "pings"):
+        cache = os.path.join(glean_objdir, f"{kind}_yamls.cached")
+        if not os.path.exists(cache):
+            continue
+        cache_inputs.append(normalize_path(cache, topsrcdir, objdir))
+        try:
+            text = Path(cache).read_bytes().decode("utf-8", errors="ignore")
+        except OSError:
+            continue
+        prefix = os.path.normpath(str(topsrcdir)).replace("\\", "/") + "/"
+        for match in re.finditer(
+            re.escape(prefix) + r"([A-Za-z0-9_./-]+\.yaml)", text
+        ):
+            candidate = match.group(1).replace("\\", "/")
+            if os.path.exists(os.path.join(topsrcdir, candidate)):
+                yaml_inputs[kind].add(candidate)
+
+    generated_outputs = []
+    generated_sources = os.path.join(objdir, "generated-sources.json")
+    if os.path.exists(generated_sources):
+        try:
+            generated = json.loads(Path(generated_sources).read_text(encoding="utf-8"))
+            raw_text = json.dumps(generated)
+            generated_outputs = sorted(
+                set(
+                    value
+                    for value in re.findall(
+                        r"toolkit/components/glean/[A-Za-z0-9_./-]+", raw_text
+                    )
+                    if value.startswith("toolkit/components/glean/")
+                )
+            )
+        except (OSError, ValueError):
+            generated_outputs = []
+
+    return {
+        "enabled": bool(cache_inputs or generator_scripts),
+        "generator_scripts": sorted(generator_scripts),
+        "cache_inputs": sorted(cache_inputs),
+        "metrics_yaml_inputs": sorted(yaml_inputs["metrics"]),
+        "pings_yaml_inputs": sorted(yaml_inputs["pings"]),
+        "generated_outputs_count": len(generated_outputs),
+        "generated_outputs_sample": generated_outputs[:100],
     }
 
 
@@ -406,7 +534,10 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "path": rel_lib,
             "size_bytes": sz,
             "member_count": len(members),
-            "members": members[:30],
+            # Keep the complete archive member inventory.  The first 30
+            # members are not a source closure: omitting the rest would make
+            # a future allowlist silently incomplete.
+            "members": members,
         })
 
     if not js_static_found:
@@ -420,7 +551,18 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
     dynamic_deps = get_dynamic_dependencies(str(bin_xul))
 
     rust_crates = get_reachable_rust_closure(topsrcdir, target_triple)
-    source_inputs = get_source_and_build_inputs(topsrcdir, objdir)
+    archive_member_names = [
+        member
+        for archive in static_libs
+        for member in archive["members"]
+    ]
+    source_inputs = get_source_and_build_inputs(
+        topsrcdir,
+        objdir,
+        [item for item in link_items if os.path.exists(item)],
+        archive_member_names,
+    )
+    glean_inputs = get_glean_inputs(topsrcdir, objdir)
 
     dist_bin_files = []
     dist_bin = objdir_path / "dist" / "bin"
@@ -465,7 +607,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
-            "analyzer_version": "2.3.0-strict-clean",
+            "analyzer_version": "2.4.0-strict-target",
             "compiler_version": compiler_ver,
             "linker_version": linker_ver,
             "sccache_state": "supported",
@@ -496,19 +638,38 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
         "shared_libraries": [normalize_path(l, topsrcdir, objdir) for l in raw_shared_libs],
         "dynamic_dependencies": dynamic_deps,
         "rust_closure": {
+            "platform_filter": target_triple,
+            "root_package": "gkrust",
             "reachable_crates_count": len(rust_crates),
             "crates": rust_crates,
         },
         "build_inputs": {
+            "cxx_translation_units": source_inputs["cxx_translation_units"],
+            "cargo_manifests": sorted(
+                c["manifest_path"] for c in rust_crates
+            ),
+            "cargo_root_manifest": "toolkit/library/rust/Cargo.toml",
+            "cargo_lockfile": "Cargo.lock",
+            "cargo_config_template": ".cargo/config.toml.in",
+            "depfiles_scanned": source_inputs["depfiles_scanned"],
+            "headers_count": source_inputs["headers_count"],
+            "headers": source_inputs["headers"],
             "xpidl_inputs_count": len(source_inputs["xpidl_inputs"]),
             "xpidl_inputs": source_inputs["xpidl_inputs"],
             "ipdl_inputs_count": len(source_inputs["ipdl_inputs"]),
             "ipdl_inputs": source_inputs["ipdl_inputs"],
             "webidl_binding_inputs": source_inputs["webidl_binding_inputs"],
             "generators_and_python_scripts_count": len(source_inputs["generators_and_python_scripts"]),
-            "generators_and_python_scripts": source_inputs["generators_and_python_scripts"][:50],
+            "generators_and_python_scripts": source_inputs["generators_and_python_scripts"],
+            "mozbuild_definition_inputs_count": source_inputs[
+                "mozbuild_definition_inputs_count"
+            ],
+            "mozbuild_definition_inputs": source_inputs[
+                "mozbuild_definition_inputs"
+            ],
             "runtime_resource_sources": source_inputs["runtime_resource_sources"],
             "licenses_and_notices": source_inputs["licenses_and_notices"],
+            "glean": glean_inputs,
         },
         "runtime_inventory": {
             "dist_bin_unfiltered_count": len(dist_bin_files),

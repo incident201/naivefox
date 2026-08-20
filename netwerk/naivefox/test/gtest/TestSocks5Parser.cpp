@@ -130,6 +130,21 @@ TEST(NaiveFoxSocks5Parser, RejectsBindAndUdpAssociate)
   }
 }
 
+TEST(NaiveFoxSocks5Parser, FailedStateIsTerminalAndConsumesNothing)
+{
+  Socks5Parser parser;
+  const nsTArray<uint8_t> request{0x05, 0x01, 0x00, 0x05, 0x03, 0x00,
+                                  0x01, 0x00, 0x00, 0x00, 0x00};
+  size_t consumed = 0;
+  EXPECT_EQ(parser.Consume(Span(request), consumed), Event::RejectCommand);
+  EXPECT_EQ(consumed, 5U);
+
+  const nsTArray<uint8_t> tail(1024, 0xaa);
+  consumed = 123;
+  EXPECT_EQ(parser.Consume(Span(tail), consumed), Event::ProtocolError);
+  EXPECT_EQ(consumed, 0U);
+}
+
 TEST(NaiveFoxSocks5Parser, RejectsBadVersionReservedAndAddressType)
 {
   {

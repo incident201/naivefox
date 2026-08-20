@@ -80,9 +80,16 @@ run_dir=$(<"$ACTIVE_RUN_FILE")
 source "$run_dir/fixture.env"
 
 BIN="$OBJDIR/dist/bin"
-REFERENCE_BIN="${NAIVEFOX_CAPTURE_REFERENCE_BIN:-$BIN/firefox}"
-REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$BIN}"
-REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-$OBJDIR}"
+if [[ -n ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ]]; then
+  REFERENCE_BIN="$NAIVEFOX_CAPTURE_REFERENCE_BIN"
+  REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$(dirname "$REFERENCE_BIN")}"
+  REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-}"
+else
+  REFERENCE_ROOT=$("$INTEGRATION_DIR/../../tools/fetch-firefox-reference.sh")
+  REFERENCE_BIN="$REFERENCE_ROOT/firefox"
+  REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$REFERENCE_ROOT}"
+  REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-}"
+fi
 NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
 NAIVEFOX_LIBDIR="${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$BIN}"
 for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
@@ -93,10 +100,12 @@ for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
     exit 1
   }
 done
-if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
-  "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
-  printf 'this NSS build does not enable SSLKEYLOGFILE\n' >&2
-  exit 1
+if [[ -n "$REFERENCE_OBJDIR" ]]; then
+  if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
+    "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
+    printf 'this NSS build does not enable SSLKEYLOGFILE\n' >&2
+    exit 1
+  fi
 fi
 
 capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"

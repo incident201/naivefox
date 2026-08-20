@@ -8,10 +8,134 @@ Fails with non-zero exit code if any forbidden objects, libraries, or paths are 
 import json
 import os
 import re
+import subprocess
 import sys
 
 
-def assert_closure(report_path):
+def _repo_root():
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+
+def _current_commit(topsrcdir):
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=topsrcdir, text=True
+    ).strip()
+
+
+def _git_commit_exists(topsrcdir, sha):
+    if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+        return False
+    return subprocess.run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        cwd=topsrcdir,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
+
+
+def _check_repo_path(path, topsrcdir, violations, field, allow_objdir=False):
+    """Validate a report path without accepting developer/cache paths."""
+    if not isinstance(path, str) or not path:
+        violations.append(f"{field} is empty or not a string")
+        return
+    normalized = path.replace("\\", "/")
+    if (
+        normalized.startswith("/")
+        or re.match(r"^[A-Za-z]:/", normalized)
+        or "/home/" in normalized
+        or "/Users/" in normalized
+        or "\\Users\\" in path
+    ):
+        violations.append(f"{field} is not repository-relative: {path}")
+        return
+    parts = [part for part in normalized.split("/") if part]
+    if ".." in parts:
+        violations.append(f"{field} escapes the repository: {path}")
+        return
+    if allow_objdir and normalized.startswith("objdir/"):
+        return
+    full = os.path.join(topsrcdir, *parts)
+    if not os.path.exists(full):
+        violations.append(f"{field} does not exist in checkout: {path}")
+
+
+def _check_source_lists(report, topsrcdir, violations):
+    build = report.get("build_inputs", {})
+    rust = report.get("rust_closure", {})
+    for index, crate in enumerate(rust.get("crates", [])):
+        _check_repo_path(
+            crate.get("manifest_path"),
+            topsrcdir,
+            violations,
+            f"rust_closure.crates[{index}].manifest_path",
+        )
+        for source_index, source_path in enumerate(crate.get("source_paths", [])):
+            _check_repo_path(
+                source_path,
+                topsrcdir,
+                violations,
+                f"rust_closure.crates[{index}].source_paths[{source_index}]",
+            )
+
+    list_fields = [
+        "cxx_translation_units",
+        "headers",
+        "xpidl_inputs",
+        "ipdl_inputs",
+        "webidl_binding_inputs",
+        "generators_and_python_scripts",
+        "mozbuild_definition_inputs",
+        "runtime_resource_sources",
+        "licenses_and_notices",
+    ]
+    for field in list_fields:
+        values = build.get(field, report.get(field, []))
+        if not isinstance(values, list):
+            violations.append(f"build_inputs.{field} is not a list")
+            continue
+        for index, path in enumerate(values):
+            _check_repo_path(path, topsrcdir, violations, f"build_inputs.{field}[{index}]")
+
+    for field in ("cargo_root_manifest", "cargo_lockfile", "cargo_config_template"):
+        _check_repo_path(
+            build.get(field), topsrcdir, violations, f"build_inputs.{field}"
+        )
+
+    for index, path in enumerate(build.get("cargo_manifests", [])):
+        _check_repo_path(
+            path, topsrcdir, violations, f"build_inputs.cargo_manifests[{index}]"
+        )
+
+    glean = build.get("glean", {})
+    if not isinstance(glean, dict):
+        violations.append("build_inputs.glean is not an object")
+    else:
+        for field in ("generator_scripts", "metrics_yaml_inputs", "pings_yaml_inputs"):
+            values = glean.get(field, [])
+            if not isinstance(values, list):
+                violations.append(f"build_inputs.glean.{field} is not a list")
+                continue
+            for index, path in enumerate(values):
+                _check_repo_path(
+                    path, topsrcdir, violations, f"build_inputs.glean.{field}[{index}]"
+                )
+        for index, path in enumerate(glean.get("cache_inputs", [])):
+            _check_repo_path(
+                path,
+                topsrcdir,
+                violations,
+                f"build_inputs.glean.cache_inputs[{index}]",
+                allow_objdir=True,
+            )
+        for index, path in enumerate(glean.get("generated_outputs_sample", [])):
+            normalized = str(path).replace("\\", "/")
+            if normalized.startswith("/") or ".." in normalized.split("/"):
+                violations.append(
+                    f"build_inputs.glean.generated_outputs_sample[{index}] is not relative: {path}"
+                )
+
+
+def assert_closure(report_path, topsrcdir):
     if not os.path.exists(report_path):
         print(f"FAIL: Closure report not found: {report_path}", file=sys.stderr)
         return False
@@ -21,8 +145,58 @@ def assert_closure(report_path):
         report = json.loads(raw_text)
 
     violations = []
-    target = report.get("report_provenance", {}).get("target_triple", report_path)
+    provenance = report.get("report_provenance", {})
+    target = provenance.get("target_triple", report_path)
     is_linux = "linux" in target.lower()
+
+    # Reports are build artifacts, not hand-maintained evidence.  A report
+    # generated from an older commit must fail instead of silently validating
+    # the current tree.
+    current_commit = _current_commit(topsrcdir)
+    report_commit = provenance.get("source_commit_sha")
+    if report_commit != current_commit:
+        # Reports are generated from a source commit and then committed as a
+        # report-only snapshot.  In that normal workflow HEAD is the report
+        # commit and HEAD^ is the audited source tree.  Accept exactly that
+        # case; any other stale report remains a hard failure.
+        parent = subprocess.run(
+            ["git", "rev-parse", f"{current_commit}^"],
+            cwd=topsrcdir,
+            capture_output=True,
+            text=True,
+        )
+        changed = subprocess.run(
+            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", current_commit],
+            cwd=topsrcdir,
+            capture_output=True,
+            text=True,
+        )
+        report_only_paths = {
+            "netwerk/naivefox/reports/closure-report-linux-x86_64.json",
+            "netwerk/naivefox/reports/closure-report-windows-x86_64.json",
+        }
+        parent_sha = parent.stdout.strip()
+        changed_paths = {
+            path for path in changed.stdout.splitlines() if path
+        }
+        if report_commit != parent_sha or not changed_paths.issubset(report_only_paths):
+            violations.append(
+                "stale provenance: source_commit_sha is neither current HEAD nor "
+                "the parent of a report-only commit "
+                f"({report_commit} != {current_commit})"
+            )
+    if not _git_commit_exists(topsrcdir, provenance.get("source_commit_sha")):
+        violations.append("source_commit_sha is not an existing commit")
+    if not _git_commit_exists(topsrcdir, provenance.get("firefox_base_sha")):
+        violations.append("firefox_base_sha is not an existing commit")
+    if not provenance.get("analyzer_version", "").startswith("2.4."):
+        violations.append("report was not generated by the strict target-aware analyzer")
+    if report.get("rust_closure", {}).get("platform_filter") != target:
+        violations.append("Rust closure platform filter does not match target triple")
+    if report.get("rust_closure", {}).get("root_package") != "gkrust":
+        violations.append("Rust closure root is not gkrust")
+
+    _check_source_lists(report, topsrcdir, violations)
 
     # 1. Assert NO absolute developer paths in raw JSON
     for bad_pattern in [r"/home/[a-zA-Z0-9_-]+", r"[A-Za-z]:\\[a-zA-Z0-9_-]+", r"[A-Za-z]:/[a-zA-Z0-9_-]+"]:
@@ -30,20 +204,6 @@ def assert_closure(report_path):
             violations.append(f"Forbidden absolute developer path found matching '{bad_pattern}'")
 
     # 2. Assert NO DOM / Layout / GFX implementation objects
-    forbidden_object_substrings = [
-        ("dom/", ["OriginAttributes", "LeanDOMBindings"]),  # Only LeanDOMBindings allowed
-        ("layout/", []),
-        ("gfx/thebes", []),
-        ("gfx/src", []),
-        ("gfx/cairo", []),
-        ("gfx/2d", []),
-        ("harfbuzz", ["Unified_cpp_gfx_harfbuzz"]),  # HarfBuzz shaper objects forbidden
-        ("abseil", []),
-        ("jsoncpp", []),
-        ("tools/profiler", ["Unified_cpp_tools_profiler", "LUL", "platform"]),
-        ("breakpad", []),
-    ]
-
     direct_objects = report.get("direct_objects", [])
     for obj in direct_objects:
         p = obj.get("path", "")
@@ -60,6 +220,30 @@ def assert_closure(report_path):
             violations.append(f"Forbidden heavy Gecko Profiler object in link closure: {p}")
         if "breakpad" in p.lower() or "lul" in p.lower():
             violations.append(f"Forbidden Breakpad / LUL unwinder object in link closure: {p}")
+
+        lower = p.lower()
+        if "dom/" in lower and "leandombindings" not in lower:
+            violations.append(f"DOM implementation object in link closure: {p}")
+        if "gfx/" in lower and "profilernaivefoxstub" not in lower:
+            violations.append(f"GFX implementation object in link closure: {p}")
+        if "harfbuzz" in lower:
+            violations.append(f"HarfBuzz implementation object in link closure: {p}")
+
+    # The filtered Cargo graph must not smuggle a platform-specific crate into
+    # the other target.  These names are intentionally conservative: a new
+    # platform crate should make the audit fail and be reviewed explicitly.
+    rust_crates = report.get("rust_closure", {}).get("crates", [])
+    crate_names = {str(c.get("name", "")).lower() for c in rust_crates}
+    forbidden_platform = ["android", "core-foundation", "darwin", "haiku", "redox"]
+    if is_linux:
+        forbidden_platform.append("windows")
+    for crate_name in sorted(crate_names):
+        if any(token in crate_name for token in forbidden_platform):
+            violations.append(
+                f"Platform-inapplicable Rust crate in {target} closure: {crate_name}"
+            )
+        if any(token in crate_name for token in ("harfbuzz-sys", "abseil", "jsoncpp")):
+            violations.append(f"Forbidden implementation Rust crate: {crate_name}")
 
     # 3. Assert NO Desktop UI libraries in dynamic dependencies (Linux DT_NEEDED)
     if is_linux:
@@ -88,8 +272,6 @@ def assert_closure(report_path):
         "aa-stroke", "adblock", "alsa", "alsa-sys", "audio_thread_priority",
         "browser_engine", "webrtc", "wgpu", "ash", "autofill"
     ]
-    rust_crates = report.get("rust_closure", {}).get("crates", [])
-    crate_names = {c.get("name") for c in rust_crates}
     for bad_crate in forbidden_crates:
         if bad_crate in crate_names:
             violations.append(f"Forbidden unreachable crate found in Rust closure: {bad_crate}")
@@ -106,7 +288,7 @@ def assert_closure(report_path):
 
 
 def main():
-    topsrcdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    topsrcdir = _repo_root()
     reports = [
         os.path.join(topsrcdir, "netwerk", "naivefox", "reports", "closure-report-linux-x86_64.json"),
         os.path.join(topsrcdir, "netwerk", "naivefox", "reports", "closure-report-windows-x86_64.json"),
@@ -114,7 +296,7 @@ def main():
 
     all_passed = True
     for rep in reports:
-        if not assert_closure(rep):
+        if not assert_closure(rep, topsrcdir):
             all_passed = False
 
     if not all_passed:

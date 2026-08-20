@@ -8,6 +8,7 @@ printf '%s\n' 'Running complete H2 suite'
 "$integration_dir/run-local-suite.sh"
 "$integration_dir/run-h2-config-tests.sh"
 "$integration_dir/run-config-runtime-behavior-tests.sh"
+"$integration_dir/run-malformed-socks-tests.sh"
 
 printf '%s\n' 'Running complete H3 suite'
 "$integration_dir/run-h3-suite.sh"

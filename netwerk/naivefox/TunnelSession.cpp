@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <utility>
 
 #include "AutoFallback.h"
@@ -38,6 +39,20 @@ namespace mozilla::naivefox {
 namespace {
 
 constexpr size_t kPumpBufferSize = 64 * 1024;
+
+std::atomic<uint64_t> gNextConnectionId{1};
+
+const char* ProtocolName(ProxyProtocol aProtocol) {
+  switch (aProtocol) {
+    case ProxyProtocol::H2:
+      return "h2";
+    case ProxyProtocol::H3:
+      return "h3";
+    case ProxyProtocol::Auto:
+      return "auto";
+  }
+  return "unknown";
+}
 
 using net::naivefox::NaivePaddingDecoder;
 using net::naivefox::NaivePaddingEncoder;
@@ -334,6 +349,8 @@ class TunnelSession::Impl final {
         mLocalOut(aLocalOut),
         mConfig(aConfig),
         mSocketTarget(aSocketTarget),
+        mConnectionId(
+            gNextConnectionId.fetch_add(1, std::memory_order_relaxed)),
         mOnEstablished(std::move(aOnEstablished)),
         mOnFailure(std::move(aOnFailure)),
         mOnClosed(std::move(aOnClosed)) {}
@@ -342,6 +359,7 @@ class TunnelSession::Impl final {
   nsCOMPtr<nsIAsyncOutputStream> mLocalOut;
   TunnelConfig mConfig;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
+  const uint64_t mConnectionId;
   EstablishedCallback mOnEstablished;
   FailureCallback mOnFailure;
   ClosedCallback mOnClosed;
@@ -465,6 +483,9 @@ nsresult TunnelSession::Start(const nsACString& aTargetAuthority,
       mImpl->mConfig.mProtocol == ProxyProtocol::Auto
           ? ProxyProtocol::H3
           : mImpl->mConfig.mProtocol;
+  RuntimeLogEvent("Connection %llu target=%s protocol=%s\n",
+                  static_cast<unsigned long long>(mImpl->mConnectionId),
+                  mImpl->mTargetAuthority.get(), ProtocolName(firstProtocol));
   return StartAttempt(firstProtocol);
 }
 
@@ -810,6 +831,10 @@ void TunnelSession::TunnelReady() {
     return;
   }
   mImpl->mReady = true;
+  RuntimeLogEvent("Connection %llu established target=%s outer=%s padding=%s\n",
+                  static_cast<unsigned long long>(mImpl->mConnectionId),
+                  mImpl->mTargetAuthority.get(), mImpl->mOuterProtocol.get(),
+                  mImpl->mPaddingEnabled ? "yes" : "no");
   RuntimeLog("Outer protocol: %s\n", mImpl->mOuterProtocol.get());
   RuntimeLog("Padding negotiated: %s\n", mImpl->mPaddingEnabled ? "yes" : "no");
   if (mImpl->mOnEstablished) {
@@ -839,6 +864,10 @@ void TunnelSession::Fail(nsresult aStatus) {
     return;
   }
   mImpl->mFailed = true;
+  RuntimeLogEvent("Connection %llu failed target=%s status=0x%08x\n",
+                  static_cast<unsigned long long>(mImpl->mConnectionId),
+                  mImpl->mTargetAuthority.get(),
+                  static_cast<unsigned>(aStatus));
   if (mImpl->mPendingTunnelIn) {
     (void)mImpl->mPendingTunnelIn->CloseWithStatus(aStatus);
     mImpl->mPendingTunnelIn = nullptr;
@@ -860,6 +889,9 @@ void TunnelSession::Cancel(nsresult aStatus) {
     return;
   }
   mImpl->mClosed = true;
+  RuntimeLogEvent("Connection %llu closed status=0x%08x\n",
+                  static_cast<unsigned long long>(mImpl->mConnectionId),
+                  static_cast<unsigned>(aStatus));
   (void)mImpl->mLocalIn->CloseWithStatus(aStatus);
   (void)mImpl->mLocalOut->CloseWithStatus(aStatus);
   if (mImpl->mPendingTunnelIn) {

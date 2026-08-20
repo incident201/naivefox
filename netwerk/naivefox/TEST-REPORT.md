@@ -14,6 +14,43 @@ real Caddy deployment, the staged runtime, and the official NaiveProxy control
 client. It intentionally contains no endpoint, username, password, proxy
 authorization value, packet payload, or TLS key material.
 
+## Current pre-export audit update (2026-08-20)
+
+The current audit does not start `export-minimal-source.sh`; source export
+remains blocked until the final closure/provenance reports and standalone build
+gate are complete. The reproducible SOCKS terminal-state OOM/remote-DoS issue
+is fixed and covered by Linux `run-malformed-socks-tests.sh` plus the native
+Windows staged smoke. Both SOCKS and HTTP malformed inputs stop parsing after
+one bounded failure response and leave the listener usable for a subsequent
+normal connection.
+
+Windows file logging now uses the native wide-character API and passes relative,
+absolute, Unicode, append-after-restart, clean-shutdown, and credential-scan
+checks. The staged Windows package passed five repeated smoke iterations. The
+native strict-H3 soak then ran for 600 seconds against the supplied real Caddy:
+
+| Windows H3 soak metric | Result |
+|---|---:|
+| Observation window | 600 s |
+| Integrity-checked requests | 45 / 45 |
+| `Outer protocol: h3` records | 45 |
+| `Padding negotiated: yes` records | 45 |
+| Resource samples | 593 one-second samples |
+| RSS | 26.9 MiB min / 28.3 MiB peak / 27.5 MiB final |
+| Threads / handles | 19 max / 265 max |
+| Credentials in log | absent |
+| Unexpected exit during soak | none |
+
+The capture gate now downloads a clean official Mozilla Firefox 154.0 release
+(`firefox-154.0.tar.xz`, archive SHA-256
+`7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b`) through
+`tools/fetch-firefox-reference.sh`. It no longer relies on an optional Firefox
+package or source objdir. Exact TLS/QUIC field equality against the pinned
+NaiveFox snapshot is diagnostic because the releases differ; strict H2/H3
+protocol, UDP/no-fallback, Necko/NSS ownership, classic CONNECT, padding, and
+multiplexing assertions remain mandatory. See `CAPTURE.md`, `H3-CAPTURE.md`,
+and `KNOWN-ISSUES.md` for the current policy.
+
 ## Build and focused automated tests
 
 | Command | Result |
@@ -475,26 +512,33 @@ development run exposed an over-strict exact-one-Firefox-connection assertion;
 the final runner accepts a normal Firefox retry while still requiring one
 NaiveFox QUIC connection for the two CONNECT streams.
 
-The decrypted pass proved QUIC v1 with `h3`, matching semantic TLS
-configuration, matching client transport parameters, and matching HTTP/3 and
-QPACK settings for ordinary Firefox and NaiveFox from the same build family.
-Ordinary Firefox sent one GET. NaiveFox sent classic CONNECT on stream IDs 0
-and 4 over one outer QUIC connection. Both CONNECT requests and responses
-carried the `padding` header name; no synthetic `alpn`, `upgrade`, or
+The decrypted pass used the clean official Firefox 154 reference and the
+pinned NaiveFox snapshot. It proved QUIC v1 with `h3`; semantic TLS
+configuration and client transport parameters were compared and recorded as
+expected cross-release differences, while HTTP/3/QPACK settings matched in the
+audited run. Ordinary Firefox sent one GET. NaiveFox sent classic CONNECT on
+stream IDs 0 and 4 over one outer QUIC connection. Both CONNECT requests and
+responses carried the `padding` header name; no synthetic `alpn`, `upgrade`, or
 `connection` header was present.
 
-The passive no-keylog pass observed 1,762 Firefox and 1,845 NaiveFox UDP
-datagrams for approximately 2 MiB server-to-client workloads. Server UDP bytes
-were 2,167,712 and 2,166,305 respectively. Neither side established TCP or sent
-TCP payload. Ordinary Firefox emitted two TCP SYN probes which the strict
-UDP-only fixture rejected with RST and performed a second QUIC attempt;
-NaiveFox emitted no TCP probe and kept both CONNECT streams on one QUIC
-connection. No Version Negotiation packet occurred.
+The passive no-keylog pass observed 1,945 Firefox and 1,741 NaiveFox UDP
+datagrams. Server UDP bytes were 2,187,585 and 2,167,729 respectively. Neither
+side established TCP or sent TCP payload. Ordinary Firefox emitted two TCP SYN
+probes which the strict UDP-only fixture rejected with RST and performed a
+second QUIC attempt; NaiveFox emitted no TCP probe and kept both CONNECT
+streams on one QUIC connection. No Version Negotiation packet occurred.
 
 Raw pcaps, NSS keys, profiles, screenshots, bodies, and logs were deleted after
 successful aggregation. The retained credential-free summary is under
 `obj-x86_64-pc-linux-gnu/naivefox-fixture/h3-capture-safe/` and the complete
 methodology and safe results are in [`H3-CAPTURE.md`](H3-CAPTURE.md).
+
+The separate passive H2 observer runner was also updated to use the same clean
+official Firefox reference. Its current run reported two official Firefox TCP
+retry streams versus one NaiveFox pooled stream; visible ClientHello equality
+was `no`, ServerHello equality was `yes`, and the canary was absent. This is a
+cross-release comparison, not a requirement to clone a moving Firefox
+fingerprint.
 
 ## Minimal staged runtime gate
 

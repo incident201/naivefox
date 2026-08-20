@@ -1,11 +1,38 @@
 # NaiveFox known issues and current constraints
 
-Last reviewed: 2026-08-13, for `h2-h3-prototype-v0.2`.
+Last reviewed: 2026-08-20, for the pre-export audit on `minimal`.
 
 This document separates active architectural constraints, frozen Firefox
 snapshot limitations, and non-reproducible observations from the acceptance
 results in `TEST-REPORT.md`. None of the items below invalidates the completed
 H2 or H3 classic-CONNECT prototype gates.
+
+## Current pre-export status
+
+The malformed SOCKS5 terminal-state/OOM issue is fixed. Unsupported commands,
+bad address types, malformed versions, oversized same-write tails, and clients
+that never read a reject now produce at most one bounded failure reply and stop
+rearming input. The native Windows stress runner and Linux
+`run-malformed-socks-tests.sh` both exercise this path; the next normal SOCKS
+connection remains usable.
+
+Windows file logging is also fixed and verified with relative, absolute, and
+Unicode paths, append-after-restart, clean shutdown, and credential scans. The
+Windows staged package passed five repeated local malformed-input/file-logging
+smoke runs and a strict 600-second H3 soak (45/45 integrity requests, 45
+padding/protocol records, no unexpected exit). A complete native Windows H2,
+H3, and Auto workload matrix beyond this H3 soak remains a follow-up gate.
+
+`minimal-source` export is intentionally still blocked. Closure reports and
+provenance must be regenerated on the final audited commit, and the standalone
+export validator/build gate has not been started. No generated source tree is
+an accepted artifact yet.
+
+Capture comparisons now use the clean official Mozilla Firefox release fetched
+by `tools/fetch-firefox-reference.sh`. The pinned NaiveFox Firefox snapshot is
+kept as the other side; exact TLS/QUIC fingerprint equality is reported, not
+required across release versions. Strict protocol, no-fallback, marker,
+padding, and multiplexing assertions remain mandatory.
 
 ## Single-process networking
 

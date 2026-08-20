@@ -40,6 +40,7 @@ cleanup() {
     wait "$client_pid" 2>/dev/null || true
   fi
   if [[ $status -ne 0 ]]; then
+    mkdir -p "$SOURCE_ROOT/artifacts"
     {
       for client_log in "${client_logs[@]}"; do
         if [[ -f $client_log ]]; then
@@ -150,8 +151,9 @@ proxy_flow_count() {
     ss -Haunp | awk -v owner="pid=$client_pid," \
       'index($0, owner) { count++ } END { print count + 0 }'
   else
-    ss -Htn state established \
-      "( dport = :$NAIVEFOX_FIXTURE_PROXY_PORT )" | wc -l
+    ss -Htnp state established \
+      "( dport = :$NAIVEFOX_FIXTURE_PROXY_PORT )" |
+      awk -v owner="pid=$client_pid," 'index($0, owner) { count++ } END { print count + 0 }'
   fi
 }
 
