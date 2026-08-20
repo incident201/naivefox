@@ -23,6 +23,8 @@ MAKE_SOURCE_PATH = re.compile(
 )
 GYP_SOURCE_PATH = re.compile(r"[\"']([^\"']+\.gypi?)[\"']")
 PY_ACTION = re.compile(r"call\s+py_action,\s*([A-Za-z0-9_+-]+)")
+JAR_MANIFEST = re.compile(r"^JAR_MANIFEST\s*:?=\s*(.+)$", re.MULTILINE)
+JAR_SOURCE = re.compile(r"\((%?[^)]+)\)")
 
 
 def git(repo: Path, *args: str) -> str:
@@ -300,12 +302,19 @@ def main() -> int:
 
     makefile_digest = hashlib.sha256()
     absolute_source = re.compile(re.escape(str(source_tree)) + r"/[^\s\\'\"():;,]+")
+    active_jar_manifests = set()
     for makefile in makefiles:
         text = makefile.read_text(encoding="utf-8", errors="replace")
         makefile_digest.update(makefile.relative_to(objdir).as_posix().encode())
         makefile_digest.update(b"\0")
         makefile_digest.update(text.encode())
         makefile_digest.update(b"\0")
+        for match in JAR_MANIFEST.findall(text):
+            manifest = Path(match.strip()).resolve()
+            relative = source_relative(manifest)
+            if relative is not None:
+                add_path(manifest, "make:active-jar-manifest")
+                active_jar_manifests.add(relative)
         source_dir = source_tree / makefile.parent.relative_to(objdir)
         for match in MAKE_SOURCE_PATH.finditer(text):
             root = source_tree if match.group(1) != "srcdir" else source_dir
@@ -314,6 +323,19 @@ def main() -> int:
             )
         for match in absolute_source.finditer(text):
             add_make_path(match.group(0), "objdir:generated-make-prerequisite")
+
+    for value in sorted(active_jar_manifests):
+        manifest = source_tree / value
+        for source in JAR_SOURCE.findall(
+            manifest.read_text(encoding="utf-8", errors="replace")
+        ):
+            if source.startswith("%"):
+                path = manifest.parent / "en-US" / source.removeprefix("%")
+            elif source.startswith("/"):
+                path = source_tree / source.lstrip("/")
+            else:
+                path = manifest.parent / source
+            add_make_path(str(path), "make:active-jar-source")
 
     for fragment in make_fragments:
         text = fragment.read_text(encoding="utf-8", errors="replace")
@@ -706,6 +728,7 @@ def main() -> int:
         "cargo_workspace_member_count": len(metadata["workspace_members"]),
         "active_gyp_roots": sorted(active_gyp_roots),
         "active_python_actions": sorted(active_python_actions),
+        "active_jar_manifests": sorted(active_jar_manifests),
         "build_python_site_manifest": source_relative(build_site_manifest),
         "build_python_site_sha256": sha256(build_site_manifest),
         "build_python_site_roots": sorted(build_site_roots),
