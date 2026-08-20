@@ -8,6 +8,7 @@ import argparse
 import glob
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tomllib
@@ -33,6 +34,7 @@ def main() -> int:
     parser.add_argument("output", type=Path)
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--source-tree", type=Path)
+    parser.add_argument("--source-commit")
     parser.add_argument("--objdir", type=Path, required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--cargo-target", required=True)
@@ -47,6 +49,8 @@ def main() -> int:
     output = args.output.resolve()
     if source_tree not in mozconfig.parents:
         raise SystemExit("mozconfig must be inside the analyzed source tree")
+    if source_tree != repo and not args.source_commit:
+        raise SystemExit("diagnostic source trees require --source-commit")
 
     status = git(repo, "status", "--porcelain=v1")
     if status and not args.allow_dirty:
@@ -60,6 +64,12 @@ def main() -> int:
         "-z",
     ]).decode("utf-8", "surrogateescape")
     tracked = {value for value in tracked_raw.split("\0") if value}
+    source_commit = args.source_commit or git(repo, "rev-parse", "HEAD")
+    if subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "-e", f"{source_commit}^{{commit}}"],
+        check=False,
+    ).returncode:
+        raise SystemExit(f"source commit does not exist: {source_commit}")
     categories: dict[str, set[str]] = defaultdict(set)
     directory_contracts = set()
 
@@ -97,11 +107,29 @@ def main() -> int:
             if line.startswith(f"{source_tree}/"):
                 add_path(Path(line), f"objdir:{name}")
 
-    depfiles = sorted(
-        path
-        for path in {*objdir.rglob("*.d"), *objdir.rglob("*.pp")}
-        if path.is_file() and "naivefox-fixture" not in path.parts
-    )
+    depfiles = []
+    makefiles = []
+    manifest_lists = []
+    backends = []
+    for root, directories, names in os.walk(objdir):
+        directories[:] = [
+            directory for directory in directories if directory != "naivefox-fixture"
+        ]
+        directory = Path(root)
+        for name in names:
+            path = directory / name
+            if name.endswith((".d", ".pp")):
+                depfiles.append(path)
+            if name in {"Makefile", "backend.mk"}:
+                makefiles.append(path)
+            if name == "backend.mk":
+                backends.append(path)
+            if name == "manifest-lists.json":
+                manifest_lists.append(path)
+    depfiles.sort()
+    makefiles.sort()
+    manifest_lists.sort()
+    backends.sort()
     for depfile in depfiles:
         text = depfile.read_text(encoding="utf-8", errors="replace").replace(
             "\\\n", " "
@@ -126,7 +154,7 @@ def main() -> int:
                 "objdir:generated-action-relative-depfile",
             )
 
-    for manifest_list in objdir.rglob("manifest-lists.json"):
+    for manifest_list in manifest_lists:
         try:
             data = json.loads(manifest_list.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
@@ -134,11 +162,6 @@ def main() -> int:
         for value in data.get("manifests", []):
             add_path(Path(value), "objdir:component-manifest")
 
-    makefiles = sorted(
-        path
-        for path in objdir.rglob("*")
-        if path.is_file() and path.name in {"Makefile", "backend.mk"}
-    )
     makefile_digest = hashlib.sha256()
     absolute_source = re.compile(re.escape(str(source_tree)) + r"/[^\s\\'\"():;,]+")
     for makefile in makefiles:
@@ -156,7 +179,7 @@ def main() -> int:
         for match in absolute_source.finditer(text):
             add_make_path(match.group(0), "objdir:generated-make-prerequisite")
 
-    for backend in objdir.rglob("backend.mk"):
+    for backend in backends:
         text = backend.read_text(encoding="utf-8", errors="replace")
         for match in INCLUDE_PATH.finditer(text):
             value = next(item for item in match.groups() if item is not None)
@@ -173,24 +196,100 @@ def main() -> int:
             [
                 "cargo",
                 "metadata",
-                "--all-features",
+                "--manifest-path",
+                str(source_tree / "Cargo.toml"),
                 "--format-version",
                 "1",
                 "--filter-platform",
                 args.cargo_target,
+                "--no-default-features",
+                "--features",
+                "gkrust/naivefox",
                 "--frozen",
             ],
-            cwd=source_tree,
+            cwd=objdir,
             text=True,
         )
     )
-    package_dirs = set()
-    for package in metadata["packages"]:
-        manifest = Path(package["manifest_path"]).resolve()
-        try:
-            package_dirs.add(manifest.parent.relative_to(source_tree).as_posix())
-        except ValueError:
+    packages_by_id = {package["id"]: package for package in metadata["packages"]}
+    nodes_by_id = {node["id"]: node for node in metadata["resolve"]["nodes"]}
+    root_ids = {
+        package["id"]
+        for package in metadata["packages"]
+        if package["name"] in {"gkrust", "oxilangtag-ffi"} and package["source"] is None
+    }
+    if {packages_by_id[value]["name"] for value in root_ids} != {
+        "gkrust",
+        "oxilangtag-ffi",
+    }:
+        raise SystemExit("Cargo metadata is missing a required NaiveFox build root")
+    reachable_package_ids = set()
+    pending_package_ids = list(root_ids)
+    while pending_package_ids:
+        package_id = pending_package_ids.pop()
+        if package_id in reachable_package_ids:
             continue
+        reachable_package_ids.add(package_id)
+        for dependency in nodes_by_id[package_id]["deps"]:
+            if any(
+                kind.get("kind") != "dev" for kind in dependency.get("dep_kinds", [])
+            ):
+                pending_package_ids.append(dependency["pkg"])
+
+    package_dirs = set()
+    cargo_packages = []
+    for package_id in sorted(reachable_package_ids):
+        package = packages_by_id[package_id]
+        manifest = Path(package["manifest_path"]).resolve()
+        relative_manifest = None
+        license_file = None
+        license_candidates = []
+        try:
+            relative_manifest = manifest.relative_to(source_tree).as_posix()
+            package_directory = manifest.parent.relative_to(source_tree).as_posix()
+            package_dirs.add(package_directory)
+        except ValueError:
+            package_directory = None
+        if package_directory:
+            declared_license_file = package.get("license_file")
+            if declared_license_file:
+                candidate = Path(declared_license_file).resolve()
+                try:
+                    value = candidate.relative_to(source_tree).as_posix()
+                except ValueError:
+                    pass
+                else:
+                    if value in tracked:
+                        license_file = value
+            prefix = f"{package_directory.rstrip('/')}/"
+            for value in tracked:
+                if not value.startswith(prefix):
+                    continue
+                name = Path(value).name.lower()
+                if name.startswith(("license", "copying", "notice")):
+                    license_candidates.append(value)
+        if license_file:
+            license_coverage = [license_file]
+        elif license_candidates:
+            license_coverage = sorted(license_candidates)
+        elif package["source"] is None and not (package_directory or "").startswith(
+            "third_party/"
+        ):
+            license_coverage = ["LICENSE"]
+        elif package.get("license"):
+            license_coverage = ["toolkit/content/license.html"]
+        else:
+            license_coverage = []
+        cargo_packages.append({
+            "name": package["name"],
+            "version": package["version"],
+            "source": package.get("source"),
+            "manifest_path": relative_manifest,
+            "license": package.get("license"),
+            "license_file": license_file,
+            "license_candidates": sorted(license_candidates),
+            "license_coverage": license_coverage,
+        })
     prefixes = tuple(f"{value.rstrip('/')}" + "/" for value in package_dirs)
     for value in tracked:
         if value.startswith(prefixes):
@@ -220,18 +319,30 @@ def main() -> int:
         "target": args.target,
         "cargo_target": args.cargo_target,
         "source_tree_kind": "repository" if source_tree == repo else "diagnostic",
-        "source_commit": git(repo, "rev-parse", "HEAD"),
-        "source_worktree_clean": not bool(status),
+        "source_commit": source_commit,
+        "source_worktree_clean": source_tree == repo and not bool(status),
         "source_worktree_status": status.splitlines(),
         "firefox_base_commit": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
+        "collector_sha256": sha256(Path(__file__).resolve()),
         "mozconfig": mozconfig.relative_to(source_tree).as_posix(),
         "mozconfig_sha256": sha256(mozconfig),
         "objdir_evidence_sha256": evidence,
         "generated_makefile_count": len(makefiles),
         "generated_makefiles_sha256": makefile_digest.hexdigest(),
         "depfile_count": len(depfiles),
-        "cargo_package_count": len(metadata["packages"]),
+        "cargo_package_count": len(reachable_package_ids),
+        "cargo_build_roots": sorted(
+            packages_by_id[value]["name"] for value in root_ids
+        ),
         "cargo_workspace_member_count": len(metadata["workspace_members"]),
+        "cargo_packages": sorted(
+            cargo_packages,
+            key=lambda package: (
+                package["name"],
+                package["version"],
+                package["source"] or "",
+            ),
+        ),
         "files": files,
         "directory_contracts": missing_contracts,
         "category_counts": {

@@ -48,7 +48,18 @@ def normalize_path(full_path, topsrcdir, objdir=None):
             return "objdir"
     # If path is still absolute, strip developer home/drive
     if p.startswith("/") or re.match(r"^[a-zA-Z]:", p):
-        for marker in ["obj-naivefox", "toolkit", "netwerk", "xpcom", "security", "intl", "storage", "js", "third_party", "config"]:
+        for marker in [
+            "obj-naivefox",
+            "toolkit",
+            "netwerk",
+            "xpcom",
+            "security",
+            "intl",
+            "storage",
+            "js",
+            "third_party",
+            "config",
+        ]:
             if "/" + marker in p:
                 idx = p.find("/" + marker)
                 return p[idx + 1 :]
@@ -67,11 +78,15 @@ def map_crate_manifest(raw_manifest, pkg_name, topsrcdir):
                 f"Rust manifest is inside the checkout but does not exist: {mapped}"
             )
         return mapped
-    vendored_candidate = os.path.join(topsrcdir, "third_party", "rust", pkg_name, "Cargo.toml")
+    vendored_candidate = os.path.join(
+        topsrcdir, "third_party", "rust", pkg_name, "Cargo.toml"
+    )
     if os.path.exists(vendored_candidate):
         return f"third_party/rust/{pkg_name}/Cargo.toml"
     alt_name = pkg_name.replace("-", "_")
-    vendored_alt = os.path.join(topsrcdir, "third_party", "rust", alt_name, "Cargo.toml")
+    vendored_alt = os.path.join(
+        topsrcdir, "third_party", "rust", alt_name, "Cargo.toml"
+    )
     if os.path.exists(vendored_alt):
         return f"third_party/rust/{alt_name}/Cargo.toml"
     raise AuditConsistencyError(
@@ -116,7 +131,9 @@ def get_archive_members(archive_path, topsrcdir, objdir):
                 line = line.strip()
                 if line:
                     norm = normalize_path(line, topsrcdir, objdir)
-                    if re.match(r"^[A-Za-z]:", norm) or (norm.startswith("/") and not norm.startswith("objdir/")):
+                    if re.match(r"^[A-Za-z]:", norm) or (
+                        norm.startswith("/") and not norm.startswith("objdir/")
+                    ):
                         norm = os.path.basename(norm)
                     members.append(norm)
             if members:
@@ -291,9 +308,7 @@ def get_reachable_rust_closure(topsrcdir, target_triple, objdir=None):
             continue
         match = package_line.match(line)
         if not match:
-            raise AuditConsistencyError(
-                f"cannot parse cargo tree package line: {line}"
-            )
+            raise AuditConsistencyError(f"cannot parse cargo tree package line: {line}")
         name = match.group("name")
         version = match.group("version")
         source = match.group("source")
@@ -334,12 +349,25 @@ def get_reachable_rust_closure(topsrcdir, target_triple, objdir=None):
         if not pkg:
             continue
         name = pkg.get("name", "")
-        norm_manifest = map_crate_manifest(pkg.get("manifest_path", ""), name, topsrcdir)
+        norm_manifest = map_crate_manifest(
+            pkg.get("manifest_path", ""), name, topsrcdir
+        )
 
         source_type = "in-tree"
         if norm_manifest.startswith("third_party/rust/"):
             source_type = "vendored"
-        elif any(norm_manifest.startswith(p) for p in ["toolkit/", "netwerk/", "xpcom/", "security/", "intl/", "storage/", "js/"]):
+        elif any(
+            norm_manifest.startswith(p)
+            for p in [
+                "toolkit/",
+                "netwerk/",
+                "xpcom/",
+                "security/",
+                "intl/",
+                "storage/",
+                "js/",
+            ]
+        ):
             source_type = "in-tree-component"
 
         source_paths = []
@@ -418,7 +446,9 @@ def get_source_and_build_inputs(
                         continue
                     try:
                         depfiles_scanned += 1
-                        with open(pp_path, "r", encoding="utf-8", errors="ignore") as pf:
+                        with open(
+                            pp_path, "r", encoding="utf-8", errors="ignore"
+                        ) as pf:
                             content = pf.read()
                             for token in content.replace("\\\n", " ").split():
                                 if token.endswith(":") or token.startswith("-"):
@@ -429,9 +459,17 @@ def get_source_and_build_inputs(
                                 norm = normalize_path(token_norm, topsrcdir, objdir)
                                 if norm.startswith("objdir/"):
                                     continue
-                                if norm.endswith(
-                                    (".cpp", ".c", ".cc", ".cxx", ".mm", ".S", ".s", ".asm", ".rc")
-                                ):
+                                if norm.endswith((
+                                    ".cpp",
+                                    ".c",
+                                    ".cc",
+                                    ".cxx",
+                                    ".mm",
+                                    ".S",
+                                    ".s",
+                                    ".asm",
+                                    ".rc",
+                                )):
                                     cxx_sources.add(norm)
                                 elif norm.endswith(".h") or norm.endswith(".hpp"):
                                     headers.add(norm)
@@ -447,7 +485,17 @@ def get_source_and_build_inputs(
     mozbuild_files = set()
     for root, dirs, files in os.walk(str(topsrcdir)):
         rel_root = normalize_path(root, topsrcdir)
-        if any(rel_root.startswith(skip) for skip in ["browser", "devtools", "mobile", "accessible", "layout", "editor"]):
+        if any(
+            rel_root.startswith(skip)
+            for skip in [
+                "browser",
+                "devtools",
+                "mobile",
+                "accessible",
+                "layout",
+                "editor",
+            ]
+        ):
             continue
         for f in files:
             if f == "moz.build" or f == "moz.configure":
@@ -482,7 +530,9 @@ def get_source_and_build_inputs(
         "mozbuild_definition_inputs": sorted(mozbuild_files),
         "mozbuild_definition_inputs_count": len(mozbuild_files),
         "runtime_resource_sources": runtime_resources,
-        "licenses_and_notices": [l for l in licenses if os.path.exists(os.path.join(topsrcdir, l))],
+        "licenses_and_notices": [
+            l for l in licenses if os.path.exists(os.path.join(topsrcdir, l))
+        ],
     }
 
 
@@ -495,7 +545,9 @@ def get_glean_inputs(topsrcdir, objdir):
         "toolkit/components/glean/build_scripts/glean_parser_ext/metrics_header_names.py",
     ]
     generator_scripts = [
-        path for path in generator_scripts if os.path.exists(os.path.join(topsrcdir, path))
+        path
+        for path in generator_scripts
+        if os.path.exists(os.path.join(topsrcdir, path))
     ]
 
     yaml_inputs = {"metrics": set(), "pings": set()}
@@ -511,9 +563,7 @@ def get_glean_inputs(topsrcdir, objdir):
         except OSError:
             continue
         prefix = os.path.normpath(str(topsrcdir)).replace("\\", "/") + "/"
-        for match in re.finditer(
-            re.escape(prefix) + r"([A-Za-z0-9_./-]+\.yaml)", text
-        ):
+        for match in re.finditer(re.escape(prefix) + r"([A-Za-z0-9_./-]+\.yaml)", text):
             candidate = match.group(1).replace("\\", "/")
             if os.path.exists(os.path.join(topsrcdir, candidate)):
                 yaml_inputs[kind].add(candidate)
@@ -560,10 +610,14 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
 
     libxul_list_path = objdir_path / "toolkit" / "library" / "build" / list_name
     if not libxul_list_path.exists():
-        libxul_list_path = objdir_path / "toolkit" / "library" / "build" / "xul.dll.list"
+        libxul_list_path = (
+            objdir_path / "toolkit" / "library" / "build" / "xul.dll.list"
+        )
 
     if not libxul_list_path.exists():
-        raise AuditConsistencyError(f"Linker response file not found: {libxul_list_path}")
+        raise AuditConsistencyError(
+            f"Linker response file not found: {libxul_list_path}"
+        )
 
     link_items = parse_response_file(str(libxul_list_path), topsrcdir)
     objects = []
@@ -577,7 +631,11 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
         sz = os.path.getsize(full_path)
         total_obj_bytes += sz
         rel_obj = normalize_path(full_path, topsrcdir, objdir)
-        top_comp = rel_obj.split("/")[1] if rel_obj.startswith("objdir/") else rel_obj.split("/")[0]
+        top_comp = (
+            rel_obj.split("/")[1]
+            if rel_obj.startswith("objdir/")
+            else rel_obj.split("/")[0]
+        )
         if top_comp not in component_groups:
             component_groups[top_comp] = {"files": 0, "bytes": 0}
         component_groups[top_comp]["files"] += 1
@@ -613,10 +671,14 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
         })
 
     if not js_static_found:
-        raise AuditConsistencyError("Self-consistency failure: js_static is missing from STATIC_LIBS")
+        raise AuditConsistencyError(
+            "Self-consistency failure: js_static is missing from STATIC_LIBS"
+        )
 
     if not gkrust_found:
-        raise AuditConsistencyError("Self-consistency failure: gkrust is missing from STATIC_LIBS")
+        raise AuditConsistencyError(
+            "Self-consistency failure: gkrust is missing from STATIC_LIBS"
+        )
 
     bin_xul = objdir_path / "dist" / "bin" / xul_name
     bin_naivefox = objdir_path / "dist" / "bin" / naivefox_name
@@ -624,9 +686,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
 
     rust_crates = get_reachable_rust_closure(topsrcdir, target_triple, objdir)
     archive_member_names = [
-        member
-        for archive in static_libs
-        for member in archive["members"]
+        member for archive in static_libs for member in archive["members"]
     ]
     source_inputs = get_source_and_build_inputs(
         topsrcdir,
@@ -660,14 +720,18 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
                     "sha256": sha256_file(full),
                 })
 
-    git_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=topsrcdir, text=True).strip()
+    git_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=topsrcdir, text=True
+    ).strip()
     mozconfig_full = os.path.join(topsrcdir, mozconfig_relpath)
     mozconfig_hash = sha256_file(mozconfig_full)
 
     compiler_ver = "Clang 18.1.8"
     linker_ver = "LLD 18.1.8"
     try:
-        c_out = subprocess.check_output(["clang", "--version"], stderr=subprocess.DEVNULL, text=True)
+        c_out = subprocess.check_output(
+            ["clang", "--version"], stderr=subprocess.DEVNULL, text=True
+        )
         compiler_ver = c_out.splitlines()[0]
     except Exception:
         pass
@@ -675,7 +739,9 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
     report = {
         "report_provenance": {
             "source_commit_sha": git_head,
+            "source_worktree_clean": True,
             "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
+            "analyzer_sha256": sha256_file(__file__),
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
@@ -692,7 +758,9 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "unstripped_link_objects_mb": round(total_obj_bytes / (1024 * 1024), 2),
             "static_libraries_count": len(static_libs),
             "libxul_size_bytes": bin_xul.stat().st_size if bin_xul.exists() else 0,
-            "naivefox_bin_size_bytes": bin_naivefox.stat().st_size if bin_naivefox.exists() else 0,
+            "naivefox_bin_size_bytes": bin_naivefox.stat().st_size
+            if bin_naivefox.exists()
+            else 0,
             "reachable_rust_crates_count": len(rust_crates),
             "dynamic_dependencies_count": len(dynamic_deps),
             "staged_runtime_files_count": len(staged_manifest_files),
@@ -703,11 +771,15 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
                 "bytes": v["bytes"],
                 "mb": round(v["bytes"] / (1024 * 1024), 2),
             }
-            for k, v in sorted(component_groups.items(), key=lambda x: x[1]["bytes"], reverse=True)
+            for k, v in sorted(
+                component_groups.items(), key=lambda x: x[1]["bytes"], reverse=True
+            )
         },
         "cxx_translation_units": source_inputs["cxx_translation_units"],
         "static_libraries": static_libs,
-        "shared_libraries": [normalize_path(l, topsrcdir, objdir) for l in raw_shared_libs],
+        "shared_libraries": [
+            normalize_path(l, topsrcdir, objdir) for l in raw_shared_libs
+        ],
         "dynamic_dependencies": dynamic_deps,
         "rust_closure": {
             "platform_filter": target_triple,
@@ -717,9 +789,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
         },
         "build_inputs": {
             "cxx_translation_units": source_inputs["cxx_translation_units"],
-            "cargo_manifests": sorted(
-                c["manifest_path"] for c in rust_crates
-            ),
+            "cargo_manifests": sorted(c["manifest_path"] for c in rust_crates),
             "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
             "cargo_lockfile": "Cargo.lock",
             "cargo_config_template": ".cargo/config.toml.in",
@@ -731,14 +801,16 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "ipdl_inputs_count": len(source_inputs["ipdl_inputs"]),
             "ipdl_inputs": source_inputs["ipdl_inputs"],
             "webidl_binding_inputs": source_inputs["webidl_binding_inputs"],
-            "generators_and_python_scripts_count": len(source_inputs["generators_and_python_scripts"]),
-            "generators_and_python_scripts": source_inputs["generators_and_python_scripts"],
+            "generators_and_python_scripts_count": len(
+                source_inputs["generators_and_python_scripts"]
+            ),
+            "generators_and_python_scripts": source_inputs[
+                "generators_and_python_scripts"
+            ],
             "mozbuild_definition_inputs_count": source_inputs[
                 "mozbuild_definition_inputs_count"
             ],
-            "mozbuild_definition_inputs": source_inputs[
-                "mozbuild_definition_inputs"
-            ],
+            "mozbuild_definition_inputs": source_inputs["mozbuild_definition_inputs"],
             "runtime_resource_sources": source_inputs["runtime_resource_sources"],
             "licenses_and_notices": source_inputs["licenses_and_notices"],
             "glean": glean_inputs,
@@ -754,7 +826,15 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
 
 
 def main():
-    topsrcdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    topsrcdir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..")
+    )
+    if subprocess.check_output(
+        ["git", "status", "--porcelain=v1"], cwd=topsrcdir, text=True
+    ).strip():
+        raise AuditConsistencyError(
+            "source checkout must be clean before closure report generation"
+        )
     reports_dir = os.path.join(topsrcdir, "netwerk", "naivefox", "reports")
     os.makedirs(reports_dir, exist_ok=True)
 
@@ -782,13 +862,25 @@ def main():
         out_path = os.path.join(reports_dir, filename)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
-        print(f"  -> Saved report: {normalize_path(out_path, topsrcdir)} ({os.path.getsize(out_path) / 1024:.1f} KB)")
+        print(
+            f"  -> Saved report: {normalize_path(out_path, topsrcdir)} ({os.path.getsize(out_path) / 1024:.1f} KB)"
+        )
         s = report["summary"]
-        print(f"  -> C/C++ TUs:     {s['cxx_translation_units_count']} translation units")
-        print(f"  -> Direct Objs:   {s['direct_link_objects_count']} files ({s['unstripped_link_objects_mb']} MB)")
-        print(f"  -> Static Libs:   {s['static_libraries_count']} archives (SpiderMonkey & gkrust verified)")
-        print(f"  -> Reachable Rust:{s['reachable_rust_crates_count']} crates (filtered from 850 total)")
-        print(f"  -> Dynamic Deps:  {s['dynamic_dependencies_count']} dynamic libraries")
+        print(
+            f"  -> C/C++ TUs:     {s['cxx_translation_units_count']} translation units"
+        )
+        print(
+            f"  -> Direct Objs:   {s['direct_link_objects_count']} files ({s['unstripped_link_objects_mb']} MB)"
+        )
+        print(
+            f"  -> Static Libs:   {s['static_libraries_count']} archives (SpiderMonkey & gkrust verified)"
+        )
+        print(
+            f"  -> Reachable Rust:{s['reachable_rust_crates_count']} crates (filtered from 850 total)"
+        )
+        print(
+            f"  -> Dynamic Deps:  {s['dynamic_dependencies_count']} dynamic libraries"
+        )
         print(f"  -> Staged Runtime:{s['staged_runtime_files_count']} package files")
 
     print("\nAll closure audits completed and self-consistency assertions passed.")
