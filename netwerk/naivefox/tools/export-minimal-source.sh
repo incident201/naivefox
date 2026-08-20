@@ -237,7 +237,7 @@ for path in list(entries):
 # closure: it avoids one-file-at-a-time backend failures while still copying
 # only files explicitly mentioned by selected build definitions, not whole
 # Firefox directories.
-mozbuild_literal = re.compile(r"(?:\"([^\"]+)\"|'([^']+)')")
+mozbuild_literal = re.compile(r"(?:\"([^\"\\r\\n]+)\"|'([^'\\r\\n]+)')")
 for path in list(entries):
     if not (
         path.endswith("/moz.build")
