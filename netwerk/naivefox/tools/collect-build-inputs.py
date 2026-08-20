@@ -18,7 +18,9 @@ from pathlib import Path
 
 SOURCE_PATH = re.compile(r"(?:^|[\s(])(/[^\s)]+)")
 INCLUDE_PATH = re.compile(r"-I(?:\"([^\"]+)\"|'([^']+)'|([^\s]+))")
-MAKE_SOURCE_PATH = re.compile(r"\$\((topsrcdir|TOPSRCDIR|srcdir)\)(/[^\s\\'\"():;,]+)")
+MAKE_SOURCE_PATH = re.compile(
+    r"\$\((topsrcdir|TOPSRCDIR|MOZILLA_DIR|srcdir)\)(/[^\s\\'\"():;,]+)"
+)
 GYP_SOURCE_PATH = re.compile(r"[\"']([^\"']+\.gypi?)[\"']")
 PY_ACTION = re.compile(r"call\s+py_action,\s*([A-Za-z0-9_+-]+)")
 
@@ -106,6 +108,12 @@ def main() -> int:
                     directory_contracts.add(relative)
             else:
                 add_path(path, category)
+
+    for value in tracked:
+        if (value.startswith("config/") and value.endswith(".mk")) or value == (
+            "toolkit/mozapps/installer/upload-files.mk"
+        ):
+            add_path(source_tree / value, "make:core-build-infrastructure")
 
     evidence_names = ("backend.RecursiveMakeBackend.in", "config_status_deps.in")
     evidence = {}
@@ -263,6 +271,31 @@ def main() -> int:
             )
         for match in absolute_source.finditer(text):
             add_make_path(match.group(0), "objdir:generated-make-prerequisite")
+
+    for fragment in make_fragments:
+        text = fragment.read_text(encoding="utf-8", errors="replace")
+        source_dir = source_tree / fragment.parent.relative_to(objdir)
+        for match in MAKE_SOURCE_PATH.finditer(text):
+            root = source_tree if match.group(1) != "srcdir" else source_dir
+            add_make_path(
+                str(root) + match.group(2),
+                "objdir:generated-make-fragment-source",
+            )
+        for match in absolute_source.finditer(text):
+            add_make_path(match.group(0), "objdir:generated-make-fragment-source")
+
+    active_source_makefiles = sorted(
+        value for value in set().union(*categories.values()) if value.endswith(".mk")
+    )
+    for value in active_source_makefiles:
+        path = source_tree / value
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in MAKE_SOURCE_PATH.finditer(text):
+            root = source_tree if match.group(1) != "srcdir" else path.parent
+            add_make_path(
+                str(root) + match.group(2),
+                "make:active-source-fragment-input",
+            )
 
     for backend in backends:
         text = backend.read_text(encoding="utf-8", errors="replace")
