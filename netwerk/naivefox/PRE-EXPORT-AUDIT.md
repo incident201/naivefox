@@ -11,23 +11,25 @@ plus a 600-second strict-H3 soak. The soak completed 45/45 integrity-checked
 requests, recorded 45 H3 and 45 padding events, sampled the process for 593
 seconds, and ended with RSS 27.5 MiB (peak 28.3 MiB).
 
-Source-closure discovery has started, but the publishable clean export has not.
+Source-closure discovery and standalone target validation are complete.
 Early attempts incorrectly used clean copy operations as a dependency-discovery
 loop. They produced a disposable, contaminated diagnostic tree and repeatedly
 stopped on inputs that compiler/link reports cannot observe. That workflow is
-retired. The current diagnostic tree is augmented in place by input *classes*;
-it completed standalone configure, a full Linux `mach build -j4` in 5:38, and
-runtime smoke at source content commit `a020da3d5ba4`. Its final depfile/backend
-report is a subset of the conservative full-tree Linux allowlist (zero new
-files), which closes the discovery loop. It is not a valid release export and
-will never be published.
+retired. The diagnostic tree was augmented in place by input *classes* and
+completed full Linux and Windows builds with the original Firefox checkout
+hidden. Linux then passed the complete H2/H3/Auto/config suite and staged
+runtime gate. Windows passed native runtime/config/logging/malformed-input
+checks and short H2/H3/Auto integrity workloads. The diagnostic tree is not a
+valid release export and will never be published.
 
-Final evidence regeneration is complete: all five reports attest
-`745d58bf7dcb44df0b8be87b39fb7d21d19383f9` and are committed in report-only
-snapshot `bec198a62d422b1382315f335ef2965b429d9387`. The fast
-`export-minimal-source.sh --plan-only` gate passes. The remaining sequence is
-exactly one clean export, then isolated build/test with the original checkout
-and objdirs unavailable.
+The four build/closure reports plus Linux configure trace attest
+`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; report-only snapshot
+`bec198a62d422b1382315f335ef2965b429d9387` froze the original five-report set.
+The target-specific Windows configure trace attests
+`af716bf57f83ebdb377c0f34cd20995faf41b641`. The planner consumes all six
+reports and at exporter checkpoint `4db1292e96ec` validates 25,549 files and 37
+directory contracts. Publication is a clean deterministic snapshot, not a new
+dependency-discovery run.
 
 The capture reference policy is also final: both H2 and H3 capture runners
 fetch a clean official Mozilla Firefox release into ignored object storage via
@@ -71,7 +73,9 @@ runtime-reachable packages from the 311/325 source/build package closure.
 - **Standalone Diagnostic Source Commit:** `a020da3d5ba4`; standalone full build and runtime smoke passed from source content through this checkpoint.
 - **Audited Minimal Evidence Source Commit:** `745d58bf7dcb44df0b8be87b39fb7d21d19383f9`.
 - **Evidence Report Snapshot Commit:** `bec198a62d422b1382315f335ef2965b429d9387`; this direct report-only child contains the five configure/build/closure reports.
-- **Validated Minimal Source Commit:** `NOT_CREATED`
+- **Validated exporter/code checkpoint:** `4db1292e96ec97fa39575e936e76608a711dbdb5`
+- **Published Minimal Source Commit:** generated as an orphan snapshot after
+  this audit; its `UPSTREAM-BASE` records the exact Minimal source commit.
 - **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 
 ---
@@ -87,7 +91,8 @@ counts are measurements, not manifest contracts. Export policy consumes the
 union of validated target-specific reports rather than hard-coded counts.
 
 ### Closure Report Archives
-- Configure: `netwerk/naivefox/reports/configure-inputs-linux-x86_64.json`
+- Linux configure: `netwerk/naivefox/reports/configure-inputs-linux-x86_64.json`
+- Windows configure: `netwerk/naivefox/reports/configure-inputs-windows-x86_64.json`
 - Linux build inputs: `netwerk/naivefox/reports/build-inputs-linux-x86_64.json`
 - Windows build inputs: `netwerk/naivefox/reports/build-inputs-windows-x86_64.json`
 - Linux: `netwerk/naivefox/reports/closure-report-linux-x86_64.json`
@@ -144,12 +149,15 @@ Automated smoke test executed via `tools/verify-staged-windows-smoke.py`:
 - `[PASS]` five repeated native Windows smoke iterations without unexpected exit
 - `[PASS]` 600-second strict H3 real-Caddy soak: 45/45 integrity requests,
   45/45 H3 and padding records, 593 resource samples
+- `[PASS]` standalone native H2 workload: 8/8 integrity requests, SOCKS5 +
+  HTTP CONNECT, parallelism four, strict H2 and padding records
+- `[PASS]` standalone native H3 workload: 8/8 integrity requests, SOCKS5 +
+  HTTP CONNECT, parallelism four, strict H3/no H2 fallback and padding records
+- `[PASS]` standalone native Auto workload: 8/8 integrity requests, H3 selected
 - `[PASS]` Clean process termination and shutdown
-- *Note:* strict H3 networking is now covered by the native soak. Before the
-  first `minimal-source` Windows validation, run the existing native H2 and
-  Auto workload paths plus the long churn gate; no random crash recurred in
-  the repeated smoke/soak evidence, so no hypothetical profiler race is being
-  pursued without a new crash reproduction.
+- *Note:* no random crash recurred in the smoke, historical soak, or current
+  H2/H3/Auto evidence, so no hypothetical profiler race is pursued without a
+  new symbolized crash reproduction.
 
 ---
 

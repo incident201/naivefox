@@ -11,9 +11,11 @@ The prototype reuses Firefox's **real networking stack** instead of manually imi
 - A small NaiveFox-specific layer for the local SOCKS5 server, HTTP CONNECT tunnel orchestration, Naive padding compatibility, configuration, logging, and stream pumping.
 
 Linux x86_64 is the primary fully integrated prototype platform. Native
-Windows x86_64 build and staged H3 soak are validated; standalone
-`minimal-source` acceptance for both targets remains pending. Development uses
-Firefox's normal `mach` build system and a supported Linux build environment.
+Windows x86_64 and standalone source builds are also validated. The exported
+tree builds with the full Firefox checkout hidden, and the Windows package
+passes native H2, H3, Auto, SOCKS5, HTTP CONNECT, malformed-input, and file-log
+checks. Development uses Firefox's normal `mach` build system and a supported
+Linux build environment.
 
 The tagged `h2-prototype-v0.1` baseline is preserved. The `feature/h3` stage
 adds strict HTTP/3/QUIC through the same executable and project architecture;
@@ -74,12 +76,16 @@ deterministic allowlist without copying it. A new empty clean export is created
 once, only for isolated release acceptance; repeatedly rebuilding clean exports
 to discover individual files is prohibited.
 
-The frozen evidence set attests audited source
-`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; reports are committed in
-snapshot `bec198a62d422b1382315f335ef2965b429d9387`. The fast manifest
-`--plan-only` gate passes with 25,518 entries and 37 source directory
-contracts. The single clean export and isolated Linux/Windows acceptance are
-the remaining publication gates.
+The build-input and linked-closure reports attest audited source
+`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; report snapshot
+`bec198a62d422b1382315f335ef2965b429d9387` freezes that original five-report
+set. The later attested Windows configure trace records source
+`af716bf57f83ebdb377c0f34cd20995faf41b641`. The planner consumes this explicit
+six-report target union and, at exporter checkpoint `4db1292e96ec`, validates
+25,549 files and 37 source directory contracts. Standalone Linux build/full
+suite/staging and native Windows build/acceptance are green. The publication
+step creates the validated clean snapshot as an independent orphan history;
+its generated `UPSTREAM-BASE` is the authoritative snapshot provenance.
 
 ## Goal
 

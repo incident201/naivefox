@@ -335,18 +335,21 @@ directory contracts. Recreating an empty export for each newly missing file
 was both slow and incapable of proving whole classes.
 
 The corrected process maintains one disposable diagnostic tree, augmented in
-place from an attested configure trace and the union of Linux/Windows backend,
-config-status, depfile, Makefile, component, and target Cargo evidence. That
-tree now passes standalone configure, a full Linux build (5:38), and runtime
-smoke. A report from its fresh objdir contains no source file absent from the
-conservative Linux report.
+place from attested Linux and Windows configure traces and the union of
+target-specific backend, config-status, depfile, Makefile, component, Cargo,
+and Windows resource evidence. That tree passes standalone configure and full
+Linux and Windows builds while the original Firefox checkout is hidden. The
+Windows pass exposed two missing *classes*, not a reason to restart export:
+target-active configure auxiliaries such as `.def` files and the recursive
+`.rc` include/resource graph. Both classes are now handled generically by the
+planner.
 
-The exporter now has a fast `--plan-only` phase for provenance, exact file
-list, content hashes, modes, directory contracts, licenses, and product-doc
-curation. Final evidence attests source `745d58bf7dcb` and is frozen in
-report-only snapshot `bec198a62d42`: configure observed 10,273 files; target build evidence
-contains 1,949/2,306 depfiles and 311/325 source/build Cargo packages. The
-`--plan-only` union passes with 25,518 entries and 37 source directory
-contracts. The one clean source export remains the next release gate; the
-diagnostic tree is never published. Final source-tree/archive and normalized
-stripped package measurements will be recorded only from that clean export.
+The exporter has a fast `--plan-only` phase for provenance, exact file list,
+content hashes, modes, directory contracts, licenses, Windows resource
+closure, and product-doc curation. The build/closure evidence attests source
+`745d58bf7dcb`; the later Windows configure trace attests `af716bf57f83`.
+Target evidence contains 1,949/2,306 depfiles and 311/325 source/build Cargo
+packages. At exporter checkpoint `4db1292e96ec`, the target union passes with
+25,549 entries and 37 source directory contracts. Clean export is a release
+snapshot operation only; it must never again be used as a per-file discovery
+loop. The diagnostic tree is never published.

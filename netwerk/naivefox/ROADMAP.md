@@ -991,19 +991,22 @@ generated output, never a hand-edited source of truth.
 - [x] Regenerate configure, Linux/Windows build-input, and linked-closure
   reports from audited source `745d58bf7dcb`; freeze the evidence in report-only
   snapshot `bec198a62d42`.
-- [x] Pass `export-minimal-source.sh --plan-only` on the target union: 25,518
+- [x] Add the attested Windows configure trace and generic target-active
+  configure-auxiliary/recursive Windows resource closure; do not add files one
+  at a time.
+- [x] Pass `export-minimal-source.sh --plan-only` on the target union: 25,549
   entries and 37 source directory contracts.
-- [ ] Generate NaiveFox root documentation, licenses/notices, build scripts,
+- [x] Generate NaiveFox root documentation, licenses/notices, build scripts,
   and exact `UPSTREAM-BASE` traceability.
-- [ ] Validate absence of Firefox browser product files, `.git`, objdirs,
+- [x] Validate absence of Firefox browser product files, `.git`, objdirs,
   artifacts, credentials, profiles, logs, captures, and absolute build paths.
 - [ ] Generate a deterministic source archive from the same export tree.
 
 ### M14.4 Isolated build and publication
 
-- [ ] Build and test the export with the original Firefox source and objdir
+- [x] Build and test the export with the original Firefox source and objdir
   unavailable.
-- [ ] Pass the complete networking/config/package acceptance suite from the
+- [x] Pass the complete networking/config/package acceptance suite from the
   exported build.
 - [ ] Create the independent orphan-history `minimal-source` branch and publish
   only validated generated snapshots.
@@ -1070,9 +1073,9 @@ Run all reproducible local H2 and H3 integration gates sequentially with:
 The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
 user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
 must not weaken any item in this H2 suite. Native Windows x86_64 now has a
-build profile, staged package, bounded native SOCKS/HTTP smoke, and a
-600-second strict-H3 soak. Standalone-export H2/Auto Windows gates, Android,
-and further size reduction remain future work.
+standalone build, staged package, bounded SOCKS/HTTP/malformed-input/logging
+smoke, short native H2/H3/Auto integrity workloads, and historical 600-second
+strict-H3 soak evidence. Android and further size reduction remain future work.
 
 ## Current minimisation checkpoint: audited lean build/runtime closure
 
@@ -1089,9 +1092,10 @@ non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. Source
 closure discovery now uses one in-place diagnostic tree and is complete for
-Linux. Final provenance is frozen from `745d58bf` in report-only snapshot
-`bec198a6`; the fast manifest plan passes. Next create one clean export for
-isolated Linux/Windows gates.
+Linux and Windows. Build/closure provenance comes from `745d58bf`; the later
+Windows configure evidence comes from `af716bf5`. The 25,549-entry manifest
+plan and isolated Linux/Windows gates pass. Publication now creates one clean
+orphan snapshot; it does not reopen dependency discovery.
 Do not return to repeated clean-export discovery or reopen deep
 SpiderMonkey/ICU minimization in this phase.
 

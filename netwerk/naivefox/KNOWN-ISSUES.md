@@ -18,24 +18,27 @@ connection remains usable.
 
 Windows file logging is also fixed and verified with relative, absolute, and
 Unicode paths, append-after-restart, clean shutdown, and credential scans. The
-Windows staged package passed five repeated local malformed-input/file-logging
-smoke runs and a strict 600-second H3 soak (45/45 integrity requests, 45
-padding/protocol records, no unexpected exit). A complete native Windows H2,
-H3, and Auto workload matrix beyond this H3 soak remains a follow-up gate.
+standalone Windows package passes malformed-input/file-logging smoke plus
+short native H2, H3, and Auto workloads. Each protocol workload completed
+8/8 integrity-checked requests with parallelism four; strict H2/H3 used both
+SOCKS5 and HTTP CONNECT listeners, padding was negotiated for every tunnel,
+and Auto selected H3. The historical 600-second H3 soak remains valid earlier
+stability evidence but was not repeated for this source-publication gate.
 
-`minimal-source` publication is intentionally still blocked. One disposable
-diagnostic tree now passes standalone configure, a full Linux build, and
-runtime smoke, but it contains discovery residue and is not an accepted
-artifact. Evidence regeneration is complete at audited source `745d58bf7dcb`
-with report-only snapshot `bec198a62d42`, and the fast manifest plan
-passes. Publication remains blocked on the single clean export, isolated Linux
-acceptance, and standalone Windows acceptance.
+Standalone closure validation is complete. The disposable diagnostic tree is
+still contaminated discovery state and is never published, but it has now
+passed full Linux and Windows builds with the original Firefox checkout hidden.
+An independent clean Linux export passed the full H2/H3/Auto/config suite and
+staged-runtime verification; the native Windows package passed the short
+matrix above. Publication uses one newly generated clean manifest snapshot and
+an orphan history. The remaining repository action is switching GitHub's
+default branch after the published product branch is reviewed.
 
 Maintenance constraint: after any Firefox refresh or build-graph/Cargo/
-generator change, regenerate both target build reports and the attested
-configure report. Do not debug closure by repeatedly starting clean exports;
-augment one diagnostic tree by missing input class and reserve clean export for
-the final gate.
+generator change, regenerate both target build reports and both attested
+configure reports. Do not debug closure by repeatedly starting clean exports;
+augment one diagnostic tree by missing input *class*, follow Windows resource
+includes recursively, and reserve clean export for the publication gate.
 
 The previously reproducible Auto-suite startup abort on repeated H3 profile
 launches is resolved. The lean preferences file adapter now forces the EOF

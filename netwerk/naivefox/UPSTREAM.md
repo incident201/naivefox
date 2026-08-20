@@ -156,24 +156,27 @@ NaiveFox reference merge-base for export: e11c162e44703e8be50b619341c350f05b1b26
 Standalone diagnostic build source commit: a020da3d5ba4 (full build and runtime smoke PASS)
 Audited Minimal evidence source commit: 745d58bf7dcb44df0b8be87b39fb7d21d19383f9
 Evidence report snapshot commit: bec198a62d422b1382315f335ef2965b429d9387
-Validated clean Minimal export source commit: NOT_CREATED
-Published minimal-source commit: NOT_CREATED
+Windows configure evidence source commit: af716bf57f83ebdb377c0f34cd20995faf41b641
+Validated exporter/code checkpoint: 4db1292e96ec97fa39575e936e76608a711dbdb5
+Published minimal-source commit: recorded in this full-tree document after orphan publication
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
 ### Current pre-export audit provenance
 
-The configure, Linux/Windows build-input, and Linux/Windows linked-closure
-reports all attest source `745d58bf7dcb`; report-only snapshot `bec198a62d42`
-freezes that evidence. Later exporter-only descendants may consume the reports
-only while the planner proves that no build-affecting input changed and checks
-the exact collector hashes. Do not copy a working-tree SHA into a source
-commit's own documentation. The validated Firefox base remains the concrete
-snapshot `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla upstream refresh
-was performed during this audit. `minimal-source` is still `NOT_CREATED`.
-Disposable diagnostic export attempts are not publication candidates; the
-single clean release export has not run.
+The Linux configure, Linux/Windows build-input, and Linux/Windows linked-
+closure reports attest source `745d58bf7dcb`; report-only snapshot
+`bec198a62d42` freezes that original five-report set. The later Windows
+configure report attests source `af716bf57f83` and is consumed as the sixth
+target-specific evidence file. Exporter checkpoint `4db1292e96ec` adds no
+runtime/build behavior; it closes target-active configure auxiliaries and the
+recursive Windows `.rc` resource graph. The planner proves that intervening
+changes are report/document/export-only and verifies all collector hashes.
+Do not copy a working-tree SHA into its own commit documentation. The validated
+Firefox base remains `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`; no Mozilla
+upstream refresh was performed during this audit. Disposable diagnostic trees
+are not publication candidates; only the deterministic orphan snapshot is.
 
 The capture reference is no longer an optional in-tree Firefox binary:
 `tools/fetch-firefox-reference.sh` downloads and digest-records the clean
@@ -1504,7 +1507,8 @@ Tests: Linux and Windows frozen Cargo metadata resolution PASS. Corrected
 reports separately record 271/287 runtime-reachable packages and 311/325
 normal/build/proc-macro source packages. Standalone diagnostic configure PASS;
 full standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke
-PASS; final `--plan-only` PASS with 25,518 entries and 37 directory contracts.
+PASS; final six-report-union `--plan-only` PASS with 25,549 entries and 37
+directory contracts.
 Commits: `c8ad512671d6` (Rust workspace) and `a020da3d5ba4` (ping index).
 
 ## NF-UPSTREAM-019 — explicit Windows Winsock feature ownership
@@ -1545,7 +1549,7 @@ new downstream Necko patch inventory entries:
 | Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
 | Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
 | Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
-| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean closure and strict repository-relative/provenance checks. | Five-report set frozen in `bec198a62d42` from audited source `745d58bf7dcb`; both target assertions and plan-only PASS; physical clean export remains locked. |
+| Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `tools/minimal-source-plan.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean/resource closure and strict repository-relative/provenance checks. | Six-report target union: five original reports frozen in `bec198a62d42` from source `745d58bf7dcb`, plus Windows configure trace from `af716bf57f83`; both target assertions and the 25,549-entry plan PASS. |
 
 Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
 stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate
@@ -1584,12 +1588,22 @@ Verified directly on native Windows x86_64 via `netwerk/naivefox/tools/verify-st
 - 5 consecutive client SOCKS5 sessions;
 - Dynamic port HTTP CONNECT listener startup and request handling;
 - Clean process shutdown with zero dangling handles.
+- H2: 8/8 integrity requests through SOCKS5 and HTTP CONNECT, parallelism four,
+  strict outer H2 and padding for every tunnel.
+- H3: 8/8 integrity requests through SOCKS5 and HTTP CONNECT, parallelism four,
+  strict outer H3, no H2 fallback, and padding for every tunnel.
+- Auto: 8/8 integrity requests through SOCKS5, H3 selected, padding for every
+  tunnel.
 
-*Documentation Status:* Windows build, launch, config parsing, local listener handshake and shutdown verified. The strict-H3 native soak is green; native H2 and Auto workload paths remain mandatory before the first standalone `minimal-source` Windows acceptance gate. Do not investigate hypothetical profiler/message-pump races without a new crash reproduction.
+*Documentation Status:* standalone Windows build, launch, config parsing,
+logging, malformed-input handling, local listeners, H2/H3/Auto transfer, and
+shutdown are verified. The historical strict-H3 native soak remains valid and
+was not repeated for publication. Do not investigate hypothetical profiler/
+message-pump races without a new crash reproduction.
 
 ## Source-Export Allowlist Requirements for `minimal-source`
 
-For the upcoming source-export step (`export-minimal-source.sh`), the following rules are established:
+For deterministic source export (`export-minimal-source.sh`), the following rules are established:
 
 1. **Boundary Definition:** DOM implementation and layout engines are excluded. Explicit minimal WebIDL, binding metadata, and code generator subsets are retained where required.
 2. **Build-Time Dependency Inclusion:** The source export manifest must include all build-time generators, python actions, and dependency metadata even if they do not compile into the final runtime binary.

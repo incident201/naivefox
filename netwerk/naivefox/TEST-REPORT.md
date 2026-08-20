@@ -16,22 +16,21 @@ real Caddy deployment, the staged runtime, and the official NaiveProxy control
 client. It intentionally contains no endpoint, username, password, proxy
 authorization value, packet payload, or TLS key material.
 
-## Current pre-export audit update (2026-08-20)
+## Standalone source publication update (2026-08-20)
 
-Disposable source-export diagnostics have run; the single clean release export
-has not. Source publication remains blocked until final reports, fast manifest
-planning, and isolated Linux/Windows gates are complete. The reproducible SOCKS
-terminal-state OOM/remote-DoS issue
-is fixed and covered by Linux `run-malformed-socks-tests.sh` plus the native
-Windows staged smoke. Both SOCKS and HTTP malformed inputs stop parsing after
-one bounded failure response and leave the listener usable for a subsequent
-normal connection.
+Source-closure discovery and isolated target validation are complete. The
+reproducible SOCKS terminal-state OOM/remote-DoS issue is fixed and covered by
+Linux `run-malformed-socks-tests.sh` plus native Windows malformed SOCKS/HTTP
+stress. Terminal input produces at most one bounded failure response and leaves
+the listener usable for a subsequent normal connection.
 
-Final reports are no longer stale. The configure, Linux/Windows build-input,
-and Linux/Windows closure reports all attest audited source
-`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; direct report-only snapshot
-`bec198a62d422b1382315f335ef2965b429d9387` freezes them without trying to
-embed a commit's own SHA.
+The Linux configure/build/closure evidence and Windows build/closure evidence
+attest audited source `745d58bf7dcb44df0b8be87b39fb7d21d19383f9`;
+report-only snapshot `bec198a62d422b1382315f335ef2965b429d9387` freezes
+the original five reports. The later Windows configure trace attests
+`af716bf57f83ebdb377c0f34cd20995faf41b641`. This six-report model avoids
+pretending that every evidence file must share one SHA and never embeds a
+commit's own SHA inside itself.
 
 ### Standalone source-closure discovery
 
@@ -43,30 +42,30 @@ used one disposable tree and augmented it in place by evidence class.
 
 | Diagnostic gate | Result |
 |---|---|
-| Attested full-tree configure trace | PASS; source inputs normalized repository-relative |
+| Attested Linux and Windows configure traces | PASS; source inputs normalized repository-relative |
 | Linux/Windows backend + config-status inputs | collected |
 | Compiler/generated-action depfiles + Makefile prerequisites | collected |
+| Windows target-active configure auxiliaries + recursive `.rc` resources | collected |
 | Target-filtered Cargo source/build closure | Linux 311 / Windows 325 packages |
-| Configure trace | 10,273 files; trace SHA-256 `8a522abb10923a0a5e4b0fb4fa56f5d03e10c0a2dc8e0aa1c8a325a9c1795dcb` |
 | Source directory contracts | Linux 37 / Windows 33; 37 in the target union |
 | Depfiles | Linux 1,949 / Windows 2,306 |
 | Generated Makefiles | Linux 441 / Windows 425 |
-| Evidence provenance | source `745d58bf7dcb`; report-only snapshot `bec198a62d42` |
-| Standalone diagnostic configure | PASS |
-| Standalone full Linux `mach build -j4` | PASS, 5:38 |
-| Diagnostic runtime smoke | PASS |
-| Fresh diagnostic objdir inputs outside conservative Linux report | **0** |
+| Evidence provenance | build/closure source `745d58bf7dcb`; Windows configure source `af716bf57f83`; original snapshot `bec198a62d42` |
+| Manifest planner at `4db1292e96ec` | PASS; 25,549 files / 37 directory contracts |
+| Standalone full Linux `mach build -j4` with full checkout hidden | PASS, 9:59.85 |
+| Standalone Linux full H2/H3/Auto/config suite | PASS, 273.3 s |
+| Standalone Linux staged runtime outside objdir | PASS; runtime smoke, public HTTPS, H2/H3/Auto config |
+| Standalone full Windows cross-build with full checkout hidden | PASS; 9:54.80 initial compile plus 6.94 s final incremental link after local Wine-prefix repair |
 
 The diagnostic tree is contaminated discovery state and will not be
-published. `export-minimal-source.sh --plan-only` performs the cheap
-provenance/hash/mode/license/list validation and now passes with 25,518 entries
-and 37 source directory contracts. One new empty tree will be populated only
-for final acceptance.
+published. `export-minimal-source.sh --plan-only` performs provenance/hash/
+mode/license/list validation. Clean export is now a deterministic publication
+snapshot, never a per-file discovery loop.
 
 Windows file logging now uses the native wide-character API and passes relative,
 absolute, Unicode, append-after-restart, clean-shutdown, and credential-scan
 checks. The staged Windows package passed five repeated smoke iterations. The
-native strict-H3 soak then ran for 600 seconds against the supplied real Caddy:
+historical strict-H3 soak ran for 600 seconds against the supplied real Caddy:
 
 | Windows H3 soak metric | Result |
 |---|---:|
@@ -79,6 +78,18 @@ native strict-H3 soak then ran for 600 seconds against the supplied real Caddy:
 | Threads / handles | 19 max / 265 max |
 | Credentials in log | absent |
 | Unexpected exit during soak | none |
+
+The standalone Windows package then passed a bounded native protocol matrix:
+
+| Native Windows standalone gate | Result |
+|---|---|
+| H2 | PASS; 8/8 integrity requests, SOCKS5 + HTTP CONNECT, parallelism 4, strict H2, padding 8/8 |
+| H3 | PASS; 8/8 integrity requests, SOCKS5 + HTTP CONNECT, parallelism 4, strict H3/no H2 fallback, padding 8/8 |
+| Auto | PASS; 8/8 integrity requests through SOCKS5, H3 selected, padding 8/8 |
+| Credentials / `Proxy-Authorization` in logs | absent |
+
+The 600-second soak was not repeated for the source-publication checkpoint;
+the bounded matrix above is the current package evidence.
 
 The Auto protocol runner had previously exposed a reproducible lean-runtime
 startup abort when successive H3 attempts reused one fixture profile. The
@@ -812,8 +823,9 @@ SpiderMonkey encoding symbols.
 The reproducible Linux linker-map aggregate retains `js_static` 225.86 MiB,
 `gkrust` 115.63 MiB, ICU 31.26 MiB, cache2 6.24 MiB, IPC Chromium 4.09 MiB,
 and IPC glue 2.98 MiB. These are deliberate future SpiderMonkey/ICU work, not
-unreviewed removal candidates. The source-closure diagnostic build is now
-green; the publishable clean export remains a separate, not-yet-run gate.
+unreviewed removal candidates. The source-closure diagnostic build is green;
+the publishable clean export is now a deterministic release gate, not a
+dependency-discovery loop.
 
 The authoritative JSON reports identify `745d58bf7dcb` as the audited evidence
 source; `bec198a62d42` is the direct report-only snapshot. Later approved
