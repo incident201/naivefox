@@ -12,8 +12,12 @@ expected_binary_version='naive 150.0.7871.63'
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source_root=$(cd "$script_dir/../../.." && pwd)
-environment_json=$("$source_root/mach" environment --format json)
-objdir=$(python3 -c '
+configured_objdir=${NAIVEFOX_OBJDIR:-${MOZ_OBJDIR:-}}
+if [[ -n $configured_objdir ]]; then
+  objdir=$(realpath -m -- "$configured_objdir")
+else
+  environment_json=$("$source_root/mach" environment --format json)
+  objdir=$(python3 -c '
 import json
 import os
 import sys
@@ -21,6 +25,7 @@ import sys
 data = json.load(sys.stdin)
 print(os.path.realpath(data["topobjdir"]))
 ' <<<"$environment_json")
+fi
 
 reference_root="$objdir/naiveproxy-reference"
 output_dir="$reference_root/$package"

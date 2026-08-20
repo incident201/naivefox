@@ -39,8 +39,13 @@ done
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 script_source_root=$(cd "$script_dir/../../.." && pwd)
-environment_json=$("$script_source_root/mach" environment --format json)
-environment_paths=$(python3 -c '
+configured_objdir=${NAIVEFOX_OBJDIR:-${MOZ_OBJDIR:-}}
+if [[ -n $configured_objdir ]]; then
+  source_root=$script_source_root
+  objdir=$(realpath -m -- "$configured_objdir")
+else
+  environment_json=$("$script_source_root/mach" environment --format json)
+  environment_paths=$(python3 -c '
 import json
 import os
 import sys
@@ -52,7 +57,8 @@ if not os.path.isabs(source) or not os.path.isabs(objdir):
     raise SystemExit("mach returned a non-absolute source or object directory")
 print(source + "\t" + objdir)
 ' <<<"$environment_json")
-IFS=$'\t' read -r source_root objdir <<<"$environment_paths"
+  IFS=$'\t' read -r source_root objdir <<<"$environment_paths"
+fi
 
 if [[ $source_root != "$script_source_root" || ! -d $objdir ]]; then
   printf 'mach environment does not describe this source tree\n' >&2

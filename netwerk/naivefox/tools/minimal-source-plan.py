@@ -73,8 +73,10 @@ REPORT_ONLY_PATHS = (
     re.compile(
         r"^netwerk/naivefox/tools/(?:assert-closure\.py|"
         r"collect-(?:build|configure)-inputs\.py|"
+        r"fetch-naiveproxy-reference\.sh|"
         r"export-minimal-source\.sh|minimal-source-plan\.py|"
-        r"validate-minimal-source\.py)$"
+        r"stage-runtime(?:-windows-x86_64)?\.sh|"
+        r"validate-minimal-source\.py|verify-staged-runtime\.sh)$"
     ),
 )
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root=$(git rev-parse --show-toplevel)
-objdir=${MOZ_OBJDIR:-$repo_root/obj-naivefox-windows-x86_64}
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(cd "$script_dir/../../.." && pwd)
+objdir=${NAIVEFOX_OBJDIR:-${MOZ_OBJDIR:-$repo_root/obj-naivefox-windows-x86_64}}
 src=$objdir/dist/bin
 out=${1:-$objdir/naivefox-package/naivefox-windows-x86_64}
 
