@@ -19,6 +19,7 @@ from pathlib import Path
 SOURCE_PATH = re.compile(r"(?:^|[\s(])(/[^\s)]+)")
 INCLUDE_PATH = re.compile(r"-I(?:\"([^\"]+)\"|'([^']+)'|([^\s]+))")
 MAKE_SOURCE_PATH = re.compile(r"\$\((topsrcdir|TOPSRCDIR|srcdir)\)(/[^\s\\'\"():;,]+)")
+GYP_SOURCE_PATH = re.compile(r"[\"']([^\"']+\.gypi?)[\"']")
 
 
 def git(repo: Path, *args: str) -> str:
@@ -267,6 +268,27 @@ def main() -> int:
             if path.is_dir():
                 if relative is not None:
                     directory_contracts.add(relative)
+
+    # backend.RecursiveMakeBackend.in records recursively loaded GYP files,
+    # but not necessarily the root named by an active GYP_DIRS declaration.
+    # Recover those target entry points from the already target-filtered
+    # moz.build inputs instead of walking every GYP file in the checkout.
+    active_mozbuilds = sorted(
+        value
+        for value in set().union(*categories.values())
+        if Path(value).name == "moz.build"
+    )
+    for value in active_mozbuilds:
+        path = source_tree / value
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in GYP_SOURCE_PATH.finditer(text):
+            raw = match.group(1)
+            candidate = (
+                source_tree / raw.lstrip("/")
+                if raw.startswith("/")
+                else path.parent / raw
+            )
+            add_path(candidate, "mozbuild:active-gyp-entry")
 
     metadata = json.loads(
         subprocess.check_output(
