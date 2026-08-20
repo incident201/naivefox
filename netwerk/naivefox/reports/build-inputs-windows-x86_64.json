@@ -11354,7 +11354,7 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "3331ce47b7d510f6ef927e626ee43ce39bba3c3052c0faa9b42a05658864b420",
+  "collector_sha256": "fa3f9d0c4285537905ed44e4f8bd153dce8fc4ad4555cb90f5713494b807b673",
   "counts": {
     "directory_contracts": 33,
     "files": 21026
@@ -32423,7 +32423,7 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
+  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
   "generated_makefile_count": 425,
   "generated_makefiles_sha256": "051e8120b41c958fd4868b4ed6bf3c0712407f22d58548665ce59d23575559c3",
   "install_manifest_count": 7,
@@ -32445,14 +32445,11 @@
     "config_status_deps.in": "aebc5b42738e0d748e05798ddb8bf34dd1c39c7b271f6af50c48a032f2870959"
   },
   "report_version": 1,
-  "source_commit": "ae8f9c7aae68",
+  "source_commit": "956e7cff806441fd54ad4091fe2731705acf7a4f",
   "source_tree_kind": "repository",
   "source_worktree_clean": false,
   "source_worktree_status": [
-    "M netwerk/naivefox/reports/build-inputs-linux-x86_64.json",
-    " M netwerk/naivefox/reports/build-inputs-windows-x86_64.json",
-    " M netwerk/naivefox/reports/closure-report-linux-x86_64.json",
-    " M netwerk/naivefox/reports/closure-report-windows-x86_64.json"
+    "M netwerk/naivefox/reports/build-inputs-linux-x86_64.json"
   ],
   "target": "windows-x86_64"
 }
