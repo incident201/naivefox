@@ -160,9 +160,9 @@ Pre-minimization baseline tag: pre-minimization-v0.3
 
 ### Current pre-export audit provenance
 
-The last validated audit source is the post-stability documentation
-checkpoint `d65f41c305abd9c9bc9f5ea7f80833d0b7df6aa5` plus its documentation
-gate (the full SHA is recorded in the closure reports).
+The last validated audit source is the post-stability documentation checkpoint
+`3e395eb1aca9fc73af7bfeaa6076e929f80b8ff0` (the full SHA is recorded in the
+closure reports).
 The closure reports are regenerated in a report-only child; the exact SHA is
 stored in each report's provenance. `assert-closure.py` accepts that exact
 parent/report pair and

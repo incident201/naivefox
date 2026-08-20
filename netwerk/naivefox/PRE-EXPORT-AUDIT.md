@@ -34,7 +34,7 @@ segmentation fault.
 
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
-- **Validated Minimal Audit Source Commit:** `d65f41c305abd9c9bc9f5ea7f80833d0b7df6aa5` plus the documentation checkpoint recorded in the closure reports
+- **Validated Minimal Audit Source Commit:** `3e395eb1aca9fc73af7bfeaa6076e929f80b8ff0`
 - **Validated Minimal Report Commit:** report-only child of the audit source commit (exact SHA is recorded in the report provenance)
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** `minimal-graph-v0.1` (`60f2eede69da856daf2324fc90b2c2ab9cb86fd2`)
