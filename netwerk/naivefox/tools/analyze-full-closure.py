@@ -727,7 +727,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
         "report_provenance": {
             "source_commit_sha": git_head,
             "source_worktree_clean": True,
-            "firefox_base_sha": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
+            "firefox_base_sha": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
             "analyzer_sha256": sha256_file(__file__),
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,

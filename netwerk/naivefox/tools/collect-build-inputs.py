@@ -733,7 +733,7 @@ def main() -> int:
         "source_commit": source_commit,
         "source_worktree_clean": source_tree == repo and not bool(status),
         "source_worktree_status": status.splitlines(),
-        "firefox_base_commit": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
+        "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
         "collector_sha256": sha256(Path(__file__).resolve()),
         "mozconfig": mozconfig.relative_to(source_tree).as_posix(),
         "mozconfig_sha256": sha256(mozconfig),

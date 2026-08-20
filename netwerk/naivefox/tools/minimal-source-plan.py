@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 
-FIREFOX_BASE = "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6"
+FIREFOX_BASE = "17e93ad5d3261e20104c7f6f2ec867ecc138ca1"
 BUILD_TARGETS = {"linux-x86_64", "windows-x86_64"}
 MAINTENANCE_TOOLS = {
     "analyze-full-closure.py",
