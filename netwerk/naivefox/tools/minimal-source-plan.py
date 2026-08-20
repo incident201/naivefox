@@ -226,6 +226,7 @@ def main() -> int:
     validate_commit(build_source_commit, "build-input reports")
     cargo_license_inventory = {}
     active_manifests = set()
+    active_build_definition_dirs = set()
     active_gyp_roots = set()
     build_collector_hash = sha256(
         repo / "netwerk/naivefox/tools/collect-build-inputs.py"
@@ -255,6 +256,8 @@ def main() -> int:
             add(value, f"build:{report['target']}")
             if value.endswith(".toml"):
                 active_manifests.add(value)
+            if value.endswith("moz.build") or value.endswith(".mozbuild"):
+                active_build_definition_dirs.add(Path(value).parent.as_posix())
         for value in report.get("active_gyp_roots", []):
             value = safe_path(value).rstrip("/")
             if not (repo / value).is_dir():
@@ -441,6 +444,15 @@ def main() -> int:
                 for root in active_gyp_roots
             ):
                 add(value, f"configure:{target}:active-gyp-input")
+            elif Path(value).parent.as_posix() in active_build_definition_dirs:
+                # Backend evaluation can validate target-specific auxiliary
+                # files (for example a Windows DEFFILE) without emitting them
+                # into compiler depfiles or RecursiveMakeBackend.in.  Import
+                # observed files adjacent to a target-active build definition
+                # as one bounded class.  This deliberately excludes the many
+                # unrelated Android/browser files touched by global configure
+                # probes.
+                add(value, f"configure:{target}:active-build-input")
 
     project_raw = subprocess.check_output([
         "git",
