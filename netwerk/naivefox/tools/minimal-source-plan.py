@@ -388,6 +388,9 @@ def main() -> int:
         else:
             add(path, "product:source-and-tests")
 
+    for value in sorted(path for path in tracked if path.startswith("python/mozboot/")):
+        add(value, "explicit:mach-bootstrap")
+
     for value in (
         "mach",
         "client.mk",
