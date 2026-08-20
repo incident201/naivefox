@@ -53,8 +53,8 @@ the 271/287 count shown below.
 
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
-- **Audited Minimal Source Commit:** recorded as `report_provenance.source_commit_sha` in both closure reports; it is the exact source tree that was built and audited.
-- **Minimal Report Snapshot Commit:** the direct report-only child of that audited source commit; it changes only the two closure JSON files.
+- **Audited Minimal Source Commit:** `8fd1f47a67bcfe14471896c8bf488428a8a240ae`; this is the exact source tree recorded by `report_provenance.source_commit_sha` in both closure reports.
+- **Minimal Report Snapshot Commit:** `6fa615ff8206108122c0ec9178c649ed5db43c41`, the direct report-only child of the audited source commit; it changes only the two closure JSON files.
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** historical checkpoint retained only in Git history; it is not part of current provenance.
 

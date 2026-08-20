@@ -6,7 +6,8 @@ later phases prove that they can be reduced safely.
 
 ## Phase 1: staged runtime resources
 
-Baseline source point: `2a539d796d1a1d134ec64739c69b61f443132a3c`.
+Historical full-tree baseline source point (not the current audit
+provenance): `2a539d796d1a1d134ec64739c69b61f443132a3c`.
 The binary and shared libraries were not rebuilt or changed during this
 phase. Successful copied-package H2 and H3 config workloads were traced with
 `strace -ff -e trace=%file`; the trace contained 68 process files and observed

@@ -24,6 +24,11 @@ Windows staged smoke. Both SOCKS and HTTP malformed inputs stop parsing after
 one bounded failure response and leave the listener usable for a subsequent
 normal connection.
 
+The audited source provenance is `8fd1f47a67bcfe14471896c8bf488428a8a240ae`.
+The closure JSON files were generated in report-only child
+`6fa615ff8206108122c0ec9178c649ed5db43c41`; later documentation commits do not
+change that source/report relationship.
+
 Windows file logging now uses the native wide-character API and passes relative,
 absolute, Unicode, append-after-restart, clean-shutdown, and credential-scan
 checks. The staged Windows package passed five repeated smoke iterations. The

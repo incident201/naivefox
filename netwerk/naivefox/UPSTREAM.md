@@ -151,9 +151,9 @@ not aliases for a moving `main`:
 
 ```text
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Audited Minimal source commit: see `report_provenance.source_commit_sha` in the closure reports
-Minimal report snapshot commit: direct report-only child of the audited source commit
+Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Audited Minimal source commit: 8fd1f47a67bcfe14471896c8bf488428a8a240ae
+Closure report snapshot commit: 6fa615ff8206108122c0ec9178c649ed5db43c41 (direct report-only child)
 Validated Minimal Source commit: NOT_CREATED
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
@@ -433,9 +433,9 @@ The agent must keep this section current.
 Upstream repository: https://github.com/mozilla-firefox/firefox
 Upstream branch: main
 Validated Firefox base commit: 8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6
-Validated NaiveFox commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
-Audited Minimal source commit: see `report_provenance.source_commit_sha` in the closure reports
-Minimal report snapshot commit: direct report-only child of the audited source commit
+Validated full-tree NaiveFox baseline commit: 2a539d796d1a1d134ec64739c69b61f443132a3c
+Audited Minimal source commit: 8fd1f47a67bcfe14471896c8bf488428a8a240ae
+Closure report snapshot commit: 6fa615ff8206108122c0ec9178c649ed5db43c41 (direct report-only child)
 Validated Minimal Source commit: NOT_CREATED
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
