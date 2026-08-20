@@ -5760,6 +5760,12 @@ static nsresult openPrefFile(nsIFile* aFile, PrefValueKind aKind) {
   MOZ_TRY(NS_NewLocalFileInputStream(getter_AddRefs(input), aFile));
   nsCString data;
   MOZ_TRY(NS_ReadInputStreamToString(input, data, -1));
+  // NS_ReadInputStreamToString() uses nsCString::Adopt() for an unknown-size
+  // read. The adopted buffer is marked as terminated by nsCString, but the
+  // low-level buffer writer is allowed to allocate exactly the byte count.
+  // Preferences' Rust parser requires a real EOF byte immediately after the
+  // advertised length; force the string invariant before handing it over.
+  data.SetLength(data.Length());
 #else
   nsCString data = MOZ_TRY(URLPreloader::ReadFile(aFile));
 #endif
