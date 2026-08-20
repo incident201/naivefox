@@ -109,6 +109,49 @@ def main() -> int:
             else:
                 add_path(path, category)
 
+    # The product build virtualenv is a semantic build input in its own right.
+    # It is not visible in compiler depfiles, and configure succeeds when some
+    # vendored import roots are absent because they are only imported by later
+    # generated actions.  Retain the repository-owned Python packages declared
+    # by the build site, but deliberately exclude the WPT-only import roots:
+    # NaiveFox does not build or run the WPT harness as part of its product and
+    # focused acceptance gates.
+    build_site_manifest = source_tree / "python" / "sites" / "build.txt"
+    if not build_site_manifest.is_file():
+        raise SystemExit(f"build virtualenv manifest is missing: {build_site_manifest}")
+    add_path(build_site_manifest, "python:build-site-manifest")
+    build_site_roots = set()
+    for raw_line in build_site_manifest.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("pth:"):
+            value = line.removeprefix("pth:").rstrip("/")
+        elif line.startswith("vendored:third_party/python/"):
+            value = line.removeprefix("vendored:").rstrip("/")
+        else:
+            continue
+        root = (source_tree / value).resolve()
+        try:
+            relative_root = root.relative_to(source_tree).as_posix()
+        except ValueError as error:
+            raise SystemExit(
+                f"build virtualenv path escapes the source tree: {value}"
+            ) from error
+        if not root.is_dir():
+            raise SystemExit(f"build virtualenv path is missing: {value}")
+        build_site_roots.add(relative_root)
+    build_site_prefixes = tuple(f"{value}/" for value in build_site_roots)
+    for value in tracked:
+        if value in build_site_roots or value.startswith(build_site_prefixes):
+            categories["python:build-site-package"].add(value)
+        if value.startswith("third_party/rust/") and value.endswith(
+            "/.cargo-checksum.json"
+        ):
+            # Cargo validates the vendored replacement source while resolving
+            # the unfiltered --all-features graph used by RunCbindgen.  This
+            # metadata index is broader than the platform-filtered package set,
+            # but it contains no crate implementation sources.
+            categories["cargo:vendor-checksum-index"].add(value)
+
     for value in tracked:
         if (value.startswith("config/") and value.endswith(".mk")) or value == (
             "toolkit/mozapps/installer/upload-files.mk"
@@ -533,6 +576,9 @@ def main() -> int:
         "cargo_workspace_member_count": len(metadata["workspace_members"]),
         "active_gyp_roots": sorted(active_gyp_roots),
         "active_python_actions": sorted(active_python_actions),
+        "build_python_site_manifest": source_relative(build_site_manifest),
+        "build_python_site_sha256": sha256(build_site_manifest),
+        "build_python_site_roots": sorted(build_site_roots),
         "cargo_packages": sorted(
             cargo_packages,
             key=lambda package: (
