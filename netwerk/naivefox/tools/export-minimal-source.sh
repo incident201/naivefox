@@ -230,18 +230,20 @@ for path in list(entries):
         tracked_siblings(path, "explicit:mozbuild-sibling")
 
 # A compiler depfile does not contain headers/resources named only by a
-# moz.build EXPORTS/SOURCES/GENERATED_FILES declaration.  Read relative
-# string literals from every moz.build already selected by the closure and
-# retain them when they resolve to tracked files in the checkout.  This is a
-# conservative declaration closure: it avoids the one-file-at-a-time backend
-# failures while still copying only files explicitly mentioned by selected
-# build definitions, not whole Firefox directories.
+# moz.build EXPORTS/SOURCES/GENERATED_FILES declaration.  Test manifests have
+# the same property for their listed files. Read relative string literals from
+# selected moz.build/.mozbuild/.toml inputs and retain them when they resolve
+# to tracked files in the checkout. This is a conservative declaration
+# closure: it avoids one-file-at-a-time backend failures while still copying
+# only files explicitly mentioned by selected build definitions, not whole
+# Firefox directories.
 mozbuild_literal = re.compile(r"(?:\"([^\"]+)\"|'([^']+)')")
 for path in list(entries):
     if not (
         path.endswith("/moz.build")
         or path == "moz.build"
         or path.endswith(".mozbuild")
+        or path.endswith(".toml")
     ):
         continue
     mozbuild = repo / path
