@@ -31,8 +31,10 @@ def safe_relative(value: str) -> pathlib.PurePosixPath:
     path = pathlib.PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts or value.startswith("/"):
         fail(f"unsafe absolute/parent path: {value}")
-    if any(part in FORBIDDEN_COMPONENTS for part in path.parts):
+    if any(part in FORBIDDEN_COMPONENTS for part in path.parts if part != "objdir"):
         fail(f"forbidden path component: {value}")
+    if path.parts and (path.parts[0] == "objdir" or path.parts[0].startswith("obj-")):
+        fail(f"generated object directory at export root: {value}")
     return path
 
 
