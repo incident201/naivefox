@@ -123,6 +123,43 @@ def tracked_siblings(relative, category):
            name.startswith("sources."):
             add(path, category)
 
+def tracked_project():
+    """Export product code plus a deliberately curated technical doc set."""
+    raw = subprocess.check_output(
+        ["git", "-C", str(repo), "ls-files", "-z", "--", "netwerk/naivefox"],
+    )
+    technical_docs = {
+        "CAPTURE.md",
+        "H3-CAPTURE.md",
+        "H3-DESIGN.md",
+        "KNOWN-ISSUES.md",
+        "MINIMISATION-REPORT.md",
+        "OBSERVER-TRAFFIC-REPORT.md",
+        "PERFORMANCE-REPORT.md",
+        "PRE-EXPORT-AUDIT.md",
+        "ROADMAP.md",
+        "TEST-REPORT.md",
+        "UPSTREAM.md",
+    }
+    excluded = {
+        "AGENTS.md",
+        "GEMINI-HANDOFF.md",
+        "MINIMISATION-TASK.MD",
+        "README.md",
+    }
+    for path in raw.decode("utf-8", "surrogateescape").split("\0"):
+        if not path:
+            continue
+        relative = path.removeprefix("netwerk/naivefox/")
+        if relative in excluded or relative.startswith("reports/"):
+            continue
+        if relative == "PRODUCT-README.md":
+            add(path, "product-root", "README.md")
+        elif relative in technical_docs:
+            add(path, "product-doc", f"docs/naivefox/{relative}")
+        else:
+            add(path, "project")
+
 for report_path in report_paths:
     if not report_path.is_file():
         raise SystemExit(f"closure report missing: {report_path}")
@@ -158,7 +195,7 @@ for report_path in report_paths:
 # The project tree is the product source of truth.  Git tracking makes this an
 # allowlist, not a copy-and-delete blacklist, and excludes ignored objdirs and
 # local credentials by construction.
-tracked_under("netwerk/naivefox", "project")
+tracked_project()
 
 # Firefox build/bootstrap inputs deliberately kept as explicit infrastructure.
 for tree in ("build", "config", "python", "tools", "third_party/python", "nsprpub"):
@@ -225,19 +262,6 @@ for path in list(entries):
             continue
         if candidate.is_file():
             add(relative.as_posix(), "explicit:mozbuild-declared")
-
-# Product-facing root files are aliases, while the original project paths stay
-# available for the Firefox build and for traceability.
-for source, destination in (
-    ("netwerk/naivefox/README.md", "README.md"),
-    ("netwerk/naivefox/MINIMISATION-TASK.MD", "MINIMISATION-TASK.MD"),
-    ("netwerk/naivefox/UPSTREAM.md", "UPSTREAM.md"),
-    ("netwerk/naivefox/ROADMAP.md", "ROADMAP.md"),
-    ("netwerk/naivefox/KNOWN-ISSUES.md", "KNOWN-ISSUES.md"),
-    ("netwerk/naivefox/PRE-EXPORT-AUDIT.md", "PRE-EXPORT-AUDIT.md"),
-    ("netwerk/naivefox/TEST-REPORT.md", "TEST-REPORT.md"),
-):
-    add(source, "product-root", destination)
 
 if missing:
     details = "\n".join(f"{path} ({kind})" for path, kind in sorted(set(missing)))
