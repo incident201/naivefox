@@ -30,6 +30,7 @@ FORBIDDEN_SUFFIXES = (
 )
 TRACKED_SOURCE_FIXTURES = {
     pathlib.PurePosixPath("memory/replace/logalloc/replay/expected_output_minimal.log"),
+    pathlib.PurePosixPath("memory/replace/logalloc/replay/replay.log"),
 }
 FORBIDDEN_BASENAMES = {
     "AGENTS.md",

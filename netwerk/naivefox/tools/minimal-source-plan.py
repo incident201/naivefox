@@ -57,6 +57,7 @@ FORBIDDEN_SUFFIXES = (
 )
 TRACKED_SOURCE_FIXTURES = {
     "memory/replace/logalloc/replay/expected_output_minimal.log",
+    "memory/replace/logalloc/replay/replay.log",
 }
 ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
