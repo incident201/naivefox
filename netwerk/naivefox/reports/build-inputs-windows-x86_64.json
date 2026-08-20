@@ -32445,11 +32445,9 @@
     "config_status_deps.in": "aebc5b42738e0d748e05798ddb8bf34dd1c39c7b271f6af50c48a032f2870959"
   },
   "report_version": 1,
-  "source_commit": "956e7cff806441fd54ad4091fe2731705acf7a4f",
+  "source_commit": "06854b221348865919a763c8b9fcf4cce16a09f4",
   "source_tree_kind": "repository",
-  "source_worktree_clean": false,
-  "source_worktree_status": [
-    "M netwerk/naivefox/reports/build-inputs-linux-x86_64.json"
-  ],
+  "source_worktree_clean": true,
+  "source_worktree_status": [],
   "target": "windows-x86_64"
 }
