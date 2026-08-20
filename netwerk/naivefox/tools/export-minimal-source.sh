@@ -220,6 +220,7 @@ for tree in ("dom/bindings", "gfx/harfbuzz/src", "intl/icu/source"):
     tracked_under(tree, f"explicit:{tree}")
 tracked_under("toolkit/library/rust", "explicit:gkrust")
 tracked_under("intl/locale/rust", "explicit:locale-rust")
+tracked_under("js/src/ctypes/libffi", "explicit:libffi")
 for path in (
     "mach", "configure", "configure.py", "moz.configure", "Cargo.toml", "Cargo.lock",
     ".cargo/config.toml.in", "LICENSE",
