@@ -59,6 +59,7 @@ python3 "$script_dir/minimal-source-plan.py" \
   --repo "$repo_root" \
   --output "$plan" \
   --configure-report "$script_dir/../reports/configure-inputs-linux-x86_64.json" \
+  --configure-report "$script_dir/../reports/configure-inputs-windows-x86_64.json" \
   --build-report "$script_dir/../reports/build-inputs-linux-x86_64.json" \
   --build-report "$script_dir/../reports/build-inputs-windows-x86_64.json" \
   --closure-report "$script_dir/../reports/closure-report-linux-x86_64.json" \
@@ -124,12 +125,14 @@ manifest["manifest_sha256"] = manifest_hash
 (stage / "minimal-source.manifest.json").write_text(
     json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
 )
+configure_sources = ",".join(manifest["configure_report_source_commits"])
 closure_sources = ",".join(manifest["closure_report_source_commits"])
 (stage / "UPSTREAM-BASE").write_text(
     f"Firefox base SHA: {manifest['firefox_base_commit']}\n"
     f"NaiveFox reference SHA: {manifest['naivefox_reference_commit']}\n"
     f"Minimal export SHA: {manifest['minimal_export_commit']}\n"
     f"Build report source SHA: {manifest['build_report_source_commit']}\n"
+    f"Configure report source SHA(s): {configure_sources}\n"
     f"Closure report source SHA(s): {closure_sources}\n"
     "Minimal-source publication SHA: NOT_YET_PUBLISHED\n"
     f"Export manifest version: {manifest['manifest_version']}\n"

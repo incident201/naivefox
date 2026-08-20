@@ -152,6 +152,9 @@ def main() -> int:
         "NaiveFox reference SHA": manifest["naivefox_reference_commit"],
         "Minimal export SHA": manifest["minimal_export_commit"],
         "Build report source SHA": manifest["build_report_source_commit"],
+        "Configure report source SHA(s)": ",".join(
+            manifest["configure_report_source_commits"]
+        ),
         "Closure report source SHA(s)": ",".join(
             manifest["closure_report_source_commits"]
         ),

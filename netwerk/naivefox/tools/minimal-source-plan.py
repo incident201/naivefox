@@ -114,7 +114,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--configure-report", type=Path, required=True)
+    parser.add_argument("--configure-report", type=Path, action="append", required=True)
     parser.add_argument("--build-report", type=Path, action="append", required=True)
     parser.add_argument("--closure-report", type=Path, action="append", required=True)
     args = parser.parse_args()
@@ -371,33 +371,21 @@ def main() -> int:
             "build-input and linked-closure reports must share one audited source"
         )
 
-    configure_report = load_report(args.configure_report, "configure-trace")
-    if configure_report.get("report_version") != 2:
-        raise SystemExit("configure report must use attested schema version 2")
-    if configure_report.get("target") != "linux-x86_64":
-        raise SystemExit("configure report target mismatch")
-    if configure_report.get("target_triple") != "x86_64-pc-linux-gnu":
-        raise SystemExit("configure report configured target mismatch")
-    if not configure_report.get("source_worktree_clean"):
-        raise SystemExit("configure trace was collected from a dirty checkout")
-    if configure_report.get("configure_exit_status") != 0:
-        raise SystemExit("configure trace does not attest a successful configure")
-    configure_source_commit = configure_report.get("source_commit")
-    validate_commit(configure_source_commit, "configure trace")
-    if configure_source_commit != build_source_commit:
-        raise SystemExit(
-            "configure, build-input, and closure reports must share one audited source"
-        )
-    if configure_report.get("firefox_base_commit") != FIREFOX_BASE:
-        raise SystemExit("configure report Firefox base mismatch")
+    configure_reports = [
+        load_report(path, "configure-trace") for path in args.configure_report
+    ]
+    expected_configure_targets = {
+        "linux-x86_64": "x86_64-pc-linux-gnu",
+        "windows-x86_64": "x86_64-pc-mingw32",
+    }
+    if {report.get("target") for report in configure_reports} != set(
+        expected_configure_targets
+    ) or len(configure_reports) != len(expected_configure_targets):
+        raise SystemExit("configure reports must be exactly Linux and Windows x86-64")
     configure_collector_hash = sha256(
         repo / "netwerk/naivefox/tools/collect-configure-inputs.py"
     )
-    if configure_report.get("collector_sha256") != configure_collector_hash:
-        raise SystemExit("configure report collector hash mismatch")
-    configure_mozconfig = safe_path(configure_report["mozconfig"])
-    if sha256(repo / configure_mozconfig) != configure_report.get("mozconfig_sha256"):
-        raise SystemExit("configure report mozconfig hash mismatch")
+    configure_source_commits = set()
     configure_bootstrap_prefixes = (
         "build/",
         "config/",
@@ -408,13 +396,51 @@ def main() -> int:
         "other-licenses/ply/",
         "nsprpub/",
     )
-    for value in configure_report.get("files", []):
-        if value.startswith(configure_bootstrap_prefixes):
-            add(value, "configure:bootstrap")
-        elif any(
-            value == root or value.startswith(f"{root}/") for root in active_gyp_roots
+    for configure_report in configure_reports:
+        target = configure_report.get("target")
+        if configure_report.get("report_version") != 2:
+            raise SystemExit("configure report must use attested schema version 2")
+        if configure_report.get("target_triple") != expected_configure_targets[target]:
+            raise SystemExit(f"configure report configured target mismatch: {target}")
+        if not configure_report.get("source_worktree_clean"):
+            raise SystemExit("configure trace was collected from a dirty checkout")
+        if configure_report.get("configure_exit_status") != 0:
+            raise SystemExit("configure trace does not attest a successful configure")
+        configure_source_commit = configure_report.get("source_commit")
+        validate_commit(configure_source_commit, f"{target} configure trace")
+        configure_source_commits.add(configure_source_commit)
+        if subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo),
+                "merge-base",
+                "--is-ancestor",
+                build_source_commit,
+                configure_source_commit,
+            ],
+            check=False,
+        ).returncode:
+            raise SystemExit(
+                f"{target} configure trace predates the audited build reports"
+            )
+        if configure_report.get("firefox_base_commit") != FIREFOX_BASE:
+            raise SystemExit("configure report Firefox base mismatch")
+        if configure_report.get("collector_sha256") != configure_collector_hash:
+            raise SystemExit("configure report collector hash mismatch")
+        configure_mozconfig = safe_path(configure_report["mozconfig"])
+        if sha256(repo / configure_mozconfig) != configure_report.get(
+            "mozconfig_sha256"
         ):
-            add(value, "configure:active-gyp-input")
+            raise SystemExit("configure report mozconfig hash mismatch")
+        for value in configure_report.get("files", []):
+            if value.startswith(configure_bootstrap_prefixes):
+                add(value, f"configure:{target}:bootstrap")
+            elif any(
+                value == root or value.startswith(f"{root}/")
+                for root in active_gyp_roots
+            ):
+                add(value, f"configure:{target}:active-gyp-input")
 
     project_raw = subprocess.check_output([
         "git",
@@ -524,6 +550,7 @@ def main() -> int:
         "naivefox_reference_commit": run(repo, "merge-base", "naivefox", source_commit),
         "minimal_export_commit": source_commit,
         "build_report_source_commit": build_source_commit,
+        "configure_report_source_commits": sorted(configure_source_commits),
         "closure_report_source_commits": sorted(closure_source_commits),
         "generated_at": generated_at,
         "commit_epoch": commit_epoch,
