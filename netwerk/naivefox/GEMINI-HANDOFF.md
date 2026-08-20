@@ -4,7 +4,7 @@
 **Repository:** `https://github.com/incident201/naivefox`  
 **Branch:** `minimal`  
 **Base Commit / Tag:** `minimization-handoff-v0.1` (`ff684c83a71d`)  
-**Environment:** WSL2 `Ubuntu24Dev` (`/home/zubastik/src/naivefox`)  
+**Environment:** WSL2 `Ubuntu24Dev` (`<repo-root>`)  
 **Publication Target:** `D:\naivefox` (`/mnt/d/naivefox`)
 
 > Historical handoff snapshot. The 62.0 MiB stripped figure below predates
@@ -146,14 +146,14 @@ To reproduce and verify any part of this work:
 
 ```bash
 # 1. Enter WSL Ubuntu24Dev
-cd /home/zubastik/src/naivefox
+cd <repo-root>
 
 # 2. Check git status
 git status -sb
 
 # 3. Fast incremental build (Linux)
 export MOZCONFIG=netwerk/naivefox/mozconfig-minimal
-export NAIVEFOX_OBJDIR=/home/zubastik/src/naivefox/obj-naivefox-minimal
+export NAIVEFOX_OBJDIR=<objdir>/obj-naivefox-minimal
 ./mach build binaries
 
 # 4. Stage and verify Linux runtime outside build tree
@@ -162,7 +162,7 @@ export NAIVEFOX_OBJDIR=/home/zubastik/src/naivefox/obj-naivefox-minimal
 
 # 5. Build and stage Windows runtime
 export MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64
-export NAIVEFOX_OBJDIR=/home/zubastik/src/naivefox/obj-naivefox-windows-x86_64
+export NAIVEFOX_OBJDIR=<objdir>/obj-naivefox-windows-x86_64
 ./mach build binaries
 ./netwerk/naivefox/tools/stage-runtime-windows-x86_64.sh
 
