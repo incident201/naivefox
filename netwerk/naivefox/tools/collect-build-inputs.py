@@ -192,13 +192,11 @@ def main() -> int:
         text = backend.read_text(encoding="utf-8", errors="replace")
         for match in INCLUDE_PATH.finditer(text):
             value = next(item for item in match.groups() if item is not None)
-            try:
-                path = Path(value).resolve()
-                relative = path.relative_to(source_tree).as_posix()
-            except (OSError, ValueError):
-                continue
+            path = Path(value)
+            relative = source_relative(path)
             if path.is_dir():
-                directory_contracts.add(relative)
+                if relative is not None:
+                    directory_contracts.add(relative)
 
     metadata = json.loads(
         subprocess.check_output(
