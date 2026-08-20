@@ -351,7 +351,11 @@ def main() -> int:
                     directory_contracts.add(relative)
 
     active_python_actions = set()
-    for fragment in make_fragments:
+    python_action_fragments = list(make_fragments)
+    python_action_fragments.extend(
+        source_tree / value for value in active_source_makefiles
+    )
+    for fragment in python_action_fragments:
         text = fragment.read_text(encoding="utf-8", errors="replace")
         for action in PY_ACTION.findall(text):
             path = source_tree / "python" / "mozbuild" / "mozbuild" / "action"
