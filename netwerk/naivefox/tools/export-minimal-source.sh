@@ -218,6 +218,11 @@ for path in list(entries):
             relative = candidate.relative_to(repo)
         except ValueError:
             continue
+        # Product documentation is intentionally aliased to the export root
+        # below; do not let an incidental moz.build string create a competing
+        # root README entry.
+        if relative.as_posix() in {"README.md", "netwerk/naivefox/README.md"}:
+            continue
         if candidate.is_file():
             add(relative.as_posix(), "explicit:mozbuild-declared")
 
