@@ -70,6 +70,7 @@ REPORT_ONLY_PATHS = (
     re.compile(r"^netwerk/naivefox/reports/"),
     re.compile(r"^netwerk/naivefox/[^/]+\.md$", re.IGNORECASE),
     re.compile(r"^netwerk/naivefox/config\.example\.json$"),
+    re.compile(r"^netwerk/naivefox/test/integration/common\.sh$"),
     re.compile(
         r"^netwerk/naivefox/tools/(?:assert-closure\.py|"
         r"collect-(?:build|configure)-inputs\.py|"

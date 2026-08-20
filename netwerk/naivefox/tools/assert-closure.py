@@ -189,6 +189,7 @@ def assert_closure(report_path, topsrcdir):
             if path.startswith("netwerk/naivefox/reports/") and path.endswith(".json")
         }
         export_tool_paths = {
+            "netwerk/naivefox/test/integration/common.sh",
             "netwerk/naivefox/tools/assert-closure.py",
             "netwerk/naivefox/tools/collect-build-inputs.py",
             "netwerk/naivefox/tools/collect-configure-inputs.py",

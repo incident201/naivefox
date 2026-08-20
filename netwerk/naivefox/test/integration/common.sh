@@ -8,6 +8,10 @@ SOURCE_ROOT=$(cd "$INTEGRATION_DIR/../../../.." && pwd)
 source "$INTEGRATION_DIR/versions.env"
 
 topobjdir() {
+  if [[ -n "${NAIVEFOX_OBJDIR:-}" ]]; then
+    printf '%s\n' "$NAIVEFOX_OBJDIR"
+    return
+  fi
   if [[ -n "${MOZ_OBJDIR:-}" ]]; then
     printf '%s\n' "$MOZ_OBJDIR"
     return
