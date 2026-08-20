@@ -218,6 +218,7 @@ for tree in ("build", "config", "python", "tools", "third_party/python", "nsprpu
     tracked_under(tree, f"explicit:{tree}")
 for tree in ("dom/bindings", "gfx/harfbuzz/src", "intl/icu/source"):
     tracked_under(tree, f"explicit:{tree}")
+tracked_under("toolkit/library/rust", "explicit:gkrust")
 for path in (
     "mach", "configure", "configure.py", "moz.configure", "Cargo.toml", "Cargo.lock",
     ".cargo/config.toml.in", "LICENSE",
