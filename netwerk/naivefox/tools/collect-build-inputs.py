@@ -405,6 +405,22 @@ def main() -> int:
             text=True,
         )
     )
+    cbindgen_metadata = json.loads(
+        subprocess.check_output(
+            [
+                "cargo",
+                "metadata",
+                "--manifest-path",
+                str(source_tree / "Cargo.toml"),
+                "--format-version",
+                "1",
+                "--all-features",
+                "--frozen",
+            ],
+            cwd=objdir,
+            text=True,
+        )
+    )
     packages_by_id = {package["id"]: package for package in metadata["packages"]}
     nodes_by_id = {node["id"]: node for node in metadata["resolve"]["nodes"]}
     manifest_parse_packages = []
@@ -433,6 +449,38 @@ def main() -> int:
             add_path(entry, "cargo:target-manifest-parse-entry")
             target_entry_points.append(relative_entry)
         manifest_parse_packages.append({
+            "name": package["name"],
+            "version": package["version"],
+            "manifest_path": relative,
+            "source": package.get("source"),
+            "target_entry_points": sorted(target_entry_points),
+        })
+    cbindgen_manifest_parse_packages = []
+    for package in cbindgen_metadata["packages"]:
+        manifest = Path(package["manifest_path"]).resolve()
+        relative = source_relative(manifest)
+        if relative is None:
+            raise SystemExit(
+                "cbindgen Cargo metadata package manifest is outside the source "
+                f"tree: {package['name']} {manifest}"
+            )
+        add_path(manifest, "cargo:cbindgen-manifest-parse-closure")
+        target_entry_points = []
+        for target in package.get("targets", []):
+            if not {"lib", "proc-macro", "custom-build"}.intersection(
+                target.get("kind", [])
+            ):
+                continue
+            entry = Path(target["src_path"]).resolve()
+            relative_entry = source_relative(entry)
+            if relative_entry is None:
+                raise SystemExit(
+                    "cbindgen Cargo metadata target entry is outside the source "
+                    f"tree: {package['name']} {entry}"
+                )
+            add_path(entry, "cargo:cbindgen-manifest-parse-entry")
+            target_entry_points.append(relative_entry)
+        cbindgen_manifest_parse_packages.append({
             "name": package["name"],
             "version": package["version"],
             "manifest_path": relative,
@@ -524,13 +572,69 @@ def main() -> int:
     root_manifest = tomllib.loads(
         (source_tree / "Cargo.toml").read_text(encoding="utf-8")
     )
+    vendored_packages: dict[str, list[Path]] = defaultdict(list)
+    for manifest in (source_tree / "third_party" / "rust").glob("*/Cargo.toml"):
+        try:
+            package_name = (
+                tomllib
+                .loads(manifest.read_text(encoding="utf-8"))
+                .get("package", {})
+                .get("name")
+            )
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        if package_name:
+            vendored_packages[package_name].append(manifest)
+    git_patch_packages = set()
     for patches in root_manifest.get("patch", {}).values():
-        for specification in patches.values():
-            if not isinstance(specification, dict) or "path" not in specification:
+        for alias, specification in patches.items():
+            if not isinstance(specification, dict):
                 continue
-            directory = (source_tree / specification["path"]).resolve()
-            for name in ("Cargo.toml", "build.rs", "src/lib.rs", "src/main.rs"):
-                add_path(directory / name, "cargo:local-patch-metadata")
+            if "path" in specification:
+                directory = (source_tree / specification["path"]).resolve()
+                for name in (
+                    "Cargo.toml",
+                    "build.rs",
+                    "src/lib.rs",
+                    "src/main.rs",
+                ):
+                    add_path(directory / name, "cargo:local-patch-metadata")
+                continue
+            if "git" not in specification:
+                continue
+            package_name = specification.get("package", alias)
+            manifests = vendored_packages.get(package_name, [])
+            if not manifests:
+                raise SystemExit(
+                    f"vendored Cargo git patch package is missing: {package_name}"
+                )
+            git_patch_packages.add(package_name)
+            for manifest in manifests:
+                add_path(manifest, "cargo:git-patch-manifest")
+                data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+                package = data.get("package", {})
+                library = data.get("lib")
+                if isinstance(library, dict):
+                    add_path(
+                        manifest.parent / library.get("path", "src/lib.rs"),
+                        "cargo:git-patch-entry",
+                    )
+                elif package.get("autolib", True):
+                    add_path(
+                        manifest.parent / "src" / "lib.rs",
+                        "cargo:git-patch-entry",
+                    )
+                build_script = package.get("build")
+                if isinstance(build_script, str):
+                    add_path(
+                        manifest.parent / build_script,
+                        "cargo:git-patch-entry",
+                    )
+                elif build_script is not False:
+                    add_path(
+                        manifest.parent / "build.rs",
+                        "cargo:git-patch-entry",
+                    )
 
     files = sorted(set().union(*categories.values()))
     missing_contracts = sorted(
@@ -570,6 +674,15 @@ def main() -> int:
                 package["source"] or "",
             ),
         ),
+        "cbindgen_manifest_parse_package_count": len(cbindgen_manifest_parse_packages),
+        "cbindgen_manifest_parse_packages": sorted(
+            cbindgen_manifest_parse_packages,
+            key=lambda package: (
+                package["name"],
+                package["version"],
+                package["source"] or "",
+            ),
+        ),
         "cargo_build_roots": sorted(
             packages_by_id[value]["name"] for value in root_ids
         ),
@@ -579,6 +692,7 @@ def main() -> int:
         "build_python_site_manifest": source_relative(build_site_manifest),
         "build_python_site_sha256": sha256(build_site_manifest),
         "build_python_site_roots": sorted(build_site_roots),
+        "cargo_git_patch_packages": sorted(git_patch_packages),
         "cargo_packages": sorted(
             cargo_packages,
             key=lambda package: (
