@@ -188,6 +188,8 @@ def assert_closure(report_path, topsrcdir):
         }
         export_tool_paths = {
             "netwerk/naivefox/tools/assert-closure.py",
+            "netwerk/naivefox/tools/collect-build-inputs.py",
+            "netwerk/naivefox/tools/collect-configure-inputs.py",
             "netwerk/naivefox/tools/export-minimal-source.sh",
             "netwerk/naivefox/tools/minimal-source-plan.py",
             "netwerk/naivefox/tools/validate-minimal-source.py",
