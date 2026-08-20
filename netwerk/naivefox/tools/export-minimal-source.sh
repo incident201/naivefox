@@ -167,6 +167,9 @@ for tree in ("dom/bindings", "gfx/harfbuzz/src", "intl/icu/source"):
 for path in (
     "mach", "configure", "configure.py", "moz.configure", "Cargo.toml", "Cargo.lock",
     ".cargo/config.toml.in", "LICENSE",
+    # The configure graph reads this even for the non-browser NaiveFox
+    # application; it is a small tracked version input, not browser runtime.
+    "browser/config/version.txt",
     "netwerk/naivefox/moz.configure", "toolkit/moz.configure", "js/moz.configure",
     "js/ffi.configure", "memory/moz.configure",
 ):
