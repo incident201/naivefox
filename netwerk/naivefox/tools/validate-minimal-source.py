@@ -105,7 +105,7 @@ def main() -> int:
         text = path.read_text(encoding="utf-8", errors="replace")
         if ABSOLUTE_TEXT.search(text):
             fail(f"absolute host/build path present in {path.relative_to(root)}")
-        if "github_pat_" in text:
+        if "github_" + "pat_" in text:
             fail(f"credential-bearing text present in {path.relative_to(root)}")
     print(f"minimal-source validation passed: {len(expected)} manifest files")
     return 0
