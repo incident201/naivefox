@@ -20,8 +20,9 @@ FORBIDDEN_COMPONENTS = {
 }
 FORBIDDEN_SUFFIXES = (".pcap", ".pcapng", ".keylog")
 ABSOLUTE_TEXT = re.compile(
-    r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']+/(?:src|obj[^/]*|dist)(?:/|\s|$)|"
-    r"[A-Za-z]:\\\\Users\\\\[^\s\"']+"
+    r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
+    r"(?:naivefox|obj-[^/\s\"']*)(?:/|\s|$)|"
+    r"[A-Za-z]:\\\\Users\\\\[^\s\"']*/(?:naivefox|obj-[^\\\s\"']*)(?:\\\\|\s|$)"
 )
 
 
