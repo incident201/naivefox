@@ -1503,6 +1503,33 @@ packages as runtime dependencies. Standalone diagnostic configure PASS; full
 standalone Linux `mach build -j4` PASS in 5:38; diagnostic runtime smoke PASS.
 Commits: `c8ad512671d6` (Rust workspace) and `a020da3d5ba4` (ping index).
 
+## NF-UPSTREAM-019 — explicit Windows Winsock feature ownership
+
+Status: implemented on the frozen Firefox base; Windows rebuild validation is
+in progress.
+
+Files:
+
+- `netwerk/socket/neqo_glue/Cargo.toml`
+
+Purpose: declare the `winapi/winsock2` feature at the crate which directly uses
+`winapi::um::winsock2::INVALID_SOCKET`. The former Firefox-wide workspace-hack
+enabled that feature incidentally; the isolated NaiveFox Rust root correctly
+exposed the undeclared target-specific dependency.
+
+Why project-only code was insufficient: the failing symbol is used inside the
+Firefox-owned Neqo glue on Windows. A NaiveFox frontend dependency would only
+recreate feature-unification by accident instead of assigning the feature to
+its real owner.
+
+Behavioral risk: Windows compile-time feature exposure only. It does not add a
+library, change Linux code, or alter runtime QUIC behavior. Future Firefox
+refreshes should remove this downstream declaration if upstream Neqo glue owns
+the same feature explicitly.
+
+Tests: Windows x86-64 full build and final target closure report pending at this
+source checkpoint. Commit: recorded by the implementing commit.
+
 ## Project-owned pre-export stability changes
 
 These changes do not modify Firefox upstream files and therefore do not create
