@@ -205,7 +205,13 @@ for path in list(entries):
         continue
     for first, second in mozbuild_literal.findall(text):
         value = first or second
-        if not value or value.startswith(("$", "-", "#")):
+        if (
+            not value
+            or "\n" in value
+            or "\r" in value
+            or len(value) > 256
+            or value.startswith(("$", "-", "#"))
+        ):
             continue
         candidate = (mozbuild.parent / value).resolve()
         try:
