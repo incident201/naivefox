@@ -1,9 +1,9 @@
 {
   "report_provenance": {
-    "source_commit_sha": "57a3ed9d4142b8da18f706d371873a40c351c9af",
+    "source_commit_sha": "feeac229d4fd06a0164ec09b576b2b55a37aea7a",
     "source_worktree_clean": true,
-    "firefox_base_sha": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
-    "analyzer_sha256": "2a85185dea67b28602aa3a20cb43ab4d1c77a605cfc95cd0543f90cbacee9fdd",
+    "firefox_base_sha": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
+    "analyzer_sha256": "7793c649f1f88c5b0ff0e2b3e22ea0e834b0f88bdbf9532e13b2935e446cc43b",
     "target_triple": "x86_64-unknown-linux-gnu",
     "mozconfig_path": "netwerk/naivefox/mozconfig-minimal",
     "mozconfig_sha256": "a22f8bb886ad53b082ccfa576203405f614efa1655a9a3ddf7d2fa2e300ab4bc",
