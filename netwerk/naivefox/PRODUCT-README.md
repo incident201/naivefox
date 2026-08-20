@@ -47,6 +47,30 @@ The package launcher sets only its runtime library path. It does not require a
 Firefox checkout, an objdir, developer-only protocol flags, or proxy
 credentials in the environment.
 
+## Building from source
+
+Install the normal Firefox build prerequisites, then run the bootstrap command
+once if this machine has not been prepared for Mozilla builds:
+
+```sh
+./mach --no-interactive bootstrap \
+  --application-choice "Firefox for Desktop" --no-system-changes
+```
+
+Build NaiveFox into an objdir outside the source tree (the same commands work
+on Linux and in a compatible Windows shell):
+
+```sh
+export NAIVEFOX_OBJDIR="$PWD/../naivefox-objdir"
+export MOZCONFIG="$PWD/netwerk/naivefox/mozconfig-minimal"
+./mach configure
+./mach build binaries
+```
+
+The resulting executable is in `$NAIVEFOX_OBJDIR/dist/bin/naivefox`. For a
+relocatable package, use `netwerk/naivefox/tools/stage-runtime.sh` and verify
+it with `verify-staged-runtime.sh` before distributing it.
+
 ## Scope
 
 NaiveFox intentionally supports TCP SOCKS5 `CONNECT` and HTTP `CONNECT` only.
@@ -54,4 +78,3 @@ It does not provide UDP ASSOCIATE, CONNECT-UDP/MASQUE, a full HTTP forward
 proxy, proxy chains, TUN/TAP, or a GUI. The full Firefox-based reference tree,
 upstream patch inventory, test reports, and reproducibility metadata are kept
 under `docs/naivefox/` in generated source exports.
-
