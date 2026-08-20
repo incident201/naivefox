@@ -160,7 +160,9 @@ Pre-minimization baseline tag: pre-minimization-v0.3
 
 ### Current pre-export audit provenance
 
-The last validated audit source is `4238f0582b5a`.
+The last validated audit source is the post-stability documentation
+checkpoint `d65f41c305abd9c9bc9f5ea7f80833d0b7df6aa5` plus its documentation
+gate (the full SHA is recorded in the closure reports).
 The closure reports are regenerated in a report-only child; the exact SHA is
 stored in each report's provenance. `assert-closure.py` accepts that exact
 parent/report pair and
@@ -1338,6 +1340,44 @@ Tests:
 Notes for future sync: keep `ProfilerNaiveFoxStub.cpp` in `netwerk/naivefox/core/` and the `MOZ_NAIVEFOX` guard in `tools/profiler/moz.build`.
 
 
+### Patch NF-UPSTREAM-016
+
+Status: implemented on `minimal`.
+
+Files:
+
+```text
+modules/libpref/Preferences.cpp
+```
+
+Purpose: preserve the EOF byte required by the Rust preferences parser when
+the lean `MOZ_NAIVEFOX` path reads `user.js`/`prefs.js` through an unknown-size
+input stream. Without this guard, the adopted exact-size buffer could be
+marked terminated without actually containing a NUL byte; a later process
+opening the same profile could abort in `prefs_parser_parse` before starting
+the network listener.
+
+Why project-only code was insufficient: the failure is in the Firefox
+preferences file adapter used by the lean runtime, before NaiveFox networking
+code runs. Replacing or bypassing the parser would diverge from Firefox's
+profile semantics. The six-line fix is guarded by `MOZ_NAIVEFOX`, reasserts the
+`nsCString` termination invariant, and leaves ordinary Firefox file loading
+unchanged.
+
+Behavioral risk: limited to the lean application's file-backed preference
+read. It does not change preference syntax, values, persistence, or the
+network stack. The change prevents a startup abort and is safe for repeated
+launches using one profile.
+
+Tests:
+
+- `./mach build binaries` in `obj-naivefox-minimal`, 0 warnings;
+- isolated `run-auto-protocol-tests.sh` after the fix, including repeated H3
+  starts with the same trusted profile and one establishment-only H2 fallback;
+- final full H2/H3/config/Auto suite and malformed-input gates.
+
+Commit: `d65f41c305abd9c9bc9f5ea7f80833d0b7df6aa5` (`fix: preserve pref parser EOF in lean runtime`)
+
 ## Final Source & Link Closure Audit Report
 
 A comprehensive audit was performed using `netwerk/naivefox/tools/analyze-full-closure.py` across Linux and Windows x86_64 targets.
@@ -1371,8 +1411,8 @@ new downstream Necko patch inventory entries:
 | Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
 | Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `reports/closure-report-*.json` | Target-correct Linux/Windows C/C++/Rust/Glean closure and strict repository-relative/provenance checks. Reports are regenerated in a report-only child commit. | Both target assertions PASS; source export remains intentionally locked. |
 
-No Firefox source update was made for these project-owned changes. If a future
-Firefox refresh touches an inventoried upstream file, follow the two-gate
+Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
+stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate
 `main -> refresh/firefox-* -> naivefox -> refresh/minimal-* -> minimal`
 workflow above and rerun the full H2/H3/config/capture gates before export.
 

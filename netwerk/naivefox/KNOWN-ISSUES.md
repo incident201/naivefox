@@ -28,6 +28,12 @@ provenance must be regenerated on the final audited commit, and the standalone
 export validator/build gate has not been started. No generated source tree is
 an accepted artifact yet.
 
+The previously reproducible Auto-suite startup abort on repeated H3 profile
+launches is resolved. The lean preferences file adapter now forces the EOF
+terminator expected by the Rust parser after an unknown-size read. An isolated
+Auto run after the fix completed H3 preference, one bounded H2 establishment
+fallback, logical H3 failures, and same-profile relaunches without a panic.
+
 Capture comparisons now use the clean official Mozilla Firefox release fetched
 by `tools/fetch-firefox-reference.sh`. The pinned NaiveFox Firefox snapshot is
 kept as the other side; exact TLS/QUIC fingerprint equality is reported, not

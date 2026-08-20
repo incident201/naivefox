@@ -21,13 +21,20 @@ or source objdir to be present. Exact TLS/QUIC field equality against the
 pinned NaiveFox snapshot is diagnostic only; protocol ownership and strict
 transport assertions remain gates.
 
+The Auto protocol gate had one reproducible startup abort while repeatedly
+reusing the H3 fixture profile. The lean `MOZ_NAIVEFOX` preferences adapter was
+passing an adopted exact-size buffer to the Rust parser without reasserting
+its trailing EOF byte. NF-UPSTREAM-016 fixes that invariant; the minimal
+binary was rebuilt and the isolated Auto matrix passed with no parser panic or
+segmentation fault.
+
 ---
 
 ## 1. Release & Baseline Provenance
 
 - **Validated Firefox Base Commit:** `8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6`
 - **Validated NaiveFox Baseline Commit:** `2a539d796d1a1d134ec64739c69b61f443132a3c` (historical full-tree baseline)
-- **Validated Minimal Audit Source Commit:** `4238f0582b5a` (full SHA is recorded in the closure reports)
+- **Validated Minimal Audit Source Commit:** `d65f41c305abd9c9bc9f5ea7f80833d0b7df6aa5` plus the documentation checkpoint recorded in the closure reports
 - **Validated Minimal Report Commit:** report-only child of the audit source commit (exact SHA is recorded in the report provenance)
 - **Validated Minimal Source Commit:** `NOT_CREATED`
 - **Pre-Audit Graph Checkpoint Tag:** `minimal-graph-v0.1` (`60f2eede69da856daf2324fc90b2c2ab9cb86fd2`)

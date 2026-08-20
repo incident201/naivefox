@@ -41,6 +41,15 @@ native strict-H3 soak then ran for 600 seconds against the supplied real Caddy:
 | Credentials in log | absent |
 | Unexpected exit during soak | none |
 
+The Auto protocol runner had previously exposed a reproducible lean-runtime
+startup abort when successive H3 attempts reused one fixture profile. The
+symbolized stack ended in `prefs_parser_parse` while reading `user.js`: the
+`MOZ_NAIVEFOX` unknown-size stream adapter adopted a buffer without reasserting
+the parser's trailing EOF byte. NF-UPSTREAM-016 fixes the adapter. After an
+incremental minimal rebuild, the isolated Auto matrix passed (H3 preference,
+one establishment-only H2 fallback, logical 407/target failures, and repeated
+same-profile starts) with no panic or segmentation fault.
+
 The capture gate now downloads a clean official Mozilla Firefox 154.0 release
 (`firefox-154.0.tar.xz`, archive SHA-256
 `7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b`) through
