@@ -186,12 +186,18 @@ def assert_closure(report_path, topsrcdir):
             for path in changed_paths
             if path.startswith("netwerk/naivefox/reports/") and path.endswith(".json")
         }
+        export_tool_paths = {
+            "netwerk/naivefox/tools/assert-closure.py",
+            "netwerk/naivefox/tools/export-minimal-source.sh",
+            "netwerk/naivefox/tools/minimal-source-plan.py",
+            "netwerk/naivefox/tools/validate-minimal-source.py",
+        }
         if ancestor.returncode != 0 or not changed_paths.issubset(
-            report_paths | documentation_paths
+            report_paths | documentation_paths | export_tool_paths
         ):
             violations.append(
                 "stale provenance: source_commit_sha is not an ancestor of HEAD "
-                "with only report/documentation descendants "
+                "with only report/documentation/export-tool descendants "
                 f"({report_commit} -> {current_commit})"
             )
     if not _git_commit_exists(topsrcdir, provenance.get("source_commit_sha")):
