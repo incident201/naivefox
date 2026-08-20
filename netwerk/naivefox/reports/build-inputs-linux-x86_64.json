@@ -76,7 +76,7 @@
     "ohttp",
     "unicode-bidi"
   ],
-  "cargo_manifest_parse_package_count": 334,
+  "cargo_manifest_parse_package_count": 335,
   "cargo_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -1381,13 +1381,22 @@
       "version": "1.0.7"
     },
     {
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "target_entry_points": [
+        "build/rust/itertools/lib.rs"
+      ],
+      "version": "0.14.999"
+    },
+    {
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "target_entry_points": [
         "third_party/rust/itertools/src/lib.rs"
       ],
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "manifest_path": "third_party/rust/itoa/Cargo.toml",
@@ -3134,7 +3143,7 @@
       "version": "1.0.20"
     }
   ],
-  "cargo_package_count": 311,
+  "cargo_package_count": 312,
   "cargo_packages": [
     {
       "license": "MPL-2.0",
@@ -4995,6 +5004,18 @@
       "version": "2.11.4"
     },
     {
+      "license": "MPL2.0",
+      "license_candidates": [],
+      "license_coverage": [
+        "LICENSE"
+      ],
+      "license_file": null,
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "version": "0.14.999"
+    },
+    {
       "license": "MIT OR Apache-2.0",
       "license_candidates": [
         "third_party/rust/itertools/LICENSE-APACHE",
@@ -5008,7 +5029,7 @@
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -7634,37 +7655,35 @@
   "cargo_target": "x86_64-unknown-linux-gnu",
   "cargo_workspace_member_count": 51,
   "category_counts": {
-    "cargo:cbindgen-manifest-parse-closure": 364,
-    "cargo:cbindgen-manifest-parse-entry": 421,
+    "cargo:cbindgen-manifest-parse-closure": 365,
+    "cargo:cbindgen-manifest-parse-entry": 422,
     "cargo:git-patch-entry": 29,
     "cargo:git-patch-manifest": 15,
-    "cargo:local-patch-metadata": 81,
-    "cargo:local-patch-target-entry": 117,
-    "cargo:target-build-closure": 9844,
-    "cargo:target-manifest-parse-closure": 334,
-    "cargo:target-manifest-parse-entry": 385,
+    "cargo:local-patch-metadata": 82,
+    "cargo:local-patch-target-entry": 118,
+    "cargo:target-build-closure": 9849,
+    "cargo:target-manifest-parse-closure": 335,
+    "cargo:target-manifest-parse-entry": 386,
     "cargo:vendor-checksum-index": 621,
-    "make:active-assembly-include": 3,
-    "make:active-assembly-source": 2,
     "make:active-jar-manifest": 3,
     "make:active-jar-source": 11,
     "make:active-python-action": 15,
     "make:active-source-fragment-input": 36,
     "make:core-build-infrastructure": 15,
     "mozbuild:active-gyp-entry": 1,
-    "objdir:backend.RecursiveMakeBackend.in": 489,
+    "objdir:backend.RecursiveMakeBackend.in": 488,
     "objdir:component-manifest": 16,
-    "objdir:config_status_deps.in": 121,
-    "objdir:generated-action-depfile": 8216,
-    "objdir:generated-action-relative-depfile": 1934,
-    "objdir:generated-make-fragment-source": 1359,
-    "objdir:generated-make-prerequisite": 1350,
+    "objdir:config_status_deps.in": 122,
+    "objdir:generated-action-depfile": 8219,
+    "objdir:generated-action-relative-depfile": 1935,
+    "objdir:generated-make-fragment-source": 1349,
+    "objdir:generated-make-prerequisite": 1340,
     "objdir:install-manifest-pattern": 511,
     "objdir:install-manifest-source": 1925,
     "python:build-site-manifest": 1,
     "python:build-site-package": 1229
   },
-  "cbindgen_manifest_parse_package_count": 364,
+  "cbindgen_manifest_parse_package_count": 365,
   "cbindgen_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -9025,13 +9044,22 @@
       "version": "1.0.7"
     },
     {
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "target_entry_points": [
+        "build/rust/itertools/lib.rs"
+      ],
+      "version": "0.14.999"
+    },
+    {
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "target_entry_points": [
         "third_party/rust/itertools/src/lib.rs"
       ],
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "manifest_path": "third_party/rust/itoa/Cargo.toml",
@@ -10998,12 +11026,12 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "6ee7a1387e1276e7e93d829e9757800be97e80ad3994f53c7dad5ba2daefb242",
+  "collector_sha256": "3331ce47b7d510f6ef927e626ee43ce39bba3c3052c0faa9b42a05658864b420",
   "counts": {
     "directory_contracts": 37,
-    "files": 19918
+    "files": 19920
   },
-  "depfile_count": 1949,
+  "depfile_count": 1965,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -11141,6 +11169,8 @@
     "build/rust/hashlink/lib.rs",
     "build/rust/hermit-abi/Cargo.toml",
     "build/rust/hermit-abi/lib.rs",
+    "build/rust/itertools-0.13/Cargo.toml",
+    "build/rust/itertools-0.13/lib.rs",
     "build/rust/itertools/Cargo.toml",
     "build/rust/itertools/lib.rs",
     "build/rust/libcrux-traits/Cargo.toml",
@@ -11273,7 +11303,6 @@
     "config/create_res.py",
     "config/emptyvars.mk.in",
     "config/external/fdlibm/moz.build",
-    "config/external/ffi/moz.build",
     "config/external/ffi/subst_header.py",
     "config/external/icu/common/moz.build",
     "config/external/icu/common/sources.mozbuild",
@@ -14256,7 +14285,6 @@
     "js/src/ctypes/ctypes.msg",
     "js/src/ctypes/libffi/fficonfig.h.in",
     "js/src/ctypes/libffi/include/ffi.h.in",
-    "js/src/ctypes/libffi/include/ffi_cfi.h",
     "js/src/ctypes/libffi/include/ffi_common.h",
     "js/src/ctypes/libffi/include/tramp.h",
     "js/src/ctypes/libffi/src/closures.c",
@@ -14264,14 +14292,10 @@
     "js/src/ctypes/libffi/src/prep_cif.c",
     "js/src/ctypes/libffi/src/tramp.c",
     "js/src/ctypes/libffi/src/types.c",
-    "js/src/ctypes/libffi/src/x86/asmnames.h",
     "js/src/ctypes/libffi/src/x86/ffi64.c",
     "js/src/ctypes/libffi/src/x86/ffitarget.h",
     "js/src/ctypes/libffi/src/x86/ffiw64.c",
     "js/src/ctypes/libffi/src/x86/internal64.h",
-    "js/src/ctypes/libffi/src/x86/unix64.S",
-    "js/src/ctypes/libffi/src/x86/win64.S",
-    "js/src/ctypes/moz.build",
     "js/src/ctypes/typedefs.h",
     "js/src/debugger/DebugAPI-inl.h",
     "js/src/debugger/DebugAPI.h",
@@ -14688,6 +14712,8 @@
     "js/src/jit/GenerateCacheIRFiles.py",
     "js/src/jit/GenerateLIRFiles.py",
     "js/src/jit/GenerateMIRFiles.py",
+    "js/src/jit/GeneratorResumeAnalysis.cpp",
+    "js/src/jit/GeneratorResumeAnalysis.h",
     "js/src/jit/GraphSpewer.cpp",
     "js/src/jit/GraphSpewer.h",
     "js/src/jit/ICState.h",
@@ -17276,6 +17302,7 @@
     "python/mozbuild/mozbuild/mozinfo.py",
     "python/mozbuild/mozbuild/nodeutil.py",
     "python/mozbuild/mozbuild/nss_libs.py",
+    "python/mozbuild/mozbuild/packaging.py",
     "python/mozbuild/mozbuild/preprocessor.py",
     "python/mozbuild/mozbuild/pythonutil.py",
     "python/mozbuild/mozbuild/repackaging/test/python.toml",
@@ -24181,6 +24208,8 @@
     "third_party/rust/itertools/src/adaptors/map.rs",
     "third_party/rust/itertools/src/adaptors/mod.rs",
     "third_party/rust/itertools/src/adaptors/multi_product.rs",
+    "third_party/rust/itertools/src/all_equal_value_err.rs",
+    "third_party/rust/itertools/src/array_impl.rs",
     "third_party/rust/itertools/src/combinations.rs",
     "third_party/rust/itertools/src/combinations_with_replacement.rs",
     "third_party/rust/itertools/src/concat_impl.rs",
@@ -24228,6 +24257,7 @@
     "third_party/rust/itertools/src/zip_longest.rs",
     "third_party/rust/itertools/src/ziptuple.rs",
     "third_party/rust/itertools/tests/adaptors_no_collect.rs",
+    "third_party/rust/itertools/tests/arrays.rs",
     "third_party/rust/itertools/tests/flatten_ok.rs",
     "third_party/rust/itertools/tests/laziness.rs",
     "third_party/rust/itertools/tests/macros_hygiene.rs",
@@ -30963,9 +30993,9 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
-  "generated_makefile_count": 441,
-  "generated_makefiles_sha256": "aec55a2bdf8659425849199056a3bf4b3f4a7d075794e69a9702d8b41545b116",
+  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
+  "generated_makefile_count": 437,
+  "generated_makefiles_sha256": "815e281cbd0cb7edc6e801ece0104e926154e2119fdbb1813a2c2c7ee81e6114",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -30979,15 +31009,20 @@
   "install_manifest_record_count": 2632,
   "install_manifests_sha256": "d04663a12c24642462db19a40d36ead87e921d9efae4d9dcbfdd5c4c79979f52",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-  "mozconfig_sha256": "a6e9b6326d878b7ad3f2fc60c84d10e9ce7c970dea56d8bff96ebfad9362d127",
+  "mozconfig_sha256": "a22f8bb886ad53b082ccfa576203405f614efa1655a9a3ddf7d2fa2e300ab4bc",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "5081a819967c4e0ce8f0179d11d96bc7560ccc37aee7c125d2bebe30794a5a00",
-    "config_status_deps.in": "11efeaaa393e212a9f3d807f9800bb0acb3b9adf2479651b461aa92b5709928f"
+    "backend.RecursiveMakeBackend.in": "62bcf501808a34aa7ac885d4be1e9eb621c25a85904b189d5b172d30de23ccce",
+    "config_status_deps.in": "0ad94451d36e7ce058e66b37251dc86e726328d0251b59dea0b7684c7b8f8217"
   },
   "report_version": 1,
-  "source_commit": "745d58bf7dcb44df0b8be87b39fb7d21d19383f9",
+  "source_commit": "ae8f9c7aae68",
   "source_tree_kind": "repository",
-  "source_worktree_clean": true,
-  "source_worktree_status": [],
+  "source_worktree_clean": false,
+  "source_worktree_status": [
+    "M netwerk/naivefox/reports/build-inputs-linux-x86_64.json",
+    " M netwerk/naivefox/reports/build-inputs-windows-x86_64.json",
+    " M netwerk/naivefox/reports/closure-report-linux-x86_64.json",
+    " M netwerk/naivefox/reports/closure-report-windows-x86_64.json"
+  ],
   "target": "linux-x86_64"
 }

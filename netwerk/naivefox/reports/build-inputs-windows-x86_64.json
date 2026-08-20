@@ -76,7 +76,7 @@
     "ohttp",
     "unicode-bidi"
   ],
-  "cargo_manifest_parse_package_count": 347,
+  "cargo_manifest_parse_package_count": 348,
   "cargo_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -1372,13 +1372,22 @@
       "version": "1.0.7"
     },
     {
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "target_entry_points": [
+        "build/rust/itertools/lib.rs"
+      ],
+      "version": "0.14.999"
+    },
+    {
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "target_entry_points": [
         "third_party/rust/itertools/src/lib.rs"
       ],
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "manifest_path": "third_party/rust/itoa/Cargo.toml",
@@ -3252,7 +3261,7 @@
       "version": "1.0.20"
     }
   ],
-  "cargo_package_count": 325,
+  "cargo_package_count": 326,
   "cargo_packages": [
     {
       "license": "MPL-2.0",
@@ -5113,6 +5122,18 @@
       "version": "2.11.4"
     },
     {
+      "license": "MPL2.0",
+      "license_candidates": [],
+      "license_coverage": [
+        "LICENSE"
+      ],
+      "license_file": null,
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "version": "0.14.999"
+    },
+    {
       "license": "MIT OR Apache-2.0",
       "license_candidates": [
         "third_party/rust/itertools/LICENSE-APACHE",
@@ -5126,7 +5147,7 @@
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -7962,15 +7983,15 @@
   "cargo_target": "x86_64-pc-windows-msvc",
   "cargo_workspace_member_count": 51,
   "category_counts": {
-    "cargo:cbindgen-manifest-parse-closure": 364,
-    "cargo:cbindgen-manifest-parse-entry": 421,
+    "cargo:cbindgen-manifest-parse-closure": 365,
+    "cargo:cbindgen-manifest-parse-entry": 422,
     "cargo:git-patch-entry": 29,
     "cargo:git-patch-manifest": 15,
-    "cargo:local-patch-metadata": 81,
-    "cargo:local-patch-target-entry": 117,
-    "cargo:target-build-closure": 10220,
-    "cargo:target-manifest-parse-closure": 347,
-    "cargo:target-manifest-parse-entry": 399,
+    "cargo:local-patch-metadata": 82,
+    "cargo:local-patch-target-entry": 118,
+    "cargo:target-build-closure": 10225,
+    "cargo:target-manifest-parse-closure": 348,
+    "cargo:target-manifest-parse-entry": 400,
     "cargo:vendor-checksum-index": 621,
     "make:active-jar-manifest": 3,
     "make:active-jar-source": 11,
@@ -7990,7 +8011,7 @@
     "python:build-site-manifest": 1,
     "python:build-site-package": 1229
   },
-  "cbindgen_manifest_parse_package_count": 364,
+  "cbindgen_manifest_parse_package_count": 365,
   "cbindgen_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -9351,13 +9372,22 @@
       "version": "1.0.7"
     },
     {
+      "manifest_path": "build/rust/itertools/Cargo.toml",
+      "name": "itertools",
+      "source": null,
+      "target_entry_points": [
+        "build/rust/itertools/lib.rs"
+      ],
+      "version": "0.14.999"
+    },
+    {
       "manifest_path": "third_party/rust/itertools/Cargo.toml",
       "name": "itertools",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "target_entry_points": [
         "third_party/rust/itertools/src/lib.rs"
       ],
-      "version": "0.14.0"
+      "version": "0.15.0"
     },
     {
       "manifest_path": "third_party/rust/itoa/Cargo.toml",
@@ -11324,10 +11354,10 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "6ee7a1387e1276e7e93d829e9757800be97e80ad3994f53c7dad5ba2daefb242",
+  "collector_sha256": "3331ce47b7d510f6ef927e626ee43ce39bba3c3052c0faa9b42a05658864b420",
   "counts": {
     "directory_contracts": 33,
-    "files": 21021
+    "files": 21026
   },
   "depfile_count": 2306,
   "directory_contracts": [
@@ -11463,6 +11493,8 @@
     "build/rust/hashlink/lib.rs",
     "build/rust/hermit-abi/Cargo.toml",
     "build/rust/hermit-abi/lib.rs",
+    "build/rust/itertools-0.13/Cargo.toml",
+    "build/rust/itertools-0.13/lib.rs",
     "build/rust/itertools/Cargo.toml",
     "build/rust/itertools/lib.rs",
     "build/rust/libcrux-traits/Cargo.toml",
@@ -25166,6 +25198,8 @@
     "third_party/rust/itertools/src/adaptors/map.rs",
     "third_party/rust/itertools/src/adaptors/mod.rs",
     "third_party/rust/itertools/src/adaptors/multi_product.rs",
+    "third_party/rust/itertools/src/all_equal_value_err.rs",
+    "third_party/rust/itertools/src/array_impl.rs",
     "third_party/rust/itertools/src/combinations.rs",
     "third_party/rust/itertools/src/combinations_with_replacement.rs",
     "third_party/rust/itertools/src/concat_impl.rs",
@@ -25213,6 +25247,7 @@
     "third_party/rust/itertools/src/zip_longest.rs",
     "third_party/rust/itertools/src/ziptuple.rs",
     "third_party/rust/itertools/tests/adaptors_no_collect.rs",
+    "third_party/rust/itertools/tests/arrays.rs",
     "third_party/rust/itertools/tests/flatten_ok.rs",
     "third_party/rust/itertools/tests/laziness.rs",
     "third_party/rust/itertools/tests/macros_hygiene.rs",
@@ -32388,7 +32423,7 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "8d4f297e7481f71d5b3fad7fb84aa8e2f600b4c6",
+  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1",
   "generated_makefile_count": 425,
   "generated_makefiles_sha256": "051e8120b41c958fd4868b4ed6bf3c0712407f22d58548665ce59d23575559c3",
   "install_manifest_count": 7,
@@ -32404,15 +32439,20 @@
   "install_manifest_record_count": 2677,
   "install_manifests_sha256": "a1e2dcfa683a3b376ddce8376d67e1ec8b04d1d06699e5ecee547ecdf2b99196",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
-  "mozconfig_sha256": "3e35ca6e2eca2936412138bfb82ea226549cbe5b6c10bf9f3006e491844b07b0",
+  "mozconfig_sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "b6580a339d674b386fb5ba738035ec34fd6d28c03b2cf0bc771fa977a0370b33",
     "config_status_deps.in": "aebc5b42738e0d748e05798ddb8bf34dd1c39c7b271f6af50c48a032f2870959"
   },
   "report_version": 1,
-  "source_commit": "745d58bf7dcb44df0b8be87b39fb7d21d19383f9",
+  "source_commit": "ae8f9c7aae68",
   "source_tree_kind": "repository",
-  "source_worktree_clean": true,
-  "source_worktree_status": [],
+  "source_worktree_clean": false,
+  "source_worktree_status": [
+    "M netwerk/naivefox/reports/build-inputs-linux-x86_64.json",
+    " M netwerk/naivefox/reports/build-inputs-windows-x86_64.json",
+    " M netwerk/naivefox/reports/closure-report-linux-x86_64.json",
+    " M netwerk/naivefox/reports/closure-report-windows-x86_64.json"
+  ],
   "target": "windows-x86_64"
 }
