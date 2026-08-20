@@ -232,6 +232,7 @@ for path in (
     # graph is evaluated.
     "security/nss/lib/nss/nss.h",
     "security/nss/coreconf/config.gypi",
+    "security/nss/coreconf/empty.c",
     "netwerk/naivefox/moz.configure", "toolkit/moz.configure", "js/moz.configure",
     "js/ffi.configure", "memory/moz.configure",
 ):
