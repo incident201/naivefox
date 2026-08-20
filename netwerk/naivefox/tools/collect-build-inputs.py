@@ -139,6 +139,70 @@ def main() -> int:
     makefiles.sort()
     manifest_lists.sort()
     backends.sort()
+
+    # Installed headers and resources are generated from EXPORTS and related
+    # moz.build declarations.  They do not necessarily occur in linker object
+    # depfiles, so the target-specific install manifests are an independent
+    # source-input class required by a clean standalone build.
+    install_manifest_dir = objdir / "_build_manifests" / "install"
+    if not install_manifest_dir.is_dir():
+        raise SystemExit(
+            f"objdir install manifests are missing: {install_manifest_dir}"
+        )
+    product_install_manifest_names = {
+        "dist_bin",
+        "dist_include",
+        "dist_private",
+        "dist_public",
+        "xpidl",
+    }
+    install_manifests = sorted(
+        path
+        for path in install_manifest_dir.iterdir()
+        if path.is_file() and path.name in product_install_manifest_names
+    )
+    manifest_names = {path.name for path in install_manifests}
+    if not {"dist_bin", "dist_include"}.issubset(manifest_names):
+        raise SystemExit(
+            f"objdir product install manifests are incomplete: {install_manifest_dir}"
+        )
+    install_manifest_digest = hashlib.sha256()
+    install_manifest_records = 0
+    for manifest in install_manifests:
+        content = manifest.read_bytes()
+        install_manifest_digest.update(manifest.name.encode())
+        install_manifest_digest.update(b"\0")
+        install_manifest_digest.update(content)
+        install_manifest_digest.update(b"\0")
+        lines = content.decode("utf-8", "surrogateescape").splitlines()
+        if not lines or lines[0] not in {"1", "2", "3", "4", "5"}:
+            raise SystemExit(f"unknown install manifest format: {manifest}")
+        for line in lines[1:]:
+            fields = line.split("\x1f")
+            if not fields:
+                continue
+            install_manifest_records += 1
+            record_type = fields[0]
+            if record_type in {"1", "2"}:
+                if len(fields) != 3:
+                    raise SystemExit(f"malformed install manifest record: {manifest}")
+                add_path(Path(fields[2]), "objdir:install-manifest-source")
+            elif record_type in {"5", "6"}:
+                if len(fields) != 5:
+                    raise SystemExit(f"malformed install pattern record: {manifest}")
+                base, pattern = fields[2:4]
+                for match in glob.glob(str(Path(base) / pattern), recursive=True):
+                    add_path(Path(match), "objdir:install-manifest-pattern")
+            elif record_type == "7":
+                if len(fields) != 8:
+                    raise SystemExit(f"malformed install preprocess record: {manifest}")
+                add_path(Path(fields[2]), "objdir:install-manifest-source")
+                add_path(Path(fields[3]), "objdir:install-manifest-dependency")
+            elif record_type not in {"3", "4", "8"}:
+                raise SystemExit(
+                    f"unsupported install manifest record {record_type}: {manifest}"
+                )
+
     for depfile in depfiles:
         text = depfile.read_text(encoding="utf-8", errors="replace").replace(
             "\\\n", " "
@@ -336,6 +400,10 @@ def main() -> int:
         "objdir_evidence_sha256": evidence,
         "generated_makefile_count": len(makefiles),
         "generated_makefiles_sha256": makefile_digest.hexdigest(),
+        "install_manifest_count": len(install_manifests),
+        "install_manifest_names": sorted(manifest_names),
+        "install_manifest_record_count": install_manifest_records,
+        "install_manifests_sha256": install_manifest_digest.hexdigest(),
         "depfile_count": len(depfiles),
         "cargo_package_count": len(reachable_package_ids),
         "cargo_build_roots": sorted(
