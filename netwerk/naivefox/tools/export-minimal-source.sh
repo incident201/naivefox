@@ -65,6 +65,7 @@ entries = {}
 categories = defaultdict(set)
 missing = []
 ignored_generated = set()
+directory_placeholders = set()
 
 def norm(value):
     value = str(value).replace("\\", "/")
@@ -325,7 +326,7 @@ for path in list(entries):
             # compiler depfile.  Keep this restricted to explicit
             # topsrcdir-rooted declarations; arbitrary relative directories
             # would pull in unrelated build trees.
-            tracked_under(relative.as_posix(), "explicit:mozbuild-directory")
+            directory_placeholders.add(relative.as_posix())
 
 # TOML test manifests use bare table names such as ["test_name.js"], which
 # are deliberately not treated as arbitrary string-valued build settings.
@@ -401,6 +402,12 @@ for destination, entry in sorted(entries.items()):
     else:
         shutil.copy2(source_path, destination_path)
     os.utime(destination_path, (int(commit_epoch), int(commit_epoch)))
+
+# Some moz.build LOCAL_INCLUDES entries are only directory contracts.  Create
+# those directories after copying the actual closure instead of recursively
+# importing an unrelated subsystem merely to satisfy an existence check.
+for relative in sorted(directory_placeholders):
+    (stage / relative).mkdir(parents=True, exist_ok=True)
 
 manifest = {
     "manifest_version": 1,
