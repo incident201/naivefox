@@ -169,7 +169,7 @@ for path in (
     ".cargo/config.toml.in", "LICENSE",
     # The configure graph reads this even for the non-browser NaiveFox
     # application; it is a small tracked version input, not browser runtime.
-    "browser/config/version.txt",
+    "browser/config/version.txt", "browser/config/version_display.txt",
     "netwerk/naivefox/moz.configure", "toolkit/moz.configure", "js/moz.configure",
     "js/ffi.configure", "memory/moz.configure",
 ):
