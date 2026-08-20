@@ -179,14 +179,15 @@ def assert_closure(report_path, topsrcdir):
             capture_output=True,
             text=True,
         )
-        report_only_paths = {
-            "netwerk/naivefox/reports/closure-report-linux-x86_64.json",
-            "netwerk/naivefox/reports/closure-report-windows-x86_64.json",
-        }
         changed_paths = {path for path in changed.stdout.splitlines() if path}
         documentation_paths = {path for path in changed_paths if path.endswith(".md")}
+        report_paths = {
+            path
+            for path in changed_paths
+            if path.startswith("netwerk/naivefox/reports/") and path.endswith(".json")
+        }
         if ancestor.returncode != 0 or not changed_paths.issubset(
-            report_only_paths | documentation_paths
+            report_paths | documentation_paths
         ):
             violations.append(
                 "stale provenance: source_commit_sha is not an ancestor of HEAD "
