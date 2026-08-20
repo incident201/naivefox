@@ -68,7 +68,8 @@ REPORT_ONLY_PATHS = (
     re.compile(r"^netwerk/naivefox/[^/]+\.md$"),
     re.compile(r"^netwerk/naivefox/config\.example\.json$"),
     re.compile(
-        r"^netwerk/naivefox/tools/(?:collect-(?:build|configure)-inputs\.py|"
+        r"^netwerk/naivefox/tools/(?:assert-closure\.py|"
+        r"collect-(?:build|configure)-inputs\.py|"
         r"export-minimal-source\.sh|minimal-source-plan\.py|"
         r"validate-minimal-source\.py)$"
     ),
