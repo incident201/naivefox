@@ -63,6 +63,7 @@ report_paths = [pathlib.Path(x).resolve() for x in sys.argv[6:]]
 entries = {}
 categories = defaultdict(set)
 missing = []
+ignored_generated = set()
 
 def norm(value):
     value = str(value).replace("\\", "/")
@@ -77,6 +78,12 @@ def add(source, category, destination=None):
     if not source:
         return
     source = norm(source)
+    # Closure reports intentionally retain a small amount of provenance from
+    # generated depfile/backend inventories.  These are not source inputs and
+    # must never be copied into a standalone tree.
+    if source.startswith("objdir/") or source.startswith("obj-"):
+        ignored_generated.add(source)
+        return
     destination = norm(destination or source)
     source_path = repo / source
     if not source_path.is_file():
@@ -222,6 +229,7 @@ manifest = {
     "category_counts": {
         category: len(paths) for category, paths in sorted(categories.items())
     },
+    "ignored_generated_inputs": sorted(ignored_generated),
 }
 canonical = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
 manifest_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
