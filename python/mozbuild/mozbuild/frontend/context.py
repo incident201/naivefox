@@ -3177,6 +3177,7 @@ SPECIAL_VARIABLES = {
         lambda context: (
             context["DIRS"]
             if context.config.substs.get("ENABLE_TESTS")
+            and not context.config.substs.get("MOZ_NAIVEFOX")
             else TestDirsPlaceHolder
         ),
         list,

@@ -6,6 +6,7 @@ and clear reporting of verified capabilities.
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import socket
@@ -13,6 +14,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.parse
+
+SOCKS_NO_AUTH_GREETING = b"\x05\x01\x00"
 
 
 def find_free_port():
@@ -35,7 +39,41 @@ def wait_for_log_and_liveness(proc, log_path, minimum_size=0, timeout=10.0):
     raise AssertionError(f"runtime log was not created: {log_path}")
 
 
-def run_file_logging_case(exe_path, proxy_endpoint, temp_root, log_value, log_path):
+def proxy_secret_tokens(proxy_url):
+    parsed = urllib.parse.urlsplit(proxy_url)
+    if "@" not in parsed.netloc:
+        return ()
+    raw_userinfo = parsed.netloc.rsplit("@", 1)[0]
+    raw_user, separator, raw_password = raw_userinfo.partition(":")
+    raw_values = (raw_user, raw_password) if separator else (raw_user,)
+    tokens = set(raw_values)
+    tokens.update(urllib.parse.unquote(value) for value in raw_values)
+    return tuple(sorted(token for token in tokens if token))
+
+
+def redact_proxy_url(proxy_url):
+    parsed = urllib.parse.urlsplit(proxy_url)
+    netloc = parsed.netloc.rsplit("@", 1)[-1]
+    return urllib.parse.urlunsplit((
+        parsed.scheme,
+        netloc,
+        parsed.path,
+        parsed.query,
+        parsed.fragment,
+    ))
+
+
+def assert_no_proxy_secrets(contents, secrets, label):
+    for secret in secrets:
+        assert secret not in contents, f"proxy credential leaked into {label}"
+    assert "Proxy-Authorization" not in contents, (
+        f"proxy auth header leaked into {label}"
+    )
+
+
+def run_file_logging_case(
+    exe_path, proxy_endpoint, temp_root, log_value, log_path, secrets
+):
     cfg_path = os.path.join(temp_root, "config-file-log.json")
     diagnostic_path = os.path.join(temp_root, "file-log-process.txt")
     cfg = {
@@ -75,7 +113,8 @@ def run_file_logging_case(exe_path, proxy_endpoint, temp_root, log_value, log_pa
     finally:
         stop(proc)
 
-    # Reopen the same file to verify append semantics and clean shutdown.
+    # Reopen the same file to verify append semantics across bounded process
+    # teardowns.  Natural clean exit is covered by runtime-smoke.
     proc = launch()
     try:
         wait_for_log_and_liveness(proc, log_path, minimum_size=first_size)
@@ -83,14 +122,15 @@ def run_file_logging_case(exe_path, proxy_endpoint, temp_root, log_value, log_pa
         assert current_size > first_size, (
             f"runtime log did not append (first={first_size}, current={current_size})"
         )
-        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
             contents = f.read()
-        assert "dummy_pass" not in contents, "credentials leaked into runtime log"
-        assert "Proxy-Authorization" not in contents, (
-            "proxy auth leaked into runtime log"
-        )
     finally:
         stop(proc)
+
+    with open(diagnostic_path, encoding="utf-8", errors="replace") as f:
+        diagnostics = f.read()
+    assert_no_proxy_secrets(contents, secrets, "runtime log")
+    assert_no_proxy_secrets(diagnostics, secrets, "process output")
 
 
 def assert_alive(proc, label):
@@ -98,6 +138,169 @@ def assert_alive(proc, label):
         raise AssertionError(
             f"NaiveFox exited during Windows {label} stress (code {proc.returncode})"
         )
+
+
+def wait_for_listener(proc, port, label, timeout=10.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        assert_alive(proc, label)
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                return
+        except OSError:
+            time.sleep(0.05)
+    raise AssertionError(f"Windows {label} listener did not become ready")
+
+
+def make_socks_connect_request(host="lifecycle.test", port=443):
+    encoded_host = host.encode("ascii")
+    if not encoded_host or len(encoded_host) > 255:
+        raise ValueError("SOCKS domain must contain 1..255 ASCII bytes")
+    return (
+        b"\x05\x01\x00\x03"
+        + bytes((len(encoded_host),))
+        + encoded_host
+        + port.to_bytes(2, "big")
+    )
+
+
+def make_http_connect_request(authority="lifecycle.test:443"):
+    encoded_authority = authority.encode("ascii")
+    return (
+        b"CONNECT "
+        + encoded_authority
+        + b" HTTP/1.1\r\nHost: "
+        + encoded_authority
+        + b"\r\n\r\n"
+    )
+
+
+def recv_exact(sock, size):
+    chunks = []
+    remaining = size
+    while remaining:
+        chunk = sock.recv(remaining)
+        if not chunk:
+            raise AssertionError("SOCKS listener closed during method negotiation")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def connect_and_drop(port, payload, listener_scheme):
+    last_error = None
+    for _ in range(3):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2.0) as sock:
+                sock.settimeout(2.0)
+                if listener_scheme == "socks":
+                    sock.sendall(SOCKS_NO_AUTH_GREETING)
+                    selection = recv_exact(sock, 2)
+                    if selection != b"\x05\x00":
+                        raise AssertionError(
+                            f"unexpected SOCKS method selection: {selection!r}"
+                        )
+                sock.sendall(payload)
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    # The deliberately dead upstream may make NaiveFox close
+                    # first.  Either ordering exercises cancellation.
+                    pass
+                return
+        except OSError as exc:
+            last_error = exc
+            time.sleep(0.02)
+    raise AssertionError(f"lifecycle churn connection failed: {last_error}")
+
+
+def assert_alive_during_drain(proc, label, duration=1.0, interval=0.05):
+    deadline = time.monotonic() + duration
+    while time.monotonic() < deadline:
+        assert_alive(proc, label)
+        time.sleep(min(interval, max(0.0, deadline - time.monotonic())))
+    assert_alive(proc, label)
+
+
+def run_disconnect_waves(
+    proc, port, payload, listener_scheme, label, waves=12, width=24
+):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=width) as executor:
+        for _ in range(waves):
+            futures = [
+                executor.submit(connect_and_drop, port, payload, listener_scheme)
+                for _ in range(width)
+            ]
+            for future in futures:
+                future.result(timeout=5.0)
+            assert_alive(proc, label)
+
+    # Repeatedly sample liveness while main/socket-thread stop runnables drain.
+    # The historical UAF usually surfaced in this bounded interval.
+    assert_alive_during_drain(proc, label)
+
+
+def force_stop_after_churn(proc, label):
+    if proc.poll() is None:
+        proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired as exc:
+        proc.kill()
+        proc.wait(timeout=5)
+        raise AssertionError(
+            f"NaiveFox did not terminate after Windows {label} churn"
+        ) from exc
+
+
+def run_lifecycle_churn_case(exe_path, temp_root, listener_scheme, payload):
+    listener_port = find_free_port()
+    diagnostic_path = os.path.join(
+        temp_root, f"lifecycle-{listener_scheme}-process.txt"
+    )
+
+    # Keep the upstream port bound but not listening.  Every H2 connection is
+    # rejected locally and deterministically, without network access.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as dead_upstream:
+        dead_upstream.bind(("127.0.0.1", 0))
+        dead_port = dead_upstream.getsockname()[1]
+        cfg_path = os.path.join(temp_root, f"config-lifecycle-{listener_scheme}.json")
+        cfg = {
+            "listen": f"{listener_scheme}://127.0.0.1:{listener_port}",
+            # NaiveFox requires credentials for HTTPS proxy URIs even when the
+            # endpoint is deliberately dead.  The values are local test data
+            # and never leave this temporary config.
+            "proxy": f"https://lifecycle:pass@127.0.0.1:{dead_port}",
+            "log": "",
+        }
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+
+        with open(diagnostic_path, "ab") as diagnostic:
+            proc = subprocess.Popen(
+                [exe_path, cfg_path],
+                cwd=temp_root,
+                stdout=diagnostic,
+                stderr=subprocess.STDOUT,
+            )
+            try:
+                wait_for_listener(proc, listener_port, listener_scheme.upper())
+                run_disconnect_waves(
+                    proc,
+                    listener_port,
+                    payload,
+                    listener_scheme,
+                    listener_scheme.upper(),
+                )
+            except AssertionError as exc:
+                diagnostic.flush()
+                with open(diagnostic_path, "rb") as details_file:
+                    details = details_file.read().decode("utf-8", errors="replace")[
+                        -2000:
+                    ]
+                raise AssertionError(f"{exc}; process output: {details!r}") from exc
+            finally:
+                force_stop_after_churn(proc, listener_scheme.upper())
 
 
 def send_socks_probe(port, payload, read_reply=True):
@@ -299,6 +502,7 @@ def main():
     # 3. Dynamic Port SOCKS5 listener test
     socks_port = find_free_port()
     proxy_endpoint = args.proxy_url or "https://dummy_user:dummy_pass@127.0.0.1:28443"
+    proxy_secrets = proxy_secret_tokens(proxy_endpoint)
 
     with tempfile.TemporaryDirectory(prefix="nf_win_socks_") as temp_prof:
         cfg_path = os.path.join(temp_prof, "config.json")
@@ -346,7 +550,7 @@ def main():
         finally:
             proc.terminate()
             proc.wait(timeout=5)
-            print("    SOCKS5 process clean shutdown: PASSED")
+            print("    SOCKS5 process bounded forced teardown: PASSED")
 
     # 4. Dynamic Port HTTP CONNECT listener test
     http_port = find_free_port()
@@ -387,15 +591,38 @@ def main():
         finally:
             proc.terminate()
             proc.wait(timeout=5)
-            print("    HTTP CONNECT process clean shutdown: PASSED")
+            print("    HTTP CONNECT process bounded forced teardown: PASSED")
 
-    # 5. Native Windows malformed-input terminal-state stress.
+    # 5. Native Windows lifecycle regression.  Valid requests create a
+    # TunnelSession, then an immediate client close races the dead upstream's
+    # OnStopRequest -> TunnelChannelStop -> ApplyChannelStop runnable.
+    with tempfile.TemporaryDirectory(prefix="nf_win_lifecycle_") as temp_churn:
+        run_lifecycle_churn_case(
+            exe_path, temp_churn, "socks", make_socks_connect_request()
+        )
+        run_lifecycle_churn_case(
+            exe_path, temp_churn, "http", make_http_connect_request()
+        )
+    print(
+        "[5] Windows TunnelSession stop lifecycle churn + bounded forced "
+        "teardown: PASSED"
+    )
+
+    # 6. Prove a fresh runtime still starts and exits naturally after churn.
+    with tempfile.TemporaryDirectory(prefix="nf_win_post_churn_") as temp_prof:
+        out = subprocess.check_output(
+            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True
+        )
+        assert "completed successfully" in out, "post-churn smoke test failed"
+    print("[6] Post-churn runtime smoke clean exit: PASSED")
+
+    # 7. Native Windows malformed-input terminal-state stress.
     with tempfile.TemporaryDirectory(prefix="nf_win_malformed_socks_") as temp_stress:
         run_malformed_socks_case(exe_path, proxy_endpoint, temp_stress)
         run_malformed_http_case(exe_path, proxy_endpoint, temp_stress)
-    print("[5] Windows malformed SOCKS/HTTP bounded stress: PASSED")
+    print("[7] Windows malformed SOCKS/HTTP bounded stress: PASSED")
 
-    # 6. Native Windows file logging: relative/Unicode path, append, and
+    # 8. Native Windows file logging: relative/Unicode path, append, and
     # liveness.  The runtime must not call POSIX chmod() on this path.
     with tempfile.TemporaryDirectory(prefix="nf_win_logging_") as temp_log:
         relative_dir = os.path.join(temp_log, "日志_日本")
@@ -403,13 +630,23 @@ def main():
         relative_path = os.path.join(relative_dir, "naivefox-运行.log")
         relative_value = os.path.relpath(relative_path, temp_log)
         run_file_logging_case(
-            exe_path, proxy_endpoint, temp_log, relative_value, relative_path
+            exe_path,
+            proxy_endpoint,
+            temp_log,
+            relative_value,
+            relative_path,
+            proxy_secrets,
         )
-        print("[6] Windows relative Unicode file logging + append: PASSED")
+        print("[8] Windows relative Unicode file logging + append: PASSED")
 
         absolute_path = os.path.join(temp_log, "absolute-运行.log")
         run_file_logging_case(
-            exe_path, proxy_endpoint, temp_log, absolute_path, absolute_path
+            exe_path,
+            proxy_endpoint,
+            temp_log,
+            absolute_path,
+            absolute_path,
+            proxy_secrets,
         )
         print("    Windows absolute Unicode file logging: PASSED")
 
@@ -419,7 +656,10 @@ def main():
         "  Windows build, launch, config parsing, file logging, local listener handshake and shutdown verified."
     )
     if args.proxy_url:
-        print(f"  Live upstream proxy verified against: {args.proxy_url}")
+        print(
+            "  Live upstream proxy verified against: "
+            f"{redact_proxy_url(args.proxy_url)}"
+        )
     else:
         print("  End-to-end H2/H3 networking is tracked separately.")
     print("=" * 70)

@@ -10,6 +10,7 @@ UNIFIED_SOURCES += [
     "TestNaivePadding.cpp",
     "TestPaddingNegotiation.cpp",
     "TestSocks5Parser.cpp",
+    "TestTunnelSessionLifecycle.cpp",
 ]
 
 LOCAL_INCLUDES += [
@@ -17,4 +18,4 @@ LOCAL_INCLUDES += [
     "/netwerk/naivefox/codec",
 ]
 
-FINAL_LIBRARY = "xul-gtest"
+FINAL_LIBRARY = "xul" if CONFIG["MOZ_NAIVEFOX"] else "xul-gtest"

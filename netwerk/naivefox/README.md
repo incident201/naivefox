@@ -109,7 +109,7 @@ fails before a CONNECT response or tunnel transport exists.
 
 NaiveFox deliberately does not implement SOCKS BIND or UDP ASSOCIATE,
 CONNECT-UDP, MASQUE, WebTransport, transparent proxying, TUN/TAP, a GUI, or a
-separate socket-process transport. See [`KNOWN-ISSUES.md`](netwerk/naivefox/KNOWN-ISSUES.md).
+separate socket-process transport. See [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
 
 ## Architecture and wire compatibility
 
@@ -127,7 +127,7 @@ Connection pooling remains owned by Necko in both modes.
 The target's TLS session belongs to the application using the local proxy.
 NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 
-See [`ARCHITECTURE.md`](netwerk/naivefox/ARCHITECTURE.md) for component, event-target, stream,
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for component, event-target, stream,
 and fallback details. Downstream Firefox hooks are inventoried in
 `UPSTREAM-PATCHES.md` in the full maintenance checkout.
 
@@ -161,7 +161,7 @@ The fixture builds pinned Caddy and `forwardproxy@naive` inputs, binds only to
 loopback, creates per-run credentials and PKI state, and trusts its CA only in
 isolated NSS profiles. No real proxy account is required. Detailed focused and
 real-deployment commands are in
-[`test/integration/README.md`](netwerk/naivefox/test/integration/README.md).
+[`test/integration/README.md`](test/integration/README.md).
 
 Stage and verify the Linux package after a successful product build:
 
@@ -172,7 +172,7 @@ Stage and verify the Linux package after a successful product build:
 
 An ordinary Firefox build is not a merge or release gate. It is allowed only
 for an explicitly requested same-base capture comparison; see
-[`CAPTURE.md`](netwerk/naivefox/CAPTURE.md).
+[`CAPTURE.md`](CAPTURE.md).
 
 ## Repository workflow
 

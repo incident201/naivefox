@@ -1,10 +1,7 @@
-Firefox base SHA: 17e93ad5d3261e20104c7f6f2ec867ecc138ca1a
-NaiveFox reference SHA: c4a23f626e9e58ee832f0682a8bf504d037cb2c5
-Minimal export SHA: da9cd768cdc22bba370fcfcf2dc0a0d851d0bec4
-Build report source SHA: e9225674f75af2d8cf7178c4ac6fc98d74220c9c
-Configure report source SHA(s): e9225674f75af2d8cf7178c4ac6fc98d74220c9c
-Closure report source SHA(s): e9225674f75af2d8cf7178c4ac6fc98d74220c9c
-Minimal-source publication SHA: NOT_YET_PUBLISHED
-Export manifest version: 1
-Export manifest SHA-256: 8ffdf7061c7460fca3eae57a221b099def147e9f7f499c42e9134196aba44f8a
-Generated at: 2026-08-21T09:27:52Z
+Firefox base SHA: 7b61047039c98a25b9ef5c6824089ab6c60bf54c
+NaiveFox reference SHA: 75e1719d590083cbd60977961c695788a3ece1ba
+Minimal export SHA: 3b84fa001a50b5dfd5209717b154dbb27f23f68f
+Evidence source SHA: 43de35bde815c5f7515f8cc12f87b9cf60762615
+Evidence commit SHA: 3b84fa001a50b5dfd5209717b154dbb27f23f68f
+Export manifest version: 2
+Export manifest SHA-256: 43be1b75dab5e120efff5d3d4ddb03e29e6014cf00e996d62ed611aa0edfb020

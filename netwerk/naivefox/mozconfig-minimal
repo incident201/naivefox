@@ -11,7 +11,11 @@ ac_add_options --with-app-basename=NaiveFox
 ac_add_options --with-app-name=naivefox
 ac_add_options --build-backends=RecursiveMake
 
-ac_add_options --disable-tests
+if test "${NAIVEFOX_ENABLE_TESTS:-0}" = 1; then
+  ac_add_options --enable-tests
+else
+  ac_add_options --disable-tests
+fi
 ac_add_options --disable-crashreporter
 ac_add_options --disable-backgroundtasks
 ac_add_options --disable-sandbox
