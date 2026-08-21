@@ -4,6 +4,38 @@ This report records measured changes on the `minimal` branch. The full
 Firefox source tree and compiled Gecko dependency closure remain intact until
 later phases prove that they can be reduced safely.
 
+## Phase 3.1: no-SpiderMonkey product graph (2026-08-21)
+
+The final NaiveFox-only graph no longer traverses the `js/src` runtime `DIRS`
+or links its `FINAL_LIBRARY`. Public and generated JS headers remain because
+retained Gecko code still exposes JS ABI types; the narrow project-owned
+`SpiderMonkeyCompat.cpp` layer supplies the required ABI shims without adding
+the SpiderMonkey runtime back. URLPattern C++/Rust glue is also excluded.
+
+This is not an Intl-removal phase. Classic ICU and the ICU4X support used by
+encoding, locale canonicalization, and segmentation remain deliberately in
+the graph. In particular, retained `jsrust_shared` ICU4X support is not the
+SpiderMonkey runtime.
+
+The clean Linux build in an external product objdir completed a full
+`./mach build -j4` in 5:00 with 114 unused browser/JS-path warnings and no
+errors, then passed the staged runtime smoke and config SOCKS/HTTP CONNECT H2,
+H3, and Auto H3/fallback gates. The clean Windows cross-build in an external
+product objdir produced
+`x86_64-pc-windows-msvc` `xul.dll` and `naivefox.exe`; bundled Wine ran
+`--help` with explicit `WINEPREFIX`, `WINELOADER`, and `WINESERVER`.
+
+The two object directories contain no `js/src` `.o`, `.obj`, or `.a`, no
+`libjs_static.a`, and no Wasm objects. Their `dependentlibs.list` files have no
+`js`, `mozjs`, or `wasm` entries.
+
+Host-native acceptance then used the current staged Windows package. With the pinned Caddy
+fixture still in WSL and NaiveFox running natively on Windows,
+`verify-staged-windows-smoke.py` passed version/runtime smoke, dynamic SOCKS5 and HTTP
+CONNECT, malformed stress, and Unicode file logging. Strict H2 and H3 each
+passed SOCKS5 and HTTP CONNECT fetches with padding, and CLI Auto passed H3
+preference and H2 fallback.
+
 ## Phase 1: staged runtime resources
 
 Historical full-tree baseline source point (not the current audit
@@ -111,10 +143,13 @@ warnings after removal of an already-unused local usage helper.
 
 Acceptance passed: 49/49 project gtests, six focused Firefox classic CONNECT
 tests including raw H3, the copied staged package H2/H3/Auto gate with public
-TLS fetch, and `run-full-suite.sh` in 308.3 seconds. H2 and H3 capture
-comparisons, multiplexing, half-close, backpressure, integrity, simultaneous
-SOCKS/HTTP config listeners, and strict no-fallback assertions all remained
-green. No Firefox networking source was changed.
+TLS fetch, and a historical `run-full-suite.sh` in 308.3 seconds. H2 and H3
+capture comparisons in that record were historical; the current suite uses
+the downloaded Nightly for its quick capture, while same-base remains an
+isolated diagnostic. Multiplexing,
+half-close, backpressure, integrity, simultaneous SOCKS/HTTP config listeners,
+and strict no-fallback assertions all remained green. No Firefox networking
+source was changed.
 
 ## Phase 2.3: accessibility graph removal
 
@@ -195,9 +230,10 @@ fetch, profile/no-home checks, strict H2/H3 config workloads, and Auto.
 
 The final isolated H2 and H3 suites passed all raw CONNECT, SOCKS, padding,
 large-transfer integrity, backpressure, lifecycle, multiplexing, Auto,
-configuration, robustness, and capture checks. Capture uses an explicitly
-separate full Firefox baseline and per-runtime library paths; no Firefox
-browser binary is added to the lean staged package. A single sequential run
+configuration, robustness, and the historical capture checks. If a new capture
+comparison is explicitly requested, it uses a separate same-base Firefox
+control package and per-runtime library paths; no Firefox browser binary is
+added to the lean staged package. A single sequential run
 hit a transient libpref parser abort at the start of a second H3 capture pass;
 fresh per-pass profiles fixed the environmental race and the independent H3
 suite passed without weakening any gate.

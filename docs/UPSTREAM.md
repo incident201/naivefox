@@ -60,9 +60,10 @@ reference implementation: H2, H3, Auto, config, SOCKS5 and HTTP CONNECT
 listeners, Naive padding, every downstream Necko/Neqo hook, all Firefox-focused
 regressions, integration fixtures, capture tooling, and staging scripts.
 
-Do not minimize this branch. It is the mandatory first integration layer for
-every new Firefox base and the control that distinguishes an upstream refresh
-problem from a product-minimization problem.
+Do not minimize this branch. It is the mandatory source-integration layer for
+every new Firefox base: resolve conflicts and review the downstream inventory
+here before the product reaches `minimal`. It is not a Firefox browser build
+or runtime-test gate.
 
 ### `minimal`: full-source minimization branch
 
@@ -94,6 +95,58 @@ NaiveFox, and minimal commits plus the export-manifest version in
 Never merge `main`, `naivefox`, or `minimal` into `minimal-source`. Never merge
 generated changes back from `minimal-source`; fix the source of truth in
 `minimal` or an upper layer, validate it, and regenerate.
+
+### Full Firefox build and capture policy
+
+A full ordinary Firefox package is not part of the normal upstream/minimal
+cycle and is never a condition for merge, release, or routine NaiveFox changes.
+Gate 1 is source-only; the NaiveFox product is built and tested at Gate 2, and
+the standalone exported product is built and tested at Gate 3.
+
+The normal product suite includes a quick capture comparison against the
+downloaded, SHA-pinned latest Firefox Nightly recorded in
+`tools/firefox-reference-manifest`. This uses a binary package only; it does
+not build Firefox and remains part of the lightweight suite. A full ordinary
+Firefox build from source is permitted only as a separate, explicitly
+requested same-base capture/control. That isolated check builds ordinary
+Firefox and NaiveFox from the same Firefox base and compares the two packages'
+packet/transport behavior without becoming a prerequisite for the branch cycle.
+See `CAPTURE.md`, `H3-CAPTURE.md`, and `OBSERVER-TRAFFIC-REPORT.md`.
+
+### Compiler-cache preflight and fallback
+
+The bundled `sccache` is an optional acceleration layer, never an upstream,
+merge, export, or release gate. In Ubuntu24Dev, `sccache` 0.17.0 has been
+observed to leave the first configure compiler probe waiting on
+`127.0.0.1:4226` when its background server is absent or stale. The visible
+symptom is a configure process frozen at `clang -E`; this is a cache-server
+failure, not a source or build-graph failure.
+
+Before a Linux Gate 2 or Gate 3 configure/build, use the existing object
+directory and run a bounded preflight. Starting the server is harmless when it
+is already running; the probe is the actual pass/fail check:
+
+```bash
+SCCACHE="$HOME/.mozbuild/sccache/sccache"
+CLANG="$HOME/.mozbuild/clang/bin/clang"
+SYSROOT="$HOME/.mozbuild/sysroot-x86_64-linux-gnu"
+timeout 15 "$SCCACHE" --version
+timeout 15 "$SCCACHE" --start-server >/dev/null 2>&1 || true
+probe="$(mktemp "${TMPDIR:-/tmp}/naivefox-sccache-probe.XXXXXX")"
+trap 'rm -f "$probe"' EXIT
+printf 'int main(void) { return 0; }\n' >"$probe"
+if ! timeout 15 "$SCCACHE" "$CLANG" --sysroot "$SYSROOT" -x c "$probe" -E >/dev/null; then
+  echo "sccache unavailable; continuing without compiler cache" >&2
+  export NAIVEFOX_DISABLE_SCCACHE=1
+fi
+```
+
+If any bounded command times out, stop only the hung configure/build command
+and rerun it in the same object directory with
+`NAIVEFOX_DISABLE_SCCACHE=1`. `mozconfig-minimal` already honors that variable;
+do not delete the cache or create another object directory just to recover from
+this condition. The Windows product mozconfig does not enable this cache and
+does not need this preflight.
 
 ## Remotes, default branch, and merge direction
 
@@ -156,32 +209,81 @@ Evidence/configure report snapshot commit: a7251b0ea7fd530d1d23fada8e3217514aa13
 Validated Minimal evidence/export source commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
 Export manifest entries: 25558 (37 directory contracts)
 Export manifest SHA-256: recorded in each generated snapshot's `UPSTREAM-BASE`
-Published minimal-source root commit: pending publication from this export
-Published source tag: pending publication
+Published minimal-source root commit: 0df131ea63ae0d2dc1bbefb9e811fcd038168f70
+Published source tag: minimal-source-v0.2
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
+### Upstream refresh checkpoint (2026-08-21)
+
+`upstream/main` was fast-forwarded into `main` at Firefox base
+`7b61047039c98a25b9ef5c6824089ab6c60bf54c9`. Gate 1 merged the refreshed
+`main` into `naivefox` without conflicts, and Gate 2 merged that reference into
+`minimal` with the documented Cargo, DNS, and XPCOM conflict resolutions.
+The stale GitHub branch `codex/minimal-spidermonkey-guards` was deleted because
+its tip was already an ancestor of `minimal`.
+
+The product-only Gate 2 evidence was regenerated after the merge. The tooling
+checkpoint is `e9225674f75a` and the report-only snapshot is
+`4b9c53757700`; both Linux and Windows closure assertions pass with
+`SpiderMonkey=absent`, `gkrust` present, and no `js`/`mozjs`/`wasm` runtime
+dependencies. The Linux and Windows build-input reports contain 17,748 and
+18,111 files respectively; the attested configure traces contain 10,270 and
+10,327 files. These are evidence sizes, not export contracts.
+
+The normal H2/H3/Auto/config product suite passed, including its quick capture
+against the SHA-pinned Firefox Nightly binary (`Mozilla Firefox 156.0a1`). No
+ordinary Firefox package was built. A full same-base Firefox/NaiveFox capture
+remains an explicit optional diagnostic only; it is not a merge, release, or
+routine-change condition.
+
+The standalone export Gate 3 is the next step after this checkpoint. It must
+run `--plan-only`, create one clean export, build only NaiveFox from that tree,
+and pass the staged product suite before a new `minimal-source` snapshot is
+published. The previous `minimal-source` snapshot remains historical until
+this cycle completes.
+
 ### Current pre-export audit provenance
 
-The Linux/Windows configure, build-input, and linked-closure reports used by
-the current export attest one audited source `a533411d0c4940f3063d1d01313a3e4fc24ba53d`;
-the final report-only/export-tool evidence snapshot is
-`a7251b0ea7fd530d1d23fada8e3217514aa1399c`.
-The target union passed strict provenance, repository-relative path, license,
-mode, and content checks. The clean export was built and tested without access
-to the full Firefox checkout or its object directory. A full Firefox browser
-build is intentionally not an acceptance gate: `./mach build export`, the
-NaiveFox `binaries` target, staged runtime, and focused H2/H3/Auto/config gates
-are the product gates. Do not copy a working-tree SHA into its own commit
-documentation.
+The Linux/Windows configure, build-input, and linked-closure reports for this
+cycle attest source `e9225674f75a` and are frozen in report-only commit
+`4b9c53757700`. The target union passed strict provenance, repository-relative
+path, license, mode, content, and no-SpiderMonkey checks. A full Firefox browser
+build is intentionally not an acceptance gate: the NaiveFox product build,
+staged runtime, focused H2/H3/Auto/config gates, and the quick Nightly capture
+are the routine gates.
 
-The capture reference is no longer an optional in-tree Firefox binary:
-`tools/fetch-firefox-reference.sh` downloads and digest-records the clean
-official Mozilla release used by `CAPTURE.md`, `H3-CAPTURE.md`, and
-`OBSERVER-TRAFFIC-REPORT.md`. Exact cross-release TLS/QUIC field equality is
-diagnostic; Necko/NSS/Neqo ownership, strict protocol/no-fallback behavior,
-classic CONNECT, padding, and multiplexing remain acceptance gates.
+### No-SpiderMonkey graph handoff (2026-08-21)
+
+The final NaiveFox product graph suppresses SpiderMonkey's `js/src` runtime
+`DIRS` and `FINAL_LIBRARY`, but deliberately retains the public/generated JS
+headers needed by common Gecko ABI declarations. The project-owned
+`netwerk/naivefox/core/SpiderMonkeyCompat.cpp` boundary supplies only the
+required ABI shims. URLPattern C++ and Rust glue is removed for NaiveFox.
+Normal Firefox keeps its normal SpiderMonkey and URLPattern graph.
+
+Intl is a separate boundary: classic ICU plus the retained ICU4X encoding,
+locale, and segmenter support remain. `jsrust_shared` is retained for that
+ICU4X/common support and must not be mistaken for a SpiderMonkey runtime edge.
+No no-Intl result is asserted by this checkpoint.
+
+Clean Linux acceptance used an external product objdir: full `mach build -j4` PASS in
+5:00 with 114 unused browser/JS-only warnings and no errors, followed by staged
+runtime smoke and config SOCKS/HTTP CONNECT H2, H3, and Auto H3/fallback. Clean
+Windows acceptance used
+an external Windows product objdir: the
+`x86_64-pc-windows-msvc` cross-build produced `xul.dll`/`naivefox.exe`, and
+bundled Wine passed `--help` after explicit `WINEPREFIX`, `WINELOADER`, and
+`WINESERVER` selection. Native Windows protocol tests were previously run on
+the host with Caddy kept in WSL; those tests are a separate product/runtime
+check and do not imply a full Firefox browser build.
+
+Both objdirs contain no `js/src` `.o`, `.obj`, or `.a`, no
+`libjs_static.a`, and no Wasm objects; build-output `dependentlibs.list` has no
+`js`, `mozjs`, or `wasm` entry. Future Firefox refreshes must preserve this
+distinction between retained ABI headers/ICU4X support and the removed JS
+runtime, then repeat both clean build-graph audits and the staged network gate.
 
 The `minimal` branch was initialized from that tagged NaiveFox line and then
 fast-forwarded through the validated config/profile corrections above; it has
@@ -189,7 +291,7 @@ no minimization-only commit at this baseline. Every release or significant
 milestone must record concrete Firefox, NaiveFox, minimal, and generated-source
 SHAs. Phrases such as "current Firefox main" are not valid release provenance.
 
-## Two-gate Firefox refresh workflow
+## Three-gate upstream/product/export workflow
 
 There is no supported `main -> minimal` workflow. Every Firefox refresh must
 pass the following gates in order.
@@ -205,25 +307,21 @@ git switch -c refresh/firefox-YYYYMMDD
 git merge main
 ```
 
-Resolve conflicts on the refresh branch. Before merging it into `naivefox`:
+Resolve conflicts on the refresh branch. Gate 1 is deliberately source-only.
+Before merging it into `naivefox`:
 
 1. inspect every downstream file in the patch inventory below, even if Git did
    not report a textual conflict;
-2. build NaiveFox with the refreshed full Firefox tree;
-3. run all project gtests;
-4. run the focused Firefox CONNECT/H2/H3/Necko/Neqo regression set associated
-   with the active patches;
-5. run the complete H2/H3/Auto/config integration suite;
-6. stage and verify the runtime outside the object directory;
-7. rerun capture sanity/comparison when TLS, H2, H3, Neqo, NSS, PSM, or relevant
-   network preferences changed;
-8. run the bounded supplied-real-Caddy gate when networking behavior changed
-   materially.
+2. review each conflict resolution and nearby upstream change for preserved
+   normal Firefox behavior and the smallest downstream patch;
+3. update the exact base/inventory metadata and remove any patch made obsolete
+   by an upstream API or fix;
+4. review build manifests and configuration diffs for unintended graph changes.
 
-Only after every applicable check passes may the refresh branch be merged into
-`naivefox`. Update the three concrete validated SHA fields in this document as
-part of that milestone. If Firefox now exposes an equivalent supported API or
-fix, remove the downstream patch instead of carrying it forward by inertia.
+Do not configure or build a Firefox browser package at Gate 1. Do not run the
+NaiveFox product suite there either; product build/runtime validation belongs
+to Gate 2. After the source and inventory review passes, merge the refresh into
+`naivefox` and update the concrete SHA record.
 
 ### Gate 2: `naivefox` -> `minimal`
 
@@ -236,11 +334,11 @@ git switch -c refresh/minimal-YYYYMMDD
 git merge naivefox
 ```
 
-Before merging it into `minimal`, verify the minimal build/runtime, package
-manifest, H2, H3, Auto, SOCKS5, HTTP CONNECT, config mode, padding,
-integrity/concurrency, size regression, and staged runtime outside the build
-tree. Add focused checks for any dependency or packaging area touched while
-resolving conflicts.
+Before merging it into `minimal`, build and verify the NaiveFox minimal product:
+the build/runtime, package manifest, H2, H3, Auto, SOCKS5, HTTP CONNECT, config
+mode, padding, integrity/concurrency, size regression, and staged runtime
+outside the build tree. Add focused checks for any dependency or packaging area
+touched while resolving conflicts. This is the normal cycle's product gate.
 
 If Gate 1 passes but Gate 2 fails, classify the failure as a minimization
 integration defect until evidence proves otherwise. Do not weaken `naivefox`
@@ -469,7 +567,7 @@ The remote `main` mirror and the first validated NaiveFox base share that exact
 Firefox commit. No upstream fetch or base update was performed while adopting
 the three-branch policy.
 
-## Baseline build
+## One-time historical baseline build (non-gate)
 
 On 2026-08-12 the untouched checkout was bootstrapped for a full Firefox
 Desktop build and built successfully.
@@ -481,6 +579,12 @@ Build type: full Firefox Desktop, non-artifact
 Build time: 42 minutes 55 seconds
 Build log: artifacts/baseline-build.log (local, ignored)
 ```
+
+This was a one-time environment/bootstrap record from project initialization.
+It is preserved as history, but it is not a current Gate 1, merge, release, or
+routine-change requirement and must not be repeated by default. A new ordinary
+Firefox package is built only for an explicitly requested isolated same-base
+capture/comparison.
 
 Mozilla bootstrap used its managed Clang/Rust toolchains. The Ubuntu packages
 `watchman` and `gh` were added to the development environment; `gh` is not
@@ -997,6 +1101,21 @@ netwerk/naivefox/tools/stage-runtime.sh
 netwerk/naivefox/tools/verify-staged-runtime.sh
 ```
 
+The normal `run-full-suite.sh` command runs the NaiveFox product gates and the
+quick capture checks against the downloaded Nightly binary. It does not build
+Firefox. For the optional full same-base control, run the capture runners
+directly with matching build artifacts:
+
+```bash
+NAIVEFOX_CAPTURE_MODE=same-base \
+NAIVEFOX_CAPTURE_REFERENCE_BIN=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_LIBDIR=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/full-firefox-objdir \
+./netwerk/naivefox/test/integration/run-capture-comparison.sh
+```
+
+Repeat with `run-h3-capture-comparison.sh` when the H3 control is requested.
+
 Purpose:
 
 Add a strict NaiveProxy-compatible JSON subset, automatic persistent or
@@ -1044,7 +1163,8 @@ Tests:
 
 - warning-free `./mach build -j4 binaries`;
 - 49/49 project and padding gtests;
-- complete local H2/H3 suite, including prior robustness and capture gates;
+- complete local H2/H3 suite, including prior robustness checks and the
+  historical capture record;
 - strict H2 and H3 config workloads with simultaneous wildcard-bound SOCKS5
   and HTTP CONNECT listeners and repeated per-listener proxy-array entries;
 - a concrete non-loopback interface bind and successful client connection;
@@ -1082,9 +1202,9 @@ During every Mozilla synchronization:
 
 1. fast-forward only the clean `main` mirror from `upstream/main`;
 2. create `refresh/firefox-YYYYMMDD` from the validated `naivefox`;
-3. merge `main` there and inspect every inventory file, not only conflicts;
-4. pass the complete Gate 1 build, test, staging, and conditional capture/real
-   deployment checks;
+3. merge `main` there and complete the Gate 1 source/inventory/conflict review;
+4. do not build or test a Firefox browser package or the NaiveFox product at
+   Gate 1;
 5. merge the validated refresh into `naivefox` and update the exact SHA record;
 6. create `refresh/minimal-YYYYMMDD` from the validated `minimal`;
 7. merge only the newly validated `naivefox` there and pass the complete Gate 2
@@ -1148,9 +1268,10 @@ Tests:
 
 - cold lean link and direct HTTPS fetch (`example.com`, HTTP 200);
 - staged runtime smoke, public fetch, persistent/temporary/no-home profiles;
-- H2 and H3 raw, SOCKS, padding, robustness, Auto, config, and capture suites;
-- full Firefox baseline capture uses separate libraries and remains outside
-  the lean package.
+- H2 and H3 raw, SOCKS, padding, robustness, Auto, config, and quick capture
+  suites against the downloaded Nightly binary;
+- an explicitly requested same-base full Firefox capture/control package uses
+  separate libraries and remains outside the lean product package.
 
 Commit: `daf76d468b89 min: validate lean staged runtime`
 
@@ -1546,13 +1667,16 @@ new downstream Necko patch inventory entries:
 |---|---|---|---|
 | Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
 | Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
-| Official capture reference | `tools/fetch-firefox-reference.sh`, capture runners/docs | Download and digest-record a clean Mozilla Firefox release; do not require an optional full Firefox package or source objdir. | Firefox 154.0 archive digest recorded in `REFERENCE-MANIFEST`; H2/H3 decrypted and passive gates PASS. |
+| Capture comparison | capture runners/docs | The normal suite uses the downloaded Nightly binary for quick H2/H3 comparison; only an explicitly requested same-base run builds ordinary Firefox, and that package is never a refresh or release gate. | Historical H2/H3 decrypted and passive records plus the pinned Nightly manifest. |
 | Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `tools/minimal-source-plan.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean/resource closure and strict repository-relative/provenance checks. | Six-report target union: five original reports frozen in `bec198a62d42` from source `745d58bf7dcb`, plus Windows configure trace from `af716bf57f83`; both target assertions and the 25,549-entry plan PASS. |
 
 Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
 stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate
 `main -> refresh/firefox-* -> naivefox -> refresh/minimal-* -> minimal`
-workflow above and rerun the full H2/H3/config/capture gates before export.
+workflow above and rerun the full H2/H3/config product gates before export.
+Run the full same-base capture diagnostic only when explicitly requested; the
+quick downloaded-Nightly capture remains part of the normal product suite, and
+the full ordinary Firefox package is never a refresh or release condition.
 
 
 ## 3-Tier Build Performance Benchmark
@@ -1561,7 +1685,7 @@ Measured on standard 16-thread development workstation:
 
 1. **Incremental build (`./mach build binaries`):** **~2.85s**
 2. **Clean objdir rebuild with warm compiler cache (`sccache`):** **~36s**
-3. **True cold build from scratch without compiler cache (`SCCACHE_DISABLE=1`):** **1m 16.268s** (`real 1m16.268s`)
+3. **True cold build from scratch without compiler cache (`NAIVEFOX_DISABLE_SCCACHE=1`):** **1m 16.268s** (`real 1m16.268s`)
 
 
 ## Verified Test Gate Inventory

@@ -110,7 +110,9 @@ class nsUDPMessage : public nsIUDPMessage {
   NetAddr mAddr;
   nsCOMPtr<nsIOutputStream> mOutputStream;
   FallibleTArray<uint8_t> mData;
+#ifndef MOZ_NAIVEFOX
   JS::Heap<JSObject*> mJsobj;
+#endif
 };
 
 //-----------------------------------------------------------------------------

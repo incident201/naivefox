@@ -30,8 +30,9 @@ manifest_value() {
 default_url=$(manifest_value url)
 default_sha256=$(manifest_value archive_sha256)
 default_version=$(manifest_value version)
+default_mode=$(manifest_value mode)
 [[ $default_url == https://* && $default_sha256 =~ ^[0-9a-f]{64}$ && \
-  -n $default_version ]] || {
+  -n $default_version && $default_mode == nightly ]] || {
   printf 'invalid committed Firefox reference manifest\n' >&2
   exit 1
 }
@@ -99,7 +100,8 @@ if [[ $version != "$expected_version" ]]; then
 fi
 mv -- "$extracted" "$output"
 {
-  printf 'source=Mozilla official download\n'
+  printf 'mode=%s\n' "$default_mode"
+  printf 'source=Mozilla Firefox Nightly download\n'
   printf 'url=%s\n' "$effective_url"
   printf 'archive_sha256=%s\n' "$sha256"
   printf 'version=%s\n' "$version"

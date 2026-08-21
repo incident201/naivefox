@@ -2801,10 +2801,11 @@ http3:
       Tracking this lets us know when the stale-entry population has died out.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2030700
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064971
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2030700
     data_sensitivity:
       - technical
     notification_emails:
       - necko@mozilla.com
-    expires: 158
+    expires: 168

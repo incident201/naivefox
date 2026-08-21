@@ -329,11 +329,8 @@ DIRS += [
 ]
 
 if CONFIG["MOZ_NAIVEFOX"]:
-    # Compression dictionaries use URLPattern matching, but not the DOM
-    # URLPattern binding. Keep the small Rust matcher without restoring DOM.
     DIRS += [
         "uritemplate_glue",
-        "urlpattern_glue",
     ]
 else:
     DIRS += [

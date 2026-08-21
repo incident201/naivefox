@@ -9,7 +9,9 @@
 #  include "MockNetworkLayer.h"
 #endif
 #include "mozilla/Components.h"
-#include "mozilla/HoldDropJSObjects.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/HoldDropJSObjects.h"
+#endif
 #include "mozilla/ProfilerBandwidthCounter.h"
 #include "mozilla/StaticPrefs_network.h"
 #ifndef MOZ_NAIVEFOX
@@ -194,14 +196,18 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsUDPMessage)
 NS_INTERFACE_MAP_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsUDPMessage)
+#ifndef MOZ_NAIVEFOX
   NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mJsobj)
+#endif
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsUDPMessage)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsUDPMessage)
+#ifndef MOZ_NAIVEFOX
   tmp->mJsobj = nullptr;
+#endif
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 nsUDPMessage::nsUDPMessage(NetAddr* aAddr, nsIOutputStream* aOutputStream,

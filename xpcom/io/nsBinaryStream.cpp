@@ -22,11 +22,14 @@
 
 #include <algorithm>
 
-#include "js/ArrayBuffer.h"  // JS::{GetArrayBuffer{,ByteLength},IsArrayBufferObject}
-#include "js/ArrayBufferMaybeShared.h"  // JS::IsImmutableArrayBufferMaybeShared
-#include "js/GCAPI.h"                   // JS::AutoCheckCannotGC
-#include "js/RootingAPI.h"              // JS::{Handle,Rooted}
-#include "js/Value.h"                   // JS::Value
+#include "StaticComponents.h"
+#ifndef MOZ_NAIVEFOX
+#  include "js/ArrayBuffer.h"  // JS::{GetArrayBuffer{,ByteLength},IsArrayBufferObject}
+#  include "js/ArrayBufferMaybeShared.h"  // JS::IsImmutableArrayBufferMaybeShared
+#  include "js/GCAPI.h"                   // JS::AutoCheckCannotGC
+#  include "js/RootingAPI.h"              // JS::{Handle,Rooted}
+#  include "js/Value.h"                   // JS::Value
+#endif
 #include "mozilla/CheckedInt.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/PodOperations.h"
@@ -46,6 +49,12 @@ using mozilla::MakeUnique;
 using mozilla::PodCopy;
 using mozilla::Span;
 using mozilla::UniquePtr;
+
+static bool IsCIDSerializable(const nsID& aCID) {
+  const mozilla::xpcom::StaticModule* module =
+      mozilla::xpcom::StaticComponents::LookupByCID(aCID);
+  return module && module->mIsSerializable;
+}
 
 already_AddRefed<nsIObjectOutputStream> NS_NewObjectOutputStream(
     nsIOutputStream* aOutputStream) {
@@ -308,20 +317,24 @@ nsBinaryOutputStream::WriteCompoundObject(nsISupports* aObject,
 
   nsCID cid;
   nsresult rv = classInfo->GetClassIDNoAlloc(&cid);
-  if (NS_SUCCEEDED(rv)) {
-    rv = WriteID(cid);
-  } else {
-    nsCID* cidptr = nullptr;
-    rv = classInfo->GetClassID(&cidptr);
+  if (NS_FAILED(rv)) {
+    std::unique_ptr<nsCID> cidptr;
+    rv = classInfo->GetClassID(mozilla::getter_Transfers(cidptr));
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
 
-    rv = WriteID(*cidptr);
-
-    free(cidptr);
+    cid = *cidptr;
   }
 
+  if (NS_WARN_IF(!IsCIDSerializable(cid))) {
+    MOZ_ASSERT_UNREACHABLE(
+        "static component entry was not marked as serializable for "
+        "nsISerializable");
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  rv = WriteID(cid);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -810,6 +823,10 @@ NS_IMETHODIMP
 nsBinaryInputStream::ReadArrayBuffer(uint64_t aLength,
                                      JS::Handle<JS::Value> aBuffer,
                                      JSContext* aCx, uint64_t* aReadLength) {
+#ifdef MOZ_NAIVEFOX
+  *aReadLength = 0;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!aBuffer.isObject()) {
     return NS_ERROR_FAILURE;
   }
@@ -868,6 +885,7 @@ nsBinaryInputStream::ReadArrayBuffer(uint64_t aLength,
   } while (pos < aLength);
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -951,6 +969,10 @@ nsBinaryInputStream::ReadObject(bool aIsStrongRef, nsISupports** aObject) {
     iid = newCertIID;
   }
   // END HACK
+
+  if (NS_WARN_IF(!IsCIDSerializable(cid))) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
 
   nsCOMPtr<nsISupports> object = do_CreateInstance(cid, &rv);
   if (NS_WARN_IF(NS_FAILED(rv))) {

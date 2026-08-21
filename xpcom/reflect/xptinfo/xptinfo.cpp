@@ -64,12 +64,17 @@ nsresult nsXPTInterfaceInfo::GetMethodInfo(
 nsresult nsXPTInterfaceInfo::GetConstant(uint16_t aIndex,
                                          JS::MutableHandle<JS::Value> aConstant,
                                          char** aName) const {
+#ifdef MOZ_NAIVEFOX
+  *aName = nullptr;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (aIndex < ConstantCount()) {
     aConstant.set(Constant(aIndex).JSValue());
     *aName = moz_xstrdup(Constant(aIndex).Name());
     return NS_OK;
   }
   return NS_ERROR_FAILURE;
+#endif
 }
 
 ////////////////////////////////////
@@ -90,6 +95,9 @@ const char* nsXPTMethodInfo::SymbolDescription() const {
 }
 
 bool nsXPTMethodInfo::GetId(JSContext* aCx, jsid& aId) const {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   if (IsSymbol()) {
     aId = JS::PropertyKey::Symbol(GetSymbol(aCx));
     return true;
@@ -101,4 +109,5 @@ bool nsXPTMethodInfo::GetId(JSContext* aCx, jsid& aId) const {
   }
   aId = JS::PropertyKey::NonIntAtom(str);
   return true;
+#endif
 }
