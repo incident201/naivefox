@@ -10,8 +10,11 @@ suites=(
   run-socks-tests.sh
   run-padded-tests.sh
   run-robustness-tests.sh
-  run-capture-comparison.sh
 )
+
+if [[ ${NAIVEFOX_RUN_CAPTURE:-0} == 1 ]]; then
+  suites+=(run-capture-comparison.sh)
+fi
 
 for suite in "${suites[@]}"; do
   printf 'Running %s\n' "$suite"

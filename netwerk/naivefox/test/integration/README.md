@@ -25,6 +25,18 @@ the proxy port. They require `Outer protocol: h3`, so H2 fallback cannot satisfy
 the workload. Both suites execute the same `naivefox` binary and share the
 SOCKS, CONNECT, padding, and pump implementation.
 
+The H2/H3 suites do not run Firefox capture comparisons by default. The
+ordinary Firefox control is an isolated, explicitly requested same-base
+diagnostic. After placing the matching Firefox and NaiveFox packages in the
+capture environment, opt in explicitly with:
+
+```bash
+NAIVEFOX_RUN_CAPTURE=1 ./run-full-suite.sh
+```
+
+Without that variable, the complete suite remains a NaiveFox-only product
+gate and does not download or build Firefox.
+
 Run the NaiveProxy-style config and simultaneous local-listener gates with:
 
 ```bash
@@ -74,8 +86,9 @@ HTTPS and direct/proxied integrity, and mixes SOCKS with HTTP CONNECT requests.
 Private configs are deleted on both success and failure; retained summaries do
 not contain the endpoint or credentials.
 
-The final capture step requires the restricted `dumpcap` capabilities
-documented below and in `../../CAPTURE.md`.
+The optional capture comparison requires the restricted `dumpcap` capabilities
+documented below and in `../../CAPTURE.md`; it is never part of the normal
+product gate.
 
 Run the complete M0.4 control suite from this directory:
 
@@ -146,7 +159,7 @@ TCP decoy beside the H3-only UDP fixture and requires zero decoy accepts for H3
 success, authentication rejection, and target failure. Raw and SOCKS entry
 points use the same policy.
 
-Run the M10 Firefox/NaiveFox wire comparison with:
+Run the separately requested M10 Firefox/NaiveFox wire comparison with:
 
 ```bash
 ./run-capture-comparison.sh
@@ -159,7 +172,7 @@ data under the object directory and are deleted on success. Only sanitized
 ClientHello, ALPN, SETTINGS, early-frame, stream-reuse, and header-name
 metadata is retained.
 
-Run the strict HTTP/3 equivalent with:
+Run the separately requested strict HTTP/3 equivalent with:
 
 ```bash
 ./run-h3-capture-comparison.sh

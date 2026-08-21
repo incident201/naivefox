@@ -798,14 +798,15 @@ Run the complete local integration gate with:
 ./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
-The capture phase requires the restricted `dumpcap` capabilities documented
-in `CAPTURE.md`. The H3-specific decrypted and no-keylog comparison is in
-`H3-CAPTURE.md` and is reproduced by
-`test/integration/run-h3-capture-comparison.sh`. The commands build or reuse
-the pinned fixture dependencies, and an explicitly requested same-base capture
-run supplies isolated ordinary Firefox and NaiveFox packages. The normal
+The optional capture phase requires the restricted `dumpcap` capabilities
+documented in `CAPTURE.md`. The H3-specific decrypted and no-keylog comparison
+is in `H3-CAPTURE.md` and is reproduced by
+`test/integration/run-h3-capture-comparison.sh`. Set
+`NAIVEFOX_RUN_CAPTURE=1` only for an explicitly requested same-base capture
+diagnostic with matching ordinary Firefox and NaiveFox packages. The normal
 commands run local functional and failure-path suites sequentially and delete
-sensitive run material after every successful phase; they do not build Firefox.
+sensitive run material after every successful phase; they do not build or
+download Firefox.
 
 Additional repeatable test entry points are:
 

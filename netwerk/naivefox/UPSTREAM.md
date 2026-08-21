@@ -1082,6 +1082,11 @@ netwerk/naivefox/tools/stage-runtime.sh
 netwerk/naivefox/tools/verify-staged-runtime.sh
 ```
 
+The normal `run-full-suite.sh` command is a NaiveFox-only product gate and
+does not run or fetch an ordinary Firefox package. The H2/H3 capture runners
+are separate same-base diagnostics; after an explicit request and package
+setup, `NAIVEFOX_RUN_CAPTURE=1` opts them into the full suite.
+
 Purpose:
 
 Add a strict NaiveProxy-compatible JSON subset, automatic persistent or

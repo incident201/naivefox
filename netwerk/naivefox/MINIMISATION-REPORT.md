@@ -145,10 +145,11 @@ warnings after removal of an already-unused local usage helper.
 
 Acceptance passed: 49/49 project gtests, six focused Firefox classic CONNECT
 tests including raw H3, the copied staged package H2/H3/Auto gate with public
-TLS fetch, and `run-full-suite.sh` in 308.3 seconds. H2 and H3 capture
-comparisons, multiplexing, half-close, backpressure, integrity, simultaneous
-SOCKS/HTTP config listeners, and strict no-fallback assertions all remained
-green. No Firefox networking source was changed.
+TLS fetch, and a historical `run-full-suite.sh` in 308.3 seconds. H2 and H3
+capture comparisons were historical isolated diagnostics; multiplexing,
+half-close, backpressure, integrity, simultaneous SOCKS/HTTP config listeners,
+and strict no-fallback assertions all remained green. No Firefox networking
+source was changed.
 
 ## Phase 2.3: accessibility graph removal
 

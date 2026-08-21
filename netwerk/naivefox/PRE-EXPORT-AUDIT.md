@@ -126,7 +126,9 @@ Detailed in [`netwerk/naivefox/SHIMS.md`](SHIMS.md) and verified by [`netwerk/na
 ## 5. Verification Status
 
 ### Linux x86_64 Status: Fully Verified
-Automated test gates executed via live Caddy fixture (`test/integration/run-full-suite.sh` and `tools/verify-staged-runtime.sh`):
+Automated NaiveFox product gates executed via live Caddy fixture
+(`test/integration/run-full-suite.sh` and `tools/verify-staged-runtime.sh`)
+exclude the optional ordinary-Firefox capture control:
 - `[PASS]` SOCKS5 listener (IPv4/IPv6, TCP CONNECT, domain names)
 - `[PASS]` HTTP CONNECT listener
 - `[PASS]` Multiplexed H2 proxying with padding negotiation

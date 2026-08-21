@@ -1121,6 +1121,11 @@ Run all reproducible local H2 and H3 integration gates sequentially with:
 ./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
+The normal full suite is a NaiveFox-only product gate. It excludes the
+ordinary Firefox capture control; that isolated comparison is run only on
+request with matching same-base packages, optionally using
+`NAIVEFOX_RUN_CAPTURE=1 ./netwerk/naivefox/test/integration/run-full-suite.sh`.
+
 The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
 user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
 must not weaken any item in this H2 suite. Native Windows x86_64 now has a
