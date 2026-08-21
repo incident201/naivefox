@@ -1,10 +1,10 @@
 {
   "counts": {
     "executable_files": 144,
-    "files": 22660
+    "files": 22661
   },
-  "evidence_commit": "22fd5248f6193fe0e4dacf6b1e24aa17bf9ad5d5",
-  "evidence_source_commit": "72380e73fd8783751342c42f956b08b10866ade4",
+  "evidence_commit": "61af3272cf93beb8d377586f94b0c490b48eec62",
+  "evidence_source_commit": "aebb8eee8d2a13eb89593ffc805132fe56593c4b",
   "files": [
     {
       "mode": "0644",
@@ -39745,6 +39745,11 @@
       "mode": "0644",
       "path": "third_party/python/platformdirs/platformdirs/version.py",
       "sha256": "75d37711c50f7deafb09baa6c85366834dd1deefaa0e7df64ff7cbb31db9f829"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/platformdirs/platformdirs/windows.py",
+      "sha256": "205a62a21501c313ed0b39722b036dc725b8264f2169ae96f28e7d99fac35d5a"
     },
     {
       "mode": "0644",
@@ -113308,8 +113313,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "0fae9c58c930b6e706a39c0aab247f037aef98df9776fa16e79a98784e2eca10",
+  "manifest_sha256": "652c8f0fc5b343aef70d6aa8e1c6639644ee6bb04b0b43c4596be17b641dc65f",
   "manifest_version": 2,
-  "minimal_export_commit": "22fd5248f6193fe0e4dacf6b1e24aa17bf9ad5d5",
-  "naivefox_reference_commit": "72380e73fd8783751342c42f956b08b10866ade4"
+  "minimal_export_commit": "61af3272cf93beb8d377586f94b0c490b48eec62",
+  "naivefox_reference_commit": "aebb8eee8d2a13eb89593ffc805132fe56593c4b"
 }
