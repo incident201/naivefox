@@ -68,6 +68,16 @@ TRACKED_SOURCE_FIXTURES = {
     "memory/replace/logalloc/replay/expected_output_minimal.log",
     "memory/replace/logalloc/replay/replay.log",
 }
+# Mach imports Blessed before configure starts.  Linux evidence therefore
+# cannot observe Blessed's Windows-only import path or the Jinxed/ANSICON
+# modules behind it.  Export these small vendored packages as a bounded
+# platform bootstrap class so the standalone tree can start Mach natively on
+# Windows.
+WINDOWS_MACH_BOOTSTRAP_PREFIXES = (
+    "third_party/python/ansicon/",
+    "third_party/python/blessed/",
+    "third_party/python/jinxed/",
+)
 ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
     r"(?:naivefox|obj-[^/\s\"']*)(?:/|\s|$)|"
@@ -527,6 +537,13 @@ def main() -> int:
 
     for value in sorted(path for path in tracked if path.startswith("python/mozboot/")):
         add(value, "explicit:mach-bootstrap")
+
+    for value in sorted(
+        path
+        for path in tracked
+        if path.startswith(WINDOWS_MACH_BOOTSTRAP_PREFIXES)
+    ):
+        add(value, "explicit:mach-windows-bootstrap")
 
     for value in sorted(
         path for path in tracked if path.startswith("config/") and path.endswith(".mk")
