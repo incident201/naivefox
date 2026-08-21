@@ -143,7 +143,15 @@ DIRS += [
     "buildid_reader",
 ]
 
-TEST_DIRS += ["gtest"]
+if CONFIG["MOZ_NAIVEFOX"] and CONFIG["ENABLE_TESTS"]:
+    # NaiveFox disables generic TEST_DIRS traversal and opts into the one gtest
+    # link target required by its focused lifecycle regression suite.
+    # Keep the gtest tier so `mach gtest` has a runnable target. NaiveFox's
+    # focused sources are linked into ordinary xul; toolkit/library/gtest is
+    # an otherwise empty tier marker for this product.
+    DIRS += ["gtest"]
+else:
+    TEST_DIRS += ["gtest"]
 
 # js needs to come after xul for now, because it is an archive and its content
 # is discarded when it comes first.

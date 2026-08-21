@@ -10,4 +10,7 @@ SOURCES += [
 
 DIRS += ["codec", "core"]
 
-TEST_DIRS += ["test/gtest"]
+if CONFIG["ENABLE_TESTS"]:
+    # NaiveFox suppresses the tree-wide TEST_DIRS traversal and opts into only
+    # its lifecycle-focused gtests through an ordinary directory edge.
+    DIRS += ["test/gtest"]

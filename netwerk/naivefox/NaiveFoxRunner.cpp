@@ -21,6 +21,16 @@
 #include "nsString.h"
 #include "nsXPCOM.h"
 
+#ifdef ENABLE_TESTS
+#  include "GTestRunner.h"
+#endif
+
+#ifdef ENABLE_TESTS
+namespace mozilla {
+int (*RunGTest)(int*, char**) = nullptr;
+}  // namespace mozilla
+#endif
+
 namespace {
 
 class AutoLogging final {
@@ -77,6 +87,18 @@ const char* ProxyProtocolName(mozilla::naivefox::ProxyProtocol aProtocol) {
 }  // namespace
 
 extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
+#ifdef ENABLE_TESTS
+  if (std::getenv("MOZ_RUN_GTEST")) {
+    mozilla::EnsureGTestRunnerLinked();
+    if (!mozilla::RunGTest) {
+      std::fprintf(stderr,
+                   "TEST-UNEXPECTED-FAIL | gtest | runner is not linked\n");
+      return 1;
+    }
+    return mozilla::RunGTest(&aArgc, aArgv);
+  }
+#endif
+
   AutoLogging logging;
   mozilla::LogModule::Init(aArgc, aArgv);
 

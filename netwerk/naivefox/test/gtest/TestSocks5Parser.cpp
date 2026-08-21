@@ -139,7 +139,9 @@ TEST(NaiveFoxSocks5Parser, FailedStateIsTerminalAndConsumesNothing)
   EXPECT_EQ(parser.Consume(Span(request), consumed), Event::RejectCommand);
   EXPECT_EQ(consumed, 5U);
 
-  const nsTArray<uint8_t> tail(1024, 0xaa);
+  nsTArray<uint8_t> tail;
+  tail.SetLength(1024);
+  std::fill(tail.Elements(), tail.Elements() + tail.Length(), 0xaa);
   consumed = 123;
   EXPECT_EQ(parser.Consume(Span(tail), consumed), Event::ProtocolError);
   EXPECT_EQ(consumed, 0U);

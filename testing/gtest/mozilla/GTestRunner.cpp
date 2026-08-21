@@ -5,11 +5,13 @@
 #include "GTestRunner.h"
 #include "gtest/gtest.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/FOG.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/FOG.h"
+#endif
 #include "mozilla/Preferences.h"
 #include "nsICrashReporter.h"
 #include "nsString.h"
-#include "testing/TestHarness.h"
+#include "TestHarness.h"
 #include "prenv.h"
 #include "prtime.h"
 #ifdef ANDROID
@@ -28,6 +30,8 @@ using ::testing::TestSuite;
 using ::testing::UnitTest;
 
 namespace mozilla {
+
+void EnsureGTestRunnerLinked() {}
 
 #ifdef ANDROID
 #  define MOZ_STDOUT_PRINT(...) \
@@ -245,6 +249,7 @@ int RunGTestFunc(int* argc, char** argv) {
     }
   }
 
+#ifndef MOZ_NAIVEFOX
   // FOG should init exactly once, as early into running as possible, to enable
   // instrumentation tests to work properly.
   // However, at init, Glean may decide to send a ping. So let's first tell FOG
@@ -260,6 +265,7 @@ int RunGTestFunc(int* argc, char** argv) {
                       int32_t(PR_Now() / PR_USEC_PER_SEC));
   const nsCString empty;
   RefPtr<FOG>(FOG::GetSingleton())->InitializeFOG(empty, empty, false);
+#endif
 
   return RUN_ALL_TESTS();
 }

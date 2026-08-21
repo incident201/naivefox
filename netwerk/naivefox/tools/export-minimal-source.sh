@@ -14,8 +14,14 @@ if [[ $# -gt 1 ]]; then
   printf 'usage: %s [--plan-only] [OUTPUT_DIRECTORY]\n' "$0" >&2
   exit 2
 fi
-if [[ ! -d "$repo_root/.git" ]]; then
+if ! repo_toplevel=$(git -C "$repo_root" rev-parse --show-toplevel 2>/dev/null); then
   printf 'export must run from the full minimal git checkout: %s\n' "$repo_root" >&2
+  exit 2
+fi
+repo_toplevel=$(realpath -- "$repo_toplevel")
+if [[ "$repo_toplevel" != "$repo_root" ]]; then
+  printf 'export script is not rooted at the Git checkout top level: %s\n' \
+    "$repo_root" >&2
   exit 2
 fi
 if [[ -n $(git -C "$repo_root" status --porcelain=v1) ]]; then
@@ -96,11 +102,21 @@ import sys
 repo = pathlib.Path(sys.argv[1]).resolve(strict=True)
 stage = pathlib.Path(sys.argv[2]).resolve(strict=True)
 plan_path = pathlib.Path(sys.argv[3]).resolve(strict=True)
-plan = json.loads(plan_path.read_text(encoding="utf-8"))
-epoch = int(plan["commit_epoch"])
-generated_contents = plan.pop("generated_contents")
+sys.path.insert(0, str(repo / "netwerk/naivefox/tools"))
+from minimal_source_manifest import (  # noqa: E402
+    canonical_json,
+    create_public_manifest,
+    render_root_readme,
+    upstream_base_text,
+)
 
-for entry in plan["entries"]:
+plan = json.loads(plan_path.read_text(encoding="utf-8"))
+manifest_plan = dict(plan)
+manifest_plan["entries"] = [dict(entry) for entry in plan["entries"]]
+epoch = int(plan["commit_epoch"])
+generated_contents = plan["generated_contents"]
+
+for entry, manifest_entry in zip(plan["entries"], manifest_plan["entries"], strict=True):
     destination = stage / entry["path"]
     destination.parent.mkdir(parents=True, exist_ok=True)
     source = entry["source"]
@@ -110,36 +126,33 @@ for entry in plan["entries"]:
         source_path = repo / source
         if source_path.is_symlink():
             source_path = source_path.resolve(strict=True)
-        shutil.copyfile(source_path, destination)
+        if (
+            entry["path"] == "README.md"
+            and source == "netwerk/naivefox/README.md"
+        ):
+            source_bytes = source_path.read_bytes()
+            if hashlib.sha256(source_bytes).hexdigest() != entry["sha256"]:
+                raise SystemExit("content changed while exporting root README source")
+            destination.write_text(
+                render_root_readme(source_bytes.decode("utf-8")),
+                encoding="utf-8",
+            )
+            manifest_entry["sha256"] = hashlib.sha256(
+                destination.read_bytes()
+            ).hexdigest()
+        else:
+            shutil.copyfile(source_path, destination)
     actual = hashlib.sha256(destination.read_bytes()).hexdigest()
-    if actual != entry["sha256"]:
+    if actual != manifest_entry["sha256"]:
         raise SystemExit(f"content changed while exporting: {entry['path']}")
     os.chmod(destination, int(entry["mode"], 8))
     os.utime(destination, (epoch, epoch))
 
-manifest = dict(plan)
-manifest["manifest_version"] = manifest.pop("plan_version")
-canonical = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
-manifest_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-manifest["manifest_sha256"] = manifest_hash
+manifest = create_public_manifest(manifest_plan)
 (stage / "minimal-source.manifest.json").write_text(
-    json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    canonical_json(manifest).decode("utf-8"), encoding="utf-8"
 )
-configure_sources = ",".join(manifest["configure_report_source_commits"])
-closure_sources = ",".join(manifest["closure_report_source_commits"])
-(stage / "UPSTREAM-BASE").write_text(
-    f"Firefox base SHA: {manifest['firefox_base_commit']}\n"
-    f"NaiveFox reference SHA: {manifest['naivefox_reference_commit']}\n"
-    f"Minimal export SHA: {manifest['minimal_export_commit']}\n"
-    f"Build report source SHA: {manifest['build_report_source_commit']}\n"
-    f"Configure report source SHA(s): {configure_sources}\n"
-    f"Closure report source SHA(s): {closure_sources}\n"
-    "Minimal-source publication SHA: NOT_YET_PUBLISHED\n"
-    f"Export manifest version: {manifest['manifest_version']}\n"
-    f"Export manifest SHA-256: {manifest_hash}\n"
-    f"Generated at: {manifest['generated_at']}\n",
-    encoding="utf-8",
-)
+(stage / "UPSTREAM-BASE").write_text(upstream_base_text(manifest), encoding="utf-8")
 for generated in (stage / "minimal-source.manifest.json", stage / "UPSTREAM-BASE"):
     os.chmod(generated, 0o644)
     os.utime(generated, (epoch, epoch))
@@ -152,8 +165,8 @@ for directory in sorted(
     os.utime(directory, (epoch, epoch))
 os.chmod(stage, 0o755)
 os.utime(stage, (epoch, epoch))
-print(f"entries={len(manifest['entries'])}")
-print(f"manifest_sha256={manifest_hash}")
+print(f"entries={manifest['counts']['files']}")
+print(f"manifest_sha256={manifest['manifest_sha256']}")
 PY
 
 python3 "$script_dir/validate-minimal-source.py" "$tmp"

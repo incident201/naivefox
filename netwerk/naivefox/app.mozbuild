@@ -28,9 +28,11 @@ if CONFIG["JS_HAS_INTL_API"]:
 EXPORTS += ["/gfx/thebes/gfxSparseBitSet.h"]
 
 # A few retained platform headers include this friend declaration even in a
-# --disable-tests product build.  Export the single header without pulling
-# the gtest libraries or test registration graph into NaiveFox.
-EXPORTS.gtest += ["/testing/gtest/MozGtestFriend.h"]
+# --disable-tests product build. Export the single header without pulling the
+# gtest libraries or test registration graph into NaiveFox. A test-enabled
+# build traverses /testing/gtest below, which owns the canonical export.
+if not CONFIG["ENABLE_TESTS"]:
+    EXPORTS.gtest += ["/testing/gtest/MozGtestFriend.h"]
 
 # nsUnicodeProperties uses HarfBuzz's public Unicode enums and types for character
 # properties. Export only the required public headers into dist/include/harfbuzz
@@ -135,7 +137,7 @@ if CONFIG["COMPILE_ENVIRONMENT"]:
     ]
 
 if not CONFIG["MOZ_OVERRIDE_GKRUST"]:
-    if CONFIG["ENABLE_TESTS"]:
+    if CONFIG["ENABLE_TESTS"] and not CONFIG["MOZ_NAIVEFOX"]:
         DIRS += ["/toolkit/library/gtest/rust"]
     DIRS += ["/toolkit/library/rust"]
 
@@ -167,4 +169,11 @@ DIRS += [
 ]
 
 if CONFIG["ENABLE_TESTS"]:
-    DIRS += ["/testing/gtest"]
+    # Generic TEST_DIRS traversal is disabled for the minimal product. Pull in
+    # only the gtest runner and its implementation, then the NaiveFox suite is
+    # added by netwerk/naivefox/moz.build.
+    DIRS += [
+        "/testing/gtest",
+        "/testing/gtest/mozilla",
+        "/third_party/googletest",
+    ]

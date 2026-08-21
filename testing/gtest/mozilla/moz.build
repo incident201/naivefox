@@ -22,17 +22,24 @@ if CONFIG["ENABLE_TESTS"]:
         "WaitFor.h",
     ]
 
-    SOURCES += [
-        "GTestRunner.cpp",
-        "MozAssertions.cpp",
-        "MozGTestBench.cpp",
-        "MozHelpers.cpp",
-        "SanityTest.cpp",
-    ]
+    if CONFIG["MOZ_NAIVEFOX"]:
+        # The minimal product needs only the runner. The remaining Mozilla
+        # gtest helpers pull browser/media headers that are outside its graph.
+        SOURCES += ["GTestRunner.cpp", "MozAssertions.cpp"]
+    else:
+        SOURCES += [
+            "GTestRunner.cpp",
+            "MozAssertions.cpp",
+            "MozGTestBench.cpp",
+            "MozHelpers.cpp",
+            "SanityTest.cpp",
+        ]
+
+    LOCAL_INCLUDES += ["/xpcom/tests"]
 
     if CONFIG["OS_ARCH"] == "WINNT":
         LOCAL_INCLUDES += [
             "/security/sandbox/chromium",
         ]
 
-    FINAL_LIBRARY = "xul-gtest"
+    FINAL_LIBRARY = "xul" if CONFIG["MOZ_NAIVEFOX"] else "xul-gtest"

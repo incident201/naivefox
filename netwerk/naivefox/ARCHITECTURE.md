@@ -181,4 +181,4 @@ is an optional diagnostic, not a product build gate; see
 [`CAPTURE.md`](CAPTURE.md).
 
 All modifications outside `netwerk/naivefox/` are maintained in
-[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md).
+`UPSTREAM-PATCHES.md` in the full maintenance checkout.

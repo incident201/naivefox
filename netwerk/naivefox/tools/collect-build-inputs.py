@@ -11,10 +11,11 @@ import json
 import os
 import re
 import subprocess
-import tomllib
 from collections import defaultdict
 from pathlib import Path
 
+import tomllib
+from provenance import derive_source_provenance
 
 SOURCE_PATH = re.compile(r"(?:^|[\s(])(/[^\s)]+)")
 INCLUDE_PATH = re.compile(r"-I(?:\"([^\"]+)\"|'([^']+)'|([^\s]+))")
@@ -48,6 +49,8 @@ def main() -> int:
     parser.add_argument("--cargo-target", required=True)
     parser.add_argument("--mozconfig", type=Path, required=True)
     parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument("--firefox-ref", default="main")
+    parser.add_argument("--naivefox-ref", default="naivefox")
     args = parser.parse_args()
 
     repo = args.repo.resolve(strict=True)
@@ -72,12 +75,18 @@ def main() -> int:
         "-z",
     ]).decode("utf-8", "surrogateescape")
     tracked = {value for value in tracked_raw.split("\0") if value}
-    source_commit = args.source_commit or git(repo, "rev-parse", "HEAD")
-    if subprocess.run(
-        ["git", "-C", str(repo), "cat-file", "-e", f"{source_commit}^{{commit}}"],
-        check=False,
-    ).returncode:
-        raise SystemExit(f"source commit does not exist: {source_commit}")
+    try:
+        source_provenance = derive_source_provenance(
+            repo,
+            args.source_commit or "HEAD",
+            firefox_ref=args.firefox_ref,
+            naivefox_ref=args.naivefox_ref,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    source_commit = source_provenance.source_commit
+    if source_tree == repo and source_commit != git(repo, "rev-parse", "HEAD"):
+        raise SystemExit("repository build inputs must attest the current HEAD")
     categories: dict[str, set[str]] = defaultdict(set)
     directory_contracts = set()
 
@@ -733,8 +742,16 @@ def main() -> int:
         "source_commit": source_commit,
         "source_worktree_clean": source_tree == repo and not bool(status),
         "source_worktree_status": status.splitlines(),
-        "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
+        "provenance_version": 2,
+        "firefox_base_commit": source_provenance.firefox_base_commit,
+        "naivefox_reference_commit": source_provenance.naivefox_reference_commit,
         "collector_sha256": sha256(Path(__file__).resolve()),
+        "provenance_sha256": sha256(
+            Path(__file__).resolve().with_name("provenance.py")
+        ),
+        "evidence_collector_sha256": sha256(
+            Path(__file__).resolve().with_name("collect-minimal-source-evidence.py")
+        ),
         "mozconfig": mozconfig.relative_to(source_tree).as_posix(),
         "mozconfig_sha256": sha256(mozconfig),
         "objdir_evidence_sha256": evidence,

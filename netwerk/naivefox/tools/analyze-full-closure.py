@@ -4,14 +4,17 @@ analyze-full-closure.py - Comprehensive Multi-Target Link & Source Closure Audit
 Produces complete, reproducible, normalized machine-readable JSON reports.
 """
 
+import argparse
 import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
+
+from provenance import derive_source_provenance
+from provenance import sha256 as provenance_sha256
 
 
 class AuditConsistencyError(Exception):
@@ -101,7 +104,7 @@ def parse_response_file(rsp_path, topsrcdir):
     if not os.path.exists(rsp_path):
         raise AuditConsistencyError(f"Response file not found: {rsp_path}")
     base_dir = os.path.dirname(rsp_path)
-    with open(rsp_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(rsp_path, encoding="utf-8", errors="ignore") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
@@ -152,7 +155,7 @@ def parse_backend_mk(backend_mk_path):
         return static_libs, shared_libs, os_libs
 
     depth = str(Path(backend_mk_path).parent.parent.parent.parent)
-    with open(backend_mk_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(backend_mk_path, encoding="utf-8", errors="ignore") as f:
         for line in f:
             line = line.strip()
             if line.startswith("STATIC_LIBS +="):
@@ -446,9 +449,7 @@ def get_source_and_build_inputs(
                         continue
                     try:
                         depfiles_scanned += 1
-                        with open(
-                            pp_path, "r", encoding="utf-8", errors="ignore"
-                        ) as pf:
+                        with open(pp_path, encoding="utf-8", errors="ignore") as pf:
                             content = pf.read()
                             for token in content.replace("\\\n", " ").split():
                                 if token.endswith(":") or token.startswith("-"):
@@ -525,7 +526,6 @@ def get_source_and_build_inputs(
 
 def get_glean_inputs(topsrcdir, objdir):
     """Record the real Glean generator/cache/YAML inputs without exporting objdir paths."""
-    glean_source_dir = os.path.join(topsrcdir, "toolkit", "components", "glean")
     generator_scripts = [
         "toolkit/components/glean/build_scripts/glean_parser_ext/cache_yaml.py",
         "toolkit/components/glean/build_scripts/glean_parser_ext/run_glean_parser.py",
@@ -584,7 +584,14 @@ def get_glean_inputs(topsrcdir, objdir):
     }
 
 
-def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
+def analyze_target(
+    topsrcdir,
+    objdir,
+    target_triple,
+    mozconfig_relpath,
+    firefox_ref="main",
+    naivefox_ref="naivefox",
+):
     """Analyze comprehensive full link and source closure for target."""
     objdir_path = Path(objdir)
     if not objdir_path.exists():
@@ -702,9 +709,9 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
                     "sha256": sha256_file(full),
                 })
 
-    git_head = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=topsrcdir, text=True
-    ).strip()
+    source_provenance = derive_source_provenance(
+        Path(topsrcdir), firefox_ref=firefox_ref, naivefox_ref=naivefox_ref
+    )
     mozconfig_full = os.path.join(topsrcdir, mozconfig_relpath)
     mozconfig_hash = sha256_file(mozconfig_full)
 
@@ -720,10 +727,18 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
 
     report = {
         "report_provenance": {
-            "source_commit_sha": git_head,
+            "provenance_version": 2,
+            "source_commit_sha": source_provenance.source_commit,
             "source_worktree_clean": True,
-            "firefox_base_sha": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
+            "firefox_base_sha": source_provenance.firefox_base_commit,
+            "naivefox_reference_sha": source_provenance.naivefox_reference_commit,
             "analyzer_sha256": sha256_file(__file__),
+            "provenance_sha256": provenance_sha256(
+                Path(__file__).resolve().with_name("provenance.py")
+            ),
+            "evidence_collector_sha256": provenance_sha256(
+                Path(__file__).resolve().with_name("collect-minimal-source-evidence.py")
+            ),
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
@@ -809,29 +824,44 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
 
 
 def main():
-    topsrcdir = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "..")
-    )
+    default_repo = Path(__file__).resolve().parents[3]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", type=Path, default=default_repo)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--linux-objdir", type=Path)
+    parser.add_argument("--windows-objdir", type=Path)
+    parser.add_argument("--firefox-ref", default="main")
+    parser.add_argument("--naivefox-ref", default="naivefox")
+    args = parser.parse_args()
+    topsrcdir = str(args.repo.resolve(strict=True))
     if subprocess.check_output(
         ["git", "status", "--porcelain=v1"], cwd=topsrcdir, text=True
     ).strip():
         raise AuditConsistencyError(
             "source checkout must be clean before closure report generation"
         )
-    reports_dir = os.path.join(topsrcdir, "netwerk", "naivefox", "reports")
+    reports_dir = str(
+        args.output_dir.resolve()
+        if args.output_dir
+        else Path(topsrcdir) / "netwerk" / "naivefox" / "reports"
+    )
     os.makedirs(reports_dir, exist_ok=True)
 
     targets = [
         (
             "Linux x86_64",
-            os.path.join(topsrcdir, "obj-naivefox-minimal"),
+            str(args.linux_objdir.resolve())
+            if args.linux_objdir
+            else os.path.join(topsrcdir, "obj-naivefox-minimal"),
             "x86_64-unknown-linux-gnu",
             "netwerk/naivefox/mozconfig-minimal",
             "closure-report-linux-x86_64.json",
         ),
         (
             "Windows x86_64",
-            os.path.join(topsrcdir, "obj-naivefox-windows-x86_64"),
+            str(args.windows_objdir.resolve())
+            if args.windows_objdir
+            else os.path.join(topsrcdir, "obj-naivefox-windows-x86_64"),
             "x86_64-pc-windows-msvc",
             "netwerk/naivefox/mozconfig-windows-x86_64",
             "closure-report-windows-x86_64.json",
@@ -841,7 +871,14 @@ def main():
     print("Executing comprehensive multi-target link and source closure audit...")
     for name, objdir, triple, mozcfg, filename in targets:
         print(f"\n--- Analyzing {name} ({triple}) ---")
-        report = analyze_target(topsrcdir, objdir, triple, mozcfg)
+        report = analyze_target(
+            topsrcdir,
+            objdir,
+            triple,
+            mozcfg,
+            firefox_ref=args.firefox_ref,
+            naivefox_ref=args.naivefox_ref,
+        )
         out_path = os.path.join(reports_dir, filename)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)

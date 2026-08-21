@@ -97,10 +97,13 @@ if CONFIG["ENABLE_TESTS"]:
     ]
     
 
-    SOURCES += [
-        "googlemock/src/gmock-all.cc",
-        "googletest/src/gtest-all.cc",
-    ]
+    if CONFIG["MOZ_NAIVEFOX"]:
+        SOURCES += ["googletest/src/gtest-all.cc"]
+    else:
+        SOURCES += [
+            "googlemock/src/gmock-all.cc",
+            "googletest/src/gtest-all.cc",
+        ]
 
     Library("gtest")
 
@@ -112,4 +115,4 @@ if CONFIG["ENABLE_TESTS"]:
     if CONFIG["OS_ARCH"] == "WINNT":
         DEFINES["UNICODE"] = True
 
-    FINAL_LIBRARY = "xul-gtest"
+    FINAL_LIBRARY = "xul" if CONFIG["MOZ_NAIVEFOX"] else "xul-gtest"

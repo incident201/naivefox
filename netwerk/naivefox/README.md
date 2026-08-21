@@ -129,7 +129,7 @@ NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for component, event-target, stream,
 and fallback details. Downstream Firefox hooks are inventoried in
-[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md).
+`UPSTREAM-PATCHES.md` in the full maintenance checkout.
 
 ## Building and testing
 
@@ -148,8 +148,7 @@ and Windows SDK:
 ```bash
 MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64 \
 NAIVEFOX_OBJDIR="$PWD/obj-naivefox-windows-x86_64" \
-./mach build binaries
-./mach build misc
+./mach build -j4
 ```
 
 Run the reproducible local H2/H3/Auto/config/robustness gate with:
@@ -186,8 +185,8 @@ Mozilla main -> main -> naivefox -> minimal -> generated minimal-source
 - `minimal` contains the minimized build/runtime and export tooling.
 - `minimal-source` is a generated standalone snapshot and is never hand-edited.
 
-The three review gates and provenance rules are defined in
-[`UPSTREAM.md`](UPSTREAM.md). In particular, commit SHAs and test transcripts
+The three review gates and provenance rules are defined in `UPSTREAM.md` in the
+full maintenance checkout. In particular, commit SHAs and test transcripts
 belong in generated evidence, commits, and annotated tags rather than being
 copied into active Markdown.
 

@@ -12,13 +12,18 @@ import os
 import re
 import stat
 import subprocess
-import tomllib
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+import tomllib
+from provenance import (
+    CANONICAL_REPORT_PATHS,
+    canonical_oid,
+    load_and_validate_report_bundle,
+    validate_evidence_head,
+)
 
-FIREFOX_BASE = "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a"
 BUILD_TARGETS = {"linux-x86_64", "windows-x86_64"}
 MAINTENANCE_TOOLS = {
     "analyze-full-closure.py",
@@ -27,19 +32,21 @@ MAINTENANCE_TOOLS = {
     "assert-closure.py",
     "collect-build-inputs.py",
     "collect-configure-inputs.py",
+    "collect-minimal-source-evidence.py",
     "export-minimal-source.sh",
+    "minimal_source_manifest.py",
     "minimal-source-plan.py",
+    "provenance.py",
     "validate-minimal-source.py",
     "verify-shims.py",
 }
 PRODUCT_DOCS = {
-    "H3-DESIGN.md",
+    "README.md",
+    "ARCHITECTURE.md",
     "KNOWN-ISSUES.md",
-    "MINIMISATION-REPORT.md",
-    "PERFORMANCE-REPORT.md",
+    "CAPTURE.md",
     "SHIMS.md",
-    "TEST-REPORT.md",
-    "UPSTREAM.md",
+    "test/integration/README.md",
 }
 FORBIDDEN_BASENAMES = {
     "AGENTS.md",
@@ -65,20 +72,6 @@ ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
     r"(?:naivefox|obj-[^/\s\"']*)(?:/|\s|$)|"
     r"[A-Za-z]:\\Users\\[^\s\"']*/(?:naivefox|obj-[^\\\s\"']*)(?:\\|\s|$)"
-)
-REPORT_ONLY_PATHS = (
-    re.compile(r"^netwerk/naivefox/reports/"),
-    re.compile(r"^netwerk/naivefox/[^/]+\.md$", re.IGNORECASE),
-    re.compile(r"^netwerk/naivefox/config\.example\.json$"),
-    re.compile(r"^netwerk/naivefox/test/integration/common\.sh$"),
-    re.compile(
-        r"^netwerk/naivefox/tools/(?:assert-closure\.py|"
-        r"collect-(?:build|configure)-inputs\.py|"
-        r"fetch-naiveproxy-reference\.sh|"
-        r"export-minimal-source\.sh|minimal-source-plan\.py|"
-        r"stage-runtime(?:-windows-x86_64)?\.sh|"
-        r"validate-minimal-source\.py|verify-staged-runtime\.sh)$"
-    ),
 )
 
 
@@ -110,6 +103,15 @@ def safe_path(value: str) -> str:
     return path.as_posix()
 
 
+def write_plan(plan: dict, output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_suffix(f"{output.suffix}.tmp")
+    temporary.write_text(
+        json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(temporary, output)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, required=True)
@@ -117,15 +119,23 @@ def main() -> int:
     parser.add_argument("--configure-report", type=Path, action="append", required=True)
     parser.add_argument("--build-report", type=Path, action="append", required=True)
     parser.add_argument("--closure-report", type=Path, action="append", required=True)
+    parser.add_argument("--firefox-ref", default="main")
+    parser.add_argument("--naivefox-ref", default="naivefox")
     args = parser.parse_args()
 
     repo = args.repo.resolve(strict=True)
     output = args.output.resolve()
-    status = run(repo, "status", "--porcelain=v1")
-    if status:
-        raise SystemExit("minimal checkout must be clean when creating an export plan")
-    source_commit = run(repo, "rev-parse", "HEAD")
-    commit_epoch = int(run(repo, "show", "-s", "--format=%ct", source_commit))
+    try:
+        release = validate_evidence_head(
+            repo,
+            firefox_ref=args.firefox_ref,
+            naivefox_ref=args.naivefox_ref,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    evidence_commit = release.evidence_commit
+    evidence_source_commit = release.source_commit
+    commit_epoch = int(run(repo, "show", "-s", "--format=%ct", evidence_commit))
     generated_at = (
         datetime
         .fromtimestamp(commit_epoch, timezone.utc)
@@ -148,37 +158,12 @@ def main() -> int:
     evidence = []
 
     def validate_commit(commit: str, label: str) -> None:
-        if not re.fullmatch(r"[0-9a-f]{40}", commit or ""):
-            raise SystemExit(f"invalid {label} source commit: {commit!r}")
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo),
-                "merge-base",
-                "--is-ancestor",
-                commit,
-                source_commit,
-            ],
-            check=False,
-        )
-        if result.returncode:
-            raise SystemExit(f"{label} source {commit} is not an export ancestor")
-        if commit == source_commit:
-            return
-        changed = run(
-            repo, "diff", "--name-only", f"{commit}..{source_commit}"
-        ).splitlines()
-        invalid = [
-            path
-            for path in changed
-            if not any(pattern.search(path) for pattern in REPORT_ONLY_PATHS)
-        ]
-        if invalid:
-            details = "\n".join(invalid[:30])
-            raise SystemExit(
-                f"{label} is stale across build-affecting changes:\n{details}"
-            )
+        try:
+            canonical_oid(repo, commit, f"{label} source commit")
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+        if commit != evidence_source_commit:
+            raise SystemExit(f"{label} must attest direct evidence parent S")
 
     def add(source: str, category: str, destination: str | None = None) -> None:
         source = safe_path(source)
@@ -213,6 +198,26 @@ def main() -> int:
         })
         return data
 
+    supplied_reports = args.configure_report + args.build_report + args.closure_report
+    supplied_relative = set()
+    for report_path in supplied_reports:
+        resolved = report_path.resolve(strict=True)
+        if repo not in resolved.parents:
+            raise SystemExit("evidence reports must be committed inside the repository")
+        supplied_relative.add(resolved.relative_to(repo))
+    if supplied_relative != set(CANONICAL_REPORT_PATHS) or len(supplied_reports) != 6:
+        raise SystemExit("planner requires exactly the six canonical evidence reports")
+    try:
+        load_and_validate_report_bundle(
+            repo,
+            [repo / path for path in CANONICAL_REPORT_PATHS],
+            evidence_source_commit,
+            release.firefox_base_commit,
+            release.naivefox_reference_commit,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
     build_reports = [load_report(path, "build-inputs") for path in args.build_report]
     targets = {report.get("target") for report in build_reports}
     if targets != BUILD_TARGETS or len(build_reports) != len(BUILD_TARGETS):
@@ -241,7 +246,7 @@ def main() -> int:
             )
         if not report.get("source_worktree_clean"):
             raise SystemExit("build-input report was collected from a dirty checkout")
-        if report.get("firefox_base_commit") != FIREFOX_BASE:
+        if report.get("firefox_base_commit") != release.firefox_base_commit:
             raise SystemExit("build-input report Firefox base mismatch")
         if report.get("collector_sha256") != build_collector_hash:
             raise SystemExit("build-input report collector hash mismatch")
@@ -386,7 +391,7 @@ def main() -> int:
         commit = provenance.get("source_commit_sha")
         closure_source_commits.add(commit)
         validate_commit(commit, f"closure report {target}")
-        if provenance.get("firefox_base_sha") != FIREFOX_BASE:
+        if provenance.get("firefox_base_sha") != release.firefox_base_commit:
             raise SystemExit("closure report Firefox base mismatch")
         build = report.get("build_inputs", {})
         for key in (
@@ -457,22 +462,9 @@ def main() -> int:
         configure_source_commit = configure_report.get("source_commit")
         validate_commit(configure_source_commit, f"{target} configure trace")
         configure_source_commits.add(configure_source_commit)
-        if subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo),
-                "merge-base",
-                "--is-ancestor",
-                build_source_commit,
-                configure_source_commit,
-            ],
-            check=False,
-        ).returncode:
-            raise SystemExit(
-                f"{target} configure trace predates the audited build reports"
-            )
-        if configure_report.get("firefox_base_commit") != FIREFOX_BASE:
+        if configure_source_commit != build_source_commit:
+            raise SystemExit(f"{target} configure trace does not attest source S")
+        if configure_report.get("firefox_base_commit") != release.firefox_base_commit:
             raise SystemExit("configure report Firefox base mismatch")
         if configure_report.get("collector_sha256") != configure_collector_hash:
             raise SystemExit("configure report collector hash mismatch")
@@ -510,16 +502,20 @@ def main() -> int:
     ]).decode("utf-8", "surrogateescape")
     for path in (value for value in project_raw.split("\0") if value):
         relative = path.removeprefix("netwerk/naivefox/")
-        if relative in FORBIDDEN_BASENAMES or relative == "README.md":
+        if relative in FORBIDDEN_BASENAMES:
             continue
-        if relative == "PRODUCT-README.md":
+        if relative == "README.md":
             add(path, "product:readme", "README.md")
+            add(path, "product:documentation")
+        elif relative in PRODUCT_DOCS:
+            add(path, "product:documentation")
         elif relative == "config.example.json":
             add(path, "product:config-example", "config.example.json")
         elif relative.endswith(".md"):
-            if relative in PRODUCT_DOCS:
-                add(path, "product:documentation", f"docs/{relative}")
+            continue
         elif relative.startswith("reports/"):
+            continue
+        elif relative.startswith("tools/tests/"):
             continue
         elif (
             relative.startswith("tools/")
@@ -603,9 +599,11 @@ def main() -> int:
 
     plan = {
         "plan_version": 1,
-        "firefox_base_commit": FIREFOX_BASE,
-        "naivefox_reference_commit": run(repo, "merge-base", "naivefox", source_commit),
-        "minimal_export_commit": source_commit,
+        "firefox_base_commit": release.firefox_base_commit,
+        "naivefox_reference_commit": release.naivefox_reference_commit,
+        "minimal_export_commit": evidence_commit,
+        "evidence_source_commit": evidence_source_commit,
+        "evidence_commit": evidence_commit,
         "build_report_source_commit": build_source_commit,
         "configure_report_source_commits": sorted(configure_source_commits),
         "closure_report_source_commits": sorted(closure_source_commits),
@@ -618,12 +616,7 @@ def main() -> int:
             cargo_license_inventory[key] for key in sorted(cargo_license_inventory)
         ],
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_suffix(f"{output.suffix}.tmp")
-    temporary.write_text(
-        json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    os.replace(temporary, output)
+    write_plan(plan, output)
     print(
         f"minimal-source plan passed: {len(entries)} files, "
         f"{len(directory_contracts)} directory contracts"

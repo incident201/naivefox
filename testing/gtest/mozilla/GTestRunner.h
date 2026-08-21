@@ -9,6 +9,10 @@ namespace mozilla {
 
 extern int (*RunGTest)(int*, char**);
 
+// Referenced by minimal-product entry points to force the runner object out
+// of libxul's static archive before its registration initializer runs.
+void EnsureGTestRunnerLinked();
+
 }  // namespace mozilla
 
 #endif  // TESTING_GTEST_MOZILLA_GTESTRUNNER_H_

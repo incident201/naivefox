@@ -2234,7 +2234,9 @@ class RecursiveMakeBackend(MakeBackend):
         backend_file.write("CPPSRCS += $(unified_binding_cpp_files)\n")
 
         # Add the test directory to the compile graph.
-        if self.environment.substs.get("ENABLE_TESTS"):
+        if self.environment.substs.get("ENABLE_TESTS") and not self.environment.substs.get(
+            "MOZ_NAIVEFOX"
+        ):
             self._compile_graph[
                 mozpath.join(
                     mozpath.relpath(bindings_dir, self.environment.topobjdir),

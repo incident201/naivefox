@@ -4,9 +4,12 @@
 
 FINAL_TARGET = "dist/bin/gtest"
 
-USE_LIBS += [
-    "gkrust-gtest",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    USE_LIBS += [
+        "gkrust-gtest",
+    ]
+else:
+    USE_LIBS += ["gkrust"]
 
 DIRS += [
     "libxul_broken_buildid",
@@ -14,9 +17,10 @@ DIRS += [
     "libxul_missing_buildid",
 ]
 
-UNIFIED_SOURCES = [
-    "TestBuildIDReader.cpp",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES = [
+        "TestBuildIDReader.cpp",
+    ]
 
 LOCAL_INCLUDES += [
     "/xpcom/build",

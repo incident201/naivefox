@@ -15,8 +15,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from provenance import derive_source_provenance
 
-FIREFOX_BASE = "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a"
 QUOTED_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
 FORBIDDEN_PARTS = {
     ".git",
@@ -49,6 +49,8 @@ def main() -> int:
     parser.add_argument("--mozconfig", type=Path, required=True)
     parser.add_argument("--objdir", type=Path, required=True)
     parser.add_argument("--trace-output", type=Path)
+    parser.add_argument("--firefox-ref", default="main")
+    parser.add_argument("--naivefox-ref", default="naivefox")
     args = parser.parse_args()
 
     repo = args.repo.resolve(strict=True)
@@ -63,7 +65,15 @@ def main() -> int:
         raise SystemExit(f"configure trace requires a fresh objdir: {objdir}")
     if git(repo, "status", "--porcelain=v1"):
         raise SystemExit("source checkout must be clean before configure tracing")
-    source_commit = git(repo, "rev-parse", "HEAD")
+    try:
+        source_provenance = derive_source_provenance(
+            repo,
+            firefox_ref=args.firefox_ref,
+            naivefox_ref=args.naivefox_ref,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+    source_commit = source_provenance.source_commit
     tracked_raw = subprocess.check_output([
         "git",
         "-C",
@@ -103,6 +113,7 @@ def main() -> int:
         "configure",
     ]
     environment = os.environ.copy()
+    environment["NAIVEFOX_ENABLE_TESTS"] = "0"
     environment["MOZCONFIG"] = str(mozconfig)
     environment["NAIVEFOX_OBJDIR"] = str(objdir)
     try:
@@ -175,7 +186,9 @@ def main() -> int:
             "target_triple": configured_target,
             "source_commit": source_commit,
             "source_worktree_clean": True,
-            "firefox_base_commit": FIREFOX_BASE,
+            "provenance_version": 2,
+            "firefox_base_commit": source_provenance.firefox_base_commit,
+            "naivefox_reference_commit": source_provenance.naivefox_reference_commit,
             "mozconfig": mozconfig.relative_to(repo).as_posix(),
             "mozconfig_sha256": sha256(mozconfig),
             "configure_command": [
@@ -192,6 +205,7 @@ def main() -> int:
             "configure_environment": {
                 "MOZCONFIG": mozconfig.relative_to(repo).as_posix(),
                 "NAIVEFOX_OBJDIR": "<fresh-external-objdir>",
+                "NAIVEFOX_ENABLE_TESTS": "0",
                 "NAIVEFOX_DISABLE_SCCACHE": environment.get(
                     "NAIVEFOX_DISABLE_SCCACHE", "<unset>"
                 ),
@@ -202,6 +216,12 @@ def main() -> int:
             ).splitlines()[0],
             "python_version": sys.version.split()[0],
             "collector_sha256": sha256(Path(__file__).resolve()),
+            "provenance_sha256": sha256(
+                Path(__file__).resolve().with_name("provenance.py")
+            ),
+            "evidence_collector_sha256": sha256(
+                Path(__file__).resolve().with_name("collect-minimal-source-evidence.py")
+            ),
             "trace_sha256": sha256(trace),
             "trace_size_bytes": trace.stat().st_size,
             "files": sorted(files),

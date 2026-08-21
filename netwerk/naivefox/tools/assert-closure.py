@@ -11,6 +11,13 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+from provenance import (
+    CANONICAL_REPORT_PATHS,
+    load_and_validate_report_bundle,
+    validate_evidence_head,
+)
 
 
 def _repo_root():
@@ -32,6 +39,7 @@ def _git_commit_exists(topsrcdir, sha):
             cwd=topsrcdir,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            check=False,
         ).returncode
         == 0
     )
@@ -146,7 +154,7 @@ def assert_closure(report_path, topsrcdir):
         print(f"FAIL: Closure report not found: {report_path}", file=sys.stderr)
         return False
 
-    with open(report_path, "r", encoding="utf-8") as f:
+    with open(report_path, encoding="utf-8") as f:
         raw_text = f.read()
         report = json.loads(raw_text)
 
@@ -155,60 +163,24 @@ def assert_closure(report_path, topsrcdir):
     target = provenance.get("target_triple", report_path)
     is_linux = "linux" in target.lower()
 
-    # Reports are build artifacts, not hand-maintained evidence.  A report
-    # generated from an older commit must fail instead of silently validating
-    # the current tree.
-    current_commit = _current_commit(topsrcdir)
     report_commit = provenance.get("source_commit_sha")
     if not provenance.get("source_worktree_clean"):
         violations.append("closure report was not collected from a clean checkout")
-    if report_commit != current_commit:
-        # Reports are generated from an audited source commit and then
-        # committed as a report-only snapshot. Later documentation-only
-        # commits must not make valid evidence stale, but any source/build
-        # change after the audited point is a hard failure.
-        ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", report_commit, current_commit],
-            cwd=topsrcdir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        changed = subprocess.run(
-            ["git", "diff", "--name-only", f"{report_commit}..{current_commit}"],
-            cwd=topsrcdir,
-            capture_output=True,
-            text=True,
-        )
-        changed_paths = {path for path in changed.stdout.splitlines() if path}
-        documentation_paths = {
-            path for path in changed_paths if path.lower().endswith(".md")
-        }
-        report_paths = {
-            path
-            for path in changed_paths
-            if path.startswith("netwerk/naivefox/reports/") and path.endswith(".json")
-        }
-        export_tool_paths = {
-            "netwerk/naivefox/test/integration/common.sh",
-            "netwerk/naivefox/tools/assert-closure.py",
-            "netwerk/naivefox/tools/collect-build-inputs.py",
-            "netwerk/naivefox/tools/collect-configure-inputs.py",
-            "netwerk/naivefox/tools/export-minimal-source.sh",
-            "netwerk/naivefox/tools/fetch-naiveproxy-reference.sh",
-            "netwerk/naivefox/tools/minimal-source-plan.py",
-            "netwerk/naivefox/tools/stage-runtime.sh",
-            "netwerk/naivefox/tools/stage-runtime-windows-x86_64.sh",
-            "netwerk/naivefox/tools/validate-minimal-source.py",
-            "netwerk/naivefox/tools/verify-staged-runtime.sh",
-        }
-        if ancestor.returncode != 0 or not changed_paths.issubset(
-            report_paths | documentation_paths | export_tool_paths
-        ):
-            violations.append(
-                "stale provenance: source_commit_sha is not an ancestor of HEAD "
-                "with only report/documentation/export-tool descendants "
-                f"({report_commit} -> {current_commit})"
-            )
+    try:
+        release = validate_evidence_head(Path(topsrcdir))
+    except ValueError as error:
+        violations.append(str(error))
+        release = None
+    if release and report_commit != release.source_commit:
+        violations.append("closure report does not attest direct evidence parent S")
+    if release and provenance.get("firefox_base_sha") != release.firefox_base_commit:
+        violations.append("closure report Firefox base does not match source S")
+    if (
+        release
+        and provenance.get("naivefox_reference_sha")
+        != release.naivefox_reference_commit
+    ):
+        violations.append("closure report NaiveFox reference does not match source S")
     if not _git_commit_exists(topsrcdir, provenance.get("source_commit_sha")):
         violations.append("source_commit_sha is not an existing commit")
     if not _git_commit_exists(topsrcdir, provenance.get("firefox_base_sha")):
@@ -329,7 +301,9 @@ def assert_closure(report_path, topsrcdir):
     gkrust = next((s for s in static_libs if "gkrust" in s.get("path", "")), None)
 
     if js_static:
-        violations.append("SpiderMonkey js_static unexpectedly present in NaiveFox closure")
+        violations.append(
+            "SpiderMonkey js_static unexpectedly present in NaiveFox closure"
+        )
     if not gkrust or gkrust.get("member_count", 0) == 0:
         violations.append("Rust gkrust is missing or has 0 archive members")
 
@@ -423,6 +397,19 @@ def main():
             "closure-report-windows-x86_64.json",
         ),
     ]
+
+    try:
+        release = validate_evidence_head(Path(topsrcdir))
+        load_and_validate_report_bundle(
+            Path(topsrcdir),
+            [Path(topsrcdir) / path for path in CANONICAL_REPORT_PATHS],
+            release.source_commit,
+            release.firefox_base_commit,
+            release.naivefox_reference_commit,
+        )
+    except (OSError, ValueError) as error:
+        print(f"\nClosure evidence provenance FAILED: {error}", file=sys.stderr)
+        sys.exit(1)
 
     all_passed = True
     for rep in reports:
