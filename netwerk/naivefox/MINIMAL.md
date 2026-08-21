@@ -54,6 +54,10 @@ export LD_LIBRARY_PATH="$NAIVEFOX_OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY
 ./mach gtest 'NaiveFoxTunnelSessionLifecycle.*'
 ```
 
+The product wrapper disables the local sccache daemon by default. Set
+`NAIVEFOX_USE_SCCACHE=1` explicitly only for a deliberately configured cache;
+otherwise configure inputs remain stable across runs.
+
 Unset `NAIVEFOX_ENABLE_TESTS` before a release build. Do not substitute a
 browser mozconfig or run an ordinary Firefox build as a product gate.
 

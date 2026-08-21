@@ -172,6 +172,11 @@ NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
   package/naivefox-linux-x86_64
 ```
 
+The entrypoint disables the local sccache daemon by default so a build does
+not depend on stale daemon state or silently change its configure inputs. Set
+`NAIVEFOX_USE_SCCACHE=1` only when the daemon has been deliberately configured
+for this checkout.
+
 An ordinary Firefox build is not a merge or release gate. It is allowed only
 for an explicitly requested same-base capture comparison; see
 [`CAPTURE.md`](CAPTURE.md).

@@ -15,6 +15,10 @@ Options:
   --objdir PATH     external object directory
   --package-dir PATH
                     staged package directory below the object directory
+
+Environment:
+  NAIVEFOX_USE_SCCACHE=1
+                    opt in to the local sccache daemon (disabled by default)
 EOF
 }
 
@@ -121,6 +125,18 @@ PY
 
 export MOZCONFIG=$mozconfig
 export NAIVEFOX_OBJDIR=$objdir
+
+# A product build must not silently depend on a long-lived, possibly stale
+# compiler-cache daemon. Opt in explicitly when the daemon is known to be
+# healthy; otherwise keep configure and build behavior reproducible.
+if [[ ${NAIVEFOX_USE_SCCACHE:-0} == 1 ]]; then
+  printf 'compiler cache: sccache (explicitly enabled)\n'
+else
+  export NAIVEFOX_DISABLE_SCCACHE=1
+  export SCCACHE_DISABLE=1
+  unset USE_SCCACHE
+  printf 'compiler cache: disabled (set NAIVEFOX_USE_SCCACHE=1 to opt in)\n'
+fi
 
 if [[ $target == windows && $(uname -s) == Linux ]]; then
   wine_root=${NAIVEFOX_WINE_ROOT:-$HOME/.mozbuild/wine}
