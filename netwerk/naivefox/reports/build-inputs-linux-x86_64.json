@@ -10969,7 +10969,7 @@
     "directory_contracts": 37,
     "files": 17748
   },
-  "depfile_count": 1428,
+  "depfile_count": 1807,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -11009,7 +11009,7 @@
     "tools/profiler/core",
     "widget/windows"
   ],
-  "evidence_collector_sha256": "2c25575c9e19f03892d62619d83ab014dc27727f3f1fcaeb2b8f1c19f630e8f4",
+  "evidence_collector_sha256": "434ed6b7ead0ad69b93a82e45f69b32644c22643f3447d1e5710ad44f7140d1e",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -28762,7 +28762,7 @@
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "generated_makefile_count": 384,
-  "generated_makefiles_sha256": "cab8d6566997c60df64e9c5017327a656a5cba8301f0719db4bc6a2c489c4964",
+  "generated_makefiles_sha256": "d03333b4c363f783aa5b8dd8742815b31db39c9671f7f91d17e4f2896ca47354",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28777,15 +28777,15 @@
   "install_manifests_sha256": "b03822696683d8698324cbf2edf0df945df4e00d37da510881b9c26404f1ecaa",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
+  "naivefox_reference_commit": "72380e73fd8783751342c42f956b08b10866ade4",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "3844cb76cf960fcc12264f925b80e751384831b650f77b061290f5c8cd0d82a1",
-    "config_status_deps.in": "4bb62a4e261abeab80f47c58cf36abc5d2d040c56b05a7d18493d599dac64dbd"
+    "backend.RecursiveMakeBackend.in": "5e8f754fe6c07910fea5943ab9f51874b777e8003aa6f4e76c5f4b74ac8d8147",
+    "config_status_deps.in": "1ee12e6df56cf56058d205dd4f96682a5b32f4c16915a69c153634c8effa5005"
   },
   "provenance_sha256": "be679ab13bb39939bd5802769084a0c47d4e4b181f114e4858fe5119189311dd",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
+  "source_commit": "72380e73fd8783751342c42f956b08b10866ade4",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],

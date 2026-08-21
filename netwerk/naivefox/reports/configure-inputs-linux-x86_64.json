@@ -22,7 +22,7 @@
     "directories": 11050,
     "files": 10270
   },
-  "evidence_collector_sha256": "2c25575c9e19f03892d62619d83ab014dc27727f3f1fcaeb2b8f1c19f630e8f4",
+  "evidence_collector_sha256": "434ed6b7ead0ad69b93a82e45f69b32644c22643f3447d1e5710ad44f7140d1e",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -10298,7 +10298,7 @@
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
+  "naivefox_reference_commit": "72380e73fd8783751342c42f956b08b10866ade4",
   "observed_directories": [
     "browser",
     "build",
@@ -21355,11 +21355,11 @@
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
+  "source_commit": "72380e73fd8783751342c42f956b08b10866ade4",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "6275d236f47bafaa9e3c9b25f37376f036dd3f77e4d7a1c3e8b4314b3d8ed9bd",
-  "trace_size_bytes": 33676023
+  "trace_sha256": "924b1bb10234d9554b6213b5a763934a8e18c0141c7425822fac4ff553ae7d69",
+  "trace_size_bytes": 33598349
 }
