@@ -204,30 +204,21 @@ jobs:
           mkdir -p "${objdir}/package"
           export MOZCONFIG="$mozconfig"
           export NAIVEFOX_OBJDIR="$objdir"
-          printf 'Validating mach environment (5 minute limit)...\n'
+          printf 'Configuring NaiveFox (10 minute limit)...\n'
           python3 - "$PWD/mach" <<'PY'
           import subprocess
           import sys
 
           try:
-              result = subprocess.run(
-                  [sys.executable, sys.argv[1], "environment", "--format", "json"],
-                  capture_output=True,
-                  text=True,
-                  timeout=300,
+              subprocess.run(
+                  [sys.executable, sys.argv[1], "configure"],
+                  check=True,
+                  timeout=600,
               )
           except subprocess.TimeoutExpired as exc:
-              raise SystemExit("mach environment timed out after 300 seconds") from exc
-
-          if result.returncode:
-              # Avoid repeating the full environment dump (and its secrets)
-              # when mozconfig parsing fails; the useful diagnostic precedes it.
-              stdout = result.stdout.split("mozconfig output:", 1)[0]
-              sys.stderr.write(stdout)
-              sys.stderr.write(result.stderr)
-              raise SystemExit(result.returncode)
+              raise SystemExit("mach configure timed out after 600 seconds") from exc
           PY
-          printf 'Mach environment validated.\n'
+          printf 'NaiveFox configure completed.\n'
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --objdir "${objdir}"
 
