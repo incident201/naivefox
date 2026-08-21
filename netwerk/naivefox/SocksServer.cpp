@@ -25,6 +25,7 @@
 #include "nsIOutputStream.h"
 #include "nsIServerSocket.h"
 #include "nsISocketTransport.h"
+#include "nsISupportsImpl.h"
 #include "nsITransport.h"
 #include "nsNetCID.h"
 #include "nsServiceManagerUtils.h"
@@ -501,9 +502,9 @@ void HttpConnectConnection::Close(nsresult aStatus) {
   }
 }
 
-class ServerState final : public RefCounted<ServerState> {
+class ServerState final {
  public:
-  MOZ_DECLARE_REFCOUNTED_TYPENAME(ServerState)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ServerState)
 
   explicit ServerState(uint32_t aMaxConnections)
       : mMaxConnections(aMaxConnections) {}
@@ -539,9 +540,9 @@ class ServerState final : public RefCounted<ServerState> {
     mSockets.Clear();
   }
 
+ private:
   ~ServerState() { Shutdown(); }
 
- private:
   nsTArray<nsCOMPtr<nsIServerSocket>> mSockets;
   uint32_t mMaxConnections;
   Atomic<uint32_t, Relaxed> mAcceptedConnections{0};

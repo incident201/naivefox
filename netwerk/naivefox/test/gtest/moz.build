@@ -10,6 +10,7 @@ UNIFIED_SOURCES += [
     "TestNaivePadding.cpp",
     "TestPaddingNegotiation.cpp",
     "TestSocks5Parser.cpp",
+    "TestTunnelSessionLifecycle.cpp",
 ]
 
 LOCAL_INCLUDES += [
