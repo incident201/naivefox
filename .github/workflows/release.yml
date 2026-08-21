@@ -1,0 +1,195 @@
+name: NaiveFox draft release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: naivefox-draft-release
+  cancel-in-progress: false
+
+env:
+  PRODUCT_BRANCH: naivefox-minimal-source
+
+jobs:
+  guard:
+    name: Verify product branch
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Refuse non-product runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/${PRODUCT_BRANCH}"
+
+  metadata:
+    name: Freeze release metadata
+    needs: guard
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.metadata.outputs.source_sha }}
+      short_sha: ${{ steps.metadata.outputs.short_sha }}
+      release_date: ${{ steps.metadata.outputs.release_date }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+    steps:
+      - name: Check out the selected product commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.PRODUCT_BRANCH }}
+          fetch-depth: 1
+
+      - name: Compute immutable release metadata
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          short_sha="${source_sha:0:12}"
+          release_date="$(date -u +%Y%m%d)"
+          release_tag="naivefox-${release_date}-${short_sha}"
+          {
+            echo "source_sha=${source_sha}"
+            echo "short_sha=${short_sha}"
+            echo "release_date=${release_date}"
+            echo "release_tag=${release_tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-24.04
+            archive_suffix: linux-x86_64.tar.xz
+          - platform: windows
+            runner: windows-2022
+            archive_suffix: windows-x86_64.zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out the frozen product commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Build and stage NaiveFox
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
+            --bootstrap \
+            --objdir "$PWD/obj-naivefox-${{ matrix.platform }}"
+
+      - name: Archive Linux package
+        if: matrix.platform == 'linux'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_dir="$PWD/release-assets"
+          package_parent="$PWD/obj-naivefox-linux/package"
+          mkdir -p "${release_dir}"
+          tar -C "${package_parent}" -cJf \
+            "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz" \
+            naivefox-linux-x86_64
+          sha256sum "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz" \
+            > "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz.sha256"
+
+      - name: Archive Windows package
+        if: matrix.platform == 'windows'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_dir="$PWD/release-assets"
+          package_parent="$PWD/obj-naivefox-windows/package"
+          mkdir -p "${release_dir}"
+          (
+            cd "${package_parent}"
+            7z a -tzip "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip" \
+              naivefox-windows-x86_64
+          )
+          sha256sum "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip" \
+            > "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip.sha256"
+
+      - name: Upload platform archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: naivefox-${{ matrix.platform }}-${{ needs.metadata.outputs.short_sha }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  draft-release:
+    name: Create or update draft release
+    needs:
+      - metadata
+      - build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download platform archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: naivefox-*
+          path: assets
+          merge-multiple: true
+
+      - name: Write draft release notes
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+          SOURCE_SHA: ${{ needs.metadata.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "NaiveFox product build from \`${SOURCE_SHA}\`."
+            echo
+            echo "This release is intentionally created as a draft."
+            echo
+            echo "SHA-256 checksums:"
+            for checksum in assets/*.sha256; do
+              cat "${checksum}"
+            done
+          } > assets/release-notes.md
+
+      - name: Create or update draft release (never publish)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+          SOURCE_SHA: ${{ needs.metadata.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t archives < <(find assets -maxdepth 1 -type f \
+            \( -name '*.tar.xz' -o -name '*.zip' -o -name '*.sha256' \) -print | sort)
+          test "${#archives[@]}" -eq 4
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+              --json isDraft --jq '.isDraft' >/tmp/release-is-draft 2>/dev/null; then
+            test "$(cat /tmp/release-is-draft)" = true
+            gh release upload "${RELEASE_TAG}" "${archives[@]}" \
+              --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release edit "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "NaiveFox ${RELEASE_TAG}" \
+              --notes-file assets/release-notes.md \
+              --target "${SOURCE_SHA}" \
+              --draft
+          else
+            gh release create "${RELEASE_TAG}" "${archives[@]}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${SOURCE_SHA}" \
+              --title "NaiveFox ${RELEASE_TAG}" \
+              --notes-file assets/release-notes.md \
+              --draft
+          fi
