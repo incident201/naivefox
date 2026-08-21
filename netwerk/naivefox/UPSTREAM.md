@@ -221,7 +221,7 @@ on a concrete Git-recorded base between refreshes.
 An ordinary Firefox package may be built only for an explicitly requested
 same-base capture/control comparison. It must use the same Firefox base as
 NaiveFox and a separate object/package directory. This diagnostic is outside
-Gates 1-3 and never becomes a merge or release prerequisite. See
+the two maintenance gates and never becomes a merge or release prerequisite. See
 [`CAPTURE.md`](CAPTURE.md).
 
 ## Cleanup
