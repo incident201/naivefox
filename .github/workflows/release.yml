@@ -22,6 +22,8 @@ concurrency:
 
 env:
   PRODUCT_BRANCH: naivefox-minimal-source
+  MACH_NO_TERMINAL_FOOTER: "1"
+  PYTHONUNBUFFERED: "1"
 
 jobs:
   guard:
@@ -165,6 +167,12 @@ jobs:
           if (-not (Test-Path 'C:\mozilla-build\VERSION')) {
             throw 'MozillaBuild extraction did not produce C:\mozilla-build\VERSION'
           }
+          # 7-Zip does not preserve the installer's empty MSYS2 /tmp
+          # directory. Without it, sh.exe writes a warning before the
+          # mozconfig protocol markers and mach's parser fails, then hangs
+          # during Python shutdown.
+          New-Item -ItemType Directory -Force `
+            -Path 'C:\mozilla-build\msys2\tmp' | Out-Null
 
       - name: Build and stage NaiveFox
         if: steps.staged_cache.outputs.cache-hit != 'true'
@@ -194,6 +202,32 @@ jobs:
           runner_temp="${RUNNER_TEMP//\\//}"
           objdir="${runner_temp}/obj-naivefox-${{ matrix.platform }}"
           mkdir -p "${objdir}/package"
+          export MOZCONFIG="$mozconfig"
+          export NAIVEFOX_OBJDIR="$objdir"
+          printf 'Validating mach environment (5 minute limit)...\n'
+          python3 - "$PWD/mach" <<'PY'
+          import subprocess
+          import sys
+
+          try:
+              result = subprocess.run(
+                  [sys.executable, sys.argv[1], "environment", "--format", "json"],
+                  capture_output=True,
+                  text=True,
+                  timeout=300,
+              )
+          except subprocess.TimeoutExpired as exc:
+              raise SystemExit("mach environment timed out after 300 seconds") from exc
+
+          if result.returncode:
+              # Avoid repeating the full environment dump (and its secrets)
+              # when mozconfig parsing fails; the useful diagnostic precedes it.
+              stdout = result.stdout.split("mozconfig output:", 1)[0]
+              sys.stderr.write(stdout)
+              sys.stderr.write(result.stderr)
+              raise SystemExit(result.returncode)
+          PY
+          printf 'Mach environment validated.\n'
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --objdir "${objdir}"
 
