@@ -85,7 +85,7 @@ jobs:
           set -euo pipefail
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --bootstrap \
-            --objdir "$PWD/obj-naivefox-${{ matrix.platform }}"
+            --objdir "$PWD/../obj-naivefox-${{ matrix.platform }}"
 
       - name: Archive Linux package
         if: matrix.platform == 'linux'
@@ -95,7 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           release_dir="$PWD/release-assets"
-          package_parent="$PWD/obj-naivefox-linux/package"
+          package_parent="$PWD/../obj-naivefox-linux/package"
           mkdir -p "${release_dir}"
           tar -C "${package_parent}" -cJf \
             "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz" \
@@ -111,7 +111,7 @@ jobs:
         run: |
           set -euo pipefail
           release_dir="$PWD/release-assets"
-          package_parent="$PWD/obj-naivefox-windows/package"
+          package_parent="$PWD/../obj-naivefox-windows/package"
           mkdir -p "${release_dir}"
           (
             cd "${package_parent}"
