@@ -1,330 +1,34 @@
 # NaiveFox
 
-NaiveFox is an experimental headless proxy client built inside the Firefox/Gecko source tree.
-
-The prototype reuses Firefox's **real networking stack** instead of manually imitating a browser fingerprint:
-
-- **Necko** for HTTP networking, HTTP/2, and HTTP/3 behavior.
-- **NSS/PSM** for TLS.
-- Firefox's normal HTTP/2 and Neqo HTTP/3 implementations, connection
-  management, HPACK/QPACK, TLS parameters, and related network behavior.
-- A small NaiveFox-specific layer for the local SOCKS5 server, HTTP CONNECT tunnel orchestration, Naive padding compatibility, configuration, logging, and stream pumping.
-
-The first target is **Linux x86_64 only**. Development uses Firefox's normal `mach` build system and a supported Linux build environment.
-
-The tagged `h2-prototype-v0.1` baseline is preserved. The `feature/h3` stage
-adds strict HTTP/3/QUIC through the same executable and project architecture;
-there is no separate H3 client, SOCKS server, pool, or padding implementation.
-The combined H2/H3 prototype is recorded by `h2-h3-prototype-v0.2`. Current
-architectural constraints and non-blocking observations are centralized in
-[`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
-
-## Repository model
-
-This repository is a fork of:
-
-- Upstream Firefox: https://github.com/mozilla-firefox/firefox
-- Project fork: https://github.com/incident201/naivefox
-
-The long-lived branch model is:
+NaiveFox is a headless Naive-compatible proxy client built on Firefox's real
+networking stack. Necko supplies HTTP/2, HTTP/3, CONNECT, pooling, and flow
+control; NSS/PSM supplies TLS and certificate validation; Neqo supplies QUIC.
+NaiveFox adds local proxy listeners, transport selection, CONNECT orchestration,
+Naive padding, bounded stream pumping, configuration, and packaging.
 
 ```text
-mozilla-firefox/firefox:main
-             |
-             v
-incident201/naivefox:main       <- keep clean, mirror upstream
-             |
-             v
-incident201/naivefox:naivefox   <- project development branch
-             |
-             v
-incident201/naivefox:minimal    <- full tree, minimized build/runtime
-             |
-             | generated allowlist export
-             v
-incident201/naivefox:minimal-source <- compact standalone product tree
+application -> SOCKS5 or HTTP CONNECT -> NaiveFox
+            -> Firefox Necko/NSS/Neqo -> H2 or H3 CONNECT
+            -> Caddy forwardproxy@naive -> destination
 ```
 
-Do not develop directly on `main` or manually on `minimal-source`. Shared
-network functionality is implemented and validated on `naivefox`; minimization
-work is performed on `minimal`; the product source branch is regenerated only
-from a validated `minimal` snapshot.
+The server is an unmodified Naive-compatible Caddy build. NaiveFox does not
+ship another HTTP/TLS stack and does not synthesize a Firefox fingerprint.
 
-The normal upstream/minimal cycle does not build an ordinary Firefox browser
-package. The `naivefox` refresh is a source/inventory/conflict review, the
-NaiveFox minimal product is built and tested on `minimal`, and the standalone
-product is rebuilt from `minimal-source`. An ordinary Firefox package is
-allowed only for a separately requested, isolated same-base capture comparison
-against NaiveFox. That comparison is not a merge or release gate and is not run
-for routine changes; see `UPSTREAM.md` and `CAPTURE.md`.
+## Running the product
 
-Project-specific code and documentation should live under:
-
-```text
-netwerk/naivefox/
-```
-
-Existing Firefox files should be modified only when no suitable existing internal API can solve the problem. Every upstream modification must be small, isolated, justified, tested, and documented in `UPSTREAM.md`.
-
-The root Firefox `README.md` and root Firefox `AGENTS.md` are upstream files and must not be replaced by this project.
-The generated `minimal-source` export deliberately places the NaiveFox README
-at its repository root without modifying those files in the full-tree branches.
-See `MINIMISATION-TASK.MD` and `UPSTREAM.md` for the closure, export, and Firefox
-refresh gates.
-
-## Goal
-
-The end-to-end prototype should provide a local SOCKS5 endpoint:
-
-```text
-Application
-    |
-    | SOCKS5 CONNECT
-    v
-NaiveFox
-    |
-    | Necko + NSS
-    | HTTPS connection to proxy
-    | --protocol h2: TLS/TCP, ALPN h2
-    | --protocol h3: QUIC/UDP, ALPN h3
-    | regular HTTP CONNECT target.example:443
-    v
-Existing Caddy + klzgrad/forwardproxy@naive
-    |
-    v
-Target server
-```
-
-Example user-facing behavior:
+The staged Linux package has one launcher at its root. With no argument it
+reads `./config.json`; one positional argument selects another config:
 
 ```bash
-export NAIVEFOX_PROXY_USER='user'
-export NAIVEFOX_PROXY_PASS='pass'
-
-obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
-  --profile /path/to/writable-nss-profile \
-  --socks-listen 127.0.0.1:1080 \
-  --proxy https://proxy.example.com:443 \
-  --protocol h3
-
-curl --socks5-hostname 127.0.0.1:1080 https://example.com/
+./naivefox
+./naivefox /absolute/path/to/config.json
 ```
 
-The prototype is successful when traffic flows through the user's existing Naive-compatible Caddy server, with the server unchanged.
+The staged Windows package provides `run-naivefox.cmd` beside its runtime and
+accepts the same optional config path.
 
-## Server compatibility
-
-Both the local integration fixture and the supplied real test server are expected to use a normal Naive-compatible Caddy build with the Naive fork of `forwardproxy`, equivalent to:
-
-```bash
-xcaddy build \
-  --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive
-```
-
-NaiveFox must interoperate with that existing server. Do not require a custom NaiveFox server. The command above describes compatibility; the committed local fixture must pin an exact tested Caddy version and immutable `forwardproxy` commit instead of resolving a moving branch on every run.
-
-The user may provide a real test server address and credentials for final interoperability validation. Their absence must not block development because the repository must include a reproducible local Caddy fixture.
-
-Never commit test credentials, proxy passwords, private keys, TLS keys, packet captures containing secrets, or generated NSS profile secrets.
-
-## Integration test strategy
-
-Testing has two distinct gates.
-
-| Gate | Purpose |
-|---|---|
-| Local Caddy fixture | Reproducible development and regression testing without external credentials |
-| Supplied real Caddy | Final interoperability validation against the user's deployment, DNS, public certificate, and production-like configuration |
-
-The local fixture runs directly in the provided Linux build environment and uses:
-
-- a dedicated Caddy binary built from pinned Caddy and `forwardproxy@naive` revisions,
-- a loopback-only, explicitly TLS-enabled catch-all listener on an unprivileged port,
-- an ACL and allowed-port list restricted to the local target,
-- Basic Auth credentials generated outside the source tree,
-- isolated Caddy internal-PKI state with `skip_install_trust`,
-- a dedicated NSS profile containing only the fixture CA trust,
-- a second untrusted NSS profile for the required certificate-failure test,
-- a deterministic local HTTP/HTTPS target for integrity, upload, close, delay, and concurrency tests.
-
-The fixture must not install its CA globally, modify a normal Firefox profile, disable certificate validation, start a system Caddy service, or expose an open proxy. Generated Caddy binaries, CA material, credentials, NSS databases, logs, and captures belong under the object directory and are not committed.
-
-The automated runners cover certificate rejection/trust, strict `h2` and
-strict `h3`, Basic Auth success and failure, raw CONNECT, SOCKS remote-hostname
-semantics, padding negotiation, deterministic transfer hashes, concurrency,
-backpressure, half-close, and shutdown paths. H3-only fixture mode exposes a
-UDP listener with no TCP listener on the proxy port, so hidden H2 fallback
-cannot make a strict H3 test pass. The supplied real server is tested only
-after the local suite passes.
-
-Run the bounded real-deployment gate with credentials supplied only through the
-environment:
-
-```bash
-NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
-NAIVEFOX_REAL_PROXY_USER=user \
-NAIVEFOX_REAL_PROXY_PASS=secret \
-netwerk/naivefox/test/integration/run-real-server-tests.sh
-```
-
-The default runner keeps one client process alive for two minutes, visits
-several ordinary HTTPS pages, compares a direct and proxied GitHub archive by
-SHA-256, and runs spaced four-request parallel waves. Generated bodies,
-profiles, and client logs stay under the object directory; only a
-credential-free summary is copied to the ignored `artifacts/` directory. Set
-`NAIVEFOX_REAL_DURATION_SECONDS` to a bounded value from 30 through 300 when a
-shorter or longer manual session is needed.
-
-The strict H3 real-deployment soak is a separate ten-minute gate. It first
-proves H3 and transfer integrity, then observes the same process for exactly
-600 seconds with periodic small and parallel requests, two deliberate idle
-windows, resource sampling, and a requirement that the proxy path uses UDP
-without a TCP fallback:
-
-```bash
-NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
-NAIVEFOX_REAL_PROXY_USER=user \
-NAIVEFOX_REAL_PROXY_PASS=secret \
-netwerk/naivefox/test/integration/run-real-server-h3-soak.sh
-```
-
-`netwerk/naivefox/tools/fetch-naiveproxy-reference.sh` downloads the pinned
-official Linux client and verifies the GitHub release SHA-256. It is a
-behavioral and performance reference, not a wire-shaping target.
-NaiveFox deliberately does not copy Chromium-specific preambles or camouflage:
-its TLS and HTTP/2 behavior must continue to come from Firefox Necko/NSS.
-`run-reference-server-tests.sh` applies a separate, bounded long-lived workload
-to that official client using a private generated config, so future comparisons
-do not depend on fragile one-line invocations.
-
-See `AGENTS.md` for fixture construction and trust procedure, `ROADMAP.md` for
-milestone acceptance gates, and `TEST-REPORT.md` for the committed local,
-real-deployment, reference-client, and packaged-runtime results.
-
-## Non-goals
-
-The first prototype does **not** need:
-
-- Android support.
-- Windows-native support.
-- TUN/TAP support.
-- Transparent proxying.
-- UDP ASSOCIATE.
-- SOCKS5 BIND.
-- GUI.
-- Browser UI.
-- A single statically linked executable.
-- Minimizing Firefox/libxul size.
-- Matching Chromium.
-- Copying Chromium-specific NaiveProxy camouflage patches.
-- Full resistance to traffic analysis.
-- Production hardening.
-
-The H3 stage deliberately does not implement CONNECT-UDP, MASQUE,
-WebTransport, UDP ASSOCIATE, a standalone Neqo client, or manual QUIC
-fingerprint shaping.
-
-## Why Firefox instead of Chromium
-
-Original NaiveProxy reuses Chromium's networking stack. NaiveFox explores the same general idea with Firefox:
-
-> Do not manually synthesize a Firefox TLS/HTTP fingerprint. Run the real Firefox networking implementation.
-
-The outer network stack should therefore remain as close as practical to unmodified Firefox behavior.
-
-Do not replace Necko HTTP/2 with nghttp2, curl, Boost.Beast, a custom HTTP/2 implementation, or another networking library.
-
-Do not replace NSS with OpenSSL, BoringSSL, rustls, or another TLS implementation.
-
-If a low-level Firefox internal change is required, prefer the smallest generic hook that allows NaiveFox to use the existing stack.
-
-## High-level architecture
-
-```text
-NaiveFoxApp
-|
-+-- GeckoRuntime
-|   +-- XPCOM startup/shutdown
-|   +-- profile/runtime setup
-|   +-- preferences needed for a headless networking process
-|   +-- Necko / PSM / NSS initialization
-|
-+-- Config
-|   +-- strict NaiveProxy-compatible JSON schema
-|   +-- multiple configurable IPv4/IPv6 SOCKS5 / HTTP CONNECT listeners
-|   +-- strict H2 (`https://`) or H3 (`quic://`) upstream
-|   +-- persistent or temporary profile and logging policy
-|
-+-- LocalProxyServer
-|   +-- one Gecko runtime and one Necko connection manager
-|   +-- SocksConnection: parse SOCKS5 CONNECT and produce SOCKS replies
-|   +-- HttpConnectConnection: parse HTTP CONNECT and produce HTTP replies
-|   +-- preserve domain names for upstream resolution
-|
-+-- TunnelSession
-|   +-- shared H2/H3/Auto attempt and fallback lifecycle
-|   +-- CONNECT metadata and padding negotiation
-|   +-- expose one established target tunnel to either frontend
-|
-+-- NeckoTunnel
-|   +-- create an explicit HTTPS or QUIC proxy configuration
-|   +-- require the configured Firefox H2 or H3 transport
-|   +-- issue CONNECT host:port
-|   +-- expose async tunnel input/output streams
-|   +-- expose CONNECT status and response headers
-|
-+-- NaivePadding
-|   +-- CONNECT header padding negotiation
-|   +-- payload encoder
-|   +-- payload decoder
-|
-+-- DuplexPump
-    +-- local frontend -> Naive encode -> Necko tunnel output
-    +-- Necko tunnel input -> Naive decode -> local frontend
-    +-- bounded buffering and backpressure
-    +-- shutdown/error propagation
-```
-
-Keep these responsibilities separate. In particular, `NaivePadding` should be testable without Necko or real sockets.
-
-## SOCKS5 behavior
-
-The first implementation should:
-
-- Bind to the address configured by the user, for example `127.0.0.1`,
-  `0.0.0.0`, a LAN address, `::1`, or `::`.
-- Support SOCKS5 `CONNECT`.
-- Support destination address types:
-  - IPv4.
-  - IPv6.
-  - Domain name.
-- Reject unsupported commands with the correct SOCKS5 reply.
-- Require no authentication on the local SOCKS endpoint for the prototype.
-- Do not apply an implicit loopback restriction to an explicitly configured
-  address.
-- Avoid local DNS resolution when the client supplied a domain name.
-
-For a SOCKS domain request such as:
-
-```text
-example.com:443
-```
-
-the CONNECT authority sent to the upstream proxy should remain:
-
-```text
-example.com:443
-```
-
-The upstream proxy should resolve the target name.
-
-This is important both for proxy semantics and for avoiding local DNS leaks.
-
-## Proxy configuration
-
-Normal use follows the small NaiveProxy-compatible JSON subset below. With no
-arguments, `naivefox` reads `./config.json`; one positional argument selects a
-different file.
+The supported config is a strict NaiveProxy-compatible subset:
 
 ```json
 {
@@ -340,458 +44,166 @@ different file.
 }
 ```
 
-`listen` may be one string or a non-empty array. `socks://` provides SOCKS5
-CONNECT; `http://` provides HTTP CONNECT only. Numeric IPv4 and IPv6 bind
-addresses are accepted, including wildcard and non-loopback addresses;
-`localhost` is normalized to IPv4 loopback. An explicit nonzero port is
-required. Because local listener authentication is not implemented yet,
-binding a wildcard or LAN address intentionally exposes the listener and must
-be protected by the host firewall or trusted-network policy. Ordinary
-forward-proxy GET/POST requests sent to the HTTP listener return 405.
+- `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
+  `http://` serves HTTP CONNECT only.
+- `proxy` is one URI shared by all listeners, or an array whose length matches
+  `listen`. Multi-hop comma-separated proxy chains are rejected.
+- `https://` requires H2 over TLS/TCP. `quic://` requires H3 over QUIC/UDP.
+  Strict modes never silently fall back.
+- Credentials are percent-decoded and passed to Necko's proxy-auth path. They
+  are never written to normal logs.
+- Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
+  An explicit nonzero port is required.
+- `log` absent disables runtime logging, `""` logs to the console, and a path
+  appends to a mode-`0600` file.
 
-Like NaiveProxy `v150.0.7871.63-1`, `proxy` may be one string or a non-empty
-array. One URI is shared by every listener. With two or more URIs, the count
-must equal the listener count and `proxy[i]` is used by `listen[i]`; repeating
-the same URI for SOCKS and HTTP is therefore valid. Comma-separated multi-hop
-proxy chains remain outside this stage and produce an explicit error rather
-than being misinterpreted.
+Local listeners do not authenticate clients. Binding `0.0.0.0`, `::`, or a LAN
+address intentionally exposes the listener and requires an appropriate host
+firewall or trusted-network policy. Ordinary forward-proxy HTTP requests return
+405.
 
-All listeners still run in one process and share one Gecko runtime, Necko
-connection manager, tunnel backend, and padding implementation. Different
-per-listener `https://` and `quic://` entries are supported without duplicating
-the transport implementation.
-
-The proxy URI contains percent-encoded credentials and selects a strict outer
-transport:
-
-- `https://user:password@host[:port]` requires H2;
-- `quic://user:password@host[:port]` requires H3/QUIC without H2 fallback.
-
-The default proxy port is 443. Username and password are decoded once, passed
-to the existing Necko proxy-auth path, and never written to runtime logs.
-Unknown or duplicate fields, malformed JSON, wrong types, unsupported schemes,
-and unsafe endpoints are rejected rather than ignored.
-
-Logging is disabled when `log` is absent, goes to the console when it is an
-empty string, and appends to a mode-`0600` file for any non-empty path. The
-normal config mode first creates or reuses a writable persistent Firefox/NSS
-profile at `$XDG_STATE_HOME/naivefox/profile`, or
-`$HOME/.local/state/naivefox/profile` when XDG state is unset. Set
-`NAIVEFOX_PROFILE` to require an explicit persistent location; an invalid
-explicit override is an error.
-
-When neither state location is usable, including for a service account with no
-home directory, NaiveFox creates a unique mode-`0700` temporary profile. It
-prefers `XDG_RUNTIME_DIR` and otherwise uses the platform temporary directory
-with `/tmp` as the final Linux fallback. The temporary profile is removed after
-an orderly runtime shutdown and starts clean on every process invocation. On
-systems where the runtime directory or `/tmp` is memory-backed, its contents
-are consequently held on tmpfs; NaiveFox does not require that property.
-Operators who need persistent user certificate databases or other profile
-state should set `NAIVEFOX_PROFILE` or provide a writable XDG/HOME state
-location. Developer/test CLI modes retain their explicit `--profile`,
-`--protocol`, and environment-only credential interfaces.
-
-## HTTP/2 tunnel requirements
-
-The upstream connection must be an HTTPS connection handled by Firefox's stack.
-
-For the H2-only prototype:
-
-- HTTP/3 must be disabled for the tunnel path.
-- HTTP/2 must be allowed.
-- The agent must verify that ALPN actually negotiates `h2`.
-- The CONNECT request must be generated and transmitted through Firefox's HTTP/2 implementation.
-- On successful CONNECT, NaiveFox needs asynchronous bidirectional streams representing the tunnel payload.
-- The target TLS session belongs to the application using SOCKS, not to Necko. Necko must not automatically establish a second TLS connection to the CONNECT target.
-
-Relevant Firefox implementation areas include:
-
-```text
-netwerk/protocol/http/nsIHttpChannelInternal.idl
-netwerk/protocol/http/HttpBaseChannel.cpp
-netwerk/protocol/http/nsHttpConnection.cpp
-netwerk/protocol/http/Http2Session.cpp
-netwerk/protocol/http/Http2StreamTunnel.cpp
-netwerk/test/unit/test_proxyconnect.js
-netwerk/test/unit/test_proxyconnect_headers.js
-```
-
-The exact internal API path must be verified against the current checkout before implementation.
-
-### Important raw-CONNECT caveat
-
-Current Firefox `setConnectOnly()` is tied to an `HTTPUpgrade()` listener. The existing implementation uses the upgrade protocol to generate an `ALPN` header in the CONNECT request.
-
-NaiveFox must **not** ship a fake `ALPN: webrtc` or similar project-specific marker merely to obtain raw streams.
-
-The agent must investigate the current code and implement the smallest maintainable solution that:
-
-1. exposes the successful CONNECT tunnel streams,
-2. does not add a synthetic protocol header to the wire,
-3. preserves normal Firefox HTTP/2 behavior.
-
-This may require a small internal Necko hook. Treat this as an expected engineering task, not a reason to bypass Necko.
-
-## Naive padding
-
-Naive padding is separate from Firefox/Chrome TLS fingerprinting.
-
-Firefox's real stack handles the outer TLS and HTTP/2 behavior. Naive padding addresses observable length patterns created by tunneling another protocol inside HTTP/2 CONNECT.
-
-The prototype should implement the Naive-compatible padding protocol used by current NaiveProxy and `forwardproxy@naive`.
-
-Reference:
-
-https://github.com/klzgrad/naiveproxy/blob/master/README.md#padding-protocol-an-informal-specification
-
-The first prototype targets legacy Naive padding Variant 1 as implemented by the pinned `forwardproxy@naive` fixture: eight padded records per direction followed by raw bytes. Newer NaiveProxy padding variants are not part of this prototype.
-
-### CONNECT header negotiation
-
-Naive-compatible clients put a `padding` header in the CONNECT request.
-
-The server returns a `padding` header if it supports the padding protocol.
-
-Payload padding is enabled only after server support has been established.
-
-The request padding length used by current NaiveProxy is randomized in the range documented by upstream NaiveProxy. Do not invent a different wire protocol during the initial compatibility implementation.
-
-Firefox normally constructs proxy CONNECT headers separately from the original request headers. The agent must verify the current source path and add only the minimal hook required to get the Naive `padding` header into the actual proxy CONNECT request.
-
-Firefox already exposes CONNECT response metadata through `nsIProxiedChannel`, including the CONNECT status and response headers. Prefer using that existing machinery to detect the server's `padding` response header.
-
-### Payload framing
-
-Current upstream NaiveProxy documents padding for the first 8 reads/writes in each direction:
-
-```text
-+-------------------------+
-| original_size_hi : u8   |
-| original_size_lo : u8   |
-| padding_size     : u8   |
-+-------------------------+
-| original payload        |
-+-------------------------+
-| zero padding            |
-+-------------------------+
-```
-
-Where:
-
-- `original_size` is a big-endian 16-bit length.
-- `padding_size` is in `[0, 255]`.
-- payload chunks larger than 65535 bytes must be split.
-- only the first configured Naive padding records in each direction are framed this way; subsequent data is raw.
-
-The decoder must be a true streaming decoder:
-
-- it must handle a framing header split across multiple reads,
-- payload split across multiple reads,
-- padding split across multiple reads,
-- multiple padded records received in one read,
-- the final padded record and following raw bytes arriving in the same read.
-
-Do not assume that HTTP/2 DATA frame boundaries or socket read boundaries preserve Naive record boundaries.
-
-### Chromium-specific Naive changes are not automatically applicable
-
-Do not blindly port:
-
-- Chromium-specific RST_STREAM camouflage.
-- Chromium-specific preambles.
-- Chromium-specific HTTP/2 parameter patches.
-- Chromium-specific Fast Open behavior.
-- Changes whose purpose is specifically to make modified Chromium look like ordinary Chrome.
-
-NaiveFox's outer stack is Firefox.
-
-Any Firefox-specific camouflage proposal must first be justified by an
-explicitly requested isolated comparison between ordinary Firefox and NaiveFox
-packages built from the same Firefox base. That comparison is diagnostic, not
-an ordinary build, merge, or release gate.
-
-## Runtime and packaging model
-
-The prototype is intentionally allowed to be large.
-
-NaiveFox is expected to be built as a Gecko-dependent executable, conceptually similar to:
-
-```python
-GeckoProgram("naivefox", linkage="dependent")
-```
-
-The runtime will therefore not initially be a single static binary.
-
-Development output will likely use Firefox build artifacts such as:
-
-```text
-naivefox
-libxul.so
-NSS/NSPR libraries
-mozglue and other required Gecko runtime files
-```
-
-A separately requested capture/control build may produce the ordinary Firefox
-browser executable in its isolated object directory. That executable is not
-part of the NaiveFox product, normal build cycle, merge gate, or release gate.
-
-The current prototype keeps the Gecko-facing implementation inside `libxul`
-so it can use internal Necko and PSM APIs, while the small `naivefox` program
-owns Firefox's bootstrap lifetime and calls the exported NaiveFox entry point.
-This follows the dependent executable model without exposing internal XPCOM
-types across the executable boundary.
-
-The staged package has a user-facing launcher at its root and keeps the native
-binary and GRE dependencies below `runtime/`:
-
-```text
-naivefox-linux-x86_64/
-|-- naivefox
-`-- runtime/
-    |-- naivefox
-    |-- libxul.so
-    `-- ...
-```
-
-The root `naivefox` is the only user-facing launcher. `runtime/naivefox` is the
-native ELF it invokes alongside `libxul` and the GRE files; it is not a second
-launcher. Normal packaged use requires no build-tree loader variables, profile
-argument, or credential environment variables:
+A SOCKS client should delegate destination DNS to the proxy:
 
 ```bash
-cd naivefox-linux-x86_64
-./naivefox
-./naivefox /absolute/path/to/config.json
+curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 ```
 
-Runtime diagnostics are also available independently of SOCKS mode:
+Normal config mode uses a persistent profile under `XDG_STATE_HOME`, then
+`$HOME/.local/state`, or the explicit `NAIVEFOX_PROFILE`. If no persistent
+location is usable, it creates a private temporary profile and removes it after
+an orderly shutdown. Certificate verification is never disabled.
+
+Developer-only modes provide focused diagnostics:
 
 ```bash
-export LD_LIBRARY_PATH="$PWD/obj-x86_64-pc-linux-gnu/dist/bin"
-obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
-  --profile /path/to/nss-profile --runtime-smoke
-obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
-  --profile /path/to/nss-profile --fetch https://example.com/
-obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
-  --profile /path/to/nss-profile \
+naivefox --profile /path/to/profile --runtime-smoke
+naivefox --profile /path/to/profile --fetch https://example.com/
+naivefox --profile /path/to/profile \
   --raw-tunnel-smoke https://proxy.example:443 target.example:80
-```
-
-The development binary's legacy test-only SOCKS mode uses the same profile and
-environment-only credentials:
-
-```bash
-obj-x86_64-pc-linux-gnu/dist/bin/naivefox \
-  --profile /path/to/nss-profile \
+naivefox --profile /path/to/profile \
   --socks-listen 127.0.0.1:1080 \
-  --proxy https://proxy.example:443 \
-  --protocol h2
+  --proxy https://proxy.example:443 --protocol h2
 ```
 
-`--protocol h2` is the compatibility-preserving default. `--protocol h3`
-requires a Necko/Neqo HTTP/3 proxy connection and never silently falls back to
-H2. `--protocol auto` first makes the same strict H3 attempt and retries once
-with H2 only when transport establishment fails before any CONNECT response or
-tunnel transport is observed. Authentication, ACL, target, CONNECT 200, and
-established-tunnel failures never trigger fallback. Each successful tunnel
-logs only `Outer protocol: h2` or `Outer protocol: h3`; credentials and proxy
-authorization are never logged.
+Developer CLI modes take proxy credentials from `NAIVEFOX_PROXY_USER` and
+`NAIVEFOX_PROXY_PASS`. `--protocol h2` is the default; `h3` is strict H3;
+`auto` performs one strict H3 attempt and permits one H2 retry only when H3
+fails before a CONNECT response or tunnel transport exists.
 
-`--max-connections N` is an optional finite-run test control. Omitting it
-keeps the loopback SOCKS listener running. The value counts total accepted
-SOCKS connections over the lifetime of the process; it is not a parallel or
-production concurrency limit. Normal long-lived use should omit the option.
+## Supported behavior
 
-The raw-tunnel diagnostic creates an explicit HTTPS proxy through Necko,
-requires the selected outer protocol, and obtains regular CONNECT as
-asynchronous Gecko streams. Credentials come only from
-`NAIVEFOX_PROXY_USER` and `NAIVEFOX_PROXY_PASS`. The reproducible local
-authentication and bidirectional stream tests are:
+- SOCKS5 CONNECT with IPv4, IPv6, and domain destinations; domain names remain
+  unresolved in the upstream CONNECT authority.
+- HTTP CONNECT local frontend, including bytes received with the request
+  headers.
+- Multiple listeners in one process, sharing one Gecko runtime and Necko
+  connection manager.
+- Strict H2 and strict H3 regular CONNECT, plus bounded developer Auto mode.
+- Basic proxy authentication through Firefox's normal proxy-auth machinery.
+- Naive `padding` request/response negotiation and legacy Variant 1 payload
+  framing: eight padded records per direction, then raw bytes.
+- Bounded async pumping, partial I/O, backpressure, half-close, connection reuse,
+  and coordinated shutdown.
+- Relocatable Linux x86-64 and Windows x86-64 packages from the minimized
+  product graph.
+
+NaiveFox deliberately does not implement SOCKS BIND or UDP ASSOCIATE,
+CONNECT-UDP, MASQUE, WebTransport, transparent proxying, TUN/TAP, a GUI, or a
+separate socket-process transport. See [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
+
+## Architecture and wire compatibility
+
+NaiveFox asks Firefox to create a normal proxied channel and takes over the
+successful classic CONNECT as asynchronous byte streams. The empty raw-upgrade
+token is restricted to connect-only channels and emits no synthetic `ALPN`,
+`Upgrade`, or `Connection` marker. A validated sidecar adds only the intentional
+Naive `padding` header to the actual proxy CONNECT request.
+
+H2 uses Firefox's TLS/TCP connection and `Http2StreamTunnel`. H3 uses a strict
+MASQUE-type proxy route to create a regular classic CONNECT through
+`Http3StreamTunnel`; it does not use CONNECT-UDP or a standalone Neqo client.
+Connection pooling remains owned by Necko in both modes.
+
+The target's TLS session belongs to the application using the local proxy.
+NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for component, event-target, stream,
+and fallback details. Downstream Firefox hooks are inventoried in
+[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md).
+
+## Building and testing
+
+Development happens in the full Firefox source checkout, but the normal
+product workflow builds only the minimized NaiveFox graph. It does not build a
+Firefox browser:
 
 ```bash
-netwerk/naivefox/test/integration/run-raw-connect-tests.sh
-netwerk/naivefox/test/integration/run-h3-raw-connect-tests.sh
+MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
 ```
 
-For this internal path, `setConnectOnly(false)` is followed by
-`HTTPUpgrade("", listener)`. An empty protocol is restricted to a connect-only
-channel and means raw stream takeover: it emits neither an Upgrade header nor
-the synthetic CONNECT `ALPN` header used by protocol upgrades. The explicit
-proxy's resolve flags must carry both HTTPS-proxy preference and always-tunnel
-semantics; the similarly named `nsIProxyInfo` connection flags are not a
-substitute.
-
-Single-process networking is the explicit architecture of the current Linux
-prototype, not an accidental fallback. The socket process remains disabled,
-and both `Http2StreamTunnel` and `Http3StreamTunnel` operate successfully in
-the parent process. Necko owns HTTP and connection pooling, Neqo owns
-QUIC/HTTP3, and PSM/NSS owns certificate verification and TLS. See
-`H3-DESIGN.md` for the exact source path, `KNOWN-ISSUES.md` for the boundary of
-this choice, and `UPSTREAM.md` for the minimal focused Firefox changes.
-
-Packaging/minimization comes only after the network prototype works.
-
-## Development environment
-
-The prototype targets a supported **Linux x86_64** build environment.
-
-The exact host arrangement is intentionally not part of the project architecture. Development may happen on a native Linux machine, virtual machine, container-like environment, subsystem, CI runner, or another suitable Linux environment.
-
-Requirements:
-
-- the source tree must be on a filesystem suitable for a full-source native
-  NaiveFox C++/Rust build,
-- the environment must satisfy current Mozilla Firefox Linux build requirements,
-- the agent must use Firefox's normal bootstrap and toolchain,
-- the agent must prove the affected NaiveFox product graph with the appropriate
-  minimal build gate.
-
-Mozilla's current Linux build documentation:
-
-https://firefox-source-docs.mozilla.org/setup/linux_build.html
-
-Use a native compiled NaiveFox build, not Artifact Mode, because NaiveFox
-modifies and links C++ backend code. This requirement does not authorize or
-require building the ordinary Firefox browser package.
-
-Use Mozilla's normal toolchain and `mach`; do not introduce CMake as the project build system.
-
-## Source references
-
-Primary upstream references:
-
-- Firefox source:
-  https://github.com/mozilla-firefox/firefox
-- Firefox Linux build documentation:
-  https://firefox-source-docs.mozilla.org/setup/linux_build.html
-- Firefox C++ policy:
-  https://firefox-source-docs.mozilla.org/code-quality/coding-style/using_cxx_in_firefox_code.html
-- NaiveProxy:
-  https://github.com/klzgrad/naiveproxy
-- Naive padding specification:
-  https://github.com/klzgrad/naiveproxy/blob/master/README.md#padding-protocol-an-informal-specification
-- Naive Caddy forward proxy:
-  https://github.com/klzgrad/forwardproxy/tree/naive
-
-Relevant current Firefox source paths:
-
-- `build/gecko_templates.mozbuild`
-- `js/xpconnect/shell/moz.build`
-- `netwerk/moz.build`
-- `netwerk/protocol/http/nsIHttpChannelInternal.idl`
-- `netwerk/protocol/http/HttpBaseChannel.cpp`
-- `netwerk/protocol/http/nsHttpConnection.cpp`
-- `netwerk/protocol/http/Http2Session.cpp`
-- `netwerk/protocol/http/Http2StreamTunnel.cpp`
-- `netwerk/protocol/http/Http3Session.cpp`
-- `netwerk/protocol/http/Http3StreamTunnel.cpp`
-- `netwerk/protocol/http/Http3TransportLayer.cpp`
-- `netwerk/test/unit/test_proxyconnect.js`
-- `netwerk/test/unit/test_proxyconnect_headers.js`
-
-Source code changes over time. Always verify current `main`; never copy line numbers or old assumptions blindly.
-
-## Definition of the complete H2/H3 prototype
-
-As of 2026-08-13, every local-fixture, codec, robustness, capture, staging, and
-supplied-real-Caddy milestone is implemented and passes in the supported Linux
-x86-64 environment. Extended local throughput, passive-observer, and
-10-minute real-deployment stability tests also pass.
-
-The H2 baseline remains defined by the list below. The H3 stage additionally
-requires one `naivefox` executable to pass strict H2, strict H3, and bounded
-Auto tests; use UDP/QUIC with no TCP fallback in strict H3; reuse the same
-SOCKS, padding codec, and bounded duplex pump; multiplex concurrent regular
-CONNECT streams on a Necko-owned H3 session; pass half-close, slow producer,
-slow consumer, large-transfer, and proxy-loss tests; and run outside the
-object directory from the same staged package.
-
-The historical prototype acceptance record demonstrates the following on
-Linux x86_64. For the current branch cycle, the ordinary Firefox comparison is
-an isolated diagnostic only when explicitly requested; it is not repeated for
-routine merges or releases.
-
-1. A clean full-source checkout can bootstrap and build the NaiveFox product
-   graph with Mozilla's native toolchain.
-2. `naivefox` builds as part of the Firefox tree.
-3. It starts headlessly and initializes the required Gecko networking runtime.
-4. It can perform a normal HTTPS request using Necko/NSS as a sanity test.
-5. It can establish an HTTPS connection to the local Caddy fixture through scoped NSS trust and negotiate HTTP/2.
-6. It can issue a raw HTTP/2 CONNECT without an artificial NaiveFox-specific ALPN/Upgrade marker.
-7. It exposes the CONNECT tunnel as async bidirectional streams.
-8. It serves a local SOCKS5 endpoint.
-9. `curl --socks5-hostname ...` can fetch deterministic HTTP and HTTPS targets through the local Caddy fixture.
-10. Proxy authentication works.
-11. The Naive CONNECT `padding` header is sent.
-12. The server `padding` response header is detected.
-13. Naive payload padding is encoded/decoded compatibly.
-14. End-to-end traffic works with payload padding enabled.
-15. Large transfers and multiple concurrent SOCKS connections work without corruption or unbounded buffering.
-16. Tests cover the padding codec and critical SOCKS/tunnel state transitions.
-17. The one-time historical packet-capture record documents the outer TLS/H2
-    comparison; any new same-base ordinary Firefox comparison is a separate,
-    explicitly requested diagnostic.
-18. The complete local integration suite passes from one documented command.
-19. The same core path is confirmed against the supplied real Caddy server.
-20. All changes to existing Firefox files are documented in `UPSTREAM.md`.
-21. The prototype runtime can be staged and run outside the build tree on a compatible Linux system.
-22. `naivefox` reads a strict NaiveProxy-compatible `config.json` without
-    requiring developer CLI flags or credential environment variables.
-23. One process can serve SOCKS5 and HTTP CONNECT listeners simultaneously,
-    with both frontends using the same `TunnelSession`, Necko pool, padding
-    negotiation, and bounded duplex pump.
-24. Config `https://` and `quic://` upstreams pass local, staged, and supplied
-    real-Caddy tests as strict H2 and strict H3 respectively.
-
-See `ROADMAP.md` for the required implementation order.
-
-Run the complete local integration gate with:
+The Windows x86-64 cross-build uses the separate product mozconfig on the
+`minimal` branch and Mozilla's clang-cl toolchain with the Visual Studio linker
+and Windows SDK:
 
 ```bash
-./netwerk/naivefox/test/integration/run-local-suite.sh
-./netwerk/naivefox/test/integration/run-h3-suite.sh
+MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64 \
+NAIVEFOX_OBJDIR="$PWD/obj-naivefox-windows-x86_64" \
+./mach build binaries
+./mach build misc
+```
+
+Run the reproducible local H2/H3/Auto/config/robustness gate with:
+
+```bash
 ./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
-The capture phase requires the restricted `dumpcap` capabilities documented
-in `CAPTURE.md`. The H3-specific decrypted and no-keylog comparison is in
-`H3-CAPTURE.md` and is reproduced by
-`test/integration/run-h3-capture-comparison.sh`. The commands build or reuse
-the pinned fixture dependencies, run local functional and failure-path suites
-sequentially, and delete sensitive run material after every successful phase.
+The fixture builds pinned Caddy and `forwardproxy@naive` inputs, binds only to
+loopback, creates per-run credentials and PKI state, and trusts its CA only in
+isolated NSS profiles. No real proxy account is required. Detailed focused and
+real-deployment commands are in
+[`test/integration/README.md`](test/integration/README.md).
 
-Additional repeatable test entry points are:
-
-```bash
-./netwerk/naivefox/test/integration/run-throughput-benchmark.sh
-./netwerk/naivefox/test/integration/run-h3-throughput-benchmark.sh
-./netwerk/naivefox/test/integration/run-observer-comparison.sh
-NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
-NAIVEFOX_REAL_PROXY_USER=user \
-NAIVEFOX_REAL_PROXY_PASS=secret \
-./netwerk/naivefox/test/integration/run-real-server-soak.sh
-NAIVEFOX_REAL_PROXY_URL=https://proxy.example:443 \
-NAIVEFOX_REAL_PROXY_USER=user \
-NAIVEFOX_REAL_PROXY_PASS=secret \
-./netwerk/naivefox/test/integration/run-real-server-h3-soak.sh
-```
-
-The committed outcomes and limitations are recorded in
-[`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md),
-[`OBSERVER-TRAFFIC-REPORT.md`](OBSERVER-TRAFFIC-REPORT.md), and
-[`TEST-REPORT.md`](TEST-REPORT.md).
-
-After a successful build, create and verify the relocatable prototype runtime
-with:
+Stage and verify the Linux package after a successful product build:
 
 ```bash
 ./netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64
 ./netwerk/naivefox/tools/verify-staged-runtime.sh naivefox-linux-x86_64
 ```
 
-The package is created below the configured object directory and deliberately
-contains no NSS profile, fixture credentials, logs, TLS key logs, or packet
-captures. Config mode creates or reuses a writable persistent profile when a
-state/home location is available and falls back to a private temporary profile
-when it is not; only developer/test modes require an explicit `--profile`.
+An ordinary Firefox build is not a merge or release gate. It is allowed only
+for an explicitly requested same-base capture comparison; see
+[`CAPTURE.md`](CAPTURE.md).
+
+## Repository workflow
+
+```text
+Mozilla main -> main -> naivefox -> minimal -> generated minimal-source
+```
+
+- `main` is a clean fast-forward-only Mozilla mirror.
+- `naivefox` is the complete full-source reference implementation.
+- `minimal` contains the minimized build/runtime and export tooling.
+- `minimal-source` is a generated standalone snapshot and is never hand-edited.
+
+The three review gates and provenance rules are defined in
+[`UPSTREAM.md`](UPSTREAM.md). In particular, commit SHAs and test transcripts
+belong in generated evidence, commits, and annotated tags rather than being
+copied into active Markdown.
+
+## Security and data handling
+
+Never commit or retain proxy passwords, authorization headers, TLS keys, local
+CA private keys, NSS profiles, packet captures, request payloads, or generated
+fixture state. Integration state lives under the object directory with private
+permissions and is removed after successful runs. Real-server tests receive
+their endpoint and credentials through environment variables and keep only a
+credential-free summary.
+
+## References
+
+- [Firefox source](https://github.com/mozilla-firefox/firefox)
+- [Firefox Linux build documentation](https://firefox-source-docs.mozilla.org/setup/linux_build.html)
+- [NaiveProxy](https://github.com/klzgrad/naiveproxy)
+- [Naive padding specification](https://github.com/klzgrad/naiveproxy/blob/master/README.md#padding-protocol-an-informal-specification)
+- [Naive Caddy forward proxy](https://github.com/klzgrad/forwardproxy/tree/naive)

@@ -1,743 +1,113 @@
-# NaiveFox agent instructions
+# NaiveFox contributor instructions
 
-This file contains project-specific instructions for AI coding agents working on NaiveFox. They apply to project code under `netwerk/naivefox/` and to the minimal required changes elsewhere in the Firefox tree.
+Read the repository-root `AGENTS.md` first. These rules apply to
+`netwerk/naivefox/` and to the few downstream Firefox files listed in
+[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md).
 
-The repository root also contains Mozilla's upstream `AGENTS.md`. **Read and obey both files.** The root file covers Firefox-wide tooling and workflow; this file adds NaiveFox-specific constraints.
+Before changing NaiveFox, read:
 
-Before changing code, read:
+- [`README.md`](README.md) for product behavior;
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) for ownership and threading constraints;
+- [`UPSTREAM.md`](UPSTREAM.md) for branch and refresh rules;
+- [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) for active limitations;
+- [`test/integration/README.md`](test/integration/README.md) when changing runtime behavior.
 
-1. `netwerk/naivefox/README.md`
-2. `netwerk/naivefox/ROADMAP.md`
-3. `netwerk/naivefox/UPSTREAM.md`
-4. repository-root `AGENTS.md`
+## Repository discipline
 
-Do not assume access to any prior conversation about this project. These documents are the source of project intent.
+- Shared networking and product behavior belongs on `naivefox`.
+- Build-graph, packaging, shims, and export work belongs on `minimal`.
+- `main` is a fast-forward-only mirror of Mozilla Firefox.
+- `minimal-source` is generated; never edit or merge it back.
+- Preserve unrelated work in a dirty tree. Do not rewrite public history or push
+  without authorization.
+- Keep project code under `netwerk/naivefox/`. Modify an existing Firefox file
+  only when project-only code cannot use an existing API.
+- Every downstream Firefox change must be narrow, regression-tested, and added
+  to `UPSTREAM-PATCHES.md` with a stable `NF-UPSTREAM-XXX` identifier.
 
-## Mission
+## Architecture invariants
 
-Build the Linux HTTP/2 NaiveFox prototype described in `README.md`.
+- Necko owns HTTP/2, HTTP/3, CONNECT, pooling, and flow control.
+- NSS/PSM owns TLS and certificate validation; Neqo owns QUIC.
+- Do not add another HTTP, TLS, or QUIC stack or manually generate protocol
+  frames to imitate Firefox.
+- A raw CONNECT must not emit a synthetic `ALPN`, `Upgrade`, or `Connection`
+  marker. The Naive `padding` header is the intentional compatibility signal.
+- SOCKS domain targets remain hostnames in CONNECT authority; do not resolve
+  them locally.
+- Strict H2 and H3 must fail closed. Auto may retry H2 only after an H3
+  establishment failure before CONNECT response or tunnel creation.
+- The current product intentionally runs networking in one process. Do not
+  enable the socket process without IPC-capable tunnel-stream takeover.
+- Cross-thread-owned objects require thread-safe refcounting. Keep state
+  mutation on its owning event target even when lifetime is thread-safe.
+- Preserve bounded buffering, partial-I/O handling, async backpressure,
+  half-close behavior, and shutdown propagation. Never assume socket reads map
+  to H2/H3 frames or Naive records.
+- Keep credentials, authorization headers, payloads, TLS secrets, profiles,
+  captures, generated Caddy state, and logs out of Git and ordinary output.
 
-The core principle is:
+## Configuration and protocol scope
 
-> Reuse Firefox's real Necko + NSS networking stack. Do not recreate, imitate, or replace it.
+The supported local frontends are SOCKS5 CONNECT and HTTP CONNECT. SOCKS BIND,
+UDP ASSOCIATE, ordinary forward HTTP, CONNECT-UDP, MASQUE, WebTransport, TUN,
+and GUI work are outside the current product.
 
-The target path is:
+Config parsing is strict. Preserve the documented string/array listener and
+proxy mapping, percent-decoded upstream credentials, numeric IPv4/IPv6 binds,
+and `https://` = H2 / `quic://` = H3 selection. Local listeners have no
+authentication; wildcard or LAN binding must remain an explicit operator
+choice.
 
-```text
-local SOCKS5
-    -> NaiveFox
-    -> Necko
-    -> NSS TLS
-    -> HTTP/2 CONNECT
-    -> existing Naive-compatible Caddy
-    -> target
-```
+Naive payload compatibility is legacy Variant 1: eight framed records per
+direction followed by raw bytes. The streaming decoder must accept every
+header/payload/padding split, coalesced records, and raw bytes following the
+last framed record. Production padding must not use a deterministic RNG.
 
-HTTP/3/Neqo is explicitly out of scope until the H2 prototype is complete.
+## Build and test policy
 
-## Autonomy
+Use Mozilla's `mach`, managed toolchains, source style, and ownership types.
+Do not introduce CMake or a replacement build system. Use `searchfox-cli` for
+upstream symbol research and narrow local `rg` searches for project code.
 
-You are expected to work autonomously inside the provided Linux build environment.
+The normal three-gate cycle never builds the Firefox browser:
 
-You should:
+1. `main -> naivefox`: source, inventory, and conflict review only.
+2. `naivefox -> minimal`: build and test the minimized NaiveFox product graph.
+3. `minimal -> minimal-source`: export, isolated build, and acceptance tests.
 
-- inspect the current repository state,
-- bootstrap missing Firefox build dependencies,
-- establish the applicable clean NaiveFox product build,
-- research current Firefox internals,
-- implement milestones incrementally,
-- build and run tests,
-- diagnose failures,
-- add targeted tests,
-- update project documentation when discoveries invalidate an assumption.
+An ordinary Firefox build is allowed only for an explicitly requested,
+same-base capture comparison. See [`CAPTURE.md`](CAPTURE.md).
 
-Do not stop merely because an internal Firefox API differs from this document. Investigate the current source and adapt while preserving the architectural constraints.
-
-Ask the user only when information cannot reasonably be discovered or inferred. Real proxy endpoint credentials are needed only for the final M8.3 interoperability gate; their absence must not block implementation or any local validation.
-
-## First actions in a fresh environment
-
-Run these read-only checks before modifying source:
-
-```bash
-pwd
-git status --short
-git branch --show-current
-git remote -v
-git log -1 --oneline
-```
-
-Confirm:
-
-- the checkout is on the `naivefox` development branch,
-- `origin` is the project fork,
-- an `upstream` remote points to `https://github.com/mozilla-firefox/firefox.git` or can be added,
-- the source tree is on a filesystem suitable for a full-source native Linux
-  NaiveFox C++/Rust build.
-
-Preserve any existing user changes. If the working tree is not clean, do not discard, overwrite, or silently include them.
-
-If `upstream` is missing:
-
-```bash
-git remote add upstream https://github.com/mozilla-firefox/firefox.git
-```
-
-After the branch, remotes, and clean working tree are confirmed, update the development branch without creating an implicit merge commit:
+For changes on `minimal`, use the product configuration and a full graph build
+when build files or closure may have changed:
 
 ```bash
-git pull --ff-only origin naivefox
+MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
 ```
 
-If the branch has diverged, report it instead of rebasing, merging, or force-pushing without user approval.
-
-Do not modify or commit to the `main` branch.
-
-### Bootstrap
-
-Follow the current Firefox Linux build documentation and the repository's tooling.
-
-Start with the checkout's own tooling:
-
-```bash
-./mach bootstrap
-```
-
-Install/select Mozilla's native compiled C++ toolchain support, not Artifact
-Mode. Product validation uses the NaiveFox minimal mozconfig; bootstrap does
-not make an ordinary Firefox browser build a required gate.
-
-If bootstrap needs basic packages on Debian/Ubuntu, install only what is needed. Mozilla currently documents a base similar to:
-
-```bash
-sudo apt update
-sudo apt install -y curl python3 python3-venv git make
-```
-
-Do not manually replace Firefox's compiler/toolchain with a random system GCC setup.
-
-### NaiveFox product baseline
-
-Before source changes, prove the applicable NaiveFox product graph when the
-task requires a build:
-
-```bash
-mkdir -p artifacts
-MOZCONFIG=netwerk/naivefox/mozconfig-minimal \
-  ./mach build > artifacts/baseline-build.log 2>&1
-```
-
-Follow root `AGENTS.md` guidance for long-running commands and logs.
-
-Record:
-
-- source commit SHA,
-- selected build configuration,
-- successful build result,
-- object directory,
-- compiler/toolchain reported by the build.
-
-If the NaiveFox product baseline does not build, diagnose the environment
-before touching NaiveFox code.
-
-Do not build an ordinary Firefox browser package during the normal
-upstream/minimal cycle. Gate 1 is source/inventory/conflict review only; Gate 2
-builds and tests the NaiveFox minimal product, and Gate 3 builds and tests the
-standalone export. Ordinary Firefox is allowed only in a separate, explicitly
-requested same-base capture/comparison, never as a routine merge or release
-condition. The one-time historical full Firefox baseline in `UPSTREAM.md` is
-not a recurring gate.
-
-## Build philosophy
-
-Use Firefox's build system.
-
-Do not introduce:
-
-- CMake as the primary build system,
-- Meson,
-- Bazel,
-- a separate vendored HTTP/2 stack,
-- a separate vendored TLS stack.
-
-The project is expected to use `moz.build` and `mach`.
-
-A likely initial declaration is:
-
-```python
-GeckoProgram("naivefox", linkage="dependent")
-```
-
-but verify current Firefox build conventions before committing it.
-
-For initial integration, expect to add the new directory to `netwerk/moz.build`.
-
-After the initial product build, use the narrowest valid build command that
-still verifies the affected C++ code. The root Firefox `AGENTS.md` currently
-documents `./mach build binaries` for C/C++/Rust-only changes. Use the full
-NaiveFox product `./mach build` after build-system changes; this does not mean
-building the Firefox browser target.
-
-## Search and source research
-
-Firefox is enormous.
-
-Follow the root Firefox `AGENTS.md`:
-
-- use `searchfox-cli` for upstream code research when available,
-- use identifier-aware search for C++,
-- narrow local `rg` searches to relevant directories,
-- do not run blind whole-tree grep searches.
-
-For NaiveFox-specific local code, ordinary `rg` inside `netwerk/naivefox` is fine.
-
-Primary Necko areas for this project:
-
-```text
-netwerk/protocol/http/
-netwerk/base/
-netwerk/test/unit/
-```
-
-Useful known files:
-
-```text
-netwerk/protocol/http/nsIHttpChannelInternal.idl
-netwerk/protocol/http/HttpBaseChannel.cpp
-netwerk/protocol/http/nsHttpConnection.cpp
-netwerk/protocol/http/Http2Session.cpp
-netwerk/protocol/http/Http2StreamBase.cpp
-netwerk/protocol/http/Http2StreamTunnel.cpp
-netwerk/test/unit/test_proxyconnect.js
-netwerk/test/unit/test_proxyconnect_headers.js
-```
-
-Use those as starting points, not as frozen implementation assumptions.
-
-## Hard architectural constraints
-
-### 1. Use real Necko HTTP/2
-
-Do not manually write HTTP/2 frames.
-
-Do not directly implement:
-
-- SETTINGS,
-- HEADERS,
-- HPACK,
-- flow control,
-- stream IDs,
-- TLS ALPN,
-- connection pooling.
-
-These are precisely the behaviors this project wants Firefox to own.
-
-### 2. Use real NSS/PSM TLS
-
-Do not replace the outer TLS connection with:
-
-- OpenSSL,
-- BoringSSL,
-- curl,
-- rustls,
-- another TLS client.
-
-### 3. H2 only for this phase
-
-Disable or disallow HTTP/3 on the proxy channel as necessary.
-
-Do not begin Neqo work.
-
-Do not add QUIC support.
-
-### 4. Caddy protocol remains unchanged
-
-Both the reproducible local fixture and the supplied real server must use an unmodified Naive-compatible Caddy build with `forwardproxy@naive`.
-
-Fixture configuration may change only to isolate the test, bind it safely to loopback, and expose deterministic assertions. Do not solve a client problem by changing the server module or wire protocol.
-
-### 5. Keep upstream modifications tiny
-
-Default location for project code:
-
-```text
-netwerk/naivefox/
-```
-
-Before editing an existing Firefox file:
-
-1. search for an existing API,
-2. inspect relevant tests,
-3. determine whether the requirement can be implemented entirely in project code,
-4. if not, design the smallest generic or narrowly scoped hook,
-5. document the change in `UPSTREAM.md`,
-6. add a test that proves why the hook is needed.
-
-Do not refactor unrelated Necko code.
-
-Do not reformat unrelated Firefox files.
-
-Do not modify browser UI.
-
-### 6. Do not leak a NaiveFox-specific wire marker
-
-A prototype that works only by emitting an obviously artificial header such as:
-
-```text
-ALPN: naivefox
-ALPN: webrtc
-Upgrade: naivefox
-```
-
-is not acceptable.
-
-Current Firefox `setConnectOnly()`/`HTTPUpgrade()` plumbing must be inspected carefully because the upgrade protocol may be reflected into the proxy CONNECT request.
-
-Use the existing raw-connect machinery where possible, but if obtaining the stream callback requires a synthetic protocol marker, implement a small clean internal hook instead.
-
-### 7. Preserve remote destination DNS
-
-For SOCKS domain requests, do not resolve the destination hostname locally.
-
-The proxy should receive the hostname in the CONNECT authority.
-
-Resolving the proxy server itself locally through normal Necko behavior is expected.
-
-## C++ and Firefox style
-
-New C++ code should follow current Mozilla style and current required C++ standard.
-
-Use Mozilla-provided formatting:
-
-```bash
-./mach format
-```
-
-New Mozilla source files should use the standard MPL 2.0 source header used by nearby Firefox files.
-
-Follow root `AGENTS.md` comment guidance: comments should explain non-obvious behavior, not narrate straightforward code.
-
-Prefer Mozilla types and ownership conventions where they make integration safer:
-
-- `RefPtr`
-- `nsCOMPtr`
-- `nsCString`
-- `nsresult`
-- `UniquePtr`
-- existing async stream interfaces
-
-Do not mechanically replace standard C++ types when a standard type is clearer and accepted by surrounding code.
-
-Avoid raw ownership unless dictated by an existing API.
-
-## Eventing, I/O, and backpressure
-
-The client must not use blocking I/O on Gecko's main thread.
-
-Prefer event-driven integration with Firefox/XPCOM networking APIs.
-
-The `DuplexPump` must:
-
-- tolerate partial reads and writes,
-- handle `WOULD_BLOCK`,
-- register async callbacks correctly,
-- bound memory usage,
-- propagate EOF and errors,
-- avoid busy loops,
-- avoid recursive callback explosions,
-- avoid a thread-per-byte-stream design unless there is a compelling reason.
-
-Do not assume one local socket write equals one H2 DATA frame.
-
-Do not assume one H2 read equals one Naive padding record.
-
-## SOCKS5 implementation rules
-
-Initial scope:
-
-- SOCKS version 5 only.
-- No-auth local method.
-- CONNECT only.
-- IPv4, IPv6, and domain targets.
-- loopback bind by default.
-
-Reject unsupported methods/commands correctly.
-
-Do not resolve SOCKS domain targets locally.
-
-Write protocol parsing as explicit bounded state machines. Validate lengths before consuming data.
-
-Add tests for fragmented SOCKS handshakes and requests.
-
-## Naive padding implementation rules
-
-Treat padding as a wire-compatibility protocol, not approximate obfuscation.
-
-Reference current upstream NaiveProxy before implementation:
-
-https://github.com/klzgrad/naiveproxy/blob/master/README.md#padding-protocol-an-informal-specification
-
-Also inspect current NaiveProxy source implementation if the README leaves ambiguity.
-
-The first prototype implements the legacy Naive padding Variant 1 used by the pinned `forwardproxy@naive` fixture: eight padded records per direction followed by raw bytes. Newer padding-type negotiation and variants in current NaiveProxy are out of scope.
-
-### Header padding
-
-The actual proxy CONNECT must carry the Naive `padding` header.
-
-Do not merely set a normal origin request header and assume Firefox copies it into CONNECT. Verify on the wire or in a dedicated proxy test.
-
-The CONNECT response must be checked for the server `padding` header using existing Firefox CONNECT response APIs where possible.
-
-Only enable payload padding after compatibility is established.
-
-### Payload padding
-
-Implement encoder and decoder as independent state machines.
-
-Required tests include:
-
-- empty/very small payload,
-- padding size 0,
-- padding size 255,
-- original payload length 65535,
-- split payload larger than 65535,
-- every framing field split at every possible input boundary,
-- multiple records coalesced in one input buffer,
-- transition from padded records to raw mode in the same input buffer,
-- malformed/truncated input,
-- connection close mid-record.
-
-Random padding generation must be appropriate for the upstream protocol. Do not use deterministic production padding. Tests may inject a deterministic RNG.
-
-Do not add Chromium-specific RST_STREAM camouflage in this phase.
-
-## Proxy authentication
-
-Use normal Firefox proxy authentication behavior if practical.
-
-Investigate current:
-
-- `nsIProxyInfo`,
-- proxy username/password handling,
-- `Proxy-Authorization`,
-- CONNECT authentication retry behavior.
-
-Acceptance criteria:
-
-- a valid user/password reaches the local Caddy fixture successfully,
-- invalid and missing credentials fail cleanly against the local fixture,
-- valid supplied credentials work against the real Caddy server during M8.3,
-- credentials are never written to logs.
-
-Do not deliberately send invalid credentials to the supplied real server; the local fixture already covers failure behavior.
-
-Do not hardcode credentials.
-
-## Headless Gecko runtime
-
-Do not launch a browser UI just to access Necko.
-
-The project should have its own executable and initialize enough Gecko/XPCOM runtime for networking.
-
-Use current in-tree executable startup patterns as references, especially small Gecko-dependent programs such as `xpcshell`.
-
-Known useful references include:
-
-```text
-js/xpconnect/shell/moz.build
-js/xpconnect/shell/xpcshell.cpp
-toolkit/xre/
-```
-
-For the first prototype, it is acceptable to disable the separate Firefox socket process if doing so materially simplifies correct in-process networking integration. If used, document the mechanism and rationale. Do not assume it is a permanent product requirement.
-
-## Testing rules
-
-Every milestone in `ROADMAP.md` has explicit acceptance criteria. Do not advance a milestone because the code merely compiles.
-
-At minimum:
-
-- build after each structural change,
-- add unit/component tests for protocol state machines,
-- run targeted Firefox networking tests relevant to changed upstream code,
-- run `./mach test --auto` when appropriate,
-- run end-to-end tests against the reproducible local Caddy fixture,
-- confirm final interoperability against the supplied real Caddy server,
-- test large transfers,
-- test concurrent connections.
-
-When changing existing Necko CONNECT code, run existing proxy CONNECT tests, including the current equivalents of:
-
-```text
-netwerk/test/unit/test_proxyconnect.js
-netwerk/test/unit/test_proxyconnect_headers.js
-```
-
-Discover the exact current test invocation with `./mach test --help` / repository tooling rather than guessing.
-
-## Reproducible local Caddy integration fixture
-
-The project must provide a self-contained local integration fixture inside the provided Linux build environment. Missing remote proxy credentials are not a blocker for M3-M9: implement and validate against the local fixture first. The supplied real server is a second interoperability gate, not the everyday development dependency.
-
-Commit the fixture source under a structure similar to:
-
-```text
-netwerk/naivefox/test/integration/
-├── README.md
-├── Caddyfile.template
-├── setup-fixture.sh
-├── start-fixture.sh
-├── stop-fixture.sh
-├── run-e2e.sh
-└── target_server.py
-```
-
-The exact filenames may follow current Mozilla test conventions, but setup, execution, and cleanup must be automated. Do not require a manually configured system service.
-
-### Generated state and isolation
-
-Keep generated state outside the source tree, preferably under the Firefox object directory:
-
-```text
-<objdir>/naivefox-fixture/
-├── bin/
-├── caddy-data/
-├── caddy-config/
-├── nss-profile/
-├── nss-profile-untrusted/
-├── run/
-└── logs/
-```
-
-The fixture must:
-
-- use unprivileged loopback ports selected or checked at runtime,
-- run Caddy and the target as ordinary child processes,
-- keep PID files and install cleanup traps,
-- stop only processes it started,
-- leave an already installed/system Caddy untouched,
-- never require `sudo` or a global firewall change,
-- never place generated binaries, CA keys, credentials, logs, or packet captures in git,
-- use restrictive permissions for generated secrets,
-- sanitize or avoid logs that could contain proxy authorization or tunneled payload.
-
-Repeated setup and cleanup must be idempotent. A failed test must still tear down child processes. The runner should print the selected non-secret ports and paths, but never generated credentials.
-
-### Real Naive-compatible Caddy
-
-Build a dedicated fixture binary with the real module. The compatibility form is:
-
-```bash
-xcaddy build \
-  --with github.com/caddyserver/forwardproxy=github.com/klzgrad/forwardproxy@naive
-```
-
-The committed fixture setup must replace the moving branch and implicit latest Caddy with an exact tested Caddy version and immutable `forwardproxy` commit. Record the xcaddy and Go versions in diagnostics, but do not require a particular installation method when a compatible toolchain is already available.
-
-Verify the result before running tests:
-
-```bash
-./caddy list-modules | rg '^http\.handlers\.forward_proxy$'
-./caddy validate --config Caddyfile
-```
-
-Cache the binary in generated state, never in the repository.
-
-The Caddy configuration must:
-
-- bind the proxy only to loopback on a checked high port,
-- use a catch-all HTTP route on an explicitly TLS-enabled listener so CONNECT authorities for arbitrary targets reach `forward_proxy`; do not use a wildcard hostname as a substitute,
-- explicitly enable HTTPS because a bare catch-all `:<high-port>` address is otherwise plaintext on a non-standard port,
-- present a certificate valid for the proxy SNI hostname, normally `localhost`, from the isolated internal PKI,
-- disable HTTP/3 for the fixture, keep HTTP/1.1 available for control/health requests, and require NaiveFox itself to negotiate `h2`,
-- set Caddy's `skip_install_trust` global option so startup never attempts a system trust-store change,
-- enable Basic Auth with per-run credentials supplied outside the committed Caddyfile,
-- omit probe resistance so missing and invalid credentials have deterministic results; no separate probe-resistance fixture is required,
-- configure `forward_proxy { hosts localhost }` or the current equivalent so a normal request for the proxy hostname reaches an ordinary health response,
-- restrict both allowed target ports and the ACL to the fixture target, then deny everything else,
-- never become a general-purpose or externally reachable open proxy.
-
-Validate the adapted Caddy configuration as well as the source Caddyfile and verify that the listener is loopback-only, TLS-enabled, and has a catch-all route without a request Host matcher.
-
-The client under test must require HTTP/2 and prove that the outer NSS connection negotiated `h2`; merely reaching Caddy over HTTP/1.1 does not pass.
-
-### Local CA and NSS trust
-
-Use Caddy's isolated internal PKI or an equivalently scripted local CA. Point Caddy's XDG data/config directories at the generated fixture state so the CA root and private key never mix with the user's normal Caddy state.
-
-Trust the generated root only in a dedicated NSS profile used by NaiveFox tests. Use the NSS `certutil` from the platform package, conceptually:
-
-```bash
-certutil -N --empty-password -d "sql:$NSS_PROFILE"
-certutil -A -d "sql:$NSS_PROFILE" \
-  -n "NaiveFox local fixture CA" -t "C,," -i "$CADDY_ROOT_CA"
-certutil -L -d "sql:$NSS_PROFILE"
-```
-
-Adapt command details to the current NSS tooling when necessary, and make NaiveFox explicitly use that profile.
-
-Do not:
-
-- call `caddy trust`,
-- install the root in the operating-system trust store,
-- modify the user's normal Firefox profile,
-- disable certificate verification,
-- use `curl -k`, an NSS bad-certificate override, or an "accept all certificates" callback as the passing path.
-
-Maintain a second fresh NSS profile without the root CA. M0.4 verifies that the trusted profile contains the fixture root and the untrusted profile does not; actual Necko connection acceptance and rejection begin in M2.2. The negative connection test proves the passing result comes from scoped trust rather than disabled validation. Use a proxy hostname matching the certificate SAN and SNI; do not hide hostname errors with an IP address.
-
-### Deterministic target
-
-Run a small loopback-only target service controlled by the fixture. It should provide deterministic endpoints for:
-
-- a small known response,
-- a multi-megabyte body generated from a stable pattern,
-- an upload that returns the received byte count and hash,
-- a delayed response for backpressure tests,
-- an intentional early close for lifecycle tests.
-
-If an HTTPS target is required, terminate its TLS with a separate local Caddy site or another scripted server certificate from the same test CA. The application using SOCKS must validate the target certificate with the scoped CA file, for example with curl `--cacert`; outer proxy TLS trust and inner target TLS trust are separate assertions. Never use `-k`.
-
-Use a hostname target in at least one SOCKS test and verify that the CONNECT authority received by the proxy retains that hostname. Unit/component coverage must additionally prove NaiveFox did not resolve the SOCKS domain before creating CONNECT.
-
-### Required local end-to-end sequence
-
-`run-e2e.sh` or its equivalent must perform, in order:
-
-1. build or locate the pinned fixture Caddy and verify the module,
-2. create isolated state, per-run credentials, CA, trusted NSS profile, and untrusted NSS profile,
-3. start the target and Caddy and wait for explicit readiness with a timeout,
-4. prove the untrusted NSS profile rejects the proxy certificate,
-5. use a control request with curl `--proxy-cacert` for the HTTPS proxy and `--cacert` when the target is HTTPS, never `-k`, to prove Caddy auth/ACL wiring independently of NaiveFox,
-6. prove the trusted NSS profile connects through Necko/NSS and negotiates `h2`,
-7. test valid, invalid, and missing proxy credentials without exposing them in output,
-8. run the hard-coded raw CONNECT bidirectional smoke test,
-9. run SOCKS5 HTTP and HTTPS target requests with `curl --socks5-hostname`,
-10. assert CONNECT header padding negotiation and then padded payload operation,
-11. compare hashes for the deterministic large download and upload,
-12. run repeated and concurrent connections,
-13. exercise target close, proxy close, and client close paths,
-14. stop all fixture processes and preserve only sanitized diagnostics on failure.
-
-Where a milestone has not implemented a later feature yet, the runner may select the applicable subset, but the final local suite must execute the complete sequence with one documented command.
-
-A local pass is required before using the real server. Final real-server validation must use credentials supplied outside git and must not depend on local CA overrides.
-
-## Isolated packet capture / fingerprint validation
-
-This comparison is optional and isolated. Run it only when the user or task
-explicitly requires a same-base capture/control; do not run it for ordinary
-source changes, upstream refreshes, merges, or releases. Build ordinary Firefox
-and NaiveFox from the same Firefox base in separate controlled packages. This
-diagnostic is not Gate 1, Gate 2, or Gate 3; see `UPSTREAM.md` and `CAPTURE.md`.
-
-For such an explicitly requested check, capture and compare:
-
-```text
-ordinary Firefox from the same source revision
-vs.
-NaiveFox from the same source revision
-```
-
-At minimum inspect:
-
-- TLS ClientHello structure,
-- ALPN,
-- cipher/extension behavior visible in the handshake,
-- HTTP/2 SETTINGS,
-- initial WINDOW_UPDATE behavior,
-- connection reuse behavior,
-- ordering of early H2 frames,
-- unexpected custom headers or protocol markers.
-
-When possible, connect ordinary Firefox and NaiveFox to the same front-end host to make the outer comparison meaningful.
-
-NaiveFox is not required to produce identical application request traffic to a browsing session. Differences inherent to `CONNECT` are expected. The purpose is to detect accidental deviations caused by our integration.
-
-Document findings rather than adding camouflage patches speculatively.
-
-## Logging
-
-Logs should be useful for engineering while avoiding secrets.
-
-Useful fields:
-
-- connection id,
-- SOCKS target host/port,
-- proxy host/port,
-- tunnel state,
-- HTTP version negotiated,
-- CONNECT status,
-- padding negotiated yes/no,
-- byte counters,
-- close/error reason.
-
-Never log:
-
-- proxy passwords,
-- complete `Proxy-Authorization`,
-- TLS secrets,
-- arbitrary tunneled application payload.
-
-Verbose payload dumps must not exist in normal builds.
-
-## Error handling
-
-Fail explicitly and locally.
-
-Examples:
-
-- no HTTP/2 negotiated -> clear connection failure in H2-only mode,
-- CONNECT status != 200 -> return appropriate SOCKS failure,
-- proxy auth failure -> clear failure,
-- malformed Naive record -> close tunnel with diagnostic,
-- upstream EOF -> propagate close,
-- local EOF -> stop corresponding direction and clean up.
-
-Do not silently fall back to a different networking stack.
-
-## Git and commit discipline
-
-Work on `naivefox`, not `main`.
-
-Keep commits milestone-oriented and reviewable.
-
-Preferred history shape:
-
-```text
-NF01 docs / build integration
-NF02 headless Gecko runtime
-NF03 Necko HTTPS sanity request
-NF04 raw H2 CONNECT plumbing
-NF05 SOCKS5 server
-NF06 CONNECT padding negotiation
-NF07 Naive payload codec
-NF08 end-to-end padded proxy
-NF09 robustness / capture validation
-NF10 packaging prototype
-```
-
-If an existing Firefox file must be changed, prefer a dedicated commit for that upstream hook instead of mixing it into large NaiveFox feature commits.
-
-Do not force-push `main`.
-
-Do not mass-rebase or rewrite public project history unless the user asks.
-
-## Updating documentation
-
-Update these files as part of engineering work:
-
-- `README.md` when architecture or supported behavior changes.
-- `ROADMAP.md` when a milestone is completed or materially redesigned.
-- `UPSTREAM.md` whenever an existing Firefox file is modified.
-
-If current Firefox source disproves a statement in these docs, fix the documentation in the same change.
-
-## Stop conditions
-
-Do not declare the prototype complete until the definition in `README.md` and final roadmap acceptance criteria are met.
-
-Do not start HTTP/3 merely because H2 is working.
-
-Do not optimize binary size before correctness and interoperability are demonstrated.
+For focused C++ iteration, use the narrowest valid target, then finish with the
+applicable full product gate. Run project gtests and the integration suites
+described in [`test/integration/README.md`](test/integration/README.md). Changes
+to downstream Necko/Neqo hooks also require their focused xpcshell regressions.
+Do not run formatters over unrelated Firefox files.
+
+Generated fixture state belongs below the object directory. The fixture must
+remain loopback-only, use pinned Caddy and `forwardproxy@naive` inputs, install
+trust only into isolated NSS profiles, never call `caddy trust`, never disable
+certificate checks, and stop only processes that it started.
+
+## Documentation
+
+Keep active documentation short and durable:
+
+- behavior and operator examples in `README.md`;
+- design invariants in `ARCHITECTURE.md`;
+- branch/process rules in `UPSTREAM.md`;
+- downstream Firefox inventory in `UPSTREAM-PATCHES.md`;
+- unresolved limitations only in `KNOWN-ISSUES.md`.
+
+Do not copy mutable commit SHAs, dated status reports, command transcripts, or
+one-off test results into multiple Markdown files. Release provenance belongs
+in generated machine-readable evidence, `UPSTREAM-BASE`, commits, and annotated
+tags. Historical reports remain available in Git history.
