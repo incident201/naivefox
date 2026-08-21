@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "7bb5d5418d6b3f72d753f35010d272320e42f7fa",
+    "source_commit_sha": "6b3868a9f90ef8915f01ab7ac19073e6a29cb0bc",
     "source_worktree_clean": true,
     "firefox_base_sha": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-    "naivefox_reference_sha": "7bb5d5418d6b3f72d753f35010d272320e42f7fa",
+    "naivefox_reference_sha": "6b3868a9f90ef8915f01ab7ac19073e6a29cb0bc",
     "analyzer_sha256": "2745c12f2c94b9bcefca077401d2e3f6c13b146689c3e4835bd6e57bfe00b23b",
     "provenance_sha256": "be679ab13bb39939bd5802769084a0c47d4e4b181f114e4858fe5119189311dd",
     "evidence_collector_sha256": "2c25575c9e19f03892d62619d83ab014dc27727f3f1fcaeb2b8f1c19f630e8f4",
