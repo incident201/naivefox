@@ -120,7 +120,7 @@ jobs:
         id: staged_cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: ${{ github.workspace }}/../obj-naivefox-${{ matrix.platform }}/package/naivefox-${{ matrix.platform }}-x86_64
+          path: ${{ runner.temp }}/obj-naivefox-${{ matrix.platform }}/package/naivefox-${{ matrix.platform }}-x86_64
           key: naivefox-stage-v1-${{ matrix.platform }}-${{ steps.runner_image.outputs.version }}-${{ needs.metadata.outputs.product_tree_hash }}
 
       - name: Restore cbindgen cache
@@ -191,9 +191,11 @@ jobs:
           # explicitly without enabling MOZ_AUTOMATION: that variable also
           # changes compiler and Rust policy, and is not appropriate here.
           printf '\nac_add_options --disable-bootstrap\n' >> "${mozconfig}"
-          mkdir -p "$PWD/../obj-naivefox-${{ matrix.platform }}/package"
+          runner_temp="${RUNNER_TEMP//\\//}"
+          objdir="${runner_temp}/obj-naivefox-${{ matrix.platform }}"
+          mkdir -p "${objdir}/package"
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
-            --objdir "$PWD/../obj-naivefox-${{ matrix.platform }}"
+            --objdir "${objdir}"
 
       - name: Archive Linux package
         if: matrix.platform == 'linux'
@@ -203,7 +205,8 @@ jobs:
         run: |
           set -euo pipefail
           release_dir="$PWD/release-assets"
-          package_parent="$PWD/../obj-naivefox-linux/package"
+          runner_temp="${RUNNER_TEMP//\\//}"
+          package_parent="${runner_temp}/obj-naivefox-linux/package"
           mkdir -p "${release_dir}"
           tar -C "${package_parent}" -cJf \
             "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz" \
@@ -219,7 +222,8 @@ jobs:
         run: |
           set -euo pipefail
           release_dir="$PWD/release-assets"
-          package_parent="$PWD/../obj-naivefox-windows/package"
+          runner_temp="${RUNNER_TEMP//\\//}"
+          package_parent="${runner_temp}/obj-naivefox-windows/package"
           mkdir -p "${release_dir}"
           (
             cd "${package_parent}"
