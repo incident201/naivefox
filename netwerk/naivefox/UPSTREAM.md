@@ -109,6 +109,41 @@ Firefox and NaiveFox from the same Firefox base and compare the two packages'
 packet/transport behavior without becoming a prerequisite for the branch cycle.
 See `CAPTURE.md`, `H3-CAPTURE.md`, and `OBSERVER-TRAFFIC-REPORT.md`.
 
+### Compiler-cache preflight and fallback
+
+The bundled `sccache` is an optional acceleration layer, never an upstream,
+merge, export, or release gate. In Ubuntu24Dev, `sccache` 0.17.0 has been
+observed to leave the first configure compiler probe waiting on
+`127.0.0.1:4226` when its background server is absent or stale. The visible
+symptom is a configure process frozen at `clang -E`; this is a cache-server
+failure, not a source or build-graph failure.
+
+Before a Linux Gate 2 or Gate 3 configure/build, use the existing object
+directory and run a bounded preflight. Starting the server is harmless when it
+is already running; the probe is the actual pass/fail check:
+
+```bash
+SCCACHE="$HOME/.mozbuild/sccache/sccache"
+CLANG="$HOME/.mozbuild/clang/bin/clang"
+SYSROOT="$HOME/.mozbuild/sysroot-x86_64-linux-gnu"
+timeout 15 "$SCCACHE" --version
+timeout 15 "$SCCACHE" --start-server >/dev/null 2>&1 || true
+probe="$(mktemp "${TMPDIR:-/tmp}/naivefox-sccache-probe.XXXXXX")"
+trap 'rm -f "$probe"' EXIT
+printf 'int main(void) { return 0; }\n' >"$probe"
+if ! timeout 15 "$SCCACHE" "$CLANG" --sysroot "$SYSROOT" -x c "$probe" -E >/dev/null; then
+  echo "sccache unavailable; continuing without compiler cache" >&2
+  export NAIVEFOX_DISABLE_SCCACHE=1
+fi
+```
+
+If any bounded command times out, stop only the hung configure/build command
+and rerun it in the same object directory with
+`NAIVEFOX_DISABLE_SCCACHE=1`. `mozconfig-minimal` already honors that variable;
+do not delete the cache or create another object directory just to recover from
+this condition. The Windows product mozconfig does not enable this cache and
+does not need this preflight.
+
 ## Remotes, default branch, and merge direction
 
 Local remotes are:
@@ -1614,7 +1649,7 @@ Measured on standard 16-thread development workstation:
 
 1. **Incremental build (`./mach build binaries`):** **~2.85s**
 2. **Clean objdir rebuild with warm compiler cache (`sccache`):** **~36s**
-3. **True cold build from scratch without compiler cache (`SCCACHE_DISABLE=1`):** **1m 16.268s** (`real 1m16.268s`)
+3. **True cold build from scratch without compiler cache (`NAIVEFOX_DISABLE_SCCACHE=1`):** **1m 16.268s** (`real 1m16.268s`)
 
 
 ## Verified Test Gate Inventory

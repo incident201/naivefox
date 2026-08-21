@@ -83,6 +83,12 @@ NAIVEFOX_OBJDIR=/absolute/external/objdir \
 `mach build binaries` is not a valid clean-source acceptance command because it
 can skip early generators.
 
+The bundled `sccache` is best-effort acceleration, not a gate. Run the bounded
+preflight in `UPSTREAM.md` before a Linux product/export gate. If the server or
+the first compiler probe stalls, keep the same objdir and set
+`NAIVEFOX_DISABLE_SCCACHE=1` for `mach configure` and `mach build`; never turn a
+cache-server hang into a source diagnosis or create a second objdir for it.
+
 Do not build the ordinary Firefox browser package during the normal
 upstream/minimal cycle. Gate 1 is source/inventory/conflict review only; Gate 2
 builds and tests the NaiveFox minimal product, and Gate 3 builds and tests the

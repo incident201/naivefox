@@ -696,6 +696,11 @@ require building the ordinary Firefox browser package.
 
 Use Mozilla's normal toolchain and `mach`; do not introduce CMake as the project build system.
 
+The bundled Linux `sccache` is optional acceleration. Run the bounded preflight
+from `UPSTREAM.md`; if its server or compiler probe stalls, reuse the same
+object directory with `NAIVEFOX_DISABLE_SCCACHE=1`. A cache-server hang is not
+a source/build failure and is not a reason to create a second object directory.
+
 ## Source references
 
 Primary upstream references:

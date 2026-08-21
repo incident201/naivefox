@@ -107,7 +107,7 @@ Benchmarked on 16-thread development workstation:
 
 1. **Incremental Build (`./mach build binaries`):** **~2.85s**
 2. **Clean objdir Build with Warm Compiler Cache (`sccache`):** **~36s**
-3. **True Cold Clean Build without Cache (`SCCACHE_DISABLE=1`):** **1m 16.268s** (`real 1m16.268s`)
+3. **True Cold Clean Build without Cache (`NAIVEFOX_DISABLE_SCCACHE=1`):** **1m 16.268s** (`real 1m16.268s`)
 
 ---
 

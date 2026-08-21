@@ -53,6 +53,16 @@ snapshot limitations, and non-reproducible observations from the acceptance
 results in `TEST-REPORT.md`. None of the items below invalidates the completed
 H2 or H3 classic-CONNECT prototype gates.
 
+## Bundled sccache server is optional
+
+The bundled `sccache` 0.17.0 can hang the first `clang -E` configure probe in
+Ubuntu24Dev when the local server at `127.0.0.1:4226` is missing or stale. A
+bounded probe and explicit `sccache --start-server` are documented in
+`UPSTREAM.md`. If the probe still times out, rerun configure/build in the same
+objdir with `NAIVEFOX_DISABLE_SCCACHE=1`. This is an operational cache issue;
+it does not justify changing source, repeating the upstream merge, or making a
+new object directory, and it is never a product or release failure.
+
 ## Current pre-export status
 
 The malformed SOCKS5 terminal-state/OOM issue is fixed. Unsupported commands,
