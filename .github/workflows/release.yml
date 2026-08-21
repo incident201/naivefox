@@ -231,6 +231,32 @@ jobs:
           "MOZ_WINDOWS_APP_SDK_DIR=$appSdkDir" | Out-File `
             -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+          $windowsRsArchive = Join-Path $env:RUNNER_TEMP 'windows-0.62.2.crate'
+          $windowsRsParent = Join-Path $env:RUNNER_TEMP 'windows-rs'
+          curl.exe --fail --location `
+            'https://static.crates.io/crates/windows/windows-0.62.2.crate' `
+            --output $windowsRsArchive
+          $windowsRsSha256 = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath $windowsRsArchive
+          ).Hash
+          if ($windowsRsSha256 -ne '527FADEE13E0C05939A6A05D5BD6EEC6CD2E3DBD648B9F8E447C6518133D8580') {
+            throw "unexpected windows Rust crate SHA-256: $windowsRsSha256"
+          }
+          New-Item -ItemType Directory -Force -Path $windowsRsParent | Out-Null
+          tar.exe -xf $windowsRsArchive -C $windowsRsParent
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to extract $windowsRsArchive"
+          }
+          $windowsRsDir = Join-Path $windowsRsParent 'windows-0.62.2'
+          if (
+            -not (Test-Path (Join-Path $windowsRsDir 'Cargo.toml')) -or
+            -not (Test-Path (Join-Path $windowsRsDir 'src\Windows\mod.rs'))
+          ) {
+            throw "windows Rust crate extraction is incomplete below $windowsRsDir"
+          }
+          "MOZ_WINDOWS_RS_DIR=$windowsRsDir" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build and stage NaiveFox
         if: steps.staged_cache.outputs.cache-hit != 'true'
         shell: bash
