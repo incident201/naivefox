@@ -140,8 +140,8 @@ jobs:
           RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
         run: |
           set -euo pipefail
-          export MOZ_AUTOMATION=1
           if [[ "${{ matrix.platform }}" == linux ]]; then
+            mozconfig=netwerk/naivefox/mozconfig-minimal
             export CC=clang-20
             export CXX=clang++-20
             export HOST_CC=clang-20
@@ -150,8 +150,14 @@ jobs:
             export LLVM_OBJDUMP=llvm-objdump-20
             export LIBCLANG_PATH=/usr/lib/llvm-20/lib
           else
+            mozconfig=netwerk/naivefox/mozconfig-windows-x86_64
             export MOZILLABUILD='C:\mozilla-build'
           fi
+          # The product branch intentionally omits Firefox's Taskcluster
+          # toolchain graph. Disable configure's source-checkout bootstrap
+          # explicitly without enabling MOZ_AUTOMATION: that variable also
+          # changes compiler and Rust policy, and is not appropriate here.
+          printf '\nac_add_options --disable-bootstrap\n' >> "${mozconfig}"
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --objdir "$PWD/../obj-naivefox-${{ matrix.platform }}"
 
