@@ -80,16 +80,35 @@ run_dir=$(<"$ACTIVE_RUN_FILE")
 source "$run_dir/fixture.env"
 
 BIN="$OBJDIR/dist/bin"
-if [[ -n ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ]]; then
-  REFERENCE_BIN="$NAIVEFOX_CAPTURE_REFERENCE_BIN"
-  REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$(dirname "$REFERENCE_BIN")}"
-  REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-}"
-else
-  REFERENCE_ROOT=$("$INTEGRATION_DIR/../../tools/fetch-firefox-reference.sh")
-  REFERENCE_BIN="$REFERENCE_ROOT/firefox"
-  REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$REFERENCE_ROOT}"
-  REFERENCE_OBJDIR="${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-}"
-fi
+capture_mode=${NAIVEFOX_CAPTURE_MODE:-quick}
+case "$capture_mode" in
+  quick)
+    if [[ -n ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ||
+          -n ${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-} ]]; then
+      printf 'reference overrides require NAIVEFOX_CAPTURE_MODE=same-base\n' >&2
+      exit 2
+    fi
+    REFERENCE_ROOT=$("$INTEGRATION_DIR/../../tools/fetch-firefox-reference.sh")
+    REFERENCE_BIN="$REFERENCE_ROOT/firefox"
+    REFERENCE_LIBDIR="$REFERENCE_ROOT"
+    REFERENCE_OBJDIR=""
+    ;;
+  same-base)
+    if [[ -z ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ||
+          -z ${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-} ]]; then
+      printf 'same-base mode requires NAIVEFOX_CAPTURE_REFERENCE_BIN and _OBJDIR\n' >&2
+      exit 2
+    fi
+    REFERENCE_BIN="$NAIVEFOX_CAPTURE_REFERENCE_BIN"
+    REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$(dirname "$REFERENCE_BIN")}"
+    REFERENCE_OBJDIR="$NAIVEFOX_CAPTURE_REFERENCE_OBJDIR"
+    ;;
+  *)
+    printf 'unknown NAIVEFOX_CAPTURE_MODE: %s (use quick or same-base)\n' \
+      "$capture_mode" >&2
+    exit 2
+    ;;
+esac
 NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
 NAIVEFOX_LIBDIR="${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$BIN}"
 for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \

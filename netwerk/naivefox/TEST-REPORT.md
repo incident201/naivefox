@@ -17,10 +17,10 @@ client. It intentionally contains no endpoint, username, password, proxy
 authorization value, packet payload, or TLS key material.
 
 Capture-policy note: result tables below include historical runs from before
-the normal-suite split. The current `run-local-suite.sh`, `run-h3-suite.sh`,
-and `run-full-suite.sh` commands exclude ordinary Firefox capture comparisons;
-those comparisons are isolated diagnostics and require an explicit same-base
-request (or `NAIVEFOX_RUN_CAPTURE=1` with matching packages).
+the two-mode capture policy. The current `run-local-suite.sh`,
+`run-h3-suite.sh`, and `run-full-suite.sh` commands include quick capture
+against the downloaded Nightly binary. A full same-base Firefox build remains
+an isolated diagnostic and requires an explicit request with matching packages.
 
 ## Final no-SpiderMonkey build and runtime gate (2026-08-21)
 
@@ -354,7 +354,7 @@ Result: PASS. All seven constituent runners completed:
 | `run-socks-tests.sh` | SOCKS5 remote-hostname HTTP and HTTPS paths |
 | `run-padded-tests.sh` | Negotiated Variant 1 traffic, multi-megabyte download/upload integrity, repeats |
 | `run-robustness-tests.sh` | 32 MiB slow download/upload, bounded memory, half-close, early close, timeouts, proxy loss, seven simultaneous H2 streams on one outer TCP connection |
-| `run-capture-comparison.sh` | Historical Firefox/NaiveFox TLS and HTTP/2 capture comparison; no longer part of the default suite |
+| `run-capture-comparison.sh` | Historical Firefox/NaiveFox TLS and HTTP/2 capture comparison; current default uses the downloaded Nightly, same-base is explicit |
 
 Expected negative-path `curl` diagnostics from the robustness runner were a
 truncated response, a timeout, and a rejected SOCKS target. The runner reported
@@ -743,8 +743,8 @@ bytes and its `libxul.so` was 325,341,920 bytes.
 
 That historical run included strict H2 and H3 raw, SOCKS, padding, integrity,
 backpressure, lifecycle, multiplexing, Auto, simultaneous config listeners,
-and both capture comparisons. Current default runs keep those functional gates
-but invoke capture only as a separate diagnostic. An in-tree test environment ordering bug found
+and both capture comparisons. Current default runs use the downloaded Nightly
+for capture; same-base comparison remains a separate diagnostic. An in-tree test environment ordering bug found
 during this gate was fixed: all `env -u` options now precede the internal
 `LD_LIBRARY_PATH` assignment. Failure output is retained only as a sanitized,
 ignored diagnostic.

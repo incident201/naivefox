@@ -85,14 +85,31 @@ for binary in naivefox libssl3.so libxul.so; do
     exit 1
   }
 done
-if [[ -n ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ]]; then
-  REFERENCE_BIN="$NAIVEFOX_CAPTURE_REFERENCE_BIN"
-  REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$(dirname "$REFERENCE_BIN")}"
-else
-  REFERENCE_ROOT=$("$INTEGRATION_DIR/../../tools/fetch-firefox-reference.sh")
-  REFERENCE_BIN="$REFERENCE_ROOT/firefox"
-  REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$REFERENCE_ROOT}"
-fi
+capture_mode=${NAIVEFOX_CAPTURE_MODE:-quick}
+case "$capture_mode" in
+  quick)
+    if [[ -n ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ]]; then
+      printf 'reference overrides require NAIVEFOX_CAPTURE_MODE=same-base\n' >&2
+      exit 2
+    fi
+    REFERENCE_ROOT=$("$INTEGRATION_DIR/../../tools/fetch-firefox-reference.sh")
+    REFERENCE_BIN="$REFERENCE_ROOT/firefox"
+    REFERENCE_LIBDIR="$REFERENCE_ROOT"
+    ;;
+  same-base)
+    if [[ -z ${NAIVEFOX_CAPTURE_REFERENCE_BIN:-} ]]; then
+      printf 'same-base mode requires NAIVEFOX_CAPTURE_REFERENCE_BIN\n' >&2
+      exit 2
+    fi
+    REFERENCE_BIN="$NAIVEFOX_CAPTURE_REFERENCE_BIN"
+    REFERENCE_LIBDIR="${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$(dirname "$REFERENCE_BIN")}"
+    ;;
+  *)
+    printf 'unknown NAIVEFOX_CAPTURE_MODE: %s (use quick or same-base)\n' \
+      "$capture_mode" >&2
+    exit 2
+    ;;
+esac
 for artifact in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
                "$REFERENCE_LIBDIR/libxul.so"; do
   [[ -f $artifact ]] || {

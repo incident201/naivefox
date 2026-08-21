@@ -1,16 +1,14 @@
 # HTTP/3 capture comparison
 
-> **Isolated diagnostic only:** building an ordinary Firefox package for this
-> same-base comparison requires an explicit request. It is not part of the
-> normal upstream/minimal cycle and is not a merge or release gate. See the
-> full Firefox build and capture policy in [`UPSTREAM.md`](UPSTREAM.md).
+There are two modes. The normal suite runs the quick comparison against the
+SHA-pinned latest Firefox Nightly binary from
+`tools/firefox-reference-manifest`; it does not build Firefox. The full
+same-base comparison requires `NAIVEFOX_CAPTURE_MODE=same-base` and ordinary
+Firefox and NaiveFox packages built from one Firefox base. That full build is
+an explicitly requested diagnostic only, never a merge or release gate.
 
-The historical capture record used a clean official Mozilla Firefox release.
-For a new run, only when explicitly requested, build ordinary Firefox and
-NaiveFox from the same Firefox base in isolated packages and compare packet
-behavior. This diagnostic is not a merge or release gate; Firefox-owned
-Neqo/Necko/NSS, strict UDP/QUIC, classic CONNECT, padding, and multiplexing
-remain product gates on the NaiveFox package.
+Firefox-owned Neqo/Necko/NSS, strict UDP/QUIC, classic CONNECT, padding, and
+multiplexing remain product gates on the NaiveFox package.
 
 The reproducible runner is:
 
@@ -38,8 +36,8 @@ Result: PASS.
 | TCP sessions / TCP payload | 0 / 0 bytes | 0 / 0 bytes |
 | Server-side encrypted bytes | 2,163,143 | 2,166,626 |
 
-The parsed TLS configuration is compared field-by-field. With the clean
-Firefox 154 reference, the semantic configuration and transport-parameter
+The parsed TLS configuration is compared field-by-field. The historical clean
+Firefox 154 reference had semantic configuration and transport-parameter
 equality booleans are expected to be `no` against the pinned NaiveFox snapshot;
 this is version drift, not evidence of a replacement QUIC/TLS stack. TLS
 extension order is never used as an equality gate: Firefox/NSS randomizes it

@@ -92,9 +92,10 @@ cache-server hang into a source diagnosis or create a second objdir for it.
 Do not build the ordinary Firefox browser package during the normal
 upstream/minimal cycle. Gate 1 is source/inventory/conflict review only; Gate 2
 builds and tests the NaiveFox minimal product, and Gate 3 builds and tests the
-standalone export. An ordinary Firefox build is allowed only in a separate,
-explicitly requested same-base capture/comparison and is never a merge or
-release condition.
+standalone export. The normal suite may download the SHA-pinned Nightly binary
+for its quick capture check, but an ordinary Firefox build is allowed only in a
+separate, explicitly requested same-base capture/comparison and is never a
+merge or release condition.
 
 Never put credentials, proxy URLs with userinfo, TLS keys, pcaps, profiles,
 raw logs, or private fixture state in Git or documentation. Runtime logs must
@@ -156,9 +157,10 @@ Before publication, proportionally run:
   concurrency/robustness, no-home profile, and staged-runtime gates;
 - native Windows build plus file logging, H2/H3/Auto, malformed SOCKS/HTTP,
   churn/concurrency, clean shutdown, and stability soak;
-- optional isolated capture/comparison only when explicitly requested, using
-  ordinary Firefox and NaiveFox packages built from the same Firefox base; it
-  is not a routine gate.
+- quick downloaded-Nightly capture in the normal suite;
+- optional isolated same-base capture/comparison only when explicitly
+  requested, using ordinary Firefox and NaiveFox packages built from the same
+  Firefox base; it is not a routine gate.
 
 Record exact commands, commits, outcomes, sizes, and limitations in
 `TEST-REPORT.md`, `MINIMISATION-REPORT.md`, `UPSTREAM.md`, `ROADMAP.md`, and

@@ -1092,9 +1092,9 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 20. close/error lifecycle tests pass.
 21. supplied real Caddy interoperability passes with normal public certificate validation.
 22. existing touched Firefox CONNECT tests pass.
-23. the historical capture comparison is documented; any new ordinary Firefox
-    same-base run is an explicitly requested isolated diagnostic, not a
-    merge/release gate.
+23. the quick downloaded-Nightly capture is part of the normal suite; any new
+    ordinary Firefox same-base run is an explicitly requested isolated
+    diagnostic, not a merge/release gate.
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
 26. strict NaiveProxy-style config mode works without developer flags.
@@ -1121,10 +1121,10 @@ Run all reproducible local H2 and H3 integration gates sequentially with:
 ./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
-The normal full suite is a NaiveFox-only product gate. It excludes the
-ordinary Firefox capture control; that isolated comparison is run only on
-request with matching same-base packages, optionally using
-`NAIVEFOX_RUN_CAPTURE=1 ./netwerk/naivefox/test/integration/run-full-suite.sh`.
+The normal full suite runs the NaiveFox product gates and quick capture against
+the downloaded Nightly binary; it does not build Firefox. The ordinary Firefox
+same-base control is run only on request with matching packages and the
+`NAIVEFOX_CAPTURE_MODE=same-base` capture-runner settings.
 
 The H2 acceptance point is preserved by the `h2-prototype-v0.1` tag. The
 user-approved HTTP/3/Neqo continuation is tracked separately in Phase 12 and
@@ -1142,9 +1142,10 @@ reserved for the clean export. Runtime-reachable Rust closure is 271/287
 packages on Linux/Windows, while source/build Cargo closure is 311/325. The
 package and functional H2/H3/Auto/config gates remain green.
 
-An explicitly requested capture comparison uses a separate full Firefox
-control package with its own runtime libraries; the browser binary is not
-bundled into the lean package. A
+The normal suite uses the downloaded Nightly binary for a quick capture. An
+explicitly requested same-base comparison uses a separate full Firefox control
+package with its own runtime libraries; the browser binary is not bundled into
+the lean package. A
 non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. Source

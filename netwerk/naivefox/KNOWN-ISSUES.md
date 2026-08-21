@@ -104,12 +104,12 @@ terminator expected by the Rust parser after an unknown-size read. An isolated
 Auto run after the fix completed H3 preference, one bounded H2 establishment
 fallback, logical H3 failures, and same-profile relaunches without a panic.
 
-Capture comparison is an isolated diagnostic only. When explicitly requested,
-ordinary Firefox and NaiveFox must be built from the same Firefox base and
-compared with the capture runners. It is not a minimization, merge, release, or
-routine-change gate. The historical official-release record remains evidence
-only; no ordinary Firefox package is built by the normal upstream/minimal or
-minimal-source workflow.
+The normal suite runs a quick capture against the downloaded, SHA-pinned latest
+Firefox Nightly binary. The full same-base capture is an isolated diagnostic:
+when explicitly requested, ordinary Firefox and NaiveFox are built from the
+same Firefox base and compared with the capture runners. Only that full build
+is outside the minimization, merge, release, and routine-change gates. The
+historical official-release record remains evidence only.
 
 ## Single-process networking
 

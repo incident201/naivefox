@@ -103,9 +103,13 @@ cycle and is never a condition for merge, release, or routine NaiveFox changes.
 Gate 1 is source-only; the NaiveFox product is built and tested at Gate 2, and
 the standalone exported product is built and tested at Gate 3.
 
-An ordinary Firefox build is permitted only as a separate, explicitly
-requested capture/comparison control. That isolated check must build ordinary
-Firefox and NaiveFox from the same Firefox base and compare the two packages'
+The normal product suite includes a quick capture comparison against the
+downloaded, SHA-pinned latest Firefox Nightly recorded in
+`tools/firefox-reference-manifest`. This uses a binary package only; it does
+not build Firefox and remains part of the lightweight suite. A full ordinary
+Firefox build from source is permitted only as a separate, explicitly
+requested same-base capture/control. That isolated check builds ordinary
+Firefox and NaiveFox from the same Firefox base and compares the two packages'
 packet/transport behavior without becoming a prerequisite for the branch cycle.
 See `CAPTURE.md`, `H3-CAPTURE.md`, and `OBSERVER-TRAFFIC-REPORT.md`.
 
@@ -1082,10 +1086,20 @@ netwerk/naivefox/tools/stage-runtime.sh
 netwerk/naivefox/tools/verify-staged-runtime.sh
 ```
 
-The normal `run-full-suite.sh` command is a NaiveFox-only product gate and
-does not run or fetch an ordinary Firefox package. The H2/H3 capture runners
-are separate same-base diagnostics; after an explicit request and package
-setup, `NAIVEFOX_RUN_CAPTURE=1` opts them into the full suite.
+The normal `run-full-suite.sh` command runs the NaiveFox product gates and the
+quick capture checks against the downloaded Nightly binary. It does not build
+Firefox. For the optional full same-base control, run the capture runners
+directly with matching build artifacts:
+
+```bash
+NAIVEFOX_CAPTURE_MODE=same-base \
+NAIVEFOX_CAPTURE_REFERENCE_BIN=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_LIBDIR=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/full-firefox-objdir \
+./netwerk/naivefox/test/integration/run-capture-comparison.sh
+```
+
+Repeat with `run-h3-capture-comparison.sh` when the H3 control is requested.
 
 Purpose:
 
@@ -1239,7 +1253,8 @@ Tests:
 
 - cold lean link and direct HTTPS fetch (`example.com`, HTTP 200);
 - staged runtime smoke, public fetch, persistent/temporary/no-home profiles;
-- H2 and H3 raw, SOCKS, padding, robustness, Auto, config, and capture suites;
+- H2 and H3 raw, SOCKS, padding, robustness, Auto, config, and quick capture
+  suites against the downloaded Nightly binary;
 - an explicitly requested same-base full Firefox capture/control package uses
   separate libraries and remains outside the lean product package.
 
@@ -1637,15 +1652,16 @@ new downstream Necko patch inventory entries:
 |---|---|---|---|
 | Bounded local parser failure | `SocksServer.cpp`, `test/gtest/TestSocks5Parser.cpp`, `test/integration/run-malformed-socks-tests.sh` | Terminal SOCKS/HTTP parser events stop rearming input and retain at most one fixed-size failure reply; prevents cross-platform remote OOM/spin. Normal frontend behavior is unchanged. | Linux malformed probes PASS; native Windows malformed stress PASS, including 2 MiB tails and 200 non-reading rejects. |
 | Runtime logging | `RuntimeLogging.cpp`, `RuntimeLogging.h`, `NaiveFoxRunner.cpp`, `TunnelSession.cpp` | Informative timestamped event records, normalized endpoint without userinfo, connection/protocol/padding/status lifecycle. POSIX uses atomic `0600` creation; Windows uses wide-path CRT open. | Linux config logging PASS; native Windows relative/absolute/Unicode append and credential scan PASS; five repeated smoke runs and 600 s H3 soak PASS. |
-| Isolated capture comparison | capture runners/docs | When explicitly requested, compare ordinary Firefox and NaiveFox packages built from the same Firefox base; never make the ordinary package a refresh or release gate. | Historical H2/H3 decrypted and passive comparison records; not a routine gate. |
+| Capture comparison | capture runners/docs | The normal suite uses the downloaded Nightly binary for quick H2/H3 comparison; only an explicitly requested same-base run builds ordinary Firefox, and that package is never a refresh or release gate. | Historical H2/H3 decrypted and passive records plus the pinned Nightly manifest. |
 | Closure audit | `tools/analyze-full-closure.py`, `tools/assert-closure.py`, `tools/minimal-source-plan.py`, `reports/*.json` | Target-correct Linux/Windows configure/build/C++/Rust/Glean/resource closure and strict repository-relative/provenance checks. | Six-report target union: five original reports frozen in `bec198a62d42` from source `745d58bf7dcb`, plus Windows configure trace from `af716bf57f83`; both target assertions and the 25,549-entry plan PASS. |
 
 Except for the `MOZ_NAIVEFOX`-guarded preferences fix in NF-UPSTREAM-016, the
 stability changes above are project-owned. If a future Firefox refresh touches an inventoried upstream file, follow the two-gate
 `main -> refresh/firefox-* -> naivefox -> refresh/minimal-* -> minimal`
 workflow above and rerun the full H2/H3/config product gates before export.
-Run the isolated same-base capture diagnostic only when explicitly requested;
-it is never a refresh or release condition.
+Run the full same-base capture diagnostic only when explicitly requested; the
+quick downloaded-Nightly capture remains part of the normal product suite, and
+the full ordinary Firefox package is never a refresh or release condition.
 
 
 ## 3-Tier Build Performance Benchmark

@@ -9,11 +9,8 @@ suites=(
   run-h3-padded-tests.sh
   run-h3-robustness-tests.sh
   run-auto-protocol-tests.sh
+  run-h3-capture-comparison.sh
 )
-
-if [[ ${NAIVEFOX_RUN_CAPTURE:-0} == 1 ]]; then
-  suites+=(run-h3-capture-comparison.sh)
-fi
 
 for suite in "${suites[@]}"; do
   printf 'Running %s\n' "$suite"

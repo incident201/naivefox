@@ -58,10 +58,11 @@ from a validated `minimal` snapshot.
 The normal upstream/minimal cycle does not build an ordinary Firefox browser
 package. The `naivefox` refresh is a source/inventory/conflict review, the
 NaiveFox minimal product is built and tested on `minimal`, and the standalone
-product is rebuilt from `minimal-source`. An ordinary Firefox package is
-allowed only for a separately requested, isolated same-base capture comparison
-against NaiveFox. That comparison is not a merge or release gate and is not run
-for routine changes; see `UPSTREAM.md` and `CAPTURE.md`.
+product is rebuilt from `minimal-source`. The normal suite includes a quick
+capture against the SHA-pinned latest Firefox Nightly binary; it does not build
+Firefox. A full ordinary Firefox package is allowed only for a separately
+requested, isolated same-base capture comparison against NaiveFox. That build
+is not a merge or release gate; see `UPSTREAM.md` and `CAPTURE.md`.
 
 Project-specific code and documentation should live under:
 
@@ -798,15 +799,14 @@ Run the complete local integration gate with:
 ./netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
-The optional capture phase requires the restricted `dumpcap` capabilities
-documented in `CAPTURE.md`. The H3-specific decrypted and no-keylog comparison
-is in `H3-CAPTURE.md` and is reproduced by
-`test/integration/run-h3-capture-comparison.sh`. Set
-`NAIVEFOX_RUN_CAPTURE=1` only for an explicitly requested same-base capture
-diagnostic with matching ordinary Firefox and NaiveFox packages. The normal
-commands run local functional and failure-path suites sequentially and delete
-sensitive run material after every successful phase; they do not build or
-download Firefox.
+The normal capture phase uses the downloaded Nightly binary and requires the
+restricted `dumpcap` capabilities documented in `CAPTURE.md`. The H3-specific
+decrypted and no-keylog comparison is in `H3-CAPTURE.md`. For the separate
+same-base diagnostic, set `NAIVEFOX_CAPTURE_MODE=same-base` plus the matching
+`NAIVEFOX_CAPTURE_REFERENCE_*` paths and invoke the capture runner directly.
+The normal commands run local functional and failure-path suites sequentially
+and delete sensitive run material after every successful phase; they do not
+build Firefox.
 
 Additional repeatable test entry points are:
 

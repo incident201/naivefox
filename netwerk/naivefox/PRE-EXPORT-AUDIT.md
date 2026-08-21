@@ -31,11 +31,12 @@ reports and at exporter checkpoint `4db1292e96ec` validates 25,549 files and 37
 directory contracts. Publication is a clean deterministic snapshot, not a new
 dependency-discovery run.
 
-Capture comparison is outside the export gates. When explicitly requested,
-both H2 and H3 runners compare ordinary Firefox and NaiveFox packages built
-from the same Firefox base in isolated locations. The historical official
-release capture remains diagnostic evidence only; the normal export workflow
-does not build or fetch an ordinary Firefox browser package.
+The normal export/product suite may run the quick capture against the
+downloaded, SHA-pinned latest Firefox Nightly binary; this does not build
+Firefox. The full same-base capture is outside the export gates. When
+explicitly requested, both H2 and H3 runners compare ordinary Firefox and
+NaiveFox packages built from the same Firefox base in isolated locations. The
+historical official-release capture remains diagnostic evidence only.
 
 The Auto protocol gate had one reproducible startup abort while repeatedly
 reusing the H3 fixture profile. The lean `MOZ_NAIVEFOX` preferences adapter was

@@ -25,17 +25,22 @@ the proxy port. They require `Outer protocol: h3`, so H2 fallback cannot satisfy
 the workload. Both suites execute the same `naivefox` binary and share the
 SOCKS, CONNECT, padding, and pump implementation.
 
-The H2/H3 suites do not run Firefox capture comparisons by default. The
-ordinary Firefox control is an isolated, explicitly requested same-base
-diagnostic. After placing the matching Firefox and NaiveFox packages in the
-capture environment, opt in explicitly with:
+The H2/H3 suites include a quick capture comparison against the downloaded,
+SHA-pinned latest Firefox Nightly. It uses a binary package only and does not
+build Firefox. The full same-base ordinary Firefox control is a separate,
+explicitly requested diagnostic. After building matching packages, invoke it
+directly with:
 
 ```bash
-NAIVEFOX_RUN_CAPTURE=1 ./run-full-suite.sh
+NAIVEFOX_CAPTURE_MODE=same-base \
+NAIVEFOX_CAPTURE_REFERENCE_BIN=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_LIBDIR=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/full-firefox-objdir \
+./run-capture-comparison.sh
 ```
 
-Without that variable, the complete suite remains a NaiveFox-only product
-gate and does not download or build Firefox.
+Repeat with `run-h3-capture-comparison.sh` for the H3 control. The ordinary
+full Firefox build remains outside the normal suite and release gates.
 
 Run the NaiveProxy-style config and simultaneous local-listener gates with:
 
@@ -86,9 +91,10 @@ HTTPS and direct/proxied integrity, and mixes SOCKS with HTTP CONNECT requests.
 Private configs are deleted on both success and failure; retained summaries do
 not contain the endpoint or credentials.
 
-The optional capture comparison requires the restricted `dumpcap` capabilities
-documented below and in `../../CAPTURE.md`; it is never part of the normal
-product gate.
+The capture comparisons require the restricted `dumpcap` capabilities
+documented below and in `../../CAPTURE.md`. The quick Nightly comparison is
+part of the normal suite; only the same-base comparison is outside the product
+gate.
 
 Run the complete M0.4 control suite from this directory:
 
