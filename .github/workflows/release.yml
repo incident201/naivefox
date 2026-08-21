@@ -44,6 +44,7 @@ jobs:
       release_date: ${{ steps.metadata.outputs.release_date }}
       release_tag: ${{ steps.metadata.outputs.release_tag }}
       build_matrix: ${{ steps.metadata.outputs.build_matrix }}
+      product_tree_hash: ${{ steps.metadata.outputs.product_tree_hash }}
     steps:
       - name: Check out the selected product commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -62,6 +63,12 @@ jobs:
           short_sha="${source_sha:0:12}"
           release_date="$(date -u +%Y%m%d)"
           release_tag="naivefox-${release_date}-${short_sha}"
+          product_tree_hash="$(
+            git ls-tree HEAD |
+              awk -F '\t' '$2 != ".github"' |
+              sha256sum |
+              cut -d ' ' -f1
+          )"
           case "${BUILD_TARGET}" in
             all)
               build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","archive_suffix":"linux-x86_64.tar.xz"},{"platform":"windows","runner":"windows-2022","archive_suffix":"windows-x86_64.zip"}]}'
@@ -83,6 +90,7 @@ jobs:
             echo "release_date=${release_date}"
             echo "release_tag=${release_tag}"
             echo "build_matrix=${build_matrix}"
+            echo "product_tree_hash=${product_tree_hash}"
           } >> "${GITHUB_OUTPUT}"
 
   build:
@@ -100,8 +108,30 @@ jobs:
           ref: ${{ needs.metadata.outputs.source_sha }}
           fetch-depth: 1
 
+      - name: Identify runner image
+        id: runner_image
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "version=${ImageOS:-unknown}-${ImageVersion:-unknown}" \
+            >> "${GITHUB_OUTPUT}"
+
+      - name: Restore staged product cache
+        id: staged_cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ github.workspace }}/../obj-naivefox-${{ matrix.platform }}/package/naivefox-${{ matrix.platform }}-x86_64
+          key: naivefox-stage-v1-${{ matrix.platform }}-${{ steps.runner_image.outputs.version }}-${{ needs.metadata.outputs.product_tree_hash }}
+
+      - name: Restore cbindgen cache
+        if: matrix.platform == 'linux' && steps.staged_cache.outputs.cache-hit != 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cargo/bin/cbindgen
+          key: naivefox-cbindgen-v1-${{ runner.os }}-${{ runner.arch }}-0.29.4
+
       - name: Prepare Linux build environment
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && steps.staged_cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -118,10 +148,12 @@ jobs:
             libxt-dev \
             lld-20 \
             nasm
-          cargo install cbindgen --version 0.29.4 --locked
+          if ! cbindgen --version 2>/dev/null | grep -qx 'cbindgen 0.29.4'; then
+            cargo install cbindgen --version 0.29.4 --locked
+          fi
 
       - name: Prepare MozillaBuild
-        if: matrix.platform == 'windows'
+        if: matrix.platform == 'windows' && steps.staged_cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -135,6 +167,7 @@ jobs:
           }
 
       - name: Build and stage NaiveFox
+        if: steps.staged_cache.outputs.cache-hit != 'true'
         shell: bash
         env:
           RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
