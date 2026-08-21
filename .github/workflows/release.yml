@@ -158,6 +158,7 @@ jobs:
           # explicitly without enabling MOZ_AUTOMATION: that variable also
           # changes compiler and Rust policy, and is not appropriate here.
           printf '\nac_add_options --disable-bootstrap\n' >> "${mozconfig}"
+          mkdir -p "$PWD/../obj-naivefox-${{ matrix.platform }}/package"
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --objdir "$PWD/../obj-naivefox-${{ matrix.platform }}"
 
