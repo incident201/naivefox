@@ -86,7 +86,8 @@ For changes on `naivefox-full-source`, use the product configuration and a full 
 when build files or closure may have changed:
 
 ```bash
-MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
+netwerk/naivefox/tools/build-product.sh linux \
+  --objdir /absolute/path/to/obj-naivefox-linux
 ```
 
 For focused C++ iteration, use the narrowest valid target, then finish with the

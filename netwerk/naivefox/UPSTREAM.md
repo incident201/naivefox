@@ -96,7 +96,8 @@ runtime checks, and size/closure assertions. Use the full minimal graph after
 build-system or dependency changes:
 
 ```bash
-MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
+netwerk/naivefox/tools/build-product.sh linux \
+  --objdir /absolute/path/to/obj-naivefox-linux
 ```
 
 If the upstream refresh passes source review but the minimized graph fails,

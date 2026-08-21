@@ -35,11 +35,11 @@ closure evidence.
 Linux product build:
 
 ```bash
-export MOZCONFIG=netwerk/naivefox/mozconfig-minimal
-export NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-linux
-./mach build -j4
-./netwerk/naivefox/tools/stage-runtime.sh
-./netwerk/naivefox/tools/verify-staged-runtime.sh
+./netwerk/naivefox/tools/build-product.sh linux \
+  --objdir /absolute/path/to/obj-naivefox-linux
+NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-linux \
+  ./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  package/naivefox-linux-x86_64
 ```
 
 The default graph has tests disabled. To build the same NaiveFox application
@@ -49,7 +49,7 @@ with its test targets, use a separate object directory and opt in explicitly:
 export MOZCONFIG=netwerk/naivefox/mozconfig-minimal
 export NAIVEFOX_ENABLE_TESTS=1
 export NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-linux-tests
-./mach build -j4
+./netwerk/naivefox/tools/build-product.sh linux
 export LD_LIBRARY_PATH="$NAIVEFOX_OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 ./mach gtest 'NaiveFoxTunnelSessionLifecycle.*'
 ```
@@ -60,10 +60,9 @@ browser mozconfig or run an ordinary Firefox build as a product gate.
 Windows cross-build and staging:
 
 ```bash
-export MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64
-export NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-windows
-./mach build -j4
-./netwerk/naivefox/tools/stage-runtime-windows-x86_64.sh
+./netwerk/naivefox/tools/build-product.sh windows \
+  --objdir /absolute/path/to/obj-naivefox-windows \
+  --bootstrap
 ```
 
 On Windows, verify the staged directory, including the deterministic
@@ -163,13 +162,11 @@ object directories:
 ```bash
 cd "$export_root/minimal-source"
 
-MOZCONFIG=netwerk/naivefox/mozconfig-minimal \
-NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-linux \
-./mach build -j4
+./netwerk/naivefox/tools/build-product.sh linux \
+  --objdir /absolute/path/to/export-obj-linux
 
-MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64 \
-NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-windows \
-./mach build -j4
+./netwerk/naivefox/tools/build-product.sh windows \
+  --objdir /absolute/path/to/export-obj-windows
 ```
 
 For the independence gate, run those commands in a disposable namespace, VM,

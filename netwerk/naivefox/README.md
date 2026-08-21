@@ -138,17 +138,17 @@ product workflow builds only the minimized NaiveFox graph. It does not build a
 Firefox browser:
 
 ```bash
-MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
+./netwerk/naivefox/tools/build-product.sh linux \
+  --objdir "$PWD/../obj-naivefox-linux"
 ```
 
-The Windows x86-64 cross-build uses the separate product mozconfig on the
-`naivefox-full-source` branch and Mozilla's clang-cl toolchain with the Visual Studio linker
-and Windows SDK:
+The same entrypoint selects the Windows x86-64 mozconfig, external object
+directory, staging script, and (under WSL) the portable Wine paths/prefix:
 
 ```bash
-MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64 \
-NAIVEFOX_OBJDIR="$PWD/obj-naivefox-windows-x86_64" \
-./mach build -j4
+./netwerk/naivefox/tools/build-product.sh windows \
+  --objdir "$PWD/../obj-naivefox-windows" \
+  --bootstrap
 ```
 
 Run the reproducible local H2/H3/Auto/config/robustness gate with:
@@ -163,11 +163,13 @@ isolated NSS profiles. No real proxy account is required. Detailed focused and
 real-deployment commands are in
 [`test/integration/README.md`](test/integration/README.md).
 
-Stage and verify the Linux package after a successful product build:
+The entrypoint stages the package below the object directory. Verify the Linux
+package after a successful product build:
 
 ```bash
-./netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64
-./netwerk/naivefox/tools/verify-staged-runtime.sh naivefox-linux-x86_64
+NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
+./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  package/naivefox-linux-x86_64
 ```
 
 An ordinary Firefox build is not a merge or release gate. It is allowed only
