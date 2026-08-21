@@ -56,6 +56,12 @@ def run(
 def evidence_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment["NAIVEFOX_ENABLE_TESTS"] = "0"
+    # Evidence must not silently depend on a long-lived compiler-cache daemon.
+    # Keep this aligned with build-product.sh so provenance refreshes cannot
+    # reintroduce the recurring stale/unavailable sccache failure mode.
+    environment["NAIVEFOX_DISABLE_SCCACHE"] = "1"
+    environment["SCCACHE_DISABLE"] = "1"
+    environment.pop("USE_SCCACHE", None)
     return environment
 
 
