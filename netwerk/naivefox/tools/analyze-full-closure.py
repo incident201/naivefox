@@ -657,11 +657,6 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "members": members,
         })
 
-    if not js_static_found:
-        raise AuditConsistencyError(
-            "Self-consistency failure: js_static is missing from STATIC_LIBS"
-        )
-
     if not gkrust_found:
         raise AuditConsistencyError(
             "Self-consistency failure: gkrust is missing from STATIC_LIBS"
@@ -732,7 +727,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
-            "analyzer_version": "2.5.0-active-cargo-tree",
+            "analyzer_version": "2.6.0-no-spidermonkey-active-cargo-tree",
             "compiler_version": compiler_ver,
             "linker_version": linker_ver,
             "sccache_state": "supported",
@@ -744,6 +739,7 @@ def analyze_target(topsrcdir, objdir, target_triple, mozconfig_relpath):
             "unstripped_link_objects_bytes": total_obj_bytes,
             "unstripped_link_objects_mb": round(total_obj_bytes / (1024 * 1024), 2),
             "static_libraries_count": len(static_libs),
+            "spidermonkey_static_present": js_static_found,
             "libxul_size_bytes": bin_xul.stat().st_size if bin_xul.exists() else 0,
             "naivefox_bin_size_bytes": bin_naivefox.stat().st_size
             if bin_naivefox.exists()
@@ -860,7 +856,8 @@ def main():
             f"  -> Direct Objs:   {s['direct_link_objects_count']} files ({s['unstripped_link_objects_mb']} MB)"
         )
         print(
-            f"  -> Static Libs:   {s['static_libraries_count']} archives (SpiderMonkey & gkrust verified)"
+            f"  -> Static Libs:   {s['static_libraries_count']} archives "
+            f"(gkrust verified; SpiderMonkey={'present' if s['spidermonkey_static_present'] else 'absent'})"
         )
         print(
             f"  -> Reachable Rust:{s['reachable_rust_crates_count']} crates (filtered from 850 total)"
