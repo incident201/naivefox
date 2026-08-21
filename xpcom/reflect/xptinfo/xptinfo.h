@@ -462,7 +462,11 @@ struct nsXPTMethodInfo {
   }
 
   JS::Symbol* GetSymbol(JSContext* aCx) const {
+#ifdef MOZ_NAIVEFOX
+    return nullptr;
+#else
     return JS::GetWellKnownSymbol(aCx, GetSymbolCode());
+#endif
   }
 
   const char* SymbolDescription() const;

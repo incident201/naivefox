@@ -103,7 +103,9 @@
 #  include "mozilla/net/SocketProcessParent.h"
 #endif
 #include "mozilla/net/TRRService.h"
-#include "mozilla/net/urlpattern_glue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/urlpattern_glue.h"
+#endif
 #include "netCore.h"
 #include "nsCOMPtr.h"
 #include "nsCORSListenerProxy.h"
@@ -6643,6 +6645,9 @@ nsresult nsHttpChannel::UpdateCacheEntryHeaders(nsICacheEntry* entry,
 bool nsHttpChannel::ParseDictionary(nsICacheEntry* aEntry,
                                     nsHttpResponseHead* aResponseHead,
                                     bool aModified) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   nsAutoCString val;
   if (NS_SUCCEEDED(aResponseHead->GetHeader(nsHttp::Use_As_Dictionary, val))) {
     nsAutoCStringN<128> matchVal;
@@ -6712,6 +6717,7 @@ bool nsHttpChannel::ParseDictionary(nsICacheEntry* aEntry,
     return true;
   }
   return true;  // succeeded, no use-as-dictionary
+#endif
 }
 
 inline void GetAuthType(const char* challenge, nsCString& authType) {

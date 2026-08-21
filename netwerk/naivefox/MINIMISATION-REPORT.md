@@ -4,6 +4,40 @@ This report records measured changes on the `minimal` branch. The full
 Firefox source tree and compiled Gecko dependency closure remain intact until
 later phases prove that they can be reduced safely.
 
+## Phase 3.1: no-SpiderMonkey product graph (2026-08-21)
+
+The final NaiveFox-only graph no longer traverses the `js/src` runtime `DIRS`
+or links its `FINAL_LIBRARY`. Public and generated JS headers remain because
+retained Gecko code still exposes JS ABI types; the narrow project-owned
+`SpiderMonkeyCompat.cpp` layer supplies the required ABI shims without adding
+the SpiderMonkey runtime back. URLPattern C++/Rust glue is also excluded.
+
+This is not an Intl-removal phase. Classic ICU and the ICU4X support used by
+encoding, locale canonicalization, and segmentation remain deliberately in
+the graph. In particular, retained `jsrust_shared` ICU4X support is not the
+SpiderMonkey runtime.
+
+The clean Linux build in
+`/home/zubastik/obj-naivefox-no-sm-linux-final` completed a full
+`./mach build -j4` in 5:00 with 114 unused browser/JS-path warnings and no
+errors, then passed the staged runtime smoke and config SOCKS/HTTP CONNECT H2,
+H3, and Auto H3/fallback gates. The clean Windows cross-build in
+`/home/zubastik/obj-naivefox-no-sm-windows-final` produced
+`x86_64-pc-windows-msvc` `xul.dll` and `naivefox.exe`; bundled Wine ran
+`--help` with explicit `WINEPREFIX`, `WINELOADER`, and `WINESERVER`.
+
+The two object directories contain no `js/src` `.o`, `.obj`, or `.a`, no
+`libjs_static.a`, and no Wasm objects. Their `dependentlibs.list` files have no
+`js`, `mozjs`, or `wasm` entries.
+
+Host-native acceptance then used the current staged package
+`D:\naivefox\naivefox-windows-x86_64-no-sm-final`. With the pinned Caddy
+fixture still in WSL and NaiveFox running natively on Windows,
+`verify-staged-windows-smoke.py` passed version/runtime smoke, dynamic SOCKS5 and HTTP
+CONNECT, malformed stress, and Unicode file logging. Strict H2 and H3 each
+passed SOCKS5 and HTTP CONNECT fetches with padding, and CLI Auto passed H3
+preference and H2 fallback.
+
 ## Phase 1: staged runtime resources
 
 Historical full-tree baseline source point (not the current audit

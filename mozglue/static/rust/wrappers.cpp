@@ -2,11 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// This ensures the right configuration for e.g. MOZ_GLUE_IN_PROGRAM,
-// used in the MFBT headers included further below. We use js-confdefs.h
-// instead of mozilla-config.h because the latter is not present in
-// spidermonkey standalone builds while the former is always present.
-#include "js-confdefs.h"
+// This ensures the right configuration for e.g. MOZ_GLUE_IN_PROGRAM, used in
+// the MFBT headers included further below. SpiderMonkey and normal Gecko builds
+// use js-confdefs.h so standalone builds remain supported. NaiveFox uses
+// Gecko's mozilla-config.h because it has no SpiderMonkey runtime graph.
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla-config.h"
+#else
+#  include "js-confdefs.h"
+#endif
 #include "mozilla/Assertions.h"
 #include "mozilla/Types.h"
 #include "mozilla/mozalloc_oom.h"

@@ -22,11 +22,13 @@
 
 #include <algorithm>
 
-#include "js/ArrayBuffer.h"  // JS::{GetArrayBuffer{,ByteLength},IsArrayBufferObject}
-#include "js/ArrayBufferMaybeShared.h"  // JS::IsImmutableArrayBufferMaybeShared
-#include "js/GCAPI.h"                   // JS::AutoCheckCannotGC
-#include "js/RootingAPI.h"              // JS::{Handle,Rooted}
-#include "js/Value.h"                   // JS::Value
+#ifndef MOZ_NAIVEFOX
+#  include "js/ArrayBuffer.h"  // JS::{GetArrayBuffer{,ByteLength},IsArrayBufferObject}
+#  include "js/ArrayBufferMaybeShared.h"  // JS::IsImmutableArrayBufferMaybeShared
+#  include "js/GCAPI.h"                   // JS::AutoCheckCannotGC
+#  include "js/RootingAPI.h"              // JS::{Handle,Rooted}
+#  include "js/Value.h"                   // JS::Value
+#endif
 #include "mozilla/CheckedInt.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/PodOperations.h"
@@ -810,6 +812,10 @@ NS_IMETHODIMP
 nsBinaryInputStream::ReadArrayBuffer(uint64_t aLength,
                                      JS::Handle<JS::Value> aBuffer,
                                      JSContext* aCx, uint64_t* aReadLength) {
+#ifdef MOZ_NAIVEFOX
+  *aReadLength = 0;
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!aBuffer.isObject()) {
     return NS_ERROR_FAILURE;
   }
@@ -868,6 +874,7 @@ nsBinaryInputStream::ReadArrayBuffer(uint64_t aLength,
   } while (pos < aLength);
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

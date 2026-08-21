@@ -554,6 +554,7 @@ NS_ShutdownXPCOM(nsIServiceManager* aServMgr) {
 namespace mozilla {
 
 void SetICUMemoryFunctions() {
+#ifndef MOZ_NAIVEFOX
   static bool sICUReporterInitialized = false;
   if (!sICUReporterInitialized) {
     if (!JS_SetICUMemoryFunctions(ICUReporter::Alloc, ICUReporter::Realloc,
@@ -562,6 +563,7 @@ void SetICUMemoryFunctions() {
     }
     sICUReporterInitialized = true;
   }
+#endif
 }
 
 nsresult ShutdownXPCOM(nsIServiceManager* aServMgr) {

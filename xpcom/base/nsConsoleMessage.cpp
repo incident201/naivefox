@@ -8,14 +8,22 @@
 
 #include "nsConsoleMessage.h"
 
-#include "jsapi.h"
+#ifdef MOZ_NAIVEFOX
+#  include "prtime.h"
+#else
+#  include "jsapi.h"
+#endif
 
 NS_IMPL_ISUPPORTS(nsConsoleMessage, nsIConsoleMessage)
 
 nsConsoleMessage::nsConsoleMessage() : mMicroSecondTimeStamp(0) {}
 
 nsConsoleMessage::nsConsoleMessage(const nsAString& aMessage) {
+#ifdef MOZ_NAIVEFOX
+  mMicroSecondTimeStamp = PR_Now();
+#else
   mMicroSecondTimeStamp = JS_Now();
+#endif
   mMessage.Assign(aMessage);
   mIsForwardedFromContentProcess = false;
 }

@@ -21,5 +21,9 @@ SOURCES["lz4/xxhash.c"].flags += ["-Wno-unused-function"]
 DEFINES["LZ4LIB_VISIBILITY"] = ""
 DEFINES["LZ4FLIB_VISIBILITY"] = ""
 
-# By putting it in js, it ends up in libxul too.
-FINAL_LIBRARY = "js"
+# By putting it in js, it ends up in libxul too. NaiveFox has no SpiderMonkey
+# final library, so keep the shared compression implementation directly in xul.
+if CONFIG["MOZ_NAIVEFOX"]:
+    FINAL_LIBRARY = "xul"
+else:
+    FINAL_LIBRARY = "js"

@@ -4,7 +4,9 @@
 
 #include "sqlite3.h"
 
-#include "jsfriendapi.h"
+#ifndef MOZ_NAIVEFOX
+#  include "jsfriendapi.h"
+#endif
 
 #include "nsPrintfCString.h"
 #include "nsString.h"
@@ -12,7 +14,9 @@
 #include "mozilla/Mutex.h"
 #include "mozilla/CondVar.h"
 #include "nsThreadUtils.h"
-#include "nsJSUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsJSUtils.h"
+#endif
 #include "nsIInterfaceRequestorUtils.h"
 
 #include "Variant.h"
@@ -113,6 +117,9 @@ void checkAndLogStatementPerformance(sqlite3_stmt* aStatement) {
 
 already_AddRefed<nsIVariant> convertJSValToVariant(JSContext* aCtx,
                                                    const JS::Value& aValue) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   if (aValue.isInt32()) {
     return MakeAndAddRef<IntegerVariant>(aValue.toInt32());
   }
@@ -157,6 +164,7 @@ already_AddRefed<nsIVariant> convertJSValToVariant(JSContext* aCtx,
   }
 
   return nullptr;
+#endif
 }
 
 already_AddRefed<Variant_base> convertVariantToStorageVariant(

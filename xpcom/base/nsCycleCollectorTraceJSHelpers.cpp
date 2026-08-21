@@ -23,33 +23,49 @@ void CycleCollectionNoteEdgeNameImpl(
 void nsCycleCollectionParticipant::NoteJSChild(JS::GCCellPtr aGCThing,
                                                const char* aName,
                                                void* aClosure) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   nsCycleCollectionTraversalCallback* cb =
       static_cast<nsCycleCollectionTraversalCallback*>(aClosure);
   NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb, aName);
   if (JS::IsCCTraceKind(aGCThing.kind())) {
     cb->NoteJSChild(aGCThing);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::Heap<JS::Value>* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (aPtr->unbarrieredGet().isGCThing()) {
     mCallback(aPtr->unbarrieredGet().toGCCellPtr(), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::Heap<jsid>* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (aPtr->unbarrieredGet().isGCThing()) {
     mCallback(aPtr->unbarrieredGet().toGCCellPtr(), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::Heap<JSObject*>* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (*aPtr) {
     mCallback(JS::GCCellPtr(aPtr->unbarrieredGet()), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(nsWrapperCache* aPtr, const char* aName,
@@ -66,28 +82,44 @@ void TraceCallbackFunc::Trace(nsWrapperCache* aPtr, const char* aName,
 
 void TraceCallbackFunc::Trace(JS::TenuredHeap<JSObject*>* aPtr,
                               const char* aName, void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (*aPtr) {
     mCallback(JS::GCCellPtr(aPtr->unbarrieredGetPtr()), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::Heap<JSFunction*>* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (*aPtr) {
     mCallback(JS::GCCellPtr(aPtr->unbarrieredGet()), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::Heap<JSString*>* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (*aPtr) {
     mCallback(JS::GCCellPtr(aPtr->unbarrieredGet()), aName, aClosure);
   }
+#endif
 }
 
 void TraceCallbackFunc::Trace(JS::Heap<JSScript*>* aPtr, const char* aName,
                               void* aClosure) const {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   if (*aPtr) {
     mCallback(JS::GCCellPtr(aPtr->unbarrieredGet()), aName, aClosure);
   }
+#endif
 }

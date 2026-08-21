@@ -35,7 +35,6 @@ extern crate unicode_bidi_ffi;
 extern crate unic_langid;
 extern crate unic_langid_ffi;
 extern crate uritemplate_glue;
-extern crate urlpattern_glue;
 extern crate xpcom;
 
 use std::ffi::CStr;

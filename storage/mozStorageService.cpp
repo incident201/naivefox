@@ -27,7 +27,9 @@
 #include "mozIStoragePendingStatement.h"
 #include "mozilla/StaticPrefs_security.h"
 #include "mozilla/StaticPrefs_storage.h"
-#include "mozilla/intl/Collator.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/intl/Collator.h"
+#endif
 #include "mozilla/intl/LocaleService.h"
 #include "mozilla/storage/SQLiteEncryption.h"
 
@@ -39,7 +41,9 @@
 #  undef CompareString
 #endif
 
+#ifndef MOZ_NAIVEFOX
 using mozilla::intl::Collator;
+#endif
 
 namespace mozilla::storage {
 
