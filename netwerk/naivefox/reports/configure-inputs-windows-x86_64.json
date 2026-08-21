@@ -10355,7 +10355,7 @@
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c",
-  "naivefox_reference_commit": "aebb8eee8d2a13eb89593ffc805132fe56593c4b",
+  "naivefox_reference_commit": "a7a40629a1624b6b28c4ba5f33c14ba3eece0d1b",
   "observed_directories": [
     "browser",
     "build",
@@ -21407,7 +21407,7 @@
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "aebb8eee8d2a13eb89593ffc805132fe56593c4b",
+  "source_commit": "a7a40629a1624b6b28c4ba5f33c14ba3eece0d1b",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "windows-x86_64",
