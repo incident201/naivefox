@@ -31,7 +31,7 @@ show a clean development branch and correct remotes.
 ### M0.2 Bootstrap Firefox build dependencies
 
 - [x] Run `./mach bootstrap`.
-- [x] Select full Firefox Desktop build.
+- [x] Install/select Mozilla's native compiled C++ toolchain support.
 - [x] Do not use Artifact Mode.
 - [x] Let Mozilla tooling install the appropriate compiler/toolchain.
 - [x] Record any required local environment changes.
@@ -44,18 +44,24 @@ Acceptance:
 
 and normal build configuration commands work without missing-tool errors.
 
-### M0.3 Clean baseline build
+### M0.3 One-time historical Firefox baseline (non-gate)
 
-Before any implementation change:
+At project initialization only, before the first implementation change:
 
 - [x] Run a complete `./mach build`.
 - [x] Save build output under `artifacts/`.
 - [x] Record object directory and compiler.
 - [x] Do not proceed if the untouched checkout fails to build.
 
-Acceptance:
+Historical acceptance:
 
 Firefox baseline build exits successfully.
+
+This 2026-08-12 baseline is retained as an environment record. It is not part
+of the current Gate 1, merge, release, or routine-change workflow and is not
+repeated by default. Current validation builds the NaiveFox minimal product at
+Gate 2 and its standalone export at Gate 3. An ordinary Firefox package is
+allowed only for an explicitly requested isolated same-base capture/control.
 
 ---
 
@@ -678,6 +684,12 @@ pooling; NaiveFox does not implement a separate connection pool.
 
 This phase validates the original reason for the project.
 
+This is a separate, explicitly requested diagnostic phase, not an ordinary
+upstream/minimal-cycle, merge, or release gate. A new run builds ordinary
+Firefox and NaiveFox from the same Firefox base in isolated packages solely to
+compare behavior. The historical results below remain evidence and are not
+automatically rerun for routine changes; see `UPSTREAM.md` and `CAPTURE.md`.
+
 ### M10.1 Reference Firefox capture
 
 From the same source revision/build family, capture an ordinary Firefox HTTPS connection to the same proxy/front-end host if possible.
@@ -980,9 +992,9 @@ generated output, never a hand-edited source of truth.
 
 The H2 prototype is complete only when this full sequence can be reproduced:
 
-1. Fresh supported Linux build environment.
+1. Fresh supported Linux build environment for the NaiveFox product graph.
 2. `./mach bootstrap`.
-3. clean build.
+3. clean NaiveFox minimal product build.
 4. reproducible loopback-only Caddy fixture starts with isolated state.
 5. the untrusted fixture NSS profile rejects the proxy certificate.
 6. the dedicated trusted NSS profile validates it without global trust changes or verification bypasses.
@@ -1002,7 +1014,9 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 20. close/error lifecycle tests pass.
 21. supplied real Caddy interoperability passes with normal public certificate validation.
 22. existing touched Firefox CONNECT tests pass.
-23. capture comparison is documented.
+23. the historical capture comparison is documented; any new ordinary
+    Firefox same-base run is an explicitly requested isolated diagnostic, not
+    a merge/release gate.
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
 26. strict NaiveProxy-style config mode works without developer flags.

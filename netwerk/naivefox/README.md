@@ -50,6 +50,14 @@ network functionality is implemented and validated on `naivefox`; minimization
 work is performed on `minimal`; the product source branch is regenerated only
 from a validated `minimal` snapshot.
 
+The normal upstream/minimal cycle does not build an ordinary Firefox browser
+package. The `naivefox` refresh is a source/inventory/conflict review, the
+NaiveFox minimal product is built and tested on `minimal`, and the standalone
+product is rebuilt from `minimal-source`. An ordinary Firefox package is
+allowed only for a separately requested, isolated same-base capture comparison
+against NaiveFox. That comparison is not a merge or release gate and is not run
+for routine changes; see `UPSTREAM.md` and `CAPTURE.md`.
+
 Project-specific code and documentation should live under:
 
 ```text
@@ -498,7 +506,10 @@ Do not blindly port:
 
 NaiveFox's outer stack is Firefox.
 
-Any Firefox-specific camouflage change must be justified by measurements comparing NaiveFox against an ordinary Firefox build from the same source revision.
+Any Firefox-specific camouflage proposal must first be justified by an
+explicitly requested isolated comparison between ordinary Firefox and NaiveFox
+packages built from the same Firefox base. That comparison is diagnostic, not
+an ordinary build, merge, or release gate.
 
 ## Runtime and packaging model
 
@@ -521,7 +532,9 @@ NSS/NSPR libraries
 mozglue and other required Gecko runtime files
 ```
 
-A normal Firefox build may also produce the Firefox browser executable in the object directory. That browser executable is not part of the NaiveFox product requirement.
+A separately requested capture/control build may produce the ordinary Firefox
+browser executable in its isolated object directory. That executable is not
+part of the NaiveFox product, normal build cycle, merge gate, or release gate.
 
 The current prototype keeps the Gecko-facing implementation inside `libxul`
 so it can use internal Necko and PSM APIs, while the small `naivefox` program
@@ -627,16 +640,20 @@ The exact host arrangement is intentionally not part of the project architecture
 
 Requirements:
 
-- the source tree must be on a filesystem suitable for large native Linux builds,
+- the source tree must be on a filesystem suitable for a full-source native
+  NaiveFox C++/Rust build,
 - the environment must satisfy current Mozilla Firefox Linux build requirements,
 - the agent must use Firefox's normal bootstrap and toolchain,
-- the agent must prove a clean baseline build before modifying source.
+- the agent must prove the affected NaiveFox product graph with the appropriate
+  minimal build gate.
 
 Mozilla's current Linux build documentation:
 
 https://firefox-source-docs.mozilla.org/setup/linux_build.html
 
-Use a **full Firefox build**, not Artifact Mode, because NaiveFox modifies/links C++ backend code.
+Use a native compiled NaiveFox build, not Artifact Mode, because NaiveFox
+modifies and links C++ backend code. This requirement does not authorize or
+require building the ordinary Firefox browser package.
 
 Use Mozilla's normal toolchain and `mach`; do not introduce CMake as the project build system.
 
@@ -690,9 +707,13 @@ CONNECT streams on a Necko-owned H3 session; pass half-close, slow producer,
 slow consumer, large-transfer, and proxy-loss tests; and run outside the
 object directory from the same staged package.
 
-The prototype is complete when all of the following are demonstrated on Linux x86_64:
+The historical prototype acceptance record demonstrates the following on
+Linux x86_64. For the current branch cycle, the ordinary Firefox comparison is
+an isolated diagnostic only when explicitly requested; it is not repeated for
+routine merges or releases.
 
-1. A clean upstream Firefox checkout can be bootstrapped and built.
+1. A clean full-source checkout can bootstrap and build the NaiveFox product
+   graph with Mozilla's native toolchain.
 2. `naivefox` builds as part of the Firefox tree.
 3. It starts headlessly and initializes the required Gecko networking runtime.
 4. It can perform a normal HTTPS request using Necko/NSS as a sanity test.
@@ -708,7 +729,9 @@ The prototype is complete when all of the following are demonstrated on Linux x8
 14. End-to-end traffic works with payload padding enabled.
 15. Large transfers and multiple concurrent SOCKS connections work without corruption or unbounded buffering.
 16. Tests cover the padding codec and critical SOCKS/tunnel state transitions.
-17. A packet-capture comparison documents how the outer TLS/H2 setup compares with ordinary Firefox from the same revision.
+17. The one-time historical packet-capture record documents the outer TLS/H2
+    comparison; any new same-base ordinary Firefox comparison is a separate,
+    explicitly requested diagnostic.
 18. The complete local integration suite passes from one documented command.
 19. The same core path is confirmed against the supplied real Caddy server.
 20. All changes to existing Firefox files are documented in `UPSTREAM.md`.

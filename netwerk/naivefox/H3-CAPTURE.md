@@ -1,5 +1,10 @@
 # HTTP/3 capture comparison
 
+> **Isolated diagnostic only:** building an ordinary Firefox package for this
+> same-base comparison requires an explicit request. It is not part of the
+> normal upstream/minimal cycle and is not a merge or release gate. See the
+> full Firefox build and capture policy in [`UPSTREAM.md`](UPSTREAM.md).
+
 This report compares ordinary Firefox and NaiveFox from the same local build
 family against the strict H3-only loopback Caddy fixture. Both processes load
 the same `libxul` and NSS libraries. The comparison was recorded on revision

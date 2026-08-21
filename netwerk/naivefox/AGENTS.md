@@ -43,7 +43,7 @@ You should:
 
 - inspect the current repository state,
 - bootstrap missing Firefox build dependencies,
-- establish a clean baseline build,
+- establish the applicable clean NaiveFox product build,
 - research current Firefox internals,
 - implement milestones incrementally,
 - build and run tests,
@@ -72,7 +72,8 @@ Confirm:
 - the checkout is on the `naivefox` development branch,
 - `origin` is the project fork,
 - an `upstream` remote points to `https://github.com/mozilla-firefox/firefox.git` or can be added,
-- the source tree is on a filesystem suitable for a large native Linux Firefox build.
+- the source tree is on a filesystem suitable for a full-source native Linux
+  NaiveFox C++/Rust build.
 
 Preserve any existing user changes. If the working tree is not clean, do not discard, overwrite, or silently include them.
 
@@ -102,7 +103,9 @@ Start with the checkout's own tooling:
 ./mach bootstrap
 ```
 
-Select a **full Firefox Desktop build**, not Artifact Mode.
+Install/select Mozilla's native compiled C++ toolchain support, not Artifact
+Mode. Product validation uses the NaiveFox minimal mozconfig; bootstrap does
+not make an ordinary Firefox browser build a required gate.
 
 If bootstrap needs basic packages on Debian/Ubuntu, install only what is needed. Mozilla currently documents a base similar to:
 
@@ -113,13 +116,15 @@ sudo apt install -y curl python3 python3-venv git make
 
 Do not manually replace Firefox's compiler/toolchain with a random system GCC setup.
 
-### Baseline build
+### NaiveFox product baseline
 
-Before any source changes, prove that the checkout builds:
+Before source changes, prove the applicable NaiveFox product graph when the
+task requires a build:
 
 ```bash
 mkdir -p artifacts
-./mach build > artifacts/baseline-build.log 2>&1
+MOZCONFIG=netwerk/naivefox/mozconfig-minimal \
+  ./mach build > artifacts/baseline-build.log 2>&1
 ```
 
 Follow root `AGENTS.md` guidance for long-running commands and logs.
@@ -132,7 +137,16 @@ Record:
 - object directory,
 - compiler/toolchain reported by the build.
 
-If baseline Firefox does not build, diagnose the environment before touching NaiveFox code.
+If the NaiveFox product baseline does not build, diagnose the environment
+before touching NaiveFox code.
+
+Do not build an ordinary Firefox browser package during the normal
+upstream/minimal cycle. Gate 1 is source/inventory/conflict review only; Gate 2
+builds and tests the NaiveFox minimal product, and Gate 3 builds and tests the
+standalone export. Ordinary Firefox is allowed only in a separate, explicitly
+requested same-base capture/comparison, never as a routine merge or release
+condition. The one-time historical full Firefox baseline in `UPSTREAM.md` is
+not a recurring gate.
 
 ## Build philosophy
 
@@ -158,7 +172,11 @@ but verify current Firefox build conventions before committing it.
 
 For initial integration, expect to add the new directory to `netwerk/moz.build`.
 
-After the initial full build, use the narrowest valid build command that still verifies the affected C++ code. The root Firefox `AGENTS.md` currently documents `./mach build binaries` for C/C++/Rust-only changes. Use `./mach build` whenever in doubt or after build-system changes.
+After the initial product build, use the narrowest valid build command that
+still verifies the affected C++ code. The root Firefox `AGENTS.md` currently
+documents `./mach build binaries` for C/C++/Rust-only changes. Use the full
+NaiveFox product `./mach build` after build-system changes; this does not mean
+building the Firefox browser target.
 
 ## Search and source research
 
@@ -606,11 +624,15 @@ Where a milestone has not implemented a later feature yet, the runner may select
 
 A local pass is required before using the real server. Final real-server validation must use credentials supplied outside git and must not depend on local CA overrides.
 
-## Packet capture / fingerprint validation
+## Isolated packet capture / fingerprint validation
 
-The project's goal is to use real Firefox behavior, so "it connects" is not enough.
+This comparison is optional and isolated. Run it only when the user or task
+explicitly requires a same-base capture/control; do not run it for ordinary
+source changes, upstream refreshes, merges, or releases. Build ordinary Firefox
+and NaiveFox from the same Firefox base in separate controlled packages. This
+diagnostic is not Gate 1, Gate 2, or Gate 3; see `UPSTREAM.md` and `CAPTURE.md`.
 
-After the end-to-end path works, capture and compare:
+For such an explicitly requested check, capture and compare:
 
 ```text
 ordinary Firefox from the same source revision

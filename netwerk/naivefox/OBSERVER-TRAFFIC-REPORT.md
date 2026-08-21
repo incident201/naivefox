@@ -1,5 +1,10 @@
 # External-observer traffic comparison
 
+> **Isolated diagnostic only:** building an ordinary Firefox package for this
+> same-base comparison requires an explicit request. It is not part of the
+> normal upstream/minimal cycle and is not a merge or release gate. See the
+> full Firefox build and capture policy in [`UPSTREAM.md`](UPSTREAM.md).
+
 Date: 2026-08-13
 
 Environment: `Ubuntu24Dev`, x86-64, Firefox opt build, same loopback-only Caddy
