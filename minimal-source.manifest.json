@@ -1,10 +1,10 @@
 {
   "counts": {
     "executable_files": 144,
-    "files": 22622
+    "files": 22660
   },
-  "evidence_commit": "1dfc30955cac353e83f4d51d906aeab944440d7a",
-  "evidence_source_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
+  "evidence_commit": "22fd5248f6193fe0e4dacf6b1e24aa17bf9ad5d5",
+  "evidence_source_commit": "72380e73fd8783751342c42f956b08b10866ade4",
   "files": [
     {
       "mode": "0644",
@@ -36763,6 +36763,36 @@
     },
     {
       "mode": "0644",
+      "path": "third_party/python/ansicon/ansicon-1.89.0.dist-info/LICENSE.txt",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/ansicon/ansicon-1.89.0.dist-info/METADATA",
+      "sha256": "8121c50b2a96d538c610bdc7a43c36c1ba7e59a3128c24e93eb7ec3b4bf0fd9c"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/ansicon/ansicon-1.89.0.dist-info/RECORD",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/ansicon/ansicon-1.89.0.dist-info/WHEEL",
+      "sha256": "81dbae3f206f149412434cddcb117b934cf29c35db21bbe0e59047a17ba6e6e9"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/ansicon/ansicon-1.89.0.dist-info/top_level.txt",
+      "sha256": "e1e2235cb7b9352c27265489680ff86a50ce87e55285bf4f8b45e46af99de28b"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/ansicon/ansicon/__init__.py",
+      "sha256": "0f49ee4bd785718e03f5d59da21711a85b0987cdffd06461e0dd100efe2d764b"
+    },
+    {
+      "mode": "0644",
       "path": "third_party/python/attrs/attr/__init__.py",
       "sha256": "7ce608bedd5e192a90adee2e092dec256299d26c00b82f140faa9b6b9392f7f5"
     },
@@ -36828,6 +36858,31 @@
     },
     {
       "mode": "0644",
+      "path": "third_party/python/blessed/blessed-1.21.0.dist-info/METADATA",
+      "sha256": "2a54fd5f69f0aeb9ebe610ec3d5efef17ff45613a771a9dcaaad2e3e80c45846"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed-1.21.0.dist-info/RECORD",
+      "sha256": "7973c95bef43f7696903baadb7b2bf24a97dd74b55c8ebf59cec87131d951178"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed-1.21.0.dist-info/WHEEL",
+      "sha256": "01e3b606fa206169b77866870af87399462df226bb29f511887cceff56ad972b"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed-1.21.0.dist-info/licenses/LICENSE",
+      "sha256": "601490d5b882d100c4782f9da9bfdd23f960e6b79e35acc44994395c18f4d57d"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed-1.21.0.dist-info/top_level.txt",
+      "sha256": "da55087cbc0566d02e72f7ac4b9504f3f3315c80f9ad2c7fde0276fb52467240"
+    },
+    {
+      "mode": "0644",
       "path": "third_party/python/blessed/blessed/__init__.py",
       "sha256": "2a7d5a5b13070770d292d7e51e6c05472748fd0fabc2b1046edde254833e9ae5"
     },
@@ -36835,6 +36890,11 @@
       "mode": "0644",
       "path": "third_party/python/blessed/blessed/_capabilities.py",
       "sha256": "4e18fc9600ef85f33a4edb6fce20eed2669ba99a989f00300b7353b52327b717"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/_capabilities.pyi",
+      "sha256": "e0b71ab3f524158292fdf8b8f35adaf7d2df9b2ce318afb6d0bc592ad371ec26"
     },
     {
       "mode": "0644",
@@ -36848,8 +36908,18 @@
     },
     {
       "mode": "0644",
+      "path": "third_party/python/blessed/blessed/color.pyi",
+      "sha256": "9578996627f811bf8bd8bcc15d1f670ade4936c6c407d47e9481e49781da0655"
+    },
+    {
+      "mode": "0644",
       "path": "third_party/python/blessed/blessed/colorspace.py",
       "sha256": "2cc7fa0de3d7571d30389c7e8f019b8b12e0ac14b8c32eaf9c38385c190d922b"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/colorspace.pyi",
+      "sha256": "44e3a65fb877d1777b656364334e06c6959a438c4f3c941897d616ffb8f7a511"
     },
     {
       "mode": "0644",
@@ -36858,8 +36928,23 @@
     },
     {
       "mode": "0644",
+      "path": "third_party/python/blessed/blessed/formatters.pyi",
+      "sha256": "4e803a6674912db20dd0318577cc2540bb2203ea2d41ad37620de1a6ba354bf6"
+    },
+    {
+      "mode": "0644",
       "path": "third_party/python/blessed/blessed/keyboard.py",
       "sha256": "85147378d11dd7aad67f46e5a74976135d43f6812204963cc8ac67904b8603a9"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/keyboard.pyi",
+      "sha256": "10dced7b05c8a0a36a84626724bf3d4de909a421a8526beaa9a3e68ae38bdd63"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/py.typed",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "mode": "0644",
@@ -36868,8 +36953,28 @@
     },
     {
       "mode": "0644",
+      "path": "third_party/python/blessed/blessed/sequences.pyi",
+      "sha256": "aa34cffab28ef1b40e8ac2b45eee7d3ea0a51385c0cf782a4a39152855f48d13"
+    },
+    {
+      "mode": "0644",
       "path": "third_party/python/blessed/blessed/terminal.py",
       "sha256": "ebfc866fb153598c57806f65a2818b26e1f5578d99fbbfa38157c7b86485df01"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/terminal.pyi",
+      "sha256": "01f041765dd41df9b5003db4462f0ca9698c4bd6666c3f62dfe310bc020f9dd9"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/win_terminal.py",
+      "sha256": "aa13608b493970227a650e6f49566c142acabf160ef4580f21f0570dad8ea36d"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/blessed/blessed/win_terminal.pyi",
+      "sha256": "f38f1f5720ee5fd74517b99d78938845f59530d67621a96f37119a8c3ab02b12"
     },
     {
       "mode": "0644",
@@ -38235,6 +38340,91 @@
       "mode": "0644",
       "path": "third_party/python/jinja2/jinja2/visitor.py",
       "sha256": "11c9cbd4f2307ffe1154238cc6c44db91f005c76d2d6a7c074c384da780a273e"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed-1.3.0.dist-info/LICENSE",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed-1.3.0.dist-info/METADATA",
+      "sha256": "907d542c8ee3e7150562141cefa409e468ca39575af479d98068ab60794f9622"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed-1.3.0.dist-info/RECORD",
+      "sha256": "77415d35c14b71daaec3a37c70e988be51ab415780ac5d681dbd4097e1a1242c"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed-1.3.0.dist-info/WHEEL",
+      "sha256": "5d1c56e2bd4f3625613293f86d3f685adbb71f29ddc6927ce1292e6c5833a7f6"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed-1.3.0.dist-info/top_level.txt",
+      "sha256": "07a91967c39b6cf1e3388ba1a52eb3c44f6519f9e91e9e4ab61a6c0ee5c85d1d"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/__init__.py",
+      "sha256": "44f99d1dae9e39983433bf5ac1f2a6154976400c9b3a97fbb7175498cd8f400d"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/_keys.py",
+      "sha256": "d9478439508f060cb97efe8729a5bf4f1987234dd0c2a12ffd388a181e654822"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/_terminal.py",
+      "sha256": "c00ebe728fa6012f4768dc8fe3a39fef7d5a79e2be718534d9b2c14c94ce53cd"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/_tparm.py",
+      "sha256": "9ce45ed68aa9e210e5e6370999cd68f3ed9fc35c7970c0399a54f4cc4997fc35"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/_util.py",
+      "sha256": "2c3fea0104b795296b5e9327d04b7caf28ab101c1f17b91749b00f5b4ead0275"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/has_key.py",
+      "sha256": "27d9d4eb6b3629972774eb9dd5bf31fc1dee06c6689c67ea3cb59a9fd2a1e49c"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/terminfo/__init__.py",
+      "sha256": "eb77596d81b54e4489c166e6ff6ac47e606331a94e3be8018f5a4712f09a4cd8"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/terminfo/ansicon.py",
+      "sha256": "5f774bb9f2c1a45c17f28b8a24cb7b21add7bbbac22b1288f694046059400f91"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/terminfo/vtwin10.py",
+      "sha256": "5b8b2a5ad1f4a7e97377ee6ed2aff091e3cd85b2ad257fd478392c3c19d8a79a"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/terminfo/xterm.py",
+      "sha256": "3483ee556216be11780a54317b01a546757104aab68f5895d649ca746ed60352"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/terminfo/xterm_256color.py",
+      "sha256": "5e2e88ecb6c8cb6178866a735dfe7560ad6eb5d59629436a1169691dbdfd8ac3"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/jinxed/jinxed/win32.py",
+      "sha256": "f20d4682293ef0b514f12a0004e9155b4f43e0dcd42220804f1bd26c450a6fef"
     },
     {
       "mode": "0644",
@@ -113118,8 +113308,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "cd7bd911b068dfacd45d2d33ead31b11d6684632945c14e80c043c02139d5a82",
+  "manifest_sha256": "0fae9c58c930b6e706a39c0aab247f037aef98df9776fa16e79a98784e2eca10",
   "manifest_version": 2,
-  "minimal_export_commit": "1dfc30955cac353e83f4d51d906aeab944440d7a",
-  "naivefox_reference_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83"
+  "minimal_export_commit": "22fd5248f6193fe0e4dacf6b1e24aa17bf9ad5d5",
+  "naivefox_reference_commit": "72380e73fd8783751342c42f956b08b10866ade4"
 }
