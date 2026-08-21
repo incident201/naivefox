@@ -7497,9 +7497,9 @@
         "third_party/rust/zerofrom-derive/LICENSE"
       ],
       "license_coverage": [
-        "LICENSE"
+        "third_party/rust/zerofrom-derive/LICENSE"
       ],
-      "license_file": "LICENSE",
+      "license_file": null,
       "manifest_path": "third_party/rust/zerofrom-derive/Cargo.toml",
       "name": "zerofrom-derive",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -28777,7 +28777,7 @@
   "install_manifests_sha256": "b03822696683d8698324cbf2edf0df945df4e00d37da510881b9c26404f1ecaa",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "72380e73fd8783751342c42f956b08b10866ade4",
+  "naivefox_reference_commit": "aebb8eee8d2a13eb89593ffc805132fe56593c4b",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "5e8f754fe6c07910fea5943ab9f51874b777e8003aa6f4e76c5f4b74ac8d8147",
     "config_status_deps.in": "1ee12e6df56cf56058d205dd4f96682a5b32f4c16915a69c153634c8effa5005"
@@ -28785,7 +28785,7 @@
   "provenance_sha256": "be679ab13bb39939bd5802769084a0c47d4e4b181f114e4858fe5119189311dd",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "72380e73fd8783751342c42f956b08b10866ade4",
+  "source_commit": "aebb8eee8d2a13eb89593ffc805132fe56593c4b",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
