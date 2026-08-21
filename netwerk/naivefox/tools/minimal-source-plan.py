@@ -562,6 +562,7 @@ def main() -> int:
         "Cargo.lock",
         ".cargo/config.toml.in",
         "CLOBBER",
+        ".gitattributes",
         "LICENSE",
         "toolkit/content/license.html",
         "browser/config/version.txt",
