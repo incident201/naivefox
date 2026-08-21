@@ -203,7 +203,7 @@ jobs:
           $appSdkSha256 = (
             Get-FileHash -Algorithm SHA256 -LiteralPath $appSdkArchive
           ).Hash
-          if ($appSdkSha256 -ne '62B2378C602AB8DCA78B44E165638E95EA22D906970190A71E31D0BEBC76B7EA') {
+          if ($appSdkSha256 -ne 'BEFC65BD587A7268C30E3EE45AFC787C6E2F138767E039F7B71E34B83C7A696A') {
             throw "unexpected Windows App SDK archive SHA-256: $appSdkSha256"
           }
           New-Item -ItemType Directory -Force -Path $appSdkParent | Out-Null
