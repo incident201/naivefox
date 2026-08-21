@@ -30,7 +30,28 @@ dynamic SOCKS5 and HTTP CONNECT, malformed stress, and Unicode file logging;
 strict H2 and H3 each passed SOCKS5 and HTTP CONNECT fetches with padding, and
 CLI Auto passed H3 preference and H2 fallback.
 
-## Current refresh/export result
+## Current upstream refresh/export result (2026-08-21)
+
+The controlled refresh is complete at Firefox base
+`7b61047039c98a25b9ef5c6824089ab6c60bf54c9`. Gate 1 and Gate 2 passed through
+the `naivefox` and `minimal` branches. The product build and closure audit
+were run without a full Firefox browser build; no SpiderMonkey/mozjs/wasm
+objects or runtime dependencies are present in the Linux or Windows product
+artifacts.
+
+Gate 3 created exactly one clean standalone export from Minimal. Its
+22,620-file, 37-directory-contract manifest has SHA-256
+`8ffdf7061c7460fca3eae57a221b099def147e9f7f499c42e9134196aba44f8a`. The
+standalone NaiveFox build, staged-runtime verifier, complete H2/H3/Auto/config
+suite, and quick Nightly H2/H3 captures passed. The generated snapshot is
+published on `minimal-source` at
+`7527b5b9e08764eacd5140e144cc5af43626d2de` (`minimal-source-v0.3`).
+
+A full same-base Firefox/NaiveFox capture remains an explicit optional
+diagnostic only; it is not an upstream, merge, release, export, or routine
+test gate.
+
+## Historical refresh/export result (2026-08-20)
 
 The controlled upstream refresh and one clean export are complete. The audited
 source is `a533411d0c4940f3063d1d01313a3e4fc24ba53d`, the final report/export

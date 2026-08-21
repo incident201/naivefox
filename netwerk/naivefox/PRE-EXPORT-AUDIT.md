@@ -2,6 +2,25 @@
 
 This document records the definitive technical and architectural audit of the `minimal` branch prior to code tree export (`minimal-source`).
 
+## Post-export Gate 3 result (2026-08-21)
+
+The upstream refresh and product gates completed at Firefox base
+`7b61047039c98a25b9ef5c6824089ab6c60bf54c9`. The deterministic plan passed,
+one clean export was created with 22,620 files and 37 directory contracts, and
+the exported tree configured and built only NaiveFox with the full Firefox
+checkout hidden. Staged-runtime verification and the complete H2/H3/Auto,
+config, SOCKS, HTTP CONNECT, robustness, and quick Nightly capture suite all
+passed. No ordinary Firefox browser package was built.
+
+The export manifest SHA-256 is
+`8ffdf7061c7460fca3eae57a221b099def147e9f7f499c42e9134196aba44f8a`; the
+published `minimal-source` snapshot is commit
+`7527b5b9e08764eacd5140e144cc5af43626d2de`, tag `minimal-source-v0.3`.
+
+The quick Nightly capture is the normal suite comparison. A same-base
+Firefox/NaiveFox capture requires an explicit request and is an isolated
+diagnostic, never a Gate 3, merge, release, or routine test condition.
+
 ## Current gate status (2026-08-20)
 
 The stability blockers that motivated this audit are closed: malformed

@@ -1157,6 +1157,17 @@ orphan snapshot; it does not reopen dependency discovery.
 Do not return to repeated clean-export discovery or reopen deep
 SpiderMonkey/ICU minimization in this phase.
 
+### Upstream synchronization and standalone export checkpoint (2026-08-21)
+
+The Firefox refresh is synchronized at `7b61047039c9` through `main`,
+`naivefox`, and `minimal`. Gate 2 product/closure checks passed without a
+full Firefox browser build. Gate 3 created one deterministic standalone export
+from Minimal (22,620 files, 37 directory contracts), built only NaiveFox from
+that tree, passed staged-runtime verification and the full H2/H3/Auto/config
+suite with quick Nightly capture, and published
+`minimal-source-v0.3` (`7527b5b9e087`). A full same-base Firefox comparison is
+still an explicit optional diagnostic and is never a normal roadmap gate.
+
 ## Handoff checkpoint: Windows package and workspace cleanup (2026-08-16)
 
 The historical handoff point was the annotated tag `minimization-handoff-v0.1`.

@@ -85,17 +85,17 @@ deterministic allowlist without copying it. A new empty clean export is created
 once, only for isolated release acceptance; repeatedly rebuilding clean exports
 to discover individual files is prohibited.
 
-The build-input and linked-closure reports attest audited source
-`745d58bf7dcb44df0b8be87b39fb7d21d19383f9`; report snapshot
-`bec198a62d422b1382315f335ef2965b429d9387` freezes that original five-report
-set. The later attested Windows configure trace records source
-`af716bf57f83ebdb377c0f34cd20995faf41b641`. The planner consumes this explicit
-six-report target union and, at exporter checkpoint `4db1292e96ec`, validates
-25,549 files and 37 source directory contracts. Standalone Linux build/full
-suite/staging and native Windows build/acceptance are green. The first product
-snapshot is published as independent root commit `31c1813e26cf` and tag
-`minimal-source-v0.1`; GitHub's default branch is now `minimal-source`. Its
-generated `UPSTREAM-BASE` is the authoritative snapshot provenance.
+The current build-input and linked-closure reports attest tooling checkpoint
+`e9225674f75a`; report snapshot `4b9c53757700` freezes the Linux and Windows
+target union. The planner validates 22,620 files and 37 source directory
+contracts for Minimal commit `da9cd768cdc2`. Standalone Linux build/full
+suite/staging and the Windows product build are green; the exported standalone
+NaiveFox build and complete H2/H3/Auto/config suite are green as well. The
+current product snapshot is published as independent root commit
+`7527b5b9e087` and tag `minimal-source-v0.3`; GitHub's default branch is
+`minimal-source`. Its generated `UPSTREAM-BASE` is the authoritative snapshot
+provenance. Earlier report and snapshot SHAs remain in the historical sections
+of `UPSTREAM.md` and `TEST-REPORT.md`.
 
 ## Goal
 

@@ -2,7 +2,7 @@
 
 Initial acceptance record: 2026-08-13
 
-Latest pre-export update: 2026-08-20
+Latest upstream/export update: 2026-08-21
 
 Environment: `Ubuntu24Dev`, x86-64, Firefox opt build
 
@@ -21,6 +21,26 @@ the two-mode capture policy. The current `run-local-suite.sh`,
 `run-h3-suite.sh`, and `run-full-suite.sh` commands include quick capture
 against the downloaded Nightly binary. A full same-base Firefox build remains
 an isolated diagnostic and requires an explicit request with matching packages.
+
+## Upstream refresh and Gate 3 publication (2026-08-21)
+
+Mozilla `upstream/main` was fast-forwarded into `main` at Firefox base
+`7b61047039c98a25b9ef5c6824089ab6c60bf54c9`, then merged through Gate 1 into
+`naivefox` and Gate 2 into `minimal`. The refreshed product graph was built and
+tested without building ordinary Firefox. Closure assertions passed for Linux
+and Windows with SpiderMonkey/mozjs/wasm absent from the product artifacts.
+
+The deterministic export plan passed with 22,620 files and 37 directory
+contracts. One clean export was created, configured, and built as standalone
+NaiveFox in an external object directory. The 4:46 build, staged-runtime
+verification, full H2/H3/Auto/config/SOCKS/HTTP CONNECT suite, and both quick
+Nightly capture checks passed. The manifest SHA-256 is
+`8ffdf7061c7460fca3eae57a221b099def147e9f7f499c42e9134196aba44f8a`.
+
+The generated snapshot is published on `minimal-source` at
+`7527b5b9e08764eacd5140e144cc5af43626d2de` and tagged
+`minimal-source-v0.3`. A full same-base Firefox/NaiveFox capture remains an
+explicit optional diagnostic and was not part of this cycle.
 
 ## Final no-SpiderMonkey build and runtime gate (2026-08-21)
 

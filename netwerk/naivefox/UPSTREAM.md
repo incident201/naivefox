@@ -202,15 +202,15 @@ The following values are immutable inputs to the first minimization milestone,
 not aliases for a moving `main`:
 
 ```text
-Validated Firefox base commit: 17e93ad5d3261e20104c7f6f2ec867ecc138ca1a
-Validated full-tree NaiveFox reference commit: 73a1ae3e49a069dc7bc97090c00af6e0b9e61376
-Audited Minimal evidence source commit: a533411d0c4940f3063d1d01313a3e4fc24ba53d
-Evidence/configure report snapshot commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
-Validated Minimal evidence/export source commit: a7251b0ea7fd530d1d23fada8e3217514aa1399c
-Export manifest entries: 25558 (37 directory contracts)
+Validated Firefox base commit: 7b61047039c98a25b9ef5c6824089ab6c60bf54c9
+Validated full-tree NaiveFox reference commit: c4a23f626e9e58ee832f0682a8bf504d037cb2c5
+Audited Minimal evidence source commit: e9225674f75af2d8cf7178c4ac6fc98d74220c9c
+Evidence/configure report snapshot commit: 4b9c537577003654ecf7b450797bce659eb5807c
+Validated Minimal evidence/export source commit: da9cd768cdc22bba370fcfcf2dc0a0d851d0bec4
+Export manifest entries: 22620 (37 directory contracts)
 Export manifest SHA-256: recorded in each generated snapshot's `UPSTREAM-BASE`
-Published minimal-source root commit: 0df131ea63ae0d2dc1bbefb9e811fcd038168f70
-Published source tag: minimal-source-v0.2
+Published minimal-source root commit: 7527b5b9e08764eacd5140e144cc5af43626d2de
+Published source tag: minimal-source-v0.3
 Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
@@ -238,11 +238,15 @@ ordinary Firefox package was built. A full same-base Firefox/NaiveFox capture
 remains an explicit optional diagnostic only; it is not a merge, release, or
 routine-change condition.
 
-The standalone export Gate 3 is the next step after this checkpoint. It must
-run `--plan-only`, create one clean export, build only NaiveFox from that tree,
-and pass the staged product suite before a new `minimal-source` snapshot is
-published. The previous `minimal-source` snapshot remains historical until
-this cycle completes.
+Gate 3 is complete for this checkpoint. `export-minimal-source.sh --plan-only`
+and the one clean export produced 22,620 manifest files (37 directory
+contracts; manifest SHA-256 `8ffdf7061c7460fca3eae57a221b099def147e9f7f499c42e9134196aba44f8a`).
+The exported tree configured and built only NaiveFox in an external objdir;
+the build passed in 4:46, staged-runtime verification passed outside the build
+tree, and the complete H2/H3/Auto/config/SOCKS/HTTP CONNECT suite passed with
+quick Nightly H2 and H3 capture. No ordinary Firefox package was built. The
+validated snapshot was published as `minimal-source` commit
+`7527b5b9e08764eacd5140e144cc5af43626d2de` and tag `minimal-source-v0.3`.
 
 ### Current pre-export audit provenance
 
@@ -253,6 +257,12 @@ path, license, mode, content, and no-SpiderMonkey checks. A full Firefox browser
 build is intentionally not an acceptance gate: the NaiveFox product build,
 staged runtime, focused H2/H3/Auto/config gates, and the quick Nightly capture
 are the routine gates.
+
+The standalone export is now also a completed Gate 3 result: the export plan,
+clean allowlist copy, standalone configure/build, staged-runtime verifier, and
+full H2/H3/Auto/config product suite all passed. Publication is a generated
+snapshot operation only; future fixes must land in `minimal` and regenerate
+the snapshot.
 
 ### No-SpiderMonkey graph handoff (2026-08-21)
 
