@@ -3,8 +3,8 @@
     "executable_files": 144,
     "files": 22622
   },
-  "evidence_commit": "c5f21a77599bcd8c50335a41647a0c0317ab7077",
-  "evidence_source_commit": "8dfe9a8356d43c3de4bb3406f1e7577202a3912a",
+  "evidence_commit": "1dfc30955cac353e83f4d51d906aeab944440d7a",
+  "evidence_source_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
   "files": [
     {
       "mode": "0644",
@@ -113118,8 +113118,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "17da2a5b39d1f84f18dea827c874337981b5936a4b67b786c92a902d734e1af1",
+  "manifest_sha256": "cd7bd911b068dfacd45d2d33ead31b11d6684632945c14e80c043c02139d5a82",
   "manifest_version": 2,
-  "minimal_export_commit": "c5f21a77599bcd8c50335a41647a0c0317ab7077",
-  "naivefox_reference_commit": "8dfe9a8356d43c3de4bb3406f1e7577202a3912a"
+  "minimal_export_commit": "1dfc30955cac353e83f4d51d906aeab944440d7a",
+  "naivefox_reference_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83"
 }
