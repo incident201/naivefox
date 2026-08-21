@@ -174,6 +174,24 @@ jobs:
           New-Item -ItemType Directory -Force `
             -Path 'C:\mozilla-build\msys2\tmp' | Out-Null
 
+          $nasmArchive = Join-Path $env:RUNNER_TEMP 'nasm-3.01-win64.zip'
+          $nasmRoot = Join-Path $env:RUNNER_TEMP 'nasm-3.01-win64'
+          curl.exe --fail --location `
+            'https://www.nasm.us/pub/nasm/releasebuilds/3.01/win64/nasm-3.01-win64.zip' `
+            --output $nasmArchive
+          $nasmSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $nasmArchive).Hash
+          if ($nasmSha256 -ne 'E0BA5157007ABC7B1A65118A96657A961DDF55F7E3F632EE035366DFCE039CA4') {
+            throw "unexpected NASM archive SHA-256: $nasmSha256"
+          }
+          7z x $nasmArchive "-o$nasmRoot" -y
+          $nasm = Get-ChildItem -Path $nasmRoot -Filter nasm.exe -Recurse |
+            Select-Object -First 1
+          if (-not $nasm) {
+            throw "NASM extraction did not produce nasm.exe below $nasmRoot"
+          }
+          $nasm.DirectoryName | Out-File `
+            -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Build and stage NaiveFox
         if: steps.staged_cache.outputs.cache-hit != 'true'
         shell: bash
