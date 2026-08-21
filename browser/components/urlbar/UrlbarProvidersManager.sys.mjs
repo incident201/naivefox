@@ -978,7 +978,8 @@ export class Query {
     // synchronously later without calling back into the provider, which may
     // live in another process.
     if (result.type == lazy.UrlbarShared.RESULT_TYPE.DYNAMIC) {
-      result.viewTemplate = provider.getViewTemplate(result);
+      result.payload.viewTemplate = provider.getViewTemplate(result);
+      result.payload.viewUpdate = provider.getViewUpdate(result);
     }
     let commands = provider.tryMethod(
       "getResultCommands",

@@ -1353,10 +1353,6 @@ tab-group > tab-split-view-wrapper {
   .tabbrowser-tab {
     padding-inline: var(--split-view-tab-padding-inline);
 
-    .tab-background {
-      min-height: calc(var(--tab-min-height) - 4px); /* exclude the 4px padding normally added */
-    }
-
     tab-group & {
       overflow: visible;
     }

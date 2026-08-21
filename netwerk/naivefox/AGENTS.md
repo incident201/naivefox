@@ -17,7 +17,7 @@ Git state are authoritative.
 ## Current branch model
 
 - `main`: clean Mozilla mirror; never add NaiveFox changes.
-- `naivefox`: full-tree reference implementation and Firefox refresh gate.
+- `naivefox`: full-tree reference implementation and source-only Firefox refresh layer.
 - `minimal`: full-tree product/minimization source of truth.
 - `minimal-source`: generated, independent orphan-history product snapshot.
 
@@ -71,7 +71,8 @@ project-only insufficiency, risk, tests, and commit.
 
 Use Firefox's `mach`/`moz.build` build system. For normal incremental source
 changes use the narrowest justified target. After build-graph/configure/Cargo
-changes and for every standalone clean gate, use a full build:
+changes and for every standalone clean gate, use a full NaiveFox product build
+with the minimal graph:
 
 ```bash
 MOZCONFIG=netwerk/naivefox/mozconfig-minimal \
@@ -81,6 +82,13 @@ NAIVEFOX_OBJDIR=/absolute/external/objdir \
 
 `mach build binaries` is not a valid clean-source acceptance command because it
 can skip early generators.
+
+Do not build the ordinary Firefox browser package during the normal
+upstream/minimal cycle. Gate 1 is source/inventory/conflict review only; Gate 2
+builds and tests the NaiveFox minimal product, and Gate 3 builds and tests the
+standalone export. An ordinary Firefox build is allowed only in a separate,
+explicitly requested same-base capture/comparison and is never a merge or
+release condition.
 
 Never put credentials, proxy URLs with userinfo, TLS keys, pcaps, profiles,
 raw logs, or private fixture state in Git or documentation. Runtime logs must
@@ -142,7 +150,9 @@ Before publication, proportionally run:
   concurrency/robustness, no-home profile, and staged-runtime gates;
 - native Windows build plus file logging, H2/H3/Auto, malformed SOCKS/HTTP,
   churn/concurrency, clean shutdown, and stability soak;
-- capture sanity using the pinned official Firefox reference where applicable.
+- optional isolated capture/comparison only when explicitly requested, using
+  ordinary Firefox and NaiveFox packages built from the same Firefox base; it
+  is not a routine gate.
 
 Record exact commands, commits, outcomes, sizes, and limitations in
 `TEST-REPORT.md`, `MINIMISATION-REPORT.md`, `UPSTREAM.md`, `ROADMAP.md`, and

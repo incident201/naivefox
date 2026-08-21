@@ -229,9 +229,10 @@ fetch, profile/no-home checks, strict H2/H3 config workloads, and Auto.
 
 The final isolated H2 and H3 suites passed all raw CONNECT, SOCKS, padding,
 large-transfer integrity, backpressure, lifecycle, multiplexing, Auto,
-configuration, robustness, and capture checks. Capture uses an explicitly
-separate full Firefox baseline and per-runtime library paths; no Firefox
-browser binary is added to the lean staged package. A single sequential run
+configuration, robustness, and the historical capture checks. If a new capture
+comparison is explicitly requested, it uses a separate same-base Firefox
+control package and per-runtime library paths; no Firefox browser binary is
+added to the lean staged package. A single sequential run
 hit a transient libpref parser abort at the start of a second H3 capture pass;
 fresh per-pass profiles fixed the environmental race and the independent H3
 suite passed without weakening any gate.

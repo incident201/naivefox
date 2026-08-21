@@ -198,23 +198,12 @@ with zero compiler warnings. Native smoke against the refreshed package again
 passed version/runtime startup, five consecutive SOCKS sessions, HTTP CONNECT,
 malformed bounded stress, and relative/absolute/Unicode append logging.
 
-The capture gate now downloads a clean official Mozilla Firefox 154.0 release
-(`firefox-154.0.tar.xz`, archive SHA-256
-`7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b`) through
-`tools/fetch-firefox-reference.sh`. It no longer relies on an optional Firefox
-package or source objdir. Exact TLS/QUIC field equality against the pinned
-NaiveFox snapshot is diagnostic because the releases differ; strict H2/H3
-protocol, UDP/no-fallback, Necko/NSS ownership, classic CONNECT, padding, and
-multiplexing assertions remain mandatory. See `CAPTURE.md`, `H3-CAPTURE.md`,
-and `KNOWN-ISSUES.md` for the current policy.
-
-Capture has two deliberately separate modes. The strict same-Firefox-base mode
-uses an explicitly supplied reference binary/library directory and is the
-minimalization regression gate: it detects wire/fingerprint drift while the
-Firefox base is held constant. The default standalone mode downloads the
-committed `tools/firefox-reference-manifest` (Firefox 154.0 and its archive
-SHA-256) and is the future `minimal-source` diagnostic/control mode. A moving
-`firefox-latest-ssl` URL is not accepted as a reproducible reference.
+The capture section below is a historical diagnostic record, not a build or
+release gate. When explicitly requested, a new capture must build ordinary
+Firefox and NaiveFox from the same Firefox base in isolated packages and
+compare packet behavior. The normal upstream/minimal and export workflows do
+not fetch or build an ordinary Firefox browser package. See `CAPTURE.md`,
+`H3-CAPTURE.md`, and `KNOWN-ISSUES.md` for the policy.
 
 ## Build and focused automated tests
 
@@ -248,7 +237,7 @@ duplex pumping to one shared `TunnelSession`.
 | `run-h2-config-tests.sh` | PASS, one process, 10 padded H2 tunnels, SOCKS5 + HTTP CONNECT, 3 MiB downloads, 2 MiB uploads, mixed concurrency |
 | `run-h3-config-tests.sh` | PASS, the same workload over an H3-only UDP fixture, 10 padded H3 tunnels and no TCP fallback |
 | `run-config-runtime-behavior-tests.sh` | PASS, absent log is silent, empty log is console-covered, an existing `0644` file is tightened to `0600`, persistent and no-home temporary profiles are `0700`, and a concrete non-loopback interface bind accepts traffic |
-| `run-full-suite.sh` | PASS in 311.5 seconds, including all pre-existing H2/H3, Auto, robustness, and capture gates plus config mode |
+| `run-full-suite.sh` | PASS in 311.5 seconds, including all pre-existing H2/H3, Auto, robustness, config mode, and the historical capture checks |
 
 The H2 and H3 config runs used two `0.0.0.0` listeners and a two-element
 `proxy` array containing the same URI twice, matching NaiveProxy's
@@ -677,8 +666,10 @@ development run exposed an over-strict exact-one-Firefox-connection assertion;
 the final runner accepts a normal Firefox retry while still requiring one
 NaiveFox QUIC connection for the two CONNECT streams.
 
-The decrypted pass used the clean official Firefox 154 reference and the
-pinned NaiveFox snapshot. It proved QUIC v1 with `h3`; semantic TLS
+The historical decrypted pass used the clean official Firefox 154 reference
+and the pinned NaiveFox snapshot. A new run is only performed when explicitly
+requested with ordinary Firefox and NaiveFox built from the same base. The
+historical run proved QUIC v1 with `h3`; semantic TLS
 configuration and client transport parameters were compared and recorded as
 expected cross-release differences, while HTTP/3/QPACK settings matched in the
 audited run. Ordinary Firefox sent one GET. NaiveFox sent classic CONNECT on
@@ -698,8 +689,8 @@ successful aggregation. The retained credential-free summary is under
 `obj-x86_64-pc-linux-gnu/naivefox-fixture/h3-capture-safe/` and the complete
 methodology and safe results are in [`H3-CAPTURE.md`](H3-CAPTURE.md).
 
-The separate passive H2 observer runner was also updated to use the same clean
-official Firefox reference. Its current run reported two official Firefox TCP
+The separate passive H2 observer runner was also recorded with the clean
+official Firefox reference. Its historical run reported two official Firefox TCP
 retry streams versus one NaiveFox pooled stream; visible ClientHello equality
 was `no`, ServerHello equality was `yes`, and the canary was absent. This is a
 cross-release comparison, not a requirement to clone a moving Firefox
@@ -844,14 +835,15 @@ The functional gates were rerun from the same cold binary:
 | H2 config and runtime-profile tests | PASS |
 | H3 local suite (`run-h3-suite.sh`) | PASS |
 | H3 config, padding, robustness and Auto | PASS |
-| Firefox-vs-NaiveFox H2 capture | PASS |
-| Firefox-vs-NaiveFox strict H3/QUIC capture | PASS |
+| Historical Firefox-vs-NaiveFox H2 capture | PASS (diagnostic) |
+| Historical Firefox-vs-NaiveFox strict H3/QUIC capture | PASS (diagnostic) |
 
-Capture used the separate full Firefox baseline from the pre-minimization
-object directory, with its own `libxul`/NSS path; the lean NaiveFox process used
-only the cold staged libraries. H3 capture proved UDP/QUIC and HTTP/3 without
-TCP fallback. Raw pcaps, key logs, profiles and bodies were deleted after
-sanitization; only aggregate reports remain under the ignored fixture state.
+The historical capture used a separate full Firefox control package with its
+own `libxul`/NSS path; the lean NaiveFox process used only the cold staged
+libraries. H3 capture proved UDP/QUIC and HTTP/3 without TCP fallback. Raw
+pcaps, key logs, profiles and bodies were deleted after sanitization; only
+aggregate reports remain under the ignored fixture state. This control package
+is not part of the normal staged-runtime gate.
 The capture scripts accept `NAIVEFOX_CAPTURE_REFERENCE_BIN`,
 `NAIVEFOX_CAPTURE_REFERENCE_LIBDIR`, and `NAIVEFOX_CAPTURE_REFERENCE_OBJDIR`
 for that baseline, plus matching `NAIVEFOX_CAPTURE_NAIVEFOX_BIN` and

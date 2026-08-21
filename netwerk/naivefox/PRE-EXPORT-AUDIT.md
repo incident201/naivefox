@@ -31,12 +31,11 @@ reports and at exporter checkpoint `4db1292e96ec` validates 25,549 files and 37
 directory contracts. Publication is a clean deterministic snapshot, not a new
 dependency-discovery run.
 
-The capture reference policy is also final: both H2 and H3 capture runners
-fetch a clean official Mozilla Firefox release into ignored object storage via
-`tools/fetch-firefox-reference.sh`. They do not require a full Firefox package
-or source objdir to be present. Exact TLS/QUIC field equality against the
-pinned NaiveFox snapshot is diagnostic only; protocol ownership and strict
-transport assertions remain gates.
+Capture comparison is outside the export gates. When explicitly requested,
+both H2 and H3 runners compare ordinary Firefox and NaiveFox packages built
+from the same Firefox base in isolated locations. The historical official
+release capture remains diagnostic evidence only; the normal export workflow
+does not build or fetch an ordinary Firefox browser package.
 
 The Auto protocol gate had one reproducible startup abort while repeatedly
 reusing the H3 fixture profile. The lean `MOZ_NAIVEFOX` preferences adapter was

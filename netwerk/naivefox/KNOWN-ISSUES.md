@@ -94,17 +94,12 @@ terminator expected by the Rust parser after an unknown-size read. An isolated
 Auto run after the fix completed H3 preference, one bounded H2 establishment
 fallback, logical H3 failures, and same-profile relaunches without a panic.
 
-Capture comparisons now use the clean official Mozilla Firefox release fetched
-by `tools/fetch-firefox-reference.sh`. The pinned NaiveFox Firefox snapshot is
-kept as the other side; exact TLS/QUIC fingerprint equality is reported, not
-required across release versions. Strict protocol, no-fallback, marker,
-padding, and multiplexing assertions remain mandatory.
-
-There are two capture meanings: same-base mode (an explicitly supplied Firefox
-binary/library pair) is the strict minimalization regression gate; the default
-pinned Firefox 154.0 release is the standalone/minimal-source diagnostic mode.
-The committed `tools/firefox-reference-manifest` fixes its URL, version, and
-archive digest; a moving `latest` URL is not accepted.
+Capture comparison is an isolated diagnostic only. When explicitly requested,
+ordinary Firefox and NaiveFox must be built from the same Firefox base and
+compared with the capture runners. It is not a minimization, merge, release, or
+routine-change gate. The historical official-release record remains evidence
+only; no ordinary Firefox package is built by the normal upstream/minimal or
+minimal-source workflow.
 
 ## Single-process networking
 

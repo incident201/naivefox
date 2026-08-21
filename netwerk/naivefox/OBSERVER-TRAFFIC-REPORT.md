@@ -1,11 +1,17 @@
 # External-observer traffic comparison
 
+> **Isolated diagnostic only:** building an ordinary Firefox package for this
+> same-base comparison requires an explicit request. It is not part of the
+> normal upstream/minimal cycle and is not a merge or release gate. See the
+> full Firefox build and capture policy in [`UPSTREAM.md`](UPSTREAM.md).
+
 Date: 2026-08-20
 
 Environment: `Ubuntu24Dev`, x86-64, strict loopback-only Caddy TLS endpoint.
-The reference is the clean Mozilla Firefox 154.0 archive downloaded by
-`tools/fetch-firefox-reference.sh`; NaiveFox uses the pinned project snapshot.
-The archive SHA-256 is recorded in `REFERENCE-MANIFEST`.
+The historical record used the clean Mozilla Firefox 154.0 archive. New runs,
+when explicitly requested, build ordinary Firefox and NaiveFox from the same
+Firefox base in isolated packages; the ordinary package is never a routine
+upstream, merge, or release prerequisite.
 
 This test asks what a passive network observer can see when ordinary Firefox
 and NaiveFox use the same TLS front-end. It deliberately does **not** set

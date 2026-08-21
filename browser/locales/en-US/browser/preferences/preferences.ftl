@@ -2804,11 +2804,11 @@ security-privacy-issue-warning-proxy-autodetection =
 
 # The header in settings with link to the referral page, where the user can invite others to
 # use the browser. "Share" here means recommending or referring the browser
-referrals-section-header =
-  .label = Share { -brand-short-name }
+referrals-section-header2 =
+  .label = Share { -brand-product-name }
   .description = Invite someone to choose the browser that puts privacy first.
 
 # Link that opens the referral page, where the user can invite others to
 # use the browser. "Share" here means recommending or referring the browser
-referrals-link =
-  .label = Share { -brand-short-name }
+referrals-link2 =
+  .label = Share { -brand-product-name }

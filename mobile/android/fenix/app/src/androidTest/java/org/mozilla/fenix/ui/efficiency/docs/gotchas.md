@@ -47,14 +47,18 @@ Last updated: 2026-07-22.
   the failure tells you the class: a systematic selector break fails hundreds _uniformly_; flakiness is
   _scattered_ across unrelated pages. Don't re-tune shared resolution on an unconfirmed hypothesis.
 
-### A5. `BaseTest.isRetryable()` is too broad (MTE-5729)
+### A5. `BaseTest` does not retry (bug 2065120)
 
-- **Symptom:** a genuinely failing test shows "0 failed" because the 1 retry passed, or a real bug is
-  masked as flakiness.
-- **Cause:** `isRetryable()` retries `AssertionError`/`RuntimeException`/`NullPointerException` — nearly
-  everything.
-- **Check:** when diagnosing, remember 1 retry can turn a real red into green. Tightening the retry scope
-  is tracked as MTE-5729.
+- **What changed:** `BaseTest` used to re-run a failed test once, retrying on nearly any throwable. That
+  could turn an intermittent real failure green. The retry was removed.
+- **Why nothing replaces it:** every test already runs in its own process with package data cleared
+  (`ANDROIDX_TEST_ORCHESTRATOR` + `clearPackageData`, `app/build.gradle`), and Firebase re-runs a failing
+  test once (`num-flaky-test-attempts` in the TAE flank configs) in a fresh process, reporting it as flaky
+  rather than green. An in-process retry was the one thing that escaped that isolation — the second attempt
+  inherited whatever the first left behind.
+- **Check:** a local failure is now just a failure. Re-run the class yourself to judge flakiness; do not
+  expect the harness to absorb it. The legacy suite's shared `RetryTestRule(3)` still retries and still has
+  the masking problem.
 
 ### A6. Page-arrival timeouts are the most common failure shape
 

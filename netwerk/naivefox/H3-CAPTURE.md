@@ -1,14 +1,16 @@
 # HTTP/3 capture comparison
 
-This report compares a clean official Mozilla Firefox release with NaiveFox
-against the strict H3-only loopback Caddy fixture. The reference is downloaded
-by `tools/fetch-firefox-reference.sh`, not assumed to exist in an objdir. The
-audited archive is Mozilla Firefox 154.0 (`firefox-154.0.tar.xz`, SHA-256
-`7665cd49ab13417270748325838e565136adbc76d41bbd76fb24d15a0cc7792b`) and the
-NaiveFox side is the pinned Firefox snapshot built by this checkout. Their
-TLS/QUIC configuration can legitimately differ across Firefox releases; the
-gate reports that difference while requiring Firefox-owned Neqo/Necko/NSS,
-strict UDP/QUIC, classic CONNECT, padding, and multiplexing.
+> **Isolated diagnostic only:** building an ordinary Firefox package for this
+> same-base comparison requires an explicit request. It is not part of the
+> normal upstream/minimal cycle and is not a merge or release gate. See the
+> full Firefox build and capture policy in [`UPSTREAM.md`](UPSTREAM.md).
+
+The historical capture record used a clean official Mozilla Firefox release.
+For a new run, only when explicitly requested, build ordinary Firefox and
+NaiveFox from the same Firefox base in isolated packages and compare packet
+behavior. This diagnostic is not a merge or release gate; Firefox-owned
+Neqo/Necko/NSS, strict UDP/QUIC, classic CONNECT, padding, and multiplexing
+remain product gates on the NaiveFox package.
 
 The reproducible runner is:
 

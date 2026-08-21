@@ -1145,6 +1145,10 @@ class XPCNativeSet final {
   static void DestroyInstance(XPCNativeSet* inst);
 
  private:
+  // The number of interfaces a set can hold is bounded by the width of
+  // mInterfaceCount.
+  static constexpr size_t kMaxInterfaceCount = UINT16_MAX;
+
   uint16_t mInterfaceCount;
   // Always last - object sized for array.
   // These are strong references.

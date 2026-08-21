@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import mozilla.components.browser.state.selector.findTab
 import mozilla.components.browser.state.selector.normalTabs
 import mozilla.components.browser.state.selector.privateTabs
+import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.concept.engine.utils.ABOUT_HOME_URL
 import mozilla.components.feature.tabs.TabsUseCases
@@ -92,6 +93,10 @@ class TabsCleanupFeature(
     }
 
     private fun removeAllTabsAndShowSnackbar(sessionCode: String) {
+        // The undo action restores the selected tab. Check if the selected tab is a
+        // homepage tab before the tabs are removed.
+        val isRestoringHomepageTab = browserStore.state.selectedTab?.content?.url == ABOUT_HOME_URL
+
         val tabsCount =
             when (sessionCode) {
                 ALL_PRIVATE_TABS -> removeAllPrivateTabs()
@@ -111,7 +116,10 @@ class TabsCleanupFeature(
         showUndoSnackbar(
             message = context.tabsClosedUndoMessage(count = tabsCount),
             onCancel = {
-                onUndoAllTabsRemoved(tabId)
+                onUndoTabsRemoved(
+                    tabId = tabId,
+                    isRestoringHomepageTab = isRestoringHomepageTab,
+                )
             },
         )
     }
@@ -129,21 +137,6 @@ class TabsCleanupFeature(
         tabsUseCases.removeTabs(ids = tabsToRemove, excludedTabIds = inactiveTabIds)
 
         return tabsToRemove.size
-    }
-
-    /**
-     * Callback invoked when the remove all tabs action is cancelled.
-     *
-     * @param tabId Optional ID of the tab that should be removed after the tab removal is undone.
-     */
-    @VisibleForTesting
-    internal fun onUndoAllTabsRemoved(tabId: String?) {
-        tabsUseCases.undo.invoke()
-
-        if (tabId?.isNotBlank() == true) {
-            tabsUseCases.removeTab.invoke(tabId)
-        }
-        navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
     }
 
     private fun removeTabAndShowSnackbar(sessionId: String) {
@@ -173,7 +166,7 @@ class TabsCleanupFeature(
         showUndoSnackbar(
             message = context.tabClosedUndoMessage(tab.content.private),
             onCancel = {
-                onUndoTabRemoved(
+                onUndoTabsRemoved(
                     tabId = tabId,
                     isRestoringHomepageTab = tab.content.url == ABOUT_HOME_URL,
                 )
@@ -182,13 +175,13 @@ class TabsCleanupFeature(
     }
 
     /**
-     * Callback invoked when the remove tab action is cancelled.
+     * Callback invoked when the remove tabs action is cancelled.
      *
      * @param tabId Optional ID of the tab that should be removed after the tab removal is undone.
-     * @param isRestoringHomepageTab Whether the restored tab is a homepage tab.
+     * @param isRestoringHomepageTab Whether the restored selected tab is a homepage tab.
      */
     @VisibleForTesting
-    internal fun onUndoTabRemoved(
+    internal fun onUndoTabsRemoved(
         tabId: String?,
         isRestoringHomepageTab: Boolean = false,
     ) {
@@ -198,8 +191,8 @@ class TabsCleanupFeature(
             tabsUseCases.removeTab.invoke(tabId)
         }
 
-        // The homepage is already shown when the removed tab is undone. Only navigate to the browser
-        // when restoring a non-homepage tab.
+        // The homepage is already shown when the removed tabs are undone. Only navigate to the
+        // browser when restoring a non-homepage tab.
         if (!isRestoringHomepageTab) {
             navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
         }

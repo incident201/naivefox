@@ -31,7 +31,7 @@ show a clean development branch and correct remotes.
 ### M0.2 Bootstrap Firefox build dependencies
 
 - [x] Run `./mach bootstrap`.
-- [x] Select full Firefox Desktop build.
+- [x] Install/select Mozilla's native compiled C++ toolchain support.
 - [x] Do not use Artifact Mode.
 - [x] Let Mozilla tooling install the appropriate compiler/toolchain.
 - [x] Record any required local environment changes.
@@ -44,18 +44,24 @@ Acceptance:
 
 and normal build configuration commands work without missing-tool errors.
 
-### M0.3 Clean baseline build
+### M0.3 One-time historical Firefox baseline (non-gate)
 
-Before any implementation change:
+At project initialization only, before the first implementation change:
 
 - [x] Run a complete `./mach build`.
 - [x] Save build output under `artifacts/`.
 - [x] Record object directory and compiler.
 - [x] Do not proceed if the untouched checkout fails to build.
 
-Acceptance:
+Historical acceptance:
 
 Firefox baseline build exits successfully.
+
+This 2026-08-12 baseline is retained as an environment record. It is not part
+of the current Gate 1, merge, release, or routine-change workflow and is not
+repeated by default. Current validation builds the NaiveFox minimal product at
+Gate 2 and its standalone export at Gate 3. An ordinary Firefox package is
+allowed only for an explicitly requested isolated same-base capture/control.
 
 ---
 
@@ -678,16 +684,12 @@ pooling; NaiveFox does not implement a separate connection pool.
 
 This phase validates the original reason for the project.
 
-The capture reference is a clean official Mozilla Firefox release downloaded by
-`netwerk/naivefox/tools/fetch-firefox-reference.sh` into ignored object
-storage. It is not a required pre-existing Firefox package or the NaiveFox
-objdir's optional `firefox` binary. The current reference is Firefox 154.0;
-its archive digest and version are recorded in `REFERENCE-MANIFEST`. Since the
-reference release and the pinned NaiveFox snapshot are different Firefox
-versions, exact ClientHello/QUIC transport-parameter/SETTINGS equality is
-reported diagnostically rather than used as a pass/fail gate. Firefox-owned
-Necko/NSS/Neqo behavior, selected protocol, strict UDP/no-fallback behavior,
-classic CONNECT, padding, and stream reuse remain mandatory gates.
+It is a separate, explicitly requested diagnostic phase, not an ordinary
+upstream/minimal-cycle, merge, or release gate. A new run builds ordinary
+Firefox and NaiveFox from the same Firefox base in isolated packages solely to
+compare packet/transport behavior. Historical official-release capture records
+remain evidence only and are not automatically rerun for routine changes; see
+`UPSTREAM.md` and `CAPTURE.md`.
 
 ### M10.1 Reference Firefox capture
 
@@ -726,10 +728,10 @@ If a measurable Firefox-specific anomaly is caused by our integration, document 
 
 Acceptance:
 
-- [x] clean official Firefox and NaiveFox were captured against the same
-  fixture TLS front-end,
-- [x] both selected `h2`; ordered ClientHello fields and client H2 SETTINGS
-  were compared and recorded without requiring cross-release equality,
+- [x] ordinary Firefox and NaiveFox were captured from the same local build
+  family against the same fixture TLS front-end,
+- [x] both selected `h2`, and their ordered ClientHello fields and client H2
+  SETTINGS were compared,
 - [x] two NaiveFox CONNECT requests used distinct stream IDs on one outer TCP
   connection,
 - [x] Naive `padding` was present in both directions and no synthetic
@@ -741,12 +743,11 @@ The reproducible procedure and 2026-08-12 comparison record are in
 `CAPTURE.md`; `test/integration/run-capture-comparison.sh` performs the capture,
 safe extraction, assertions, and sensitive-data cleanup.
 
-The strict HTTP/3 equivalent is complete. Clean official Firefox and NaiveFox
-both used QUIC v1 and `h3`; semantic TLS configuration and client QUIC
-transport parameters were compared, with expected cross-release differences,
-while HTTP/3/QPACK settings matched in the audited run. Two classic CONNECT
-request streams shared one NaiveFox QUIC connection, padding was visible in
-both header directions, and no synthetic marker header existed.
+The strict HTTP/3 equivalent is complete. Ordinary Firefox and NaiveFox from
+the same build family both used QUIC v1 and `h3`; semantic TLS configuration,
+client QUIC transport parameters, and HTTP/3/QPACK settings matched. Two
+classic CONNECT request streams shared one NaiveFox QUIC connection, padding
+was visible in both header directions, and no synthetic marker header existed.
 The independent passive pass used no key log and established no TCP session.
 See `H3-CAPTURE.md` and
 `test/integration/run-h3-capture-comparison.sh`; raw pcaps, keys, profiles,
@@ -1091,7 +1092,9 @@ The H2 prototype is complete only when this full sequence can be reproduced:
 20. close/error lifecycle tests pass.
 21. supplied real Caddy interoperability passes with normal public certificate validation.
 22. existing touched Firefox CONNECT tests pass.
-23. capture comparison is documented.
+23. the historical capture comparison is documented; any new ordinary Firefox
+    same-base run is an explicitly requested isolated diagnostic, not a
+    merge/release gate.
 24. all upstream Firefox modifications are listed in `UPSTREAM.md`.
 25. prototype runtime can be staged outside the build tree.
 26. strict NaiveProxy-style config mode works without developer flags.
@@ -1134,8 +1137,9 @@ reserved for the clean export. Runtime-reachable Rust closure is 271/287
 packages on Linux/Windows, while source/build Cargo closure is 311/325. The
 package and functional H2/H3/Auto/config gates remain green.
 
-The capture gate uses a separate full Firefox baseline with its own runtime
-libraries; the browser binary is not bundled into the lean package. A
+An explicitly requested capture comparison uses a separate full Firefox
+control package with its own runtime libraries; the browser binary is not
+bundled into the lean package. A
 non-reproducible libpref parser abort was observed once when two capture passes
 were run back-to-back. Per-pass profiles and separate runtime library paths
 were added, after which the H2 and H3 suites passed independently. Source
