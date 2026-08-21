@@ -10298,7 +10298,7 @@
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "8dfe9a8356d43c3de4bb3406f1e7577202a3912a",
+  "naivefox_reference_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
   "observed_directories": [
     "browser",
     "build",
@@ -21355,11 +21355,11 @@
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "8dfe9a8356d43c3de4bb3406f1e7577202a3912a",
+  "source_commit": "1547c1416123cabe4151a9f0775ecf9f9024eb83",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "d0d218669d440aa6259a883620722ef2c2e6e1e503e7694f4b2e74227af13fa6",
-  "trace_size_bytes": 33733569
+  "trace_sha256": "6275d236f47bafaa9e3c9b25f37376f036dd3f77e4d7a1c3e8b4314b3d8ed9bd",
+  "trace_size_bytes": 33676023
 }
