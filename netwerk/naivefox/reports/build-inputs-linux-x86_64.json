@@ -10964,7 +10964,7 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "fa3f9d0c4285537905ed44e4f8bd153dce8fc4ad4555cb90f5713494b807b673",
+  "collector_sha256": "aabbe6dd0185bbf24b950e29dbf603e174ab1dc38fc50e51f76b36cff159a227",
   "counts": {
     "directory_contracts": 37,
     "files": 17748
@@ -11009,6 +11009,7 @@
     "tools/profiler/core",
     "widget/windows"
   ],
+  "evidence_collector_sha256": "9311b204d72831470af1a278a3e76f8f839462123444de38853574f45e9de441",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -28759,9 +28760,9 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
+  "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "generated_makefile_count": 384,
-  "generated_makefiles_sha256": "79e09c67122ffd863d432a9f87f1b92076b7e2b4e89f7393f745f760c056c29f",
+  "generated_makefiles_sha256": "8c99c283402b0c652b0b676d9e1693cddea269d64b6c4a2e880ebdadfc1d4b20",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28775,13 +28776,16 @@
   "install_manifest_record_count": 2626,
   "install_manifests_sha256": "b03822696683d8698324cbf2edf0df945df4e00d37da510881b9c26404f1ecaa",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-  "mozconfig_sha256": "a22f8bb886ad53b082ccfa576203405f614efa1655a9a3ddf7d2fa2e300ab4bc",
+  "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
+  "naivefox_reference_commit": "75e1719d590083cbd60977961c695788a3ece1ba",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "5e8f754fe6c07910fea5943ab9f51874b777e8003aa6f4e76c5f4b74ac8d8147",
-    "config_status_deps.in": "1ee12e6df56cf56058d205dd4f96682a5b32f4c16915a69c153634c8effa5005"
+    "backend.RecursiveMakeBackend.in": "d10183a6df5901ad939a3d3b656207ce32391a6e1af1f0dd043a7824fb90de21",
+    "config_status_deps.in": "5a71842ed64ff1cb46005465c9b069582838d92dbe424e432405399889f3e5c3"
   },
+  "provenance_sha256": "9aa6ef442ddb22957ff2a738652386a2380dfc10cc1289e1d5d76858c6e34553",
+  "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "e9225674f75af2d8cf7178c4ac6fc98d74220c9c",
+  "source_commit": "43de35bde815c5f7515f8cc12f87b9cf60762615",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],

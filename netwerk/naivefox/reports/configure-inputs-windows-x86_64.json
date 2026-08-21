@@ -1,5 +1,5 @@
 {
-  "collector_sha256": "243ad76c3fca440c3320709d59155c4e02abee598cfac9eb6e9048d1ce0c059b",
+  "collector_sha256": "f598ea9a355814e6e4f7da76688e5d8b7eeafdbb0f58438ed396deaf1d36e7b3",
   "configure_command": [
     "strace",
     "-f",
@@ -13,7 +13,8 @@
   ],
   "configure_environment": {
     "MOZCONFIG": "netwerk/naivefox/mozconfig-windows-x86_64",
-    "NAIVEFOX_DISABLE_SCCACHE": "1",
+    "NAIVEFOX_DISABLE_SCCACHE": "<unset>",
+    "NAIVEFOX_ENABLE_TESTS": "0",
     "NAIVEFOX_OBJDIR": "<fresh-external-objdir>"
   },
   "configure_exit_status": 0,
@@ -21,6 +22,7 @@
     "directories": 11045,
     "files": 10327
   },
+  "evidence_collector_sha256": "9311b204d72831470af1a278a3e76f8f839462123444de38853574f45e9de441",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -10350,9 +10352,10 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "17e93ad5d3261e20104c7f6f2ec867ecc138ca1a",
+  "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c",
+  "naivefox_reference_commit": "75e1719d590083cbd60977961c695788a3ece1ba",
   "observed_directories": [
     "browser",
     "build",
@@ -21400,13 +21403,15 @@
     "xpcom/rust/gkrust_utils",
     "xpcom/threads"
   ],
+  "provenance_sha256": "9aa6ef442ddb22957ff2a738652386a2380dfc10cc1289e1d5d76858c6e34553",
+  "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "e9225674f75af2d8cf7178c4ac6fc98d74220c9c",
+  "source_commit": "43de35bde815c5f7515f8cc12f87b9cf60762615",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "windows-x86_64",
   "target_triple": "x86_64-pc-mingw32",
-  "trace_sha256": "9fc01a68e4935e1f19a3f5608176cc671cf8f5531df847ce7073a2e6533d7584",
-  "trace_size_bytes": 25009988
+  "trace_sha256": "3d650f3918b10608baa8744283285a7d1e695fd7ee589f7e5396397e97cd476e",
+  "trace_size_bytes": 26106696
 }
