@@ -2,6 +2,16 @@ name: NaiveFox draft release
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Build target (use all for a draft release)
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - linux
+          - windows
 
 permissions:
   contents: read
@@ -33,6 +43,7 @@ jobs:
       short_sha: ${{ steps.metadata.outputs.short_sha }}
       release_date: ${{ steps.metadata.outputs.release_date }}
       release_tag: ${{ steps.metadata.outputs.release_tag }}
+      build_matrix: ${{ steps.metadata.outputs.build_matrix }}
     steps:
       - name: Check out the selected product commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -43,17 +54,35 @@ jobs:
       - name: Compute immutable release metadata
         id: metadata
         shell: bash
+        env:
+          BUILD_TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
           source_sha="$(git rev-parse HEAD)"
           short_sha="${source_sha:0:12}"
           release_date="$(date -u +%Y%m%d)"
           release_tag="naivefox-${release_date}-${short_sha}"
+          case "${BUILD_TARGET}" in
+            all)
+              build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","archive_suffix":"linux-x86_64.tar.xz"},{"platform":"windows","runner":"windows-2022","archive_suffix":"windows-x86_64.zip"}]}'
+              ;;
+            linux)
+              build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","archive_suffix":"linux-x86_64.tar.xz"}]}'
+              ;;
+            windows)
+              build_matrix='{"include":[{"platform":"windows","runner":"windows-2022","archive_suffix":"windows-x86_64.zip"}]}'
+              ;;
+            *)
+              echo "unsupported build target: ${BUILD_TARGET}" >&2
+              exit 2
+              ;;
+          esac
           {
             echo "source_sha=${source_sha}"
             echo "short_sha=${short_sha}"
             echo "release_date=${release_date}"
             echo "release_tag=${release_tag}"
+            echo "build_matrix=${build_matrix}"
           } >> "${GITHUB_OUTPUT}"
 
   build:
@@ -61,15 +90,9 @@ jobs:
     needs: metadata
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: linux
-            runner: ubuntu-24.04
-            archive_suffix: linux-x86_64.tar.xz
-          - platform: windows
-            runner: windows-2022
-            archive_suffix: windows-x86_64.zip
+      matrix: ${{ fromJSON(needs.metadata.outputs.build_matrix) }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
     steps:
       - name: Check out the frozen product commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -77,14 +100,48 @@ jobs:
           ref: ${{ needs.metadata.outputs.source_sha }}
           fetch-depth: 1
 
+      - name: Prepare Linux build environment
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clang-20 libclang-20-dev lld-20 nasm
+          cargo install cbindgen --version 0.29.4 --locked
+
+      - name: Prepare MozillaBuild
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'MozillaBuildSetup.exe'
+          curl.exe --fail --location `
+            'https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-Latest.exe' `
+            --output $installer
+          7z x $installer '-oC:\mozilla-build' -y
+          if (-not (Test-Path 'C:\mozilla-build\VERSION')) {
+            throw 'MozillaBuild extraction did not produce C:\mozilla-build\VERSION'
+          }
+
       - name: Build and stage NaiveFox
         shell: bash
         env:
           RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
         run: |
           set -euo pipefail
+          export MOZ_AUTOMATION=1
+          if [[ "${{ matrix.platform }}" == linux ]]; then
+            export CC=clang-20
+            export CXX=clang++-20
+            export HOST_CC=clang-20
+            export HOST_CXX=clang++-20
+            export LINKER=lld-20
+            export LLVM_OBJDUMP=llvm-objdump-20
+            export LIBCLANG_PATH=/usr/lib/llvm-20/lib
+          else
+            export MOZILLABUILD='C:\mozilla-build'
+          fi
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
-            --bootstrap \
             --objdir "$PWD/../obj-naivefox-${{ matrix.platform }}"
 
       - name: Archive Linux package
@@ -131,6 +188,7 @@ jobs:
 
   draft-release:
     name: Create or update draft release
+    if: inputs.target == 'all'
     needs:
       - metadata
       - build
