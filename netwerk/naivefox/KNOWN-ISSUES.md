@@ -10,11 +10,11 @@ JS ABI headers and the project-owned `SpiderMonkeyCompat.cpp` shims. They also
 retain classic ICU and the ICU4X encoding, locale, and segmenter support; this
 is intentionally not a no-Intl configuration.
 
-Linux acceptance in `/home/zubastik/obj-naivefox-no-sm-linux-final` completed
+Linux acceptance in an external Linux product objdir completed
 the full `mach build -j4` in 5:00 with 114 unused browser/JS-only warnings and
 no errors, then passed staged runtime smoke and config SOCKS/HTTP CONNECT H2,
 H3, and Auto H3/fallback. Windows acceptance in
-`/home/zubastik/obj-naivefox-no-sm-windows-final` produced
+an external Windows product objdir produced
 `x86_64-pc-windows-msvc` `xul.dll` and `naivefox.exe`; bundled Wine passed
 `--help` only after `WINEPREFIX`, `WINELOADER`, and `WINESERVER` were set
 explicitly.
@@ -23,8 +23,7 @@ Neither objdir contains `js/src` `.o`, `.obj`, or `.a`, `libjs_static.a`, or
 Wasm objects, and neither build-output `dependentlibs.list` contains a
 `js`/`mozjs`/`wasm` entry.
 
-The current staged Windows package at
-`D:\naivefox\naivefox-windows-x86_64-no-sm-final` also passed host-native
+The current staged Windows package also passed host-native
 acceptance. The pinned Caddy fixture remained in WSL while Windows NaiveFox ran
 natively. The `verify-staged-windows-smoke.py` runner passed version/runtime smoke,
 dynamic SOCKS5 and HTTP CONNECT, malformed stress, and Unicode file logging;

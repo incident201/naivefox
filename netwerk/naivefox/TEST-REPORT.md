@@ -34,13 +34,13 @@ Rust glue is removed from the NaiveFox graph.
 
 | Gate | Result |
 |---|---|
-| Clean Linux objdir | `/home/zubastik/obj-naivefox-no-sm-linux-final` |
+| Clean Linux product objdir | external, outside the source checkout |
 | Full Linux `./mach build -j4` | PASS in 5:00; 114 warnings, no errors |
 | Staged Linux runtime | PASS: runtime smoke, config SOCKS5 and HTTP CONNECT over H2 and H3, Auto H3 preference and bounded H2 fallback |
-| Clean Windows objdir | `/home/zubastik/obj-naivefox-no-sm-windows-final` |
+| Clean Windows product objdir | external, outside the source checkout |
 | Windows cross-build | PASS for `x86_64-pc-windows-msvc`; `xul.dll` and `naivefox.exe` produced |
 | PE launch smoke | PASS: `--help` under bundled Wine after explicitly setting `WINEPREFIX`, `WINELOADER`, and `WINESERVER` |
-| Host-native Windows package | `D:\naivefox\naivefox-windows-x86_64-no-sm-final` |
+| Host-native Windows package | staged package outside the source checkout |
 | Host-native smoke | PASS: `verify-staged-windows-smoke.py` covered version/runtime smoke, dynamic SOCKS5 and HTTP CONNECT, malformed stress, and Unicode file logging |
 | Host-native protocols | PASS: strict H2 and H3 through both local frontends with padding; CLI Auto H3 preference and H2 fallback |
 
@@ -50,8 +50,7 @@ Wasm objects. Their build-output `dependentlibs.list` files contain no `js`,
 `mozjs`, or `wasm` entry. The 114 Linux warnings are confined to retained but
 unused browser/JS-only paths; the build reported no errors.
 
-Host-native acceptance ran the current staged package
-`D:\naivefox\naivefox-windows-x86_64-no-sm-final`. The
+Host-native acceptance ran the current staged Windows package. The
 `verify-staged-windows-smoke.py` runner passed version/runtime smoke, dynamic SOCKS5
 and HTTP CONNECT, malformed stress, and Unicode file logging. The pinned Caddy
 fixture remained in WSL while the Windows NaiveFox process ran natively.

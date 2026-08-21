@@ -215,28 +215,44 @@ Historical pre-audit graph tag: not used for current provenance
 Pre-minimization baseline tag: pre-minimization-v0.3
 ```
 
+### Upstream refresh checkpoint (2026-08-21)
+
+`upstream/main` was fast-forwarded into `main` at Firefox base
+`7b61047039c98a25b9ef5c6824089ab6c60bf54c9`. Gate 1 merged the refreshed
+`main` into `naivefox` without conflicts, and Gate 2 merged that reference into
+`minimal` with the documented Cargo, DNS, and XPCOM conflict resolutions.
+The stale GitHub branch `codex/minimal-spidermonkey-guards` was deleted because
+its tip was already an ancestor of `minimal`.
+
+The product-only Gate 2 evidence was regenerated after the merge. The tooling
+checkpoint is `e9225674f75a` and the report-only snapshot is
+`4b9c53757700`; both Linux and Windows closure assertions pass with
+`SpiderMonkey=absent`, `gkrust` present, and no `js`/`mozjs`/`wasm` runtime
+dependencies. The Linux and Windows build-input reports contain 17,748 and
+18,111 files respectively; the attested configure traces contain 10,270 and
+10,327 files. These are evidence sizes, not export contracts.
+
+The normal H2/H3/Auto/config product suite passed, including its quick capture
+against the SHA-pinned Firefox Nightly binary (`Mozilla Firefox 156.0a1`). No
+ordinary Firefox package was built. A full same-base Firefox/NaiveFox capture
+remains an explicit optional diagnostic only; it is not a merge, release, or
+routine-change condition.
+
+The standalone export Gate 3 is the next step after this checkpoint. It must
+run `--plan-only`, create one clean export, build only NaiveFox from that tree,
+and pass the staged product suite before a new `minimal-source` snapshot is
+published. The previous `minimal-source` snapshot remains historical until
+this cycle completes.
+
 ### Current pre-export audit provenance
 
-The Linux/Windows configure, build-input, and linked-closure reports used by
-the current export attest one audited source `a533411d0c4940f3063d1d01313a3e4fc24ba53d`;
-the final report-only/export-tool evidence snapshot is
-`a7251b0ea7fd530d1d23fada8e3217514aa1399c`.
-The target union passed strict provenance, repository-relative path, license,
-mode, and content checks. The clean export was built and tested without access
-to the full Firefox checkout or its object directory. A full Firefox browser
-build is intentionally not an acceptance gate: `./mach build export`, the
-NaiveFox `binaries` target, staged runtime, and focused H2/H3/Auto/config gates
-are the product gates. Do not copy a working-tree SHA into its own commit
-documentation.
-
-The validated generated snapshot is published on `minimal-source` at
-`0df131ea63ae0d2dc1bbefb9e811fcd038168f70` (tag `minimal-source-v0.2`).
-Capture comparison is not part of the normal product gates. When explicitly
-requested, `CAPTURE.md`, `H3-CAPTURE.md`, and
-`OBSERVER-TRAFFIC-REPORT.md` require ordinary Firefox and NaiveFox packages
-built from the same Firefox base so packet/transport behavior can be compared.
-The old official-release capture record is historical diagnostic evidence only;
-it does not authorize a full Firefox build during routine upstream refreshes.
+The Linux/Windows configure, build-input, and linked-closure reports for this
+cycle attest source `e9225674f75a` and are frozen in report-only commit
+`4b9c53757700`. The target union passed strict provenance, repository-relative
+path, license, mode, content, and no-SpiderMonkey checks. A full Firefox browser
+build is intentionally not an acceptance gate: the NaiveFox product build,
+staged runtime, focused H2/H3/Auto/config gates, and the quick Nightly capture
+are the routine gates.
 
 ### No-SpiderMonkey graph handoff (2026-08-21)
 
@@ -252,12 +268,11 @@ locale, and segmenter support remain. `jsrust_shared` is retained for that
 ICU4X/common support and must not be mistaken for a SpiderMonkey runtime edge.
 No no-Intl result is asserted by this checkpoint.
 
-Clean Linux acceptance used
-`/home/zubastik/obj-naivefox-no-sm-linux-final`: full `mach build -j4` PASS in
+Clean Linux acceptance used an external product objdir: full `mach build -j4` PASS in
 5:00 with 114 unused browser/JS-only warnings and no errors, followed by staged
 runtime smoke and config SOCKS/HTTP CONNECT H2, H3, and Auto H3/fallback. Clean
 Windows acceptance used
-`/home/zubastik/obj-naivefox-no-sm-windows-final`: the
+an external Windows product objdir: the
 `x86_64-pc-windows-msvc` cross-build produced `xul.dll`/`naivefox.exe`, and
 bundled Wine passed `--help` after explicit `WINEPREFIX`, `WINELOADER`, and
 `WINESERVER` selection. Native Windows protocol tests were previously run on

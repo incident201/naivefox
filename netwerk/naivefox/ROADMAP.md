@@ -1023,13 +1023,13 @@ generated output, never a hand-edited source of truth.
 - [x] Provide the retained ABI through project-owned `SpiderMonkeyCompat.cpp`
   shims; keep classic ICU and required ICU4X encoding/locale/segmenter support.
 - [x] Remove unused URLPattern C++ and Rust glue without claiming no-Intl.
-- [x] Complete a clean Linux full `mach build -j4` in
-  `/home/zubastik/obj-naivefox-no-sm-linux-final`: PASS in 5:00 with 114
+- [x] Complete a clean Linux full `mach build -j4` in an external product
+  objdir: PASS in 5:00 with 114
   unused browser/JS-only warnings and no errors.
 - [x] Pass the staged runtime smoke plus config SOCKS5/HTTP CONNECT H2, H3,
   and Auto H3 preference/bounded H2 fallback gates.
-- [x] Complete the clean `x86_64-pc-windows-msvc` cross-build in
-  `/home/zubastik/obj-naivefox-no-sm-windows-final`, producing `xul.dll` and
+- [x] Complete the clean `x86_64-pc-windows-msvc` cross-build in an external
+  product objdir, producing `xul.dll` and
   `naivefox.exe`; pass PE `--help` under bundled Wine with explicit
   `WINEPREFIX`, `WINELOADER`, and `WINESERVER`.
 - [x] Audit both objdirs: no `js/src` `.o`/`.obj`/`.a`, no
