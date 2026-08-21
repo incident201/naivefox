@@ -11,7 +11,9 @@
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Vector.h"
 #include "mozilla/dom/RequestBinding.h"
-#include "mozilla/net/urlpattern_glue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/urlpattern_glue.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsHashKeys.h"
 #include "nsICacheEntry.h"
@@ -178,7 +180,9 @@ class DictionaryCacheEntry final : public nsICacheEntryOpenCallback,
   //  nsCString mType;
 
   // Cached parsed URLPattern for performance
+#ifndef MOZ_NAIVEFOX
   Maybe<UrlPatternGlue> mCachedPattern;
+#endif
 
   // SHA-256 hash value - only written/read on MainThread (after
   // pending->active) Written by FinishHash() on MainThread, immutable after

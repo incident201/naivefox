@@ -103,7 +103,9 @@
 #include "prdtoa.h"
 #include "prlink.h"
 #include "xpcpublic.h"
-#include "js/RootingAPI.h"
+#ifndef MOZ_NAIVEFOX
+#  include "js/RootingAPI.h"
+#endif
 #if defined(MOZ_BACKGROUNDTASKS) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/BackgroundTasks.h"
 #endif
@@ -2207,7 +2209,9 @@ static void AddAccessCount(const nsACString& aPrefName) {
   // 1474789), and triggers assertions here if we try to add usage count entries
   // from background threads.
   if (NS_IsMainThread()) {
+#ifndef MOZ_NAIVEFOX
     JS::AutoSuppressGCAnalysis nogc;  // Hash functions will not GC.
+#endif
     uint32_t& count = gAccessCounts->LookupOrInsert(aPrefName);
     count++;
   }
@@ -3785,6 +3789,9 @@ NS_IMPL_ISUPPORTS(nsPrefOverrideMap, nsIPrefOverrideMap)
 NS_IMETHODIMP
 nsPrefOverrideMap::AddEntry(const nsACString& aPrefName,
                             JS::Handle<JS::Value> aPrefValue, JSContext* aCx) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   nsCString prefName(aPrefName);
   auto maybePrefWrapper = sPImpl->Lookup(prefName.get());
   if (NS_WARN_IF(!maybePrefWrapper)) {
@@ -3824,11 +3831,15 @@ nsPrefOverrideMap::AddEntry(const nsACString& aPrefName,
     return NS_ERROR_OUT_OF_MEMORY;
   }
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 nsPrefOverrideMap::GetEntry(const nsACString& aPrefName, JSContext* aCx,
                             JS::MutableHandle<JS::Value> aPrefValue) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   nsCString prefName(aPrefName);
   auto maybePrefWrapper = sPImpl->Lookup(prefName.get());
   if (NS_WARN_IF(!maybePrefWrapper)) {
@@ -3861,6 +3872,7 @@ nsPrefOverrideMap::GetEntry(const nsACString& aPrefName, JSContext* aCx,
   auto ret = MOZ_TRY(prefValueToJsValue());
   aPrefValue.set(ret);
   return NS_OK;
+#endif
 }
 
 //----------------------------------------------------------------------------

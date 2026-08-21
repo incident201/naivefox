@@ -185,6 +185,36 @@ official Mozilla release used by `CAPTURE.md`, `H3-CAPTURE.md`, and
 diagnostic; Necko/NSS/Neqo ownership, strict protocol/no-fallback behavior,
 classic CONNECT, padding, and multiplexing remain acceptance gates.
 
+### No-SpiderMonkey graph handoff (2026-08-21)
+
+The final NaiveFox product graph suppresses SpiderMonkey's `js/src` runtime
+`DIRS` and `FINAL_LIBRARY`, but deliberately retains the public/generated JS
+headers needed by common Gecko ABI declarations. The project-owned
+`netwerk/naivefox/core/SpiderMonkeyCompat.cpp` boundary supplies only the
+required ABI shims. URLPattern C++ and Rust glue is removed for NaiveFox.
+Normal Firefox keeps its normal SpiderMonkey and URLPattern graph.
+
+Intl is a separate boundary: classic ICU plus the retained ICU4X encoding,
+locale, and segmenter support remain. `jsrust_shared` is retained for that
+ICU4X/common support and must not be mistaken for a SpiderMonkey runtime edge.
+No no-Intl result is asserted by this checkpoint.
+
+Clean Linux acceptance used
+`/home/zubastik/obj-naivefox-no-sm-linux-final`: full `mach build -j4` PASS in
+5:00 with 114 unused browser/JS-only warnings and no errors, followed by staged
+runtime smoke and config SOCKS/HTTP CONNECT H2, H3, and Auto H3/fallback. Clean
+Windows acceptance used
+`/home/zubastik/obj-naivefox-no-sm-windows-final`: the
+`x86_64-pc-windows-msvc` cross-build produced `xul.dll`/`naivefox.exe`, and
+bundled Wine passed `--help` after explicit `WINEPREFIX`, `WINELOADER`, and
+`WINESERVER` selection. Native Windows protocol tests were not run in WSL.
+
+Both objdirs contain no `js/src` `.o`, `.obj`, or `.a`, no
+`libjs_static.a`, and no Wasm objects; build-output `dependentlibs.list` has no
+`js`, `mozjs`, or `wasm` entry. Future Firefox refreshes must preserve this
+distinction between retained ABI headers/ICU4X support and the removed JS
+runtime, then repeat both clean build-graph audits and the staged network gate.
+
 The `minimal` branch was initialized from that tagged NaiveFox line and then
 fast-forwarded through the validated config/profile corrections above; it has
 no minimization-only commit at this baseline. Every release or significant

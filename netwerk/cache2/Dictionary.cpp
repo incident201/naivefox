@@ -24,8 +24,10 @@
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/net/NeckoCommon.h"
-#include "mozilla/net/URLPatternGlue.h"
-#include "mozilla/net/urlpattern_glue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/URLPatternGlue.h"
+#  include "mozilla/net/urlpattern_glue.h"
+#endif
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsComponentManagerUtils.h"
 #ifndef MOZ_NAIVEFOX
@@ -98,6 +100,7 @@ DictionaryCacheEntry::~DictionaryCacheEntry() {
   DICTIONARY_LOG(
       ("Destroyed DictionaryCacheEntry %p, uri=%s, pattern=%s, id=%s", this,
        mURI.get(), mPattern.get(), mId.get()));
+#ifndef MOZ_NAIVEFOX
   if (mCachedPattern.isSome()) {
     if (NS_IsMainThread()) {
       urlpattern_pattern_free(mCachedPattern.ref());
@@ -108,6 +111,7 @@ DictionaryCacheEntry::~DictionaryCacheEntry() {
           [pattern]() { urlpattern_pattern_free(pattern); }));
     }
   }
+#endif
 }
 
 DictionaryCacheEntry::DictionaryCacheEntry(const nsACString& aURI,

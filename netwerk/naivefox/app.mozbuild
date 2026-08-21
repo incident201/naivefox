@@ -6,7 +6,22 @@
 # toolkit/toolkit.mozbuild. The latter is a browser-oriented superset which
 # unconditionally pulls DOM, layout, graphics, media, DevTools, and most
 # Toolkit components into libxul.
-include("/js/app.mozbuild")
+# Keep SpiderMonkey's canonical public/generated header exports available to
+# retained XPCOM consumers, but let js/src suppress its runtime build graph for
+# this product.
+DIRS += [
+    "/config/external/nspr",
+    "/config/external/zlib",
+    "/js/src",
+    "/memory",
+    "/mfbt",
+    "/mozglue",
+]
+
+if CONFIG["JS_HAS_INTL_API"]:
+    DIRS += [
+        "/config/external/icu",
+    ]
 
 # Unicode normalization needs this header-only sparse table type.  Export the
 # single header without adding the graphics build graph.

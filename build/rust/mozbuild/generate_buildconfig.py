@@ -131,6 +131,7 @@ def generate(output):
     output.write(generate_bool("MOZ_ESR"))
     output.write(generate_bool("MOZ_DIAGNOSTIC_ASSERT_ENABLED"))
     output.write(generate_bool("MOZ_CODE_COVERAGE"))
+    output.write(generate_bool("MOZ_NAIVEFOX"))
 
     # Used by toolkit/crashreporter/client
     output.write(generate_bool("MOZ_CRASHREPORTER_MOCK"))

@@ -16,6 +16,42 @@ real Caddy deployment, the staged runtime, and the official NaiveProxy control
 client. It intentionally contains no endpoint, username, password, proxy
 authorization value, packet payload, or TLS key material.
 
+## Final no-SpiderMonkey build and runtime gate (2026-08-21)
+
+The final no-SpiderMonkey NaiveFox graph suppresses the `js/src` runtime
+`DIRS` and `FINAL_LIBRARY` contribution while retaining the public and
+generated JS headers required by common Gecko ABI types. Project-owned
+`SpiderMonkeyCompat.cpp` shims satisfy the small retained ABI surface. Intl,
+classic ICU, and the required ICU4X/encoding/locale Rust support remain in the
+product; this checkpoint does not claim no-Intl. The unused URLPattern C++ and
+Rust glue is removed from the NaiveFox graph.
+
+| Gate | Result |
+|---|---|
+| Clean Linux objdir | `/home/zubastik/obj-naivefox-no-sm-linux-final` |
+| Full Linux `./mach build -j4` | PASS in 5:00; 114 warnings, no errors |
+| Staged Linux runtime | PASS: runtime smoke, config SOCKS5 and HTTP CONNECT over H2 and H3, Auto H3 preference and bounded H2 fallback |
+| Clean Windows objdir | `/home/zubastik/obj-naivefox-no-sm-windows-final` |
+| Windows cross-build | PASS for `x86_64-pc-windows-msvc`; `xul.dll` and `naivefox.exe` produced |
+| PE launch smoke | PASS: `--help` under bundled Wine after explicitly setting `WINEPREFIX`, `WINELOADER`, and `WINESERVER` |
+| Host-native Windows package | `D:\naivefox\naivefox-windows-x86_64-no-sm-final` |
+| Host-native smoke | PASS: `verify-staged-windows-smoke.py` covered version/runtime smoke, dynamic SOCKS5 and HTTP CONNECT, malformed stress, and Unicode file logging |
+| Host-native protocols | PASS: strict H2 and H3 through both local frontends with padding; CLI Auto H3 preference and H2 fallback |
+
+Both clean object directories were audited after the successful builds. They
+contain no `js/src` `.o`, `.obj`, or `.a` files, no `libjs_static.a`, and no
+Wasm objects. Their build-output `dependentlibs.list` files contain no `js`,
+`mozjs`, or `wasm` entry. The 114 Linux warnings are confined to retained but
+unused browser/JS-only paths; the build reported no errors.
+
+Host-native acceptance ran the current staged package
+`D:\naivefox\naivefox-windows-x86_64-no-sm-final`. The
+`verify-staged-windows-smoke.py` runner passed version/runtime smoke, dynamic SOCKS5
+and HTTP CONNECT, malformed stress, and Unicode file logging. The pinned Caddy
+fixture remained in WSL while the Windows NaiveFox process ran natively.
+Strict H2 and H3 each passed SOCKS5 and HTTP CONNECT fetches with padding; CLI
+Auto passed H3 preference and H2 fallback.
+
 ## Current controlled upstream refresh and standalone export (2026-08-20)
 
 This is the authoritative result for the current synchronization cycle. Mozilla

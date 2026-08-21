@@ -7,8 +7,13 @@ use rustc_version::{version, version_meta, Channel, Version};
 fn main() {
     let mut build = cc::Build::new();
     build.cpp(true);
-    // For js-confdefs.h, see wrappers.cpp.
-    build.include(mozbuild::TOPOBJDIR.join("js").join("src"));
+    // For js-confdefs.h and mozilla-config.h, see wrappers.cpp.
+    if mozbuild::config::MOZ_NAIVEFOX {
+        build.include(mozbuild::TOPOBJDIR);
+        build.define("MOZ_NAIVEFOX", None);
+    } else {
+        build.include(mozbuild::TOPOBJDIR.join("js").join("src"));
+    }
     build.include(mozbuild::TOPOBJDIR.join("dist").join("include"));
     build.define("MOZ_HAS_MOZGLUE", None);
     build.file("wrappers.cpp");

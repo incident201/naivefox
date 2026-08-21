@@ -12,15 +12,19 @@
 #include "nsTArray.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/UniquePtr.h"
-#include "mozilla/intl/Collator.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/intl/Collator.h"
+#endif
 
 #include "mozIStorageService.h"
 
 class nsIMemoryReporter;
 struct sqlite3_vfs;
+#ifndef MOZ_NAIVEFOX
 namespace mozilla::intl {
 class Collator;
 }
+#endif
 
 namespace mozilla::storage {
 
