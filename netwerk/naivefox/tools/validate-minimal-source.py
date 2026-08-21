@@ -63,6 +63,7 @@ PRODUCT_DOCS = {
     pathlib.PurePosixPath("netwerk/naivefox/SHIMS.md"),
     pathlib.PurePosixPath("netwerk/naivefox/test/integration/README.md"),
 }
+CONTROL_PLANE_PREFIX = pathlib.PurePosixPath(".github", "workflows")
 MANIFEST_KEYS = {
     "manifest_version",
     "firefox_base_commit",
@@ -131,6 +132,15 @@ def safe_relative(value: str) -> pathlib.PurePosixPath:
         fail(f"forbidden path component: {value}")
     if any(part == "objdir" or part.startswith("obj-") for part in path.parts):
         fail(f"generated object directory leaked into export: {value}")
+    if path == pathlib.PurePosixPath(".github") or path == CONTROL_PLANE_PREFIX:
+        return path
+    if path.parts[:2] == CONTROL_PLANE_PREFIX.parts:
+        if len(path.parts) != 3 or path.suffix.lower() not in {".yml", ".yaml"}:
+            fail(
+                "only workflow files are allowed in the control-plane overlay: "
+                f"{value}"
+            )
+        return path
     if path.parts and path.parts[0] == "browser":
         if len(path.parts) >= 2 and path.parts[1] != "config":
             fail(f"Firefox browser product source leaked into export: {value}")
@@ -291,6 +301,7 @@ def validate(root: pathlib.Path) -> int:
             fail(f"mode mismatch for {path}: {actual_mode:04o} != {expected_mode:04o}")
 
     actual = set()
+    control_plane = set()
     for path in root.rglob("*"):
         relative = path.relative_to(root).as_posix()
         safe = safe_relative(relative)
@@ -301,13 +312,17 @@ def validate(root: pathlib.Path) -> int:
         if not path.is_file():
             fail(f"unsupported filesystem node present: {relative}")
         actual.add(safe)
+        if safe.parts[:2] == CONTROL_PLANE_PREFIX.parts:
+            control_plane.add(safe)
         if safe not in TRACKED_SOURCE_FIXTURES and path.name.lower().endswith(
             FORBIDDEN_SUFFIXES
         ):
             fail(f"build/capture/log artifact present: {relative}")
-    if actual != expected | generated:
+    if actual != expected | generated | control_plane:
         missing = sorted(str(value) for value in (expected | generated) - actual)
-        unexpected = sorted(str(value) for value in actual - (expected | generated))
+        unexpected = sorted(
+            str(value) for value in actual - (expected | generated | control_plane)
+        )
         fail(f"file list mismatch; missing={missing[:5]} unexpected={unexpected[:5]}")
     for path in generated:
         mode = stat.S_IMODE((root / path).stat().st_mode)

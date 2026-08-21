@@ -51,17 +51,16 @@ class ProvenanceTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.objdirs_temporary = tempfile.TemporaryDirectory()
         self.repo = Path(self.temporary.name)
-        run(self.repo, "init", "-b", "main")
+        run(self.repo, "init", "-b", "firefox-upstream")
         run(self.repo, "config", "user.name", "NaiveFox Test")
         run(self.repo, "config", "user.email", "naivefox@example.invalid")
         (self.repo / "root.txt").write_text("old\n", encoding="utf-8")
         self.old_base = commit(self.repo, "old base")
         (self.repo / "root.txt").write_text("current\n", encoding="utf-8")
         self.firefox_base = commit(self.repo, "Firefox base")
-        run(self.repo, "switch", "-c", "naivefox")
+        run(self.repo, "switch", "-c", "naivefox-full-source")
         (self.repo / "naivefox.txt").write_text("reference\n", encoding="utf-8")
         self.naivefox_reference = commit(self.repo, "NaiveFox reference")
-        run(self.repo, "switch", "-c", "minimal")
 
         tools = self.repo / "netwerk/naivefox/tools"
         reports = self.repo / provenance.REPORT_DIRECTORY
@@ -362,8 +361,8 @@ class ProvenanceTest(unittest.TestCase):
                 linux,
                 collector.TARGETS[0],
                 source,
-                "main",
-                "naivefox",
+                "firefox-upstream",
+                "naivefox-full-source",
                 {**os.environ, "NAIVEFOX_ENABLE_TESTS": "1"},
             )
         finally:

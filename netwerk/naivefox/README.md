@@ -142,7 +142,7 @@ MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
 ```
 
 The Windows x86-64 cross-build uses the separate product mozconfig on the
-`minimal` branch and Mozilla's clang-cl toolchain with the Visual Studio linker
+`naivefox-full-source` branch and Mozilla's clang-cl toolchain with the Visual Studio linker
 and Windows SDK:
 
 ```bash
@@ -177,18 +177,25 @@ for an explicitly requested same-base capture comparison; see
 ## Repository workflow
 
 ```text
-Mozilla main -> main -> naivefox -> minimal -> generated minimal-source
+Mozilla main -> firefox-upstream -> naivefox-full-source -> generated naivefox-minimal-source
 ```
 
-- `main` is a clean fast-forward-only Mozilla mirror.
-- `naivefox` is the complete full-source reference implementation.
-- `minimal` contains the minimized build/runtime and export tooling.
-- `minimal-source` is a generated standalone snapshot and is never hand-edited.
+- `firefox-upstream` is a clean fast-forward-only Mozilla mirror.
+- `naivefox-full-source` is the single complete working tree containing the
+  NaiveFox implementation, minimization rules, and export tooling.
+- `naivefox-minimal-source` is a generated standalone product snapshot and is
+  never hand-edited. Its `.github/workflows/` control-plane files are the
+  deliberate exception and may be maintained directly.
 
-The three review gates and provenance rules are defined in `UPSTREAM.md` in the
-full maintenance checkout. In particular, commit SHAs and test transcripts
+The refresh and export gates are defined in `UPSTREAM.md` in the full
+maintenance checkout. In particular, commit SHAs and test transcripts
 belong in generated evidence, commits, and annotated tags rather than being
 copied into active Markdown.
+
+Release automation is intentionally maintained as the control-plane overlay
+`.github/workflows/release.yml` on `naivefox-minimal-source`. It is manual-only,
+builds that branch's compact tree for Linux and Windows, and creates a draft
+release without running the integration/Caddy suites.
 
 ## Security and data handling
 

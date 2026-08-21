@@ -123,8 +123,8 @@ def is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
 def derive_source_provenance(
     repo: Path,
     source_ref: str = "HEAD",
-    firefox_ref: str = "main",
-    naivefox_ref: str = "naivefox",
+    firefox_ref: str = "firefox-upstream",
+    naivefox_ref: str = "naivefox-full-source",
 ) -> SourceProvenance:
     repo = repo.resolve(strict=True)
     source = resolve_commit(repo, source_ref, "source")
@@ -158,8 +158,8 @@ def _changed_paths(repo: Path, older: str, newer: str) -> set[Path]:
 def validate_evidence_head(
     repo: Path,
     head_ref: str = "HEAD",
-    firefox_ref: str = "main",
-    naivefox_ref: str = "naivefox",
+    firefox_ref: str = "firefox-upstream",
+    naivefox_ref: str = "naivefox-full-source",
     require_clean: bool = True,
 ) -> EvidenceProvenance:
     repo = repo.resolve(strict=True)

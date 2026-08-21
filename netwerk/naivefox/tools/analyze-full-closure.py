@@ -589,8 +589,8 @@ def analyze_target(
     objdir,
     target_triple,
     mozconfig_relpath,
-    firefox_ref="main",
-    naivefox_ref="naivefox",
+    firefox_ref="firefox-upstream",
+    naivefox_ref="naivefox-full-source",
 ):
     """Analyze comprehensive full link and source closure for target."""
     objdir_path = Path(objdir)
@@ -830,8 +830,8 @@ def main():
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--linux-objdir", type=Path)
     parser.add_argument("--windows-objdir", type=Path)
-    parser.add_argument("--firefox-ref", default="main")
-    parser.add_argument("--naivefox-ref", default="naivefox")
+    parser.add_argument("--firefox-ref", default="firefox-upstream")
+    parser.add_argument("--naivefox-ref", default="naivefox-full-source")
     args = parser.parse_args()
     topsrcdir = str(args.repo.resolve(strict=True))
     if subprocess.check_output(

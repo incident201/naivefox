@@ -49,8 +49,8 @@ def main() -> int:
     parser.add_argument("--cargo-target", required=True)
     parser.add_argument("--mozconfig", type=Path, required=True)
     parser.add_argument("--allow-dirty", action="store_true")
-    parser.add_argument("--firefox-ref", default="main")
-    parser.add_argument("--naivefox-ref", default="naivefox")
+    parser.add_argument("--firefox-ref", default="firefox-upstream")
+    parser.add_argument("--naivefox-ref", default="naivefox-full-source")
     args = parser.parse_args()
 
     repo = args.repo.resolve(strict=True)

@@ -169,6 +169,14 @@ print(f"entries={manifest['counts']['files']}")
 print(f"manifest_sha256={manifest['manifest_sha256']}")
 PY
 
+# The product branch owns its workflow control plane. Preserve that overlay
+# from the current product ref without putting it into the source manifest.
+control_plane_ref=${NAIVEFOX_CONTROL_PLANE_REF:-naivefox-minimal-source}
+if [[ -n $(git -C "$repo_root" ls-tree -d --name-only "$control_plane_ref" .github/workflows 2>/dev/null) ]]; then
+  mkdir -p -- "$tmp/.github"
+  git -C "$repo_root" archive "$control_plane_ref" .github/workflows | tar -x -C "$tmp"
+fi
+
 python3 "$script_dir/validate-minimal-source.py" "$tmp"
 mv -T -- "$tmp" "$output"
 tmp=

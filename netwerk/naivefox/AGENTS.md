@@ -14,10 +14,12 @@ Before changing NaiveFox, read:
 
 ## Repository discipline
 
-- Shared networking and product behavior belongs on `naivefox`.
-- Build-graph, packaging, shims, and export work belongs on `minimal`.
-- `main` is a fast-forward-only mirror of Mozilla Firefox.
-- `minimal-source` is generated; never edit or merge it back.
+- All NaiveFox networking, product, build-graph, packaging, shim, and export
+  work belongs on `naivefox-full-source`.
+- `firefox-upstream` is a fast-forward-only mirror of Mozilla Firefox.
+- `naivefox-minimal-source` is generated; never edit its product tree or merge
+  it back. Its `.github/workflows/` control-plane overlay is intentionally
+  maintained directly so release automation can evolve independently.
 - Preserve unrelated work in a dirty tree. Do not rewrite public history or push
   without authorization.
 - Keep project code under `netwerk/naivefox/`. Modify an existing Firefox file
@@ -70,16 +72,17 @@ Use Mozilla's `mach`, managed toolchains, source style, and ownership types.
 Do not introduce CMake or a replacement build system. Use `searchfox-cli` for
 upstream symbol research and narrow local `rg` searches for project code.
 
-The normal three-gate cycle never builds the Firefox browser:
+The normal two-stage cycle never builds the Firefox browser:
 
-1. `main -> naivefox`: source, inventory, and conflict review only.
-2. `naivefox -> minimal`: build and test the minimized NaiveFox product graph.
-3. `minimal -> minimal-source`: export, isolated build, and acceptance tests.
+1. `upstream/main -> firefox-upstream -> naivefox-full-source`: source,
+   inventory, and conflict review, followed by the minimized product build.
+2. `naivefox-full-source -> naivefox-minimal-source`: export, isolated build,
+   and acceptance checks.
 
 An ordinary Firefox build is allowed only for an explicitly requested,
 same-base capture comparison. See [`CAPTURE.md`](CAPTURE.md).
 
-For changes on `minimal`, use the product configuration and a full graph build
+For changes on `naivefox-full-source`, use the product configuration and a full graph build
 when build files or closure may have changed:
 
 ```bash

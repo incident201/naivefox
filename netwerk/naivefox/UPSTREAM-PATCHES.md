@@ -1,7 +1,7 @@
 # Downstream Firefox patch inventory
 
 This is the durable inventory of changes to existing Firefox files on the
-`naivefox` reference branch. It contains stable patch identifiers and semantic
+`naivefox-full-source` reference branch. It contains stable patch identifiers and semantic
 review obligations, not mutable branch SHAs or dated test results. Git history
 is the authority for the exact diff and originating commit.
 

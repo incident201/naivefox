@@ -1,7 +1,8 @@
-# Minimal-only Firefox patch inventory
+# NaiveFox minimization-only Firefox patch inventory
 
-This is the refresh checklist for changes carried only by `minimal`. The
-shared NaiveFox integration patches are catalogued in `UPSTREAM-PATCHES.md`.
+This is the refresh checklist for changes carried only by
+`naivefox-full-source`. The shared NaiveFox integration patches are catalogued
+in `UPSTREAM-PATCHES.md`.
 Do not record transient commit SHAs or measured results here; reports and Git
 history provide that evidence.
 

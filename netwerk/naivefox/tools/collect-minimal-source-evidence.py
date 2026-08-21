@@ -240,8 +240,8 @@ def main() -> int:
     parser.add_argument("--linux-objdir", type=Path, required=True)
     parser.add_argument("--windows-objdir", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path)
-    parser.add_argument("--firefox-ref", default="main")
-    parser.add_argument("--naivefox-ref", default="naivefox")
+    parser.add_argument("--firefox-ref", default="firefox-upstream")
+    parser.add_argument("--naivefox-ref", default="naivefox-full-source")
     args = parser.parse_args()
 
     repo = args.repo.resolve(strict=True)

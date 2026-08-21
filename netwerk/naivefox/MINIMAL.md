@@ -1,29 +1,29 @@
 # Minimal build and source export
 
-This guide is the maintainer runbook for the `minimal` branch. It deliberately
+This guide is the maintainer runbook for the `naivefox-full-source` branch. It deliberately
 contains no release SHA, date, size, or test transcript. Git and the generated
 evidence files are the source of those values.
 
 The supported flow is:
 
 ```text
-validated naivefox -> minimal source commit S -> report-only commit E
-                   -> generated minimal-source snapshot
+validated naivefox-full-source -> source commit S -> report-only commit E
+                   -> generated naivefox-minimal-source snapshot
 ```
 
-`minimal` retains the full Firefox checkout for merges and review. The build
+`naivefox-full-source` retains the full Firefox checkout for merges and review. The build
 graph selected by `mozconfig-minimal` is the headless NaiveFox application;
 none of the commands below configures or builds the Firefox browser.
 
 ## 1. Prepare the branch
 
-Start from a clean `minimal` checkout after the corresponding `naivefox`
-change has been merged:
+Start from a clean `naivefox-full-source` checkout after the corresponding
+`firefox-upstream` refresh has been reviewed:
 
 ```bash
-git switch minimal
+git switch naivefox-full-source
 git status --short
-git merge-base --is-ancestor naivefox HEAD
+git merge-base --is-ancestor firefox-upstream HEAD
 ```
 
 Review `MINIMAL-PATCHES.md` whenever a Firefox refresh changes an inventoried
@@ -122,7 +122,7 @@ git add \
   netwerk/naivefox/reports/configure-inputs-linux-x86_64.json \
   netwerk/naivefox/reports/configure-inputs-windows-x86_64.json
 git diff --cached --name-only
-git commit -m 'reports: freeze minimal-source evidence'
+git commit -m 'reports: freeze naivefox-minimal-source evidence'
 E=$(git rev-parse HEAD)
 test "$(git rev-parse HEAD^)" = "$S"
 python3 netwerk/naivefox/tools/assert-closure.py
@@ -177,9 +177,11 @@ or container where the full checkout and its old object directories are not
 visible. Repeat staging, validation, and integration acceptance against the
 exported binaries.
 
-Only then replace the contents of a disposable `minimal-source` worktree,
-commit one linear generated snapshot, and create its annotated release tag.
-Never hand-edit that branch and never merge it back into `minimal`.
+Only then replace the contents of a disposable `naivefox-minimal-source`
+worktree and commit one linear generated snapshot. Preserve the
+`.github/workflows/` control-plane overlay in that branch; it is intentionally
+maintained independently from full-source exports. Never hand-edit the product
+tree and never merge it back into `naivefox-full-source`.
 
 ## 5. Cleanup
 

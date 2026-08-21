@@ -14,58 +14,58 @@ Downstream modifications to existing Firefox files are listed separately in
 mozilla-firefox/firefox:main
              |
              v
-main            clean upstream mirror
+firefox-upstream       clean upstream mirror
              |
+             | reviewed merge
              v
-naivefox        full Firefox + shared NaiveFox implementation
-             |
-             v
-minimal         full source + minimized product graph/export tooling
+naivefox-full-source   full Firefox + all NaiveFox/minimization work
              |
              | generated allowlist export
              v
-minimal-source  standalone product snapshot
+naivefox-minimal-source  standalone product snapshot
 ```
 
-- `main` contains only commits reachable from Mozilla `main`. Update it with an
+- `firefox-upstream` contains only commits reachable from Mozilla `main`. Update it with an
   explicit fetch and fast-forward; never merge a project branch into it.
-- `naivefox` is the source-integration branch. It retains the full Firefox tree,
-  all shared product code, downstream hooks, focused regressions, and fixtures.
-- `minimal` retains the full tree for ordinary Git ancestry while reducing the
-  configured build, link, runtime, and exported source closure.
-- `minimal-source` is generated from a validated `minimal` snapshot. Never edit
-  it by hand and never merge it into an upper branch.
+- `naivefox-full-source` is the only working branch. It retains the full Firefox
+  tree, all shared product code, downstream hooks, minimization rules, focused
+  regressions, fixtures, and export tooling.
+- `naivefox-minimal-source` is generated from a validated
+  `naivefox-full-source` snapshot. Never edit it by hand and never merge it into
+  the full-source branch. Its `.github/workflows/` files are the permanent
+  control-plane exception: they may be edited directly so release automation
+  can evolve without a full source export.
 
 Allowed long-lived direction is only:
 
 ```text
-upstream/main -> main -> naivefox -> minimal -> minimal-source
+upstream/main -> firefox-upstream -> naivefox-full-source -> naivefox-minimal-source
 ```
 
-Feature branches for shared behavior start from `naivefox`; minimization-only
-branches start from `minimal`. Protect all long-lived branches from force-push
+Feature branches start from `naivefox-full-source`. There is no separate
+unminimized NaiveFox branch. Protect all long-lived branches from force-push
 and deletion where repository settings permit it.
 
 ## Ordinary refresh workflow
 
-The normal cycle has three gates. It never configures or builds a Firefox
-browser package.
+The normal cycle has two gates. Gate 1 is source review only; Gate 2 builds
+only the minimized NaiveFox product and never a Firefox browser package.
 
-### Gate 1: Firefox to `naivefox`
+### Gate 1: Firefox to `naivefox-full-source`
 
 Fast-forward the mirror, then merge it on a temporary refresh branch:
 
 ```bash
 git fetch upstream
-git switch main
+git switch firefox-upstream
 git merge --ff-only upstream/main
 
-git switch naivefox
+git switch naivefox-full-source
 git switch -c refresh/firefox-<name>
-git merge main
+git merge firefox-upstream
 ```
 
-Before merging the refresh into `naivefox`:
+Before merging the refresh into `naivefox-full-source`:
 
 1. inspect every entry in `UPSTREAM-PATCHES.md`, including clean textual merges;
 2. review adjacent upstream changes for semantic conflicts and obsolete hooks;
@@ -75,21 +75,21 @@ Before merging the refresh into `naivefox`:
    resolution, but do not build the Firefox browser or run the product gate.
 
 Remove a downstream patch when Firefox now supplies an equivalent supported
-API or fix. Merge the reviewed refresh into `naivefox` without inserting its
-SHA into Markdown.
+API or fix. Merge the reviewed refresh into `naivefox-full-source` without
+inserting its SHA into Markdown.
 
-### Gate 2: `naivefox` to `minimal`
+### Gate 2: validate `naivefox-full-source` and export `naivefox-minimal-source`
 
-Only a Gate 1 result may enter the minimized product:
+The working branch already contains the complete minimized product. After a
+Gate 1 result is reviewed, freeze it and export the product snapshot:
 
 ```bash
-git switch minimal
-git switch -c refresh/minimal-<name>
-git merge naivefox
+git switch naivefox-full-source
+git merge --ff-only refresh/firefox-<name>
 ```
 
-Resolve minimization conflicts, then validate the complete minimized product
-graph. The gate includes Linux and Windows product builds where supported,
+Resolve minimization conflicts on `naivefox-full-source`, then validate the
+complete minimized product graph. The gate includes Linux and Windows product builds where supported,
 focused unit regressions, H2/H3/Auto/config/listener behavior, padding and
 integrity, concurrency/backpressure/lifecycle, package manifests, staged
 runtime checks, and size/closure assertions. Use the full minimal graph after
@@ -99,14 +99,14 @@ build-system or dependency changes:
 MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
 ```
 
-If Gate 1 passes but Gate 2 fails, treat the failure as a minimization
-integration defect until evidence proves the full reference is also affected.
-Do not weaken shared behavior merely to make the minimized graph pass.
+If the upstream refresh passes source review but the minimized graph fails,
+treat the failure as a minimization integration defect. Do not weaken shared
+behavior merely to make the minimized graph pass.
 
-### Gate 3: `minimal` to `minimal-source`
+### Gate 2 details: freeze, evidence, and export
 
-Gate 3 starts only after Gate 2 is complete. Use exactly two adjacent commits
-on `minimal`:
+Gate 2 starts only after the working branch is complete. Use exactly two
+adjacent commits on `naivefox-full-source`:
 
 ```text
 S  source, build configuration, tools, and durable documentation
@@ -131,10 +131,13 @@ The gate is:
    or old object directories;
 7. configure and build only the exported NaiveFox graph for the supported
    platforms, stage it, and run the applicable product acceptance suites;
-8. create one new linear `minimal-source` snapshot and an annotated release tag.
+8. create one new linear `naivefox-minimal-source` snapshot. Release tags and
+   draft GitHub releases are created by the manual workflow.
 
-If `minimal` passes but the isolated export fails, fix the allowlist, exporter,
-or source closure on `minimal`; never patch `minimal-source` manually.
+If `naivefox-full-source` passes but the isolated export fails, fix the
+allowlist, exporter, or source closure on `naivefox-full-source`; never patch
+the product tree manually. Only the workflow control-plane overlay is edited
+directly on `naivefox-minimal-source`.
 
 ## Provenance without SHA churn
 
@@ -143,8 +146,8 @@ from Markdown:
 
 ```bash
 git rev-parse HEAD
-git merge-base HEAD main
-git merge-base HEAD naivefox
+git merge-base HEAD firefox-upstream
+git merge-base HEAD naivefox-full-source
 ```
 
 Every recorded object ID must resolve to one canonical 40-hex commit and satisfy
@@ -156,10 +159,15 @@ directory, cross-validates every report, and installs the set only after all
 checks pass. Partial evidence updates are invalid. Exact tool/config inputs are
 included in evidence so a change automatically invalidates old reports.
 
-The public export manifest records the exact Firefox base, NaiveFox reference,
-minimal source commit `S`, evidence commit `E`, file count, sorted path/mode/hash
+The public export manifest records the exact Firefox base, NaiveFox full-source
+reference, minimal source commit `S`, evidence commit `E`, file count, sorted path/mode/hash
 entries, and a canonical manifest hash. Internal closure categories and raw
 trace details remain build evidence rather than product-tree prose.
+
+The product branch's `.github/workflows/` directory is a control-plane overlay,
+not a generated source entry. `export-minimal-source.sh` carries the current
+overlay forward from `naivefox-minimal-source`, so workflow edits do not require
+another full-source change before the next product export.
 
 `UPSTREAM-BASE` records source provenance that can be known at export time. The
 publication commit is represented by the generated branch commit and annotated
@@ -203,8 +211,8 @@ on a concrete Git-recorded base between refreshes.
 
 - Gate 1 failure: resolve or remove the downstream Firefox integration.
 - Gate 2-only failure: repair minimized configuration/runtime assumptions.
-- Gate 3-only failure: repair evidence, manifest, allowlist, or isolated export.
-- Shared product behavior changes flow down from `naivefox`; fixes never flow
+- Gate 2-only failure: repair evidence, manifest, allowlist, or isolated export.
+- Shared product behavior changes flow down from `naivefox-full-source`; fixes never flow
   upward from generated source.
 
 ## Capture policy
