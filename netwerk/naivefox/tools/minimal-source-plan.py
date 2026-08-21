@@ -70,13 +70,15 @@ TRACKED_SOURCE_FIXTURES = {
 }
 # Mach imports Blessed before configure starts.  Linux evidence therefore
 # cannot observe Blessed's Windows-only import path or the Jinxed/ANSICON
-# modules behind it.  Export these small vendored packages as a bounded
-# platform bootstrap class so the standalone tree can start Mach natively on
-# Windows.
+# modules behind it.  platformdirs also selects its Windows implementation
+# while that import is running.  Export these small vendored files as a
+# bounded platform bootstrap class so the standalone tree can start Mach
+# natively on Windows.
 WINDOWS_MACH_BOOTSTRAP_PREFIXES = (
     "third_party/python/ansicon/",
     "third_party/python/blessed/",
     "third_party/python/jinxed/",
+    "third_party/python/platformdirs/platformdirs/windows.py",
 )
 ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
