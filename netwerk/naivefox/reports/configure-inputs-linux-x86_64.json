@@ -1,5 +1,5 @@
 {
-  "collector_sha256": "f598ea9a355814e6e4f7da76688e5d8b7eeafdbb0f58438ed396deaf1d36e7b3",
+  "collector_sha256": "38b38ab2e0bc8ffcfff7f15846b6bb895ca992a58ad4e52c9f62de543630b777",
   "configure_command": [
     "strace",
     "-f",
@@ -22,7 +22,7 @@
     "directories": 11050,
     "files": 10270
   },
-  "evidence_collector_sha256": "9311b204d72831470af1a278a3e76f8f839462123444de38853574f45e9de441",
+  "evidence_collector_sha256": "2c25575c9e19f03892d62619d83ab014dc27727f3f1fcaeb2b8f1c19f630e8f4",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -10298,7 +10298,7 @@
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "75e1719d590083cbd60977961c695788a3ece1ba",
+  "naivefox_reference_commit": "7bb5d5418d6b3f72d753f35010d272320e42f7fa",
   "observed_directories": [
     "browser",
     "build",
@@ -21351,15 +21351,15 @@
     "xpcom/rust/gkrust_utils",
     "xpcom/threads"
   ],
-  "provenance_sha256": "9aa6ef442ddb22957ff2a738652386a2380dfc10cc1289e1d5d76858c6e34553",
+  "provenance_sha256": "be679ab13bb39939bd5802769084a0c47d4e4b181f114e4858fe5119189311dd",
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "43de35bde815c5f7515f8cc12f87b9cf60762615",
+  "source_commit": "7bb5d5418d6b3f72d753f35010d272320e42f7fa",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "fab0b59d54f015bda74d50ad9d1a06935075472a60b9a32d083a6a022b123221",
-  "trace_size_bytes": 39644174
+  "trace_sha256": "a311910c8501df5a2b9f0fce915c18bc157aac67a3c2dfa0665733e0638b5a2d",
+  "trace_size_bytes": 38670692
 }

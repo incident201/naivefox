@@ -11292,12 +11292,12 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "aabbe6dd0185bbf24b950e29dbf603e174ab1dc38fc50e51f76b36cff159a227",
+  "collector_sha256": "e7a0485452e7199f649043d5a5e8a102c35002fccac099f6b2128763e642c32b",
   "counts": {
     "directory_contracts": 35,
     "files": 18111
   },
-  "depfile_count": 1452,
+  "depfile_count": 1847,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -11335,7 +11335,7 @@
     "tools/fuzzing/ipc",
     "tools/profiler/core"
   ],
-  "evidence_collector_sha256": "9311b204d72831470af1a278a3e76f8f839462123444de38853574f45e9de441",
+  "evidence_collector_sha256": "2c25575c9e19f03892d62619d83ab014dc27727f3f1fcaeb2b8f1c19f630e8f4",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -29451,7 +29451,7 @@
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "generated_makefile_count": 370,
-  "generated_makefiles_sha256": "ebb37b1a00cd992f077ca8d0ae470ce7fa4a9c9702d99727b5c4bdaf0a8ca399",
+  "generated_makefiles_sha256": "4bc62cf8aa2544a33825b8b1cd60519d21e7f623fe39c5978b9b107255246c28",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -29466,15 +29466,15 @@
   "install_manifests_sha256": "b27664a5fb85e40d92ea46fc4cbd6067305c6d1b17bd37e084a71ece9b976f5f",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c",
-  "naivefox_reference_commit": "75e1719d590083cbd60977961c695788a3ece1ba",
+  "naivefox_reference_commit": "7bb5d5418d6b3f72d753f35010d272320e42f7fa",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "5ca2c5e5891c388e547e26ec18886d9cc1c39083d7038c6ead3cdaddb841c923",
-    "config_status_deps.in": "df9bae4badfce5ce12a7560e95515e4dc0f6d7992a4c0266edb5d0d48508ea20"
+    "backend.RecursiveMakeBackend.in": "549a037e29395d7f5c5b224a216396a9514a3b76668252380b20116814c6938d",
+    "config_status_deps.in": "009b32cc7901f08cebda2426b2cc27b1db7be8b1736014e3b4614d504942e879"
   },
-  "provenance_sha256": "9aa6ef442ddb22957ff2a738652386a2380dfc10cc1289e1d5d76858c6e34553",
+  "provenance_sha256": "be679ab13bb39939bd5802769084a0c47d4e4b181f114e4858fe5119189311dd",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "43de35bde815c5f7515f8cc12f87b9cf60762615",
+  "source_commit": "7bb5d5418d6b3f72d753f35010d272320e42f7fa",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
