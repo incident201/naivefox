@@ -1,10 +1,10 @@
 {
   "counts": {
-    "executable_files": 143,
-    "files": 22621
+    "executable_files": 144,
+    "files": 22622
   },
-  "evidence_commit": "3b84fa001a50b5dfd5209717b154dbb27f23f68f",
-  "evidence_source_commit": "43de35bde815c5f7515f8cc12f87b9cf60762615",
+  "evidence_commit": "c5f21a77599bcd8c50335a41647a0c0317ab7077",
+  "evidence_source_commit": "8dfe9a8356d43c3de4bb3406f1e7577202a3912a",
   "files": [
     {
       "mode": "0644",
@@ -44,7 +44,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "9712d41b0800a31eac4704ac1b8949670fe384434b1acce626d5d91de009bf82"
+      "sha256": "fb138bab4730e009cff898ccad8f682111c8502785bfdf7bef9f513b654b742b"
     },
     {
       "mode": "0644",
@@ -23399,7 +23399,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "b948338c35e7d1becf8f8382e07467e91ff9cebcd5a6f20ce7c56ad0276b5599"
+      "sha256": "c791574a5b4269afda8b479e5ccf1e739ce3570157c8c96cf3e092ed405e84d7"
     },
     {
       "mode": "0644",
@@ -23629,7 +23629,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/README.md",
-      "sha256": "4caf8c27eafcdd2c497e615238f41ccd136c9794a26f988a25ccb77b9fd22281"
+      "sha256": "fbbf0dec7c5ffcd801b561a3471ec4e8a7142df86f6d48a6ad47e1106a3a7e0f"
     },
     {
       "mode": "0755",
@@ -23823,6 +23823,11 @@
     },
     {
       "mode": "0755",
+      "path": "netwerk/naivefox/tools/build-product.sh",
+      "sha256": "a385c38781e4d9285f21df882f404c1e85c11ec7bb5dcd0bb7322c562dea03ed"
+    },
+    {
+      "mode": "0755",
       "path": "netwerk/naivefox/tools/fetch-firefox-reference.sh",
       "sha256": "655e4718832126d996025631c8b51d42b0207776cc21b295853fed9e23feb1ad"
     },
@@ -23839,7 +23844,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/tools/run-windows-soak.py",
-      "sha256": "bde5dc1d90727f955d0dc12039e7455d250d2758a5ffecaa4542579d602c1806"
+      "sha256": "f83f57874111f256612809f213742e01c2ab3ebf9eaac961314850a472a76c3e"
     },
     {
       "mode": "0644",
@@ -113113,8 +113118,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "43be1b75dab5e120efff5d3d4ddb03e29e6014cf00e996d62ed611aa0edfb020",
+  "manifest_sha256": "17da2a5b39d1f84f18dea827c874337981b5936a4b67b786c92a902d734e1af1",
   "manifest_version": 2,
-  "minimal_export_commit": "3b84fa001a50b5dfd5209717b154dbb27f23f68f",
-  "naivefox_reference_commit": "75e1719d590083cbd60977961c695788a3ece1ba"
+  "minimal_export_commit": "c5f21a77599bcd8c50335a41647a0c0317ab7077",
+  "naivefox_reference_commit": "8dfe9a8356d43c3de4bb3406f1e7577202a3912a"
 }

@@ -74,7 +74,7 @@ no-argument `config.json` and an explicit positional config with inherited
 loader and TLS-keylog variables removed.
 
 Windows packages are checked with the staged Windows verifier and native
-PowerShell/Python smoke/soak tooling on the `minimal` branch. The native gate
+PowerShell/Python smoke/soak tooling on the `naivefox-full-source` branch. The native gate
 must include valid CONNECT churn and repeated channel-stop/lifecycle activity;
 a launch-only check is insufficient.
 

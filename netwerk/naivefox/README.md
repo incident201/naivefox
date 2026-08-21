@@ -138,17 +138,17 @@ product workflow builds only the minimized NaiveFox graph. It does not build a
 Firefox browser:
 
 ```bash
-MOZCONFIG=netwerk/naivefox/mozconfig-minimal ./mach build -j4
+./netwerk/naivefox/tools/build-product.sh linux \
+  --objdir "$PWD/../obj-naivefox-linux"
 ```
 
-The Windows x86-64 cross-build uses the separate product mozconfig on the
-`minimal` branch and Mozilla's clang-cl toolchain with the Visual Studio linker
-and Windows SDK:
+The same entrypoint selects the Windows x86-64 mozconfig, external object
+directory, staging script, and (under WSL) the portable Wine paths/prefix:
 
 ```bash
-MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64 \
-NAIVEFOX_OBJDIR="$PWD/obj-naivefox-windows-x86_64" \
-./mach build -j4
+./netwerk/naivefox/tools/build-product.sh windows \
+  --objdir "$PWD/../obj-naivefox-windows" \
+  --bootstrap
 ```
 
 Run the reproducible local H2/H3/Auto/config/robustness gate with:
@@ -163,12 +163,19 @@ isolated NSS profiles. No real proxy account is required. Detailed focused and
 real-deployment commands are in
 [`test/integration/README.md`](test/integration/README.md).
 
-Stage and verify the Linux package after a successful product build:
+The entrypoint stages the package below the object directory. Verify the Linux
+package after a successful product build:
 
 ```bash
-./netwerk/naivefox/tools/stage-runtime.sh naivefox-linux-x86_64
-./netwerk/naivefox/tools/verify-staged-runtime.sh naivefox-linux-x86_64
+NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
+./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  package/naivefox-linux-x86_64
 ```
+
+The entrypoint disables the local sccache daemon by default so a build does
+not depend on stale daemon state or silently change its configure inputs. Set
+`NAIVEFOX_USE_SCCACHE=1` only when the daemon has been deliberately configured
+for this checkout.
 
 An ordinary Firefox build is not a merge or release gate. It is allowed only
 for an explicitly requested same-base capture comparison; see
@@ -177,18 +184,25 @@ for an explicitly requested same-base capture comparison; see
 ## Repository workflow
 
 ```text
-Mozilla main -> main -> naivefox -> minimal -> generated minimal-source
+Mozilla main -> firefox-upstream -> naivefox-full-source -> generated naivefox-minimal-source
 ```
 
-- `main` is a clean fast-forward-only Mozilla mirror.
-- `naivefox` is the complete full-source reference implementation.
-- `minimal` contains the minimized build/runtime and export tooling.
-- `minimal-source` is a generated standalone snapshot and is never hand-edited.
+- `firefox-upstream` is a clean fast-forward-only Mozilla mirror.
+- `naivefox-full-source` is the single complete working tree containing the
+  NaiveFox implementation, minimization rules, and export tooling.
+- `naivefox-minimal-source` is a generated standalone product snapshot and is
+  never hand-edited. Its `.github/workflows/` control-plane files are the
+  deliberate exception and may be maintained directly.
 
-The three review gates and provenance rules are defined in `UPSTREAM.md` in the
-full maintenance checkout. In particular, commit SHAs and test transcripts
+The refresh and export gates are defined in `UPSTREAM.md` in the full
+maintenance checkout. In particular, commit SHAs and test transcripts
 belong in generated evidence, commits, and annotated tags rather than being
 copied into active Markdown.
+
+Release automation is intentionally maintained as the control-plane overlay
+`.github/workflows/release.yml` on `naivefox-minimal-source`. It is manual-only,
+builds that branch's compact tree for Linux and Windows, and creates a draft
+release without running the integration/Caddy suites.
 
 ## Security and data handling
 

@@ -24,7 +24,7 @@ import psutil
 
 
 README_URL = (
-    "https://raw.githubusercontent.com/incident201/naivefox/naivefox/"
+    "https://raw.githubusercontent.com/incident201/naivefox/naivefox-full-source/"
     "netwerk/naivefox/README.md"
 )
 ARCHIVE_URL = (
