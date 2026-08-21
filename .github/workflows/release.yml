@@ -192,6 +192,45 @@ jobs:
           $nasm.DirectoryName | Out-File `
             -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+          # This is the x86_64 runtime-DLL bundle produced by Firefox's
+          # win64-WindowsAppSDK toolchain job for this source revision.
+          $appSdkArchive = Join-Path $env:RUNNER_TEMP `
+            'winappsdk-x86_64-pc-windows-msvc.tar.zst'
+          $appSdkParent = Join-Path $env:RUNNER_TEMP 'windows-app-sdk'
+          curl.exe --fail --location `
+            'https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/WB_mKg31SO2GAGiahx2A8w/artifacts/public/build/winappsdk-x86_64-pc-windows-msvc.tar.zst' `
+            --output $appSdkArchive
+          $appSdkSha256 = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath $appSdkArchive
+          ).Hash
+          if ($appSdkSha256 -ne '62B2378C602AB8DCA78B44E165638E95EA22D906970190A71E31D0BEBC76B7EA') {
+            throw "unexpected Windows App SDK archive SHA-256: $appSdkSha256"
+          }
+          New-Item -ItemType Directory -Force -Path $appSdkParent | Out-Null
+          tar.exe -xf $appSdkArchive -C $appSdkParent
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to extract $appSdkArchive"
+          }
+          $appSdkDir = Join-Path $appSdkParent `
+            'winappsdk-x86_64-pc-windows-msvc'
+          $requiredAppSdkDlls = @(
+            'CoreMessagingXP.dll',
+            'marshal.dll',
+            'Microsoft.InputStateManager.dll',
+            'Microsoft.Internal.FrameworkUdk.dll',
+            'Microsoft.UI.Composition.OSSupport.dll',
+            'Microsoft.UI.Input.dll',
+            'Microsoft.UI.Windowing.Core.dll',
+            'Microsoft.UI.Windowing.dll'
+          )
+          foreach ($dll in $requiredAppSdkDlls) {
+            if (-not (Test-Path (Join-Path $appSdkDir $dll))) {
+              throw "Windows App SDK extraction is missing $dll"
+            }
+          }
+          "MOZ_WINDOWS_APP_SDK_DIR=$appSdkDir" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build and stage NaiveFox
         if: steps.staged_cache.outputs.cache-hit != 'true'
         shell: bash
