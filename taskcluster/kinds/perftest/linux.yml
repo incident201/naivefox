@@ -426,8 +426,6 @@ side-by-side:
     run:
         clone-with: hg
         using: run-task
-        sparse-profile: perftest
-        checkout: true
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -448,8 +446,6 @@ mwu-change-detector:
     run:
         clone-with: hg
         using: run-task
-        sparse-profile: perftest
-        checkout: true
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&

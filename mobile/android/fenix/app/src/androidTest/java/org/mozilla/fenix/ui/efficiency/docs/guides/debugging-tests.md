@@ -28,8 +28,8 @@ A conversion is done only when the **named** test:
 - **Slow ≠ flaky (E1).** UIAutomator list rendering can take ~3s; `mozVerify` polls-until-present (logs
   "not found" retries, then finds it). If it passed on try #1 with retries _inside_ the poll, that's fine —
   not flaky.
-- **Retry can mask a real red (A5, MTE-5729).** `BaseTest.isRetryable()` is broad; one retry can turn a
-  genuine failure green. A test that only passes on a _test-level_ retry is flaky/failing, not done.
+- **No test-level retry (A5, bug 2065120).** `BaseTest` does not re-run a failed test; a red is a red.
+  Firebase still retries once, so a test that only passes on _its_ retry is flaky/failing, not done.
 - **Local-only opaque crash (A1/A2).** A test that should report a clean assertion instead dies with a
   StrictMode `penaltyDeath` crash locally (but passes on Firebase) = Espresso's failure-handler screenshot
   tripping StrictMode. `BaseTest` disables screenshot capture; presence probes are exception-safe (return

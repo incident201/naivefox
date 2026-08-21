@@ -291,7 +291,12 @@ toolbar[inactive="true"] .urlbar,
 }
 
 .urlbar-input-container {
-  padding-inline: var(--urlbar-input-container-padding);
+  /* The buttons keep the same distance to the inline edges as to the block ones,
+     which is half of the height they leave over. This resolves the height here
+     rather than reusing --urlbar-input-container-padding, which substitutes it
+     at :root and so misses a --urlbar-height set further down, as New Tab
+     does. */
+  padding-inline: calc((var(--urlbar-height) - var(--urlbar-basic-component-size)) / 2);
   min-width: 0;
   display: flex;
   align-items: center;
@@ -299,6 +304,13 @@ toolbar[inactive="true"] .urlbar,
   box-sizing: border-box;
   border-radius: var(--urlbar-border-radius);
   overflow: clip;
+
+  /* stylelint-disable-next-line media-query-no-invalid */
+  @media not -moz-pref("browser.nova.enabled") {
+    /* This branch draws a border on the container, and that insets the buttons
+       too, so it comes out of the padding. */
+    padding-inline: calc((var(--urlbar-height) - var(--urlbar-basic-component-size)) / 2 - var(--urlbar-input-container-border-width));
+  }
 
   .urlbar[breakout] > & {
     width: 100%;
@@ -521,6 +533,13 @@ toolbar[inactive="true"] .urlbar,
 }
 
 .urlbar-input-box {
+  /* The box spans the container, so the buttons after it stay at its end, and
+     is a flex container, so the input fills it. xul.css gives a XUL element
+     both, through `* { display: flex }` and `[flex="1"]`, and a content
+     document does not load it. */
+  display: flex;
+  flex-grow: 1;
+  min-width: 0;
   height: 100%;
   margin-inline-start: var(--urlbar-input-gap);
 

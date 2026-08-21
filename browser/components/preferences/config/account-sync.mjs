@@ -1140,14 +1140,14 @@ SettingGroupManager.registerGroups({
     ],
   },
   referrals: {
-    l10nId: "referrals-section-header",
+    l10nId: "referrals-section-header2",
     headingLevel: 2,
     hidden: !Referrals.isEnabled,
     items: [
       {
         id: "referrals-link",
         control: "moz-box-button",
-        l10nId: "referrals-link",
+        l10nId: "referrals-link2",
       },
     ],
   },

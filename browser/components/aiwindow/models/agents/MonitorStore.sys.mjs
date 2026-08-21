@@ -116,6 +116,34 @@ function watchUrlRecords(watchUrls) {
   return normalizedUrls;
 }
 
+function initialSnapshotRecord(snapshot, recoverInvalid = false) {
+  if (snapshot == null) {
+    return null;
+  }
+  try {
+    if (
+      typeof snapshot !== "object" ||
+      Array.isArray(snapshot) ||
+      typeof snapshot.pageContent !== "string"
+    ) {
+      throw invalidField("initial snapshot");
+    }
+    return {
+      capturedAt: timestampField(
+        snapshot.capturedAt,
+        "initial snapshot timestamp"
+      ),
+      pageContent: snapshot.pageContent,
+    };
+  } catch (error) {
+    if (!recoverInvalid) {
+      throw error;
+    }
+    lazy.log.warn(`Discarding invalid stored initial snapshot: ${error}`);
+    return null;
+  }
+}
+
 function historyRecord(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     throw invalidField("history entry");
@@ -194,6 +222,10 @@ function sanitizeMonitorRecord(monitor, recoverInvalidHistory = false) {
     ),
     history: sanitizeHistoryRecords(
       monitor.history ?? [],
+      recoverInvalidHistory
+    ),
+    initialSnapshot: initialSnapshotRecord(
+      monitor.initialSnapshot ?? null,
       recoverInvalidHistory
     ),
   };

@@ -5,10 +5,7 @@
 import { SearchModeSwitcher } from "chrome://browser/content/urlbar/SearchModeSwitcher.mjs";
 import { UrlbarChildController } from "chrome://browser/content/urlbar/UrlbarChildController.mjs";
 import { UrlbarEventBufferer } from "chrome://browser/content/urlbar/UrlbarEventBufferer.mjs";
-import {
-  getPlatform,
-  isWindowPrivate,
-} from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
+import * as UrlbarContentUtils from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 import { UrlbarQueryContext } from "chrome://browser/content/urlbar/UrlbarQueryContext.mjs";
 import { UrlbarView } from "chrome://browser/content/urlbar/UrlbarView.mjs";
@@ -200,8 +197,7 @@ ${
 
         <moz-urlbar-slot name="site-info" />
         <xul:moz-input-box tooltip="aHTMLTooltip"
-                           class="urlbar-input-box"
-                           flex="1">
+                           class="urlbar-input-box">
           <!-- In the addressbar, there will be an input with id="urlbar-scheme" here. -->
           <input class="urlbar-input textbox-input"
                  role="combobox"
@@ -323,7 +319,7 @@ ${
 
     this.window = window;
     this.document = this.window.document;
-    this.isPrivate = isWindowPrivate(this.window);
+    this.isPrivate = UrlbarContentUtils.isWindowPrivate(this.window);
 
     UrlbarPrefs.addObserver(this);
     window.addEventListener("unload", () => {
@@ -569,7 +565,7 @@ ${
     this.window.addEventListener("keyup", this);
 
     this.window.addEventListener("mousedown", this);
-    if (getPlatform() == "win") {
+    if (UrlbarContentUtils.getPlatform() == "win") {
       this.window.addEventListener("draggableregionleftmousedown", this);
     }
     this.addEventListener("mousedown", this);
@@ -667,7 +663,7 @@ ${
     this.window.removeEventListener("keyup", this);
 
     this.window.removeEventListener("mousedown", this);
-    if (getPlatform() == "win") {
+    if (UrlbarContentUtils.getPlatform() == "win") {
       this.window.removeEventListener("draggableregionleftmousedown", this);
     }
     this.removeEventListener("mousedown", this);
@@ -743,7 +739,7 @@ ${
 
     this._initStripOnShare();
     this._initPasteAndGo();
-    if (this.#isAddressbar && getPlatform() == "macosx") {
+    if (this.#isAddressbar && UrlbarContentUtils.getPlatform() == "macosx") {
       this.#initShareURL();
     }
     if (this.#isAddressbar) {
@@ -791,7 +787,7 @@ ${
     if (this.isPrivate) {
       return "private";
     }
-    return lazy.AIWindow.isAIWindowActive(this.window)
+    return lazy?.AIWindow.isAIWindowActive(this.window)
       ? "smartwindow"
       : "classic";
   }
@@ -1238,7 +1234,7 @@ ${
    * @param {Event} [event] The event triggering the open.
    */
   handleCommand(event = null) {
-    let isMouseEvent = MouseEvent.isInstance(event);
+    let isMouseEvent = UrlbarShared.isInstance(event, MouseEvent);
     if (isMouseEvent && event.button == 2) {
       // Do nothing for right clicks.
       return;
@@ -1410,7 +1406,7 @@ ${
     // been updated yet, because the input event happens after composition end.
     // We can't trust element nor _resultForCurrentValue targets in that case,
     // so we always generate a new heuristic to load.
-    let isComposing = this.editor.composing;
+    let isComposing = this.isComposing;
 
     // Use the selected element if we have one; this is usually the case
     // when the view is open.
@@ -1850,7 +1846,10 @@ ${
       openParams.forceForeground = true;
     }
 
-    let keepViewOpen = this.controller.willLoadInBackground(where, openParams);
+    let keepViewOpen = UrlbarContentUtils.willLoadInBackground(
+      where,
+      openParams
+    );
     openParams.avoidBrowserFocus = keepViewOpen;
 
     if (!this.#providesSearchMode(result) && !keepViewOpen) {
@@ -3724,8 +3723,10 @@ ${
     // use the unmodified url instead. Otherwise, if the user edits the url
     // and confirms the new value, we may transform the url into a search.
     let trimmedUrl = UrlbarShared.stripPrefixAndTrim(url, { stripHttp })[0];
-    let isSearch =
-      !!this.controller.getFixupPrimitives(trimmedUrl)?.keywordAsSent;
+    let isSearch = !!UrlbarContentUtils.getFixupPrimitives(
+      trimmedUrl,
+      this.isPrivate
+    )?.keywordAsSent;
     if (isSearch) {
       // Although https-first might not respect the shown protocol, converting
       // the result to a search would be more disruptive.
@@ -3853,7 +3854,7 @@ ${
 
     let isRTL =
       this.getAttribute("domaindir") === "rtl" &&
-      this.controller.isTextDirectionRTL(this.value);
+      UrlbarContentUtils.isTextDirectionRTL(this.value, window);
 
     this.window.promiseDocumentFlushed(() => {
       // Check overflow again to ensure it didn't change in the meanwhile.
@@ -4016,7 +4017,7 @@ ${
       event.keyCode == KeyEvent.DOM_VK_SHIFT ||
       event.keyCode == KeyEvent.DOM_VK_ALT ||
       event.keyCode ==
-        (getPlatform() == "macosx"
+        (UrlbarContentUtils.getPlatform() == "macosx"
           ? KeyEvent.DOM_VK_META
           : KeyEvent.DOM_VK_CONTROL)
     ) {
@@ -4115,7 +4116,7 @@ ${
       : val;
     // Only trim value if the directionality doesn't change to RTL and we're not
     // showing a strikeout https protocol.
-    return this.controller.isTextDirectionRTL(trimmedValue) ||
+    return UrlbarContentUtils.isTextDirectionRTL(trimmedValue, window) ||
       this.#getValueFormatter().willShowFormattedMixedContentProtocol(val)
       ? val
       : trimmedValue;
@@ -5330,7 +5331,7 @@ ${
 
     // The extension input sessions depends more on blur than on the fact we
     // actually cancel a running query, so we do it here.
-    if (lazy.ExtensionSearchHandler.hasActiveInputSession()) {
+    if (lazy?.ExtensionSearchHandler.hasActiveInputSession()) {
       lazy.ExtensionSearchHandler.handleInputCancelled();
     }
 
@@ -5358,7 +5359,9 @@ ${
     this._isKeyDownWithMeta = false;
     this._isKeyDownWithMetaAndLeft = false;
 
-    Services.obs.notifyObservers(null, "urlbar-blur");
+    if (typeof ChromeUtils != "undefined") {
+      Services.obs.notifyObservers(null, "urlbar-blur");
+    }
   }
 
   _on_click(event) {
@@ -5434,11 +5437,12 @@ ${
     if (this.#isAddressbar && (this._protocolIsTrimmed || this._wwwIsTrimmed)) {
       let untrim = this._wwwIsTrimmed;
       if (!untrim) {
-        let fixedDisplaySpec = this.controller.getFixupPrimitives(
-          this.value
+        let fixedDisplaySpec = UrlbarContentUtils.getFixupPrimitives(
+          this.value,
+          this.isPrivate
         )?.preferredURIDisplaySpec;
         if (fixedDisplaySpec) {
-          let expectedDisplaySpec = this.controller.getDisplaySpec(
+          let expectedDisplaySpec = UrlbarContentUtils.getDisplaySpec(
             this._untrimmedValue
           );
           if (expectedDisplaySpec == null) {
@@ -5790,7 +5794,7 @@ ${
 
     const pasteData = UrlbarShared.sanitizeTextFromClipboard(
       originalPasteData,
-      this.controller.getFixupPrimitives(originalPasteData)
+      UrlbarContentUtils.getFixupPrimitives(originalPasteData, this.isPrivate)
     );
 
     if (originalPasteData != pasteData) {
@@ -5956,7 +5960,7 @@ ${
         this._keyDownEnterDeferred = Promise.withResolvers();
         this._keyDownEnterDeferred.inputEpoch = this.#inputEpoch;
         event._disableCanonization =
-          getPlatform() == "macosx"
+          UrlbarContentUtils.getPlatform() == "macosx"
             ? this._isKeyDownWithMeta
             : this._isKeyDownWithCtrl;
       }
@@ -6053,6 +6057,16 @@ ${
 
       this._keyDownEnterDeferred = null;
     }
+  }
+
+  /**
+   * Whether an IME composition is in progress. Mirrors chrome-only
+   * `editor.composing`.
+   *
+   * @returns {boolean}
+   */
+  get isComposing() {
+    return this.#compositionState == UrlbarShared.COMPOSITION.COMPOSING;
   }
 
   _on_compositionstart() {
@@ -6196,7 +6210,7 @@ ${
     if (!droppedData) {
       return;
     }
-    let droppedString = URL.isInstance(droppedData)
+    let droppedString = UrlbarShared.isInstance(droppedData, URL)
       ? droppedData.href
       : droppedData;
     if (droppedString == this.window.gBrowser.currentURI.spec) {
@@ -6312,7 +6326,7 @@ ${
    * @returns {boolean} Whether the even will act like the Home key.
    */
   #isHomeKeyUpEvent(event) {
-    let isMac = getPlatform() === "macosx";
+    let isMac = UrlbarContentUtils.getPlatform() === "macosx";
     return (
       // On MacOS this can be generated with Fn + Left.
       event.keyCode == KeyEvent.DOM_VK_HOME ||

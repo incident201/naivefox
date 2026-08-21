@@ -751,6 +751,50 @@ class AccessibilityTest : BaseSessionTest() {
     }
 
     @Test
+    fun testFieldset() {
+        mainSession.loadTestPath(FORMS2_HTML_PATH)
+        waitForInitialFocus()
+
+        val rootNode = createNodeInfo(View.NO_ID)
+        assertThat("Document has 2 children", rootNode.childCount, equalTo(2))
+
+        val formNode = createNodeInfo(rootNode.getChildId(0))
+        assertThat("Form has 1 child", formNode.childCount, equalTo(1))
+
+        val fieldsetNode = createNodeInfo(formNode.getChildId(0))
+        assertThat(
+            "Fieldset has correct containerTitle",
+            fieldsetNode.containerTitle.toString(),
+            equalTo("Create New Account"),
+        )
+    }
+
+    @Test
+    fun testMixedCheckbox() {
+        var nodeId = AccessibilityNodeProvider.HOST_VIEW_ID
+        mainSession.loadUri(
+            "data:text/html;charset=utf-8,<div tabindex='0' id='checkbox' role='checkbox' aria-label='Are you sure?' aria-checked='mixed'></div>"
+        )
+        waitForInitialFocus(true)
+
+        sessionRule.waitUntilCalled(
+            object : EventDelegate {
+                @AssertCalled(count = 1)
+                override fun onAccessibilityFocused(event: AccessibilityEvent) {
+                    nodeId = getSourceId(event)
+                    val node = createNodeInfo(nodeId)
+                    assertThat("Accessibility focus on first text leaf", node.text.toString(), equalTo("Are you sure?"))
+                    assertThat(
+                        "Accessibility focus on first text leaf",
+                        node.hintText.toString(),
+                        equalTo("partially checked"),
+                    )
+                }
+            }
+        )
+    }
+
+    @Test
     fun testMoveByCharacter() {
         var nodeId = AccessibilityNodeProvider.HOST_VIEW_ID
         mainSession.loadUri("data:text/html;charset=utf-8,<p>🤦‍♂️ Peanut</p>")

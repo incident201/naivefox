@@ -6,6 +6,7 @@ import {
   Monitor,
   monitorAgeMs,
   trimAndFilterWatchUrls,
+  urlListsEqual,
   TOTAL_NUM_MONITORS,
   MONITOR_PROMPT_VERSION,
   MONITOR_AGENTS_CHANGED_TOPIC,
@@ -143,6 +144,7 @@ export const MonitorAgent = {
       throw error;
     }
     monitor.scheduleNextRun();
+    this._refreshInitialSnapshot(monitor);
     const telemetryData = monitorTelemetryExtra(monitor);
     telemetryData.source = source;
     Glean.smartWindow.monitorCreate.record(telemetryData);
@@ -198,9 +200,24 @@ export const MonitorAgent = {
       throw new Error("Monitor is invalid.");
     }
 
+    // The stored snapshot is the baseline from when the user last committed
+    // the monitor's definition, so any definition edit (title, prompt,
+    // schedule, or watch URLs) replaces it with one captured at edit time.
+    // Pause/resume toggles are not edits and keep the baseline.
+    const scheduleChanged =
+      "schedule" in updates &&
+      JSON.stringify({ ...next.schedule }) !==
+        JSON.stringify({ ...monitor.schedule });
+    const definitionChanged =
+      scheduleChanged ||
+      next.monitorPrompt !== monitor.monitorPrompt ||
+      next.title !== monitor.title ||
+      !urlListsEqual(next.watchUrls, monitor.watchUrls);
+
     // save old in case the update fails, so we can restore it
     const previous = {
       enabled: monitor.enabled,
+      initialSnapshot: monitor.initialSnapshot,
       monitorPrompt: monitor.monitorPrompt,
       nextRunTime: monitor.nextRunTime,
       schedule: monitor.schedule,
@@ -216,6 +233,11 @@ export const MonitorAgent = {
     monitor.title = next.title;
     monitor.watchUrls = next.watchUrls;
     monitor.updatedAt = new Date().toISOString();
+    if (definitionChanged) {
+      // stop any in-flight capture so a stale baseline can't land post-edit
+      monitor.cancelSnapshotCapture();
+      monitor.initialSnapshot = null;
+    }
     try {
       await this._saveAndNotify(monitor);
     } catch (error) {
@@ -223,6 +245,9 @@ export const MonitorAgent = {
       throw error;
     }
     monitor.scheduleNextRun();
+    if (definitionChanged) {
+      this._refreshInitialSnapshot(monitor);
+    }
     const telemetryExtra = monitorTelemetryExtra(monitor);
     Glean.smartWindow.monitorEdit.record(telemetryExtra);
     if (previous.enabled !== monitor.enabled) {
@@ -336,6 +361,32 @@ export const MonitorAgent = {
         }
       }
     }
+  },
+
+  /**
+   * Captures the monitor's initial snapshot in the background and persists it
+   * once done. Never blocks creation or editing; failures are logged and the
+   * monitor keeps working without a snapshot.
+   *
+   * @param {Monitor} monitor
+   */
+  _refreshInitialSnapshot(monitor) {
+    monitor
+      .ensureInitialSnapshot()
+      .then(() => {
+        // the monitor may have been deleted or replaced while capturing
+        if (gMonitors?.get(monitor.id) === monitor) {
+          return this._saveAndNotify(monitor);
+        }
+        return null;
+      })
+      .catch(error => {
+        lazy.log.warn(
+          `Failed to capture initial snapshot for monitor ${monitor.id}: ${
+            error.message ?? error
+          }`
+        );
+      });
   },
 
   async _saveAndNotify(monitor = null) {

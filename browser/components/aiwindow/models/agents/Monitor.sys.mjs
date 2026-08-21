@@ -70,6 +70,8 @@ export class Monitor {
   #running = false;
   #disposed = false;
   #abortController = null;
+  #snapshotCapture = null;
+  #snapshotAbortController = null;
 
   /**
    * @param {object} options
@@ -86,6 +88,10 @@ export class Monitor {
    * @param {string} [options.lastRunTime] - Last run timestamp.
    * @param {string} [options.nextRunTime] - Next run timestamp.
    * @param {object[]} [options.history] - Saved monitor history entries.
+   * @param {{ capturedAt: string, pageContent: string }} [options.initialSnapshot] -
+   *   Page content extracted when the monitor was created, used as the
+   *   baseline for change detection. The page content covers all watch URLs
+   *   in the same concatenated format as run-time extraction.
    */
   constructor({
     id = crypto.randomUUID(),
@@ -100,6 +106,7 @@ export class Monitor {
     lastRunTime,
     nextRunTime,
     history = [],
+    initialSnapshot = null,
   } = {}) {
     // validate the schedule is an actual schedule object and not a serialized object
     if (!schedule?.getNextRunTime) {
@@ -124,6 +131,7 @@ export class Monitor {
     this.nextRunTime =
       nextRunTime ?? schedule.getNextRunTime(lastRunTime).toISOString();
     this.history = Array.isArray(history) ? history : [];
+    this.initialSnapshot = initialSnapshot;
 
     // final verification that the monitor is valid
     if (!this.id || !this.monitorPrompt || !this.watchUrls.length) {
@@ -153,6 +161,7 @@ export class Monitor {
       lastRunTime: savedMonitor.lastRunTime,
       nextRunTime: savedMonitor.nextRunTime,
       history: normalizeLoadedHistory(savedMonitor.history),
+      initialSnapshot: savedMonitor.initialSnapshot ?? null,
     });
   }
 
@@ -274,6 +283,27 @@ export class Monitor {
       { flowId }
     );
 
+    // Backfill the baseline for monitors without one (created before
+    // snapshots existed, or the creation-time capture failed). The first
+    // successful run then becomes the comparison baseline.
+    let initialSnapshot = this.initialSnapshot;
+    if (!initialSnapshot) {
+      try {
+        initialSnapshot = await this.ensureInitialSnapshot({
+          conversation,
+          signal,
+        });
+      } catch (error) {
+        throwIfAborted(signal);
+        lazy.log.warn(
+          `Monitor check proceeding without a baseline snapshot: ${
+            error.message ?? error
+          }`
+        );
+        initialSnapshot = null;
+      }
+    }
+
     const pageContent = await extractMonitorPageContent(
       this.watchUrls,
       conversation,
@@ -300,6 +330,10 @@ export class Monitor {
       pageUrls: this.watchUrls.join("\n - "),
       checkedAt: now.toISOString(),
       pageContent,
+      snapshotCapturedAt: initialSnapshot?.capturedAt ?? "unavailable",
+      snapshotContent:
+        initialSnapshot?.pageContent ||
+        "No initial snapshot is available for this monitor.",
     });
 
     // add messages to the conversation
@@ -327,6 +361,97 @@ export class Monitor {
     // parse and return the result
     throwIfAborted(signal);
     return this.parseMonitorResult(response);
+  }
+
+  /**
+   * Extract the current page content of the watch URLs and store it as the
+   * monitor's initial snapshot, replacing any previous one.
+   *
+   * The extraction runs through the same code path as run-time extraction so
+   * the snapshot and later page content are directly comparable by the model.
+   *
+   * @param {object} [options]
+   * @param {object} [options.conversation] - Existing conversation to reuse
+   *   for the extraction; a fresh one is built when not provided.
+   * @param {AbortSignal} [options.signal]
+   * @returns {Promise<{ capturedAt: string, pageContent: string }>}
+   */
+  async captureInitialSnapshot({ conversation = null, signal = null } = {}) {
+    throwIfAborted(signal);
+    // own controller so dispose() and cancelSnapshotCapture() can cancel a
+    // capture that no caller waits on
+    const abortController = new AbortController();
+    this.#snapshotAbortController = abortController;
+    const captureSignal = signal
+      ? AbortSignal.any([signal, abortController.signal])
+      : abortController.signal;
+    const watchUrlsAtCapture = this.watchUrls;
+    try {
+      conversation ??= await lazy.buildConversation(
+        MODEL_FEATURES.AGENT_MONITOR,
+        { flowId: this.id }
+      );
+      const pageContent = await extractMonitorPageContent(
+        watchUrlsAtCapture,
+        conversation,
+        { signal: captureSignal }
+      );
+      throwIfAborted(captureSignal);
+      // An edit may have replaced the watch URLs while extraction ran; the
+      // old pages must not become the baseline for the new ones.
+      if (!urlListsEqual(this.watchUrls, watchUrlsAtCapture)) {
+        throw new Error("Monitor watch URLs changed during snapshot capture.");
+      }
+      this.initialSnapshot = {
+        capturedAt: new Date().toISOString(),
+        pageContent,
+      };
+      return this.initialSnapshot;
+    } finally {
+      if (this.#snapshotAbortController === abortController) {
+        this.#snapshotAbortController = null;
+      }
+    }
+  }
+
+  /**
+   * Cancel any in-flight initial-snapshot capture, so a capture started for a
+   * previous monitor definition can't become the baseline of the new one.
+   * The next ensureInitialSnapshot() call starts a fresh capture.
+   */
+  cancelSnapshotCapture() {
+    this.#snapshotAbortController?.abort(
+      new Error("Monitor snapshot capture canceled by an edit.")
+    );
+    this.#snapshotCapture = null;
+  }
+
+  /**
+   * Return the initial snapshot, capturing one first if the monitor doesn't
+   * have one yet. Concurrent callers share a single in-flight capture.
+   *
+   * @param {object} [options]
+   * @param {object} [options.conversation]
+   * @param {AbortSignal} [options.signal]
+   * @returns {Promise<{ capturedAt: string, pageContent: string }>}
+   */
+  async ensureInitialSnapshot({ conversation = null, signal = null } = {}) {
+    if (this.initialSnapshot) {
+      return this.initialSnapshot;
+    }
+    if (!this.#snapshotCapture) {
+      const capture = this.captureInitialSnapshot({
+        conversation,
+        signal,
+      }).finally(() => {
+        // a canceled capture must not clear its replacement
+        if (this.#snapshotCapture === capture) {
+          this.#snapshotCapture = null;
+        }
+      });
+      this.#snapshotCapture = capture;
+    }
+    return this.#snapshotCapture;
   }
 
   /**
@@ -419,6 +544,9 @@ export class Monitor {
       lastRunTime: this.lastRunTime,
       nextRunTime: this.nextRunTime,
       history: this.history.map(entry => ({ ...entry })),
+      initialSnapshot: this.initialSnapshot
+        ? { ...this.initialSnapshot }
+        : null,
     };
   }
 
@@ -432,6 +560,9 @@ export class Monitor {
   dispose() {
     this.#disposed = true;
     this.#abortController?.abort(new Error("Monitor check aborted."));
+    this.#snapshotAbortController?.abort(
+      new Error("Monitor snapshot capture aborted.")
+    );
     this.clearTimer();
   }
 
@@ -546,7 +677,10 @@ async function extractMonitorPageContent(
 ) {
   throwIfAborted(signal);
   const pageContents = await withAbortSignal(
-    lazy.GetPageContent.getPageContent({ url_list: urls }, conversation),
+    lazy.GetPageContent.getPageContent(
+      { url_list: urls, signal },
+      conversation
+    ),
     signal
   );
   throwIfAborted(signal);
@@ -554,6 +688,10 @@ async function extractMonitorPageContent(
   return Array.isArray(pageContents)
     ? pageContents.join("\n\n<----- PAGE BREAK ---->\n\n")
     : pageContents;
+}
+
+export function urlListsEqual(a, b) {
+  return a.length === b.length && a.every((url, index) => url === b[index]);
 }
 
 export function trimAndFilterWatchUrls(urls) {

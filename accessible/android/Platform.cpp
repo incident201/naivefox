@@ -46,6 +46,12 @@ void a11y::PlatformInit() {
     sLocalizedStrings.InsertOrUpdate(u"stateRequired"_ns, localizedStr);
   }
 
+  // Preload the state mixed localized string.
+  rv = stringBundle->GetStringFromName("statePartiallyChecked", localizedStr);
+  if (NS_SUCCEEDED(rv)) {
+    sLocalizedStrings.InsertOrUpdate(u"statePartiallyChecked"_ns, localizedStr);
+  }
+
   // Preload heading level localized descriptions 1 thru 6.
   for (int32_t level = 1; level <= 6; level++) {
     nsAutoString token;

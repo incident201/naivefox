@@ -379,8 +379,8 @@ class TabsCleanupFeatureTest {
     }
 
     @Test
-    fun `WHEN undo all tabs removed is called THEN undo tab removal and navigate to browser`() {
-        feature.onUndoAllTabsRemoved(tabId = "")
+    fun `WHEN undo tabs removed is called THEN undo tab removal and navigate to browser`() {
+        feature.onUndoTabsRemoved(tabId = "")
 
         verify {
             tabsUseCases.undo.invoke()
@@ -390,10 +390,10 @@ class TabsCleanupFeatureTest {
     }
 
     @Test
-    fun `GIVEN a tab ID WHEN undo all tabs removed is called THEN undo tab removal, remove the tab and navigate to browser`() {
+    fun `GIVEN a tab ID WHEN undo tabs removed is called THEN undo tab removal, remove the tab and navigate to browser`() {
         val tabId = "1"
 
-        feature.onUndoAllTabsRemoved(tabId = tabId)
+        feature.onUndoTabsRemoved(tabId = tabId)
 
         verifyOrder {
             tabsUseCases.undo.invoke()
@@ -403,32 +403,8 @@ class TabsCleanupFeatureTest {
     }
 
     @Test
-    fun `WHEN undo tab removed is called THEN undo tab removal and navigate to browser`() {
-        feature.onUndoTabRemoved(tabId = "")
-
-        verify {
-            tabsUseCases.undo.invoke()
-
-            navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
-        }
-    }
-
-    @Test
-    fun `GIVEN a tab ID WHEN undo tab removed is called THEN undo tab removal, remove the tab and navigate to browser`() {
-        val tabId = "1"
-
-        feature.onUndoTabRemoved(tabId = tabId)
-
-        verifyOrder {
-            tabsUseCases.undo.invoke()
-            tabsUseCases.removeTab.invoke(tabId)
-            navController.navigate(HomeFragmentDirections.actionGlobalBrowser(null))
-        }
-    }
-
-    @Test
-    fun `GIVEN the restored tab is a homepage tab WHEN undo tab removed is called THEN do not navigate away from the homepage`() {
-        feature.onUndoTabRemoved(tabId = "", isRestoringHomepageTab = true)
+    fun `GIVEN the restored tab is a homepage tab WHEN undo tabs removed is called THEN do not navigate away from the homepage`() {
+        feature.onUndoTabsRemoved(tabId = "", isRestoringHomepageTab = true)
 
         verify {
             tabsUseCases.undo.invoke()

@@ -538,6 +538,11 @@ async function stubResumeActivityGeneration(sb) {
   }));
   sb.stub(openAIEngine, "getFxAccountToken").resolves(null);
 
+  const originalAvailableLocales = Services.locale.availableLocales;
+  const originalRequestedLocales = Services.locale.requestedLocales;
+  Services.locale.availableLocales = ["en-US"];
+  Services.locale.requestedLocales = ["en-US"];
+
   return {
     getMemoriesStub,
     memories,
@@ -549,6 +554,8 @@ async function stubResumeActivityGeneration(sb) {
       for (const { url } of urls) {
         await PlacesUtils.history.remove(url);
       }
+      Services.locale.availableLocales = originalAvailableLocales;
+      Services.locale.requestedLocales = originalRequestedLocales;
     },
   };
 }

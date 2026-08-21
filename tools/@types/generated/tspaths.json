@@ -424,9 +424,6 @@
       "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs": [
         "../../../browser/components/urlbar/content/UrlbarContentPrefs.mjs"
       ],
-      "chrome://browser/content/urlbar/UrlbarContentURIUtils.mjs": [
-        "../../../browser/components/urlbar/content/UrlbarContentURIUtils.mjs"
-      ],
       "chrome://browser/content/urlbar/UrlbarContentUtils.mjs": [
         "../../../browser/components/urlbar/content/UrlbarContentUtils.mjs"
       ],
@@ -6759,6 +6756,9 @@
       ],
       "resource://gre/modules/launchonlogin/MacOSLaunchOnLogin.sys.mjs": [
         "../../../toolkit/modules/launchonlogin/MacOSLaunchOnLogin.sys.mjs"
+      ],
+      "resource://gre/modules/launchonlogin/UnsupportedLaunchOnLogin.sys.mjs": [
+        "../../../toolkit/modules/launchonlogin/UnsupportedLaunchOnLogin.sys.mjs"
       ],
       "resource://gre/modules/launchonlogin/WindowsLaunchOnLogin.sys.mjs": [
         "../../../toolkit/modules/launchonlogin/WindowsLaunchOnLogin.sys.mjs"
