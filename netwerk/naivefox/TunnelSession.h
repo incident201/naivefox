@@ -12,6 +12,7 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
 #include "mozilla/UniquePtr.h"
+#include "nsISupportsImpl.h"
 #include "nsString.h"
 #include "nscore.h"
 
@@ -31,9 +32,9 @@ struct TunnelConfig final {
   ProxyProtocol mProtocol = ProxyProtocol::H2;
 };
 
-class TunnelSession final : public RefCounted<TunnelSession> {
+class TunnelSession final {
  public:
-  MOZ_DECLARE_REFCOUNTED_TYPENAME(TunnelSession)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(TunnelSession)
 
   using EstablishedCallback = std::function<void(const nsACString&, bool)>;
   using FailureCallback = std::function<void(nsresult)>;
@@ -43,7 +44,6 @@ class TunnelSession final : public RefCounted<TunnelSession> {
                 const TunnelConfig& aConfig, nsIEventTarget* aSocketTarget,
                 EstablishedCallback&& aOnEstablished,
                 FailureCallback&& aOnFailure, ClosedCallback&& aOnClosed);
-  ~TunnelSession();
 
   nsresult Start(const nsACString& aTargetAuthority,
                  Span<const uint8_t> aInitialPayload = {});
@@ -52,7 +52,10 @@ class TunnelSession final : public RefCounted<TunnelSession> {
 
  private:
   friend class TunnelAttempt;
+  friend class TunnelSessionTestPeer;
   class Impl;
+
+  ~TunnelSession();
 
   nsresult StartAttempt(ProxyProtocol aProtocol);
   void OpenAttemptOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
