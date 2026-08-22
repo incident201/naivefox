@@ -1077,12 +1077,17 @@ def jar_maker_format(host, build_project):
 set_config("MOZ_JAR_MAKER_FILE_FORMAT", jar_maker_format)
 
 
-@depends(toolkit)
-def omnijar_name(toolkit):
+@depends(toolkit, build_project)
+def omnijar_name(toolkit, build_project):
     # Fennec's static resources live in the assets/ folder of the
     # APK.  Adding a path to the name here works because we only
     # have one omnijar file in the final package (which is not the
     # case on desktop).
+    # Android application builds put the archive in the APK assets directory.
+    # NaiveFox is an unpacked native runtime, however, and has no APK layer;
+    # keep its GRE archive next to libxul instead.
+    if build_project == "netwerk/naivefox":
+        return "omni.ja"
     return "assets/omni.ja" if toolkit == "android" else "omni.ja"
 
 

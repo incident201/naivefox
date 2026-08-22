@@ -205,6 +205,9 @@ directory, staging script, and (under WSL) the portable Wine paths/prefix:
   --bootstrap
 ```
 
+For a local WSL/Windows ARM64 AVD, pass --start-emulator to the same runner;
+it owns the QEMU virt launch workaround and cleans up the emulator it starts.
+
 The Android ARM64 command and package verifier are documented in
 [Android embedded runtime](#android-embedded-runtime). A static NDK harness
 check, which does not require a device, is available after staging:

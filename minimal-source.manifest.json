@@ -1,10 +1,10 @@
 {
   "counts": {
-    "executable_files": 149,
-    "files": 22744
+    "executable_files": 150,
+    "files": 22745
   },
-  "evidence_commit": "67b096e916afbc19e7216029da743aec8c9e0441",
-  "evidence_source_commit": "a87b136e9f309f316bc8a7d9048cc261368bd04c",
+  "evidence_commit": "a99e2466bff70d8a94814670ef528852ad893dbf",
+  "evidence_source_commit": "a132e58d3e0281bff712c430412a9fbf0f46e6c2",
   "files": [
     {
       "mode": "0644",
@@ -49,7 +49,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "d69650c3ebba3907d7cf8f18d2188ed160a84fe68817ba3aa6cae719dc44cbf8"
+      "sha256": "4c607e5fd772dca9b22b707e701f23b52d4ba660e99ac387ee664a9a15cebf01"
     },
     {
       "mode": "0644",
@@ -23454,7 +23454,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "19223f160344a1f080f4781f018313d590f1fb3df62fd08b387ed723b3eb26a6"
+      "sha256": "4f2276dbf1f7153902af183252786196ae186c918d54a1e1b7fffbe4605f0fd8"
     },
     {
       "mode": "0644",
@@ -23694,7 +23694,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/README.md",
-      "sha256": "70a8eea34666f3a373e691ad3835517ec69aa4e86a65e72b6daf89926ce11fff"
+      "sha256": "14bcc06a1761b316e7a1b356cf79f13589e48e39b704123c6992b658982a35d5"
     },
     {
       "mode": "0644",
@@ -23719,7 +23719,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-android-embedded-tests.sh",
-      "sha256": "00f2ca2f7323103e1ba8a60151f131b9bc7ca1c600b6ebb4ee023c166edbfd6e"
+      "sha256": "63a84729b389a890e4baec3f0c9ab3bf0a82426daef41f8c288c061cc79fe6ad"
     },
     {
       "mode": "0755",
@@ -23904,7 +23904,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/android-runtime-package.py",
-      "sha256": "a73ba8d432c4b9a6ffc4a773c47578853a41a9694d59aedfed16ca61ba9ac55c"
+      "sha256": "6929418bbdd2915ab718ee2d2a1fdc39ef1ea71d2a3d1a418f0adc8924ca1a45"
     },
     {
       "mode": "0755",
@@ -23960,6 +23960,11 @@
       "mode": "0755",
       "path": "netwerk/naivefox/tools/stage-runtime.sh",
       "sha256": "0a2afc426efb057184cf9eac2202b96d6ba35e3c0480a1af5e7c0a2d370f2951"
+    },
+    {
+      "mode": "0755",
+      "path": "netwerk/naivefox/tools/start-android-emulator.sh",
+      "sha256": "a88585a5cc7caaf57b894d4d4a5840f97a6e35cdcceffd648ccabee41219d528"
     },
     {
       "mode": "0755",
@@ -109054,7 +109059,7 @@
     {
       "mode": "0644",
       "path": "toolkit/moz.configure",
-      "sha256": "114337a62d22a8c0a1036306549822f54b78ab7dddd9a7ede0871c07fd15c1a3"
+      "sha256": "2988138743a38bd1ff4d42ad63a80036ecaa03ce0f47415091dd30882489d9ae"
     },
     {
       "mode": "0644",
@@ -113728,8 +113733,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "b4ec42caaa7597123e2ce29de45f4f6c299728e6c0642f88c1123da750df139f",
+  "manifest_sha256": "68307a160169e6f57217d708c3462ea82dcf00c465855913984765e818df0e0e",
   "manifest_version": 2,
-  "minimal_export_commit": "67b096e916afbc19e7216029da743aec8c9e0441",
-  "naivefox_reference_commit": "a87b136e9f309f316bc8a7d9048cc261368bd04c"
+  "minimal_export_commit": "a99e2466bff70d8a94814670ef528852ad893dbf",
+  "naivefox_reference_commit": "a132e58d3e0281bff712c430412a9fbf0f46e6c2"
 }

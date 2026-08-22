@@ -9,6 +9,7 @@ import re
 import shutil
 import stat
 import subprocess
+import zipfile
 from pathlib import Path
 
 ABI = "arm64-v8a"
@@ -207,6 +208,26 @@ def reject_sensitive_names(root: Path) -> None:
             fail(f"package contains a sensitive artifact: {path.relative_to(root)}")
 
 
+def create_omnijar(dist_bin: Path, destination: Path) -> None:
+    """Create the GRE archive required by the standalone Android runtime."""
+
+    # Android application builds wrap this archive inside an APK assets/
+    # directory. The embedded product has no APK layer, so it stores the
+    # archive beside libxul. The product graph contributes this generated,
+    # architecture-specific preference resource.
+    greprefs = dist_bin / ABI / "greprefs.js"
+    if not greprefs.is_file():
+        fail(f"required Android GRE resource is missing: {greprefs}")
+
+    info = zipfile.ZipInfo("greprefs.js", (1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = (0o100644 & 0xFFFF) << 16
+    with zipfile.ZipFile(
+        destination, mode="w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
+        archive.writestr(info, greprefs.read_bytes())
+
+
 def file_manifest(root: Path) -> tuple[list[dict[str, object]], int]:
     files = []
     total_bytes = 0
@@ -285,6 +306,8 @@ def create_package(source_root: Path, objdir: Path, stage: Path) -> None:
         shutil.copy2(dist_bin / name, destination, follow_symlinks=True)
         os.chmod(destination, 0o755)
         subprocess.run([strip, "--strip-debug", str(destination)], check=True)
+
+    create_omnijar(dist_bin, library_dir / "omni.ja")
 
     symbols = dynamic_naivefox_symbols(readelf, library_dir / "libxul.so")
     if symbols != PUBLIC_SYMBOLS:

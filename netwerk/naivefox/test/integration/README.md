@@ -78,6 +78,12 @@ PowerShell/Python smoke/soak tooling on the `naivefox-full-source` branch. The n
 must include valid CONNECT churn and repeated channel-stop/lifecycle activity;
 a launch-only check is insufficient.
 
+When the host has the supported naivefox-arm64-api27-raw AVD installed but no
+device is running, append --start-emulator. The runner invokes
+tools/start-android-emulator.sh, supplies the ARM64-safe -qemu -machine virt
+launch override, waits for boot completion, and shuts down only the emulator
+instance it started during cleanup.
+
 The Android ARM64 embedded package has a test-only native harness and emulator
 gate. It compiles the harness with NDK r29, relocates the package below
 `/data/local/tmp`, loads `libxul.so` through the public C ABI, and verifies H2
