@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #include "ProxyProtocol.h"
+#include "mozilla/Maybe.h"
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nscore.h"
@@ -19,6 +20,8 @@ enum class ListenerType : uint8_t { Socks5, HttpConnect };
 struct ListenerConfig final {
   ListenerType mType = ListenerType::Socks5;
   nsCString mHost;
+  nsCString mUser;
+  nsCString mPassword;
   uint16_t mPort = 0;
   bool mIPv6 = false;
 };
@@ -30,11 +33,24 @@ struct UpstreamProxyConfig final {
   ProxyProtocol mProtocol = ProxyProtocol::H2;
 };
 
+struct HostResolverRule final {
+  nsCString mLogicalHost;
+  nsCString mPhysicalHost;
+};
+
+struct ExtraHeader final {
+  nsCString mName;
+  nsCString mValue;
+};
+
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
 
 struct Config final {
   nsTArray<ListenerConfig> mListeners;
   nsTArray<UpstreamProxyConfig> mProxies;
+  Maybe<HostResolverRule> mHostResolverRule;
+  nsTArray<ExtraHeader> mExtraHeaders;
+  bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;
 };

@@ -15,6 +15,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -220,6 +221,65 @@ bool IsDomainName(const nsACString& aHost) {
   return labelLength != 0 && !labelStartsWithHyphen && previous != '-';
 }
 
+bool IsHostOrAddress(const nsACString& aHost) {
+  if (aHost.IsEmpty()) {
+    return false;
+  }
+  in_addr ipv4Address{};
+  if (ParseNetworkAddress(AF_INET, PromiseFlatCString(aHost).get(),
+                          &ipv4Address) == 1) {
+    return true;
+  }
+  in6_addr ipv6Address{};
+  return ParseNetworkAddress(AF_INET6, PromiseFlatCString(aHost).get(),
+                             &ipv6Address) == 1 ||
+         IsDomainName(aHost);
+}
+
+bool IsHeaderTokenCharacter(char aValue) {
+  if ((aValue >= '0' && aValue <= '9') ||
+      (aValue >= 'A' && aValue <= 'Z') ||
+      (aValue >= 'a' && aValue <= 'z')) {
+    return true;
+  }
+  switch (aValue) {
+    case '!':
+    case '#':
+    case '$':
+    case '%':
+    case '&':
+    case '\'':
+    case '*':
+    case '+':
+    case '-':
+    case '.':
+    case '^':
+    case '_':
+    case '`':
+    case '|':
+    case '~':
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsProtectedProxyConnectHeader(const nsACString& aName) {
+  return aName.LowerCaseEqualsLiteral("padding") ||
+         aName.LowerCaseEqualsLiteral("host") ||
+         aName.LowerCaseEqualsLiteral("connection") ||
+         aName.LowerCaseEqualsLiteral("proxy-connection") ||
+         aName.LowerCaseEqualsLiteral("keep-alive") ||
+         aName.LowerCaseEqualsLiteral("transfer-encoding") ||
+         aName.LowerCaseEqualsLiteral("te") ||
+         aName.LowerCaseEqualsLiteral("trailer") ||
+         aName.LowerCaseEqualsLiteral("upgrade") ||
+         aName.LowerCaseEqualsLiteral("content-length") ||
+         aName.LowerCaseEqualsLiteral("proxy-authorization") ||
+         aName.LowerCaseEqualsLiteral("proxy-authenticate") ||
+         aName.LowerCaseEqualsLiteral("alpn");
+}
+
 class JsonParser final {
  public:
   JsonParser(const nsACString& aInput, nsACString& aError)
@@ -242,6 +302,9 @@ class JsonParser final {
     bool sawListen = false;
     bool sawProxy = false;
     bool sawLog = false;
+    bool sawHostResolverRules = false;
+    bool sawExtraHeaders = false;
+    bool sawNoPostQuantum = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -270,6 +333,31 @@ class JsonParser final {
         MOZ_TRY(ParseString(parsed.mLogPath, "log must be a string"));
         parsed.mLogMode = parsed.mLogPath.IsEmpty() ? RuntimeLogMode::Console
                                                     : RuntimeLogMode::File;
+      } else if (key.EqualsLiteral("host-resolver-rules")) {
+        if (sawHostResolverRules) {
+          return Error("duplicate host-resolver-rules field");
+        }
+        sawHostResolverRules = true;
+        nsAutoCString value;
+        MOZ_TRY(ParseString(value, "host-resolver-rules must be a string"));
+        HostResolverRule rule;
+        MOZ_TRY(ParseHostResolverRule(value, rule));
+        parsed.mHostResolverRule.emplace(std::move(rule));
+      } else if (key.EqualsLiteral("extra-headers")) {
+        if (sawExtraHeaders) {
+          return Error("duplicate extra-headers field");
+        }
+        sawExtraHeaders = true;
+        nsAutoCString value;
+        MOZ_TRY(ParseString(value, "extra-headers must be a string"));
+        MOZ_TRY(ParseExtraHeaders(value, parsed.mExtraHeaders));
+      } else if (key.EqualsLiteral("no-post-quantum")) {
+        if (sawNoPostQuantum) {
+          return Error("duplicate no-post-quantum field");
+        }
+        sawNoPostQuantum = true;
+        MOZ_TRY(ParseBoolean(parsed.mNoPostQuantum,
+                             "no-post-quantum must be a boolean"));
       } else {
         return Error("unsupported config field");
       }
@@ -317,6 +405,28 @@ class JsonParser final {
     }
     ++mPosition;
     return true;
+  }
+
+  bool ConsumeLiteral(const char* aExpected) {
+    const size_t length = std::strlen(aExpected);
+    if (mInput.Length() - mPosition < length ||
+        !Substring(mInput, mPosition, length).Equals(aExpected)) {
+      return false;
+    }
+    mPosition += length;
+    return true;
+  }
+
+  nsresult ParseBoolean(bool& aOutput, const char* aTypeError) {
+    if (ConsumeLiteral("true")) {
+      aOutput = true;
+      return NS_OK;
+    }
+    if (ConsumeLiteral("false")) {
+      aOutput = false;
+      return NS_OK;
+    }
+    return Error(aTypeError);
   }
 
   nsresult ParseHexQuad(uint16_t& aValue) {
@@ -449,6 +559,107 @@ class JsonParser final {
     return NS_OK;
   }
 
+  nsresult ParseHostResolverRule(const nsACString& aValue,
+                                 HostResolverRule& aRule) {
+    nsTArray<nsCString> tokens;
+    size_t position = 0;
+    while (position < aValue.Length()) {
+      while (position < aValue.Length() &&
+             (aValue.CharAt(position) == ' ' ||
+              aValue.CharAt(position) == '\t')) {
+        ++position;
+      }
+      if (position == aValue.Length()) {
+        break;
+      }
+      const size_t start = position;
+      while (position < aValue.Length() &&
+             aValue.CharAt(position) != ' ' &&
+             aValue.CharAt(position) != '\t') {
+        if (aValue.CharAt(position) == '\r' ||
+            aValue.CharAt(position) == '\n') {
+          return Error("host-resolver-rules must contain one exact MAP rule");
+        }
+        ++position;
+      }
+      tokens.AppendElement(Substring(aValue, start, position - start));
+    }
+    if (tokens.Length() != 3 || !tokens[0].EqualsLiteral("MAP") ||
+        !IsHostOrAddress(tokens[1]) || !IsHostOrAddress(tokens[2])) {
+      return Error("host-resolver-rules must contain one exact MAP rule");
+    }
+    aRule.mLogicalHost = tokens[1];
+    aRule.mPhysicalHost = tokens[2];
+    return NS_OK;
+  }
+
+  nsresult ParseExtraHeaders(const nsACString& aValue,
+                             nsTArray<ExtraHeader>& aHeaders) {
+    size_t position = 0;
+    while (position < aValue.Length()) {
+      const int32_t separator = aValue.Find("\r\n"_ns, position);
+      const size_t lineEnd =
+          separator < 0 ? aValue.Length() : static_cast<size_t>(separator);
+      const nsDependentCSubstring line =
+          Substring(aValue, position, lineEnd - position);
+      if (line.IsEmpty()) {
+        return Error("extra-headers must not contain an empty header line");
+      }
+      if (line.FindChar('\r') >= 0 || line.FindChar('\n') >= 0) {
+        return Error("extra-headers must use CRLF line endings");
+      }
+      const int32_t colon = line.FindChar(':');
+      if (colon <= 0) {
+        return Error("extra-headers entries must contain a header name");
+      }
+      ExtraHeader header;
+      header.mName.Assign(Substring(line, 0, colon));
+      for (size_t index = 0; index < header.mName.Length(); ++index) {
+        if (!IsHeaderTokenCharacter(header.mName.CharAt(index))) {
+          return Error("extra-headers contains an invalid header name");
+        }
+      }
+      if (IsProtectedProxyConnectHeader(header.mName)) {
+        return Error("extra-headers contains a protected header name");
+      }
+      size_t valueStart = static_cast<size_t>(colon + 1);
+      size_t valueEnd = line.Length();
+      while (valueStart < valueEnd &&
+             (line.CharAt(valueStart) == ' ' ||
+              line.CharAt(valueStart) == '\t')) {
+        ++valueStart;
+      }
+      while (valueEnd > valueStart &&
+             (line.CharAt(valueEnd - 1) == ' ' ||
+              line.CharAt(valueEnd - 1) == '\t')) {
+        --valueEnd;
+      }
+      header.mValue.Assign(Substring(line, valueStart, valueEnd - valueStart));
+      for (size_t index = 0; index < header.mValue.Length(); ++index) {
+        const char value = header.mValue.CharAt(index);
+        if ((static_cast<unsigned char>(value) < 0x20 && value != '\t') ||
+            value == 0x7f) {
+          return Error("extra-headers contains an invalid header value");
+        }
+      }
+      for (const auto& existing : aHeaders) {
+        if (existing.mName.Equals(header.mName,
+                                  nsCaseInsensitiveCStringComparator)) {
+          return Error("extra-headers contains a duplicate header name");
+        }
+      }
+      aHeaders.AppendElement(std::move(header));
+      if (separator < 0) {
+        return NS_OK;
+      }
+      position = lineEnd + 2;
+      if (position == aValue.Length()) {
+        return NS_OK;
+      }
+    }
+    return NS_OK;
+  }
+
   nsresult ParsePort(const nsACString& aText, uint16_t& aPort) {
     if (aText.IsEmpty()) {
       return Error("endpoint requires an explicit port");
@@ -537,13 +748,35 @@ class JsonParser final {
     } else {
       return Error("unsupported listener scheme");
     }
-    const nsDependentCSubstring endpoint = Substring(aValue, schemeEnd + 3);
-    if (endpoint.FindChar('/') >= 0 || endpoint.FindChar('@') >= 0 ||
-        endpoint.FindChar('?') >= 0 || endpoint.FindChar('#') >= 0) {
+    const nsDependentCSubstring authority = Substring(aValue, schemeEnd + 3);
+    if (authority.FindChar('/') >= 0 || authority.FindChar('?') >= 0 ||
+        authority.FindChar('#') >= 0) {
       return Error("listener URI must contain only host and port");
     }
-    MOZ_TRY(ParseHostPort(endpoint, true, aListener.mHost, aListener.mIPv6,
-                          aListener.mPort));
+    const int32_t at = authority.RFindChar('@');
+    size_t endpointStart = 0;
+    if (at >= 0) {
+      if (aListener.mType != ListenerType::Socks5 || at == 0 ||
+          authority.FindChar('@') != at) {
+        return Error("listener URI contains invalid credentials");
+      }
+      const nsDependentCSubstring userInfo = Substring(authority, 0, at);
+      const int32_t colon = userInfo.FindChar(':');
+      if (colon <= 0) {
+        return Error("listener URI requires username and password");
+      }
+      MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aListener.mUser));
+      MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1),
+                            aListener.mPassword));
+      if (aListener.mUser.IsEmpty() || aListener.mPassword.IsEmpty() ||
+          aListener.mUser.Length() > 255 ||
+          aListener.mPassword.Length() > 255) {
+        return Error("listener URI contains invalid credentials");
+      }
+      endpointStart = static_cast<size_t>(at + 1);
+    }
+    MOZ_TRY(ParseHostPort(Substring(authority, endpointStart), true,
+                          aListener.mHost, aListener.mIPv6, aListener.mPort));
     in_addr ipv4Address{};
     if (!aListener.mIPv6 && !aListener.mHost.EqualsLiteral("localhost") &&
         ParseNetworkAddress(AF_INET, PromiseFlatCString(aListener.mHost).get(),
@@ -643,26 +876,30 @@ class JsonParser final {
       return Error("proxy URI must not contain a path, query, or fragment");
     }
     const int32_t at = authority.RFindChar('@');
-    if (at <= 0 || authority.FindChar('@') != at) {
-      return Error("proxy URI requires username and password");
-    }
-    const nsDependentCSubstring userInfo = Substring(authority, 0, at);
-    const int32_t colon = userInfo.FindChar(':');
-    if (colon <= 0) {
-      return Error("proxy URI requires username and password");
-    }
-    MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aProxy.mUser));
-    MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1), aProxy.mPassword));
-    if (aProxy.mUser.IsEmpty() || aProxy.mPassword.IsEmpty() ||
-        aProxy.mUser.FindChar(':') >= 0) {
-      return Error("proxy URI contains invalid credentials");
+    size_t endpointStart = 0;
+    if (at >= 0) {
+      if (at == 0 || authority.FindChar('@') != at) {
+        return Error("proxy URI contains invalid credentials");
+      }
+      const nsDependentCSubstring userInfo = Substring(authority, 0, at);
+      const int32_t colon = userInfo.FindChar(':');
+      if (colon <= 0) {
+        return Error("proxy URI requires username and password");
+      }
+      MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aProxy.mUser));
+      MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1), aProxy.mPassword));
+      if (aProxy.mUser.IsEmpty() || aProxy.mPassword.IsEmpty() ||
+          aProxy.mUser.FindChar(':') >= 0) {
+        return Error("proxy URI contains invalid credentials");
+      }
+      endpointStart = static_cast<size_t>(at + 1);
     }
 
     nsAutoCString host;
     bool ipv6 = false;
     uint16_t port = 443;
-    MOZ_TRY(
-        ParseHostPort(Substring(authority, at + 1), false, host, ipv6, port));
+    MOZ_TRY(ParseHostPort(Substring(authority, endpointStart), false, host, ipv6,
+                          port));
     in_addr ipv4Address{};
     if (!ipv6 &&
         ParseNetworkAddress(AF_INET, PromiseFlatCString(host).get(),

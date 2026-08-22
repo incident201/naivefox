@@ -528,7 +528,9 @@ void TunnelSession::OpenAttemptOnMain(uint64_t aGeneration,
     rv = OpenNeckoTunnel(mImpl->mConfig.mProxyUrl, aTargetAuthority,
                          mImpl->mConfig.mProxyUser,
                          mImpl->mConfig.mProxyPassword, attempt, attempt,
-                         padding, aProtocol, getter_AddRefs(openedRequest));
+                         padding, aProtocol, mImpl->mConfig.mHostResolverRule,
+                         mImpl->mConfig.mExtraHeaders,
+                         getter_AddRefs(openedRequest));
     if (NS_SUCCEEDED(rv)) {
       mImpl->mActiveRequest = openedRequest;
       mImpl->mActiveRequestGeneration = aGeneration;

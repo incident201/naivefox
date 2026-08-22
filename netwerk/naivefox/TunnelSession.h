@@ -7,6 +7,7 @@
 
 #include <functional>
 
+#include "Config.h"
 #include "ProxyProtocol.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
@@ -27,10 +28,34 @@ namespace mozilla::naivefox {
 class TunnelAttempt;
 
 struct TunnelConfig final {
+  TunnelConfig() = default;
+  TunnelConfig(const TunnelConfig& aOther)
+      : mProxyUrl(aOther.mProxyUrl),
+        mProxyUser(aOther.mProxyUser),
+        mProxyPassword(aOther.mProxyPassword),
+        mProtocol(aOther.mProtocol),
+        mHostResolverRule(aOther.mHostResolverRule) {
+    mExtraHeaders.AppendElements(aOther.mExtraHeaders);
+  }
+  TunnelConfig& operator=(const TunnelConfig& aOther) {
+    if (this != &aOther) {
+      mProxyUrl = aOther.mProxyUrl;
+      mProxyUser = aOther.mProxyUser;
+      mProxyPassword = aOther.mProxyPassword;
+      mProtocol = aOther.mProtocol;
+      mHostResolverRule = aOther.mHostResolverRule;
+      mExtraHeaders.Clear();
+      mExtraHeaders.AppendElements(aOther.mExtraHeaders);
+    }
+    return *this;
+  }
+
   nsCString mProxyUrl;
   nsCString mProxyUser;
   nsCString mProxyPassword;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
+  Maybe<HostResolverRule> mHostResolverRule;
+  nsTArray<ExtraHeader> mExtraHeaders;
 };
 
 class TunnelSession final {

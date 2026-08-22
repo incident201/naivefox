@@ -15,13 +15,21 @@ namespace {
 
 constexpr uint8_t kVersion = 0x05;
 constexpr uint8_t kNoAuthentication = 0x00;
+constexpr uint8_t kUsernamePassword = 0x02;
 constexpr uint8_t kNoAcceptableMethods = 0xff;
+constexpr uint8_t kAuthenticationVersion = 0x01;
+constexpr uint8_t kAuthenticationSuccess = 0x00;
+constexpr uint8_t kAuthenticationFailure = 0xff;
 constexpr uint8_t kConnect = 0x01;
 constexpr uint8_t kIPv4 = 0x01;
 constexpr uint8_t kDomain = 0x03;
 constexpr uint8_t kIPv6 = 0x04;
 
 }  // namespace
+
+Socks5Parser::Socks5Parser(const nsACString& aUser,
+                           const nsACString& aPassword)
+    : mExpectedUser(aUser), mExpectedPassword(aPassword) {}
 
 nsCString Socks5Target::Authority() const {
   nsCString authority;
@@ -72,13 +80,23 @@ Socks5Parser::Event Socks5Parser::ConsumeByte(uint8_t aByte) {
       }
       mRemaining = aByte;
       mSawNoAuthentication = false;
+      mSawUsernamePassword = false;
       mState = State::GreetingMethods;
       return Event::NeedMore;
 
     case State::GreetingMethods:
       mSawNoAuthentication |= aByte == kNoAuthentication;
+      mSawUsernamePassword |= aByte == kUsernamePassword;
       if (--mRemaining != 0) {
         return Event::NeedMore;
+      }
+      if (!mExpectedUser.IsEmpty() || !mExpectedPassword.IsEmpty()) {
+        if (!mSawUsernamePassword) {
+          mState = State::Failed;
+          return Event::RejectMethods;
+        }
+        mState = State::AuthenticationVersion;
+        return Event::SendUsernamePasswordSelection;
       }
       if (!mSawNoAuthentication) {
         mState = State::Failed;
@@ -86,6 +104,44 @@ Socks5Parser::Event Socks5Parser::ConsumeByte(uint8_t aByte) {
       }
       mState = State::RequestVersion;
       return Event::SendNoAuthenticationSelection;
+
+    case State::AuthenticationVersion:
+      if (aByte != kAuthenticationVersion) {
+        mState = State::Failed;
+        return Event::AuthenticationProtocolError;
+      }
+      mState = State::AuthenticationUsernameLength;
+      return Event::NeedMore;
+
+    case State::AuthenticationUsernameLength:
+      mAuthenticationUser.Truncate();
+      mRemaining = aByte;
+      mState = mRemaining == 0 ? State::AuthenticationPasswordLength
+                              : State::AuthenticationUsername;
+      return Event::NeedMore;
+
+    case State::AuthenticationUsername:
+      mAuthenticationUser.Append(static_cast<char>(aByte));
+      if (--mRemaining == 0) {
+        mState = State::AuthenticationPasswordLength;
+      }
+      return Event::NeedMore;
+
+    case State::AuthenticationPasswordLength:
+      mAuthenticationPassword.Truncate();
+      mRemaining = aByte;
+      if (mRemaining == 0) {
+        return FinishAuthentication();
+      }
+      mState = State::AuthenticationPassword;
+      return Event::NeedMore;
+
+    case State::AuthenticationPassword:
+      mAuthenticationPassword.Append(static_cast<char>(aByte));
+      if (--mRemaining == 0) {
+        return FinishAuthentication();
+      }
+      return Event::NeedMore;
 
     case State::RequestVersion:
       if (aByte != kVersion) {
@@ -169,6 +225,14 @@ Socks5Parser::Event Socks5Parser::ConsumeByte(uint8_t aByte) {
   MOZ_CRASH("unreachable SOCKS5 parser state");
 }
 
+Socks5Parser::Event Socks5Parser::FinishAuthentication() {
+  const bool accepted = mAuthenticationUser.Equals(mExpectedUser) &&
+                        mAuthenticationPassword.Equals(mExpectedPassword);
+  mState = accepted ? State::RequestVersion : State::Failed;
+  return accepted ? Event::SendAuthenticationSuccess
+                  : Event::RejectAuthentication;
+}
+
 bool Socks5Parser::FinishAddress() {
   if (mTarget.mType == Socks5Target::Type::Domain) {
     mTarget.mHost.Assign(reinterpret_cast<const char*>(mAddress.Elements()),
@@ -198,6 +262,21 @@ void Socks5Parser::MakeMethodSelection(bool aAccepted,
   aReply.ClearAndRetainStorage();
   aReply.AppendElement(kVersion);
   aReply.AppendElement(aAccepted ? kNoAuthentication : kNoAcceptableMethods);
+}
+
+void Socks5Parser::MakeUsernamePasswordMethodSelection(
+    nsTArray<uint8_t>& aReply) {
+  aReply.ClearAndRetainStorage();
+  aReply.AppendElement(kVersion);
+  aReply.AppendElement(kUsernamePassword);
+}
+
+void Socks5Parser::MakeAuthenticationReply(bool aAccepted,
+                                           nsTArray<uint8_t>& aReply) {
+  aReply.ClearAndRetainStorage();
+  aReply.AppendElement(kAuthenticationVersion);
+  aReply.AppendElement(aAccepted ? kAuthenticationSuccess
+                                 : kAuthenticationFailure);
 }
 
 void Socks5Parser::MakeReply(uint8_t aReplyCode, nsTArray<uint8_t>& aReply) {

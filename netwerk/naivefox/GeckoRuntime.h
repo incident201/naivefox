@@ -26,19 +26,22 @@ class GeckoRuntime final {
   GeckoRuntime& operator=(const GeckoRuntime&) = delete;
 
   nsresult Initialize(int aArgc, char* aArgv[], const nsACString& aProfilePath,
-                      ProxyProtocol aProtocol);
+                      ProxyProtocol aProtocol,
+                      bool aNoPostQuantum = false);
   static nsresult ValidateEmbeddedLocations(const nsACString& aProfilePath,
                                             const nsACString& aRuntimePath);
   nsresult InitializeEmbedded(const nsACString& aProfilePath,
                               const nsACString& aRuntimePath,
-                              ProxyProtocol aProtocol);
+                              ProxyProtocol aProtocol,
+                              bool aNoPostQuantum = false);
   nsresult RunEventLoopSmoke();
 
  private:
   nsresult InitializeWithLocations(nsIFile* aProfile, nsIFile* aBinDirectory,
                                    nsIFile* aExecutable,
                                    ProxyProtocol aProtocol,
-                                   const nsACString* aAndroidRuntimePath);
+                                   const nsACString* aAndroidRuntimePath,
+                                   bool aNoPostQuantum);
   void Shutdown();
 
   nsCOMPtr<nsIFile> mExecutable;
@@ -47,6 +50,13 @@ class GeckoRuntime final {
   nsCOMPtr<nsIIOService> mIOService;
   UniquePtr<AutoSQLiteLifetime> mSQLiteLifetime;
   bool mXPCOMInitialized = false;
+  bool mNoPostQuantumApplied = false;
+  bool mHadKyberPref = false;
+  bool mHadMlkemPref = false;
+  bool mHadHttp3KyberPref = false;
+  bool mOldKyberPref = false;
+  bool mOldMlkemPref = false;
+  bool mOldHttp3KyberPref = false;
 };
 
 }  // namespace mozilla::naivefox

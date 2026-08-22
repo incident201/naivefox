@@ -15,12 +15,14 @@ Enabling the socket process requires an IPC-capable design plus cross-process
 lifecycle, half-close, backpressure, and shutdown regressions. Do not enable it
 only by changing preferences.
 
-## Unauthenticated local listeners
+## Local listener exposure
 
-SOCKS5 and HTTP CONNECT listeners do not authenticate local clients. Loopback
-is the safe default, but explicit wildcard and LAN addresses are accepted for
-NaiveProxy-compatible configuration. Operators exposing such an address must
-provide host-firewall or trusted-network protection.
+HTTP CONNECT listeners do not authenticate local clients. SOCKS5 listeners can
+require RFC 1929 username/password authentication when credentials are present
+in the `listen` URI. Loopback is the safe default, but explicit wildcard and
+LAN addresses are accepted for NaiveProxy-compatible configuration. Operators
+exposing such an address must provide host-firewall or trusted-network
+protection.
 
 The HTTP frontend accepts CONNECT only; ordinary forward HTTP returns 405.
 

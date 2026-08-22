@@ -76,12 +76,15 @@ class SocksConnection final : public nsIInputStreamCallback,
   SocksConnection(nsIAsyncInputStream* aLocalIn,
                   nsIAsyncOutputStream* aLocalOut,
                   const TunnelConfig& aTunnelConfig,
+                  const nsACString& aListenUser,
+                  const nsACString& aListenPassword,
                   nsIEventTarget* aSocketTarget,
                   std::function<void()>&& aOnClose)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
         mTunnelConfig(aTunnelConfig),
         mSocketTarget(aSocketTarget),
+        mParser(aListenUser, aListenPassword),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start() { return WaitForInput(); }
@@ -255,16 +258,31 @@ NS_IMETHODIMP SocksConnection::OnInputStreamReady(
       nsTArray<uint8_t> reply;
       Socks5Parser::MakeMethodSelection(true, reply);
       rv = QueueReply(Span(reply), false);
+    } else if (event ==
+               Socks5Parser::Event::SendUsernamePasswordSelection) {
+      nsTArray<uint8_t> reply;
+      Socks5Parser::MakeUsernamePasswordMethodSelection(reply);
+      rv = QueueReply(Span(reply), false);
+    } else if (event == Socks5Parser::Event::SendAuthenticationSuccess) {
+      nsTArray<uint8_t> reply;
+      Socks5Parser::MakeAuthenticationReply(true, reply);
+      rv = QueueReply(Span(reply), false);
     } else if (event == Socks5Parser::Event::RequestReady) {
       mOpening = true;
       rv = BeginTunnel(mParser.Target().Authority(),
                        Span(buffer.data() + offset, read - offset));
+    } else if (event == Socks5Parser::Event::AuthenticationProtocolError) {
+      mInputTerminal = true;
+      Close(NS_ERROR_FAILURE);
+      return NS_OK;
     } else if (event != Socks5Parser::Event::NeedMore) {
       mInputTerminal = true;
       mFailureQueued = true;
       nsTArray<uint8_t> reply;
       if (event == Socks5Parser::Event::RejectMethods) {
         Socks5Parser::MakeMethodSelection(false, reply);
+      } else if (event == Socks5Parser::Event::RejectAuthentication) {
+        Socks5Parser::MakeAuthenticationReply(false, reply);
       } else {
         const uint8_t code = event == Socks5Parser::Event::RejectCommand ? 0x07
                              : event == Socks5Parser::Event::RejectAddressType
@@ -746,8 +764,9 @@ NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
         [state, connectionId]() { state->ConnectionClosed(connectionId); }));
   };
   if (mListener.mType == ListenerType::Socks5) {
-    RefPtr connection = new SocksConnection(localIn, localOut, mTunnelConfig,
-                                            mSocketTarget, std::move(onClose));
+    RefPtr connection = new SocksConnection(
+        localIn, localOut, mTunnelConfig, mListener.mUser,
+        mListener.mPassword, mSocketTarget, std::move(onClose));
     nsCOMPtr<nsIEventTarget> socketTarget = mSocketTarget;
     mState->SetCancellation(
         connectionId, [socketTarget, connection = RefPtr{connection}]() {
@@ -798,6 +817,12 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
       (aTunnelConfigs.Length() >= 2 &&
        aTunnelConfigs.Length() != aListeners.Length())) {
     return NS_ERROR_INVALID_ARG;
+  }
+  for (const auto& listener : aListeners) {
+    if (listener.mType == ListenerType::HttpConnect &&
+        (!listener.mUser.IsEmpty() || !listener.mPassword.IsEmpty())) {
+      return NS_ERROR_INVALID_ARG;
+    }
   }
   nsCOMPtr<nsIEventTarget> socketTarget =
       do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID);

@@ -150,8 +150,12 @@ void DnsAndConnectSocket::CheckProxyConfig() {
 
     if (!proxyTransparent && !proxyInfo->Host().IsEmpty()) {
       mProxyNotTransparent = true;
-      mPrimaryTransport.mHost = proxyInfo->Host();
-      mBackupTransport.mHost = proxyInfo->Host();
+      const nsCString& connectHost =
+          proxyInfo->NaiveFoxPhysicalHost().IsEmpty()
+              ? proxyInfo->Host()
+              : proxyInfo->NaiveFoxPhysicalHost();
+      mPrimaryTransport.mHost = connectHost;
+      mBackupTransport.mHost = connectHost;
     }
   }
 }

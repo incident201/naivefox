@@ -56,6 +56,13 @@ free_port() {
 socks_port=$(free_port)
 http_port=$(free_port)
 while [[ $http_port == "$socks_port" ]]; do http_port=$(free_port); done
+auth_socks_port=$(free_port)
+while [[ $auth_socks_port == "$socks_port" ||
+  $auth_socks_port == "$http_port" ]]; do
+  auth_socks_port=$(free_port)
+done
+listen_user='local user'
+listen_pass='p@ss/word'
 
 config_file=${NAIVEFOX_CONFIG_PATH:-$run_dir/config.json}
 if [[ $config_file != /* || -e $config_file ]]; then
@@ -67,7 +74,9 @@ proxy_scheme=https
 CONFIG_PATH=$config_file PROXY_SCHEME=$proxy_scheme \
   PROXY_PORT=$NAIVEFOX_FIXTURE_PROXY_PORT \
   PROXY_USER=$NAIVEFOX_FIXTURE_USER PROXY_PASS=$NAIVEFOX_FIXTURE_PASS \
-  SOCKS_PORT=$socks_port HTTP_PORT=$http_port python3 - <<'PY'
+  SOCKS_PORT=$socks_port HTTP_PORT=$http_port \
+  AUTH_SOCKS_PORT=$auth_socks_port LISTEN_USER=$listen_user \
+  LISTEN_PASS=$listen_pass python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -79,11 +88,22 @@ config = {
     "listen": [
         f"socks://0.0.0.0:{os.environ['SOCKS_PORT']}",
         f"http://0.0.0.0:{os.environ['HTTP_PORT']}",
+        (
+            "socks://"
+            + quote(os.environ["LISTEN_USER"], safe="")
+            + ":"
+            + quote(os.environ["LISTEN_PASS"], safe="")
+            + "@0.0.0.0:"
+            + os.environ["AUTH_SOCKS_PORT"]
+        ),
     ],
     "proxy": [(
         f"{os.environ['PROXY_SCHEME']}://{user}:{password}"
         f"@localhost:{os.environ['PROXY_PORT']}"
-    )] * 2,
+    )] * 3,
+    "host-resolver-rules": "MAP localhost 127.0.0.1",
+    "extra-headers": "X-NaiveFox-Config-Test: enabled" + chr(13) + chr(10),
+    "no-post-quantum": True,
     "log": "",
 }
 path = Path(os.environ["CONFIG_PATH"])
@@ -124,7 +144,8 @@ fi
 
 for ((i = 0; i < 150; i++)); do
   if rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log" &&
-    rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"; then
+    rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log" &&
+    rg -q "^SOCKS5 listening on 0.0.0.0:$auth_socks_port$" "$client_log"; then
     break
   fi
   kill -0 "$client_pid" 2>/dev/null || {
@@ -135,8 +156,10 @@ for ((i = 0; i < 150; i++)); do
 done
 rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log"
 rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"
+rg -q "^SOCKS5 listening on 0.0.0.0:$auth_socks_port$" "$client_log"
 ss -Hltn "sport = :$socks_port" | rg -q '0\.0\.0\.0:'
 ss -Hltn "sport = :$http_port" | rg -q '0\.0\.0\.0:'
+ss -Hltn "sport = :$auth_socks_port" | rg -q '0\.0\.0\.0:'
 
 if [[ -n ${NAIVEFOX_EXPECT_RUNTIME_DIR:-} ]]; then
   expected_runtime=$(realpath -- "$NAIVEFOX_EXPECT_RUNTIME_DIR")
@@ -154,12 +177,35 @@ curl_http=(
   --silent --show-error --fail --noproxy ''
   --proxy "http://127.0.0.1:$http_port"
 )
+curl_auth_socks=(
+  --silent --show-error --fail --noproxy ''
+  --socks5-hostname "127.0.0.1:$auth_socks_port"
+  --proxy-user "$listen_user:$listen_pass"
+)
 expected=naivefox-fixture-small
 
 [[ $(curl "${curl_socks[@]}" \
   "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small") == "$expected" ]]
 [[ $(curl "${curl_http[@]}" --cacert "$NAIVEFOX_FIXTURE_CA" \
   "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/small") == "$expected" ]]
+[[ $(curl "${curl_auth_socks[@]}" \
+  "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small") == "$expected" ]]
+
+if curl --silent --fail --max-time 5 --noproxy '' \
+  --socks5-hostname "127.0.0.1:$auth_socks_port" \
+  "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small" \
+  >/dev/null 2>&1; then
+  printf 'authenticated SOCKS listener accepted a client without auth\n' >&2
+  exit 1
+fi
+if curl --silent --fail --max-time 5 --noproxy '' \
+  --socks5-hostname "127.0.0.1:$auth_socks_port" \
+  --proxy-user 'wrong:credentials' \
+  "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small" \
+  >/dev/null 2>&1; then
+  printf 'authenticated SOCKS listener accepted wrong credentials\n' >&2
+  exit 1
+fi
 
 http_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
   --noproxy '' --proxy "http://127.0.0.1:$http_port" \
@@ -216,8 +262,8 @@ for file in "$run_dir"/mixed-*; do
   [[ $(<"$file") == "$expected" ]]
 done
 
-[[ $(rg -c "^Outer protocol: $protocol$" "$client_log") -eq 10 ]]
-[[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 10 ]]
+[[ $(rg -c "^Outer protocol: $protocol$" "$client_log") -eq 11 ]]
+[[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 11 ]]
 ! rg -q '^Padding negotiated: no$' "$client_log"
 ! rg -Fq "$NAIVEFOX_FIXTURE_PASS" "$client_log"
 

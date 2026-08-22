@@ -234,7 +234,15 @@ already_AddRefed<nsProxyInfo> nsProxyInfo::CloneProxyInfoWithNewResolveFlags(
     arg.resolveFlags() = aResolveFlags;
   }
 
-  return DeserializeProxyInfo(args);
+  RefPtr<nsProxyInfo> clone = DeserializeProxyInfo(args);
+  nsProxyInfo* source = this;
+  nsProxyInfo* destination = clone;
+  while (source && destination) {
+    destination->mNaiveFoxPhysicalHost = source->mNaiveFoxPhysicalHost;
+    source = source->mNext;
+    destination = destination->mNext;
+  }
+  return clone.forget();
 }
 
 already_AddRefed<nsProxyInfo> nsProxyInfo::CreateFallbackProxyInfo() {
@@ -247,7 +255,15 @@ already_AddRefed<nsProxyInfo> nsProxyInfo::CreateFallbackProxyInfo() {
     }
   }
 
-  return DeserializeProxyInfo(args);
+  RefPtr<nsProxyInfo> fallback = DeserializeProxyInfo(args);
+  nsProxyInfo* source = this;
+  nsProxyInfo* destination = fallback;
+  while (source && destination) {
+    destination->mNaiveFoxPhysicalHost = source->mNaiveFoxPhysicalHost;
+    source = source->mNext;
+    destination = destination->mNext;
+  }
+  return fallback.forget();
 }
 
 }  // namespace net

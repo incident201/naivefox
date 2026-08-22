@@ -29,12 +29,19 @@ class Socks5Parser final {
   enum class Event : uint8_t {
     NeedMore,
     SendNoAuthenticationSelection,
+    SendUsernamePasswordSelection,
+    SendAuthenticationSuccess,
     RequestReady,
     RejectMethods,
+    RejectAuthentication,
+    AuthenticationProtocolError,
     RejectCommand,
     RejectAddressType,
     ProtocolError,
   };
+
+  Socks5Parser() = default;
+  Socks5Parser(const nsACString& aUser, const nsACString& aPassword);
 
   Event Consume(Span<const uint8_t> aInput, size_t& aConsumed);
 
@@ -42,6 +49,9 @@ class Socks5Parser final {
   bool IsComplete() const { return mState == State::Complete; }
 
   static void MakeMethodSelection(bool aAccepted, nsTArray<uint8_t>& aReply);
+  static void MakeUsernamePasswordMethodSelection(nsTArray<uint8_t>& aReply);
+  static void MakeAuthenticationReply(bool aAccepted,
+                                      nsTArray<uint8_t>& aReply);
   static void MakeReply(uint8_t aReplyCode, nsTArray<uint8_t>& aReply);
 
  private:
@@ -49,6 +59,11 @@ class Socks5Parser final {
     GreetingVersion,
     GreetingMethodCount,
     GreetingMethods,
+    AuthenticationVersion,
+    AuthenticationUsernameLength,
+    AuthenticationUsername,
+    AuthenticationPasswordLength,
+    AuthenticationPassword,
     RequestVersion,
     RequestCommand,
     RequestReserved,
@@ -62,11 +77,17 @@ class Socks5Parser final {
   };
 
   Event ConsumeByte(uint8_t aByte);
+  Event FinishAuthentication();
   bool FinishAddress();
 
   State mState = State::GreetingVersion;
   uint16_t mRemaining = 0;
   bool mSawNoAuthentication = false;
+  bool mSawUsernamePassword = false;
+  nsCString mExpectedUser;
+  nsCString mExpectedPassword;
+  nsCString mAuthenticationUser;
+  nsCString mAuthenticationPassword;
   Socks5Target mTarget;
   nsTArray<uint8_t> mAddress;
   uint8_t mPortHigh = 0;

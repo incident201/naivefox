@@ -47,6 +47,15 @@ class nsProxyInfo final : public nsIProxyInfo {
   const nsCString& ConnectionIsolationKey() const {
     return mConnectionIsolationKey;
   }
+  // NaiveFox keeps the logical proxy host in the URI/connection identity for
+  // TLS verification, while this optional host is used only for the socket
+  // DNS lookup and connect destination.
+  const nsCString& NaiveFoxPhysicalHost() const {
+    return mNaiveFoxPhysicalHost;
+  }
+  void SetNaiveFoxPhysicalHost(const nsACString& aHost) {
+    mNaiveFoxPhysicalHost = aHost;
+  }
 
   bool IsDirect();
   bool IsHTTP();
@@ -86,6 +95,7 @@ class nsProxyInfo final : public nsIProxyInfo {
   nsCString mConnectionIsolationKey;
   nsCString mSourceId;
   nsCString mMasqueTemplate;
+  nsCString mNaiveFoxPhysicalHost;
   int32_t mPort{-1};
   uint32_t mFlags{0};
   // We need to read on multiple threads, but don't need to sync on anything
