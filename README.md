@@ -38,29 +38,42 @@ The supported config is a strict NaiveProxy-compatible subset:
   ],
   "proxy": [
     "https://user:password@proxy.example:443",
-    "https://user:password@proxy.example:443"
+    "quic://proxy.example:443"
   ],
+  "host-resolver-rules": "MAP proxy.example 127.0.0.1",
+  "extra-headers": "X-NaiveFox-Test: enabled\r\n",
+  "no-post-quantum": false,
   "log": ""
 }
 ```
 
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
-  `http://` serves HTTP CONNECT only.
+  without userinfo it uses the normal no-auth method. SOCKS credentials are
+  optional, percent-decoded, and checked with RFC 1929 username/password
+  authentication; `http://` serves HTTP CONNECT only and does not accept
+  listener credentials.
 - `proxy` is one URI shared by all listeners, or an array whose length matches
-  `listen`. Multi-hop comma-separated proxy chains are rejected.
+  `listen`. `https://` is strict H2 over TLS/TCP and `quic://` is strict H3
+  over QUIC. Credentials are optional, percent-decoded, and passed to
+  Necko's proxy-auth path. Port 443 is used when omitted.
 - `https://` requires H2 over TLS/TCP. `quic://` requires H3 over QUIC/UDP.
   Strict modes never silently fall back.
-- Credentials are percent-decoded and passed to Necko's proxy-auth path. They
-  are never written to normal logs.
 - Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
   An explicit nonzero port is required.
+- `host-resolver-rules` accepts exactly one `MAP logical-host physical-host`
+  rule. A matching upstream socket uses the physical host while TLS SNI and
+  certificate validation retain the logical hostname.
+- `extra-headers` is a CRLF-separated list added only to the outer upstream
+  CONNECT request. Malformed, duplicate, or service headers such as `Host`,
+  `Padding`, and `Proxy-Authorization` are rejected.
+- `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
+  Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path
   appends to a mode-`0600` file.
 
-Local listeners do not authenticate clients. Binding `0.0.0.0`, `::`, or a LAN
-address intentionally exposes the listener and requires an appropriate host
-firewall or trusted-network policy. Ordinary forward-proxy HTTP requests return
-405.
+Binding `0.0.0.0`, `::`, or a LAN address intentionally exposes a listener.
+Ordinary forward-proxy HTTP requests return 405. Comma-separated proxy chains,
+upstream HTTP/SOCKS proxies, and direct mode are not supported.
 
 A SOCKS client should delegate destination DNS to the proxy:
 
@@ -89,6 +102,28 @@ Developer CLI modes take proxy credentials from `NAIVEFOX_PROXY_USER` and
 `NAIVEFOX_PROXY_PASS`. `--protocol h2` is the default; `h3` is strict H3;
 `auto` performs one strict H3 attempt and permits one H2 retry only when H3
 fails before a CONNECT response or tunnel transport exists.
+
+## Building and testing
+
+The minimized product workflow builds and stages the runtime below the object
+directory:
+
+```bash
+./netwerk/naivefox/tools/build-product.sh linux \
+  --objdir "$PWD/../obj-naivefox-linux"
+
+NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
+./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  package/naivefox-linux-x86_64
+
+./netwerk/naivefox/test/integration/run-full-suite.sh
+```
+
+Use the same entrypoint with `windows --bootstrap` for the Windows package.
+The Android command is shown in the next section. Android packaging can be
+checked without a device with
+`run-android-embedded-tests.sh --check-only`; network acceptance requires an
+online ARM64 API-26+ device or emulator.
 
 ## Android embedded runtime
 
@@ -154,6 +189,9 @@ listeners.
   connection manager.
 - Strict H2 and strict H3 regular CONNECT, plus bounded developer Auto mode.
 - Basic proxy authentication through Firefox's normal proxy-auth machinery.
+- RFC 1929 authentication for configured SOCKS listeners.
+- Upstream host mapping, custom CONNECT headers, and the no-post-quantum TLS
+  preference.
 - Naive `padding` request/response negotiation and legacy Variant 1 payload
   framing: eight padded records per direction, then raw bytes.
 - Bounded async pumping, partial I/O, backpressure, half-close, connection reuse,
@@ -170,8 +208,9 @@ separate socket-process transport. See [`KNOWN-ISSUES.md`](netwerk/naivefox/KNOW
 NaiveFox asks Firefox to create a normal proxied channel and takes over the
 successful classic CONNECT as asynchronous byte streams. The empty raw-upgrade
 token is restricted to connect-only channels and emits no synthetic `ALPN`,
-`Upgrade`, or `Connection` marker. A validated sidecar adds only the intentional
-Naive `padding` header to the actual proxy CONNECT request.
+`Upgrade`, or `Connection` marker. A validated sidecar adds the intentional
+Naive `padding` header and configured extra headers to the actual proxy CONNECT
+request.
 
 H2 uses Firefox's TLS/TCP connection and `Http2StreamTunnel`. H3 uses a strict
 MASQUE-type proxy route to create a regular classic CONNECT through
@@ -182,109 +221,7 @@ The target's TLS session belongs to the application using the local proxy.
 NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 
 See [`ARCHITECTURE.md`](netwerk/naivefox/ARCHITECTURE.md) for component, event-target, stream,
-and fallback details. Downstream Firefox hooks are inventoried in
-`UPSTREAM-PATCHES.md` in the full maintenance checkout.
-
-## Building and testing
-
-Development happens in the full Firefox source checkout, but the normal
-product workflow builds only the minimized NaiveFox graph. It does not build a
-Firefox browser:
-
-```bash
-./netwerk/naivefox/tools/build-product.sh linux \
-  --objdir "$PWD/../obj-naivefox-linux"
-```
-
-The same entrypoint selects the Windows x86-64 mozconfig, external object
-directory, staging script, and (under WSL) the portable Wine paths/prefix:
-
-```bash
-./netwerk/naivefox/tools/build-product.sh windows \
-  --objdir "$PWD/../obj-naivefox-windows" \
-  --bootstrap
-```
-
-For a local WSL/Windows ARM64 AVD, pass --start-emulator to the same runner;
-it owns the QEMU virt launch workaround and cleans up the emulator it starts.
-
-The Android ARM64 command and package verifier are documented in
-[Android embedded runtime](#android-embedded-runtime). A static NDK harness
-check, which does not require a device, is available after staging:
-
-```bash
-./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
-  --package "$PWD/../obj-naivefox-android-aarch64/package/naivefox-android-aarch64" \
-  --check-only
-```
-
-Together, the verifier and `--check-only` prove the package manifest,
-dependency/export metadata, AArch64 harness construction, and ELF inspection
-only. Android acceptance still requires an online ARM64 API-26+ device or
-emulator and the same runner without `--check-only`, so a host with no `adb`
-device or KVM must not report the H2/H3 device gate as passed.
-
-Run the reproducible local H2/H3/Auto/config/robustness gate with:
-
-```bash
-./netwerk/naivefox/test/integration/run-full-suite.sh
-```
-
-The fixture builds pinned Caddy and `forwardproxy@naive` inputs, binds only to
-loopback, creates per-run credentials and PKI state, and trusts its CA only in
-isolated NSS profiles. No real proxy account is required. Detailed focused and
-real-deployment commands are in
-[`test/integration/README.md`](netwerk/naivefox/test/integration/README.md).
-
-The entrypoint stages the package below the object directory. Verify the Linux
-package after a successful product build:
-
-```bash
-NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
-./netwerk/naivefox/tools/verify-staged-runtime.sh \
-  package/naivefox-linux-x86_64
-```
-
-The entrypoint disables the local sccache daemon by default so a build does
-not depend on stale daemon state or silently change its configure inputs. Set
-`NAIVEFOX_USE_SCCACHE=1` only when the daemon has been deliberately configured
-for this checkout.
-
-An ordinary Firefox build is not a merge or release gate. It is allowed only
-for an explicitly requested same-base capture comparison; see
-[`CAPTURE.md`](netwerk/naivefox/CAPTURE.md).
-
-## Repository workflow
-
-```text
-Mozilla main -> firefox-upstream -> naivefox-full-source -> generated naivefox-minimal-source
-```
-
-- `firefox-upstream` is a clean fast-forward-only Mozilla mirror.
-- `naivefox-full-source` is the single complete working tree containing the
-  NaiveFox implementation, minimization rules, and export tooling.
-- `naivefox-minimal-source` is a generated standalone product snapshot and is
-  never hand-edited. Its `.github/workflows/` control-plane files are the
-  deliberate exception and may be maintained directly.
-
-The refresh and export gates are defined in `UPSTREAM.md` in the full
-maintenance checkout. In particular, commit SHAs and test transcripts
-belong in generated evidence, commits, and annotated tags rather than being
-copied into active Markdown.
-
-Release automation is intentionally maintained as the control-plane overlay
-`.github/workflows/release.yml` on `naivefox-minimal-source`. It is manual-only,
-builds the targets selected by that branch's release workflow, and creates a
-draft release without running the integration/Caddy suites.
-
-## Security and data handling
-
-Never commit or retain proxy passwords, authorization headers, TLS keys, local
-CA private keys, NSS profiles, packet captures, request payloads, or generated
-fixture state. Integration state lives under the object directory with private
-permissions and is removed after successful runs. Real-server tests receive
-their endpoint and credentials through environment variables and keep only a
-credential-free summary.
+and fallback details.
 
 ## References
 
