@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "47de75de9ded09af81347e513c6d343dc2a75e3e",
+    "source_commit_sha": "b6f3ce0f649d15b676a2325b0fcc07eefa6b4303",
     "source_worktree_clean": true,
     "firefox_base_sha": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-    "naivefox_reference_sha": "47de75de9ded09af81347e513c6d343dc2a75e3e",
+    "naivefox_reference_sha": "b6f3ce0f649d15b676a2325b0fcc07eefa6b4303",
     "analyzer_sha256": "f5fc1ae9c8b65ce6532989afae3422b0f9cdc727e9c39e5cdff890d8ad53ec9c",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "71d7a93b99c6bd1f8c2f8553300e4559d26f9e539d7f8202952ba282f4e57029",
@@ -6884,7 +6884,7 @@
       {
         "path": "application.ini",
         "size_bytes": 354,
-        "sha256": "8ff890fbc7f1771317554365f686e68c462dfe8448b34d3bb745ffa1cd3e8766"
+        "sha256": "4a40002792d55af61bfa6a388e0fb954f433d474be9eed1527fe93377a6e229b"
       },
       {
         "path": "chrome.manifest",
@@ -6914,7 +6914,7 @@
       {
         "path": "naivefox.exe",
         "size_bytes": 10752,
-        "sha256": "1139b4584fd7117383d5eff56e937279b0f20c364c8e03d08ae8248893162530"
+        "sha256": "d695b590945c6e274d612b7fc8eb991fa327ec9ac21baad328c4c16f86027b0f"
       },
       {
         "path": "nss3.dll",
@@ -6934,7 +6934,7 @@
       {
         "path": "xul.dll",
         "size_bytes": 27646976,
-        "sha256": "3e732fd72c37ac34b2ac0d0ad0086407f36971f41c54894144239a2a721fe4d3"
+        "sha256": "164b20f0209def0f4f58e8b7817e9c14fea292e630651905094afe96a7d225c3"
       },
       {
         "path": "localization/en-US/netwerk/necko.ftl",

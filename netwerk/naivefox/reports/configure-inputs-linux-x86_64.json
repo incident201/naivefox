@@ -2839,6 +2839,7 @@
     "netwerk/naivefox/HttpConnectParser.cpp",
     "netwerk/naivefox/LeanDOMBindings.cpp",
     "netwerk/naivefox/MemMapSnapshot.cpp",
+    "netwerk/naivefox/NAIVEFOX_VERSION",
     "netwerk/naivefox/NaiveFox.cpp",
     "netwerk/naivefox/NaiveFoxOriginTrials.h",
     "netwerk/naivefox/NaiveFoxRFPTarget.h",
@@ -2858,7 +2859,6 @@
     "netwerk/naivefox/TunnelSession.cpp",
     "netwerk/naivefox/UnknownProtocolHandler.cpp",
     "netwerk/naivefox/UnknownProtocolHandler.h",
-    "netwerk/naivefox/VERSION",
     "netwerk/naivefox/app.mozbuild",
     "netwerk/naivefox/codec/NaivePadding.cpp",
     "netwerk/naivefox/codec/moz.build",
@@ -10300,7 +10300,7 @@
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "47de75de9ded09af81347e513c6d343dc2a75e3e",
+  "naivefox_reference_commit": "b6f3ce0f649d15b676a2325b0fcc07eefa6b4303",
   "observed_directories": [
     "browser",
     "build",
@@ -21358,11 +21358,11 @@
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "47de75de9ded09af81347e513c6d343dc2a75e3e",
+  "source_commit": "b6f3ce0f649d15b676a2325b0fcc07eefa6b4303",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "dfd7f3cb868d454ca6ad67f320888442a657945fffaa3896d3c84f6cdb0335e4",
-  "trace_size_bytes": 34081602
+  "trace_sha256": "0a5dee40cfb34d57cb9b7f89b3efb99d3a4528c7289975c0a93280fa7309678d",
+  "trace_size_bytes": 34078679
 }
