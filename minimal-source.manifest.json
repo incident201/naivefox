@@ -3,8 +3,8 @@
     "executable_files": 149,
     "files": 22744
   },
-  "evidence_commit": "f1a939618b358c8cad2a094bda71570e7ee05df5",
-  "evidence_source_commit": "578a8826e27abd777c8b585475f183a88ea77640",
+  "evidence_commit": "334aa68e8da65503f3c2d76e9ae16c2fb80df4a2",
+  "evidence_source_commit": "47de75de9ded09af81347e513c6d343dc2a75e3e",
   "files": [
     {
       "mode": "0644",
@@ -23719,7 +23719,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-android-embedded-tests.sh",
-      "sha256": "fa02a6e581a44d532a3fd77dd8b728fca7d4bde7d82e15c3d659b37ea2e5d573"
+      "sha256": "00f2ca2f7323103e1ba8a60151f131b9bc7ca1c600b6ebb4ee023c166edbfd6e"
     },
     {
       "mode": "0755",
@@ -113728,8 +113728,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "7a0106bb1bd5bb89b6afef1d9a4ecd1843c6fa6d289332e39608ab0e76e8c3dc",
+  "manifest_sha256": "9e8700333e9b27424883b169634f143eaf340951d19db1f11787daee420aadbb",
   "manifest_version": 2,
-  "minimal_export_commit": "f1a939618b358c8cad2a094bda71570e7ee05df5",
-  "naivefox_reference_commit": "578a8826e27abd777c8b585475f183a88ea77640"
+  "minimal_export_commit": "334aa68e8da65503f3c2d76e9ae16c2fb80df4a2",
+  "naivefox_reference_commit": "47de75de9ded09af81347e513c6d343dc2a75e3e"
 }

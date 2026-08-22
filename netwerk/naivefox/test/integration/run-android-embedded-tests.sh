@@ -90,7 +90,8 @@ compiler="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-andr
   -I"$header_dir" "$INTEGRATION_DIR/android_embedded_harness.cpp" \
   -ldl -o "$harness"
 readelf="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-"$readelf" --file-header "$harness" | rg -q '^  Machine:[[:space:]]+AArch64$'
+"$readelf" --file-header "$harness" |
+  rg '^  Machine:[[:space:]]+AArch64$' >/dev/null
 
 if (( check_only )); then
   printf 'Android embedded harness static checks passed with NDK r29\n'
