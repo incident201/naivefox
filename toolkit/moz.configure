@@ -173,8 +173,17 @@ set_config("MOZ_FOLD_LIBS", fold_libs)
 
 # Enable perfetto on Android if gecko profiling is enabled and only for
 # nightly builds. Linux support requires at least linux-headers-3.18 for <linux/vm_sockets.h>
-set_config("MOZ_PERFETTO", True, when=target_is_android & milestone.is_nightly)
-set_define("MOZ_PERFETTO", True, when=target_is_android & milestone.is_nightly)
+@depends(target, milestone.is_nightly, build_project)
+def enable_android_perfetto(target, is_nightly, build_project):
+    return (
+        target.os == "Android"
+        and is_nightly
+        and build_project != "netwerk/naivefox"
+    )
+
+
+set_config("MOZ_PERFETTO", True, when=enable_android_perfetto)
+set_define("MOZ_PERFETTO", True, when=enable_android_perfetto)
 
 
 # Whether code to parse ELF binaries should be compiled for the Gecko profiler
@@ -3873,9 +3882,9 @@ non_macos_pkg_path = dependable("bin")
 
 # Smart card support
 # ==============================================================
-@depends(target)
-def disable_smart_cards(target):
-    return target.os == "Android"
+@depends(target, build_project)
+def disable_smart_cards(target, build_project):
+    return target.os == "Android" or build_project == "netwerk/naivefox"
 
 
 set_config("MOZ_NO_SMART_CARDS", True, when=disable_smart_cards)

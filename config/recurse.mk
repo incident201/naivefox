@@ -166,7 +166,9 @@ ifeq (.,$(DEPTH))
 # This is required so that the pre-export tier sees the rules in
 # mobile/android
 ifeq ($(MOZ_WIDGET_TOOLKIT),android)
+ifndef MOZ_NAIVEFOX
 recurse_pre-export: mobile/android/pre-export
+endif
 endif
 
 ifeq ($(TARGET_ENDIANNESS),big)

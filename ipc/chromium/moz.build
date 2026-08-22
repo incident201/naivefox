@@ -85,10 +85,10 @@ if CONFIG["TARGET_KERNEL"] != "WINNT":
 if CONFIG["MOZ_NAIVEFOX"] and CONFIG["TARGET_KERNEL"] != "WINNT":
     # No child process or IPC transport exists in the single-process product.
     # Retain Chromium's event-loop primitives, but omit the Unix IPC channel.
-    for source in [
-        "src/chrome/common/process_watcher_posix_sigchld.cc",
-    ]:
-        UNIFIED_SOURCES.remove(source)
+    if CONFIG["TARGET_OS"] in ("Android", "iOS"):
+        UNIFIED_SOURCES.remove("src/chrome/common/process_watcher_dummy.cc")
+    else:
+        UNIFIED_SOURCES.remove("src/chrome/common/process_watcher_posix_sigchld.cc")
 
 if CONFIG["TARGET_KERNEL"] == "Darwin":
     UNIFIED_SOURCES += [
@@ -131,9 +131,10 @@ if CONFIG["TARGET_KERNEL"] == "Linux":
         "src/base/time_posix.cc",
     ]
     if CONFIG["OS_TARGET"] == "Android":
-        UNIFIED_SOURCES += [
-            "src/base/message_pump_android.cc",
-        ]
+        if not CONFIG["MOZ_NAIVEFOX"]:
+            UNIFIED_SOURCES += [
+                "src/base/message_pump_android.cc",
+            ]
         DEFINES["ANDROID"] = True
         DEFINES["_POSIX_MONOTONIC_CLOCK"] = 0
 

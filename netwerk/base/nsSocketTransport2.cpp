@@ -60,8 +60,10 @@
 #endif
 
 #if defined(MOZ_WIDGET_ANDROID)
-#  include "AndroidLocalNetworkPermission.h"
 #  include "AndroidNetworkBlockedReason.h"
+#  if !defined(MOZ_NAIVEFOX)
+#    include "AndroidLocalNetworkPermission.h"
+#  endif
 #endif
 
 /* Following inclusions required for keepalive config not supported by NSPR. */
@@ -1626,7 +1628,7 @@ nsresult nsSocketTransport::InitiateSocket() {
   }
 #endif
 
-#if defined(MOZ_WIDGET_ANDROID)
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   // Android 17+ refuses connections to the local network unless the app holds
   // ACCESS_LOCAL_NETWORK. Ask for it here, as the connection is made, rather
   // than after a 30 second connect timeout.

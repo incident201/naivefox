@@ -32,7 +32,7 @@
 #    include "base/message_pump_glib.h"
 #  endif
 #endif
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "base/message_pump_android.h"
 #endif
 #include "nsISerialEventTarget.h"
@@ -279,7 +279,11 @@ MessageLoop::MessageLoop(Type type, nsISerialEventTarget* aEventTarget)
     pump_ = base::MessagePumpMac::Create();
 #  elif defined(XP_LINUX) || defined(__DragonFly__) || defined(XP_FREEBSD) || \
       defined(XP_NETBSD) || defined(XP_OPENBSD)
+#    if defined(ANDROID) && defined(MOZ_NAIVEFOX)
+    pump_ = new base::MessagePumpDefault();
+#    else
     pump_ = new base::MessagePumpForUI();
+#    endif
 #  endif  // XP_LINUX
   } else if (type_ == TYPE_IO) {
 #  if defined(XP_DARWIN)

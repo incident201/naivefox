@@ -13,11 +13,14 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/Span.h"
 #include "mozilla/SpinEventLoopUntil.h"
+#include "mozilla/Utf8.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
@@ -117,16 +120,6 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
     return NS_ERROR_INVALID_ARG;
   }
 
-#ifdef XP_WIN
-  if (_putenv_s("MOZ_HEADLESS", "1") != 0 ||
-      _putenv_s("MOZ_DISABLE_SOCKET_PROCESS", "1") != 0) {
-#else
-  if (setenv("MOZ_HEADLESS", "1", 1) != 0 ||
-      setenv("MOZ_DISABLE_SOCKET_PROCESS", "1", 1) != 0) {
-#endif
-    return NS_ERROR_FAILURE;
-  }
-
   (void)aArgc;
   (void)aArgv;
 
@@ -152,14 +145,139 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
   nsCOMPtr<nsIFile> profile;
   MOZ_TRY(NS_NewNativeLocalFile(aProfilePath, getter_AddRefs(profile)));
 
+  return InitializeWithLocations(profile, mBinDirectory, mExecutable, aProtocol,
+                                 nullptr);
+}
+
+nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
+                                          const nsACString& aRuntimePath,
+                                          ProxyProtocol aProtocol) {
+  if (mXPCOMInitialized) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  MOZ_TRY(ValidateEmbeddedLocations(aProfilePath, aRuntimePath));
+
+  nsCOMPtr<nsIFile> profile;
+  nsCOMPtr<nsIFile> binDirectory;
+  nsCOMPtr<nsIFile> executable;
+  MOZ_TRY(NS_NewNativeLocalFile(aProfilePath, getter_AddRefs(profile)));
+  MOZ_TRY(NS_NewNativeLocalFile(aRuntimePath, getter_AddRefs(binDirectory)));
+  MOZ_TRY(profile->Normalize());
+  MOZ_TRY(binDirectory->Normalize());
+  MOZ_TRY(binDirectory->Clone(getter_AddRefs(executable)));
+#ifdef XP_WIN
+  MOZ_TRY(executable->AppendNative("xul.dll"_ns));
+#else
+  MOZ_TRY(executable->AppendNative("libxul.so"_ns));
+#endif
+
+#ifdef ANDROID
+  nsAutoCString normalizedRuntimePath;
+  MOZ_TRY(binDirectory->GetNativePath(normalizedRuntimePath));
+  return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
+                                 &normalizedRuntimePath);
+#else
+  return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
+                                 nullptr);
+#endif
+}
+
+nsresult GeckoRuntime::ValidateEmbeddedLocations(
+    const nsACString& aProfilePath, const nsACString& aRuntimePath) {
+  if (aProfilePath.IsEmpty() || aRuntimePath.IsEmpty() ||
+      !IsUtf8(Span(aProfilePath.BeginReading(), aProfilePath.Length())) ||
+      !IsUtf8(Span(aRuntimePath.BeginReading(), aRuntimePath.Length())) ||
+      !std::filesystem::path(PromiseFlatCString(aProfilePath).get())
+           .is_absolute() ||
+      !std::filesystem::path(PromiseFlatCString(aRuntimePath).get())
+           .is_absolute()) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  nsCOMPtr<nsIFile> profile;
+  nsCOMPtr<nsIFile> binDirectory;
+  nsCOMPtr<nsIFile> executable;
+  MOZ_TRY(NS_NewNativeLocalFile(aProfilePath, getter_AddRefs(profile)));
+  MOZ_TRY(NS_NewNativeLocalFile(aRuntimePath, getter_AddRefs(binDirectory)));
+  MOZ_TRY(profile->Normalize());
+  MOZ_TRY(binDirectory->Normalize());
+  MOZ_TRY(binDirectory->Clone(getter_AddRefs(executable)));
+#ifdef XP_WIN
+  MOZ_TRY(executable->AppendNative("xul.dll"_ns));
+#else
+  MOZ_TRY(executable->AppendNative("libxul.so"_ns));
+#endif
+
   bool isDirectory = false;
   MOZ_TRY(profile->IsDirectory(&isDirectory));
   if (!isDirectory) {
     return NS_ERROR_FILE_NOT_DIRECTORY;
   }
+  bool isWritable = false;
+  MOZ_TRY(profile->IsWritable(&isWritable));
+  if (!isWritable) {
+    return NS_ERROR_FILE_ACCESS_DENIED;
+  }
+  MOZ_TRY(binDirectory->IsDirectory(&isDirectory));
+  if (!isDirectory) {
+    return NS_ERROR_FILE_NOT_DIRECTORY;
+  }
+  bool isFile = false;
+  MOZ_TRY(executable->IsFile(&isFile));
+  return isFile ? NS_OK : NS_ERROR_FILE_NOT_FOUND;
+}
+
+nsresult GeckoRuntime::InitializeWithLocations(
+    nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
+    ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath) {
+  if (mXPCOMInitialized || !aProfile || !aBinDirectory || !aExecutable) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  bool isDirectory = false;
+  MOZ_TRY(aProfile->IsDirectory(&isDirectory));
+  if (!isDirectory) {
+    return NS_ERROR_FILE_NOT_DIRECTORY;
+  }
+  bool isWritable = false;
+  MOZ_TRY(aProfile->IsWritable(&isWritable));
+  if (!isWritable) {
+    return NS_ERROR_FILE_ACCESS_DENIED;
+  }
+  MOZ_TRY(aBinDirectory->IsDirectory(&isDirectory));
+  if (!isDirectory) {
+    return NS_ERROR_FILE_NOT_DIRECTORY;
+  }
+  bool isFile = false;
+  MOZ_TRY(aExecutable->IsFile(&isFile));
+  if (!isFile) {
+    return NS_ERROR_FILE_NOT_FOUND;
+  }
+
+#ifdef XP_WIN
+  if (_putenv_s("MOZ_HEADLESS", "1") != 0 ||
+      _putenv_s("MOZ_DISABLE_SOCKET_PROCESS", "1") != 0) {
+#else
+  if (setenv("MOZ_HEADLESS", "1", 1) != 0 ||
+      setenv("MOZ_DISABLE_SOCKET_PROCESS", "1", 1) != 0) {
+#endif
+    return NS_ERROR_FAILURE;
+  }
+#ifdef ANDROID
+  if (!aAndroidRuntimePath ||
+      setenv("MOZ_ANDROID_LIBDIR",
+             PromiseFlatCString(*aAndroidRuntimePath).get(), 1) != 0) {
+    return NS_ERROR_FAILURE;
+  }
+#else
+  (void)aAndroidRuntimePath;
+#endif
+
+  mExecutable = aExecutable;
+  mBinDirectory = aBinDirectory;
 
   RefPtr<DirectoryProvider> provider =
-      new DirectoryProvider(profile, mBinDirectory, mExecutable);
+      new DirectoryProvider(aProfile, mBinDirectory, mExecutable);
   mDirectoryProvider = provider;
 
   mSQLiteLifetime = MakeUnique<AutoSQLiteLifetime>();

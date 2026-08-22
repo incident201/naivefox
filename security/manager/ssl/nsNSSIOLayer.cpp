@@ -69,7 +69,7 @@
 #  include "mozilla/arm.h"
 #endif
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/java/ClientAuthCertificateManagerWrappers.h"
 #endif  // MOZ_WIDGET_ANDROID
 
@@ -1985,6 +1985,9 @@ void DoSign(size_t cert_len, const uint8_t* cert, size_t data_len,
 // certificates and keys. It gets a list of all known client auth certificates
 // from `ClientAuthCertificateManager` and returns them via the callback.
 void AndroidDoFindObjects(FindObjectsCallback cb, void* ctx) {
+#  ifdef MOZ_NAIVEFOX
+  return;
+#  else
   if (!jni::IsAvailable()) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
             ("AndroidDoFindObjects: JNI not available"));
@@ -2016,6 +2019,7 @@ void AndroidDoFindObjects(FindObjectsCallback cb, void* ctx) {
       }
     }
   }
+#  endif
 }
 
 // Similar to `DoSign`, this function implements signing for client
@@ -2025,6 +2029,9 @@ void AndroidDoFindObjects(FindObjectsCallback cb, void* ctx) {
 void AndroidDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
                    const uint8_t* data, const char* algorithm, SignCallback cb,
                    void* ctx) {
+#  ifdef MOZ_NAIVEFOX
+  return;
+#  else
   if (!jni::IsAvailable()) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("AndroidDoSign: JNI not available"));
     return;
@@ -2041,6 +2048,7 @@ void AndroidDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
        reinterpret_cast<const uint8_t*>(signature->GetElements().Elements()),
        ctx);
   }
+#  endif
 }
 #endif  // MOZ_WIDGET_ANDROID
 }  // extern "C"

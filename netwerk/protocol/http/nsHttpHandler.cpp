@@ -1374,7 +1374,7 @@ void nsHttpHandler::PrefsChanged(const char* pref) {
     mUserAgentIsDirty = true;
   }
 
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   // general.useragent.use_device
   if (PREF_CHANGED(UA_PREF("use_device"))) {
     if (Preferences::GetBool(UA_PREF("use_device"), false)) {

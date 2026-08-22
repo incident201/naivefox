@@ -15,6 +15,7 @@
 #include "TunnelSession.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/ScopeExit.h"
 #include "mozilla/Span.h"
 #include "nsCOMPtr.h"
 #include "nsComponentManagerUtils.h"
@@ -34,6 +35,34 @@
 #include "prnetdb.h"
 
 namespace mozilla::naivefox {
+
+void LocalProxyServerControl::RequestStop() {
+  mStopRequested = true;
+  nsCOMPtr<nsIEventTarget> target;
+  {
+    MutexAutoLock lock(mMutex);
+    target = mMainEventTarget;
+  }
+  if (target) {
+    (void)target->Dispatch(
+        NS_NewRunnableFunction("NaiveFox::WakeEmbeddedEventLoop", []() {}));
+  }
+}
+
+void LocalProxyServerControl::SetMainEventTarget(nsIEventTarget* aTarget) {
+  {
+    MutexAutoLock lock(mMutex);
+    mMainEventTarget = aTarget;
+  }
+  if (mStopRequested) {
+    RequestStop();
+  }
+}
+
+void LocalProxyServerControl::ClearMainEventTarget() {
+  MutexAutoLock lock(mMutex);
+  mMainEventTarget = nullptr;
+}
 
 namespace {
 
@@ -56,6 +85,7 @@ class SocksConnection final : public nsIInputStreamCallback,
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start() { return WaitForInput(); }
+  void RequestClose(nsresult aStatus) { Close(aStatus); }
 
  private:
   static constexpr size_t kMaxReplyBytes = 32;
@@ -306,6 +336,7 @@ class HttpConnectConnection final : public nsIInputStreamCallback,
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start() { return WaitForInput(); }
+  void RequestClose(nsresult aStatus) { Close(aStatus); }
 
  private:
   ~HttpConnectConnection() { Close(NS_BASE_STREAM_CLOSED); }
@@ -529,46 +560,136 @@ class ServerState final {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ServerState)
 
   explicit ServerState(uint32_t aMaxConnections)
-      : mMaxConnections(aMaxConnections) {}
+      : mMutex("NaiveFox::ServerState::mMutex"),
+        mMaxConnections(aMaxConnections) {}
 
-  void AddSocket(nsIServerSocket* aSocket) { mSockets.AppendElement(aSocket); }
-
-  bool ConnectionAccepted() {
-    const uint32_t accepted = ++mAcceptedConnections;
-    if (mMaxConnections && accepted > mMaxConnections) {
-      return false;
+  void AddSocket(nsIServerSocket* aSocket) {
+    bool close = false;
+    {
+      MutexAutoLock lock(mMutex);
+      close = mStopping;
+      if (!close) {
+        mSockets.AppendElement(aSocket);
+      }
     }
-    if (mMaxConnections && accepted == mMaxConnections) {
+    if (close) {
+      (void)aSocket->Close();
+    }
+  }
+
+  bool ConnectionAccepted(uint64_t& aConnectionId) {
+    bool closeListeners = false;
+    {
+      MutexAutoLock lock(mMutex);
+      if (mStopping ||
+          (mMaxConnections && mAcceptedConnections >= mMaxConnections)) {
+        return false;
+      }
+      ++mAcceptedConnections;
+      aConnectionId = ++mNextConnectionId;
+      mConnections.AppendElement(ActiveConnection{aConnectionId, nullptr});
+      closeListeners =
+          mMaxConnections && mAcceptedConnections == mMaxConnections;
+    }
+    if (closeListeners) {
       CloseListeners();
     }
     return true;
   }
 
-  void ConnectionClosed() { ++mCompletedConnections; }
+  void SetCancellation(uint64_t aConnectionId,
+                       std::function<void()>&& aCancellation) {
+    std::function<void()> cancellation;
+    {
+      MutexAutoLock lock(mMutex);
+      for (auto& connection : mConnections) {
+        if (connection.mId == aConnectionId) {
+          connection.mCancel = std::move(aCancellation);
+          if (mStopping) {
+            cancellation = connection.mCancel;
+          }
+          break;
+        }
+      }
+    }
+    if (cancellation) {
+      cancellation();
+    }
+  }
 
-  bool Complete() const {
-    return mMaxConnections && mAcceptedConnections == mMaxConnections &&
-           mCompletedConnections == mAcceptedConnections;
+  void ConnectionClosed(uint64_t aConnectionId) {
+    MutexAutoLock lock(mMutex);
+    for (size_t index = 0; index < mConnections.Length(); ++index) {
+      if (mConnections[index].mId == aConnectionId) {
+        mConnections.RemoveElementAt(index);
+        break;
+      }
+    }
+  }
+
+  bool Complete() {
+    MutexAutoLock lock(mMutex);
+    return mConnections.IsEmpty() &&
+           (mStopping ||
+            (mMaxConnections && mAcceptedConnections == mMaxConnections));
   }
 
   void CloseListeners() {
-    for (const auto& socket : mSockets) {
+    nsTArray<nsCOMPtr<nsIServerSocket>> sockets;
+    {
+      MutexAutoLock lock(mMutex);
+      sockets = mSockets.Clone();
+    }
+    for (const auto& socket : sockets) {
       (void)socket->Close();
     }
   }
 
+  void RequestStop() {
+    nsTArray<nsCOMPtr<nsIServerSocket>> sockets;
+    nsTArray<std::function<void()>> cancellations;
+    {
+      MutexAutoLock lock(mMutex);
+      if (mStopping) {
+        return;
+      }
+      mStopping = true;
+      sockets = mSockets.Clone();
+      for (const auto& connection : mConnections) {
+        if (connection.mCancel) {
+          cancellations.AppendElement(connection.mCancel);
+        }
+      }
+    }
+    for (const auto& socket : sockets) {
+      (void)socket->Close();
+    }
+    for (auto& cancellation : cancellations) {
+      cancellation();
+    }
+  }
+
   void Shutdown() {
-    CloseListeners();
+    RequestStop();
+    MutexAutoLock lock(mMutex);
     mSockets.Clear();
   }
 
  private:
+  struct ActiveConnection final {
+    uint64_t mId;
+    std::function<void()> mCancel;
+  };
+
   ~ServerState() { Shutdown(); }
 
-  nsTArray<nsCOMPtr<nsIServerSocket>> mSockets;
-  uint32_t mMaxConnections;
-  Atomic<uint32_t, Relaxed> mAcceptedConnections{0};
-  Atomic<uint32_t, Relaxed> mCompletedConnections{0};
+  Mutex mMutex;
+  nsTArray<nsCOMPtr<nsIServerSocket>> mSockets MOZ_GUARDED_BY(mMutex);
+  nsTArray<ActiveConnection> mConnections MOZ_GUARDED_BY(mMutex);
+  uint32_t mMaxConnections MOZ_GUARDED_BY(mMutex);
+  uint32_t mAcceptedConnections MOZ_GUARDED_BY(mMutex) = 0;
+  uint64_t mNextConnectionId MOZ_GUARDED_BY(mMutex) = 0;
+  bool mStopping MOZ_GUARDED_BY(mMutex) = false;
 };
 
 class LocalListener final : public nsIServerSocketListener {
@@ -597,7 +718,8 @@ NS_IMPL_ISUPPORTS(LocalListener, nsIServerSocketListener)
 
 NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
                                               nsISocketTransport* aTransport) {
-  if (!mState->ConnectionAccepted()) {
+  uint64_t connectionId = 0;
+  if (!mState->ConnectionAccepted(connectionId)) {
     (void)aTransport->Close(NS_ERROR_ABORT);
     return NS_OK;
   }
@@ -613,27 +735,50 @@ NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
   nsCOMPtr<nsIAsyncOutputStream> localOut = do_QueryInterface(rawOut);
   if (NS_FAILED(rv) || !localIn || !localOut) {
     (void)aTransport->Close(NS_FAILED(rv) ? rv : NS_ERROR_FAILURE);
-    mState->ConnectionClosed();
+    mState->ConnectionClosed(connectionId);
     return NS_OK;
   }
 
   RefPtr state = mState;
-  auto onClose = [state]() {
-    (void)NS_DispatchToMainThread(
-        NS_NewRunnableFunction("NaiveFox::LocalConnectionClosed",
-                               [state]() { state->ConnectionClosed(); }));
+  auto onClose = [state, connectionId]() {
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::LocalConnectionClosed",
+        [state, connectionId]() { state->ConnectionClosed(connectionId); }));
   };
   if (mListener.mType == ListenerType::Socks5) {
     RefPtr connection = new SocksConnection(localIn, localOut, mTunnelConfig,
                                             mSocketTarget, std::move(onClose));
+    nsCOMPtr<nsIEventTarget> socketTarget = mSocketTarget;
+    mState->SetCancellation(
+        connectionId, [socketTarget, connection = RefPtr{connection}]() {
+          nsresult rv = socketTarget->Dispatch(NS_NewRunnableFunction(
+              "NaiveFox::CloseSocksConnection",
+              [connection]() { connection->RequestClose(NS_ERROR_ABORT); }));
+          if (NS_FAILED(rv)) {
+            connection->RequestClose(rv);
+          }
+        });
     rv = connection->Start();
+    if (NS_FAILED(rv)) {
+      connection->RequestClose(rv);
+    }
   } else {
     RefPtr connection = new HttpConnectConnection(
         localIn, localOut, mTunnelConfig, mSocketTarget, std::move(onClose));
+    nsCOMPtr<nsIEventTarget> socketTarget = mSocketTarget;
+    mState->SetCancellation(
+        connectionId, [socketTarget, connection = RefPtr{connection}]() {
+          nsresult rv = socketTarget->Dispatch(NS_NewRunnableFunction(
+              "NaiveFox::CloseHttpConnectConnection",
+              [connection]() { connection->RequestClose(NS_ERROR_ABORT); }));
+          if (NS_FAILED(rv)) {
+            connection->RequestClose(rv);
+          }
+        });
     rv = connection->Start();
-  }
-  if (NS_FAILED(rv)) {
-    (void)aTransport->Close(rv);
+    if (NS_FAILED(rv)) {
+      connection->RequestClose(rv);
+    }
   }
   return NS_OK;
 }
@@ -647,7 +792,8 @@ NS_IMETHODIMP LocalListener::OnStopListening(nsIServerSocket* aServer,
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
                              const nsTArray<TunnelConfig>& aTunnelConfigs,
-                             uint32_t aMaxConnections) {
+                             uint32_t aMaxConnections,
+                             LocalProxyServerControl* aControl) {
   if (aListeners.IsEmpty() || aTunnelConfigs.IsEmpty() ||
       (aTunnelConfigs.Length() >= 2 &&
        aTunnelConfigs.Length() != aListeners.Length())) {
@@ -658,7 +804,19 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
   if (!socketTarget) {
     return NS_ERROR_FAILURE;
   }
+  if (aControl) {
+    aControl->SetMainEventTarget(GetMainThreadSerialEventTarget());
+  }
+  auto clearControl = MakeScopeExit([aControl]() {
+    if (aControl) {
+      aControl->ClearMainEventTarget();
+    }
+  });
   RefPtr state = new ServerState(aMaxConnections);
+  if (aControl && aControl->StopRequested()) {
+    state->RequestStop();
+    return NS_OK;
+  }
   for (size_t index = 0; index < aListeners.Length(); ++index) {
     const auto& config = aListeners[index];
     const auto& tunnelConfig =
@@ -698,6 +856,10 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
       return rv;
     }
     state->AddSocket(server);
+    if (aControl && aControl->StopRequested()) {
+      state->RequestStop();
+      return NS_OK;
+    }
     RuntimeLog("%s listening on %s%s%s:%u\n",
                config.mType == ListenerType::Socks5 ? "SOCKS5" : "HTTP CONNECT",
                config.mIPv6 ? "[" : "", config.mHost.get(),
@@ -708,8 +870,16 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
                     config.mIPv6 ? "]" : "",
                     static_cast<unsigned>(config.mPort));
   }
-  while ((!aMaxConnections || !state->Complete()) &&
-         NS_ProcessNextEvent(nullptr, true)) {
+  while (!state->Complete()) {
+    if (aControl && aControl->StopRequested()) {
+      state->RequestStop();
+      if (state->Complete()) {
+        break;
+      }
+    }
+    if (!NS_ProcessNextEvent(nullptr, true)) {
+      break;
+    }
   }
   state->Shutdown();
   return NS_OK;

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 #include "Config.h"
 #include "GeckoRuntime.h"
@@ -84,9 +85,142 @@ const char* ProxyProtocolName(mozilla::naivefox::ProxyProtocol aProtocol) {
   return "unknown";
 }
 
+mozilla::naivefox::ProxyProtocol RuntimeProtocol(
+    const mozilla::naivefox::Config& aConfig) {
+  for (const auto& proxy : aConfig.mProxies) {
+    if (proxy.mProtocol == mozilla::naivefox::ProxyProtocol::H3) {
+      return mozilla::naivefox::ProxyProtocol::H3;
+    }
+  }
+  return mozilla::naivefox::ProxyProtocol::H2;
+}
+
+nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
+    const mozilla::naivefox::Config& aConfig) {
+  nsTArray<mozilla::naivefox::TunnelConfig> tunnelConfigs;
+  for (const auto& proxy : aConfig.mProxies) {
+    auto& tunnelConfig = *tunnelConfigs.AppendElement();
+    tunnelConfig.mProxyUrl = proxy.mUrl;
+    tunnelConfig.mProxyUser = proxy.mUser;
+    tunnelConfig.mProxyPassword = proxy.mPassword;
+    tunnelConfig.mProtocol = proxy.mProtocol;
+  }
+  return tunnelConfigs;
+}
+
+enum class EmbeddedRunState { Idle, Starting, Running, Stopping, Finished };
+
+std::mutex sEmbeddedMutex;
+EmbeddedRunState sEmbeddedState = EmbeddedRunState::Idle;
+RefPtr<mozilla::naivefox::LocalProxyServerControl> sEmbeddedControl;
+
+bool BeginEmbeddedRun(
+    RefPtr<mozilla::naivefox::LocalProxyServerControl>& aControl) {
+  std::lock_guard lock(sEmbeddedMutex);
+  if (sEmbeddedState != EmbeddedRunState::Idle) {
+    return false;
+  }
+  sEmbeddedState = EmbeddedRunState::Starting;
+  sEmbeddedControl = new mozilla::naivefox::LocalProxyServerControl();
+  aControl = sEmbeddedControl;
+  return true;
+}
+
+void MarkEmbeddedRunning() {
+  std::lock_guard lock(sEmbeddedMutex);
+  if (sEmbeddedState == EmbeddedRunState::Starting) {
+    sEmbeddedState = sEmbeddedControl && sEmbeddedControl->StopRequested()
+                         ? EmbeddedRunState::Stopping
+                         : EmbeddedRunState::Running;
+  }
+}
+
+void FinishEmbeddedRun(bool aXPCOMAttempted) {
+  std::lock_guard lock(sEmbeddedMutex);
+  sEmbeddedControl = nullptr;
+  sEmbeddedState =
+      aXPCOMAttempted ? EmbeddedRunState::Finished : EmbeddedRunState::Idle;
+}
+
 }  // namespace
 
-extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
+extern "C" NAIVEFOX_EXPORT void NaiveFoxRequestStop(void) {
+  RefPtr<mozilla::naivefox::LocalProxyServerControl> control;
+  {
+    std::lock_guard lock(sEmbeddedMutex);
+    if (sEmbeddedState != EmbeddedRunState::Starting &&
+        sEmbeddedState != EmbeddedRunState::Running &&
+        sEmbeddedState != EmbeddedRunState::Stopping) {
+      return;
+    }
+    sEmbeddedState = EmbeddedRunState::Stopping;
+    control = sEmbeddedControl;
+  }
+  if (control) {
+    control->RequestStop();
+  }
+}
+
+extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
+                                                   const char* aProfilePath,
+                                                   const char* aRuntimePath) {
+  if (!aConfigJson || !*aConfigJson || !aProfilePath || !*aProfilePath ||
+      !aRuntimePath || !*aRuntimePath) {
+    return NAIVEFOX_STATUS_INVALID_ARGUMENT;
+  }
+
+  RefPtr<mozilla::naivefox::LocalProxyServerControl> control;
+  if (!BeginEmbeddedRun(control)) {
+    return NAIVEFOX_STATUS_ALREADY_USED;
+  }
+
+  mozilla::naivefox::Config config;
+  nsAutoCString error;
+  nsresult rv = mozilla::naivefox::ParseConfig(nsDependentCString(aConfigJson),
+                                               config, error);
+  if (NS_SUCCEEDED(rv)) {
+    rv = mozilla::naivefox::GeckoRuntime::ValidateEmbeddedLocations(
+        nsDependentCString(aProfilePath), nsDependentCString(aRuntimePath));
+  }
+  if (NS_FAILED(rv)) {
+    FinishEmbeddedRun(false);
+    return NAIVEFOX_STATUS_INVALID_ARGUMENT;
+  }
+
+  bool xpcomAttempted = false;
+  int status = NAIVEFOX_STATUS_RUNTIME_ERROR;
+  {
+    AutoLogging logging;
+    mozilla::LogModule::Init(0, nullptr);
+    rv = mozilla::naivefox::ConfigureRuntimeLogging(config.mLogMode,
+                                                    config.mLogPath, error);
+    if (NS_FAILED(rv)) {
+      status = NAIVEFOX_STATUS_INVALID_ARGUMENT;
+    } else {
+      mozilla::naivefox::GeckoRuntime runtime;
+      xpcomAttempted = true;
+      rv = runtime.InitializeEmbedded(nsDependentCString(aProfilePath),
+                                      nsDependentCString(aRuntimePath),
+                                      RuntimeProtocol(config));
+      if (NS_SUCCEEDED(rv)) {
+        MarkEmbeddedRunning();
+        mozilla::naivefox::RuntimeLogEvent(
+            "NaiveFox embedded runtime started listeners=%u upstreams=%u\n",
+            static_cast<unsigned>(config.mListeners.Length()),
+            static_cast<unsigned>(config.mProxies.Length()));
+        auto tunnelConfigs = MakeTunnelConfigs(config);
+        rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
+                                                    tunnelConfigs, 0, control);
+      }
+      status =
+          NS_SUCCEEDED(rv) ? NAIVEFOX_STATUS_OK : NAIVEFOX_STATUS_RUNTIME_ERROR;
+    }
+  }
+  FinishEmbeddedRun(xpcomAttempted);
+  return status;
+}
+
+extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
 #ifdef ENABLE_TESTS
   if (std::getenv("MOZ_RUN_GTEST")) {
     mozilla::EnsureGTestRunnerLinked();
@@ -122,14 +256,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       return 2;
     }
 
-    mozilla::naivefox::ProxyProtocol runtimeProtocol =
-        mozilla::naivefox::ProxyProtocol::H2;
-    for (const auto& proxy : config.mProxies) {
-      if (proxy.mProtocol == mozilla::naivefox::ProxyProtocol::H3) {
-        runtimeProtocol = mozilla::naivefox::ProxyProtocol::H3;
-        break;
-      }
-    }
+    const auto runtimeProtocol = RuntimeProtocol(config);
 
     mozilla::naivefox::GeckoRuntime runtime;
     rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol);
@@ -145,14 +272,7 @@ extern "C" MOZ_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
             config.mProxies[index].mUrl.get(),
             static_cast<unsigned>(index + 1));
       }
-      nsTArray<mozilla::naivefox::TunnelConfig> tunnelConfigs;
-      for (const auto& proxy : config.mProxies) {
-        auto& tunnelConfig = *tunnelConfigs.AppendElement();
-        tunnelConfig.mProxyUrl = proxy.mUrl;
-        tunnelConfig.mProxyUser = proxy.mUser;
-        tunnelConfig.mProxyPassword = proxy.mPassword;
-        tunnelConfig.mProtocol = proxy.mProtocol;
-      }
+      auto tunnelConfigs = MakeTunnelConfigs(config);
       rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
                                                   tunnelConfigs);
     }

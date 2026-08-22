@@ -12,7 +12,7 @@
 #include "nsNetUtil.h"
 #include "nsURLHelper.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/java/GeckoAppShellWrappers.h"
 #endif
 
@@ -53,7 +53,7 @@ nsresult nsResProtocolHandler::Init() {
     mAppURI = mGREURI;
   }
 
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   rv = GetApkURI(mApkURI);
 #endif
 
@@ -67,7 +67,7 @@ nsresult nsResProtocolHandler::Init() {
   return rv;
 }
 
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
 nsresult nsResProtocolHandler::GetApkURI(nsACString& aResult) {
   mozilla::jni::String::LocalRef path =
       mozilla::java::GeckoAppShell::GetPackageResourcePath();
@@ -133,7 +133,7 @@ bool nsResProtocolHandler::ResolveSpecialCases(const nsACString& aHost,
     aResult.Assign(mAppURI);
   } else if (aHost.Equals(kGRE)) {
     aResult.Assign(mGREURI);
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   } else if (aHost.Equals(kAndroid)) {
     aResult.Assign(mApkURI);
 #endif
@@ -167,7 +167,7 @@ nsresult nsResProtocolHandler::SetSubstitutionWithFlags(const nsACString& aRoot,
 nsresult nsResProtocolHandler::HasSubstitution(const nsACString& aRoot,
                                                bool* aResult) {
   if (aRoot.EqualsLiteral(kAPP) || aRoot.EqualsLiteral(kGRE)
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
       || aRoot.EqualsLiteral(kAndroid)
 #endif
   ) {

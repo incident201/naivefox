@@ -19,6 +19,7 @@
 class nsIAsyncInputStream;
 class nsIAsyncOutputStream;
 class nsIEventTarget;
+class nsIRequest;
 class nsISocketTransport;
 
 namespace mozilla::naivefox {
@@ -60,6 +61,8 @@ class TunnelSession final {
   nsresult StartAttempt(ProxyProtocol aProtocol);
   void OpenAttemptOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
+  void CancelRequestOnMain(nsresult aStatus);
+  void ClearRequestOnMain(uint64_t aGeneration, nsIRequest* aRequest);
   void ApplyConnectMetadata(uint64_t aGeneration, ProxyProtocol aProtocol,
                             nsresult aStatus, bool aConnectCodeKnown,
                             int32_t aConnectCode,
@@ -81,6 +84,7 @@ class TunnelSession final {
   void MaybeFinishAttempt();
   void TunnelReady();
   void Fail(nsresult aStatus);
+  void CancelInternal(nsresult aStatus, bool aCancelRequest);
 
   UniquePtr<Impl> mImpl;
 };

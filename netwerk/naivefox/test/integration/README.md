@@ -78,6 +78,27 @@ PowerShell/Python smoke/soak tooling on the `naivefox-full-source` branch. The n
 must include valid CONNECT churn and repeated channel-stop/lifecycle activity;
 a launch-only check is insufficient.
 
+The Android ARM64 embedded package has a test-only native harness and emulator
+gate. It compiles the harness with NDK r29, relocates the package below
+`/data/local/tmp`, loads `libxul.so` through the public C ABI, and verifies H2
+and strict H3 through both local frontends:
+
+```bash
+NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-android-aarch64 \
+./netwerk/naivefox/test/integration/run-android-embedded-tests.sh
+```
+
+H2 reaches the loopback fixture through `adb reverse`. H3 performs a UDP
+preflight and reaches the same loopback-only fixture through the emulator host
+alias `10.0.2.2`; set `NAIVEFOX_ANDROID_HOST_ALIAS` for an equivalent CI
+network. The fixture certificate gains that IP SAN only for this test, and the
+trusted CA remains confined to the pushed test profile. The gate checks
+download/upload integrity, an active connection during cross-thread stop,
+listener closure, runner return, and crash-free XPCOM shutdown. It fails when
+no ARM64 API-26+ device is available. `--allow-skip-device` explicitly permits
+a non-acceptance static run, while `--check-only` only builds and inspects the
+harness.
+
 ## Real Caddy interoperability
 
 Run real-deployment checks only after the local gate passes. Supply secrets

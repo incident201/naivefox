@@ -692,6 +692,9 @@ class JsonParser final {
 nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
                      nsACString& aError) {
   aError.Truncate();
+  if (aJson.Length() > kMaximumConfigSize) {
+    return Fail(aError, "config is too large", NS_ERROR_FILE_TOO_BIG);
+  }
   return JsonParser(aJson, aError).Parse(aConfig);
 }
 

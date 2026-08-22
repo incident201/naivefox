@@ -56,6 +56,14 @@ issue_leaf() {
   local subject_alt_name='DNS:localhost'
   if [[ $name == target ]]; then
     subject_alt_name+=',IP:127.0.0.1'
+  elif [[ -n ${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-} ]]; then
+    if ! python3 -c 'import ipaddress,sys; ipaddress.ip_address(sys.argv[1])' \
+      "$NAIVEFOX_FIXTURE_PROXY_IP_SAN"; then
+      printf 'invalid proxy certificate IP SAN: %s\n' \
+        "$NAIVEFOX_FIXTURE_PROXY_IP_SAN" >&2
+      exit 2
+    fi
+    subject_alt_name+=",IP:$NAIVEFOX_FIXTURE_PROXY_IP_SAN"
   fi
   local key="$RUN_DIR/pki/$name.key"
   local csr="$RUN_DIR/pki/$name.csr"
@@ -188,6 +196,7 @@ NAIVEFOX_FIXTURE_TRUSTED_PROFILE=$RUN_DIR/profiles/trusted
 NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE=$RUN_DIR/profiles/untrusted
 NAIVEFOX_FIXTURE_CADDY_PID=$caddy_pid
 NAIVEFOX_FIXTURE_TARGET_PID=$target_pid
+NAIVEFOX_FIXTURE_PROXY_IP_SAN=${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-}
 EOF
 chmod 0600 "$RUN_DIR/fixture.env"
 
@@ -197,6 +206,7 @@ chmod 0600 "$RUN_DIR/fixture.env"
   printf 'fixture_mode=%s\n' "$fixture_mode"
   printf 'proxy_protocols=%s\n' "$fixture_protocols"
   printf 'proxy_listener=127.0.0.1:%s\n' "$proxy_port"
+  printf 'proxy_ip_san=%s\n' "${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-}"
   printf 'http_target=127.0.0.1:%s\n' "$http_port"
   printf 'https_target=127.0.0.1:%s\n' "$https_port"
   printf 'caddy_pid=%s\n' "$caddy_pid"

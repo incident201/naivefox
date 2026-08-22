@@ -23,7 +23,7 @@
 #include "nsTArray.h"
 #include "nsThreadUtils.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/jni/GeckoResultUtils.h"
 #endif
 
@@ -1247,7 +1247,7 @@ class MozPromise : public MozPromiseBase {
     }
   }
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   // Creates a C++ MozPromise from its Java counterpart, GeckoResult.
   [[nodiscard]] static RefPtr<MozPromise> FromGeckoResult(
       java::GeckoResult::Param aGeckoResult) {

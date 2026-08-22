@@ -12,7 +12,7 @@
 #include "nsCRT.h"
 #include "nsThreadUtils.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/java/EnterpriseRootsWrappers.h"
 #endif  // MOZ_WIDGET_ANDROID
 
@@ -465,7 +465,7 @@ OSStatus GatherEnterpriseCertsMacOS(nsTArray<EnterpriseCert>& certs,
 }
 #endif  // XP_MACOSX
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 void GatherEnterpriseCertsAndroid(nsTArray<EnterpriseCert>& certs,
                                   UniqueSECMODModule& rootsModule) {
   if (!jni::IsAvailable()) {
@@ -512,7 +512,7 @@ nsresult GatherEnterpriseCerts(nsTArray<EnterpriseCert>& certs) {
     return NS_ERROR_FAILURE;
   }
 #endif  // XP_MACOSX
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   GatherEnterpriseCertsAndroid(certs, rootsModule);
 #endif  // MOZ_WIDGET_ANDROID
   return NS_OK;

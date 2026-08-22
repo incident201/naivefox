@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "SocksServer.h"
 #include "TunnelSession.h"
 #include "gtest/gtest.h"
 #include "mozilla/Atomics.h"
@@ -27,6 +28,17 @@ class TunnelSessionTestPeer final {
 namespace {
 
 static_assert(TunnelSession::HasThreadSafeRefCnt::value);
+static_assert(LocalProxyServerControl::HasThreadSafeRefCnt::value);
+
+TEST(NaiveFoxEmbeddedLifecycle, StopRequestIsLatchedAndIdempotent)
+{
+  RefPtr control = new LocalProxyServerControl();
+  EXPECT_FALSE(control->StopRequested());
+  control->RequestStop();
+  EXPECT_TRUE(control->StopRequested());
+  control->RequestStop();
+  EXPECT_TRUE(control->StopRequested());
+}
 
 RefPtr<TunnelSession> NewSession(nsIEventTarget* aSocketTarget,
                                  Atomic<uint32_t, Relaxed>& aClosedCount) {

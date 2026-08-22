@@ -9,10 +9,38 @@
 
 #include "Config.h"
 #include "TunnelSession.h"
+#include "mozilla/Atomics.h"
+#include "mozilla/Mutex.h"
+#include "mozilla/RefPtr.h"
+#include "nsCOMPtr.h"
+#include "nsISupportsImpl.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
 
+class nsIEventTarget;
+
 namespace mozilla::naivefox {
+
+class LocalProxyServerControl final {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(LocalProxyServerControl)
+
+  void RequestStop();
+  bool StopRequested() const { return mStopRequested; }
+
+ private:
+  friend nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>&,
+                                      const nsTArray<TunnelConfig>&, uint32_t,
+                                      LocalProxyServerControl*);
+
+  ~LocalProxyServerControl() = default;
+  void SetMainEventTarget(nsIEventTarget* aTarget);
+  void ClearMainEventTarget();
+
+  Atomic<bool, Relaxed> mStopRequested{false};
+  Mutex mMutex{"LocalProxyServerControl::mMutex"};
+  nsCOMPtr<nsIEventTarget> mMainEventTarget MOZ_GUARDED_BY(mMutex);
+};
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
                              const TunnelConfig& aTunnelConfig,
@@ -20,7 +48,8 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
                              const nsTArray<TunnelConfig>& aTunnelConfigs,
-                             uint32_t aMaxConnections = 0);
+                             uint32_t aMaxConnections = 0,
+                             LocalProxyServerControl* aControl = nullptr);
 
 nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
                         const nsACString& aProxyUser,

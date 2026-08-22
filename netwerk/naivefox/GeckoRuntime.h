@@ -27,9 +27,18 @@ class GeckoRuntime final {
 
   nsresult Initialize(int aArgc, char* aArgv[], const nsACString& aProfilePath,
                       ProxyProtocol aProtocol);
+  static nsresult ValidateEmbeddedLocations(const nsACString& aProfilePath,
+                                            const nsACString& aRuntimePath);
+  nsresult InitializeEmbedded(const nsACString& aProfilePath,
+                              const nsACString& aRuntimePath,
+                              ProxyProtocol aProtocol);
   nsresult RunEventLoopSmoke();
 
  private:
+  nsresult InitializeWithLocations(nsIFile* aProfile, nsIFile* aBinDirectory,
+                                   nsIFile* aExecutable,
+                                   ProxyProtocol aProtocol,
+                                   const nsACString* aAndroidRuntimePath);
   void Shutdown();
 
   nsCOMPtr<nsIFile> mExecutable;

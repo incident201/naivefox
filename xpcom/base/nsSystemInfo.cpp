@@ -117,9 +117,13 @@ NS_IMETHODIMP nsSystemInfo::IsWindows10BuildOrLater(uint32_t, bool* aResult) {
 #endif
 
 #ifdef MOZ_WIDGET_ANDROID
-#  include "AndroidBuild.h"
-#  include "mozilla/java/GeckoAppShellWrappers.h"
-#  include "mozilla/jni/Utils.h"
+#  ifdef MOZ_NAIVEFOX
+#    include <android/api-level.h>
+#  else
+#    include "AndroidBuild.h"
+#    include "mozilla/java/GeckoAppShellWrappers.h"
+#    include "mozilla/jni/Utils.h"
+#  endif
 #endif
 
 #ifdef XP_MACOSX
@@ -1808,7 +1812,16 @@ nsresult nsSystemInfo::Init() {
   }
 #endif
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && defined(MOZ_NAIVEFOX)
+  nsAutoString kernelVersion;
+  if (NS_SUCCEEDED(GetPropertyAsAString(u"version"_ns, kernelVersion))) {
+    SetPropertyAsAString(u"kernel_version"_ns, kernelVersion);
+  }
+  const int32_t androidApiLevel = android_get_device_api_level();
+  if (androidApiLevel > 0) {
+    SetPropertyAsInt32(u"version"_ns, androidApiLevel);
+  }
+#elif defined(MOZ_WIDGET_ANDROID)
   AndroidSystemInfo info;
   GetAndroidSystemInfo(&info);
   SetupAndroidInfo(info);
@@ -1853,7 +1866,7 @@ nsresult nsSystemInfo::Init() {
   return NS_OK;
 }
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 // Prerelease versions of Android use a letter instead of version numbers.
 // Unfortunately this breaks websites due to the user agent.
 // Chrome works around this by hardcoding an Android version when a

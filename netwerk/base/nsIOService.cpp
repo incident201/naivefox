@@ -79,7 +79,7 @@
 #include "prprf.h"
 #include "ssl.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include <regex>
 
 #  include "AndroidBridge.h"
@@ -432,7 +432,7 @@ nsIOService::~nsIOService() {
   }
 }
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 bool nsIOService::ShouldAddAdditionalSearchHeaders(nsIURI* aURI,
                                                    bool* aHeaderVal) {
   if (!(mozilla::AndroidBridge::Bridge())) {
