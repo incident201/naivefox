@@ -143,11 +143,22 @@ nohup "$emulator" \
   >"$log_file" 2>&1 &
 
 for ((second = 0; second < boot_timeout; second++)); do
+  boot_completed=
+  boot_animation=
+  legacy_boot_completed=
+  if "$adb" -s "$serial" get-state >/dev/null 2>&1; then
+    boot_completed=$("$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
+      tr -d '\r')
+    boot_animation=$("$adb" -s "$serial" shell getprop init.svc.bootanim 2>/dev/null |
+      tr -d '\r')
+    legacy_boot_completed=$("$adb" -s "$serial" shell getprop dev.bootcomplete 2>/dev/null |
+      tr -d '\r')
+  fi
   if "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
      [[ $("$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
-         tr -d '\r') == arm64-v8a ]] &&
-     [[ $("$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-         tr -d '\r') == 1 ]]; then
+       tr -d '\r') == arm64-v8a ]] &&
+     [[ $boot_completed == 1 || $legacy_boot_completed == 1 ||
+        $boot_animation == stopped ]]; then
     printf 'Android ARM64 emulator ready: %s\n' "$serial"
     exit 0
   fi
