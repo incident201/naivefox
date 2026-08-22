@@ -231,5 +231,7 @@ def config_status(
                 print("\n".join(diff))
 
     # Advertise Android Studio if it is appropriate.
-    if MachCommandConditions.is_android(env):
+    if MachCommandConditions.is_android(env) and not env.substs.get(
+        "MOZ_NAIVEFOX"
+    ):
         print(ANDROID_IDE_ADVERTISEMENT)

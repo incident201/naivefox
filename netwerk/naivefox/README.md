@@ -15,7 +15,7 @@ application -> SOCKS5 or HTTP CONNECT -> NaiveFox
 The server is an unmodified Naive-compatible Caddy build. NaiveFox does not
 ship another HTTP/TLS stack and does not synthesize a Firefox fingerprint.
 
-## Running the product
+## Running the desktop product
 
 The staged Linux package has one launcher at its root. With no argument it
 reads `./config.json`; one positional argument selects another config:
@@ -90,6 +90,60 @@ Developer CLI modes take proxy credentials from `NAIVEFOX_PROXY_USER` and
 `auto` performs one strict H3 attempt and permits one H2 retry only when H3
 fails before a CONNECT response or tunnel transport exists.
 
+## Android embedded runtime
+
+Android ARM64 is a native SDK/runtime target for embedding the same NaiveFox
+core in another process. Build and stage it with the common product entrypoint:
+
+```bash
+./netwerk/naivefox/tools/build-product.sh android \
+  --objdir "$PWD/../obj-naivefox-android-aarch64"
+
+NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-android-aarch64" \
+./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
+  "$PWD/../obj-naivefox-android-aarch64/package/naivefox-android-aarch64"
+```
+
+The build remains `--enable-project=netwerk/naivefox` and cross-compiles for
+`aarch64-linux-android`. The staged, relocatable package is:
+
+```text
+naivefox-android-aarch64/
+  include/NaiveFoxAPI.h
+  lib/arm64-v8a/
+    libxul.so
+    dependent native and NSS libraries selected from the build output
+  manifest.json
+```
+
+The manifest records the target, minimum Android API, runtime path, exact file
+hashes, Android system dependencies, and four exported `NaiveFox*` symbols.
+The host must make `lib/arm64-v8a` and its dependent libraries visible in its
+Android linker namespace. It then includes `NaiveFoxAPI.h`, starts the blocking
+runner on one host worker thread, and stops it from another thread:
+
+```c
+int status = NaiveFoxRunEmbedded(config_json, writable_profile_dir,
+                                 runtime_lib_dir);
+
+/* From another host thread while the call above is running. */
+NaiveFoxRequestStop();
+```
+
+`config_json` is the same UTF-8 JSON contract documented above, not a file
+name. `writable_profile_dir` must be an existing writable directory, and
+`runtime_lib_dir` is the absolute `lib/arm64-v8a` directory containing
+`libxul.so`. `NaiveFoxVersion()` returns the product version. Return values are
+the `NaiveFoxStatus` constants in the public header. The first successful Gecko
+startup consumes the process-wide runtime; restarting it in the same process is
+not supported.
+
+This target contains no JNI or Java/Kotlin API, Gradle project, GeckoView,
+Firefox Android application, Android manifest, UI, service, `VpnService`, TUN,
+or tun2socks layer. Those are downstream integration concerns; the public
+boundary here is the small native C ABI plus the local SOCKS5/HTTP CONNECT
+listeners.
+
 ## Supported behavior
 
 - SOCKS5 CONNECT with IPv4, IPv6, and domain destinations; domain names remain
@@ -104,8 +158,8 @@ fails before a CONNECT response or tunnel transport exists.
   framing: eight padded records per direction, then raw bytes.
 - Bounded async pumping, partial I/O, backpressure, half-close, connection reuse,
   and coordinated shutdown.
-- Relocatable Linux x86-64 and Windows x86-64 packages from the minimized
-  product graph.
+- Relocatable Linux x86-64 and Windows x86-64 packages, plus an Android ARM64
+  embedded native runtime, from the minimized product graph.
 
 NaiveFox deliberately does not implement SOCKS BIND or UDP ASSOCIATE,
 CONNECT-UDP, MASQUE, WebTransport, transparent proxying, TUN/TAP, a GUI, or a
@@ -150,6 +204,22 @@ directory, staging script, and (under WSL) the portable Wine paths/prefix:
   --objdir "$PWD/../obj-naivefox-windows" \
   --bootstrap
 ```
+
+The Android ARM64 command and package verifier are documented in
+[Android embedded runtime](#android-embedded-runtime). A static NDK harness
+check, which does not require a device, is available after staging:
+
+```bash
+./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
+  --package "$PWD/../obj-naivefox-android-aarch64/package/naivefox-android-aarch64" \
+  --check-only
+```
+
+Together, the verifier and `--check-only` prove the package manifest,
+dependency/export metadata, AArch64 harness construction, and ELF inspection
+only. Android acceptance still requires an online ARM64 API-26+ device or
+emulator and the same runner without `--check-only`, so a host with no `adb`
+device or KVM must not report the H2/H3 device gate as passed.
 
 Run the reproducible local H2/H3/Auto/config/robustness gate with:
 
@@ -201,8 +271,8 @@ copied into active Markdown.
 
 Release automation is intentionally maintained as the control-plane overlay
 `.github/workflows/release.yml` on `naivefox-minimal-source`. It is manual-only,
-builds that branch's compact tree for Linux and Windows, and creates a draft
-release without running the integration/Caddy suites.
+builds the targets selected by that branch's release workflow, and creates a
+draft release without running the integration/Caddy suites.
 
 ## Security and data handling
 

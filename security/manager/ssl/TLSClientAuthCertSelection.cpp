@@ -66,7 +66,7 @@
 #include "secerr.h"
 #include "sslerr.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/java/ClientAuthCertificateManagerWrappers.h"
 #endif  // MOZ_WIDGET_ANDROID
 
@@ -546,7 +546,7 @@ void SelectClientAuthCertificate::DispatchContinuation(
   // selected certificate.
   // On Android, there are no pre-built certificate chains, so use what the OS
   // says is the issuer certificate chain.
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   if (jni::IsAvailable()) {
     jni::ByteArray::LocalRef certBytes = jni::ByteArray::New(
         reinterpret_cast<const int8_t*>(selectedCertBytes.Elements()),
@@ -948,7 +948,7 @@ void DoSelectClientAuthCertificate(NSSSocketControl* info,
   // On Android, gathering potential client certificates and filtering them by
   // issuer is handled by the OS, so `potentialClientCertificates` is expected
   // to be empty here.
-#ifndef MOZ_WIDGET_ANDROID
+#if !defined(MOZ_WIDGET_ANDROID) || defined(MOZ_NAIVEFOX)
   FilterPotentialClientCertificatesByCANames(potentialClientCertificates,
                                              caNames, enterpriseCertificates,
                                              potentialClientCertificateChains);

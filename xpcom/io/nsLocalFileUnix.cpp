@@ -64,8 +64,10 @@ static nsresult MacErrorMapper(OSErr inErr);
 #ifdef MOZ_WIDGET_ANDROID
 #  include <linux/magic.h>
 
-#  include "mozilla/java/GeckoAppShellWrappers.h"
-#  include "nsIMIMEService.h"
+#  if !defined(MOZ_NAIVEFOX)
+#    include "mozilla/java/GeckoAppShellWrappers.h"
+#    include "nsIMIMEService.h"
+#  endif
 #endif
 
 #include "nsNativeCharsetUtils.h"

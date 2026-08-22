@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: build-product.sh linux|windows [OPTIONS]
+Usage: build-product.sh linux|windows|android [OPTIONS]
 
 Build and stage one NaiveFox product target.
 
@@ -31,14 +31,19 @@ target=$1
 shift
 case "$target" in
   linux)
-    mozconfig_name=mozconfig-minimal
-    package_name=naivefox-linux-x86_64
-    stage_script=stage-runtime.sh
+    mozconfig_name='mozconfig-minimal'
+    package_name='naivefox-linux-x86_64'
+    stage_script='stage-runtime.sh'
     ;;
   windows)
-    mozconfig_name=mozconfig-windows-x86_64
-    package_name=naivefox-windows-x86_64
-    stage_script=stage-runtime-windows-x86_64.sh
+    mozconfig_name='mozconfig-windows-x86_64'
+    package_name='naivefox-windows-x86_64'
+    stage_script='stage-runtime-windows-x86_64.sh'
+    ;;
+  android)
+    mozconfig_name='mozconfig-android-aarch64'
+    package_name='naivefox-android-aarch64'
+    stage_script='stage-runtime-android-aarch64.sh'
     ;;
   *)
     printf 'unsupported target: %s\n' "$target" >&2
@@ -175,6 +180,23 @@ if $bootstrap; then
   printf 'Bootstrapping Mozilla build dependencies...\n'
   if ! $dry_run; then
     "$repo_root/mach" --no-interactive bootstrap --application-choice browser
+  fi
+  if [[ $target == android ]]; then
+    if $dry_run; then
+      printf 'dry-run: rustup target add aarch64-linux-android\n'
+    else
+      rustup_bin=$(command -v rustup || true)
+      if [[ -z $rustup_bin && -n ${HOME:-} &&
+            -x ${HOME}/.cargo/bin/rustup ]]; then
+        rustup_bin=${HOME}/.cargo/bin/rustup
+      fi
+      if [[ -z $rustup_bin ]]; then
+        printf '%s\n' \
+          "rustup is required to install the Android Rust target; add it to PATH or install it at \$HOME/.cargo/bin/rustup" >&2
+        exit 1
+      fi
+      "$rustup_bin" target add aarch64-linux-android
+    fi
   fi
 fi
 

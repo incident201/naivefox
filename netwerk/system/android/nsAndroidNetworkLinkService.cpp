@@ -4,19 +4,22 @@
 
 #include "nsAndroidNetworkLinkService.h"
 
-#include "AndroidBridge.h"
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/java/GeckoAppShellWrappers.h"
-#include "mozilla/java/GeckoNetworkManagerWrappers.h"
-#include "mozilla/jni/Utils.h"
 #include "nsIObserverService.h"
 #include "nsServiceManagerUtils.h"
 
+#ifndef MOZ_NAIVEFOX
+#  include "AndroidBridge.h"
+#  include "mozilla/java/GeckoAppShellWrappers.h"
+#  include "mozilla/java/GeckoNetworkManagerWrappers.h"
+#  include "mozilla/jni/Utils.h"
+
 namespace java = mozilla::java;
 namespace jni = mozilla::jni;
+#endif
 
 static mozilla::LazyLogModule gNotifyAddrLog("nsAndroidNetworkLinkService");
 #define LOG(args) MOZ_LOG(gNotifyAddrLog, mozilla::LogLevel::Debug, args)
@@ -83,6 +86,10 @@ nsAndroidNetworkLinkService::GetIsLinkUp(bool* aIsUp) {
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  *aIsUp = true;
+  return NS_OK;
+#else
   if (!mozilla::AndroidBridge::Bridge()) {
     // Fail soft here and assume a connection exists
     NS_WARNING("GetIsLinkUp is not supported without a bridge connection");
@@ -92,6 +99,7 @@ nsAndroidNetworkLinkService::GetIsLinkUp(bool* aIsUp) {
 
   *aIsUp = java::GeckoAppShell::IsNetworkLinkUp();
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -101,16 +109,25 @@ nsAndroidNetworkLinkService::GetLinkStatusKnown(bool* aIsKnown) {
     return NS_OK;
   }
 
+#ifdef MOZ_NAIVEFOX
+  *aIsKnown = false;
+  return NS_OK;
+#else
   NS_ENSURE_TRUE(mozilla::AndroidBridge::Bridge(), NS_ERROR_NOT_IMPLEMENTED);
 
   *aIsKnown = java::GeckoAppShell::IsNetworkLinkKnown();
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 nsAndroidNetworkLinkService::GetLinkType(uint32_t* aLinkType) {
   NS_ENSURE_ARG_POINTER(aLinkType);
 
+#ifdef MOZ_NAIVEFOX
+  *aLinkType = nsINetworkLinkService::LINK_TYPE_UNKNOWN;
+  return NS_OK;
+#else
   if (!mozilla::AndroidBridge::Bridge()) {
     // Fail soft here and assume a connection exists
     NS_WARNING("GetLinkType is not supported without a bridge connection");
@@ -120,6 +137,7 @@ nsAndroidNetworkLinkService::GetLinkType(uint32_t* aLinkType) {
 
   *aLinkType = java::GeckoAppShell::GetNetworkLinkType();
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -136,6 +154,9 @@ NS_IMETHODIMP
 nsAndroidNetworkLinkService::GetDnsSuffixList(
     nsTArray<nsCString>& aDnsSuffixList) {
   aDnsSuffixList.Clear();
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   if (!jni::IsAvailable()) {
     NS_WARNING("GetDnsSuffixList is not supported without JNI");
     return NS_ERROR_NOT_AVAILABLE;
@@ -156,6 +177,7 @@ nsAndroidNetworkLinkService::GetDnsSuffixList(
     aDnsSuffixList.AppendElement(suffix);
   }
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
@@ -177,6 +199,9 @@ nsAndroidNetworkLinkService::GetPlatformDNSIndications(
 
   *aPlatformDNSIndications = nsINetworkLinkService::NONE_DETECTED;
 
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   if (!jni::IsAvailable()) {
     NS_WARNING("GetPlatformDNSIndications is not supported without JNI");
     return NS_ERROR_NOT_AVAILABLE;
@@ -190,6 +215,7 @@ nsAndroidNetworkLinkService::GetPlatformDNSIndications(
   }
 
   return NS_OK;
+#endif
 }
 
 void nsAndroidNetworkLinkService::OnNetworkChanged() {

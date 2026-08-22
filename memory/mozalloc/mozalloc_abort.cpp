@@ -8,8 +8,10 @@
 #  include <android/log.h>
 #endif
 #ifdef MOZ_WIDGET_ANDROID
-#  include "APKOpen.h"
 #  include "dlfcn.h"
+#  ifndef MOZ_NAIVEFOX
+#    include "APKOpen.h"
+#  endif
 #endif
 #include <stdio.h>
 #include <string.h>
@@ -25,7 +27,7 @@ void mozalloc_abort(const char* const msg) {
   __android_log_print(ANDROID_LOG_ERROR, "Gecko", "mozalloc_abort: %s", msg);
 #endif
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   abortThroughJava(msg);
 #endif
 

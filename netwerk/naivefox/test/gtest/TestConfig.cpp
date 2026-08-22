@@ -71,6 +71,16 @@ class ScopedTestDirectory final {
 
 }  // namespace
 
+TEST(NaiveFoxConfig, RejectsOversizedStringInput)
+{
+  nsCString json;
+  ASSERT_TRUE(json.SetLength(1024 * 1024 + 1, fallible));
+  Config config;
+  nsAutoCString error;
+  EXPECT_EQ(ParseConfig(json, config, error), NS_ERROR_FILE_TOO_BIG);
+  EXPECT_STREQ(error.get(), "config is too large");
+}
+
 TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
 {
   Config config;

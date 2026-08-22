@@ -18,7 +18,7 @@
 #  include <gtk/gtk.h>
 #endif
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "AndroidBuild.h"
 #  include "mozilla/java/GeckoAppShellWrappers.h"
 #endif
@@ -460,11 +460,13 @@ void ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
                             gtk_minor_version);
 #elif defined(MOZ_WIDGET_ANDROID)
   bool isTablet = false;
+#  if !defined(MOZ_NAIVEFOX)
   if (jni::IsAvailable()) {
     jni::String::LocalRef release = java::sdk::Build::VERSION::RELEASE();
     osVersion.Assign(release->ToString());
     isTablet = java::GeckoAppShell::IsTablet();
   }
+#  endif
 #endif
 
   if (XRE_IsContentProcess()) {

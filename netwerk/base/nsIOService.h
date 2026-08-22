@@ -134,7 +134,7 @@ class nsIOService final : public nsIIOService,
 
   static bool TooManySocketProcessCrash();
   static void IncreaseSocketProcessCrashCount();
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   static bool ShouldAddAdditionalSearchHeaders(nsIURI* aURI, bool* val);
 #endif
 

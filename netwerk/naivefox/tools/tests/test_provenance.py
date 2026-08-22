@@ -30,6 +30,14 @@ collector = load_script(
     "collect_minimal_source_evidence",
     TOOLS_DIR / "collect-minimal-source-evidence.py",
 )
+analyzer = load_script(
+    "analyze_full_closure",
+    TOOLS_DIR / "analyze-full-closure.py",
+)
+closure_assertions = load_script(
+    "assert_closure",
+    TOOLS_DIR / "assert-closure.py",
+)
 
 
 def run(repo: Path, *args: str) -> str:
@@ -80,6 +88,9 @@ class ProvenanceTest(unittest.TestCase):
         (self.repo / "netwerk/naivefox/mozconfig-windows-x86_64").write_text(
             "windows product\n", encoding="utf-8"
         )
+        (self.repo / "netwerk/naivefox/mozconfig-android-aarch64").write_text(
+            "android product\n", encoding="utf-8"
+        )
         for path in provenance.CANONICAL_REPORT_PATHS:
             destination = self.repo / path
             destination.write_text("{}\n", encoding="utf-8")
@@ -110,18 +121,19 @@ class ProvenanceTest(unittest.TestCase):
             "mozconfig": str((self.repo / target["mozconfig"]).resolve()),
             "buildapp": "netwerk/naivefox",
             "appname": "naivefox",
-            "processor": "x86_64",
-            "os": target["os"],
             "tests_enabled": False,
+            **target["mozinfo"],
         }
         mozinfo.update(overrides or {})
         (objdir / "mozinfo.json").write_text(json.dumps(mozinfo), encoding="utf-8")
-        for relative in (
+        required_outputs = (
             "config.status",
             target["link_response"],
             target["libxul"],
-            target["executable"],
-        ):
+        )
+        if target["executable"]:
+            required_outputs += (target["executable"],)
+        for relative in required_outputs:
             if relative == omit:
                 continue
             output = objdir / relative
@@ -148,12 +160,9 @@ class ProvenanceTest(unittest.TestCase):
                 tools / "collect-minimal-source-evidence.py"
             ),
         }
-        for target in ("linux-x86_64", "windows-x86_64"):
-            mozconfig = (
-                "netwerk/naivefox/mozconfig-minimal"
-                if target == "linux-x86_64"
-                else "netwerk/naivefox/mozconfig-windows-x86_64"
-            )
+        for target_spec in provenance.TARGET_SPECS:
+            target = target_spec["name"]
+            mozconfig = target_spec["mozconfig"]
             build = {
                 **common,
                 "target": target,
@@ -164,21 +173,13 @@ class ProvenanceTest(unittest.TestCase):
             configure = {
                 **common,
                 "target": target,
-                "target_triple": (
-                    "x86_64-pc-linux-gnu"
-                    if target == "linux-x86_64"
-                    else "x86_64-pc-mingw32"
-                ),
+                "target_triple": target_spec["configure_target"],
                 "collector_sha256": digest(tools / "collect-configure-inputs.py"),
                 "mozconfig": mozconfig,
                 "mozconfig_sha256": digest(self.repo / mozconfig),
                 "configure_environment": {"NAIVEFOX_ENABLE_TESTS": "0"},
             }
-            triple = (
-                "x86_64-unknown-linux-gnu"
-                if target == "linux-x86_64"
-                else "x86_64-pc-windows-msvc"
-            )
+            triple = target_spec["cargo_target"]
             closure = {
                 "report_provenance": {
                     "provenance_version": 2,
@@ -191,6 +192,8 @@ class ProvenanceTest(unittest.TestCase):
                     "evidence_collector_sha256": digest(
                         tools / "collect-minimal-source-evidence.py"
                     ),
+                    "target": target,
+                    "platform": target_spec["platform"],
                     "target_triple": triple,
                     "mozconfig_path": mozconfig,
                     "mozconfig_sha256": digest(self.repo / mozconfig),
@@ -219,7 +222,7 @@ class ProvenanceTest(unittest.TestCase):
         release = provenance.validate_evidence_head(self.repo)
         self.assertEqual(release.source_commit, self.source)
         self.assertEqual(release.evidence_commit, self.evidence)
-        self.assertEqual(len(self.load_bundle()), 6)
+        self.assertEqual(len(self.load_bundle()), 9)
 
     def test_existing_stale_firefox_ancestor_is_rejected(self) -> None:
         self.write_reports(firefox_base=self.old_base)
@@ -276,6 +279,14 @@ class ProvenanceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "target triple does not match"):
             self.load_bundle()
 
+        self.write_reports()
+        android_path = reports / "closure-report-android-aarch64.json"
+        android = json.loads(android_path.read_text(encoding="utf-8"))
+        android["report_provenance"]["platform"] = "desktop-linux"
+        android_path.write_text(json.dumps(android) + "\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "platform does not match"):
+            self.load_bundle()
+
     def test_changed_tool_and_config_invalidate_reports(self) -> None:
         tool = self.repo / "netwerk/naivefox/tools/collect-build-inputs.py"
         tool.write_text("changed\n", encoding="utf-8")
@@ -299,7 +310,7 @@ class ProvenanceTest(unittest.TestCase):
         run(self.repo, "reset", "--hard", self.evidence)
         (self.repo / "post.txt").write_text("post\n", encoding="utf-8")
         commit(self.repo, "post evidence")
-        with self.assertRaisesRegex(ValueError, "six canonical reports"):
+        with self.assertRaisesRegex(ValueError, "canonical reports"):
             provenance.validate_evidence_head(self.repo)
 
     def test_plan_serialization_is_byte_deterministic(self) -> None:
@@ -319,11 +330,43 @@ class ProvenanceTest(unittest.TestCase):
 
     def test_evidence_objdirs_must_be_distinct(self) -> None:
         linux = self.make_objdir("linux-x86_64")
+        android = self.make_objdir("android-aarch64")
         with self.assertRaisesRegex(ValueError, "must be distinct"):
             collector.validate_objdirs(
                 self.repo,
-                {"linux-x86_64": linux, "windows-x86_64": linux},
+                {
+                    "linux-x86_64": linux,
+                    "windows-x86_64": linux,
+                    "android-aarch64": android,
+                },
             )
+
+    def test_android_objdir_does_not_require_product_executable(self) -> None:
+        android = self.make_objdir("android-aarch64")
+        target = provenance.TARGET_SPECS_BY_NAME["android-aarch64"]
+        self.assertFalse(target["executable"])
+        collector.validate_objdir(self.repo, android, target)
+
+    def test_android_platform_policy_allows_android_but_not_windows_crates(
+        self,
+    ) -> None:
+        android_tokens = closure_assertions._forbidden_platform_crate_tokens("android")
+        self.assertNotIn("android", android_tokens)
+        self.assertIn("windows", android_tokens)
+        linux_tokens = closure_assertions._forbidden_platform_crate_tokens(
+            "desktop-linux"
+        )
+        self.assertIn("android", linux_tokens)
+        self.assertIn("windows", linux_tokens)
+
+    def test_analyzer_prefers_current_package_directory(self) -> None:
+        objdir = Path(self.objdirs_temporary.name) / "package-layout"
+        target = provenance.TARGET_SPECS_BY_NAME["android-aarch64"]
+        legacy = objdir / "naivefox-package" / target["staged_package"]
+        current = objdir / "package" / target["staged_package"]
+        legacy.mkdir(parents=True)
+        current.mkdir(parents=True)
+        self.assertEqual(analyzer.staged_package_dir(objdir, target), current)
 
     def test_stale_objdir_is_rejected(self) -> None:
         target = collector.TARGETS[0]

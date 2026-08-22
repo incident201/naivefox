@@ -9,7 +9,7 @@
 #include "nsHashPropertyBag.h"
 #include "nsISystemInfo.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/dom/PContent.h"
 #endif  // MOZ_WIDGET_ANDROID
 
@@ -97,7 +97,7 @@ class nsSystemInfo final : public nsISystemInfo, public nsHashPropertyBag {
   // See comments above the variable definition and in NS_InitXPCOM.
   static uint32_t gUserUmask;
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   static void GetAndroidSystemInfo(mozilla::dom::AndroidSystemInfo* aInfo);
 
  protected:

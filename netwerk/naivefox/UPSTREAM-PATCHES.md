@@ -70,20 +70,32 @@ authority, framing, hop-by-hop, authentication, ALPN, invalid token, and invalid
 value inputs remain rejected; H1 and H2 CONNECT tests verify the request and
 response metadata paths.
 
-## NF-UPSTREAM-004: export the NaiveFox entry point
+## NF-UPSTREAM-004: export the controlled NaiveFox C ABI
 
 Files:
 
 ```text
-toolkit/library/libxul.symbols
+toolkit/library/libxul-naivefox.symbols
 ```
 
-Exports the single C ABI bootstrap entry used by the dependent executable while
-the Gecko-facing implementation remains inside `libxul` with internal Necko,
-PSM, preference, and shutdown APIs.
+Exports exactly the desktop bootstrap and Android embedded lifecycle boundary:
 
-Review obligations: the symbol remains otherwise isolated and the dependent
-executable passes runtime startup, shutdown, and HTTPS sanity checks.
+```text
+NaiveFoxMain
+NaiveFoxRunEmbedded
+NaiveFoxRequestStop
+NaiveFoxVersion
+```
+
+The Gecko-facing implementation remains inside `libxul` with internal Necko,
+PSM, preference, listener, session, and shutdown APIs. The embedded API adds a
+blocking frontend over the same core; it does not expose internal Gecko or
+NaiveFox C++ symbols.
+
+Review obligations: the target-specific symbol list remains exactly these four
+symbols; the dependent desktop executable preserves startup, shutdown, and
+HTTPS behavior; and the embedded runner validates direct JSON/profile/runtime
+inputs, cross-thread orderly stop, and clean XPCOM shutdown.
 
 ## NF-UPSTREAM-005: H2 raw-tunnel byte-stream lifecycle
 

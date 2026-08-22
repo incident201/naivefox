@@ -66,10 +66,13 @@ python3 "$script_dir/minimal-source-plan.py" \
   --output "$plan" \
   --configure-report "$script_dir/../reports/configure-inputs-linux-x86_64.json" \
   --configure-report "$script_dir/../reports/configure-inputs-windows-x86_64.json" \
+  --configure-report "$script_dir/../reports/configure-inputs-android-aarch64.json" \
   --build-report "$script_dir/../reports/build-inputs-linux-x86_64.json" \
   --build-report "$script_dir/../reports/build-inputs-windows-x86_64.json" \
+  --build-report "$script_dir/../reports/build-inputs-android-aarch64.json" \
   --closure-report "$script_dir/../reports/closure-report-linux-x86_64.json" \
-  --closure-report "$script_dir/../reports/closure-report-windows-x86_64.json"
+  --closure-report "$script_dir/../reports/closure-report-windows-x86_64.json" \
+  --closure-report "$script_dir/../reports/closure-report-android-aarch64.json"
 
 if $plan_only; then
   python3 - "$plan" <<'PY'

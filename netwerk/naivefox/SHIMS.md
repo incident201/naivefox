@@ -24,6 +24,7 @@ check. It must not silently approximate browser behavior.
 | `SpiderMonkeyCompat.cpp` | Small profiling/GC ABI symbols referenced by retained headers and XPCOM code when SpiderMonkey is not linked. | JavaScript execution, `js_static`, Wasm, GC heaps, realms, and script parsing. | `js/src/moz.build`, `js/src/frontend/Stencil.cpp`, JS public headers, and retained callers. |
 | `nsContentUtils.h`, `StoragePrincipalHelper.h`, `ClientInfo.h`, `FeaturePolicy.h`, `NaiveFoxOriginTrials.h`, `NaiveFoxRFPTarget.h`, `Promise.h`, `ReferrerPolicyBinding.h`, `RequestBinding.h`, `ServiceWorkerDescriptor.h` | Header-only types and inert helpers needed to compile the selected Necko graph. | Browser DOM, ServiceWorker, origin-trial, permissions, and Promise runtime behavior. | Matching WebIDL, generated binding, DOM, and Necko headers. |
 | `UnknownProtocolHandler.cpp` | Explicit rejection for schemes outside the retained protocol set. | External-app dispatch and UI prompts; returns unknown-protocol failure. | Protocol-handler interfaces and component registration. |
+| Android native product fallbacks in `intl/locale/android`, `netwerk/system/android`, PSM, `mozglue`, and XPCOM | NDK/Bionic locale and API-level discovery, native filesystem/runtime behavior, conservative network availability hints, and logcat output needed by the headless runtime. | GeckoAppShell/JNI network notifications, Android local-network permission UI, Java enterprise-root import, Android keystore client-certificate discovery/signing, application metadata, and Java abort bridging. Security-sensitive Java-backed facilities are unavailable or use the normal non-Android NSS path; they are never treated as successful verification. | Android locale/JNI wrappers, NetworkLinkService and local-permission APIs, PSM enterprise-root/client-auth hooks, Android linker/bootstrap code, system-info, console, manifest, and local-file code. |
 
 ## Non-negotiable behavior
 
@@ -36,6 +37,10 @@ check. It must not silently approximate browser behavior.
   and closure checks must fail if a JS execution path becomes linked.
 - Ordinary Firefox builds must remain unchanged; minimal guards are selected
   only by the NaiveFox project configuration.
+- Android fallbacks must remain native and product-scoped. They must not pull
+  Java, GeckoView, Gradle, mobile application, or widget application code into
+  the measured Android closure, and they must not weaken NSS certificate,
+  hostname, or client-auth failure behavior.
 - A new unresolved symbol is not justification for a new stub. First determine
   whether the caller belongs in the minimal graph, then prefer a real small
   implementation, and document any remaining compatibility surface here.
@@ -50,6 +55,11 @@ MOZCONFIG=netwerk/naivefox/mozconfig-minimal \
 NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-linux \
 ./mach build -j4
 ```
+
+Android fallback changes additionally require a clean
+`mozconfig-android-aarch64` build, staged dependency/export verification, and
+the static NDK harness check. An online ARM64 device/emulator H2/H3 run remains
+the runtime acceptance gate; the static check is not a substitute.
 
 Then run staged startup/shutdown and the networking suites relevant to the
 changed shim. Security-manager, channel-parameter, profiler, binding, or IPDL

@@ -5,14 +5,25 @@
 
 #include "OSPreferences.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/intl/Locale.h"
 
-#include "mozilla/java/GeckoAppShellWrappers.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/java/GeckoAppShellWrappers.h"
+#endif
 
 using namespace mozilla::intl;
 
 OSPreferences::OSPreferences() {}
 
 bool OSPreferences::ReadSystemLocales(nsTArray<nsCString>& aLocaleList) {
+#ifdef MOZ_NAIVEFOX
+  nsAutoCString locale(Locale::GetDefaultLocale());
+  if (CanonicalizeLanguageTag(locale)) {
+    aLocaleList.AppendElement(locale);
+    return true;
+  }
+  return false;
+#else
   if (!mozilla::jni::IsAvailable()) {
     return false;
   }
@@ -29,6 +40,7 @@ bool OSPreferences::ReadSystemLocales(nsTArray<nsCString>& aLocaleList) {
     return true;
   }
   return false;
+#endif
 }
 
 bool OSPreferences::ReadRegionalPrefsLocales(nsTArray<nsCString>& aLocaleList) {
@@ -46,9 +58,11 @@ bool OSPreferences::ReadDateTimePattern(DateTimeFormatStyle aDateStyle,
                                         DateTimeFormatStyle aTimeStyle,
                                         const nsACString& aLocale,
                                         nsACString& aRetVal) {
+#ifndef MOZ_NAIVEFOX
   if (!mozilla::jni::IsAvailable()) {
     return false;
   }
+#endif
 
   nsAutoCString skeleton;
   if (!GetDateTimeSkeletonForStyle(aDateStyle, aTimeStyle, aLocale, skeleton)) {
@@ -56,7 +70,9 @@ bool OSPreferences::ReadDateTimePattern(DateTimeFormatStyle aDateStyle,
   }
 
   // Customize the skeleton if necessary to reflect user's 12/24hr pref
+#ifndef MOZ_NAIVEFOX
   OverrideSkeletonHourCycle(java::GeckoAppShell::GetIs24HourFormat(), skeleton);
+#endif
 
   if (!GetPatternForSkeleton(skeleton, aLocale, aRetVal)) {
     return false;

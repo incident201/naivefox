@@ -20,9 +20,9 @@ IDs, connection pools, or transport flow control.
 ## Components and ownership
 
 `GeckoRuntime` initializes the headless XPCOM/Necko/PSM environment, profile,
-preferences, and event loop. The small executable owns bootstrap lifetime; the
-Gecko-facing implementation remains inside `libxul` behind one C ABI entry
-point.
+preferences, and event loop. The small desktop executable and the Android
+embedded runner are frontends over the same initializer and proxy core. The
+Gecko-facing implementation remains inside `libxul` behind a controlled C ABI.
 
 `Config` parses the strict JSON subset and produces one or more listener/proxy
 pairs. `SocksServer` owns the local server sockets. Each accepted connection is
@@ -58,6 +58,15 @@ remain confined to the documented owning event target or are dispatched there.
 Queued callbacks must hold strong references, stale Auto generations must be
 ignored, and teardown must be idempotent. A successful last reference release
 must occur only after queued work has finished.
+
+The embedded entrypoint is deliberately blocking. A host calls
+`NaiveFoxRunEmbedded()` on one worker thread, which becomes the Gecko main/event
+thread for that runtime, and may call `NaiveFoxRequestStop()` from another
+thread. The stop request is atomically published and dispatched to the owning
+event targets: listener sockets stop accepting, active connections and tunnel
+requests are cancelled, the event loop drains and exits, and XPCOM shuts down
+before the blocking call returns. Dispatch failure must complete the associated
+connection bookkeeping rather than leave shutdown waiting indefinitely.
 
 ## Raw CONNECT contract
 
@@ -167,9 +176,35 @@ One process may host several local listeners. They share the Gecko runtime,
 Necko connection manager, TLS/QUIC stack, padding code, and tunnel backend.
 Firefox, not NaiveFox, owns outer connection reuse.
 
+There are two runtime-location frontends:
+
+```text
+desktop CLI -> discover executable/runtime location -> common Gecko initializer
+embedded API -> caller-supplied runtime directory  -> common Gecko initializer
+```
+
+Desktop discovery continues to use the executable path (`/proc/self/exe` on
+Unix and the module filename on Windows). Embedded Android must not use
+`/proc/self/exe`, because it names the host application rather than the
+NaiveFox runtime. Its caller supplies the absolute library directory, and the
+embedded frontend sets `MOZ_ANDROID_LIBDIR` before any `BinaryPath`, Gecko, or
+XPCOM work. No `JNIEnv`, Android `Context`, Java type, or GeckoView lifecycle is
+part of the common initializer.
+
+The instance contract is one NaiveFox runtime per process. Multiple listeners
+belong to that one runtime; concurrent starts are rejected. After a successful
+Gecko/XPCOM initialization and shutdown, another embedded start in the same
+process is not supported because Gecko's process lifecycle is one-shot.
+
 Gecko requires a writable profile. Config mode prefers managed persistent state
 and falls back to a unique private temporary profile. The profile choice never
 weakens NSS certificate or hostname verification.
+
+The embedded frontend instead requires the host to provide an existing,
+writable profile directory. It neither discovers desktop state directories nor
+creates an Android application profile. Both frontends pass the chosen profile
+to the same Gecko initialization path and use the same JSON parser, listeners,
+sessions, transports, and shutdown machinery.
 
 ## Validation boundaries
 

@@ -42,7 +42,7 @@
 #include "secerr.h"
 #include "ssl.h"
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
 #  include "mozilla/java/ClientAuthCertificateManagerWrappers.h"
 #endif
 
@@ -1354,7 +1354,7 @@ NS_IMETHODIMP
 nsNSSCertificateDB::GetAndroidCertificateFromAlias(
     const nsAString& aAlias, /*out*/ nsIX509Cert** aResult) {
   *aResult = nullptr;
-#ifndef MOZ_WIDGET_ANDROID
+#if !defined(MOZ_WIDGET_ANDROID) || defined(MOZ_NAIVEFOX)
   return NS_ERROR_NOT_AVAILABLE;
 #else
   if (!jni::IsAvailable()) {

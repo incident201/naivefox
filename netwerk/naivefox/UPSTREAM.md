@@ -6,7 +6,8 @@ machine-readable evidence, `UPSTREAM-BASE`, and annotated release tags record
 the exact provenance of each snapshot.
 
 Downstream modifications to existing Firefox files are listed separately in
-[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md).
+[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md) and
+[`MINIMAL-PATCHES.md`](MINIMAL-PATCHES.md).
 
 ## Branch model
 
@@ -67,7 +68,8 @@ git merge firefox-upstream
 
 Before merging the refresh into `naivefox-full-source`:
 
-1. inspect every entry in `UPSTREAM-PATCHES.md`, including clean textual merges;
+1. inspect every entry in `UPSTREAM-PATCHES.md` and `MINIMAL-PATCHES.md`,
+   including clean textual merges;
 2. review adjacent upstream changes for semantic conflicts and obsolete hooks;
 3. keep every resolution narrow and preserve unflagged Firefox behavior;
 4. inspect manifests/configuration for unintended graph changes;
@@ -89,16 +91,29 @@ git merge --ff-only refresh/firefox-<name>
 ```
 
 Resolve minimization conflicts on `naivefox-full-source`, then validate the
-complete minimized product graph. The gate includes Linux and Windows product builds where supported,
-focused unit regressions, H2/H3/Auto/config/listener behavior, padding and
-integrity, concurrency/backpressure/lifecycle, package manifests, staged
-runtime checks, and size/closure assertions. Use the full minimal graph after
-build-system or dependency changes:
+complete minimized product graph. The gate includes Linux x86-64, Windows
+x86-64, and Android ARM64 embedded product builds, focused unit regressions,
+H2/H3/Auto/config/listener behavior, padding and integrity,
+concurrency/backpressure/lifecycle, package manifests, staged runtime checks,
+and size/closure assertions. Android remains the NaiveFox project; GeckoView
+and the Firefox Android application graph are not part of this gate. Use all
+three product graphs after build-system or dependency changes:
 
 ```bash
 netwerk/naivefox/tools/build-product.sh linux \
   --objdir /absolute/path/to/obj-naivefox-linux
+
+netwerk/naivefox/tools/build-product.sh windows \
+  --objdir /absolute/path/to/obj-naivefox-windows
+
+netwerk/naivefox/tools/build-product.sh android \
+  --objdir /absolute/path/to/obj-naivefox-android-aarch64
 ```
+
+The Android build must stage and verify the relocatable native package and
+construct the static NDK harness. H2/H3 traffic and cross-thread embedded stop
+remain an online ARM64 device/emulator gate; static validation on a machine
+without `adb` or KVM is not device acceptance.
 
 If the upstream refresh passes source review but the minimized graph fails,
 treat the failure as a minimization integration defect. Do not weaken shared
@@ -130,8 +145,10 @@ The gate is:
    and absence of secrets, VCS data, objdirs, profiles, logs, and captures;
 6. copy the export to an isolated location with no access to the full checkout
    or old object directories;
-7. configure and build only the exported NaiveFox graph for the supported
-   platforms, stage it, and run the applicable product acceptance suites;
+7. configure and build only the exported NaiveFox graph for all three supported
+   targets, stage them, and run the applicable product acceptance suites. The
+   isolated Android tree must complete clean configure, build, package
+   dependency/export verification, and static harness construction;
 8. create one new linear `naivefox-minimal-source` snapshot. Release tags and
    draft GitHub releases are created by the manual workflow.
 
@@ -159,6 +176,21 @@ The evidence collector generates the full canonical report set into a temporary
 directory, cross-validates every report, and installs the set only after all
 checks pass. Partial evidence updates are invalid. Exact tool/config inputs are
 included in evidence so a change automatically invalidates old reports.
+
+The canonical set contains nine reports: build inputs, configure inputs, and
+link/source closure for each of `linux-x86_64`, `windows-x86_64`, and
+`android-aarch64`. Evidence collection therefore requires three distinct
+validated external object directories, including the Android object directory;
+omitting one target or installing only part of the nine-file bundle is invalid.
+The collector invocation must provide all three explicitly:
+
+```bash
+python3 netwerk/naivefox/tools/collect-minimal-source-evidence.py \
+  --linux-objdir /absolute/path/to/obj-naivefox-linux \
+  --windows-objdir /absolute/path/to/obj-naivefox-windows \
+  --android-objdir /absolute/path/to/obj-naivefox-android-aarch64 \
+  --work-dir /absolute/path/to/new-evidence-work
+```
 
 The public export manifest records the exact Firefox base, NaiveFox full-source
 reference, minimal source commit `S`, evidence commit `E`, file count, sorted path/mode/hash
@@ -198,6 +230,12 @@ Prefer build exclusion over deleting upstream directories. Physical deletion
 from the full-source branch requires measured benefit and explicit review of
 future merge cost. The exporter is allowlist-based; copying the whole tree and
 deleting suspected unused paths is forbidden.
+
+The public source plan is the reviewed union of the three measured target
+closures. Android-specific files enter `naivefox-minimal-source` only through
+its configure/build/link evidence and explicit target-owned tooling; broad
+Android, mobile, Java, Gradle, GeckoView, or browser directories must not be
+added as convenience allowlists.
 
 Almost all project code belongs under `netwerk/naivefox/`. Before modifying an
 existing Firefox file, establish that no usable API exists, preserve default

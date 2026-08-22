@@ -24,6 +24,66 @@ available, and remove the downstream guard instead of preserving it by habit.
 | `NF-UPSTREAM-019` | Declare Winsock support at the Neqo crate that directly consumes it. | `netwerk/socket/neqo_glue/Cargo.toml` and upstream `winapi`/socket feature changes | Windows Cargo resolution and cross-link; native H3/UDP acceptance. |
 | `NF-UPSTREAM-020` | Export SpiderMonkey public headers needed by retained types while suppressing the JS engine and satisfying only the narrow compatibility ABI. | `js/src/moz.build`, `js/src/frontend/Stencil.cpp`, `SpiderMonkeyCompat.cpp`, JS public headers | Closure contains no `js_static`, frontend, Wasm, or execution objects; startup and networking suites pass. |
 | `NF-UPSTREAM-021` | Let the test-enabled NaiveFox graph use Mozilla gtest without linking browser FOG/XRE startup. Ordinary Firefox gtest remains unchanged. | `testing/gtest/mozilla/GTestRunner.cpp`, `NaiveFoxRunner.cpp`, `core/moz.build` | `mach gtest 'NaiveFoxTunnelSessionLifecycle.*'` on the test-enabled minimal graph. |
+| `NF-UPSTREAM-022` | Retain the native NDK/Bionic pieces needed by the Android ARM64 NaiveFox product while excluding GeckoView, JNI/Java application services, and browser/mobile graph edges. | Exact existing-Firefox file set below. | Clean Android configure/build/stage; dependency and four-symbol export audit; static harness; online-device H2/H3 embedded startup, traffic, stop, and XPCOM shutdown. |
+
+## NF-UPSTREAM-022 Android native target watchpoints
+
+The exact existing Firefox files carried for this target are:
+
+```text
+config/recurse.mk
+intl/locale/android/OSPreferences_android.cpp
+ipc/chromium/moz.build
+ipc/chromium/src/base/message_loop.cc
+memory/mozalloc/mozalloc_abort.cpp
+mozglue/moz.build
+netwerk/base/Tickler.h
+netwerk/base/nsIOService.cpp
+netwerk/base/nsIOService.h
+netwerk/base/nsSocketTransport2.cpp
+netwerk/dns/nsHostResolver.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpHandler.cpp
+netwerk/protocol/res/nsResProtocolHandler.cpp
+netwerk/protocol/res/nsResProtocolHandler.h
+netwerk/system/android/moz.build
+netwerk/system/android/nsAndroidNetworkLinkService.cpp
+python/mozbuild/mozbuild/config_status.py
+security/manager/ssl/EnterpriseRoots.cpp
+security/manager/ssl/TLSClientAuthCertSelection.cpp
+security/manager/ssl/nsNSSCertificateDB.cpp
+security/manager/ssl/nsNSSIOLayer.cpp
+toolkit/moz.configure
+xpcom/base/nsConsoleService.cpp
+xpcom/base/nsSystemInfo.cpp
+xpcom/base/nsSystemInfo.h
+xpcom/components/ManifestParser.cpp
+xpcom/io/nsLocalFileUnix.cpp
+xpcom/threads/MozPromise.h
+```
+
+`netwerk/moz.build` remains owned by `NF-UPSTREAM-001`, and
+`toolkit/library/libxul-naivefox.symbols` remains owned by
+`NF-UPSTREAM-004`; they are intentionally not duplicated in this list.
+
+Refresh obligations:
+
+- every fallback or graph exclusion stays scoped to the NaiveFox Android
+  product, and ordinary Firefox/GeckoView Android behavior stays unchanged;
+- the retained path uses Mozilla's NDK/Bionic facilities without linking Java,
+  JNI application wrappers, Gradle, GeckoView, mobile application, or browser
+  resources into the measured closure;
+- Android services unavailable without Java, including enterprise-root import,
+  platform client-certificate signing, permission UI, and network metadata,
+  remain unavailable or conservative. NSS certificate and hostname validation
+  must never be weakened;
+- clean Android configure/build/stage, resolved ELF `DT_NEEDED`, and the exact
+  four-symbol C ABI are mandatory. The static NDK harness is a build gate, not
+  device acceptance; H2 and H3 traffic plus cross-thread stop and crash-free
+  XPCOM shutdown must run on an online ARM64 device/emulator when accepting the
+  target;
+- Linux and Windows product builds, integration suites, and staged-runtime
+  verification remain unchanged.
 
 Project-owned shims are reviewed separately in `SHIMS.md`. Source-export
 discovery and report mechanics are maintenance tooling, not Firefox patches;

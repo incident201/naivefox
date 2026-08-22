@@ -388,6 +388,9 @@ class TunnelSession::Impl final {
   bool mPumpStarted = false;
   bool mFailed = false;
   bool mClosed = false;
+  std::atomic<bool> mCancelRequested{false};
+  nsCOMPtr<nsIRequest> mActiveRequest;
+  uint64_t mActiveRequestGeneration = 0;
 };
 
 class TunnelAttempt final : public nsIHttpUpgradeListener,
@@ -469,7 +472,9 @@ TunnelSession::TunnelSession(nsIAsyncInputStream* aLocalIn,
                              std::move(aOnEstablished), std::move(aOnFailure),
                              std::move(aOnClosed))) {}
 
-TunnelSession::~TunnelSession() { Cancel(NS_BASE_STREAM_CLOSED); }
+TunnelSession::~TunnelSession() {
+  CancelInternal(NS_BASE_STREAM_CLOSED, false);
+}
 
 nsresult TunnelSession::Start(const nsACString& aTargetAuthority,
                               Span<const uint8_t> aInitialPayload) {
@@ -511,6 +516,9 @@ void TunnelSession::OpenAttemptOnMain(uint64_t aGeneration,
                                       ProxyProtocol aProtocol,
                                       const nsACString& aTargetAuthority) {
   MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    return;
+  }
   nsAutoCString padding;
   nsresult rv = GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
@@ -521,9 +529,15 @@ void TunnelSession::OpenAttemptOnMain(uint64_t aGeneration,
                          mImpl->mConfig.mProxyUser,
                          mImpl->mConfig.mProxyPassword, attempt, attempt,
                          padding, aProtocol, getter_AddRefs(openedRequest));
-    if (NS_SUCCEEDED(rv) && mImpl->mConfig.mProtocol == ProxyProtocol::Auto &&
-        aProtocol == ProxyProtocol::H3) {
-      rv = attempt->ArmEstablishmentTimeout(openedRequest);
+    if (NS_SUCCEEDED(rv)) {
+      mImpl->mActiveRequest = openedRequest;
+      mImpl->mActiveRequestGeneration = aGeneration;
+      if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+        CancelRequestOnMain(NS_ERROR_ABORT);
+      } else if (mImpl->mConfig.mProtocol == ProxyProtocol::Auto &&
+                 aProtocol == ProxyProtocol::H3) {
+        rv = attempt->ArmEstablishmentTimeout(openedRequest);
+      }
     }
   }
   if (NS_FAILED(rv)) {
@@ -603,6 +617,7 @@ NS_IMETHODIMP TunnelAttempt::OnStopRequest(nsIRequest* aRequest,
                                            nsresult aStatus) {
   CancelEstablishmentTimeout();
   RefPtr owner = mOwner;
+  owner->ClearRequestOnMain(mGeneration, aRequest);
   const uint64_t generation = mGeneration;
   const ProxyProtocol protocol = mProtocol;
   (void)mSocketTarget->Dispatch(
@@ -613,6 +628,25 @@ NS_IMETHODIMP TunnelAttempt::OnStopRequest(nsIRequest* aRequest,
                              }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
+}
+
+void TunnelSession::CancelRequestOnMain(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mActiveRequest) {
+    nsCOMPtr<nsIRequest> request = std::move(mImpl->mActiveRequest);
+    mImpl->mActiveRequestGeneration = 0;
+    (void)request->Cancel(aStatus);
+  }
+}
+
+void TunnelSession::ClearRequestOnMain(uint64_t aGeneration,
+                                       nsIRequest* aRequest) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mActiveRequestGeneration == aGeneration &&
+      mImpl->mActiveRequest == aRequest) {
+    mImpl->mActiveRequest = nullptr;
+    mImpl->mActiveRequestGeneration = 0;
+  }
 }
 
 NS_IMETHODIMP TunnelAttempt::OnTransportAvailable(
@@ -864,6 +898,11 @@ void TunnelSession::Fail(nsresult aStatus) {
     return;
   }
   mImpl->mFailed = true;
+  mImpl->mCancelRequested.store(true, std::memory_order_release);
+  RefPtr self = this;
+  (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::CancelFailedTunnelRequest",
+      [self, aStatus]() { self->CancelRequestOnMain(aStatus); }));
   RuntimeLogEvent("Connection %llu failed target=%s status=0x%08x\n",
                   static_cast<unsigned long long>(mImpl->mConnectionId),
                   mImpl->mTargetAuthority.get(),
@@ -884,11 +923,20 @@ void TunnelSession::Fail(nsresult aStatus) {
   }
 }
 
-void TunnelSession::Cancel(nsresult aStatus) {
+void TunnelSession::Cancel(nsresult aStatus) { CancelInternal(aStatus, true); }
+
+void TunnelSession::CancelInternal(nsresult aStatus, bool aCancelRequest) {
   if (mImpl->mClosed) {
     return;
   }
   mImpl->mClosed = true;
+  mImpl->mCancelRequested.store(true, std::memory_order_release);
+  if (aCancelRequest) {
+    RefPtr self = this;
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::CancelTunnelRequest",
+        [self, aStatus]() { self->CancelRequestOnMain(aStatus); }));
+  }
   RuntimeLogEvent("Connection %llu closed status=0x%08x\n",
                   static_cast<unsigned long long>(mImpl->mConnectionId),
                   static_cast<unsigned>(aStatus));

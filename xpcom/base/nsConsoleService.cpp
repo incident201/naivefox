@@ -38,7 +38,9 @@
 #  include <android/log.h>
 
 #  include "mozilla/StaticPrefs_consoleservice.h"
-#  include "mozilla/dom/ContentChild.h"
+#  ifndef MOZ_NAIVEFOX
+#    include "mozilla/dom/ContentChild.h"
+#  endif
 #endif
 #ifdef XP_WIN
 #  include <windows.h>
@@ -326,6 +328,10 @@ nsresult nsConsoleService::LogMessageWithMode(
       nsCString msg;
       aMessage->ToString(msg);
 
+      const char* logTag;
+#  ifdef MOZ_NAIVEFOX
+      logTag = "NaiveFox";
+#  else
       /** Attempt to use the process name as the log tag. */
       mozilla::dom::ContentChild* child =
           mozilla::dom::ContentChild::GetSingleton();
@@ -335,6 +341,8 @@ nsresult nsConsoleService::LogMessageWithMode(
       } else {
         appName = "GeckoConsole";
       }
+      logTag = appName.get();
+#  endif
 
       uint32_t logLevel = 0;
       aMessage->GetLogLevel(&logLevel);
@@ -355,7 +363,7 @@ nsresult nsConsoleService::LogMessageWithMode(
           break;
       }
 
-      __android_log_print(logPriority, appName.get(), "%s", msg.get());
+      __android_log_print(logPriority, logTag, "%s", msg.get());
     }
 #endif
 #ifdef XP_WIN

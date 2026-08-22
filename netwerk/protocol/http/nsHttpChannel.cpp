@@ -1536,7 +1536,7 @@ nsresult nsHttpChannel::Connect() {
     }
   }
 
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_NAIVEFOX)
   bool val = false;
   if (nsIOService::ShouldAddAdditionalSearchHeaders(mURI, &val)) {
     SetRequestHeader("X-Search-Subdivision"_ns, val ? "1"_ns : "0"_ns, false);

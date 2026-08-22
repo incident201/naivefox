@@ -62,7 +62,7 @@ class nsResProtocolHandler final
 
   nsCString mAppURI;
   nsCString mGREURI;
-#ifdef ANDROID
+#if defined(ANDROID) && !defined(MOZ_NAIVEFOX)
   // Used for resource://android URIs
   nsCString mApkURI;
   nsresult GetApkURI(nsACString& aResult);

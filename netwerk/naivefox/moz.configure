@@ -8,7 +8,5 @@ imply_option("MOZ_GECKOVIEW_HISTORY", True)
 
 set_define("MOZ_NAIVEFOX", True)
 set_config("MOZ_NAIVEFOX", True)
-set_define("MOZ_NO_SMART_CARDS", True)
-set_config("MOZ_NO_SMART_CARDS", True)
 
 include("../../toolkit/moz.configure")

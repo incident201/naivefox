@@ -52,8 +52,12 @@
 #  include "mozilla/WindowsVersion.h"
 #endif  // XP_WIN
 
-#ifdef MOZ_WIDGET_ANDROID
-#  include "mozilla/jni/Utils.h"
+#if defined(MOZ_WIDGET_ANDROID)
+#  if defined(MOZ_NAIVEFOX)
+#    include <android/api-level.h>
+#  else
+#    include "mozilla/jni/Utils.h"
+#  endif
 #endif
 
 #define IS_ADDR_TYPE(_type) ((_type) == nsIDNSService::RESOLVE_TYPE_DEFAULT)
@@ -175,7 +179,11 @@ nsresult nsHostResolver::Init() MOZ_NO_THREAD_SAFETY_ANALYSIS {
   sNativeHTTPSSupported = mozilla::IsWin11OrLater();
 #elif defined(MOZ_WIDGET_ANDROID)
   // android_res_nquery only got added in API level 29
+#  if defined(MOZ_NAIVEFOX)
+  sNativeHTTPSSupported = android_get_device_api_level() >= 29;
+#  else
   sNativeHTTPSSupported = jni::GetAPIVersion() >= 29;
+#  endif
 #elif defined(XP_LINUX) || defined(XP_MACOSX)
   sNativeHTTPSSupported = true;
 #endif

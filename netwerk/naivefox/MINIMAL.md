@@ -11,9 +11,10 @@ validated naivefox-full-source -> source commit S -> report-only commit E
                    -> generated naivefox-minimal-source snapshot
 ```
 
-`naivefox-full-source` retains the full Firefox checkout for merges and review. The build
-graph selected by `mozconfig-minimal` is the headless NaiveFox application;
-none of the commands below configures or builds the Firefox browser.
+`naivefox-full-source` retains the full Firefox checkout for merges and review.
+The supported product graphs are Linux x86-64, Windows x86-64, and Android
+ARM64 embedded. All remain `--enable-project=netwerk/naivefox`; none of the
+commands below configures or builds the Firefox browser or GeckoView.
 
 ## 1. Prepare the branch
 
@@ -77,6 +78,27 @@ py -3 netwerk/naivefox/tools/verify-staged-windows-smoke.py `
   --package-dir C:\absolute\path\to\naivefox-windows-x86_64
 ```
 
+Android ARM64 cross-build, staging, and static harness verification:
+
+```bash
+./netwerk/naivefox/tools/build-product.sh android \
+  --objdir /absolute/path/to/obj-naivefox-android-aarch64
+
+NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-android-aarch64 \
+./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
+  /absolute/path/to/obj-naivefox-android-aarch64/package/naivefox-android-aarch64
+
+./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
+  --package /absolute/path/to/obj-naivefox-android-aarch64/package/naivefox-android-aarch64 \
+  --check-only
+```
+
+The final command compiles and inspects the native harness but does not start
+Gecko on Android. Device acceptance requires the runner without `--check-only`
+on an online ARM64 API-26+ device or emulator. Lack of `adb` or KVM is not a
+pass and must be recorded as an unrun device gate, not replaced with
+`--allow-skip-device`.
+
 Run the integration suites appropriate to the change as described in
 `test/integration/README.md`. H2, H3, Auto, config, padding, parser robustness,
 and staged-runtime checks are release gates when their code paths change.
@@ -91,14 +113,15 @@ test -z "$(git status --porcelain)"
 S=$(git rev-parse HEAD)
 ```
 
-Build and test that exact clean commit. Then collect all six target reports in
-one operation, using the validated Linux and Windows object directories and a
-new external work directory:
+Build and test that exact clean commit. Then collect all nine target reports in
+one operation, using the validated Linux, Windows, and Android object
+directories and a new external work directory:
 
 ```bash
 python3 netwerk/naivefox/tools/collect-minimal-source-evidence.py \
   --linux-objdir /absolute/path/to/obj-naivefox-linux \
   --windows-objdir /absolute/path/to/obj-naivefox-windows \
+  --android-objdir /absolute/path/to/obj-naivefox-android-aarch64 \
   --work-dir /absolute/path/to/new-evidence-work
 ```
 
@@ -108,10 +131,13 @@ abbreviated, stale, or hand-entered provenance and atomically installs only:
 ```text
 netwerk/naivefox/reports/build-inputs-linux-x86_64.json
 netwerk/naivefox/reports/build-inputs-windows-x86_64.json
+netwerk/naivefox/reports/build-inputs-android-aarch64.json
 netwerk/naivefox/reports/closure-report-linux-x86_64.json
 netwerk/naivefox/reports/closure-report-windows-x86_64.json
+netwerk/naivefox/reports/closure-report-android-aarch64.json
 netwerk/naivefox/reports/configure-inputs-linux-x86_64.json
 netwerk/naivefox/reports/configure-inputs-windows-x86_64.json
+netwerk/naivefox/reports/configure-inputs-android-aarch64.json
 ```
 
 Review those files, stage exactly that set, and create direct child `E`:
@@ -120,10 +146,13 @@ Review those files, stage exactly that set, and create direct child `E`:
 git add \
   netwerk/naivefox/reports/build-inputs-linux-x86_64.json \
   netwerk/naivefox/reports/build-inputs-windows-x86_64.json \
+  netwerk/naivefox/reports/build-inputs-android-aarch64.json \
   netwerk/naivefox/reports/closure-report-linux-x86_64.json \
   netwerk/naivefox/reports/closure-report-windows-x86_64.json \
+  netwerk/naivefox/reports/closure-report-android-aarch64.json \
   netwerk/naivefox/reports/configure-inputs-linux-x86_64.json \
-  netwerk/naivefox/reports/configure-inputs-windows-x86_64.json
+  netwerk/naivefox/reports/configure-inputs-windows-x86_64.json \
+  netwerk/naivefox/reports/configure-inputs-android-aarch64.json
 git diff --cached --name-only
 git commit -m 'reports: freeze naivefox-minimal-source evidence'
 E=$(git rev-parse HEAD)
@@ -132,7 +161,7 @@ python3 netwerk/naivefox/tools/assert-closure.py
 ```
 
 Do not make a documentation, tool, or SHA-fix commit after `E`. If anything
-outside the six reports must change, reset the release candidate to a new
+outside the nine reports must change, reset the release candidate to a new
 source commit `S`, rerun the builds, regenerate all evidence, and create a new
 direct report-only child `E`.
 
@@ -160,7 +189,7 @@ The two planner runs and byte-for-byte comparison are mandatory for every
 publication. The exported manifest is the public compact file inventory; rich
 diagnostic categories remain temporary evidence and are not published.
 
-Build Linux and Windows again from the generated directory with new external
+Build all three targets again from the generated directory with new external
 object directories:
 
 ```bash
@@ -171,12 +200,27 @@ cd "$export_root/minimal-source"
 
 ./netwerk/naivefox/tools/build-product.sh windows \
   --objdir /absolute/path/to/export-obj-windows
+
+./netwerk/naivefox/tools/build-product.sh android \
+  --objdir /absolute/path/to/export-obj-android-aarch64
+
+NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-android-aarch64 \
+./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
+  /absolute/path/to/export-obj-android-aarch64/package/naivefox-android-aarch64
+
+./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
+  --package /absolute/path/to/export-obj-android-aarch64/package/naivefox-android-aarch64 \
+  --check-only
 ```
 
 For the independence gate, run those commands in a disposable namespace, VM,
 or container where the full checkout and its old object directories are not
-visible. Repeat staging, validation, and integration acceptance against the
-exported binaries.
+visible. In particular, the exported tree must complete a clean Android ARM64
+configure, clean build, embedded-runtime stage, package verification, and
+static harness construction without borrowing any file from full-source.
+Repeat staging, validation, and the applicable integration acceptance against
+the exported binaries. Device H2/H3 acceptance remains a separate mandatory
+online-device gate and must not be inferred from the standalone static check.
 
 Only then replace the contents of a disposable `naivefox-minimal-source`
 worktree and commit one linear generated snapshot. Preserve the

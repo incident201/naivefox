@@ -14,40 +14,75 @@ from typing import Iterable
 
 OID_PATTERN = re.compile(r"[0-9a-f]{40}")
 REPORT_DIRECTORY = Path("netwerk/naivefox/reports")
-REPORT_SPECS = {
-    REPORT_DIRECTORY / "build-inputs-linux-x86_64.json": {
+TARGET_SPECS = (
+    {
+        "name": "linux-x86_64",
+        "cargo_target": "x86_64-unknown-linux-gnu",
+        "configure_target": "x86_64-pc-linux-gnu",
+        "mozconfig": "netwerk/naivefox/mozconfig-minimal",
+        "platform": "desktop-linux",
+        "mozinfo": {"processor": "x86_64", "os": "linux"},
+        "link_response": "toolkit/library/build/libxul_so.list",
+        "libxul": "dist/bin/libxul.so",
+        "executable": "dist/bin/naivefox",
+        "staged_package": "naivefox-linux-x86_64",
+        "default_objdir": "obj-naivefox-minimal",
+    },
+    {
+        "name": "windows-x86_64",
+        "cargo_target": "x86_64-pc-windows-msvc",
+        "configure_target": "x86_64-pc-mingw32",
+        "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
+        "platform": "windows",
+        "mozinfo": {"processor": "x86_64", "os": "win"},
+        "link_response": "toolkit/library/build/xul_dll.list",
+        "libxul": "dist/bin/xul.dll",
+        "executable": "dist/bin/naivefox.exe",
+        "staged_package": "naivefox-windows-x86_64",
+        "default_objdir": "obj-naivefox-windows-x86_64",
+    },
+    {
+        "name": "android-aarch64",
+        "cargo_target": "aarch64-linux-android",
+        "configure_target": "aarch64-unknown-linux-android",
+        "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
+        "platform": "android",
+        "mozinfo": {
+            "processor": "aarch64",
+            "os": "android",
+            "toolkit": "android",
+        },
+        "link_response": "toolkit/library/build/libxul_so.list",
+        "libxul": "dist/bin/libxul.so",
+        "executable": None,
+        "staged_package": "naivefox-android-aarch64",
+        "default_objdir": "obj-naivefox-android-aarch64",
+    },
+)
+TARGET_SPECS_BY_NAME = {target["name"]: target for target in TARGET_SPECS}
+
+REPORT_SPECS = {}
+for _target in TARGET_SPECS:
+    _name = _target["name"]
+    _mozconfig = _target["mozconfig"]
+    REPORT_SPECS[REPORT_DIRECTORY / f"build-inputs-{_name}.json"] = {
         "kind": "build",
-        "target": "linux-x86_64",
-        "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-    },
-    REPORT_DIRECTORY / "build-inputs-windows-x86_64.json": {
-        "kind": "build",
-        "target": "windows-x86_64",
-        "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
-    },
-    REPORT_DIRECTORY / "closure-report-linux-x86_64.json": {
+        "target": _name,
+        "mozconfig": _mozconfig,
+    }
+    REPORT_SPECS[REPORT_DIRECTORY / f"closure-report-{_name}.json"] = {
         "kind": "closure",
-        "target_triple": "x86_64-unknown-linux-gnu",
-        "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-    },
-    REPORT_DIRECTORY / "closure-report-windows-x86_64.json": {
-        "kind": "closure",
-        "target_triple": "x86_64-pc-windows-msvc",
-        "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
-    },
-    REPORT_DIRECTORY / "configure-inputs-linux-x86_64.json": {
+        "target": _name,
+        "platform": _target["platform"],
+        "target_triple": _target["cargo_target"],
+        "mozconfig": _mozconfig,
+    }
+    REPORT_SPECS[REPORT_DIRECTORY / f"configure-inputs-{_name}.json"] = {
         "kind": "configure",
-        "target": "linux-x86_64",
-        "target_triple": "x86_64-pc-linux-gnu",
-        "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-    },
-    REPORT_DIRECTORY / "configure-inputs-windows-x86_64.json": {
-        "kind": "configure",
-        "target": "windows-x86_64",
-        "target_triple": "x86_64-pc-mingw32",
-        "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
-    },
-}
+        "target": _name,
+        "target_triple": _target["configure_target"],
+        "mozconfig": _mozconfig,
+    }
 CANONICAL_REPORT_PATHS = tuple(REPORT_SPECS)
 
 
@@ -176,7 +211,7 @@ def validate_evidence_head(
         missing = sorted(path.as_posix() for path in expected - changed)
         extra = sorted(path.as_posix() for path in changed - expected)
         raise ValueError(
-            "evidence commit E must change exactly the six canonical reports; "
+            "evidence commit E must change exactly the canonical reports; "
             f"missing={missing}, extra={extra}"
         )
     derived = derive_source_provenance(
@@ -256,12 +291,20 @@ def load_and_validate_report_bundle(
         if spec is None:
             raise ValueError(f"non-canonical evidence report: {name}")
         kind = spec["kind"]
-        if "target" in spec and report.get("target") != spec["target"]:
+        report_provenance = report.get("report_provenance", {})
+        report_target = (
+            report_provenance.get("target")
+            if kind == "closure"
+            else report.get("target")
+        )
+        if "target" in spec and report_target != spec["target"]:
             raise ValueError(f"{name} target does not match its canonical filename")
         if kind == "closure":
-            report_target_triple = report.get("report_provenance", {}).get(
-                "target_triple"
-            )
+            report_target_triple = report_provenance.get("target_triple")
+            if report_provenance.get("platform") != spec["platform"]:
+                raise ValueError(
+                    f"{name} platform does not match its canonical filename"
+                )
         else:
             report_target_triple = report.get("target_triple")
         if "target_triple" in spec and report_target_triple != spec["target_triple"]:

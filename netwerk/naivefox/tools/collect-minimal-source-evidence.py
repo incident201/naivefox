@@ -15,33 +15,13 @@ from pathlib import Path
 
 from provenance import (
     CANONICAL_REPORT_PATHS,
+    TARGET_SPECS,
     derive_source_provenance,
     load_and_validate_report_bundle,
     require_clean_tree,
 )
 
-TARGETS = (
-    {
-        "name": "linux-x86_64",
-        "cargo_target": "x86_64-unknown-linux-gnu",
-        "configure_target": "x86_64-pc-linux-gnu",
-        "mozconfig": "netwerk/naivefox/mozconfig-minimal",
-        "os": "linux",
-        "link_response": "toolkit/library/build/libxul_so.list",
-        "libxul": "dist/bin/libxul.so",
-        "executable": "dist/bin/naivefox",
-    },
-    {
-        "name": "windows-x86_64",
-        "cargo_target": "x86_64-pc-windows-msvc",
-        "configure_target": "x86_64-pc-mingw32",
-        "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
-        "os": "win",
-        "link_response": "toolkit/library/build/xul_dll.list",
-        "libxul": "dist/bin/xul.dll",
-        "executable": "dist/bin/naivefox.exe",
-    },
-)
+TARGETS = TARGET_SPECS
 
 
 def run(
@@ -77,7 +57,7 @@ def _resolved_metadata_path(value: object, label: str) -> Path:
         raise ValueError(f"mozinfo {label} does not exist: {value}") from error
 
 
-def validate_objdir(repo: Path, objdir: Path, target: dict[str, str]) -> dict:
+def validate_objdir(repo: Path, objdir: Path, target: dict[str, object]) -> dict:
     mozinfo_path = objdir / "mozinfo.json"
     if not mozinfo_path.is_file():
         raise ValueError(f"missing regular {target['name']} mozinfo.json")
@@ -100,8 +80,7 @@ def validate_objdir(repo: Path, objdir: Path, target: dict[str, str]) -> dict:
     expected_values = {
         "buildapp": "netwerk/naivefox",
         "appname": "naivefox",
-        "processor": "x86_64",
-        "os": target["os"],
+        **target["mozinfo"],
     }
     for field, expected in expected_values.items():
         if mozinfo.get(field) != expected:
@@ -111,12 +90,14 @@ def validate_objdir(repo: Path, objdir: Path, target: dict[str, str]) -> dict:
             )
     if mozinfo.get("tests_enabled") is not False:
         raise ValueError(f"{target['name']} evidence objdir must have tests disabled")
-    for relative in (
+    required_outputs = [
         "config.status",
         target["link_response"],
         target["libxul"],
-        target["executable"],
-    ):
+    ]
+    if target["executable"]:
+        required_outputs.append(target["executable"])
+    for relative in required_outputs:
         output = objdir / relative
         if not output.is_file() or output.stat().st_size == 0:
             raise ValueError(
@@ -126,8 +107,11 @@ def validate_objdir(repo: Path, objdir: Path, target: dict[str, str]) -> dict:
 
 
 def validate_objdirs(repo: Path, objdirs: dict[str, Path]) -> dict[str, dict]:
-    if objdirs["linux-x86_64"] == objdirs["windows-x86_64"]:
-        raise ValueError("Linux and Windows evidence objdirs must be distinct")
+    expected_names = {target["name"] for target in TARGETS}
+    if set(objdirs) != expected_names:
+        raise ValueError(f"evidence objdirs must be exactly {sorted(expected_names)}")
+    if len(set(objdirs.values())) != len(objdirs):
+        raise ValueError("all evidence objdirs must be distinct")
     validated = {}
     for target in TARGETS:
         objdir = objdirs[target["name"]]
@@ -140,7 +124,7 @@ def validate_objdirs(repo: Path, objdirs: dict[str, Path]) -> dict[str, dict]:
 def build_target(
     repo: Path,
     objdir: Path,
-    target: dict[str, str],
+    target: dict[str, object],
     source,
     firefox_ref: str,
     naivefox_ref: str,
@@ -188,14 +172,11 @@ def validate_targets(reports: dict[Path, dict]) -> None:
         if path.name.startswith("closure-report-")
     }
     if build_targets != {target["name"] for target in TARGETS}:
-        raise ValueError("build evidence does not contain exactly both targets")
+        raise ValueError("build evidence does not contain exactly all targets")
     if configure_targets != {target["name"] for target in TARGETS}:
-        raise ValueError("configure evidence does not contain exactly both targets")
-    if closure_targets != {
-        "x86_64-unknown-linux-gnu",
-        "x86_64-pc-windows-msvc",
-    }:
-        raise ValueError("closure evidence does not contain exactly both targets")
+        raise ValueError("configure evidence does not contain exactly all targets")
+    if closure_targets != {target["cargo_target"] for target in TARGETS}:
+        raise ValueError("closure evidence does not contain exactly all targets")
 
 
 def install_bundle(repo: Path, generated: dict[Path, Path]) -> None:
@@ -218,7 +199,7 @@ def install_bundle(repo: Path, generated: dict[Path, Path]) -> None:
         changed = changed_paths(repo)
         if changed != set(CANONICAL_REPORT_PATHS):
             raise ValueError(
-                "evidence installation must leave exactly the six canonical reports "
+                "evidence installation must leave exactly the canonical reports "
                 f"modified, got {sorted(path.as_posix() for path in changed)}"
             )
     except Exception:
@@ -245,6 +226,7 @@ def main() -> int:
     )
     parser.add_argument("--linux-objdir", type=Path, required=True)
     parser.add_argument("--windows-objdir", type=Path, required=True)
+    parser.add_argument("--android-objdir", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--firefox-ref", default="firefox-upstream")
     parser.add_argument("--naivefox-ref", default="naivefox-full-source")
@@ -254,6 +236,7 @@ def main() -> int:
     objdirs = {
         "linux-x86_64": args.linux_objdir.resolve(strict=True),
         "windows-x86_64": args.windows_objdir.resolve(strict=True),
+        "android-aarch64": args.android_objdir.resolve(strict=True),
     }
     try:
         require_clean_tree(
@@ -313,6 +296,8 @@ def main() -> int:
                 str(objdirs["linux-x86_64"]),
                 "--windows-objdir",
                 str(objdirs["windows-x86_64"]),
+                "--android-objdir",
+                str(objdirs["android-aarch64"]),
                 *ref_args,
             ],
             env=environment,
@@ -387,7 +372,7 @@ def main() -> int:
             shutil.rmtree(work_dir, ignore_errors=True)
 
     print(
-        "installed six validated reports for source S "
+        f"installed {len(CANONICAL_REPORT_PATHS)} validated reports for source S "
         f"{source.source_commit}; commit them together as evidence E"
     )
     return 0

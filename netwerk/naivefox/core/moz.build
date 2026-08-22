@@ -24,6 +24,14 @@ SOURCES += [
     "ProfilerNaiveFoxStub.cpp",
 ]
 
+GeneratedFile(
+    "NaiveFoxVersion.cpp",
+    script="generate_version_source.py",
+    inputs=["../VERSION"],
+)
+
+SOURCES += ["!NaiveFoxVersion.cpp"]
+
 XPCOM_MANIFESTS += ["components.conf"]
 
 SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
@@ -38,6 +46,7 @@ EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
 EXPORTS += ["../nsContentUtils.h"]
 
 LOCAL_INCLUDES += ["/netwerk/base"]
+LOCAL_INCLUDES += ["/netwerk/naivefox"]
 LOCAL_INCLUDES += ["/security/manager/ssl"]
 LOCAL_INCLUDES += ["/tools/profiler/core"]
 LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]

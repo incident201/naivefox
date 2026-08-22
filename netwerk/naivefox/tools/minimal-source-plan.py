@@ -19,12 +19,13 @@ from pathlib import Path, PurePosixPath
 import tomllib
 from provenance import (
     CANONICAL_REPORT_PATHS,
+    TARGET_SPECS,
     canonical_oid,
     load_and_validate_report_bundle,
     validate_evidence_head,
 )
 
-BUILD_TARGETS = {"linux-x86_64", "windows-x86_64"}
+BUILD_TARGETS = {target["name"] for target in TARGET_SPECS}
 MAINTENANCE_TOOLS = {
     "analyze-full-closure.py",
     "analyze-link-closure.py",
@@ -217,8 +218,10 @@ def main() -> int:
         if repo not in resolved.parents:
             raise SystemExit("evidence reports must be committed inside the repository")
         supplied_relative.add(resolved.relative_to(repo))
-    if supplied_relative != set(CANONICAL_REPORT_PATHS) or len(supplied_reports) != 6:
-        raise SystemExit("planner requires exactly the six canonical evidence reports")
+    if supplied_relative != set(CANONICAL_REPORT_PATHS) or len(supplied_reports) != len(
+        CANONICAL_REPORT_PATHS
+    ):
+        raise SystemExit("planner requires exactly the canonical evidence reports")
     try:
         load_and_validate_report_bundle(
             repo,
@@ -236,9 +239,7 @@ def main() -> int:
         raise SystemExit(f"build reports must be exactly {sorted(BUILD_TARGETS)}")
     build_source_commits = {report.get("source_commit") for report in build_reports}
     if len(build_source_commits) != 1:
-        raise SystemExit(
-            "Linux and Windows build reports have different source commits"
-        )
+        raise SystemExit("target build reports have different source commits")
     build_source_commit = next(iter(build_source_commits))
     validate_commit(build_source_commit, "build-input reports")
     cargo_license_inventory = {}
@@ -428,9 +429,11 @@ def main() -> int:
         for key in ("generator_scripts", "metrics_yaml_inputs", "pings_yaml_inputs"):
             for value in glean.get(key, []):
                 add(value, f"closure:{target}:glean:{key}")
-    expected_closure_targets = {"x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"}
-    if closure_targets != expected_closure_targets or len(closure_reports) != 2:
-        raise SystemExit("closure reports must be exactly Linux and Windows x86-64")
+    expected_closure_targets = {target["cargo_target"] for target in TARGET_SPECS}
+    if closure_targets != expected_closure_targets or len(closure_reports) != len(
+        expected_closure_targets
+    ):
+        raise SystemExit("closure reports must be exactly the supported targets")
     if closure_source_commits != {build_source_commit}:
         raise SystemExit(
             "build-input and linked-closure reports must share one audited source"
@@ -440,13 +443,12 @@ def main() -> int:
         load_report(path, "configure-trace") for path in args.configure_report
     ]
     expected_configure_targets = {
-        "linux-x86_64": "x86_64-pc-linux-gnu",
-        "windows-x86_64": "x86_64-pc-mingw32",
+        target["name"]: target["configure_target"] for target in TARGET_SPECS
     }
     if {report.get("target") for report in configure_reports} != set(
         expected_configure_targets
     ) or len(configure_reports) != len(expected_configure_targets):
-        raise SystemExit("configure reports must be exactly Linux and Windows x86-64")
+        raise SystemExit("configure reports must be exactly the supported targets")
     configure_collector_hash = sha256(
         repo / "netwerk/naivefox/tools/collect-configure-inputs.py"
     )
@@ -541,9 +543,7 @@ def main() -> int:
         add(value, "explicit:mach-bootstrap")
 
     for value in sorted(
-        path
-        for path in tracked
-        if path.startswith(WINDOWS_MACH_BOOTSTRAP_PREFIXES)
+        path for path in tracked if path.startswith(WINDOWS_MACH_BOOTSTRAP_PREFIXES)
     ):
         add(value, "explicit:mach-windows-bootstrap")
 

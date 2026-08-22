@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from provenance import derive_source_provenance
+from provenance import TARGET_SPECS, derive_source_provenance
 from provenance import sha256 as provenance_sha256
 
 
@@ -584,11 +584,21 @@ def get_glean_inputs(topsrcdir, objdir):
     }
 
 
+def staged_package_dir(objdir, target_spec):
+    objdir_path = Path(objdir)
+    package_name = target_spec["staged_package"]
+    candidates = (
+        objdir_path / "package" / package_name,
+        objdir_path / "naivefox-package" / package_name,
+        objdir_path / package_name,
+    )
+    return next((path for path in candidates if path.is_dir()), candidates[0])
+
+
 def analyze_target(
     topsrcdir,
     objdir,
-    target_triple,
-    mozconfig_relpath,
+    target_spec,
     firefox_ref="firefox-upstream",
     naivefox_ref="naivefox-full-source",
 ):
@@ -597,16 +607,12 @@ def analyze_target(
     if not objdir_path.exists():
         raise AuditConsistencyError(f"Objdir does not exist: {objdir}")
 
-    is_linux = "linux" in target_triple.lower()
-    xul_name = "libxul.so" if is_linux else "xul.dll"
-    naivefox_name = "naivefox" if is_linux else "naivefox.exe"
-    list_name = "libxul_so.list" if is_linux else "xul_dll.list"
+    target_triple = target_spec["cargo_target"]
+    mozconfig_relpath = target_spec["mozconfig"]
+    xul_name = Path(target_spec["libxul"]).name
+    executable = target_spec["executable"]
 
-    libxul_list_path = objdir_path / "toolkit" / "library" / "build" / list_name
-    if not libxul_list_path.exists():
-        libxul_list_path = (
-            objdir_path / "toolkit" / "library" / "build" / "xul.dll.list"
-        )
+    libxul_list_path = objdir_path / target_spec["link_response"]
 
     if not libxul_list_path.exists():
         raise AuditConsistencyError(
@@ -670,7 +676,7 @@ def analyze_target(
         )
 
     bin_xul = objdir_path / "dist" / "bin" / xul_name
-    bin_naivefox = objdir_path / "dist" / "bin" / naivefox_name
+    bin_naivefox = objdir_path / executable if executable else None
     dynamic_deps = get_dynamic_dependencies(str(bin_xul))
 
     rust_crates = get_reachable_rust_closure(topsrcdir, target_triple, objdir)
@@ -692,10 +698,7 @@ def analyze_target(
             if f.is_file():
                 dist_bin_files.append({"name": f.name, "size_bytes": f.stat().st_size})
 
-    staged_pkg_name = "naivefox-linux-x86_64" if is_linux else "naivefox-windows-x86_64"
-    staged_pkg_dir = objdir_path / staged_pkg_name
-    if not staged_pkg_dir.exists():
-        staged_pkg_dir = objdir_path / "naivefox-package" / staged_pkg_name
+    staged_pkg_dir = staged_package_dir(objdir_path, target_spec)
 
     staged_manifest_files = []
     if staged_pkg_dir.exists():
@@ -739,10 +742,12 @@ def analyze_target(
             "evidence_collector_sha256": provenance_sha256(
                 Path(__file__).resolve().with_name("collect-minimal-source-evidence.py")
             ),
+            "target": target_spec["name"],
+            "platform": target_spec["platform"],
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
-            "analyzer_version": "2.6.0-no-spidermonkey-active-cargo-tree",
+            "analyzer_version": "2.7.0-three-target-active-cargo-tree",
             "compiler_version": compiler_ver,
             "linker_version": linker_ver,
             "sccache_state": "supported",
@@ -757,7 +762,7 @@ def analyze_target(
             "spidermonkey_static_present": js_static_found,
             "libxul_size_bytes": bin_xul.stat().st_size if bin_xul.exists() else 0,
             "naivefox_bin_size_bytes": bin_naivefox.stat().st_size
-            if bin_naivefox.exists()
+            if bin_naivefox and bin_naivefox.exists()
             else 0,
             "reachable_rust_crates_count": len(rust_crates),
             "dynamic_dependencies_count": len(dynamic_deps),
@@ -830,6 +835,7 @@ def main():
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--linux-objdir", type=Path)
     parser.add_argument("--windows-objdir", type=Path)
+    parser.add_argument("--android-objdir", type=Path)
     parser.add_argument("--firefox-ref", default="firefox-upstream")
     parser.add_argument("--naivefox-ref", default="naivefox-full-source")
     args = parser.parse_args()
@@ -847,38 +853,30 @@ def main():
     )
     os.makedirs(reports_dir, exist_ok=True)
 
-    targets = [
-        (
-            "Linux x86_64",
-            str(args.linux_objdir.resolve())
-            if args.linux_objdir
-            else os.path.join(topsrcdir, "obj-naivefox-minimal"),
-            "x86_64-unknown-linux-gnu",
-            "netwerk/naivefox/mozconfig-minimal",
-            "closure-report-linux-x86_64.json",
-        ),
-        (
-            "Windows x86_64",
-            str(args.windows_objdir.resolve())
-            if args.windows_objdir
-            else os.path.join(topsrcdir, "obj-naivefox-windows-x86_64"),
-            "x86_64-pc-windows-msvc",
-            "netwerk/naivefox/mozconfig-windows-x86_64",
-            "closure-report-windows-x86_64.json",
-        ),
-    ]
+    supplied_objdirs = {
+        "linux-x86_64": args.linux_objdir,
+        "windows-x86_64": args.windows_objdir,
+        "android-aarch64": args.android_objdir,
+    }
 
     print("Executing comprehensive multi-target link and source closure audit...")
-    for name, objdir, triple, mozcfg, filename in targets:
-        print(f"\n--- Analyzing {name} ({triple}) ---")
+    for target in TARGET_SPECS:
+        supplied_objdir = supplied_objdirs[target["name"]]
+        objdir = (
+            str(supplied_objdir.resolve())
+            if supplied_objdir
+            else os.path.join(topsrcdir, target["default_objdir"])
+        )
+        triple = target["cargo_target"]
+        print(f"\n--- Analyzing {target['name']} ({triple}) ---")
         report = analyze_target(
             topsrcdir,
             objdir,
-            triple,
-            mozcfg,
+            target,
             firefox_ref=args.firefox_ref,
             naivefox_ref=args.naivefox_ref,
         )
+        filename = f"closure-report-{target['name']}.json"
         out_path = os.path.join(reports_dir, filename)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
