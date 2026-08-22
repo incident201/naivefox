@@ -309,8 +309,9 @@ jobs:
               ;;
             android)
               mozconfig=netwerk/naivefox/mozconfig-android-aarch64
-              export CC=clang-20
-              export CXX=clang++-20
+              ndk_bin="${NAIVEFOX_ANDROID_NDK:?}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+              export CC="${ndk_bin}/clang"
+              export CXX="${ndk_bin}/clang++"
               export HOST_CC=clang-20
               export HOST_CXX=clang++-20
               export LINKER=lld-20
