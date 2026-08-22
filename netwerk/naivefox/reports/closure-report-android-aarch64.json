@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "a87b136e9f309f316bc8a7d9048cc261368bd04c",
+    "source_commit_sha": "a132e58d3e0281bff712c430412a9fbf0f46e6c2",
     "source_worktree_clean": true,
     "firefox_base_sha": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-    "naivefox_reference_sha": "a87b136e9f309f316bc8a7d9048cc261368bd04c",
+    "naivefox_reference_sha": "a132e58d3e0281bff712c430412a9fbf0f46e6c2",
     "analyzer_sha256": "f5fc1ae9c8b65ce6532989afae3422b0f9cdc727e9c39e5cdff890d8ad53ec9c",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "71d7a93b99c6bd1f8c2f8553300e4559d26f9e539d7f8202952ba282f4e57029",
@@ -17,20 +17,20 @@
     "compiler_version": "Clang 18.1.8",
     "linker_version": "LLD 18.1.8",
     "sccache_state": "supported",
-    "staged_runtime_manifest_count": 7
+    "staged_runtime_manifest_count": 8
   },
   "summary": {
     "cxx_translation_units_count": 461,
     "direct_link_objects_count": 536,
-    "unstripped_link_objects_bytes": 252858968,
+    "unstripped_link_objects_bytes": 252858936,
     "unstripped_link_objects_mb": 241.15,
     "static_libraries_count": 2,
     "spidermonkey_static_present": false,
-    "libxul_size_bytes": 270048576,
+    "libxul_size_bytes": 270048560,
     "naivefox_bin_size_bytes": 0,
     "reachable_rust_crates_count": 270,
     "dynamic_dependencies_count": 8,
-    "staged_runtime_files_count": 7
+    "staged_runtime_files_count": 8
   },
   "component_groups": {
     "netwerk": {
@@ -45,7 +45,7 @@
     },
     "xpcom": {
       "files": 29,
-      "bytes": 36317840,
+      "bytes": 36317808,
       "mb": 34.64
     },
     "modules": {
@@ -6766,7 +6766,7 @@
       },
       {
         "name": "libxul.so",
-        "size_bytes": 270048576
+        "size_bytes": 270048560
       },
       {
         "name": "libxul.so-gdb.py",
@@ -6788,8 +6788,8 @@
     "staged_package_manifest": [
       {
         "path": "manifest.json",
-        "size_bytes": 1671,
-        "sha256": "749f26bd523a564208d21946cae0bd20c531a693dc06bcba82962559c1910115"
+        "size_bytes": 1849,
+        "sha256": "a199cd8f5c41850f00fe02b2b5000005d2375feeb490424d0b82ad0441d7c63b"
       },
       {
         "path": "include/NaiveFoxAPI.h",
@@ -6799,27 +6799,32 @@
       {
         "path": "lib/arm64-v8a/libfreebl3.so",
         "size_bytes": 919136,
-        "sha256": "453e95c7617e6643d066bbe356735129ebf113c8927e5a29b419c9ef181615a2"
+        "sha256": "17041506275222ae659622164c78389d3a6e27c6250c63e1929e5afda06835db"
       },
       {
         "path": "lib/arm64-v8a/libmozglue.so",
         "size_bytes": 1974864,
-        "sha256": "6595ab8800647322485756c780b4912892b5939499eafb4217c77e859c3cb4b0"
+        "sha256": "8cca767256d12ed8c9436cecc7c44d359ce91257273fcd02a5e91bdc5807a689"
       },
       {
         "path": "lib/arm64-v8a/libnss3.so",
         "size_bytes": 3365136,
-        "sha256": "4e0729e9f7229aaa18f259419d36f6692c2bd24a5695268c4e52d6132aecc970"
+        "sha256": "bd57e9f38d6997f880fd7247333f40b4d11578cda750001bdfdf5ef0ea967b22"
       },
       {
         "path": "lib/arm64-v8a/libsoftokn3.so",
         "size_bytes": 420128,
-        "sha256": "a9fd450f19c58cfb7dc89381eebb7456d8ddf0614658c571321f9678d8af99fb"
+        "sha256": "e3f9c1a41bced77b545b5b1daa7f6ba06560f677645ce550399224ba379e05d5"
       },
       {
         "path": "lib/arm64-v8a/libxul.so",
         "size_bytes": 47010216,
-        "sha256": "ca5065f2f9353f4a669ddf302eb53023247a5ef701c6f71e54960da05d1d3ef1"
+        "sha256": "39e5c3abc2d28b3f330de309ed5e9dab6f8624babf3967fee8ce92bfec2a6ac5"
+      },
+      {
+        "path": "lib/arm64-v8a/omni.ja",
+        "size_bytes": 16895,
+        "sha256": "c61c961e3c161bac6c9d274d1320c31e317b45e4bcc282ff896a645665848c4d"
       }
     ]
   },
@@ -8754,7 +8759,7 @@
     },
     {
       "path": "objdir/xpcom/build/Unified_cpp_xpcom_build0.o",
-      "size_bytes": 1584584
+      "size_bytes": 1584552
     },
     {
       "path": "objdir/ipc/chromium/process_util_linux.o",
