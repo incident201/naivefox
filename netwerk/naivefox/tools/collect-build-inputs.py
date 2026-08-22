@@ -28,6 +28,9 @@ JAR_MANIFEST = re.compile(r"^JAR_MANIFEST\s*:?=\s*(.+)$", re.MULTILINE)
 JAR_SOURCE = re.compile(r"\((%?[^)]+)\)")
 ASSEMBLY_SOURCE = re.compile(r"^SSRCS\s*\+=\s*(.+)$", re.MULTILINE)
 CPP_INCLUDE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.MULTILINE)
+MAKE_DIRECTORY = re.compile(
+    r"^(topsrcdir|topobjdir|srcdir)\s*:?=\s*(.+?)\s*$", re.MULTILINE
+)
 
 
 def git(repo: Path, *args: str) -> str:
@@ -36,6 +39,66 @@ def git(repo: Path, *args: str) -> str:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def assembly_preprocessor_inputs(
+    backend: Path, source_tree: Path, objdir: Path
+) -> tuple[list[Path], list[Path], list[Path]]:
+    variables = {
+        "topsrcdir": str(source_tree),
+        "topobjdir": str(objdir),
+        "srcdir": str(source_tree / backend.parent.relative_to(objdir)),
+    }
+    makefile = backend.with_name("Makefile")
+    if makefile.is_file():
+        for name, value in MAKE_DIRECTORY.findall(
+            makefile.read_text(encoding="utf-8", errors="replace")
+        ):
+            expanded_value = value
+            for variable, replacement in variables.items():
+                expanded_value = expanded_value.replace(
+                    f"$({variable})", replacement
+                )
+            variables[name] = expanded_value
+
+    expanded = backend.read_text(encoding="utf-8", errors="replace")
+    for variable, replacement in variables.items():
+        expanded = expanded.replace(f"$({variable})", replacement)
+
+    include_directories = []
+    for match in INCLUDE_PATH.finditer(expanded):
+        value = next(item for item in match.groups() if item is not None)
+        path = Path(value)
+        if path.is_dir():
+            include_directories.append(path)
+
+    assembly_inputs = []
+    for value in ASSEMBLY_SOURCE.findall(expanded):
+        path = Path(value.strip()).resolve()
+        if path.is_file():
+            assembly_inputs.append(path)
+
+    includes = []
+    pending = list(assembly_inputs)
+    visited = set()
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        contents = path.read_text(encoding="utf-8", errors="replace")
+        for name in CPP_INCLUDE.findall(contents):
+            candidates = [path.parent / name]
+            candidates.extend(directory / name for directory in include_directories)
+            dependency = next(
+                (candidate.resolve() for candidate in candidates if candidate.is_file()),
+                None,
+            )
+            if dependency is None or dependency in visited:
+                continue
+            includes.append(dependency)
+            pending.append(dependency)
+    return assembly_inputs, includes, include_directories
 
 
 def main() -> int:
@@ -383,45 +446,17 @@ def main() -> int:
             )
 
     for backend in backends:
-        text = backend.read_text(encoding="utf-8", errors="replace")
-        expanded = text.replace("$(topsrcdir)", str(source_tree)).replace(
-            "$(topobjdir)", str(objdir)
+        assembly_inputs, assembly_includes, assembly_include_directories = (
+            assembly_preprocessor_inputs(backend, source_tree, objdir)
         )
-        include_directories = []
-        for match in INCLUDE_PATH.finditer(expanded):
-            value = next(item for item in match.groups() if item is not None)
-            path = Path(value)
-            if path.is_dir():
-                include_directories.append(path)
+        for path in assembly_include_directories:
             relative = source_relative(path)
-            if path.is_dir():
-                if relative is not None:
-                    directory_contracts.add(relative)
-        assembly_inputs = []
-        for value in ASSEMBLY_SOURCE.findall(expanded):
-            path = Path(value.strip()).resolve()
+            if relative is not None:
+                directory_contracts.add(relative)
+        for path in assembly_inputs:
             add_path(path, "make:active-assembly-source")
-            if path.is_file():
-                assembly_inputs.append(path)
-        pending_headers = list(assembly_inputs)
-        visited_headers = set()
-        while pending_headers:
-            path = pending_headers.pop()
-            if path in visited_headers:
-                continue
-            visited_headers.add(path)
-            contents = path.read_text(encoding="utf-8", errors="replace")
-            for name in CPP_INCLUDE.findall(contents):
-                candidates = [path.parent / name]
-                candidates.extend(directory / name for directory in include_directories)
-                for candidate in candidates:
-                    if not candidate.is_file():
-                        continue
-                    relative = source_relative(candidate)
-                    if relative is not None:
-                        add_path(candidate, "make:active-assembly-include")
-                        pending_headers.append(candidate.resolve())
-                    break
+        for path in assembly_includes:
+            add_path(path, "make:active-assembly-include")
 
     active_python_actions = set()
     python_action_fragments = list(make_fragments)
