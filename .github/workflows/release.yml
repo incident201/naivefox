@@ -170,7 +170,8 @@ jobs:
             clang-20 \
             libclang-20-dev \
             lld-20 \
-            nasm
+            nasm \
+            ripgrep
           ndk_dir="${ANDROID_HOME:?}/ndk/${ANDROID_NDK_REVISION}"
           test -f "${ndk_dir}/source.properties"
           grep -Fqx \
