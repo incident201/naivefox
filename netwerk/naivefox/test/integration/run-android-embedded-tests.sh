@@ -5,13 +5,14 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
 usage() {
-  printf 'usage: %s [--package DIR] [--protocol h2|h3|all] [--check-only] [--allow-skip-device]\n' "$0"
+  printf 'usage: %s [--package DIR] [--protocol h2|h3|all] [--check-only] [--allow-skip-device] [--start-emulator]\n' "$0"
 }
 
 package_arg=${NAIVEFOX_ANDROID_PACKAGE:-}
 protocol=all
 check_only=0
 allow_skip_device=0
+start_emulator=0
 while (( $# )); do
   case $1 in
     --package)
@@ -30,6 +31,10 @@ while (( $# )); do
       ;;
     --allow-skip-device)
       allow_skip_device=1
+      shift
+      ;;
+    --start-emulator)
+      start_emulator=1
       shift
       ;;
     --help)
@@ -120,9 +125,33 @@ skip_device() {
   exit 1
 }
 [[ -n $adb_bin && -x $adb_bin ]] || skip_device 'adb is unavailable'
+emulator_started=0
+emulator_stop_adb=$adb_bin
+emulator_stop_serial=${NAIVEFOX_ANDROID_SERIAL:-emulator-5554}
+if [[ -n ${NAIVEFOX_ANDROID_STOP_ADB:-} ]]; then
+  emulator_stop_adb=$NAIVEFOX_ANDROID_STOP_ADB
+elif [[ -n ${NAIVEFOX_WINDOWS_USER:-} &&
+        -x /mnt/c/Users/$NAIVEFOX_WINDOWS_USER/AppData/Local/Android/Sdk/platform-tools/adb.exe ]]; then
+  emulator_stop_adb=/mnt/c/Users/$NAIVEFOX_WINDOWS_USER/AppData/Local/Android/Sdk/platform-tools/adb.exe
+else
+  for candidate in /mnt/c/Users/*/AppData/Local/Android/Sdk/platform-tools/adb.exe; do
+    if [[ -x $candidate ]]; then
+      emulator_stop_adb=$candidate
+      break
+    fi
+  done
+fi
 ADB=("$adb_bin")
 [[ -z ${NAIVEFOX_ANDROID_SERIAL:-} ]] || ADB+=(-s "$NAIVEFOX_ANDROID_SERIAL")
-"${ADB[@]}" get-state >/dev/null 2>&1 || skip_device 'no selected adb device is online'
+if ! "${ADB[@]}" get-state >/dev/null 2>&1; then
+  if (( start_emulator )); then
+    emulator_tool="$SOURCE_ROOT/netwerk/naivefox/tools/start-android-emulator.sh"
+    NAIVEFOX_ADB="$adb_bin" "$emulator_tool"
+    emulator_started=1
+  else
+    skip_device 'no selected adb device is online'
+  fi
+fi
 device_abi=$("${ADB[@]}" shell getprop ro.product.cpu.abi | tr -d '\r')
 [[ $device_abi == arm64-v8a ]] || skip_device "selected device ABI is $device_abi, not arm64-v8a"
 device_api=$("${ADB[@]}" shell getprop ro.build.version.sdk | tr -d '\r')
@@ -197,6 +226,10 @@ cleanup_current() {
 cleanup() {
   local status=$?
   cleanup_current "$status"
+  if (( emulator_started )); then
+    "$emulator_stop_adb" -s "$emulator_stop_serial" emu kill >/dev/null 2>&1 || true
+    emulator_started=0
+  fi
   rm -rf -- "$work_dir"
   return "$status"
 }
@@ -225,7 +258,12 @@ wait_for_host_process() {
   local pid=$1
   local description=$2
   for ((i = 0; i < 300; i++)); do
-    kill -0 "$pid" 2>/dev/null || return
+    # A cleanly exited child is the success condition.  Preserve an explicit
+    # zero status here so callers running with `set -e` do not misclassify the
+    # expected shutdown as a harness failure.
+    if ! kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
     sleep 0.1
   done
   printf 'timed out waiting for %s\n' "$description" >&2

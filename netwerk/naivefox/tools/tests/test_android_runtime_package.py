@@ -3,6 +3,7 @@ import json
 import stat
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 SCRIPT = (
@@ -74,6 +75,10 @@ elif '--dyn-syms' in sys.argv:
 
         for name in ("libxul.so", "libnss3.so", "libsoftokn3.so"):
             (self.dist / name).write_bytes(name.encode("ascii"))
+        (self.dist / "arm64-v8a").mkdir()
+        (self.dist / "arm64-v8a/greprefs.js").write_text(
+            "pref('naivefox.test', true);\n", encoding="utf-8"
+        )
         (self.dist / "dependentlibs.list").write_text(
             "libnss3.so\nlibxul.so\n", encoding="utf-8"
         )
@@ -106,8 +111,10 @@ elif '--dyn-syms' in sys.argv:
         )
         self.assertEqual(
             sorted(path.name for path in (self.stage / "lib/arm64-v8a").iterdir()),
-            ["libnss3.so", "libsoftokn3.so", "libxul.so"],
+            ["libnss3.so", "libsoftokn3.so", "libxul.so", "omni.ja"],
         )
+        with zipfile.ZipFile(self.stage / "lib/arm64-v8a/omni.ja") as archive:
+            self.assertEqual(archive.namelist(), ["greprefs.js"])
         self.assertEqual(
             stat.S_IMODE((self.stage / "include/NaiveFoxAPI.h").stat().st_mode),
             0o644,

@@ -93,6 +93,10 @@ NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-android-aarch64 \
   --check-only
 ```
 
+On the configured WSL/Windows host, the device gate can start the local ARM64
+AVD itself, including the required QEMU virt machine override, by appending
+--start-emulator to the runner command above.
+
 The final command compiles and inspects the native harness but does not start
 Gecko on Android. Device acceptance requires the runner without `--check-only`
 on an online ARM64 API-26+ device or emulator. Lack of `adb` or KVM is not a
