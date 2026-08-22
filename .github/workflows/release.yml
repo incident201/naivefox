@@ -309,8 +309,12 @@ jobs:
               ;;
             android)
               mozconfig=netwerk/naivefox/mozconfig-android-aarch64
+              export CC=clang-20
+              export CXX=clang++-20
               export HOST_CC=clang-20
               export HOST_CXX=clang++-20
+              export LINKER=lld-20
+              export LLVM_OBJDUMP=llvm-objdump-20
               export LIBCLANG_PATH=/usr/lib/llvm-20/lib
               ;;
           esac
