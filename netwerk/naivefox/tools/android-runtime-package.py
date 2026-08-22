@@ -228,7 +228,7 @@ def file_manifest(root: Path) -> tuple[list[dict[str, object]], int]:
 
 
 def read_version(source_root: Path) -> str:
-    path = source_root / "netwerk/naivefox/VERSION"
+    path = source_root / "netwerk/naivefox/NAIVEFOX_VERSION"
     if not path.is_file():
         fail(f"NaiveFox version file is missing: {path}")
     version = path.read_text(encoding="utf-8").strip()

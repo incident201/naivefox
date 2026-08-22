@@ -30,7 +30,7 @@ class AndroidRuntimePackageTest(unittest.TestCase):
             "int NaiveFoxRunEmbedded(const char*, const char*, const char*);\n",
             encoding="utf-8",
         )
-        (self.source / "netwerk/naivefox/VERSION").write_text(
+        (self.source / "netwerk/naivefox/NAIVEFOX_VERSION").write_text(
             "0.3.0-dev\n", encoding="utf-8"
         )
         system = (

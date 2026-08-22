@@ -27,7 +27,7 @@ SOURCES += [
 GeneratedFile(
     "NaiveFoxVersion.cpp",
     script="generate_version_source.py",
-    inputs=["../VERSION"],
+    inputs=["../NAIVEFOX_VERSION"],
 )
 
 SOURCES += ["!NaiveFoxVersion.cpp"]
