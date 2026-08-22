@@ -12,6 +12,7 @@ on:
           - all
           - linux
           - windows
+          - android
 
 permissions:
   contents: read
@@ -73,13 +74,16 @@ jobs:
           )"
           case "${BUILD_TARGET}" in
             all)
-              build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","archive_suffix":"linux-x86_64.tar.xz"},{"platform":"windows","runner":"windows-2022","archive_suffix":"windows-x86_64.zip"}]}'
+              build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","package_name":"naivefox-linux-x86_64","archive_suffix":"linux-x86_64.tar.xz"},{"platform":"windows","runner":"windows-2022","package_name":"naivefox-windows-x86_64","archive_suffix":"windows-x86_64.zip"},{"platform":"android","runner":"ubuntu-24.04","package_name":"naivefox-android-aarch64","archive_suffix":"android-aarch64.tar.xz"}]}'
               ;;
             linux)
-              build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","archive_suffix":"linux-x86_64.tar.xz"}]}'
+              build_matrix='{"include":[{"platform":"linux","runner":"ubuntu-24.04","package_name":"naivefox-linux-x86_64","archive_suffix":"linux-x86_64.tar.xz"}]}'
               ;;
             windows)
-              build_matrix='{"include":[{"platform":"windows","runner":"windows-2022","archive_suffix":"windows-x86_64.zip"}]}'
+              build_matrix='{"include":[{"platform":"windows","runner":"windows-2022","package_name":"naivefox-windows-x86_64","archive_suffix":"windows-x86_64.zip"}]}'
+              ;;
+            android)
+              build_matrix='{"include":[{"platform":"android","runner":"ubuntu-24.04","package_name":"naivefox-android-aarch64","archive_suffix":"android-aarch64.tar.xz"}]}'
               ;;
             *)
               echo "unsupported build target: ${BUILD_TARGET}" >&2
@@ -120,13 +124,14 @@ jobs:
 
       - name: Restore staged product cache
         id: staged_cache
+        if: matrix.platform != 'android'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: ${{ runner.temp }}/obj-naivefox-${{ matrix.platform }}/package/naivefox-${{ matrix.platform }}-x86_64
+          path: ${{ runner.temp }}/obj-naivefox-${{ matrix.platform }}/package/${{ matrix.package_name }}
           key: naivefox-stage-v1-${{ matrix.platform }}-${{ steps.runner_image.outputs.version }}-${{ needs.metadata.outputs.product_tree_hash }}
 
       - name: Restore cbindgen cache
-        if: matrix.platform == 'linux' && steps.staged_cache.outputs.cache-hit != 'true'
+        if: (matrix.platform == 'linux' || matrix.platform == 'android') && steps.staged_cache.outputs.cache-hit != 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cargo/bin/cbindgen
@@ -150,6 +155,22 @@ jobs:
             libxt-dev \
             lld-20 \
             nasm
+          if ! cbindgen --version 2>/dev/null | grep -qx 'cbindgen 0.29.4'; then
+            cargo install cbindgen --version 0.29.4 --locked
+          fi
+
+      - name: Prepare Android build environment
+        if: matrix.platform == 'android'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-20 \
+            libclang-20-dev \
+            lld-20 \
+            nasm
+          rustup target add aarch64-linux-android
           if ! cbindgen --version 2>/dev/null | grep -qx 'cbindgen 0.29.4'; then
             cargo install cbindgen --version 0.29.4 --locked
           fi
@@ -264,24 +285,35 @@ jobs:
           RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.platform }}" == linux ]]; then
-            mozconfig=netwerk/naivefox/mozconfig-minimal
-            export CC=clang-20
-            export CXX=clang++-20
-            export HOST_CC=clang-20
-            export HOST_CXX=clang++-20
-            export LINKER=lld-20
-            export LLVM_OBJDUMP=llvm-objdump-20
-            export LIBCLANG_PATH=/usr/lib/llvm-20/lib
-          else
-            mozconfig=netwerk/naivefox/mozconfig-windows-x86_64
-            export MOZILLABUILD='C:\mozilla-build'
-          fi
+          case "${{ matrix.platform }}" in
+            linux)
+              mozconfig=netwerk/naivefox/mozconfig-minimal
+              export CC=clang-20
+              export CXX=clang++-20
+              export HOST_CC=clang-20
+              export HOST_CXX=clang++-20
+              export LINKER=lld-20
+              export LLVM_OBJDUMP=llvm-objdump-20
+              export LIBCLANG_PATH=/usr/lib/llvm-20/lib
+              ;;
+            windows)
+              mozconfig=netwerk/naivefox/mozconfig-windows-x86_64
+              export MOZILLABUILD='C:\mozilla-build'
+              ;;
+            android)
+              mozconfig=netwerk/naivefox/mozconfig-android-aarch64
+              export HOST_CC=clang-20
+              export HOST_CXX=clang++-20
+              export LIBCLANG_PATH=/usr/lib/llvm-20/lib
+              ;;
+          esac
           # The product branch intentionally omits Firefox's Taskcluster
           # toolchain graph. Disable configure's source-checkout bootstrap
           # explicitly without enabling MOZ_AUTOMATION: that variable also
           # changes compiler and Rust policy, and is not appropriate here.
-          printf '\nac_add_options --disable-bootstrap\n' >> "${mozconfig}"
+          if [[ "${{ matrix.platform }}" != android ]]; then
+            printf '\nac_add_options --disable-bootstrap\n' >> "${mozconfig}"
+          fi
           runner_temp="${RUNNER_TEMP//\\//}"
           objdir="${runner_temp}/obj-naivefox-${{ matrix.platform }}"
           mkdir -p "${objdir}/package"
@@ -304,6 +336,20 @@ jobs:
           printf 'NaiveFox configure completed.\n'
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --objdir "${objdir}"
+
+      - name: Verify Android embedded package
+        if: matrix.platform == 'android'
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_temp="${RUNNER_TEMP//\\//}"
+          objdir="${runner_temp}/obj-naivefox-android"
+          package_dir="${objdir}/package/naivefox-android-aarch64"
+          ./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
+            "${package_dir}"
+          NAIVEFOX_OBJDIR="${objdir}" \
+            ./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
+              --package "${package_dir}" --check-only
 
       - name: Archive Linux package
         if: matrix.platform == 'linux'
@@ -340,6 +386,23 @@ jobs:
           )
           sha256sum "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip" \
             > "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip.sha256"
+
+      - name: Archive Android package
+        if: matrix.platform == 'android'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_dir="$PWD/release-assets"
+          runner_temp="${RUNNER_TEMP//\\//}"
+          package_parent="${runner_temp}/obj-naivefox-android/package"
+          mkdir -p "${release_dir}"
+          tar -C "${package_parent}" -cJf \
+            "${release_dir}/${RELEASE_TAG}-android-aarch64.tar.xz" \
+            naivefox-android-aarch64
+          sha256sum "${release_dir}/${RELEASE_TAG}-android-aarch64.tar.xz" \
+            > "${release_dir}/${RELEASE_TAG}-android-aarch64.tar.xz.sha256"
 
       - name: Upload platform archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -394,7 +457,7 @@ jobs:
           set -euo pipefail
           mapfile -t archives < <(find assets -maxdepth 1 -type f \
             \( -name '*.tar.xz' -o -name '*.zip' -o -name '*.sha256' \) -print | sort)
-          test "${#archives[@]}" -eq 4
+          test "${#archives[@]}" -eq 6
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
               --json isDraft --jq '.isDraft' >/tmp/release-is-draft 2>/dev/null; then
             test "$(cat /tmp/release-is-draft)" = true
