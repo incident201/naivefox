@@ -19,10 +19,10 @@
   },
   "configure_exit_status": 0,
   "counts": {
-    "directories": 11050,
-    "files": 10270
+    "directories": 11051,
+    "files": 10272
   },
-  "evidence_collector_sha256": "434ed6b7ead0ad69b93a82e45f69b32644c22643f3447d1e5710ad44f7140d1e",
+  "evidence_collector_sha256": "71d7a93b99c6bd1f8c2f8553300e4559d26f9e539d7f8202952ba282f4e57029",
   "files": [
     ".cargo/config.toml.in",
     ".ycm_extra_conf.py",
@@ -2858,12 +2858,14 @@
     "netwerk/naivefox/TunnelSession.cpp",
     "netwerk/naivefox/UnknownProtocolHandler.cpp",
     "netwerk/naivefox/UnknownProtocolHandler.h",
+    "netwerk/naivefox/VERSION",
     "netwerk/naivefox/app.mozbuild",
     "netwerk/naivefox/codec/NaivePadding.cpp",
     "netwerk/naivefox/codec/moz.build",
     "netwerk/naivefox/confvars.sh",
     "netwerk/naivefox/core/NaiveFoxComponents.cpp",
     "netwerk/naivefox/core/ProfilerNaiveFoxStub.cpp",
+    "netwerk/naivefox/core/generate_version_source.py",
     "netwerk/naivefox/core/moz.build",
     "netwerk/naivefox/glean/bindings/MetricTypes.h",
     "netwerk/naivefox/idl/moz.build",
@@ -10298,7 +10300,7 @@
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826",
-  "naivefox_reference_commit": "a7a40629a1624b6b28c4ba5f33c14ba3eece0d1b",
+  "naivefox_reference_commit": "23a95303ce7c289bb2fea9dfc25377c3b08415a7",
   "observed_directories": [
     "browser",
     "build",
@@ -19992,6 +19994,7 @@
     "netwerk/dns",
     "netwerk/ipc",
     "netwerk/mime",
+    "netwerk/naivefox",
     "netwerk/protocol/about",
     "netwerk/protocol/data",
     "netwerk/protocol/file",
@@ -21351,15 +21354,15 @@
     "xpcom/rust/gkrust_utils",
     "xpcom/threads"
   ],
-  "provenance_sha256": "be679ab13bb39939bd5802769084a0c47d4e4b181f114e4858fe5119189311dd",
+  "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "a7a40629a1624b6b28c4ba5f33c14ba3eece0d1b",
+  "source_commit": "23a95303ce7c289bb2fea9dfc25377c3b08415a7",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "linux-x86_64",
   "target_triple": "x86_64-pc-linux-gnu",
-  "trace_sha256": "da72d121bedd8eba7e64ed3b90581eaa5acc83ff002a1c65835a91951435a262",
-  "trace_size_bytes": 33674260
+  "trace_sha256": "75461dc0013e24b0758d9cff1399a40141fcd00516872adce07b38747ff21bc0",
+  "trace_size_bytes": 34149413
 }
