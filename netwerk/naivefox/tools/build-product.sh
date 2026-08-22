@@ -202,6 +202,10 @@ fi
 
 if ! $dry_run; then
   "$repo_root/mach" build "-j$jobs"
+  # Keep the entry point self-contained.  CI creates this parent directory
+  # before invoking us, but a clean checkout (and downstream callers) should
+  # not need to know that staging expects an existing parent.
+  mkdir -p -- "$(dirname -- "$package_dir")"
   bash "$script_dir/$stage_script" "$package_dir"
   printf 'NAIVEFOX_PACKAGE=%s\n' "$package_dir"
 else

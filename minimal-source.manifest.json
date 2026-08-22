@@ -3,8 +3,8 @@
     "executable_files": 149,
     "files": 22744
   },
-  "evidence_commit": "334aa68e8da65503f3c2d76e9ae16c2fb80df4a2",
-  "evidence_source_commit": "47de75de9ded09af81347e513c6d343dc2a75e3e",
+  "evidence_commit": "67b096e916afbc19e7216029da743aec8c9e0441",
+  "evidence_source_commit": "a87b136e9f309f316bc8a7d9048cc261368bd04c",
   "files": [
     {
       "mode": "0644",
@@ -23383,6 +23383,11 @@
     },
     {
       "mode": "0644",
+      "path": "netwerk/naivefox/NAIVEFOX_VERSION",
+      "sha256": "90325c8f60537581cade7378c9dd5776f7fc918641cbc2929b4a60094ed07751"
+    },
+    {
+      "mode": "0644",
       "path": "netwerk/naivefox/NaiveFox.cpp",
       "sha256": "d860183b76fe47411177e8563997360bc344bd93a4b7ec990365eaa8e7e8a91a"
     },
@@ -23533,11 +23538,6 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/VERSION",
-      "sha256": "90325c8f60537581cade7378c9dd5776f7fc918641cbc2929b4a60094ed07751"
-    },
-    {
-      "mode": "0644",
       "path": "netwerk/naivefox/app.mozbuild",
       "sha256": "e1e20598676b2ad2c6275bdb322184091daf8c72c0b5e52d819ccf65a62a8482"
     },
@@ -23589,7 +23589,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/core/moz.build",
-      "sha256": "c891d95840a45e4f9507b61fc0b4c20e4b2c987999cc0148766f82893d71c18e"
+      "sha256": "54678d465958d62eaceb35c032ae5a16972621ebd72b47aeed04aa3ab9a95242"
     },
     {
       "mode": "0644",
@@ -23904,12 +23904,12 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/android-runtime-package.py",
-      "sha256": "dd9e4648f93bbe76f4da7ac7a7a260c74701c176d3539bff90058ed93e6cb0e2"
+      "sha256": "a73ba8d432c4b9a6ffc4a773c47578853a41a9694d59aedfed16ca61ba9ac55c"
     },
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/build-product.sh",
-      "sha256": "9a26ed80eab1d030b770d3f2f5989b7b3ea57e76c3b628dbcd13c4f6460cb9b7"
+      "sha256": "f13c2527fe210eb97a3eaf338a4567234504585c778f3131e55cbe56d0370f71"
     },
     {
       "mode": "0755",
@@ -113728,8 +113728,8 @@
     }
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "9e8700333e9b27424883b169634f143eaf340951d19db1f11787daee420aadbb",
+  "manifest_sha256": "b4ec42caaa7597123e2ce29de45f4f6c299728e6c0642f88c1123da750df139f",
   "manifest_version": 2,
-  "minimal_export_commit": "334aa68e8da65503f3c2d76e9ae16c2fb80df4a2",
-  "naivefox_reference_commit": "47de75de9ded09af81347e513c6d343dc2a75e3e"
+  "minimal_export_commit": "67b096e916afbc19e7216029da743aec8c9e0441",
+  "naivefox_reference_commit": "a87b136e9f309f316bc8a7d9048cc261368bd04c"
 }
