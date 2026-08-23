@@ -1165,11 +1165,8 @@ struct sRGBColor {
            uint32_t(r * 255.0f) << 16 | uint32_t(a * 255.0f) << 24;
   }
 
-  bool operator==(const sRGBColor& aColor) const {
-    return r == aColor.r && g == aColor.g && b == aColor.b && a == aColor.a;
-  }
-
-  bool operator!=(const sRGBColor& aColor) const { return !(*this == aColor); }
+  bool operator==(const sRGBColor& aColor) const = default;
+  bool operator!=(const sRGBColor& aColor) const = default;
 
   Float r, g, b, a;
 };
@@ -1235,13 +1232,8 @@ struct DeviceColor {
            uint32_t(r * 255.0f) << 16 | uint32_t(a * 255.0f) << 24;
   }
 
-  bool operator==(const DeviceColor& aColor) const {
-    return r == aColor.r && g == aColor.g && b == aColor.b && a == aColor.a;
-  }
-
-  bool operator!=(const DeviceColor& aColor) const {
-    return !(*this == aColor);
-  }
+  bool operator==(const DeviceColor& aColor) const = default;
+  bool operator!=(const DeviceColor& aColor) const = default;
 
   friend std::ostream& operator<<(std::ostream& aOut,
                                   const DeviceColor& aColor);

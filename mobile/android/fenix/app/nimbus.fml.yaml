@@ -755,6 +755,16 @@ features:
           pref: "privacy.trackingprotection.defer_annotation.enabled"
           branch: "default"
 
+  webcompat-interventions:
+    description: "Experimental controls for webcompat site interventions"
+    variables:
+      disabled-intervention-2060611:
+        description: If `true`, disables the webcompat intervention tracked by bug 2060611 (background media playback). Unset or false leaves the intervention enabled.
+        type: Option<Boolean>
+        gecko-pref:
+          pref: "extensions.webcompat.disabled_interventions.2060611"
+          branch: "default"
+
   pki:
     description: Certificate verification configuration
     variables:
@@ -1054,7 +1064,7 @@ features:
         description: Country codes whose users are eligible for IP Protection.
         type: List<String>
         default: [ "AU", "AT", "BE", "BG", "CA", "CL", "CO", "DK", "FI", "FR", "DE", "IE", "IT", "JP", "MY", "MX",
-                   "NL", "NZ", "NO", "PL", "PT", "SG", "ZA", "ES", "SE", "CH", "TH", "GB", "US" ]
+                   "NL", "NZ", "NO", "PL", "PT", "RO", "SG", "ZA", "ES", "SE", "CH", "TH", "GB", "US" ]
       promo-deadline:
         description: The final date for the promotion to end. This needs to be an ISO 8601 formatted date (i.e. YYYY-MM-DD).
         type: String

@@ -11,6 +11,7 @@
 #include "mozilla/dom/ImageUtils.h"
 
 using mozilla::ConvertToI420;
+using mozilla::ConvertToRGBA;
 using mozilla::MakeAndAddRef;
 using mozilla::MakeRefPtr;
 using mozilla::Maybe;
@@ -141,6 +142,37 @@ static already_AddRefed<SourceSurfaceImage> CreateRedSurfaceImage2x2(
   }
 
   return MakeAndAddRef<SourceSurfaceImage>(size, surface);
+}
+
+static already_AddRefed<SourceSurfaceImage> CreateSurfaceImage(
+    const IntSize& aSurfaceSize, const IntSize& aImageSize) {
+  auto surface = MakeRefPtr<SourceSurfaceAlignedRawData>();
+  if (NS_WARN_IF(!surface->Init(aSurfaceSize, SurfaceFormat::R8G8B8A8,
+                                /* aClearMem */ true, 0, 0))) {
+    return nullptr;
+  }
+  return MakeAndAddRef<SourceSurfaceImage>(aImageSize, surface);
+}
+
+TEST(MediaImageConversion, ConvertToRGBASourceSurfaceExtent)
+{
+  // RGBA destination sized for the whole image, zero-initialized.
+  constexpr IntSize imageSize(2, 2);
+  constexpr int destStride = imageSize.width * 4;
+  uint8_t dest[imageSize.width * imageSize.height * 4] = {};
+
+  // Source surface matches the image size: the conversion succeeds.
+  RefPtr<SourceSurfaceImage> matched = CreateSurfaceImage(imageSize, imageSize);
+  ASSERT_TRUE(!!matched);
+  EXPECT_TRUE(NS_SUCCEEDED(
+      ConvertToRGBA(matched, SurfaceFormat::R8G8B8A8, dest, destStride)));
+
+  // Source surface smaller than the image size: the conversion is refused.
+  RefPtr<SourceSurfaceImage> undersized =
+      CreateSurfaceImage(IntSize(2, 1), imageSize);
+  ASSERT_TRUE(!!undersized);
+  EXPECT_TRUE(NS_FAILED(
+      ConvertToRGBA(undersized, SurfaceFormat::R8G8B8A8, dest, destStride)));
 }
 
 TEST(MediaImageConversion, ConvertToI420)

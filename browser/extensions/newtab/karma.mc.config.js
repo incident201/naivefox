@@ -135,6 +135,16 @@ module.exports = function (config) {
                 branches: 0,
               },
             /**
+             * CardCarousel.jsx is tested via Jest (see test/jest/content-src/components/DiscoveryStreamComponents/CardCarousel.test.jsx).
+             */
+            "content-src/components/DiscoveryStreamComponents/CardCarousel/CardCarousel.jsx":
+              {
+                statements: 0,
+                lines: 0,
+                functions: 0,
+                branches: 0,
+              },
+            /**
              * ErrorBoundary.jsx is tested via Jest (see test/jest/content-src/components/ErrorBoundary.test.jsx).
              */
             "content-src/components/ErrorBoundary/ErrorBoundary.jsx": {
@@ -592,6 +602,14 @@ module.exports = function (config) {
             },
             // Coverage for this component lives in Jest (test/jest/content-src/components/Widgets/PictureOfTheDay.test.jsx)
             "content-src/components/Widgets/PictureOfTheDay/PictureOfTheDay.jsx":
+              {
+                statements: 0,
+                lines: 0,
+                functions: 0,
+                branches: 0,
+              },
+            // Coverage for this component lives in Jest (test/jest/content-src/components/Widgets/RecentSearches.test.jsx)
+            "content-src/components/Widgets/RecentSearches/RecentSearches.jsx":
               {
                 statements: 0,
                 lines: 0,

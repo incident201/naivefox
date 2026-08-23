@@ -52,7 +52,8 @@ class Settings final
   static void ToggleNativeAccessibility(bool aEnable) {
     if (aEnable) {
       GetOrCreateAccService();
-    } else {
+    } else if (PlatformDisabledState() != ePlatformIsForceEnabled) {
+      // Accessibility isn't force enabled, so shut it down.
       MaybeShutdownAccService(nsAccessibilityService::ePlatformAPI);
     }
   }

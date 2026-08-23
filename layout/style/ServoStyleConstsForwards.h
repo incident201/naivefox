@@ -71,6 +71,7 @@ class FontPaletteValueSet;
 }  // namespace mozilla
 using gfxFontVariation = mozilla::gfx::FontVariation;
 using gfxFontFeature = mozilla::gfx::FontFeature;
+struct gfxFontVariationAxis;
 
 enum nsCSSUnit : uint32_t;
 enum nsChangeHint : uint32_t;

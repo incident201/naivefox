@@ -12,7 +12,7 @@ transforms:
     - gecko_taskgraph.transforms.task
 
 kind-dependencies:
-    - toolchain
+    - fetch
 
 task-defaults:
     run-on-repo-type: [hg]
@@ -40,3 +40,6 @@ tasks:
             sparse-profile: upload-symbols
         scopes:
             - secrets:get:project/releng/gecko/build/level-{level}/gecko-symbol-upload
+        fetches:
+            fetch:
+                - upload-symbols-linux64

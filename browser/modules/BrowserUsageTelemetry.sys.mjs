@@ -1411,6 +1411,7 @@ export let BrowserUsageTelemetry = {
     if (userContextId) {
       Glean.containers.containerTabOpened.record({
         container_id: String(userContextId),
+        source: event.detail?.containerSource ?? "unknown",
       });
     }
 

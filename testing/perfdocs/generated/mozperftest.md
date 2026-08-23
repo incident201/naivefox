@@ -674,7 +674,7 @@ browser_ml_autofill_perf.js
  --manifest-flavor browser-chrome
  --try-platform linux, mac, win
 
-**Latency for the ML Autofill model (legacy single-model and new two-engine)**
+**Latency for the ML Autofill model (default single-model and opt-in two-engine)**
 
 browser_ml_engine_multi_perf.js
 ===============================

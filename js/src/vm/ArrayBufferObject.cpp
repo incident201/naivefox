@@ -1921,10 +1921,19 @@ void ArrayBufferObject::releaseData(JS::GCContext* gcx) {
   }
 }
 
+void ArrayBufferObject::initDataPointer(BufferContents contents) {
+  initFixedSlotTyped(DATA_SLOT, PrivateValue(contents.data()));
+  initFlags((flags() & ~KIND_MASK) | contents.kind());
+  setFreeInfo(contents);
+}
+
 void ArrayBufferObject::setDataPointer(BufferContents contents) {
   setFixedSlotTyped(DATA_SLOT, PrivateValue(contents.data()));
   setFlags((flags() & ~KIND_MASK) | contents.kind());
+  setFreeInfo(contents);
+}
 
+void ArrayBufferObject::setFreeInfo(BufferContents contents) {
   if (isExternal()) {
     auto info = freeInfo();
     info->freeFunc = contents.freeFunc();
@@ -1944,6 +1953,11 @@ inline size_t ArrayBufferObject::associatedBytes() const {
     return RoundUp(byteLength(), js::gc::SystemPageSize());
   }
   MOZ_CRASH("Unexpected buffer kind");
+}
+
+void ArrayBufferObject::initByteLength(size_t length) {
+  MOZ_ASSERT(length <= ArrayBufferObject::ByteLengthLimit);
+  initFixedSlotTyped(BYTE_LENGTH_SLOT, PrivateValue(length));
 }
 
 void ArrayBufferObject::setByteLength(size_t length) {
@@ -2179,6 +2193,10 @@ void ArrayBufferObject::wasmDiscard(Handle<ArrayBufferObject*> buf,
 
 uint32_t ArrayBufferObject::flags() const {
   return uint32_t(getFixedSlotTyped(FLAGS_SLOT).toInt32());
+}
+
+void ArrayBufferObject::initFlags(uint32_t flags) {
+  initFixedSlotTyped(FLAGS_SLOT, Int32Value(flags));
 }
 
 void ArrayBufferObject::setFlags(uint32_t flags) {
@@ -3255,6 +3273,10 @@ JSObject* ArrayBufferObject::firstView() {
   return getFixedSlotTyped(FIRST_VIEW_SLOT).isObject()
              ? &getFixedSlotTyped(FIRST_VIEW_SLOT).toObject()
              : nullptr;
+}
+
+void ArrayBufferObject::initFirstView() {
+  initFixedSlotTyped(FIRST_VIEW_SLOT, NullValue());
 }
 
 void ArrayBufferObject::setFirstView(ArrayBufferViewObject* view) {

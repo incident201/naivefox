@@ -1036,7 +1036,6 @@ dependencies = [
  "prefs_parser",
  "qwac-trust-anchors",
  "signature_cache",
- "ssl_tokens_cache",
  "static_prefs",
  "storage",
  "trust-anchors",
@@ -2578,20 +2577,6 @@ checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
  "windows-sys",
-]
-
-[[package]]
-name = "ssl_tokens_cache"
-version = "0.1.0"
-dependencies = [
- "adler2",
- "bincode",
- "log",
- "nsstring",
- "serde",
- "static_assertions",
- "tempfile",
- "thin-vec",
 ]
 
 [[package]]

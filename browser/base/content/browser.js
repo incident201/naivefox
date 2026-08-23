@@ -1536,6 +1536,7 @@ function CreateContainerTabMenu(event) {
   createUserContextMenu(event, {
     useAccessKeys: false,
     showDefaultTab: true,
+    containerSource: "new_tab_button",
   });
 }
 
@@ -1704,11 +1705,7 @@ function toOpenWindowByType(inType, uri, features) {
   } else if (features) {
     window.open(uri, "_blank", features);
   } else {
-    window.open(
-      uri,
-      "_blank",
-      "chrome,extrachrome,menubar,resizable,scrollbars,status,toolbar"
-    );
+    window.open(uri, "_blank", "chrome,resizable,toolbar");
   }
 }
 /**
@@ -1918,6 +1915,9 @@ let gFileMenu = {
 function openNewUserContextTab(event) {
   openTrustedLinkIn(BROWSER_NEW_TAB_URL, "tab", {
     userContextId: parseInt(event.target.getAttribute("data-usercontextid")),
+    eventDetail: {
+      containerSource: event.target.dataset.containerEntrypoint,
+    },
   });
 }
 

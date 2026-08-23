@@ -660,7 +660,6 @@ AbortReasonOr<WarpScriptSnapshot*> WarpScriptOracle::createScriptSnapshot() {
       case JSOp::MoreIter:
       case JSOp::EndIter:
       case JSOp::IsNoIter:
-      case JSOp::IsGenClosing:
       case JSOp::IsNullOrUndefined:
       case JSOp::DelProp:
       case JSOp::StrictDelProp:
@@ -677,7 +676,6 @@ AbortReasonOr<WarpScriptSnapshot*> WarpScriptOracle::createScriptSnapshot() {
       case JSOp::FinalYieldRval:
       case JSOp::AsyncResolve:
       case JSOp::AsyncReject:
-      case JSOp::CheckResumeKind:
       case JSOp::CanSkipAwait:
       case JSOp::MaybeExtractAwaitValue:
       case JSOp::AsyncAwait:

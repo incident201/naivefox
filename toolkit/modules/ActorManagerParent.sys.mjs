@@ -696,6 +696,16 @@ if (!Services.prefs.getBoolPref("browser.pagedata.enabled", false)) {
 }
 
 if (AppConstants.platform != "android") {
+  // The stream converter sends this actor's message from the scriptless
+  // object/embed fallback page; no child module is needed.
+  JSWINDOWACTORS.PdfEmbedFallback = {
+    parent: {
+      esModuleURI: "resource://pdf.js/PdfEmbedFallbackParent.sys.mjs",
+    },
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  };
+
   // Note that GeckoView has another implementation in mobile/android/actors.
   JSWINDOWACTORS.Select = {
     parent: {

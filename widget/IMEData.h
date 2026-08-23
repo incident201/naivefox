@@ -377,13 +377,8 @@ struct NativeIMEContext final {
   }
   void InitWithRawNativeIMEContext(void* aRawNativeIMEContext);
 
-  bool operator==(const NativeIMEContext& aOther) const {
-    return mRawNativeIMEContext == aOther.mRawNativeIMEContext &&
-           mOriginProcessID == aOther.mOriginProcessID;
-  }
-  bool operator!=(const NativeIMEContext& aOther) const {
-    return !(*this == aOther);
-  }
+  bool operator==(const NativeIMEContext& aOther) const = default;
+  bool operator!=(const NativeIMEContext& aOther) const = default;
 
   friend auto format_as(const NativeIMEContext& aContext) {
     return fmt::format("{{ mRawNativeIMEContext={}, mOriginProcessID={} }}",

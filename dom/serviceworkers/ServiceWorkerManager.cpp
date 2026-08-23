@@ -26,6 +26,7 @@
 #include "mozilla/AppShutdown.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/Components.h"
 #include "mozilla/ContentBlockingAllowList.h"
 #include "mozilla/ErrorNames.h"
 #include "mozilla/LoadContext.h"
@@ -276,7 +277,7 @@ NS_IMPL_ISUPPORTS(PBMUnregisterBarrier, nsIServiceWorkerUnregisterCallback)
 already_AddRefed<nsIAsyncShutdownClient> GetAsyncShutdownBarrier() {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsIAsyncShutdownService> svc = services::GetAsyncShutdownService();
+  nsCOMPtr<nsIAsyncShutdownService> svc = components::AsyncShutdown::Service();
   MOZ_ASSERT(svc);
 
   nsCOMPtr<nsIAsyncShutdownClient> barrier;

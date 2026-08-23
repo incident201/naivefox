@@ -216,9 +216,7 @@ static bool ShouldBailoutForDebugger(JSContext* cx,
 
 static void OnLeaveIonFrame(JSContext* cx, const InlineFrameIterator& frame,
                             ResumeFromException* rfe) {
-  bool returnFromThisFrame =
-      cx->isPropagatingForcedReturn() || cx->isClosingGenerator();
-  if (!returnFromThisFrame) {
+  if (!cx->isPropagatingForcedReturn()) {
     return;
   }
 
@@ -235,11 +233,7 @@ static void OnLeaveIonFrame(JSContext* cx, const InlineFrameIterator& frame,
 
   MOZ_ASSERT(!frame.more());
 
-  if (cx->isClosingGenerator()) {
-    HandleClosingGeneratorReturn(cx, rematFrame, /*frameOk=*/true);
-  } else {
-    cx->clearPropagatingForcedReturn();
-  }
+  cx->clearPropagatingForcedReturn();
 
   Value& rval = rematFrame->returnValue();
   MOZ_RELEASE_ASSERT(!rval.isMagic());
@@ -272,7 +266,6 @@ static void HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame,
   // try/catch blocks, but OOM is implementation-defined so that's acceptable.
   if (frame.frame().jsFrame()->isResumingGenerator()) {
     MOZ_ASSERT(!frame.more(), "the resume path has no calls to inline");
-    MOZ_ASSERT(!cx->isClosingGenerator());
     return;
   }
 
@@ -310,11 +303,6 @@ static void HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame,
         break;
 
       case TryNoteKind::Catch:
-        // If we're closing a generator, we have to skip catch blocks.
-        if (cx->isClosingGenerator()) {
-          break;
-        }
-
         if (cx->isExceptionPending()) {
           // Ion can compile try-catch, but bailing out to catch
           // exceptions is slow. Reset the warm-up counter so that if we
@@ -507,11 +495,6 @@ static bool ProcessTryNotesBaseline(JSContext* cx, const JSJitFrameIter& frame,
     MOZ_ASSERT(cx->isExceptionPending());
     switch (tn->kind()) {
       case TryNoteKind::Catch: {
-        // If we're closing a generator, we have to skip catch blocks.
-        if (cx->isClosingGenerator()) {
-          break;
-        }
-
         SettleOnTryNote(cx, tn, frame, ei, rfe, pc);
 
         // Ion can compile try-catch, but bailing out to catch
@@ -662,16 +645,14 @@ static void HandleExceptionBaseline(JSContext* cx, JSJitFrameIter& frame,
 
 again:
   if (cx->isExceptionPending()) {
-    if (!cx->isClosingGenerator()) {
-      if (!DebugAPI::onExceptionUnwind(cx, frame.baselineFrame())) {
-        if (!cx->isExceptionPending()) {
-          goto again;
-        }
+    if (!DebugAPI::onExceptionUnwind(cx, frame.baselineFrame())) {
+      if (!cx->isExceptionPending()) {
+        goto again;
       }
-      // Ensure that the debugger hasn't returned 'true' while clearing the
-      // exception state.
-      MOZ_ASSERT(cx->isExceptionPending());
     }
+    // Ensure that the debugger hasn't returned 'true' while clearing the
+    // exception state.
+    MOZ_ASSERT(cx->isExceptionPending());
 
     if (hasTryNotes) {
       EnvironmentIter ei(cx, frame.baselineFrame(), pc);
@@ -685,8 +666,6 @@ again:
         return;
       }
     }
-
-    frameOk = HandleClosingGeneratorReturn(cx, frame.baselineFrame(), frameOk);
   } else {
     if (hasTryNotes) {
       CloseLiveIteratorsBaselineForUncatchableException(cx, frame, pc);

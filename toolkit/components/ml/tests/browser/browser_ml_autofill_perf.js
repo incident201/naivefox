@@ -4,10 +4,15 @@ http://creativecommons.org/publicdomain/zero/1.0/ */
 
 // Latency test for the ML Autofill model.
 //
-// Two field classifiers are exercised:
-//   1. LEGACY: the single-model `text-classification` classifier
+// Both field classifiers are exercised unconditionally, so the two are tracked
+// side by side in perfherder while the two-engine one is being evaluated. Which
+// one production actually uses is decided at runtime by
+// `extensions.formautofill.useml.twoHead`, but this test drives the engines
+// directly and so does not read that pref.
+//
+//   1. DEFAULT: the single-model `text-classification` classifier
 //      (Mozilla/tinybert-address-autofill) -- `test_ml_generic_pipeline`.
-//   2. NEW ("Approach 3"): a triple-encoder deployed as TWO engines
+//   2. OPT-IN (two-head): a triple-encoder deployed as TWO engines
 //      (see toolkit/components/formautofill/shared/FormAutofillML.sys.mjs) --
 //      `test_ml_autofill_two_engine_pipeline`:
 //        - ENCODER: a stock `feature-extraction` model that turns each field's
@@ -39,8 +44,8 @@ const FIELD_TOKENS = [
 ];
 const NUM_FIELDS = FIELD_TOKENS.length;
 
-// NEW model (encoder): the unique section strings the encoder embeds once per
-// form -- each field's own tokens plus the empty boundary section. Neighbor
+// Two-head model (encoder): the unique section strings the encoder embeds once
+// per form -- each field's own tokens plus the empty boundary section. Neighbor
 // sections are other fields' own tokens, already present in this set.
 const ENCODER_INPUTS = [...FIELD_TOKENS, ""];
 
@@ -54,12 +59,12 @@ function prefixTokens(tokens, prefix) {
     .join(" ");
 }
 
-// LEGACY model input: one combined string PER FIELD -- own tokens + the previous
+// Single-model input: one combined string PER FIELD -- own tokens + the previous
 // field's tokens ("bb"-prefixed) + the next field's tokens ("aa"-prefixed) --
 // exactly the `mlData` the single text-classification model receives in
 // production. The whole form is classified in ONE batched engine.run, matching
-// the old FormAutofillML.detectFields (`args: [inputData]`).
-const LEGACY_INPUTS = FIELD_TOKENS.map((own, i) => {
+// FormAutofillML's default path (`args: [inputData]`).
+const SINGLE_MODEL_INPUTS = FIELD_TOKENS.map((own, i) => {
   const parts = [own];
   if (i > 0) {
     parts.push(prefixTokens(FIELD_TOKENS[i - 1], "bb"));
@@ -132,12 +137,12 @@ const perfMetadata = {
   owner: "GenAI Team",
   name: "browser_ml_autofill_perf.js",
   description:
-    "Latency for the ML Autofill model (legacy single-model and new two-engine)",
+    "Latency for the ML Autofill model (default single-model and opt-in two-engine)",
   options: {
     default: {
       perfherder: true,
       perfherder_metrics: [
-        // Legacy single text-classification model (test_ml_generic_pipeline).
+        // Default single text-classification model (test_ml_generic_pipeline).
         {
           name: "AUTOFILL-pipeline-ready-latency",
           unit: "ms",
@@ -170,9 +175,9 @@ const perfMetadata = {
           shouldAlert: false,
           lowerIsBetter: false,
         },
-        // New two-engine (encoder + head) architecture
+        // Opt-in two-engine (encoder + head) architecture
         // (test_ml_autofill_two_engine_pipeline). Uppercase "AUTOFILL-" prefix
-        // to match the legacy metrics above.
+        // to match the single-model metrics above.
         // NOTE: these must be string LITERALS -- the mozperftest static parser
         // (mozperftest/script.py) reads this object and rejects identifiers /
         // expressions. Keep them in sync with the *_METRIC constants and the
@@ -236,12 +241,12 @@ const perfMetadata = {
 requestLongerTimeout(10);
 
 /**
- * LEGACY: single-model text-classification autofill classifier.
+ * DEFAULT: single-model text-classification autofill classifier.
  *
  * Classifies the WHOLE form in one batched run (one string per field, each
- * carrying its own tokens plus the aa/bb neighbor context), exactly as the old
- * FormAutofillML.detectFields did -- so `AUTOFILL-model-run-latency` is a
- * per-form cost directly comparable to the new pipeline's
+ * carrying its own tokens plus the aa/bb neighbor context), exactly as
+ * FormAutofillML's default path does -- so `AUTOFILL-model-run-latency` is a
+ * per-form cost directly comparable to the two-engine pipeline's
  * `AUTOFILL-two-engine-e2e-run-latency`.
  */
 add_task(async function test_ml_generic_pipeline() {
@@ -258,7 +263,7 @@ add_task(async function test_ml_generic_pipeline() {
   });
 
   const request = {
-    args: [LEGACY_INPUTS],
+    args: [SINGLE_MODEL_INPUTS],
     options: { pooling: "mean", normalize: true },
   };
 
@@ -284,7 +289,7 @@ async function runEngineWithMetrics(engine, engineConfig, iterations, tag) {
 }
 
 /**
- * NEW: two-engine (encoder + head) ML Autofill pipeline -- per-engine latency
+ * OPT-IN: two-engine (encoder + head) ML Autofill pipeline -- per-engine latency
  * plus the end-to-end per-form cost (encode -> head).
  */
 add_task(async function test_ml_autofill_two_engine_pipeline() {

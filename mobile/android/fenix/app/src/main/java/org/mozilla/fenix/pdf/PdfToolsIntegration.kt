@@ -45,7 +45,7 @@ class PdfToolsIntegration(
             return
         }
 
-        pdfTools =
+        val view =
             ComposeView(container.context).apply {
                 // The tools are positioned by their behavior, which insets them from the browser chrome.
                 layoutParams =
@@ -57,8 +57,14 @@ class PdfToolsIntegration(
 
                 setContent { PdfToolsHost() }
             }
+        pdfTools = view
 
-        container.addView(pdfTools)
+        // Add once the container has attached, since the chrome removes a sibling during that pass (Bug 2065098).
+        container.post {
+            if (pdfTools === view) {
+                container.addView(view)
+            }
+        }
     }
 
     override fun stop() {

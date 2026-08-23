@@ -1217,20 +1217,27 @@
   background-color: var(--urlbarview-action-button-background-color);
   margin-inline-end: var(--space-large);
 
+  &[aria-disabled="true"] {
+    color: var(--text-color-disabled);
+    opacity: var(--button-opacity-disabled);
+  }
+
+  &:not([aria-disabled="true"]) {
+    &:hover {
+      background-color: var(--urlbarview-action-button-background-color-hover);
+    }
+
+    &[selected],
+    &:hover:active {
+      outline: var(--focus-outline);
+    }
+  }
+
   > img {
-    width: 16px;
-    height: 16px;
+    width: var(--icon-size-small);
+    height: var(--icon-size-small);
     margin-inline-end: 0.4em;
     -moz-context-properties: fill, fill-opacity;
-  }
-
-  &:hover {
-    background-color: var(--urlbarview-action-button-background-color-hover);
-  }
-
-  &[selected],
-  &:hover:active {
-    outline: var(--focus-outline);
   }
 
   &.urlbarView-userContext {

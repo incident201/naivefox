@@ -335,7 +335,7 @@
           this.documentGlobal === tab.documentGlobal
             ? tab
             : gBrowser.adoptTab(tab, {
-                tabIndex: gBrowser.tabs.at(-1)._tPos + 1,
+                tabIndex: gBrowser.tabs.at(-1).index + 1,
                 selectTab: tab.selected,
               });
         if (indexOfReplacedTab > -1 && indexOfReplacedTab < this.#tabs.length) {

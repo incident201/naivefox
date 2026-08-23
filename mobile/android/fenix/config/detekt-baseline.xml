@@ -347,7 +347,6 @@
     <ID>HardcodedPaddingUsage:TabTools.kt$(start = 16.dp)</ID>
     <ID>HardcodedPaddingUsage:TermsOfUseBottomSheet.kt$(start = 36.dp, end = 36.dp, bottom = 32.dp)</ID>
     <ID>HardcodedPaddingUsage:TopSites.kt$(horizontal = 4.dp)</ID>
-    <ID>HardcodedPaddingUsage:TopSites.kt$(top = 8.dp)</ID>
     <ID>HardcodedPaddingUsage:TrackerCategoryDetailsPanel.kt$(horizontal = 16.dp)</ID>
     <ID>HardcodedPaddingUsage:TrackersBlockedCard.kt$(horizontal = 16.dp, vertical = 8.dp)</ID>
     <ID>HardcodedPaddingUsage:TrackersBlockedPanel.kt$(horizontal = 12.dp)</ID>

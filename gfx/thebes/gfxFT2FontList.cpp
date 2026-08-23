@@ -610,7 +610,7 @@ gfxFontEntry::FontTableCache* FT2FontEntry::GetFontTableCache(bool aCreate) {
   return mFontTableCache;
 }
 
-bool FT2FontEntry::HasVariations() {
+bool FT2FontEntry::HasVariationsInternal() {
   switch (mHasVariations) {
     case HasVariationsState::No:
       return false;
@@ -630,7 +630,8 @@ bool FT2FontEntry::HasVariations() {
   return hasVariations;
 }
 
-void FT2FontEntry::GetVariationAxes(nsTArray<gfxFontVariationAxis>& aAxes) {
+void FT2FontEntry::GetVariationAxesInternal(
+    nsTArray<gfxFontVariationAxis>& aAxes) {
   if (!HasVariations()) {
     return;
   }
@@ -639,7 +640,7 @@ void FT2FontEntry::GetVariationAxes(nsTArray<gfxFontVariationAxis>& aAxes) {
   }
 }
 
-void FT2FontEntry::GetVariationInstances(
+void FT2FontEntry::GetVariationInstancesInternal(
     nsTArray<gfxFontVariationInstance>& aInstances) {
   if (!HasVariations()) {
     return;

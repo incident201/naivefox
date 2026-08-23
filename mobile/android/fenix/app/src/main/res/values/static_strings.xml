@@ -105,8 +105,6 @@
     <string name="preferences_debug_settings_universal_edge_to_edge_wallpapers" translatable="false">Enable universal edge-to-edge wallpapers</string>
     <!-- Label for hiding the Collections UI -->
     <string name="preferences_debug_settings_hide_collections_ui" translatable="false">Hide Collections UI</string>
-    <!-- Label for enabling top sites pager layout -->
-    <string name="preferences_debug_settings_top_sites_pager" translatable="false">Enable Top Sites Pager</string>
     <!-- Label for enabling Add Shortcuts improvement -->
     <string name="preferences_debug_settings_add_shortcuts_improvement" translatable="false">Enable Add Shortcuts Improvement</string>
     <!-- Label for showing more shortcuts -->

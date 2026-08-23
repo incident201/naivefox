@@ -22,6 +22,7 @@ import mozilla.components.feature.summarize.ViewAppeared
 import mozilla.components.feature.summarize.ViewDismissed
 import mozilla.components.feature.summarize.content.Content
 import mozilla.components.feature.summarize.content.PageMetadata
+import mozilla.components.feature.summarize.content.PaywalledContentException
 import mozilla.components.lib.llm.mlpa.service.RateLimited
 import mozilla.components.lib.state.Store
 import mozilla.components.support.test.robolectric.testContext
@@ -137,6 +138,30 @@ class SummarizationTelemetryMiddlewareTest {
         assertNull(extras["error_type"])
         assertNull(extras["error_code"])
         assertNotNull(extras["summarize_duration_ms"])
+    }
+
+    @Test
+    fun `WHEN SummarizationFailed with a paywalled page THEN error_type identifies the paywall and no content metrics are recorded`() {
+        assertNull(AiSummarize.completed.testGetValue())
+
+        // A gated page never reaches ContentExtracted, so the session carries no content metrics.
+        every { store.state } returns SummarizationState.Inert(initializedWithShake = false)
+        invokeMiddleware(ViewAppeared)
+        invokeMiddleware(
+            SummarizationRequested(LlmProvider.Info(nameRes = 42, modelId = LlmProvider.ModelID(TEST_MODEL)))
+        )
+        invokeMiddleware(SummarizationFailed(PaywalledContentException()))
+
+        val snapshot = AiSummarize.completed.testGetValue()!!
+        assertEquals(1, snapshot.size)
+
+        val extras = snapshot.first().extra!!
+        assertEquals("false", extras["success"])
+        assertEquals(TEST_MODEL, extras["model"])
+        assertEquals("PaywalledContentException", extras["error_type"])
+        assertEquals("9999", extras["error_code"])
+        assertNull(extras["content_type"])
+        assertNull(extras["length_words"])
     }
 
     @Test

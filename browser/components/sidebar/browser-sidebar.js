@@ -711,8 +711,8 @@ var SidebarController = {
     if (this.isLauncherDragging) {
       this._state.launcherDragActive = true;
     }
-    if (this._state.visibilitySetting === "expand-on-hover") {
-      this.setLauncherCollapsedWidth();
+    if (this._launcherCollapsedWidthStale) {
+      this.refreshLauncherCollapsedWidth();
     }
   },
 
@@ -733,7 +733,14 @@ var SidebarController = {
   async _updateLauncherAndPanelMaxWidths() {
     const launcherEl = this.sidebarContainer;
     const panelEl = this._box;
-    if (!this._state.launcherExpanded || !this._state.panelOpen) {
+    const expandOnHoverEnabled = document.documentElement.hasAttribute(
+      "sidebar-expand-on-hover"
+    );
+    if (
+      expandOnHoverEnabled ||
+      !this._state.launcherExpanded ||
+      !this._state.panelOpen
+    ) {
       // We don't have both the launcher + panel open. Fallback to css max widths.
       launcherEl.style.removeProperty("max-width");
       panelEl.style.removeProperty("max-width");
@@ -2697,6 +2704,22 @@ var SidebarController = {
     return this._mouseEnterDeferred?.promise || Promise.resolve();
   },
 
+  refreshLauncherCollapsedWidth() {
+    if (
+      !document.documentElement.hasAttribute("sidebar-expand-on-hover") ||
+      !this._state
+    ) {
+      this._launcherCollapsedWidthStale = false;
+      return;
+    }
+    if (this.getUIState()?.launcherExpanded) {
+      this._launcherCollapsedWidthStale = true;
+      return;
+    }
+    this._launcherCollapsedWidthStale = false;
+    this.setLauncherCollapsedWidth();
+  },
+
   /**
    * Record the launcher's collapsed width, which the content area's
    * compensating margins are derived from while the launcher is expanded and
@@ -2764,6 +2787,9 @@ var SidebarController = {
           this._reconcileHoverState();
         }
         break;
+      case "uidensitychanged":
+        this.refreshLauncherCollapsedWidth();
+        break;
       default:
         break;
     }
@@ -2785,6 +2811,7 @@ var SidebarController = {
       }
       document.addEventListener("popupshown", this);
       document.addEventListener("popuphidden", this);
+      window.addEventListener("uidensitychanged", this);
       // Reset user-preferred height
       this.sidebarMain.buttonsWrapper.style.height = this._state
         .launcherExpanded
@@ -2798,6 +2825,8 @@ var SidebarController = {
       }
       document.removeEventListener("popupshown", this);
       document.removeEventListener("popuphidden", this);
+      window.removeEventListener("uidensitychanged", this);
+      this._launcherCollapsedWidthStale = false;
       // Add back user-preferred height if defined
       if (
         this._state.launcherExpanded &&

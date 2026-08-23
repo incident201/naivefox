@@ -97,8 +97,7 @@ add_task(async function testWindowCreate() {
         });
         await createWindow([{ state: "normal" }], {
           state: "STATE_NORMAL",
-          hiddenChrome: [],
-          navbarVisible: true,
+          popupWindow: false,
         });
         await createWindow([{ state: "fullscreen" }], {
           state: "STATE_FULLSCREEN",
@@ -107,9 +106,8 @@ add_task(async function testWindowCreate() {
         let window = await createWindow(
           [{ type: "popup" }],
           {
-            hiddenChrome: ["menubar", "toolbar", "directories", "extrachrome"],
+            popupWindow: true,
             chromeFlags: ["CHROME_OPENAS_DIALOG"],
-            navbarVisible: false,
           },
           true
         );
@@ -165,27 +163,24 @@ add_task(async function testWindowCreate() {
         );
       }
     }
-    if (expected.hiddenChrome) {
-      let chromeHidden =
-        latestWindow.document.documentElement.getAttribute("chromehidden");
-      is(
-        chromeHidden.trim().split(/\s+/).sort().join(" "),
-        expected.hiddenChrome.sort().join(" "),
-        "Got expected hidden chrome"
-      );
-    }
-    if (expected.navbarVisible != null) {
+    if (expected.popupWindow != null) {
       let { documentElement } = latestWindow.document;
+      // These attributes hide a bunch of window chrome.
+      is(
+        latestWindow.document.documentElement.hasAttribute("popup-window"),
+        expected.popupWindow,
+        "Got expected popup-window attribute"
+      );
       is(
         documentElement.hasAttribute("web-extension-popup-window"),
-        !expected.navbarVisible,
+        expected.popupWindow,
         "Got expected web-extension-popup-window attribute"
       );
       is(
         BrowserTestUtils.isVisible(
           latestWindow.document.querySelector("#nav-bar")
         ),
-        expected.navbarVisible,
+        !expected.popupWindow,
         "Got expected #nav-bar visibility"
       );
     }

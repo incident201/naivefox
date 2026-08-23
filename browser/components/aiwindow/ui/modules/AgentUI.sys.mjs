@@ -229,6 +229,9 @@ export class AgentUI {
     const monitorName =
       args.pageTitle ||
       lazy.l10n.formatValueSync("smartwindow-agent-monitor-default-name");
+    const watchUrlTitles = await lazy.MonitorUIUtils.resolveWatchUrlTitles(
+      args.watchUrls
+    );
     message.content.body = "";
     message.content.l10nId = "smartwindow-agent-monitor-watching";
     message.content.l10nArgs = {
@@ -246,6 +249,7 @@ export class AgentUI {
           monitorName,
           url: args.watchUrls[0] ?? "",
           watchUrls: args.watchUrls,
+          watchUrlTitles,
           condition: args.prompt,
           status: this.#statusForKind("watching"),
           schedule: updateData?.schedule,
@@ -327,6 +331,9 @@ export class AgentUI {
     }
 
     const agent = message?.toolUIData?.properties?.agent ?? {};
+    const watchUrlTitles = await lazy.MonitorUIUtils.resolveWatchUrlTitles(
+      updateData.watchUrls
+    );
     message.toolUIDraft = null;
     message.toolUIData = {
       ...message.toolUIData,
@@ -338,6 +345,7 @@ export class AgentUI {
           condition: updateData.condition,
           url: updateData.watchUrls?.[0] ?? agent.url,
           watchUrls: updateData.watchUrls,
+          watchUrlTitles,
           schedule: updateData.schedule,
         },
       },

@@ -15,9 +15,9 @@
 #endif  // MOZ_WEBRTC
 #include "MockCubeb.h"
 #include "WavDumper.h"
+#include "mozilla/Components.h"
 #include "mozilla/GenericFactory.h"
 #include "mozilla/Preferences.h"
-#include "mozilla/Services.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/StateMirroring.h"
 #include "mozilla/gtest/MozHelpers.h"
@@ -3529,7 +3529,7 @@ class TrackDestroyShutdownFactory final : public nsIFactory {
   NS_DECL_THREADSAFE_ISUPPORTS
 
   explicit TrackDestroyShutdownFactory(MediaTrack* aTrack)
-      : mShutdownSvc(services::GetAsyncShutdownService()), mTrack(aTrack) {}
+      : mShutdownSvc(components::AsyncShutdown::Service()), mTrack(aTrack) {}
 
   NS_IMETHOD CreateInstance(const nsIID& aIID, void** aResult) override {
     if (!mTrack->IsDestroyed()) {
@@ -3580,20 +3580,12 @@ TEST_WithTailDispatch(TestAudioTrackGraph, GraphRemovalInGetInstance) {
 
   // Register an async shutdown service that removes dummySource1 when
   // instantiated on demand.  The component manager makes this override the
-  // static async shutdown service, but `services` cached the previous lookup
-  // and so its cache needs to be cleared.
+  // static async shutdown service because that component is `overridable`.
   RefPtr factory = new TrackDestroyShutdownFactory(dummySource1);
   nsresult rv = nsComponentManagerImpl::gComponentManager->RegisterFactory(
       kTRACKDESTROYTEST_CID, "TrackDestroyTestService", shutdownSvcContractId,
       factory);
   EXPECT_EQ(rv, NS_OK);
-
-  auto ClearServicesCache = [] {
-    mozilla::services::Shutdown();
-    // Restore after services::Shutdown() set to true;
-    gXPCOMShuttingDown = false;
-  };
-  ClearServicesCache();
 
   MediaTrackGraph* graph2;
   DispatchFunction([&] {
@@ -3616,7 +3608,6 @@ TEST_WithTailDispatch(TestAudioTrackGraph, GraphRemovalInGetInstance) {
   rv = nsComponentManagerImpl::gComponentManager->UnregisterFactory(
       kTRACKDESTROYTEST_CID, factory);
   EXPECT_EQ(rv, NS_OK);
-  ClearServicesCache();
   // Destroy a track to shutdown the MTG.
   RefPtr<SourceMediaTrack> dummySource2;
   DispatchFunction(

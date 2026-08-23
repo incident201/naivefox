@@ -1010,6 +1010,10 @@
     </vbox>
   </panelview>
 
+#ifdef NIGHTLY_BUILD
+#include ../../components/remotecontrol/content/remoteControlPanel.inc.xhtml
+#endif
+
   <panelview id="content-analysis-panel" class="PanelUI-subView" role="document" mainview-with-header="true">
     <vbox id="content-analysis-panel-container" role="alertdialog" aria-labelledby="content-analysis-header">
       <hbox class="panel-header">

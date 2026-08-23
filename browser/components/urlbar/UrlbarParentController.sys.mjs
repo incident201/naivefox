@@ -1662,7 +1662,7 @@ export class TelemetryEvent {
    *
    * @param {string} searchSource
    *   The search source string to convert.
-   * @returns {null|"urlbar"|"searchbar"|"smartbar"|"handoff"|"urlbar_newtab"|"urlbar_addonpage"}
+   * @returns {null|"urlbar"|"newtab_searchbar"|"searchbar"|"smartbar"|"handoff"|"urlbar_newtab"|"urlbar_addonpage"}
    *   The sap value for urlbar.* telemetry or null if the browser window
    *   already started closing. In that case, no telemetry should be recorded.
    */
@@ -1673,6 +1673,9 @@ export class TelemetryEvent {
     // TODO (bug 2024630): Ideally, we would not add every new SAP here.
     if (searchSource === "searchbar") {
       return "searchbar";
+    }
+    if (searchSource === "newtab_searchbar") {
+      return "newtab_searchbar";
     }
     if (searchSource === "smartbar") {
       return "smartbar";

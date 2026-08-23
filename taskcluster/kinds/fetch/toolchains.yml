@@ -507,11 +507,11 @@ dump-syms:
         revision: 34e934c8d0aefad43e6d9d9352667b6d36140264
 
 rust-minidump:
-    description: rust-minidump 0.25.0 source code (for minidump-stackwalk)
+    description: rust-minidump 0.27.0 source code (for minidump-stackwalk)
     fetch:
         type: git
         repo: https://github.com/rust-minidump/rust-minidump/
-        revision: 4bc0e1bb3a19f22d5b7c4057112197ac5f6ea2d9
+        revision: 4adf5555b2ab844f23c52982fc202357ff882695
 
 fix-stacks:
     description: fix-stacks source code
@@ -519,6 +519,17 @@ fix-stacks:
         type: git
         repo: https://github.com/mozilla/fix-stacks/
         revision: 1fb1bcc8cb4dd65fbe342853954651563a0a88e7
+
+upload-symbols-linux64:
+    description: upload-symbols command-line client
+    fetch:
+        type: static-url
+        url: https://github.com/mozilla-services/upload-symbols/releases/download/v0.3.1/upload-symbols-cli-x86_64-unknown-linux-gnu.tar.xz
+        sha256: 88edc90fb06d01eb1a2d63da47661c5394cd42aa370986842405c9b1bb332e69
+        size: 4047360
+        artifact-name: upload-symbols-cli.tar.zst
+        strip-components: 1
+        add-prefix: upload-symbols-cli/
 
 7zz:
     description: 7-zip 26.01 source code
@@ -583,7 +594,7 @@ samply:
     fetch:
         type: git
         repo: https://github.com/mstange/samply
-        revision: bc0cd2fe29c9de471653c0891162569760fa0e5e
+        revision: 7003392bdcdd78d7c8fa115c306408abf54a0e1a
 
 nodejs-12-linux64:
     description: nodejs 12 for x64 linux
@@ -718,7 +729,7 @@ afl-plus-plus:
     fetch:
         type: git
         repo: https://github.com/AFLplusplus/AFLplusplus
-        revision: 4d0ec73b3eaad851402f18d63ea8344e9890d458
+        revision: 011cd189801830253c66ecd3cd6919ec01b46c34
 
 cargo-vet:
     description: cargo-vet source

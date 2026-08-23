@@ -741,6 +741,73 @@ newtab:
     send_in_pings:
       - newtab
 
+  carousel_navigate:
+    type: event
+    description: >
+      Recorded when the previous or next control on the story carousel is used.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065554
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065554
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - ini@mozilla.com
+      - sdowne@mozilla.com
+    expires: never
+    extra_keys:
+      newtab_visit_id: *newtab_visit_id
+      direction:
+        description: >
+          Which control was used, "previous" or "next"
+        type: string
+      slide_index:
+        description: >
+          Zero-based index of the slide moved to
+        type: quantity
+      section:
+        description: >
+          Name of the section the carousel belongs to
+        type: string
+      section_position:
+        description: >
+          position of section on newtab
+        type: string
+    send_in_pings:
+      - newtab
+
+  carousel_toggle_autoplay:
+    type: event
+    description: >
+      Recorded when the story carousel's rotation control is used to stop or
+      start automatic rotation.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065554
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065554
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - ini@mozilla.com
+      - sdowne@mozilla.com
+    expires: never
+    extra_keys:
+      newtab_visit_id: *newtab_visit_id
+      paused:
+        description: >
+          Whether the control paused rotation, as opposed to resuming it
+        type: boolean
+      section:
+        description: >
+          Name of the section the carousel belongs to
+        type: string
+      section_position:
+        description: >
+          position of section on newtab
+        type: string
+    send_in_pings:
+      - newtab
+
   inline_selection_impression:
     type: event
     description: >
@@ -1337,11 +1404,13 @@ newtab:
       The name of the newtab page layout variant the client is assigned, for
       layout experimentation. One of nova-full-width,
       side-by-side-content-lead, side-by-side-widgets-lead,
-      side-by-side-content-lead-five or side-by-side-widgets-lead-five. The
-      -five variants reach five card columns counting the widgets column, the
-      others four. Reports the assigned variant whether or not the page can
-      currently render it, and covers variants set by pref as well as by a
-      Nimbus train-hop configuration.
+      side-by-side-content-lead-five, side-by-side-widgets-lead-five,
+      spaces-buttons-top or spaces-buttons-bottom. The -five variants reach five
+      card columns counting the widgets column, the others four. The spaces
+      variants split the band into separately-navigable panels and differ only
+      in where the segmented control sits. Reports the assigned variant whether
+      or not the page can currently render it, and covers variants set by pref
+      as well as by a Nimbus train-hop configuration.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2061741
     data_reviews:
@@ -1352,6 +1421,41 @@ newtab:
       - mcrawford@mozilla.com
     expires: never
     lifetime: application
+    send_in_pings:
+      - newtab
+
+  spaces_switch:
+    type: event
+    description: >
+      Recorded when the user navigates from one newtab space to another, in the
+      spaces page layout variants. Not recorded for the space the page opens on,
+      only for switches away from it, so the count is the number of deliberate
+      navigations.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2061742
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2061742
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - sdowne@mozilla.com
+    expires: never
+    extra_keys:
+      newtab_visit_id: *newtab_visit_id
+      space:
+        description: >
+          The space navigated to. One of stories, widgets or activity.
+        type: string
+      previous_space:
+        description: >
+          The space navigated away from, same values as space.
+        type: string
+      method:
+        description: >
+          Which control was used: tab (the segmented control), keyboard (arrow
+          keys on the segmented control) or swipe (horizontal wheel, shift plus
+          wheel, or a touch drag).
+        type: string
     send_in_pings:
       - newtab
 

@@ -1046,6 +1046,8 @@ class nsFrameSelection final {
 
   [[nodiscard]] mozilla::PresShell* GetPresShell() const { return mPresShell; }
 
+  [[nodiscard]] nsISelectionController* GetSelectionController() const;
+
   void DisconnectFromPresShell();
   MOZ_CAN_RUN_SCRIPT nsresult ClearNormalSelection();
 

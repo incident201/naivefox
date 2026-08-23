@@ -244,6 +244,28 @@ newtab-discovery-empty-section-topstories-loading = Loading…
 # Displays when a layout in a section took too long to fetch articles.
 newtab-discovery-empty-section-topstories-timed-out = Oops! We almost loaded this section, but not quite.
 
+## Strings for the story cards carousel
+
+# Identifies the current carousel slide to screen reader users.
+# Variables:
+#   $index - the position of this slide
+#   $total - how many slides there are
+newtab-carousel-slide =
+    .aria-label = { $index } of { $total }
+
+# Button that goes to the previous carousel slide.
+newtab-carousel-previous =
+    .aria-label = Previous
+# Button that goes to the next carousel slide.
+newtab-carousel-next =
+    .aria-label = Next
+# Button that pauses autoplay on the carousel.
+newtab-carousel-pause =
+    .aria-label = Pause autoplay
+# Button that resumes autoplay on the carousel.
+newtab-carousel-play =
+    .aria-label = Resume autoplay
+
 ## Error Fallback Content.
 ## This message and suggested action link are shown in each section of UI that fails to render.
 
@@ -303,6 +325,8 @@ newtab-custom-widget-stocks-toggle =
   .label = Stocks
 newtab-custom-widget-picture-toggle =
   .label = Picture of the day
+newtab-custom-widget-recent-searches-toggle =
+  .label = Recent searches
 newtab-custom-widget-section-title = Widgets
 newtab-custom-widget-section-toggle =
     .label = Widgets
@@ -1420,6 +1444,10 @@ home-prefs-stocks-header =
 home-prefs-picture-header =
     .label = Picture of the day
 
+# Recent searches is a widget on New Tab that shows the user's recent searches.
+home-prefs-recent-searches-header =
+    .label = Recent searches
+
 home-prefs-mission-message2 =
     .message = Our sponsors support our mission to build a better web.
 
@@ -1835,3 +1863,22 @@ newtab-picture-check-back = Check back tomorrow for a new picture
 # Screen-reader text alternative for the picture; fallback used when the source
 # provides no localized description.
 newtab-picture-image-alt = Wikimedia Commons picture of the day
+
+## Strings for the Recent Searches widget
+
+# Widget heading; also the widget's accessible name.
+newtab-recent-searches-widget-title = Recent searches
+
+# Screen reader label for the widget's icon-only menu button.
+newtab-recent-searches-widget-menu-button =
+    .aria-label = Recent searches options
+
+# Context menu item linking to more information about the widget.
+newtab-recent-searches-menu-learn-more = Learn more
+
+## Strings for the navigable panels that new tab content area can be
+## split into.
+
+newtab-spaces-tab-stories = Stories
+newtab-spaces-tab-widgets = Widgets
+newtab-spaces-tab-activity = Activity

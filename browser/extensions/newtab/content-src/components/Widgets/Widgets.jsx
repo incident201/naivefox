@@ -26,7 +26,12 @@ import {
   resolveWidgetHasSidebar,
   getHideAllTargets,
 } from "common/WidgetsRegistry.mjs";
-import { isSideBySideActive } from "common/PageLayoutVariants.mjs";
+import {
+  isSideBySideActive,
+  isSpaceOverridden,
+  isSpacesActive,
+  SPACE_IDS,
+} from "common/PageLayoutVariants.mjs";
 import { WIDGET_ROW_COMPONENTS } from "./WidgetsComponentRegistry.jsx";
 import { WidgetWrapper } from "./WidgetWrapper";
 import { ErrorBoundary } from "content-src/components/ErrorBoundary/ErrorBoundary";
@@ -40,7 +45,6 @@ const CONTAINER_ACTION_TYPES = {
   FEEDBACK: "feedback",
 };
 
-const PREF_WIDGETS_ENABLED = "widgets.enabled";
 const PREF_NOVA_ENABLED = "nova.enabled";
 const PREF_WIDGETS_SYSTEM_WEATHER_FORECAST_ENABLED =
   "widgets.system.weatherForecast.enabled";
@@ -132,7 +136,10 @@ function Widgets() {
 
   const novaEnabled = prefs[PREF_NOVA_ENABLED];
   const isMaximized = prefs[PREF_WIDGETS_MAXIMIZED];
-  const rowExpanded = !!prefs[PREF_WIDGETS_ROW_EXPANDED];
+  const spacesActive = isSpacesActive(prefs);
+  // A space is a full page of its own, so there is nothing to be conservative
+  // about: widgets always show expanded and the row toggle is hidden.
+  const rowExpanded = spacesActive || !!prefs[PREF_WIDGETS_ROW_EXPANDED];
   const nimbusMaximizedTrainhopEnabled =
     prefs.trainhopConfig?.widgets?.maximized;
   const feedbackEnabled =
@@ -144,14 +151,20 @@ function Widgets() {
   const feedbackUrl =
     prefs.trainhopConfig?.widgets?.feedbackUrl ?? WIDGETS_FEEDBACK_URL;
   const sideBySideActive = isSideBySideActive(prefs);
+  // Side-by-side and spaces both put an add button in the section header where
+  // the row size toggle would otherwise sit.
+  const addButtonInHeader = sideBySideActive || spacesActive;
   const widgetsMayBeMaximized =
     nimbusMaximizedTrainhopEnabled || prefs[PREF_WIDGETS_SYSTEM_MAXIMIZED];
   // The row toggle resizes every widget at once, which a one-card-wide column has
   // no room for; that slot gets an add button instead. Per-widget "Change size"
   // still applies -- size is a row span, so medium and large are both one card wide.
-  const showWidgetsSizeToggle = !sideBySideActive && widgetsMayBeMaximized;
+  const showWidgetsSizeToggle = !addButtonInHeader && widgetsMayBeMaximized;
 
-  const widgetsEnabled = prefs[PREF_WIDGETS_ENABLED];
+  // The experiment can show the Widgets space to someone who had the master
+  // toggle off, and the panel must not then be empty.
+  const widgetsEnabled =
+    prefs["widgets.enabled"] || isSpaceOverridden(SPACE_IDS.WIDGETS, prefs);
 
   // Bug 2034542: these per-widget lookups and all the derived consts below
   // (listsEnabled, timerEnabled, weatherBase, weatherEnabled, weatherSize,
@@ -234,6 +247,11 @@ function Widgets() {
     ),
     pictureOfTheDay: isWidgetEnabled(
       WIDGET_REGISTRY.find(w => w.id === "pictureOfTheDay"),
+      prefs,
+      widgetsEnabled
+    ),
+    recentSearches: isWidgetEnabled(
+      WIDGET_REGISTRY.find(w => w.id === "recentSearches"),
       prefs,
       widgetsEnabled
     ),
@@ -571,7 +589,7 @@ function Widgets() {
             onKeyDown={handleToggleMaximizeKeyDown}
           />
         ) : null}
-        {sideBySideActive ? (
+        {addButtonInHeader ? (
           <moz-button
             id="add-widgets-button"
             size="small"
@@ -846,7 +864,7 @@ function Widgets() {
             </button>
           )}
         </div>
-        {novaEnabled && (
+        {novaEnabled && !spacesActive && (
           <moz-button
             className="widgets-row-toggle"
             type="muted"

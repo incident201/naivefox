@@ -4,6 +4,8 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  MozAdsCacheConfig:
+    "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAdsClient.sys.mjs",
   MozAdsCallbackOptions:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAdsClient.sys.mjs",
   MozAdsClientBuilder:
@@ -33,6 +35,8 @@ const PREF_OHTTP_RELAY_URL =
   "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL";
 const PREF_OHTTP_CONFIG_URL =
   "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL";
+
+const CACHE_DB_NAME = "ads-client.sqlite";
 
 ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
   return console.createInstance({
@@ -71,6 +75,19 @@ export class _AdsClient {
       this.#client = this.#build();
     }
     return this.#client;
+  }
+
+  /**
+   * Configuration for the ads-client's SQLite HTTP response cache, kept in the
+   * local profile directory since it is regenerable. TTL and max size are left
+   * to the component's defaults.
+   *
+   * @returns {MozAdsCacheConfig}
+   */
+  get cacheConfig() {
+    return new lazy.MozAdsCacheConfig({
+      dbPath: PathUtils.join(PathUtils.localProfileDir, CACHE_DB_NAME),
+    });
   }
 
   /**
@@ -188,6 +205,7 @@ export class _AdsClient {
     try {
       return lazy.MozAdsClientBuilder.init()
         .environment(lazy.MozAdsEnvironment.PROD)
+        .cacheConfig(this.cacheConfig)
         .telemetry(this.buildTelemetry())
         .build();
     } catch (error) {

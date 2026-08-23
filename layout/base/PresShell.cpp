@@ -2427,7 +2427,10 @@ PresShell::CompleteMove(bool aForward, bool aExtend) {
     if (!frame) [[unlikely]] {
       return Nothing{};
     }
-    return Some(frame->GetExtremeCaretPosition(!aForward));
+    // Don't return content in the native anonymous subtree because it's not
+    // managed by selection for the document.
+    return Some(frame->GetExtremeCaretPosition(
+        !aForward, nsIFrame::IGNORE_NATIVE_ANONYMOUS_SUBTREE));
   }();
   if (pos.isNothing()) [[unlikely]] {
     return NS_ERROR_FAILURE;
@@ -11697,8 +11700,26 @@ void PresShell::AddAnchorPosAnchorImpl(const nsAtom* aName, nsIFrame* aFrame,
   entry.InsertElementAt(matchOrInsertionIdx, aFrame);
 }
 
-void PresShell::AddAnchorPosAnchor(const nsAtom* aName, nsIFrame* aFrame) {
-  AddAnchorPosAnchorImpl(aName, aFrame, /* aForMerge = */ false);
+void PresShell::AddAnchorPosAnchor(Span<const StyleAtom> aNames,
+                                   nsIFrame* aFrame) {
+  AutoTArray<const nsAtom*, 2> added;
+  for (const auto& styleName : aNames) {
+    const auto* name = styleName.AsAtom();
+    if (added.Contains(name)) {
+      // This could scale badly if authors specify a lot of anchor names -
+      // (Hopefully) unlikely.
+      continue;
+    }
+    AddAnchorPosAnchorImpl(name, aFrame, /* aForMerge = */ false);
+    added.AppendElement(name);
+  }
+}
+
+void PresShell::RemoveAnchorPosAnchor(Span<const StyleAtom> aNames,
+                                      nsIFrame* aFrame) {
+  for (const auto& name : aNames) {
+    RemoveAnchorPosAnchor(name.AsAtom(), aFrame);
+  }
 }
 
 void PresShell::RemoveAnchorPosAnchor(const nsAtom* aName, nsIFrame* aFrame) {

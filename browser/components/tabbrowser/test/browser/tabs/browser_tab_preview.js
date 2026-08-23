@@ -1413,7 +1413,7 @@ add_task(async function tabGroupPanelUpdatesTests() {
   info("Test that moving tabs within the group updates the panel");
   let tabMoveEvent = BrowserTestUtils.waitForEvent(group, "TabMove");
   let tabToMove = group.tabs[1];
-  gBrowser.moveTabTo(tabToMove, { tabIndex: tabToMove._tPos - 1 });
+  gBrowser.moveTabTo(tabToMove, { tabIndex: tabToMove.index - 1 });
   await tabMoveEvent;
 
   Assert.equal(

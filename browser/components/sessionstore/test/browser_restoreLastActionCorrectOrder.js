@@ -6,7 +6,7 @@ const { _LastSession, _lastClosedActions } = ChromeUtils.importESModule(
 
 /**
  * Tests that the _lastClosedAction list is truncated correctly
- * by removing oldest actions in SessionStore._addClosedAction
+ * by removing oldest actions in SessionStore's #addClosedAction
  */
 add_task(async function test_undo_last_action_correct_order() {
   SpecialPowers.pushPrefEnv({

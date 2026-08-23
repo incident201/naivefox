@@ -81,6 +81,8 @@ skip-if = [
 
 ["browser_newtab_side_by_side_layout.js"]
 
+["browser_newtab_spaces.js"]
+
 ["browser_newtab_sticky_search.js"]
 
 ["browser_newtab_towindow.js"]

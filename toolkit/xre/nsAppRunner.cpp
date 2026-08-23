@@ -6338,6 +6338,13 @@ nsresult XREMain::XRE_mainRun() {
   // the `nsICommandLineRunner` anymore.
   cmdLine = nullptr;
 
+#ifdef ACCESSIBILITY
+  // If accessibility.force_disabled is force enabled, start accessibility
+  // now rather than waiting for something to request it. This is the one
+  // place we can do this reliably on every platform.
+  a11y::MaybeStartForceEnabled();
+#endif
+
   {
     rv = appStartup->Run();
     if (NS_FAILED(rv)) {

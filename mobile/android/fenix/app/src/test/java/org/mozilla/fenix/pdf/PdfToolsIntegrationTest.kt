@@ -4,8 +4,13 @@
 
 package org.mozilla.fenix.pdf
 
+import android.content.Context
+import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
+import androidx.activity.ComponentActivity
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.test.core.app.ApplicationProvider
+import io.mockk.every
 import io.mockk.mockk
 import kotlin.test.assertIs
 import kotlinx.coroutines.test.TestScope
@@ -20,16 +25,25 @@ import mozilla.components.browser.state.state.content.ShareResourceState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.support.test.middleware.CaptureActionsMiddleware
+import mozilla.components.support.test.robolectric.testContext
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mozilla.fenix.R
+import org.mozilla.fenix.components.AppStore
+import org.mozilla.fenix.ext.components
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class PdfToolsIntegrationTest {
     private val tabId = "1"
 
-    private val container = CoordinatorLayout(ApplicationProvider.getApplicationContext())
+    private val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+
+    private val container = CoordinatorLayout(activity)
 
     private val captureActionsMiddleware = CaptureActionsMiddleware<BrowserState, BrowserAction>()
 
@@ -58,6 +72,13 @@ class PdfToolsIntegrationTest {
             isAddressBarAtBottom = isAddressBarAtBottom,
         )
 
+    @Before
+    fun setUp() {
+        every { testContext.components.appStore } returns AppStore()
+        // The tools are added from a runnable posted on the container, which only runs once it is attached.
+        activity.setContentView(container)
+    }
+
     private val layoutParams: CoordinatorLayout.LayoutParams
         get() = container.getChildAt(0).layoutParams as CoordinatorLayout.LayoutParams
 
@@ -66,6 +87,7 @@ class PdfToolsIntegrationTest {
         val integration = integration()
 
         integration.start()
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1, container.childCount)
 
         integration.stop()
@@ -77,8 +99,10 @@ class PdfToolsIntegrationTest {
         val integration = integration()
 
         integration.start()
+        shadowOf(Looper.getMainLooper()).idle()
         integration.stop()
         integration.start()
+        shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(1, container.childCount)
     }
@@ -89,6 +113,7 @@ class PdfToolsIntegrationTest {
 
         integration.start()
         integration.start()
+        shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(1, container.childCount)
     }
@@ -96,6 +121,7 @@ class PdfToolsIntegrationTest {
     @Test
     fun `WHEN the feature is started THEN the tools are positioned by their behavior`() {
         integration().start()
+        shadowOf(Looper.getMainLooper()).idle()
 
         assertIs<PdfToolsBehavior>(layoutParams.behavior)
     }
@@ -147,5 +173,33 @@ class PdfToolsIntegrationTest {
         integration().handleShareClick()
 
         captureActionsMiddleware.assertNotDispatched(ShareResourceAction.AddShareAction::class)
+    }
+
+    /** Stands in for the browser toolbar, which removes the navigation bar as its composition is created. */
+    private class SiblingRemovingView(context: Context, private val sibling: View) : View(context) {
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            (sibling.parent as? ViewGroup)?.removeView(sibling)
+        }
+    }
+
+    @Test
+    fun `GIVEN chrome that removes a sibling while attaching WHEN the feature is started THEN the container attaches`() {
+        // Test for Bug 2065098
+        val detachedContainer = CoordinatorLayout(activity)
+        val navigationBar = View(activity).apply { id = R.id.navigation_bar }
+        detachedContainer.addView(navigationBar)
+        detachedContainer.addView(SiblingRemovingView(activity, navigationBar).apply { id = R.id.composable_toolbar })
+
+        PdfToolsIntegration(
+                container = detachedContainer,
+                browserStore = browserStore,
+                isAddressBarAtBottom = true,
+            )
+            .start()
+
+        activity.setContentView(detachedContainer)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(2, detachedContainer.childCount)
     }
 }

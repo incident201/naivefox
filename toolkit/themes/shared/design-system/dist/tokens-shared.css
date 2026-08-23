@@ -7,9 +7,9 @@
 
 @layer tokens-foundation, tokens-browser-theme, tokens-foundation-brand, tokens-foundation-nova, tokens-browser-theme-nova, tokens-foundation-brand-nova, tokens-prefers-contrast, tokens-prefers-contrast-nova, tokens-forced-colors, tokens-forced-colors-nova;
 
-@layer tokens-foundation {
-  :root,
-  :host(.anonymous-content-host) {
+:root,
+:host(.anonymous-content-host) {
+  @layer tokens-foundation {
     /** background-color **/
     --background-color-box: light-dark(var(--color-white), var(--color-gray-80));
     --background-color-critical: light-dark(var(--color-red-0), var(--color-red-90));
@@ -602,14 +602,9 @@
     --toolbox-text-color: light-dark(var(--color-gray-100), var(--color-gray-0));
     --toolbox-text-color-inactive: var(--toolbox-text-color);
   }
-}
 
-/* Bug 1879900: Can't nest media queries inside of :host, :root selector
-   until Bug 1879349 lands */
-@layer tokens-prefers-contrast {
-  @media (prefers-contrast) {
-    :root,
-    :host(.anonymous-content-host) {
+  @layer tokens-prefers-contrast {
+    @media (prefers-contrast) {
       /** background-color **/
       --background-color-box: var(--background-color-canvas);
       --background-color-box-info: var(--background-color-canvas);
@@ -680,14 +675,9 @@
       --toolbarbutton-outline-color-active: currentColor;
     }
   }
-}
 
-/* Bug 1879900: Can't nest media queries inside of :host, :root selector
-   until Bug 1879349 lands */
-@layer tokens-forced-colors {
-  @media (forced-colors) {
-    :root,
-    :host(.anonymous-content-host) {
+  @layer tokens-forced-colors {
+    @media (forced-colors) {
       /** border **/
       --border-color-deemphasized: ButtonText;
       --border-color-interactive: ButtonText;
@@ -792,12 +782,9 @@
       --toolbarbutton-outline-color-selected: SelectedItem;
     }
   }
-}
 
-@media -moz-pref("browser.nova.enabled") {
-  @layer tokens-foundation-nova {
-    :root,
-    :host(.anonymous-content-host) {
+  @media -moz-pref("browser.nova.enabled") {
+    @layer tokens-foundation-nova {
       /** background-color **/
       --background-color-box: light-dark(var(--color-white), var(--color-gray-70));
       --background-color-box-info: light-dark(var(--color-gray-15), var(--color-gray-65));
@@ -1105,14 +1092,9 @@
       );
       --toolbox-text-color: var(--text-color);
     }
-  }
 
-  /* Bug 1879900: Can't nest media queries inside of :host, :root selector
-   until Bug 1879349 lands */
-  @layer tokens-prefers-contrast-nova {
-    @media (prefers-contrast) {
-      :root,
-      :host(.anonymous-content-host) {
+    @layer tokens-prefers-contrast-nova {
+      @media (prefers-contrast) {
         /** text-color **/
         --text-color: CanvasText;
         --text-color-error: inherit;
@@ -1121,14 +1103,9 @@
         --toolbar-field-border-color-focus: var(--focus-outline-color);
       }
     }
-  }
 
-  /* Bug 1879900: Can't nest media queries inside of :host, :root selector
-   until Bug 1879349 lands */
-  @layer tokens-forced-colors-nova {
-    @media (forced-colors) {
-      :root,
-      :host(.anonymous-content-host) {
+    @layer tokens-forced-colors-nova {
+      @media (forced-colors) {
         /** background-color **/
         --background-color-box: var(--background-color-canvas);
         --background-color-box-info: var(--background-color-canvas);

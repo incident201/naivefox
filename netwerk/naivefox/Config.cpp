@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -305,6 +306,7 @@ class JsonParser final {
     bool sawHostResolverRules = false;
     bool sawExtraHeaders = false;
     bool sawNoPostQuantum = false;
+    bool sawInsecureConcurrency = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -358,6 +360,15 @@ class JsonParser final {
         sawNoPostQuantum = true;
         MOZ_TRY(ParseBoolean(parsed.mNoPostQuantum,
                              "no-post-quantum must be a boolean"));
+      } else if (key.EqualsLiteral("insecure-concurrency")) {
+        if (sawInsecureConcurrency) {
+          return Error("duplicate insecure-concurrency field");
+        }
+        sawInsecureConcurrency = true;
+        // NaiveProxy accepts this setting for compatibility, but NaiveFox
+        // deliberately keeps connection pooling under Necko's control.
+        MOZ_TRY(ParsePositiveCompatibilityInteger(
+            "insecure-concurrency must be a positive integer"));
       } else {
         return Error("unsupported config field");
       }
@@ -427,6 +438,85 @@ class JsonParser final {
       return NS_OK;
     }
     return Error(aTypeError);
+  }
+
+  nsresult ParsePositiveCompatibilityInteger(const char* aTypeError) {
+    nsAutoCString value;
+    if (mPosition < mInput.Length() && mInput.CharAt(mPosition) == '"') {
+      MOZ_TRY(ParseString(value, aTypeError));
+    } else {
+      const size_t start = mPosition;
+      if (mPosition < mInput.Length() && mInput.CharAt(mPosition) == '-') {
+        ++mPosition;
+      }
+      const size_t digitsStart = mPosition;
+      if (mPosition == mInput.Length() || mInput.CharAt(mPosition) < '0' ||
+          mInput.CharAt(mPosition) > '9') {
+        return Error(aTypeError);
+      }
+      if (mInput.CharAt(mPosition) == '0') {
+        ++mPosition;
+        if (mPosition < mInput.Length() && mInput.CharAt(mPosition) >= '0' &&
+            mInput.CharAt(mPosition) <= '9') {
+          return Error(aTypeError);
+        }
+      } else {
+        while (mPosition < mInput.Length() && mInput.CharAt(mPosition) >= '0' &&
+               mInput.CharAt(mPosition) <= '9') {
+          ++mPosition;
+        }
+      }
+      if (mPosition < mInput.Length() &&
+          (mInput.CharAt(mPosition) == '.' || mInput.CharAt(mPosition) == 'e' ||
+           mInput.CharAt(mPosition) == 'E')) {
+        return Error(aTypeError);
+      }
+      if (mPosition < mInput.Length() &&
+          !IsWhitespace(mInput.CharAt(mPosition)) &&
+          mInput.CharAt(mPosition) != ',' && mInput.CharAt(mPosition) != '}') {
+        return Error(aTypeError);
+      }
+      value.Assign(Substring(mInput, start, mPosition - start));
+      if (digitsStart == mPosition) {
+        return Error(aTypeError);
+      }
+    }
+
+    if (value.IsEmpty()) {
+      return Error(aTypeError);
+    }
+    size_t position = 0;
+    bool negative = false;
+    if (value.CharAt(position) == '+' || value.CharAt(position) == '-') {
+      negative = value.CharAt(position) == '-';
+      if (++position == value.Length()) {
+        return Error(aTypeError);
+      }
+    }
+    uint64_t parsed = 0;
+    const uint64_t limit =
+        static_cast<uint64_t>(std::numeric_limits<int32_t>::max()) +
+        (negative ? 1 : 0);
+    for (; position < value.Length(); ++position) {
+      const char digit = value.CharAt(position);
+      if (digit < '0' || digit > '9') {
+        return Error(aTypeError);
+      }
+      const uint64_t numericDigit = digit - '0';
+      if (parsed > (limit - numericDigit) / 10) {
+        return Error(aTypeError);
+      }
+      parsed = parsed * 10 + numericDigit;
+    }
+    int64_t signedValue = static_cast<int64_t>(parsed);
+    if (negative) {
+      signedValue = -signedValue;
+    }
+    if (signedValue <= 0 ||
+        signedValue > std::numeric_limits<int32_t>::max()) {
+      return Error(aTypeError);
+    }
+    return NS_OK;
   }
 
   nsresult ParseHexQuad(uint16_t& aValue) {
@@ -883,13 +973,12 @@ class JsonParser final {
       }
       const nsDependentCSubstring userInfo = Substring(authority, 0, at);
       const int32_t colon = userInfo.FindChar(':');
-      if (colon <= 0) {
+      if (colon < 0) {
         return Error("proxy URI requires username and password");
       }
       MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aProxy.mUser));
       MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1), aProxy.mPassword));
-      if (aProxy.mUser.IsEmpty() || aProxy.mPassword.IsEmpty() ||
-          aProxy.mUser.FindChar(':') >= 0) {
+      if (aProxy.mUser.FindChar(':') >= 0) {
         return Error("proxy URI contains invalid credentials");
       }
       endpointStart = static_cast<size_t>(at + 1);

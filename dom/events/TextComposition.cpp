@@ -535,7 +535,12 @@ void TextComposition::DispatchCompositionEvent(
 
   // Emulate editor behavior of compositionchange event (DOM text event) handler
   // if no editor handles composition events.
-  if (dispatchDOMTextEvent && !HasEditor()) {
+  // However, if we have received a commit, but not from aCompositionEvent (e.g.
+  // an event listener called above caused the composition to end by removing
+  // the editor), then we don't want to overwrite the data from the commit.
+  if (dispatchDOMTextEvent && !HasEditor() &&
+      (!mHasReceivedCommitEvent ||
+       aCompositionEvent->IsFollowedByCompositionEnd())) {
     EditorWillHandleCompositionChangeEvent(aCompositionEvent);
     EditorDidHandleCompositionChangeEvent();
   }
@@ -544,6 +549,22 @@ void TextComposition::DispatchCompositionEvent(
     // Dispatch a compositionend event if it's necessary.
     if (aCompositionEvent->mMessage != eCompositionEnd) {
       CloneAndDispatchAs(aCompositionEvent, eCompositionEnd);
+    }
+    if (RefPtr<EditorBase> editor = GetEditorBase()) {
+      // If the editable element is removed during a composition
+      // (or is adopted to a different document) then we immediately fire
+      // compositionend but the event never reaches the EditorEventListener,
+      // since it's now targeting an element that's not in the document.
+      // So we need to tell the editor that the composition has ended here.
+      MOZ_ASSERT(mNode);
+      MOZ_ASSERT(
+          editor->GetDocument() != mNode->GetComposedDoc(),
+          "Should only happen if event target node is disconnected or moved to "
+          "a different document");
+      editor->OnCompositionEnd(*aCompositionEvent);
+      // We don't necessarily get a eCompositionChange event with
+      // IsComposing() = false in these cases.
+      mIsComposing = false;
     }
     MOZ_ASSERT(!mIsComposing, "Why is the editor still composing?");
     MOZ_ASSERT(!HasEditor(), "Why does the editor still keep to hold this?");

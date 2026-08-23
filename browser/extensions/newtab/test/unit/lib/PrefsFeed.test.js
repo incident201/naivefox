@@ -31,6 +31,15 @@ describe("PrefsFeed", () => {
         getBoolPref: sinon.spy(),
         addObserver: sinon.spy(),
         removeObserver: sinon.spy(),
+        prefHasUserValue: sinon.stub().returns(true),
+        // Trainhop writes pref defaults on every update, so every test that
+        // reaches _getTrainhopConfig needs this. Individual tests replace it
+        // with their own spy when they assert on the writes.
+        getDefaultBranch: sinon.stub().returns({
+          setBoolPref: sinon.spy(),
+          setIntPref: sinon.spy(),
+          setStringPref: sinon.spy(),
+        }),
       },
       obs: {
         removeObserver: sinon.spy(),
@@ -459,6 +468,77 @@ describe("PrefsFeed", () => {
       })
     );
   });
+  describe("spaces opt-out mirror", () => {
+    beforeEach(() => {
+      FAKE_PREFS.set("pageLayouts.variant", "spaces-buttons-bottom");
+    });
+
+    it("should opt the space out when its pref is turned off", () => {
+      feed.onPrefChanged("feeds.section.topstories", false);
+
+      assert.calledWith(feed._prefs.set, "spaces.storiesOptOut", true);
+    });
+
+    it("should opt back in when the pref is turned on again", () => {
+      FAKE_PREFS.set("spaces.storiesOptOut", true);
+
+      feed.onPrefChanged("feeds.section.topstories", true);
+
+      assert.calledWith(feed._prefs.set, "spaces.storiesOptOut", false);
+    });
+
+    it("should mirror every space the same way", () => {
+      feed.onPrefChanged("widgets.enabled", false);
+      feed.onPrefChanged("feeds.section.highlights", false);
+
+      assert.calledWith(feed._prefs.set, "spaces.widgetsOptOut", true);
+      assert.calledWith(feed._prefs.set, "spaces.activityOptOut", true);
+    });
+
+    it("should mirror a change made outside the newtab page", () => {
+      // about:preferences writes through the Preferences binding rather than
+      // SET_PREF, so only the branch observer sees it.
+      feed.observe(null, "nsPref:changed", "feeds.section.topstories");
+      feed.onPrefChanged("feeds.section.topstories", false);
+
+      assert.calledWith(feed._prefs.set, "spaces.storiesOptOut", true);
+    });
+
+    it("should not write when the mirror already matches", () => {
+      FAKE_PREFS.set("spaces.storiesOptOut", true);
+
+      feed.onPrefChanged("feeds.section.topstories", false);
+
+      assert.neverCalledWith(
+        feed._prefs.set,
+        "spaces.storiesOptOut",
+        sinon.match.any
+      );
+    });
+
+    it("should not mirror outside the experiment", () => {
+      FAKE_PREFS.set("pageLayouts.variant", "nova-full-width");
+
+      feed.onPrefChanged("feeds.section.topstories", false);
+
+      assert.neverCalledWith(
+        feed._prefs.set,
+        "spaces.storiesOptOut",
+        sinon.match.any
+      );
+    });
+
+    it("should not mirror a pref that is not a space", () => {
+      feed.onPrefChanged("feeds.topsites", false);
+
+      assert.neverCalledWith(
+        feed._prefs.set,
+        sinon.match(/^spaces\./),
+        sinon.match.any
+      );
+    });
+  });
+
   describe("newtabTrainhop", () => {
     it("should send a PREF_CHANGED actions when onTrainhopExperimentUpdated is called", () => {
       const testObject = {
@@ -639,7 +719,7 @@ describe("PrefsFeed", () => {
       const setStringPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setStringPref });
+        .returns({ setStringPref, setBoolPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -660,7 +740,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -678,11 +758,147 @@ describe("PrefsFeed", () => {
       assert.calledWith(setBoolPref, "widgets.focusTimer.enabled", true);
     });
 
+    it("should write the Recent Activity default for the spaces experiment", () => {
+      // Scoped to the experiment, so an unrelated train-hop config leaves it be.
+      FAKE_PREFS.set("pageLayouts.variant", "spaces-buttons-bottom");
+      const setBoolPref = sinon.spy();
+      ServicesStub.prefs.getDefaultBranch = sinon
+        .stub()
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
+      const enrollment = {
+        meta: { isRollout: false },
+        value: {
+          type: "highlights",
+          payload: { enabled: true },
+        },
+      };
+      sandbox
+        .stub(global.NimbusFeatures.newtabTrainhop, "getAllEnrollments")
+        .returns([enrollment]);
+
+      feed.onTrainhopExperimentUpdated();
+
+      // The default branch, so a user who has switched Recent Activity off
+      // keeps it off: the user branch always wins.
+      assert.calledWith(setBoolPref, "feeds.section.highlights", true);
+    });
+
+    it("should put the Recent Activity default back on unenrollment", () => {
+      FAKE_PREFS.set("pageLayouts.variant", "spaces-buttons-bottom");
+      const setBoolPref = sinon.spy();
+      ServicesStub.prefs.getDefaultBranch = sinon
+        .stub()
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
+      const enrolled = {
+        meta: { isRollout: false },
+        value: { type: "highlights", payload: { enabled: true } },
+      };
+      const getAllEnrollments = sandbox.stub(
+        global.NimbusFeatures.newtabTrainhop,
+        "getAllEnrollments"
+      );
+
+      getAllEnrollments.returns([enrolled]);
+      feed.onTrainhopExperimentUpdated();
+
+      // Unenrolling takes the variant with it, so the revert has to run when
+      // spaces is no longer assigned -- which is the whole point of it.
+      getAllEnrollments.returns([]);
+      FAKE_PREFS.set("pageLayouts.variant", "nova-full-width");
+      feed.onTrainhopExperimentUpdated();
+
+      // Reverted in the same update rather than at the next restart, but only
+      // because this profile was enrolled.
+      assert.calledWith(setBoolPref, "feeds.section.highlights", false);
+    });
+
+    it("should not opt the space out when unenrolling reverts its default", () => {
+      // The revert writes feeds.section.highlights, which fires the branch
+      // observer. Its handler has to see the fresh config, or it reads our own
+      // write as the user turning Recent Activity off.
+      const setBoolPref = sinon.spy((name, value) =>
+        feed.onPrefChanged(name, value)
+      );
+      ServicesStub.prefs.getDefaultBranch = sinon
+        .stub()
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
+      const getAllEnrollments = sandbox.stub(
+        global.NimbusFeatures.newtabTrainhop,
+        "getAllEnrollments"
+      );
+
+      FAKE_PREFS.set("pageLayouts.variant", "spaces-buttons-bottom");
+      getAllEnrollments.returns([
+        {
+          meta: { isRollout: false },
+          value: {
+            type: "multi-payload",
+            payload: [
+              {
+                type: "pageLayouts",
+                payload: { variant: "spaces-buttons-bottom" },
+              },
+              { type: "highlights", payload: { enabled: true } },
+            ],
+          },
+        },
+      ]);
+      feed.onTrainhopExperimentUpdated();
+
+      getAllEnrollments.returns([]);
+      FAKE_PREFS.set("pageLayouts.variant", "nova-full-width");
+      feed.onTrainhopExperimentUpdated();
+
+      assert.neverCalledWith(feed._prefs.set, "spaces.activityOptOut", true);
+    });
+
+    it("should not revert a default this profile was never given", () => {
+      const setBoolPref = sinon.spy();
+      ServicesStub.prefs.getDefaultBranch = sinon
+        .stub()
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
+      sandbox
+        .stub(global.NimbusFeatures.newtabTrainhop, "getAllEnrollments")
+        .returns([]);
+
+      FAKE_PREFS.set("pageLayouts.variant", "nova-full-width");
+      feed.onTrainhopExperimentUpdated();
+
+      assert.neverCalledWith(
+        setBoolPref,
+        "feeds.section.highlights",
+        sinon.match.any
+      );
+    });
+
+    it("should not touch the Recent Activity default for an unrelated config", () => {
+      FAKE_PREFS.set("pageLayouts.variant", "spaces-buttons-bottom");
+      const setBoolPref = sinon.spy();
+      ServicesStub.prefs.getDefaultBranch = sinon
+        .stub()
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
+      const enrollment = {
+        meta: { isRollout: false },
+        value: { type: "highlights", payload: {} },
+      };
+      sandbox
+        .stub(global.NimbusFeatures.newtabTrainhop, "getAllEnrollments")
+        .returns([enrollment]);
+
+      feed.onTrainhopExperimentUpdated();
+
+      assert.neverCalledWith(
+        setBoolPref,
+        "feeds.section.highlights",
+        sinon.match.any
+      );
+    });
+
     it("should not write a widget default when its widgetsSettings key is absent", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -707,7 +923,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -745,7 +961,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -770,7 +986,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -803,7 +1019,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -837,7 +1053,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -862,7 +1078,7 @@ describe("PrefsFeed", () => {
       const setBoolPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setBoolPref });
+        .returns({ setBoolPref, setStringPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -887,7 +1103,7 @@ describe("PrefsFeed", () => {
       const setStringPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setStringPref });
+        .returns({ setStringPref, setBoolPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {
@@ -912,7 +1128,7 @@ describe("PrefsFeed", () => {
       const setStringPref = sinon.spy();
       ServicesStub.prefs.getDefaultBranch = sinon
         .stub()
-        .returns({ setStringPref });
+        .returns({ setStringPref, setBoolPref: sinon.spy() });
       const enrollment = {
         meta: { isRollout: false },
         value: {

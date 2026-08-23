@@ -176,13 +176,9 @@ class LAllocation {
                                               ~(KIND_MASK << KIND_SHIFT));
   }
 
-  bool operator==(const LAllocation& other) const {
-    return bits_ == other.bits_;
-  }
+  bool operator==(const LAllocation& other) const = default;
 
-  bool operator!=(const LAllocation& other) const {
-    return bits_ != other.bits_;
-  }
+  bool operator!=(const LAllocation& other) const = default;
 
   HashNumber hash() const { return bits_; }
 

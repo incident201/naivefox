@@ -18,10 +18,6 @@ import {
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
   MANAGE_TABS,
-  WORLD_CUP_MATCHES,
-  WORLD_CUP_LIVE,
-  WORLD_CUP_TOOLS,
-  WORLD_CUP_PREF,
   AITAB_PREF,
   AITAB_TOOLS,
   GENERATE_AITAB,
@@ -139,8 +135,6 @@ export async function executeToolByName(
  * fetchWithHistory's cyclomatic complexity.
  */
 const FEATURE_GATED_HANDLERS = new Map([
-  [WORLD_CUP_MATCHES, toolFns.worldCupMatches],
-  [WORLD_CUP_LIVE, toolFns.worldCupLive],
   [SEARCH_THE_WEB, runSearchTheWeb],
   [GENERATE_AITAB, toolFns.createAITab],
 ]);
@@ -162,9 +156,6 @@ const TOOLS_WITH_PENDING_ACTION_LOG = new Set([SEARCH_THE_WEB]);
  */
 function filterFeatureGatedTools(tools) {
   let filtered = tools;
-  if (!Services.prefs.getBoolPref(WORLD_CUP_PREF, false)) {
-    filtered = filtered.filter(t => !WORLD_CUP_TOOLS.has(t.function?.name));
-  }
   // The two search_the_web paths return different shapes, so the description
   // and parameters the model sees have to match the path that will run.
   if (Services.prefs.getBoolPref(SEARCH_THE_WEB_FAST_PREF, false)) {

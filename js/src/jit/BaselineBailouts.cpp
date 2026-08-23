@@ -1256,8 +1256,13 @@ bool BaselineStackBuilder::envChainSlotCanBeOptimized() {
 bool jit::AssertBailoutStackDepth(JSContext* cx, JSScript* script,
                                   jsbytecode* pc, ResumeMode mode,
                                   uint32_t exprStackSlots) {
+  bool resumeAfterNonFallthrough = false;
   if (IsResumeAfter(mode)) {
-    pc = GetNextPc(pc);
+    if (BytecodeFallsThrough(JSOp(*pc))) {
+      pc = GetNextPc(pc);
+    } else {
+      resumeAfterNonFallthrough = true;
+    }
   }
 
   uint32_t expectedDepth;
@@ -1270,6 +1275,14 @@ bool jit::AssertBailoutStackDepth(JSContext* cx, JSScript* script,
   }
 
   JSOp op = JSOp(*pc);
+
+  if (resumeAfterNonFallthrough) {
+    // Because the op doesn't fall through, ReconstructStackDepth returned the
+    // depth before it. Account for the op's own stack effect.
+    uint32_t uses = StackUses(op, pc);
+    MOZ_ASSERT(expectedDepth >= uses);
+    expectedDepth = expectedDepth - uses + StackDefs(op);
+  }
 
   if (mode == ResumeMode::InlinedFunCall) {
     // For inlined fun.call(this, ...); the reconstructed stack depth will

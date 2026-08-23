@@ -35,7 +35,6 @@ import mozilla.components.support.utils.DefaultDateTimeProvider
 import mozilla.components.support.utils.SafeIntent
 import mozilla.components.support.utils.StatusBarUtils
 import mozilla.telemetry.glean.private.NoExtras
-import org.mozilla.experiments.nimbus.initializeTooling
 import org.mozilla.experiments.nimbus.internal.FeatureHolder
 import org.mozilla.focus.GleanMetrics.AppOpened
 import org.mozilla.focus.GleanMetrics.Notifications
@@ -115,7 +114,6 @@ open class MainActivity : EdgeToEdgeActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        components.experiments.initializeTooling(applicationContext, intent)
         installSplashScreen()
 
         updateSecureWindowFlags()

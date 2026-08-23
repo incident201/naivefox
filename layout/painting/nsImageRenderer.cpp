@@ -77,6 +77,7 @@ struct SymbolicImageEntry {
 struct SymbolicImageCache final
     : public mozilla::MruCache<SymbolicImageKey, SymbolicImageEntry,
                                SymbolicImageCache, 8> {
+  static bool IsEmpty(const ValueType& aVal) { return !std::get<0>(aVal.mKey); }
   static HashNumber Hash(const KeyType& aKey) {
     return AddToHash(std::get<0>(aKey)->hash(),
                      HashGeneric(std::get<1>(aKey), std::get<2>(aKey)));

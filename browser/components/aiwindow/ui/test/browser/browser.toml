@@ -7,6 +7,7 @@ prefs = [
 ]
 support-files = [
   "head.js",
+  "head_smartformfill_autocomplete.js",
   "head_history_thumbnails.js",
   "test_agent_monitor_item_page.html",
   "test_agent_monitor_item.mjs",
@@ -27,6 +28,9 @@ support-files = [
   "test_memories_icon_button.mjs",
   "test_grouped_chips_page.html",
   "test_grouped_chips.mjs",
+  "test_smartformfill_autocomplete.html",
+  "test_smartwindow_promo_page.html",
+  "test_smartwindow_promo.mjs",
   "test_smartwindow_prompts_page.html",
   "test_smartwindow_prompts.mjs",
   "test_smartwindow_panel_list_page.html",
@@ -174,6 +178,8 @@ skip-if = [
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && ccov",
 ]
 
+["browser_aiwindow_smartwindow_promo.js"]
+
 ["browser_aiwindow_stop_generation.js"]
 
 ["browser_aiwindow_switcher.js"]
@@ -313,6 +319,10 @@ skip-if = [
 ["browser_smartwindow_smartbar_model_select.js"]
 
 ["browser_smartwindow_smartbar_tab_state.js"]
+
+["browser_smartwindow_smartformfill_autocomplete.js"]
+
+["browser_smartwindow_smartformfill_metadata_lifecycle.js"]
 
 ["browser_smartwindow_switcher_telemetry.js"]
 

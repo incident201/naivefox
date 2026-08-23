@@ -91,7 +91,7 @@ export var SessionStoreTestUtils = {
       "browser.sessionstore.restore_hidden_tabs"
     );
     // This should match the |restoreTabsLazily| value that
-    // SessionStore.restoreWindow() uses.
+    // SessionStore's #restoreWindow() uses.
     let restoreTabsLazily =
       Services.prefs.getBoolPref("browser.sessionstore.restore_on_demand") &&
       Services.prefs.getBoolPref("browser.sessionstore.restore_tabs_lazily");

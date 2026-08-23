@@ -289,6 +289,7 @@ let JSWINDOWACTORS = {
         "SmartWindowTasks:RequestRunMonitor": { wantUntrusted: true },
         "SmartWindowTasks:RequestPauseMonitor": { wantUntrusted: true },
         "SmartWindowTasks:RequestConstants": { wantUntrusted: true },
+        "SmartWindowTasks:RequestOpenUrl": { wantUntrusted: true },
       },
     },
     allFrames: true,

@@ -150,6 +150,11 @@ export const PREF_WIDGETS_PICTURE_OF_THE_DAY_ENABLED =
 export const PREF_PICTURE_OF_THE_DAY_SIZE = "widgets.pictureOfTheDay.size";
 export const PREF_WIDGETS_SYSTEM_PICTURE_OF_THE_DAY_ENABLED =
   "widgets.system.pictureOfTheDay.enabled";
+export const PREF_WIDGETS_RECENT_SEARCHES_ENABLED =
+  "widgets.recentSearches.enabled";
+export const PREF_RECENT_SEARCHES_SIZE = "widgets.recentSearches.size";
+export const PREF_WIDGETS_SYSTEM_RECENT_SEARCHES_ENABLED =
+  "widgets.system.recentSearches.enabled";
 
 /**
  * @typedef {object} WidgetRegistryEntry
@@ -322,6 +327,22 @@ export const WIDGET_REGISTRY = [
     trainhopSidebarKey: null,
     widgetsSettingsVisibleKey: "stocksVisible",
     widgetsSettingsEnabledKey: "stocksEnabled",
+  },
+  {
+    id: "recentSearches",
+    telemetryName: "recent_searches",
+    order: 9,
+    enabledPref: PREF_WIDGETS_RECENT_SEARCHES_ENABLED,
+    sizePref: PREF_RECENT_SEARCHES_SIZE,
+    defaultSize: "medium",
+    validSizes: ["medium", "large"],
+    hasSidebar: false,
+    systemEnabledPref: PREF_WIDGETS_SYSTEM_RECENT_SEARCHES_ENABLED,
+    trainhopEnabledKey: "recentSearchesEnabled",
+    trainhopSizeKey: "recentSearchesSize",
+    trainhopSidebarKey: null,
+    widgetsSettingsVisibleKey: "recentSearchesVisible",
+    widgetsSettingsEnabledKey: "recentSearchesEnabled",
   },
 ];
 
@@ -519,9 +540,14 @@ export function resolveWidgetHasSidebar(widget, prefs) {
  * even when the user has hidden every widget.
  *
  * @param {object} prefs - current pref values from the Redux store
+ * @param {boolean} [widgetsEnabled] - the master toggle, passed explicitly when
+ *   the spaces experiment is overriding it
  * @returns {boolean}
  */
-export function hasContentAreaWidgets(prefs) {
+export function hasContentAreaWidgets(
+  prefs,
+  widgetsEnabled = prefs["widgets.enabled"]
+) {
   const weatherWidget = WIDGET_REGISTRY.find(w => w.id === "weather");
   const weatherGoesToSidebar =
     resolveWidgetHasSidebar(weatherWidget, prefs) &&
@@ -529,7 +555,7 @@ export function hasContentAreaWidgets(prefs) {
 
   return WIDGET_REGISTRY.some(
     w =>
-      isWidgetEnabled(w, prefs, prefs["widgets.enabled"]) &&
+      isWidgetEnabled(w, prefs, widgetsEnabled) &&
       !(w.id === "weather" && weatherGoesToSidebar)
   );
 }

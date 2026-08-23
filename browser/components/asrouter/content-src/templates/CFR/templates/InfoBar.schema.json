@@ -142,6 +142,10 @@
           "items": {
             "type": "object",
             "properties": {
+              "id": {
+                "type": "string",
+                "description": "A stable identifier for this button, reported as `event_context.source` on click telemetry. Defaults to `button_<index>` when omitted."
+              },
               "label": {
                 "$ref": "file:///FxMSCommon.schema.json#/$defs/localizableText",
                 "description": "The text label of the button."

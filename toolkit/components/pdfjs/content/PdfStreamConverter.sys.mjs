@@ -1097,6 +1097,13 @@ PdfStreamConverter.prototype = {
   },
 
   getConvertedType(aFromType, aChannel) {
+    // nsIStreamConverter allows a null channel, but PDF.js needs one to decide
+    // how the PDF must be handled.
+    if (!aChannel) {
+      Components.returnCode = Cr.NS_ERROR_INVALID_ARG;
+      return "";
+    }
+
     if (aChannel instanceof Ci.nsIMultiPartChannel) {
       throw new Components.Exception(
         "PDF.js doesn't support multipart responses.",
@@ -1108,7 +1115,7 @@ PdfStreamConverter.prototype = {
     // PDF.js must not claim the channel and rewrite its type to text/html -
     // that breaks the external handler for attachments opened from the compose
     // window (bug 1698140).
-    let browsingContext = aChannel?.loadInfo?.targetBrowsingContext;
+    let browsingContext = aChannel.loadInfo?.targetBrowsingContext;
     if (!browsingContext) {
       throw new Components.Exception(
         "PDF.js can't be used without a browsing context.",
@@ -1117,7 +1124,7 @@ PdfStreamConverter.prototype = {
     }
 
     const HTML = "text/html";
-    let channelURI = aChannel?.URI;
+    let channelURI = aChannel.URI;
     // We can be invoked for application/octet-stream; check if we want the
     // channel first:
     if (aFromType != "application/pdf") {

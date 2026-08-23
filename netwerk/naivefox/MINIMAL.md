@@ -66,9 +66,13 @@ Windows cross-build and staging:
 
 ```bash
 ./netwerk/naivefox/tools/build-product.sh windows \
-  --objdir /absolute/path/to/obj-naivefox-windows \
-  --bootstrap
+  --objdir /absolute/path/to/obj-naivefox-windows
 ```
+
+The generated source tree is intentionally git-less and must be built without
+`--bootstrap`. Bootstrap Mozilla dependencies, when needed, from the full Git
+checkout before exporting; the product build wrapper rejects `--bootstrap` in
+an export with an actionable error.
 
 On Windows, verify the staged directory, including the deterministic
 TunnelSession stop-lifecycle churn:
@@ -193,11 +197,13 @@ The two planner runs and byte-for-byte comparison are mandatory for every
 publication. The exported manifest is the public compact file inventory; rich
 diagnostic categories remain temporary evidence and are not published.
 
-Build all three targets again from the generated directory with new external
-object directories:
+Keep that validated directory pristine for publication. Build an isolated
+verification copy with new external object directories:
 
 ```bash
-cd "$export_root/minimal-source"
+full_source=$PWD
+cp -a "$export_root/minimal-source" "$export_root/verification-source"
+cd "$export_root/verification-source"
 
 ./netwerk/naivefox/tools/build-product.sh linux \
   --objdir /absolute/path/to/export-obj-linux
@@ -227,10 +233,22 @@ the exported binaries. Device H2/H3 acceptance remains a separate mandatory
 online-device gate and must not be inferred from the standalone static check.
 
 Only then replace the contents of a disposable `naivefox-minimal-source`
-worktree and commit one linear generated snapshot. Preserve the
-`.github/workflows/` control-plane overlay in that branch; it is intentionally
-maintained independently from full-source exports. Never hand-edit the product
-tree and never merge it back into `naivefox-full-source`.
+worktree and commit one linear generated snapshot. The helper checks the
+manifest again, requires a clean linked worktree on the generated branch, and
+preserves its `.git` metadata:
+
+```bash
+python3 "$full_source/netwerk/naivefox/tools/replace-minimal-source-worktree.py" \
+  "$export_root/minimal-source" \
+  /absolute/path/to/naivefox-minimal-source
+git -C /absolute/path/to/naivefox-minimal-source status --short
+```
+
+Review and commit the resulting generated changes. The helper never stages or
+commits files. Preserve the `.github/workflows/` control-plane overlay in that
+branch; it is intentionally maintained independently from full-source exports.
+Never hand-edit the product tree and never merge it back to
+`naivefox-full-source`.
 
 ## 5. Cleanup
 

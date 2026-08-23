@@ -68,6 +68,9 @@ export class ContentSection extends React.PureComponent {
         case "WIDGET_STOCKS":
           widgetName = "stocks";
           break;
+        case "WIDGET_RECENT_SEARCHES":
+          widgetName = "recent_searches";
+          break;
         case "WIDGET_PICTURE_OF_THE_DAY":
           widgetName = "picture_of_the_day";
           break;
@@ -203,6 +206,7 @@ export class ContentSection extends React.PureComponent {
       mayHaveCrosswordWidget,
       mayHaveStocksWidget,
       mayHavePictureOfTheDayWidget,
+      mayHaveRecentSearchesWidget,
       mayHaveWeatherForecast,
       openPreferences,
       wallpapersUserEnabled,
@@ -240,6 +244,7 @@ export class ContentSection extends React.PureComponent {
       crosswordEnabled,
       stocksEnabled,
       pictureOfTheDayEnabled,
+      recentSearchesEnabled,
     } = enabledWidgets;
 
     // @nova-cleanup(remove-conditional): Remove novaEnabled check and newtab-custom-stories-toggle, default to newtab-recommended-stories-toggle
@@ -412,6 +417,19 @@ export class ContentSection extends React.PureComponent {
                     />
                   </div>
                 )}
+                {/* Recent searches */}
+                {mayHaveRecentSearchesWidget && (
+                  <div id="recent-searches-widget-section" className="section">
+                    <moz-toggle
+                      id="recent-searches-toggle"
+                      pressed={recentSearchesEnabled || null}
+                      ontoggle={this.onPreferenceSelect}
+                      data-preference="widgets.recentSearches.enabled"
+                      data-event-source="WIDGET_RECENT_SEARCHES"
+                      data-l10n-id="newtab-custom-widget-recent-searches-toggle"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -542,6 +560,9 @@ export class ContentSection extends React.PureComponent {
                             mayHaveStocksWidget={mayHaveStocksWidget}
                             mayHavePictureOfTheDayWidget={
                               mayHavePictureOfTheDayWidget
+                            }
+                            mayHaveRecentSearchesWidget={
+                              mayHaveRecentSearchesWidget
                             }
                             mayHaveWeatherForecast={mayHaveWeatherForecast}
                             weatherDisplay={weatherDisplay}

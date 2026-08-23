@@ -47,10 +47,10 @@
 // ```
 //   (operand here)                  # VALUE
 //   GetAliasedVar ".generator"      # VALUE .generator
-//   Await 0                         # RVAL GENERATOR RESUMEKIND
+//   Await 0                         # RVAL RESUMEKIND
 //
-//   AfterYield                      # RVAL GENERATOR RESUMEKIND
-//   CheckResumeKind                 # RVAL
+//   AfterYield                      # RVAL RESUMEKIND
+//   [resume-kind check]             # RVAL
 // ```
 //
 // Async generators don't use JSOp::AsyncAwait, and that part is handled
@@ -78,18 +78,18 @@
 // ```
 //   (operand here)                  # VALUE
 //   GetAliasedVar ".generator"      # VALUE .generator
-//   Await 1                         # RVAL GENERATOR RESUMEKIND
-//   AfterYield                      # RVAL GENERATOR RESUMEKIND
-//   CheckResumeKind                 # RVAL
+//   Await 1                         # RVAL RESUMEKIND
+//   AfterYield                      # RVAL RESUMEKIND
+//   [resume-kind check]             # RVAL
 //
 //   GetAliasedVar ".generator"      # RVAL .generator
-//   Yield 2                         # RVAL2 GENERATOR RESUMEKIND
+//   Yield 2                         # RVAL2 RESUMEKIND
 //
-//   AfterYield                      # RVAL2 GENERATOR RESUMEKIND
-//   CheckResumeKind                 # RVAL2
+//   AfterYield                      # RVAL2 RESUMEKIND
+//   [resume-kind check]             # RVAL2
 // ```
 //
-// The 1st part (JSOp::Await + JSOp::CheckResumeKind) performs an implicit
+// The 1st part (JSOp::Await + the resume-kind check) performs an implicit
 // `await`, as specified in Yield step 2.
 //
 //   Yield ( value )
@@ -134,7 +134,7 @@
 //          execution context again.
 //       f. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
 //
-// The last part (JSOp::CheckResumeKind) checks the resumption type and
+// The last part (the resume-kind check) checks the resumption type and
 // resumes/throws/returns the execution, as specified in
 // AsyncGeneratorUnwrapYieldResumption
 //
@@ -160,16 +160,16 @@
 // ```
 //   (operand here)                  # VALUE
 //   GetAliasedVar ".generator"      # VALUE .generator
-//   Await 0                         # RVAL GENERATOR RESUMEKIND
-//   AfterYield                      # RVAL GENERATOR RESUMEKIND
-//   CheckResumeKind                 # RVAL
+//   Await 0                         # RVAL RESUMEKIND
+//   AfterYield                      # RVAL RESUMEKIND
+//   [resume-kind check]             # RVAL
 //
 //   SetRval                         #
 //   GetAliasedVar ".generator"      # .generator
 //   FinalYieldRval                  #
 // ```
 //
-// The 1st part (JSOp::Await + JSOp::CheckResumeKind) performs implicit
+// The 1st part (JSOp::Await + the resume-kind check) performs implicit
 // `await`, as specified in ReturnStatement's Evaluation step 3.
 //
 //   ReturnStatement: return Expression;
@@ -249,7 +249,7 @@
 // PromiseHandler::AsyncGeneratorYieldReturnAwaitedRejected), and resumes the
 // generator with the result of await.
 //
-// The return completion is finally handled in JSOp::CheckResumeKind
+// The return completion is finally handled by the resume-kind check
 // after JSOp::Yield.
 //
 //   AsyncGeneratorUnwrapYieldResumption ( resumptionValue )

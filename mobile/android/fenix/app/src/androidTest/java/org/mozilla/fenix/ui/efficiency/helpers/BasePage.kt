@@ -16,6 +16,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.hasAnyAncestor
@@ -200,6 +202,18 @@ abstract class BasePage(protected val composeRule: AndroidComposeTestRule<HomeAc
     // ------------------------------------------------------------
 
     private fun mozWaitForPageToLoad(timeout: Long = 10_000, interval: Long = 100): Boolean {
+        if (pollForPageReady(timeout, interval)) return true
+        // The destination may be covered by a known blocking overlay in its own window (e.g. the
+        // "Secure your saved passwords" system dialog) that the arrival poll cannot see past. Unlike a
+        // moz* verb, this poll has no built-in overlay handling, so dismiss any known overlay and poll
+        // once more before declaring navigation failed.
+        if (dismissKnownOverlaysIfPresent()) {
+            return pollForPageReady(timeout, interval)
+        }
+        return false
+    }
+
+    private fun pollForPageReady(timeout: Long, interval: Long): Boolean {
         val rep = rep()
         val requiredSelectors = mozGetSelectorsByGroup("requiredForPage")
         val deadline = System.currentTimeMillis() + timeout
@@ -1619,6 +1633,10 @@ abstract class BasePage(protected val composeRule: AndroidComposeTestRule<HomeAc
                 is ViewInteraction -> element.check(matches(isChecked()))
                 is UiObject -> if (!element.isChecked) throw AssertionError("'${selector.description}' is not checked")
                 is UiObject2 -> if (!element.isChecked) throw AssertionError("'${selector.description}' is not checked")
+                is SemanticsNodeInteraction -> {
+                    element.assertExists()
+                    element.assertIsOn()
+                }
                 else ->
                     throw AssertionError(
                         "Unsupported element type (${element::class.simpleName}) for selector: ${selector.description}"
@@ -1657,6 +1675,10 @@ abstract class BasePage(protected val composeRule: AndroidComposeTestRule<HomeAc
                 is ViewInteraction -> element.check(matches(isNotChecked()))
                 is UiObject -> if (element.isChecked) throw AssertionError("'${selector.description}' is checked")
                 is UiObject2 -> if (element.isChecked) throw AssertionError("'${selector.description}' is checked")
+                is SemanticsNodeInteraction -> {
+                    element.assertExists()
+                    element.assertIsOff()
+                }
                 else ->
                     throw AssertionError(
                         "Unsupported element type (${element::class.simpleName}) for selector: ${selector.description}"

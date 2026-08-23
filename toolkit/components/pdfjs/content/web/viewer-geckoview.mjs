@@ -21,8 +21,8 @@
  */
 
 /**
- * pdfjsVersion = 6.3.227
- * pdfjsBuild = e05127938
+ * pdfjsVersion = 6.3.237
+ * pdfjsBuild = 9aea8e2df
  */
 
 ;// ./web/ui_utils.js
@@ -896,7 +896,7 @@ const {
 } = globalThis.pdfjsLib;
 
 ;// ./web/internal_evt.js
-const INTERNAL_EVT = "9cec0aca-d738-4ffb-a6aa-af0edf713ce3";
+const INTERNAL_EVT = "0dbae0d4-6a6c-42d9-90aa-b76687a77787";
 const internalOpt = Object.freeze({
   internal: INTERNAL_EVT
 });
@@ -8800,7 +8800,7 @@ class PDFViewer {
   #savedPageViews = null;
   #deletedPageNumbers = null;
   constructor(options) {
-    const viewerVersion = "6.3.227";
+    const viewerVersion = "6.3.237";
     if (version !== viewerVersion) {
       throw new Error(`The API version "${version}" does not match the Viewer version "${viewerVersion}".`);
     }
@@ -12174,12 +12174,10 @@ const PDFViewerApplication = {
     if (factor === 1) {
       return 1;
     }
-    if (this[prop] > 1 && factor < 1 || this[prop] < 1 && factor > 1) {
-      this[prop] = 1;
-    }
-    const newFactor = Math.floor(previousScale * factor * this[prop] * 100) / (100 * previousScale);
-    this[prop] = factor / newFactor;
-    return newFactor;
+    const target = MathClamp(previousScale * factor * this[prop], (/* inlined export .MIN_SCALE */0.1), (/* inlined export .MAX_SCALE */25));
+    const newScale = Math.round(target * 100) / 100;
+    this[prop] = target / newScale;
+    return newScale / previousScale;
   },
   _unblockDocumentLoadEvent() {
     document.blockUnblockOnload?.(false);

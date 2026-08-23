@@ -89,7 +89,6 @@ import mozilla.components.support.webextensions.WebExtensionOptionsPageObserver
 import mozilla.components.support.webextensions.WebExtensionPopupObserver
 import mozilla.components.ui.icons.R as iconsR
 import mozilla.telemetry.glean.private.NoExtras
-import org.mozilla.experiments.nimbus.initializeTooling
 import org.mozilla.fenix.GleanMetrics.AppIcon
 import org.mozilla.fenix.GleanMetrics.Events
 import org.mozilla.fenix.GleanMetrics.Metrics
@@ -440,8 +439,6 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
         // DO NOT MOVE ANYTHING ABOVE THIS getProfilerTime CALL.
         val startTimeProfiler = components.core.engine.profiler?.getProfilerTime()
 
-        // Setup nimbus-cli tooling. This is a NOOP when launching normally.
-        components.nimbus.sdk.initializeTooling(applicationContext, intent)
         components.strictMode.attachListenerToDisablePenaltyDeath(supportFragmentManager)
         MarkersFragmentLifecycleCallbacks.register(supportFragmentManager, components.core.engine)
 

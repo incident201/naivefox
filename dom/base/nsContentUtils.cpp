@@ -108,7 +108,6 @@
 #include "mozilla/Result.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/ScrollContainerFrame.h"
-#include "mozilla/ScrollbarPreferences.h"
 #include "mozilla/ShutdownPhase.h"
 #include "mozilla/Span.h"
 #include "mozilla/StaticAnalysisFunctions.h"
@@ -116,6 +115,7 @@
 #include "mozilla/StaticPrefs_clipboard.h"
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/StaticPrefs_network.h"
+#include "mozilla/StaticPrefs_pdfjs.h"
 #include "mozilla/dom/ReportDeliver.h"
 #include "mozilla/extensions/WebExtensionPolicy.h"
 #include "nsIOService.h"
@@ -8693,11 +8693,7 @@ bool nsContentUtils::AllowXULXBLForPrincipal(nsIPrincipal* aPrincipal) {
   return xpc::IsInAutomation() && IsSitePermAllow(aPrincipal, "allowXULXBL"_ns);
 }
 
-bool nsContentUtils::IsPDFJSEnabled() {
-  nsCOMPtr<nsIStreamConverter> conv = do_CreateInstance(
-      "@mozilla.org/streamconv;1?from=application/pdf&to=text/html");
-  return conv;
-}
+bool nsContentUtils::IsPDFJSEnabled() { return !StaticPrefs::pdfjs_disabled(); }
 
 bool nsContentUtils::IsPDFJS(nsIPrincipal* aPrincipal) {
   if (!aPrincipal || !aPrincipal->SchemeIs("resource")) {
@@ -11871,16 +11867,6 @@ bool nsContentUtils::IsSpecificAboutPage(JSObject* aGlobal, const char* aUri) {
 }
 
 /* static */
-void nsContentUtils::SetScrollbarsVisibility(nsIDocShell* aDocShell,
-                                             bool aVisible) {
-  if (!aDocShell) {
-    return;
-  }
-  auto pref = aVisible ? ScrollbarPreference::Auto : ScrollbarPreference::Never;
-  nsDocShell::Cast(aDocShell)->SetScrollbarPreference(pref);
-}
-
-/* static */
 nsIDocShell* nsContentUtils::GetDocShellForEventTarget(EventTarget* aTarget) {
   if (!aTarget) {
     return nullptr;
@@ -12950,9 +12936,10 @@ uint32_t nsContentUtils::HtmlObjectContentTypeForMIMEType(
     return nsIObjectLoadingContent::TYPE_DOCUMENT;
   }
 
-  // Faking support of the PDF content as a document for EMBED tags
-  // when internal PDF viewer is enabled.
-  if (aMIMEType.LowerCaseEqualsLiteral(APPLICATION_PDF) && IsPDFJSEnabled()) {
+  // Faking support of the PDF content as a document for EMBED tags when the
+  // internal PDF viewer or the embedded PDF fallback is enabled.
+  if (aMIMEType.LowerCaseEqualsLiteral(APPLICATION_PDF) &&
+      (IsPDFJSEnabled() || StaticPrefs::pdfjs_embedFallback())) {
     // Sandboxed iframes are just never allowed to display plugins. In the
     // modern world, this just means "application/pdf".
     return aIsSandboxed ? nsIObjectLoadingContent::TYPE_FALLBACK

@@ -1222,15 +1222,6 @@ bool DebugAfterYield(JSContext* cx, BaselineFrame* frame) {
   return DebugAPI::onResumeFrame(cx, frame);
 }
 
-bool GeneratorThrowOrReturn(JSContext* cx, BaselineFrame* frame,
-                            Handle<AbstractGeneratorObject*> genObj,
-                            HandleValue arg, int32_t resumeKindArg) {
-  GeneratorResumeKind resumeKind = IntToResumeKind(resumeKindArg);
-  MOZ_ALWAYS_FALSE(
-      js::GeneratorThrowOrReturn(cx, frame, genObj, arg, resumeKind));
-  return false;
-}
-
 bool GlobalDeclInstantiationFromIon(JSContext* cx, HandleScript script,
                                     const jsbytecode* pc) {
   MOZ_ASSERT(!script->hasNonSyntacticScope());

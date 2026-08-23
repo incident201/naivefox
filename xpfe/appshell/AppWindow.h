@@ -245,7 +245,6 @@ class AppWindow final : public nsIBaseWindow,
   void EnableParent(bool aEnable);
   void PlaceWindowLayersBehind(uint32_t aLowLevel, uint32_t aHighLevel,
                                nsIAppWindow* aBehind);
-  void SetContentScrollbarVisibility(bool aVisible);
 
   enum PersistentAttributeUpdate { Sync, Async };
   void PersistentAttributesDirty(PersistentAttributes,

@@ -775,15 +775,15 @@ mozilla::ipc::IPCResult SocketProcessChild::RecvFlushFOGData(
 }
 
 mozilla::ipc::IPCResult SocketProcessChild::RecvLoadSSLTokensCache(
-    ByteBuf&& aBuf) {
-  SSLTokensCache::DeserializeFromIPCAsync(std::move(aBuf),
+    nsTArray<SSLTokensCacheRecordInfo>&& aRecords) {
+  SSLTokensCache::DeserializeFromIPCAsync(std::move(aRecords),
                                           /* aRestored */ true);
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult SocketProcessChild::RecvFlushSSLTokensCache(
     FlushSSLTokensCacheResolver&& aResolver) {
-  aResolver(mozilla::ipc::ByteBufFrom(SSLTokensCache::SerializeForIPC()));
+  aResolver(SSLTokensCache::SerializeForIPC());
   return IPC_OK();
 }
 

@@ -621,6 +621,7 @@ export const URILoadingHelper = {
           focusUrlBar,
           openerBrowser: params.openerBrowser,
           fromExternal: params.fromExternal,
+          eventDetail: params.eventDetail,
           globalHistoryOptions,
           schemelessInput: params.schemelessInput,
           hasValidUserGestureActivation,

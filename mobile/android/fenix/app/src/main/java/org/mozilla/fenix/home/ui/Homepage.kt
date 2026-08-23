@@ -445,7 +445,6 @@ internal fun TopSitesSection(
         interactor = interactor,
         onTopSitesItemBound = onTopSitesItemBound,
         onAddShortcutClicked = onAddShortcutClicked,
-        isPager = components.settings.topSitesPager,
     )
 }
 

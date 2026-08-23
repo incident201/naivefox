@@ -117,6 +117,7 @@ if CONFIG["OS_TARGET"] != "Android":
     UNIFIED_SOURCES += [
         "TestCDMStorage.cpp",
         "TestGMPCrossOrigin.cpp",
+        "TestGMPPluginScan.cpp",
         "TestGMPRemoveAndDelete.cpp",
     ]
 

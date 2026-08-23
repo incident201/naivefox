@@ -526,7 +526,6 @@ export const AIWindow = {
     );
     if (willOpenImmersive) {
       propBag.setPropertyAsBool("aiwindow-immersive-view", true);
-      propBag.setPropertyAsBool("aiwindow-new-window", true);
     }
 
     return args;
@@ -1011,8 +1010,7 @@ export const AIWindow = {
     if (!this.isAIWindowActiveAndEnabled(win)) {
       root.toggleAttribute("hide-ai-sidebar", shouldHideSidebarForNewtab);
       root.removeAttribute("aiwindow-immersive-view");
-      root.removeAttribute("aiwindow-new-window");
-      root.removeAttribute("aiwindow-has-nav-forward");
+      root.removeAttribute("aiwindow-first-run");
       return;
     }
 
@@ -1027,26 +1025,18 @@ export const AIWindow = {
 
     /* sets attr only for first run for css reasons */
     const isFirstRun = currentURI.equalsExceptRef(FIRSTRUN_URI);
-    // A new window has a single tab; once more tabs are open the window is no
-    // longer in dedicated new-window mode and the navbar reappears.
-    const isNewWindow = win.gBrowser.tabs.length === 1;
-    root.toggleAttribute("aiwindow-first-run", isFirstRun && isImmersiveView);
-    root.toggleAttribute("aiwindow-immersive-view", isImmersiveView);
-    const wasNewWindow = root.hasAttribute("aiwindow-new-window");
-    root.toggleAttribute("aiwindow-new-window", isImmersiveView && isNewWindow);
-    if (wasNewWindow && !root.hasAttribute("aiwindow-new-window")) {
+    const isFirstRunView = isFirstRun && isImmersiveView;
+    // Leaving first run reveals the previously hidden nav-bar; notify the urlbar
+    // so it can recompute its layout breakout for the now-visible bar.
+    if (root.hasAttribute("aiwindow-first-run") && !isFirstRunView) {
       Services.obs.notifyObservers(
         win,
         "ai-window-state-changed",
         "nav-bar-visible"
       );
     }
-
-    const canGoForward =
-      isImmersiveView &&
-      !isFirstRun &&
-      (win.gBrowser.selectedBrowser?.webNavigation?.canGoForward ?? false);
-    root.toggleAttribute("aiwindow-has-nav-forward", canGoForward);
+    root.toggleAttribute("aiwindow-first-run", isFirstRunView);
+    root.toggleAttribute("aiwindow-immersive-view", isImmersiveView);
 
     const askButton = win.document.getElementById("smartwindow-ask-button");
     if (askButton) {

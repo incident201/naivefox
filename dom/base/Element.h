@@ -778,10 +778,6 @@ class Element : public FragmentOrElement {
   REFLECT_NULLABLE_DOMSTRING_ATTR(AriaValueNow, aria_valuenow)
   REFLECT_NULLABLE_DOMSTRING_ATTR(AriaValueText, aria_valuetext)
 
- protected:
-  already_AddRefed<ShadowRoot> AttachShadowInternal(ShadowRootMode,
-                                                    ErrorResult& aError);
-
  public:
   MOZ_CAN_RUN_SCRIPT
   ScrollContainerFrame* GetScrollContainerFrame(

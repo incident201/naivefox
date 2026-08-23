@@ -596,9 +596,6 @@ contentblocking:
       ('pageLoad' = There was a page load, 'blocked' = at least one cryptominer
       was blocked, 'allowed' = at least one cryptominer was detected and
       allowed.) Note, pageLoad is used as a baseline measurement.
-
-      This metric was generated to correspond to the Legacy Telemetry
-      categorical histogram CRYPTOMINERS_BLOCKED_COUNT.
     labels:
       - pageLoad
       - blocked
@@ -611,7 +608,6 @@ contentblocking:
       - privacy-team@mozilla.org
       - seceng-telemetry@mozilla.com
     expires: never
-    telemetry_mirror: h#CRYPTOMINERS_BLOCKED_COUNT
 
 cookie_purging:
   origins_purged:

@@ -322,6 +322,11 @@ export const INITIAL_STATE = {
     // pref made it; `awardedAt` doubles as its id.
     celebration: null,
   },
+  RecentSearches: {
+    initialized: false,
+    // Recent search strings, newest first.
+    searches: [],
+  },
 };
 
 function App(prevState = INITIAL_STATE.App, action) {
@@ -1289,6 +1294,19 @@ function PrivacyWidget(prevState = INITIAL_STATE.PrivacyWidget, action) {
   }
 }
 
+function RecentSearches(prevState = INITIAL_STATE.RecentSearches, action) {
+  switch (action.type) {
+    case at.WIDGETS_RECENT_SEARCHES_UPDATE:
+      return {
+        ...prevState,
+        ...action.data,
+        initialized: true,
+      };
+    default:
+      return prevState;
+  }
+}
+
 function Ads(prevState = INITIAL_STATE.Ads, action) {
   switch (action.type) {
     case at.ADS_INIT:
@@ -1593,4 +1611,5 @@ export const reducers = {
   SportsWidget,
   PrivacyWidget,
   PictureOfTheDay,
+  RecentSearches,
 };

@@ -10,6 +10,7 @@
   display: inline-block;
   height: fit-content;
   width: fit-content;
+  user-select: none;
 }
 
 :host([type="split"]) {

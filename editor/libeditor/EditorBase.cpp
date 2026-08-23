@@ -4236,6 +4236,10 @@ nsresult EditorBase::OnCompositionChange(
 
 void EditorBase::OnCompositionEnd(
     WidgetCompositionEvent& aCompositionEndEvent) {
+  // In the usual case, this is called with an eCompositionEnd event,
+  // however, TextComposition may also call it with the eCompositionCommit
+  // directly (e.g. when the editor is removed during a composition).
+  MOZ_ASSERT(aCompositionEndEvent.CausesDOMCompositionEndEvent());
   MOZ_LOG(gTextInputLog, LogLevel::Info,
           ("%p %s::OnCompositionEnd(aCompositionEndEvent={ mData=\"%s\"}), "
            "mComposition=%p",

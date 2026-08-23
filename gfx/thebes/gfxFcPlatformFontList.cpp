@@ -1143,7 +1143,7 @@ FTUserFontData* gfxFontconfigFontEntry::GetUserFontData() {
   return nullptr;
 }
 
-bool gfxFontconfigFontEntry::HasVariations() {
+bool gfxFontconfigFontEntry::HasVariationsInternal() {
   // If the answer is already cached, just return it.
   switch (mHasVariations) {
     case HasVariationsState::No:
@@ -1211,7 +1211,7 @@ FT_MM_Var* gfxFontconfigFontEntry::GetMMVar() {
   return mMMVar;
 }
 
-void gfxFontconfigFontEntry::GetVariationAxes(
+void gfxFontconfigFontEntry::GetVariationAxesInternal(
     nsTArray<gfxFontVariationAxis>& aAxes) {
   if (!HasVariations()) {
     return;
@@ -1219,7 +1219,7 @@ void gfxFontconfigFontEntry::GetVariationAxes(
   gfxFT2Utils::GetVariationAxes(GetMMVar(), aAxes);
 }
 
-void gfxFontconfigFontEntry::GetVariationInstances(
+void gfxFontconfigFontEntry::GetVariationInstancesInternal(
     nsTArray<gfxFontVariationInstance>& aInstances) {
   if (!HasVariations()) {
     return;

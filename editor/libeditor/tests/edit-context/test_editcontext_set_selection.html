@@ -14,6 +14,11 @@
 const host = document.querySelector('div');
 const editContext = new EditContext({text: 'cạ̀́b'});
 host.editContext = editContext;
+editContext.addEventListener('characterboundsupdate', e => {
+  // Provide fake character bounds so that we don't suppress IME notifications
+  const bounds = new Array(e.rangeEnd - e.rangeStart).fill(new DOMRect(1,1,1,1));
+  editContext.updateCharacterBounds(e.rangeStart, bounds);
+});
 const utils = SpecialPowers.getDOMWindowUtils(window);
 
 async function doTest(test) {
@@ -97,8 +102,6 @@ add_task(async () => {
 add_task(async () => {
   host.focus();
   editContext.updateSelection(1, 4);
-  // Wait for IMEContentObserver to handle the selection change.
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   // Test that this eSetSelection event updates the IMEContentObserver's cached selection,
   // so it doesn't skip sending the second eSetSelection
   await synthesizeSelectionSet(3, 0);

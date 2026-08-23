@@ -228,6 +228,10 @@ CacheFileHandle::~CacheFileHandle() {
 }
 
 void CacheFileHandle::Log() {
+  if (!LOG_ENABLED()) {
+    return;
+  }
+
   nsAutoCString leafName;
   if (mFile) {
     mFile->GetNativeLeafName(leafName);
@@ -1300,7 +1304,11 @@ void CacheFileIOManager::ShutdownInternal() {
     // Invalid files don't have metadata and thus won't load anyway
     // (hashes won't match).
 
-    if (!h->IsSpecialFile() && !h->mIsDoomed && !h->mFileExists) {
+    // Past the shutdown I/O lag the index is no longer written to disk, so
+    // this bookkeeping would be thrown away. The next startup rescans the
+    // entries directory and drops the stale entries anyway.
+    if (!h->IsSpecialFile() && !h->mIsDoomed && !h->mFileExists &&
+        !CacheObserver::IsPastShutdownIOLag()) {
       CacheIndex::RemoveEntry(h->Hash(), h->Key());
     }
 

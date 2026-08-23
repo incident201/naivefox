@@ -45,10 +45,6 @@ const DISALLOWED = {
     flag: Ci.nsIWebBrowserChrome.CHROME_SUPPRESS_INITIAL_FULLSCREEN,
     defaults_to: false,
   },
-  extrachrome: {
-    flag: Ci.nsIWebBrowserChrome.CHROME_EXTRA,
-    defaults_to: false,
-  },
   centerscreen: {
     flag: Ci.nsIWebBrowserChrome.CHROME_CENTER_SCREEN,
     defaults_to: false,
@@ -217,40 +213,6 @@ add_task(async function test_disallowed_flags() {
         Ci.nsIWebBrowserChrome.CHROME_ALL,
         "Should not have been able to set CHROME_ALL"
       );
-      await BrowserTestUtils.closeWindow(win);
-    }
-  );
-});
-
-/**
- * Opens a window with some chrome flags specified, which should not affect
- * scrollbars flag which defaults to true when not disabled explicitly.
- */
-add_task(async function test_scrollbars_flag() {
-  const SCRIPT = 'window.open("about:blank", "_blank", "toolbar=0");';
-  const SCRIPT_PAGE = `data:text/html,<script>${SCRIPT}</script>`;
-
-  let newWinPromise = BrowserTestUtils.waitForNewWindow();
-  await BrowserTestUtils.withNewTab(
-    {
-      gBrowser,
-      url: SCRIPT_PAGE,
-    },
-    async function () {
-      let win = await newWinPromise;
-
-      let parentChromeFlags = getParentChromeFlags(win);
-      Assert.ok(
-        parentChromeFlags & Ci.nsIWebBrowserChrome.CHROME_SCROLLBARS,
-        "Should have scrollbars when not disabled explicitly"
-      );
-
-      let contentChromeFlags = await getContentChromeFlags(win);
-      Assert.ok(
-        contentChromeFlags & Ci.nsIWebBrowserChrome.CHROME_SCROLLBARS,
-        "Should have scrollbars when not disabled explicitly"
-      );
-
       await BrowserTestUtils.closeWindow(win);
     }
   );

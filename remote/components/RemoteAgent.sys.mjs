@@ -147,6 +147,10 @@ class RemoteAgentParentProcess {
     return this.running && this.#isBrowserAutomation;
   }
 
+  get isDynamicStartRunning() {
+    return this.running && !this.#isBrowserAutomation;
+  }
+
   get scheme() {
     return this.#server?.identity.primaryScheme;
   }
@@ -455,6 +459,7 @@ class RemoteAgentParentProcess {
       lazy.logger.trace(`Received observer notification ${topic}`);
     }
 
+    let hasBeforeCancelObserver = false;
     switch (topic) {
       case "profile-after-change":
         Services.obs.addObserver(this, "command-line-startup");
@@ -475,9 +480,13 @@ class RemoteAgentParentProcess {
           Services.appinfo.annotateCrashReport("RemoteAgent", true);
 
           Services.obs.addObserver(this, "final-ui-startup");
-          Services.obs.addObserver(this, "before-cancel-download-prompt");
           Services.obs.addObserver(this, "browser-idle-startup-tasks-finished");
           Services.obs.addObserver(this, "mail-idle-startup-tasks-finished");
+
+          // startAtRuntime will not hit this path, and the observer should not
+          // be removed on quit-application.
+          Services.obs.addObserver(this, "before-cancel-download-prompt");
+          hasBeforeCancelObserver = true;
 
           this.#addShutdownObservers();
 
@@ -515,10 +524,14 @@ class RemoteAgentParentProcess {
       // and a possible running instance of httpd.js.
       case "quit-application":
         Services.obs.removeObserver(this, topic);
-        // Remove this observer here rather than inside the handler itself,
-        // because on some platforms the notification fires multiple times
-        // and removing an already-removed observer would throw.
-        Services.obs.removeObserver(this, "before-cancel-download-prompt");
+
+        if (hasBeforeCancelObserver) {
+          // Remove this observer here rather than inside the handler itself,
+          // because on some platforms the notification fires multiple times
+          // and removing an already-removed observer would throw.
+          Services.obs.removeObserver(this, "before-cancel-download-prompt");
+        }
+
         lazy.logger.trace(
           `Application is shutting down with reason: "${data || "unknown"}"`
         );

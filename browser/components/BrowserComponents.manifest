@@ -18,6 +18,9 @@ category browser-before-ui-startup resource:///modules/BuiltInThemes.sys.mjs Bui
 category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init
 #endif
 category browser-before-ui-startup moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs ResetPBMPanel.init
+#ifdef NIGHTLY_BUILD
+category browser-before-ui-startup moz-src:///browser/components/remotecontrol/RemoteControlPanel.sys.mjs RemoteControlPanel.init
+#endif
 category browser-before-ui-startup resource:///modules/AboutHomeStartupCache.sys.mjs AboutHomeStartupCache.init
 category browser-before-ui-startup resource:///modules/AccountsGlue.sys.mjs AccountsGlue.init
 category browser-before-ui-startup moz-src:///browser/modules/ObserverForwarder.sys.mjs ObserverForwarder.init
@@ -179,6 +182,7 @@ category browser-idle-startup moz-src:///browser/components/urlbar/QuickSuggest.
 category browser-idle-startup moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.init
 category browser-idle-startup moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.init
 category browser-idle-startup resource://gre/modules/ContentRelevancyManager.sys.mjs ContentRelevancyManager.init
+category browser-idle-startup chrome://global/content/ml/EngineProcess.sys.mjs EngineProcess.maybeReportNativeOnnxRuntimeAvailability
 category browser-idle-startup resource://gre/modules/ColorwayThemeMigration.sys.mjs ColorwayThemeMigration.maybeWarn
 category browser-idle-startup resource://gre/modules/AppServicesTracing.sys.mjs RustLogForwarder.init
 #ifdef MOZ_UPDATER

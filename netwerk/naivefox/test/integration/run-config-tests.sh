@@ -102,6 +102,7 @@ config = {
         f"@localhost:{os.environ['PROXY_PORT']}"
     )] * 3,
     "host-resolver-rules": "MAP localhost 127.0.0.1",
+    "insecure-concurrency": 2,
     "extra-headers": "X-NaiveFox-Config-Test: enabled" + chr(13) + chr(10),
     "no-post-quantum": True,
     "log": "",

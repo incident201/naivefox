@@ -2541,13 +2541,6 @@ class Settings(
             default = { FxNimbus.features.adsClientForStories.value().enabled },
         )
 
-    /** Indicates if the top sites pager layout is enabled. */
-    var topSitesPager by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_top_sites_pager),
-            default = false,
-        )
-
     /** Indicates if Add Shortcuts improvement is enabled. */
     var enableAddShortcutsImprovement by
         booleanPreference(

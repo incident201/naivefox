@@ -224,6 +224,9 @@ export class _CustomizeMenu extends React.PureComponent {
                 mayHavePictureOfTheDayWidget={
                   this.props.mayHavePictureOfTheDayWidget
                 }
+                mayHaveRecentSearchesWidget={
+                  this.props.mayHaveRecentSearchesWidget
+                }
                 dispatch={this.props.dispatch}
                 onSubpanelToggle={this.onSubpanelToggle}
                 toggleSectionsMgmtPanel={this.props.toggleSectionsMgmtPanel}

@@ -1222,6 +1222,16 @@ var gSync = {
     return targets.sort((a, b) => b.lastAccessTime - a.lastAccessTime);
   },
 
+  // Returns the clientType attribute value used for device icons for a send
+  // tab to device target, preferring the Sync client record when available.
+  getTargetClientType(target) {
+    if (target.clientRecord) {
+      return Weave.Service.clientsEngine.getClientType(target.clientRecord.id);
+    }
+    // For phones, FxA uses "mobile" and Sync clients uses "phone".
+    return target.type == "mobile" ? "phone" : target.type;
+  },
+
   hasOnlyMobileSendTabTargets(targets = this.getSendTabTargets()) {
     return (
       !targets.length ||
@@ -1383,9 +1393,12 @@ var gSync = {
     PanelMultiView.getViewNode(
       document,
       "PanelUI-fxa-menu-sync-status-off-button"
-    ).addEventListener("click", e =>
-      this.openPrefsFromFxaMenu("sync_settings", e.currentTarget)
-    );
+    ).addEventListener("click", e => {
+      // We can't use the onCommand handler as we need to be able to pass in
+      // the event currentTarget.
+      this.openPrefsFromFxaMenu("sync_settings", e.currentTarget);
+      CustomizableUI.hidePanelForNode(e.currentTarget);
+    });
     PanelMultiView.getViewNode(
       document,
       "PanelUI-fxa-menu-secure-sync-subpanel"
@@ -2801,15 +2814,11 @@ var gSync = {
     }
 
     for (let target of targets) {
-      let type, lastModified;
+      let type = this.getTargetClientType(target);
+      let lastModified;
       if (target.clientRecord) {
-        type = Weave.Service.clientsEngine.getClientType(
-          target.clientRecord.id
-        );
         lastModified = new Date(target.clientRecord.serverLastModified * 1000);
       } else {
-        // For phones, FxA uses "mobile" and Sync clients uses "phone".
-        type = target.type == "mobile" ? "phone" : target.type;
         lastModified = target.lastAccessTime
           ? new Date(target.lastAccessTime)
           : null;
@@ -3514,11 +3523,13 @@ var gSync = {
     openTrustedLinkIn("about:preferences#sync", "tab");
   },
 
-  async openPairDevice(sourceElement) {
-    const entryPoint =
-      this._getEntryPointForElement(sourceElement) === "fxa_app_menu"
-        ? "send-tab-app-menu"
-        : "send-tab-account-menu";
+  async openPairDevice(sourceElement, entryPoint) {
+    if (!entryPoint) {
+      entryPoint =
+        this._getEntryPointForElement(sourceElement) === "fxa_app_menu"
+          ? "send-tab-app-menu"
+          : "send-tab-account-menu";
+    }
     const url = await FxAccounts.config.promisePairingURI({
       entrypoint: entryPoint,
     });

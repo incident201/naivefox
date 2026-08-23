@@ -42,6 +42,7 @@ const MONITOR_ACTIONS = {
   REQUEST_UPDATE_MONITOR: "RequestUpdateMonitor",
   REQUEST_RUN_MONITOR: "RequestRunMonitor",
   REQUEST_PAUSE_MONITOR: "RequestPauseMonitor",
+  REQUEST_OPEN_URL: "RequestOpenUrl",
 };
 
 const SCHEDULE_ICON = "chrome://browser/skin/calendar-24.svg";
@@ -132,6 +133,7 @@ export class AITasks extends MozLitElement {
     this.boundHandleMonitorDelete = this.handleMonitorDelete.bind(this);
     this.boundHandleMonitorPause = this.handleMonitorPause.bind(this);
     this.boundHandleMonitorCheckNow = this.handleMonitorCheckNow.bind(this);
+    this.boundHandleMonitorOpen = this.handleMonitorOpen.bind(this);
     this.boundHandleMonitorSubmit = this.handleMonitorSubmit.bind(this);
 
     // Listen for events bubbling up from monitors-display > agent-monitor-item
@@ -150,6 +152,10 @@ export class AITasks extends MozLitElement {
     this.addEventListener(
       "agent-monitor-item:submit",
       this.boundHandleMonitorSubmit
+    );
+    this.addEventListener(
+      "AIChatContent:OpenLink",
+      this.boundHandleMonitorOpen
     );
   }
 
@@ -239,6 +245,10 @@ export class AITasks extends MozLitElement {
     this.removeEventListener(
       "agent-monitor-item:submit",
       this.boundHandleMonitorSubmit
+    );
+    this.removeEventListener(
+      "AIChatContent:OpenLink",
+      this.boundHandleMonitorOpen
     );
   }
 
@@ -372,6 +382,28 @@ export class AITasks extends MozLitElement {
       }
     } catch (error) {
       console.error("Failed to run monitor check:", error);
+    }
+  }
+
+  /**
+   * Handles the open event from a watched page chip in agent-monitor-item.
+   *
+   * @param {CustomEvent} event - Event containing the page url
+   */
+  async handleMonitorOpen(event) {
+    event.stopPropagation();
+
+    const { url } = event.detail;
+    try {
+      const result = await this.#dispatchMonitorAction(
+        MONITOR_ACTIONS.REQUEST_OPEN_URL,
+        { url }
+      );
+      if (!result?.success) {
+        console.error("Failed to open monitor URL:", result?.error);
+      }
+    } catch (error) {
+      console.error("Failed to open monitor URL:", error);
     }
   }
 

@@ -178,11 +178,6 @@ class gfxDWriteFontEntry final : public gfxFontEntry {
 
   bool IsCJKFont();
 
-  bool HasVariations() override;
-  void GetVariationAxes(nsTArray<gfxFontVariationAxis>& aAxes) override;
-  void GetVariationInstances(
-      nsTArray<gfxFontVariationInstance>& aInstances) override;
-
   void SetForceGDIClassic(bool aForce) { mForceGDIClassic = aForce; }
   bool GetForceGDIClassic() { return mForceGDIClassic; }
 
@@ -201,6 +196,11 @@ class gfxDWriteFontEntry final : public gfxFontEntry {
 
   // Protected destructor, to discourage deletion outside of Release():
   virtual ~gfxDWriteFontEntry();
+
+  bool HasVariationsInternal() override;
+  void GetVariationAxesInternal(nsTArray<gfxFontVariationAxis>& aAxes) override;
+  void GetVariationInstancesInternal(
+      nsTArray<gfxFontVariationInstance>& aInstances) override;
 
   hb_blob_t* GetFontTableInternal(uint32_t aTableTag) override;
 

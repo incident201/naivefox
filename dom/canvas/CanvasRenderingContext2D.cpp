@@ -1092,8 +1092,6 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CanvasRenderingContext2D)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-CanvasRenderingContext2D::ContextState::ContextState() = default;
-
 CanvasRenderingContext2D::ContextState::ContextState(const ContextState& aOther)
     : fontGroup(aOther.fontGroup),
       fontFont(aOther.fontFont),
@@ -1114,6 +1112,8 @@ CanvasRenderingContext2D::ContextState::ContextState(const ContextState& aOther)
       wordSpacing(aOther.wordSpacing),
       letterSpacingStr(aOther.letterSpacingStr),
       wordSpacingStr(aOther.wordSpacingStr),
+      lang(aOther.lang),
+      resolvedFontLang(aOther.resolvedFontLang),
       shadowColor(aOther.shadowColor),
       transform(aOther.transform),
       shadowOffset(aOther.shadowOffset),
@@ -1133,9 +1133,8 @@ CanvasRenderingContext2D::ContextState::ContextState(const ContextState& aOther)
       filter(aOther.filter),
       filterAdditionalImages(aOther.filterAdditionalImages.Clone()),
       filterSourceGraphicTainted(aOther.filterSourceGraphicTainted),
-      imageSmoothingEnabled(aOther.imageSmoothingEnabled) {}
-
-CanvasRenderingContext2D::ContextState::~ContextState() = default;
+      imageSmoothingEnabled(aOther.imageSmoothingEnabled),
+      explicitLang(aOther.explicitLang) {}
 
 void CanvasRenderingContext2D::ContextState::SetColorStyle(Style aWhichStyle,
                                                            nscolor aColor) {
@@ -4183,7 +4182,6 @@ void CanvasRenderingContext2D::SetFont(const nsACString& aFont,
 
   if (ResolveFontLang()) {
     CurrentState().fontGroup = nullptr;
-    mFontGroupCache.reset(nullptr);
   }
 
   SetFontInternal(aFont, aError);
@@ -4222,7 +4220,6 @@ bool CanvasRenderingContext2D::SetFontInternal(const nsACString& aFont,
   }
 
   if (!mFontStyleCache) {
-    mFontGroupCache.reset(nullptr);
     mFontStyleCache = MakeUnique<FontStyleCache>();
   }
 
@@ -4454,13 +4451,14 @@ bool CanvasRenderingContext2D::SetFontInternalDisconnected(
 
   // Do we have a cached fontgroup that corresponds to this `font` value?
   if (!mFontGroupCache) {
-    mFontStyleCache.reset(nullptr);
     mFontGroupCache = MakeUnique<FontGroupCache>();
   }
 
   auto& state = CurrentState();
   FontGroupCacheKey key(
-      aFont, fontFaceSetImpl ? fontFaceSetImpl->GetRebuildGeneration() : 0);
+      aFont, state.resolvedFontLang, state.fontWidth, state.fontVariantCaps,
+      state.fontKerning,
+      fontFaceSetImpl ? fontFaceSetImpl->GetRebuildGeneration() : 0);
   auto entry = mFontGroupCache->Lookup(key);
   if (entry) {
     const auto& data = entry.Data();
@@ -5492,7 +5490,6 @@ gfxFontGroup* CanvasRenderingContext2D::GetCurrentFontStyle() {
   if (ResolveFontLang()) {
     // If lang has changed, any cached fontGroup needs to be replaced.
     CurrentState().fontGroup = nullptr;
-    mFontGroupCache.reset(nullptr);
   } else {
     // If there is a cached fontGroup, check if visibility setting matches;
     // if not, we can't use it and will have to re-create it.

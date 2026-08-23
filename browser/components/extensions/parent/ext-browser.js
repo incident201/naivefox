@@ -423,7 +423,7 @@ class TabTracker extends TabTrackerBase {
       let nativeTab = adoptedTab;
       let adoptedBy = adoptingTab;
       let oldWindowId = windowTracker.getId(nativeTab.documentGlobal);
-      let oldPosition = nativeTab._tPos;
+      let oldPosition = nativeTab.index;
       this.emit("tab-detached", {
         nativeTab,
         adoptedBy,
@@ -435,7 +435,7 @@ class TabTracker extends TabTrackerBase {
     if (this.has("tab-attached")) {
       let nativeTab = adoptingTab;
       let newWindowId = windowTracker.getId(nativeTab.documentGlobal);
-      let newPosition = nativeTab._tPos;
+      let newPosition = nativeTab.index;
       this.emit("tab-attached", {
         nativeTab,
         tabId,
@@ -846,7 +846,7 @@ class Tab extends TabBase {
   }
 
   get index() {
-    return this.nativeTab._tPos;
+    return this.nativeTab.index;
   }
 
   get mutedInfo() {

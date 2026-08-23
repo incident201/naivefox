@@ -373,6 +373,17 @@ async function generateFormValuesBatch(request, { signal } = {}) {
  */
 export const SmartFormFillModel = {
   /**
+   * Checks whether a failed Smart Form Fill model request can be retried.
+   *
+   * @param {unknown} error The request failure to classify.
+   *
+   * @returns {boolean} Whether the error is worth retrying
+   */
+  isRetryableRequestError(error) {
+    return openAIEngine.isRetryableError(error);
+  },
+
+  /**
    * Trigger LLM request to classify form fields
    *
    * @param {ClassifyFieldsRequestBody} request

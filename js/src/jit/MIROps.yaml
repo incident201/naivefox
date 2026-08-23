@@ -3630,15 +3630,6 @@
   alias_set: none
   generate_lir: true
 
-- name: IsGenClosing
-  operands:
-    value: Value
-  result_type: Boolean
-  movable: true
-  congruent_to: if_operands_equal
-  alias_set: none
-  generate_lir: true
-
 - name: IsSuspendedGenerator
   operands:
     object: Object
@@ -3769,14 +3760,6 @@
   movable: false
   congruent_to: if_operands_and_arguments_equal
   alias_set: none
-  generate_lir: true
-
-# Assert this frame's ResumeFrameArgs resume kind is GeneratorResumeKind::Next.
-# Only used in DEBUG builds.
-- name: AssertResumeKindIsNext
-  guard: true
-  alias_set: none
-  lir_temps: 1
   generate_lir: true
 
 # Clear the frame's FrameDescriptor::IsResumingGenerator bit.

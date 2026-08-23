@@ -480,12 +480,14 @@ export class ProtonScreen extends React.PureComponent {
     darkModeImageURL,
     reducedMotionImageURL,
     darkModeReducedMotionImageURL,
+    videoURL,
     alt = "",
     width,
     height,
     marginBlock,
     marginInline,
     style,
+    imgStyle,
     className = "logo-container",
   }) {
     function getLoadingStrategy() {
@@ -502,14 +504,40 @@ export class ProtonScreen extends React.PureComponent {
       return "eager";
     }
 
-    const pictureStyle = {
+    const containerStyle = {
       marginInline,
       marginBlock,
       ...style,
     };
 
+    // videoURL lets this render a one-shot animation instead of a static image.
+    // It plays once and holds its last frame. Users who prefer reduced motion
+    // fall through to the static <picture>/<img> below.
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (videoURL && !prefersReducedMotion) {
+      return (
+        <div className={className} style={containerStyle}>
+          <Localized text={alt}>
+            <div className="sr-only logo-alt" />
+          </Localized>
+          <video
+            className="brand-logo"
+            style={{ height, width, ...imgStyle }}
+            src={videoURL}
+            autoPlay={true}
+            muted={true}
+            playsInline={true}
+            role={alt ? null : "presentation"}
+          />
+        </div>
+      );
+    }
+
     return (
-      <picture className={className} style={pictureStyle}>
+      <picture className={className} style={containerStyle}>
         {darkModeReducedMotionImageURL ? (
           <source
             srcset={darkModeReducedMotionImageURL}
@@ -533,7 +561,7 @@ export class ProtonScreen extends React.PureComponent {
         </Localized>
         <img
           className="brand-logo"
-          style={{ height, width }}
+          style={{ height, width, ...imgStyle }}
           src={imageURL}
           alt=""
           loading={getLoadingStrategy()}
@@ -867,6 +895,8 @@ export class ProtonScreen extends React.PureComponent {
       "paddingBlockStart",
       "paddingBlockEnd",
       "width",
+      "minHeight",
+      "flexGrow",
     ];
 
     const innerContentStyles = isWideScreen
@@ -975,6 +1005,13 @@ export class ProtonScreen extends React.PureComponent {
     const isSystemPromptStyleSpotlight =
       content.isSystemPromptStyleSpotlight === true;
     const combinedStyles = this.getCombinedInnerStyles(content, isWideScreen);
+    // content.screen_style is a shared mix of screen-level layout tweaks
+    // consumed by three different elements below (.screen, .section-main,
+    // .main-content), each pulling its own allowlisted subset of it.
+    const screenStyleJustifyContent =
+      content.screen_style &&
+      MultiStageUtils.getValidStyle(content.screen_style, ["justifyContent"])
+        .justifyContent;
 
     return (
       <main
@@ -1044,6 +1081,7 @@ export class ProtonScreen extends React.PureComponent {
               paddingInline: content.split_content_padding_inline
                 ? content.split_content_padding_inline
                 : null,
+              justifyContent: screenStyleJustifyContent,
             }}
           >
             {isCenterLargeFullscreen ? secondaryCTATop : null}
@@ -1364,6 +1402,10 @@ export const screenContentShape = {
     reducedMotionImageURL: PropTypes.string,
     // The dark mode reduced motion image URL.
     darkModeReducedMotionImageURL: PropTypes.string,
+    // A video URL, played once, rendered instead of the image ones above.
+    // Ignored (falls back to the image URLs above) for users who prefer reduced
+    // motion.
+    videoURL: PropTypes.string,
     // The <img> alt text.
     alt: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
     // The CSS style overriding the width property.

@@ -236,6 +236,11 @@ pref("extensions.update.enabled", true);
 pref("extensions.update.interval", 86400);
 pref("extensions.update.url", "https://versioncheck.addons.mozilla.org/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
 
+// Register the type of the background-video-playback intervention's kill-switch
+// pref (bug 2060611) so Nimbus can toggle it. Defaults to disabled; the
+// intervention is turned on for Nightly via a Nimbus rollout.
+pref("extensions.webcompat.disabled_interventions.2060611", true);
+
 // Enable prompts for browser.permissions.request() (bug 1392176)
 pref("extensions.webextOptionalPermissionPrompts", true);
 

@@ -6737,11 +6737,6 @@ void LIRGenerator::visitIsObject(MIsObject* ins) {
   define(lir, ins);
 }
 
-void LIRGenerator::visitIsGenClosing(MIsGenClosing* ins) {
-  MOZ_ASSERT(ins->value()->type() == MIRType::Value);
-  define(new (alloc()) LIsGenClosing(useBoxAtStart(ins->value())), ins);
-}
-
 void LIRGenerator::visitIsResumingGenerator(MIsResumingGenerator* ins) {
   // Try to emit LIsResumingGeneratorAndBranch. IsResumingGenerator loads the
   // frame descriptor so we also make sure the MTest instruction is the next
@@ -6760,10 +6755,6 @@ void LIRGenerator::visitIsResumingGenerator(MIsResumingGenerator* ins) {
 
 void LIRGenerator::visitResumeFrameArg(MResumeFrameArg* ins) {
   defineBox(new (alloc()) LResumeFrameArg(), ins);
-}
-
-void LIRGenerator::visitAssertResumeKindIsNext(MAssertResumeKindIsNext* ins) {
-  add(new (alloc()) LAssertResumeKindIsNext(temp()), ins);
 }
 
 void LIRGenerator::visitClearResumingGeneratorFlag(

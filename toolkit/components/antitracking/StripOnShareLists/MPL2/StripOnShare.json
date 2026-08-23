@@ -175,24 +175,12 @@
   "wikimedia": {
     "queryParams": ["wprov"],
     "origins": [
-      "en.wikipedia.org",
-      "ja.wikipedia.org",
-      "de.wikipedia.org",
-      "ru.wikipedia.org",
-      "es.wikipedia.org",
-      "fr.wikipedia.org",
-      "zh.wikipedia.org",
-      "it.wikipedia.org",
-      "fa.wikipedia.org",
-      "pt.wikipedia.org",
-      "www.mediawiki.org",
       "w.wiki",
       "www.wikidata.org",
       "test.wikidata.org",
-      "www.wikifunctions.org",
-      "meta.wikimedia.org",
-      "commons.wikimedia.org"
-    ]
+      "www.wikifunctions.org"
+    ],
+    "schemelessSites": ["wikipedia.org", "wikimedia.org", "mediawiki.org"]
   },
   "bilibili": {
     "queryParams": [

@@ -102,6 +102,11 @@ if (AppConstants.ENABLE_WEBDRIVER) {
     "@mozilla.org/remote/agent;1",
     Ci.nsIRemoteAgent
   );
+
+  ChromeUtils.defineESModuleGetters(lazy, {
+    RemoteControlBanner:
+      "moz-src:///browser/components/remotecontrol/RemoteControlBanner.sys.mjs",
+  });
 } else {
   lazy.Marionette = { running: false };
   lazy.RemoteAgent = { running: false };
@@ -686,9 +691,7 @@ BrowserGlue.prototype = {
       return;
     }
 
-    let browserWindowFeatures =
-      "chrome,all,dialog=no,extrachrome,menubar,resizable,scrollbars,status," +
-      "location,toolbar,personalbar";
+    let browserWindowFeatures = "chrome,all,dialog=no,resizable,toolbar";
     // This needs to be set when opening the window to ensure that the AppUserModelID
     // is set correctly on Windows. Without it, initial launches with `-private-window`
     // will show up under the regular Firefox taskbar icon first, and then switch
@@ -983,6 +986,10 @@ BrowserGlue.prototype = {
         "resource://gre/modules/AsanReporter.sys.mjs"
       );
       AsanReporter.init();
+    }
+
+    if (AppConstants.ENABLE_WEBDRIVER) {
+      lazy.RemoteControlBanner.init();
     }
 
     lazy.Sanitizer.onStartup();

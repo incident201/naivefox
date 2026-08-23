@@ -6,6 +6,10 @@ import {
   actionTypes as at,
   actionCreators as ac,
 } from "resource://newtab/common/Actions.mjs";
+import {
+  isSpaceOverridden,
+  SPACE_IDS,
+} from "resource://newtab/common/PageLayoutVariants.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -730,7 +734,10 @@ export class SectionsLayoutFeed {
       prefs[PREF_SECTIONS_ORDERING] ??
       "";
     // Sync the collections only when a sections-ordering is selected.
-    const shouldSyncLayouts = prefs[PREF_TOPSTORIES_ENABLED] && !!orderingKey;
+    const shouldSyncLayouts =
+      (prefs[PREF_TOPSTORIES_ENABLED] ||
+        isSpaceOverridden(SPACE_IDS.STORIES, prefs)) &&
+      !!orderingKey;
 
     if (shouldSyncLayouts) {
       this._layoutsClient ??= this._connectClient(

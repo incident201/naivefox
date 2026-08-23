@@ -13,7 +13,9 @@ import {
   PAGE_LAYOUT_VARIANTS,
   PREF_PAGE_LAYOUT_VARIANT,
   isSideBySideAssigned,
+  isSpacesAssigned,
   resolvePageLayoutVariant,
+  resolvePopulatedSpaces,
 } from "common/PageLayoutVariants.mjs";
 import { connect } from "react-redux";
 import React from "react";
@@ -90,6 +92,16 @@ const PAGE_LAYOUTS_INFO = {
     description:
       "Same as Widgets lead, but stories get a fourth card across on wide " +
       "screens.",
+  },
+  [PAGE_LAYOUT_VARIANTS.SPACES_BUTTONS_BOTTOM]: {
+    label: "Spaces (Buttons at the bottom)",
+    description:
+      "Stories, widgets and Highlights each get their own panel, navigated " +
+      "with a segmented control below the content and arrows at either edge.",
+  },
+  [PAGE_LAYOUT_VARIANTS.SPACES_BUTTONS_TOP]: {
+    label: "Spaces (Buttons at the top)",
+    description: "Same as above, with the segmented control above the content.",
   },
 };
 
@@ -546,6 +558,20 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     return null;
   }
 
+  // Same idea for spaces, which needs two places to navigate between. Without
+  // this an assigned-but-inactive spaces variant is indistinguishable from
+  // today's page, since spaces adds no visible frame of its own when it falls
+  // back. Callers check the variant is spaces first.
+  spacesInactiveReason() {
+    const populated = resolvePopulatedSpaces(this.props.otherPrefs);
+    if (populated.length > 1) {
+      return null;
+    }
+    return populated.length
+      ? `only the ${populated[0]} space has content, so there is nowhere to navigate to`
+      : "no space has content";
+  }
+
   renderLayouts() {
     const prefs = this.props.otherPrefs;
     // The pref, not the effective value: what the radio sets and reset clears.
@@ -554,7 +580,8 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     const effectiveVariant = resolvePageLayoutVariant(prefs);
     const trainhopOverride = effectiveVariant !== prefVariant;
     const inactiveReason =
-      isSideBySideAssigned(prefs) && this.pageLayoutInactiveReason();
+      (isSideBySideAssigned(prefs) && this.pageLayoutInactiveReason()) ||
+      (isSpacesAssigned(prefs) && this.spacesInactiveReason());
 
     return (
       <>

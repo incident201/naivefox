@@ -582,10 +582,9 @@ function createEntry(
   }
 
   // Set the targetURI attribute so it will be shown in tooltip.
-  // SessionStore uses one-based indexes, so we need to normalize them.
   let tabData;
   tabData = aIsWindowsFragment ? aClosedTab : aClosedTab.state;
-  let activeIndex = (tabData.index || tabData.entries.length) - 1;
+  let activeIndex = lazy.SessionStore.historyIndex(tabData);
   if (activeIndex >= 0 && tabData.entries[activeIndex]) {
     element.setAttribute("targetURI", tabData.entries[activeIndex].url);
   }

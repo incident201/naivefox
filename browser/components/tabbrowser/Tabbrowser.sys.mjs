@@ -5,29 +5,69 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
+const lazy = XPCOMUtils.declareLazy({
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  allowTransparentBrowser: {
+    pref: "browser.tabs.allow_transparent_browser",
+    default: false,
+  },
+  ASRouter: "resource:///modules/asrouter/ASRouter.sys.mjs",
+  AsyncTabSwitcher:
+    "moz-src:///browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs",
   BrowserUIUtils: "resource:///modules/BrowserUIUtils.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   ContextualIdentityService:
     "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
+  FaviconUtils: "moz-src:///toolkit/modules/FaviconUtils.sys.mjs",
+  KeyboardLockUtils: "resource://gre/modules/KeyboardLockUtils.sys.mjs",
   NewTabPagePreloading:
     "moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs",
+  notificationEnableDelay: {
+    pref: "security.notification_enable_delay",
+    default: 500,
+  },
+  OpenInTabsUtils:
+    "moz-src:///browser/components/tabbrowser/OpenInTabsUtils.sys.mjs",
+  PictureInPicture:
+    "moz-src:///toolkit/components/pictureinpicture/PictureInPicture.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ReducedProtectionNotification:
     "resource:///modules/ReducedProtectionNotification.sys.mjs",
+  remoteSVGIconDecoding: {
+    pref: "browser.tabs.remoteSVGIconDecoding",
+    default: false,
+  },
   SelectableProfileService:
     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
   SessionStore:
     "moz-src:///browser/components/sessionstore/SessionStore.sys.mjs",
   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
+  shouldExposeContentTitle: {
+    pref: "privacy.exposeContentTitleInWindow",
+    default: true,
+  },
+  shouldExposeContentTitlePbm: {
+    pref: "privacy.exposeContentTitleInWindow.pbm",
+    default: true,
+  },
+  showTabCardPreview: {
+    pref: "browser.tabs.hoverPreview.enabled",
+    default: true,
+  },
   SitePermissions: "resource:///modules/SitePermissions.sys.mjs",
+  SponsorProtection:
+    "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
   TabCrashHandler: "resource:///modules/ContentCrashHandlers.sys.mjs",
+  TabStateFlusher:
+    "moz-src:///browser/components/sessionstore/TabStateFlusher.sys.mjs",
+  TaskbarTabs: "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs",
+  TaskbarTabsUtils: "resource:///modules/taskbartabs/TaskbarTabsUtils.sys.mjs",
+  UrlbarProviderOpenTabs:
+    "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
+  UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
   webrtcUI: "resource:///modules/webrtcUI.sys.mjs",
 });
 
@@ -117,7 +157,7 @@ async function handleDroppedLink(
     links.length >= Services.prefs.getIntPref("browser.tabs.maxOpenBeforeWarn")
   ) {
     // Sync dialog cannot be used inside drop event handler.
-    let answer = await tabbrowser.OpenInTabsUtils.promiseConfirmOpenInTabs(
+    let answer = await lazy.OpenInTabsUtils.promiseConfirmOpenInTabs(
       links.length,
       tabbrowser.documentGlobal
     );
@@ -129,9 +169,7 @@ async function handleDroppedLink(
   let urls = [];
   let postDatas = [];
   for (let link of links) {
-    let data = await tabbrowser.UrlbarUtils.getShortcutOrURIAndPostData(
-      link.url
-    );
+    let data = await lazy.UrlbarUtils.getShortcutOrURIAndPostData(link.url);
     urls.push(data.url);
     postDatas.push(data.postData);
   }
@@ -152,6 +190,11 @@ async function handleDroppedLink(
  * Displays and manages the contents of a browser window's tabs. Every window
  * instantiates this class during startup and exposes the instance in its window
  * scope as `gBrowser`.
+ *
+ * A member is either public API, `#private`, or `_`-prefixed. The last is
+ * internal as well, and carries the underscore only because something outside
+ * the class reaches it: `TabProgressListener` below, or one of the sibling
+ * modules that implement the tab strip. Nothing else may use those.
  */
 export class Tabbrowser {
   static create(window) {
@@ -175,32 +218,11 @@ export class Tabbrowser {
     this.splitViewCommandSet =
       this.document.getElementById("splitViewCommands");
 
-    // Defined on the instance, not on `lazy`, because callers reach these
-    // as `gBrowser.TabMetrics` and friends.
+    // Defined on the instance, not on `lazy`, because callers reach it as
+    // `gBrowser.TabMetrics`.
     // eslint-disable-next-line mozilla/lazy-getter-object-name
     ChromeUtils.defineESModuleGetters(this, {
-      ASRouter: "resource:///modules/asrouter/ASRouter.sys.mjs",
-      AsyncTabSwitcher:
-        "moz-src:///browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs",
-      OpenInTabsUtils:
-        "moz-src:///browser/components/tabbrowser/OpenInTabsUtils.sys.mjs",
-      PictureInPicture:
-        "moz-src:///toolkit/components/pictureinpicture/PictureInPicture.sys.mjs",
-      SmartTabGroupingManager:
-        "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs",
-      SponsorProtection:
-        "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
       TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
-      TabStateFlusher:
-        "moz-src:///browser/components/sessionstore/TabStateFlusher.sys.mjs",
-      TaskbarTabsUtils:
-        "resource:///modules/taskbartabs/TaskbarTabsUtils.sys.mjs",
-      TaskbarTabs: "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs",
-      UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
-      UrlbarProviderOpenTabs:
-        "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
-      FaviconUtils: "moz-src:///toolkit/modules/FaviconUtils.sys.mjs",
-      KeyboardLockUtils: "resource://gre/modules/KeyboardLockUtils.sys.mjs",
     });
     ChromeUtils.defineLazyGetter(this, "tabLocalization", () => {
       return new Localization(
@@ -214,38 +236,8 @@ export class Tabbrowser {
     });
     XPCOMUtils.defineLazyPreferenceGetter(
       this,
-      "_shouldExposeContentTitle",
-      "privacy.exposeContentTitleInWindow",
-      true
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_shouldExposeContentTitlePbm",
-      "privacy.exposeContentTitleInWindow.pbm",
-      true
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_showTabCardPreview",
-      "browser.tabs.hoverPreview.enabled",
-      true
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_allowTransparentBrowser",
-      "browser.tabs.allow_transparent_browser",
-      false
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_tabGroupsEnabled",
+      "tabGroupsEnabled",
       "browser.tabs.groups.enabled",
-      false
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_tabNotesEnabled",
-      "browser.tabs.notes.enabled",
       false
     );
     XPCOMUtils.defineLazyPreferenceGetter(
@@ -254,31 +246,6 @@ export class Tabbrowser {
       "browser.tabs.tooltipsShowPidAndActiveness",
       false
     );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_unloadTabInContextMenu",
-      "browser.tabs.unloadTabInContextMenu",
-      false
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_notificationEnableDelay",
-      "security.notification_enable_delay",
-      500
-    );
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_remoteSVGIconDecoding",
-      "browser.tabs.remoteSVGIconDecoding",
-      false
-    );
-
-    if (AppConstants.MOZ_CRASHREPORTER) {
-      // eslint-disable-next-line mozilla/lazy-getter-object-name
-      ChromeUtils.defineESModuleGetters(this, {
-        TabCrashHandler: "resource:///modules/ContentCrashHandlers.sys.mjs",
-      });
-    }
 
     Services.obs.addObserver(this, "contextual-identity-updated");
     Services.obs.addObserver(this, "intl:app-locales-changed");
@@ -306,14 +273,14 @@ export class Tabbrowser {
 
     this.tabContainer.init();
 
-    this._defaultDropLinkHandler = function (...args) {
+    this.#defaultDropLinkHandler = function (...args) {
       // The droppedLinkHandler gets invoked with `this` being the browser
       // element on which the drop took place.
       let browser = this;
       let tabbrowser = browser.getTabBrowser();
       handleDroppedLink(tabbrowser, browser, ...args);
     };
-    this._setupInitialBrowserAndTab();
+    this.#setupInitialBrowserAndTab();
 
     if (Services.prefs.getIntPref("browser.display.document_color_use") == 2) {
       this.tabpanels.style.backgroundColor = Services.prefs.getCharPref(
@@ -321,14 +288,14 @@ export class Tabbrowser {
       );
     }
 
-    this._setFindbarData();
+    this.#setFindbarData();
 
     // We take over setting the document title, so remove the l10n id to
     // avoid it being re-translated and overwriting document content if
     // we ever switch languages at runtime.
     this.document.querySelector("title").removeAttribute("data-l10n-id");
 
-    this._setupEventListeners();
+    this.#setupEventListeners();
     this._initialized = true;
   }
 
@@ -369,11 +336,16 @@ export class Tabbrowser {
 
   _isBusy = false;
 
-  _awaitingToggleCaretBrowsingPrompt = false;
+  #awaitingToggleCaretBrowsingPrompt = false;
 
   #previewMode = false;
 
-  _lastFindValue = "";
+  #asyncTabSwitching = false;
+
+  /** @type {Function} */
+  #defaultDropLinkHandler;
+
+  #lastFindValue = "";
 
   _tabLayerCache = [];
 
@@ -385,10 +357,10 @@ export class Tabbrowser {
   #tabForBrowser = new WeakMap();
 
   /**
-   * `_createLazyBrowser` will define properties on the unbound lazy browser
+   * `#createLazyBrowser` will define properties on the unbound lazy browser
    * which correspond to properties defined in MozBrowser which will be bound to
    * the browser when it is inserted into the document.  If any of these
-   * properties are accessed by consumers, `_insertBrowser` is called and
+   * properties are accessed by consumers, `insertBrowser()` is called and
    * the browser is inserted to ensure that things don't break.  This list
    * provides the names of properties that may be called while the browser
    * is in its unbound (lazy) state.
@@ -440,7 +412,7 @@ export class Tabbrowser {
 
   _removingTabs = new Set();
 
-  _multiSelectedTabsSet = new WeakSet();
+  #multiSelectedTabsSet = new WeakSet();
 
   #lastMultiSelectedTabRef = null;
 
@@ -623,7 +595,7 @@ export class Tabbrowser {
     if (
       this.documentGlobal.gSharedTabWarning.willShowSharedTabWarning(val) ||
       this.document.documentElement.hasAttribute("window-modal-open") ||
-      (this.documentGlobal.gNavToolbox.collapsed && !this._allowTabChange)
+      this.documentGlobal.gNavToolbox.collapsed
     ) {
       return;
     }
@@ -636,26 +608,30 @@ export class Tabbrowser {
     );
   }
 
+  #selectedTab = null;
+
+  #selectedBrowser = null;
+
   set selectedTab(val) {
     this.setSelectedTab(val);
   }
 
   get selectedTab() {
-    return this._selectedTab;
+    return this.#selectedTab;
   }
 
   get selectedBrowser() {
-    return this._selectedBrowser;
+    return this.#selectedBrowser;
   }
 
   get selectedBrowsers() {
     const splitViewBrowsers = this.splitViewBrowsers;
     return splitViewBrowsers.length
       ? splitViewBrowsers
-      : [this._selectedBrowser];
+      : [this.#selectedBrowser];
   }
 
-  _setupInitialBrowserAndTab() {
+  #setupInitialBrowserAndTab() {
     // See browser.js for the meaning of window.arguments.
     // Bug 1485961 covers making this more sane.
     let userContextId =
@@ -775,7 +751,7 @@ export class Tabbrowser {
     if (this.documentGlobal.gBrowserAllowScriptsToCloseInitialTabs) {
       browser.setAttribute("allowscriptstoclose", "true");
     }
-    browser.droppedLinkHandler = this._defaultDropLinkHandler;
+    browser.droppedLinkHandler = this.#defaultDropLinkHandler;
     browser.loadURI = URILoadingWrapper.loadURI.bind(
       URILoadingWrapper,
       browser
@@ -787,7 +763,7 @@ export class Tabbrowser {
       let uriToLoad = this.documentGlobal.gBrowserInit.uriToLoadPromise;
       let firstURI = Array.isArray(uriToLoad) ? uriToLoad[0] : uriToLoad;
 
-      if (!this._allowTransparentBrowser) {
+      if (!lazy.allowTransparentBrowser) {
         // firstURI may be a Promise (uriToLoadPromise still resolving while
         // SessionStore restores) or empty; only build a URI from a real
         // string, otherwise default to transparent like the no-URI case.
@@ -800,17 +776,17 @@ export class Tabbrowser {
       }
     }
 
-    let uniqueId = this._generateUniquePanelID();
+    let uniqueId = this.#generateUniquePanelID();
     let panel = this.getPanel(browser);
     panel.id = uniqueId;
     this.tabpanels.appendChild(panel);
 
     let tab = this.tabs[0];
     tab.linkedPanel = uniqueId;
-    this._selectedTab = tab;
-    this._selectedBrowser = browser;
+    this.#selectedTab = tab;
+    this.#selectedBrowser = browser;
     tab.permanentKey = browser.permanentKey;
-    tab._tPos = 0;
+    tab._index = 0;
     tab._fullyOpen = true;
     tab.linkedBrowser = browser;
 
@@ -950,7 +926,7 @@ export class Tabbrowser {
             () => loadBrowserURI(browser, url, principal),
             { once: true }
           );
-          this._insertBrowser(tab);
+          this.#insertBrowser(tab);
         }
       } else {
         unchangedRemoteness.push(tab);
@@ -1000,7 +976,7 @@ export class Tabbrowser {
             once: true,
           }
         );
-        tabbrowser._insertBrowser(tab);
+        tabbrowser.#insertBrowser(tab);
       }
     }
 
@@ -1111,7 +1087,7 @@ export class Tabbrowser {
     return this.selectedBrowser.userTypedValue;
   }
 
-  _setFindbarData() {
+  #setFindbarData() {
     // Ensure we know what the find bar key is in the content process:
     let { sharedData } = Services.ppmm;
     if (!sharedData.has("Findbar:Shortcut")) {
@@ -1147,6 +1123,13 @@ export class Tabbrowser {
   }
 
   /**
+   * Forget the find value that newly created findbars are prefilled with.
+   */
+  clearLastFindValue() {
+    this.#lastFindValue = "";
+  }
+
+  /**
    * Get the findbar, and create it if it doesn't exist.
    *
    * @param {MozTabbrowserTab} [aTab]
@@ -1161,7 +1144,7 @@ export class Tabbrowser {
 
     // Avoid re-entrancy by caching the promise we're about to return.
     if (!aTab._pendingFindBar) {
-      aTab._pendingFindBar = this._createFindBar(aTab);
+      aTab._pendingFindBar = this.#createFindBar(aTab);
     }
     return aTab._pendingFindBar;
   }
@@ -1172,7 +1155,7 @@ export class Tabbrowser {
    * @param {MozTabbrowserTab} aTab the tab to create the find bar for.
    * @return the created findbar, or null if the window or tab is closed/closing.
    */
-  async _createFindBar(aTab) {
+  async #createFindBar(aTab) {
     let findBar = this.document.createXULElement("findbar");
     let browser = this.getBrowserForTab(aTab);
 
@@ -1185,7 +1168,7 @@ export class Tabbrowser {
     }
 
     findBar.browser = browser;
-    findBar._findField.value = this._lastFindValue;
+    findBar._findField.value = this.#lastFindValue;
 
     aTab._findBar = findBar;
 
@@ -1203,7 +1186,7 @@ export class Tabbrowser {
     );
   }
 
-  _updateTabBarForPinnedTabs() {
+  #updateTabBarForPinnedTabs() {
     this.tabContainer._unlockTabSizing();
     this.tabContainer._handleTabSelect(true);
     this.tabContainer._updateCloseButtons();
@@ -1261,7 +1244,7 @@ export class Tabbrowser {
     });
 
     aTab.setAttribute("pinned", "true");
-    this._updateTabBarForPinnedTabs();
+    this.#updateTabBarForPinnedTabs();
     this.#notifyPinnedStatus(aTab, { metricsContext });
   }
 
@@ -1289,7 +1272,7 @@ export class Tabbrowser {
 
     aTab.style.marginInlineStart = "";
     aTab._pinnedUnscrollable = false;
-    this._updateTabBarForPinnedTabs();
+    this.#updateTabBarForPinnedTabs();
     this.#notifyPinnedStatus(aTab, { metricsContext });
   }
 
@@ -1332,17 +1315,18 @@ export class Tabbrowser {
     return (aBrowser || this.selectedBrowser).parentNode.parentNode;
   }
 
+  #tabNotificationDeck = null;
   getTabNotificationDeck() {
-    if (!this._tabNotificationDeck) {
+    if (!this.#tabNotificationDeck) {
       let template = this.document.getElementById(
         "tab-notification-deck-template"
       );
       template.replaceWith(template.content);
-      this._tabNotificationDeck = this.document.getElementById(
+      this.#tabNotificationDeck = this.document.getElementById(
         "tab-notification-deck"
       );
     }
-    return this._tabNotificationDeck;
+    return this.#tabNotificationDeck;
   }
 
   #nextNotificationBoxId = 0;
@@ -1357,7 +1341,7 @@ export class Tabbrowser {
             `tab-notification-box-${this.#nextNotificationBoxId++}`
           );
           this.#insertNotificationBox(browser, element);
-        }, this._notificationEnableDelay);
+        }, lazy.notificationEnableDelay);
     }
     return browser._notificationBox;
   }
@@ -1388,7 +1372,7 @@ export class Tabbrowser {
     }
     this.getTabNotificationDeck().append(box);
     if (browser == this.selectedBrowser) {
-      this._updateVisibleNotificationBox(browser);
+      this.#updateVisibleNotificationBox(browser);
     }
   }
 
@@ -1402,8 +1386,8 @@ export class Tabbrowser {
     return browser._notificationBox || null;
   }
 
-  _updateVisibleNotificationBox(aBrowser) {
-    if (!this._tabNotificationDeck) {
+  #updateVisibleNotificationBox(aBrowser) {
+    if (!this.#tabNotificationDeck) {
       // If the deck hasn't been created we don't need to create it here.
       return;
     }
@@ -1526,8 +1510,8 @@ export class Tabbrowser {
       if (aIconURL) {
         let url = aIconURL;
         if (
-          this._remoteSVGIconDecoding &&
-          url.startsWith(this.FaviconUtils.SVG_DATA_URI_PREFIX)
+          lazy.remoteSVGIconDecoding &&
+          url.startsWith(lazy.FaviconUtils.SVG_DATA_URI_PREFIX)
         ) {
           url = this.#getMozRemoteImageURLForSvg(browser, url);
         }
@@ -1547,7 +1531,7 @@ export class Tabbrowser {
 
   // Used for refreshing the icons when the color scheme changes.
   #maybeRefreshIcons() {
-    if (!this._remoteSVGIconDecoding) {
+    if (!lazy.remoteSVGIconDecoding) {
       return;
     }
 
@@ -1556,7 +1540,7 @@ export class Tabbrowser {
       let iconURL = browser.mIconURL;
       if (
         !iconURL ||
-        !iconURL.startsWith(this.FaviconUtils.SVG_DATA_URI_PREFIX)
+        !iconURL.startsWith(lazy.FaviconUtils.SVG_DATA_URI_PREFIX)
       ) {
         continue;
       }
@@ -1586,7 +1570,7 @@ export class Tabbrowser {
       options.contentParentId = contentParentId;
     }
 
-    return this.FaviconUtils.getMozRemoteImageURL(aUrl, options);
+    return lazy.FaviconUtils.getMozRemoteImageURL(aUrl, options);
   }
 
   getIcon(aTab) {
@@ -1660,7 +1644,7 @@ export class Tabbrowser {
    * the Taskbar Tab, or null if nothing is needed.
    */
   #determineTaskbarTabTitle(aProfile) {
-    if (!this._shouldExposeContentTitle) {
+    if (!lazy.shouldExposeContentTitle) {
       // The Taskbar Tab and container info expose what site the user's on.
       return null;
     }
@@ -1669,7 +1653,7 @@ export class Tabbrowser {
       return this.#taskbarTabTitle;
     }
 
-    let id = this.TaskbarTabsUtils.getTaskbarTabIdFromWindow(
+    let id = lazy.TaskbarTabsUtils.getTaskbarTabIdFromWindow(
       this.documentGlobal
     );
     if (!id) {
@@ -1677,7 +1661,7 @@ export class Tabbrowser {
     }
 
     if (!this.#taskbarTab) {
-      this.TaskbarTabs.getTaskbarTab(id)
+      lazy.TaskbarTabs.getTaskbarTab(id)
         .then(tt => {
           this.#taskbarTab = tt;
           this.updateTitlebar();
@@ -1714,9 +1698,9 @@ export class Tabbrowser {
   #determineContentTitle(browser) {
     let title = "";
     if (
-      !this._shouldExposeContentTitle ||
+      !lazy.shouldExposeContentTitle ||
       (lazy.PrivateBrowsingUtils.isWindowPrivate(this.documentGlobal) &&
-        !this._shouldExposeContentTitlePbm)
+        !lazy.shouldExposeContentTitlePbm)
     ) {
       return title;
     }
@@ -1831,9 +1815,9 @@ export class Tabbrowser {
       timerId = Glean.browserTabswitch.update.start();
 
       if (this.documentGlobal.gMultiProcessBrowser) {
-        this._asyncTabSwitching = true;
+        this.#asyncTabSwitching = true;
         this._getSwitcher().requestTab(newTab);
-        this._asyncTabSwitching = false;
+        this.#asyncTabSwitching = false;
       }
 
       this.document.commandDispatcher.lock();
@@ -1861,13 +1845,13 @@ export class Tabbrowser {
       newBrowser.docShellIsActive = !this.document.hidden;
     }
 
-    this._selectedBrowser = newBrowser;
-    this._selectedTab = newTab;
+    this.#selectedBrowser = newBrowser;
+    this.#selectedTab = newTab;
     this.showTab(newTab);
 
     this.appendStatusPanel();
 
-    this._updateVisibleNotificationBox(newBrowser);
+    this.#updateVisibleNotificationBox(newBrowser);
 
     let oldBrowserPopupsBlocked =
       oldBrowser.popupAndRedirectBlocker.getBlockedPopupCount();
@@ -1947,7 +1931,7 @@ export class Tabbrowser {
         oldFindBar.findMode == oldFindBar.FIND_NORMAL &&
         !oldFindBar.hidden
       ) {
-        this._lastFindValue = oldFindBar._findField.value;
+        this.#lastFindValue = oldFindBar._findField.value;
       }
 
       this.updateTitlebar();
@@ -2014,12 +1998,12 @@ export class Tabbrowser {
       newTab.dispatchEvent(event);
 
       // Check if switched repeatedly between tabs in the last minute
-      this._checkIfShouldTriggerTabSelectMessage(oldTab, newTab);
+      this.#checkIfShouldTriggerTabSelectMessage(oldTab, newTab);
 
       this._tabAttrModified(oldTab, ["selected"]);
       this._tabAttrModified(newTab, ["selected"]);
 
-      this._startMultiSelectChange();
+      this.#startMultiSelectChange();
       this.#multiSelectChangeSelected = true;
       this.clearMultiSelectedTabs();
       if (this.#multiSelectChangeAdditions.size) {
@@ -2074,7 +2058,7 @@ export class Tabbrowser {
    * @param {object} oldTab - The tab being switched away from.
    * @param {object} newTab - The tab being switched to.
    */
-  async _checkIfShouldTriggerTabSelectMessage(oldTab, newTab) {
+  async #checkIfShouldTriggerTabSelectMessage(oldTab, newTab) {
     const ONE_MINUTE_MS = 60000;
     const LIMIT_FOR_TRIGGER = 3;
     const now = Date.now();
@@ -2105,8 +2089,8 @@ export class Tabbrowser {
       existingEntry.count++;
       existingEntry.timestamp = now;
       if (existingEntry.count === LIMIT_FOR_TRIGGER) {
-        await this.ASRouter.waitForInitialized;
-        this.ASRouter.sendTriggerMessage({
+        await lazy.ASRouter.waitForInitialized;
+        lazy.ASRouter.sendTriggerMessage({
           browser: newTab.linkedBrowser,
           id: "tabSwitch",
           context: {
@@ -2137,7 +2121,7 @@ export class Tabbrowser {
     this.documentGlobal.gURLBar.getBrowserState(oldBrowser).urlbarFocused =
       this.documentGlobal.gURLBar.focused;
 
-    if (this._asyncTabSwitching) {
+    if (this.#asyncTabSwitching) {
       newBrowser._userTypedValueAtBeforeTabSwitch = newBrowser.userTypedValue;
     }
 
@@ -2188,7 +2172,7 @@ export class Tabbrowser {
     // if the tab is a blank one.
     if (this.documentGlobal.gURLBar.getBrowserState(newBrowser).urlbarFocused) {
       let selectURL = () => {
-        if (this._asyncTabSwitching) {
+        if (this.#asyncTabSwitching) {
           // Set _awaitingSetURI flag to suppress popup notification
           // explicitly while tab switching asynchronously.
           newBrowser._awaitingSetURI = true;
@@ -2392,11 +2376,13 @@ export class Tabbrowser {
         aTab._labelIsInitialTitle = true;
       }
 
-      this._setTabLabel(aTab, aTitle, aOptions);
+      this.#setTabLabel(aTab, aTitle, aOptions);
     }
   }
 
   #dataURLRegEx = /^data:[^,]+;base64,/i;
+
+  #shortenURLRegEx = /^[^:]+:\/\/(?:www\.)?/;
 
   // Regex to test if a string (potential tab label) consists of only non-
   // printable characters. We consider Unicode categories Separator
@@ -2477,7 +2463,7 @@ export class Tabbrowser {
       }
     }
 
-    return this._setTabLabel(aTab, title, { isContentTitle, isURL });
+    return this.#setTabLabel(aTab, title, { isContentTitle, isURL });
   }
 
   // While an auth prompt from a base domain different than the current sites is open, we do not want to show the tab title of the current site,
@@ -2485,10 +2471,10 @@ export class Tabbrowser {
   // This is to prevent possible auth spoofing scenarios.
   // See bug 791594 for reference.
   setTabLabelForAuthPrompts(aTab, aLabel) {
-    return this._setTabLabel(aTab, aLabel);
+    return this.#setTabLabel(aTab, aLabel);
   }
 
-  _setTabLabel(aTab, aLabel, { beforeTabOpen, isContentTitle, isURL } = {}) {
+  #setTabLabel(aTab, aLabel, { beforeTabOpen, isContentTitle, isURL } = {}) {
     if (!aLabel || (isURL && /^about:reader\?url=/.test(aLabel))) {
       return false;
     }
@@ -2508,10 +2494,7 @@ export class Tabbrowser {
 
     if (!isContentTitle) {
       // Remove protocol and "www."
-      if (!("_regex_shortenURLForTabLabel" in this)) {
-        this._regex_shortenURLForTabLabel = /^[^:]+:\/\/(?:www\.)?/;
-      }
-      aLabel = aLabel.replace(this._regex_shortenURLForTabLabel, "");
+      aLabel = aLabel.replace(this.#shortenURLRegEx, "");
     }
 
     if (aLabel.length > TAB_LABEL_MAX_LENGTH) {
@@ -2647,7 +2630,7 @@ export class Tabbrowser {
       newIndex < 0 &&
       Services.prefs.getBoolPref("browser.tabs.insertAfterCurrent")
     ) {
-      newIndex = this.selectedTab._tPos + 1;
+      newIndex = this.selectedTab.index + 1;
     }
 
     if (replace) {
@@ -2659,7 +2642,7 @@ export class Tabbrowser {
       let browser;
       if (targetTab) {
         browser = this.getBrowserForTab(targetTab);
-        targetTabIndex = targetTab._tPos;
+        targetTabIndex = targetTab.index;
       } else {
         browser = this.selectedBrowser;
         targetTabIndex = this.tabContainer.selectedIndex;
@@ -2710,7 +2693,7 @@ export class Tabbrowser {
       firstTabAdded = this.addTab(aURIs[0], params);
       tabs.push(firstTabAdded);
       if (newIndex > -1) {
-        targetTabIndex = firstTabAdded._tPos;
+        targetTabIndex = firstTabAdded.index;
       }
     }
 
@@ -2773,7 +2756,7 @@ export class Tabbrowser {
 
     let tab = this.getTabForBrowser(aBrowser);
     // aBrowser needs to be inserted now if it hasn't been already.
-    this._insertBrowser(tab);
+    this.#insertBrowser(tab);
 
     let evt = this.document.createEvent("Events");
     evt.initEvent("BeforeTabRemotenessChange", true, false);
@@ -3001,7 +2984,7 @@ export class Tabbrowser {
 
     if (
       lazy.AIWindow.isAIWindowActive(this.documentGlobal) ||
-      this._allowTransparentBrowser
+      lazy.allowTransparentBrowser
     ) {
       b.setAttribute("transparent", "true");
     }
@@ -3032,7 +3015,7 @@ export class Tabbrowser {
     return b;
   }
 
-  _createLazyBrowser(aTab) {
+  #createLazyBrowser(aTab) {
     let browser = aTab.linkedBrowser;
 
     let names = this.#browserBindingProperties;
@@ -3090,7 +3073,7 @@ export class Tabbrowser {
               },
               { once: true }
             );
-            this._insertBrowser(aTab);
+            this.#insertBrowser(aTab);
           };
           break;
         case "remoteType":
@@ -3113,7 +3096,7 @@ export class Tabbrowser {
               let message = `[bug 1345098] Lazy browser prematurely inserted via '${name}' property access:\n`;
               Services.console.logStringMessage(message + new Error().stack);
             }
-            this._insertBrowser(aTab);
+            this.#insertBrowser(aTab);
             return browser[name];
           };
           setter = value => {
@@ -3121,7 +3104,7 @@ export class Tabbrowser {
               let message = `[bug 1345098] Lazy browser prematurely inserted via '${name}' property access:\n`;
               Services.console.logStringMessage(message + new Error().stack);
             }
-            this._insertBrowser(aTab);
+            this.#insertBrowser(aTab);
             return (browser[name] = value);
           };
       }
@@ -3134,7 +3117,18 @@ export class Tabbrowser {
     }
   }
 
-  _insertBrowser(aTab, aInsertedOnTabCreation) {
+  /**
+   * Gives a lazy tab the browser it was created without, so that its content
+   * can load. Tabs restored by the session store start out lazy, and normally
+   * get their browser when they are first selected.
+   *
+   * @param {MozTabbrowserTab} tab
+   */
+  insertBrowser(tab) {
+    this.#insertBrowser(tab);
+  }
+
+  #insertBrowser(aTab, aInsertedOnTabCreation) {
     // If browser is already inserted or window is closed don't do anything.
     if (aTab.linkedPanel || this.documentGlobal.closed) {
       return;
@@ -3154,7 +3148,7 @@ export class Tabbrowser {
     delete browser._cachedCurrentURI;
 
     let panel = this.getPanel(browser);
-    let uniqueId = this._generateUniquePanelID();
+    let uniqueId = this.#generateUniquePanelID();
     panel.id = uniqueId;
     aTab.linkedPanel = uniqueId;
 
@@ -3187,7 +3181,7 @@ export class Tabbrowser {
     this.#tabListeners.set(aTab, tabListener);
     this.#tabFilters.set(aTab, filter);
 
-    browser.droppedLinkHandler = this._defaultDropLinkHandler;
+    browser.droppedLinkHandler = this.#defaultDropLinkHandler;
     browser.loadURI = URILoadingWrapper.loadURI.bind(
       URILoadingWrapper,
       browser
@@ -3241,7 +3235,7 @@ export class Tabbrowser {
     }
   }
 
-  _mayDiscardBrowser(aTab, aForceDiscard) {
+  #mayDiscardBrowser(aTab, aForceDiscard) {
     let browser = aTab.linkedBrowser;
     let action = aForceDiscard ? "unload" : "dontUnload";
 
@@ -3271,7 +3265,7 @@ export class Tabbrowser {
 
   async prepareDiscardBrowser(aTab) {
     let browser = aTab.linkedBrowser;
-    // This is similar to the checks in _mayDiscardBrowser, but
+    // This is similar to the checks in #mayDiscardBrowser, but
     // doesn't have to be complete (and we want to be sure not to
     // fire the beforeunload event). Calling TabStateFlusher.flush()
     // and then not unloading the browser is fine.
@@ -3280,13 +3274,13 @@ export class Tabbrowser {
     }
 
     // Flush the tab's state so session restore has the latest data.
-    await this.TabStateFlusher.flush(browser);
+    await lazy.TabStateFlusher.flush(browser);
   }
 
   discardBrowser(aTab, aForceDiscard) {
     let browser = aTab.linkedBrowser;
 
-    if (!this._mayDiscardBrowser(aTab, aForceDiscard)) {
+    if (!this.#mayDiscardBrowser(aTab, aForceDiscard)) {
       return false;
     }
 
@@ -3355,7 +3349,7 @@ export class Tabbrowser {
     this.getPanel(browser).remove();
     aTab.removeAttribute("linkedpanel");
 
-    this._createLazyBrowser(aTab);
+    this.#createLazyBrowser(aTab);
 
     let evt = new this.documentGlobal.CustomEvent("TabBrowserDiscarded", {
       bubbles: true,
@@ -3399,7 +3393,7 @@ export class Tabbrowser {
           this.selectedTab = this.addTrustedTab(
             this.documentGlobal.BROWSER_NEW_TAB_URL,
             {
-              tabIndex: tab._tPos + 1,
+              tabIndex: tab.index + 1,
               userContextId: tab.userContextId,
               tabGroup: tab.group,
               focusUrlBar: true,
@@ -3426,8 +3420,8 @@ export class Tabbrowser {
     // new tab right after `tab`.
     const tabIndex =
       !options.tabGroup && adjacentTab.group
-        ? adjacentTab.group.tabs.at(-1)._tPos + 1
-        : adjacentTab._tPos + 1;
+        ? adjacentTab.group.tabs.at(-1).index + 1
+        : adjacentTab.index + 1;
 
     return this.addTab(uriString, {
       ...options,
@@ -3668,7 +3662,7 @@ export class Tabbrowser {
       !this.tabContainer.overflowing &&
       !this.documentGlobal.gReduceMotion;
 
-    let uriInfo = this._determineURIToLoad(uriString, createLazyBrowser);
+    let uriInfo = this.#determineURIToLoad(uriString, createLazyBrowser);
     let { uri, uriIsAboutBlank, lazyBrowserURI } = uriInfo;
     // Have to overwrite this if we're lazy-loading. Should go away
     // with bug 1818777.
@@ -3678,7 +3672,7 @@ export class Tabbrowser {
     let b, t;
 
     try {
-      t = this._createTab({
+      t = this.#createTab({
         uriString,
         animate,
         userContextId,
@@ -3700,7 +3694,7 @@ export class Tabbrowser {
         });
       }
 
-      ({ browser: b, usingPreloadedContent } = this._createBrowserForTab(t, {
+      ({ browser: b, usingPreloadedContent } = this.#createBrowserForTab(t, {
         uriString,
         uri,
         preferredRemoteType,
@@ -3721,12 +3715,12 @@ export class Tabbrowser {
 
       // If the caller opts in, create a lazy browser.
       if (createLazyBrowser) {
-        this._createLazyBrowser(t);
+        this.#createLazyBrowser(t);
 
         if (lazyBrowserURI) {
           // Lazy browser must be explicitly registered so tab will appear as
           // a switch-to-tab candidate in autocomplete.
-          this.UrlbarProviderOpenTabs.registerOpenTab(
+          lazy.UrlbarProviderOpenTabs.registerOpenTab(
             lazyBrowserURI.spec,
             t.userContextId,
             tabGroup?.id,
@@ -3755,7 +3749,7 @@ export class Tabbrowser {
           });
         }
       } else {
-        this._insertBrowser(t, true);
+        this.#insertBrowser(t, true);
         // If we were called by frontend and don't have openWindowInfo,
         // but we were opened from another browser, set the cross group
         // opener ID:
@@ -3781,9 +3775,9 @@ export class Tabbrowser {
         ...eventDetail,
         fromExternal,
       };
-      this._fireTabOpen(t, tabOpenDetail);
+      this.#fireTabOpen(t, tabOpenDetail);
 
-      this._kickOffBrowserLoad(b, {
+      this.#kickOffBrowserLoad(b, {
         uri,
         uriString,
         usingPreloadedContent,
@@ -3864,14 +3858,14 @@ export class Tabbrowser {
     if (this.isSplitViewWrapper(element)) {
       element = element.tabs[0];
     }
-    return element._tPos;
+    return element.index;
   }
 
   /**
    * @param {number} id
    * @returns {MozTabSplitViewWrapper}
    */
-  _createTabSplitView(id) {
+  #createTabSplitView(id) {
     if (id && typeof id !== "number") {
       throw new Error("Unexpected id type: " + typeof id);
     }
@@ -3919,7 +3913,7 @@ export class Tabbrowser {
       tabGroupInfo = { primaryGroup, secondaryGroup };
     }
 
-    let splitview = this._createTabSplitView(id);
+    let splitview = this.#createTabSplitView(id);
     this.tabContainer.insertBefore(
       splitview,
       insertBefore?.splitview ?? insertBefore
@@ -3976,7 +3970,7 @@ export class Tabbrowser {
   showSplitViewPanels(tabs) {
     const panels = [];
     for (const tab of tabs) {
-      this._insertBrowser(tab);
+      this.#insertBrowser(tab);
       this.#insertSplitViewFooter(tab);
       if (tab.linkedBrowser) {
         tab.linkedBrowser.docShellIsActive = true;
@@ -4022,7 +4016,7 @@ export class Tabbrowser {
    * @param {boolean} [isAdoptingGroup=false]
    * @returns {MozTabbrowserTabGroup}
    */
-  _createTabGroup(id, color, collapsed, label = "", isAdoptingGroup = false) {
+  #createTabGroup(id, color, collapsed, label = "", isAdoptingGroup = false) {
     let group = this.document.createXULElement("tab-group", {
       is: "tab-group",
     });
@@ -4092,7 +4086,7 @@ export class Tabbrowser {
       // See: Bug 1960104 - Improve tab group ID generation in addTabGroup
       id = `${Date.now()}-${Math.round(Math.random() * 100)}`;
     }
-    let group = this._createTabGroup(id, color, false, label, isAdoptingGroup);
+    let group = this.#createTabGroup(id, color, false, label, isAdoptingGroup);
     this.tabContainer.insertBefore(group, insertBefore?.group ?? insertBefore);
     group.addTabs(tabsAndSplitViews, metricsContext);
 
@@ -4119,7 +4113,7 @@ export class Tabbrowser {
     // Without this, it is not possible to save and close a tab group with
     // a short lifetime.
     group.tabs.forEach(tab => {
-      this.TabStateFlusher.flush(tab.linkedBrowser);
+      lazy.TabStateFlusher.flush(tab.linkedBrowser);
     });
 
     return group;
@@ -4260,7 +4254,7 @@ export class Tabbrowser {
           tabIndex,
         });
         newTabs.push(splitview);
-        tabIndex = splitview.tabs[0]._tPos + splitview.tabs.length;
+        tabIndex = splitview.tabs[0].index + splitview.tabs.length;
       } else {
         adoptedTab = this.adoptTab(element, {
           elementIndex,
@@ -4270,7 +4264,7 @@ export class Tabbrowser {
         newTabs.push(adoptedTab);
         // Put next tab after current one.
         elementIndex = undefined;
-        tabIndex = adoptedTab._tPos + 1;
+        tabIndex = adoptedTab.index + 1;
       }
     }
 
@@ -4317,7 +4311,7 @@ export class Tabbrowser {
       newTabs.push(adoptedTab);
       // Put next tab after current one.
       elementIndex = undefined;
-      tabIndex = adoptedTab._tPos + 1;
+      tabIndex = adoptedTab.index + 1;
     }
 
     try {
@@ -4368,7 +4362,7 @@ export class Tabbrowser {
     return null;
   }
 
-  _determineURIToLoad(uriString, createLazyBrowser) {
+  #determineURIToLoad(uriString, createLazyBrowser) {
     uriString = uriString || "about:blank";
     let aURIObject = null;
     try {
@@ -4411,7 +4405,7 @@ export class Tabbrowser {
    *   Whether the tab is going to be animated into place.
    * @returns {MozTabbrowserTab}
    */
-  _createTab({
+  #createTab({
     uriString,
     userContextId,
     openerTab,
@@ -4525,7 +4519,7 @@ export class Tabbrowser {
    *   The remoteType triggering this load, preferred over predicting one.
    * @returns {{browser: MozBrowser, usingPreloadedContent: boolean}}
    */
-  _createBrowserForTab(
+  #createBrowserForTab(
     tab,
     {
       uriString,
@@ -4678,7 +4672,7 @@ export class Tabbrowser {
    * @param {boolean} [options.textDirectiveUserActivation]
    *   Whether a user gesture allows the load to scroll to a text fragment.
    */
-  _kickOffBrowserLoad(
+  #kickOffBrowserLoad(
     browser,
     {
       uri,
@@ -4817,7 +4811,7 @@ export class Tabbrowser {
 
   /**
    * @param {boolean} restoreTabsLazily
-   * @param {number} selectTab see SessionStore.restoreTabs { aSelectTab }
+   * @param {number} selectTab see SessionStore's #restoreTabs { aSelectTab }
    * @param {TabStateData[]} tabDataList
    * @param {TabGroupStateData[]} tabGroupDataList
    * @param {TabSplitViewStateData[]} splitViewDataList
@@ -4933,7 +4927,7 @@ export class Tabbrowser {
         splitView.tabs.push(tab);
         // Only create the split view when we've got the last tab it would contain
         if (splitView.tabs.length == splitView.numberOfTabs) {
-          splitView.node = this._createTabSplitView(tabData.splitViewId);
+          splitView.node = this.#createTabSplitView(tabData.splitViewId);
         }
       }
 
@@ -4942,7 +4936,7 @@ export class Tabbrowser {
       if (tabData.pinned) {
         this.pinTab(tab);
         // Then ensure all the tab open/pinning information is sent.
-        this._fireTabOpen(tab, {});
+        this.#fireTabOpen(tab, {});
       } else if (tabData.groupId) {
         let { groupId } = tabData;
         const tabGroup = tabGroupWorkingData.get(groupId);
@@ -4959,7 +4953,7 @@ export class Tabbrowser {
           // if this is the first time encountering a tab group, create its
           // DOM node once and place it in the tabs bar fragment
           if (!tabGroup.node) {
-            tabGroup.node = this._createTabGroup(
+            tabGroup.node = this.#createTabGroup(
               tabGroup.stateData.id,
               tabGroup.stateData.color,
               tabGroup.stateData.collapsed,
@@ -5023,7 +5017,7 @@ export class Tabbrowser {
     }
 
     if (tabs.length > 1 || !tabs[0].selected) {
-      this._updateTabsAfterInsert();
+      this.#updateTabsAfterInsert();
       this.documentGlobal.TabBarVisibility.update();
 
       for (let tab of tabs) {
@@ -5032,7 +5026,7 @@ export class Tabbrowser {
           // Fire a TabOpen event for all unpinned tabs, except reused selected
           // tabs.
           if (!tab.pinned) {
-            this._fireTabOpen(tab, {});
+            this.#fireTabOpen(tab, {});
           }
 
           // Fire a TabBrowserInserted event on all tabs that have a connected,
@@ -5359,10 +5353,10 @@ export class Tabbrowser {
       tab.group.collapsed = false;
     }
 
-    this._updateTabsAfterInsert();
+    this.#updateTabsAfterInsert();
 
     if (pinned) {
-      this._updateTabBarForPinnedTabs();
+      this.#updateTabBarForPinnedTabs();
     }
 
     this.documentGlobal.TabBarVisibility.update();
@@ -5377,7 +5371,7 @@ export class Tabbrowser {
    * @param {object} [eventDetail]
    *   Additional information to include in the event's `detail`.
    */
-  _fireTabOpen(tab, eventDetail) {
+  #fireTabOpen(tab, eventDetail) {
     delete tab.initializingTab;
     let evt = new this.documentGlobal.CustomEvent("TabOpen", {
       bubbles: true,
@@ -5523,7 +5517,7 @@ export class Tabbrowser {
   }
 
   removeDuplicateTabs(aTab, options) {
-    this._removeDuplicateTabs(
+    this.#removeDuplicateTabs(
       aTab,
       this.getDuplicateTabsToClose(aTab),
       this.closingTabsEnum.DUPLICATES,
@@ -5531,7 +5525,7 @@ export class Tabbrowser {
     );
   }
 
-  _removeDuplicateTabs(aConfirmationAnchor, tabs, aCloseTabs, options) {
+  #removeDuplicateTabs(aConfirmationAnchor, tabs, aCloseTabs, options) {
     if (!tabs.length) {
       return;
     }
@@ -5559,7 +5553,7 @@ export class Tabbrowser {
   removeAllDuplicateTabs({
     confirmationAnchor = this.document.getElementById("alltabs-button"),
   } = {}) {
-    this._removeDuplicateTabs(
+    this.#removeDuplicateTabs(
       confirmationAnchor,
       this.getAllDuplicateTabsToClose(),
       this.closingTabsEnum.ALL_DUPLICATES
@@ -5681,7 +5675,7 @@ export class Tabbrowser {
   }
 
   /**
-   * @typedef {object} _startRemoveTabsReturnValue
+   * @typedef {object} StartRemoveTabsResult
    * @property {Promise<void>} beforeUnloadComplete
    *   A promise that is resolved once all the beforeunload handlers have been
    *   called.
@@ -5711,9 +5705,9 @@ export class Tabbrowser {
    *   If true, don't record the closed tabs in SessionStore.
    * @param {TabMetricsContext} options.metricsContext
    *   The context for the operation for telemetry purposes.
-   * @returns {_startRemoveTabsReturnValue}
+   * @returns {StartRemoveTabsResult}
    */
-  _startRemoveTabs(
+  #startRemoveTabs(
     tabs,
     {
       animate,
@@ -5747,7 +5741,7 @@ export class Tabbrowser {
         if (toBlurTo) {
           this._getSwitcher().warmupTab(toBlurTo);
         }
-      } else if (!skipPermitUnload && this._hasBeforeUnload(tab)) {
+      } else if (!skipPermitUnload && this.#hasBeforeUnload(tab)) {
         let timerId = Glean.browserTabclose.permitUnloadTime.start();
         // We need to block while calling permitUnload() because it
         // processes the event queue and may lead to another removeTab()
@@ -5835,7 +5829,7 @@ export class Tabbrowser {
   async runBeforeUnloadForTabs(tabs) {
     try {
       let { beforeUnloadComplete, tabsWithBeforeUnloadPrompt } =
-        this._startRemoveTabs(tabs, {
+        this.#startRemoveTabs(tabs, {
           animate: false,
           suppressWarnAboutClosingWindow: false,
           skipPermitUnload: false,
@@ -5981,7 +5975,7 @@ export class Tabbrowser {
       }
 
       let { beforeUnloadComplete, tabsWithBeforeUnloadPrompt, lastToClose } =
-        this._startRemoveTabs(tabs, {
+        this.#startRemoveTabs(tabs, {
           animate,
           suppressWarnAboutClosingWindow,
           skipPermitUnload,
@@ -6054,7 +6048,7 @@ export class Tabbrowser {
     }
 
     this.#clearMultiSelectionLocked = false;
-    this._avoidSingleSelectedTab();
+    this.#avoidSingleSelectedTab();
   }
 
   removeCurrentTab(aParams) {
@@ -6116,7 +6110,7 @@ export class Tabbrowser {
     }
 
     let isVisibleTab = aTab.visible;
-    // We have to sample the tab width now, since _beginRemoveTab might
+    // We have to sample the tab width now, since #beginRemoveTab might
     // end up modifying the DOM in such a way that aTab gets a new
     // frame created for it (for example, by updating the visually selected
     // state).
@@ -6124,7 +6118,7 @@ export class Tabbrowser {
       this.documentGlobal.windowUtils.getBoundsWithoutFlushing(aTab).width;
     let isLastTab = this.#isLastTabInWindow(aTab);
     if (
-      !this._beginRemoveTab(aTab, {
+      !this.#beginRemoveTab(aTab, {
         closeWindowFastpath: true,
         skipPermitUnload,
         closeWindowWithLastTab,
@@ -6233,7 +6227,7 @@ export class Tabbrowser {
     return true;
   }
 
-  _hasBeforeUnload(aTab) {
+  #hasBeforeUnload(aTab) {
     let browser = aTab.linkedBrowser;
     if (browser.isRemoteBrowser && browser.frameLoader) {
       return browser.hasBeforeUnload;
@@ -6241,7 +6235,7 @@ export class Tabbrowser {
     return false;
   }
 
-  _beginRemoveTab(
+  #beginRemoveTab(
     aTab,
     {
       adoptedByTab,
@@ -6263,7 +6257,7 @@ export class Tabbrowser {
       !adoptedByTab &&
       aTab.linkedPanel &&
       !aTab._pendingPermitUnload &&
-      (!browser.isRemoteBrowser || this._hasBeforeUnload(aTab))
+      (!browser.isRemoteBrowser || this.#hasBeforeUnload(aTab))
     ) {
       if (!prewarmed) {
         let blurTab = this._findTabToBlurTo(aTab);
@@ -6306,7 +6300,7 @@ export class Tabbrowser {
       aTab == this.selectedTab && browser._sharingState?.webRTC?.screen;
 
     if (!screenShareInActiveTab) {
-      this._blurTab(aTab);
+      this.#blurTab(aTab);
     }
 
     var closeWindow = false;
@@ -6457,7 +6451,7 @@ export class Tabbrowser {
 
     if (browser.registeredOpenURI && !adoptedByTab) {
       let userContextId = browser.getAttribute("usercontextid") || 0;
-      this.UrlbarProviderOpenTabs.unregisterOpenTab(
+      lazy.UrlbarProviderOpenTabs.unregisterOpenTab(
         browser.registeredOpenURI.spec,
         userContextId,
         aTab.group?.id,
@@ -6508,7 +6502,7 @@ export class Tabbrowser {
 
     // update the UI early for responsiveness
     aTab.collapsed = true;
-    this._blurTab(aTab);
+    this.#blurTab(aTab);
 
     this._removingTabs.delete(aTab);
 
@@ -6545,9 +6539,9 @@ export class Tabbrowser {
     aTab.remove();
     this.tabContainer._invalidateCachedTabs();
 
-    // ... and fix up the _tPos properties immediately.
-    for (let i = aTab._tPos; i < this.tabs.length; i++) {
-      this.tabs[i]._tPos = i;
+    // ... and fix up the _index properties immediately.
+    for (let i = aTab.index; i < this.tabs.length; i++) {
+      this.tabs[i]._index = i;
     }
 
     if (!this.#windowIsClosing) {
@@ -6645,7 +6639,7 @@ export class Tabbrowser {
     let closedCount = 0;
 
     if (tabsToRemove.length) {
-      const { beforeUnloadComplete, lastToClose } = this._startRemoveTabs(
+      const { beforeUnloadComplete, lastToClose } = this.#startRemoveTabs(
         tabsToRemove,
         {
           animate: false,
@@ -6661,7 +6655,7 @@ export class Tabbrowser {
 
       closedCount = tabsToRemove.length - (lastToClose ? 1 : 0);
 
-      // _startRemoveTabs doesn't close the last tab in the window
+      // #startRemoveTabs doesn't close the last tab in the window
       // for this use case, we simply close it
       if (lastToClose) {
         this.removeTab(lastToClose);
@@ -6856,7 +6850,7 @@ export class Tabbrowser {
     return tab;
   }
 
-  _blurTab(aTab) {
+  #blurTab(aTab) {
     this.selectedTab = this._findTabToBlurTo(aTab);
   }
 
@@ -6929,7 +6923,7 @@ export class Tabbrowser {
     // fire the beforeunload event in the process.  Close the other
     // window if this was its last tab.
     if (
-      !remoteBrowser._beginRemoveTab(aOtherTab, {
+      !remoteBrowser.#beginRemoveTab(aOtherTab, {
         adoptedByTab: aOurTab,
         closeWindowWithLastTab: true,
       })
@@ -7025,7 +7019,7 @@ export class Tabbrowser {
       delete aOurTab.initializingTab;
 
       // Make sure to unregister any open URIs.
-      this._swapRegisteredOpenURIs(ourBrowser, otherBrowser);
+      this.#swapRegisteredOpenURIs(ourBrowser, otherBrowser);
     } else {
       // Workarounds for bug 458697
       // Icon might have been set on DOMLinkAdded, don't override that.
@@ -7041,7 +7035,7 @@ export class Tabbrowser {
         }
       }
 
-      this._swapBrowserDocShells(aOurTab, otherBrowser, stateFlags);
+      this.#swapBrowserDocShells(aOurTab, otherBrowser, stateFlags);
     }
 
     lazy.SitePermissions.copyTemporaryPermissions(
@@ -7053,7 +7047,7 @@ export class Tabbrowser {
     // Unregister the previously opened URI
     if (otherBrowser.registeredOpenURI) {
       let userContextId = otherBrowser.getAttribute("usercontextid") || 0;
-      this.UrlbarProviderOpenTabs.unregisterOpenTab(
+      lazy.UrlbarProviderOpenTabs.unregisterOpenTab(
         otherBrowser.registeredOpenURI.spec,
         userContextId,
         aOtherTab.group?.id,
@@ -7112,7 +7106,7 @@ export class Tabbrowser {
     filter.removeProgressListener(tabListener);
 
     // Perform the docshell swap through the common mechanism.
-    this._swapBrowserDocShells(aOurTab, otherBrowser);
+    this.#swapBrowserDocShells(aOurTab, otherBrowser);
 
     // Restore the listeners for the swapped in tab.
     tabListener = new TabProgressListener(
@@ -7128,9 +7122,9 @@ export class Tabbrowser {
     otherBrowser.webProgress.addProgressListener(filter, notifyAll);
   }
 
-  _swapBrowserDocShells(aOurTab, aOtherBrowser, aStateFlags) {
+  #swapBrowserDocShells(aOurTab, aOtherBrowser, aStateFlags) {
     // aOurTab's browser needs to be inserted now if it hasn't already.
-    this._insertBrowser(aOurTab);
+    this.#insertBrowser(aOurTab);
 
     // Unhook our progress listener
     const filter = this.#tabFilters.get(aOurTab);
@@ -7140,7 +7134,7 @@ export class Tabbrowser {
     filter.removeProgressListener(tabListener);
 
     // Make sure to unregister any open URIs.
-    this._swapRegisteredOpenURIs(ourBrowser, aOtherBrowser);
+    this.#swapRegisteredOpenURIs(ourBrowser, aOtherBrowser);
 
     let remoteBrowser = aOtherBrowser.documentGlobal.gBrowser;
 
@@ -7194,7 +7188,7 @@ export class Tabbrowser {
     ourBrowser.webProgress.addProgressListener(filter, notifyAll);
   }
 
-  _swapRegisteredOpenURIs(aOurBrowser, aOtherBrowser) {
+  #swapRegisteredOpenURIs(aOurBrowser, aOtherBrowser) {
     // Swap the registeredOpenURI properties of the two browsers
     let tmp = aOurBrowser.registeredOpenURI;
     delete aOurBrowser.registeredOpenURI;
@@ -7308,7 +7302,7 @@ export class Tabbrowser {
 
     this.tabContainer._updateCloseButtons();
     if (aTab.multiselected) {
-      this._updateMultiselectedTabCloseButtonTooltip();
+      this.#updateMultiselectedTabCloseButtonTooltip();
     }
 
     let event = this.document.createEvent("Events");
@@ -7344,7 +7338,7 @@ export class Tabbrowser {
 
     this.tabContainer._updateCloseButtons();
     if (aTab.multiselected) {
-      this._updateMultiselectedTabCloseButtonTooltip();
+      this.#updateMultiselectedTabCloseButtonTooltip();
     }
 
     // Splice this tab out of any lines of succession before any events are
@@ -7584,9 +7578,9 @@ export class Tabbrowser {
     return !!(element?.tagName == "tab-split-view-wrapper");
   }
 
-  _updateTabsAfterInsert() {
+  #updateTabsAfterInsert() {
     for (let i = 0; i < this.tabs.length; i++) {
-      this.tabs[i]._tPos = i;
+      this.tabs[i]._index = i;
       this.tabs[i]._selected = false;
     }
 
@@ -7644,7 +7638,7 @@ export class Tabbrowser {
     // Return early if the tab is already in the right spot.
     if (
       this.isTab(element) &&
-      element._tPos == tabIndex &&
+      element.index == tabIndex &&
       !(element.group && forceUngrouped)
     ) {
       return;
@@ -7668,11 +7662,11 @@ export class Tabbrowser {
     // causes all following tabs to have a decreased index.
     let movingForwards = false;
     if (this.isTab(element)) {
-      movingForwards = tabIndex > element._tPos;
+      movingForwards = tabIndex > element.index;
     } else {
       // tab group or split view (mutually exclusive with being pinned).
       let tabsInElement = element.tabs;
-      movingForwards = tabIndex > tabsInElement[0]._tPos;
+      movingForwards = tabIndex > tabsInElement[0].index;
       if (movingForwards) {
         // -1 because element will be *after* tabIndex instead of at it.
         tabIndex += tabsInElement.length - 1;
@@ -7980,7 +7974,7 @@ export class Tabbrowser {
     }
 
     let state = {
-      tabIndex: tab._tPos,
+      tabIndex: tab.index,
     };
     if (tab.visible) {
       state.elementIndex = tab.elementIndex;
@@ -8080,7 +8074,7 @@ export class Tabbrowser {
     // changed.
     this.tabContainer._invalidateCachedTabs();
     this.#lastRelatedTabMap = new WeakMap();
-    this._updateTabsAfterInsert();
+    this.#updateTabsAfterInsert();
 
     if (wasFocused) {
       this.selectedTab.focus();
@@ -8092,7 +8086,7 @@ export class Tabbrowser {
     // the front tab, then logically that tab moves, and all following tabs
     // would shift, which would invalidate the index in previousTabState.
     let reverseEvents =
-      tabs.length > 1 && tabs[0]._tPos > previousTabStates[0].tabIndex;
+      tabs.length > 1 && tabs[0].index > previousTabStates[0].tabIndex;
 
     for (let i = 0; i < tabs.length; i++) {
       let ii = reverseEvents ? tabs.length - i - 1 : i;
@@ -8328,7 +8322,7 @@ export class Tabbrowser {
    *          no longer. The accessible name of their close button will be
    *          reset to default.
    */
-  _updateMultiselectedTabCloseButtonTooltip(aTabsRemovedFromMultiselection) {
+  #updateMultiselectedTabCloseButtonTooltip(aTabsRemovedFromMultiselection) {
     const { selectedTabs } = this;
     const args = { tabCount: selectedTabs.length };
     selectedTabs.forEach(selectedTab => {
@@ -8350,7 +8344,7 @@ export class Tabbrowser {
    * Adds a tab into the (multi) selected tabs collection.
    *
    * Warning: this function can be called from a loop, when selecting several tabs.
-   * Instead of adding expensive logic here, do it in `_endMultiSelectChange()`.
+   * Instead of adding expensive logic here, do it in `#endMultiSelectChange()`.
    *
    * @param {MozTabbrowserTab} aTab
    */
@@ -8373,8 +8367,8 @@ export class Tabbrowser {
 
     aTab.setAttribute("multiselected", "true");
     aTab.setAttribute("aria-selected", "true");
-    this._multiSelectedTabsSet.add(aTab);
-    this._startMultiSelectChange();
+    this.#multiSelectedTabsSet.add(aTab);
+    this.#startMultiSelectChange();
     if (!this.#multiSelectChangeRemovals.delete(aTab)) {
       this.#multiSelectChangeAdditions.add(aTab);
     }
@@ -8409,7 +8403,7 @@ export class Tabbrowser {
    * Removes a tab from the (multi) selected tabs collection.
    *
    * Warning: this function can be called from a loop, when unselecting several tabs.
-   * Instead of adding expensive logic here, do it in `_endMultiSelectChange()`.
+   * Instead of adding expensive logic here, do it in `#endMultiSelectChange()`.
    *
    * @param {MozTabbrowserTab} aTab
    */
@@ -8425,8 +8419,8 @@ export class Tabbrowser {
 
     aTab.removeAttribute("multiselected");
     aTab.removeAttribute("aria-selected");
-    this._multiSelectedTabsSet.delete(aTab);
-    this._startMultiSelectChange();
+    this.#multiSelectedTabsSet.delete(aTab);
+    this.#startMultiSelectChange();
     if (!this.#multiSelectChangeAdditions.delete(aTab)) {
       this.#multiSelectChangeRemovals.add(aTab);
     }
@@ -8502,13 +8496,13 @@ export class Tabbrowser {
    * B and C closing
    * A[pinned] being the only multi-selected tab, selection should be cleared.
    */
-  _avoidSingleSelectedTab() {
+  #avoidSingleSelectedTab() {
     if (this.multiSelectedTabsCount == 1) {
       this.clearMultiSelectedTabs();
     }
   }
 
-  _switchToNextMultiSelectedTab() {
+  #switchToNextMultiSelectedTab() {
     this.#clearMultiSelectionLocked = true;
 
     // Guarantee that #clearMultiSelectionLocked lock gets released.
@@ -8518,8 +8512,8 @@ export class Tabbrowser {
         this.selectedTab = lastMultiSelectedTab;
       } else {
         let selectedTabs = ChromeUtils.nondeterministicGetWeakSetKeys(
-          this._multiSelectedTabsSet
-        ).filter(this._mayTabBeMultiselected);
+          this.#multiSelectedTabsSet
+        ).filter(this.#mayTabBeMultiselected);
         this.selectedTab = selectedTabs.at(-1);
       }
     } catch (e) {
@@ -8540,18 +8534,18 @@ export class Tabbrowser {
   }
 
   get selectedTabs() {
-    let { selectedTab, _multiSelectedTabsSet } = this;
+    let { selectedTab } = this;
     let tabs = ChromeUtils.nondeterministicGetWeakSetKeys(
-      _multiSelectedTabsSet
-    ).filter(this._mayTabBeMultiselected);
+      this.#multiSelectedTabsSet
+    ).filter(this.#mayTabBeMultiselected);
     if (
-      (!_multiSelectedTabsSet.has(selectedTab) &&
-        this._mayTabBeMultiselected(selectedTab)) ||
+      (!this.#multiSelectedTabsSet.has(selectedTab) &&
+        this.#mayTabBeMultiselected(selectedTab)) ||
       !tabs.length
     ) {
       tabs.push(selectedTab);
     }
-    return tabs.sort((a, b) => a._tPos > b._tPos);
+    return tabs.sort((a, b) => a.index > b.index);
   }
 
   /**
@@ -8572,15 +8566,15 @@ export class Tabbrowser {
 
   get multiSelectedTabsCount() {
     return ChromeUtils.nondeterministicGetWeakSetKeys(
-      this._multiSelectedTabsSet
-    ).filter(this._mayTabBeMultiselected).length;
+      this.#multiSelectedTabsSet
+    ).filter(this.#mayTabBeMultiselected).length;
   }
 
   get lastMultiSelectedTab() {
     let tab = this.#lastMultiSelectedTabRef
       ? this.#lastMultiSelectedTabRef.get()
       : null;
-    if (tab && tab.isConnected && this._multiSelectedTabsSet.has(tab)) {
+    if (tab && tab.isConnected && this.#multiSelectedTabsSet.has(tab)) {
       return tab;
     }
     let selectedTab = this.selectedTab;
@@ -8592,18 +8586,18 @@ export class Tabbrowser {
     this.#lastMultiSelectedTabRef = Cu.getWeakReference(aTab);
   }
 
-  _mayTabBeMultiselected(aTab) {
+  #mayTabBeMultiselected(aTab) {
     return aTab.visible;
   }
 
-  _startMultiSelectChange() {
+  #startMultiSelectChange() {
     if (!this.#multiSelectChangeStarted) {
       this.#multiSelectChangeStarted = true;
-      Promise.resolve().then(() => this._endMultiSelectChange());
+      Promise.resolve().then(() => this.#endMultiSelectChange());
     }
   }
 
-  _endMultiSelectChange() {
+  #endMultiSelectChange() {
     let noticeable = false;
     let { selectedTab } = this;
     if (this.#multiSelectChangeAdditions.size) {
@@ -8614,13 +8608,13 @@ export class Tabbrowser {
     }
     if (this.#multiSelectChangeRemovals.size) {
       if (this.#multiSelectChangeRemovals.has(selectedTab)) {
-        this._switchToNextMultiSelectedTab();
+        this.#switchToNextMultiSelectedTab();
       }
-      this._avoidSingleSelectedTab();
+      this.#avoidSingleSelectedTab();
       noticeable = true;
     }
     if (noticeable) {
-      this._updateMultiselectedTabCloseButtonTooltip(
+      this.#updateMultiselectedTabCloseButtonTooltip(
         this.#multiSelectChangeRemovals
       );
     }
@@ -8708,14 +8702,14 @@ export class Tabbrowser {
     return (
       (aBrowser == this.selectedBrowser && !this.document.hidden) ||
       this._printPreviewBrowsers.has(aBrowser) ||
-      this.PictureInPicture.isOriginatingBrowser(aBrowser) ||
+      lazy.PictureInPicture.isOriginatingBrowser(aBrowser) ||
       this.splitViewBrowsers.includes(aBrowser)
     );
   }
 
   _getSwitcher() {
     if (!this._switcher) {
-      this._switcher = new this.AsyncTabSwitcher(this);
+      this._switcher = new lazy.AsyncTabSwitcher(this);
     }
     return this._switcher;
   }
@@ -8727,14 +8721,14 @@ export class Tabbrowser {
   }
 
   /**
-   * _maybeRequestReplyFromRemoteContent may call
+   * #maybeRequestReplyFromRemoteContent may call
    * aEvent.requestReplyFromRemoteContent if necessary.
    *
    * @param {Event} aEvent    The handling event.
    * @return          true if the handler should wait a reply event.
    *                  false if the handle can handle the immediately.
    */
-  _maybeRequestReplyFromRemoteContent(aEvent) {
+  #maybeRequestReplyFromRemoteContent(aEvent) {
     if (aEvent.defaultPrevented) {
       return false;
     }
@@ -8774,7 +8768,7 @@ export class Tabbrowser {
     const action = lazy.ShortcutUtils.getSystemActionForEvent(aEvent);
     if (
       action != null &&
-      this.KeyboardLockUtils.mustWaitForKeyboardLockRequestedReply(aEvent)
+      lazy.KeyboardLockUtils.mustWaitForKeyboardLockRequestedReply(aEvent)
     ) {
       return;
     }
@@ -8783,7 +8777,7 @@ export class Tabbrowser {
     // navigation should always work for better user experience.
     switch (action) {
       case lazy.ShortcutUtils.TOGGLE_CARET_BROWSING:
-        this._maybeRequestReplyFromRemoteContent(aEvent);
+        this.#maybeRequestReplyFromRemoteContent(aEvent);
         return;
       case lazy.ShortcutUtils.MOVE_TAB_BACKWARD:
         this.moveTabBackward({
@@ -8846,7 +8840,7 @@ export class Tabbrowser {
     const kPrefCaretBrowsingOn = "accessibility.browsewithcaret";
 
     var isEnabled = Services.prefs.getBoolPref(kPrefShortcutEnabled);
-    if (!isEnabled || this._awaitingToggleCaretBrowsingPrompt) {
+    if (!isEnabled || this.#awaitingToggleCaretBrowsingPrompt) {
       return;
     }
 
@@ -8861,7 +8855,7 @@ export class Tabbrowser {
       var promptService = Services.prompt;
 
       try {
-        this._awaitingToggleCaretBrowsingPrompt = true;
+        this.#awaitingToggleCaretBrowsingPrompt = true;
         const [title, message, checkbox] =
           this.tabLocalization.formatValuesSync([
             "tabbrowser-confirm-caretbrowsing-title",
@@ -8883,7 +8877,7 @@ export class Tabbrowser {
       } catch (ex) {
         return;
       } finally {
-        this._awaitingToggleCaretBrowsingPrompt = false;
+        this.#awaitingToggleCaretBrowsingPrompt = false;
       }
       if (buttonPressed != 0) {
         if (checkValue.value) {
@@ -8930,7 +8924,7 @@ export class Tabbrowser {
       case lazy.ShortcutUtils.TOGGLE_CARET_BROWSING:
         if (
           aEvent.defaultPrevented ||
-          this._maybeRequestReplyFromRemoteContent(aEvent)
+          this.#maybeRequestReplyFromRemoteContent(aEvent)
         ) {
           break;
         }
@@ -8993,13 +8987,13 @@ export class Tabbrowser {
     let uri =
       tab.linkedBrowser?.registeredOpenURI || tab._originalRegisteredOpenURI;
     if (uri) {
-      this.UrlbarProviderOpenTabs.unregisterOpenTab(
+      lazy.UrlbarProviderOpenTabs.unregisterOpenTab(
         uri.spec,
         tab.userContextId,
         null,
         lazy.PrivateBrowsingUtils.isWindowPrivate(this.documentGlobal)
       );
-      this.UrlbarProviderOpenTabs.registerOpenTab(
+      lazy.UrlbarProviderOpenTabs.registerOpenTab(
         uri.spec,
         tab.userContextId,
         tab.group?.id,
@@ -9016,13 +9010,13 @@ export class Tabbrowser {
       // By the time the tab makes it to us it is already ungrouped, but
       // the original group is preserved in the event target.
       let originalGroup = aEvent.target;
-      this.UrlbarProviderOpenTabs.unregisterOpenTab(
+      lazy.UrlbarProviderOpenTabs.unregisterOpenTab(
         uri.spec,
         tab.userContextId,
         originalGroup.id,
         lazy.PrivateBrowsingUtils.isWindowPrivate(this.documentGlobal)
       );
-      this.UrlbarProviderOpenTabs.registerOpenTab(
+      lazy.UrlbarProviderOpenTabs.registerOpenTab(
         uri.spec,
         tab.userContextId,
         null,
@@ -9125,7 +9119,7 @@ export class Tabbrowser {
         debugStringArray.push("[A]");
       }
 
-      if (this.SponsorProtection.isProtectedBrowser(tab.linkedBrowser)) {
+      if (lazy.SponsorProtection.isProtectedBrowser(tab.linkedBrowser)) {
         debugStringArray.push("[S]");
       }
 
@@ -9221,7 +9215,7 @@ export class Tabbrowser {
       // Prevent the tooltip from appearing if card preview is enabled, but
       // only if the user is not hovering over the media play icon or the
       // close button
-      if (this._showTabCardPreview) {
+      if (lazy.showTabCardPreview) {
         event.preventDefault();
         return;
       }
@@ -9298,17 +9292,14 @@ export class Tabbrowser {
     }
   }
 
-  _generateUniquePanelID() {
-    if (!this._uniquePanelIDCounter) {
-      this._uniquePanelIDCounter = 0;
-    }
-
+  #uniquePanelIDCounter = 0;
+  #generateUniquePanelID() {
     let outerID = this.documentGlobal.docShell.outerWindowID;
 
     // We want panel IDs to be globally unique, that's why we include the
     // window ID. We switched to a monotonic counter as Date.now() lead
     // to random failures because of colliding IDs.
-    return "panel-" + outerID + "-" + ++this._uniquePanelIDCounter;
+    return "panel-" + outerID + "-" + ++this.#uniquePanelIDCounter;
   }
 
   destroy() {
@@ -9320,7 +9311,7 @@ export class Tabbrowser {
       let browser = tab.linkedBrowser;
       if (browser.registeredOpenURI) {
         let userContextId = browser.getAttribute("usercontextid") || 0;
-        this.UrlbarProviderOpenTabs.unregisterOpenTab(
+        lazy.UrlbarProviderOpenTabs.unregisterOpenTab(
           browser.registeredOpenURI.spec,
           userContextId,
           tab.group?.id,
@@ -9364,7 +9355,7 @@ export class Tabbrowser {
     }
   }
 
-  _setupEventListeners() {
+  #setupEventListeners() {
     this.tabpanels.addEventListener("select", event => {
       if (event.target == this.tabpanels) {
         this.updateCurrentBrowser();
@@ -9805,8 +9796,9 @@ export class Tabbrowser {
     });
   }
 
+  #tabContextMenuTranslated = false;
   translateTabContextMenu() {
-    if (this._tabContextMenuTranslated) {
+    if (this.#tabContextMenuTranslated) {
       return;
     }
     this.documentGlobal.MozXULElement.insertFTLIfNeeded(
@@ -9820,7 +9812,7 @@ export class Tabbrowser {
         el.setAttribute("data-l10n-id", el.getAttribute("data-lazy-l10n-id"));
         el.removeAttribute("data-lazy-l10n-id");
       });
-    this._tabContextMenuTranslated = true;
+    this.#tabContextMenuTranslated = true;
   }
 
   setSuccessor(aTab, successorTab) {
@@ -10386,7 +10378,7 @@ class TabProgressListener {
           this._browser.originalURI = aRequest.originalURI;
         }
 
-        if (!this.#tabbrowser._allowTransparentBrowser) {
+        if (!lazy.allowTransparentBrowser) {
           this._browser.toggleAttribute(
             "transparent",
             lazy.AIWindow.isAIWindowActive(this.#documentGlobal) &&
@@ -10398,7 +10390,7 @@ class TabProgressListener {
       let userContextId = this._browser.getAttribute("usercontextid") || 0;
       if (this._browser.registeredOpenURI) {
         let uri = this._browser.registeredOpenURI;
-        this.#tabbrowser.UrlbarProviderOpenTabs.unregisterOpenTab(
+        lazy.UrlbarProviderOpenTabs.unregisterOpenTab(
           uri.spec,
           userContextId,
           this._tab.group?.id,
@@ -10407,7 +10399,7 @@ class TabProgressListener {
         delete this._browser.registeredOpenURI;
       }
       if (!this.#documentGlobal.isBlankPageURL(aLocation.spec)) {
-        this.#tabbrowser.UrlbarProviderOpenTabs.registerOpenTab(
+        lazy.UrlbarProviderOpenTabs.registerOpenTab(
           aLocation.spec,
           userContextId,
           this._tab.group?.id,
@@ -10563,10 +10555,9 @@ let URILoadingWrapper = {
     uriString,
     { loadFlags, globalHistoryOptions }
   ) {
-    let { SponsorProtection } = browser.getTabBrowser();
     if (globalHistoryOptions?.triggeringSponsoredURL) {
       if (globalHistoryOptions.triggeringSource == "newtab") {
-        SponsorProtection.addProtectedBrowser(browser);
+        lazy.SponsorProtection.addProtectedBrowser(browser);
       }
 
       try {
@@ -10586,7 +10577,7 @@ let URILoadingWrapper = {
         );
       } catch (e) {}
     } else {
-      SponsorProtection.removeProtectedBrowser(browser);
+      lazy.SponsorProtection.removeProtectedBrowser(browser);
     }
 
     if (globalHistoryOptions?.triggeringSearchEngine) {

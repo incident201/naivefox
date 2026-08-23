@@ -873,16 +873,10 @@ void nsIFrame::HandlePrimaryFrameStyleChange(ComputedStyle* aOldStyle) {
               : disp->HasAnchorName();
   if (handleAnchorPosAnchorNameChange &&
       !HasAnyStateBits(NS_FRAME_IS_NONDISPLAY)) {
-    // TODO: Add invalidation.
-    // TODO: Only remove/add the necessary names below.
     if (oldDisp && oldDisp->HasAnchorName()) {
-      for (const auto& name : oldDisp->mAnchorName.AsSpan()) {
-        PresShell()->RemoveAnchorPosAnchor(name.AsAtom(), this);
-      }
+      PresShell()->RemoveAnchorPosAnchor(oldDisp->mAnchorName.AsSpan(), this);
     }
-    for (const auto& name : disp->mAnchorName.AsSpan()) {
-      PresShell()->AddAnchorPosAnchor(name.AsAtom(), this);
-    }
+    PresShell()->AddAnchorPosAnchor(disp->mAnchorName.AsSpan(), this);
   }
 
   // According to the Anchor Positioning spec,
@@ -1029,9 +1023,7 @@ void nsIFrame::Destroy(DestroyContext& aContext) {
   }
 
   if (HasAnchorPosName()) {
-    for (const auto& name : disp->mAnchorName.AsSpan()) {
-      PresShell()->RemoveAnchorPosAnchor(name.AsAtom(), this);
-    }
+    PresShell()->RemoveAnchorPosAnchor(disp->mAnchorName.AsSpan(), this);
   }
 
   if (HasAnchorPosReference()) {
@@ -5960,6 +5952,7 @@ static bool SelfIsSelectable(nsIFrame* aFrame, nsIFrame* aParentFrame,
   if (aFrame->IsGeneratedContentFrame()) {
     return false;
   }
+  // XXX Why do we ignore `aFlag & nsIFrame::IGNORE_SELECTION_STYLE`?
   if (aFrame->Style()->UserSelect() == StyleUserSelect::None) {
     return false;
   }
@@ -9757,10 +9750,11 @@ static nsresult GetNextPrevLineFromBlockFrame(PeekOffsetStruct* aPos,
   return NS_OK;
 }
 
-nsIFrame::CaretPosition nsIFrame::GetExtremeCaretPosition(bool aStart) {
+nsIFrame::CaretPosition nsIFrame::GetExtremeCaretPosition(bool aStart,
+                                                          uint32_t aFlags) {
   CaretPosition result;
 
-  FrameTarget targetFrame = DrillDownToSelectionFrame(this, !aStart, 0);
+  FrameTarget targetFrame = DrillDownToSelectionFrame(this, !aStart, aFlags);
   FrameContentRange range = GetRangeForFrame(targetFrame.frame);
   result.mResultContent = range.content;
   result.mContentOffset = aStart ? range.start : range.end;

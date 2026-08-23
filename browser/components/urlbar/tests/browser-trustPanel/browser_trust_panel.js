@@ -261,20 +261,13 @@ add_task(async function test_update() {
     "trustpanel-blocker-section-header"
   );
 
-  // With nothing blocked yet the section must be hidden rather than showing a
-  // misleading "0 trackers blocked" (Bug: intermittent 0-blocked state).
-  Assert.ok(
-    blockerSection.hasAttribute("hidden"),
-    "Blocker section is hidden while no trackers have been blocked"
-  );
-
-  await SpecialPowers.spawn(tab.linkedBrowser, [], function () {
-    content.postMessage("cryptomining", "*");
-  });
-
+  // The test page loads a trackertest.org iframe, so one tracker is already
+  // blocked by the time the panel opens. The count now reflects the full
+  // content-blocking log, so the section shows that baseline rather than a
+  // misleading "0 trackers blocked".
   await TestUtils.waitForCondition(
     () => parseInt(blockerHeader.textContent, 10) == 1,
-    "Updated to show new cryptominer blocked"
+    "Shows the tracker already blocked on page load"
   );
   Assert.ok(
     !blockerSection.hasAttribute("hidden"),
@@ -282,11 +275,24 @@ add_task(async function test_update() {
   );
 
   await SpecialPowers.spawn(tab.linkedBrowser, [], function () {
-    content.postMessage("fingerprinting", "*");
+    content.postMessage("cryptomining", "*");
   });
 
   await TestUtils.waitForCondition(
     () => parseInt(blockerHeader.textContent, 10) == 2,
+    "Updated to show new cryptominer blocked"
+  );
+  Assert.ok(
+    !blockerSection.hasAttribute("hidden"),
+    "Blocker section stays shown with multiple trackers blocked"
+  );
+
+  await SpecialPowers.spawn(tab.linkedBrowser, [], function () {
+    content.postMessage("fingerprinting", "*");
+  });
+
+  await TestUtils.waitForCondition(
+    () => parseInt(blockerHeader.textContent, 10) == 3,
     "Updated to show new fingerprinter blocked"
   );
   Assert.ok(
@@ -295,77 +301,6 @@ add_task(async function test_update() {
   );
 
   BrowserTestUtils.removeTab(tab);
-});
-
-// Regression test: a slower/older content-blocking update must not overwrite a
-// fresher one's blocked count. Without the guard in #updateBlockerView, a stale
-// run that resolves last clobbers the header back to 0 ("0 trackers blocked"),
-// which QA hit intermittently on tracker-heavy sites like Meta.
-add_task(async function test_blocker_count_no_stale_overwrite() {
-  const tab = await BrowserTestUtils.openNewForegroundTab({
-    gBrowser,
-    opening: "https://example.com",
-    waitForLoad: true,
-  });
-
-  await UrlbarTestUtils.openTrustPanel(window);
-
-  let blockerSection = document.getElementById("trustpanel-blocker-section");
-  let blockerHeader = document.getElementById(
-    "trustpanel-blocker-section-header"
-  );
-
-  // Drive a single blocker and control when its async count resolves, so we can
-  // interleave two updates and force the stale one to resolve last.
-  let sandbox = sinon.createSandbox();
-  registerCleanupFunction(() => sandbox.restore());
-  let pendingCounts = [];
-  sandbox.stub(TrackingProtection, "isBlocking").returns(true);
-  sandbox
-    .stub(TrackingProtection, "getBlockerCount")
-    .callsFake(() => new Promise(resolve => pendingCounts.push(resolve)));
-
-  // Start the older update and let it park awaiting its blocker count.
-  gTrustPanelHandler.onContentBlockingEvent(0);
-  await TestUtils.waitForCondition(
-    () => pendingCounts.length == 1,
-    "Older update is awaiting its blocker count"
-  );
-
-  // Start the newer update and let it park too.
-  gTrustPanelHandler.onContentBlockingEvent(0);
-  await TestUtils.waitForCondition(
-    () => pendingCounts.length == 2,
-    "Newer update is awaiting its blocker count"
-  );
-
-  // Resolve the newer update first with the real count.
-  pendingCounts[1](3);
-  await TestUtils.waitForCondition(
-    () => parseInt(blockerHeader.textContent, 10) == 3,
-    "Fresh count is applied"
-  );
-  Assert.ok(
-    !blockerSection.hasAttribute("hidden"),
-    "Section is shown for the fresh non-zero count"
-  );
-
-  // Now resolve the older (stale) update with 0 — it must be ignored.
-  pendingCounts[0](0);
-  await new Promise(resolve => setTimeout(resolve, 0));
-  Assert.equal(
-    parseInt(blockerHeader.textContent, 10),
-    3,
-    "Stale update did not overwrite the fresh count with 0"
-  );
-  Assert.ok(
-    !blockerSection.hasAttribute("hidden"),
-    "Stale update did not hide the section"
-  );
-
-  sandbox.restore();
-  await UrlbarTestUtils.closeTrustPanel(window);
-  await BrowserTestUtils.removeTab(tab);
 });
 
 add_task(async function test_etld() {

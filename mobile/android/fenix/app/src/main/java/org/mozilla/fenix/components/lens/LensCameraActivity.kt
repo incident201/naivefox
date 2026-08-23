@@ -380,20 +380,26 @@ class LensCameraActivity : AppCompatActivity() {
         }
     }
 
-    private fun decodeDownsampledStream(uri: Uri): Bitmap {
+    @VisibleForTesting
+    internal fun decodeDownsampledStream(uri: Uri): Bitmap {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         contentResolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, bounds)
-        } ?: throw IOException("Unable to open $uri")
+        }
+        // A bounds pass always returns a null bitmap, so the decoded dimensions are what tell
+        // us whether the image could be read. They are untouched if the stream could not be opened.
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw IOException("Unable to read the bounds of $uri")
+        }
 
         val longEdge = maxOf(bounds.outWidth, bounds.outHeight)
         var sampleSize = 1
         while (longEdge / sampleSize > QR_DECODE_MAX_DIMENSION) sampleSize *= 2
 
         val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        return contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, opts)
-        } ?: throw IOException("Unable to open $uri")
+        val stream = contentResolver.openInputStream(uri)
+        return stream?.use { BitmapFactory.decodeStream(it, null, opts) }
+            ?: throw IOException(if (stream == null) "Unable to open $uri" else "Unable to decode $uri")
     }
 
     @VisibleForTesting

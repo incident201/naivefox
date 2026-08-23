@@ -28,7 +28,7 @@ const MUTATION_OBSERVER_OPTIONS = {
 };
 
 // List of input types current being autofilled by SmartFormFill
-const SUPPORTED_INPUT_TYPES = [
+export const SUPPORTED_INPUT_TYPES = [
   "text",
   "email",
   "tel",
@@ -89,10 +89,11 @@ const SUPPORTED_INPUT_TYPES = [
  */
 
 /**
- * @typedef {{
- *   id: string,
- *   emptyFieldIds: Set<string>,
- * }} FocusedForm
+ * @typedef {object} FocusedForm
+ * @property {string} id Stable identifier for the focused form.
+ * @property {Array<FieldData>} fields Serializable fields belonging to the
+ * focused form.
+ * @property {Set<string>} emptyFieldIds IDs of fields that can be filled.
  */
 
 /**
@@ -349,8 +350,14 @@ export class SmartFormFillDocument {
         .map(formField => this.#getFieldId(formField))
     );
 
+    const formData = this.getFormData().find(({ id }) => id === group.formId);
+    if (!formData) {
+      return null;
+    }
+
     return {
-      id: group.formId,
+      id: formData.id,
+      fields: formData.fields,
       emptyFieldIds,
     };
   }
@@ -369,36 +376,64 @@ export class SmartFormFillDocument {
       return;
     }
 
-    const filledFieldIds = new Set();
-    const formFields = new Set(group.fields);
-    for (const { id: fieldId, value } of fields) {
-      if (filledFieldIds.has(fieldId)) {
-        continue;
+    Services.obs.notifyObservers(null, "autofill-fill-starting");
+
+    try {
+      const filledFieldIds = new Set();
+      const formFields = new Set(group.fields);
+      for (const { id: fieldId, value } of fields) {
+        if (filledFieldIds.has(fieldId)) {
+          continue;
+        }
+
+        const field = this.#fieldsById.get(fieldId);
+
+        const valid =
+          field &&
+          field.isConnected &&
+          formFields.has(field) &&
+          lazy.FormLikeFactory.findRootForField(field) ===
+            group.formLike.rootElement &&
+          this.#isSupportedField(field) &&
+          this.#isFillableField(field);
+
+        if (!valid) {
+          continue;
+        }
+
+        if (!value || typeof value !== "string") {
+          continue;
+        }
+
+        field.setUserInput(value);
+        field.autofillState = lazy.FormAutofillUtils.FIELD_STATES.AUTO_FILLED;
+        filledFieldIds.add(fieldId);
       }
-
-      const field = this.#fieldsById.get(fieldId);
-
-      const valid =
-        field &&
-        field.isConnected &&
-        formFields.has(field) &&
-        lazy.FormLikeFactory.findRootForField(field) ===
-          group.formLike.rootElement &&
-        this.#isSupportedField(field) &&
-        this.#isFillableField(field);
-
-      if (!valid) {
-        continue;
-      }
-
-      if (!value || typeof value !== "string") {
-        continue;
-      }
-
-      field.setUserInput(value);
-      field.autofillState = lazy.FormAutofillUtils.FIELD_STATES.AUTO_FILLED;
-      filledFieldIds.add(fieldId);
+    } finally {
+      Services.obs.notifyObservers(null, "autofill-fill-complete");
     }
+  }
+
+  /**
+   * Gets list of supported fields that were detected
+   *
+   * @returns {Array<SmartFormFillField>}
+   */
+  getSupportedFields() {
+    return Array.from(this.#forms.values()).flatMap(({ fields }) =>
+      fields.filter(field => this.#isSupportedField(field))
+    );
+  }
+
+  /**
+   * Whether the field is current supported
+   *
+   * @param {HTMLElement} field
+   *
+   * @returns {boolean}
+   */
+  isSupportedField(field) {
+    return this.#isSupportedField(field);
   }
 
   /**

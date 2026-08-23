@@ -96,6 +96,7 @@ class ProfileChunkedBuffer;
 class ScopedNameRef;
 class ScrollContainerFrame;
 class StyleSheet;
+struct StyleAtom;
 
 struct AutoConnectedAncestorTracker;
 struct PointerInfo;
@@ -816,8 +817,8 @@ class PresShell final : public nsStubDocumentObserver,
                                const nsIFrame* aPositionedFrame) const;
   void CollectAnchorNames(const nsIFrame* aPositionedFrame,
                           nsTArray<nsString>& aResult);
-  void AddAnchorPosAnchor(const nsAtom* aName, nsIFrame* aFrame);
-  void RemoveAnchorPosAnchor(const nsAtom* aName, nsIFrame* aFrame);
+  void AddAnchorPosAnchor(Span<const StyleAtom> aNames, nsIFrame* aFrame);
+  void RemoveAnchorPosAnchor(Span<const StyleAtom> aNames, nsIFrame* aFrame);
   enum class AnchorPosUpdateResult {
     NotApplicable,
     Flushed,
@@ -2133,6 +2134,7 @@ class PresShell final : public nsStubDocumentObserver,
     RenderingState mOldState;
   };
   void SetRenderingState(const RenderingState& aState);
+  void RemoveAnchorPosAnchor(const nsAtom* aName, nsIFrame* aFrame);
 
   friend class ::nsPresShellEventCB;
 

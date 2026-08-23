@@ -20,7 +20,7 @@ if (lazy) {
 // Query selector for selectable elements in results.
 const SELECTABLE_ELEMENT_SELECTOR = "[role=button], [selectable], a";
 const KEYBOARD_SELECTABLE_ELEMENT_SELECTOR =
-  "[role=button]:not([keyboard-inaccessible]), [selectable], a";
+  '[role=button]:not([keyboard-inaccessible]):not([aria-disabled="true"]), [selectable], a';
 
 const RESULT_MENU_COMMANDS = {
   DISMISS: "dismiss",
@@ -479,10 +479,7 @@ export class UrlbarView {
     if (!userPressedTab) {
       let { selectedRowIndex } = this;
       let end = this.visibleRowCount - 1;
-      if (selectedRowIndex == -1) {
-        this.selectedRowIndex = reverse ? end : 0;
-        return;
-      }
+      let step = reverse ? -1 : 1;
       let endReached = selectedRowIndex == (reverse ? 0 : end);
       if (endReached) {
         if (this.allowEmptySelection) {
@@ -493,17 +490,16 @@ export class UrlbarView {
         return;
       }
 
-      let index = Math.min(end, selectedRowIndex + amount * (reverse ? -1 : 1));
-      // When navigating with arrow keys we skip rows that contain
-      // global actions.
-      if (
-        this.#rows.children[index]?.result.providerName ==
-          "UrlbarProviderGlobalActions" &&
-        this.#rows.children.length > 2
-      ) {
-        index = index + (reverse ? -1 : 1);
+      let index = reverse ? end : 0;
+      if (selectedRowIndex != -1) {
+        index = Math.min(end, Math.max(0, selectedRowIndex + amount * step));
       }
-      this.selectedRowIndex = Math.max(0, index);
+      // When navigating with arrow keys we skip rows that contain global
+      // actions and rows only disabled actions.
+      while (index >= 0 && index <= end && !this.#isRowArrowSelectable(index)) {
+        index += step;
+      }
+      this.selectedRowIndex = index > end ? -1 : index;
       return;
     }
 
@@ -3377,6 +3373,27 @@ export class UrlbarView {
   }
 
   /**
+   * Returns true if the row at the given index can be selected with the arrow
+   * keys.
+   *
+   * @param {number} index
+   *   Index of the row to examine.
+   * @returns {boolean}
+   *   True if the arrow keys can select the row and false if not.
+   */
+  #isRowArrowSelectable(index) {
+    let row = this.#rows.children[index];
+    if (
+      row.result?.providerName == "UrlbarProviderGlobalActions" &&
+      this.#rows.children.length > 2
+    ) {
+      return false;
+    }
+    let element = this.#getNextSelectableElement(row);
+    return !!element && this.#getRowFromElement(element) == row;
+  }
+
+  /**
    * Returns the first keyboard-selectable element in the view.
    *
    * @returns {Element}
@@ -4371,7 +4388,8 @@ export class UrlbarView {
     let element = this.#getClosestSelectableElement(event.target, {
       byMouse: true,
     });
-    if (!element) {
+
+    if (!element || element.getAttribute("aria-disabled") == "true") {
       // Ignore clicks on elements that can't be selected/picked.
       return;
     }
@@ -4433,7 +4451,7 @@ export class UrlbarView {
             byMouse: true,
           })
         : null;
-    if (element) {
+    if (element && element.getAttribute("aria-disabled") != "true") {
       this.input.pickElement(element, event);
     }
 
@@ -4562,6 +4580,7 @@ export class UrlbarView {
     ) {
       event.target.documentGlobal.createUserContextMenu(event, {
         isContextMenu: true,
+        containerSource: "urlbar_result_context_menu",
       });
     }
   }

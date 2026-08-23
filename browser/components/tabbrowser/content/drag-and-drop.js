@@ -6,6 +6,13 @@
 
 // Wrap in a block to prevent leaking to window scope.
 {
+  const lazy = {};
+
+  ChromeUtils.defineESModuleGetters(lazy, {
+    OpenInTabsUtils:
+      "moz-src:///browser/components/tabbrowser/OpenInTabsUtils.sys.mjs",
+  });
+
   const isTab = element => gBrowser.isTab(element);
   const isTabGroupLabel = element => gBrowser.isTabGroupLabel(element);
   const isSplitViewWrapper = element => gBrowser.isSplitViewWrapper(element);
@@ -26,7 +33,7 @@
    * - <tab-split-view-wrapper>
    *
    * When working with tab strip items, if you need logical information, you
-   * can get it directly, e.g. `element.elementIndex` or `element._tPos`. If
+   * can get it directly, e.g. `element.elementIndex` or `element.index`. If
    * you need spatial information like position or dimensions, then you should
    * call this function. For example, `elementToMove(element).getBoundingClientRect()`
    * or `elementToMove(element).style.top`.
@@ -688,11 +695,10 @@
             Services.prefs.getIntPref("browser.tabs.maxOpenBeforeWarn")
           ) {
             // Sync dialog cannot be used inside drop event handler.
-            let answer =
-              await gBrowser.OpenInTabsUtils.promiseConfirmOpenInTabs(
-                urls.length,
-                window
-              );
+            let answer = await lazy.OpenInTabsUtils.promiseConfirmOpenInTabs(
+              urls.length,
+              window
+            );
             if (!answer) {
               return;
             }
@@ -2508,7 +2514,7 @@
           dropElementSize
         );
 
-        moveOverThreshold = gBrowser._tabGroupsEnabled
+        moveOverThreshold = gBrowser.tabGroupsEnabled
           ? Services.prefs.getIntPref(
               "browser.tabs.dragDrop.moveOverThresholdPercent"
             ) / 100
@@ -2581,7 +2587,7 @@
       }
 
       if (
-        gBrowser._tabGroupsEnabled &&
+        gBrowser.tabGroupsEnabled &&
         (isTab(draggedTab) || isSplitViewWrapper(draggedTab)) &&
         !isPinned &&
         (!numPinned || newDropElementIndex >= numPinned)

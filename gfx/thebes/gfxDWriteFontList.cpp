@@ -604,7 +604,7 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
   return rv;
 }
 
-bool gfxDWriteFontEntry::HasVariations() {
+bool gfxDWriteFontEntry::HasVariationsInternal() {
   if (mHasVariationsInitialized) {
     return mHasVariations;
   }
@@ -629,7 +629,7 @@ bool gfxDWriteFontEntry::HasVariations() {
   return mHasVariations;
 }
 
-void gfxDWriteFontEntry::GetVariationAxes(
+void gfxDWriteFontEntry::GetVariationAxesInternal(
     nsTArray<gfxFontVariationAxis>& aAxes) {
   if (!HasVariations()) {
     return;
@@ -677,7 +677,7 @@ void gfxDWriteFontEntry::GetVariationAxes(
   }
 }
 
-void gfxDWriteFontEntry::GetVariationInstances(
+void gfxDWriteFontEntry::GetVariationInstancesInternal(
     nsTArray<gfxFontVariationInstance>& aInstances) {
   gfxFontUtils::GetVariationData(this, nullptr, &aInstances);
 }

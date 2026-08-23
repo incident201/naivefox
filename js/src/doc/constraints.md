@@ -13,10 +13,13 @@ ECMAScript specification's limit of `2**53 - 1` elements.
 
 For comparison, per [MDN][mdn-max-string-length]:
 
-* In V8, the maximum length is `2**29 - 24` (~512MiB). On 32-bit systems, the
-  maximum length is `2**28 - 16` (~256MiB).
-* In Firefox, the maximum length is `2**30 - 2` (~1GiB).
-* In Safari, the maximum length is `2**31 - 1` (~2GiB).
+* In V8, the maximum length is `2**29 - 24` (~512MiB for Latin1, 1GiB for
+  WTF-16). On 32-bit systems, the maximum length is `2**28 - 16` (~256MiB and
+  512MiB).
+* In Firefox, the maximum length is `2**30 - 2` (~1GiB for Latin1, 2GiB for
+  WTF-16).
+* In Safari, the maximum length is `2**31 - 1` (~2GiB for Latin1, 4GiB for
+  WTF-16).
 
 [mdn-max-string-length]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/length
 
@@ -31,6 +34,9 @@ at the definition of `JS::MaxStringLength` explains one motivation:
  */
 static constexpr uint32_t MaxStringLength = (1 << 30) - 2;
 ```
+
+So: out of 32 bits, we lose 1 for WTF-16 encoding, and lose another one for the
+sign bit (Int32Value is a thing; UInt32Value is not.)
 
 That alone may not be a sufficient reason to keep the limit this low; it would
 need a scan of the code to see how the restriction is actually used. But there

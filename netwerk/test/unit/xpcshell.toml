@@ -97,13 +97,13 @@ run-sequentially = ["true"] # node server exceptions dont replay well
 
 ["test_altsvc_lna.js"]
 
-["test_altsvc_proxy_dns_leak.js"]
-
 ["test_altsvc_pref.js"]
 skip-if = [
   "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && msix",
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix",
 ]
+
+["test_altsvc_proxy_dns_leak.js"]
 
 ["test_android_content_uri.js"]
 run-if = [
@@ -567,6 +567,13 @@ skip-if = [
 
 ["test_compressappend.js"]
 
+["test_compressConv_offmainthread_js_listener.js"]
+prefs = [
+  "network.decompression_off_mainthread2=true",
+  "network.decompression_off_mainthread_min_size=0",
+  "network.http.encoding.trustworthy_is_https=false",
+]
+
 ["test_connection_based_auth.js"]
 
 ["test_connection_coalescing.js"]
@@ -797,16 +804,7 @@ skip-if = [
   "os == 'win' && msix",
 ]
 
-["test_happy_eyeballs_trr_connect_fallback.js"]
-skip-if = [
-  "os == 'android'",
-  "os == 'win' && msix",
-]
-
 ["test_happy_eyeballs_dns_prefetch_reuse.js"]
-run-sequentially = ["true"] # node server exceptions dont replay well
-
-["test_happy_eyeballs_https_rr_prefetch_reuse.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
 
 ["test_happy_eyeballs_h1_0rtt.js"]
@@ -862,6 +860,9 @@ skip-if = [
   "os == 'win'",
 ]
 
+["test_happy_eyeballs_https_rr_prefetch_reuse.js"]
+run-sequentially = ["true"] # node server exceptions dont replay well
+
 ["test_happy_eyeballs_ip_preference.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
 
@@ -890,6 +891,12 @@ run-sequentially = ["true"] # node server exceptions dont replay well
 skip-if = [
   "os == 'android'",
   "os == 'win'",
+]
+
+["test_happy_eyeballs_trr_connect_fallback.js"]
+skip-if = [
+  "os == 'android'",
+  "os == 'win' && msix",
 ]
 
 ["test_happy_eyeballs_websocket_https_rr.js"]
@@ -1471,6 +1478,8 @@ skip-if = [
 
 ["test_network_connectivity_service.js"]
 
+["test_network_connectivity_service_idle_startup.js"]
+
 ["test_networking_over_socket_process.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
 run-if = [
@@ -1884,8 +1893,8 @@ run-if = [
 
 ["test_trr_bench.js"]
 skip-if = [
-  "verify",
   "os == 'android'", # intermittent ADB port exhaustion
+  "verify",
 ]
 run-sequentially = ["true"] # We want to check performance
 

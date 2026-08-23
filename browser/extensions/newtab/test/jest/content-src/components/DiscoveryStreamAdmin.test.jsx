@@ -671,6 +671,8 @@ describe("<DiscoveryStreamAdminUI> Layouts", () => {
     "side-by-side-widgets-lead",
     "side-by-side-content-lead-five",
     "side-by-side-widgets-lead-five",
+    "spaces-buttons-top",
+    "spaces-buttons-bottom",
   ];
   // Everything isSideBySideActive gates on, so the status line stays quiet.
   const ACTIVE_PREFS = {

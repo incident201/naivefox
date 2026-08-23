@@ -392,7 +392,7 @@ gfxFont* CTFontEntry::CreateFontInstance(const gfxFontStyle* aFontStyle) {
   return new gfxMacFont(unscaledFont, this, aFontStyle);
 }
 
-bool CTFontEntry::HasVariations() {
+bool CTFontEntry::HasVariationsInternal() {
   if (!mHasVariationsInitialized) {
     mHasVariationsInitialized = true;
     mHasVariations = gfxPlatform::HasVariationFontSupport() &&
@@ -402,7 +402,7 @@ bool CTFontEntry::HasVariations() {
   return mHasVariations;
 }
 
-void CTFontEntry::GetVariationAxes(
+void CTFontEntry::GetVariationAxesInternal(
     nsTArray<gfxFontVariationAxis>& aVariationAxes) {
   // We could do this by creating a CTFont and calling CTFontCopyVariationAxes,
   // but it is expensive to instantiate a CTFont for every face just to set up
@@ -411,7 +411,7 @@ void CTFontEntry::GetVariationAxes(
   gfxFontUtils::GetVariationData(this, &aVariationAxes, nullptr);
 }
 
-void CTFontEntry::GetVariationInstances(
+void CTFontEntry::GetVariationInstancesInternal(
     nsTArray<gfxFontVariationInstance>& aInstances) {
   // Core Text doesn't offer API for this, so we use gfxFontUtils to read the
   // font tables directly.

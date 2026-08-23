@@ -1952,20 +1952,11 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForSystem(
   if (aFeatures.GetBoolWithDefault("toolbar", false, &presenceFlag)) {
     chromeFlags |= nsIWebBrowserChrome::CHROME_TOOLBAR;
   }
-  if (aFeatures.GetBoolWithDefault("personalbar", false, &presenceFlag)) {
-    chromeFlags |= nsIWebBrowserChrome::CHROME_PERSONAL_TOOLBAR;
-  }
-  if (aFeatures.GetBoolWithDefault("menubar", false, &presenceFlag)) {
-    chromeFlags |= nsIWebBrowserChrome::CHROME_MENUBAR;
-  }
   if (aFeatures.GetBoolWithDefault("resizable", false, &presenceFlag)) {
     chromeFlags |= nsIWebBrowserChrome::CHROME_WINDOW_RESIZE;
   }
   if (aFeatures.GetBoolWithDefault("minimizable", false, &presenceFlag)) {
     chromeFlags |= nsIWebBrowserChrome::CHROME_WINDOW_MINIMIZE;
-  }
-  if (aFeatures.GetBoolWithDefault("scrollbars", true, &presenceFlag)) {
-    chromeFlags |= nsIWebBrowserChrome::CHROME_SCROLLBARS;
   }
 
   // Determine whether the window is a private browsing window
@@ -2032,9 +2023,6 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForSystem(
   }
   if (aFeatures.GetBoolWithDefault("chrome", false)) {
     chromeFlags |= nsIWebBrowserChrome::CHROME_OPENAS_CHROME;
-  }
-  if (aFeatures.GetBoolWithDefault("extrachrome", false)) {
-    chromeFlags |= nsIWebBrowserChrome::CHROME_EXTRA;
   }
   if (aFeatures.GetBoolWithDefault("centerscreen", false)) {
     chromeFlags |= nsIWebBrowserChrome::CHROME_CENTER_SCREEN;

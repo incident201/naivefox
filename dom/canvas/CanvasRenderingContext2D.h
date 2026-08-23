@@ -326,7 +326,6 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
     if (CurrentState().fontKerning != aFontKerning) {
       CurrentState().fontKerning = aFontKerning;
       CurrentState().fontGroup = nullptr;
-      mFontGroupCache.reset(nullptr);
     }
   }
 
@@ -335,7 +334,6 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
     if (CurrentState().fontWidth != aFontWidth) {
       CurrentState().fontWidth = aFontWidth;
       CurrentState().fontGroup = nullptr;
-      mFontGroupCache.reset(nullptr);
     }
   }
 
@@ -346,7 +344,6 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
     if (CurrentState().fontVariantCaps != aFontVariantCaps) {
       CurrentState().fontVariantCaps = aFontVariantCaps;
       CurrentState().fontGroup = nullptr;
-      mFontGroupCache.reset(nullptr);
     }
   }
 
@@ -360,7 +357,6 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
     if (!CurrentState().lang->Equals(aLang)) {
       CurrentState().lang = NS_Atomize(aLang);
       CurrentState().fontGroup = nullptr;
-      mFontGroupCache.reset(nullptr);
     }
   }
 
@@ -1077,9 +1073,10 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   // state stack handling
   class ContextState {
    public:
-    ContextState();
+    ContextState() = default;
     ContextState(const ContextState& aOther);
-    ~ContextState();
+
+    ~ContextState() = default;
 
     void SetColorStyle(Style aWhichStyle, nscolor aColor);
     void SetPatternStyle(Style aWhichStyle, CanvasPattern* aPat);
@@ -1208,6 +1205,8 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   class FontStyleCache
       : public MruCache<FontStyleCacheKey, FontStyleData, FontStyleCache> {
    public:
+    // A cached failure has a null mStyle, but every live entry has a lang.
+    static bool IsEmpty(const FontStyleData& aVal) { return !aVal.mKey.mLang; }
     static HashNumber Hash(const FontStyleCacheKey& aKey) {
       HashNumber hash = HashString(aKey.mFont);
       hash = AddToHash(hash, aKey.mLang->hash());
@@ -1224,10 +1223,21 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
 
   struct FontGroupCacheKey {
     FontGroupCacheKey() = default;
-    FontGroupCacheKey(const nsACString& aStr, uint64_t aGen)
-        : mSpecifiedFont(aStr), mGeneration(aGen) {}
+    FontGroupCacheKey(const nsACString& aStr, nsAtom* aLang,
+                      CanvasFontStretch aStretch, CanvasFontVariantCaps aCaps,
+                      CanvasFontKerning aKerning, uint64_t aGen)
+        : mSpecifiedFont(aStr),
+          mLang(aLang),
+          mStretch(aStretch),
+          mCaps(aCaps),
+          mKerning(aKerning),
+          mGeneration(aGen) {}
 
     nsCString mSpecifiedFont;
+    RefPtr<nsAtom> mLang;
+    CanvasFontStretch mStretch;
+    CanvasFontVariantCaps mCaps;
+    CanvasFontKerning mKerning;
     uint64_t mGeneration = 0;
   };
 
@@ -1250,15 +1260,26 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   class FontGroupCache
       : public MruCache<FontGroupCacheKey, FontGroupCacheData, FontGroupCache> {
    public:
+    static bool IsEmpty(const FontGroupCacheData& aVal) {
+      return !aVal.mFontGroup;
+    }
     static HashNumber Hash(const FontGroupCacheKey& aKey) {
       HashNumber hash = HashString(aKey.mSpecifiedFont);
+      hash = AddToHash(hash, aKey.mLang->hash());
+      hash = AddToHash(hash, aKey.mStretch);
+      hash = AddToHash(hash, aKey.mCaps);
+      hash = AddToHash(hash, aKey.mKerning);
       hash = AddToHash(hash, aKey.mGeneration);
       return hash;
     }
     static bool Match(const FontGroupCacheKey& aKey,
                       const FontGroupCacheData& aVal) {
       return aVal.mKey.mGeneration == aKey.mGeneration &&
-             aVal.mKey.mSpecifiedFont == aKey.mSpecifiedFont;
+             aVal.mKey.mSpecifiedFont == aKey.mSpecifiedFont &&
+             aVal.mKey.mLang == aKey.mLang &&
+             aVal.mKey.mStretch == aKey.mStretch &&
+             aVal.mKey.mCaps == aKey.mCaps &&
+             aVal.mKey.mKerning == aKey.mKerning;
     }
   };
 
@@ -1277,6 +1298,9 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   class ColorStyleCache
       : public MruCache<nsACString, ColorStyleCacheEntry, ColorStyleCache> {
    public:
+    static bool IsEmpty(const ColorStyleCacheEntry& aVal) {
+      return aVal.mKey.IsEmpty();
+    }
     static HashNumber Hash(const nsACString& aKey) { return HashString(aKey); }
     static bool Match(const nsACString& aKey,
                       const ColorStyleCacheEntry& aVal) {

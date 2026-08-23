@@ -1832,26 +1832,26 @@
   },
   "tab/group/gray": {
     "light": "{Colors$color/gray/55}",
-    "dark": "{Colors$color/gray/0}",
+    "dark": "{Colors$color/gray/40}",
     "forcedColors": "transparent"
   },
   "tab/group/gray/text": {
     "light": "{Colors$color/white}",
-    "dark": "{Colors$color/gray/65}",
+    "dark": "{Colors$color/gray/90}",
     "forcedColors": "transparent"
   },
   "tab/group/gray/text/invert": {
-    "light": "{Colors$color/gray/65}",
+    "light": "{Colors$color/gray/90}",
     "dark": "{Colors$color/white}",
     "forcedColors": "transparent"
   },
   "tab/group/gray/hover": {
     "light": "{Colors$color/gray/65}",
-    "dark": "{Colors$color/gray/10}",
+    "dark": "{Colors$color/gray/50}",
     "forcedColors": "transparent"
   },
   "tab/group/gray/invert": {
-    "light": "{Colors$color/gray/0}",
+    "light": "{Colors$color/gray/40}",
     "dark": "{Colors$color/gray/55}",
     "forcedColors": "transparent"
   },

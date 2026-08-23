@@ -225,6 +225,7 @@ allowlist-types = [
     "GeckoFontMetrics",
     "GeckoImplicitShadowRoot",
     "gfxFontFeatureValueSet",
+    "gfxFontVariationAxis",
     "mozilla::HalfCorner",
     "Image",
     "mozilla::MediumFeaturesChangedResult",

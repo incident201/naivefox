@@ -902,29 +902,53 @@ extern "C" {
     pub fn gecko_profiler_thread_is_being_profiled() -> bool;
 }
 
-pub fn gecko_profiler_start_marker(name: &str) {
+pub fn gecko_profiler_start_marker(name: &str, text: &str) {
     use gecko_profiler::{gecko_profiler_category, MarkerOptions, MarkerTiming, ProfilerTime, Tracing};
-    gecko_profiler::add_marker(
-        name,
-        gecko_profiler_category!(Graphics),
-        MarkerOptions {
-            timing: MarkerTiming::interval_start(ProfilerTime::now()),
-            ..Default::default()
-        },
-        Tracing::from_str("Webrender"),
-    );
+    if text.is_empty() {
+        gecko_profiler::add_marker(
+            name,
+            gecko_profiler_category!(Graphics),
+            MarkerOptions {
+                timing: MarkerTiming::interval_start(ProfilerTime::now()),
+                ..Default::default()
+            },
+            Tracing::from_str("Webrender"),
+        );
+    } else {
+        gecko_profiler::add_text_marker(
+            name,
+            gecko_profiler_category!(Graphics),
+            MarkerOptions {
+                timing: MarkerTiming::interval_start(ProfilerTime::now()),
+                ..Default::default()
+            },
+            text,
+        );
+    }
 }
-pub fn gecko_profiler_end_marker(name: &str) {
+pub fn gecko_profiler_end_marker(name: &str, text: &str) {
     use gecko_profiler::{gecko_profiler_category, MarkerOptions, MarkerTiming, ProfilerTime, Tracing};
-    gecko_profiler::add_marker(
-        name,
-        gecko_profiler_category!(Graphics),
-        MarkerOptions {
-            timing: MarkerTiming::interval_end(ProfilerTime::now()),
-            ..Default::default()
-        },
-        Tracing::from_str("Webrender"),
-    );
+    if text.is_empty() {
+        gecko_profiler::add_marker(
+            name,
+            gecko_profiler_category!(Graphics),
+            MarkerOptions {
+                timing: MarkerTiming::interval_end(ProfilerTime::now()),
+                ..Default::default()
+            },
+            Tracing::from_str("Webrender"),
+        );
+    } else {
+        gecko_profiler::add_text_marker(
+            name,
+            gecko_profiler_category!(Graphics),
+            MarkerOptions {
+                timing: MarkerTiming::interval_end(ProfilerTime::now()),
+                ..Default::default()
+            },
+            text,
+        );
+    }
 }
 
 pub fn gecko_profiler_event_marker(name: &str) {
@@ -969,12 +993,12 @@ impl ProfilerHooks for GeckoProfilerHooks {
         gecko_profiler::unregister_thread();
     }
 
-    fn begin_marker(&self, label: &str) {
-        gecko_profiler_start_marker(label);
+    fn begin_marker(&self, label: &str, text: &str) {
+        gecko_profiler_start_marker(label, text);
     }
 
-    fn end_marker(&self, label: &str) {
-        gecko_profiler_end_marker(label);
+    fn end_marker(&self, label: &str, text: &str) {
+        gecko_profiler_end_marker(label, text);
     }
 
     fn event_marker(&self, label: &str) {
@@ -1035,7 +1059,7 @@ impl SceneBuilderHooks for APZCallbacks {
     }
 
     fn pre_scene_build(&self) {
-        gecko_profiler_start_marker("SceneBuilding");
+        gecko_profiler_start_marker("SceneBuilding", "");
     }
 
     fn pre_scene_swap(&self) {
@@ -1053,16 +1077,16 @@ impl SceneBuilderHooks for APZCallbacks {
         if schedule_frame {
             unsafe { wr_schedule_frame_after_scene_build(self.window_id, &mut info) }
         }
-        gecko_profiler_end_marker("SceneBuilding");
+        gecko_profiler_end_marker("SceneBuilding", "");
     }
 
     fn post_resource_update(&self, _document_ids: &Vec<DocumentId>) {
         unsafe { wr_schedule_render(self.window_id, RenderReasons::POST_RESOURCE_UPDATES_HOOK) }
-        gecko_profiler_end_marker("SceneBuilding");
+        gecko_profiler_end_marker("SceneBuilding", "");
     }
 
     fn post_empty_scene_build(&self) {
-        gecko_profiler_end_marker("SceneBuilding");
+        gecko_profiler_end_marker("SceneBuilding", "");
     }
 
     fn poke(&self) {

@@ -1257,14 +1257,6 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   mDefaultIMC.Init(this);
   IMEHandler::InitInputContext(this, mInputContext);
 
-  static bool a11yPrimed = false;
-  if (!a11yPrimed && mWindowType == WindowType::TopLevel) {
-    a11yPrimed = true;
-    if (Preferences::GetInt("accessibility.force_disabled", 0) == -1) {
-      ::PostMessage(mWnd, MOZ_WM_STARTA11Y, 0, 0);
-    }
-  }
-
   RecreateDirectManipulationIfNeeded();
 
   return NS_OK;
@@ -4796,15 +4788,6 @@ bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,
       *aRetValue = !shouldCancelQuit;
       result = true;
     } break;
-
-    case MOZ_WM_STARTA11Y:
-#if defined(ACCESSIBILITY)
-      (void)GetAccessible();
-      result = true;
-#else
-      result = false;
-#endif
-      break;
 
     case WM_ENDSESSION: {
       // For WM_ENDSESSION, wParam indicates whether we need to shutdown

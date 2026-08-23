@@ -4336,11 +4336,15 @@ void Selection::Modify(const nsAString& aAlter, const nsAString& aDirection,
       visual ? nsFrameSelection::eVisual : nsFrameSelection::eLogical);
 
   if (aGranularity.LowerCaseEqualsLiteral("line") && NS_FAILED(rv)) {
-    RefPtr<PresShell> presShell = frameSelection->GetPresShell();
-    if (!presShell) {
+    const nsCOMPtr<nsISelectionController> controller =
+        frameSelection->GetSelectionController();
+    if (!controller) [[unlikely]] {
       return;
     }
-    presShell->CompleteMove(forward, extend);
+    // XXX This won't move caret into non-selectable node by `user-select`
+    // style. However, it's for user's operation, not for Selection API. So, we
+    // may need to add an option to ignore `user-select` style.
+    controller->CompleteMove(forward, extend);
   }
 }
 

@@ -54,6 +54,7 @@ const isRemote =
 class MarionetteParentProcess {
   #browserStartupFinished;
   #isBrowserAutomation;
+  #portFilePath;
 
   constructor() {
     this.server = null;
@@ -65,6 +66,11 @@ class MarionetteParentProcess {
     // Whether the running instance belongs to a browser automation session.
     // True for command line startup. Optional for startAtRuntime.
     this.#isBrowserAutomation = true;
+
+    // Path to the file where the Marionette port should be saved, in addition
+    // to the one saved in the profile. This path is only used when starting
+    // Marionette dynamically via startAtRuntime().
+    this.#portFilePath = null;
 
     this.#browserStartupFinished = lazy.Deferred();
   }
@@ -102,6 +108,10 @@ class MarionetteParentProcess {
     return this.running && this.#isBrowserAutomation;
   }
 
+  get isDynamicStartRunning() {
+    return this.running && !this.#isBrowserAutomation;
+  }
+
   /**
    * Syncs the Marionette active flag with the web content processes.
    *
@@ -131,6 +141,7 @@ class MarionetteParentProcess {
       lazy.logger.trace(`Received observer notification ${topic}`);
     }
 
+    let hasBeforeCancelObserver = false;
     switch (topic) {
       case "profile-after-change":
         Services.obs.addObserver(this, "command-line-startup");
@@ -191,9 +202,13 @@ class MarionetteParentProcess {
       case "final-ui-startup":
         Services.obs.removeObserver(this, topic);
 
-        Services.obs.addObserver(this, "before-cancel-download-prompt");
         Services.obs.addObserver(this, "browser-idle-startup-tasks-finished");
         Services.obs.addObserver(this, "mail-idle-startup-tasks-finished");
+
+        // startAtRuntime will not hit this path, and the observer should not
+        // be removed on quit-application.
+        Services.obs.addObserver(this, "before-cancel-download-prompt");
+        hasBeforeCancelObserver = true;
 
         Services.obs.addObserver(this, "quit-application");
         Services.obs.addObserver(this, "xpcom-shutdown");
@@ -215,10 +230,14 @@ class MarionetteParentProcess {
 
       case "quit-application":
         Services.obs.removeObserver(this, topic);
-        // Remove this observer here rather than inside the handler itself,
-        // because on some platforms the notification fires multiple times
-        // and removing an already-removed observer would throw.
-        Services.obs.removeObserver(this, "before-cancel-download-prompt");
+
+        if (hasBeforeCancelObserver) {
+          // Remove this observer here rather than inside the handler itself,
+          // because on some platforms the notification fires multiple times
+          // and removing an already-removed observer would throw.
+          Services.obs.removeObserver(this, "before-cancel-download-prompt");
+        }
+
         lazy.logger.trace(
           `Application is shutting down with reason: "${data || "unknown"}"`
         );
@@ -310,12 +329,16 @@ class MarionetteParentProcess {
    * @param {boolean=} options.isBrowserAutomation
    *     True if the server is started for regular browser automation (as
    *     opposed to tooling, agentic assisted browsing etc.). Defaults to true.
+   * @param {string=} options.portFilePath
+   *     Path to a file where the Marionette port should be written once the
+   *     server is listening. The parent directory has to exist.
+   *     Defaults to null, in which case no additional file is written.
    *
    * @returns {number}
    *     The port on which Marionette was started. -1 if it could not be started.
    */
   async startAtRuntime(options = {}) {
-    const { isBrowserAutomation = true } = options;
+    const { isBrowserAutomation = true, portFilePath = null } = options;
 
     if (!Services.prefs.getBoolPref(PREF_DYNAMIC_START_ENABLED, false)) {
       lazy.logger.debug(
@@ -376,6 +399,20 @@ class MarionetteParentProcess {
       throw Error(`Unable to start Marionette: ${e}`);
     }
 
+    this.#portFilePath = portFilePath;
+    if (this.#portFilePath !== null) {
+      try {
+        await IOUtils.write(
+          this.#portFilePath,
+          lazy.textEncoder.encode(`${this.server.port}`)
+        );
+      } catch (e) {
+        lazy.logger.warn(
+          `Failed to create ${this.#portFilePath} (${e.message})`
+        );
+      }
+    }
+
     return this.server.port;
   }
 
@@ -409,6 +446,16 @@ class MarionetteParentProcess {
         lazy.logger.warn(
           `Failed to remove ${this._activePortPath} (${e.message})`
         );
+      }
+
+      if (this.#portFilePath !== null) {
+        try {
+          await IOUtils.remove(this.#portFilePath, { ignoreAbsent: true });
+        } catch (e) {
+          lazy.logger.warn(
+            `Failed to remove ${this.#portFilePath} (${e.message})`
+          );
+        }
       }
 
       lazy.logger.debug("Marionette stopped listening");

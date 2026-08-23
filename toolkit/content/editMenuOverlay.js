@@ -109,9 +109,12 @@ window.addEventListener("contextmenu", e => {
   let popup = document.getElementById("textbox-contextmenu");
   if (!popup) {
     MozXULElement.insertFTLIfNeeded("toolkit/global/textActions.ftl");
+    // showservicesmenu is read by macOS cocoa code to enable the "services"
+    // menu here.
     document.documentElement.appendChild(
       MozXULElement.parseXULToFragment(`
-      <menupopup id="textbox-contextmenu" class="textbox-contextmenu">
+      <menupopup id="textbox-contextmenu" class="textbox-contextmenu"
+                 showservicesmenu="true">
         <menuitem id="edit-contextmenu-undo" data-l10n-id="text-action-undo" command="cmd_undo"></menuitem>
         <menuitem id="edit-contextmenu-redo" data-l10n-id="text-action-redo" command="cmd_redo"></menuitem>
         <menuseparator></menuseparator>

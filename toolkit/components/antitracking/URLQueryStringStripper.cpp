@@ -373,7 +373,6 @@ URLQueryStringStripper::OnStripOnShareUpdate(const nsTArray<nsString>& aArgs,
         mStripOnShareOriginMap.InsertOrUpdate(origin, rule);
       }
       for (const auto& schemelessSite : rule.mSchemelessSites) {
-        printf_stderr("Adding schemeless site: %s\n", schemelessSite.get());
         mStripOnShareSchemelessSiteMap.InsertOrUpdate(schemelessSite, rule);
       }
     }

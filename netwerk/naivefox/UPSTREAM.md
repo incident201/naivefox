@@ -143,14 +143,17 @@ The gate is:
 4. export once into a new empty directory from `E`;
 5. validate the manifest, file modes, hashes, links, licenses, forbidden paths,
    and absence of secrets, VCS data, objdirs, profiles, logs, and captures;
-6. copy the export to an isolated location with no access to the full checkout
-   or old object directories;
+6. keep the validated export pristine for publication and copy it to an
+   isolated verification location with no access to the full checkout or old
+   object directories;
 7. configure and build only the exported NaiveFox graph for all three supported
    targets, stage them, and run the applicable product acceptance suites. The
    isolated Android tree must complete clean configure, build, package
    dependency/export verification, and static harness construction;
-8. create one new linear `naivefox-minimal-source` snapshot. Release tags and
-   draft GitHub releases are created by the manual workflow.
+8. use `tools/replace-minimal-source-worktree.py` to replace a clean linked
+   `naivefox-minimal-source` worktree from the untouched export, then create
+   one new linear snapshot. Release tags and draft GitHub releases are created
+   by the manual workflow.
 
 If `naivefox-full-source` passes but the isolated export fails, fix the
 allowlist, exporter, or source closure on `naivefox-full-source`; never patch

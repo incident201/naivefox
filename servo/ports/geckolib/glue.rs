@@ -11499,11 +11499,12 @@ pub extern "C" fn Servo_GetShadowRootForScoped(
 pub unsafe extern "C" fn Servo_GetComputationStepsSupportedCSSFunctions(
     out: &mut nsTArray<nsCString>,
 ) {
+    use style::properties::ARBITRARY_SUBSTITUTION_FUNCTIONS;
     use style::values::specified::calc::MathFunction;
 
-    out.push(nsCString::from("var"));
-    out.push(nsCString::from("attr"));
-    out.push(nsCString::from("env"));
+    for func in ARBITRARY_SUBSTITUTION_FUNCTIONS {
+        out.push(nsCString::from(*func));
+    }
     for func in MathFunction::variants() {
         out.push(nsCString::from(func.as_ref()));
     }
@@ -11519,7 +11520,7 @@ pub unsafe extern "C" fn Servo_GetComputationSteps(
     out: &mut nsTArray<nsString>,
 ) {
     use style::custom_properties::VariableValue;
-    use style::properties::enabled_arbitrary_substitution_functions;
+    use style::properties::ARBITRARY_SUBSTITUTION_FUNCTIONS;
     use style::values::generics::calc::SimplificationResult;
     use style::values::specified::calc::{CalcNode, CalcParseFlags, Leaf};
 
@@ -11569,7 +11570,7 @@ pub unsafe extern "C" fn Servo_GetComputationSteps(
     );
 
     // Let's check if we have substitution functions (`var()`, `attr()`, `env()`) to handle.
-    parser.look_for_arbitrary_substitution_functions(enabled_arbitrary_substitution_functions());
+    parser.look_for_arbitrary_substitution_functions(ARBITRARY_SUBSTITUTION_FUNCTIONS);
     let Ok(variable_value) = VariableValue::parse(
         &mut parser,
         Some(&parser_context.namespaces.prefixes),

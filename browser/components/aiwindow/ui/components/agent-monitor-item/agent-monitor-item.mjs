@@ -16,6 +16,8 @@ import "chrome://global/content/elements/moz-select.mjs";
 import "chrome://global/content/elements/moz-button.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/monitor-icon.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/ai-website-chip.mjs";
 
 const SCHEDULE_TYPES = Object.freeze({
   DAILY: "daily",
@@ -84,13 +86,16 @@ const WEEKDAYS = [
  *  - agent-monitor-item:delete       detail: { id }
  *  - agent-monitor-item:pause        detail: { id, paused }
  *  - agent-monitor-item:check-now    detail: { id }
- *  - agent-monitor-item:open         detail: { id, url }
  *
  * @property {Agent} agent - Monitor data:
  *  {
  *    id: string,
  *    monitorName: string,
  *    url: string,
+ *    watchUrls?: string[],
+ *    watchUrlTitles?: Record<string, string>, // url -> page title, resolved by
+ *                               // the host from Places; chips fall back to the
+ *                               // hostname for URLs
  *    faviconText?: string,      // 1-2 char fallback favicon glyph
  *    faviconColor?: string,     // fallback favicon background
  *    value?: string,            // current value, e.g. "$278"
@@ -955,9 +960,15 @@ export class AgentMonitorItem extends MozLitElement {
                     <div class="url-chips">
                       ${agent.watchUrls.map(
                         url =>
-                          html`<span class="url-chip"
-                            >${this.#displayUrl(url)}</span
-                          >`
+                          html`<ai-website-chip
+                            type="context-chip"
+                            size="small"
+                            label=${agent.watchUrlTitles?.[url] ??
+                            this.#displayUrl(url)}
+                            .iconSrc=${`page-icon:${url}`}
+                            title=${url}
+                            .href=${url}
+                          ></ai-website-chip>`
                       )}
                     </div>
                   </div>`

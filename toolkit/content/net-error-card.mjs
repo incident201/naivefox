@@ -954,6 +954,8 @@ export class NetErrorCard extends MozLitElement {
           id="error-learn-more-link"
           support-page="server-not-found-connection-problem"
           data-l10n-id="neterror-search-cta-learn-more"
+          data-telemetry-id="learn_more_link"
+          @click=${this.handleTelemetryClick}
         ></a>
       </p>`;
   }

@@ -51,6 +51,12 @@ add_setup(async function setup() {
         "urlclassifier.features.cryptomining.annotate.blacklistHosts",
         "cryptomining.example.com",
       ],
+      // trackingPage.html contains a static <iframe src="http://trackertest.org/">.
+      // The tests in this file check for other types of tracking, but its
+      // presence can interfere with tests that check for a specific number of
+      // blocked trackers. Thus, we exclude them from being counted as trackers:
+      ["urlclassifier.trackingSkipURLs", "*://trackertest.org/*"],
+      ["urlclassifier.trackingAnnotationSkipURLs", "*://trackertest.org/*"],
     ],
   });
 
@@ -211,6 +217,52 @@ add_task(async function test_breached_urlbar_icon_animation_logic() {
         await BrowserTestUtils.removeTab(tab);
       }
     }
+  }
+});
+
+// The breach list stores domains in their ASCII (punycode) form, so an IDN
+// site has to be matched against its ASCII host rather than the host we
+// display in the panel.
+add_task(async function test_breached_idn_site() {
+  const IDN_ASCII_HOST = "xn--hxajbheg2az3al.xn--jxalpdlp";
+  const IDN_URL = `https://${IDN_ASCII_HOST}/`;
+
+  Assert.notEqual(
+    Services.io.newURI(IDN_URL).displayHost,
+    IDN_ASCII_HOST,
+    "The test site is displayed as an IDN, not as punycode"
+  );
+
+  const db = RemoteSettings("fxmonitor-breaches").db;
+  await db.create(
+    {
+      ...TEST_BREACH,
+      id: "idn-guid",
+      Domain: IDN_ASCII_HOST,
+    },
+    { useRecordId: true }
+  );
+  await db.importChanges({}, Date.now());
+
+  const tab = await BrowserTestUtils.openNewForegroundTab({
+    gBrowser,
+    opening: IDN_URL,
+    waitForLoad: true,
+  });
+
+  try {
+    await waitForTrustIconClass(
+      "breached",
+      "Waiting for breached class on the IDN site"
+    );
+
+    await Promise.all(
+      trustIconContainer()
+        .getAnimations({ subtree: true })
+        .map(anim => anim.finished.catch(() => {}))
+    );
+  } finally {
+    await BrowserTestUtils.removeTab(tab);
   }
 });
 
@@ -649,64 +701,63 @@ add_task(async function test_same_site_navigation_preserves_state() {
   await BrowserTestUtils.removeTab(tab);
 });
 
-add_task(
-  async function test_same_site_navigation_preserves_count_and_highlight() {
-    await PlacesUtils.history.clear();
+add_task(async function test_same_site_navigation_resets_count() {
+  await PlacesUtils.history.clear();
 
-    const tab = await BrowserTestUtils.openNewForegroundTab({
-      gBrowser,
-      opening: TRACKING_PAGE,
-      waitForLoad: true,
-    });
+  const tab = await BrowserTestUtils.openNewForegroundTab({
+    gBrowser,
+    opening: TRACKING_PAGE,
+    waitForLoad: true,
+  });
 
-    await SpecialPowers.spawn(tab.linkedBrowser, [], () => {
-      // See trackingAPI.js - this postMessage causes it to inject an iframe with
-      // one of the blocked tracking hosts:
-      content.postMessage("cryptomining", "*");
-    });
+  await SpecialPowers.spawn(tab.linkedBrowser, [], () => {
+    // See trackingAPI.js - this postMessage causes it to inject an iframe with
+    // one of the blocked tracking hosts:
+    content.postMessage("cryptomining", "*");
+  });
 
-    await waitForTrustIconClass(
-      "has-blocked-trackers",
-      "Waiting for has-blocked-trackers after a cryptominer is blocked"
-    );
-    Assert.equal(
-      document.getElementById("trust-icon-tracker-count-shortform").textContent,
-      "1",
-      "Count shows 1 before the same-site navigation"
-    );
+  await waitForTrustIconClass(
+    "has-blocked-trackers",
+    "Waiting for has-blocked-trackers after a cryptominer is blocked"
+  );
 
-    // Navigate within the same site (same host, new query). The new page blocks
-    // no tracker, so its recomputed count starts at 0 -- but the highlight pill
-    // and its count must be preserved rather than flickering off / dropping to
-    // 0 between pages of the same site.
-    const loaded = BrowserTestUtils.browserLoaded(tab.linkedBrowser);
-    BrowserTestUtils.startLoadingURIString(
-      tab.linkedBrowser,
-      TRACKING_PAGE + "?same-site"
-    );
-    await loaded;
+  Assert.greater(
+    Number(
+      document.getElementById("trust-icon-tracker-count-shortform").textContent
+    ),
+    0,
+    "Count is positive before same-site navigation"
+  );
 
-    await waitForTrustIconClass(
-      "same-site-nav",
-      "Same-site navigation marks the icon so the reveal stays suppressed"
-    );
-    Assert.ok(
-      trustIconContainer().classList.contains("has-blocked-trackers"),
-      "Highlight pill is preserved across a same-site navigation"
-    );
-    Assert.ok(
-      !trustIconContainer().classList.contains("first-visit"),
-      "Same-site navigation is not treated as a first visit"
-    );
-    Assert.equal(
-      document.getElementById("trust-icon-tracker-count-shortform").textContent,
-      "1",
-      "Count is preserved (not dropped to 0) across the same-site navigation"
-    );
+  // Navigate within the same site (same host, new query).
+  const loaded = BrowserTestUtils.browserLoaded(tab.linkedBrowser);
+  BrowserTestUtils.startLoadingURIString(
+    tab.linkedBrowser,
+    TRACKING_PAGE + "?same-site"
+  );
+  await loaded;
 
-    await BrowserTestUtils.removeTab(tab);
-  }
-);
+  await waitForTrustIconWithoutClass(
+    "has-blocked-trackers",
+    "Pill is absent after same-site navigation with no new trackers"
+  );
+
+  await SpecialPowers.spawn(tab.linkedBrowser, [], () => {
+    content.postMessage("cryptomining", "*");
+  });
+
+  await waitForTrustIconClass(
+    "has-blocked-trackers",
+    "Waiting for has-blocked-trackers after a cryptominer is blocked on a new page"
+  );
+
+  Assert.ok(
+    !trustIconContainer().classList.contains("first-visit"),
+    "Same-site navigation does not re-trigger the first-visit UI"
+  );
+
+  await BrowserTestUtils.removeTab(tab);
+});
 
 add_task(async function test_scanning_does_not_mask_breach() {
   await PlacesUtils.history.clear();
@@ -1146,3 +1197,122 @@ add_task(
     }
   }
 );
+
+add_task(
+  // We update the tracker count in the address bar when
+  // `onContentBlockingEvent` is called; however, that only gets called when a
+  // particular category of trackers is first blocked (e.g. fingerprinters), not
+  // for every blocked origin, leaving the count incomplete. To compensate,
+  // we also update it in onNavigationComplete. This test verifies that.
+  async function test_navigation_complete_refreshes_count() {
+    await PlacesUtils.history.clear();
+
+    const tab = await BrowserTestUtils.openNewForegroundTab({
+      gBrowser,
+      opening: TRACKING_PAGE,
+      waitForLoad: true,
+    });
+
+    try {
+      await SpecialPowers.spawn(tab.linkedBrowser, [], () => {
+        content.postMessage("cryptomining", "*");
+      });
+
+      await waitForTrustIconClass(
+        "has-blocked-trackers",
+        "Waiting for has-blocked-trackers"
+      );
+
+      const correctCount = document.getElementById(
+        "trust-icon-tracker-count-shortform"
+      ).textContent;
+      Assert.greater(
+        Number(correctCount),
+        0,
+        "Some trackers are blocked after postMessage"
+      );
+
+      // Fake a stale tracker count:
+      document.getElementById(
+        "trust-icon-tracker-count-shortform"
+      ).textContent = "42";
+
+      await gTrustPanelHandler.onNavigationComplete();
+
+      Assert.equal(
+        document.getElementById("trust-icon-tracker-count-shortform")
+          .textContent,
+        correctCount,
+        "onNavigationComplete corrects a stale toolbar count"
+      );
+      Assert.ok(
+        trustIconContainer().classList.contains("has-blocked-trackers"),
+        "has-blocked-trackers is still present after the correction"
+      );
+      Assert.ok(
+        !trustIconContainer().classList.contains("scanning"),
+        "scanning state is not re-entered after the correction"
+      );
+    } finally {
+      await BrowserTestUtils.removeTab(tab);
+    }
+  }
+);
+
+add_task(async function test_tab_switch_back_shows_correct_count() {
+  await PlacesUtils.history.clear();
+
+  const trackingTab = await BrowserTestUtils.openNewForegroundTab({
+    gBrowser,
+    opening: TRACKING_PAGE,
+    waitForLoad: true,
+  });
+
+  try {
+    await SpecialPowers.spawn(trackingTab.linkedBrowser, [], () => {
+      content.postMessage("cryptomining", "*");
+    });
+
+    await waitForTrustIconClass(
+      "has-blocked-trackers",
+      "Waiting for has-blocked-trackers on the tracking tab"
+    );
+
+    Assert.greater(
+      Number(
+        document.getElementById("trust-icon-tracker-count-shortform")
+          .textContent
+      ),
+      0,
+      "Count is positive before switching away"
+    );
+
+    const otherTab = await BrowserTestUtils.openNewForegroundTab({
+      gBrowser,
+      opening: "about:blank",
+      waitForLoad: true,
+    });
+
+    try {
+      await BrowserTestUtils.switchTab(gBrowser, trackingTab);
+
+      await waitForTrustIconClass(
+        "has-blocked-trackers",
+        "has-blocked-trackers reappears after switching back to the tracking tab"
+      );
+
+      Assert.greater(
+        Number(
+          document.getElementById("trust-icon-tracker-count-shortform")
+            .textContent
+        ),
+        0,
+        "Count is still positive after switching back to the tracking tab"
+      );
+    } finally {
+      await BrowserTestUtils.removeTab(otherTab);
+    }
+  } finally {
+    await BrowserTestUtils.removeTab(trackingTab);
+  }
+});

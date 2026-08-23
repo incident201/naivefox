@@ -442,17 +442,6 @@
           }
         }
       }
-      /* Same-site navigation: show the count in its final state, no animation. */
-      &:not(.first-visit).same-site-nav {
-        #trust-icon-tracker-count-shortform-wrapper {
-          animation-name: none;
-          grid-template-columns: 1fr;
-          opacity: 1;
-          padding-block: var(--space-xxsmall);
-          padding-inline: var(--space-xsmall);
-          visibility: visible;
-        }
-      }
       /* On a site's first visit, we first show "x trackers blocked" (the long form) for a few seconds,
          after which we transition to just the number of blocked trackers (the short form) */
       &.first-visit {

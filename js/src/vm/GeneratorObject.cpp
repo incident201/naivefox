@@ -238,25 +238,6 @@ AbstractGeneratorObject* js::GetGeneratorObjectForEnvironment(
   return call ? GetGeneratorObjectForCall(cx, *call) : nullptr;
 }
 
-bool js::GeneratorThrowOrReturn(JSContext* cx, AbstractFramePtr frame,
-                                Handle<AbstractGeneratorObject*> genObj,
-                                HandleValue arg,
-                                GeneratorResumeKind resumeKind) {
-  MOZ_ASSERT(genObj->isRunning());
-  if (resumeKind == GeneratorResumeKind::Throw) {
-    cx->setPendingException(arg, ShouldCaptureStack::Maybe);
-  } else {
-    MOZ_ASSERT(resumeKind == GeneratorResumeKind::Return);
-
-    MOZ_ASSERT_IF(genObj->is<GeneratorObject>(), arg.isObject());
-    frame.setReturnValue(arg);
-
-    RootedValue closing(cx, MagicValue(JS_GENERATOR_CLOSING));
-    cx->setPendingException(closing, nullptr);
-  }
-  return false;
-}
-
 void AbstractGeneratorObject::resume(JSContext* cx,
                                      InterpreterActivation& activation,
                                      Handle<AbstractGeneratorObject*> genObj,
@@ -292,11 +273,10 @@ void AbstractGeneratorObject::resume(JSContext* cx,
   uint32_t offset = script->resumeOffsets()[resumeIndex];
   activation.regs().pc = script->offsetToPC(offset);
 
-  // Push arg, generator, resumeKind Values on the generator's stack.
-  activation.regs().sp += 3;
+  // Push arg and resumeKind Values on the generator's stack.
+  activation.regs().sp += 2;
   MOZ_ASSERT(activation.regs().spForStackDepth(activation.regs().stackDepth()));
-  activation.regs().sp[-3] = arg;
-  activation.regs().sp[-2] = ObjectValue(*genObj);
+  activation.regs().sp[-2] = arg;
   activation.regs().sp[-1] = Int32Value(int32_t(resumeKind));
 }
 

@@ -41,6 +41,8 @@ support-files = [
   "file_pdfjs_signed_invalid.pdf",
 ]
 
+["browser_pdfjs_disabled_handle_internally.js"]
+
 ["browser_pdfjs_download_button.js"]
 
 ["browser_pdfjs_editing_contextmenu.js"]
@@ -49,6 +51,17 @@ run-if = [
 ]
 
 ["browser_pdfjs_editing_telemetry.js"]
+
+["browser_pdfjs_embed_fallback.js"]
+support-files = [
+  "file_pdfjs_embed.html",
+  "file_pdfjs_embed_cross_site.html",
+  "file_pdfjs_embed_short.html",
+  "file_pdfjs_embed_referrer.html",
+  "file_pdfjs_embed_slow.html",
+  "file_pdfjs_referrer.sjs",
+  "file_pdfjs_slow.sjs",
+]
 
 ["browser_pdfjs_fill_login.js"]
 support-files = ["file_pdfjs_form.pdf"]

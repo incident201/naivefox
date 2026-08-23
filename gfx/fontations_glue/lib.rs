@@ -136,38 +136,31 @@ pub extern "C" fn skrifa_location_delete(location: *mut SkrifaLocation) {
 }
 
 // VARIATION AXES AND INSTANCES
+use style::gecko_bindings::structs::gfxFontVariationAxis;
+
 #[no_mangle]
 pub extern "C" fn skrifa_font_axes_count(font: &SkrifaFontRef) -> usize {
     font.0.axes().len()
 }
 
-#[repr(C)]
-pub struct SkrifaAxis {
-    tag: u32,
-    name: nsCString,
-    min_value: f32,
-    max_value: f32,
-    default_value: f32,
-}
-
 #[no_mangle]
 pub extern "C" fn skrifa_font_copy_axes(
     font: &SkrifaFontRef,
-    axes: &mut ThinVec<SkrifaAxis>,
+    axes: &mut ThinVec<gfxFontVariationAxis>,
     include_hidden: bool,
 ) -> usize {
     axes.extend(font.0.axes().iter().filter_map(|a| {
         if include_hidden || !a.is_hidden() {
-            Some(SkrifaAxis {
-                tag: a.tag().to_u32(),
-                name: font
+            Some(gfxFontVariationAxis {
+                mTag: a.tag().to_u32(),
+                mName: font
                     .0
                     .localized_strings(a.name_id())
                     .english_or_first()
                     .map_or_else(|| nsCString::new(), |name| name.to_string().into()),
-                min_value: a.min_value(),
-                max_value: a.max_value(),
-                default_value: a.default_value(),
+                mMinValue: a.min_value(),
+                mMaxValue: a.max_value(),
+                mDefaultValue: a.default_value(),
             })
         } else {
             None

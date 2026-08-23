@@ -74,6 +74,7 @@ import org.mozilla.fenix.theme.ThemedValue
 import org.mozilla.fenix.theme.ThemedValueProvider
 import org.mozilla.fenix.webcompat.BrokenSiteReporterTestTags
 import org.mozilla.fenix.webcompat.BrokenSiteReporterTestTags.BROKEN_SITE_REPORTER_DESCRIPTION_INPUT
+import org.mozilla.fenix.webcompat.BrokenSiteReporterTestTags.BROKEN_SITE_REPORTER_INCLUDE_ETP_BLOCKED_URLS_CHECKBOX
 import org.mozilla.fenix.webcompat.BrokenSiteReporterTestTags.BROKEN_SITE_REPORTER_SEND_BUTTON
 import org.mozilla.fenix.webcompat.store.WebCompatReporterAction
 import org.mozilla.fenix.webcompat.store.WebCompatReporterState
@@ -399,6 +400,10 @@ private fun ProblemDetailsSection(
                     role = Role.Checkbox,
                     onValueChange = onIncludeEtpBlockedUrlsChange,
                 )
+                .semantics {
+                    testTagsAsResourceId = true
+                    testTag = BROKEN_SITE_REPORTER_INCLUDE_ETP_BLOCKED_URLS_CHECKBOX
+                }
                 .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

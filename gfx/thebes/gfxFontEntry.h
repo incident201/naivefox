@@ -519,18 +519,12 @@ class gfxFontEntry {
   bool SupportsScriptInGSUB(const hb_tag_t* aScriptTags, uint32_t aNumTags);
 
   /**
-   * Font-variation query methods.
-   *
-   * Font backends that don't support variations should provide empty
-   * implementations.
+   * Font-variation query methods. These will call through to ...Internal()
+   * implementation methods if we don't have a Skrifa font to query.
    */
-  virtual bool HasVariations() = 0;
-
-  virtual void GetVariationAxes(
-      nsTArray<gfxFontVariationAxis>& aVariationAxes) = 0;
-
-  virtual void GetVariationInstances(
-      nsTArray<gfxFontVariationInstance>& aInstances) = 0;
+  bool HasVariations();
+  void GetVariationAxes(nsTArray<gfxFontVariationAxis>& aVariationAxes);
+  void GetVariationInstances(nsTArray<gfxFontVariationInstance>& aInstances);
 
   bool HasBoldVariableWeight();
   bool HasItalicVariation();
@@ -778,6 +772,14 @@ class gfxFontEntry {
   inline bool CheckForGraphiteTables() {
     return HasFontTable(TRUETYPE_TAG('S', 'i', 'l', 'f'));
   }
+
+  virtual bool HasVariationsInternal() { return false; };
+
+  virtual void GetVariationAxesInternal(
+      nsTArray<gfxFontVariationAxis>& aVariationAxes) {};
+
+  virtual void GetVariationInstancesInternal(
+      nsTArray<gfxFontVariationInstance>& aInstances) {};
 
   // The default implementation uses CopyFontTable to get the data
   // into a byte array, and maintains a cache of loaded tables.

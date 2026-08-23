@@ -435,7 +435,7 @@ int FFmpegVideoDecoder<LIBAV_VER>::ChooseVulkanPixelFormatFromContext(
     }
     if (!mLib->avcodec_get_hw_frames_parameters) {
       FFMPEGV_LOG("Requesting pixel format VULKAN (no hw_frames_parameters)");
-      return AV_PIX_FMT_VULKAN;
+      return AV_PIX_FMT_NONE;
     }
     AVBufferRef* frames_ref = nullptr;
     int ret = mLib->avcodec_get_hw_frames_parameters(
@@ -447,7 +447,7 @@ int FFmpegVideoDecoder<LIBAV_VER>::ChooseVulkanPixelFormatFromContext(
       }
       FFMPEGV_LOG(
           "Requesting pixel format VULKAN (get_hw_frames_parameters failed)");
-      return AV_PIX_FMT_VULKAN;
+      return AV_PIX_FMT_NONE;
     }
     AVHWFramesContext* frames_ctx = (AVHWFramesContext*)frames_ref->data;
 

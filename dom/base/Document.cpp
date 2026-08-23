@@ -19397,7 +19397,8 @@ class UserInteractionTimer final : public Runnable,
   }
 
   static already_AddRefed<nsIAsyncShutdownClient> GetShutdownPhase() {
-    nsCOMPtr<nsIAsyncShutdownService> svc = services::GetAsyncShutdownService();
+    nsCOMPtr<nsIAsyncShutdownService> svc =
+        components::AsyncShutdown::Service();
     NS_ENSURE_TRUE(!!svc, nullptr);
 
     nsCOMPtr<nsIAsyncShutdownClient> phase;

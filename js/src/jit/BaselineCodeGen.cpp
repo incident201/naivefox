@@ -5997,11 +5997,6 @@ bool BaselineCodeGen<Handler>::emit_OptimizeGetIterator() {
 }
 
 template <typename Handler>
-bool BaselineCodeGen<Handler>::emit_IsGenClosing() {
-  return emitIsMagicValue(JS_GENERATOR_CLOSING);
-}
-
-template <typename Handler>
 bool BaselineCodeGen<Handler>::emit_IsNullOrUndefined() {
   frame.syncStack(0);
 
@@ -6312,9 +6307,9 @@ bool BaselineCodeGen<Handler>::emitSuspend(JSOp op) {
     return false;
   }
 
-  // Three values are pushed onto the stack when resuming the generator,
+  // Two values are pushed onto the stack when resuming the generator,
   // replacing the one slot that holds the return value.
-  frame.incStackDepth(2);
+  frame.incStackDepth(1);
   return true;
 }
 
@@ -6543,10 +6538,9 @@ bool BaselineCodeGen<Handler>::emitGeneratorResumePrologueBody() {
   }
   masm.bind(&noStackStorage);
 
-  // Push the resume operands (value, generator, resumeKind) on the operand
-  // stack, where JSOp::AfterYield and JSOp::CheckResumeKind expect them.
+  // Push the resume operands (value, resumeKind) on the operand stack, where
+  // JSOp::AfterYield expects them.
   masm.pushValue(argValue);
-  masm.pushValue(argGen);
   masm.pushValue(argResumeKind);
 
   // Jump to the resume point.
@@ -6677,13 +6671,13 @@ bool BaselineCodeGen<Handler>::emit_Resume() {
   MOZ_ASSERT(masm.framePushed() == sizeof(uintptr_t));
   masm.setFramePushed(0);
 
-  // Load the code to call. Throw and Return currently always resume in
-  // Baseline; see MaybeEnterJit.
+  // Load the code to call. Throw currently always resumes in Baseline.
+  // See MaybeEnterJit.
   Register code = regs.takeAny();
   Label baselineOnly, gotEntry;
   masm.unboxInt32(resumeKindSlot, scratch1);
-  masm.branch32(Assembler::NotEqual, scratch1,
-                Imm32(int32_t(GeneratorResumeKind::Next)), &baselineOnly);
+  masm.branch32(Assembler::Equal, scratch1,
+                Imm32(int32_t(GeneratorResumeKind::Throw)), &baselineOnly);
   masm.loadJitCodeRaw(callee, code);
   masm.jump(&gotEntry);
   masm.bind(&baselineOnly);
@@ -6720,47 +6714,6 @@ bool BaselineCodeGen<Handler>::emit_Resume() {
   restoreInterpreterPCReg();
   frame.popn(3);
   frame.push(R0);
-  return true;
-}
-
-template <typename Handler>
-bool BaselineCodeGen<Handler>::emit_CheckResumeKind() {
-  // Load resumeKind in R1, generator in R0.
-  frame.popRegsAndSync(2);
-
-#ifdef DEBUG
-  Label ok;
-  masm.branchTestInt32(Assembler::Equal, R1, &ok);
-  masm.assumeUnreachable("Expected int32 resumeKind");
-  masm.bind(&ok);
-#endif
-
-  // If resumeKind is 'next' we don't have to do anything.
-  Label done;
-  masm.unboxInt32(R1, R1.scratchReg());
-  masm.branch32(Assembler::Equal, R1.scratchReg(),
-                Imm32(int32_t(GeneratorResumeKind::Next)), &done);
-
-  prepareVMCall();
-
-  pushArg(R1.scratchReg());  // resumeKind
-
-  masm.loadValue(frame.addressOfStackValue(-1), R2);
-  pushArg(R2);  // arg
-
-  masm.unboxObject(R0, R0.scratchReg());
-  pushArg(R0.scratchReg());  // genObj
-
-  masm.loadBaselineFramePtr(FramePointer, R2.scratchReg());
-  pushArg(R2.scratchReg());  // frame
-
-  using Fn = bool (*)(JSContext*, BaselineFrame*,
-                      Handle<AbstractGeneratorObject*>, HandleValue, int32_t);
-  if (!callVM<Fn, jit::GeneratorThrowOrReturn>()) {
-    return false;
-  }
-
-  masm.bind(&done);
   return true;
 }
 

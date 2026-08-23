@@ -4701,11 +4701,14 @@ class nsIFrame : public nsQueryFrame {
    * @param  [in] aStart
    *         true  for getting the first possible caret position
    *         false for getting the last possible caret position
+   * @param  [in] aFlags
+   *         Flags supported by SelfIsSelectable(). E.g.,
+   *         IGNORE_NATIVE_ANONYMOUS_SUBTREE and SKIP_HIDDEN.
    * @return The caret position in a CaretPosition.
    *         the returned value is a 'best effort' in case errors
    *         are encountered rummaging through the frame.
    */
-  CaretPosition GetExtremeCaretPosition(bool aStart);
+  CaretPosition GetExtremeCaretPosition(bool aStart, uint32_t aFlags);
 
   /**
    * Query whether this frame supports getting a line iterator.

@@ -4,5 +4,6 @@
     "http://127.0.0.1:8080"
   ],
   "proxy": "https://user:password@proxy.example:443",
+  "insecure-concurrency": 2,
   "log": ""
 }

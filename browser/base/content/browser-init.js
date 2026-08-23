@@ -112,6 +112,10 @@ var gBrowserInit = {
   onBeforeInitialXULLayout() {
     this._setupFirstContentWindowPaintPromise();
 
+    if (!window.toolbar.visible) {
+      document.documentElement.setAttribute("popup-window", true);
+    }
+
     updateBookmarkToolbarVisibility();
 
     // Set a sane starting width/height for all resolutions on new profiles.
@@ -170,9 +174,6 @@ var gBrowserInit = {
       }
       if (extraOptions.hasKey("aiwindow-immersive-view")) {
         document.documentElement.setAttribute("aiwindow-immersive-view", true);
-      }
-      if (extraOptions.hasKey("aiwindow-new-window")) {
-        document.documentElement.setAttribute("aiwindow-new-window", true);
       }
       if (extraOptions.hasKey("chromeless-window")) {
         document.documentElement.setAttribute("chromeless-window", true);

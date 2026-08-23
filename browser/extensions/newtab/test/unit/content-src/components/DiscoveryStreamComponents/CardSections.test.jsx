@@ -907,11 +907,12 @@ describe("<CardSections />", () => {
         mockGridElement = {
           querySelector: sandbox.stub().returns(mockTargetCard),
         };
-        mockCurrentCard = {
-          parentElement: mockGridElement,
-        };
+        mockCurrentCard = {};
         mockEvent = {
           preventDefault: sandbox.spy(),
+          // The handler is bound to the grid, so it searches from there rather
+          // than from the focused card's parent.
+          currentTarget: mockGridElement,
           target: {
             closest: sandbox.stub().returns(mockCurrentCard),
           },
@@ -931,7 +932,7 @@ describe("<CardSections />", () => {
         assert.calledOnce(mockEvent.preventDefault);
         assert.calledWith(
           mockGridElement.querySelector,
-          "article.ds-card.col-1-position-1"
+          ":scope > article.ds-card.col-1-position-1"
         );
         assert.calledOnce(mockLink.focus);
       });
@@ -945,7 +946,7 @@ describe("<CardSections />", () => {
         assert.calledOnce(mockEvent.preventDefault);
         assert.calledWith(
           mockGridElement.querySelector,
-          "article.ds-card.col-1-position-0"
+          ":scope > article.ds-card.col-1-position-0"
         );
         assert.calledOnce(mockLink.focus);
       });

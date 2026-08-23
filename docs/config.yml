@@ -51,6 +51,7 @@ categories:
         - nspr
         - security/nss
         - content-security
+        - rlbox
     build_doc:
         - mach
         - tools/try

@@ -2155,12 +2155,6 @@ enum GetCapabilitiesExecutorSlots {
   AddPromiseFlags(*promise,
                   PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS | extraFlags);
 
-  // Let the Debugger know about this Promise, after we've set
-  // flags and slots.
-  if (!DebugAPI::onNewPromise(cx, promise)) {
-    return nullptr;
-  }
-
   // Step 11. Return promise.
   return promise;
 }
@@ -2188,12 +2182,6 @@ enum GetCapabilitiesExecutorSlots {
 
   promise->setFixedSlotTyped(PromiseObject::REJECT_FUNCTION_SLOT,
                              ObjectValue(*reject));
-
-  // Let the Debugger know about this Promise. Do this after we've set
-  // flags and functions
-  if (!DebugAPI::onNewPromise(cx, promise)) {
-    return nullptr;
-  }
 
   // Step 11. Return promise.
   return promise;
@@ -3513,11 +3501,6 @@ PromiseObject* PromiseObject::create(JSContext* cx, HandleObject executor,
               &calleeOrRval)) {
       return nullptr;
     }
-  }
-
-  // Let the Debugger know about this Promise.
-  if (!DebugAPI::onNewPromise(cx, promise)) {
-    return nullptr;
   }
 
   // Step 11. Return promise.

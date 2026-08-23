@@ -57,9 +57,10 @@ and GUI work are outside the current product.
 
 Config parsing is strict. Preserve the documented string/array listener and
 proxy mapping, percent-decoded upstream credentials, numeric IPv4/IPv6 binds,
-and `https://` = H2 / `quic://` = H3 selection. Local listeners have no
-authentication; wildcard or LAN binding must remain an explicit operator
-choice.
+and `https://` = H2 / `quic://` = H3 selection. SOCKS listeners may require
+RFC 1929 username/password authentication when credentials are configured;
+HTTP CONNECT listeners do not accept listener credentials. Wildcard or LAN
+binding must remain an explicit operator choice.
 
 Naive payload compatibility is legacy Variant 1: eight framed records per
 direction followed by raw bytes. The streaming decoder must accept every

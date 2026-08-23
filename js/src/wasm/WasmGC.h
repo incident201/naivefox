@@ -98,15 +98,8 @@ struct StackMapHeader {
                     (MaxParams * MaxParamSize / sizeof(void*)) + 16,
                 "limited size of the offset field");
 
-  bool operator==(const StackMapHeader& rhs) const {
-    return numMappedWords == rhs.numMappedWords &&
-#ifdef DEBUG
-           numExitStubWords == rhs.numExitStubWords &&
-#endif
-           frameOffsetFromTop == rhs.frameOffsetFromTop &&
-           hasDebugFrameWithLiveRefs == rhs.hasDebugFrameWithLiveRefs;
-  }
-  bool operator!=(const StackMapHeader& rhs) const { return !(*this == rhs); }
+  bool operator==(const StackMapHeader& rhs) const = default;
+  bool operator!=(const StackMapHeader& rhs) const = default;
 };
 
 WASM_DECLARE_CACHEABLE_POD(StackMapHeader);

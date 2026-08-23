@@ -164,6 +164,7 @@ panel-item::part(button) {
 @import '../components/TopSitesHoverCard/TopSitesHoverCard';
 @import '../components/TopSiteWebNotification/TopSiteWebNotification';
 @import '../components/Sections/Sections';
+@import '../components/Spaces/Spaces';
 @import '../components/Search/Search';
 @import '../components/ContextMenu/ContextMenu';
 @import '../components/ConfirmDialog/ConfirmDialog';
@@ -196,10 +197,12 @@ panel-item::part(button) {
 @import '../components/Widgets/Crossword/Crossword';
 @import '../components/Widgets/Stocks/Stocks';
 @import '../components/Widgets/PictureOfTheDay/PictureOfTheDay';
+@import '../components/Widgets/RecentSearches/RecentSearches';
 @import '../components/Widgets/WeatherForecast/WeatherForecast';
 
 // Discovery Stream Components
 @import '../components/DiscoveryStreamComponents/CardGrid/CardGrid';
+@import '../components/DiscoveryStreamComponents/CardCarousel/CardCarousel';
 @import '../components/DiscoveryStreamComponents/CardSections/CardSections';
 @import '../components/DiscoveryStreamComponents/Highlights/Highlights';
 @import '../components/DiscoveryStreamComponents/HorizontalRule/HorizontalRule';

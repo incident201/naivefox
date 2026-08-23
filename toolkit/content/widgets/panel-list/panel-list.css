@@ -41,6 +41,7 @@
   cursor: default;
   overflow-y: auto;
   box-sizing: border-box;
+  user-select: none;
 }
 
 :host([has-submenu]) {

@@ -1367,8 +1367,6 @@ void LocalAccessible::DOMAttributeChanged(int32_t aNameSpaceID,
   // DOM attribute & resulting layout to actually change. Otherwise,
   // assistive technology will retrieve the wrong state/value/selection info.
 
-  CssAltContent::HandleAttributeChange(mContent, aNameSpaceID, aAttribute);
-
   // XXX todo
   // We still need to handle special HTML cases here
   // For example, if an <img>'s usemap attribute is modified

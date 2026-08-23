@@ -143,6 +143,16 @@
       this.setAttribute("aria-level", 1);
     }
 
+    /**
+     * This tab's index in `gBrowser.tabs`, which counts every tab. See
+     * `elementIndex` for its position among the visible tab strip elements.
+     *
+     * @type {number}
+     */
+    get index() {
+      return this._index;
+    }
+
     #elementIndex;
     get elementIndex() {
       if (!this.visible) {

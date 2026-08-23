@@ -683,41 +683,46 @@ export class _DSCard extends React.PureComponent {
           onFocus={this.props.onFocus}
         >
           <div className="img-wrapper">{images}</div>
-          <ImpressionStats
-            flightId={this.props.flightId}
-            rows={[
-              {
-                id: this.props.id,
-                pos: this.props.pos,
-                ...(this.props.shim && this.props.shim.impression
-                  ? { shim: this.props.shim.impression }
-                  : {}),
-                corpus_item_id: this.props.corpus_item_id,
-                scheduled_corpus_item_id: this.props.scheduled_corpus_item_id,
-                recommended_at: this.props.recommended_at,
-                received_rank: this.props.received_rank,
-                topic: this.props.topic,
-                features: this.props.features,
-                ...(format ? { format } : {}),
-                category: this.props.category,
-                attribution: this.props.attribution,
-                ...(this.props.section
-                  ? {
-                      section: this.props.section,
-                      section_position: this.props.sectionPosition,
-                      is_section_followed: this.props.sectionFollowed,
-                      sectionLayoutName: this.props.sectionLayoutName,
-                    }
-                  : {}),
-                ...(!format && this.props.section
-                  ? // Note: sectionsCardsClassName is passed to ImpressionStats.jsx in order to calculate format
-                    { class_names: sectionsCardsClassName }
-                  : {}),
-              },
-            ]}
-            dispatch={this.props.dispatch}
-            source={this.props.type}
-          />
+          {/* Only the carousel passes isActive for its current slide. Its hidden
+              slides are stacked at zero opacity, which IntersectionObserver still
+              counts as visible, so they would otherwise all report impressions. */}
+          {this.props.isActive !== false && (
+            <ImpressionStats
+              flightId={this.props.flightId}
+              rows={[
+                {
+                  id: this.props.id,
+                  pos: this.props.pos,
+                  ...(this.props.shim && this.props.shim.impression
+                    ? { shim: this.props.shim.impression }
+                    : {}),
+                  corpus_item_id: this.props.corpus_item_id,
+                  scheduled_corpus_item_id: this.props.scheduled_corpus_item_id,
+                  recommended_at: this.props.recommended_at,
+                  received_rank: this.props.received_rank,
+                  topic: this.props.topic,
+                  features: this.props.features,
+                  ...(format ? { format } : {}),
+                  category: this.props.category,
+                  attribution: this.props.attribution,
+                  ...(this.props.section
+                    ? {
+                        section: this.props.section,
+                        section_position: this.props.sectionPosition,
+                        is_section_followed: this.props.sectionFollowed,
+                        sectionLayoutName: this.props.sectionLayoutName,
+                      }
+                    : {}),
+                  ...(!format && this.props.section
+                    ? // Note: sectionsCardsClassName is passed to ImpressionStats.jsx in order to calculate format
+                      { class_names: sectionsCardsClassName }
+                    : {}),
+                },
+              ]}
+              dispatch={this.props.dispatch}
+              source={this.props.type}
+            />
+          )}
 
           {ctaButtonVariant === "variant-b" && (
             <div className="cta-header">Shop Now</div>

@@ -1517,7 +1517,8 @@ void nsFlexContainerFrame::GenerateFlexItemForChild(
       IsSingleLine(aParentReflowInput.mFrame,
                    aParentReflowInput.mStylePosition) &&
       (aAxisTracker.IsColumnOriented() ||
-       aTentativeContentBoxCrossSize != NS_UNCONSTRAINEDSIZE) &&
+       (aTentativeContentBoxCrossSize != NS_UNCONSTRAINEDSIZE &&
+        !aParentReflowInput.mFlags.mTreatBSizeAsIndefinite)) &&
       ShouldStretchCrossSize(this, aChildFrame, flexWM,
                              aAxisTracker.CrossAxis());
   if (stretchCrossSize) {

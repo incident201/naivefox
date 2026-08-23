@@ -37,6 +37,7 @@ MOZ_SRC_FILES += [
     "modules/ChatUtils.sys.mjs",
     "modules/FeedbackModal.sys.mjs",
     "modules/MonitorUIUtils.sys.mjs",
+    "modules/SmartFormFillAutocomplete.sys.mjs",
     "modules/SmartFormFillController.sys.mjs",
     "modules/SmartFormFillDocument.sys.mjs",
     "modules/SmartFormFillUtils.sys.mjs",

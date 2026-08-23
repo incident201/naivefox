@@ -106,7 +106,7 @@ add_task(async function test_splitViewCreateAndAddTabs() {
     "Right tab has the correct ARIA label."
   );
 
-  gBrowser.selectTabAtIndex(tab1._tPos);
+  gBrowser.selectTabAtIndex(tab1.index);
   await BrowserTestUtils.waitForMutationCondition(
     splitview,
     { attributes: true, attributeFilter: ["hasactivetab"] },
@@ -734,9 +734,9 @@ add_task(async function test_createGroupFromPinnedTabWithSplitView() {
     tab1.splitview && tab2.splitview,
     "Tab 1 and tab 2 are in a split view"
   );
-  Assert.equal(pinnedTab._tPos, 0, "Pinned tab is at position 0");
+  Assert.equal(pinnedTab.index, 0, "Pinned tab is at position 0");
   Assert.less(
-    pinnedTab._tPos,
+    pinnedTab.index,
     splitViewPosition,
     "Pinned tab is before split view"
   );
@@ -826,15 +826,15 @@ add_task(async function test_move_splitview_to_end_and_start() {
   Assert.ok(!tab2.group, "tab2 is no longer in a group after moveTabToEnd");
   Assert.ok(!tab3.group, "tab3 is no longer in a group after moveTabToEnd");
   Assert.ok(
-    tab2._tPos > startingTab._tPos && tab3._tPos > startingTab._tPos,
+    tab2.index > startingTab.index && tab3.index > startingTab.index,
     "Splitview tabs are after startingTab"
   );
   Assert.ok(
-    tab2._tPos > tab1._tPos && tab3._tPos > tab1._tPos,
+    tab2.index > tab1.index && tab3.index > tab1.index,
     "Splitview tabs are after tab1"
   );
   Assert.ok(
-    tab2._tPos > tab4._tPos && tab3._tPos > tab4._tPos,
+    tab2.index > tab4.index && tab3.index > tab4.index,
     "Splitview tabs are after tab4"
   );
   Assert.ok(

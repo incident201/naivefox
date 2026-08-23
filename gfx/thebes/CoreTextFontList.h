@@ -71,12 +71,6 @@ class CTFontEntry final : public gfxFontEntry {
 
   bool RequiresAATLayout() const { return mRequiresAAT; }
 
-  bool HasVariations() override;
-  void GetVariationAxes(
-      nsTArray<gfxFontVariationAxis>& aVariationAxes) override;
-  void GetVariationInstances(
-      nsTArray<gfxFontVariationInstance>& aInstances) override;
-
   bool IsCFF();
 
   bool SupportsOpenTypeFeature(Script aScript, uint32_t aFeatureTag) override;
@@ -86,6 +80,12 @@ class CTFontEntry final : public gfxFontEntry {
   virtual ~CTFontEntry() { ::CGFontRelease(mFontRef); }
 
   gfxFont* CreateFontInstance(const gfxFontStyle* aFontStyle) override;
+
+  bool HasVariationsInternal() override;
+  void GetVariationAxesInternal(
+      nsTArray<gfxFontVariationAxis>& aVariationAxes) override;
+  void GetVariationInstancesInternal(
+      nsTArray<gfxFontVariationInstance>& aInstances) override;
 
   bool HasFontTableInternal(uint32_t aTableTag) override;
 

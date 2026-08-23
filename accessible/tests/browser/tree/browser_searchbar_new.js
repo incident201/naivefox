@@ -39,7 +39,7 @@ add_task(async function test_searchbar_a11y_tree() {
         children: [
           // search mode switcher
           {
-            role: ROLE_EDITCOMBOBOX,
+            role: ROLE_PUSHBUTTON,
             // not testing the structure inside the switcher
           },
 
@@ -92,7 +92,7 @@ add_task(async function test_searchbar_a11y_tree_with_results() {
         children: [
           // search mode switcher
           {
-            role: ROLE_EDITCOMBOBOX,
+            role: ROLE_PUSHBUTTON,
             // not testing the structure inside the switcher
           },
 

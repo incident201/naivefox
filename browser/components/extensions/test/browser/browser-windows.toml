@@ -31,9 +31,6 @@ skip-if = [
 ["browser_ext_windows_create_hidpi.js"]
 
 ["browser_ext_windows_create_params.js"]
-skip-if = [
-  "os == 'win' && os_version == '11.26200' && asan", # Bug 2019745
-]
 
 ["browser_ext_windows_create_tabId.js"]
 https_first_disabled = true
@@ -41,9 +38,6 @@ https_first_disabled = true
 ["browser_ext_windows_create_url.js"]
 
 ["browser_ext_windows_events.js"]
-skip-if = [
-  "os == 'win' && os_version == '11.26200' && asan", # Bug 2019745
-]
 
 ["browser_ext_windows_incognito.js"]
 

@@ -88,13 +88,8 @@ struct AlternativeCharCode {
   uint32_t mUnshiftedCharCode = 0u;
   uint32_t mShiftedCharCode = 0u;
 
-  bool operator==(const AlternativeCharCode& aOther) const {
-    return mUnshiftedCharCode == aOther.mUnshiftedCharCode &&
-           mShiftedCharCode == aOther.mShiftedCharCode;
-  }
-  bool operator!=(const AlternativeCharCode& aOther) const {
-    return !(*this == aOther);
-  }
+  bool operator==(const AlternativeCharCode& aOther) const = default;
+  bool operator!=(const AlternativeCharCode& aOther) const = default;
 };
 
 /******************************************************************************

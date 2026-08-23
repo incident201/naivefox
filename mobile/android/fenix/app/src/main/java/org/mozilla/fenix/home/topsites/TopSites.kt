@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -53,7 +51,6 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import mozilla.components.compose.base.PagerIndicator
 import mozilla.components.compose.base.annotation.FlexibleWindowPreview
 import mozilla.components.compose.base.button.TextButton
 import mozilla.components.compose.base.modifier.rightClickable
@@ -88,7 +85,6 @@ internal const val TOP_SITES_FAVICON_SIZE = 36
  * @param interactor The interactor which handles user actions with the widget.
  * @param onTopSitesItemBound Invoked during the composition of a top site item.
  * @param onAddShortcutClicked Invoked when the user clicks on the "Add shortcut" tile.
- * @param isPager Whether the top sites should be rendered as a horizontally pageable pager.
  */
 @Composable
 internal fun TopSites(
@@ -96,13 +92,9 @@ internal fun TopSites(
     interactor: TopSiteInteractor,
     onTopSitesItemBound: () -> Unit,
     onAddShortcutClicked: () -> Unit,
-    isPager: Boolean = false,
 ) {
     // Deliberately not persisted: every new homepage starts collapsed.
     var isExpanded by remember { mutableStateOf(false) }
-
-    // Expansion only applies to the grid.
-    val showExpandToggle = state.showExpandToggle && !isPager
 
     // Expanded, the tile follows the last shortcut as it does in the shortcuts library. Collapsed,
     // it is only shown when it fits within the truncated grid.
@@ -131,9 +123,8 @@ internal fun TopSites(
             isExpanded = expanded
             interactor.onExpandToggleClicked(expanded)
         },
-        isPager = isPager,
         showAddShortcut = showAddShortcut,
-        showExpandToggle = showExpandToggle,
+        showExpandToggle = state.showExpandToggle,
         isExpanded = isExpanded,
     )
 }
@@ -154,7 +145,6 @@ internal fun TopSites(
  * @param onTopSitesItemBound Invoked during the composition of a top site item.
  * @param onAddShortcutClicked Invoked when the user clicks on the "Add shortcut" tile.
  * @param onExpandToggleClick Invoked when the user clicks on the expand/collapse control.
- * @param isPager Whether the top sites should be rendered as a horizontally pageable pager.
  * @param showAddShortcut Whether to display the "Add shortcut" tile after the top sites.
  * @param showExpandToggle Whether to display the control that expands and collapses the grid.
  * @param isExpanded Whether every top site is shown rather than only the first [TOP_SITES_TO_SHOW].
@@ -175,7 +165,6 @@ fun TopSites(
     onTopSitesItemBound: () -> Unit,
     onAddShortcutClicked: () -> Unit,
     onExpandToggleClick: () -> Unit = {},
-    isPager: Boolean = false,
     showAddShortcut: Boolean = false,
     showExpandToggle: Boolean = false,
     isExpanded: Boolean = false,
@@ -189,37 +178,21 @@ fun TopSites(
                 .testTag(TopSitesTestTag.TOP_SITES),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (isPager) {
-            TopSitesPager(
-                topSites = topSites,
-                topSiteColors = topSiteColors,
-                onTopSiteClick = onTopSiteClick,
-                onTopSiteLongClick = onTopSiteLongClick,
-                onTopSiteImpression = onTopSiteImpression,
-                onOpenInPrivateTabClicked = onOpenInPrivateTabClicked,
-                onEditTopSiteClicked = onEditTopSiteClicked,
-                onRemoveTopSiteClicked = onRemoveTopSiteClicked,
-                onSettingsClicked = onSettingsClicked,
-                onSponsorPrivacyClicked = onSponsorPrivacyClicked,
-                onTopSitesItemBound = onTopSitesItemBound,
-            )
-        } else {
-            TopSitesGrid(
-                topSites = if (isExpanded) topSites else topSites.take(TOP_SITES_TO_SHOW),
-                topSiteColors = topSiteColors,
-                showAddShortcut = showAddShortcut,
-                onTopSiteClick = onTopSiteClick,
-                onTopSiteLongClick = onTopSiteLongClick,
-                onTopSiteImpression = onTopSiteImpression,
-                onOpenInPrivateTabClicked = onOpenInPrivateTabClicked,
-                onEditTopSiteClicked = onEditTopSiteClicked,
-                onRemoveTopSiteClicked = onRemoveTopSiteClicked,
-                onSettingsClicked = onSettingsClicked,
-                onSponsorPrivacyClicked = onSponsorPrivacyClicked,
-                onTopSitesItemBound = onTopSitesItemBound,
-                onAddShortcutClicked = onAddShortcutClicked,
-            )
-        }
+        TopSitesGrid(
+            topSites = if (isExpanded) topSites else topSites.take(TOP_SITES_TO_SHOW),
+            topSiteColors = topSiteColors,
+            showAddShortcut = showAddShortcut,
+            onTopSiteClick = onTopSiteClick,
+            onTopSiteLongClick = onTopSiteLongClick,
+            onTopSiteImpression = onTopSiteImpression,
+            onOpenInPrivateTabClicked = onOpenInPrivateTabClicked,
+            onEditTopSiteClicked = onEditTopSiteClicked,
+            onRemoveTopSiteClicked = onRemoveTopSiteClicked,
+            onSettingsClicked = onSettingsClicked,
+            onSponsorPrivacyClicked = onSponsorPrivacyClicked,
+            onTopSitesItemBound = onTopSitesItemBound,
+            onAddShortcutClicked = onAddShortcutClicked,
+        )
 
         if (showExpandToggle) {
             TopSitesExpandToggle(
@@ -383,82 +356,6 @@ private fun TopSiteGridRow(
                 onClick = onAddShortcutClicked,
             )
         }
-    }
-}
-
-/**
- * A horizontal pager of top sites.
- *
- * @param topSites List of [TopSite] to display.
- * @param topSiteColors The color set defined by [TopSiteColors] used to style a top site.
- * @param onTopSiteClick Invoked when the user clicks on a top site.
- * @param onTopSiteLongClick Invoked when the user long clicks on a top site.
- * @param onTopSiteImpression Invoked when the user sees a provided top site.
- * @param onOpenInPrivateTabClicked Invoked when the user clicks on the "Open in private tab" menu item.
- * @param onEditTopSiteClicked Invoked when the user clicks on the "Edit" menu item.
- * @param onRemoveTopSiteClicked Invoked when the user clicks on the "Remove" menu item.
- * @param onSettingsClicked Invoked when the user clicks on the "Settings" menu item.
- * @param onSponsorPrivacyClicked Invoked when the user clicks on the "Our sponsors & your privacy" menu item.
- * @param onTopSitesItemBound Invoked during the composition of a top site item.
- */
-@Suppress("LongParameterList")
-@Composable
-private fun TopSitesPager(
-    topSites: List<TopSite>,
-    topSiteColors: TopSiteColors = TopSiteColors.colors(),
-    onTopSiteClick: (TopSite) -> Unit,
-    onTopSiteLongClick: (TopSite) -> Unit,
-    onTopSiteImpression: (TopSite.Provided, Int) -> Unit,
-    onOpenInPrivateTabClicked: (TopSite) -> Unit,
-    onEditTopSiteClicked: (TopSite) -> Unit,
-    onRemoveTopSiteClicked: (TopSite) -> Unit,
-    onSettingsClicked: () -> Unit,
-    onSponsorPrivacyClicked: () -> Unit,
-    onTopSitesItemBound: () -> Unit,
-) {
-    val pages =
-        remember(topSites) {
-            topSites.take(TOP_SITES_TO_SHOW).chunked(TOP_SITES_PER_ROW)
-        }
-    val pagerState = rememberPagerState(pageCount = { pages.size })
-
-    HorizontalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxWidth(),
-    ) { pageIndex ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            pages[pageIndex].forEachIndexed { colIndex, topSite ->
-                TopSiteItem(
-                    topSite = topSite,
-                    menuItems =
-                        getMenuItems(
-                            topSite = topSite,
-                            onOpenInPrivateTabClicked = onOpenInPrivateTabClicked,
-                            onEditTopSiteClicked = onEditTopSiteClicked,
-                            onRemoveTopSiteClicked = onRemoveTopSiteClicked,
-                            onSettingsClicked = onSettingsClicked,
-                            onSponsorPrivacyClicked = onSponsorPrivacyClicked,
-                        ),
-                    position = topSites.indexOf(topSite),
-                    topSiteColors = topSiteColors,
-                    onTopSiteClick = onTopSiteClick,
-                    onTopSiteLongClick = onTopSiteLongClick,
-                    onTopSiteImpression = onTopSiteImpression,
-                    onTopSitesItemBound = onTopSitesItemBound,
-                )
-            }
-        }
-    }
-
-    if (pages.size > 1) {
-        PagerIndicator(
-            pagerState = pagerState,
-            modifier = Modifier.padding(top = 8.dp).testTag(TopSitesTestTag.TOP_SITES_PAGER_INDICATOR),
-            spacing = 6.dp,
-        )
     }
 }
 

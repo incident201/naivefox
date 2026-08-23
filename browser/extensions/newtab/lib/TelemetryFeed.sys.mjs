@@ -1589,6 +1589,12 @@ export class TelemetryFeed {
         this.handleCardSectionUserEvent(action);
         break;
       }
+      case at.CAROUSEL_NAVIGATE:
+      // Intentional fall-through
+      case at.CAROUSEL_TOGGLE_AUTOPLAY: {
+        this.handleCarouselUserEvent(action);
+        break;
+      }
       case at.INLINE_SELECTION_CLICK:
       // Intentional fall-through
       case at.INLINE_SELECTION_IMPRESSION:
@@ -1606,6 +1612,9 @@ export class TelemetryFeed {
       case at.WIDGETS_TIMER_USER_EVENT:
       case at.WIDGETS_TIMER_USER_IMPRESSION:
         this.handleWidgetsUserEvent(action);
+        break;
+      case at.SPACES_USER_EVENT:
+        this.handleSpacesUserEvent(action);
         break;
       case at.WIDGETS_USER_EVENT:
         this.handleUnifiedWidgetUserEvent(action);
@@ -1696,6 +1705,18 @@ export class TelemetryFeed {
           Glean.newtab.widgetsTimerImpression.record(payload);
           break;
       }
+    }
+  }
+
+  handleSpacesUserEvent(action) {
+    const session = this.sessions.get(au.getPortIdOfSender(action));
+    if (session) {
+      Glean.newtab.spacesSwitch.record({
+        newtab_visit_id: session.session_id,
+        space: action.data.space,
+        previous_space: action.data.previous_space,
+        method: action.data.method,
+      });
     }
   }
 
@@ -1952,6 +1973,34 @@ export class TelemetryFeed {
           break;
         }
       }
+    }
+  }
+
+  handleCarouselUserEvent(action) {
+    const session = this.sessions.get(au.getPortIdOfSender(action));
+    if (!session) {
+      return;
+    }
+
+    const { section, section_position, direction, slide_index, paused } =
+      action.data;
+    const gleanData = {
+      newtab_visit_id: session.session_id,
+      section,
+      section_position,
+    };
+
+    switch (action.type) {
+      case "CAROUSEL_NAVIGATE":
+        Glean.newtab.carouselNavigate.record({
+          ...gleanData,
+          direction,
+          slide_index,
+        });
+        break;
+      case "CAROUSEL_TOGGLE_AUTOPLAY":
+        Glean.newtab.carouselToggleAutoplay.record({ ...gleanData, paused });
+        break;
     }
   }
 

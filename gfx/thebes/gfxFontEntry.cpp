@@ -179,7 +179,7 @@ bool gfxFontEntry::TestCharacterMap(uint32_t aCh) {
   }
   AutoReadLock lock(mLock);
   gfxCharacterMap* map = mCharacterMap;
-  return map ? map->test(aCh) : 0;
+  return map ? map->test(aCh) : false;
 }
 
 void gfxFontEntry::EnsureUVSMapInitialized() {
@@ -1102,6 +1102,53 @@ gfxFloat gfxFontEntry::TrackingForCSSPx(gfxFloat aSize) const {
   double t = (aSize - s0) / (s1 - s0);
   return (1.0 - t) * int16_t(mTrakValues[sizeIndex - 1]) +
          t * int16_t(mTrakValues[sizeIndex]);
+}
+
+bool gfxFontEntry::HasVariations() {
+#if MOZ_FONTATIONS
+  if (const auto* skf = GetSkrifaFont()) {
+    return skrifa_font_axes_count(skf) > 0;
+  }
+#endif
+  return HasVariationsInternal();
+}
+
+void gfxFontEntry::GetVariationAxes(
+    nsTArray<gfxFontVariationAxis>& aVariationAxes) {
+  MOZ_ASSERT(aVariationAxes.IsEmpty());
+#if MOZ_FONTATIONS
+  if (const auto* skf = GetSkrifaFont()) {
+    size_t count = skrifa_font_axes_count(skf);
+    aVariationAxes.SetCapacity(count);
+    if (skrifa_font_copy_axes(skf, &aVariationAxes, false) < count) {
+      // We got fewer axes than |count|, presumably because some were hidden.
+      // Compact the array to reduce wasted space.
+      aVariationAxes.Compact();
+    }
+    return;
+  }
+#endif
+  GetVariationAxesInternal(aVariationAxes);
+}
+
+void gfxFontEntry::GetVariationInstances(
+    nsTArray<gfxFontVariationInstance>& aInstances) {
+  MOZ_ASSERT(aInstances.IsEmpty());
+#if MOZ_FONTATIONS
+  if (const auto* skf = GetSkrifaFont()) {
+    size_t count = skrifa_font_instances_count(skf);
+    aInstances.SetCapacity(count);
+    for (size_t i = 0; i < count; ++i) {
+      gfxFontVariationInstance* inst = aInstances.AppendElement();
+      if (!skrifa_font_copy_instance(skf, i, &inst->mName, &inst->mValues)) {
+        NS_WARNING("failed to get font variation instance from skrifa?");
+        aInstances.RemoveLastElement();
+      }
+    }
+    return;
+  }
+#endif
+  GetVariationInstancesInternal(aInstances);
 }
 
 void gfxFontEntry::SetupVariationRanges() {

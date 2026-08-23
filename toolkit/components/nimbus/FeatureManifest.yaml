@@ -2194,6 +2194,37 @@ creditcards-autofill-enabled:
         branch: default
         pref: extensions.formautofill.creditCards.supported
 
+autofill-ml:
+  description: Machine-learning based form field detection for autofill
+  owner: dlee@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      description: >-
+        If true, use the ML model instead of the regular expression based
+        heuristics to classify form fields. Has no effect on Android.
+      type: boolean
+      setPref:
+        branch: default
+        pref: extensions.formautofill.useml
+    twoHeadEnabled:
+      type: boolean
+      setPref:
+        branch: default
+        pref: extensions.formautofill.useml.twoHead
+      description: >-
+        If true, classify form fields with the two-engine encoder + fusion head
+        model instead of the single text-classification model.
+    engineTimeoutMS:
+      type: int
+      setPref:
+        branch: default
+        pref: extensions.formautofill.useml.timeoutMS
+      description: >-
+        How long an idle ML autofill engine is kept alive, in milliseconds.
+        Applies to every engine the active classifier creates. -1 means never
+        time out. Defaults to 120000.
+
 shellService:
   description: "Interface with OS, e.g., pinning and set default"
   owner: desktop-integrations@mozilla.com

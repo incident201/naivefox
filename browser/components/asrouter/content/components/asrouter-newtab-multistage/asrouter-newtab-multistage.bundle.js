@@ -4469,12 +4469,14 @@ class ProtonScreen extends (external_React_default()).PureComponent {
     darkModeImageURL,
     reducedMotionImageURL,
     darkModeReducedMotionImageURL,
+    videoURL,
     alt = "",
     width,
     height,
     marginBlock,
     marginInline,
     style,
+    imgStyle,
     className = "logo-container"
   }) {
     function getLoadingStrategy() {
@@ -4485,14 +4487,41 @@ class ProtonScreen extends (external_React_default()).PureComponent {
       }
       return "eager";
     }
-    const pictureStyle = {
+    const containerStyle = {
       marginInline,
       marginBlock,
       ...style
     };
+
+    // videoURL lets this render a one-shot animation instead of a static image.
+    // It plays once and holds its last frame. Users who prefer reduced motion
+    // fall through to the static <picture>/<img> below.
+    const prefersReducedMotion = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (videoURL && !prefersReducedMotion) {
+      return /*#__PURE__*/external_React_default().createElement("div", {
+        className: className,
+        style: containerStyle
+      }, /*#__PURE__*/external_React_default().createElement(Localized, {
+        text: alt
+      }, /*#__PURE__*/external_React_default().createElement("div", {
+        className: "sr-only logo-alt"
+      })), /*#__PURE__*/external_React_default().createElement("video", {
+        className: "brand-logo",
+        style: {
+          height,
+          width,
+          ...imgStyle
+        },
+        src: videoURL,
+        autoPlay: true,
+        muted: true,
+        playsInline: true,
+        role: alt ? null : "presentation"
+      }));
+    }
     return /*#__PURE__*/external_React_default().createElement("picture", {
       className: className,
-      style: pictureStyle
+      style: containerStyle
     }, darkModeReducedMotionImageURL ? /*#__PURE__*/external_React_default().createElement("source", {
       srcset: darkModeReducedMotionImageURL,
       media: "(prefers-color-scheme: dark) and (prefers-reduced-motion: reduce)"
@@ -4510,7 +4539,8 @@ class ProtonScreen extends (external_React_default()).PureComponent {
       className: "brand-logo",
       style: {
         height,
-        width
+        width,
+        ...imgStyle
       },
       src: imageURL,
       alt: "",
@@ -4747,7 +4777,7 @@ class ProtonScreen extends (external_React_default()).PureComponent {
     }));
   }
   getCombinedInnerStyles(content, isWideScreen) {
-    const INNER_CONTENT_CONFIGURABLE_STYLES = ["overflow", "display", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "width"];
+    const INNER_CONTENT_CONFIGURABLE_STYLES = ["overflow", "display", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "width", "minHeight", "flexGrow"];
     const innerContentStyles = isWideScreen ? content.main_content_style || {} : content.main_content_style_narrow || {};
     const validInnerStyles = MultiStageUtils.getValidStyle(innerContentStyles, INNER_CONTENT_CONFIGURABLE_STYLES) || {};
     return {
@@ -4816,6 +4846,10 @@ class ProtonScreen extends (external_React_default()).PureComponent {
     const isEmbeddedMigration = content.tiles?.type === "migration-wizard";
     const isSystemPromptStyleSpotlight = content.isSystemPromptStyleSpotlight === true;
     const combinedStyles = this.getCombinedInnerStyles(content, isWideScreen);
+    // content.screen_style is a shared mix of screen-level layout tweaks
+    // consumed by three different elements below (.screen, .section-main,
+    // .main-content), each pulling its own allowlisted subset of it.
+    const screenStyleJustifyContent = content.screen_style && MultiStageUtils.getValidStyle(content.screen_style, ["justifyContent"]).justifyContent;
     return /*#__PURE__*/external_React_default().createElement("main", {
       className: `screen ${this.props.id || ""}
           ${screenClassName} ${textColorClass}`,
@@ -4843,7 +4877,8 @@ class ProtonScreen extends (external_React_default()).PureComponent {
         background: isCenterPosition && this.getEffectiveBackground(content) ? this.getEffectiveBackground(content) : null,
         width: content.width && content.position !== "split" ? content.width : null,
         paddingBlock: content.split_content_padding_block ? content.split_content_padding_block : null,
-        paddingInline: content.split_content_padding_inline ? content.split_content_padding_inline : null
+        paddingInline: content.split_content_padding_inline ? content.split_content_padding_inline : null,
+        justifyContent: screenStyleJustifyContent
       }
     }, isCenterLargeFullscreen ? secondaryCTATop : null, isCenterPosition && this.hasAnimatedContent(content) ? this.renderAnimationPlayPauseButton() : null, content.logo && !content.fullscreen ? this.renderPicture(content.logo) : null, isRtamo && !content.fullscreen ? this.renderRTAMOIcon(addonType, this.props.themeScreenshots, this.props.addonIconURL) : null, /*#__PURE__*/external_React_default().createElement("div", {
       className: "main-content-inner",
@@ -5069,6 +5104,10 @@ const screenContentShape = {
     reducedMotionImageURL: (prop_types_default()).string,
     // The dark mode reduced motion image URL.
     darkModeReducedMotionImageURL: (prop_types_default()).string,
+    // A video URL, played once, rendered instead of the image ones above.
+    // Ignored (falls back to the image URLs above) for users who prefer reduced
+    // motion.
+    videoURL: (prop_types_default()).string,
     // The <img> alt text.
     alt: prop_types_default().oneOfType([(prop_types_default()).string, (prop_types_default()).object]),
     // The CSS style overriding the width property.

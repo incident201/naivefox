@@ -66,6 +66,25 @@ function describeMutationWait(checkFn, frame) {
 }
 
 /**
+ * Gives a lazy tab the browser it was created without.
+ *
+ * @backward-compat { version 156 }
+ * `insertBrowser()` is new in 156, but the newtab train-hop jobs run these
+ * tests against Beta and Release builds, whose tabbrowser only has the
+ * underscored predecessor. Call it directly once 156 reaches Release.
+ *
+ * @param {object} tabbrowser
+ * @param {MozTabbrowserTab} tab
+ */
+function insertBrowser(tabbrowser, tab) {
+  if (tabbrowser.insertBrowser) {
+    tabbrowser.insertBrowser(tab);
+  } else {
+    tabbrowser._insertBrowser(tab);
+  }
+}
+
+/**
  * Create and register the BrowserTestUtils and ContentEventListener window
  * actors.
  */
@@ -517,7 +536,7 @@ export var BrowserTestUtils = {
     if (tabbrowser && tabbrowser.getTabForBrowser) {
       let tab = tabbrowser.getTabForBrowser(browser);
       if (tab) {
-        tabbrowser._insertBrowser(tab);
+        insertBrowser(tabbrowser, tab);
       }
     }
 
@@ -1243,7 +1262,7 @@ export var BrowserTestUtils = {
         // Ensure all browsers have been inserted or we won't get
         // messages back from them.
         browserSet.forEach(browser => {
-          win.gBrowser._insertBrowser(win.gBrowser.getTabForBrowser(browser));
+          insertBrowser(win.gBrowser, win.gBrowser.getTabForBrowser(browser));
         });
 
         let observer = subject => {

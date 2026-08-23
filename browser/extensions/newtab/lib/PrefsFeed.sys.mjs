@@ -21,8 +21,14 @@ import { Prefs } from "resource://newtab/lib/ActivityStreamPrefs.sys.mjs";
 import {
   PREF_DEFAULT_VALUE_TOPSTORIES_ENABLED,
   PREF_DEFAULT_VALUE_TOPSITES_ENABLED,
+  PREFS_CONFIG,
 } from "resource://newtab/lib/ActivityStream.sys.mjs";
 import { WIDGET_REGISTRY } from "resource://newtab/common/WidgetsRegistry.mjs";
+import {
+  isSpacesAssigned,
+  PREF_PAGE_LAYOUT_VARIANT,
+  SPACE_CONFIG,
+} from "resource://newtab/common/PageLayoutVariants.mjs";
 
 // eslint-disable-next-line mozilla/use-static-import
 const { AppConstants } = ChromeUtils.importESModule(
@@ -156,6 +162,7 @@ export class PrefsFeed {
    *   changes are tracked during the activation window.
    */
   onPrefChanged(name, value, isUserChange = true) {
+    this._mirrorSpaceOptOut(name, value);
     const prefItem = this._prefMap.get(name);
     if (prefItem) {
       let action = "BroadcastToContent";
@@ -295,6 +302,12 @@ export class PrefsFeed {
       return accumulator;
     }, {});
 
+    // Before any pref write below. Those fire the branch observer
+    // synchronously, and its handler reads this to decide whether spaces is
+    // still assigned -- a stale value makes an unenrollment revert look like a
+    // user turning the space off.
+    this._trainhopConfig = valueObj;
+
     // Bug 2021055: Write weather.display to the default branch so Nimbus sets
     // the initial value without overriding an explicit user choice (user branch
     // always takes precedence over the default branch).
@@ -323,6 +336,8 @@ export class PrefsFeed {
         .getDefaultBranch(this._prefs._branchStr)
         .setIntPref("topSitesRows", valueObj.topSites.topSitesRows);
     }
+
+    this._applySpacePrefDefaults(valueObj);
 
     // Write initialWallpaper to the user branch so it persists after the
     // experiment ends. The guard prevents overwriting an existing value or a
@@ -404,6 +419,82 @@ export class PrefsFeed {
     }, {});
 
     return valueObj;
+  }
+
+  /**
+   * What isSpacesAssigned needs, from prefs rather than the store so this works
+   * before the store has state.
+   *
+   * @returns {object}
+   */
+  _spacesVariantPrefs(trainhopConfig = this._trainhopConfig) {
+    return {
+      [PREF_PAGE_LAYOUT_VARIANT]: this._prefs.get(PREF_PAGE_LAYOUT_VARIANT),
+      trainhopConfig,
+    };
+  }
+
+  /**
+   * Mirrors a space's pref into its opt-out pref, so the experiment stops
+   * overriding a space the user has just turned off. Driven by the branch
+   * observer, so it sees the newtab customize menu, about:preferences and
+   * about:config alike.
+   *
+   * A mirror, not a judgement: whoever wrote the pref, its new value is the
+   * answer. Enrollment fires no change, so the value a profile arrived with is
+   * left alone -- that is the population being turned back on.
+   *
+   * @param {string} name - the pref that changed
+   * @param {*} value - its new value
+   */
+  _mirrorSpaceOptOut(name, value) {
+    const space = Object.values(SPACE_CONFIG).find(s => s.userPref === name);
+    if (!space || !isSpacesAssigned(this._spacesVariantPrefs())) {
+      return;
+    }
+    if (this._prefs.get(space.optOutPref) !== !value) {
+      this._prefs.set(space.optOutPref, !value);
+    }
+  }
+
+  /**
+   * Writes the pref default for the spaces that need one, which is Recent
+   * Activity alone: its pref gates HighlightsFeed, so overriding the reads
+   * would show a space with nothing to render. The default branch, so a user
+   * value still wins, and reverted on unenrollment rather than at the next
+   * restart -- but only for a profile this has written, so an unrelated
+   * train-hop config does not touch it.
+   *
+   * Enterprise profiles are excluded by the recipe's
+   * `!hasActiveEnterprisePolicies` targeting rather than checked here.
+   *
+   * @param {object} valueObj - the freshly computed train-hop config
+   */
+  _applySpacePrefDefaults(valueObj) {
+    // Only the write is scoped to the experiment. The revert must still run
+    // once the variant is gone, which is exactly when unenrolling needs it.
+    const assigned = isSpacesAssigned(this._spacesVariantPrefs(valueObj));
+    this._wroteSpaceDefaults ??= new Set();
+    for (const space of Object.values(SPACE_CONFIG)) {
+      if (!space.feedGated) {
+        continue;
+      }
+      const { trainhopKey, userPref } = space;
+      const enabled = valueObj[trainhopKey]?.enabled;
+      if (assigned && typeof enabled === "boolean") {
+        Services.prefs
+          .getDefaultBranch(this._prefs._branchStr)
+          .setBoolPref(userPref, enabled);
+        this._wroteSpaceDefaults.add(userPref);
+      } else if (this._wroteSpaceDefaults.has(userPref)) {
+        // The Set is the safety here, not the variant: only a pref this
+        // profile was actually given gets put back.
+        Services.prefs
+          .getDefaultBranch(this._prefs._branchStr)
+          .setBoolPref(userPref, PREFS_CONFIG.get(userPref).value);
+        this._wroteSpaceDefaults.delete(userPref);
+      }
+    }
   }
 
   /**

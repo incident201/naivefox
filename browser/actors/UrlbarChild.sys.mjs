@@ -2,11 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import * as UrlbarContentUtils from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
-  UrlbarContentUtils: "chrome://browser/content/urlbar/UrlbarContentUtils.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
 });
 
@@ -157,24 +158,23 @@ export class UrlbarChild extends JSWindowActorChild {
         registerMessagePathInput: input => this.registerMessagePathInput(input),
         registerChildController: (instanceId, child) =>
           this.registerChildController(instanceId, child),
-        whereToOpenLink: event =>
-          lazy.UrlbarContentUtils.whereToOpenLink(event),
+        whereToOpenLink: event => UrlbarContentUtils.whereToOpenLink(event),
         willLoadInBackground: (where, params) =>
-          lazy.UrlbarContentUtils.willLoadInBackground(where, params),
+          UrlbarContentUtils.willLoadInBackground(where, params),
         getFixupPrimitives: (searchString, isPrivate) =>
           Cu.cloneInto(
-            lazy.UrlbarContentUtils.getFixupPrimitives(searchString, isPrivate),
+            UrlbarContentUtils.getFixupPrimitives(searchString, isPrivate),
             win
           ),
-        getDisplaySpec: url => lazy.UrlbarContentUtils.getDisplaySpec(url),
-        unEscapeURIForUI: uri => lazy.UrlbarContentUtils.unEscapeURIForUI(uri),
-        getSupportUrl: topic => lazy.UrlbarContentUtils.getSupportUrl(topic),
-        getPlatform: () => lazy.UrlbarContentUtils.getPlatform(),
+        getDisplaySpec: url => UrlbarContentUtils.getDisplaySpec(url),
+        unEscapeURIForUI: uri => UrlbarContentUtils.unEscapeURIForUI(uri),
+        getSupportUrl: topic => UrlbarContentUtils.getSupportUrl(topic),
+        getPlatform: () => UrlbarContentUtils.getPlatform(),
         isWindowPrivate: lazy.PrivateBrowsingUtils.isContentWindowPrivate(
           this.contentWindow
         ),
         isTextDirectionRTL: (value, window) =>
-          lazy.UrlbarContentUtils.isTextDirectionRTL(value, window),
+          UrlbarContentUtils.isTextDirectionRTL(value, window),
         getPref: name => Cu.cloneInto(lazy.UrlbarPrefs.get(name), win),
         addPrefObserver: observer => lazy.UrlbarPrefs.addObserver(observer),
         removePrefObserver: observer =>

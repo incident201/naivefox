@@ -236,8 +236,6 @@ pref("extensions.update.background.url", "https://versioncheck-bg.addons.mozilla
 pref("extensions.update.interval", 86400);  // Check for updates to Extensions and
                                             // Themes every day
 
-pref("lightweightThemes.getMoreURL", "https://addons.mozilla.org/%LOCALE%/firefox/themes");
-
 #if defined(MOZ_WIDEVINE_EME)
   pref("browser.eme.ui.enabled", true);
 #else
@@ -504,7 +502,7 @@ pref("browser.urlbar.searchModeSwitcher.skipTabStop", true);
 pref("browser.urlbar.searchModeSwitcher.skipTabStop", false);
 #endif
 
-pref("browser.urlbar.trackerCount.featureGate", true);
+pref("browser.urlbar.trackerCount.featureGate", false);
 pref("browser.urlbar.trackerCount.enabled", true);
 
 pref("browser.urlbar.trustPanel.featureGate", true);
@@ -1453,8 +1451,12 @@ pref("browser.xul.error_pages.expert_bad_cert", false);
 pref("browser.xul.error_pages.show_safe_browsing_details_on_load", false);
 
 // Enable the one-click search call-to-action on the online dnsNotFound error
-// page. Disabled by default; consumers land in later bugs (meta bug 2055374).
+// page. On in Nightly, off elsewhere until a Nimbus rollout (bug 2055718).
+#ifdef NIGHTLY_BUILD
+pref("browser.netError.searchCTA.enabled", true);
+#else
 pref("browser.netError.searchCTA.enabled", false);
+#endif
 
 // Freshness window for the search CTA's connectivity signal. If the last
 // captive-portal check is older than this, an authoritative re-check runs
@@ -2363,6 +2365,10 @@ pref("browser.ml.linkPreview.supportedLocales", "en");
 
 pref("browser.ml.pageAssist.enabled", false);
 
+// Set once the native ONNX runtime availability has been reported to telemetry,
+// so that the one-off probe behind it runs at most once per profile.
+pref("browser.ml.onnxNativeAvailabilityReported", false);
+
 // Smart Window Feature
 pref("browser.smartwindow.enabled", false);
 // Default endpoint for preset models
@@ -2409,11 +2415,6 @@ pref("browser.smartwindow.smartformfill.disallowedRegions", "FR");
 pref("browser.smartwindow.agent.enabled", true);
 pref("browser.smartwindow.agent.supportedRegions", "US,CA");
 
-
-// Smart Window: Merino World Cup Soccer tool call (bug 2038266)
-pref("browser.smartwindow.worldcup.enabled", false);
-pref("browser.smartwindow.worldcup.endpointURL", "https://merino.services.mozilla.com");
-pref("browser.smartwindow.worldcup.timeoutMs", 2000);
 
 // Smart Window: Exa search endpoint, used by the search_the_web agentic flow (bug 2037948)
 pref("browser.smartwindow.searchQuery.endpointURL", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1/search");
@@ -2465,6 +2466,9 @@ pref("identity.fxaccounts.remote.oauth.uri", "https://oauth.accounts.firefox.com
 
 // Whether FxA pairing using QR codes is enabled.
 pref("identity.fxaccounts.pairing.enabled", true);
+
+// The version of the pairing flow to be used by FxA.
+pref("identity.fxaccounts.pairing.version", 1);
 
 // The remote URI of the FxA pairing server
 pref("identity.fxaccounts.remote.pairing.uri", "wss://channelserver.services.mozilla.com");

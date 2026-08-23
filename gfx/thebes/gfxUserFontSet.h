@@ -688,18 +688,6 @@ class gfxUserFontEntry : public gfxFontEntry {
     return mSrcList[aSrcIndex];
   }
 
-  // The variation-query APIs should not be called on placeholders.
-  bool HasVariations() override {
-    MOZ_ASSERT_UNREACHABLE("not meaningful for a userfont placeholder");
-    return false;
-  }
-  void GetVariationAxes(nsTArray<gfxFontVariationAxis>&) override {
-    MOZ_ASSERT_UNREACHABLE("not meaningful for a userfont placeholder");
-  }
-  void GetVariationInstances(nsTArray<gfxFontVariationInstance>&) override {
-    MOZ_ASSERT_UNREACHABLE("not meaningful for a userfont placeholder");
-  }
-
  protected:
   struct OTSMessage {
     nsCString mMessage;
@@ -778,6 +766,19 @@ class gfxUserFontEntry : public gfxFontEntry {
   virtual void GetUserFontSets(nsTArray<RefPtr<gfxUserFontSet>>& aResult);
 
   FontTableCache* GetFontTableCache(bool aCreate) override { return nullptr; }
+
+  // The variation-query APIs should not be called on placeholders.
+  bool HasVariationsInternal() override {
+    MOZ_ASSERT_UNREACHABLE("not meaningful for a userfont placeholder");
+    return false;
+  }
+  void GetVariationAxesInternal(nsTArray<gfxFontVariationAxis>&) override {
+    MOZ_ASSERT_UNREACHABLE("not meaningful for a userfont placeholder");
+  }
+  void GetVariationInstancesInternal(
+      nsTArray<gfxFontVariationInstance>&) override {
+    MOZ_ASSERT_UNREACHABLE("not meaningful for a userfont placeholder");
+  }
 
   // general load state
   UserFontLoadState mUserFontLoadState;

@@ -672,6 +672,8 @@ skip-if = [
 
 ["test_pasting_text_longer_than_maxlength.html"]
 
+["test_remove_during_composition.html"]
+
 ["test_replace_text.html"]
 
 ["test_resizers_appearance.html"]
