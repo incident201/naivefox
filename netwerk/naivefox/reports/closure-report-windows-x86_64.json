@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
+    "source_commit_sha": "b2c177cb608ef9b8ce9fb56a2a1f3c8eeb5ccc5f",
     "source_worktree_clean": true,
     "firefox_base_sha": "44e151427db27db6b789e3be5439f0edbcf446de",
-    "naivefox_reference_sha": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
+    "naivefox_reference_sha": "b2c177cb608ef9b8ce9fb56a2a1f3c8eeb5ccc5f",
     "analyzer_sha256": "f5fc1ae9c8b65ce6532989afae3422b0f9cdc727e9c39e5cdff890d8ad53ec9c",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "71d7a93b99c6bd1f8c2f8553300e4559d26f9e539d7f8202952ba282f4e57029",
@@ -12,7 +12,7 @@
     "platform": "windows",
     "target_triple": "x86_64-pc-windows-msvc",
     "mozconfig_path": "netwerk/naivefox/mozconfig-windows-x86_64",
-    "mozconfig_sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c",
+    "mozconfig_sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b",
     "analyzer_version": "2.7.0-three-target-active-cargo-tree",
     "compiler_version": "Clang 18.1.8",
     "linker_version": "LLD 18.1.8",
@@ -20,57 +20,52 @@
     "staged_runtime_manifest_count": 21
   },
   "summary": {
-    "cxx_translation_units_count": 475,
-    "direct_link_objects_count": 546,
-    "unstripped_link_objects_bytes": 218436307,
-    "unstripped_link_objects_mb": 208.32,
+    "cxx_translation_units_count": 107,
+    "direct_link_objects_count": 175,
+    "unstripped_link_objects_bytes": 170684223,
+    "unstripped_link_objects_mb": 162.78,
     "static_libraries_count": 2,
     "spidermonkey_static_present": false,
-    "libxul_size_bytes": 27653632,
+    "libxul_size_bytes": 13169152,
     "naivefox_bin_size_bytes": 10752,
-    "reachable_rust_crates_count": 283,
+    "reachable_rust_crates_count": 284,
     "dynamic_dependencies_count": 22,
     "staged_runtime_files_count": 21
   },
   "component_groups": {
     "netwerk": {
       "files": 65,
-      "bytes": 81615279,
-      "mb": 77.83
-    },
-    "config": {
-      "files": 369,
-      "bytes": 45664358,
-      "mb": 43.55
+      "bytes": 81591936,
+      "mb": 77.81
     },
     "xpcom": {
       "files": 31,
-      "bytes": 31871992,
+      "bytes": 31871492,
       "mb": 30.4
     },
     "modules": {
       "files": 23,
-      "bytes": 16610647,
+      "bytes": 16610579,
       "mb": 15.84
     },
     "ipc": {
       "files": 18,
-      "bytes": 12439237,
+      "bytes": 12439021,
       "mb": 11.86
     },
     "security": {
       "files": 17,
-      "bytes": 10713932,
+      "bytes": 10713820,
       "mb": 10.22
     },
     "intl": {
-      "files": 8,
-      "bytes": 9919276,
-      "mb": 9.46
+      "files": 6,
+      "bytes": 7855961,
+      "mb": 7.49
     },
     "storage": {
       "files": 4,
-      "bytes": 5514342,
+      "bytes": 5514250,
       "mb": 5.26
     },
     "mozglue": {
@@ -80,7 +75,7 @@
     },
     "caps": {
       "files": 2,
-      "bytes": 1090752,
+      "bytes": 1090712,
       "mb": 1.04
     },
     "third_party": {
@@ -90,385 +85,17 @@
     },
     "chrome": {
       "files": 1,
-      "bytes": 873110,
+      "bytes": 873090,
       "mb": 0.83
     },
     "toolkit": {
       "files": 1,
-      "bytes": 5829,
+      "bytes": 5809,
       "mb": 0.01
     }
   },
   "cxx_translation_units": [
     "caps/BasePrincipal.cpp",
-    "intl/icu/source/common/appendable.cpp",
-    "intl/icu/source/common/bmpset.cpp",
-    "intl/icu/source/common/brkeng.cpp",
-    "intl/icu/source/common/brkiter.cpp",
-    "intl/icu/source/common/bytesinkutil.cpp",
-    "intl/icu/source/common/bytestream.cpp",
-    "intl/icu/source/common/bytestrie.cpp",
-    "intl/icu/source/common/bytestriebuilder.cpp",
-    "intl/icu/source/common/caniter.cpp",
-    "intl/icu/source/common/characterproperties.cpp",
-    "intl/icu/source/common/chariter.cpp",
-    "intl/icu/source/common/charstr.cpp",
-    "intl/icu/source/common/cmemory.cpp",
-    "intl/icu/source/common/cstring.cpp",
-    "intl/icu/source/common/dictbe.cpp",
-    "intl/icu/source/common/dictionarydata.cpp",
-    "intl/icu/source/common/dtintrv.cpp",
-    "intl/icu/source/common/edits.cpp",
-    "intl/icu/source/common/emojiprops.cpp",
-    "intl/icu/source/common/errorcode.cpp",
-    "intl/icu/source/common/filteredbrk.cpp",
-    "intl/icu/source/common/filterednormalizer2.cpp",
-    "intl/icu/source/common/fixedstring.cpp",
-    "intl/icu/source/common/loadednormalizer2impl.cpp",
-    "intl/icu/source/common/localebuilder.cpp",
-    "intl/icu/source/common/localematcher.cpp",
-    "intl/icu/source/common/localeprioritylist.cpp",
-    "intl/icu/source/common/locavailable.cpp",
-    "intl/icu/source/common/locbased.cpp",
-    "intl/icu/source/common/locdispnames.cpp",
-    "intl/icu/source/common/locdistance.cpp",
-    "intl/icu/source/common/locdspnm.cpp",
-    "intl/icu/source/common/locid.cpp",
-    "intl/icu/source/common/loclikely.cpp",
-    "intl/icu/source/common/loclikelysubtags.cpp",
-    "intl/icu/source/common/locmap.cpp",
-    "intl/icu/source/common/locresdata.cpp",
-    "intl/icu/source/common/locutil.cpp",
-    "intl/icu/source/common/lsr.cpp",
-    "intl/icu/source/common/lstmbe.cpp",
-    "intl/icu/source/common/messagepattern.cpp",
-    "intl/icu/source/common/mlbe.cpp",
-    "intl/icu/source/common/normalizer2.cpp",
-    "intl/icu/source/common/normalizer2impl.cpp",
-    "intl/icu/source/common/normlzr.cpp",
-    "intl/icu/source/common/parsepos.cpp",
-    "intl/icu/source/common/patternprops.cpp",
-    "intl/icu/source/common/propname.cpp",
-    "intl/icu/source/common/punycode.cpp",
-    "intl/icu/source/common/putil.cpp",
-    "intl/icu/source/common/rbbi.cpp",
-    "intl/icu/source/common/rbbi_cache.cpp",
-    "intl/icu/source/common/rbbidata.cpp",
-    "intl/icu/source/common/rbbinode.cpp",
-    "intl/icu/source/common/rbbirb.cpp",
-    "intl/icu/source/common/rbbiscan.cpp",
-    "intl/icu/source/common/rbbisetb.cpp",
-    "intl/icu/source/common/rbbistbl.cpp",
-    "intl/icu/source/common/rbbitblb.cpp",
-    "intl/icu/source/common/resbund.cpp",
-    "intl/icu/source/common/resource.cpp",
-    "intl/icu/source/common/restrace.cpp",
-    "intl/icu/source/common/ruleiter.cpp",
-    "intl/icu/source/common/schriter.cpp",
-    "intl/icu/source/common/serv.cpp",
-    "intl/icu/source/common/servlk.cpp",
-    "intl/icu/source/common/servlkf.cpp",
-    "intl/icu/source/common/servls.cpp",
-    "intl/icu/source/common/servnotf.cpp",
-    "intl/icu/source/common/servrbf.cpp",
-    "intl/icu/source/common/servslkf.cpp",
-    "intl/icu/source/common/sharedobject.cpp",
-    "intl/icu/source/common/simpleformatter.cpp",
-    "intl/icu/source/common/static_unicode_sets.cpp",
-    "intl/icu/source/common/stringpiece.cpp",
-    "intl/icu/source/common/stringtriebuilder.cpp",
-    "intl/icu/source/common/uarrsort.cpp",
-    "intl/icu/source/common/ubidi.cpp",
-    "intl/icu/source/common/ubidi_props.cpp",
-    "intl/icu/source/common/ubidiln.cpp",
-    "intl/icu/source/common/ubidiwrt.cpp",
-    "intl/icu/source/common/ubrk.cpp",
-    "intl/icu/source/common/ucase.cpp",
-    "intl/icu/source/common/ucasemap.cpp",
-    "intl/icu/source/common/ucasemap_titlecase_brkiter.cpp",
-    "intl/icu/source/common/uchar.cpp",
-    "intl/icu/source/common/ucharstrie.cpp",
-    "intl/icu/source/common/ucharstriebuilder.cpp",
-    "intl/icu/source/common/ucharstrieiterator.cpp",
-    "intl/icu/source/common/uchriter.cpp",
-    "intl/icu/source/common/ucln_cmn.cpp",
-    "intl/icu/source/common/ucmndata.cpp",
-    "intl/icu/source/common/ucnv.cpp",
-    "intl/icu/source/common/ucnv_bld.cpp",
-    "intl/icu/source/common/ucnv_cb.cpp",
-    "intl/icu/source/common/ucnv_cnv.cpp",
-    "intl/icu/source/common/ucnv_err.cpp",
-    "intl/icu/source/common/ucnv_io.cpp",
-    "intl/icu/source/common/ucnv_u16.cpp",
-    "intl/icu/source/common/ucnv_u32.cpp",
-    "intl/icu/source/common/ucnv_u7.cpp",
-    "intl/icu/source/common/ucnv_u8.cpp",
-    "intl/icu/source/common/ucnvbocu.cpp",
-    "intl/icu/source/common/ucnvlat1.cpp",
-    "intl/icu/source/common/ucnvscsu.cpp",
-    "intl/icu/source/common/ucol_swp.cpp",
-    "intl/icu/source/common/ucptrie.cpp",
-    "intl/icu/source/common/ucurr.cpp",
-    "intl/icu/source/common/udata.cpp",
-    "intl/icu/source/common/udatamem.cpp",
-    "intl/icu/source/common/udataswp.cpp",
-    "intl/icu/source/common/uenum.cpp",
-    "intl/icu/source/common/uhash.cpp",
-    "intl/icu/source/common/uhash_us.cpp",
-    "intl/icu/source/common/uinit.cpp",
-    "intl/icu/source/common/uinvchar.cpp",
-    "intl/icu/source/common/uiter.cpp",
-    "intl/icu/source/common/ulist.cpp",
-    "intl/icu/source/common/uloc.cpp",
-    "intl/icu/source/common/uloc_keytype.cpp",
-    "intl/icu/source/common/uloc_tag.cpp",
-    "intl/icu/source/common/ulocale.cpp",
-    "intl/icu/source/common/ulocbuilder.cpp",
-    "intl/icu/source/common/umapfile.cpp",
-    "intl/icu/source/common/umath.cpp",
-    "intl/icu/source/common/umutablecptrie.cpp",
-    "intl/icu/source/common/umutex.cpp",
-    "intl/icu/source/common/unames.cpp",
-    "intl/icu/source/common/unifiedcache.cpp",
-    "intl/icu/source/common/unifilt.cpp",
-    "intl/icu/source/common/unifunct.cpp",
-    "intl/icu/source/common/uniset.cpp",
-    "intl/icu/source/common/uniset_closure.cpp",
-    "intl/icu/source/common/uniset_props.cpp",
-    "intl/icu/source/common/unisetspan.cpp",
-    "intl/icu/source/common/unistr.cpp",
-    "intl/icu/source/common/unistr_case.cpp",
-    "intl/icu/source/common/unistr_case_locale.cpp",
-    "intl/icu/source/common/unistr_cnv.cpp",
-    "intl/icu/source/common/unistr_props.cpp",
-    "intl/icu/source/common/unistr_titlecase_brkiter.cpp",
-    "intl/icu/source/common/unormcmp.cpp",
-    "intl/icu/source/common/uobject.cpp",
-    "intl/icu/source/common/uprops.cpp",
-    "intl/icu/source/common/uresbund.cpp",
-    "intl/icu/source/common/uresdata.cpp",
-    "intl/icu/source/common/uscript.cpp",
-    "intl/icu/source/common/uscript_props.cpp",
-    "intl/icu/source/common/uset.cpp",
-    "intl/icu/source/common/uset_props.cpp",
-    "intl/icu/source/common/usetiter.cpp",
-    "intl/icu/source/common/usprep.cpp",
-    "intl/icu/source/common/ustack.cpp",
-    "intl/icu/source/common/ustr_cnv.cpp",
-    "intl/icu/source/common/ustr_titlecase_brkiter.cpp",
-    "intl/icu/source/common/ustrcase.cpp",
-    "intl/icu/source/common/ustrcase_locale.cpp",
-    "intl/icu/source/common/ustrenum.cpp",
-    "intl/icu/source/common/ustrfmt.cpp",
-    "intl/icu/source/common/ustring.cpp",
-    "intl/icu/source/common/ustrtrns.cpp",
-    "intl/icu/source/common/utext.cpp",
-    "intl/icu/source/common/utf_impl.cpp",
-    "intl/icu/source/common/util.cpp",
-    "intl/icu/source/common/util_props.cpp",
-    "intl/icu/source/common/utrace.cpp",
-    "intl/icu/source/common/utrie.cpp",
-    "intl/icu/source/common/utrie2.cpp",
-    "intl/icu/source/common/utrie2_builder.cpp",
-    "intl/icu/source/common/utrie_swap.cpp",
-    "intl/icu/source/common/uts46.cpp",
-    "intl/icu/source/common/utypes.cpp",
-    "intl/icu/source/common/uvector.cpp",
-    "intl/icu/source/common/uvectr32.cpp",
-    "intl/icu/source/common/uvectr64.cpp",
-    "intl/icu/source/common/wintz.cpp",
-    "intl/icu/source/i18n/astro.cpp",
-    "intl/icu/source/i18n/basictz.cpp",
-    "intl/icu/source/i18n/bocsu.cpp",
-    "intl/icu/source/i18n/buddhcal.cpp",
-    "intl/icu/source/i18n/calendar.cpp",
-    "intl/icu/source/i18n/cecal.cpp",
-    "intl/icu/source/i18n/chnsecal.cpp",
-    "intl/icu/source/i18n/choicfmt.cpp",
-    "intl/icu/source/i18n/coleitr.cpp",
-    "intl/icu/source/i18n/coll.cpp",
-    "intl/icu/source/i18n/collation.cpp",
-    "intl/icu/source/i18n/collationbuilder.cpp",
-    "intl/icu/source/i18n/collationcompare.cpp",
-    "intl/icu/source/i18n/collationdata.cpp",
-    "intl/icu/source/i18n/collationdatabuilder.cpp",
-    "intl/icu/source/i18n/collationdatareader.cpp",
-    "intl/icu/source/i18n/collationdatawriter.cpp",
-    "intl/icu/source/i18n/collationfastlatin.cpp",
-    "intl/icu/source/i18n/collationfastlatinbuilder.cpp",
-    "intl/icu/source/i18n/collationfcd.cpp",
-    "intl/icu/source/i18n/collationiterator.cpp",
-    "intl/icu/source/i18n/collationkeys.cpp",
-    "intl/icu/source/i18n/collationroot.cpp",
-    "intl/icu/source/i18n/collationrootelements.cpp",
-    "intl/icu/source/i18n/collationruleparser.cpp",
-    "intl/icu/source/i18n/collationsets.cpp",
-    "intl/icu/source/i18n/collationsettings.cpp",
-    "intl/icu/source/i18n/collationtailoring.cpp",
-    "intl/icu/source/i18n/collationweights.cpp",
-    "intl/icu/source/i18n/compactdecimalformat.cpp",
-    "intl/icu/source/i18n/coptccal.cpp",
-    "intl/icu/source/i18n/curramt.cpp",
-    "intl/icu/source/i18n/currfmt.cpp",
-    "intl/icu/source/i18n/currpinf.cpp",
-    "intl/icu/source/i18n/currunit.cpp",
-    "intl/icu/source/i18n/dangical.cpp",
-    "intl/icu/source/i18n/datefmt.cpp",
-    "intl/icu/source/i18n/dayperiodrules.cpp",
-    "intl/icu/source/i18n/dcfmtsym.cpp",
-    "intl/icu/source/i18n/decContext.cpp",
-    "intl/icu/source/i18n/decNumber.cpp",
-    "intl/icu/source/i18n/decimfmt.cpp",
-    "intl/icu/source/i18n/displayoptions.cpp",
-    "intl/icu/source/i18n/dtfmtsym.cpp",
-    "intl/icu/source/i18n/dtitvfmt.cpp",
-    "intl/icu/source/i18n/dtitvinf.cpp",
-    "intl/icu/source/i18n/dtptngen.cpp",
-    "intl/icu/source/i18n/dtrule.cpp",
-    "intl/icu/source/i18n/erarules.cpp",
-    "intl/icu/source/i18n/ethpccal.cpp",
-    "intl/icu/source/i18n/fmtable.cpp",
-    "intl/icu/source/i18n/format.cpp",
-    "intl/icu/source/i18n/formatted_string_builder.cpp",
-    "intl/icu/source/i18n/formattedval_iterimpl.cpp",
-    "intl/icu/source/i18n/formattedval_sbimpl.cpp",
-    "intl/icu/source/i18n/formattedvalue.cpp",
-    "intl/icu/source/i18n/fphdlimp.cpp",
-    "intl/icu/source/i18n/fpositer.cpp",
-    "intl/icu/source/i18n/gregocal.cpp",
-    "intl/icu/source/i18n/gregoimp.cpp",
-    "intl/icu/source/i18n/hebrwcal.cpp",
-    "intl/icu/source/i18n/indiancal.cpp",
-    "intl/icu/source/i18n/islamcal.cpp",
-    "intl/icu/source/i18n/iso8601cal.cpp",
-    "intl/icu/source/i18n/japancal.cpp",
-    "intl/icu/source/i18n/listformatter.cpp",
-    "intl/icu/source/i18n/measfmt.cpp",
-    "intl/icu/source/i18n/measunit.cpp",
-    "intl/icu/source/i18n/measunit_extra.cpp",
-    "intl/icu/source/i18n/measure.cpp",
-    "intl/icu/source/i18n/messageformat2.cpp",
-    "intl/icu/source/i18n/messageformat2_arguments.cpp",
-    "intl/icu/source/i18n/messageformat2_checker.cpp",
-    "intl/icu/source/i18n/messageformat2_data_model.cpp",
-    "intl/icu/source/i18n/messageformat2_errors.cpp",
-    "intl/icu/source/i18n/messageformat2_evaluation.cpp",
-    "intl/icu/source/i18n/messageformat2_formattable.cpp",
-    "intl/icu/source/i18n/messageformat2_formatter.cpp",
-    "intl/icu/source/i18n/messageformat2_function_registry.cpp",
-    "intl/icu/source/i18n/messageformat2_parser.cpp",
-    "intl/icu/source/i18n/messageformat2_serializer.cpp",
-    "intl/icu/source/i18n/msgfmt.cpp",
-    "intl/icu/source/i18n/nfrs.cpp",
-    "intl/icu/source/i18n/nfrule.cpp",
-    "intl/icu/source/i18n/nfsubs.cpp",
-    "intl/icu/source/i18n/number_affixutils.cpp",
-    "intl/icu/source/i18n/number_asformat.cpp",
-    "intl/icu/source/i18n/number_capi.cpp",
-    "intl/icu/source/i18n/number_compact.cpp",
-    "intl/icu/source/i18n/number_currencysymbols.cpp",
-    "intl/icu/source/i18n/number_decimalquantity.cpp",
-    "intl/icu/source/i18n/number_decimfmtprops.cpp",
-    "intl/icu/source/i18n/number_fluent.cpp",
-    "intl/icu/source/i18n/number_formatimpl.cpp",
-    "intl/icu/source/i18n/number_grouping.cpp",
-    "intl/icu/source/i18n/number_integerwidth.cpp",
-    "intl/icu/source/i18n/number_longnames.cpp",
-    "intl/icu/source/i18n/number_mapper.cpp",
-    "intl/icu/source/i18n/number_modifiers.cpp",
-    "intl/icu/source/i18n/number_multiplier.cpp",
-    "intl/icu/source/i18n/number_notation.cpp",
-    "intl/icu/source/i18n/number_output.cpp",
-    "intl/icu/source/i18n/number_padding.cpp",
-    "intl/icu/source/i18n/number_patternmodifier.cpp",
-    "intl/icu/source/i18n/number_patternstring.cpp",
-    "intl/icu/source/i18n/number_rounding.cpp",
-    "intl/icu/source/i18n/number_scientific.cpp",
-    "intl/icu/source/i18n/number_simple.cpp",
-    "intl/icu/source/i18n/number_skeletons.cpp",
-    "intl/icu/source/i18n/number_symbolswrapper.cpp",
-    "intl/icu/source/i18n/number_usageprefs.cpp",
-    "intl/icu/source/i18n/number_utils.cpp",
-    "intl/icu/source/i18n/numfmt.cpp",
-    "intl/icu/source/i18n/numparse_affixes.cpp",
-    "intl/icu/source/i18n/numparse_compositions.cpp",
-    "intl/icu/source/i18n/numparse_currency.cpp",
-    "intl/icu/source/i18n/numparse_decimal.cpp",
-    "intl/icu/source/i18n/numparse_impl.cpp",
-    "intl/icu/source/i18n/numparse_parsednumber.cpp",
-    "intl/icu/source/i18n/numparse_scientific.cpp",
-    "intl/icu/source/i18n/numparse_symbols.cpp",
-    "intl/icu/source/i18n/numparse_validators.cpp",
-    "intl/icu/source/i18n/numrange_capi.cpp",
-    "intl/icu/source/i18n/numrange_fluent.cpp",
-    "intl/icu/source/i18n/numrange_impl.cpp",
-    "intl/icu/source/i18n/numsys.cpp",
-    "intl/icu/source/i18n/olsontz.cpp",
-    "intl/icu/source/i18n/persncal.cpp",
-    "intl/icu/source/i18n/pluralranges.cpp",
-    "intl/icu/source/i18n/plurfmt.cpp",
-    "intl/icu/source/i18n/plurrule.cpp",
-    "intl/icu/source/i18n/quantityformatter.cpp",
-    "intl/icu/source/i18n/rbnf.cpp",
-    "intl/icu/source/i18n/rbtz.cpp",
-    "intl/icu/source/i18n/region.cpp",
-    "intl/icu/source/i18n/reldatefmt.cpp",
-    "intl/icu/source/i18n/reldtfmt.cpp",
-    "intl/icu/source/i18n/rulebasedcollator.cpp",
-    "intl/icu/source/i18n/scriptset.cpp",
-    "intl/icu/source/i18n/search.cpp",
-    "intl/icu/source/i18n/selfmt.cpp",
-    "intl/icu/source/i18n/sharedbreakiterator.cpp",
-    "intl/icu/source/i18n/simpletz.cpp",
-    "intl/icu/source/i18n/smpdtfmt.cpp",
-    "intl/icu/source/i18n/smpdtfst.cpp",
-    "intl/icu/source/i18n/sortkey.cpp",
-    "intl/icu/source/i18n/standardplural.cpp",
-    "intl/icu/source/i18n/string_segment.cpp",
-    "intl/icu/source/i18n/stsearch.cpp",
-    "intl/icu/source/i18n/taiwncal.cpp",
-    "intl/icu/source/i18n/timezone.cpp",
-    "intl/icu/source/i18n/tmunit.cpp",
-    "intl/icu/source/i18n/tmutamt.cpp",
-    "intl/icu/source/i18n/tmutfmt.cpp",
-    "intl/icu/source/i18n/tzfmt.cpp",
-    "intl/icu/source/i18n/tzgnames.cpp",
-    "intl/icu/source/i18n/tznames.cpp",
-    "intl/icu/source/i18n/tznames_impl.cpp",
-    "intl/icu/source/i18n/tzrule.cpp",
-    "intl/icu/source/i18n/tztrans.cpp",
-    "intl/icu/source/i18n/ucal.cpp",
-    "intl/icu/source/i18n/ucln_in.cpp",
-    "intl/icu/source/i18n/ucol.cpp",
-    "intl/icu/source/i18n/ucol_res.cpp",
-    "intl/icu/source/i18n/ucol_sit.cpp",
-    "intl/icu/source/i18n/ucoleitr.cpp",
-    "intl/icu/source/i18n/udat.cpp",
-    "intl/icu/source/i18n/udateintervalformat.cpp",
-    "intl/icu/source/i18n/udatpg.cpp",
-    "intl/icu/source/i18n/ufieldpositer.cpp",
-    "intl/icu/source/i18n/uitercollationiterator.cpp",
-    "intl/icu/source/i18n/ulistformatter.cpp",
-    "intl/icu/source/i18n/umsg.cpp",
-    "intl/icu/source/i18n/units_complexconverter.cpp",
-    "intl/icu/source/i18n/units_converter.cpp",
-    "intl/icu/source/i18n/units_data.cpp",
-    "intl/icu/source/i18n/units_router.cpp",
-    "intl/icu/source/i18n/unum.cpp",
-    "intl/icu/source/i18n/unumsys.cpp",
-    "intl/icu/source/i18n/upluralrules.cpp",
-    "intl/icu/source/i18n/uregion.cpp",
-    "intl/icu/source/i18n/usearch.cpp",
-    "intl/icu/source/i18n/uspoof.cpp",
-    "intl/icu/source/i18n/uspoof_impl.cpp",
-    "intl/icu/source/i18n/utf16collationiterator.cpp",
-    "intl/icu/source/i18n/utf8collationiterator.cpp",
-    "intl/icu/source/i18n/utmscale.cpp",
-    "intl/icu/source/i18n/vtzone.cpp",
-    "intl/icu/source/i18n/windtfmt.cpp",
-    "intl/icu/source/i18n/winnmfmt.cpp",
-    "intl/icu/source/i18n/wintzimpl.cpp",
-    "intl/icu/source/i18n/zonemeta.cpp",
     "intl/locale/windows/OSPreferences_win.cpp",
     "ipc/chromium/src/base/message_pump_win.cc",
     "ipc/chromium/src/base/object_watcher.cc",
@@ -587,8 +214,8 @@
     },
     {
       "path": "objdir/x86_64-pc-windows-msvc/release/gkrust.lib",
-      "size_bytes": 248141350,
-      "member_count": 1732,
+      "size_bytes": 248915732,
+      "member_count": 1741,
       "members": [
         "abridged_certs-845b7a7e8d20bb06.1c66gaznnuh69ifuxyejj8ma7.0b9b89s.rcgu.o",
         "abridged_certs-845b7a7e8d20bb06.1esgitroy6chkp3bixi8ifmj6.0b9b89s.rcgu.o",
@@ -687,57 +314,57 @@
         "bytes-0fa49e5eaebc83a7.bytes.43112fc5e93d05f1-cgu.1.rcgu.o",
         "calendrical_calculations-c1a27e2cd7cb2ab5.calendrical_calculations.d29f5ed0d9761937-cgu.0.rcgu.o",
         "calendrical_calculations-c1a27e2cd7cb2ab5.calendrical_calculations.d29f5ed0d9761937-cgu.1.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.03cy3vry1dgdqhnnvyu99aq8a.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.09v2opouti7urv9ywjbk7kitu.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.0m6f01qhxl7xtyo161hew5l0w.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.1bqia2h437rbyt898kism4bto.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.1c2jrch44zqt1h0q7ybpsofy5.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.2jeb5ro77uwzz560pqohioy5j.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.2yjzy26myf17r1o65lexvhxdu.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.3czoxtlvf11d4j71bhnsamzqx.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.3kqhi8dzes0ektb966xqos47z.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.3qb7cbngyi5yqulo0dnh3jf6e.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.41xzmoc4ij8bfscb2i1zb1kjz.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.44ipcjvu8xb7p1fqn9vzeqeey.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.469lqwj73qrk8byymlc4g1yib.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.4862kdwfnjusry73okwrc8cqp.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.4m0agdnvjswe1ixq01v8m4jqi.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.4rinw3g78s4fw8mocu6el3i76.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.4zf2nadah98p8ma5bodqwxgsu.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.519hjcmgpl4qr4sdfjakqrxlu.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.5vr2b3p2qlkmof0obn5ir7sv5.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.6gigm0kj51yuve7ddy29dicq7.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.6i7hymkf7fjuv5ajis3brn396.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.6squsyoklbgik4rv6bm7hyzl7.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.6vhucnt0iejg3rucooc604afg.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.730pyjlpuyqh0i96pcccw9470.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.7vrksvzi9dj5fycidb727scfh.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.7zon7val7suxazejoyshat4qp.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.82ohogs21qdlklp8roujykh1i.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.8mzr3bks758by2pdqornhzs8s.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.8y6wy4oz6cya0xwq7gupy745h.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.8zewot30mdw0wwmckwjhkzjwe.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.9dhbc6jer8trfwkvf1i8upp7a.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.9m63v0j49efpm0vblw4ns9dlv.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.9ov6uv8xw2e2jigxa8lsl3otj.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.a6zdbn59vhvjfdpb40pqw009a.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.a7af443ck5qvx17avvg5pd4rx.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.avq4q7o46ek1c632okd93qb1b.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.bckpyqh4eajmmprvgtx9dosul.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.biad2d523brg6bvmqpc0pru8s.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.br5j76facxr1nc0fl6qjpuc6x.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.buwbcgowkg75fs8jl4c2ho1f6.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.bzdp27ushjhcndilutpnrpvpt.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.c9h8ao20zqcv9mctja95w8eku.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.ctwc9b2mtmaip1yjtetjv0b8j.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.deu809ftbgbymefajlsk28da6.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.doiwx1fq4ghh8xg0x44y2sezj.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.dtqwr0ad5hldcpet02ud2cott.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.e6qpc9wgbjmpcv4htsupiajhc.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.eej0rm6blvuspqxzr3e1wvf75.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.eiqb83lei7wnzmn1fgv8ar9v7.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.f34ohykk9ehrq3mtkckhrqpxu.0g80xlt.rcgu.o",
-        "cert_storage-4d6dff3999dc0cce.f59reko5mjq2j6y4uijc7tlot.0g80xlt.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.03cy3vry1dgdqhnnvyu99aq8a.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.09v2opouti7urv9ywjbk7kitu.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.0m6f01qhxl7xtyo161hew5l0w.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.1bqia2h437rbyt898kism4bto.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.1c2jrch44zqt1h0q7ybpsofy5.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.2jeb5ro77uwzz560pqohioy5j.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.2yjzy26myf17r1o65lexvhxdu.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.3czoxtlvf11d4j71bhnsamzqx.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.3kqhi8dzes0ektb966xqos47z.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.3qb7cbngyi5yqulo0dnh3jf6e.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.41xzmoc4ij8bfscb2i1zb1kjz.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.44ipcjvu8xb7p1fqn9vzeqeey.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.469lqwj73qrk8byymlc4g1yib.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.4862kdwfnjusry73okwrc8cqp.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.4m0agdnvjswe1ixq01v8m4jqi.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.4rinw3g78s4fw8mocu6el3i76.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.4zf2nadah98p8ma5bodqwxgsu.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.519hjcmgpl4qr4sdfjakqrxlu.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.5vr2b3p2qlkmof0obn5ir7sv5.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.6gigm0kj51yuve7ddy29dicq7.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.6i7hymkf7fjuv5ajis3brn396.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.6squsyoklbgik4rv6bm7hyzl7.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.6vhucnt0iejg3rucooc604afg.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.730pyjlpuyqh0i96pcccw9470.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.7vrksvzi9dj5fycidb727scfh.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.7zon7val7suxazejoyshat4qp.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.82ohogs21qdlklp8roujykh1i.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.8mzr3bks758by2pdqornhzs8s.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.8y6wy4oz6cya0xwq7gupy745h.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.8zewot30mdw0wwmckwjhkzjwe.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.9dhbc6jer8trfwkvf1i8upp7a.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.9m63v0j49efpm0vblw4ns9dlv.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.9ov6uv8xw2e2jigxa8lsl3otj.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.a6zdbn59vhvjfdpb40pqw009a.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.a7af443ck5qvx17avvg5pd4rx.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.avq4q7o46ek1c632okd93qb1b.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.bckpyqh4eajmmprvgtx9dosul.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.biad2d523brg6bvmqpc0pru8s.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.br5j76facxr1nc0fl6qjpuc6x.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.buwbcgowkg75fs8jl4c2ho1f6.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.bzdp27ushjhcndilutpnrpvpt.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.c9h8ao20zqcv9mctja95w8eku.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.ctwc9b2mtmaip1yjtetjv0b8j.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.deu809ftbgbymefajlsk28da6.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.doiwx1fq4ghh8xg0x44y2sezj.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.dtqwr0ad5hldcpet02ud2cott.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.e6qpc9wgbjmpcv4htsupiajhc.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.eej0rm6blvuspqxzr3e1wvf75.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.eiqb83lei7wnzmn1fgv8ar9v7.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.f34ohykk9ehrq3mtkckhrqpxu.0843ofv.rcgu.o",
+        "cert_storage-4d6dff3999dc0cce.f59reko5mjq2j6y4uijc7tlot.0843ofv.rcgu.o",
         "cfg_if-b361853be842c2aa.cfg_if.5dc05d0d50f0f264-cgu.0.rcgu.o",
         "cfg_if-fe5dd180150954f8.cfg_if.e13abba787021f40-cgu.0.rcgu.o",
         "clubcard-0ed3540c9ba1d08e.clubcard.389e868df484ed49-cgu.0.rcgu.o",
@@ -1249,15 +876,15 @@
         "generic_array-b1b56e704a5a0af4.generic_array.ec66e2b2c1cb5b30-cgu.0.rcgu.o",
         "getrandom-4784b335cb48259e.getrandom.c318d8934984e7bf-cgu.0.rcgu.o",
         "getrandom-8253215a09e603fa.7ycmgh8y7zrk73ohrpkcz4hbn.1b44t5m.rcgu.o",
-        "gkrust-e9cbd8e0342adcbd.47s4pw72kq6f35v8wussgcjl7.0npm05u.rcgu.o",
-        "gkrust-e9cbd8e0342adcbd.ag2ffc95ma171tsxnypypllbr.0npm05u.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.05a4hndemhvrmde8l62bvezzd.0zazgkk.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.16of0h1gkh2xjbzlr2r1r83qp.0zazgkk.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.2g7mlbc1baq6xpezk2bgq8q5t.0zazgkk.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.5gnd837mtckl12qcfz320k0lu.0zazgkk.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.aqo5va8wy5qblfdtxft983s4t.0zazgkk.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.e7w0s2iekgiuqhr5xzkd4tab2.0zazgkk.rcgu.o",
-        "gkrust_naivefox-cfb1f438820b3e8f.eysqwqmfy03ky5jynn77d8psm.0zazgkk.rcgu.o",
+        "gkrust-071210cf0c33f654.3vop7tal3uuainwsq8hh2t5eu.1mn9vo0.rcgu.o",
+        "gkrust-071210cf0c33f654.57irlc27igseqk4ye2vbw9bnc.1mn9vo0.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.2rp22zc1pen23qc0d5rtno2fa.1ge96gd.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.2ve7dj1kx6ip8ggvf6fb6gbxm.1ge96gd.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.3ahu4wcnn0dyp4m68mfa1nrk9.1ge96gd.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.5k1mvbyse0h6plr6j0ev1oyf4.1ge96gd.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.6k1ih9w1zw0lqwn0wnzzqk0hn.1ge96gd.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.7u88mgi01f4s339lizz0hoya4.1ge96gd.rcgu.o",
+        "gkrust_naivefox-f6b636d651ed6889.96c1ue7y3i3l67mn183rb0g0z.1ge96gd.rcgu.o",
         "gkrust_utils-abcfba7c3ccb7044.17pppf7fmj5uf24rdjed2b7fn.144e4rf.rcgu.o",
         "gkrust_utils-abcfba7c3ccb7044.1rgcz6nd2og9seixq9g6lnnhj.144e4rf.rcgu.o",
         "gkrust_utils-abcfba7c3ccb7044.1v9zyo6e7kx8jxwizepr8uhd8.144e4rf.rcgu.o",
@@ -1269,26 +896,26 @@
         "happy_eyeballs-36c9000a4b1b49f1.happy_eyeballs.a42160d8212f2845-cgu.4.rcgu.o",
         "happy_eyeballs-36c9000a4b1b49f1.happy_eyeballs.a42160d8212f2845-cgu.5.rcgu.o",
         "happy_eyeballs-36c9000a4b1b49f1.happy_eyeballs.a42160d8212f2845-cgu.6.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.0h633w3k48mwrq8ts5fp159yb.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.1b0me3cjzh172558g1vaxsak2.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.1i95g8z15eskoaq3bc5chzstj.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.1neovk11zgdrs2z3tyfaf45n9.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.1pzcvy68uw4buanugko5riidh.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.1x5nu3klkz2jibbr6gsbao5h9.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.2fugnznjqriaukvxvyd0ymc1d.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.2s0wdbl45mgs0nlq8hmyd1s1b.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.2ysd1c2esuj824mn9n2udl8y7.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.3c4y7bdgglx44jli2j7da66wb.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.4ckdhee54et7qi97dwx36a390.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.6g0ezlaluxuw7dec9s76weynm.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.7ezcjyhzvhuzfp46r7ulqbps5.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.8mb0v9mymijsjfcwtq60pye7k.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.8p8pymjts1wilh78kvvqsvrqz.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.dadk9ggvyjh3wgg5adyngqqco.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.de9spi3kgk1t2tyn4jwnwjsvd.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.e10ilcpibhtvoqsheiy4ioec0.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.e8gxvybsizoaqpm28h0wqyv5w.178lpzg.rcgu.o",
-        "happy_eyeballs_glue-484788479dd0b1ca.e98dm1tylof9owqw54i2nq1oh.178lpzg.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.0h633w3k48mwrq8ts5fp159yb.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.1b0me3cjzh172558g1vaxsak2.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.1i95g8z15eskoaq3bc5chzstj.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.1neovk11zgdrs2z3tyfaf45n9.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.1pzcvy68uw4buanugko5riidh.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.1x5nu3klkz2jibbr6gsbao5h9.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.2fugnznjqriaukvxvyd0ymc1d.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.2s0wdbl45mgs0nlq8hmyd1s1b.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.2ysd1c2esuj824mn9n2udl8y7.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.3c4y7bdgglx44jli2j7da66wb.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.4ckdhee54et7qi97dwx36a390.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.6g0ezlaluxuw7dec9s76weynm.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.7ezcjyhzvhuzfp46r7ulqbps5.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.8mb0v9mymijsjfcwtq60pye7k.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.8p8pymjts1wilh78kvvqsvrqz.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.dadk9ggvyjh3wgg5adyngqqco.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.de9spi3kgk1t2tyn4jwnwjsvd.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.e10ilcpibhtvoqsheiy4ioec0.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.e8gxvybsizoaqpm28h0wqyv5w.1io0qtw.rcgu.o",
+        "happy_eyeballs_glue-484788479dd0b1ca.e98dm1tylof9owqw54i2nq1oh.1io0qtw.rcgu.o",
         "hashbrown-6ff564c66040d5a9.44x44vuwhqip1eo7r7o4vyudg.1semxql.rcgu.o",
         "hashbrown-8737aafd30cc2c6c.hashbrown.91fccb2f54624631-cgu.0.rcgu.o",
         "hashbrown-a77cf7d83a74a1c6.hashbrown.40f2a30048ddcd0e-cgu.0.rcgu.o",
@@ -1325,6 +952,15 @@
         "http_sfv-e9c6f4f43c49b17e.e27gis1mtstehi56u1ugj39ee.00w886e.rcgu.o",
         "http_sfv-e9c6f4f43c49b17e.ebusj4wgauqc3xvx2zbh2s1yv.00w886e.rcgu.o",
         "http_sfv-e9c6f4f43c49b17e.ern76nloubcgl8u6ugfaqlc58.00w886e.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.0fa6at9rrnj2a7axz9k4qc7v0.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.1z97uqnk4ol7f27ouc30k5sz9.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.3p965pb6xoh85fvq3jcelillo.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.5ltqo12ieabc8y78iquur0dvl.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.623aunqj6u0pdqma5dgnqaf1a.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.7zflbfbaj9l60zngit5htwayw.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.9p4vko58ka2v5lve862ocpz83.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.9xwpm4agtsvpfei89v2enhmje.0pq68fq.rcgu.o",
+        "icu4x_unicode_glue-a441318cbab7d255.cpr982nd4iulc08dhx3zmlqts.0pq68fq.rcgu.o",
         "icu_calendar-ddbde57f84d9b950.icu_calendar.3c81083d73c06426-cgu.0.rcgu.o",
         "icu_calendar-ddbde57f84d9b950.icu_calendar.3c81083d73c06426-cgu.1.rcgu.o",
         "icu_calendar-ddbde57f84d9b950.icu_calendar.3c81083d73c06426-cgu.2.rcgu.o",
@@ -1606,13 +1242,13 @@
         "locale_glue-cb83ef61b535a804.43qcm7ne8527dwn8rtvgjbkk7.0hczj6a.rcgu.o",
         "locale_glue-cb83ef61b535a804.6cuxmakp6o0tqoysd65ak1bwj.0hczj6a.rcgu.o",
         "locale_glue-cb83ef61b535a804.7fwljlqqoo8tnh4qu3c2m4h6g.0hczj6a.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.36rs5e5e3cmt3li70j8mo2kyb.0xjufqi.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.3e62vo02rh71no9o3gebdc5ee.0xjufqi.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.3h5xpsxs6do6yq7g8seloeuo6.0xjufqi.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.74mqgtgnti22w34rddw9reoa9.0xjufqi.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.a4zlox6togvov149xfgx1nyku.0xjufqi.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.am1p4sm665najdgvsmcob99d4.0xjufqi.rcgu.o",
-        "locale_service_glue-a627a9858662a34e.edfwtkb0kqf32i5c6inre5uoa.0xjufqi.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.36rs5e5e3cmt3li70j8mo2kyb.1yznloy.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.3e62vo02rh71no9o3gebdc5ee.1yznloy.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.3h5xpsxs6do6yq7g8seloeuo6.1yznloy.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.74mqgtgnti22w34rddw9reoa9.1yznloy.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.a4zlox6togvov149xfgx1nyku.1yznloy.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.am1p4sm665najdgvsmcob99d4.1yznloy.rcgu.o",
+        "locale_service_glue-a627a9858662a34e.edfwtkb0kqf32i5c6inre5uoa.1yznloy.rcgu.o",
         "lock_api-6a7370b3db5124bc.lock_api.e2db9b5de3258c17-cgu.0.rcgu.o",
         "log-9ad90c7aed74337e.log.76a1fb43e5d2f76a-cgu.0.rcgu.o",
         "md5-da6731e82f69ee84.md5.c9a7a341dfbf7996-cgu.0.rcgu.o",
@@ -1666,96 +1302,96 @@
         "neqo_common-3d728838363edd38.neqo_common.16506dec1814121b-cgu.1.rcgu.o",
         "neqo_common-3d728838363edd38.neqo_common.16506dec1814121b-cgu.2.rcgu.o",
         "neqo_common-3d728838363edd38.neqo_common.16506dec1814121b-cgu.3.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.0iyaz9oxi4x0m292e3h9mspyi.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.0l02yhkbcrvs6r2y6gwb1moq4.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.0r4ld0jnx80f2n2syqsrls5dl.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.0v2mnqyltbzmp5gv7ffrzhn3z.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.14q9n76hnq6a6lueoe7z1nloo.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1c8muwcbeh0on2i1aasuzbty4.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1e3vef5etbfy6yybf59hph3es.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1f8e59t3atrpch2lm2tshfcd6.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1h4xazac1kabrzfed5d35scqr.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1ntsx0gslcgknckfz1x4fggnw.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1pasvl6lxm7kj4hmui48njwsh.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1ptmcvdqxbyvifew06nfhufah.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.1xgzswkcupbikjlqfpnzmmxx7.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.20xk7s5hznn5efss269aatend.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.21zukb2xgp0qyo27gprt2mvba.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.2cmgwnzpkxrrh631z7jxoxjno.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.2fu87esk2pozx8hc5edtsazfu.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.2grgphl3olg4posh00ufzjz96.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.2h1j7dyz8pz8dusg6zyi4pl69.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.313a5h14r97ahfkcbmgg0ve71.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.3g49y48bd0xhoydri8u8mg5rx.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.3padro9dqobahp5snymr7e4f3.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.3sh82bmqvkgivsxb216efi2uu.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.3wuoxgloz8nu2glxya2gkt5kk.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.3xkbl2ub05u9lmlxj34h8xe3h.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.42g4hx8cg9l6o9bhcsxy6kuyr.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.43ff16ig1jo2xhr7px9rks451.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.45i7p5wql80rxoaembdl5r918.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.4mpwhmxoa87d5nbp4nlbg9sd7.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.4oeepm3cejbstzrimm4il24ba.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.4scuux0uvlwfw1upkrgc0a37p.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.4utiryc40ze2wnvlzfk5ze23h.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.4vomn44lc15p5ih9fs919vfnb.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.4zxqnpr9njcpdqc2uuq2delfh.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.55i0rh2wrhhvs1figacmki5ik.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.55lj4u18f1d1mmpcqiq8lv5g2.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.5i8pk42ccughsvcu6i3173st5.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.5u3l8toizq10bah6kuwjetrs1.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.5x42q7iz55fm3rkx0cfidvyc8.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.5xf48pn51m2sjt0zlaymuqhvq.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.60n2v5672ulqj527qhklrdszl.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.6551z3y0js41ot4bimcdy6hi2.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.682yfn2nxz87iyz12ilzf91ps.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.6aejazt0rta5rfk4edamawruw.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.6jqrp9833wbpled0172ngy2df.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.6mlvnz4rz6sljx3ldzltc21aj.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.6o8fxjtceosmmc97d1785xnc7.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.6u3t3gkcvt5ocebomg1q8xdtq.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.73uvv5na5unl75tevx7ti04ns.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.74xhwcyjusap257j5bcpgyj9y.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.7d93bzezig7fx5y0h8w3ysuov.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.7m5oq7bwoodst6scn6084eovq.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.7tjkuwm9x460zzsghpwzkjrfp.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.81c60kkcqz4yikjvnaxdes1cd.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8c7rlx0gnwmg40d73hygkk4cf.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8dduayen507hfm1tekygmkreu.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8f1sim86n9kfwvxtdo3pvg3yi.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8gsmztyuf0xgyf5hqa3na3cqp.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8jhfqmkly5474irvgp6bnwf1v.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8m65y11xo0c6lyn6xjgkxe726.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8pdqbarxygo28nip6lwhix7u4.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.8ra5lvn6ohmaa08gvbtl5mt3l.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.9a19i9vwildg089vtsf3w95n2.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.9ba9ou2omanz00vidou4l7ah2.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.9htluos6ljifzk3lysyc2fui3.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.9sqpo1ej0si0lv2fvuuv1riwe.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.a0vty8piid5qszbqs6zopyw84.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.a27vamefecji5yltkrk0dxe55.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.abf1nuas56z9r8fkm5xu3w2fp.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.alyrw0us0i2wmr3pgn8xe9980.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.baui0qu5a30h7vkimb3zmph0z.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.bwbqu86hea7a8vxi6eoy011b1.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.c8ubut1huau9i49rxwbr36sno.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.ckplpp3a8mdd4mwvbltmf14ju.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.cnjbuqh9mwwszzyvx19s073pd.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.cps776ff7rnveknpi6migbhdc.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.cwiefor8rxkzssio6boh7vu7o.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.cyccobswb7nhr22ikx9fzdvun.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.d18u0b3mapsntfb1jmpn5wky6.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.d7v5mzju9613r2td5mc4tur8k.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.djtrr553pvb6ynpo6hlhczyje.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.e2u85mf4o9qoiwaxz16dkgrx9.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.e3zzor1n43wuxwx6s4nqe5ovk.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.ech7x4h3a73darfkgaekgsb8p.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.ee1hrhn193tnyjwnhw9fycb6l.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.eeh64f2jum8u63ojtjck0hlf4.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.eg24byhmi7pm0ayn3qzgd2ngc.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.emg8osvxj7xa7zg2gos2974ba.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.ew59te3f6erthwke9qa7r5bx4.1vyyr7a.rcgu.o",
-        "neqo_glue-8434d6cc14a3cff2.f0634jvtfqp1fuhzaorll5zuj.1vyyr7a.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.0iyaz9oxi4x0m292e3h9mspyi.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.0l02yhkbcrvs6r2y6gwb1moq4.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.0r4ld0jnx80f2n2syqsrls5dl.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.0v2mnqyltbzmp5gv7ffrzhn3z.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.14q9n76hnq6a6lueoe7z1nloo.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1c8muwcbeh0on2i1aasuzbty4.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1e3vef5etbfy6yybf59hph3es.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1f8e59t3atrpch2lm2tshfcd6.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1h4xazac1kabrzfed5d35scqr.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1ntsx0gslcgknckfz1x4fggnw.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1pasvl6lxm7kj4hmui48njwsh.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1ptmcvdqxbyvifew06nfhufah.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.1xgzswkcupbikjlqfpnzmmxx7.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.20xk7s5hznn5efss269aatend.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.21zukb2xgp0qyo27gprt2mvba.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.2cmgwnzpkxrrh631z7jxoxjno.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.2fu87esk2pozx8hc5edtsazfu.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.2grgphl3olg4posh00ufzjz96.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.2h1j7dyz8pz8dusg6zyi4pl69.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.313a5h14r97ahfkcbmgg0ve71.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.3g49y48bd0xhoydri8u8mg5rx.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.3padro9dqobahp5snymr7e4f3.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.3sh82bmqvkgivsxb216efi2uu.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.3wuoxgloz8nu2glxya2gkt5kk.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.3xkbl2ub05u9lmlxj34h8xe3h.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.42g4hx8cg9l6o9bhcsxy6kuyr.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.43ff16ig1jo2xhr7px9rks451.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.45i7p5wql80rxoaembdl5r918.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.4mpwhmxoa87d5nbp4nlbg9sd7.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.4oeepm3cejbstzrimm4il24ba.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.4scuux0uvlwfw1upkrgc0a37p.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.4utiryc40ze2wnvlzfk5ze23h.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.4vomn44lc15p5ih9fs919vfnb.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.4zxqnpr9njcpdqc2uuq2delfh.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.55i0rh2wrhhvs1figacmki5ik.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.55lj4u18f1d1mmpcqiq8lv5g2.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.5i8pk42ccughsvcu6i3173st5.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.5u3l8toizq10bah6kuwjetrs1.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.5x42q7iz55fm3rkx0cfidvyc8.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.5xf48pn51m2sjt0zlaymuqhvq.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.60n2v5672ulqj527qhklrdszl.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.6551z3y0js41ot4bimcdy6hi2.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.682yfn2nxz87iyz12ilzf91ps.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.6aejazt0rta5rfk4edamawruw.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.6jqrp9833wbpled0172ngy2df.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.6mlvnz4rz6sljx3ldzltc21aj.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.6o8fxjtceosmmc97d1785xnc7.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.6u3t3gkcvt5ocebomg1q8xdtq.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.73uvv5na5unl75tevx7ti04ns.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.74xhwcyjusap257j5bcpgyj9y.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.7d93bzezig7fx5y0h8w3ysuov.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.7m5oq7bwoodst6scn6084eovq.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.7tjkuwm9x460zzsghpwzkjrfp.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.81c60kkcqz4yikjvnaxdes1cd.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8c7rlx0gnwmg40d73hygkk4cf.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8dduayen507hfm1tekygmkreu.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8f1sim86n9kfwvxtdo3pvg3yi.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8gsmztyuf0xgyf5hqa3na3cqp.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8jhfqmkly5474irvgp6bnwf1v.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8m65y11xo0c6lyn6xjgkxe726.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8pdqbarxygo28nip6lwhix7u4.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.8ra5lvn6ohmaa08gvbtl5mt3l.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.9a19i9vwildg089vtsf3w95n2.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.9ba9ou2omanz00vidou4l7ah2.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.9htluos6ljifzk3lysyc2fui3.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.9sqpo1ej0si0lv2fvuuv1riwe.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.a0vty8piid5qszbqs6zopyw84.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.a27vamefecji5yltkrk0dxe55.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.abf1nuas56z9r8fkm5xu3w2fp.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.alyrw0us0i2wmr3pgn8xe9980.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.baui0qu5a30h7vkimb3zmph0z.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.bwbqu86hea7a8vxi6eoy011b1.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.c8ubut1huau9i49rxwbr36sno.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.ckplpp3a8mdd4mwvbltmf14ju.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.cnjbuqh9mwwszzyvx19s073pd.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.cps776ff7rnveknpi6migbhdc.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.cwiefor8rxkzssio6boh7vu7o.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.cyccobswb7nhr22ikx9fzdvun.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.d18u0b3mapsntfb1jmpn5wky6.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.d7v5mzju9613r2td5mc4tur8k.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.djtrr553pvb6ynpo6hlhczyje.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.e2u85mf4o9qoiwaxz16dkgrx9.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.e3zzor1n43wuxwx6s4nqe5ovk.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.ech7x4h3a73darfkgaekgsb8p.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.ee1hrhn193tnyjwnhw9fycb6l.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.eeh64f2jum8u63ojtjck0hlf4.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.eg24byhmi7pm0ayn3qzgd2ngc.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.emg8osvxj7xa7zg2gos2974ba.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.ew59te3f6erthwke9qa7r5bx4.00cdhh0.rcgu.o",
+        "neqo_glue-8434d6cc14a3cff2.f0634jvtfqp1fuhzaorll5zuj.00cdhh0.rcgu.o",
         "neqo_http3-6c2fdc1501dd0bb2.neqo_http3.2a1a61f430974534-cgu.00.rcgu.o",
         "neqo_http3-6c2fdc1501dd0bb2.neqo_http3.2a1a61f430974534-cgu.01.rcgu.o",
         "neqo_http3-6c2fdc1501dd0bb2.neqo_http3.2a1a61f430974534-cgu.02.rcgu.o",
@@ -1868,14 +1504,14 @@
         "parking_lot-5225657b2aaecb9e.parking_lot.61d8f1389a956cc-cgu.2.rcgu.o",
         "parking_lot-5225657b2aaecb9e.parking_lot.61d8f1389a956cc-cgu.3.rcgu.o",
         "parking_lot_core-2fcc58c42114d459.parking_lot_core.ce845667a2bb6702-cgu.0.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.1l7epq1i9bx8t4ivev5jn9n7v.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.2mv91cj2qlsg2wwqxo1dirsgw.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.2nqsws8tfjy64ncxohh452z2o.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.4rghwksxqqxvhpumdpu92f428.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.4tv69i3mcpzzsthy9jem7le5r.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.7jvs4xkxjcb6g64v4l9ybwvrv.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.ajqtq7qw888i8x4a8yzmtab2m.0avx9ku.rcgu.o",
-        "pdf_trust_anchors-62ff9767dc926d58.ej5n78diutvgqh95v7wkvwk4n.0avx9ku.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.1l7epq1i9bx8t4ivev5jn9n7v.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.2mv91cj2qlsg2wwqxo1dirsgw.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.2nqsws8tfjy64ncxohh452z2o.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.4rghwksxqqxvhpumdpu92f428.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.4tv69i3mcpzzsthy9jem7le5r.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.7jvs4xkxjcb6g64v4l9ybwvrv.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.ajqtq7qw888i8x4a8yzmtab2m.0s9ry6j.rcgu.o",
+        "pdf_trust_anchors-62ff9767dc926d58.ej5n78diutvgqh95v7wkvwk4n.0s9ry6j.rcgu.o",
         "percent_encoding-2bef232a6c255cd4.percent_encoding.e015c0edd01caa23-cgu.0.rcgu.o",
         "pin_project_lite-9c27afec3e01df45.pin_project_lite.eb4dd6e95a8a625e-cgu.0.rcgu.o",
         "pkcs11_bindings-e7b297eb76e9ad1d.pkcs11_bindings.37603e646c1c621a-cgu.0.rcgu.o",
@@ -1912,14 +1548,14 @@
         "qlog-ec3bb479a32cbdcb.qlog.4c35dfeade6842bc-cgu.10.rcgu.o",
         "qlog-ec3bb479a32cbdcb.qlog.4c35dfeade6842bc-cgu.11.rcgu.o",
         "quinn_udp-4db36a81f003bde8.quinn_udp.d2aea2ed68144c98-cgu.0.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.0zaxfxt9tvzq4uxn4hmfkjll2.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.1ggmw4dcmuwgf58p6s3sfxy88.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.365ueeok42ku8dj61xzm84unv.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.4ysb2zvpw1b4fd3pk1k4g1gv4.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.9g0692msu4q5e50rmt3578mcg.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.dq9kvui6268h9z1msg4125aba.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.eg5tnua036hq1dzyadqhwp7e4.165adt8.rcgu.o",
-        "qwac_trust_anchors-24f8e58250e5ad63.ekx077u9l4knuts1vwmkfnxx3.165adt8.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.0zaxfxt9tvzq4uxn4hmfkjll2.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.1ggmw4dcmuwgf58p6s3sfxy88.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.365ueeok42ku8dj61xzm84unv.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.4ysb2zvpw1b4fd3pk1k4g1gv4.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.9g0692msu4q5e50rmt3578mcg.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.dq9kvui6268h9z1msg4125aba.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.eg5tnua036hq1dzyadqhwp7e4.04nktff.rcgu.o",
+        "qwac_trust_anchors-24f8e58250e5ad63.ekx077u9l4knuts1vwmkfnxx3.04nktff.rcgu.o",
         "ref_cast-e22105f5d421ac35.ref_cast.7ad0f558a672b98a-cgu.0.rcgu.o",
         "regex-63306d3107f54153.regex.268b31adb4351be0-cgu.0.rcgu.o",
         "regex-63306d3107f54153.regex.268b31adb4351be0-cgu.1.rcgu.o",
@@ -2005,7 +1641,7 @@
         "socket2-bd409f377d42f25b.socket2.de5350319b03f9a5-cgu.1.rcgu.o",
         "stable_deref_trait-204d390c86d6d2bf.stable_deref_trait.9972d3aa58e0982f-cgu.0.rcgu.o",
         "static_assertions-4bab36e7cf46cd71.static_assertions.76e7cf4b6af3ecbd-cgu.0.rcgu.o",
-        "static_prefs-e29da64166a253b8.5xhs66cu3iup3lxs59l74l7as.1poaadt.rcgu.o",
+        "static_prefs-e29da64166a253b8.5xhs66cu3iup3lxs59l74l7as.0a2k5q0.rcgu.o",
         "std-f01d16aa207effe6.std.8a6d8cd86c7d29b2-cgu.0.rcgu.o",
         "std_detect-084adb8ce8b5a49d.std_detect.4f6d803181789396-cgu.0.rcgu.o",
         "storage-876ec265a63f63c0.14adtud59dp55pmqp8s90viqv.1xq2x4m.rcgu.o",
@@ -2356,7 +1992,7 @@
   "rust_closure": {
     "platform_filter": "x86_64-pc-windows-msvc",
     "root_package": "gkrust-naivefox",
-    "reachable_crates_count": 283,
+    "reachable_crates_count": 284,
     "crates": [
       {
         "name": "abridged_certs",
@@ -3137,6 +2773,15 @@
         "manifest_path": "netwerk/base/http-sfv/Cargo.toml",
         "source_paths": [
           "netwerk/base/http-sfv/src/lib.rs"
+        ]
+      },
+      {
+        "name": "icu4x_unicode_glue",
+        "version": "0.1.0",
+        "source_type": "in-tree-component",
+        "manifest_path": "intl/icu4x_unicode_glue/Cargo.toml",
+        "source_paths": [
+          "intl/icu4x_unicode_glue/src/lib.rs"
         ]
       },
       {
@@ -4959,374 +4604,6 @@
   "build_inputs": {
     "cxx_translation_units": [
       "caps/BasePrincipal.cpp",
-      "intl/icu/source/common/appendable.cpp",
-      "intl/icu/source/common/bmpset.cpp",
-      "intl/icu/source/common/brkeng.cpp",
-      "intl/icu/source/common/brkiter.cpp",
-      "intl/icu/source/common/bytesinkutil.cpp",
-      "intl/icu/source/common/bytestream.cpp",
-      "intl/icu/source/common/bytestrie.cpp",
-      "intl/icu/source/common/bytestriebuilder.cpp",
-      "intl/icu/source/common/caniter.cpp",
-      "intl/icu/source/common/characterproperties.cpp",
-      "intl/icu/source/common/chariter.cpp",
-      "intl/icu/source/common/charstr.cpp",
-      "intl/icu/source/common/cmemory.cpp",
-      "intl/icu/source/common/cstring.cpp",
-      "intl/icu/source/common/dictbe.cpp",
-      "intl/icu/source/common/dictionarydata.cpp",
-      "intl/icu/source/common/dtintrv.cpp",
-      "intl/icu/source/common/edits.cpp",
-      "intl/icu/source/common/emojiprops.cpp",
-      "intl/icu/source/common/errorcode.cpp",
-      "intl/icu/source/common/filteredbrk.cpp",
-      "intl/icu/source/common/filterednormalizer2.cpp",
-      "intl/icu/source/common/fixedstring.cpp",
-      "intl/icu/source/common/loadednormalizer2impl.cpp",
-      "intl/icu/source/common/localebuilder.cpp",
-      "intl/icu/source/common/localematcher.cpp",
-      "intl/icu/source/common/localeprioritylist.cpp",
-      "intl/icu/source/common/locavailable.cpp",
-      "intl/icu/source/common/locbased.cpp",
-      "intl/icu/source/common/locdispnames.cpp",
-      "intl/icu/source/common/locdistance.cpp",
-      "intl/icu/source/common/locdspnm.cpp",
-      "intl/icu/source/common/locid.cpp",
-      "intl/icu/source/common/loclikely.cpp",
-      "intl/icu/source/common/loclikelysubtags.cpp",
-      "intl/icu/source/common/locmap.cpp",
-      "intl/icu/source/common/locresdata.cpp",
-      "intl/icu/source/common/locutil.cpp",
-      "intl/icu/source/common/lsr.cpp",
-      "intl/icu/source/common/lstmbe.cpp",
-      "intl/icu/source/common/messagepattern.cpp",
-      "intl/icu/source/common/mlbe.cpp",
-      "intl/icu/source/common/normalizer2.cpp",
-      "intl/icu/source/common/normalizer2impl.cpp",
-      "intl/icu/source/common/normlzr.cpp",
-      "intl/icu/source/common/parsepos.cpp",
-      "intl/icu/source/common/patternprops.cpp",
-      "intl/icu/source/common/propname.cpp",
-      "intl/icu/source/common/punycode.cpp",
-      "intl/icu/source/common/putil.cpp",
-      "intl/icu/source/common/rbbi.cpp",
-      "intl/icu/source/common/rbbi_cache.cpp",
-      "intl/icu/source/common/rbbidata.cpp",
-      "intl/icu/source/common/rbbinode.cpp",
-      "intl/icu/source/common/rbbirb.cpp",
-      "intl/icu/source/common/rbbiscan.cpp",
-      "intl/icu/source/common/rbbisetb.cpp",
-      "intl/icu/source/common/rbbistbl.cpp",
-      "intl/icu/source/common/rbbitblb.cpp",
-      "intl/icu/source/common/resbund.cpp",
-      "intl/icu/source/common/resource.cpp",
-      "intl/icu/source/common/restrace.cpp",
-      "intl/icu/source/common/ruleiter.cpp",
-      "intl/icu/source/common/schriter.cpp",
-      "intl/icu/source/common/serv.cpp",
-      "intl/icu/source/common/servlk.cpp",
-      "intl/icu/source/common/servlkf.cpp",
-      "intl/icu/source/common/servls.cpp",
-      "intl/icu/source/common/servnotf.cpp",
-      "intl/icu/source/common/servrbf.cpp",
-      "intl/icu/source/common/servslkf.cpp",
-      "intl/icu/source/common/sharedobject.cpp",
-      "intl/icu/source/common/simpleformatter.cpp",
-      "intl/icu/source/common/static_unicode_sets.cpp",
-      "intl/icu/source/common/stringpiece.cpp",
-      "intl/icu/source/common/stringtriebuilder.cpp",
-      "intl/icu/source/common/uarrsort.cpp",
-      "intl/icu/source/common/ubidi.cpp",
-      "intl/icu/source/common/ubidi_props.cpp",
-      "intl/icu/source/common/ubidiln.cpp",
-      "intl/icu/source/common/ubidiwrt.cpp",
-      "intl/icu/source/common/ubrk.cpp",
-      "intl/icu/source/common/ucase.cpp",
-      "intl/icu/source/common/ucasemap.cpp",
-      "intl/icu/source/common/ucasemap_titlecase_brkiter.cpp",
-      "intl/icu/source/common/uchar.cpp",
-      "intl/icu/source/common/ucharstrie.cpp",
-      "intl/icu/source/common/ucharstriebuilder.cpp",
-      "intl/icu/source/common/ucharstrieiterator.cpp",
-      "intl/icu/source/common/uchriter.cpp",
-      "intl/icu/source/common/ucln_cmn.cpp",
-      "intl/icu/source/common/ucmndata.cpp",
-      "intl/icu/source/common/ucnv.cpp",
-      "intl/icu/source/common/ucnv_bld.cpp",
-      "intl/icu/source/common/ucnv_cb.cpp",
-      "intl/icu/source/common/ucnv_cnv.cpp",
-      "intl/icu/source/common/ucnv_err.cpp",
-      "intl/icu/source/common/ucnv_io.cpp",
-      "intl/icu/source/common/ucnv_u16.cpp",
-      "intl/icu/source/common/ucnv_u32.cpp",
-      "intl/icu/source/common/ucnv_u7.cpp",
-      "intl/icu/source/common/ucnv_u8.cpp",
-      "intl/icu/source/common/ucnvbocu.cpp",
-      "intl/icu/source/common/ucnvlat1.cpp",
-      "intl/icu/source/common/ucnvscsu.cpp",
-      "intl/icu/source/common/ucol_swp.cpp",
-      "intl/icu/source/common/ucptrie.cpp",
-      "intl/icu/source/common/ucurr.cpp",
-      "intl/icu/source/common/udata.cpp",
-      "intl/icu/source/common/udatamem.cpp",
-      "intl/icu/source/common/udataswp.cpp",
-      "intl/icu/source/common/uenum.cpp",
-      "intl/icu/source/common/uhash.cpp",
-      "intl/icu/source/common/uhash_us.cpp",
-      "intl/icu/source/common/uinit.cpp",
-      "intl/icu/source/common/uinvchar.cpp",
-      "intl/icu/source/common/uiter.cpp",
-      "intl/icu/source/common/ulist.cpp",
-      "intl/icu/source/common/uloc.cpp",
-      "intl/icu/source/common/uloc_keytype.cpp",
-      "intl/icu/source/common/uloc_tag.cpp",
-      "intl/icu/source/common/ulocale.cpp",
-      "intl/icu/source/common/ulocbuilder.cpp",
-      "intl/icu/source/common/umapfile.cpp",
-      "intl/icu/source/common/umath.cpp",
-      "intl/icu/source/common/umutablecptrie.cpp",
-      "intl/icu/source/common/umutex.cpp",
-      "intl/icu/source/common/unames.cpp",
-      "intl/icu/source/common/unifiedcache.cpp",
-      "intl/icu/source/common/unifilt.cpp",
-      "intl/icu/source/common/unifunct.cpp",
-      "intl/icu/source/common/uniset.cpp",
-      "intl/icu/source/common/uniset_closure.cpp",
-      "intl/icu/source/common/uniset_props.cpp",
-      "intl/icu/source/common/unisetspan.cpp",
-      "intl/icu/source/common/unistr.cpp",
-      "intl/icu/source/common/unistr_case.cpp",
-      "intl/icu/source/common/unistr_case_locale.cpp",
-      "intl/icu/source/common/unistr_cnv.cpp",
-      "intl/icu/source/common/unistr_props.cpp",
-      "intl/icu/source/common/unistr_titlecase_brkiter.cpp",
-      "intl/icu/source/common/unormcmp.cpp",
-      "intl/icu/source/common/uobject.cpp",
-      "intl/icu/source/common/uprops.cpp",
-      "intl/icu/source/common/uresbund.cpp",
-      "intl/icu/source/common/uresdata.cpp",
-      "intl/icu/source/common/uscript.cpp",
-      "intl/icu/source/common/uscript_props.cpp",
-      "intl/icu/source/common/uset.cpp",
-      "intl/icu/source/common/uset_props.cpp",
-      "intl/icu/source/common/usetiter.cpp",
-      "intl/icu/source/common/usprep.cpp",
-      "intl/icu/source/common/ustack.cpp",
-      "intl/icu/source/common/ustr_cnv.cpp",
-      "intl/icu/source/common/ustr_titlecase_brkiter.cpp",
-      "intl/icu/source/common/ustrcase.cpp",
-      "intl/icu/source/common/ustrcase_locale.cpp",
-      "intl/icu/source/common/ustrenum.cpp",
-      "intl/icu/source/common/ustrfmt.cpp",
-      "intl/icu/source/common/ustring.cpp",
-      "intl/icu/source/common/ustrtrns.cpp",
-      "intl/icu/source/common/utext.cpp",
-      "intl/icu/source/common/utf_impl.cpp",
-      "intl/icu/source/common/util.cpp",
-      "intl/icu/source/common/util_props.cpp",
-      "intl/icu/source/common/utrace.cpp",
-      "intl/icu/source/common/utrie.cpp",
-      "intl/icu/source/common/utrie2.cpp",
-      "intl/icu/source/common/utrie2_builder.cpp",
-      "intl/icu/source/common/utrie_swap.cpp",
-      "intl/icu/source/common/uts46.cpp",
-      "intl/icu/source/common/utypes.cpp",
-      "intl/icu/source/common/uvector.cpp",
-      "intl/icu/source/common/uvectr32.cpp",
-      "intl/icu/source/common/uvectr64.cpp",
-      "intl/icu/source/common/wintz.cpp",
-      "intl/icu/source/i18n/astro.cpp",
-      "intl/icu/source/i18n/basictz.cpp",
-      "intl/icu/source/i18n/bocsu.cpp",
-      "intl/icu/source/i18n/buddhcal.cpp",
-      "intl/icu/source/i18n/calendar.cpp",
-      "intl/icu/source/i18n/cecal.cpp",
-      "intl/icu/source/i18n/chnsecal.cpp",
-      "intl/icu/source/i18n/choicfmt.cpp",
-      "intl/icu/source/i18n/coleitr.cpp",
-      "intl/icu/source/i18n/coll.cpp",
-      "intl/icu/source/i18n/collation.cpp",
-      "intl/icu/source/i18n/collationbuilder.cpp",
-      "intl/icu/source/i18n/collationcompare.cpp",
-      "intl/icu/source/i18n/collationdata.cpp",
-      "intl/icu/source/i18n/collationdatabuilder.cpp",
-      "intl/icu/source/i18n/collationdatareader.cpp",
-      "intl/icu/source/i18n/collationdatawriter.cpp",
-      "intl/icu/source/i18n/collationfastlatin.cpp",
-      "intl/icu/source/i18n/collationfastlatinbuilder.cpp",
-      "intl/icu/source/i18n/collationfcd.cpp",
-      "intl/icu/source/i18n/collationiterator.cpp",
-      "intl/icu/source/i18n/collationkeys.cpp",
-      "intl/icu/source/i18n/collationroot.cpp",
-      "intl/icu/source/i18n/collationrootelements.cpp",
-      "intl/icu/source/i18n/collationruleparser.cpp",
-      "intl/icu/source/i18n/collationsets.cpp",
-      "intl/icu/source/i18n/collationsettings.cpp",
-      "intl/icu/source/i18n/collationtailoring.cpp",
-      "intl/icu/source/i18n/collationweights.cpp",
-      "intl/icu/source/i18n/compactdecimalformat.cpp",
-      "intl/icu/source/i18n/coptccal.cpp",
-      "intl/icu/source/i18n/curramt.cpp",
-      "intl/icu/source/i18n/currfmt.cpp",
-      "intl/icu/source/i18n/currpinf.cpp",
-      "intl/icu/source/i18n/currunit.cpp",
-      "intl/icu/source/i18n/dangical.cpp",
-      "intl/icu/source/i18n/datefmt.cpp",
-      "intl/icu/source/i18n/dayperiodrules.cpp",
-      "intl/icu/source/i18n/dcfmtsym.cpp",
-      "intl/icu/source/i18n/decContext.cpp",
-      "intl/icu/source/i18n/decNumber.cpp",
-      "intl/icu/source/i18n/decimfmt.cpp",
-      "intl/icu/source/i18n/displayoptions.cpp",
-      "intl/icu/source/i18n/dtfmtsym.cpp",
-      "intl/icu/source/i18n/dtitvfmt.cpp",
-      "intl/icu/source/i18n/dtitvinf.cpp",
-      "intl/icu/source/i18n/dtptngen.cpp",
-      "intl/icu/source/i18n/dtrule.cpp",
-      "intl/icu/source/i18n/erarules.cpp",
-      "intl/icu/source/i18n/ethpccal.cpp",
-      "intl/icu/source/i18n/fmtable.cpp",
-      "intl/icu/source/i18n/format.cpp",
-      "intl/icu/source/i18n/formatted_string_builder.cpp",
-      "intl/icu/source/i18n/formattedval_iterimpl.cpp",
-      "intl/icu/source/i18n/formattedval_sbimpl.cpp",
-      "intl/icu/source/i18n/formattedvalue.cpp",
-      "intl/icu/source/i18n/fphdlimp.cpp",
-      "intl/icu/source/i18n/fpositer.cpp",
-      "intl/icu/source/i18n/gregocal.cpp",
-      "intl/icu/source/i18n/gregoimp.cpp",
-      "intl/icu/source/i18n/hebrwcal.cpp",
-      "intl/icu/source/i18n/indiancal.cpp",
-      "intl/icu/source/i18n/islamcal.cpp",
-      "intl/icu/source/i18n/iso8601cal.cpp",
-      "intl/icu/source/i18n/japancal.cpp",
-      "intl/icu/source/i18n/listformatter.cpp",
-      "intl/icu/source/i18n/measfmt.cpp",
-      "intl/icu/source/i18n/measunit.cpp",
-      "intl/icu/source/i18n/measunit_extra.cpp",
-      "intl/icu/source/i18n/measure.cpp",
-      "intl/icu/source/i18n/messageformat2.cpp",
-      "intl/icu/source/i18n/messageformat2_arguments.cpp",
-      "intl/icu/source/i18n/messageformat2_checker.cpp",
-      "intl/icu/source/i18n/messageformat2_data_model.cpp",
-      "intl/icu/source/i18n/messageformat2_errors.cpp",
-      "intl/icu/source/i18n/messageformat2_evaluation.cpp",
-      "intl/icu/source/i18n/messageformat2_formattable.cpp",
-      "intl/icu/source/i18n/messageformat2_formatter.cpp",
-      "intl/icu/source/i18n/messageformat2_function_registry.cpp",
-      "intl/icu/source/i18n/messageformat2_parser.cpp",
-      "intl/icu/source/i18n/messageformat2_serializer.cpp",
-      "intl/icu/source/i18n/msgfmt.cpp",
-      "intl/icu/source/i18n/nfrs.cpp",
-      "intl/icu/source/i18n/nfrule.cpp",
-      "intl/icu/source/i18n/nfsubs.cpp",
-      "intl/icu/source/i18n/number_affixutils.cpp",
-      "intl/icu/source/i18n/number_asformat.cpp",
-      "intl/icu/source/i18n/number_capi.cpp",
-      "intl/icu/source/i18n/number_compact.cpp",
-      "intl/icu/source/i18n/number_currencysymbols.cpp",
-      "intl/icu/source/i18n/number_decimalquantity.cpp",
-      "intl/icu/source/i18n/number_decimfmtprops.cpp",
-      "intl/icu/source/i18n/number_fluent.cpp",
-      "intl/icu/source/i18n/number_formatimpl.cpp",
-      "intl/icu/source/i18n/number_grouping.cpp",
-      "intl/icu/source/i18n/number_integerwidth.cpp",
-      "intl/icu/source/i18n/number_longnames.cpp",
-      "intl/icu/source/i18n/number_mapper.cpp",
-      "intl/icu/source/i18n/number_modifiers.cpp",
-      "intl/icu/source/i18n/number_multiplier.cpp",
-      "intl/icu/source/i18n/number_notation.cpp",
-      "intl/icu/source/i18n/number_output.cpp",
-      "intl/icu/source/i18n/number_padding.cpp",
-      "intl/icu/source/i18n/number_patternmodifier.cpp",
-      "intl/icu/source/i18n/number_patternstring.cpp",
-      "intl/icu/source/i18n/number_rounding.cpp",
-      "intl/icu/source/i18n/number_scientific.cpp",
-      "intl/icu/source/i18n/number_simple.cpp",
-      "intl/icu/source/i18n/number_skeletons.cpp",
-      "intl/icu/source/i18n/number_symbolswrapper.cpp",
-      "intl/icu/source/i18n/number_usageprefs.cpp",
-      "intl/icu/source/i18n/number_utils.cpp",
-      "intl/icu/source/i18n/numfmt.cpp",
-      "intl/icu/source/i18n/numparse_affixes.cpp",
-      "intl/icu/source/i18n/numparse_compositions.cpp",
-      "intl/icu/source/i18n/numparse_currency.cpp",
-      "intl/icu/source/i18n/numparse_decimal.cpp",
-      "intl/icu/source/i18n/numparse_impl.cpp",
-      "intl/icu/source/i18n/numparse_parsednumber.cpp",
-      "intl/icu/source/i18n/numparse_scientific.cpp",
-      "intl/icu/source/i18n/numparse_symbols.cpp",
-      "intl/icu/source/i18n/numparse_validators.cpp",
-      "intl/icu/source/i18n/numrange_capi.cpp",
-      "intl/icu/source/i18n/numrange_fluent.cpp",
-      "intl/icu/source/i18n/numrange_impl.cpp",
-      "intl/icu/source/i18n/numsys.cpp",
-      "intl/icu/source/i18n/olsontz.cpp",
-      "intl/icu/source/i18n/persncal.cpp",
-      "intl/icu/source/i18n/pluralranges.cpp",
-      "intl/icu/source/i18n/plurfmt.cpp",
-      "intl/icu/source/i18n/plurrule.cpp",
-      "intl/icu/source/i18n/quantityformatter.cpp",
-      "intl/icu/source/i18n/rbnf.cpp",
-      "intl/icu/source/i18n/rbtz.cpp",
-      "intl/icu/source/i18n/region.cpp",
-      "intl/icu/source/i18n/reldatefmt.cpp",
-      "intl/icu/source/i18n/reldtfmt.cpp",
-      "intl/icu/source/i18n/rulebasedcollator.cpp",
-      "intl/icu/source/i18n/scriptset.cpp",
-      "intl/icu/source/i18n/search.cpp",
-      "intl/icu/source/i18n/selfmt.cpp",
-      "intl/icu/source/i18n/sharedbreakiterator.cpp",
-      "intl/icu/source/i18n/simpletz.cpp",
-      "intl/icu/source/i18n/smpdtfmt.cpp",
-      "intl/icu/source/i18n/smpdtfst.cpp",
-      "intl/icu/source/i18n/sortkey.cpp",
-      "intl/icu/source/i18n/standardplural.cpp",
-      "intl/icu/source/i18n/string_segment.cpp",
-      "intl/icu/source/i18n/stsearch.cpp",
-      "intl/icu/source/i18n/taiwncal.cpp",
-      "intl/icu/source/i18n/timezone.cpp",
-      "intl/icu/source/i18n/tmunit.cpp",
-      "intl/icu/source/i18n/tmutamt.cpp",
-      "intl/icu/source/i18n/tmutfmt.cpp",
-      "intl/icu/source/i18n/tzfmt.cpp",
-      "intl/icu/source/i18n/tzgnames.cpp",
-      "intl/icu/source/i18n/tznames.cpp",
-      "intl/icu/source/i18n/tznames_impl.cpp",
-      "intl/icu/source/i18n/tzrule.cpp",
-      "intl/icu/source/i18n/tztrans.cpp",
-      "intl/icu/source/i18n/ucal.cpp",
-      "intl/icu/source/i18n/ucln_in.cpp",
-      "intl/icu/source/i18n/ucol.cpp",
-      "intl/icu/source/i18n/ucol_res.cpp",
-      "intl/icu/source/i18n/ucol_sit.cpp",
-      "intl/icu/source/i18n/ucoleitr.cpp",
-      "intl/icu/source/i18n/udat.cpp",
-      "intl/icu/source/i18n/udateintervalformat.cpp",
-      "intl/icu/source/i18n/udatpg.cpp",
-      "intl/icu/source/i18n/ufieldpositer.cpp",
-      "intl/icu/source/i18n/uitercollationiterator.cpp",
-      "intl/icu/source/i18n/ulistformatter.cpp",
-      "intl/icu/source/i18n/umsg.cpp",
-      "intl/icu/source/i18n/units_complexconverter.cpp",
-      "intl/icu/source/i18n/units_converter.cpp",
-      "intl/icu/source/i18n/units_data.cpp",
-      "intl/icu/source/i18n/units_router.cpp",
-      "intl/icu/source/i18n/unum.cpp",
-      "intl/icu/source/i18n/unumsys.cpp",
-      "intl/icu/source/i18n/upluralrules.cpp",
-      "intl/icu/source/i18n/uregion.cpp",
-      "intl/icu/source/i18n/usearch.cpp",
-      "intl/icu/source/i18n/uspoof.cpp",
-      "intl/icu/source/i18n/uspoof_impl.cpp",
-      "intl/icu/source/i18n/utf16collationiterator.cpp",
-      "intl/icu/source/i18n/utf8collationiterator.cpp",
-      "intl/icu/source/i18n/utmscale.cpp",
-      "intl/icu/source/i18n/vtzone.cpp",
-      "intl/icu/source/i18n/windtfmt.cpp",
-      "intl/icu/source/i18n/winnmfmt.cpp",
-      "intl/icu/source/i18n/wintzimpl.cpp",
-      "intl/icu/source/i18n/zonemeta.cpp",
       "intl/locale/windows/OSPreferences_win.cpp",
       "ipc/chromium/src/base/message_pump_win.cc",
       "ipc/chromium/src/base/object_watcher.cc",
@@ -5446,6 +4723,7 @@
       "intl/app_collator_glue/Cargo.toml",
       "intl/bidi/rust/unicode-bidi-ffi/Cargo.toml",
       "intl/encoding_glue/Cargo.toml",
+      "intl/icu4x_unicode_glue/Cargo.toml",
       "intl/icu_capi/Cargo.toml",
       "intl/icu_segmenter_data/Cargo.toml",
       "intl/locale/rust/fluent-langneg-ffi/Cargo.toml",
@@ -5722,8 +5000,8 @@
     "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
     "cargo_lockfile": "Cargo.lock",
     "cargo_config_template": ".cargo/config.toml.in",
-    "depfiles_scanned": 543,
-    "headers_count": 937,
+    "depfiles_scanned": 173,
+    "headers_count": 553,
     "headers": [
       "caps/SystemPrincipal.h",
       "caps/nsJSPrincipals.h",
@@ -5737,382 +5015,10 @@
       "extensions/auth/gssapi.h",
       "extensions/auth/nsAuth.h",
       "extensions/auth/nsAuthGSSAPI.h",
-      "intl/icu/source/common/bmpset.h",
-      "intl/icu/source/common/bytesinkutil.h",
-      "intl/icu/source/common/capi_helper.h",
-      "intl/icu/source/common/charstr.h",
-      "intl/icu/source/common/charstrmap.h",
-      "intl/icu/source/common/cmemory.h",
-      "intl/icu/source/common/cpputils.h",
-      "intl/icu/source/common/cstr.h",
-      "intl/icu/source/common/cstring.h",
-      "intl/icu/source/common/cwchar.h",
-      "intl/icu/source/common/dictionarydata.h",
-      "intl/icu/source/common/emojiprops.h",
-      "intl/icu/source/common/fixedstring.h",
-      "intl/icu/source/common/hash.h",
-      "intl/icu/source/common/icuplugimp.h",
-      "intl/icu/source/common/localefallback_data.h",
-      "intl/icu/source/common/localeprioritylist.h",
-      "intl/icu/source/common/locbased.h",
-      "intl/icu/source/common/locdistance.h",
-      "intl/icu/source/common/loclikelysubtags.h",
-      "intl/icu/source/common/locmap.h",
-      "intl/icu/source/common/locutil.h",
-      "intl/icu/source/common/lsr.h",
-      "intl/icu/source/common/messageimpl.h",
-      "intl/icu/source/common/mutex.h",
-      "intl/icu/source/common/normalizer2impl.h",
-      "intl/icu/source/common/patternprops.h",
-      "intl/icu/source/common/propname.h",
-      "intl/icu/source/common/propname_data.h",
-      "intl/icu/source/common/putilimp.h",
-      "intl/icu/source/common/resource.h",
-      "intl/icu/source/common/restrace.h",
-      "intl/icu/source/common/ruleiter.h",
-      "intl/icu/source/common/serv.h",
-      "intl/icu/source/common/servloc.h",
-      "intl/icu/source/common/servnotf.h",
-      "intl/icu/source/common/sharedobject.h",
-      "intl/icu/source/common/static_unicode_sets.h",
-      "intl/icu/source/common/uarrsort.h",
-      "intl/icu/source/common/uassert.h",
-      "intl/icu/source/common/ubidi_props.h",
-      "intl/icu/source/common/ubidi_props_data.h",
-      "intl/icu/source/common/ubidiimp.h",
-      "intl/icu/source/common/ucase.h",
-      "intl/icu/source/common/ucase_props_data.h",
-      "intl/icu/source/common/ucasemap_imp.h",
-      "intl/icu/source/common/uchar_props_data.h",
-      "intl/icu/source/common/ucln.h",
-      "intl/icu/source/common/ucln_cmn.h",
-      "intl/icu/source/common/ucln_imp.h",
-      "intl/icu/source/common/ucmndata.h",
-      "intl/icu/source/common/ucnv_bld.h",
-      "intl/icu/source/common/ucnv_cnv.h",
-      "intl/icu/source/common/ucnv_ext.h",
-      "intl/icu/source/common/ucnv_imp.h",
-      "intl/icu/source/common/ucnv_io.h",
-      "intl/icu/source/common/ucnvmbcs.h",
-      "intl/icu/source/common/ucol_data.h",
-      "intl/icu/source/common/ucol_swp.h",
-      "intl/icu/source/common/ucptrie_impl.h",
-      "intl/icu/source/common/ucurrimp.h",
-      "intl/icu/source/common/udatamem.h",
-      "intl/icu/source/common/udataswp.h",
-      "intl/icu/source/common/uelement.h",
-      "intl/icu/source/common/uenumimp.h",
-      "intl/icu/source/common/uhash.h",
-      "intl/icu/source/common/uinvchar.h",
-      "intl/icu/source/common/ulayout_props.h",
-      "intl/icu/source/common/ulist.h",
-      "intl/icu/source/common/ulocimp.h",
-      "intl/icu/source/common/umapfile.h",
-      "intl/icu/source/common/umutex.h",
-      "intl/icu/source/common/unicode/appendable.h",
-      "intl/icu/source/common/unicode/brkiter.h",
-      "intl/icu/source/common/unicode/bytestream.h",
-      "intl/icu/source/common/unicode/bytestrie.h",
-      "intl/icu/source/common/unicode/bytestriebuilder.h",
-      "intl/icu/source/common/unicode/casemap.h",
-      "intl/icu/source/common/unicode/char16ptr.h",
-      "intl/icu/source/common/unicode/chariter.h",
-      "intl/icu/source/common/unicode/dtintrv.h",
-      "intl/icu/source/common/unicode/edits.h",
-      "intl/icu/source/common/unicode/enumset.h",
-      "intl/icu/source/common/unicode/errorcode.h",
-      "intl/icu/source/common/unicode/icuplug.h",
-      "intl/icu/source/common/unicode/localebuilder.h",
-      "intl/icu/source/common/unicode/localematcher.h",
-      "intl/icu/source/common/unicode/localpointer.h",
-      "intl/icu/source/common/unicode/locdspnm.h",
-      "intl/icu/source/common/unicode/locid.h",
-      "intl/icu/source/common/unicode/messagepattern.h",
-      "intl/icu/source/common/unicode/normalizer2.h",
-      "intl/icu/source/common/unicode/normlzr.h",
-      "intl/icu/source/common/unicode/parseerr.h",
-      "intl/icu/source/common/unicode/parsepos.h",
-      "intl/icu/source/common/unicode/platform.h",
-      "intl/icu/source/common/unicode/ptypes.h",
-      "intl/icu/source/common/unicode/putil.h",
-      "intl/icu/source/common/unicode/rep.h",
-      "intl/icu/source/common/unicode/resbund.h",
-      "intl/icu/source/common/unicode/schriter.h",
-      "intl/icu/source/common/unicode/simpleformatter.h",
-      "intl/icu/source/common/unicode/std_string.h",
-      "intl/icu/source/common/unicode/strenum.h",
-      "intl/icu/source/common/unicode/stringoptions.h",
-      "intl/icu/source/common/unicode/stringpiece.h",
-      "intl/icu/source/common/unicode/stringtriebuilder.h",
-      "intl/icu/source/common/unicode/symtable.h",
-      "intl/icu/source/common/unicode/ubidi.h",
-      "intl/icu/source/common/unicode/ubrk.h",
-      "intl/icu/source/common/unicode/ucasemap.h",
-      "intl/icu/source/common/unicode/uchar.h",
-      "intl/icu/source/common/unicode/ucharstrie.h",
-      "intl/icu/source/common/unicode/ucharstriebuilder.h",
-      "intl/icu/source/common/unicode/uchriter.h",
-      "intl/icu/source/common/unicode/uclean.h",
-      "intl/icu/source/common/unicode/ucnv.h",
-      "intl/icu/source/common/unicode/ucnv_cb.h",
-      "intl/icu/source/common/unicode/ucnv_err.h",
-      "intl/icu/source/common/unicode/uconfig.h",
-      "intl/icu/source/common/unicode/ucpmap.h",
-      "intl/icu/source/common/unicode/ucptrie.h",
-      "intl/icu/source/common/unicode/ucurr.h",
-      "intl/icu/source/common/unicode/udata.h",
-      "intl/icu/source/common/unicode/udisplaycontext.h",
-      "intl/icu/source/common/unicode/uenum.h",
-      "intl/icu/source/common/unicode/uiter.h",
-      "intl/icu/source/common/unicode/uldnames.h",
-      "intl/icu/source/common/unicode/uloc.h",
-      "intl/icu/source/common/unicode/ulocale.h",
-      "intl/icu/source/common/unicode/ulocbuilder.h",
-      "intl/icu/source/common/unicode/umachine.h",
-      "intl/icu/source/common/unicode/umisc.h",
-      "intl/icu/source/common/unicode/umutablecptrie.h",
-      "intl/icu/source/common/unicode/unifilt.h",
-      "intl/icu/source/common/unicode/unifunct.h",
-      "intl/icu/source/common/unicode/unimatch.h",
-      "intl/icu/source/common/unicode/uniset.h",
-      "intl/icu/source/common/unicode/unistr.h",
-      "intl/icu/source/common/unicode/unorm2.h",
-      "intl/icu/source/common/unicode/uobject.h",
-      "intl/icu/source/common/unicode/urename.h",
-      "intl/icu/source/common/unicode/ures.h",
-      "intl/icu/source/common/unicode/uscript.h",
-      "intl/icu/source/common/unicode/uset.h",
-      "intl/icu/source/common/unicode/usetiter.h",
-      "intl/icu/source/common/unicode/ustring.h",
-      "intl/icu/source/common/unicode/ustringtrie.h",
-      "intl/icu/source/common/unicode/utext.h",
-      "intl/icu/source/common/unicode/utf.h",
-      "intl/icu/source/common/unicode/utf16.h",
-      "intl/icu/source/common/unicode/utf8.h",
-      "intl/icu/source/common/unicode/utrace.h",
-      "intl/icu/source/common/unicode/utypes.h",
-      "intl/icu/source/common/unicode/uvernum.h",
-      "intl/icu/source/common/unicode/uversion.h",
-      "intl/icu/source/common/unifiedcache.h",
-      "intl/icu/source/common/uniquecharstr.h",
-      "intl/icu/source/common/unisetspan.h",
-      "intl/icu/source/common/uposixdefs.h",
-      "intl/icu/source/common/uprops.h",
-      "intl/icu/source/common/uresdata.h",
-      "intl/icu/source/common/uresimp.h",
-      "intl/icu/source/common/ureslocs.h",
-      "intl/icu/source/common/uset_imp.h",
-      "intl/icu/source/common/ustr_cnv.h",
-      "intl/icu/source/common/ustr_imp.h",
-      "intl/icu/source/common/ustrenum.h",
-      "intl/icu/source/common/ustrfmt.h",
-      "intl/icu/source/common/util.h",
-      "intl/icu/source/common/utracimp.h",
-      "intl/icu/source/common/utrie.h",
-      "intl/icu/source/common/utrie2.h",
-      "intl/icu/source/common/utrie2_impl.h",
-      "intl/icu/source/common/utypeinfo.h",
-      "intl/icu/source/common/uvector.h",
-      "intl/icu/source/common/uvectr32.h",
-      "intl/icu/source/common/uvectr64.h",
-      "intl/icu/source/common/wintz.h",
-      "intl/icu/source/i18n/astro.h",
-      "intl/icu/source/i18n/buddhcal.h",
-      "intl/icu/source/i18n/cecal.h",
-      "intl/icu/source/i18n/chnsecal.h",
-      "intl/icu/source/i18n/coptccal.h",
-      "intl/icu/source/i18n/currfmt.h",
-      "intl/icu/source/i18n/dangical.h",
-      "intl/icu/source/i18n/dayperiodrules.h",
-      "intl/icu/source/i18n/decContext.h",
-      "intl/icu/source/i18n/decNumber.h",
-      "intl/icu/source/i18n/decNumberLocal.h",
-      "intl/icu/source/i18n/dt_impl.h",
-      "intl/icu/source/i18n/dtitv_impl.h",
-      "intl/icu/source/i18n/dtptngen_impl.h",
-      "intl/icu/source/i18n/erarules.h",
-      "intl/icu/source/i18n/ethpccal.h",
-      "intl/icu/source/i18n/fmtableimp.h",
-      "intl/icu/source/i18n/formatted_string_builder.h",
-      "intl/icu/source/i18n/formattedval_impl.h",
-      "intl/icu/source/i18n/fphdlimp.h",
-      "intl/icu/source/i18n/gregoimp.h",
-      "intl/icu/source/i18n/hebrwcal.h",
-      "intl/icu/source/i18n/indiancal.h",
-      "intl/icu/source/i18n/islamcal.h",
-      "intl/icu/source/i18n/iso8601cal.h",
-      "intl/icu/source/i18n/japancal.h",
-      "intl/icu/source/i18n/measunit_impl.h",
-      "intl/icu/source/i18n/msgfmt_impl.h",
-      "intl/icu/source/i18n/nfrlist.h",
-      "intl/icu/source/i18n/nfrs.h",
-      "intl/icu/source/i18n/nfrule.h",
-      "intl/icu/source/i18n/nfsubs.h",
-      "intl/icu/source/i18n/number_affixutils.h",
-      "intl/icu/source/i18n/number_asformat.h",
-      "intl/icu/source/i18n/number_compact.h",
-      "intl/icu/source/i18n/number_currencysymbols.h",
-      "intl/icu/source/i18n/number_decimalquantity.h",
-      "intl/icu/source/i18n/number_decimfmtprops.h",
-      "intl/icu/source/i18n/number_decnum.h",
-      "intl/icu/source/i18n/number_formatimpl.h",
-      "intl/icu/source/i18n/number_longnames.h",
-      "intl/icu/source/i18n/number_mapper.h",
-      "intl/icu/source/i18n/number_microprops.h",
-      "intl/icu/source/i18n/number_modifiers.h",
-      "intl/icu/source/i18n/number_multiplier.h",
-      "intl/icu/source/i18n/number_patternmodifier.h",
-      "intl/icu/source/i18n/number_patternstring.h",
-      "intl/icu/source/i18n/number_roundingutils.h",
-      "intl/icu/source/i18n/number_scientific.h",
-      "intl/icu/source/i18n/number_skeletons.h",
-      "intl/icu/source/i18n/number_types.h",
-      "intl/icu/source/i18n/number_usageprefs.h",
-      "intl/icu/source/i18n/number_utils.h",
-      "intl/icu/source/i18n/number_utypes.h",
-      "intl/icu/source/i18n/numparse_affixes.h",
-      "intl/icu/source/i18n/numparse_compositions.h",
-      "intl/icu/source/i18n/numparse_currency.h",
-      "intl/icu/source/i18n/numparse_decimal.h",
-      "intl/icu/source/i18n/numparse_impl.h",
-      "intl/icu/source/i18n/numparse_scientific.h",
-      "intl/icu/source/i18n/numparse_symbols.h",
-      "intl/icu/source/i18n/numparse_types.h",
-      "intl/icu/source/i18n/numparse_utils.h",
-      "intl/icu/source/i18n/numparse_validators.h",
-      "intl/icu/source/i18n/numrange_impl.h",
-      "intl/icu/source/i18n/numsys_impl.h",
-      "intl/icu/source/i18n/olsontz.h",
-      "intl/icu/source/i18n/persncal.h",
-      "intl/icu/source/i18n/pluralranges.h",
-      "intl/icu/source/i18n/plurrule_impl.h",
-      "intl/icu/source/i18n/quantityformatter.h",
-      "intl/icu/source/i18n/region_impl.h",
-      "intl/icu/source/i18n/reldtfmt.h",
-      "intl/icu/source/i18n/scriptset.h",
-      "intl/icu/source/i18n/selfmtimpl.h",
-      "intl/icu/source/i18n/sharedbreakiterator.h",
-      "intl/icu/source/i18n/sharedcalendar.h",
-      "intl/icu/source/i18n/shareddateformatsymbols.h",
-      "intl/icu/source/i18n/sharednumberformat.h",
-      "intl/icu/source/i18n/sharedpluralrules.h",
-      "intl/icu/source/i18n/smpdtfst.h",
-      "intl/icu/source/i18n/standardplural.h",
-      "intl/icu/source/i18n/string_segment.h",
-      "intl/icu/source/i18n/taiwncal.h",
-      "intl/icu/source/i18n/tzgnames.h",
-      "intl/icu/source/i18n/tznames_impl.h",
-      "intl/icu/source/i18n/ucln_in.h",
-      "intl/icu/source/i18n/ucol_imp.h",
-      "intl/icu/source/i18n/unicode/basictz.h",
-      "intl/icu/source/i18n/unicode/calendar.h",
-      "intl/icu/source/i18n/unicode/choicfmt.h",
-      "intl/icu/source/i18n/unicode/coleitr.h",
-      "intl/icu/source/i18n/unicode/coll.h",
-      "intl/icu/source/i18n/unicode/compactdecimalformat.h",
-      "intl/icu/source/i18n/unicode/curramt.h",
-      "intl/icu/source/i18n/unicode/currpinf.h",
-      "intl/icu/source/i18n/unicode/currunit.h",
-      "intl/icu/source/i18n/unicode/datefmt.h",
-      "intl/icu/source/i18n/unicode/dcfmtsym.h",
-      "intl/icu/source/i18n/unicode/decimfmt.h",
-      "intl/icu/source/i18n/unicode/displayoptions.h",
-      "intl/icu/source/i18n/unicode/dtfmtsym.h",
-      "intl/icu/source/i18n/unicode/dtitvfmt.h",
-      "intl/icu/source/i18n/unicode/dtitvinf.h",
-      "intl/icu/source/i18n/unicode/dtptngen.h",
-      "intl/icu/source/i18n/unicode/dtrule.h",
-      "intl/icu/source/i18n/unicode/fieldpos.h",
-      "intl/icu/source/i18n/unicode/fmtable.h",
-      "intl/icu/source/i18n/unicode/format.h",
-      "intl/icu/source/i18n/unicode/formattednumber.h",
-      "intl/icu/source/i18n/unicode/formattedvalue.h",
-      "intl/icu/source/i18n/unicode/fpositer.h",
-      "intl/icu/source/i18n/unicode/gregocal.h",
-      "intl/icu/source/i18n/unicode/listformatter.h",
-      "intl/icu/source/i18n/unicode/measfmt.h",
-      "intl/icu/source/i18n/unicode/measunit.h",
-      "intl/icu/source/i18n/unicode/measure.h",
-      "intl/icu/source/i18n/unicode/msgfmt.h",
-      "intl/icu/source/i18n/unicode/nounit.h",
-      "intl/icu/source/i18n/unicode/numberformatter.h",
-      "intl/icu/source/i18n/unicode/numberrangeformatter.h",
-      "intl/icu/source/i18n/unicode/numfmt.h",
-      "intl/icu/source/i18n/unicode/numsys.h",
-      "intl/icu/source/i18n/unicode/plurfmt.h",
-      "intl/icu/source/i18n/unicode/plurrule.h",
-      "intl/icu/source/i18n/unicode/rbnf.h",
-      "intl/icu/source/i18n/unicode/rbtz.h",
-      "intl/icu/source/i18n/unicode/region.h",
-      "intl/icu/source/i18n/unicode/reldatefmt.h",
-      "intl/icu/source/i18n/unicode/selfmt.h",
-      "intl/icu/source/i18n/unicode/simplenumberformatter.h",
-      "intl/icu/source/i18n/unicode/simpletz.h",
-      "intl/icu/source/i18n/unicode/smpdtfmt.h",
-      "intl/icu/source/i18n/unicode/tblcoll.h",
-      "intl/icu/source/i18n/unicode/timezone.h",
-      "intl/icu/source/i18n/unicode/tmunit.h",
-      "intl/icu/source/i18n/unicode/tmutamt.h",
-      "intl/icu/source/i18n/unicode/tmutfmt.h",
-      "intl/icu/source/i18n/unicode/tzfmt.h",
-      "intl/icu/source/i18n/unicode/tznames.h",
-      "intl/icu/source/i18n/unicode/tzrule.h",
-      "intl/icu/source/i18n/unicode/tztrans.h",
-      "intl/icu/source/i18n/unicode/ucal.h",
-      "intl/icu/source/i18n/unicode/ucol.h",
-      "intl/icu/source/i18n/unicode/udat.h",
-      "intl/icu/source/i18n/unicode/udateintervalformat.h",
-      "intl/icu/source/i18n/unicode/udatpg.h",
-      "intl/icu/source/i18n/unicode/udisplayoptions.h",
-      "intl/icu/source/i18n/unicode/ufieldpositer.h",
-      "intl/icu/source/i18n/unicode/uformattable.h",
-      "intl/icu/source/i18n/unicode/uformattednumber.h",
-      "intl/icu/source/i18n/unicode/uformattedvalue.h",
-      "intl/icu/source/i18n/unicode/ulistformatter.h",
-      "intl/icu/source/i18n/unicode/umsg.h",
-      "intl/icu/source/i18n/unicode/unum.h",
-      "intl/icu/source/i18n/unicode/unumberformatter.h",
-      "intl/icu/source/i18n/unicode/unumberoptions.h",
-      "intl/icu/source/i18n/unicode/unumberrangeformatter.h",
-      "intl/icu/source/i18n/unicode/unumsys.h",
-      "intl/icu/source/i18n/unicode/upluralrules.h",
-      "intl/icu/source/i18n/unicode/uregion.h",
-      "intl/icu/source/i18n/unicode/ureldatefmt.h",
-      "intl/icu/source/i18n/unicode/usimplenumberformatter.h",
-      "intl/icu/source/i18n/unicode/uspoof.h",
-      "intl/icu/source/i18n/unicode/utmscale.h",
-      "intl/icu/source/i18n/unicode/vtzone.h",
-      "intl/icu/source/i18n/units_complexconverter.h",
-      "intl/icu/source/i18n/units_converter.h",
-      "intl/icu/source/i18n/units_data.h",
-      "intl/icu/source/i18n/units_router.h",
-      "intl/icu/source/i18n/uspoof_impl.h",
-      "intl/icu/source/i18n/windtfmt.h",
-      "intl/icu/source/i18n/winnmfmt.h",
-      "intl/icu/source/i18n/wintzimpl.h",
-      "intl/icu/source/i18n/zonemeta.h",
-      "intl/icu_capi/bindings/cpp/icu4x/Calendar.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Calendar.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/CalendarDateFromFieldsError.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/CalendarDateFromFieldsError.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/CalendarError.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/CalendarError.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/CalendarKind.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/CalendarKind.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/DataError.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/DataError.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/DataProvider.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/DataProvider.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Date.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Date.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateFields.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateFields.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateFromFieldsOptions.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateFromFieldsOptions.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateMissingFieldsStrategy.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateMissingFieldsStrategy.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateOverflow.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/DateOverflow.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/GraphemeClusterBreakIteratorLatin1.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/GraphemeClusterBreakIteratorLatin1.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/GraphemeClusterBreakIteratorUtf16.d.hpp",
@@ -6121,10 +5027,6 @@
       "intl/icu_capi/bindings/cpp/icu4x/GraphemeClusterBreakIteratorUtf8.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/GraphemeClusterSegmenter.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/GraphemeClusterSegmenter.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/IsoDate.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/IsoDate.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/IsoWeekOfYear.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/IsoWeekOfYear.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/LineBreakIteratorLatin1.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/LineBreakIteratorLatin1.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/LineBreakIteratorUtf16.d.hpp",
@@ -6153,8 +5055,6 @@
       "intl/icu_capi/bindings/cpp/icu4x/LocaleFallbackerWithConfig.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/LocaleParseError.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/LocaleParseError.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Rfc9557ParseError.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Rfc9557ParseError.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/SegmenterWordType.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/SegmenterWordType.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/SentenceBreakIteratorLatin1.d.hpp",
@@ -6165,8 +5065,6 @@
       "intl/icu_capi/bindings/cpp/icu4x/SentenceBreakIteratorUtf8.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/SentenceSegmenter.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/SentenceSegmenter.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Weekday.d.hpp",
-      "intl/icu_capi/bindings/cpp/icu4x/Weekday.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/WordBreakIteratorLatin1.d.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/WordBreakIteratorLatin1.hpp",
       "intl/icu_capi/bindings/cpp/icu4x/WordBreakIteratorUtf16.d.hpp",
@@ -6244,10 +5142,6 @@
       "js/xpconnect/src/nsIXPConnect.h",
       "js/xpconnect/src/xpcpublic.h",
       "layout/build/nsLayoutModule.h",
-      "mfbt/double-conversion/double-conversion/double-conversion.h",
-      "mfbt/double-conversion/double-conversion/double-to-string.h",
-      "mfbt/double-conversion/double-conversion/string-to-double.h",
-      "mfbt/double-conversion/double-conversion/utils.h",
       "modules/brotli/common/constants.h",
       "modules/brotli/common/context.h",
       "modules/brotli/common/dictionary.h",
@@ -6839,7 +5733,7 @@
       },
       {
         "name": "xul.dll",
-        "size_bytes": 27653632
+        "size_bytes": 13169152
       }
     ],
     "staged_package_manifest": [
@@ -6953,7 +5847,7 @@
   "direct_objects": [
     {
       "path": "objdir/toolkit/library/buildid.obj",
-      "size_bytes": 5829
+      "size_bytes": 5809
     },
     {
       "path": "objdir/mozglue/static/lz4.obj",
@@ -6981,23 +5875,23 @@
     },
     {
       "path": "objdir/intl/locale/Unified_cpp_intl_locale0.obj",
-      "size_bytes": 1088205
+      "size_bytes": 878915
     },
     {
       "path": "objdir/intl/locale/windows/OSPreferences_win.obj",
-      "size_bytes": 4464977
+      "size_bytes": 4464781
     },
     {
       "path": "objdir/intl/lwbrk/Unified_cpp_intl_lwbrk0.obj",
-      "size_bytes": 651803
+      "size_bytes": 645825
     },
     {
       "path": "objdir/intl/uconv/Unified_cpp_intl_uconv0.obj",
-      "size_bytes": 416718
+      "size_bytes": 416694
     },
     {
       "path": "objdir/intl/unicharutil/util/Unified_cpp_unicharutil_util0.obj",
-      "size_bytes": 231862
+      "size_bytes": 221382
     },
     {
       "path": "objdir/modules/brotli/compress_fragment.obj",
@@ -7021,43 +5915,43 @@
     },
     {
       "path": "objdir/modules/libpref/Unified_cpp_modules_libpref0.obj",
-      "size_bytes": 11820797
+      "size_bytes": 11820777
     },
     {
       "path": "objdir/netwerk/base/MimeType.obj",
-      "size_bytes": 453692
+      "size_bytes": 453668
     },
     {
       "path": "objdir/netwerk/base/ShutdownLayer.obj",
-      "size_bytes": 42679
+      "size_bytes": 42659
     },
     {
       "path": "objdir/netwerk/base/nsURLHelperWin.obj",
-      "size_bytes": 177101
+      "size_bytes": 177077
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base0.obj",
-      "size_bytes": 2469727
+      "size_bytes": 2469707
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base1.obj",
-      "size_bytes": 4102213
+      "size_bytes": 4102193
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base2.obj",
-      "size_bytes": 4888781
+      "size_bytes": 4888761
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base3.obj",
-      "size_bytes": 4681212
+      "size_bytes": 4681192
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base4.obj",
-      "size_bytes": 2036876
+      "size_bytes": 2036856
     },
     {
       "path": "objdir/netwerk/base/mozurl/MozURL.obj",
-      "size_bytes": 33003
+      "size_bytes": 32983
     },
     {
       "path": "objdir/netwerk/base/http-sfv/SFV.obj",
@@ -7069,1507 +5963,31 @@
     },
     {
       "path": "objdir/netwerk/dns/AutoMemMap.obj",
-      "size_bytes": 78358
+      "size_bytes": 78338
     },
     {
       "path": "objdir/netwerk/dns/GetAddrInfo.obj",
-      "size_bytes": 769900
+      "size_bytes": 769876
     },
     {
       "path": "objdir/netwerk/dns/PlatformDNSWin.obj",
-      "size_bytes": 290746
+      "size_bytes": 290726
     },
     {
       "path": "objdir/netwerk/dns/nsEffectiveTLDService.obj",
-      "size_bytes": 304539
+      "size_bytes": 304515
     },
     {
       "path": "objdir/netwerk/dns/nsHostResolver.obj",
-      "size_bytes": 1221953
+      "size_bytes": 1221933
     },
     {
       "path": "objdir/netwerk/dns/Unified_cpp_netwerk_dns0.obj",
-      "size_bytes": 4794384
-    },
-    {
-      "path": "objdir/config/external/icu/common/appendable.obj",
-      "size_bytes": 11011
-    },
-    {
-      "path": "objdir/config/external/icu/common/bmpset.obj",
-      "size_bytes": 50472
-    },
-    {
-      "path": "objdir/config/external/icu/common/brkeng.obj",
-      "size_bytes": 6176
-    },
-    {
-      "path": "objdir/config/external/icu/common/brkiter.obj",
-      "size_bytes": 6180
-    },
-    {
-      "path": "objdir/config/external/icu/common/bytesinkutil.obj",
-      "size_bytes": 37002
-    },
-    {
-      "path": "objdir/config/external/icu/common/bytestream.obj",
-      "size_bytes": 19930
-    },
-    {
-      "path": "objdir/config/external/icu/common/bytestrie.obj",
-      "size_bytes": 33554
-    },
-    {
-      "path": "objdir/config/external/icu/common/bytestriebuilder.obj",
-      "size_bytes": 144682
-    },
-    {
-      "path": "objdir/config/external/icu/common/caniter.obj",
-      "size_bytes": 6180
-    },
-    {
-      "path": "objdir/config/external/icu/common/characterproperties.obj",
-      "size_bytes": 70502
-    },
-    {
-      "path": "objdir/config/external/icu/common/chariter.obj",
-      "size_bytes": 26870
-    },
-    {
-      "path": "objdir/config/external/icu/common/charstr.obj",
-      "size_bytes": 51936
-    },
-    {
-      "path": "objdir/config/external/icu/common/cmemory.obj",
-      "size_bytes": 20041
-    },
-    {
-      "path": "objdir/config/external/icu/common/cstring.obj",
-      "size_bytes": 19883
-    },
-    {
-      "path": "objdir/config/external/icu/common/dictbe.obj",
-      "size_bytes": 6176
-    },
-    {
-      "path": "objdir/config/external/icu/common/dictionarydata.obj",
-      "size_bytes": 6806
-    },
-    {
-      "path": "objdir/config/external/icu/common/dtintrv.obj",
-      "size_bytes": 19604
-    },
-    {
-      "path": "objdir/config/external/icu/common/edits.obj",
-      "size_bytes": 62920
-    },
-    {
-      "path": "objdir/config/external/icu/common/emojiprops.obj",
-      "size_bytes": 57321
-    },
-    {
-      "path": "objdir/config/external/icu/common/errorcode.obj",
-      "size_bytes": 15566
-    },
-    {
-      "path": "objdir/config/external/icu/common/filteredbrk.obj",
-      "size_bytes": 6196
-    },
-    {
-      "path": "objdir/config/external/icu/common/filterednormalizer2.obj",
-      "size_bytes": 6246
-    },
-    {
-      "path": "objdir/config/external/icu/common/fixedstring.obj",
-      "size_bytes": 25416
-    },
-    {
-      "path": "objdir/config/external/icu/common/loadednormalizer2impl.obj",
-      "size_bytes": 6258
-    },
-    {
-      "path": "objdir/config/external/icu/common/localebuilder.obj",
-      "size_bytes": 140598
-    },
-    {
-      "path": "objdir/config/external/icu/common/localematcher.obj",
-      "size_bytes": 126479
-    },
-    {
-      "path": "objdir/config/external/icu/common/localeprioritylist.obj",
-      "size_bytes": 43648
-    },
-    {
-      "path": "objdir/config/external/icu/common/locavailable.obj",
-      "size_bytes": 66189
-    },
-    {
-      "path": "objdir/config/external/icu/common/locbased.obj",
-      "size_bytes": 17954
-    },
-    {
-      "path": "objdir/config/external/icu/common/locdispnames.obj",
-      "size_bytes": 92782
-    },
-    {
-      "path": "objdir/config/external/icu/common/locdistance.obj",
-      "size_bytes": 60501
-    },
-    {
-      "path": "objdir/config/external/icu/common/locdspnm.obj",
-      "size_bytes": 191927
-    },
-    {
-      "path": "objdir/config/external/icu/common/locid.obj",
-      "size_bytes": 498283
-    },
-    {
-      "path": "objdir/config/external/icu/common/loclikely.obj",
-      "size_bytes": 128012
-    },
-    {
-      "path": "objdir/config/external/icu/common/loclikelysubtags.obj",
-      "size_bytes": 242630
-    },
-    {
-      "path": "objdir/config/external/icu/common/locmap.obj",
-      "size_bytes": 149894
-    },
-    {
-      "path": "objdir/config/external/icu/common/locresdata.obj",
-      "size_bytes": 41833
-    },
-    {
-      "path": "objdir/config/external/icu/common/locutil.obj",
-      "size_bytes": 97247
-    },
-    {
-      "path": "objdir/config/external/icu/common/lsr.obj",
-      "size_bytes": 34671
-    },
-    {
-      "path": "objdir/config/external/icu/common/lstmbe.obj",
-      "size_bytes": 6774
-    },
-    {
-      "path": "objdir/config/external/icu/common/messagepattern.obj",
-      "size_bytes": 216239
-    },
-    {
-      "path": "objdir/config/external/icu/common/mlbe.obj",
-      "size_bytes": 6168
-    },
-    {
-      "path": "objdir/config/external/icu/common/normalizer2.obj",
-      "size_bytes": 6196
-    },
-    {
-      "path": "objdir/config/external/icu/common/normalizer2impl.obj",
-      "size_bytes": 6230
-    },
-    {
-      "path": "objdir/config/external/icu/common/normlzr.obj",
-      "size_bytes": 6180
-    },
-    {
-      "path": "objdir/config/external/icu/common/parsepos.obj",
-      "size_bytes": 16862
-    },
-    {
-      "path": "objdir/config/external/icu/common/patternprops.obj",
-      "size_bytes": 17749
-    },
-    {
-      "path": "objdir/config/external/icu/common/propname.obj",
-      "size_bytes": 99266
-    },
-    {
-      "path": "objdir/config/external/icu/common/punycode.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/putil.obj",
-      "size_bytes": 69086
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbi.obj",
-      "size_bytes": 6317
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbi_cache.obj",
-      "size_bytes": 6192
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbidata.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbinode.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbirb.obj",
-      "size_bytes": 6176
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbiscan.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbisetb.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbistbl.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/rbbitblb.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/resbund.obj",
-      "size_bytes": 63901
-    },
-    {
-      "path": "objdir/config/external/icu/common/resource.obj",
-      "size_bytes": 8186
-    },
-    {
-      "path": "objdir/config/external/icu/common/restrace.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/ruleiter.obj",
-      "size_bytes": 76545
-    },
-    {
-      "path": "objdir/config/external/icu/common/schriter.obj",
-      "size_bytes": 80232
-    },
-    {
-      "path": "objdir/config/external/icu/common/serv.obj",
-      "size_bytes": 179979
-    },
-    {
-      "path": "objdir/config/external/icu/common/servlk.obj",
-      "size_bytes": 82986
-    },
-    {
-      "path": "objdir/config/external/icu/common/servlkf.obj",
-      "size_bytes": 76131
-    },
-    {
-      "path": "objdir/config/external/icu/common/servls.obj",
-      "size_bytes": 109340
-    },
-    {
-      "path": "objdir/config/external/icu/common/servnotf.obj",
-      "size_bytes": 36319
-    },
-    {
-      "path": "objdir/config/external/icu/common/servrbf.obj",
-      "size_bytes": 68388
-    },
-    {
-      "path": "objdir/config/external/icu/common/servslkf.obj",
-      "size_bytes": 72135
-    },
-    {
-      "path": "objdir/config/external/icu/common/sharedobject.obj",
-      "size_bytes": 17206
-    },
-    {
-      "path": "objdir/config/external/icu/common/simpleformatter.obj",
-      "size_bytes": 82768
-    },
-    {
-      "path": "objdir/config/external/icu/common/static_unicode_sets.obj",
-      "size_bytes": 106280
-    },
-    {
-      "path": "objdir/config/external/icu/common/stringpiece.obj",
-      "size_bytes": 59724
-    },
-    {
-      "path": "objdir/config/external/icu/common/stringtriebuilder.obj",
-      "size_bytes": 104223
-    },
-    {
-      "path": "objdir/config/external/icu/common/uarrsort.obj",
-      "size_bytes": 31327
-    },
-    {
-      "path": "objdir/config/external/icu/common/ubidi.obj",
-      "size_bytes": 120940
-    },
-    {
-      "path": "objdir/config/external/icu/common/ubidi_props.obj",
-      "size_bytes": 71794
-    },
-    {
-      "path": "objdir/config/external/icu/common/ubidiln.obj",
-      "size_bytes": 62805
-    },
-    {
-      "path": "objdir/config/external/icu/common/ubidiwrt.obj",
-      "size_bytes": 39020
-    },
-    {
-      "path": "objdir/config/external/icu/common/ubrk.obj",
-      "size_bytes": 6168
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucase.obj",
-      "size_bytes": 113309
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucasemap.obj",
-      "size_bytes": 81616
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucasemap_titlecase_brkiter.obj",
-      "size_bytes": 6274
-    },
-    {
-      "path": "objdir/config/external/icu/common/uchar.obj",
-      "size_bytes": 256270
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucharstrie.obj",
-      "size_bytes": 33189
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucharstriebuilder.obj",
-      "size_bytes": 130950
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucharstrieiterator.obj",
-      "size_bytes": 75555
-    },
-    {
-      "path": "objdir/config/external/icu/common/uchriter.obj",
-      "size_bytes": 46609
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucln_cmn.obj",
-      "size_bytes": 17804
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucmndata.obj",
-      "size_bytes": 26125
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv.obj",
-      "size_bytes": 118537
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_bld.obj",
-      "size_bytes": 77764
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_cb.obj",
-      "size_bytes": 30297
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_cnv.obj",
-      "size_bytes": 24739
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_err.obj",
-      "size_bytes": 28538
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_io.obj",
-      "size_bytes": 78065
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_u16.obj",
-      "size_bytes": 60912
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_u32.obj",
-      "size_bytes": 56519
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_u7.obj",
-      "size_bytes": 47187
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnv_u8.obj",
-      "size_bytes": 49712
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnvbocu.obj",
-      "size_bytes": 44172
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnvlat1.obj",
-      "size_bytes": 43721
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucnvscsu.obj",
-      "size_bytes": 72798
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucol_swp.obj",
-      "size_bytes": 6710
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucptrie.obj",
-      "size_bytes": 46587
-    },
-    {
-      "path": "objdir/config/external/icu/common/ucurr.obj",
-      "size_bytes": 226313
-    },
-    {
-      "path": "objdir/config/external/icu/common/udata.obj",
-      "size_bytes": 129305
-    },
-    {
-      "path": "objdir/config/external/icu/common/udatamem.obj",
-      "size_bytes": 22458
-    },
-    {
-      "path": "objdir/config/external/icu/common/udataswp.obj",
-      "size_bytes": 40999
-    },
-    {
-      "path": "objdir/config/external/icu/common/uenum.obj",
-      "size_bytes": 22220
-    },
-    {
-      "path": "objdir/config/external/icu/common/uhash.obj",
-      "size_bytes": 93116
-    },
-    {
-      "path": "objdir/config/external/icu/common/uhash_us.obj",
-      "size_bytes": 8179
-    },
-    {
-      "path": "objdir/config/external/icu/common/uinit.obj",
-      "size_bytes": 23178
-    },
-    {
-      "path": "objdir/config/external/icu/common/uinvchar.obj",
-      "size_bytes": 35480
-    },
-    {
-      "path": "objdir/config/external/icu/common/uiter.obj",
-      "size_bytes": 68129
-    },
-    {
-      "path": "objdir/config/external/icu/common/ulist.obj",
-      "size_bytes": 28728
-    },
-    {
-      "path": "objdir/config/external/icu/common/uloc.obj",
-      "size_bytes": 474144
-    },
-    {
-      "path": "objdir/config/external/icu/common/uloc_keytype.obj",
-      "size_bytes": 142431
-    },
-    {
-      "path": "objdir/config/external/icu/common/uloc_tag.obj",
-      "size_bytes": 244538
-    },
-    {
-      "path": "objdir/config/external/icu/common/ulocale.obj",
-      "size_bytes": 77627
-    },
-    {
-      "path": "objdir/config/external/icu/common/ulocbuilder.obj",
-      "size_bytes": 85345
-    },
-    {
-      "path": "objdir/config/external/icu/common/umapfile.obj",
-      "size_bytes": 16953
-    },
-    {
-      "path": "objdir/config/external/icu/common/umath.obj",
-      "size_bytes": 7320
-    },
-    {
-      "path": "objdir/config/external/icu/common/umutablecptrie.obj",
-      "size_bytes": 104764
-    },
-    {
-      "path": "objdir/config/external/icu/common/umutex.obj",
-      "size_bytes": 52527
-    },
-    {
-      "path": "objdir/config/external/icu/common/unames.obj",
-      "size_bytes": 111751
-    },
-    {
-      "path": "objdir/config/external/icu/common/unifiedcache.obj",
-      "size_bytes": 103129
-    },
-    {
-      "path": "objdir/config/external/icu/common/unifilt.obj",
-      "size_bytes": 12408
-    },
-    {
-      "path": "objdir/config/external/icu/common/unifunct.obj",
-      "size_bytes": 8979
-    },
-    {
-      "path": "objdir/config/external/icu/common/uniset.obj",
-      "size_bytes": 212722
-    },
-    {
-      "path": "objdir/config/external/icu/common/uniset_closure.obj",
-      "size_bytes": 111081
-    },
-    {
-      "path": "objdir/config/external/icu/common/uniset_props.obj",
-      "size_bytes": 170425
-    },
-    {
-      "path": "objdir/config/external/icu/common/unisetspan.obj",
-      "size_bytes": 77055
-    },
-    {
-      "path": "objdir/config/external/icu/common/unistr.obj",
-      "size_bytes": 310514
-    },
-    {
-      "path": "objdir/config/external/icu/common/unistr_case.obj",
-      "size_bytes": 33232
-    },
-    {
-      "path": "objdir/config/external/icu/common/unistr_case_locale.obj",
-      "size_bytes": 11185
-    },
-    {
-      "path": "objdir/config/external/icu/common/unistr_cnv.obj",
-      "size_bytes": 117896
-    },
-    {
-      "path": "objdir/config/external/icu/common/unistr_props.obj",
-      "size_bytes": 10291
-    },
-    {
-      "path": "objdir/config/external/icu/common/unistr_titlecase_brkiter.obj",
-      "size_bytes": 6266
-    },
-    {
-      "path": "objdir/config/external/icu/common/unormcmp.obj",
-      "size_bytes": 6184
-    },
-    {
-      "path": "objdir/config/external/icu/common/uobject.obj",
-      "size_bytes": 12729
-    },
-    {
-      "path": "objdir/config/external/icu/common/uprops.obj",
-      "size_bytes": 92959
-    },
-    {
-      "path": "objdir/config/external/icu/common/uresbund.obj",
-      "size_bytes": 322157
-    },
-    {
-      "path": "objdir/config/external/icu/common/uresdata.obj",
-      "size_bytes": 139212
-    },
-    {
-      "path": "objdir/config/external/icu/common/uscript.obj",
-      "size_bytes": 47114
-    },
-    {
-      "path": "objdir/config/external/icu/common/uscript_props.obj",
-      "size_bytes": 69026
-    },
-    {
-      "path": "objdir/config/external/icu/common/uset.obj",
-      "size_bytes": 66559
-    },
-    {
-      "path": "objdir/config/external/icu/common/uset_props.obj",
-      "size_bytes": 75525
-    },
-    {
-      "path": "objdir/config/external/icu/common/usetiter.obj",
-      "size_bytes": 71881
-    },
-    {
-      "path": "objdir/config/external/icu/common/usprep.obj",
-      "size_bytes": 6176
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustack.obj",
-      "size_bytes": 27951
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustr_cnv.obj",
-      "size_bytes": 25780
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustr_titlecase_brkiter.obj",
-      "size_bytes": 6258
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustrcase.obj",
-      "size_bytes": 81054
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustrcase_locale.obj",
-      "size_bytes": 22949
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustrenum.obj",
-      "size_bytes": 96634
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustrfmt.obj",
-      "size_bytes": 8979
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustring.obj",
-      "size_bytes": 82768
-    },
-    {
-      "path": "objdir/config/external/icu/common/ustrtrns.obj",
-      "size_bytes": 51627
-    },
-    {
-      "path": "objdir/config/external/icu/common/utext.obj",
-      "size_bytes": 165341
-    },
-    {
-      "path": "objdir/config/external/icu/common/utf_impl.obj",
-      "size_bytes": 17009
-    },
-    {
-      "path": "objdir/config/external/icu/common/util.obj",
-      "size_bytes": 86301
-    },
-    {
-      "path": "objdir/config/external/icu/common/util_props.obj",
-      "size_bytes": 69299
-    },
-    {
-      "path": "objdir/config/external/icu/common/utrace.obj",
-      "size_bytes": 80653
-    },
-    {
-      "path": "objdir/config/external/icu/common/utrie.obj",
-      "size_bytes": 62263
-    },
-    {
-      "path": "objdir/config/external/icu/common/utrie2.obj",
-      "size_bytes": 42323
-    },
-    {
-      "path": "objdir/config/external/icu/common/utrie2_builder.obj",
-      "size_bytes": 69735
-    },
-    {
-      "path": "objdir/config/external/icu/common/utrie_swap.obj",
-      "size_bytes": 29264
-    },
-    {
-      "path": "objdir/config/external/icu/common/uts46.obj",
-      "size_bytes": 6176
-    },
-    {
-      "path": "objdir/config/external/icu/common/utypes.obj",
-      "size_bytes": 44696
-    },
-    {
-      "path": "objdir/config/external/icu/common/uvector.obj",
-      "size_bytes": 80441
-    },
-    {
-      "path": "objdir/config/external/icu/common/uvectr32.obj",
-      "size_bytes": 50234
-    },
-    {
-      "path": "objdir/config/external/icu/common/uvectr64.obj",
-      "size_bytes": 39980
-    },
-    {
-      "path": "objdir/config/external/icu/common/wintz.obj",
-      "size_bytes": 33593
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/astro.obj",
-      "size_bytes": 125075
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/basictz.obj",
-      "size_bytes": 110428
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/bocsu.obj",
-      "size_bytes": 6216
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/buddhcal.obj",
-      "size_bytes": 49252
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/calendar.obj",
-      "size_bytes": 413424
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/cecal.obj",
-      "size_bytes": 37297
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/chnsecal.obj",
-      "size_bytes": 120554
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/choicfmt.obj",
-      "size_bytes": 117664
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/coleitr.obj",
-      "size_bytes": 6228
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/coll.obj",
-      "size_bytes": 6365
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collation.obj",
-      "size_bytes": 6232
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationbuilder.obj",
-      "size_bytes": 6282
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationcompare.obj",
-      "size_bytes": 6282
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationdata.obj",
-      "size_bytes": 6248
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationdatabuilder.obj",
-      "size_bytes": 6298
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationdatareader.obj",
-      "size_bytes": 6294
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationdatawriter.obj",
-      "size_bytes": 6294
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationfastlatin.obj",
-      "size_bytes": 6290
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationfastlatinbuilder.obj",
-      "size_bytes": 6314
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationfcd.obj",
-      "size_bytes": 6248
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationiterator.obj",
-      "size_bytes": 6431
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationkeys.obj",
-      "size_bytes": 6248
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationroot.obj",
-      "size_bytes": 6248
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationrootelements.obj",
-      "size_bytes": 6298
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationruleparser.obj",
-      "size_bytes": 6294
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationsets.obj",
-      "size_bytes": 6248
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationsettings.obj",
-      "size_bytes": 6282
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationtailoring.obj",
-      "size_bytes": 6290
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/collationweights.obj",
-      "size_bytes": 6282
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/compactdecimalformat.obj",
-      "size_bytes": 64382
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/coptccal.obj",
-      "size_bytes": 49115
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/curramt.obj",
-      "size_bytes": 29137
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/currfmt.obj",
-      "size_bytes": 28512
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/currpinf.obj",
-      "size_bytes": 124393
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/currunit.obj",
-      "size_bytes": 32929
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dangical.obj",
-      "size_bytes": 99413
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/datefmt.obj",
-      "size_bytes": 186290
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dayperiodrules.obj",
-      "size_bytes": 83565
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dcfmtsym.obj",
-      "size_bytes": 151236
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/decContext.obj",
-      "size_bytes": 27859
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/decNumber.obj",
-      "size_bytes": 242082
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/decimfmt.obj",
-      "size_bytes": 390851
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/displayoptions.obj",
-      "size_bytes": 27190
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dtfmtsym.obj",
-      "size_bytes": 439174
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dtitvfmt.obj",
-      "size_bytes": 254315
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dtitvinf.obj",
-      "size_bytes": 153648
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dtptngen.obj",
-      "size_bytes": 492391
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/dtrule.obj",
-      "size_bytes": 28554
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/erarules.obj",
-      "size_bytes": 39519
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ethpccal.obj",
-      "size_bytes": 61017
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/fmtable.obj",
-      "size_bytes": 149007
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/format.obj",
-      "size_bytes": 47506
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/formatted_string_builder.obj",
-      "size_bytes": 108680
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/formattedval_iterimpl.obj",
-      "size_bytes": 84882
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/formattedval_sbimpl.obj",
-      "size_bytes": 81334
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/formattedvalue.obj",
-      "size_bytes": 45143
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/fphdlimp.obj",
-      "size_bytes": 40154
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/fpositer.obj",
-      "size_bytes": 29269
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/gregocal.obj",
-      "size_bytes": 110626
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/gregoimp.obj",
-      "size_bytes": 40432
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/hebrwcal.obj",
-      "size_bytes": 86002
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/indiancal.obj",
-      "size_bytes": 57941
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/islamcal.obj",
-      "size_bytes": 125955
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/iso8601cal.obj",
-      "size_bytes": 32441
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/japancal.obj",
-      "size_bytes": 60981
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/listformatter.obj",
-      "size_bytes": 224477
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/measfmt.obj",
-      "size_bytes": 260975
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/measunit.obj",
-      "size_bytes": 649508
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/measunit_extra.obj",
-      "size_bytes": 261280
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/measure.obj",
-      "size_bytes": 30976
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2.obj",
-      "size_bytes": 6256
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_arguments.obj",
-      "size_bytes": 6314
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_checker.obj",
-      "size_bytes": 6306
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_data_model.obj",
-      "size_bytes": 6314
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_errors.obj",
-      "size_bytes": 6298
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_evaluation.obj",
-      "size_bytes": 6314
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_formattable.obj",
-      "size_bytes": 6322
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_formatter.obj",
-      "size_bytes": 6314
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_function_registry.obj",
-      "size_bytes": 6346
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_parser.obj",
-      "size_bytes": 6298
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/messageformat2_serializer.obj",
-      "size_bytes": 6314
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/msgfmt.obj",
-      "size_bytes": 311196
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/nfrs.obj",
-      "size_bytes": 122354
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/nfrule.obj",
-      "size_bytes": 175124
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/nfsubs.obj",
-      "size_bytes": 205265
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_affixutils.obj",
-      "size_bytes": 100759
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_asformat.obj",
-      "size_bytes": 72890
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_capi.obj",
-      "size_bytes": 186677
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_compact.obj",
-      "size_bytes": 158265
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_currencysymbols.obj",
-      "size_bytes": 108132
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_decimalquantity.obj",
-      "size_bytes": 302607
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_decimfmtprops.obj",
-      "size_bytes": 111383
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_fluent.obj",
-      "size_bytes": 508437
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_formatimpl.obj",
-      "size_bytes": 296344
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_grouping.obj",
-      "size_bytes": 51551
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_integerwidth.obj",
-      "size_bytes": 21939
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_longnames.obj",
-      "size_bytes": 402953
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_mapper.obj",
-      "size_bytes": 165770
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_modifiers.obj",
-      "size_bytes": 150742
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_multiplier.obj",
-      "size_bytes": 66461
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_notation.obj",
-      "size_bytes": 24557
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_output.obj",
-      "size_bytes": 126634
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_padding.obj",
-      "size_bytes": 50258
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_patternmodifier.obj",
-      "size_bytes": 182238
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_patternstring.obj",
-      "size_bytes": 224150
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_rounding.obj",
-      "size_bytes": 120004
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_scientific.obj",
-      "size_bytes": 73606
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_simple.obj",
-      "size_bytes": 158405
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_skeletons.obj",
-      "size_bytes": 395359
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_symbolswrapper.obj",
-      "size_bytes": 52608
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_usageprefs.obj",
-      "size_bytes": 113280
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/number_utils.obj",
-      "size_bytes": 87124
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numfmt.obj",
-      "size_bytes": 312471
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_affixes.obj",
-      "size_bytes": 229858
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_compositions.obj",
-      "size_bytes": 84334
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_currency.obj",
-      "size_bytes": 114044
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_decimal.obj",
-      "size_bytes": 99964
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_impl.obj",
-      "size_bytes": 305042
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_parsednumber.obj",
-      "size_bytes": 67843
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_scientific.obj",
-      "size_bytes": 86350
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_symbols.obj",
-      "size_bytes": 129591
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numparse_validators.obj",
-      "size_bytes": 85868
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numrange_capi.obj",
-      "size_bytes": 173122
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numrange_fluent.obj",
-      "size_bytes": 261640
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numrange_impl.obj",
-      "size_bytes": 233174
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/numsys.obj",
-      "size_bytes": 120844
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/olsontz.obj",
-      "size_bytes": 142393
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/persncal.obj",
-      "size_bytes": 64879
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/pluralranges.obj",
-      "size_bytes": 80764
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/plurfmt.obj",
-      "size_bytes": 176781
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/plurrule.obj",
-      "size_bytes": 438166
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/quantityformatter.obj",
-      "size_bytes": 94265
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/rbnf.obj",
-      "size_bytes": 246863
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/rbtz.obj",
-      "size_bytes": 148059
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/region.obj",
-      "size_bytes": 166894
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/reldatefmt.obj",
-      "size_bytes": 299375
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/reldtfmt.obj",
-      "size_bytes": 131205
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/rulebasedcollator.obj",
-      "size_bytes": 6282
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/scriptset.obj",
-      "size_bytes": 99705
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/search.obj",
-      "size_bytes": 6224
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/selfmt.obj",
-      "size_bytes": 47462
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/sharedbreakiterator.obj",
-      "size_bytes": 6892
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/simpletz.obj",
-      "size_bytes": 149445
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/smpdtfmt.obj",
-      "size_bytes": 418666
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/smpdtfst.obj",
-      "size_bytes": 33502
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/sortkey.obj",
-      "size_bytes": 6228
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/standardplural.obj",
-      "size_bytes": 31616
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/string_segment.obj",
-      "size_bytes": 36026
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/stsearch.obj",
-      "size_bytes": 6232
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/taiwncal.obj",
-      "size_bytes": 49479
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/timezone.obj",
-      "size_bytes": 214158
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tmunit.obj",
-      "size_bytes": 28525
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tmutamt.obj",
-      "size_bytes": 29839
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tmutfmt.obj",
-      "size_bytes": 161855
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tzfmt.obj",
-      "size_bytes": 320793
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tzgnames.obj",
-      "size_bytes": 226836
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tznames.obj",
-      "size_bytes": 121905
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tznames_impl.obj",
-      "size_bytes": 360089
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tzrule.obj",
-      "size_bytes": 106142
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/tztrans.obj",
-      "size_bytes": 31021
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ucal.obj",
-      "size_bytes": 145307
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ucln_in.obj",
-      "size_bytes": 12881
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ucol.obj",
-      "size_bytes": 6216
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ucol_res.obj",
-      "size_bytes": 6232
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ucol_sit.obj",
-      "size_bytes": 6830
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ucoleitr.obj",
-      "size_bytes": 6232
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/udat.obj",
-      "size_bytes": 188617
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/udateintervalformat.obj",
-      "size_bytes": 92149
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/udatpg.obj",
-      "size_bytes": 96814
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ufieldpositer.obj",
-      "size_bytes": 25164
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/uitercollationiterator.obj",
-      "size_bytes": 6306
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/ulistformatter.obj",
-      "size_bytes": 90968
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/umsg.obj",
-      "size_bytes": 102380
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/units_complexconverter.obj",
-      "size_bytes": 87562
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/units_converter.obj",
-      "size_bytes": 161506
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/units_data.obj",
-      "size_bytes": 226035
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/units_router.obj",
-      "size_bytes": 132087
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/unum.obj",
-      "size_bytes": 188910
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/unumsys.obj",
-      "size_bytes": 21444
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/upluralrules.obj",
-      "size_bytes": 94684
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/uregion.obj",
-      "size_bytes": 23895
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/usearch.obj",
-      "size_bytes": 6228
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/uspoof.obj",
-      "size_bytes": 6842
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/uspoof_impl.obj",
-      "size_bytes": 6866
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/utf16collationiterator.obj",
-      "size_bytes": 6306
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/utf8collationiterator.obj",
-      "size_bytes": 6298
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/utmscale.obj",
-      "size_bytes": 18374
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/vtzone.obj",
-      "size_bytes": 318508
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/windtfmt.obj",
-      "size_bytes": 106344
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/winnmfmt.obj",
-      "size_bytes": 95938
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/wintzimpl.obj",
-      "size_bytes": 20127
-    },
-    {
-      "path": "objdir/config/external/icu/i18n/zonemeta.obj",
-      "size_bytes": 146439
-    },
-    {
-      "path": "objdir/config/external/icu/data/icu_data.obj",
-      "size_bytes": 12879286
+      "size_bytes": 4774767
     },
     {
       "path": "objdir/netwerk/socket/Unified_cpp_netwerk_socket0.obj",
-      "size_bytes": 819985
+      "size_bytes": 819961
     },
     {
       "path": "objdir/netwerk/socket/neqo_glue/Unified_cpp_socket_neqo_glue0.obj",
@@ -8581,11 +5999,11 @@
     },
     {
       "path": "objdir/netwerk/streamconv/nsStreamConverterService.obj",
-      "size_bytes": 465254
+      "size_bytes": 465234
     },
     {
       "path": "objdir/netwerk/streamconv/converters/Unified_cpp_converters0.obj",
-      "size_bytes": 1042410
+      "size_bytes": 1042264
     },
     {
       "path": "objdir/third_party/zstd/Unified_c_third_party_zstd0.obj",
@@ -8593,47 +6011,47 @@
     },
     {
       "path": "objdir/netwerk/cache2/CacheCrypto.obj",
-      "size_bytes": 235744
+      "size_bytes": 235720
     },
     {
       "path": "objdir/netwerk/cache2/CacheStorage.obj",
-      "size_bytes": 137471
+      "size_bytes": 137451
     },
     {
       "path": "objdir/netwerk/cache2/Unified_cpp_netwerk_cache20.obj",
-      "size_bytes": 6793637
+      "size_bytes": 6793613
     },
     {
       "path": "objdir/netwerk/cache2/Unified_cpp_netwerk_cache21.obj",
-      "size_bytes": 3407284
+      "size_bytes": 3407260
     },
     {
       "path": "objdir/netwerk/protocol/http/nsHttpChannelAuthProvider.obj",
-      "size_bytes": 835809
+      "size_bytes": 835785
     },
     {
       "path": "objdir/netwerk/protocol/http/nsHttpHandler.obj",
-      "size_bytes": 1388486
+      "size_bytes": 1388462
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http0.obj",
-      "size_bytes": 2774594
+      "size_bytes": 2774574
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http1.obj",
-      "size_bytes": 6465919
+      "size_bytes": 6465899
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http2.obj",
-      "size_bytes": 5965599
+      "size_bytes": 5965579
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http3.obj",
-      "size_bytes": 7313664
+      "size_bytes": 7313644
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http4.obj",
-      "size_bytes": 4937070
+      "size_bytes": 4937050
     },
     {
       "path": "objdir/netwerk/protocol/http/happy_eyeballs_glue/Unified_cpp_happy_eyeballs_glue0.obj",
@@ -8641,7 +6059,7 @@
     },
     {
       "path": "objdir/netwerk/protocol/res/Unified_cpp_netwerk_protocol_res0.obj",
-      "size_bytes": 804812
+      "size_bytes": 804792
     },
     {
       "path": "objdir/netwerk/system/LinkServiceCommon.obj",
@@ -8649,7 +6067,7 @@
     },
     {
       "path": "objdir/netwerk/system/win32/nsNotifyAddrListener.obj",
-      "size_bytes": 633469
+      "size_bytes": 633445
     },
     {
       "path": "objdir/netwerk/system/win32/WinRegistry.obj",
@@ -8657,7 +6075,7 @@
     },
     {
       "path": "objdir/netwerk/ipc/Unified_cpp_netwerk_ipc0.obj",
-      "size_bytes": 1073574
+      "size_bytes": 1073550
     },
     {
       "path": "objdir/netwerk/naivefox/codec/Unified_cpp_naivefox_codec0.obj",
@@ -8665,7 +6083,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/XPCString.obj",
-      "size_bytes": 58278
+      "size_bytes": 58254
     },
     {
       "path": "objdir/netwerk/naivefox/core/AutoFallback.obj",
@@ -8673,11 +6091,11 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Config.obj",
-      "size_bytes": 830399
+      "size_bytes": 830379
     },
     {
       "path": "objdir/netwerk/naivefox/core/GeckoRuntime.obj",
-      "size_bytes": 1292084
+      "size_bytes": 1292064
     },
     {
       "path": "objdir/netwerk/naivefox/core/HeaderPadding.obj",
@@ -8685,7 +6103,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/HttpClient.obj",
-      "size_bytes": 1036071
+      "size_bytes": 1036051
     },
     {
       "path": "objdir/netwerk/naivefox/core/HttpConnectParser.obj",
@@ -8693,7 +6111,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/LeanDOMBindings.obj",
-      "size_bytes": 338892
+      "size_bytes": 336280
     },
     {
       "path": "objdir/netwerk/naivefox/core/MemMapSnapshot.obj",
@@ -8701,11 +6119,11 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/NaiveFoxRunner.obj",
-      "size_bytes": 361842
+      "size_bytes": 361822
     },
     {
       "path": "objdir/netwerk/naivefox/core/NeckoTunnel.obj",
-      "size_bytes": 1285952
+      "size_bytes": 1285928
     },
     {
       "path": "objdir/netwerk/naivefox/core/PaddingNegotiation.obj",
@@ -8717,23 +6135,23 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Socks5Parser.obj",
-      "size_bytes": 173167
+      "size_bytes": 173147
     },
     {
       "path": "objdir/netwerk/naivefox/core/SocksServer.obj",
-      "size_bytes": 725404
+      "size_bytes": 725380
     },
     {
       "path": "objdir/netwerk/naivefox/core/SpiderMonkeyCompat.obj",
-      "size_bytes": 133324
+      "size_bytes": 133304
     },
     {
       "path": "objdir/netwerk/naivefox/core/TemporaryTrustStore.obj",
-      "size_bytes": 246563
+      "size_bytes": 246539
     },
     {
       "path": "objdir/netwerk/naivefox/core/TunnelSession.obj",
-      "size_bytes": 724388
+      "size_bytes": 724364
     },
     {
       "path": "objdir/netwerk/naivefox/core/UnknownProtocolHandler.obj",
@@ -8741,11 +6159,11 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/NaiveFoxComponents.obj",
-      "size_bytes": 48923
+      "size_bytes": 48903
     },
     {
       "path": "objdir/netwerk/naivefox/core/ProfilerNaiveFoxStub.obj",
-      "size_bytes": 930296
+      "size_bytes": 930276
     },
     {
       "path": "objdir/netwerk/naivefox/core/AutoSQLiteLifetime.obj",
@@ -8753,7 +6171,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/PrefsTypes.obj",
-      "size_bytes": 248154
+      "size_bytes": 248134
     },
     {
       "path": "objdir/netwerk/naivefox/core/NaiveFoxVersion.obj",
@@ -8761,7 +6179,7 @@
     },
     {
       "path": "objdir/netwerk/build/nsNetModule.obj",
-      "size_bytes": 204617
+      "size_bytes": 204597
     },
     {
       "path": "objdir/xpcom/string/Unified_cpp_xpcom_string0.obj",
@@ -8769,23 +6187,23 @@
     },
     {
       "path": "objdir/xpcom/base/nsCrashOnException.obj",
-      "size_bytes": 58684
+      "size_bytes": 58660
     },
     {
       "path": "objdir/xpcom/base/nsDebugImpl.obj",
-      "size_bytes": 974592
+      "size_bytes": 974572
     },
     {
       "path": "objdir/xpcom/base/nsDumpUtils.obj",
-      "size_bytes": 62370
+      "size_bytes": 62350
     },
     {
       "path": "objdir/xpcom/base/Unified_cpp_xpcom_base0.obj",
-      "size_bytes": 2026650
+      "size_bytes": 2026630
     },
     {
       "path": "objdir/xpcom/base/Unified_cpp_xpcom_base1.obj",
-      "size_bytes": 2979317
+      "size_bytes": 2979297
     },
     {
       "path": "objdir/xpcom/base/Unified_cpp_xpcom_base2.obj",
@@ -8797,11 +6215,11 @@
     },
     {
       "path": "objdir/xpcom/ds/Unified_cpp_xpcom_ds0.obj",
-      "size_bytes": 1675679
+      "size_bytes": 1675655
     },
     {
       "path": "objdir/xpcom/ds/Unified_cpp_xpcom_ds1.obj",
-      "size_bytes": 1922234
+      "size_bytes": 1922210
     },
     {
       "path": "objdir/xpcom/io/Unified_c_xpcom_io0.obj",
@@ -8809,23 +6227,23 @@
     },
     {
       "path": "objdir/xpcom/io/Unified_cpp_xpcom_io0.obj",
-      "size_bytes": 2504574
+      "size_bytes": 2504554
     },
     {
       "path": "objdir/xpcom/io/Unified_cpp_xpcom_io1.obj",
-      "size_bytes": 2444224
+      "size_bytes": 2444204
     },
     {
       "path": "objdir/xpcom/components/StaticComponents.obj",
-      "size_bytes": 1663357
+      "size_bytes": 1663333
     },
     {
       "path": "objdir/xpcom/components/Unified_cpp_xpcom_components0.obj",
-      "size_bytes": 2057194
+      "size_bytes": 2057174
     },
     {
       "path": "objdir/xpcom/threads/IdlePeriodState.obj",
-      "size_bytes": 76872
+      "size_bytes": 76848
     },
     {
       "path": "objdir/xpcom/threads/IdleTaskRunner.obj",
@@ -8837,31 +6255,31 @@
     },
     {
       "path": "objdir/xpcom/threads/Unified_cpp_xpcom_threads0.obj",
-      "size_bytes": 3407974
+      "size_bytes": 3407954
     },
     {
       "path": "objdir/xpcom/threads/Unified_cpp_xpcom_threads1.obj",
-      "size_bytes": 4266613
+      "size_bytes": 4266593
     },
     {
       "path": "objdir/xpcom/reflect/xptinfo/xptdata.obj",
-      "size_bytes": 242033
+      "size_bytes": 242009
     },
     {
       "path": "objdir/xpcom/reflect/xptinfo/Unified_cpp_reflect_xptinfo0.obj",
-      "size_bytes": 91296
+      "size_bytes": 91276
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/xptcall.obj",
-      "size_bytes": 118653
+      "size_bytes": 118629
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/md/win32/xptcinvoke_x86_64.obj",
-      "size_bytes": 83524
+      "size_bytes": 83500
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/md/win32/xptcstubs_x86_64.obj",
-      "size_bytes": 88344
+      "size_bytes": 88324
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/md/win32/xptcinvoke_asm_x86_64.obj",
@@ -8873,27 +6291,27 @@
     },
     {
       "path": "objdir/chrome/Unified_cpp_chrome0.obj",
-      "size_bytes": 873110
+      "size_bytes": 873090
     },
     {
       "path": "objdir/xpcom/build/PoisonIOInterposerBase.obj",
-      "size_bytes": 75543
+      "size_bytes": 75519
     },
     {
       "path": "objdir/xpcom/build/PoisonIOInterposerWin.obj",
-      "size_bytes": 717927
+      "size_bytes": 717907
     },
     {
       "path": "objdir/xpcom/build/perfprobe.obj",
-      "size_bytes": 196706
+      "size_bytes": 196686
     },
     {
       "path": "objdir/xpcom/build/Unified_cpp_xpcom_build0.obj",
-      "size_bytes": 1491813
+      "size_bytes": 1491789
     },
     {
       "path": "objdir/ipc/chromium/message_pump_win.obj",
-      "size_bytes": 256828
+      "size_bytes": 256808
     },
     {
       "path": "objdir/ipc/chromium/object_watcher.obj",
@@ -8929,79 +6347,79 @@
     },
     {
       "path": "objdir/ipc/chromium/ipc_channel_win.obj",
-      "size_bytes": 466344
+      "size_bytes": 466320
     },
     {
       "path": "objdir/ipc/chromium/Unified_cpp_ipc_chromium0.obj",
-      "size_bytes": 2691169
+      "size_bytes": 2691145
     },
     {
       "path": "objdir/ipc/chromium/Unified_cpp_ipc_chromium1.obj",
-      "size_bytes": 2773463
+      "size_bytes": 2773439
     },
     {
       "path": "objdir/ipc/glue/CrossProcessMutex_windows.obj",
-      "size_bytes": 36505
+      "size_bytes": 36485
     },
     {
       "path": "objdir/ipc/glue/CrossProcessSemaphore_windows.obj",
-      "size_bytes": 47135
+      "size_bytes": 47115
     },
     {
       "path": "objdir/ipc/glue/WindowsMessageLoop.obj",
-      "size_bytes": 304212
+      "size_bytes": 304188
     },
     {
       "path": "objdir/ipc/glue/Unified_cpp_ipc_glue0.obj",
-      "size_bytes": 3767613
+      "size_bytes": 3767593
     },
     {
       "path": "objdir/ipc/glue/Unified_cpp_ipc_glue1.obj",
-      "size_bytes": 1430115
+      "size_bytes": 1430095
     },
     {
       "path": "objdir/ipc/ipdl/IPCMessageTypeName.obj",
-      "size_bytes": 27943
+      "size_bytes": 27923
     },
     {
       "path": "objdir/modules/libjar/Unified_cpp_modules_libjar0.obj",
-      "size_bytes": 873814
+      "size_bytes": 873790
     },
     {
       "path": "objdir/modules/libjar/zipwriter/Unified_cpp_libjar_zipwriter0.obj",
-      "size_bytes": 561176
+      "size_bytes": 561152
     },
     {
       "path": "objdir/storage/mozStorageBindingParams.obj",
-      "size_bytes": 651266
+      "size_bytes": 651246
     },
     {
       "path": "objdir/storage/mozStorageConnection.obj",
-      "size_bytes": 1939953
+      "size_bytes": 1939929
     },
     {
       "path": "objdir/storage/Unified_cpp_storage0.obj",
-      "size_bytes": 1275737
+      "size_bytes": 1275713
     },
     {
       "path": "objdir/storage/Unified_cpp_storage1.obj",
-      "size_bytes": 1647386
+      "size_bytes": 1647362
     },
     {
       "path": "objdir/caps/BasePrincipal.obj",
-      "size_bytes": 484584
+      "size_bytes": 484564
     },
     {
       "path": "objdir/caps/Unified_cpp_caps0.obj",
-      "size_bytes": 606168
+      "size_bytes": 606148
     },
     {
       "path": "objdir/security/certverifier/Unified_cpp_certverifier0.obj",
-      "size_bytes": 1240159
+      "size_bytes": 1240139
     },
     {
       "path": "objdir/security/ct/Unified_cpp_security_ct0.obj",
-      "size_bytes": 702466
+      "size_bytes": 702446
     },
     {
       "path": "objdir/security/manager/ssl/Unified_c_security_manager_ssl0.obj",
@@ -9009,15 +6427,15 @@
     },
     {
       "path": "objdir/security/manager/ssl/Unified_cpp_security_manager_ssl0.obj",
-      "size_bytes": 1296172
+      "size_bytes": 1296148
     },
     {
       "path": "objdir/security/manager/ssl/Unified_cpp_security_manager_ssl1.obj",
-      "size_bytes": 4424348
+      "size_bytes": 4424324
     },
     {
       "path": "objdir/security/manager/ssl/Unified_cpp_security_manager_ssl2.obj",
-      "size_bytes": 2310997
+      "size_bytes": 2310973
     },
     {
       "path": "objdir/security/nss/lib/mozpkix/mozpkix_mozpkix/pkixbuild.obj",
@@ -9065,15 +6483,7 @@
     },
     {
       "path": "objdir/intl/components/Unified_cpp_intl_components0.obj",
-      "size_bytes": 2052655
-    },
-    {
-      "path": "objdir/intl/components/Unified_cpp_intl_components1.obj",
-      "size_bytes": 788365
-    },
-    {
-      "path": "objdir/intl/components/src/calendar/Unified_cpp_src_calendar0.obj",
-      "size_bytes": 224691
+      "size_bytes": 1228364
     },
     {
       "path": "objdir/modules/zlib/src/adler32.obj",
