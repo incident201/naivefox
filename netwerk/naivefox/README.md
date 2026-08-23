@@ -80,8 +80,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   ```
 
   The same process environment is honored by the Android embedded entry point;
-  its caller-provided profile remains host-owned and is not modified by this
-  option.
+  its caller-provided profile remains host-owned. The CA certificates are
+  trusted through NSS's temporary certificate context and are not imported as
+  persistent profile certificates. When a configured CA is not a built-in
+  Firefox root, NaiveFox temporarily permits strict H3 to use that trust
+  anchor and restores Firefox's original preference during shutdown.
 
 Binding `0.0.0.0`, `::`, or a LAN address intentionally exposes a listener.
 Ordinary forward-proxy HTTP requests return 405. Comma-separated proxy chains,

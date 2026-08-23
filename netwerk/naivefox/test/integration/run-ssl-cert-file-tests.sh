@@ -67,7 +67,7 @@ expect_invalid_cert_file() {
     printf 'invalid SSL_CERT_FILE unexpectedly allowed %s to start\n' "$mode" >&2
     return 1
   }
-  ! ss -Hltn "sport = :$listen_port"
+  [[ -z $(ss -Hltn "sport = :$listen_port") ]]
 }
 
 run_case() {
@@ -105,8 +105,12 @@ path.write_text(json.dumps(config), encoding="utf-8")
 path.chmod(0o600)
 PY
 
-  local profile_hash
-  profile_hash=$(sha256sum "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/cert9.db")
+  find_certutil
+  if run_certutil -L -d "sql:$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE" \
+    -n 'NaiveFox Fixture Root' >/dev/null 2>&1; then
+    printf 'untrusted fixture profile unexpectedly contains the fixture root\n' >&2
+    return 1
+  fi
 
   expect_invalid_cert_file "$mode" "$config" "$listen_port" \
     "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE" "$run_dir/missing.pem" \
@@ -118,8 +122,6 @@ PY
   expect_invalid_cert_file "$mode" "$config" "$listen_port" \
     "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE" "$run_dir/malformed.pem" \
     "$run_dir/ssl-cert-file-malformed.log"
-  [[ $(sha256sum "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/cert9.db") == "$profile_hash" ]]
-
   set +e
   "${runtime_environment[@]}" -u SSL_CERT_FILE \
     NAIVEFOX_PROFILE="$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE" \
@@ -145,12 +147,9 @@ PY
     printf 'untrusted profile unexpectedly accepted %s without SSL_CERT_FILE\n' "$mode" >&2
     return 1
   }
-  [[ $(sha256sum "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/cert9.db") == "$profile_hash" ]]
-
   listen_port=$(free_port)
   sed "s/127.0.0.1:[0-9]*/127.0.0.1:$listen_port/" "$config" >"$config.tmp"
   mv -- "$config.tmp" "$config"
-  profile_hash=$(sha256sum "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/cert9.db")
   "${runtime_environment[@]}" SSL_CERT_FILE="$NAIVEFOX_FIXTURE_CA" \
     NAIVEFOX_PROFILE="$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE" \
     MOZ_CRASHREPORTER_DISABLE=1 "$runtime" "$config" \
@@ -169,7 +168,18 @@ PY
   kill "$client_pid" 2>/dev/null || true
   wait "$client_pid" 2>/dev/null || true
   client_pid=
-  [[ $(sha256sum "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/cert9.db") == "$profile_hash" ]]
+  if run_certutil -L -d "sql:$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE" \
+    -n 'NaiveFox Fixture Root' >/dev/null 2>&1; then
+    printf 'SSL_CERT_FILE trust was persisted to the NSS profile for %s\n' "$mode" >&2
+    return 1
+  fi
+  if [[ -f $NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/prefs.js ]] &&
+    rg -q 'network\.http\.http3\.disable_when_third_party_roots_found' \
+      "$NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE/prefs.js"; then
+    printf 'SSL_CERT_FILE H3 preference was persisted to the NSS profile for %s\n' \
+      "$mode" >&2
+    return 1
+  fi
 
   "$INTEGRATION_DIR/stop.sh" --quiet
   printf 'SSL_CERT_FILE temporary trust passed for %s\n' "$mode"

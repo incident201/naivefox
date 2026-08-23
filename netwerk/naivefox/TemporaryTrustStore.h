@@ -21,9 +21,11 @@ class TemporaryTrustStore final {
   TemporaryTrustStore& operator=(const TemporaryTrustStore&) = delete;
 
   nsresult LoadFromEnvironment(nsACString& aError);
+  bool IsConfigured() const { return mConfigured; }
 
  private:
   nsTArray<UniqueCERTCertificate> mCertificates;
+  bool mConfigured = false;
 };
 
 }  // namespace mozilla::naivefox

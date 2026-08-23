@@ -53,12 +53,15 @@ class GeckoRuntime final {
   UniquePtr<TemporaryTrustStore> mTemporaryTrustStore;
   bool mXPCOMInitialized = false;
   bool mNoPostQuantumApplied = false;
+  bool mSslCertFileApplied = false;
   bool mHadKyberPref = false;
   bool mHadMlkemPref = false;
   bool mHadHttp3KyberPref = false;
+  bool mHadHttp3ThirdPartyRootsPref = false;
   bool mOldKyberPref = false;
   bool mOldMlkemPref = false;
   bool mOldHttp3KyberPref = false;
+  bool mOldHttp3ThirdPartyRootsPref = false;
 };
 
 }  // namespace mozilla::naivefox

@@ -124,6 +124,7 @@ nsresult DecodeCertificates(nsCString& aContents,
 
 nsresult TemporaryTrustStore::LoadFromEnvironment(nsACString& aError) {
   aError.Truncate();
+  mConfigured = false;
 
   nsCOMPtr<nsIEnvironment> environment =
       do_GetService("@mozilla.org/process/environment;1");
@@ -216,6 +217,7 @@ nsresult TemporaryTrustStore::LoadFromEnvironment(nsACString& aError) {
     }
   }
 
+  mConfigured = true;
   return NS_OK;
 }
 

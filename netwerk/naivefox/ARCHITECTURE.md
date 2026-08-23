@@ -200,8 +200,11 @@ Gecko requires a writable profile. Config mode uses a unique private temporary
 profile unless the operator explicitly supplies `NAIVEFOX_PROFILE`; the profile
 choice never weakens NSS certificate or hostname verification. `SSL_CERT_FILE`
 adds process-lifetime trust anchors through the NSS temporary certificate
-context and never writes the profile certificate database. The environment
-option is applied by the common desktop and embedded initializer.
+context and never imports certificate or trust records into the profile. When
+that explicit CA is not a built-in Firefox root, the common initializer also
+temporarily disables Firefox's third-party-root H3 guard and restores the
+original preference during shutdown. The environment option is applied by the
+common desktop and embedded initializer.
 
 The embedded frontend instead requires the host to provide an existing,
 writable profile directory. It neither discovers desktop state directories nor

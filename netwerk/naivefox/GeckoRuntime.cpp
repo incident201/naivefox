@@ -330,6 +330,16 @@ nsresult GeckoRuntime::InitializeWithLocations(
     mTemporaryTrustStore = nullptr;
     return trustRv;
   }
+  if (mTemporaryTrustStore->IsConfigured()) {
+    constexpr auto kHttp3ThirdPartyRootsPref =
+        "network.http.http3.disable_when_third_party_roots_found";
+    mHadHttp3ThirdPartyRootsPref =
+        Preferences::HasUserValue(kHttp3ThirdPartyRootsPref);
+    (void)Preferences::GetBool(kHttp3ThirdPartyRootsPref,
+                                &mOldHttp3ThirdPartyRootsPref);
+    Preferences::SetBool(kHttp3ThirdPartyRootsPref, false);
+    mSslCertFileApplied = true;
+  }
 
   mIOService = do_GetIOService();
   return mIOService ? NS_OK : NS_ERROR_FAILURE;
@@ -373,6 +383,17 @@ void GeckoRuntime::Shutdown() {
         Preferences::ClearUser("network.http.http3.enable_kyber");
       }
       mNoPostQuantumApplied = false;
+    }
+    if (mSslCertFileApplied) {
+      constexpr auto kHttp3ThirdPartyRootsPref =
+          "network.http.http3.disable_when_third_party_roots_found";
+      if (mHadHttp3ThirdPartyRootsPref) {
+        Preferences::SetBool(kHttp3ThirdPartyRootsPref,
+                             mOldHttp3ThirdPartyRootsPref);
+      } else {
+        Preferences::ClearUser(kHttp3ThirdPartyRootsPref);
+      }
+      mSslCertFileApplied = false;
     }
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownNetTeardown);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownTeardown);
