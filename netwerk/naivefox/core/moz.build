@@ -18,6 +18,7 @@ SOURCES += [
     "../Socks5Parser.cpp",
     "../SocksServer.cpp",
     "../SpiderMonkeyCompat.cpp",
+    "../TemporaryTrustStore.cpp",
     "../TunnelSession.cpp",
     "../UnknownProtocolHandler.cpp",
     "NaiveFoxComponents.cpp",

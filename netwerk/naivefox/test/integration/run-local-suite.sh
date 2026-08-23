@@ -6,6 +6,7 @@ integration_dir=$(cd "$(dirname "$0")" && pwd)
 suites=(
   run-control-tests.sh
   run-necko-tests.sh
+  run-ssl-cert-file-tests.sh
   run-raw-connect-tests.sh
   run-socks-tests.sh
   run-padded-tests.sh

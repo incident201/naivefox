@@ -984,25 +984,6 @@ nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
     return CreatePersistentProfile(overridePath, aProfile.mPath, aError);
   }
 
-  std::filesystem::path persistent;
-  const char* stateHome = std::getenv("XDG_STATE_HOME");
-  if (stateHome && *stateHome) {
-    persistent = std::filesystem::path(stateHome) / "naivefox" / "profile";
-  } else {
-    const char* home = std::getenv("HOME");
-    if (home && *home) {
-      persistent = std::filesystem::path(home) / ".local" / "state" /
-                   "naivefox" / "profile";
-    }
-  }
-
-  if (!persistent.empty()) {
-    nsAutoCString persistentError;
-    if (NS_SUCCEEDED(CreatePersistentProfile(persistent, aProfile.mPath,
-                                             persistentError))) {
-      return NS_OK;
-    }
-  }
   nsresult rv = CreateTemporaryProfile(aProfile.mPath, aError);
   if (NS_SUCCEEDED(rv)) {
     aProfile.mTemporary = true;

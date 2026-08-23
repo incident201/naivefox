@@ -82,11 +82,13 @@ PY
 quiet_port=$(free_port)
 quiet_config="$run_dir/quiet-config.json"
 quiet_output="$run_dir/quiet-output.log"
-state_root="$run_dir/state"
+quiet_runtime="$run_dir/quiet-runtime"
+mkdir -m 700 "$quiet_runtime"
 write_config "$quiet_config" "$quiet_port" absent
 "${runtime_environment[@]}" -u NAIVEFOX_PROFILE -u NAIVEFOX_PROXY_USER \
   -u NAIVEFOX_PROXY_PASS \
-  -u SSLKEYLOGFILE XDG_STATE_HOME="$state_root" \
+  -u SSLKEYLOGFILE -u XDG_STATE_HOME -u HOME \
+  XDG_RUNTIME_DIR="$quiet_runtime" \
   MOZ_CRASHREPORTER_DISABLE=1 \
   "$runtime" "$quiet_config" >"$quiet_output" 2>&1 &
 client_pid=$!
@@ -97,8 +99,12 @@ for ((i = 0; i < 100; i++)); do
 done
 [[ -n $(ss -Hltn "sport = :$quiet_port") ]]
 [[ ! -s $quiet_output ]]
-[[ -d $state_root/naivefox/profile ]]
-[[ $(stat -c '%a' "$state_root/naivefox/profile") == 700 ]]
+mapfile -t quiet_profiles < <(
+  find "$quiet_runtime" -mindepth 1 -maxdepth 1 -type d \
+    -name 'naivefox-profile-*' -print
+)
+[[ ${#quiet_profiles[@]} -eq 1 ]]
+[[ $(stat -c '%a' "${quiet_profiles[0]}") == 700 ]]
 kill "$client_pid"
 wait "$client_pid" || [[ $? -eq 143 ]]
 client_pid=
@@ -197,4 +203,4 @@ wait "$client_pid" || [[ $? -eq 143 ]]
 client_pid=
 
 printf '%s\n' \
-  'NaiveFox config logging and persistent/temporary profile tests passed'
+  'NaiveFox config logging and temporary/explicit profile tests passed'

@@ -69,6 +69,19 @@ The supported config is a strict NaiveProxy-compatible subset:
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path
   appends to a mode-`0600` file.
+- `SSL_CERT_FILE` is an environment variable, not a JSON field. When set to an
+  absolute PEM path, its certificates become additional TLS trust anchors for
+  the current run only. The normal Firefox/NSS roots and certificate checks
+  remain active. An empty, relative, unreadable, or malformed file fails
+  startup. For example:
+
+  ```bash
+  SSL_CERT_FILE=/absolute/path/private-root.pem ./naivefox config.json
+  ```
+
+  The same process environment is honored by the Android embedded entry point;
+  its caller-provided profile remains host-owned and is not modified by this
+  option.
 
 Binding `0.0.0.0`, `::`, or a LAN address intentionally exposes a listener.
 Ordinary forward-proxy HTTP requests return 405. Comma-separated proxy chains,
@@ -80,10 +93,11 @@ A SOCKS client should delegate destination DNS to the proxy:
 curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 ```
 
-Normal config mode uses a persistent profile under `XDG_STATE_HOME`, then
-`$HOME/.local/state`, or the explicit `NAIVEFOX_PROFILE`. If no persistent
-location is usable, it creates a private temporary profile and removes it after
-an orderly shutdown. Certificate verification is never disabled.
+Normal config mode creates a private temporary profile for every run and removes
+it after an orderly shutdown. Set `NAIVEFOX_PROFILE` explicitly when NSS
+databases or other profile state must persist across restarts. Existing profiles
+under `XDG_STATE_HOME` or `$HOME/.local/state` are not selected implicitly.
+Certificate verification is never disabled.
 
 Developer-only modes provide focused diagnostics:
 
@@ -169,6 +183,7 @@ listeners.
 - RFC 1929 authentication for configured SOCKS listeners.
 - Upstream host mapping, custom CONNECT headers, and the no-post-quantum TLS
   preference.
+- Additive process-local CA trust from an absolute PEM path in `SSL_CERT_FILE`.
 - Naive `padding` request/response negotiation and legacy Variant 1 payload
   framing: eight padded records per direction, then raw bytes.
 - Bounded async pumping, partial I/O, backpressure, half-close, connection reuse,

@@ -323,6 +323,14 @@ nsresult GeckoRuntime::InitializeWithLocations(
   MOZ_TRY(observers->NotifyObservers(nullptr, "profile-do-change", u"startup"));
   net_EnsurePSMInit();
 
+  mTemporaryTrustStore = MakeUnique<TemporaryTrustStore>();
+  nsAutoCString trustError;
+  nsresult trustRv = mTemporaryTrustStore->LoadFromEnvironment(trustError);
+  if (NS_FAILED(trustRv)) {
+    mTemporaryTrustStore = nullptr;
+    return trustRv;
+  }
+
   mIOService = do_GetIOService();
   return mIOService ? NS_OK : NS_ERROR_FAILURE;
 }
@@ -344,6 +352,7 @@ nsresult GeckoRuntime::RunEventLoopSmoke() {
 
 void GeckoRuntime::Shutdown() {
   mIOService = nullptr;
+  mTemporaryTrustStore = nullptr;
 
   if (mXPCOMInitialized) {
     if (mNoPostQuantumApplied) {

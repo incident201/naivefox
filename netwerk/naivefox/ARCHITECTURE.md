@@ -196,9 +196,12 @@ belong to that one runtime; concurrent starts are rejected. After a successful
 Gecko/XPCOM initialization and shutdown, another embedded start in the same
 process is not supported because Gecko's process lifecycle is one-shot.
 
-Gecko requires a writable profile. Config mode prefers managed persistent state
-and falls back to a unique private temporary profile. The profile choice never
-weakens NSS certificate or hostname verification.
+Gecko requires a writable profile. Config mode uses a unique private temporary
+profile unless the operator explicitly supplies `NAIVEFOX_PROFILE`; the profile
+choice never weakens NSS certificate or hostname verification. `SSL_CERT_FILE`
+adds process-lifetime trust anchors through the NSS temporary certificate
+context and never writes the profile certificate database. The environment
+option is applied by the common desktop and embedded initializer.
 
 The embedded frontend instead requires the host to provide an existing,
 writable profile directory. It neither discovers desktop state directories nor

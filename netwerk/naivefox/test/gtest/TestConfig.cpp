@@ -506,4 +506,57 @@ TEST(NaiveFoxConfig, TemporaryProfileWithoutHome)
   EXPECT_FALSE(std::filesystem::exists(profilePath));
 }
 
+TEST(NaiveFoxConfig, TemporaryProfileIsTheDefault)
+{
+  ScopedTestDirectory root;
+  ASSERT_FALSE(root.Path().empty());
+  const std::filesystem::path temporaryRoot = root.Path() / "runtime";
+  const std::filesystem::path stateRoot = root.Path() / "state";
+  const std::filesystem::path homeRoot = root.Path() / "home";
+  ASSERT_TRUE(std::filesystem::create_directory(temporaryRoot));
+  ASSERT_TRUE(std::filesystem::create_directory(stateRoot));
+  ASSERT_TRUE(std::filesystem::create_directory(homeRoot));
+
+  ScopedEnvironment profileOverride("NAIVEFOX_PROFILE", nullptr);
+  const std::string state = stateRoot.string();
+  const std::string home = homeRoot.string();
+  const std::string temporary = temporaryRoot.string();
+  ScopedEnvironment stateHome("XDG_STATE_HOME", state.c_str());
+  ScopedEnvironment homeEnvironment("HOME", home.c_str());
+  ScopedEnvironment runtimeHome("XDG_RUNTIME_DIR", nullptr);
+  ScopedEnvironment temporaryHome("TMPDIR", temporary.c_str());
+
+  std::filesystem::path profilePath;
+  {
+    ProfileDirectory profile;
+    nsAutoCString error;
+    ASSERT_EQ(ResolveAndCreateProfile(profile, error), NS_OK) << error.get();
+    EXPECT_TRUE(profile.IsTemporary());
+    profilePath = PromiseFlatCString(profile.Path()).get();
+    EXPECT_EQ(profilePath.parent_path(), temporaryRoot);
+    EXPECT_TRUE(std::filesystem::is_directory(profilePath));
+  }
+  EXPECT_FALSE(std::filesystem::exists(profilePath));
+  EXPECT_FALSE(std::filesystem::exists(stateRoot / "naivefox" / "profile"));
+  EXPECT_FALSE(std::filesystem::exists(homeRoot / ".local" / "state" /
+                                       "naivefox" / "profile"));
+}
+
+TEST(NaiveFoxConfig, ExplicitProfileRemainsPersistent)
+{
+  ScopedTestDirectory root;
+  ASSERT_FALSE(root.Path().empty());
+  const std::filesystem::path persistent = root.Path() / "profile";
+  const std::string persistentString = persistent.string();
+  ScopedEnvironment profileOverride("NAIVEFOX_PROFILE",
+                                    persistentString.c_str());
+
+  ProfileDirectory profile;
+  nsAutoCString error;
+  ASSERT_EQ(ResolveAndCreateProfile(profile, error), NS_OK) << error.get();
+  EXPECT_FALSE(profile.IsTemporary());
+  EXPECT_EQ(PromiseFlatCString(profile.Path()).get(), persistentString);
+  EXPECT_TRUE(std::filesystem::is_directory(persistent));
+}
+
 }  // namespace mozilla::naivefox

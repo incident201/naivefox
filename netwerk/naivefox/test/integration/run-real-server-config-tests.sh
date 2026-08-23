@@ -55,6 +55,8 @@ PY
 state_root="$OBJDIR/naivefox-real-config-tests"
 mkdir -m 0700 -p "$state_root" "$SOURCE_ROOT/artifacts"
 run_dir=$(mktemp -d "$state_root/$protocol.XXXXXX")
+runtime_profile_root="$run_dir/runtime"
+mkdir -m 700 "$runtime_profile_root"
 config_file="$run_dir/config.json"
 client_log="$run_dir/client.log"
 summary="$run_dir/summary.txt"
@@ -132,7 +134,8 @@ if [[ $runtime_kind == objdir ]]; then
 else
   runtime_environment+=(-u LD_LIBRARY_PATH)
 fi
-runtime_environment+=(XDG_STATE_HOME="$run_dir/state"
+runtime_environment+=(XDG_RUNTIME_DIR="$runtime_profile_root"
+  -u XDG_STATE_HOME
   MOZ_CRASHREPORTER_DISABLE=1)
 "${runtime_environment[@]}" "$runtime" "$config_file" \
   >"$client_log" 2>&1 &
@@ -153,8 +156,12 @@ rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log"
 rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"
 ss -Hltn "sport = :$socks_port" | rg -q '0\.0\.0\.0:'
 ss -Hltn "sport = :$http_port" | rg -q '0\.0\.0\.0:'
-[[ -d $run_dir/state/naivefox/profile ]]
-[[ $(stat -c '%a' "$run_dir/state/naivefox/profile") == 700 ]]
+mapfile -t temporary_profiles < <(
+  find "$runtime_profile_root" -mindepth 1 -maxdepth 1 -type d \
+    -name 'naivefox-profile-*' -print
+)
+[[ ${#temporary_profiles[@]} -eq 1 ]]
+[[ $(stat -c '%a' "${temporary_profiles[0]}") == 700 ]]
 
 curl_socks=(--silent --show-error --fail --location --noproxy ''
   --connect-timeout 15 --max-time 90

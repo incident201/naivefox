@@ -6,6 +6,7 @@
 #define netwerk_naivefox_GeckoRuntime_h
 
 #include "ProxyProtocol.h"
+#include "TemporaryTrustStore.h"
 #include "mozilla/AutoSQLiteLifetime.h"
 #include "mozilla/UniquePtr.h"
 #include "nsCOMPtr.h"
@@ -49,6 +50,7 @@ class GeckoRuntime final {
   nsCOMPtr<nsIDirectoryServiceProvider> mDirectoryProvider;
   nsCOMPtr<nsIIOService> mIOService;
   UniquePtr<AutoSQLiteLifetime> mSQLiteLifetime;
+  UniquePtr<TemporaryTrustStore> mTemporaryTrustStore;
   bool mXPCOMInitialized = false;
   bool mNoPostQuantumApplied = false;
   bool mHadKyberPref = false;
