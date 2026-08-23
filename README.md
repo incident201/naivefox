@@ -56,8 +56,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   `listen`. `https://` is strict H2 over TLS/TCP and `quic://` is strict H3
   over QUIC. Credentials are optional, percent-decoded, and passed to
   Necko's proxy-auth path. Port 443 is used when omitted.
-- `https://` requires H2 over TLS/TCP. `quic://` requires H3 over QUIC/UDP.
-  Strict modes never silently fall back.
+- Strict H2/H3 modes never silently fall back.
 - Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
   An explicit nonzero port is required.
 - `host-resolver-rules` accepts exactly one `MAP logical-host physical-host`
@@ -70,6 +69,22 @@ The supported config is a strict NaiveProxy-compatible subset:
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path
   appends to a mode-`0600` file.
+- `SSL_CERT_FILE` is an environment variable, not a JSON field. When set to an
+  absolute PEM path, its certificates become additional TLS trust anchors for
+  the current run only. The normal Firefox/NSS roots and certificate checks
+  remain active. An empty, relative, unreadable, or malformed file fails
+  startup. For example:
+
+  ```bash
+  SSL_CERT_FILE=/absolute/path/private-root.pem ./naivefox config.json
+  ```
+
+  The same process environment is honored by the Android embedded entry point;
+  its caller-provided profile remains host-owned. The CA certificates are
+  trusted through NSS's temporary certificate context and are not imported as
+  persistent profile certificates. When a configured CA is not a built-in
+  Firefox root, NaiveFox temporarily permits strict H3 to use that trust
+  anchor and restores Firefox's original preference during shutdown.
 
 Binding `0.0.0.0`, `::`, or a LAN address intentionally exposes a listener.
 Ordinary forward-proxy HTTP requests return 405. Comma-separated proxy chains,
@@ -81,10 +96,11 @@ A SOCKS client should delegate destination DNS to the proxy:
 curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 ```
 
-Normal config mode uses a persistent profile under `XDG_STATE_HOME`, then
-`$HOME/.local/state`, or the explicit `NAIVEFOX_PROFILE`. If no persistent
-location is usable, it creates a private temporary profile and removes it after
-an orderly shutdown. Certificate verification is never disabled.
+Normal config mode creates a private temporary profile for every run and removes
+it after an orderly shutdown. Set `NAIVEFOX_PROFILE` explicitly when NSS
+databases or other profile state must persist across restarts. Existing profiles
+under `XDG_STATE_HOME` or `$HOME/.local/state` are not selected implicitly.
+Certificate verification is never disabled.
 
 Developer-only modes provide focused diagnostics:
 
@@ -102,28 +118,6 @@ Developer CLI modes take proxy credentials from `NAIVEFOX_PROXY_USER` and
 `NAIVEFOX_PROXY_PASS`. `--protocol h2` is the default; `h3` is strict H3;
 `auto` performs one strict H3 attempt and permits one H2 retry only when H3
 fails before a CONNECT response or tunnel transport exists.
-
-## Building and testing
-
-The minimized product workflow builds and stages the runtime below the object
-directory:
-
-```bash
-./netwerk/naivefox/tools/build-product.sh linux \
-  --objdir "$PWD/../obj-naivefox-linux"
-
-NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
-./netwerk/naivefox/tools/verify-staged-runtime.sh \
-  package/naivefox-linux-x86_64
-
-./netwerk/naivefox/test/integration/run-full-suite.sh
-```
-
-Use the same entrypoint with `windows --bootstrap` for the Windows package.
-The Android command is shown in the next section. Android packaging can be
-checked without a device with
-`run-android-embedded-tests.sh --check-only`; network acceptance requires an
-online ARM64 API-26+ device or emulator.
 
 ## Android embedded runtime
 
@@ -192,6 +186,7 @@ listeners.
 - RFC 1929 authentication for configured SOCKS listeners.
 - Upstream host mapping, custom CONNECT headers, and the no-post-quantum TLS
   preference.
+- Additive process-local CA trust from an absolute PEM path in `SSL_CERT_FILE`.
 - Naive `padding` request/response negotiation and legacy Variant 1 payload
   framing: eight padded records per direction, then raw bytes.
 - Bounded async pumping, partial I/O, backpressure, half-close, connection reuse,
@@ -221,7 +216,109 @@ The target's TLS session belongs to the application using the local proxy.
 NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 
 See [`ARCHITECTURE.md`](netwerk/naivefox/ARCHITECTURE.md) for component, event-target, stream,
-and fallback details.
+and fallback details. Downstream Firefox hooks are inventoried in
+`UPSTREAM-PATCHES.md` in the full maintenance checkout.
+
+## Building and testing
+
+Development happens in the full Firefox source checkout, but the normal
+product workflow builds only the minimized NaiveFox graph. It does not build a
+Firefox browser:
+
+```bash
+./netwerk/naivefox/tools/build-product.sh linux \
+  --objdir "$PWD/../obj-naivefox-linux"
+```
+
+The same entrypoint selects the Windows x86-64 mozconfig, external object
+directory, staging script, and (under WSL) the portable Wine paths/prefix:
+
+```bash
+./netwerk/naivefox/tools/build-product.sh windows \
+  --objdir "$PWD/../obj-naivefox-windows" \
+  --bootstrap
+```
+
+For a local WSL/Windows ARM64 AVD, pass --start-emulator to the same runner;
+it owns the QEMU virt launch workaround and cleans up the emulator it starts.
+
+The Android ARM64 command and package verifier are documented in
+[Android embedded runtime](#android-embedded-runtime). A static NDK harness
+check, which does not require a device, is available after staging:
+
+```bash
+./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
+  --package "$PWD/../obj-naivefox-android-aarch64/package/naivefox-android-aarch64" \
+  --check-only
+```
+
+Together, the verifier and `--check-only` prove the package manifest,
+dependency/export metadata, AArch64 harness construction, and ELF inspection
+only. Android acceptance still requires an online ARM64 API-26+ device or
+emulator and the same runner without `--check-only`, so a host with no `adb`
+device or KVM must not report the H2/H3 device gate as passed.
+
+Run the reproducible local H2/H3/Auto/config/robustness gate with:
+
+```bash
+./netwerk/naivefox/test/integration/run-full-suite.sh
+```
+
+The fixture builds pinned Caddy and `forwardproxy@naive` inputs, binds only to
+loopback, creates per-run credentials and PKI state, and trusts its CA only in
+isolated NSS profiles. No real proxy account is required. Detailed focused and
+real-deployment commands are in
+[`test/integration/README.md`](netwerk/naivefox/test/integration/README.md).
+
+The entrypoint stages the package below the object directory. Verify the Linux
+package after a successful product build:
+
+```bash
+NAIVEFOX_OBJDIR="$PWD/../obj-naivefox-linux" \
+./netwerk/naivefox/tools/verify-staged-runtime.sh \
+  package/naivefox-linux-x86_64
+```
+
+The entrypoint disables the local sccache daemon by default so a build does
+not depend on stale daemon state or silently change its configure inputs. Set
+`NAIVEFOX_USE_SCCACHE=1` only when the daemon has been deliberately configured
+for this checkout.
+
+An ordinary Firefox build is not a merge or release gate. It is allowed only
+for an explicitly requested same-base capture comparison; see
+[`CAPTURE.md`](netwerk/naivefox/CAPTURE.md).
+
+## Repository workflow
+
+```text
+Mozilla main -> firefox-upstream -> naivefox-full-source -> generated naivefox-minimal-source
+```
+
+- `firefox-upstream` is a clean fast-forward-only Mozilla mirror.
+- `naivefox-full-source` is the single complete working tree containing the
+  NaiveFox implementation, minimization rules, and export tooling.
+- `naivefox-minimal-source` is a generated standalone product snapshot and is
+  never hand-edited. Its `.github/workflows/` control-plane files are the
+  deliberate exception and may be maintained directly.
+
+The refresh and export gates are defined in `UPSTREAM.md` in the full
+maintenance checkout. In particular, commit SHAs and test transcripts
+belong in generated evidence, commits, and annotated tags rather than being
+copied into active Markdown.
+
+Release automation is intentionally maintained as the control-plane overlay
+`.github/workflows/release.yml` on `naivefox-minimal-source`. It is manual-only,
+builds the targets selected by that branch's release workflow, and creates a
+draft release without running the integration/Caddy suites.
+
+## Security and data handling
+
+Never commit or retain proxy passwords, authorization headers, TLS keys, local
+CA private keys, NSS profiles, packet captures, request payloads, or generated
+fixture state. Integration state lives under the object directory with private
+permissions and is removed after successful runs. Real-server tests receive
+their endpoint and credentials through environment variables and keep only a
+credential-free summary.
 
 ## References
 

@@ -42,6 +42,7 @@ applicable aggregate:
 |---|---|
 | Fixture module, auth, ACL, TLS, profiles | `run-control-tests.sh` |
 | Necko/NSS trust and hostname validation | `run-necko-tests.sh` |
+| Temporary `SSL_CERT_FILE` trust and non-persistence | `run-ssl-cert-file-tests.sh` |
 | Marker-free raw CONNECT | `run-raw-connect-tests.sh`, `run-h3-raw-connect-tests.sh` |
 | SOCKS remote DNS and tunnel shutdown | `run-socks-tests.sh`, `run-h3-socks-tests.sh` |
 | Padding negotiation and transfer integrity | `run-padded-tests.sh`, `run-h3-padded-tests.sh` |

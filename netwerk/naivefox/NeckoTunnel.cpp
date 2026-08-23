@@ -386,7 +386,10 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          nsIHttpUpgradeListener* aUpgradeListener,
                          nsIStreamListener* aChannelListener,
                          const nsACString& aConnectPadding,
-                         ProxyProtocol aProtocol, nsIRequest** aOpenedRequest) {
+                         ProxyProtocol aProtocol,
+                         const Maybe<HostResolverRule>& aHostResolverRule,
+                         const nsTArray<ExtraHeader>& aExtraHeaders,
+                         nsIRequest** aOpenedRequest) {
   if (!aUpgradeListener || !aChannelListener) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -471,6 +474,16 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   proxyInfo = concreteProxy->CloneProxyInfoWithNewResolveFlags(
       nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |
       nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL);
+  concreteProxy = do_QueryInterface(proxyInfo);
+  if (!concreteProxy) {
+    return NS_ERROR_FAILURE;
+  }
+  if (aHostResolverRule &&
+      aHostResolverRule->mLogicalHost.Equals(
+          proxyHost, nsCaseInsensitiveCStringComparator) &&
+      !aHostResolverRule->mPhysicalHost.IsEmpty()) {
+    concreteProxy->SetNaiveFoxPhysicalHost(aHostResolverRule->mPhysicalHost);
+  }
 
   nsCOMPtr<nsIPrincipal> principal;
   MOZ_TRY(GetSystemPrincipal(getter_AddRefs(principal)));
@@ -505,6 +518,9 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   MOZ_TRY(internal->SetAllowHttp3(aProtocol == ProxyProtocol::H3));
   MOZ_TRY(internal->SetBlockAuthPrompt(true));
   MOZ_TRY(internal->SetConnectOnly(false));
+  for (const auto& header : aExtraHeaders) {
+    MOZ_TRY(internal->SetProxyConnectHeader(header.mName, header.mValue));
+  }
   if (!aConnectPadding.IsEmpty()) {
     MOZ_TRY(internal->SetProxyConnectHeader("padding"_ns, aConnectPadding));
   }
@@ -544,7 +560,8 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
     nsCOMPtr<nsIRequest> openedRequest;
     MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
                             aProxyPassword, listener, listener, EmptyCString(),
-                            actualProtocol, getter_AddRefs(openedRequest)));
+                            actualProtocol, {}, {},
+                            getter_AddRefs(openedRequest)));
 
     nsCOMPtr<nsITimer> establishmentTimer;
     bool establishmentTimedOut = false;

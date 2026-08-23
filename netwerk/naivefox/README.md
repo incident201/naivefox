@@ -38,29 +38,57 @@ The supported config is a strict NaiveProxy-compatible subset:
   ],
   "proxy": [
     "https://user:password@proxy.example:443",
-    "https://user:password@proxy.example:443"
+    "quic://proxy.example:443"
   ],
+  "host-resolver-rules": "MAP proxy.example 127.0.0.1",
+  "extra-headers": "X-NaiveFox-Test: enabled\r\n",
+  "no-post-quantum": false,
   "log": ""
 }
 ```
 
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
-  `http://` serves HTTP CONNECT only.
+  without userinfo it uses the normal no-auth method. SOCKS credentials are
+  optional, percent-decoded, and checked with RFC 1929 username/password
+  authentication; `http://` serves HTTP CONNECT only and does not accept
+  listener credentials.
 - `proxy` is one URI shared by all listeners, or an array whose length matches
-  `listen`. Multi-hop comma-separated proxy chains are rejected.
-- `https://` requires H2 over TLS/TCP. `quic://` requires H3 over QUIC/UDP.
-  Strict modes never silently fall back.
-- Credentials are percent-decoded and passed to Necko's proxy-auth path. They
-  are never written to normal logs.
+  `listen`. `https://` is strict H2 over TLS/TCP and `quic://` is strict H3
+  over QUIC. Credentials are optional, percent-decoded, and passed to
+  Necko's proxy-auth path. Port 443 is used when omitted.
+- Strict H2/H3 modes never silently fall back.
 - Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
   An explicit nonzero port is required.
+- `host-resolver-rules` accepts exactly one `MAP logical-host physical-host`
+  rule. A matching upstream socket uses the physical host while TLS SNI and
+  certificate validation retain the logical hostname.
+- `extra-headers` is a CRLF-separated list added only to the outer upstream
+  CONNECT request. Malformed, duplicate, or service headers such as `Host`,
+  `Padding`, and `Proxy-Authorization` are rejected.
+- `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
+  Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path
   appends to a mode-`0600` file.
+- `SSL_CERT_FILE` is an environment variable, not a JSON field. When set to an
+  absolute PEM path, its certificates become additional TLS trust anchors for
+  the current run only. The normal Firefox/NSS roots and certificate checks
+  remain active. An empty, relative, unreadable, or malformed file fails
+  startup. For example:
 
-Local listeners do not authenticate clients. Binding `0.0.0.0`, `::`, or a LAN
-address intentionally exposes the listener and requires an appropriate host
-firewall or trusted-network policy. Ordinary forward-proxy HTTP requests return
-405.
+  ```bash
+  SSL_CERT_FILE=/absolute/path/private-root.pem ./naivefox config.json
+  ```
+
+  The same process environment is honored by the Android embedded entry point;
+  its caller-provided profile remains host-owned. The CA certificates are
+  trusted through NSS's temporary certificate context and are not imported as
+  persistent profile certificates. When a configured CA is not a built-in
+  Firefox root, NaiveFox temporarily permits strict H3 to use that trust
+  anchor and restores Firefox's original preference during shutdown.
+
+Binding `0.0.0.0`, `::`, or a LAN address intentionally exposes a listener.
+Ordinary forward-proxy HTTP requests return 405. Comma-separated proxy chains,
+upstream HTTP/SOCKS proxies, and direct mode are not supported.
 
 A SOCKS client should delegate destination DNS to the proxy:
 
@@ -68,10 +96,11 @@ A SOCKS client should delegate destination DNS to the proxy:
 curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 ```
 
-Normal config mode uses a persistent profile under `XDG_STATE_HOME`, then
-`$HOME/.local/state`, or the explicit `NAIVEFOX_PROFILE`. If no persistent
-location is usable, it creates a private temporary profile and removes it after
-an orderly shutdown. Certificate verification is never disabled.
+Normal config mode creates a private temporary profile for every run and removes
+it after an orderly shutdown. Set `NAIVEFOX_PROFILE` explicitly when NSS
+databases or other profile state must persist across restarts. Existing profiles
+under `XDG_STATE_HOME` or `$HOME/.local/state` are not selected implicitly.
+Certificate verification is never disabled.
 
 Developer-only modes provide focused diagnostics:
 
@@ -154,6 +183,10 @@ listeners.
   connection manager.
 - Strict H2 and strict H3 regular CONNECT, plus bounded developer Auto mode.
 - Basic proxy authentication through Firefox's normal proxy-auth machinery.
+- RFC 1929 authentication for configured SOCKS listeners.
+- Upstream host mapping, custom CONNECT headers, and the no-post-quantum TLS
+  preference.
+- Additive process-local CA trust from an absolute PEM path in `SSL_CERT_FILE`.
 - Naive `padding` request/response negotiation and legacy Variant 1 payload
   framing: eight padded records per direction, then raw bytes.
 - Bounded async pumping, partial I/O, backpressure, half-close, connection reuse,
@@ -170,8 +203,9 @@ separate socket-process transport. See [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
 NaiveFox asks Firefox to create a normal proxied channel and takes over the
 successful classic CONNECT as asynchronous byte streams. The empty raw-upgrade
 token is restricted to connect-only channels and emits no synthetic `ALPN`,
-`Upgrade`, or `Connection` marker. A validated sidecar adds only the intentional
-Naive `padding` header to the actual proxy CONNECT request.
+`Upgrade`, or `Connection` marker. A validated sidecar adds the intentional
+Naive `padding` header and configured extra headers to the actual proxy CONNECT
+request.
 
 H2 uses Firefox's TLS/TCP connection and `Http2StreamTunnel`. H3 uses a strict
 MASQUE-type proxy route to create a regular classic CONNECT through

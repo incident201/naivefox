@@ -104,6 +104,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mProxyUser = proxy.mUser;
     tunnelConfig.mProxyPassword = proxy.mPassword;
     tunnelConfig.mProtocol = proxy.mProtocol;
+    tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
+    tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
   }
   return tunnelConfigs;
 }
@@ -201,7 +203,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
       xpcomAttempted = true;
       rv = runtime.InitializeEmbedded(nsDependentCString(aProfilePath),
                                       nsDependentCString(aRuntimePath),
-                                      RuntimeProtocol(config));
+                                      RuntimeProtocol(config),
+                                      config.mNoPostQuantum);
       if (NS_SUCCEEDED(rv)) {
         MarkEmbeddedRunning();
         mozilla::naivefox::RuntimeLogEvent(
@@ -259,7 +262,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     const auto runtimeProtocol = RuntimeProtocol(config);
 
     mozilla::naivefox::GeckoRuntime runtime;
-    rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol);
+    rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol,
+                            config.mNoPostQuantum);
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started listeners=%u upstreams=%u\n",

@@ -115,7 +115,8 @@ GeckoRuntime::~GeckoRuntime() { Shutdown(); }
 
 nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
                                   const nsACString& aProfilePath,
-                                  ProxyProtocol aProtocol) {
+                                  ProxyProtocol aProtocol,
+                                  bool aNoPostQuantum) {
   if (mXPCOMInitialized || aProfilePath.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -146,12 +147,13 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
   MOZ_TRY(NS_NewNativeLocalFile(aProfilePath, getter_AddRefs(profile)));
 
   return InitializeWithLocations(profile, mBinDirectory, mExecutable, aProtocol,
-                                 nullptr);
+                                 nullptr, aNoPostQuantum);
 }
 
 nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
                                           const nsACString& aRuntimePath,
-                                          ProxyProtocol aProtocol) {
+                                          ProxyProtocol aProtocol,
+                                          bool aNoPostQuantum) {
   if (mXPCOMInitialized) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -175,10 +177,10 @@ nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
   nsAutoCString normalizedRuntimePath;
   MOZ_TRY(binDirectory->GetNativePath(normalizedRuntimePath));
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
-                                 &normalizedRuntimePath);
+                                 &normalizedRuntimePath, aNoPostQuantum);
 #else
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
-                                 nullptr);
+                                 nullptr, aNoPostQuantum);
 #endif
 }
 
@@ -229,7 +231,8 @@ nsresult GeckoRuntime::ValidateEmbeddedLocations(
 
 nsresult GeckoRuntime::InitializeWithLocations(
     nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
-    ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath) {
+    ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath,
+    bool aNoPostQuantum) {
   if (mXPCOMInitialized || !aProfile || !aBinDirectory || !aExecutable) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -292,6 +295,22 @@ nsresult GeckoRuntime::InitializeWithLocations(
                        aProtocol != ProxyProtocol::H2);
   Preferences::SetBool("security.nocertdb", false);
 
+  if (aNoPostQuantum) {
+    mHadKyberPref = Preferences::HasUserValue("security.tls.enable_kyber");
+    mHadMlkemPref = Preferences::HasUserValue("security.tls.enable_mlkem1024");
+    mHadHttp3KyberPref =
+        Preferences::HasUserValue("network.http.http3.enable_kyber");
+    (void)Preferences::GetBool("security.tls.enable_kyber", &mOldKyberPref);
+    (void)Preferences::GetBool("security.tls.enable_mlkem1024",
+                               &mOldMlkemPref);
+    (void)Preferences::GetBool("network.http.http3.enable_kyber",
+                               &mOldHttp3KyberPref);
+    Preferences::SetBool("security.tls.enable_kyber", false);
+    Preferences::SetBool("security.tls.enable_mlkem1024", false);
+    Preferences::SetBool("network.http.http3.enable_kyber", false);
+    mNoPostQuantumApplied = true;
+  }
+
   nsCOMPtr<nsIObserverService> observers =
       do_GetService(NS_OBSERVERSERVICE_CONTRACTID);
   if (!observers) {
@@ -303,6 +322,24 @@ nsresult GeckoRuntime::InitializeWithLocations(
   MOZ_TRY(storageRv);
   MOZ_TRY(observers->NotifyObservers(nullptr, "profile-do-change", u"startup"));
   net_EnsurePSMInit();
+
+  mTemporaryTrustStore = MakeUnique<TemporaryTrustStore>();
+  nsAutoCString trustError;
+  nsresult trustRv = mTemporaryTrustStore->LoadFromEnvironment(trustError);
+  if (NS_FAILED(trustRv)) {
+    mTemporaryTrustStore = nullptr;
+    return trustRv;
+  }
+  if (mTemporaryTrustStore->IsConfigured()) {
+    constexpr auto kHttp3ThirdPartyRootsPref =
+        "network.http.http3.disable_when_third_party_roots_found";
+    mHadHttp3ThirdPartyRootsPref =
+        Preferences::HasUserValue(kHttp3ThirdPartyRootsPref);
+    (void)Preferences::GetBool(kHttp3ThirdPartyRootsPref,
+                                &mOldHttp3ThirdPartyRootsPref);
+    Preferences::SetBool(kHttp3ThirdPartyRootsPref, false);
+    mSslCertFileApplied = true;
+  }
 
   mIOService = do_GetIOService();
   return mIOService ? NS_OK : NS_ERROR_FAILURE;
@@ -325,8 +362,39 @@ nsresult GeckoRuntime::RunEventLoopSmoke() {
 
 void GeckoRuntime::Shutdown() {
   mIOService = nullptr;
+  mTemporaryTrustStore = nullptr;
 
   if (mXPCOMInitialized) {
+    if (mNoPostQuantumApplied) {
+      if (mHadKyberPref) {
+        Preferences::SetBool("security.tls.enable_kyber", mOldKyberPref);
+      } else {
+        Preferences::ClearUser("security.tls.enable_kyber");
+      }
+      if (mHadMlkemPref) {
+        Preferences::SetBool("security.tls.enable_mlkem1024", mOldMlkemPref);
+      } else {
+        Preferences::ClearUser("security.tls.enable_mlkem1024");
+      }
+      if (mHadHttp3KyberPref) {
+        Preferences::SetBool("network.http.http3.enable_kyber",
+                             mOldHttp3KyberPref);
+      } else {
+        Preferences::ClearUser("network.http.http3.enable_kyber");
+      }
+      mNoPostQuantumApplied = false;
+    }
+    if (mSslCertFileApplied) {
+      constexpr auto kHttp3ThirdPartyRootsPref =
+          "network.http.http3.disable_when_third_party_roots_found";
+      if (mHadHttp3ThirdPartyRootsPref) {
+        Preferences::SetBool(kHttp3ThirdPartyRootsPref,
+                             mOldHttp3ThirdPartyRootsPref);
+      } else {
+        Preferences::ClearUser(kHttp3ThirdPartyRootsPref);
+      }
+      mSslCertFileApplied = false;
+    }
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownNetTeardown);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownTeardown);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdown);

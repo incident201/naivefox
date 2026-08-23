@@ -15,25 +15,27 @@ Enabling the socket process requires an IPC-capable design plus cross-process
 lifecycle, half-close, backpressure, and shutdown regressions. Do not enable it
 only by changing preferences.
 
-## Unauthenticated local listeners
+## Local listener exposure
 
-SOCKS5 and HTTP CONNECT listeners do not authenticate local clients. Loopback
-is the safe default, but explicit wildcard and LAN addresses are accepted for
-NaiveProxy-compatible configuration. Operators exposing such an address must
-provide host-firewall or trusted-network protection.
+HTTP CONNECT listeners do not authenticate local clients. SOCKS5 listeners can
+require RFC 1929 username/password authentication when credentials are present
+in the `listen` URI. Loopback is the safe default, but explicit wildcard and
+LAN addresses are accepted for NaiveProxy-compatible configuration. Operators
+exposing such an address must provide host-firewall or trusted-network
+protection.
 
 The HTTP frontend accepts CONNECT only; ordinary forward HTTP returns 405.
 
 ## Temporary profile cleanup
 
-Gecko requires a writable filesystem profile. If neither an explicit profile
-nor writable XDG/HOME state exists, NaiveFox creates a private temporary
-profile. Orderly shutdown removes it, but an uncatchable process termination
-may leave it for the runtime-directory or operating-system temporary-file
-cleanup policy.
+Gecko requires a writable filesystem profile. Config mode creates a private
+temporary profile by default; orderly shutdown removes it, but an uncatchable
+process termination may leave it for the runtime-directory or operating-system
+temporary-file cleanup policy.
 
 Use `NAIVEFOX_PROFILE` when NSS databases or other profile state must persist
-across restarts.
+across restarts. `SSL_CERT_FILE` trust anchors are deliberately process-local
+and do not persist in either profile mode.
 
 The embedded API does not use this fallback. Its caller must provide an
 existing writable profile directory and owns that directory's lifecycle.

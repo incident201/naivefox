@@ -23,6 +23,8 @@ else
 fi
 
 run_dir=$(mktemp -d "$OBJDIR/naivefox-malformed-socks.XXXXXX")
+runtime_profile_root="$run_dir/runtime"
+mkdir -m 700 "$runtime_profile_root"
 client_pid=
 cleanup() {
   local status=$?
@@ -67,8 +69,8 @@ path.write_text(json.dumps(config), encoding="utf-8")
 path.chmod(0o600)
 PY
 
-XDG_STATE_HOME="$run_dir/state" \
-  "${runtime_environment[@]}" \
+XDG_RUNTIME_DIR="$runtime_profile_root" \
+  "${runtime_environment[@]}" -u XDG_STATE_HOME \
   "$runtime" "$config" >"$client_log" 2>&1 &
 client_pid=$!
 for ((i = 0; i < 150; i++)); do
