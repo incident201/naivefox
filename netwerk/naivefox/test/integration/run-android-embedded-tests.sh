@@ -52,6 +52,21 @@ case $protocol in
   *) printf 'unsupported protocol: %s\n' "$protocol" >&2; exit 2 ;;
 esac
 
+# Resolve an explicit staged package before init_paths.  init_paths calls
+# `mach environment` when NAIVEFOX_OBJDIR is unset, but a generated
+# git-less minimal-source export intentionally omits the optional mach
+# command registry.  The package layout already gives us its object dir.
+package_dir=
+if [[ -n $package_arg ]]; then
+  package_dir=$(realpath -m -- "$package_arg")
+  if [[ -z ${NAIVEFOX_OBJDIR:-} ]]; then
+    package_objdir=$(realpath -m -- "$package_dir/../..")
+    if [[ -f $package_objdir/mozinfo.json ]]; then
+      export NAIVEFOX_OBJDIR=$package_objdir
+    fi
+  fi
+fi
+
 if (( check_only )); then
   if [[ -z $package_arg ]]; then
     printf '%s\n' '--check-only requires an explicit --package directory' >&2
@@ -61,9 +76,9 @@ else
   init_paths
   if [[ -z $package_arg ]]; then
     package_arg="$OBJDIR/package/naivefox-android-aarch64"
+    package_dir=$(realpath -m -- "$package_arg")
   fi
 fi
-package_dir=$(realpath -m -- "$package_arg")
 
 find_ndk() {
   local candidates=()

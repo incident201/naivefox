@@ -1,10 +1,10 @@
 {
   "counts": {
-    "executable_files": 162,
-    "files": 22668
+    "executable_files": 151,
+    "files": 22573
   },
-  "evidence_commit": "a5af308213ac74e8813edf9d2a6f4fc89910b6e2",
-  "evidence_source_commit": "b0497d87b6017b2dd4e2429b7d33b0882dda4859",
+  "evidence_commit": "626c3a764bfbc9b75b368f7078cd6da2d1aa4184",
+  "evidence_source_commit": "4ba99cab69876884a1a9de60b84188e704419971",
   "files": [
     {
       "mode": "0644",
@@ -1218,11 +1218,6 @@
     },
     {
       "mode": "0644",
-      "path": "build/debian-packages/valgrind.diff",
-      "sha256": "603831b4dec136942580ab12c48d8d1a035561cb1a7e8928efb53120d95eef6b"
-    },
-    {
-      "mode": "0644",
       "path": "build/gecko_templates.mozbuild",
       "sha256": "65730546837dd62d7984f01669ba6f7ceaf42238fcc831d18724c2589925757e"
     },
@@ -1873,11 +1868,6 @@
     },
     {
       "mode": "0644",
-      "path": "build/sparse-profiles/toolchain-build",
-      "sha256": "fbca4b565053bb46b586add76bd5ff102e3c5475994167a22ceebcbf75b8dd64"
-    },
-    {
-      "mode": "0644",
       "path": "build/templates.mozbuild",
       "sha256": "1e9992773eb7dde3f42778b79033026e5967496ecae6ebe97d63e406b3e91ff5"
     },
@@ -1892,44 +1882,9 @@
       "sha256": "8d3545f1b845523326b5a48d8bc21f6b4923a715dd29e145a036f90084a480ae"
     },
     {
-      "mode": "0644",
-      "path": "build/unix/build-binutils/3A24BC1E8FB409FA9F14371813FCEF89DD9E3C4F.key",
-      "sha256": "6e74acf35f0590dc20cb0eed40be78bceb672bc8e3714ebd7e149e7401cc7d2a"
-    },
-    {
       "mode": "0755",
       "path": "build/unix/build-binutils/build-binutils.sh",
       "sha256": "1b6bcecbb411923c7ea35865b0a59ef620b5105dda866fa65cf88f751ffe0188"
-    },
-    {
-      "mode": "0644",
-      "path": "build/unix/build-gcc/07F3DBBECC1A39605078094D980C197698C3739D.key",
-      "sha256": "c6c07c588bf204702bfa3c0717c6e25ad512475ef68b1c5cea520670fdd05599"
-    },
-    {
-      "mode": "0644",
-      "path": "build/unix/build-gcc/343C2FF0FBEE5EC2EDBEF399F3599FF828C67298.key",
-      "sha256": "c492d99c6407bb32d793ec3540b650adc8b8bf9829634fbce3d8709cc63db0a0"
-    },
-    {
-      "mode": "0644",
-      "path": "build/unix/build-gcc/7F74F97C103468EE5D750B583AB00996FC26A641.key",
-      "sha256": "74143cc7a83556d64be4d6d64d89d3b2cb351817bb943e65754550bbff27597b"
-    },
-    {
-      "mode": "0644",
-      "path": "build/unix/build-gcc/AD17A21EF8AED8F1CC02DBD9F7D5C9BF765C61E3.key",
-      "sha256": "ff531b7b41197d2ae87550d917c26c065f7a7e052a693af50222a28dbe2ef5d3"
-    },
-    {
-      "mode": "0644",
-      "path": "build/unix/build-gcc/D3A93CAD751C2AF4F8C7AD516C35B99309B5FA62.key",
-      "sha256": "1aead0fd049309294980a8b0c3a11ff75afd40bff17054bc96b29d93abde02b4"
-    },
-    {
-      "mode": "0644",
-      "path": "build/unix/build-gcc/DA23579A74D4AD9AF9D3F945CEFAC8EAAF17519D.key",
-      "sha256": "41147bdf16aca6f463a5c8ba5744f05e21b606dc25ba95264068789745a45ef0"
     },
     {
       "mode": "0755",
@@ -23174,7 +23129,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-android-embedded-tests.sh",
-      "sha256": "629c230acf7b3cac743d60b1d98e51f252b852aa2f2fe7fe2132b89886034dd5"
+      "sha256": "88ca097f564c682b5a314ee233902f1d005f283ce9bbe3142300609490e88e11"
     },
     {
       "mode": "0755",
@@ -26382,11 +26337,6 @@
       "sha256": "0b8ce5d0c6691855a3ff61a7de1372a061a012a95cee524f14220f797ecaa228"
     },
     {
-      "mode": "0755",
-      "path": "python/mozbuild/mozbuild/action/tooltool.py",
-      "sha256": "6d0ddff133b238cd3e2ce67969b79a14898874bd1cb2ad741273ad19240a455e"
-    },
-    {
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/action/webidl.py",
       "sha256": "48d77d4454ee350630e9ee596de605575bac43ac28985c48aaa1a9b710b8eeae"
@@ -27178,41 +27128,6 @@
     },
     {
       "mode": "0644",
-      "path": "python/mozlint/mozlint/__init__.py",
-      "sha256": "2f2dd5244ead7316a662ec28e801018d4acc1bb64e522ddbc8fd24010f17a586"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozlint/mozlint/errors.py",
-      "sha256": "9fd128eecc357fc2e317f80e6b0e07f83a84157e43effe8ead25384f30fb6f10"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozlint/mozlint/parser.py",
-      "sha256": "11f2d311fc09508b6bf0805da1036d46aef525331fbcdfc829acfde341ad1edf"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozlint/mozlint/pathutils.py",
-      "sha256": "f86f5284aaba19fef6068cfa28f871d6b59068e15577e6086c477221f768dd1b"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozlint/mozlint/result.py",
-      "sha256": "a7f5aa03966a71d39b80e78e444267a3943c0d4632f82a11af9cd06ae49d1126"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozlint/mozlint/roller.py",
-      "sha256": "28206f22ee33f66ab50300264cfd47b32e25e044999fb04629453a1cca08037e"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozlint/mozlint/types.py",
-      "sha256": "898da0e32339de55b1f4d1b2c31e1ece17749d79951ba0d6f5ce94017905dd4d"
-    },
-    {
-      "mode": "0644",
       "path": "python/mozlint/test/python.toml",
       "sha256": "e6264349c890fbb74cfe41a282a9503cec5219fba924e02c9bd9675747a7fb0b"
     },
@@ -27258,136 +27173,6 @@
     },
     {
       "mode": "0644",
-      "path": "python/mozrelease/.ruff.toml",
-      "sha256": "0ad073deedca467d25d2be06a6d03f47508372f30504518ae495b33acd303d53"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/__init__.py",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/attribute_builds.py",
-      "sha256": "bed28ffffb521f14945e038f8fa353032eb4af75cb1d6b48f4d4758111ddc16a"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/balrog.py",
-      "sha256": "777f8faba522336817924b24e9986cc5ea27fe24c1732851a4a215970bfec0ff"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/buglist_creator.py",
-      "sha256": "8585d6f6ac1b5a02857c404f114a23e53a34c9464b4d0f963022ca6c1538b77c"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/chunking.py",
-      "sha256": "4e9c7a6df0154a5f03020b407d376d00be389929b72431f9b7257dca5b28e3c6"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/l10n.py",
-      "sha256": "c24ecc19e3abbffb0094552002714da7760caf5cff3a30d61292bc7e9ea3d81f"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/mach_commands.py",
-      "sha256": "a64192539578d30c643e525b97387dab58b7c8ca6ed7b915477bb5ba88692b6f"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/partner_repack.py",
-      "sha256": "12f14b4889bdbc8544f549c55f713e2dd14b37d755c085bd90747a9f012e989a"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/paths.py",
-      "sha256": "27bcc5031ca8eb6d3498d99de9256fd422a2d2077c9b9015728e8d8783cb1f32"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/platforms.py",
-      "sha256": "55166cf73865e883714d38dc9d9682a7898dfc056f9751479ea915fe2c607399"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/scriptworker_canary.py",
-      "sha256": "1f4bcc78a3ad7394a8d27f1ae2941236319467eff3a6bde256e7d14c7732aca3"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/update_verify.py",
-      "sha256": "5f1105f2b1f55194b341fd8541bff8667d86c5427ac92cc9970ae614a56f3318"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/util.py",
-      "sha256": "f58d12aecdaf55b1e2638ce6716ccdbed1029d0af5694d8e5bc9466103657ffb"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/mozrelease/versions.py",
-      "sha256": "66c3825e5571ad54bd9befae0b8331fe90762696ef3f17f821348ecb92ff2c45"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/setup.py",
-      "sha256": "5d88b8a77750078e9651a1b00aab9453f7215415b5bb754766c4e6f5202f66e9"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/Firefox-140.0.1.update.json",
-      "sha256": "1afc8d0edc93e02a9b5260aca473e8fc798564de8f1170dc2ee69cb7c94d596d"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/Firefox-140.0.update.json",
-      "sha256": "4cb754c627a6298062b9aa942f5701e3fed20ec820010451f7319cd3b0910328"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/Firefox-62.0.3.update.json",
-      "sha256": "a328d95032c1415e38101b66ad6bb39045c5e1d4734c0fa0121da760b3912e44"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/Firefox-62.0b11-update.json",
-      "sha256": "a328d95032c1415e38101b66ad6bb39045c5e1d4734c0fa0121da760b3912e44"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/Firefox-64.0b13.update.json",
-      "sha256": "c9285683a5b79b2e8d5c41ddb7a0aaefeeec9620dc6251668da2cdb913b42c3f"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/buglist_changesets.json",
-      "sha256": "bb328299b7c02070d9295360bead95950af9214bbe75da0aa90fce5703a21e6e"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/sample-update-verify.cfg",
-      "sha256": "e0ee6bc0e1351ff1bad3faef6f883aba286d9b20838ce930f0b95b14c2ae25f1"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/whatsnew-62.0.3.yml",
-      "sha256": "60ad3bf7ee011dfb4f5f250e3089e8d32410d4ed6ea1b7ea0b2b414a93f530e9"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/whatsnew-firefox-com.yml",
-      "sha256": "b7535bcb2de549bb41d42886c3e8a874f9280a2f1ac42fff536a3ad78ba94344"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozrelease/test/data/whatsnew-release.yml",
-      "sha256": "60ad3bf7ee011dfb4f5f250e3089e8d32410d4ed6ea1b7ea0b2b414a93f530e9"
-    },
-    {
-      "mode": "0644",
       "path": "python/mozrelease/test/python.toml",
       "sha256": "665e7173d43d9a1c27b967d97f8aba89006af26b3fa6e55a5eb06ba9638cb993"
     },
@@ -27415,16 +27200,6 @@
       "mode": "0644",
       "path": "python/mozrelease/test/test_versions.py",
       "sha256": "81ed4a7bbaca672f851125084d866b7a90cd1e06db75402e7f4d3451a2235364"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozterm/mozterm/__init__.py",
-      "sha256": "d72d54c1d24a2261ff38a4e31239b75a91b20a79bb4e0e86e38a09bf68c4e05c"
-    },
-    {
-      "mode": "0644",
-      "path": "python/mozterm/mozterm/terminal.py",
-      "sha256": "e50088f20c54fac8478fdcec9b9e1f7dfd79f9fd81158f306719ff866f9c3aee"
     },
     {
       "mode": "0644",
@@ -27575,11 +27350,6 @@
       "mode": "0644",
       "path": "python/sites/mach.txt",
       "sha256": "ce44135c7092552d969f2a3cec4ffc73233c6d857e717d6cf52fb2c291b679f9"
-    },
-    {
-      "mode": "0644",
-      "path": "python/sites/taskgraph.txt",
-      "sha256": "7ab420ac5ed214930d135f0051e78387fa830df98ffa31064b734b8a047eda1c"
     },
     {
       "mode": "0644",
@@ -36653,11 +36423,6 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/python/appdirs/appdirs.py",
-      "sha256": "83df6cdac5e19ef4c49bbf688f86d62344e86a973efd298a28d5ef3971e45627"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/python/attrs/attr/__init__.py",
       "sha256": "7ce608bedd5e192a90adee2e092dec256299d26c00b82f140faa9b6b9392f7f5"
     },
@@ -43960,11 +43725,6 @@
       "mode": "0644",
       "path": "third_party/python/tqdm/tqdm/version.py",
       "sha256": "fb5c968dfbb73f47a0855b32b071f4edf6f376200335177346d60fa8e6aa4760"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/python/typing_extensions/typing_extensions.py",
-      "sha256": "433d11d170d3a24d2eb065ebc1bfe848cea7e3d7ce68567ab52bea2d4c2f7ed8"
     },
     {
       "mode": "0644",
@@ -109563,241 +109323,6 @@
     },
     {
       "mode": "0644",
-      "path": "tools/update-verify/docs/index.md",
-      "sha256": "50856d0b54c353901079756b5c9e5fbc49dcee71062c7e30fee9411754f600d6"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/Cargo.lock",
-      "sha256": "3f03770633891ef7bfbfd9d90122bef039d57fa653ecdacd7811cc366506db29"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/Cargo.toml",
-      "sha256": "bbc2bdf0d548373810c780f3b0dc3248b61093f2cc082d020644e4ef6a34cf00"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/README.md",
-      "sha256": "e839d9acc607772b80a31527460fb8381ee6aa34e0e979e92a0e7ca559a8720b"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/cli.rs",
-      "sha256": "5bf7831ce35d12278a7e79b9d34a1b60337b178911d3be3c0be249917c4438c2"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/downloader.rs",
-      "sha256": "d0856326ed6117626e8ba91b5cfae7b1e97a359367075a7e8afdeb4028fb1c4b"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/errorhandling.rs",
-      "sha256": "26d0ca081c400d85c114978a034a9112c8f56d5c6b4bb1b31ea1ae9d1991378a"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/main.rs",
-      "sha256": "ddda7e799c7b43ea1605eb636f44afdcc1eca9f52346e244e54faac82725e15a"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/runner.rs",
-      "sha256": "530cb727f8c4351d3420414f4b0fbd6fcee798c8c1b762a4ccf09c7b907232d2"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/test.rs",
-      "sha256": "5fd2df18b5249dfb28d70983a533b7ec24d05d9f55ceb7fe15787775be1a2894"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/src/updater.rs",
-      "sha256": "5c11de086b4cbf6328eb5c738d90c11dee2c70e7de287a9efc6f4b958d240df7"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/tests/fixtures/README",
-      "sha256": "d33d4b8aa024ee7cb24dbc954734b7e96d75af792effcf7aac5a237b7df2bdd6"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/tests/fixtures/dep1.der",
-      "sha256": "0ebaf1ad2e8a35c08340a00b464cd6ed9d2454a8e342edddfe832e251e0ae112"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/tests/fixtures/dep2.der",
-      "sha256": "049b2241dd4574393ef6603ed2a856eab91768db06efc4426c7472df68d685df"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/tests/fixtures/release_primary.der",
-      "sha256": "357f861c37f6648a0215440339b6555c65234e78ff92b365ad75736e87798361"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/marannon/tests/fixtures/release_secondary.der",
-      "sha256": "a866c39cce7f34ed4d85dadf1435185636233da90321ac9af64c8c9d6f35de11"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/marannon/tests/fixtures/updater",
-      "sha256": "605937e8621d7d8b104f8ee750c95be68661c8406326cd3711f3d7907545a363"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/python/util/__init__.py",
-      "sha256": "f21fb44a9170c0cd4b675fbe17129799b08ff385b4c2d8b395616df47b8a85cb"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/python/util/commands.py",
-      "sha256": "d8dc2c9b82673ded0ec9856cb078c1fa491b4c882556ac0efdf52a11cd909434"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/common/cached_download.sh",
-      "sha256": "bdbbd18fbf36e746e390b10d147cf3280e731a935ead851556ea366e27feebef"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/common/check_updates.sh",
-      "sha256": "547ac775fdae47895fd4c0089d0347503043292f1ce49800145f5e19a2db3fc6"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/common/download_builds.sh",
-      "sha256": "9c34271ddfbb1f27678dea231691a3d2d9c732418e0fdb5be9fbf7e50d440689"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/common/download_mars.sh",
-      "sha256": "707ffe5fa14bb08c71da5851e1a52cccf32373a258d03e5deac38017f4fb9683"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/common/installdmg.ex",
-      "sha256": "2d931e581bdd71c45e332764f133d53a357ba2a4827ee1fa87f2119f8ca501ef"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/common/unpack-diskimage.sh",
-      "sha256": "9816a7b0d79f5a3b17ef144bd7958448953d90919efd871d3dd1f27cd82ee63d"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/common/unpack.sh",
-      "sha256": "5fc72f399a93302d0f5a513bbc2fff98d8238623ef761d343730db2d93c29df1"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/compare-directories.py",
-      "sha256": "4a9d62986cf8559045f6d62ad3fe800ba749faec54ad9b5c88fd58636f68c2a9"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/final-verification.sh",
-      "sha256": "ed571ab29a5ac54d63867bff089cee7b6f3925e13652b0414c8d010164587540"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/get-update-xml.sh",
-      "sha256": "f703e4f56abf0066545b89f766634bee3fd4226d0e9bc026f5a7c48bff1461aa"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/README",
-      "sha256": "d2e93d2f028de81913b517314c206a5ccaab9e18675123f42c74e7a23b43b593"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/dep1.der",
-      "sha256": "0ebaf1ad2e8a35c08340a00b464cd6ed9d2454a8e342edddfe832e251e0ae112"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/dep2.der",
-      "sha256": "049b2241dd4574393ef6603ed2a856eab91768db06efc4426c7472df68d685df"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/nightly_aurora_level3_primary.der",
-      "sha256": "40e0b33e88a81b57bdd828e2cfa12387ba7ef83c8603f60924930a4eb01d10f6"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/nightly_aurora_level3_secondary.der",
-      "sha256": "3a8b135f4f6ecfa0a947a7d433d83200c1bd9e167acff821dd599e289d909d71"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/release_primary.der",
-      "sha256": "357f861c37f6648a0215440339b6555c65234e78ff92b365ad75736e87798361"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/release_secondary.der",
-      "sha256": "a866c39cce7f34ed4d85dadf1435185636233da90321ac9af64c8c9d6f35de11"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/sha1/dep1.der",
-      "sha256": "8bf8d90a678487aaaf7203039976814ba2936bc2d9b0ea1cf88d548c5c253ad6"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/sha1/dep2.der",
-      "sha256": "b4b0af3bdfc710fa4bd443b9a400171a95d0bd0320c01304c6111ddc9a4b8950"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/sha1/release_primary.der",
-      "sha256": "2776b0809386b79f838e3dfc0812af44f4d9d9176ac9787fc9b7bae4100d7146"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/sha1/release_secondary.der",
-      "sha256": "ec0cd1846f78e9445624481a6e68794dedb425b59fdb9893c6c18eb01b25dddb"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/mar_certs/xpcshellCertificate.der",
-      "sha256": "1743895484caf159c2c6d237ddf70384f05bb836806a64d18bee7e6503598fbd"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/release/replace-updater-certs.py",
-      "sha256": "47ba722b1fcbec47a02fd520e32a6bd48862b7ee58910bbcac7781e43fc3f86c"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/test-mar-url.sh",
-      "sha256": "10af73e336e2e45aad88a811e3f4da40a895720dd9f4b107df320a49cb77e78f"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/release/updates/verify.sh",
-      "sha256": "7cd4bfc21df7ac0a5121f8b41e297706454fb1bd67d90a584174f437be13389c"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/scripts/async_download.py",
-      "sha256": "6d2d35abc30d2e08d544c43921c1249d06f2c5885001bb4177185f0f5cb933a4"
-    },
-    {
-      "mode": "0644",
-      "path": "tools/update-verify/scripts/chunked-verify.py",
-      "sha256": "95ef423ebac4defaddd226f2cf5bb5aa0dea2594b7a51c2f1389f2dfb811704e"
-    },
-    {
-      "mode": "0755",
-      "path": "tools/update-verify/scripts/chunked-verify.sh",
-      "sha256": "3bd0db5d743ed21a16e970fd5942365ccfe50fd15bde34fed8c9f964b8801cc9"
-    },
-    {
-      "mode": "0644",
       "path": "tools/zucchini/app.mozbuild",
       "sha256": "38f74e1eaedbcb69822fcdb10c449b034dc366247e76096285ebbfadee897586"
     },
@@ -113348,8 +112873,8 @@
     }
   ],
   "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
-  "manifest_sha256": "99ce2e0e7f601159fa3dd7aaf12f24616336d2f4ac879800296103d13fe4e738",
+  "manifest_sha256": "61aec88f4fcd1a4f09f76a147a7fd182458427314ccd1cd3ccf8316a3f5fcdcf",
   "manifest_version": 2,
-  "minimal_export_commit": "a5af308213ac74e8813edf9d2a6f4fc89910b6e2",
-  "naivefox_reference_commit": "b0497d87b6017b2dd4e2429b7d33b0882dda4859"
+  "minimal_export_commit": "626c3a764bfbc9b75b368f7078cd6da2d1aa4184",
+  "naivefox_reference_commit": "4ba99cab69876884a1a9de60b84188e704419971"
 }
