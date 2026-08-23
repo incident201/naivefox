@@ -52,9 +52,16 @@ case $protocol in
   *) printf 'unsupported protocol: %s\n' "$protocol" >&2; exit 2 ;;
 esac
 
-init_paths
-if [[ -z $package_arg ]]; then
-  package_arg="$OBJDIR/package/naivefox-android-aarch64"
+if (( check_only )); then
+  if [[ -z $package_arg ]]; then
+    printf '%s\n' '--check-only requires an explicit --package directory' >&2
+    exit 2
+  fi
+else
+  init_paths
+  if [[ -z $package_arg ]]; then
+    package_arg="$OBJDIR/package/naivefox-android-aarch64"
+  fi
 fi
 package_dir=$(realpath -m -- "$package_arg")
 

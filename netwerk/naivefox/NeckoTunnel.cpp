@@ -366,9 +366,6 @@ nsresult MakeBasicAuthorization(const nsACString& aUser,
     aAuthorization.Truncate();
     return NS_OK;
   }
-  if (aUser.IsEmpty() || aPassword.IsEmpty()) {
-    return NS_ERROR_INVALID_ARG;
-  }
 
   nsAutoCString userPass(aUser);
   userPass.Append(':');
@@ -378,6 +375,12 @@ nsresult MakeBasicAuthorization(const nsACString& aUser,
 }
 
 }  // namespace
+
+nsresult BuildProxyAuthorization(const nsACString& aUser,
+                                 const nsACString& aPassword,
+                                 nsACString& aAuthorization) {
+  return MakeBasicAuthorization(aUser, aPassword, aAuthorization);
+}
 
 nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
                          const nsACString& aTargetAuthority,
@@ -444,7 +447,7 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
   }
 
   nsAutoCString authorization;
-  MOZ_TRY(MakeBasicAuthorization(aProxyUser, aProxyPassword, authorization));
+  MOZ_TRY(BuildProxyAuthorization(aProxyUser, aProxyPassword, authorization));
 
   nsCOMPtr<nsIProtocolProxyService> proxyService =
       do_GetService(NS_PROTOCOLPROXYSERVICE_CONTRACTID);

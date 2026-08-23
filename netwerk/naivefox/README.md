@@ -40,6 +40,7 @@ The supported config is a strict NaiveProxy-compatible subset:
     "https://user:password@proxy.example:443",
     "quic://proxy.example:443"
   ],
+  "insecure-concurrency": 2,
   "host-resolver-rules": "MAP proxy.example 127.0.0.1",
   "extra-headers": "X-NaiveFox-Test: enabled\r\n",
   "no-post-quantum": false,
@@ -54,8 +55,14 @@ The supported config is a strict NaiveProxy-compatible subset:
   listener credentials.
 - `proxy` is one URI shared by all listeners, or an array whose length matches
   `listen`. `https://` is strict H2 over TLS/TCP and `quic://` is strict H3
-  over QUIC. Credentials are optional, percent-decoded, and passed to
-  Necko's proxy-auth path. Port 443 is used when omitted.
+  over QUIC. Upstream credentials are optional and percent-decoded; when
+  userinfo is present it uses `username:password`, so either side may be
+  empty (`user:`, `:password`, or `:@`). They are passed to Necko's
+  proxy-auth path. Port 443 is used when omitted.
+- `insecure-concurrency` accepts a positive JSON integer or a decimal string for
+  NaiveProxy/Exclave config compatibility. NaiveFox validates the value and
+  ignores it; connection pooling, concurrency, and tunnel lifecycle remain
+  controlled by Firefox Necko.
 - Strict H2/H3 modes never silently fall back.
 - Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
   An explicit nonzero port is required.
@@ -235,9 +242,13 @@ directory, staging script, and (under WSL) the portable Wine paths/prefix:
 
 ```bash
 ./netwerk/naivefox/tools/build-product.sh windows \
-  --objdir "$PWD/../obj-naivefox-windows" \
-  --bootstrap
+  --objdir "$PWD/../obj-naivefox-windows"
 ```
+
+The product build command intentionally omits `--bootstrap`, so it also works
+from a generated git-less minimal-source export. Run `--bootstrap` only from
+the full Firefox Git checkout when Mozilla build dependencies need to be
+installed; bootstrapping is not part of an export build.
 
 For a local WSL/Windows ARM64 AVD, pass --start-emulator to the same runner;
 it owns the QEMU virt launch workaround and cleans up the emulator it starts.
@@ -287,38 +298,6 @@ for this checkout.
 An ordinary Firefox build is not a merge or release gate. It is allowed only
 for an explicitly requested same-base capture comparison; see
 [`CAPTURE.md`](CAPTURE.md).
-
-## Repository workflow
-
-```text
-Mozilla main -> firefox-upstream -> naivefox-full-source -> generated naivefox-minimal-source
-```
-
-- `firefox-upstream` is a clean fast-forward-only Mozilla mirror.
-- `naivefox-full-source` is the single complete working tree containing the
-  NaiveFox implementation, minimization rules, and export tooling.
-- `naivefox-minimal-source` is a generated standalone product snapshot and is
-  never hand-edited. Its `.github/workflows/` control-plane files are the
-  deliberate exception and may be maintained directly.
-
-The refresh and export gates are defined in `UPSTREAM.md` in the full
-maintenance checkout. In particular, commit SHAs and test transcripts
-belong in generated evidence, commits, and annotated tags rather than being
-copied into active Markdown.
-
-Release automation is intentionally maintained as the control-plane overlay
-`.github/workflows/release.yml` on `naivefox-minimal-source`. It is manual-only,
-builds the targets selected by that branch's release workflow, and creates a
-draft release without running the integration/Caddy suites.
-
-## Security and data handling
-
-Never commit or retain proxy passwords, authorization headers, TLS keys, local
-CA private keys, NSS profiles, packet captures, request payloads, or generated
-fixture state. Integration state lives under the object directory with private
-permissions and is removed after successful runs. Real-server tests receive
-their endpoint and credentials through environment variables and keep only a
-credential-free summary.
 
 ## References
 

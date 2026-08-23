@@ -1,10 +1,10 @@
 {
   "counts": {
     "executable_files": 151,
-    "files": 22748
+    "files": 22756
   },
-  "evidence_commit": "e86178e2b288391baee0e910471d66cc248e4ae2",
-  "evidence_source_commit": "758c8724469107034736d1a71296a07ffa097900",
+  "evidence_commit": "adb976f6d1557af9918cdf28b4bae00280d3b7e0",
+  "evidence_source_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
   "files": [
     {
       "mode": "0644",
@@ -29,7 +29,7 @@
     {
       "mode": "0644",
       "path": "Cargo.lock",
-      "sha256": "705b83842186f2d95be4faf2fdffe85095e112fbf39a62ca74d6d2f0d7059460"
+      "sha256": "1a8164b7f57cce887dd520886a1dff489abfdcbf8f2f1f45e9f8b2e6d116c415"
     },
     {
       "mode": "0644",
@@ -49,7 +49,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "6c824db79e04c546001bac0751741d9be97785b790a25ae6077a61e42f482097"
+      "sha256": "c05626477dad3ec9d37c172c266c3511cf81b4eb03b0cad55d8306c4fcdaa573"
     },
     {
       "mode": "0644",
@@ -479,7 +479,7 @@
     {
       "mode": "0644",
       "path": "build/clang-plugin/KungFuDeathGripChecker.cpp",
-      "sha256": "51d0063df4ac9b39fc0a3cc33d211209da49fa1aa1d4505627cdb38173bacb10"
+      "sha256": "8fbd8bd7f804d0722605b31fcafebda2f22df940f6a419a906097e26387395c9"
     },
     {
       "mode": "0644",
@@ -909,7 +909,7 @@
     {
       "mode": "0644",
       "path": "build/clang-plugin/mozsearch-plugin/MozsearchIndexer.cpp",
-      "sha256": "88342c3fcd4171018afa1a346a1bfea0d9f42dc20bb4be0540b884d4695bedb3"
+      "sha256": "ee4f54fa8c1131c8e350417bacfdac5e74971e5ff3b37fb6506efd7882bf1726"
     },
     {
       "mode": "0644",
@@ -2234,7 +2234,7 @@
     {
       "mode": "0644",
       "path": "chrome/nsChromeProtocolHandler.cpp",
-      "sha256": "1faf8ddc65659702e949dab25d6275938400f12bdbcf9c2f96335c1e5a967d2c"
+      "sha256": "12422736fbe5f394e0cc133103c6ce0a5a44b120d40e53bebbbc181f6564a053"
     },
     {
       "mode": "0644",
@@ -2289,7 +2289,7 @@
     {
       "mode": "0644",
       "path": "config.example.json",
-      "sha256": "6bd206baa923c949c77ea463f3ff7a020765cf70d534a97b2b2c85e6e88baa31"
+      "sha256": "c0d744dad549241c37ed9e13e8200271a1bdd76bd48c7d3b0cebc97773b9fc19"
     },
     {
       "mode": "0644",
@@ -3049,7 +3049,7 @@
     {
       "mode": "0644",
       "path": "dom/indexedDB/SafeRefPtr.h",
-      "sha256": "3e68fc1243fb781cad1879c4101f393dc0b52a14e8db3146a493b88efeee0e0a"
+      "sha256": "61f4053001183d949fe76dcc31b0f2486ca31328d7ae7045fe3bee9c2e243195"
     },
     {
       "mode": "0644",
@@ -3634,7 +3634,7 @@
     {
       "mode": "0644",
       "path": "intl/components/src/ICU4CGlue.h",
-      "sha256": "be2dd6818e0179a22096b55a63aa143404aa626d0adee03f49c6b4e148d07b68"
+      "sha256": "dc483569ffa671a41e7b185c205bf356328c0f976e86a8565fbc85f9ab7fce93"
     },
     {
       "mode": "0644",
@@ -3669,7 +3669,7 @@
     {
       "mode": "0644",
       "path": "intl/components/src/Locale.h",
-      "sha256": "8a6df7a288d3aedc183f3db436a153a16fd1ce507dfcc62c3c606cc31648ae9d"
+      "sha256": "416a4a5941441eda403c6dee8dccc67a0bf5e0b03571130a1c2c6a7226a8e4f7"
     },
     {
       "mode": "0644",
@@ -3739,7 +3739,7 @@
     {
       "mode": "0644",
       "path": "intl/components/src/NumberPart.h",
-      "sha256": "871bbcc2fa4ef574551bc3108bccd69da11a0ab7a50015a9b8f0c2ebb249bce3"
+      "sha256": "bb7ac1583ff1f9b373c2a7aabb47d57f63acdec5d41573f308afd9aa141b6979"
     },
     {
       "mode": "0644",
@@ -5329,7 +5329,7 @@
     {
       "mode": "0644",
       "path": "intl/icu/source/common/unicode/uset.h",
-      "sha256": "6316da5a6fd0f36813a2d38353de2a0d2862f8b05a9c2330f7c23907441fb576"
+      "sha256": "eebebcddfad07d7180fa1b0cb277cfab14449b2e011a0dcac059196400f2cf74"
     },
     {
       "mode": "0644",
@@ -13304,7 +13304,7 @@
     {
       "mode": "0644",
       "path": "intl/lwbrk/LineBreakCache.h",
-      "sha256": "8f1ea79d2ccf8cb63d4ec0a59466acd020878e042e0149b72bb7bfc3320275a9"
+      "sha256": "07c7f63c7385fcb886f2fc6ecf2f54a7f131d4d56e544beebe9b4b525302f959"
     },
     {
       "mode": "0644",
@@ -15934,7 +15934,7 @@
     {
       "mode": "0644",
       "path": "js/public/ColumnNumber.h",
-      "sha256": "1b907dfc993adfcd5dee4b0841f2dce2de71ae94335b0e7114f9c70b5023d529"
+      "sha256": "60326f34497d10b0e66691357f09de2df8ca95af75d39bd623a352dcdc93bbc8"
     },
     {
       "mode": "0644",
@@ -16059,7 +16059,7 @@
     {
       "mode": "0644",
       "path": "js/public/HeapAPI.h",
-      "sha256": "c46d10e0d40e58a5bbb0f51d5adadc1b87fe1e7c30e650241ba9773f8a051c69"
+      "sha256": "cad8dd5f130b0d71ab5b42bf8a8c847e27a4bdbfbc5885ce9211e91ce6ac8852"
     },
     {
       "mode": "0644",
@@ -16069,7 +16069,7 @@
     {
       "mode": "0644",
       "path": "js/public/Id.h",
-      "sha256": "34c32c4424b4c56223de651e447b9501585460d8e6f93277a0f326d20c3a665c"
+      "sha256": "a06963ed52890444db5bfa75319bbe05b7834e6882dad145086007bf0ac63677"
     },
     {
       "mode": "0644",
@@ -16234,7 +16234,7 @@
     {
       "mode": "0644",
       "path": "js/public/RegExpFlags.h",
-      "sha256": "8768b920b3aa86d133c48447f5fc4cadf1e8a795f19c4395a2b148dbeeaadd9c"
+      "sha256": "2562730f91917b87d9a770c9689b844384ec8fc8531a64ef235784604cf3ea7b"
     },
     {
       "mode": "0644",
@@ -16339,7 +16339,7 @@
     {
       "mode": "0644",
       "path": "js/public/UbiNode.h",
-      "sha256": "680ad3aeb1614c2798a6de01c15a037b2c9af14b280cf65bb54e043fb32f075d"
+      "sha256": "2a68140cc984fc94d8a1a6aee8ce7f619a6db1ef99c213bd67a539851cd40e66"
     },
     {
       "mode": "0644",
@@ -16384,7 +16384,7 @@
     {
       "mode": "0644",
       "path": "js/public/Value.h",
-      "sha256": "a918b869d5314a77fc462f7631fea280acad94b828cacf47209f5e5b3d5c932b"
+      "sha256": "5c856ef2d57839c0e5d0adae5d43af86d8926a9f10a554c4a8ec78aabd40ea92"
     },
     {
       "mode": "0644",
@@ -17444,7 +17444,7 @@
     {
       "mode": "0644",
       "path": "mfbt/MruCache.h",
-      "sha256": "3e0166081f72f36fd93a2fc49536ba2fc0e6c919b15783dd40c255b6b9e2101b"
+      "sha256": "0dfe9bdec46816c74d0701e7fc531aa885b9d1398c8d4cd7fe7247359b52a167"
     },
     {
       "mode": "0644",
@@ -19019,7 +19019,7 @@
     {
       "mode": "0644",
       "path": "modules/libpref/init/StaticPrefList.yaml",
-      "sha256": "d0d66761fb5a40e65f89751a8a5888998ae43d689fd14163030f075f030e5221"
+      "sha256": "8bed5319aa4374061395c8c3360f87197ec8cd8b53c186c3fb59369c45cc7bd9"
     },
     {
       "mode": "0644",
@@ -19034,7 +19034,7 @@
     {
       "mode": "0644",
       "path": "modules/libpref/init/all.js",
-      "sha256": "2334b373145d5af6089e0c87c38f78841687d54dd936843c85351022555cd6dc"
+      "sha256": "9cd55cb7ac6ed69bbe10d83872d86cc4ee8d520afd822d2034bbcce03b99b49b"
     },
     {
       "mode": "0644",
@@ -19454,7 +19454,7 @@
     {
       "mode": "0644",
       "path": "moz.build",
-      "sha256": "342bf9c8d5cac6f61f7d3ce4f52d6a83b0a25d9b8f4abc6002df7c0d7c1c1117"
+      "sha256": "222e087ecb6eac2e99be44159de41853fdf66a1646a23cae8339599c7490c859"
     },
     {
       "mode": "0775",
@@ -19684,7 +19684,7 @@
     {
       "mode": "0644",
       "path": "mozglue/baseprofiler/public/BaseProfilerUtils.h",
-      "sha256": "8675397dc6e67074b96c84792dfa151e79c46fddf18b1a9b77ec7f56d62af91e"
+      "sha256": "638a43162959e3562cc955fcff9470b0df898651f796ab7e08b60b65a6de28ed"
     },
     {
       "mode": "0644",
@@ -19754,7 +19754,7 @@
     {
       "mode": "0644",
       "path": "mozglue/baseprofiler/public/ProfileBufferIndex.h",
-      "sha256": "8f6e217a37fbc7a1b21878349f281da07e2274ac1048e0bf9ba9708d5f40077a"
+      "sha256": "f7e1d194760204da510eede715a0d9fe4f78196da7c48e272b726a821d6e5630"
     },
     {
       "mode": "0644",
@@ -19879,7 +19879,7 @@
     {
       "mode": "0644",
       "path": "mozglue/misc/AwakeTimeStamp.h",
-      "sha256": "9546274597f63defeb106682c297085a8c24790bdf861d51c4883e5e7f4c3b28"
+      "sha256": "e66f58076c157a5294bf0dfb04e94f160b2a2c8ecc5ea40049d13b7f7e1c13aa"
     },
     {
       "mode": "0644",
@@ -20144,7 +20144,7 @@
     {
       "mode": "0644",
       "path": "mozglue/misc/WindowsDiagnostics.h",
-      "sha256": "87a55001afe1b3e92109cf4b11b08eeca9a45f7a48a6738fd9d7607cf1afc7c2"
+      "sha256": "c314f694df6e843dae6803cedb52bb2ad841c28355bb3b28c8b447593865792b"
     },
     {
       "mode": "0644",
@@ -20584,12 +20584,12 @@
     {
       "mode": "0644",
       "path": "netwerk/base/SSLTokensCache.cpp",
-      "sha256": "44e26c5872f11d9b02a00f0eadd906eb7daf922e4c647851b8db394e43dfa37c"
+      "sha256": "6bc5787642b6ca2b0f16d627ca5e5e5e623eef8811551b24d8b9fbceac78521f"
     },
     {
       "mode": "0644",
       "path": "netwerk/base/SSLTokensCache.h",
-      "sha256": "c9b70c90c298759f7b2682b40b755fb34177fd4e2b0517dccb594d37e3d20dac"
+      "sha256": "c615ba0003a5229d6b8fe8148df83d9e765ab57e414d34aae150705f564c26c9"
     },
     {
       "mode": "0644",
@@ -20764,7 +20764,7 @@
     {
       "mode": "0644",
       "path": "netwerk/base/moz.build",
-      "sha256": "67be4d865ec3b6597012ee368e350246d6d7f72e71576dbf528926b624a8b785"
+      "sha256": "49c6b6aaf98de013df7b79e4829490ad0193caf0a38faf62ae02a1c8bbb1276c"
     },
     {
       "mode": "0644",
@@ -21893,31 +21893,6 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/base/ssl_tokens_cache/Cargo.toml",
-      "sha256": "1b2e54b83a2b6c98cf6c303ec5fb552e158704d910b4162b4c113b8e357a5278"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/base/ssl_tokens_cache/README.md",
-      "sha256": "68c985036cfaa1327e6b16430a0e3599b4895074cda866e781d5fad5353e6a5c"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/base/ssl_tokens_cache/cbindgen.toml",
-      "sha256": "c3fd5cc20f28f7cda3ad1527715438a0a818f8a52b84d96855bed35f90418a03"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/base/ssl_tokens_cache/moz.build",
-      "sha256": "9880e055725dc4a02c0fd3f3c7f6f702198ff6f9cea73aa19963588e1bf12fc5"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/base/ssl_tokens_cache/src/lib.rs",
-      "sha256": "0bb96d00d12a78edb2d7c905583d8ad0a6a410a4aee755581f3239e2afcd4339"
-    },
-    {
-      "mode": "0644",
       "path": "netwerk/base/uritemplate_glue/Cargo.toml",
       "sha256": "dd5134dd8501cb26e787867a49a66ebff740d48e800c1bbdef46e73d77ab364d"
     },
@@ -22019,7 +21994,7 @@
     {
       "mode": "0644",
       "path": "netwerk/cache2/CacheFileIOManager.cpp",
-      "sha256": "4ff8b7acda88e28a35e5d36ac2e5890e67dd398027b389020bb1354c660b033a"
+      "sha256": "a4fb25ea35c9e80757d2a4b7de796f2e13e73401c9f643aac7136f61167e67fe"
     },
     {
       "mode": "0644",
@@ -22929,7 +22904,7 @@
     {
       "mode": "0644",
       "path": "netwerk/dns/effective_tld_names.dat",
-      "sha256": "155b43d46932e933f622365225e7861288c36a45380b1f7d00b3d09748926226"
+      "sha256": "14ef61b1c212f701f3636c1d01ab9254daf841f57eb6433bcbbef56c726ca656"
     },
     {
       "mode": "0644",
@@ -22959,7 +22934,7 @@
     {
       "mode": "0644",
       "path": "netwerk/dns/nsEffectiveTLDService.h",
-      "sha256": "d4644ffa78f379e899da2276d31639a3de04357606b36c4a7d6d9f5106f6f0c0"
+      "sha256": "655d41a9dc4b091d0e1121cb27a75cef28b3968e7a94128dce1e73518dd41434"
     },
     {
       "mode": "0644",
@@ -23204,7 +23179,7 @@
     {
       "mode": "0644",
       "path": "netwerk/ipc/SocketProcessChild.h",
-      "sha256": "d2c2fa807f8eb7b7ea63d94e82ce1a53cefa6ad37ec84d61361a085d981687b8"
+      "sha256": "17f73381b115ed0e40fae3a0b03abc05da8475d15d92c2cf4b42f606d61a9941"
     },
     {
       "mode": "0644",
@@ -23244,7 +23219,7 @@
     {
       "mode": "0644",
       "path": "netwerk/metrics.yaml",
-      "sha256": "bf2d1a0a1ba68734c83d43aab7d4398ec8af1490532d2c2a4aa8a173bb27a00b"
+      "sha256": "ccb4844ab413009deb3db639a7ae028547c9428eab33bff7453f100018215d08"
     },
     {
       "mode": "0644",
@@ -23314,7 +23289,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/Config.cpp",
-      "sha256": "4ef16e86b9f3ee607fdb396e8ac858373d869e32b559ec17465459769f6a6287"
+      "sha256": "ef42ba4ce719c1325b49757f84e73d2f87d3834572b266bf3b92feddc0ac8edd"
     },
     {
       "mode": "0644",
@@ -23424,12 +23399,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NeckoTunnel.cpp",
-      "sha256": "75d3c43d814927d89e8d42489994ea104c6c2b12d208e79e7ba5dab812a4f571"
+      "sha256": "40f2a921fdcb75c530798660e04d3964883b46c5d54c74de6cd490db91129fab"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NeckoTunnel.h",
-      "sha256": "a697a5b622de11ddcda0409e1224e3bddf92cbdeedeed634975af6f5a6e8c21e"
+      "sha256": "748d2c8c9b66cb79e7c320c687ee60eccce711d61f5639e783680b28e42f1ac2"
     },
     {
       "mode": "0644",
@@ -23454,7 +23429,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "131a47ba0439f0d32b5702bd310641f5e60246662aca1cbb6c7bbbb6e92b48c5"
+      "sha256": "980a7649ae53d15ab21669c0a21b8c3e765aba320ab58c234b689f5b1e310918"
     },
     {
       "mode": "0644",
@@ -23659,7 +23634,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestConfig.cpp",
-      "sha256": "f1a54296c97becb4ad5500db69523ea3b5cd5a82d55e2aa86a625ddaf20bd2ef"
+      "sha256": "ba3e537fd2e477c0f8961b5f0f79fc3da730d8889125c5731c87d8aa4a698879"
     },
     {
       "mode": "0644",
@@ -23729,7 +23704,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-android-embedded-tests.sh",
-      "sha256": "63a84729b389a890e4baec3f0c9ab3bf0a82426daef41f8c288c061cc79fe6ad"
+      "sha256": "629c230acf7b3cac743d60b1d98e51f252b852aa2f2fe7fe2132b89886034dd5"
     },
     {
       "mode": "0755",
@@ -23749,7 +23724,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-config-tests.sh",
-      "sha256": "dcc798ce07758388aa3bbffe4b4e9bda73cc5aa2a5d6717c8ebe94f3c22cd396"
+      "sha256": "9a9f1fa0c94e26d8c324e0821a6b83c823e00746659e13ed77d83baf36f07a3e"
     },
     {
       "mode": "0755",
@@ -23924,7 +23899,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/build-product.sh",
-      "sha256": "f13c2527fe210eb97a3eaf338a4567234504585c778f3131e55cbe56d0370f71"
+      "sha256": "2a58b69ac23aafc983c8c820ae3baf65722b94b934faf28f80c8f05e7c39228f"
     },
     {
       "mode": "0755",
@@ -23940,6 +23915,11 @@
       "mode": "0644",
       "path": "netwerk/naivefox/tools/firefox-reference-manifest",
       "sha256": "b28490935d21028d35dadfd1c8e084e0d3d3ce02ceebe1d7527df90fcf6ba5fa"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/tools/replace-minimal-source-worktree.py",
+      "sha256": "26631989486e0b856c8a15a9cf48a531db69221aa1a0538c0585b94ecc5f7271"
     },
     {
       "mode": "0644",
@@ -28049,7 +28029,7 @@
     {
       "mode": "0644",
       "path": "security/ct/CTKnownLogs.h",
-      "sha256": "5515ac2e41508fa30ef1c17bc8be30c5a529dadc3e89700f11a55a15fd2a52a2"
+      "sha256": "0ed25ed8f5c850262c70c111ac31992eb5312065fe2657a0e01c9a4f109df206"
     },
     {
       "mode": "0644",
@@ -28469,7 +28449,7 @@
     {
       "mode": "0644",
       "path": "security/manager/ssl/StaticHPKPins.h",
-      "sha256": "62db2dd28d144d96352cb256aa310c82735e8f885151b8d409e64794735f6628"
+      "sha256": "09e54cd47fa82ed1f03a763d2b61edb4f3cb6d7abf674dfbcec37dd4b0408e7f"
     },
     {
       "mode": "0644",
@@ -28959,7 +28939,7 @@
     {
       "mode": "0644",
       "path": "security/manager/ssl/nsSTSPreloadList.inc",
-      "sha256": "c3803a4e096aff6bb52699d03b84e4e56cb66a9ede15a4b955484a24deddb254"
+      "sha256": "0310206dd3b352c719e5d1c2d603b55ba2759e86916966de6c493a11a1c363fe"
     },
     {
       "mode": "0644",
@@ -29024,7 +29004,7 @@
     {
       "mode": "0644",
       "path": "security/manager/ssl/pdf_trust_anchors/src/trust_anchors.rs",
-      "sha256": "70a0b5fd06d13f72f7c99371f8f421be27b1fb9673bff2ae5b857def87c4b274"
+      "sha256": "3f080ec462d3e5c1727c37c5df8ac0f6257a164f9f5ab7783d71f5324fadf3cc"
     },
     {
       "mode": "0644",
@@ -29079,7 +29059,7 @@
     {
       "mode": "0644",
       "path": "security/manager/ssl/qwac_trust_anchors/src/trust_anchors.rs",
-      "sha256": "70a0b5fd06d13f72f7c99371f8f421be27b1fb9673bff2ae5b857def87c4b274"
+      "sha256": "3f080ec462d3e5c1727c37c5df8ac0f6257a164f9f5ab7783d71f5324fadf3cc"
     },
     {
       "mode": "0644",
@@ -29174,7 +29154,7 @@
     {
       "mode": "0644",
       "path": "security/manager/ssl/trust-anchor-build-util/src/lib.rs",
-      "sha256": "94fcb8870da57e54558cee17e319acc2d98eb9e045b0f98e95b62533e17a3fa0"
+      "sha256": "d613adae38cfc89cb9478fad0bf7e8df569d208a4139e6e4f990fc5f0d1eb7cb"
     },
     {
       "mode": "0644",
@@ -32959,7 +32939,7 @@
     {
       "mode": "0644",
       "path": "servo/components/selectors/parser.rs",
-      "sha256": "4fb370393faa1fd8637b375932377d9521a5f85558c720c4e0103cf6cb8da0c9"
+      "sha256": "64cc01bb7262c318d1052b2a35b25a32821589f15544b6eca87d9a1a5fd57dd2"
     },
     {
       "mode": "0644",
@@ -33655,6 +33635,26 @@
       "mode": "0644",
       "path": "testing/gtest/mach_test_package_commands.py",
       "sha256": "ffd957d8298d19ef6fb9bcd576b74e6e0bc3d1e81ba9dcc05bf4e6d03cc1864c"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/GTestRunner.cpp",
+      "sha256": "96890cfd12d3bdc30e95f382d75403164fd5d4b1e69e6ff93742051204fbeb08"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/GTestRunner.h",
+      "sha256": "9cf036f8748cabd47569301c5b95f5597b74b751f4dd2846da8678ff56b31a04"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/MozAssertions.cpp",
+      "sha256": "c506cb17041830689d93bfb8286caa553446f584c0a882ae12b4c3a3ebcb7ea1"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/MozAssertions.h",
+      "sha256": "cb3ad1dc991f77695b8ac3c9e5195b306362822b37d831089b8c8c81511c844a"
     },
     {
       "mode": "0644",
@@ -34589,7 +34589,7 @@
     {
       "mode": "0755",
       "path": "testing/mozbase/mozinfo/mozinfo/mozinfo.py",
-      "sha256": "9cd7e5248fdc2a336d4c40d13b6c28ad4f3c8b586deb1e3a0eeb804248c39c72"
+      "sha256": "eb14f02700035fae2556fba5ad0d45d79400f37e4baa5152ddfaa872983494af"
     },
     {
       "mode": "0644",
@@ -34619,7 +34619,7 @@
     {
       "mode": "0644",
       "path": "testing/mozbase/mozinfo/tests/test.py",
-      "sha256": "34d131d3dcd7ce704767863aba83fec1d88b05dd03aa1b6abb8a051c595add12"
+      "sha256": "d74f3f843348f2393e6dd487cdc63ba98100b0f1b99ac5868b52086c548117f3"
     },
     {
       "mode": "0644",
@@ -34789,7 +34789,7 @@
     {
       "mode": "0644",
       "path": "testing/mozbase/mozlog/mozlog/formatters/machformatter.py",
-      "sha256": "6d7f80af9bd18a952560ab5a80fd7e829c8ffff5dc0778352248516be045b907"
+      "sha256": "eced808b766001d0da7fffbe3ed5a0fb9fbfb76beff5583644bf1866a5975428"
     },
     {
       "mode": "0644",
@@ -34799,7 +34799,7 @@
     {
       "mode": "0644",
       "path": "testing/mozbase/mozlog/mozlog/formatters/tbplformatter.py",
-      "sha256": "e2e5711bc4cc37e4ae096c2f2054455750f27e416532261bc8f4c669d399790d"
+      "sha256": "2c8a392bab1cc874d08869d7b6076a10370ca16d284786006a13706b489be8b8"
     },
     {
       "mode": "0644",
@@ -36975,6 +36975,61 @@
       "mode": "0644",
       "path": "third_party/function2/include/function2/function2.hpp",
       "sha256": "10fb399117ffbce3092a8fd9171b59ac19f5e5b1ceb3db060fc03f822e645e79"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-all.cc",
+      "sha256": "972d3016860f9aa6452e078cf77406290fb7003b66fd6c0744a030bd1c323606"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-assertion-result.cc",
+      "sha256": "dbd2235676dcc0ef6409108a4041e05442fc6895735a5561d71151e6a14296bb"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-death-test.cc",
+      "sha256": "2881240c49961c095505f3c044483a79ef1c32e413e19630af7508d67994f619"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-filepath.cc",
+      "sha256": "b3d0011edbb81f782b88aac6ea20d04b24050e5738b3b2240a22033f675cb71f"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-internal-inl.h",
+      "sha256": "a5fb0dbf86304cbcce6252a136d7e722e07518940ce1ed134ce93e7eea4f0fcc"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-matchers.cc",
+      "sha256": "e4ce9edf33493625353cc147a14caac14fdba7390d76166d101fa2fe9d16bbda"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-port.cc",
+      "sha256": "39470003392fcf089340a31f92e61efa46328052cb16559e5ddada64e94886bc"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-printers.cc",
+      "sha256": "efcf234bdeb688d09500dbbdede962b9ff1de5d5f842b5d5e5a4a58a0b4b99a4"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-test-part.cc",
+      "sha256": "9acddbbe251f0516a92da1f55d8edd06c66c8fdeca382460d57340ad594f76f2"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-typed-test.cc",
+      "sha256": "b92e70b2d7ee3b86328162cbda269a28de4ce67f0e8d9beec5ec2c73a93ba006"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest.cc",
+      "sha256": "c88905c471c58ca3e58978477d96d8849d97a58e8afcd190011a7a76cd2a8b75"
     },
     {
       "mode": "0644",
@@ -44798,43 +44853,13 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/adler2/Cargo.lock",
-      "sha256": "3e44ced212a9e7ddc0a5450bcebb48ec67f32a058529856458efa36415554e53"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/adler2/Cargo.toml",
       "sha256": "8f30dbd092f3acc475b9d339736cd7b64c6489bc47cd234a7f2232fc52e2d490"
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/adler2/Cargo.toml.orig",
-      "sha256": "077df9094ac86443a4d05305f74782bd237c1f15fa39640463e4c62e9e4a310a"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/adler2/LICENSE-0BSD",
-      "sha256": "861399f8c21c042b110517e76dc6b63a2b334276c8cf17412fc3c8908ca8dc17"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/adler2/LICENSE-APACHE",
-      "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/adler2/LICENSE-MIT",
-      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/adler2/README.md",
       "sha256": "cd955d5d6a49161e6f7a04df4a5963581b66ed43fd5096b2dedca8e295efe4f9"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/adler2/RELEASE_PROCESS.md",
-      "sha256": "a86cd10fc70f167f8d00e9e4ce0c6b4ebdfa1865058390dffd1e0ad4d3e68d9d"
     },
     {
       "mode": "0644",
@@ -108749,7 +108774,7 @@
     {
       "mode": "0644",
       "path": "toolkit/components/antitracking/metrics.yaml",
-      "sha256": "736adb45dc460c2905e6947b6a5cd9702a25256370db65603844bd5936f098e9"
+      "sha256": "92a2b0b9c586f352e765b0f627bc807119add5c08bbfcef6cb9295775c98e0c0"
     },
     {
       "mode": "0644",
@@ -108974,7 +108999,7 @@
     {
       "mode": "0644",
       "path": "toolkit/crashreporter/tools/upload_symbols.py",
-      "sha256": "fd7f63d2602b2510f7d4c7281a87f364c8dcc1d01b8e49e1db29964fcd05ebb9"
+      "sha256": "88001cbfa26969b8bce356250420b73f84c8cc2aae7ebeb66c1bd27964d285de"
     },
     {
       "mode": "0644",
@@ -109013,6 +109038,11 @@
     },
     {
       "mode": "0644",
+      "path": "toolkit/library/gtest/libxul_missing_buildid/xul_missing_buildid.c",
+      "sha256": "ff4a46a230d018aaa810e09e3cbb100745f2f3f459bf174a42e0394d95eb6531"
+    },
+    {
+      "mode": "0644",
       "path": "toolkit/library/libxul-naivefox.symbols",
       "sha256": "80480b7cd6e9b4dc629e258d49a8e0ee684fc0e0f417eae14110514c05134ec6"
     },
@@ -109044,27 +109074,27 @@
     {
       "mode": "0644",
       "path": "toolkit/library/rust/moz.build",
-      "sha256": "112043ee764588b5e34b112016ac6a8193b8197d0865e2cad603699bc6b2a371"
+      "sha256": "61275d3d71cacf6d61cae2a3e09b83da141dc62028d6fb2d0c4455877ec456cf"
     },
     {
       "mode": "0644",
       "path": "toolkit/library/rust/naivefox/Cargo.toml",
-      "sha256": "eea2494488ad9323ae077bc9382246409e8ee93dd14b826f71d4224ccd0417e1"
+      "sha256": "2b81fc7ea067af6c679af8605a4d11ddbc03887311f54d63da944e01934f6ec2"
     },
     {
       "mode": "0644",
       "path": "toolkit/library/rust/naivefox/lib.rs",
-      "sha256": "4784f00c3c6fbc80a42c9de1f2c32fac1dd4b8e8e6aebc541f84c12efc04f308"
+      "sha256": "d20a697ed8dcdc7cd3d81975b74fe938f70ea422b11dc210357475b668537c61"
     },
     {
       "mode": "0644",
       "path": "toolkit/library/rust/shared/Cargo.toml",
-      "sha256": "8bc9a279482740b39ee4edc62a4cbdbefcd51f84e8945bed73091d215ecd8db0"
+      "sha256": "e971b6974b8d7b12fb405ee78d677a680b8974a4a007c70134ddbbacfd451f23"
     },
     {
       "mode": "0644",
       "path": "toolkit/library/rust/shared/lib.rs",
-      "sha256": "797c7f06aafa108c147f34d6389837f6876fa76fa71986a7a43e11e8c9015182"
+      "sha256": "c06354af4d78916b2480c27a34930e59b4733c3580b0c4fcfefa383145cab27d"
     },
     {
       "mode": "0644",
@@ -110249,7 +110279,7 @@
     {
       "mode": "0644",
       "path": "widget/windows/WinHeaderOnlyUtils.h",
-      "sha256": "867945b35c2aba068013cad07c7ebc7af06119abbe248248a2b3e50e7c8db1e3"
+      "sha256": "46d515bbed5f4879746d7d098e9a0758ba9fd2c729ad3db630def308194a4c3e"
     },
     {
       "mode": "0644",
@@ -111113,11 +111143,6 @@
     },
     {
       "mode": "0644",
-      "path": "xpcom/build/Services.py",
-      "sha256": "65c0ee8dcdf9143b07b7e8b52da20c51ad4e094cfa429957bc900adba165b251"
-    },
-    {
-      "mode": "0644",
       "path": "xpcom/build/SmallArrayLRUCache.h",
       "sha256": "a86c347d1a97fbcc5f0fc599b1281d5a8745e01495d9cd27dbcb9eb1d08f4b9d"
     },
@@ -111164,7 +111189,7 @@
     {
       "mode": "0644",
       "path": "xpcom/build/moz.build",
-      "sha256": "4cd60a745ebb23181dce72d1b471cbb085b84e29efb7e2ce4645fbc0a1243808"
+      "sha256": "96f75019f7b64b5a1953652058da67cbc42ff87493a91e921def33c2dc459158"
     },
     {
       "mode": "0644",
@@ -111214,7 +111239,7 @@
     {
       "mode": "0644",
       "path": "xpcom/components/ManifestParser.cpp",
-      "sha256": "4ac300e087d74c38208cc4b49941934bacf7ec47cc99dd74ca41afd5501cc681"
+      "sha256": "2c6cc9656daeb1e14f9e50b7235510d47c2ec0231ebeed0efe6aaeef840b8182"
     },
     {
       "mode": "0644",
@@ -111230,6 +111255,16 @@
       "mode": "0644",
       "path": "xpcom/components/ModuleUtils.h",
       "sha256": "7fa85fed25fc5f2833b94e0f7043a7937670e30a9e1ebd08966f9c2433ba1661"
+    },
+    {
+      "mode": "0644",
+      "path": "xpcom/components/Services.cpp",
+      "sha256": "69934e700073f74a027b927f83e0994f05bb2ecc34e0bc3b2e4618dea24f1059"
+    },
+    {
+      "mode": "0644",
+      "path": "xpcom/components/Services.h",
+      "sha256": "447dc3e5eaf4317ff3dfe6bea68a66cff1492df2c3922b38d203d31225f59ff5"
     },
     {
       "mode": "0644",
@@ -111254,7 +111289,7 @@
     {
       "mode": "0644",
       "path": "xpcom/components/moz.build",
-      "sha256": "1f035440e65b4b2acb2a8390294ca37971b26a861149e92234cb6bfde89a7e95"
+      "sha256": "f336654e6ebfe6bca39bca5728c62e06b9d4d09c409a30dc07518214df171de9"
     },
     {
       "mode": "0644",
@@ -113183,6 +113218,11 @@
     },
     {
       "mode": "0644",
+      "path": "xpcom/tests/TestHarness.h",
+      "sha256": "a4fe56070e0cb0b0b5f986e40317c919688229b969207b5464851c1e2347ef44"
+    },
+    {
+      "mode": "0644",
       "path": "xpcom/threads/AbstractThread.cpp",
       "sha256": "7f274a63bb83f7768f154d9d85d2a1077a628f65812d56a12c6077ed69278acd"
     },
@@ -113747,9 +113787,9 @@
       "sha256": "4761b1897e063dc5abba6f9cf969508e727acb671416c192bbf07972653f231e"
     }
   ],
-  "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "manifest_sha256": "c46dae0e9dba8ef39a673b83ed845b11d8c6f370512a31a0a52ffbf52d6654a4",
+  "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
+  "manifest_sha256": "3a9f77a992bd5b8090b0912dc7df56cd0b19b150b4f59215484171e359fd31b1",
   "manifest_version": 2,
-  "minimal_export_commit": "e86178e2b288391baee0e910471d66cc248e4ae2",
-  "naivefox_reference_commit": "758c8724469107034736d1a71296a07ffa097900"
+  "minimal_export_commit": "adb976f6d1557af9918cdf28b4bae00280d3b7e0",
+  "naivefox_reference_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a"
 }

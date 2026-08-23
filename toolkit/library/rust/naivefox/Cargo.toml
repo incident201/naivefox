@@ -33,7 +33,6 @@ pdf-trust-anchors = { path = "../../../../security/manager/ssl/pdf_trust_anchors
 prefs_parser = { path = "../../../../modules/libpref/parser" }
 qwac-trust-anchors = { path = "../../../../security/manager/ssl/qwac_trust_anchors" }
 signature_cache = { path = "../../../../security/certverifier/signature_cache" }
-ssl_tokens_cache = { path = "../../../../netwerk/base/ssl_tokens_cache" }
 static_prefs = { path = "../../../../modules/libpref/init/static_prefs" }
 storage = { path = "../../../../storage/rust" }
 trust-anchors = { path = "../../../../security/manager/ssl/trust_anchors" }

@@ -27,7 +27,6 @@ extern crate pdf_trust_anchors;
 extern crate prefs_parser;
 extern crate qwac_trust_anchors;
 extern crate signature_cache;
-extern crate ssl_tokens_cache;
 extern crate static_prefs;
 extern crate storage;
 extern crate trust_anchors;

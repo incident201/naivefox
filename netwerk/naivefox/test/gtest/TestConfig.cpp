@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "Config.h"
+#include "NeckoTunnel.h"
 #include "gtest/gtest.h"
 
 namespace mozilla::naivefox {
@@ -181,6 +182,124 @@ TEST(NaiveFoxConfig, OptionalUpstreamCredentials)
   EXPECT_TRUE(config.mProxies[1].mUser.IsEmpty());
   EXPECT_TRUE(config.mProxies[1].mPassword.IsEmpty());
   EXPECT_EQ(config.mProxies[1].mProtocol, ProxyProtocol::H3);
+}
+
+TEST(NaiveFoxConfig, OneSidedUpstreamCredentials)
+{
+  struct Credentials {
+    const char* mScheme;
+    const char* mUserInfo;
+    const char* mUser;
+    const char* mPassword;
+    ProxyProtocol mProtocol;
+  };
+  for (const auto& credentials : {
+           Credentials{"https", "user:password@", "user", "password",
+                       ProxyProtocol::H2},
+           Credentials{"https", "user:@", "user", "", ProxyProtocol::H2},
+           Credentials{"https", ":password@", "", "password",
+                       ProxyProtocol::H2},
+           Credentials{"https", ":@", "", "", ProxyProtocol::H2},
+           Credentials{"quic", "user:password@", "user", "password",
+                       ProxyProtocol::H3},
+           Credentials{"quic", "user:@", "user", "", ProxyProtocol::H3},
+           Credentials{"quic", ":password@", "", "password", ProxyProtocol::H3},
+           Credentials{"quic", ":@", "", "", ProxyProtocol::H3},
+       }) {
+    nsAutoCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":")"_ns);
+    json.Append(credentials.mScheme);
+    json.AppendLiteral("://");
+    json.Append(credentials.mUserInfo);
+    json.AppendLiteral("proxy.example:443");
+    json.AppendLiteral(R"("})");
+
+    Config config;
+    nsAutoCString error;
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK)
+        << json.get() << ": " << error.get();
+    ASSERT_EQ(config.mProxies.Length(), 1U);
+    EXPECT_EQ(config.mProxies[0].mProtocol, credentials.mProtocol);
+    EXPECT_STREQ(config.mProxies[0].mUser.get(), credentials.mUser);
+    EXPECT_STREQ(config.mProxies[0].mPassword.get(), credentials.mPassword);
+  }
+}
+
+TEST(NaiveFoxConfig, PercentEncodedOneSidedUpstreamCredentials)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user%40name:@proxy.example"})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  ASSERT_EQ(config.mProxies.Length(), 1U);
+  EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user@name"));
+  EXPECT_TRUE(config.mProxies[0].mPassword.IsEmpty());
+}
+
+TEST(NaiveFoxConfig, InsecureConcurrencyIsCompatibilityOnly)
+{
+  for (const char* value :
+       {"1", "2", "2147483647", R"("1")", R"("+2")", R"("0002")"}) {
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","insecure-concurrency":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    Config config;
+    nsAutoCString error;
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK)
+        << value << ": " << error.get();
+    ASSERT_EQ(config.mProxies.Length(), 1U);
+  }
+
+  for (const char* value :
+       {"0", "-1", "2147483648", "1.0", "1e0", R"("")", R"(" 2")", R"("2 ")",
+        R"("2x")", R"("-1")", "true", "null", "[]", "{}"}) {
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","insecure-concurrency":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error))) << value;
+    EXPECT_FALSE(error.IsEmpty()) << value;
+  }
+
+  Config config;
+  nsAutoCString error;
+  nsAutoCString huge(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","insecure-concurrency":")"_ns);
+  for (size_t index = 0; index < 1024; ++index) {
+    huge.Append('9');
+  }
+  huge.AppendLiteral(R"("})");
+  EXPECT_TRUE(NS_FAILED(ParseConfig(huge, config, error)));
+  EXPECT_FALSE(error.IsEmpty());
+
+  EXPECT_TRUE(NS_FAILED(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","insecure-concurrency":1,"insecure-concurrency":2})"_ns,
+      config, error)));
+  EXPECT_FALSE(error.IsEmpty());
+}
+
+TEST(NaiveFoxConfig, BasicAuthorizationAllowsEmptyCredentialSide)
+{
+  nsAutoCString authorization;
+  EXPECT_EQ(BuildProxyAuthorization("user"_ns, "password"_ns, authorization),
+            NS_OK);
+  EXPECT_TRUE(authorization.EqualsLiteral("Basic dXNlcjpwYXNzd29yZA=="));
+
+  EXPECT_EQ(BuildProxyAuthorization("user"_ns, ""_ns, authorization), NS_OK);
+  EXPECT_TRUE(authorization.EqualsLiteral("Basic dXNlcjo="));
+
+  EXPECT_EQ(BuildProxyAuthorization(""_ns, "password"_ns, authorization),
+            NS_OK);
+  EXPECT_TRUE(authorization.EqualsLiteral("Basic OnBhc3N3b3Jk"));
+
+  EXPECT_EQ(BuildProxyAuthorization(""_ns, ""_ns, authorization), NS_OK);
+  EXPECT_TRUE(authorization.IsEmpty());
 }
 
 TEST(NaiveFoxConfig, SocksListenerCredentials)
@@ -368,8 +487,6 @@ TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
       R"({"listen":"socks://user:%zz@127.0.0.1:1080","proxy":"https://example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"http://u:p@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user@example.com"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://:pass@example.com"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user:@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@example.com/path"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:%zz@example.com"})",

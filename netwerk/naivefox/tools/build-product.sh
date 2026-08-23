@@ -10,6 +10,7 @@ Build and stage one NaiveFox product target.
 
 Options:
   --bootstrap       bootstrap Mozilla build dependencies before building
+                     (full Git checkout only; omit for a generated export)
   --dry-run         print the resolved build without running it
   --jobs N          parallel build jobs (default: NAIVEFOX_JOBS or 4)
   --objdir PATH     external object directory
@@ -177,6 +178,13 @@ printf '  package:   %s\n' "$package_dir"
 printf '  jobs:      %s\n' "$jobs"
 
 if $bootstrap; then
+  if ! git_top=$(git -C "$repo_root" rev-parse --show-toplevel 2>/dev/null) ||
+    [[ $(realpath -- "$git_top") != "$repo_root" ]]; then
+    printf '%s\n' \
+      '--bootstrap requires a full Git checkout rooted at the source tree.' \
+      'Generated minimal-source exports are intentionally git-less; build them without --bootstrap.' >&2
+    exit 2
+  fi
   printf 'Bootstrapping Mozilla build dependencies...\n'
   if ! $dry_run; then
     "$repo_root/mach" --no-interactive bootstrap --application-choice browser

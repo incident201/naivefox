@@ -279,8 +279,6 @@ if not CONFIG["MOZ_NAIVEFOX"]:
         "Dashboard.cpp",
         "ProxyAutoConfig.cpp",
     ]
-else:
-    pass
 
 if CONFIG["FUZZING"]:
     SOURCES += [
@@ -325,7 +323,6 @@ DIRS += [
     "rust-helper",
     "http-sfv",
     "idna_glue",
-    "ssl_tokens_cache",
 ]
 
 if CONFIG["MOZ_NAIVEFOX"]:

@@ -18,6 +18,12 @@ class nsIStreamListener;
 
 namespace mozilla::naivefox {
 
+// Internal Naive proxy authentication helper. This is not part of the
+// embedded C ABI.
+nsresult BuildProxyAuthorization(const nsACString& aUser,
+                                 const nsACString& aPassword,
+                                 nsACString& aAuthorization);
+
 nsresult OpenNeckoTunnel(
     const nsACString& aProxyUrl, const nsACString& aTargetAuthority,
     const nsACString& aProxyUser, const nsACString& aProxyPassword,
