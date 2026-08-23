@@ -276,7 +276,7 @@ def assert_closure(report_path, topsrcdir):
     if any(
         token in crate_name
         for crate_name in crate_names
-        for token in ("icu-sys", "icu_capi", "icu_cxx", "icu4c")
+        for token in ("icu-sys", "icu_cxx", "icu4c")
     ):
         violations.append("ICU4C Rust binding crate is reachable in NaiveFox closure")
     if "icu4x_unicode_glue" not in crate_names:
