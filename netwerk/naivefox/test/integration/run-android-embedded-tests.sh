@@ -65,6 +65,17 @@ else
 fi
 package_dir=$(realpath -m -- "$package_arg")
 
+# An explicit staged package already identifies its object directory.  Prefer
+# that path over `mach environment` so the runner also works from a generated
+# git-less minimal-source export, where the optional mach command registry is
+# intentionally not part of the product source tree.
+if [[ -z ${NAIVEFOX_OBJDIR:-} && -n $package_arg ]]; then
+  package_objdir=$(realpath -m -- "$package_dir/../..")
+  if [[ -f $package_objdir/mozinfo.json ]]; then
+    export NAIVEFOX_OBJDIR=$package_objdir
+  fi
+fi
+
 find_ndk() {
   local candidates=()
   [[ -z ${NAIVEFOX_ANDROID_NDK:-} ]] || candidates+=("$NAIVEFOX_ANDROID_NDK")

@@ -226,6 +226,7 @@ NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-android-aarch64 \
 ./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
   /absolute/path/to/export-obj-android-aarch64/package/naivefox-android-aarch64
 
+NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-android-aarch64 \
 ./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
   --package /absolute/path/to/export-obj-android-aarch64/package/naivefox-android-aarch64 \
   --check-only
