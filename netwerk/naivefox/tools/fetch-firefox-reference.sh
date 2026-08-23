@@ -91,6 +91,7 @@ sha256=$(sha256sum "$archive" | awk '{print $1}')
 if [[ $sha256 != "$expected_sha256" ]]; then
   printf 'Firefox reference archive SHA-256 mismatch: expected %s, got %s\n' \
     "$expected_sha256" "$sha256" >&2
+  printf 'The Nightly URL is mutable; inspect the reported Firefox version and refresh archive_sha256 only when it still matches the manifest version.\n' >&2
   exit 1
 fi
 if [[ $version != "$expected_version" ]]; then

@@ -10,7 +10,9 @@
 #include "nsTArray.h"
 #include "nsWeakReference.h"
 #include "MozLocaleBindings.h"
-#include "mozilla/intl/ICU4CGlue.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/intl/ICU4CGlue.h"
+#endif
 #include "mozILocaleService.h"
 
 namespace mozilla {

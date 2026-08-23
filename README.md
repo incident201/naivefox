@@ -295,6 +295,14 @@ not depend on stale daemon state or silently change its configure inputs. Set
 `NAIVEFOX_USE_SCCACHE=1` only when the daemon has been deliberately configured
 for this checkout.
 
+The product graph disables SpiderMonkey's ECMAScript `Intl` API and does not
+build ICU4C. The retained locale parser, IDNA/Unicode properties, and text
+segmentation use the existing ICU4X Rust data and Necko's normal helpers. This
+keeps the networking/runtime behavior needed by NaiveFox while avoiding the
+browser's formatting, collation, and other ICU4C-only components; code that
+requires `DateTimeFormat`, `Collator`, or the JavaScript `Intl` API is outside
+the product scope.
+
 An ordinary Firefox build is not a merge or release gate. It is allowed only
 for an explicitly requested same-base capture comparison; see
 [`CAPTURE.md`](netwerk/naivefox/CAPTURE.md).

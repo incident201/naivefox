@@ -12,15 +12,18 @@ binary_http = { path = "../../../../netwerk/protocol/http/binary_http" }
 cert_storage = { path = "../../../../security/manager/ssl/cert_storage" }
 crypto_hash = { path = "../../../../security/manager/ssl/crypto_hash" }
 data_storage = { path = "../../../../security/manager/ssl/data_storage", default-features = false, features = ["naivefox"] }
+encoding_c = "0.9.5"
+encoding_c_mem = "0.2.4"
 encoding_glue = { path = "../../../../intl/encoding_glue" }
 gecko_logger = { path = "../../../../xpcom/rust/gecko_logger" }
 gecko_tracing = { path = "../../../../xpcom/rust/gecko_tracing" }
 gkrust_utils = { path = "../../../../xpcom/rust/gkrust_utils" }
 happy_eyeballs_glue = { path = "../../../../netwerk/protocol/http/happy_eyeballs_glue", default-features = false, features = ["naivefox"] }
 http_sfv = { path = "../../../../netwerk/base/http-sfv" }
+icu_capi = { version = "2.1", default-features = false, features = ["any_provider", "compiled_data", "segmenter"] }
+icu4x_unicode_glue = { path = "../../../../intl/icu4x_unicode_glue" }
 idna_glue = { path = "../../../../netwerk/base/idna_glue" }
 icu_locale = { version = "~2.1.1", features = ["compiled_data"] }
-jsrust_shared = { path = "../../../../js/src/rust/shared", features = ["icu4x"] }
 locale_service_glue = { path = "../../../../intl/locale/rust/locale_service_glue" }
 fluent-langneg-ffi = { path = "../../../../intl/locale/rust/fluent-langneg-ffi" }
 log = { version = "0.4", features = ["release_max_level_info"] }

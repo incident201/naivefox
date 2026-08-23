@@ -9,6 +9,8 @@ init_paths
 capture_pid=
 capture_pcap=
 capture_raw=
+capture_stage_dir=
+capture_stage_raw=
 firefox_pid=
 naivefox_pid=
 capture_dir=
@@ -33,16 +35,17 @@ stop_capture() {
   fi
   [[ -z $capture_pid ]] || wait "$capture_pid" 2>/dev/null || true
   capture_pid=
-  if [[ -n $capture_raw && -s $capture_raw ]]; then
+  if [[ -n $capture_stage_raw && -s $capture_stage_raw ]]; then
     # The WSL `any` interface records loopback transmit and receive copies.
     # Retain the transmit copy before QUIC dissection so duplicate packet
     # numbers cannot perturb Wireshark's key-phase state machine.  The transmit
     # copy also preserves the sender's handshake/application packet order.
-    tshark -r "$capture_raw" -Y 'sll.pkttype==4' -w "$capture_pcap"
-    rm -f -- "$capture_raw"
+    tshark -r "$capture_stage_raw" -Y 'sll.pkttype==4' -w "$capture_pcap"
+    rm -f -- "$capture_stage_raw"
   fi
   capture_pcap=
   capture_raw=
+  capture_stage_raw=
 }
 
 cleanup() {
@@ -51,6 +54,9 @@ cleanup() {
   stop_pid "$firefox_pid"
   stop_pid "$naivefox_pid"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
+  if [[ -n $capture_stage_dir ]]; then
+    rm -rf -- "$capture_stage_dir"
+  fi
   if [[ -n $capture_dir ]]; then
     case $capture_dir in
       "$STATE_ROOT"/h3-captures/*)
@@ -144,21 +150,33 @@ fi
 capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 capture_dir="$STATE_ROOT/h3-captures/$capture_id"
 mkdir -m 0700 -p "$capture_dir"
+# WSL's dumpcap/AppArmor combination may deny opening a capture directly below
+# /home even when the caller is root.  Capture into a private /tmp staging
+# directory, then write the filtered result into the private diagnostics tree.
+capture_stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/naivefox-dumpcap.XXXXXX")
+chmod 0700 "$capture_stage_dir"
+firefox_runtime_env=()
+if [[ $EUID -eq 0 ]]; then
+  firefox_runtime_dir="$capture_stage_dir/firefox-runtime"
+  mkdir -m 0700 "$firefox_runtime_dir"
+  firefox_runtime_env=("XDG_RUNTIME_DIR=$firefox_runtime_dir")
+fi
 
 export MOZ_CRASHREPORTER_DISABLE=1
 
 start_capture() {
   local pcap=$1
   local log=$2
+  capture_pcap=$pcap
+  capture_stage_raw="$capture_stage_dir/$(basename "${pcap%.pcapng}.raw.pcapng")"
   : >"$log"
   chmod 0600 "$log"
-  capture_pcap=$pcap
-  capture_raw="${pcap%.pcapng}.raw.pcapng"
+  capture_raw=$capture_stage_raw
   # `any` is the only reliable WSL loopback source here.  stop_capture filters
   # its duplicate cooked receive/transmit views before stateful QUIC decode.
   dumpcap -q -i any \
     -f "udp port $NAIVEFOX_FIXTURE_PROXY_PORT or tcp port $NAIVEFOX_FIXTURE_PROXY_PORT" \
-    -a duration:60 -a filesize:65536 -w "$capture_raw" >"$log" 2>&1 &
+    -a duration:60 -a filesize:65536 -w "$capture_stage_raw" >"$log" 2>&1 &
   capture_pid=$!
   for ((i = 0; i < 100; i++)); do
     kill -0 "$capture_pid" 2>/dev/null || {
@@ -166,7 +184,7 @@ start_capture() {
       printf 'dumpcap exited before capture readiness\n' >&2
       return 1
     }
-    [[ -s $capture_raw ]] && return 0
+    [[ -s $capture_stage_raw ]] && return 0
     sleep 0.1
   done
   printf 'timed out waiting for dumpcap capture file\n' >&2
@@ -212,11 +230,13 @@ run_reference() {
   local screenshot="$capture_dir/$pass-reference.png"
   local keylog="$capture_dir/$pass-reference.keys"
   local -a command_env=(env -u SSLKEYLOGFILE \
+    "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
   if [[ $pass == decrypted ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
     command_env=(env "SSLKEYLOGFILE=$keylog" \
+      "${firefox_runtime_env[@]}" \
       "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
   fi
   : >"$log"

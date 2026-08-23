@@ -9,10 +9,15 @@ workloads, so packet timing and volume are not fingerprint-equality targets.
 
 The runners support two reference modes:
 
-- `quick` (default) downloads the SHA-256-pinned Firefox reference declared by
-  the tooling. It does not build Firefox and may be used in a lightweight
-  product suite. Version differences are reported rather than treated as exact
-  parity.
+- `quick` (default) downloads the current official Firefox Nightly artifact
+  named by the tooling manifest and uses that binary directly; it does not
+  build Firefox. The manifest records the expected Nightly version and the
+  SHA-256 of the last verified archive. Mozilla may republish a mutable
+  `latest-mozilla-central` URL without changing the version string. When that
+  happens, verify the downloaded binary still reports the manifest version and
+  refresh only `archive_sha256` before rerunning the gate. This keeps the
+  comparison against the current Nightly while retaining an explicit artifact
+  integrity check.
 - `same-base` uses caller-supplied Firefox and NaiveFox packages built from the
   same Firefox base. It is the only meaningful exact stack comparison and the
   only mode that may require a Firefox browser build.
@@ -59,6 +64,15 @@ On WSL, the `any` interface can expose cooked transmit and receive copies of a
 loopback packet. Before stateful QUIC dissection, retain the transmit copy
 (`sll.pkttype == 4`) so duplicate packet numbers do not corrupt Wireshark's key
 phase or QPACK tracking.
+
+WSL's packaged `dumpcap` can be denied access when its output path is below the
+object directory, even with the required capabilities. The capture runners
+automatically use a private staging directory below `/tmp` and move completed
+captures into the private object-directory diagnostics tree. No manual
+permission change is needed, and successful runs still delete raw captures and
+key logs. When the runner is invoked as root, it also supplies a private
+`XDG_RUNTIME_DIR` so the downloaded headless Firefox can start without using the
+interactive user's WSLg runtime directory.
 
 ## Decrypted internal audit
 

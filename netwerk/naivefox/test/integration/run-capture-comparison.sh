@@ -7,6 +7,9 @@ source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
 capture_pid=
+capture_stage_dir=
+capture_stage_pcap=
+capture_pcap=
 firefox_pid=
 naivefox_pid=
 run_dir=
@@ -32,6 +35,10 @@ stop_capture() {
   fi
   [[ -z $capture_pid ]] || wait "$capture_pid" 2>/dev/null || true
   capture_pid=
+  if [[ -n $capture_stage_pcap && -s $capture_stage_pcap ]]; then
+    mv -f -- "$capture_stage_pcap" "$capture_pcap"
+  fi
+  capture_stage_pcap=
 }
 
 cleanup() {
@@ -40,6 +47,9 @@ cleanup() {
   stop_pid "$firefox_pid"
   stop_pid "$naivefox_pid"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
+  if [[ -n $capture_stage_dir ]]; then
+    rm -rf -- "$capture_stage_dir"
+  fi
   if [[ $status -eq 0 && $success -eq 1 && -n $capture_dir ]]; then
     case "$capture_dir" in
       "$STATE_ROOT"/captures/*) rm -rf -- "$capture_dir" ;;
@@ -130,6 +140,17 @@ fi
 capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 capture_dir="$STATE_ROOT/captures/$capture_id"
 mkdir -m 0700 -p "$capture_dir"
+# WSL's dumpcap/AppArmor combination may deny opening a capture directly below
+# /home even when the caller is root.  Capture into a private /tmp staging
+# directory, then move the completed file into the private diagnostics tree.
+capture_stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/naivefox-dumpcap.XXXXXX")
+chmod 0700 "$capture_stage_dir"
+firefox_runtime_env=()
+if [[ $EUID -eq 0 ]]; then
+  firefox_runtime_dir="$capture_stage_dir/firefox-runtime"
+  mkdir -m 0700 "$firefox_runtime_dir"
+  firefox_runtime_env=("XDG_RUNTIME_DIR=$firefox_runtime_dir")
+fi
 chmod 0700 "$capture_dir"
 
 export MOZ_CRASHREPORTER_DISABLE=1
@@ -137,10 +158,12 @@ export MOZ_CRASHREPORTER_DISABLE=1
 start_capture() {
   local pcap=$1
   local log=$2
+  capture_pcap=$pcap
+  capture_stage_pcap="$capture_stage_dir/$(basename "$pcap")"
   : >"$log"
   chmod 0600 "$log"
   dumpcap -q -i any -f "tcp port $NAIVEFOX_FIXTURE_PROXY_PORT" \
-    -a duration:40 -a filesize:10240 -w "$pcap" >"$log" 2>&1 &
+    -a duration:40 -a filesize:10240 -w "$capture_stage_pcap" >"$log" 2>&1 &
   capture_pid=$!
   for ((i = 0; i < 100; i++)); do
     if ! kill -0 "$capture_pid" 2>/dev/null; then
@@ -148,7 +171,7 @@ start_capture() {
       printf 'dumpcap exited before capture readiness\n' >&2
       return 1
     fi
-    [[ -s $pcap ]] && return 0
+    [[ -s $capture_stage_pcap ]] && return 0
     sleep 0.1
   done
   printf 'timed out waiting for dumpcap capture file\n' >&2
@@ -192,6 +215,7 @@ chmod 0600 "$reference_keys" "$reference_log"
 start_capture "$reference_pcap" "$capture_dir/reference-dumpcap.log"
 
   timeout 25 env SSLKEYLOGFILE="$reference_keys" \
+  "${firefox_runtime_env[@]}" \
   LD_LIBRARY_PATH="$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
   "$REFERENCE_BIN" --headless --new-instance --no-remote \
   --profile "$reference_profile" \

@@ -134,4 +134,5 @@ LOCAL_INCLUDES += [
     "/netwerk/protocol/http",
 ]
 
-USE_LIBS += ["icu"]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    USE_LIBS += ["icu"]

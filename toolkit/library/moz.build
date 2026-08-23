@@ -160,7 +160,10 @@ if not CONFIG["MOZ_NAIVEFOX"]:
         "js",
     ]
 
-if CONFIG["MOZ_NAIVEFOX"] and CONFIG["JS_HAS_INTL_API"]:
+# NaiveFox keeps the locale parser and ICU4X-backed Unicode bridge even when
+# SpiderMonkey's ECMAScript Intl API is disabled.  The narrowed
+# intlcomponents archive no longer implies ICU4C in this configuration.
+if CONFIG["MOZ_NAIVEFOX"]:
     USE_LIBS += [
         "intlcomponents",
     ]

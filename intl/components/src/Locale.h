@@ -14,7 +14,9 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/intl/ICUError.h"
+#ifndef MOZ_NAIVEFOX
 #include "mozilla/intl/ICU4CGlue.h"
+#endif
 #include "mozilla/Maybe.h"
 #include "mozilla/Span.h"
 #include "mozilla/TextUtils.h"
@@ -27,9 +29,17 @@
 #include <stdint.h>
 #include <utility>
 
-#include "unicode/uloc.h"
+#ifndef MOZ_NAIVEFOX
+#  include "unicode/uloc.h"
+#else
+#  include <locale.h>
+#endif
 
 namespace mozilla::intl {
+
+#ifdef MOZ_NAIVEFOX
+using ICUResult = Result<Ok, ICUError>;
+#endif
 
 /**
  * Return true if |language| is a valid language subtag.
@@ -514,7 +524,7 @@ class MOZ_STACK_CLASS Locale final {
    *
    * Also see <https://unicode-org.github.io/icu/userguide/locale>.
    */
-  static const char* GetDefaultLocale() { return uloc_getDefault(); }
+  static const char* GetDefaultLocale();
 
   /**
    * Returns an iterator over all supported locales.
@@ -524,10 +534,12 @@ class MOZ_STACK_CLASS Locale final {
    *
    * Also see <https://unicode-org.github.io/icu/userguide/locale>.
    */
+#ifndef MOZ_NAIVEFOX
   static auto GetAvailableLocales() {
     return AvailableLocalesEnumeration<uloc_countAvailable,
                                        uloc_getAvailable>();
   }
+#endif
 
  private:
   static UniqueChars DuplicateStringToUniqueChars(const char* aStr);

@@ -6,20 +6,33 @@
 
 #include "mozilla/intl/BidiClass.h"
 #include "mozilla/intl/GeneralCategory.h"
-#include "mozilla/intl/ICU4CGlue.h"
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla/intl/ICUError.h"
+#  include "mozilla/intl/icu4x_unicode_glue.h"
+#else
+#  include "mozilla/intl/ICU4CGlue.h"
+#endif
 #include "mozilla/intl/UnicodeScriptCodes.h"
 #include "mozilla/Vector.h"
 
+#ifndef MOZ_NAIVEFOX
 #include "unicode/uchar.h"
 #include "unicode/uscript.h"
+#endif
 
 extern "C" {
 
+#ifndef MOZ_NAIVEFOX
 uint8_t mozilla_canonical_combining_class(uint32_t c);
+#endif
 
 }  // extern "C"
 
 namespace mozilla::intl {
+
+#ifdef MOZ_NAIVEFOX
+using ICUResult = Result<Ok, ICUError>;
+#endif
 
 /**
  * This component is a Mozilla-focused API for working with text properties.
@@ -30,32 +43,56 @@ class UnicodeProperties final {
    * Return the BidiClass for the character.
    */
   static inline BidiClass GetBidiClass(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return BidiClass(mozilla_icu4x_unicode_bidi_class(aCh));
+#else
     return BidiClass(u_charDirection(aCh));
+#endif
   }
 
   /**
    * Maps the specified character to a "mirror-image" character.
    */
-  static inline uint32_t CharMirror(uint32_t aCh) { return u_charMirror(aCh); }
+  static inline uint32_t CharMirror(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_char_mirror(aCh);
+#else
+    return u_charMirror(aCh);
+#endif
+  }
 
   /**
    * Return the general category value for the code point.
    */
   static inline GeneralCategory CharType(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return GeneralCategory(mozilla_icu4x_unicode_char_type(aCh));
+#else
     return GeneralCategory(u_charType(aCh));
+#endif
   }
 
   /**
    * Determine whether the code point has the Bidi_Mirrored property.
    */
-  static inline bool IsMirrored(uint32_t aCh) { return u_isMirrored(aCh); }
+  static inline bool IsMirrored(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_is_mirrored(aCh);
+#else
+    return u_isMirrored(aCh);
+#endif
+  }
 
   /**
    * Returns the combining class of the code point as specified in
    * UnicodeData.txt.
    */
   static inline uint8_t GetCombiningClass(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_combining_class(aCh);
+#else
     return mozilla_canonical_combining_class(aCh);
+#endif
   }
 
   enum class IntProperty {
@@ -73,6 +110,9 @@ class UnicodeProperties final {
    * code point.
    */
   static inline int32_t GetIntPropertyValue(uint32_t aCh, IntProperty aProp) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_int_property(aCh, static_cast<uint8_t>(aProp));
+#else
     UProperty prop;
     switch (aProp) {
       case IntProperty::BidiPairedBracketType:
@@ -98,6 +138,7 @@ class UnicodeProperties final {
         break;
     }
     return u_getIntPropertyValue(aCh, prop);
+#endif
   }
 
   /**
@@ -106,18 +147,26 @@ class UnicodeProperties final {
    * otherwise, returns -1.
    */
   static inline int8_t GetNumericValue(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_numeric_value(aCh);
+#else
     UNumericType type =
         UNumericType(GetIntPropertyValue(aCh, IntProperty::NumericType));
     return type == U_NT_DECIMAL || type == U_NT_DIGIT
                ? int8_t(u_getNumericValue(aCh))
                : -1;
+#endif
   }
 
   /**
    * Maps the specified character to its paired bracket character.
    */
   static inline uint32_t GetBidiPairedBracket(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_bidi_paired_bracket(aCh);
+#else
     return u_getBidiPairedBracket(aCh);
+#endif
   }
 
   /**
@@ -125,26 +174,50 @@ class UnicodeProperties final {
    * UnicodeData.txt; if the character has no uppercase equivalent, the
    * character itself is returned.
    */
-  static inline uint32_t ToUpper(uint32_t aCh) { return u_toupper(aCh); }
+  static inline uint32_t ToUpper(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_to_upper(aCh);
+#else
+    return u_toupper(aCh);
+#endif
+  }
 
   /**
    * The given character is mapped to its lowercase equivalent according to
    * UnicodeData.txt; if the character has no lowercase equivalent, the
    * character itself is returned.
    */
-  static inline uint32_t ToLower(uint32_t aCh) { return u_tolower(aCh); }
+  static inline uint32_t ToLower(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_to_lower(aCh);
+#else
+    return u_tolower(aCh);
+#endif
+  }
 
   /**
    * Check if a code point has the Lowercase Unicode property.
    */
-  static inline bool IsLowercase(uint32_t aCh) { return u_isULowercase(aCh); }
+  static inline bool IsLowercase(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_is_lowercase(aCh);
+#else
+    return u_isULowercase(aCh);
+#endif
+  }
 
   /**
    * The given character is mapped to its titlecase equivalent according to
    * UnicodeData.txt; if the character has no titlecase equivalent, the
    * character itself is returned.
    */
-  static inline uint32_t ToTitle(uint32_t aCh) { return u_totitle(aCh); }
+  static inline uint32_t ToTitle(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_to_title(aCh);
+#else
+    return u_totitle(aCh);
+#endif
+  }
 
   /**
    * The given character is mapped to its case folding equivalent according to
@@ -153,7 +226,11 @@ class UnicodeProperties final {
    * itself is returned.
    */
   static inline uint32_t FoldCase(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_fold_case(aCh);
+#else
     return u_foldCase(aCh, U_FOLD_CASE_DEFAULT);
+#endif
   }
 
   enum class BinaryProperty {
@@ -166,6 +243,10 @@ class UnicodeProperties final {
    * Check a binary Unicode property for a code point.
    */
   static inline bool HasBinaryProperty(uint32_t aCh, BinaryProperty aProp) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_has_binary_property(
+        aCh, static_cast<uint8_t>(aProp));
+#else
     UProperty prop;
     switch (aProp) {
       case BinaryProperty::DefaultIgnorableCodePoint:
@@ -179,20 +260,42 @@ class UnicodeProperties final {
         break;
     }
     return u_hasBinaryProperty(aCh, prop);
+#endif
   }
+
+#ifdef MOZ_NAIVEFOX
+  static constexpr int32_t kEastAsianAmbiguous = 1;
+  static constexpr int32_t kEastAsianHalfwidth = 2;
+  static constexpr int32_t kEastAsianFullwidth = 3;
+  static constexpr int32_t kEastAsianNarrow = 4;
+  static constexpr int32_t kEastAsianWide = 5;
+  static constexpr int32_t kEastAsianNeutral = 0;
+#endif
 
   /**
    * Check if the width of aCh is full width, half width or wide.
    */
   static inline bool IsEastAsianWidthFHW(uint32_t aCh) {
     switch (GetIntPropertyValue(aCh, IntProperty::EastAsianWidth)) {
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianFullwidth:
+      case kEastAsianHalfwidth:
+      case kEastAsianWide:
+#else
       case U_EA_FULLWIDTH:
       case U_EA_HALFWIDTH:
       case U_EA_WIDE:
+#endif
         return true;
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianAmbiguous:
+      case kEastAsianNarrow:
+      case kEastAsianNeutral:
+#else
       case U_EA_AMBIGUOUS:
       case U_EA_NARROW:
       case U_EA_NEUTRAL:
+#endif
         return false;
     }
     return false;
@@ -204,14 +307,29 @@ class UnicodeProperties final {
    */
   static inline bool IsEastAsianWidthFHWexcludingEmoji(uint32_t aCh) {
     switch (GetIntPropertyValue(aCh, IntProperty::EastAsianWidth)) {
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianFullwidth:
+      case kEastAsianHalfwidth:
+#else
       case U_EA_FULLWIDTH:
       case U_EA_HALFWIDTH:
+#endif
         return true;
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianWide:
+#else
       case U_EA_WIDE:
+#endif
         return HasBinaryProperty(aCh, BinaryProperty::Emoji) ? false : true;
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianAmbiguous:
+      case kEastAsianNarrow:
+      case kEastAsianNeutral:
+#else
       case U_EA_AMBIGUOUS:
       case U_EA_NARROW:
       case U_EA_NEUTRAL:
+#endif
         return false;
     }
     return false;
@@ -222,13 +340,25 @@ class UnicodeProperties final {
    */
   static inline bool IsEastAsianWidthAFW(uint32_t aCh) {
     switch (GetIntPropertyValue(aCh, IntProperty::EastAsianWidth)) {
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianAmbiguous:
+      case kEastAsianFullwidth:
+      case kEastAsianWide:
+#else
       case U_EA_AMBIGUOUS:
       case U_EA_FULLWIDTH:
       case U_EA_WIDE:
+#endif
         return true;
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianHalfwidth:
+      case kEastAsianNarrow:
+      case kEastAsianNeutral:
+#else
       case U_EA_HALFWIDTH:
       case U_EA_NARROW:
       case U_EA_NEUTRAL:
+#endif
         return false;
     }
     return false;
@@ -239,13 +369,25 @@ class UnicodeProperties final {
    */
   static inline bool IsEastAsianWidthFW(uint32_t aCh) {
     switch (GetIntPropertyValue(aCh, IntProperty::EastAsianWidth)) {
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianFullwidth:
+      case kEastAsianWide:
+#else
       case U_EA_FULLWIDTH:
       case U_EA_WIDE:
+#endif
         return true;
+#ifdef MOZ_NAIVEFOX
+      case kEastAsianAmbiguous:
+      case kEastAsianHalfwidth:
+      case kEastAsianNarrow:
+      case kEastAsianNeutral:
+#else
       case U_EA_AMBIGUOUS:
       case U_EA_HALFWIDTH:
       case U_EA_NARROW:
       case U_EA_NEUTRAL:
+#endif
         return false;
     }
     return false;
@@ -256,7 +398,11 @@ class UnicodeProperties final {
    */
   static inline bool IsEastAsianFullWidth(char32_t aCh) {
     return GetIntPropertyValue(aCh, IntProperty::EastAsianWidth) ==
+#ifdef MOZ_NAIVEFOX
+           kEastAsianFullwidth;
+#else
            U_EA_FULLWIDTH;
+#endif
   }
 
   /**
@@ -317,22 +463,38 @@ class UnicodeProperties final {
   }
 
   static inline Script GetScriptCode(uint32_t aCh) {
+#ifdef MOZ_NAIVEFOX
+    return Script(mozilla_icu4x_unicode_script(aCh));
+#else
     // We can safely ignore the error code here because uscript_getScript
     // returns USCRIPT_INVALID_CODE in the event of an error.
     UErrorCode err = U_ZERO_ERROR;
     return Script(uscript_getScript(aCh, &err));
+#endif
   }
 
   static inline bool HasScript(uint32_t aCh, Script aScript) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_has_script(aCh, static_cast<int16_t>(aScript));
+#else
     return uscript_hasScript(aCh, UScriptCode(aScript));
+#endif
   }
 
   static inline const char* GetScriptShortName(Script aScript) {
+#ifdef MOZ_NAIVEFOX
+    return mozilla_icu4x_unicode_script_short_name(static_cast<int16_t>(aScript));
+#else
     return uscript_getShortName(UScriptCode(aScript));
+#endif
   }
 
   static inline int32_t GetMaxNumberOfScripts() {
+#ifdef MOZ_NAIVEFOX
+    return static_cast<int32_t>(Script::NUM_SCRIPT_CODES) - 1;
+#else
     return u_getIntPropertyMaxValue(UCHAR_SCRIPT);
+#endif
   }
 
   // Return true if aChar belongs to a SEAsian script that is written without
@@ -383,6 +545,26 @@ class UnicodeProperties final {
    */
   static ICUResult GetExtensions(char32_t aCodePoint,
                                  ScriptExtensionVector& aExtensions) {
+#ifdef MOZ_NAIVEFOX
+    aExtensions.clear();
+    int16_t ext[kMaxScripts];
+    int32_t len = mozilla_icu4x_unicode_script_extensions(
+        static_cast<uint32_t>(aCodePoint), ext, kMaxScripts);
+    if (len < 0) {
+      if (len == -2) {
+        return Err(ICUError::InternalError);
+      }
+      aExtensions.infallibleAppend(Script::UNKNOWN);
+      return Ok();
+    }
+    if (!aExtensions.reserve(len)) {
+      return Err(ICUError::OutOfMemory);
+    }
+    for (int32_t i = 0; i < len; ++i) {
+      aExtensions.infallibleAppend(Script(ext[i]));
+    }
+    return Ok();
+#else
     // Clear the vector first.
     aExtensions.clear();
 
@@ -408,6 +590,7 @@ class UnicodeProperties final {
     }
 
     return Ok();
+#endif
   }
 };
 

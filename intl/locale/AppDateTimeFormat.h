@@ -6,6 +6,22 @@
 #ifndef mozilla_intl_AppDateTimeFormat_h
 #define mozilla_intl_AppDateTimeFormat_h
 
+#ifdef MOZ_NAIVEFOX
+
+namespace mozilla::intl {
+
+// NaiveFox does not build the browser date/time formatting stack.  Keep the
+// cache invalidation hook used by LocaleService and the small runtime stubs,
+// without pulling ICU4C-backed DateTimeFormat into the minimal target.
+class AppDateTimeFormat final {
+ public:
+  static void ClearLocaleCache();
+};
+
+}  // namespace mozilla::intl
+
+#else
+
 #include <time.h>
 #include "gtest/MozGtestFriend.h"
 #include "nsTHashMap.h"
@@ -97,5 +113,7 @@ class AppDateTimeFormat {
 };
 
 }  // namespace mozilla::intl
+
+#endif  // MOZ_NAIVEFOX
 
 #endif /* mozilla_intl_AppDateTimeFormat_h */

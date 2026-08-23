@@ -96,15 +96,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arbitrary"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dde20b3d026af13f561bdd0f15edf01fc734f0dafcedbaf42bba506a9517f223"
-dependencies = [
- "derive_arbitrary",
-]
-
-[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -427,18 +418,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "collator_glue"
-version = "0.1.0"
-dependencies = [
- "arraystring",
- "arrayvec",
- "icu_collator",
- "icu_locale_core",
- "tinystr",
- "writeable",
-]
-
-[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -601,17 +580,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 dependencies = [
  "powerfmt",
-]
-
-[[package]]
-name = "derive_arbitrary"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30542c1ad912e0e3d22a1935c290e12e8a29d704a420177a31faad4a601a0800"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -874,12 +842,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "flagset"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cda653ca797810c02f7ca4b804b40b8b95ae046eb989d356bce17919a8c25499"
-
-[[package]]
 name = "flate2"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1015,6 +977,8 @@ dependencies = [
  "cert_storage",
  "crypto_hash",
  "data_storage",
+ "encoding_c",
+ "encoding_c_mem",
  "encoding_glue",
  "fluent-langneg-ffi",
  "gecko_logger",
@@ -1022,9 +986,10 @@ dependencies = [
  "gkrust_utils",
  "happy_eyeballs_glue",
  "http_sfv",
+ "icu4x_unicode_glue",
+ "icu_capi",
  "icu_locale",
  "idna_glue",
- "jsrust_shared",
  "locale_service_glue",
  "log",
  "mozurl",
@@ -1099,15 +1064,6 @@ name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
-
-[[package]]
-name = "gluesmith"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "libc",
- "wasm-smith",
-]
 
 [[package]]
 name = "goblin"
@@ -1238,6 +1194,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "icu4x_unicode_glue"
+version = "0.1.0"
+dependencies = [
+ "icu_casemap",
+ "icu_properties",
+]
+
+[[package]]
 name = "icu_calendar"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1274,8 +1238,6 @@ dependencies = [
  "icu_provider",
  "icu_provider_adapters",
  "icu_segmenter",
- "icu_time",
- "tinystr",
  "writeable",
 ]
 
@@ -1314,7 +1276,6 @@ dependencies = [
  "icu_properties",
  "icu_provider",
  "smallvec",
- "tinystr",
  "utf16_iter",
  "utf8_iter",
  "zerovec",
@@ -1381,9 +1342,6 @@ dependencies = [
  "icu_properties",
  "icu_provider",
  "smallvec",
- "utf16_iter",
- "utf8_iter",
- "write16",
  "zerovec",
 ]
 
@@ -1455,23 +1413,6 @@ dependencies = [
 [[package]]
 name = "icu_segmenter_data"
 version = "2.1.1"
-
-[[package]]
-name = "icu_time"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8242b00da3b3b6678f731437a11c8833a43c821ae081eca60ba1b7579d45b6d8"
-dependencies = [
- "calendrical_calculations",
- "displaydoc",
- "icu_calendar",
- "icu_locale_core",
- "icu_provider",
- "ixdtf",
- "serde",
- "zerotrie",
- "zerovec",
-]
 
 [[package]]
 name = "id-arena"
@@ -1573,32 +1514,10 @@ name = "js-sys"
 version = "0.3.100"
 
 [[package]]
-name = "jsrust_shared"
-version = "0.1.0"
-dependencies = [
- "collator_glue",
- "encoding_c",
- "encoding_c_mem",
- "gluesmith",
- "icu_capi",
- "locale_glue",
- "mozglue-static",
- "normalizer_glue",
- "properties_glue",
- "unicode-bidi-ffi",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
-name = "leb128fmt"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
@@ -1643,13 +1562,6 @@ name = "litemap"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
-
-[[package]]
-name = "locale_glue"
-version = "0.1.0"
-dependencies = [
- "icu_locale",
-]
 
 [[package]]
 name = "locale_service_glue"
@@ -1915,16 +1827,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "normalizer_glue"
-version = "0.1.0"
-dependencies = [
- "encoding_rs",
- "icu_normalizer",
- "smallvec",
- "write16",
-]
-
-[[package]]
 name = "nserror"
 version = "0.1.0"
 dependencies = [
@@ -2172,15 +2074,6 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
-]
-
-[[package]]
-name = "properties_glue"
-version = "0.1.0"
-dependencies = [
- "icu_casemap",
- "icu_collections",
- "icu_properties",
 ]
 
 [[package]]
@@ -3162,38 +3055,6 @@ name = "wasm-bindgen"
 version = "0.2.100"
 
 [[package]]
-name = "wasm-encoder"
-version = "0.244.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "990065f2fe63003fe337b932cfb5e3b80e0b4d0f5ff650e6985b1048f62c8319"
-dependencies = [
- "leb128fmt",
- "wasmparser",
-]
-
-[[package]]
-name = "wasm-smith"
-version = "0.244.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8f72462e1ee97c48da6f599c7e47064dbab12bfee7b4fad278de4973ba72fd8"
-dependencies = [
- "anyhow",
- "arbitrary",
- "flagset",
- "wasm-encoder",
-]
-
-[[package]]
-name = "wasmparser"
-version = "0.244.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47b807c72e1bac69382b3a6fb3dbe8ea4c0ed87ff5629b8685ae6b9a611028fe"
-dependencies = [
- "bitflags",
- "indexmap",
-]
-
-[[package]]
 name = "weedle2"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3396,15 +3257,6 @@ dependencies = [
  "app_units",
  "euclid",
  "once_cell",
-]
-
-[[package]]
-name = "write16"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1890f4022759daae28ed4fe62859b1236caebfc61ede2f63ed4e695f3f6d936"
-dependencies = [
- "smallvec",
 ]
 
 [[package]]

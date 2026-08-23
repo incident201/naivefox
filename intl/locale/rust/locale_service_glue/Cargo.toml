@@ -11,3 +11,4 @@ nsstring = { path = "../../../../xpcom/rust/nsstring" }
 [dependencies.icu_locale]
 version = "~2.1.1"
 default-features = false
+features = ["compiled_data"]

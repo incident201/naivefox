@@ -1,10 +1,10 @@
 {
   "counts": {
-    "executable_files": 151,
-    "files": 22756
+    "executable_files": 162,
+    "files": 22668
   },
-  "evidence_commit": "adb976f6d1557af9918cdf28b4bae00280d3b7e0",
-  "evidence_source_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
+  "evidence_commit": "a5af308213ac74e8813edf9d2a6f4fc89910b6e2",
+  "evidence_source_commit": "b0497d87b6017b2dd4e2429b7d33b0882dda4859",
   "files": [
     {
       "mode": "0644",
@@ -29,7 +29,7 @@
     {
       "mode": "0644",
       "path": "Cargo.lock",
-      "sha256": "1a8164b7f57cce887dd520886a1dff489abfdcbf8f2f1f45e9f8b2e6d116c415"
+      "sha256": "1afce784785d6d10c1f128d96096ed1eb922984530385e4036061e6bfaf77064"
     },
     {
       "mode": "0644",
@@ -49,7 +49,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "c05626477dad3ec9d37c172c266c3511cf81b4eb03b0cad55d8306c4fcdaa573"
+      "sha256": "d3d681bf80aec2269a278cc10924e66a51deb30137068b0a20889a3f65590dbf"
     },
     {
       "mode": "0644",
@@ -1218,6 +1218,11 @@
     },
     {
       "mode": "0644",
+      "path": "build/debian-packages/valgrind.diff",
+      "sha256": "603831b4dec136942580ab12c48d8d1a035561cb1a7e8928efb53120d95eef6b"
+    },
+    {
+      "mode": "0644",
       "path": "build/gecko_templates.mozbuild",
       "sha256": "65730546837dd62d7984f01669ba6f7ceaf42238fcc831d18724c2589925757e"
     },
@@ -1868,6 +1873,11 @@
     },
     {
       "mode": "0644",
+      "path": "build/sparse-profiles/toolchain-build",
+      "sha256": "fbca4b565053bb46b586add76bd5ff102e3c5475994167a22ceebcbf75b8dd64"
+    },
+    {
+      "mode": "0644",
       "path": "build/templates.mozbuild",
       "sha256": "1e9992773eb7dde3f42778b79033026e5967496ecae6ebe97d63e406b3e91ff5"
     },
@@ -1882,9 +1892,44 @@
       "sha256": "8d3545f1b845523326b5a48d8bc21f6b4923a715dd29e145a036f90084a480ae"
     },
     {
+      "mode": "0644",
+      "path": "build/unix/build-binutils/3A24BC1E8FB409FA9F14371813FCEF89DD9E3C4F.key",
+      "sha256": "6e74acf35f0590dc20cb0eed40be78bceb672bc8e3714ebd7e149e7401cc7d2a"
+    },
+    {
       "mode": "0755",
       "path": "build/unix/build-binutils/build-binutils.sh",
       "sha256": "1b6bcecbb411923c7ea35865b0a59ef620b5105dda866fa65cf88f751ffe0188"
+    },
+    {
+      "mode": "0644",
+      "path": "build/unix/build-gcc/07F3DBBECC1A39605078094D980C197698C3739D.key",
+      "sha256": "c6c07c588bf204702bfa3c0717c6e25ad512475ef68b1c5cea520670fdd05599"
+    },
+    {
+      "mode": "0644",
+      "path": "build/unix/build-gcc/343C2FF0FBEE5EC2EDBEF399F3599FF828C67298.key",
+      "sha256": "c492d99c6407bb32d793ec3540b650adc8b8bf9829634fbce3d8709cc63db0a0"
+    },
+    {
+      "mode": "0644",
+      "path": "build/unix/build-gcc/7F74F97C103468EE5D750B583AB00996FC26A641.key",
+      "sha256": "74143cc7a83556d64be4d6d64d89d3b2cb351817bb943e65754550bbff27597b"
+    },
+    {
+      "mode": "0644",
+      "path": "build/unix/build-gcc/AD17A21EF8AED8F1CC02DBD9F7D5C9BF765C61E3.key",
+      "sha256": "ff531b7b41197d2ae87550d917c26c065f7a7e052a693af50222a28dbe2ef5d3"
+    },
+    {
+      "mode": "0644",
+      "path": "build/unix/build-gcc/D3A93CAD751C2AF4F8C7AD516C35B99309B5FA62.key",
+      "sha256": "1aead0fd049309294980a8b0c3a11ff75afd40bff17054bc96b29d93abde02b4"
+    },
+    {
+      "mode": "0644",
+      "path": "build/unix/build-gcc/DA23579A74D4AD9AF9D3F945CEFAC8EAAF17519D.key",
+      "sha256": "41147bdf16aca6f463a5c8ba5744f05e21b606dc25ba95264068789745a45ef0"
     },
     {
       "mode": "0755",
@@ -2330,51 +2375,6 @@
       "mode": "0644",
       "path": "config/emptyvars.mk.in",
       "sha256": "ae450838170a2d007dfa3741f1568f3531ba9b9155c1f0bd3208006191e391d8"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/common/moz.build",
-      "sha256": "6a8f8dc92d936c4429ff03e6055fd12ee82040290619149ddf28b30a4a07bde4"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/common/sources.mozbuild",
-      "sha256": "63af83f89e9abfa93b14ccb39cd3b902a37cae5279f0ad396caa9bdbc19ed888"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/data/icu_data.S",
-      "sha256": "34368dcf57957a7719caa485e4cbda1f2c5fba2454f6ca7fb1c44d6af87cb03c"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/data/icudt78l.dat",
-      "sha256": "a2e4e2e2794d23559b69f4ff8184734b365199e81746717778cbfecd716d83e6"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/data/moz.build",
-      "sha256": "58dc34ba589eeb9cb606e96e5aaca5ad33d837088536be7a7dff328db3b9fd6a"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/defs.mozbuild",
-      "sha256": "5844c87bd23050ed38ec99d0a66faffe5647bfad22ac0d86cd0f255f8c91feb5"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/i18n/moz.build",
-      "sha256": "9a05a5b6fdd6f86fb77e01625f85921455b780170a1cdeb19eac3dbc53cdfaab"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/i18n/sources.mozbuild",
-      "sha256": "a1e47f79e5518025c145e15317f35fc572805e2717dd576afc2edd83edc25c77"
-    },
-    {
-      "mode": "0644",
-      "path": "config/external/icu/moz.build",
-      "sha256": "59d9d9dbbd8baea5025e873b80731502e95440cf704efe0c0cdc2d15f1ae092e"
     },
     {
       "mode": "0644",
@@ -3504,17 +3504,7 @@
     {
       "mode": "0644",
       "path": "intl/components/moz.build",
-      "sha256": "dc4686acfd4f79e00a10a5969ff9b14e9485690904dff87623e40d538cb7c520"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Bidi.cpp",
-      "sha256": "7a73759d5f7862d1572a0f09895cbbaf0bb31c3c7599016714e81e10a7353ad4"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Bidi.h",
-      "sha256": "2f1fb184dd44edc6354ae5f52d0a1ec724edfa4c8edb56333cffe09ca67892b2"
+      "sha256": "3c5c39ad7c19ff26cceca1539cbb2a0ce1d0691cc366a5446eb390fc55ce5d8f"
     },
     {
       "mode": "0644",
@@ -3523,113 +3513,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/BidiEmbeddingLevel.cpp",
-      "sha256": "c1992188b5dc7ca8d7001a3e0ab7e7159f74acc2d7f8868e6d0b13493aabe325"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/BidiEmbeddingLevel.h",
-      "sha256": "4bb9afa3dd0f918d6fab5836d84ee5f5f35716227720039e8a6cc33c6ff0a2cc"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Calendar.cpp",
-      "sha256": "fbccb6c842d3853ea8191a95890e12afde85693c56cd5c3ed4c0ed14a489ae76"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Calendar.h",
-      "sha256": "5ef1ee9a1eaaa3e1af172728d316c14671ba6ac78919545dd0340113f2fe6c52"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Collator.h",
-      "sha256": "96c4f393b40299e33d58de1421bdf8ef55a053125516b4116625c0a5ecf468c6"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/CollatorForwards.h",
-      "sha256": "d8f8df8b1e1370ee2abaa53db96b9c1f7f628224d4ac8c8af4fdd68e16de6c14"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Currency.cpp",
-      "sha256": "619ab2c654140767808d3e543ef414ca849051e1a94e41954947f113f9a101eb"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/Currency.h",
-      "sha256": "bc60699e47d5e4593f3dffabdd703d003432d680144fae719f696f7ec8dc0ec0"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateIntervalFormat.cpp",
-      "sha256": "c9268448a4b91f7d95f1b2c9fe204fd2307e2e496e196d656cacb910d07c63d7"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateIntervalFormat.h",
-      "sha256": "96a4f5f8616d42a36b06d9dfcf049f05649595c7e690eab5f0d44ee36a32f7b2"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimeFormat.cpp",
-      "sha256": "3dedfdecce6fce4001fe53bf2bd1743209eb1380056a0816eb19aca4cb8756e4"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimeFormat.h",
-      "sha256": "3d7ad6ff56478a1566e8b8028851d936b4ab49da6dfdbb44c2e6f7cd6c19894c"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimeFormatUtils.cpp",
-      "sha256": "bf36bb2b0ef6aed7fd99a14a2d07b9b97b0d0c2c9ffb18bb5498538deb9b9802"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimeFormatUtils.h",
-      "sha256": "342172e179090e77a6132248615cff6c7a9b0b9f8dd014c0aca8b5fdc6ab842b"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimePart.h",
-      "sha256": "c810c067a4dd34f86c4b9c59b7d46572bbd9708214f3a66cd8591934f285c8f4"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimePatternGenerator.cpp",
-      "sha256": "ac4642b79c33e0a131c4ceabafcb0934e4732684e8cddb92e0d7757cf664d7f6"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DateTimePatternGenerator.h",
-      "sha256": "b26563f1c8ee8520ce0638f5e42d8a2910c35f417d0333e5c2bae1cc2798e1a6"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DisplayNames.cpp",
-      "sha256": "573feb5d246978af7c8f9653bb79452df31557d5c79a6e6afed287cc78d0b632"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/DisplayNames.h",
-      "sha256": "2c6fd74ffc32fed549b816140ffffdbffbebe2e8d589f4bab84a22f20ee56643"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/FormatBuffer.h",
-      "sha256": "10ffbab77829cecd91ecca0127c7ae8ef8a4f0313b7617e2ab33cf124c0192dd"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/GeneralCategory.h",
       "sha256": "3f2e7f25dc388c344790e71d4b2c4d3c114b00fa6d13d81541c67c36d5f4f2a0"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/ICU4CGlue.cpp",
-      "sha256": "591a1396a7da6c061cc2b32237c10ab14acbc6e14326b8a667b80827e0bd5405"
     },
     {
       "mode": "0644",
@@ -3638,63 +3523,23 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/ICU4CLibrary.cpp",
-      "sha256": "318949eb730b971694619b5e46e01c83a85954c75d02e8ab0e675822df64846b"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/ICU4CLibrary.h",
-      "sha256": "411495f09d1646c9a2b36341541ef21f2fb2d09f9788c7b08dfcc18c1b314e47"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/ICUError.h",
       "sha256": "3b834243a3806a64731beb072fa1f85149326f05de127d36be37644106e47676"
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/ListFormat.cpp",
-      "sha256": "f43c6187e2fb332f10b62d8fb05f1caae5675ade82c867f9b17863bebeb0aea0"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/ListFormat.h",
-      "sha256": "0593c62c5166ebbe2a0276c832c819208fb4f46e0abcfb3172b7ca5295f55d49"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/Locale.cpp",
-      "sha256": "bb17b7a6d1b918e5a3a761210107f1cecfb189fa91ac400cf6cfaadf9564ddd2"
+      "sha256": "d0dc45593c5aeae13bcd4e1252af9b4cd09a83cd14a9d84a20cb72e24d809ded"
     },
     {
       "mode": "0644",
       "path": "intl/components/src/Locale.h",
-      "sha256": "416a4a5941441eda403c6dee8dccc67a0bf5e0b03571130a1c2c6a7226a8e4f7"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/LocaleCanonicalizer.cpp",
-      "sha256": "f970ea1b3c49150918f066334b16e6e10330a07adbc752e7e4d2aa198f4d020f"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/LocaleCanonicalizer.h",
-      "sha256": "88662b34f9cd0aea1805fb5e22f4e56fa372d4e5d7593c46990a8ec17d9b52bd"
+      "sha256": "3de98f9eb1387c188006dd7d6966e12d561f7635f85b02c63731d8954759f629"
     },
     {
       "mode": "0644",
       "path": "intl/components/src/LocaleGenerated.cpp",
       "sha256": "760f18cd86d39587901ed1c81ab3115d7953d9fbbdb39afc8dec89988b351af3"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/MeasureUnit.cpp",
-      "sha256": "d8a22409ea24179b997c70243de9afe138d0b8fcdbc7d7ecf45faf7c6665e7a4"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/MeasureUnit.h",
-      "sha256": "fa35397a777bc7c851389d3af4dacb0bb5ad2a260bd4e9ea11161aef4991379d"
     },
     {
       "mode": "0644",
@@ -3733,23 +3578,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/NumberParser.h",
-      "sha256": "f9250c7eca5c379ed545cb9b49d462e8272e921c2d5cf5648d86175b710f998c"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/NumberPart.h",
-      "sha256": "bb7ac1583ff1f9b373c2a7aabb47d57f63acdec5d41573f308afd9aa141b6979"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/NumberRangeFormat.cpp",
       "sha256": "11761150a534b08761e94edc19a08fc259c0d9b98e36a59abffdf89e98c65c4a"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/NumberRangeFormat.h",
-      "sha256": "11f1bcec52cfce10722036b60bfe1903d6ea2f5739474a83cf65493601751665"
     },
     {
       "mode": "0644",
@@ -3758,18 +3588,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/NumberingSystem.h",
-      "sha256": "de0bc297d5b8a2386a8ff390cbf584a09c91615d09b410e1dae708e03492c6b6"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/PluralRules.cpp",
       "sha256": "05569b9669407b9c45f777ba4c6adb1b03ecea68b1bef5e54e7f957a8b416687"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/PluralRules.h",
-      "sha256": "b72d86b3ffed60ab57ea2c752ca483148f225dec1f40b9be23374c4150335e67"
     },
     {
       "mode": "0644",
@@ -3778,18 +3598,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/Region.h",
-      "sha256": "1813155e3b20bcc5c72c0de7ee0929c4a2df484521563a1b9e34122290b08990"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/RelativeTimeFormat.cpp",
       "sha256": "80e0a4cb9b11eafd3157ebac99d363f6c9d362b12dd28257d6a5fd076726b3e5"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/RelativeTimeFormat.h",
-      "sha256": "98922a1e85071be506780b7c0548c08c668b167fab743df2555147843a9fc6b0"
     },
     {
       "mode": "0644",
@@ -3803,23 +3613,13 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/String.h",
-      "sha256": "ce0ae35fd17e0b6698fd9003a2ca3fa72b0770c43f8d28c60f6a5d23c5890732"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/TimeZone.cpp",
       "sha256": "8f62730cfd915511d005d983654d23022a258df3212cbb95a955cbbe6f1f9e38"
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/TimeZone.h",
-      "sha256": "064c19c7c8b061d937945424e54375bc1720f0defa5f755b8a73669f5767de3b"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/UnicodeProperties.h",
-      "sha256": "d284da79d3638207b8bbc5eb413e3a7caf682c28c04fa12a0cabb2306d92349a"
+      "sha256": "07e16d2c6afe331bbe6c750d6c51a6032b3ec0dfc1f79ea98f0c39273eccdd70"
     },
     {
       "mode": "0644",
@@ -3833,18 +3633,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/calendar/ICU4XCalendar.h",
-      "sha256": "c876f26abcbc2fa2c1e2a0b3caa36be86c062de37690248290055f725b7e394d"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/calendar/ICU4XChineseBasedCalendar.cpp",
       "sha256": "42ccccbcc541ce17e86e23137eac0506a64025e2f9cfc7e73cd70fdb8ba84137"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/calendar/ICU4XChineseBasedCalendar.h",
-      "sha256": "d5ada9a2d5380de27a4dfc1afd60cb85f2db4c092a6d2eed7c9b9e24bac4e921"
     },
     {
       "mode": "0644",
@@ -3853,43 +3643,13 @@
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/calendar/ICU4XChineseCalendar.h",
-      "sha256": "6c717f478c81e79c03604a57d1aa972dfa98c36cc32f55947582fbf5460d128e"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/calendar/ICU4XDangiCalendar.cpp",
       "sha256": "bebf34a720fcfe96f256d53c78cbca9d3cb0ad40a7f78ae8b22ad2c57d975cfa"
     },
     {
       "mode": "0644",
-      "path": "intl/components/src/calendar/ICU4XDangiCalendar.h",
-      "sha256": "d597876ba672c98144c2ea0e3a941c0c8599991f37a7a27b49bef77f0cdbe79c"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/calendar/ICU4XUniquePtr.h",
-      "sha256": "89335c9047d4bc468fc27e3d71232bfc29e49639d0f887f9c549a110ec622376"
-    },
-    {
-      "mode": "0644",
       "path": "intl/components/src/calendar/ISODate.cpp",
       "sha256": "dac08bee4242148e02b80084e73602281454d5dbd8f1f05a759f71ddf1e014be"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/calendar/ISODate.h",
-      "sha256": "09fbf3df84df97fb1de5128da23409063a21d35155fe14ee655d321c356a5eb3"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/calendar/MonthCode.h",
-      "sha256": "4d2bde8fb6a6d02c99fe3736b9df01c6c8b0cf671643616eacdd204506708643"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/components/src/calendar/moz.build",
-      "sha256": "82fa59f34fa6dc7e02ef5bb0ff3a190e8b7916527de2dbcf7b64c8cbe3f51432"
     },
     {
       "mode": "0644",
@@ -4928,11 +4688,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/caniter.h",
-      "sha256": "5385d099e69b791f28daa2b2dbe03ec2e88d5611de21dca7389d9a07a2b77f1f"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/casemap.h",
       "sha256": "ce15018c74f49bed22f8d6d599a14f265f29e6331728142f993b0413d3c71f29"
     },
@@ -4945,16 +4700,6 @@
       "mode": "0644",
       "path": "intl/icu/source/common/unicode/chariter.h",
       "sha256": "7d6483c56995dc51f73cfcdd75b21a17f8442387bc1f050441cac3c3f2676e00"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/dbbi.h",
-      "sha256": "e581695e25e5eb36d29444d67efe125a5c59b96d80b69fc590673a4edbc90d82"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/docmain.h",
-      "sha256": "2c7027e1ca22e1de782202f4762027adeddf14ea70f7f04312d80690d456cb18"
     },
     {
       "mode": "0644",
@@ -4978,23 +4723,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/filteredbrk.h",
-      "sha256": "945a4366e5a11fd17ff77a4c325dd26df4fb02eb4c3b71d67b468843271938fc"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/icudataver.h",
-      "sha256": "5b127ee0c08b297cc97db14da06f9f52ab119e54c6fcc8732c89ff50d0e69ae8"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/icuplug.h",
       "sha256": "b44cfed0aa6f238de470936a5a133e6764c77c36b92927a911c188daec56175e"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/idna.h",
-      "sha256": "fd763ab6b40370412aca8a96ba31736422bd657ebc58e9949465eac4c2249cd0"
     },
     {
       "mode": "0644",
@@ -5063,11 +4793,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/rbbi.h",
-      "sha256": "ff5c26d03db88777ed9a05d0276455baa5faf0bd282d8316710c7e2598eb91c3"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/rep.h",
       "sha256": "bb52f48eefd0855baf716002f2792162fc4d5d22f90c9409e8d5db3b6cb279b0"
     },
@@ -5123,11 +4848,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/ubiditransform.h",
-      "sha256": "a447338adc4b448fc6a6daa7a771d646b4dea95aff5c10f2711aacaa21587533"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/ubrk.h",
       "sha256": "6462fbec833cab11c23e3230c7b875986b478d1298c2b34fe347ce577cd7aaab"
     },
@@ -5135,11 +4855,6 @@
       "mode": "0644",
       "path": "intl/icu/source/common/unicode/ucasemap.h",
       "sha256": "0419ae48e74674e3d84464f35413c1a1ab195702fa9f959a0a1d6a6627fd7e5a"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/ucat.h",
-      "sha256": "0a1990e56a7384fad3114fe0abc88561087a516acabdbfe9a30ed4c1619d4ec6"
     },
     {
       "mode": "0644",
@@ -5183,11 +4898,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/ucnvsel.h",
-      "sha256": "05b117f548a535ae125ef2e3851eba3f8db1baa9cf1bae064cc13e64d4e7b9c4"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/uconfig.h",
       "sha256": "12708680c633e73fa2cbdaec82bf30f0fc104cd135f46354d39e9e9002a92514"
     },
@@ -5220,11 +4930,6 @@
       "mode": "0644",
       "path": "intl/icu/source/common/unicode/uenum.h",
       "sha256": "a27a3bcba0fe695d96647bdb0982e15e8cca0d55df01d544fbb287e4944029e2"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/uidna.h",
-      "sha256": "4c99120063c20d8f4fd920c80e13c5d8527c2efae57c21e3086ec3ae3fff8b81"
     },
     {
       "mode": "0644",
@@ -5293,11 +4998,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/unorm.h",
-      "sha256": "3c4e6918c77b1a857953a646d2a17bc19300b41298ed428e6e20e771a1aa63ab"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/unorm2.h",
       "sha256": "63b999232e50b0e69faf58aeb0e64a5bc92c5a3da2f7631bec5f9554b5627be9"
     },
@@ -5310,11 +5010,6 @@
       "mode": "0644",
       "path": "intl/icu/source/common/unicode/urename.h",
       "sha256": "e147332f874ffcd839bd510daff8a50c4d944a988586abd7740a7bc5997ade20"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/urep.h",
-      "sha256": "45327525a9a08ac044f401d7edcf60c7574a7cdbc29d2930d533987d6a214a48"
     },
     {
       "mode": "0644",
@@ -5335,16 +5030,6 @@
       "mode": "0644",
       "path": "intl/icu/source/common/unicode/usetiter.h",
       "sha256": "7e4aa843700673ac87d73e1003395f6fe99c4bf53f32d6e04f5292f9b7351bb0"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/ushape.h",
-      "sha256": "f81bb11d208a5dd0f44925ad0b2220e8bc0ad5ccd03285e9d59e0d87433c409c"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/usprep.h",
-      "sha256": "999242c7048f3fc5da8f7b552df180182bab482cbdf1185541907a2a6c29c627"
     },
     {
       "mode": "0644",
@@ -5373,28 +5058,8 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/common/unicode/utf32.h",
-      "sha256": "5d011b08161a4ad3cbe0d31bfeb0c76fffb6c6fe832eb9c76f4d2fde1e00b1c6"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/common/unicode/utf8.h",
       "sha256": "114be262bddb1385e1287ebc0dd93e51413069b39fc98f704a9f5c22c990ed43"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/utf_old.h",
-      "sha256": "812e249c68d3a45846428a1b6284250077fcd9aa3a418ecbfa9f6448b00a45f7"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/utfiterator.h",
-      "sha256": "5f5d5f6cab98aa37bfd7edf0f6c8d6ae9ee205dd6ad593a1b0d28a15fae19fe8"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/common/unicode/utfstring.h",
-      "sha256": "72feead7894aa00108f0efe0384c890c93c78de9fd18e00c2e73404e78053d18"
     },
     {
       "mode": "0644",
@@ -7083,11 +6748,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/alphaindex.h",
-      "sha256": "a3fb15e34131d5c43c8db86005a639b8b6e0ced9f2458410d8e94d61c100338a"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/basictz.h",
       "sha256": "c2bbbdbd0e332099aab50c8f6461a7c279b0394480a5b0548fb7c2a73d45b713"
     },
@@ -7208,11 +6868,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/gender.h",
-      "sha256": "60023d302e5204cbd934e216730278e91468bd20694045c5136d5d7f2420d519"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/gregocal.h",
       "sha256": "57fd2c3d5146530c9e36f0d85df4da7d8e236ccde0afe1172a39d65a09c56219"
     },
@@ -7235,36 +6890,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/measure.h",
       "sha256": "6c757cfb6896d88844a133aa2f438dcb0ce74c91b0cd4092afb196e2862886b6"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/messageformat2.h",
-      "sha256": "1a0fbb187f3b1bfda61ccafa35e0e9c7564e7ab8aecf60cdbf09c5f766eecbc1"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/messageformat2_arguments.h",
-      "sha256": "70443776dd8a44c2512ba9faaaa9d84e651c4459de3f201b01bbde0a892bb59a"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/messageformat2_data_model.h",
-      "sha256": "685db0364776bce164ae80a2ab0a054dde27292d4a590b457515a456f75cef63"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/messageformat2_data_model_names.h",
-      "sha256": "bb0a47f78c1561ba3613556b32e11ce3fb922109cc20a2ab5598588e0edcf3f7"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/messageformat2_formattable.h",
-      "sha256": "a1fb04d1e66a3d40acf238a959e7c80274dad7988dbe1ac1ebb8edb5dd28c8eb"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/messageformat2_function_registry.h",
-      "sha256": "fd4caa2dbad919dd7c92422341c87cede05a1e6b430c7984c6285853cfc37f84"
     },
     {
       "mode": "0644",
@@ -7318,11 +6943,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/regex.h",
-      "sha256": "0684d6723b84ca8fd44bb35329a28b73e4919006d56155a77408d7ba00abdd25"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/region.h",
       "sha256": "49caadba94d869ce3cc78e6a47d5270ab2751d95088aeea2522d136796e02465"
     },
@@ -7330,16 +6950,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/reldatefmt.h",
       "sha256": "e64a8bc6a0569f834fb568e3ec22bcb7c8e0b4bf1973b884ca132ad14cc9fd5c"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/scientificnumberformatter.h",
-      "sha256": "72b42cde8149d05439510be75ceaa74f71c37a6d07d847fc0561b392bf51864f"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/search.h",
-      "sha256": "9bb0c0ed49d53732f3b6914914588be3db224f7ec81873e50e3d892198c7937f"
     },
     {
       "mode": "0644",
@@ -7360,16 +6970,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/smpdtfmt.h",
       "sha256": "63593cadb8709ab8b0d7c3209d97403335411dbe0e1af3e5877a54889b947a9b"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/sortkey.h",
-      "sha256": "bc5f5fb8a5d9900f0026c6b6025ec46cee3bf3744dd2c300463e0fcf195ed87f"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/stsearch.h",
-      "sha256": "fd4e6b793ddd33e103e1faed5716456e295026cc7abc69c91ec20df8458d2d62"
     },
     {
       "mode": "0644",
@@ -7395,11 +6995,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/tmutfmt.h",
       "sha256": "b6505fa5bc73679994da3a8cc0a56f2d2214674ace9f3495ddf547fc2b5fce12"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/translit.h",
-      "sha256": "03e1796bdaa59e70a0edb59c84d1cad46411075fc0608f9cd4cce166d278a875"
     },
     {
       "mode": "0644",
@@ -7430,16 +7025,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/ucol.h",
       "sha256": "a6b696625c2f0dba2f08c642fca49ddfe005698f7a36b51e38c615157afa175a"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/ucoleitr.h",
-      "sha256": "c9636f96e2a04d5b59ec89d805151e46524fe150c32ef0a871561514e477520a"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/ucsdet.h",
-      "sha256": "927f80ff49d9997edcbfef9b5a77e972b5f77df7c6ab8045a53b4b0bb2cf3317"
     },
     {
       "mode": "0644",
@@ -7483,28 +7068,13 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/ugender.h",
-      "sha256": "58248eb398ac7e3985927b19eccd29d541afa684f2cd6e462d821a8ff0ac0c5a"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/ulistformatter.h",
       "sha256": "64f1a741a64210c6e7f44dad23a2a97b864b5f58e6f6af3286c7f227d4ac7f7b"
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/ulocdata.h",
-      "sha256": "a2fb165abd7b51d325ff6b763f2ddbc9a482a92a177b1d04af5ea728f35be562"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/umsg.h",
       "sha256": "afcdc924e1de120678c0f688e769a76c24925a1d79b2dc5c991f2e1e3a7d730d"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/unirepl.h",
-      "sha256": "69f5cf697cbff3cc1e097bff33f3c2fe089ee3f33128aa897f007050a37aa604"
     },
     {
       "mode": "0644",
@@ -7538,11 +7108,6 @@
     },
     {
       "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/uregex.h",
-      "sha256": "cb069fb56ec8807cab04560ba64ef3fde37d535e67f74b4d33b4f32be13e9b4b"
-    },
-    {
-      "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/uregion.h",
       "sha256": "38e3fad54db2129215b3d88342b0e83a554eb19509469970ac24af9d3e122507"
     },
@@ -7550,11 +7115,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/ureldatefmt.h",
       "sha256": "c1deef931fb267eaa93cb1c39a4862221e53b2583d68549ce321b9f021cd30a0"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/usearch.h",
-      "sha256": "42209f2378dcfb8824a5488efb4dead91549d2399ed91fc3a9be2dc1571dd9a9"
     },
     {
       "mode": "0644",
@@ -7570,11 +7130,6 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/unicode/utmscale.h",
       "sha256": "fe47d8d7ec43b5b753d4a0b75fa59dad351e15a9755c2f861a5b91f52466e8f4"
-    },
-    {
-      "mode": "0644",
-      "path": "intl/icu/source/i18n/unicode/utrans.h",
-      "sha256": "344ed6e76086019e72e30ffd68fd6e49333439fc30972e1b8b6d1d11a2d9b7b1"
     },
     {
       "mode": "0644",
@@ -7720,6 +7275,21 @@
       "mode": "0644",
       "path": "intl/icu/source/i18n/zonemeta.h",
       "sha256": "586f75daf13da795b1d342fbb0e5fb077288985a1c860cb740beacc844a96352"
+    },
+    {
+      "mode": "0644",
+      "path": "intl/icu4x_unicode_glue/Cargo.toml",
+      "sha256": "9fb9fc893727c710f77fffd8e72efe980c326397fd32308dd6a01e7e99a784ce"
+    },
+    {
+      "mode": "0644",
+      "path": "intl/icu4x_unicode_glue/cbindgen.toml",
+      "sha256": "a44de44e9ca1245dd7dc83aaba57010abfd4f07f8b8ff04b49758fd3969e3e38"
+    },
+    {
+      "mode": "0644",
+      "path": "intl/icu4x_unicode_glue/src/lib.rs",
+      "sha256": "a5760c3c5b09fa2eb799c91cab1ea88d68e44c45072677470055871ed8c230a3"
     },
     {
       "mode": "0644",
@@ -13039,7 +12609,7 @@
     {
       "mode": "0644",
       "path": "intl/locale/AppDateTimeFormat.h",
-      "sha256": "4efd9e134ed8ea34ed62e6d85ad637e3a85943910484879a5c68400c1f57cda0"
+      "sha256": "c2d0ecc2f2601567d21cd880db804f2f43f44a1fca774aa0a317fdf0be387da0"
     },
     {
       "mode": "0644",
@@ -13069,7 +12639,7 @@
     {
       "mode": "0644",
       "path": "intl/locale/LocaleService.h",
-      "sha256": "04345b007d8e6425a9e19de36d02fde86b4e0901cf193820d31b771f0bf2b3f3"
+      "sha256": "a6ad5fce0f16df7684e9dd4944fda65ee5dde2cfa07f6b4bab49a936ba781a77"
     },
     {
       "mode": "0644",
@@ -13079,7 +12649,7 @@
     {
       "mode": "0644",
       "path": "intl/locale/OSPreferences.cpp",
-      "sha256": "f33afc48fea1ee0881db24d13c5dcb008177cbbe95568d4c1ea69daa66dcf592"
+      "sha256": "c3eb72d9d88ba8aee5d6f56c616a3662bb428b74bc517676c9ecf7ef6fa59767"
     },
     {
       "mode": "0644",
@@ -13189,7 +12759,7 @@
     {
       "mode": "0644",
       "path": "intl/locale/rust/locale_service_glue/Cargo.toml",
-      "sha256": "882516836a9035a0b591d76af283f2cbe3cb3ec001bb9b685d2c3e135abdc7a3"
+      "sha256": "4d971d73704f838a29a6982f5cc08b013e8c05b1628d10eede1a48dc7bb2d7e9"
     },
     {
       "mode": "0644",
@@ -13199,7 +12769,7 @@
     {
       "mode": "0644",
       "path": "intl/locale/rust/locale_service_glue/src/lib.rs",
-      "sha256": "967b86a78c5be5500d6b6a9c5fac4f4a53a90d4ebb8041b9bfe9748758bafb25"
+      "sha256": "64b7bafb3e2304cc54c7881a66dedb76dcacda7d00efc16ec94ae51408457ab5"
     },
     {
       "mode": "0644",
@@ -13494,7 +13064,7 @@
     {
       "mode": "0644",
       "path": "intl/unicharutil/util/nsUnicodeProperties.cpp",
-      "sha256": "b4d30d04430e017e0be57f3d6fefd60bdae0515203bf79ffda32fae95938adea"
+      "sha256": "0d1f47850b0f805a3b51a72a8b1ae46b94ce51fa9b6d3e146e0e0f0a554b482d"
     },
     {
       "mode": "0644",
@@ -15864,7 +15434,7 @@
     {
       "mode": "0644",
       "path": "js/moz.configure",
-      "sha256": "bcdc7ece0d22453a7553f8e2d9b7395f197a90976a7f2c46593a55a84d843c31"
+      "sha256": "f38bb8d3bf71e9fa8c0b6c4d6908be518878e0415bc9fa461042b7a1af7354cb"
     },
     {
       "mode": "0644",
@@ -16612,99 +16182,9 @@
       "sha256": "418a4f7246fdae6cb22ea2a6950c7f531fc0efcdf82be548429176e2f0817fb5"
     },
     {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/collator_glue/Cargo.toml",
-      "sha256": "51e185a008bc438b95499355e903fc749fceeabf317237d5bb4a46d01adebd74"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/collator_glue/cbindgen.toml",
-      "sha256": "e76bffd9f85228b3927505cdddada927199adb439fa8ba57daf0b8226b5068d7"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/collator_glue/moz.build",
-      "sha256": "0c3f2cd1223de5e110799ac543e76e7d83f2bdd5b10374a6b996f2a8046a2a36"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/collator_glue/src/lib.rs",
-      "sha256": "651a16c30b454e7ab3dc11f0dbd0f24237612f31583658817ca725ed3954d04d"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/locale_glue/Cargo.toml",
-      "sha256": "6340b0f62a8f235933db546e3f6d3bd1205ad427fb3f6b28200965322dcfa403"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/locale_glue/cbindgen.toml",
-      "sha256": "0f5694add9f26a05ef36bc6fe328038270bb622eaac679c41c7431982cedc48b"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/locale_glue/moz.build",
-      "sha256": "136d9a73b0c5142592247574ff238c8d27d89527a3ca12a982a60bc57207ec8c"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/intl/locale_glue/src/lib.rs",
-      "sha256": "042cbf31b1f9c1156e984d6b02203a174567181d3f71b9b2b0b387eb9479286d"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/normalizer_glue/Cargo.toml",
-      "sha256": "6e8c8a161ef48505e4651846e84cd5f4b9cab52e9587ab209932f1db99dbdde8"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/normalizer_glue/cbindgen.toml",
-      "sha256": "479af83a1fad6b81dd383a58e21b26806c651ca0765cec69254ff1d8634e3cca"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/normalizer_glue/moz.build",
-      "sha256": "b60403b0164a485902e61a28fcbcab01c9aba58181a22339b394e28e3dacfd69"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/builtin/normalizer_glue/src/lib.rs",
-      "sha256": "c521301ffb11aa129e7ed6d08b00d102c4166e727f87d23a2be1bcc484bf90e2"
-    },
-    {
       "mode": "0755",
       "path": "js/src/configure",
       "sha256": "f81755b0e06e9305b2faf47a1a20932f0f08c2135f1b73da266eb74e96e6af2f"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/fuzz-tests/gluesmith/Cargo.toml",
-      "sha256": "8a8f4304e5a826bb493a96bac98b3c5606ae8d3018298b735e91a3eb7c67464a"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/fuzz-tests/gluesmith/src/lib.rs",
-      "sha256": "16dd2b553daa94fe3319e5c9b7954fe6764d6b182db05a1d0fd2a5a5e87858ce"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/irregexp/properties_glue/Cargo.toml",
-      "sha256": "7ea1646c6a0f4cea019910659ab2a3c78ea3e03dd2649a9759ca550c28bf3714"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/irregexp/properties_glue/cbindgen.toml",
-      "sha256": "30e0d2d7e8b0857bd3278e55b4d3846792987ec1c558ad5a360e6ce4adb5f251"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/irregexp/properties_glue/moz.build",
-      "sha256": "186fe54587b97453e6ed2ea7789cd834a846ed0dbcbc3303e2e0a3274a06ef7d"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/irregexp/properties_glue/src/lib.rs",
-      "sha256": "5eff5dd636859c16d8a826b2fdd8a5f69593c56f13cc737d3451e19dec184831"
     },
     {
       "mode": "0644",
@@ -16745,16 +16225,6 @@
       "mode": "0644",
       "path": "js/src/moz.build",
       "sha256": "1563b6819fae225bb5eb649d7187ee37257beb797efd0982b1de48d831d5700f"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/rust/shared/Cargo.toml",
-      "sha256": "77cd49f3da5db7758cddc9a09c6b2fa39095906a4da643bea45fc57a5970eedc"
-    },
-    {
-      "mode": "0644",
-      "path": "js/src/rust/shared/lib.rs",
-      "sha256": "c45ced57a0cfb9735c1a7710ec8c1d987c48fe1462c28573c6bd0ed353724d51"
     },
     {
       "mode": "0644",
@@ -22914,7 +22384,7 @@
     {
       "mode": "0644",
       "path": "netwerk/dns/moz.build",
-      "sha256": "baa4cb012dace4b89f8f61f133a7af88d7ac1066ccb55d2e018f127e309bbda3"
+      "sha256": "fa4c3b1553b897103557eded602242b3d06dd311980952b5fdebb7c406238698"
     },
     {
       "mode": "0644",
@@ -23279,7 +22749,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/CAPTURE.md",
-      "sha256": "31f5d01f2113eee476535ea68f8e7dda95de9509b31aa914a52b987d7a4886a7"
+      "sha256": "ccf9330de12a63693632b3e16301f04d021086f7d4d421df752455d0c6d443b6"
     },
     {
       "mode": "0644",
@@ -23429,7 +22899,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "980a7649ae53d15ab21669c0a21b8c3e765aba320ab58c234b689f5b1e310918"
+      "sha256": "05cdfd37637b0c9f2a21d47c6d142a99808b2869c9acaed4e43e5a52143aceb1"
     },
     {
       "mode": "0644",
@@ -23609,17 +23079,17 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/mozconfig-android-aarch64",
-      "sha256": "86a83d7d84878dab7a4013e8b9c2924de9755ccf5452402ec78e2547cc9facb4"
+      "sha256": "69d4665c2b95be12ac6ba7e976069ff72d28e984a4ede2df50a4729a18052c31"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/mozconfig-minimal",
-      "sha256": "6b17a77c8cb8de5c3fde01b79b5faf83477958d83fe84ad174badbd1a32ae826"
+      "sha256": "03e7581d0f3023568f6b1dac19d87add5cfab400af3d909894bd6c49b2f4cf6b"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/mozconfig-windows-x86_64",
-      "sha256": "6d45f92c83d67489dcfdc25e52f43d879fba3e96bfc8272222cf9503ce7a3d5c"
+      "sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b"
     },
     {
       "mode": "0644",
@@ -23679,7 +23149,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/README.md",
-      "sha256": "f5ddcde935d78d32ed4815bc35551373157883c197d4da7d25906be1b0d9cda3"
+      "sha256": "fe06927f07904f56eacac0e89419a59def79fe52c88742e80fadb07b2748e1b0"
     },
     {
       "mode": "0644",
@@ -23714,7 +23184,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-capture-comparison.sh",
-      "sha256": "2ad99aa20138624b1c1f1f945deba43b89aea235bd2d73fd564d1d8a4959c62d"
+      "sha256": "201a52e333c94da87bc2e3234229f4a76bb9320d2f0e9b53dc5239c6af6cc86f"
     },
     {
       "mode": "0755",
@@ -23744,7 +23214,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-h3-capture-comparison.sh",
-      "sha256": "ecb20af2f85ec4124d67a6944cd88e47a9d5a16fee2643dd116c09373f10347c"
+      "sha256": "96672fd43c648b7c1e59988b99b19c706ca5cb91e2652c0169079efc8b768954"
     },
     {
       "mode": "0755",
@@ -23799,7 +23269,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-observer-comparison.sh",
-      "sha256": "7c1f3f7b2933bd10a27c06e7f6860c10c30f0a36e39e6dd1273054586db32360"
+      "sha256": "42ed8c75d9bb7f6a1a9140f3ae9e1f75f245a1511df420ac33f5c60b1cdb35b6"
     },
     {
       "mode": "0755",
@@ -23904,7 +23374,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/fetch-firefox-reference.sh",
-      "sha256": "655e4718832126d996025631c8b51d42b0207776cc21b295853fed9e23feb1ad"
+      "sha256": "0fab00b8cc01c8749ca44a65d764d899703551f1bd73c67fd6a905b5f367e60e"
     },
     {
       "mode": "0755",
@@ -23914,7 +23384,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/tools/firefox-reference-manifest",
-      "sha256": "b28490935d21028d35dadfd1c8e084e0d3d3ce02ceebe1d7527df90fcf6ba5fa"
+      "sha256": "64980a506a103cb89b4e82e34b3e7c4a8e421db67aedd255326d049c49a83b41"
     },
     {
       "mode": "0644",
@@ -26912,6 +26382,11 @@
       "sha256": "0b8ce5d0c6691855a3ff61a7de1372a061a012a95cee524f14220f797ecaa228"
     },
     {
+      "mode": "0755",
+      "path": "python/mozbuild/mozbuild/action/tooltool.py",
+      "sha256": "6d0ddff133b238cd3e2ce67969b79a14898874bd1cb2ad741273ad19240a455e"
+    },
+    {
       "mode": "0644",
       "path": "python/mozbuild/mozbuild/action/webidl.py",
       "sha256": "48d77d4454ee350630e9ee596de605575bac43ac28985c48aaa1a9b710b8eeae"
@@ -27703,6 +27178,41 @@
     },
     {
       "mode": "0644",
+      "path": "python/mozlint/mozlint/__init__.py",
+      "sha256": "2f2dd5244ead7316a662ec28e801018d4acc1bb64e522ddbc8fd24010f17a586"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozlint/mozlint/errors.py",
+      "sha256": "9fd128eecc357fc2e317f80e6b0e07f83a84157e43effe8ead25384f30fb6f10"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozlint/mozlint/parser.py",
+      "sha256": "11f2d311fc09508b6bf0805da1036d46aef525331fbcdfc829acfde341ad1edf"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozlint/mozlint/pathutils.py",
+      "sha256": "f86f5284aaba19fef6068cfa28f871d6b59068e15577e6086c477221f768dd1b"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozlint/mozlint/result.py",
+      "sha256": "a7f5aa03966a71d39b80e78e444267a3943c0d4632f82a11af9cd06ae49d1126"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozlint/mozlint/roller.py",
+      "sha256": "28206f22ee33f66ab50300264cfd47b32e25e044999fb04629453a1cca08037e"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozlint/mozlint/types.py",
+      "sha256": "898da0e32339de55b1f4d1b2c31e1ece17749d79951ba0d6f5ce94017905dd4d"
+    },
+    {
+      "mode": "0644",
       "path": "python/mozlint/test/python.toml",
       "sha256": "e6264349c890fbb74cfe41a282a9503cec5219fba924e02c9bd9675747a7fb0b"
     },
@@ -27748,6 +27258,136 @@
     },
     {
       "mode": "0644",
+      "path": "python/mozrelease/.ruff.toml",
+      "sha256": "0ad073deedca467d25d2be06a6d03f47508372f30504518ae495b33acd303d53"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/attribute_builds.py",
+      "sha256": "bed28ffffb521f14945e038f8fa353032eb4af75cb1d6b48f4d4758111ddc16a"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/balrog.py",
+      "sha256": "777f8faba522336817924b24e9986cc5ea27fe24c1732851a4a215970bfec0ff"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/buglist_creator.py",
+      "sha256": "8585d6f6ac1b5a02857c404f114a23e53a34c9464b4d0f963022ca6c1538b77c"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/chunking.py",
+      "sha256": "4e9c7a6df0154a5f03020b407d376d00be389929b72431f9b7257dca5b28e3c6"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/l10n.py",
+      "sha256": "c24ecc19e3abbffb0094552002714da7760caf5cff3a30d61292bc7e9ea3d81f"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/mach_commands.py",
+      "sha256": "a64192539578d30c643e525b97387dab58b7c8ca6ed7b915477bb5ba88692b6f"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/partner_repack.py",
+      "sha256": "12f14b4889bdbc8544f549c55f713e2dd14b37d755c085bd90747a9f012e989a"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/paths.py",
+      "sha256": "27bcc5031ca8eb6d3498d99de9256fd422a2d2077c9b9015728e8d8783cb1f32"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/platforms.py",
+      "sha256": "55166cf73865e883714d38dc9d9682a7898dfc056f9751479ea915fe2c607399"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/scriptworker_canary.py",
+      "sha256": "1f4bcc78a3ad7394a8d27f1ae2941236319467eff3a6bde256e7d14c7732aca3"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/update_verify.py",
+      "sha256": "5f1105f2b1f55194b341fd8541bff8667d86c5427ac92cc9970ae614a56f3318"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/util.py",
+      "sha256": "f58d12aecdaf55b1e2638ce6716ccdbed1029d0af5694d8e5bc9466103657ffb"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/mozrelease/versions.py",
+      "sha256": "66c3825e5571ad54bd9befae0b8331fe90762696ef3f17f821348ecb92ff2c45"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/setup.py",
+      "sha256": "5d88b8a77750078e9651a1b00aab9453f7215415b5bb754766c4e6f5202f66e9"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/Firefox-140.0.1.update.json",
+      "sha256": "1afc8d0edc93e02a9b5260aca473e8fc798564de8f1170dc2ee69cb7c94d596d"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/Firefox-140.0.update.json",
+      "sha256": "4cb754c627a6298062b9aa942f5701e3fed20ec820010451f7319cd3b0910328"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/Firefox-62.0.3.update.json",
+      "sha256": "a328d95032c1415e38101b66ad6bb39045c5e1d4734c0fa0121da760b3912e44"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/Firefox-62.0b11-update.json",
+      "sha256": "a328d95032c1415e38101b66ad6bb39045c5e1d4734c0fa0121da760b3912e44"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/Firefox-64.0b13.update.json",
+      "sha256": "c9285683a5b79b2e8d5c41ddb7a0aaefeeec9620dc6251668da2cdb913b42c3f"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/buglist_changesets.json",
+      "sha256": "bb328299b7c02070d9295360bead95950af9214bbe75da0aa90fce5703a21e6e"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/sample-update-verify.cfg",
+      "sha256": "e0ee6bc0e1351ff1bad3faef6f883aba286d9b20838ce930f0b95b14c2ae25f1"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/whatsnew-62.0.3.yml",
+      "sha256": "60ad3bf7ee011dfb4f5f250e3089e8d32410d4ed6ea1b7ea0b2b414a93f530e9"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/whatsnew-firefox-com.yml",
+      "sha256": "b7535bcb2de549bb41d42886c3e8a874f9280a2f1ac42fff536a3ad78ba94344"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozrelease/test/data/whatsnew-release.yml",
+      "sha256": "60ad3bf7ee011dfb4f5f250e3089e8d32410d4ed6ea1b7ea0b2b414a93f530e9"
+    },
+    {
+      "mode": "0644",
       "path": "python/mozrelease/test/python.toml",
       "sha256": "665e7173d43d9a1c27b967d97f8aba89006af26b3fa6e55a5eb06ba9638cb993"
     },
@@ -27775,6 +27415,16 @@
       "mode": "0644",
       "path": "python/mozrelease/test/test_versions.py",
       "sha256": "81ed4a7bbaca672f851125084d866b7a90cd1e06db75402e7f4d3451a2235364"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozterm/mozterm/__init__.py",
+      "sha256": "d72d54c1d24a2261ff38a4e31239b75a91b20a79bb4e0e86e38a09bf68c4e05c"
+    },
+    {
+      "mode": "0644",
+      "path": "python/mozterm/mozterm/terminal.py",
+      "sha256": "e50088f20c54fac8478fdcec9b9e1f7dfd79f9fd81158f306719ff866f9c3aee"
     },
     {
       "mode": "0644",
@@ -27925,6 +27575,11 @@
       "mode": "0644",
       "path": "python/sites/mach.txt",
       "sha256": "ce44135c7092552d969f2a3cec4ffc73233c6d857e717d6cf52fb2c291b679f9"
+    },
+    {
+      "mode": "0644",
+      "path": "python/sites/taskgraph.txt",
+      "sha256": "7ab420ac5ed214930d135f0051e78387fa830df98ffa31064b734b8a047eda1c"
     },
     {
       "mode": "0644",
@@ -33638,26 +33293,6 @@
     },
     {
       "mode": "0644",
-      "path": "testing/gtest/mozilla/GTestRunner.cpp",
-      "sha256": "96890cfd12d3bdc30e95f382d75403164fd5d4b1e69e6ff93742051204fbeb08"
-    },
-    {
-      "mode": "0644",
-      "path": "testing/gtest/mozilla/GTestRunner.h",
-      "sha256": "9cf036f8748cabd47569301c5b95f5597b74b751f4dd2846da8678ff56b31a04"
-    },
-    {
-      "mode": "0644",
-      "path": "testing/gtest/mozilla/MozAssertions.cpp",
-      "sha256": "c506cb17041830689d93bfb8286caa553446f584c0a882ae12b4c3a3ebcb7ea1"
-    },
-    {
-      "mode": "0644",
-      "path": "testing/gtest/mozilla/MozAssertions.h",
-      "sha256": "cb3ad1dc991f77695b8ac3c9e5195b306362822b37d831089b8c8c81511c844a"
-    },
-    {
-      "mode": "0644",
       "path": "testing/gtest/remotegtests.py",
       "sha256": "eb782d07ec5f5ddc4becec259842f76bb58b297ebd6f7cc511d6557842111b92"
     },
@@ -36978,61 +36613,6 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-all.cc",
-      "sha256": "972d3016860f9aa6452e078cf77406290fb7003b66fd6c0744a030bd1c323606"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-assertion-result.cc",
-      "sha256": "dbd2235676dcc0ef6409108a4041e05442fc6895735a5561d71151e6a14296bb"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-death-test.cc",
-      "sha256": "2881240c49961c095505f3c044483a79ef1c32e413e19630af7508d67994f619"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-filepath.cc",
-      "sha256": "b3d0011edbb81f782b88aac6ea20d04b24050e5738b3b2240a22033f675cb71f"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-internal-inl.h",
-      "sha256": "a5fb0dbf86304cbcce6252a136d7e722e07518940ce1ed134ce93e7eea4f0fcc"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-matchers.cc",
-      "sha256": "e4ce9edf33493625353cc147a14caac14fdba7390d76166d101fa2fe9d16bbda"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-port.cc",
-      "sha256": "39470003392fcf089340a31f92e61efa46328052cb16559e5ddada64e94886bc"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-printers.cc",
-      "sha256": "efcf234bdeb688d09500dbbdede962b9ff1de5d5f842b5d5e5a4a58a0b4b99a4"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-test-part.cc",
-      "sha256": "9acddbbe251f0516a92da1f55d8edd06c66c8fdeca382460d57340ad594f76f2"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-typed-test.cc",
-      "sha256": "b92e70b2d7ee3b86328162cbda269a28de4ce67f0e8d9beec5ec2c73a93ba006"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest.cc",
-      "sha256": "c88905c471c58ca3e58978477d96d8849d97a58e8afcd190011a7a76cd2a8b75"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/libwebrtc/.naivefox-directory",
       "sha256": "8270603aa8795e48bb4292ab394dfaaa4805a36714149e28050a8b8bbb32588d"
     },
@@ -37070,6 +36650,11 @@
       "mode": "0644",
       "path": "third_party/python/ansicon/ansicon/__init__.py",
       "sha256": "0f49ee4bd785718e03f5d59da21711a85b0987cdffd06461e0dd100efe2d764b"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/python/appdirs/appdirs.py",
+      "sha256": "83df6cdac5e19ef4c49bbf688f86d62344e86a973efd298a28d5ef3971e45627"
     },
     {
       "mode": "0644",
@@ -44378,6 +43963,11 @@
     },
     {
       "mode": "0644",
+      "path": "third_party/python/typing_extensions/typing_extensions.py",
+      "sha256": "433d11d170d3a24d2eb065ebc1bfe848cea7e3d7ce68567ab52bea2d4c2f7ed8"
+    },
+    {
+      "mode": "0644",
       "path": "third_party/python/urllib3/urllib3/__init__.py",
       "sha256": "24ca35b60d67215d40789daf10d0bf4f17e5d1ee61e86ce5f43195935ad645ba"
     },
@@ -45535,41 +45125,6 @@
       "mode": "0644",
       "path": "third_party/rust/arbitrary/.cargo-checksum.json",
       "sha256": "c6ba36e0ff34e8d34966ad60fc4da1f32874bfff7c951ad0ccf4ba67f6392e42"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/Cargo.toml",
-      "sha256": "846a1554e7ad0841d2d7a8b5f13b419b05eaeaa158e75fdb9a5e6a5b4afafb66"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/README.md",
-      "sha256": "5a1c78cfd5295f86d11bf9baf39e7190366b94a2cfb39bb6ad59b26b66addd52"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/examples/derive_enum.rs",
-      "sha256": "45d11d8cd0461716b276e2df4a5b31e7ae7ece36f05d42a0d4c055a5e4f02ab1"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/src/lib.rs",
-      "sha256": "6b429a3d1689a5d4cc9699bb8a7d53c2ff22c607f1d7eb8b2b1d271f6467a9ab"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/tests/bound.rs",
-      "sha256": "32b8ce8083419ecadd66e1fde4da427b437ac9e007ed9d6b5229a4ef24a5d772"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/tests/derive.rs",
-      "sha256": "970bee897008c0132075ff8aa14ac9610933746dabc175b626e479637972e03f"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/arbitrary/tests/path.rs",
-      "sha256": "7e3e5fa26d5671ac19e99ba010a2fa0894fafe996c5d28ee587919e486d7c7c1"
     },
     {
       "mode": "0644",
@@ -51683,21 +51238,6 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/derive_arbitrary/Cargo.toml",
-      "sha256": "f8a5e6d7f00bfbf9ed898cdb4164d04df28887c1cb9903cd8009c4e34a1be814"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/derive_arbitrary/README.md",
-      "sha256": "7059db284b2016ba7355c63a2b14eb732c7b8952286ff1bc4fdde605018a39c4"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/derive_arbitrary/src/lib.rs",
-      "sha256": "ecc4eddd09472d5e06eef8f6d0092bee896abcad168391e950e18cf383135e1c"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/derive_more-impl/.cargo-checksum.json",
       "sha256": "7bc909fd1525851f48628a4f6ff4f733003a27847f54c29f7df223c77b7e5a02"
     },
@@ -55615,21 +55155,6 @@
       "mode": "0644",
       "path": "third_party/rust/flagset/.cargo-checksum.json",
       "sha256": "c79ab0c7500d23eab7cbf0e00ec62200cf28e7bfc22c1e125b15a90cc2195d5a"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/flagset/Cargo.toml",
-      "sha256": "5a87209bc98397121d9b710b6eb05559c5f2ddb7884e82fbfc706026a24fac13"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/flagset/README.md",
-      "sha256": "391c693969a7cd5e1810d3fc4271f1b69f79ee1a26def1fc9b3f7c5df50920dd"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/flagset/src/lib.rs",
-      "sha256": "77804ee547d8723e603975d586deaf4fa8a58bf13a8c80d9416eed0298b39462"
     },
     {
       "mode": "0644",
@@ -61533,36 +61058,6 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/icu_time/.cargo_vcs_info.json",
-      "sha256": "61a6daec9fa78c878239886adc9a0ab34f199fd8bf108f4505539e6a84be9d09"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/icu_time/Cargo.lock",
-      "sha256": "0377978382e9d25f798163ada3e664c85f4abf64a922f42afe5cb6a8eee0b7b3"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/icu_time/Cargo.toml",
-      "sha256": "3ce42f76bb7302d51efdef54a645826bb41de8b9556cbe77738c016651b9c1ba"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/icu_time/Cargo.toml.orig",
-      "sha256": "36115b4057975b58363590a99a66f6854f903764434a7059ffcc2cec53d87312"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/icu_time/LICENSE",
-      "sha256": "f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/icu_time/README.md",
-      "sha256": "e56f84dbe5ba2c72530ff53a22fc34df00a2ef5a3ac1a72e2e581f34fac54b1e"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/icu_time/src/ixdtf.rs",
       "sha256": "8d768a75df995eaf51e14f1e3ff2a55cffd8d784bac63b95e7b56716144b0e41"
     },
@@ -61625,11 +61120,6 @@
       "mode": "0644",
       "path": "third_party/rust/icu_time/src/zone/zone_name_timestamp.rs",
       "sha256": "11b987901bc951f4c5a11f69b192c74d9daa353c068420591f5a57dfda74229e"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/icu_time/tests/data/offset_periods_old.blob",
-      "sha256": "561d660d1b7d6d6dc32d062f85c247c6dd5ab8049426b7530c64b72d803c203b"
     },
     {
       "mode": "0644",
@@ -62895,36 +62385,6 @@
       "mode": "0644",
       "path": "third_party/rust/leb128fmt/.cargo-checksum.json",
       "sha256": "5b101b8db77ebec6f9c7ff8c582067bbb4461f162324042a8e23ed35551a6608"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/leb128fmt/CHANGELOG.md",
-      "sha256": "2e3dd8371e4e7c5018904c8b9a0a4aa0269f22d836ae7c246936cd58e69a3990"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/leb128fmt/Cargo.toml",
-      "sha256": "9ce8fd06739a8790247a621ace591117d6b9e8eec9072596a27b0122fa87a2c8"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/leb128fmt/LICENSE-APACHE",
-      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/leb128fmt/LICENSE-MIT",
-      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/leb128fmt/README.md",
-      "sha256": "02e7647d994ef53734debd2be508d3c6bd579eb1601f2a032383257ffd6ddbdf"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/leb128fmt/src/lib.rs",
-      "sha256": "d3416930498758a653a176d50658540adf1c81cd1e5eade97272b4df69ae92cc"
     },
     {
       "mode": "0644",
@@ -87888,103 +87348,13 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/wasm-encoder/Cargo.toml",
-      "sha256": "5918b239d623f4de620208510e5f6f98238d5f381dc6a26e9a4726b48d1436ae"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-encoder/README.md",
-      "sha256": "c65cc523cd46516311fca22c82284fa0979a4638aa1cb7a02268856f43a017a8"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-encoder/src/lib.rs",
-      "sha256": "71a1f77f892a29fb5fbf7fad48415b76cad0c4c9b815de234f797ed2555a43fb"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/wasm-smith/.cargo-checksum.json",
       "sha256": "d86126a88db7e280798a66cb8aa2489210db2a626f26ba1ca971384cd4095ad4"
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/wasm-smith/Cargo.toml",
-      "sha256": "ab1048a2e23e3b06c7585c2449d788f09291a1df573030e2a1f554df419fda30"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/README.md",
-      "sha256": "e688e3c121e7eaf851e689c611248ed52c55f561edaf27d31edb7934e351963b"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/benches/corpus.rs",
-      "sha256": "2ba06766908f2bde01dc7e4545b70979ea7268806a73c1cdda4affc4ca59efa8"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/src/lib.rs",
-      "sha256": "b0b180a3849312eb415f0ee10ac193544da66c29ddc8ab43adb84aad29ba7e5f"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/tests/available_imports.rs",
-      "sha256": "0a1658bbd2343f48d4c37c82189923606d2ed77568e1d2b9e5ba9a6734fc1746"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/tests/component.rs",
-      "sha256": "d9ade851973dc4744a02ac5afb543692393bf03f3572aeceafc2bf12e564dffb"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/tests/core.rs",
-      "sha256": "7981c68958944456f99262438a9785922a152adabfe9e22d4531bc2f54ce316e"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/tests/exports.rs",
-      "sha256": "49bb78d41cdd47d09935b58ab1e496a6a2e250c3f13b5bc110b489d98058d840"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasm-smith/tests/module_shape.rs",
-      "sha256": "9486e30659486eddcca7c5f5a53056d51e3007918963166fd47b3b79719a085a"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/wasmparser/.cargo-checksum.json",
       "sha256": "ee7f98246f58460e4383fb75c2c9b2ef741f8728da781c12ddca1c1262a85585"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasmparser/Cargo.toml",
-      "sha256": "44fa0c6cd610439798dadcd0b35cf3ddc05df8f300e3df62713317d4e111c659"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasmparser/README.md",
-      "sha256": "aabf3b5930893b2a89d0114d8cd97e9b980f3c6f758b960484e06b69a504b823"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasmparser/benches/benchmark.rs",
-      "sha256": "c69fd76e74644188f25d03beac288f094b22735db58daf00019f812f9400f604"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasmparser/examples/simple.rs",
-      "sha256": "dc847c55627d346cee20f1415fde9be36a8e93d0ba0929d3fd8eef9d69e3541f"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasmparser/src/lib.rs",
-      "sha256": "1a3d8c79f116527f3c4dcb4e256758acfe3096e87d96f4ec27bbcbd10b587ddf"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/wasmparser/tests/big-module.rs",
-      "sha256": "114d250505a2a3daf2e778bd4b2c14b7fc6b6be842055fa6b9389167fa430dca"
     },
     {
       "mode": "0644",
@@ -106978,41 +106348,6 @@
     },
     {
       "mode": "0644",
-      "path": "third_party/rust/write16/.cargo_vcs_info.json",
-      "sha256": "16b719ec5498d1e4a062b78a24c2912669218a49c6bcbb4db773f97008ffdbc8"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/write16/COPYRIGHT",
-      "sha256": "3210be7332b5bdf48eb24a945258b9f38616a2cceb0dfc06e3c3c7e9740475a0"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/write16/Cargo.toml",
-      "sha256": "f6061fe4963a3da73ce810908eeba5394c0eebd2068c6655f9b596c362d74680"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/write16/Cargo.toml.orig",
-      "sha256": "9639b936043eac0b355eeaf173e512db2e6a2ca06f250823a23fa5f34f139369"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/write16/LICENSE-APACHE",
-      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/write16/LICENSE-MIT",
-      "sha256": "3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/rust/write16/README.md",
-      "sha256": "ea27b433d28b9f0bc411147079740bd28c45bcf80c0f70698a3cf6432ba3046b"
-    },
-    {
-      "mode": "0644",
       "path": "third_party/rust/write16/src/lib.rs",
       "sha256": "f3d73b15e078ea40171c8636bfb83f42a8598405d2767a2183e0bc2be91ae1e1"
     },
@@ -109038,11 +108373,6 @@
     },
     {
       "mode": "0644",
-      "path": "toolkit/library/gtest/libxul_missing_buildid/xul_missing_buildid.c",
-      "sha256": "ff4a46a230d018aaa810e09e3cbb100745f2f3f459bf174a42e0394d95eb6531"
-    },
-    {
-      "mode": "0644",
       "path": "toolkit/library/libxul-naivefox.symbols",
       "sha256": "80480b7cd6e9b4dc629e258d49a8e0ee684fc0e0f417eae14110514c05134ec6"
     },
@@ -109054,7 +108384,7 @@
     {
       "mode": "0644",
       "path": "toolkit/library/moz.build",
-      "sha256": "047f81e78eaa8f65cd2e787044cb8a241c48de6aeb3f60fd359544b9d078d271"
+      "sha256": "564b77dd5757555fe1f7cc91d48fde41632c41b0f837282277a2e1dc58301589"
     },
     {
       "mode": "0644",
@@ -109079,12 +108409,12 @@
     {
       "mode": "0644",
       "path": "toolkit/library/rust/naivefox/Cargo.toml",
-      "sha256": "2b81fc7ea067af6c679af8605a4d11ddbc03887311f54d63da944e01934f6ec2"
+      "sha256": "2c217f1610921d4c889f1ab85d58dd91ec095dbbc644bdaa297d1d92c3a9064e"
     },
     {
       "mode": "0644",
       "path": "toolkit/library/rust/naivefox/lib.rs",
-      "sha256": "d20a697ed8dcdc7cd3d81975b74fe938f70ea422b11dc210357475b668537c61"
+      "sha256": "7cd512ffc504fd6e700699f3295e2e7727af9354ede16e6cc419c9be1892fb29"
     },
     {
       "mode": "0644",
@@ -110230,6 +109560,241 @@
       "mode": "0644",
       "path": "tools/update-packaging/test/to/{foodir/update.manifest",
       "sha256": "847e382aa868f1c613df7f4b0f543a0646d6a6e64cf8496fce8461cf56a3f21f"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/docs/index.md",
+      "sha256": "50856d0b54c353901079756b5c9e5fbc49dcee71062c7e30fee9411754f600d6"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/Cargo.lock",
+      "sha256": "3f03770633891ef7bfbfd9d90122bef039d57fa653ecdacd7811cc366506db29"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/Cargo.toml",
+      "sha256": "bbc2bdf0d548373810c780f3b0dc3248b61093f2cc082d020644e4ef6a34cf00"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/README.md",
+      "sha256": "e839d9acc607772b80a31527460fb8381ee6aa34e0e979e92a0e7ca559a8720b"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/cli.rs",
+      "sha256": "5bf7831ce35d12278a7e79b9d34a1b60337b178911d3be3c0be249917c4438c2"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/downloader.rs",
+      "sha256": "d0856326ed6117626e8ba91b5cfae7b1e97a359367075a7e8afdeb4028fb1c4b"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/errorhandling.rs",
+      "sha256": "26d0ca081c400d85c114978a034a9112c8f56d5c6b4bb1b31ea1ae9d1991378a"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/main.rs",
+      "sha256": "ddda7e799c7b43ea1605eb636f44afdcc1eca9f52346e244e54faac82725e15a"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/runner.rs",
+      "sha256": "530cb727f8c4351d3420414f4b0fbd6fcee798c8c1b762a4ccf09c7b907232d2"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/test.rs",
+      "sha256": "5fd2df18b5249dfb28d70983a533b7ec24d05d9f55ceb7fe15787775be1a2894"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/src/updater.rs",
+      "sha256": "5c11de086b4cbf6328eb5c738d90c11dee2c70e7de287a9efc6f4b958d240df7"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/tests/fixtures/README",
+      "sha256": "d33d4b8aa024ee7cb24dbc954734b7e96d75af792effcf7aac5a237b7df2bdd6"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/tests/fixtures/dep1.der",
+      "sha256": "0ebaf1ad2e8a35c08340a00b464cd6ed9d2454a8e342edddfe832e251e0ae112"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/tests/fixtures/dep2.der",
+      "sha256": "049b2241dd4574393ef6603ed2a856eab91768db06efc4426c7472df68d685df"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/tests/fixtures/release_primary.der",
+      "sha256": "357f861c37f6648a0215440339b6555c65234e78ff92b365ad75736e87798361"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/marannon/tests/fixtures/release_secondary.der",
+      "sha256": "a866c39cce7f34ed4d85dadf1435185636233da90321ac9af64c8c9d6f35de11"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/marannon/tests/fixtures/updater",
+      "sha256": "605937e8621d7d8b104f8ee750c95be68661c8406326cd3711f3d7907545a363"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/python/util/__init__.py",
+      "sha256": "f21fb44a9170c0cd4b675fbe17129799b08ff385b4c2d8b395616df47b8a85cb"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/python/util/commands.py",
+      "sha256": "d8dc2c9b82673ded0ec9856cb078c1fa491b4c882556ac0efdf52a11cd909434"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/common/cached_download.sh",
+      "sha256": "bdbbd18fbf36e746e390b10d147cf3280e731a935ead851556ea366e27feebef"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/common/check_updates.sh",
+      "sha256": "547ac775fdae47895fd4c0089d0347503043292f1ce49800145f5e19a2db3fc6"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/common/download_builds.sh",
+      "sha256": "9c34271ddfbb1f27678dea231691a3d2d9c732418e0fdb5be9fbf7e50d440689"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/common/download_mars.sh",
+      "sha256": "707ffe5fa14bb08c71da5851e1a52cccf32373a258d03e5deac38017f4fb9683"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/common/installdmg.ex",
+      "sha256": "2d931e581bdd71c45e332764f133d53a357ba2a4827ee1fa87f2119f8ca501ef"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/common/unpack-diskimage.sh",
+      "sha256": "9816a7b0d79f5a3b17ef144bd7958448953d90919efd871d3dd1f27cd82ee63d"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/common/unpack.sh",
+      "sha256": "5fc72f399a93302d0f5a513bbc2fff98d8238623ef761d343730db2d93c29df1"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/compare-directories.py",
+      "sha256": "4a9d62986cf8559045f6d62ad3fe800ba749faec54ad9b5c88fd58636f68c2a9"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/final-verification.sh",
+      "sha256": "ed571ab29a5ac54d63867bff089cee7b6f3925e13652b0414c8d010164587540"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/get-update-xml.sh",
+      "sha256": "f703e4f56abf0066545b89f766634bee3fd4226d0e9bc026f5a7c48bff1461aa"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/README",
+      "sha256": "d2e93d2f028de81913b517314c206a5ccaab9e18675123f42c74e7a23b43b593"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/dep1.der",
+      "sha256": "0ebaf1ad2e8a35c08340a00b464cd6ed9d2454a8e342edddfe832e251e0ae112"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/dep2.der",
+      "sha256": "049b2241dd4574393ef6603ed2a856eab91768db06efc4426c7472df68d685df"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/nightly_aurora_level3_primary.der",
+      "sha256": "40e0b33e88a81b57bdd828e2cfa12387ba7ef83c8603f60924930a4eb01d10f6"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/nightly_aurora_level3_secondary.der",
+      "sha256": "3a8b135f4f6ecfa0a947a7d433d83200c1bd9e167acff821dd599e289d909d71"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/release_primary.der",
+      "sha256": "357f861c37f6648a0215440339b6555c65234e78ff92b365ad75736e87798361"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/release_secondary.der",
+      "sha256": "a866c39cce7f34ed4d85dadf1435185636233da90321ac9af64c8c9d6f35de11"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/sha1/dep1.der",
+      "sha256": "8bf8d90a678487aaaf7203039976814ba2936bc2d9b0ea1cf88d548c5c253ad6"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/sha1/dep2.der",
+      "sha256": "b4b0af3bdfc710fa4bd443b9a400171a95d0bd0320c01304c6111ddc9a4b8950"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/sha1/release_primary.der",
+      "sha256": "2776b0809386b79f838e3dfc0812af44f4d9d9176ac9787fc9b7bae4100d7146"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/sha1/release_secondary.der",
+      "sha256": "ec0cd1846f78e9445624481a6e68794dedb425b59fdb9893c6c18eb01b25dddb"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/mar_certs/xpcshellCertificate.der",
+      "sha256": "1743895484caf159c2c6d237ddf70384f05bb836806a64d18bee7e6503598fbd"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/release/replace-updater-certs.py",
+      "sha256": "47ba722b1fcbec47a02fd520e32a6bd48862b7ee58910bbcac7781e43fc3f86c"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/test-mar-url.sh",
+      "sha256": "10af73e336e2e45aad88a811e3f4da40a895720dd9f4b107df320a49cb77e78f"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/release/updates/verify.sh",
+      "sha256": "7cd4bfc21df7ac0a5121f8b41e297706454fb1bd67d90a584174f437be13389c"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/scripts/async_download.py",
+      "sha256": "6d2d35abc30d2e08d544c43921c1249d06f2c5885001bb4177185f0f5cb933a4"
+    },
+    {
+      "mode": "0644",
+      "path": "tools/update-verify/scripts/chunked-verify.py",
+      "sha256": "95ef423ebac4defaddd226f2cf5bb5aa0dea2594b7a51c2f1389f2dfb811704e"
+    },
+    {
+      "mode": "0755",
+      "path": "tools/update-verify/scripts/chunked-verify.sh",
+      "sha256": "3bd0db5d743ed21a16e970fd5942365ccfe50fd15bde34fed8c9f964b8801cc9"
     },
     {
       "mode": "0644",
@@ -113218,11 +112783,6 @@
     },
     {
       "mode": "0644",
-      "path": "xpcom/tests/TestHarness.h",
-      "sha256": "a4fe56070e0cb0b0b5f986e40317c919688229b969207b5464851c1e2347ef44"
-    },
-    {
-      "mode": "0644",
       "path": "xpcom/threads/AbstractThread.cpp",
       "sha256": "7f274a63bb83f7768f154d9d85d2a1077a628f65812d56a12c6077ed69278acd"
     },
@@ -113788,8 +113348,8 @@
     }
   ],
   "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
-  "manifest_sha256": "3a9f77a992bd5b8090b0912dc7df56cd0b19b150b4f59215484171e359fd31b1",
+  "manifest_sha256": "99ce2e0e7f601159fa3dd7aaf12f24616336d2f4ac879800296103d13fe4e738",
   "manifest_version": 2,
-  "minimal_export_commit": "adb976f6d1557af9918cdf28b4bae00280d3b7e0",
-  "naivefox_reference_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a"
+  "minimal_export_commit": "a5af308213ac74e8813edf9d2a6f4fc89910b6e2",
+  "naivefox_reference_commit": "b0497d87b6017b2dd4e2429b7d33b0882dda4859"
 }
