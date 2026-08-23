@@ -19,8 +19,8 @@
   },
   "configure_exit_status": 0,
   "counts": {
-    "directories": 11055,
-    "files": 10308
+    "directories": 11057,
+    "files": 10309
   },
   "evidence_collector_sha256": "71d7a93b99c6bd1f8c2f8553300e4559d26f9e539d7f8202952ba282f4e57029",
   "files": [
@@ -2610,7 +2610,6 @@
     "netwerk/base/nsURLParsers.cpp",
     "netwerk/base/nsURLParsers.h",
     "netwerk/base/rust-helper/moz.build",
-    "netwerk/base/ssl_tokens_cache/moz.build",
     "netwerk/base/uritemplate_glue/UriTemplate.h",
     "netwerk/base/uritemplate_glue/moz.build",
     "netwerk/build/moz.build",
@@ -5170,6 +5169,7 @@
     "taskcluster/kinds/source-test/android-l10n-lint.yml",
     "taskcluster/kinds/source-test/android-lint.yml",
     "taskcluster/kinds/source-test/buildconfig.yml",
+    "taskcluster/kinds/source-test/clang-tidy.yml",
     "taskcluster/kinds/source-test/clang.yml",
     "taskcluster/kinds/source-test/doc.yml",
     "taskcluster/kinds/source-test/file-metadata.yml",
@@ -9900,7 +9900,6 @@
     "xpcom/build/Omnijar.h",
     "xpcom/build/PoisonIOInterposer.h",
     "xpcom/build/PoisonIOInterposerStub.cpp",
-    "xpcom/build/Services.py",
     "xpcom/build/SmallArrayLRUCache.h",
     "xpcom/build/StaticXREAppData.h",
     "xpcom/build/XPCOMInit.cpp",
@@ -9918,6 +9917,8 @@
     "xpcom/components/ManifestParser.cpp",
     "xpcom/components/Module.h",
     "xpcom/components/ModuleUtils.h",
+    "xpcom/components/Services.cpp",
+    "xpcom/components/Services.h",
     "xpcom/components/StaticComponents.cpp.in",
     "xpcom/components/gen_static_components.py",
     "xpcom/components/moz.build",
@@ -10333,10 +10334,10 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
+  "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "86a83d7d84878dab7a4013e8b9c2924de9755ccf5452402ec78e2547cc9facb4",
-  "naivefox_reference_commit": "758c8724469107034736d1a71296a07ffa097900",
+  "naivefox_reference_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
   "observed_directories": [
     "browser",
     "build",
@@ -13551,6 +13552,7 @@
     "mobile/android/android-components/components/feature/downloads/src/main/res/values-lij",
     "mobile/android/android-components/components/feature/downloads/src/main/res/values-lo",
     "mobile/android/android-components/components/feature/downloads/src/main/res/values-lt",
+    "mobile/android/android-components/components/feature/downloads/src/main/res/values-lv",
     "mobile/android/android-components/components/feature/downloads/src/main/res/values-meh",
     "mobile/android/android-components/components/feature/downloads/src/main/res/values-mix",
     "mobile/android/android-components/components/feature/downloads/src/main/res/values-ml",
@@ -17491,6 +17493,7 @@
     "mobile/android/android-components/components/support/ktx/src/test/java/mozilla/components/support/ktx/util",
     "mobile/android/android-components/components/support/ktx/src/test/resources",
     "mobile/android/android-components/components/support/ktx/src/test/resources/mockito-extensions",
+    "mobile/android/android-components/components/support/ktx/src/test/resources/png",
     "mobile/android/android-components/components/support/license",
     "mobile/android/android-components/components/support/license/src",
     "mobile/android/android-components/components/support/license/src/main",
@@ -19402,6 +19405,7 @@
     "mobile/android/fenix/app/src/test/java/org/mozilla/fenix/wifi",
     "mobile/android/fenix/app/src/test/resources",
     "mobile/android/fenix/app/src/test/resources/mockito-extensions",
+    "mobile/android/fenix/app/src/test/resources/png",
     "mobile/android/fenix/app/src/test/resources/raw",
     "mobile/android/fenix/benchmark",
     "mobile/android/fenix/benchmark/src",
@@ -20024,7 +20028,6 @@
     "netwerk/base/idna_glue",
     "netwerk/base/mozurl",
     "netwerk/base/rust-helper",
-    "netwerk/base/ssl_tokens_cache",
     "netwerk/base/uritemplate_glue",
     "netwerk/cookie",
     "netwerk/dns",
@@ -21398,11 +21401,11 @@
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "758c8724469107034736d1a71296a07ffa097900",
+  "source_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "android-aarch64",
   "target_triple": "aarch64-unknown-linux-android",
-  "trace_sha256": "6c8b1c877af8f0fd3a43bbc7bb54685e1ba5ab5068a9797113ec7a6272c5b7c3",
-  "trace_size_bytes": 28750677
+  "trace_sha256": "948cc68c7bc2afbe9b4b03ea508d47fd2ea24d8707eb00560f34af27020234bf",
+  "trace_size_bytes": 28810695
 }

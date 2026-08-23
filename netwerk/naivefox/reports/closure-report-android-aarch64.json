@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "758c8724469107034736d1a71296a07ffa097900",
+    "source_commit_sha": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
     "source_worktree_clean": true,
-    "firefox_base_sha": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-    "naivefox_reference_sha": "758c8724469107034736d1a71296a07ffa097900",
+    "firefox_base_sha": "44e151427db27db6b789e3be5439f0edbcf446de",
+    "naivefox_reference_sha": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
     "analyzer_sha256": "f5fc1ae9c8b65ce6532989afae3422b0f9cdc727e9c39e5cdff890d8ad53ec9c",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "71d7a93b99c6bd1f8c2f8553300e4559d26f9e539d7f8202952ba282f4e57029",
@@ -21,22 +21,22 @@
   },
   "summary": {
     "cxx_translation_units_count": 462,
-    "direct_link_objects_count": 537,
-    "unstripped_link_objects_bytes": 253526496,
-    "unstripped_link_objects_mb": 241.78,
+    "direct_link_objects_count": 536,
+    "unstripped_link_objects_bytes": 253455736,
+    "unstripped_link_objects_mb": 241.71,
     "static_libraries_count": 2,
     "spidermonkey_static_present": false,
-    "libxul_size_bytes": 270444208,
+    "libxul_size_bytes": 269851936,
     "naivefox_bin_size_bytes": 0,
-    "reachable_rust_crates_count": 270,
+    "reachable_rust_crates_count": 268,
     "dynamic_dependencies_count": 8,
     "staged_runtime_files_count": 8
   },
   "component_groups": {
     "netwerk": {
       "files": 65,
-      "bytes": 101278552,
-      "mb": 96.59
+      "bytes": 101291216,
+      "mb": 96.6
     },
     "config": {
       "files": 369,
@@ -44,33 +44,33 @@
       "mb": 46.15
     },
     "xpcom": {
-      "files": 29,
-      "bytes": 36330808,
-      "mb": 34.65
+      "files": 28,
+      "bytes": 36266144,
+      "mb": 34.59
     },
     "modules": {
       "files": 23,
-      "bytes": 22718704,
-      "mb": 21.67
+      "bytes": 22697856,
+      "mb": 21.65
     },
     "ipc": {
       "files": 10,
-      "bytes": 14069784,
+      "bytes": 14068936,
       "mb": 13.42
     },
     "security": {
       "files": 17,
-      "bytes": 12989520,
+      "bytes": 12988240,
       "mb": 12.39
     },
     "intl": {
       "files": 8,
-      "bytes": 6715424,
-      "mb": 6.4
+      "bytes": 6717976,
+      "mb": 6.41
     },
     "storage": {
       "files": 4,
-      "bytes": 6429368,
+      "bytes": 6428592,
       "mb": 6.13
     },
     "mozglue": {
@@ -80,12 +80,12 @@
     },
     "caps": {
       "files": 2,
-      "bytes": 1193464,
+      "bytes": 1193304,
       "mb": 1.14
     },
     "chrome": {
       "files": 1,
-      "bytes": 879880,
+      "bytes": 882480,
       "mb": 0.84
     },
     "third_party": {
@@ -574,8 +574,8 @@
     },
     {
       "path": "objdir/aarch64-linux-android/release/libgkrust.a",
-      "size_bytes": 259963702,
-      "member_count": 1849,
+      "size_bytes": 258948634,
+      "member_count": 1828,
       "members": [
         "14ccb540ef15e05f-lse_cas16_acq.o",
         "14ccb540ef15e05f-lse_cas16_acq_rel.o",
@@ -743,7 +743,6 @@
         "abridged_certs-1a9a6a15cdfa10f2.edjebuvie2ejphqbk0445098x.0dga3xl.rcgu.o",
         "addr2line-63f1fc50a15d526f.addr2line.986fb0d9774b7269-cgu.0.rcgu.o",
         "adler2-35b120d97660b71a.adler2.ee9d24a8a270b659-cgu.0.rcgu.o",
-        "adler2-dce6050e76165e35.adler2.40dc1d8bf739510d-cgu.0.rcgu.o",
         "aho_corasick-47779a3d861865de.aho_corasick.6ef421aed3652f04-cgu.00.rcgu.o",
         "aho_corasick-47779a3d861865de.aho_corasick.6ef421aed3652f04-cgu.01.rcgu.o",
         "aho_corasick-47779a3d861865de.aho_corasick.6ef421aed3652f04-cgu.02.rcgu.o",
@@ -799,57 +798,57 @@
         "bytes-42a057a2ab2191f5.bytes.3196924568bf9d67-cgu.1.rcgu.o",
         "calendrical_calculations-a1c967eca1220f26.calendrical_calculations.5fcae3e5db5c1c90-cgu.0.rcgu.o",
         "calendrical_calculations-a1c967eca1220f26.calendrical_calculations.5fcae3e5db5c1c90-cgu.1.rcgu.o",
-        "cert_storage-bb13cae7231b5805.0gejh9x3heyzt9o5zjnw85zna.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.17mikv3snvgk2awq3oyzabzpq.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.1dphfuodv8ub9l3yb2nkfkq93.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.1j3yupv5pydwkwlrpjcutgrk6.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.21cdn3uanowf90hz0ae7yxn9g.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.30crx5btizo69zqph12hopbur.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.3a4x6yj2mszrgbtghy9ay44bv.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.3qgsykf17psy73pttascxksyr.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.3y8qnv33q5goqs5z4w3sb6l44.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.425fo0pyh6vj8lg4vfr83plvz.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.47ba0a649vj06y3vi5mqpa435.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.4ewcrjxkmilct1g1bywicx4tk.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.4wwitg9n6j0bi541caeyu74kh.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.57p9dd2v12n94zxx6hgj530il.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.5f4xnldvave5zf7sp0ayuqtcg.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.5jjx21nj6tmhy8p1fpqgat7tc.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.5l8ztlyqciadud6m9ck39qw1f.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.5wb57hembp7ilyvclvz6mci7v.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.60u00e8kawdzim35z9bkfnsgs.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.6fff1u5cnt81z6g2x406l4fqj.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.6iwmq42b0j88efnou32kd746e.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.72mru7gft8osutzppo6cdkb2g.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.7nvzpq4mtiuurxkllzbcdz15c.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.811gwhw9bv1x5rir06myb9bhp.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.89w1f4o6zwajipb846osnapy7.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.8eur1delrghjmvwju7zdj7xx3.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.8he77j1sdw6vamrfgn8z60fo3.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.8i5bzjy4ggrhwyvc1fp7a83z3.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.8okj8kr2ta4qdvvbnuj0l14ud.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.8rjxfnnlobfo94ntp88yulh8u.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.9fj055bybclqudhs4nxxb9fjk.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.9ialjgfd3f2nmbxfafasl3188.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.ag1c61dx5wub6jdwdr1g0rv63.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.b7z9ckj5zgtr0lp5i220cmgkv.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.bc70z2jyevrtp90hrrgcl0vw9.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.bhnlg6yjly6xr68kqrhcv7bt7.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.bo0idc1cz3d69qkgmhiacsjig.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.bxvak1a4zhhhxl5v3xxmqo02a.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.c0r0btk6fa1l9awu68dlgf64e.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.c3padopl5xjeaq30yydxnnvkg.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.c56s4rznjk9z9tkuv3ei5yxuo.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.cox75qkcgknz9v1s5uc4kiipy.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.cu9971ntspi3ipzy0xg7bqcts.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.cyhk93gsoe1h2dw0c9st9lu1e.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.dav0wx24f1p851vx3zpaoydos.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.djc5ayfotk62fau3x90tfphby.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.dnv75tuwnzc2qbtag5jx6s375.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.dq05bidress9ck6cr7sw2xr9r.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.dwt84ppot9l9cietpz7objxbj.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.exv047173381w0iijy9yrbvh7.12dyc0l.rcgu.o",
-        "cert_storage-bb13cae7231b5805.f3p4gzwsth7ehyvwolev8wuv0.12dyc0l.rcgu.o",
+        "cert_storage-bb13cae7231b5805.0gejh9x3heyzt9o5zjnw85zna.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.17mikv3snvgk2awq3oyzabzpq.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.1dphfuodv8ub9l3yb2nkfkq93.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.1j3yupv5pydwkwlrpjcutgrk6.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.21cdn3uanowf90hz0ae7yxn9g.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.30crx5btizo69zqph12hopbur.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.3a4x6yj2mszrgbtghy9ay44bv.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.3qgsykf17psy73pttascxksyr.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.3y8qnv33q5goqs5z4w3sb6l44.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.425fo0pyh6vj8lg4vfr83plvz.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.47ba0a649vj06y3vi5mqpa435.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.4ewcrjxkmilct1g1bywicx4tk.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.4wwitg9n6j0bi541caeyu74kh.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.57p9dd2v12n94zxx6hgj530il.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.5f4xnldvave5zf7sp0ayuqtcg.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.5jjx21nj6tmhy8p1fpqgat7tc.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.5l8ztlyqciadud6m9ck39qw1f.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.5wb57hembp7ilyvclvz6mci7v.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.60u00e8kawdzim35z9bkfnsgs.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.6fff1u5cnt81z6g2x406l4fqj.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.6iwmq42b0j88efnou32kd746e.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.72mru7gft8osutzppo6cdkb2g.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.7nvzpq4mtiuurxkllzbcdz15c.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.811gwhw9bv1x5rir06myb9bhp.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.89w1f4o6zwajipb846osnapy7.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.8eur1delrghjmvwju7zdj7xx3.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.8he77j1sdw6vamrfgn8z60fo3.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.8i5bzjy4ggrhwyvc1fp7a83z3.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.8okj8kr2ta4qdvvbnuj0l14ud.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.8rjxfnnlobfo94ntp88yulh8u.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.9fj055bybclqudhs4nxxb9fjk.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.9ialjgfd3f2nmbxfafasl3188.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.ag1c61dx5wub6jdwdr1g0rv63.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.b7z9ckj5zgtr0lp5i220cmgkv.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.bc70z2jyevrtp90hrrgcl0vw9.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.bhnlg6yjly6xr68kqrhcv7bt7.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.bo0idc1cz3d69qkgmhiacsjig.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.bxvak1a4zhhhxl5v3xxmqo02a.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.c0r0btk6fa1l9awu68dlgf64e.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.c3padopl5xjeaq30yydxnnvkg.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.c56s4rznjk9z9tkuv3ei5yxuo.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.cox75qkcgknz9v1s5uc4kiipy.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.cu9971ntspi3ipzy0xg7bqcts.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.cyhk93gsoe1h2dw0c9st9lu1e.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.dav0wx24f1p851vx3zpaoydos.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.djc5ayfotk62fau3x90tfphby.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.dnv75tuwnzc2qbtag5jx6s375.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.dq05bidress9ck6cr7sw2xr9r.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.dwt84ppot9l9cietpz7objxbj.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.exv047173381w0iijy9yrbvh7.18kdds2.rcgu.o",
+        "cert_storage-bb13cae7231b5805.f3p4gzwsth7ehyvwolev8wuv0.18kdds2.rcgu.o",
         "cfg_if-09640c9106be7bd2.cfg_if.12313a9cd5dd78ef-cgu.0.rcgu.o",
         "cfg_if-8d859d84da9792c7.cfg_if.21b7de55d16025a3-cgu.0.rcgu.o",
         "clubcard-aea749b6efaff69b.clubcard.657753ffb3e721da-cgu.0.rcgu.o",
@@ -1347,15 +1346,15 @@
         "getrandom-081cd62774fa3e19.0zfaqr82g0rf993idwqpfmny8.1v3kjp8.rcgu.o",
         "getrandom-b9a480b59aababab.getrandom.1a89d7349d7fefbc-cgu.0.rcgu.o",
         "gimli-6fc8fa945ee19445.gimli.7176d986371bc636-cgu.0.rcgu.o",
-        "gkrust-f31d0c805d6dfd57.bqki4vnr9k4rgqyxdkxcrighq.1ashb0d.rcgu.o",
-        "gkrust-f31d0c805d6dfd57.dmjaxo5nkvc1zxthcur4wy26y.1ashb0d.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.0ch860mcltfyrfpvuciefxkcx.0cr7g0x.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.1bn1yhu4g8nwgotiduq5c4wz4.0cr7g0x.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.45z7v35iakk78q158bcjvlygm.0cr7g0x.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.5t2107xg3kz03mbir4kz8vq7w.0cr7g0x.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.77uq6sac5hja199sl07crz984.0cr7g0x.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.d1t7pe87aj1o5yqmc3l3t8ygc.0cr7g0x.rcgu.o",
-        "gkrust_naivefox-d1a78b7bb5b75f53.e1jwh1rkeck6vupsm0cjiakwm.0cr7g0x.rcgu.o",
+        "gkrust-77f993eb01609731.9hgwnw4ob3aql34p9j5nbi7fn.0wh1g0f.rcgu.o",
+        "gkrust-77f993eb01609731.bzsuk1ht6hfa95rfi6qzsrtlp.0wh1g0f.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.04kmfmwsawfca9vumn42nqejw.1ho1yrl.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.0sogzr2j93fzo1agg6mzb8nj6.1ho1yrl.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.352bp5yz5uxkrqp9m463w2b8w.1ho1yrl.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.5q49i4f5st3tc1o0aywyy3orb.1ho1yrl.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.5qukcuvf2dgsbgti6gwf7ui2q.1ho1yrl.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.9l5ox76z7jb4wyt0tuwq6ifxr.1ho1yrl.rcgu.o",
+        "gkrust_naivefox-09b406a879e07550.dywov6u1ddejn8zyt1lx0pljz.1ho1yrl.rcgu.o",
         "gkrust_utils-93933b3a13ea781d.8isjutj123yzliix743a1mzek.0vea7yq.rcgu.o",
         "gkrust_utils-93933b3a13ea781d.9fo0ld0vq3i4bd30q1sm6x3fb.0vea7yq.rcgu.o",
         "gkrust_utils-93933b3a13ea781d.b03hpqq677v1v60om79wncqec.0vea7yq.rcgu.o",
@@ -1367,26 +1366,26 @@
         "happy_eyeballs-6a9283963e752951.happy_eyeballs.8a86ed2e6d1de5f7-cgu.4.rcgu.o",
         "happy_eyeballs-6a9283963e752951.happy_eyeballs.8a86ed2e6d1de5f7-cgu.5.rcgu.o",
         "happy_eyeballs-6a9283963e752951.happy_eyeballs.8a86ed2e6d1de5f7-cgu.6.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.1td9j9ugipb9asrda8vahnq2v.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.4trhhh8x9nn41ov4kht7qg1o2.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.5923x6gq1m3sgng1mn4jlexjc.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.68d22hddneir79s10ifsvnfsb.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.6f44i2mrcz22tndj8y3jbbrto.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.6y20somej033eo8rfxqc3hmlc.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.7gjc5y2x7wkwoh32i8slhb0pt.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.8hv9q5vwegoeo0omgw18oosnc.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.8inwdhnxwj0m9w7lpglwz2dfx.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.90xrgf8rq0fizb4trm7xhm78c.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.a1gr0epcz6v8da9hxqbtmr6pg.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.awnpe3tohskfgrgzn2katnofs.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.bax3as3xjtaxh3o33pq51qx4y.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.bnnfpfwiqxmpm2qrwu7avvozi.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.btthrpwkesfrz15kextopbh94.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.c2492xur5civl2txz2puygoyh.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.d6oixyyblkiknppofuxymu7th.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.e3djdwg9k9ru93qygnmtm981u.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.e9a7uyw05431rfa2tc44lbitr.0citk4n.rcgu.o",
-        "happy_eyeballs_glue-ff0ad048c2a0d676.el28qgsgb9nvkzumvrv0l6x8r.0citk4n.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.1td9j9ugipb9asrda8vahnq2v.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.4trhhh8x9nn41ov4kht7qg1o2.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.5923x6gq1m3sgng1mn4jlexjc.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.68d22hddneir79s10ifsvnfsb.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.6f44i2mrcz22tndj8y3jbbrto.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.6y20somej033eo8rfxqc3hmlc.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.7gjc5y2x7wkwoh32i8slhb0pt.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.8hv9q5vwegoeo0omgw18oosnc.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.8inwdhnxwj0m9w7lpglwz2dfx.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.90xrgf8rq0fizb4trm7xhm78c.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.a1gr0epcz6v8da9hxqbtmr6pg.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.awnpe3tohskfgrgzn2katnofs.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.bax3as3xjtaxh3o33pq51qx4y.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.bnnfpfwiqxmpm2qrwu7avvozi.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.btthrpwkesfrz15kextopbh94.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.c2492xur5civl2txz2puygoyh.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.d6oixyyblkiknppofuxymu7th.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.e3djdwg9k9ru93qygnmtm981u.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.e9a7uyw05431rfa2tc44lbitr.1d4b20y.rcgu.o",
+        "happy_eyeballs_glue-ff0ad048c2a0d676.el28qgsgb9nvkzumvrv0l6x8r.1d4b20y.rcgu.o",
         "hashbrown-033a93b8912e42b7.hashbrown.f2eca8d9b508e952-cgu.0.rcgu.o",
         "hashbrown-64c21498d94e8c66.1ql30xmht611o1yd6d6vlcr6d.04caez8.rcgu.o",
         "hashbrown-d50f719a086fe79f.hashbrown.44cc959913a14489-cgu.0.rcgu.o",
@@ -1751,114 +1750,114 @@
         "mozglue_static-a16e04f1c7c33da1.4vio5k68pa4frnzd2yr2bdvek.1da80ei.rcgu.o",
         "mozglue_static-a16e04f1c7c33da1.7q54c2lz7b753r224nxncqmrx.1da80ei.rcgu.o",
         "mozglue_static-a16e04f1c7c33da1.eco2gjtvme3izjnlw5tbgp32l.1da80ei.rcgu.o",
-        "mozurl-43f0536c1a2eccae.00wzi1czf33f0xxdi1llm1hvm.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.0fx4edqiccorlbjkk2ji0ixyp.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.3dhkhqst2h8oge02racfnlacn.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.3p775r97fht2j8nnteziix1sc.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.414bwges6ezxb3u97mtktzqfr.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.4dizuxtk919qebzwfy784290d.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.72sdg4rxnmtcm5cotgv466xgv.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.9o179az3fa17gojjazbv7g9p0.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.cz7hchv61lb6wv8mfh1gqp9bm.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.driof35cptgcg6ppj5butx5qh.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.e059d3xxvu3ufz3e180qx6gin.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.e2kqakc3rkfh7fuixnaqkghqs.1hr8lu4.rcgu.o",
-        "mozurl-43f0536c1a2eccae.eb82ekrqo9zmlog0unldxife1.1hr8lu4.rcgu.o",
+        "mozurl-43f0536c1a2eccae.00wzi1czf33f0xxdi1llm1hvm.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.0fx4edqiccorlbjkk2ji0ixyp.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.3dhkhqst2h8oge02racfnlacn.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.3p775r97fht2j8nnteziix1sc.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.414bwges6ezxb3u97mtktzqfr.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.4dizuxtk919qebzwfy784290d.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.72sdg4rxnmtcm5cotgv466xgv.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.9o179az3fa17gojjazbv7g9p0.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.cz7hchv61lb6wv8mfh1gqp9bm.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.driof35cptgcg6ppj5butx5qh.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.e059d3xxvu3ufz3e180qx6gin.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.e2kqakc3rkfh7fuixnaqkghqs.18uhxsx.rcgu.o",
+        "mozurl-43f0536c1a2eccae.eb82ekrqo9zmlog0unldxife1.18uhxsx.rcgu.o",
         "mtu-5b64d6add1ed9795.mtu.3c32de63abd6adbf-cgu.0.rcgu.o",
         "neqo_common-2ca18d28a3a23173.neqo_common.e352628cdb89a105-cgu.0.rcgu.o",
         "neqo_common-2ca18d28a3a23173.neqo_common.e352628cdb89a105-cgu.1.rcgu.o",
         "neqo_common-2ca18d28a3a23173.neqo_common.e352628cdb89a105-cgu.2.rcgu.o",
         "neqo_common-2ca18d28a3a23173.neqo_common.e352628cdb89a105-cgu.3.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.004tz7jtftn3vjar41urgkop0.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.0aljou2anoynl4eeehsnnwxtm.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.0fh2j4b94i1ie3cjb9j2czxyh.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.0jinhnq99gwkhiytywbsj68i0.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.0rx4x5q8ltthfzdv0pnlgg8sf.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.133di16t0qiwkr9fdg1f6fikp.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.15cc0w1dy2qtykr6z63z14e12.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.1888qytockzfw16d1a89ckqvy.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.1j0qqsohivfsy4v393jl78t8k.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.21o5w4h6l6pvfjrvlqa6fvm49.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.252dxrtuybf45j03geyyd5fm2.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.26551lwr1f0ae3qesktf29je7.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.27dmbx5crzfb2q7zc29y52cij.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2eoa437w791dpa5kaih5bmmxb.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2mjkl500tzr39akzp8vtmzvv2.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2op7yo83ngp1a2kyp7xfl5bmp.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2qnjk1sasy3na6nk70cgscv6r.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2rt36hozlwlkkptf2rkms20ib.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2t1dgiox6aatknv91kpyyb76r.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.2ty9ce5b4jhkf444nm4gqfuvh.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.3201eylro3b3ent5q9ridix5h.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.3eb058hq7qhjs1tfz1z0a56in.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.3mom93cvrk6vwx0a2shewef2z.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.3qktbx9rrzyk2rh32319u77k1.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.3qyib1isif3vkmpgbe8yf260a.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.3wnhln2sjewk6wx5vnalpi5dr.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.40kpovd4zcb64pvazk0wkqf3n.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.443qixomcznabbs7paokeuui5.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.4boi99xeevy4u431u6kctp607.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.4bqcnrm0mb5mv8omocna08gt7.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.4k3xaimo3gikzsncusgablflm.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.4n1ipnynd5xqwhpjidvj16xym.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.59novbdmie6ko4hny6d3ic56r.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.5bb0fezbzpx4sqp0l7hc71te4.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.5wdhwazzf310xngq2t3exs1y0.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.5wobngvdkpr5fn0iwcce6h6lx.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.5xsvukbllyfgwqw8fpxp311aa.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.65vaaqth43vv7pknkdki9d3fo.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.6g5a600szyhq2ukv6al901zzx.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.6lbnlpzqtp0hit8kbj4fypvan.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.6m0gujtg2t1nqt13q47anqie2.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.6meah7rpbjdych98h6e1uhhgz.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.6r9twynf3jcch4svgck8omsu7.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.7czzjcvsre8ilrggqy2rqwtpp.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.7fl7nm1t54xkvvxj4kwfrqamb.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.7i14ldmtqk69ai9duyvbj2lac.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.7nuo06lc0gnzkz12hcvzg6sv0.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.7wyz1324d1bhh2yw5vp49chxm.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.7xsxv11meg3u9rix1v1bgvqw7.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.86rvmzf09fpmhlu6elsafivwd.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.8ut4vxauwqeuz9v8lsgsmcn92.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.8v34ojyqxl1j4auz31chgtgc3.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.925zakrnyhwgrd2hkf80au1ez.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.9c3ucgllhddfw7avah1iq7cy0.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.9r5vagmzladxg3difukadujf2.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.9u3c0ecbb9vmi3phr0azrl7ic.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.9y7ri1tf6mi348koy74trv2r6.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.a3u7cn3ki9h9dcwvv1aaxh5dz.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.a5iurn9tnojijtgby2pomxnea.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.a5uhbv3w9zzuuxkgi4m68q245.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.a7tidojr2rky0iwaducuvpqaw.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.a9dgfimovzotycdv88zhcv80y.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.aa1l8o2k6dowuoogi5cwopcun.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.aey31t95ffjfp6252x4uoagmj.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.agnfjd7yjkpsd1axq95aviuhq.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.azqhpotgilqgv9r997zm83oml.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.b0eugusqh3e87tbzqw11l6bsh.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.b5juestll9m3hi1oq5eg6bh0c.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.c1m32k5jmqqklwpa55xmkqoow.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.c7e44qkgiomkxzhcdwyitldys.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.cs45009u2vx1dvt4qd1hbtydn.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.cx0ntttwtuboai557no5z92ef.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.cyql5rwzgsup3wcf1tjcksqze.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.d2a6g3fz8qf3eciy4dl0p6k9v.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.d62lknynnnermze1dwd2llxj6.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.d7rhihl3or75xiuqei1k946g6.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.day2womfhgl23ywi1afg60cmt.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.dexmj6hc4cyspgz37eqah8qpo.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.djehhm4s3zp76sl63mj9v31r5.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.do5pag0k7lxnibpf7m9hfuomb.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.dojg78uxgbv2lei2nm8rr47m7.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.e6noqggcpzn8swaxmeut66pue.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.egyd7cezwnxbxlwqloyds898c.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.eki1i3f250eqgkh59majb5ox8.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.emrnjgvyowus4osr53uzkbmb3.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.en405p6sq8j7qdtf5c4uj7d4q.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.eoni5w70t0pw1m2eziprxlzvb.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.esvly5x77yy9upqnlkiwzuxgc.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.eucgbymrbyumruq7zm30ky29z.12s50ua.rcgu.o",
-        "neqo_glue-47cab19beb7fc7b0.eve4mqkql9ewpfhd2uvujojg3.12s50ua.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.004tz7jtftn3vjar41urgkop0.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.0aljou2anoynl4eeehsnnwxtm.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.0fh2j4b94i1ie3cjb9j2czxyh.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.0jinhnq99gwkhiytywbsj68i0.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.0rx4x5q8ltthfzdv0pnlgg8sf.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.133di16t0qiwkr9fdg1f6fikp.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.15cc0w1dy2qtykr6z63z14e12.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.1888qytockzfw16d1a89ckqvy.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.1j0qqsohivfsy4v393jl78t8k.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.21o5w4h6l6pvfjrvlqa6fvm49.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.252dxrtuybf45j03geyyd5fm2.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.26551lwr1f0ae3qesktf29je7.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.27dmbx5crzfb2q7zc29y52cij.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2eoa437w791dpa5kaih5bmmxb.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2mjkl500tzr39akzp8vtmzvv2.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2op7yo83ngp1a2kyp7xfl5bmp.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2qnjk1sasy3na6nk70cgscv6r.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2rt36hozlwlkkptf2rkms20ib.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2t1dgiox6aatknv91kpyyb76r.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.2ty9ce5b4jhkf444nm4gqfuvh.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.3201eylro3b3ent5q9ridix5h.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.3eb058hq7qhjs1tfz1z0a56in.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.3mom93cvrk6vwx0a2shewef2z.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.3qktbx9rrzyk2rh32319u77k1.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.3qyib1isif3vkmpgbe8yf260a.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.3wnhln2sjewk6wx5vnalpi5dr.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.40kpovd4zcb64pvazk0wkqf3n.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.443qixomcznabbs7paokeuui5.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.4boi99xeevy4u431u6kctp607.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.4bqcnrm0mb5mv8omocna08gt7.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.4k3xaimo3gikzsncusgablflm.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.4n1ipnynd5xqwhpjidvj16xym.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.59novbdmie6ko4hny6d3ic56r.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.5bb0fezbzpx4sqp0l7hc71te4.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.5wdhwazzf310xngq2t3exs1y0.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.5wobngvdkpr5fn0iwcce6h6lx.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.5xsvukbllyfgwqw8fpxp311aa.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.65vaaqth43vv7pknkdki9d3fo.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.6g5a600szyhq2ukv6al901zzx.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.6lbnlpzqtp0hit8kbj4fypvan.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.6m0gujtg2t1nqt13q47anqie2.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.6meah7rpbjdych98h6e1uhhgz.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.6r9twynf3jcch4svgck8omsu7.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.7czzjcvsre8ilrggqy2rqwtpp.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.7fl7nm1t54xkvvxj4kwfrqamb.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.7i14ldmtqk69ai9duyvbj2lac.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.7nuo06lc0gnzkz12hcvzg6sv0.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.7wyz1324d1bhh2yw5vp49chxm.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.7xsxv11meg3u9rix1v1bgvqw7.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.86rvmzf09fpmhlu6elsafivwd.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.8ut4vxauwqeuz9v8lsgsmcn92.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.8v34ojyqxl1j4auz31chgtgc3.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.925zakrnyhwgrd2hkf80au1ez.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.9c3ucgllhddfw7avah1iq7cy0.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.9r5vagmzladxg3difukadujf2.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.9u3c0ecbb9vmi3phr0azrl7ic.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.9y7ri1tf6mi348koy74trv2r6.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.a3u7cn3ki9h9dcwvv1aaxh5dz.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.a5iurn9tnojijtgby2pomxnea.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.a5uhbv3w9zzuuxkgi4m68q245.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.a7tidojr2rky0iwaducuvpqaw.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.a9dgfimovzotycdv88zhcv80y.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.aa1l8o2k6dowuoogi5cwopcun.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.aey31t95ffjfp6252x4uoagmj.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.agnfjd7yjkpsd1axq95aviuhq.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.azqhpotgilqgv9r997zm83oml.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.b0eugusqh3e87tbzqw11l6bsh.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.b5juestll9m3hi1oq5eg6bh0c.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.c1m32k5jmqqklwpa55xmkqoow.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.c7e44qkgiomkxzhcdwyitldys.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.cs45009u2vx1dvt4qd1hbtydn.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.cx0ntttwtuboai557no5z92ef.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.cyql5rwzgsup3wcf1tjcksqze.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.d2a6g3fz8qf3eciy4dl0p6k9v.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.d62lknynnnermze1dwd2llxj6.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.d7rhihl3or75xiuqei1k946g6.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.day2womfhgl23ywi1afg60cmt.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.dexmj6hc4cyspgz37eqah8qpo.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.djehhm4s3zp76sl63mj9v31r5.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.do5pag0k7lxnibpf7m9hfuomb.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.dojg78uxgbv2lei2nm8rr47m7.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.e6noqggcpzn8swaxmeut66pue.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.egyd7cezwnxbxlwqloyds898c.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.eki1i3f250eqgkh59majb5ox8.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.emrnjgvyowus4osr53uzkbmb3.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.en405p6sq8j7qdtf5c4uj7d4q.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.eoni5w70t0pw1m2eziprxlzvb.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.esvly5x77yy9upqnlkiwzuxgc.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.eucgbymrbyumruq7zm30ky29z.08xyquq.rcgu.o",
+        "neqo_glue-47cab19beb7fc7b0.eve4mqkql9ewpfhd2uvujojg3.08xyquq.rcgu.o",
         "neqo_http3-da66af9d5f1feb21.neqo_http3.8c799735c6198a61-cgu.00.rcgu.o",
         "neqo_http3-da66af9d5f1feb21.neqo_http3.8c799735c6198a61-cgu.01.rcgu.o",
         "neqo_http3-da66af9d5f1feb21.neqo_http3.8c799735c6198a61-cgu.02.rcgu.o",
@@ -1970,14 +1969,14 @@
         "parking_lot-9c1a76bad98df41d.parking_lot.b3e6e6ab48cd6b4b-cgu.1.rcgu.o",
         "parking_lot-9c1a76bad98df41d.parking_lot.b3e6e6ab48cd6b4b-cgu.2.rcgu.o",
         "parking_lot_core-f0cd15373ed7a224.parking_lot_core.6c2241de788b7a49-cgu.0.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.0f7w601et24a7smt3g9r88hmd.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.4pvy1s8xqoqg8p809xgqfmzz2.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.4yqlf6i9u3f4rxjc9xh73ctwi.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.9yzqtnirk0cskuovd61kt52p3.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.a3hlu8wg354eer1kjhv39lwhz.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.ct2e7gnkkaw4zpz3vyikskt7x.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.dlzzh523jsiumtlgjt0ix2n2p.01u3ur4.rcgu.o",
-        "pdf_trust_anchors-18546da18538cbc7.elkvqvswopev1a87d2imtfhsv.01u3ur4.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.0f7w601et24a7smt3g9r88hmd.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.4pvy1s8xqoqg8p809xgqfmzz2.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.4yqlf6i9u3f4rxjc9xh73ctwi.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.9yzqtnirk0cskuovd61kt52p3.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.a3hlu8wg354eer1kjhv39lwhz.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.ct2e7gnkkaw4zpz3vyikskt7x.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.dlzzh523jsiumtlgjt0ix2n2p.0qmtrwj.rcgu.o",
+        "pdf_trust_anchors-18546da18538cbc7.elkvqvswopev1a87d2imtfhsv.0qmtrwj.rcgu.o",
         "percent_encoding-3f4b94854a292b51.percent_encoding.804a31571504312a-cgu.0.rcgu.o",
         "pin_project_lite-6e8d430af161871c.pin_project_lite.9ecbf4903b715566-cgu.0.rcgu.o",
         "pkcs11_bindings-749dfda9a5eb3559.pkcs11_bindings.f9d2672364a86926-cgu.0.rcgu.o",
@@ -2014,14 +2013,14 @@
         "qlog-c234794e28cca161.qlog.49ac937c292c55c9-cgu.10.rcgu.o",
         "qlog-c234794e28cca161.qlog.49ac937c292c55c9-cgu.11.rcgu.o",
         "quinn_udp-064f055bbd0e1970.quinn_udp.c7d8b4ca351bb589-cgu.0.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.1eg7kc6q4mkokhwa7imj90d47.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.21s611ve9o61tzc4r393z1rc4.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.2bul0cz8bcctbfbwzhuqj399a.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.9fqzkj7l3a4wxzwopcy3nz2vh.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.9qtx7gkc8px8vx7f9hg8k5otd.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.aa8ep5am0mtuaga6uvbyixopb.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.c2neso8zn2ay3h0a2ww4fz20d.1riord7.rcgu.o",
-        "qwac_trust_anchors-31d33a5640b994d2.dvc1oeea26bh7na8mg2tbuvpk.1riord7.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.1eg7kc6q4mkokhwa7imj90d47.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.21s611ve9o61tzc4r393z1rc4.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.2bul0cz8bcctbfbwzhuqj399a.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.9fqzkj7l3a4wxzwopcy3nz2vh.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.9qtx7gkc8px8vx7f9hg8k5otd.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.aa8ep5am0mtuaga6uvbyixopb.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.c2neso8zn2ay3h0a2ww4fz20d.0juqnou.rcgu.o",
+        "qwac_trust_anchors-31d33a5640b994d2.dvc1oeea26bh7na8mg2tbuvpk.0juqnou.rcgu.o",
         "ref_cast-f18b99f3bdf077e5.ref_cast.bb0b6eb4ed1e46c-cgu.0.rcgu.o",
         "regex-16ded25e10cc565b.regex.e6e0aa67d7aa84e2-cgu.0.rcgu.o",
         "regex-16ded25e10cc565b.regex.e6e0aa67d7aa84e2-cgu.1.rcgu.o",
@@ -2113,29 +2112,9 @@
         "smallvec-9bb7cbd1542a9bff.smallvec.10039f8effa4a779-cgu.0.rcgu.o",
         "socket2-33a0b7bff79be35c.socket2.d9d9333106f5f61-cgu.0.rcgu.o",
         "socket2-33a0b7bff79be35c.socket2.d9d9333106f5f61-cgu.1.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.0kkui4ny7udljkbokvla76aae.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.0mgfbfce045ogwpbz360jnfp4.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.13hkm9xypijie58m0ws4omwkw.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.2j3kvsxfuq9jtsewnnj13c0nu.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.2v2nhwk44l2cualege1byckqj.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.4wmjfr8n14g466oefmnavkha9.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.5ckrydf2wybn3l0hz2dpsbi1w.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.64a8yupb24phms8fwqr8yjq0a.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.75luabswj4du7u8m8xeeqegyt.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.7au6yqssqh5r5se4e6xf5xbz7.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.8r12eqwg6grs1q06gk7w092pv.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.8uj6agtb4d2g1r6vtxejgx0u3.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.91b3lvapjurkantifmv3uln6u.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.94yg4imlo5jpuxac82tc95jrs.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.9u5fmylq6p54ao59mwgolcp04.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.am0yb7m4zd2njukjtne0evuy9.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.ar07po4h1kgum7ozelvzwm6hf.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.bve7ftbu9p22i087p583wv0l9.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.cihnb0p5ufepq7w8nkszyevjq.1yccmay.rcgu.o",
-        "ssl_tokens_cache-8a674199d87ad2c9.cjjyjtasl9r9ylqbljyhj20q6.1yccmay.rcgu.o",
         "stable_deref_trait-27bb08bc61e8d732.stable_deref_trait.63c0062b1e993cac-cgu.0.rcgu.o",
         "static_assertions-bbac0bc30f6346b5.static_assertions.380c0091a8a1446b-cgu.0.rcgu.o",
-        "static_prefs-d88d3d244f93cdbd.cgapy79i1bggl5137bs32fmv3.02tz2w0.rcgu.o",
+        "static_prefs-d88d3d244f93cdbd.cgapy79i1bggl5137bs32fmv3.0f0wiql.rcgu.o",
         "std-16f6980904c7717e.std.928324c4db1d86a9-cgu.0.rcgu.o",
         "std_detect-e0f84d885052e159.std_detect.2b522544ae6e3b8c-cgu.0.rcgu.o",
         "storage-403a05a24983afc0.1pwovzjcsnm943ykbkbxvrs9u.08k6jrs.rcgu.o",
@@ -2446,7 +2425,7 @@
   "rust_closure": {
     "platform_filter": "aarch64-linux-android",
     "root_package": "gkrust-naivefox",
-    "reachable_crates_count": 270,
+    "reachable_crates_count": 268,
     "crates": [
       {
         "name": "abridged_certs",
@@ -2455,15 +2434,6 @@
         "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
         "source_paths": [
           "security/manager/ssl/abridged_certs/src/lib.rs"
-        ]
-      },
-      {
-        "name": "adler2",
-        "version": "2.0.1",
-        "source_type": "vendored",
-        "manifest_path": "third_party/rust/adler2/Cargo.toml",
-        "source_paths": [
-          "third_party/rust/adler2/src/lib.rs"
         ]
       },
       {
@@ -4289,15 +4259,6 @@
         ]
       },
       {
-        "name": "ssl_tokens_cache",
-        "version": "0.1.0",
-        "source_type": "in-tree-component",
-        "manifest_path": "netwerk/base/ssl_tokens_cache/Cargo.toml",
-        "source_paths": [
-          "netwerk/base/ssl_tokens_cache/src/lib.rs"
-        ]
-      },
-      {
         "name": "stable_deref_trait",
         "version": "1.2.0",
         "source_type": "vendored",
@@ -5419,7 +5380,6 @@
       "netwerk/base/idna_glue/Cargo.toml",
       "netwerk/base/mozurl/Cargo.toml",
       "netwerk/base/rust-helper/Cargo.toml",
-      "netwerk/base/ssl_tokens_cache/Cargo.toml",
       "netwerk/base/uritemplate_glue/Cargo.toml",
       "netwerk/protocol/http/binary_http/Cargo.toml",
       "netwerk/protocol/http/happy_eyeballs_glue/Cargo.toml",
@@ -5440,7 +5400,6 @@
       "third_party/application-services/components/support/error/Cargo.toml",
       "third_party/application-services/components/support/error/macros/Cargo.toml",
       "third_party/application-services/components/support/tracing/Cargo.toml",
-      "third_party/rust/adler2/Cargo.toml",
       "third_party/rust/aho-corasick/Cargo.toml",
       "third_party/rust/anyhow/Cargo.toml",
       "third_party/rust/app_units/Cargo.toml",
@@ -5668,7 +5627,7 @@
     "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
     "cargo_lockfile": "Cargo.lock",
     "cargo_config_template": ".cargo/config.toml.in",
-    "depfiles_scanned": 534,
+    "depfiles_scanned": 533,
     "headers_count": 941,
     "headers": [
       "caps/SystemPrincipal.h",
@@ -6757,7 +6716,7 @@
       },
       {
         "name": "libmozglue.so",
-        "size_bytes": 11543656
+        "size_bytes": 11543128
       },
       {
         "name": "libnss3.so",
@@ -6769,7 +6728,7 @@
       },
       {
         "name": "libxul.so",
-        "size_bytes": 270444208
+        "size_bytes": 269851936
       },
       {
         "name": "libxul.so-gdb.py",
@@ -6792,7 +6751,7 @@
       {
         "path": "manifest.json",
         "size_bytes": 1849,
-        "sha256": "ee374ac50e41d6a7bcdd8c3a68287a64c05358f0762f8ba907a24bf516d4ead5"
+        "sha256": "026a10174909e7f268b876afb4a4006d833d615e0a022f6a2eb937eae162496b"
       },
       {
         "path": "include/NaiveFoxAPI.h",
@@ -6807,7 +6766,7 @@
       {
         "path": "lib/arm64-v8a/libmozglue.so",
         "size_bytes": 1974880,
-        "sha256": "cea43b0bddf831e3572ce27dce06357a0ad7b31ce57cf149daac8074a68dd954"
+        "sha256": "d3019e4a6a6e2f2196e907f4317e8a54f59328e5b6d0e1e9b5a1531ba7486978"
       },
       {
         "path": "lib/arm64-v8a/libnss3.so",
@@ -6821,13 +6780,13 @@
       },
       {
         "path": "lib/arm64-v8a/libxul.so",
-        "size_bytes": 47030688,
-        "sha256": "311622f73d462ba8416ffc0adb76d2371fe2fdcb8f8c6432606129ef8564091e"
+        "size_bytes": 46988272,
+        "sha256": "ce45d5e36e2c30fa0a62721eeaab75e088ec444e435f6d720704d637fa1deeb3"
       },
       {
         "path": "lib/arm64-v8a/omni.ja",
-        "size_bytes": 16895,
-        "sha256": "c61c961e3c161bac6c9d274d1320c31e317b45e4bcc282ff896a645665848c4d"
+        "size_bytes": 16939,
+        "sha256": "25600e032451f5fbd3eeb7b528a60f5669e2cf7898c38b1baf677c87b50812a5"
       }
     ]
   },
@@ -6870,7 +6829,7 @@
     },
     {
       "path": "objdir/intl/lwbrk/Unified_cpp_intl_lwbrk0.o",
-      "size_bytes": 601744
+      "size_bytes": 604344
     },
     {
       "path": "objdir/intl/uconv/Unified_cpp_intl_uconv0.o",
@@ -6902,7 +6861,7 @@
     },
     {
       "path": "objdir/modules/libpref/Unified_cpp_modules_libpref0.o",
-      "size_bytes": 16188208
+      "size_bytes": 16167360
     },
     {
       "path": "objdir/netwerk/base/MimeType.o",
@@ -6914,23 +6873,23 @@
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base0.o",
-      "size_bytes": 2895136
+      "size_bytes": 2895064
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base1.o",
-      "size_bytes": 5105536
+      "size_bytes": 5102368
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base2.o",
-      "size_bytes": 6326040
+      "size_bytes": 6325960
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base3.o",
-      "size_bytes": 6367336
+      "size_bytes": 6367008
     },
     {
       "path": "objdir/netwerk/base/Unified_cpp_netwerk_base4.o",
-      "size_bytes": 2396592
+      "size_bytes": 2396256
     },
     {
       "path": "objdir/netwerk/base/mozurl/MozURL.o",
@@ -6958,7 +6917,7 @@
     },
     {
       "path": "objdir/netwerk/dns/nsEffectiveTLDService.o",
-      "size_bytes": 345792
+      "size_bytes": 348560
     },
     {
       "path": "objdir/netwerk/dns/nsHostResolver.o",
@@ -6966,7 +6925,7 @@
     },
     {
       "path": "objdir/netwerk/dns/Unified_cpp_netwerk_dns0.o",
-      "size_bytes": 6137512
+      "size_bytes": 6137152
     },
     {
       "path": "objdir/config/external/icu/common/appendable.o",
@@ -8482,11 +8441,11 @@
     },
     {
       "path": "objdir/netwerk/cache2/Unified_cpp_netwerk_cache20.o",
-      "size_bytes": 8967200
+      "size_bytes": 8970536
     },
     {
       "path": "objdir/netwerk/cache2/Unified_cpp_netwerk_cache21.o",
-      "size_bytes": 4341512
+      "size_bytes": 4341232
     },
     {
       "path": "objdir/netwerk/protocol/http/nsHttpChannelAuthProvider.o",
@@ -8494,23 +8453,23 @@
     },
     {
       "path": "objdir/netwerk/protocol/http/nsHttpHandler.o",
-      "size_bytes": 1682496
+      "size_bytes": 1682416
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http0.o",
-      "size_bytes": 3482560
+      "size_bytes": 3482512
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http1.o",
-      "size_bytes": 8634216
+      "size_bytes": 8634160
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http2.o",
-      "size_bytes": 7503608
+      "size_bytes": 7503272
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http3.o",
-      "size_bytes": 11841944
+      "size_bytes": 11841656
     },
     {
       "path": "objdir/netwerk/protocol/http/Unified_cpp_protocol_http4.o",
@@ -8542,7 +8501,7 @@
     },
     {
       "path": "objdir/netwerk/ipc/Unified_cpp_netwerk_ipc0.o",
-      "size_bytes": 1097400
+      "size_bytes": 1097120
     },
     {
       "path": "objdir/netwerk/naivefox/codec/Unified_cpp_naivefox_codec0.o",
@@ -8550,7 +8509,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/XPCString.o",
-      "size_bytes": 63808
+      "size_bytes": 63752
     },
     {
       "path": "objdir/netwerk/naivefox/core/AutoFallback.o",
@@ -8558,11 +8517,11 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Config.o",
-      "size_bytes": 704752
+      "size_bytes": 718160
     },
     {
       "path": "objdir/netwerk/naivefox/core/GeckoRuntime.o",
-      "size_bytes": 1295920
+      "size_bytes": 1295640
     },
     {
       "path": "objdir/netwerk/naivefox/core/HeaderPadding.o",
@@ -8570,7 +8529,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/HttpClient.o",
-      "size_bytes": 1043960
+      "size_bytes": 1043672
     },
     {
       "path": "objdir/netwerk/naivefox/core/HttpConnectParser.o",
@@ -8578,7 +8537,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/LeanDOMBindings.o",
-      "size_bytes": 303480
+      "size_bytes": 303432
     },
     {
       "path": "objdir/netwerk/naivefox/core/MemMapSnapshot.o",
@@ -8590,7 +8549,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/NeckoTunnel.o",
-      "size_bytes": 1310576
+      "size_bytes": 1310448
     },
     {
       "path": "objdir/netwerk/naivefox/core/PaddingNegotiation.o",
@@ -8630,7 +8589,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/ProfilerNaiveFoxStub.o",
-      "size_bytes": 930072
+      "size_bytes": 929784
     },
     {
       "path": "objdir/netwerk/naivefox/core/AutoSQLiteLifetime.o",
@@ -8646,7 +8605,7 @@
     },
     {
       "path": "objdir/netwerk/build/nsNetModule.o",
-      "size_bytes": 175568
+      "size_bytes": 175520
     },
     {
       "path": "objdir/xpcom/string/Unified_cpp_xpcom_string0.o",
@@ -8654,7 +8613,7 @@
     },
     {
       "path": "objdir/xpcom/base/nsDebugImpl.o",
-      "size_bytes": 976960
+      "size_bytes": 976672
     },
     {
       "path": "objdir/xpcom/base/nsDumpUtils.o",
@@ -8662,11 +8621,11 @@
     },
     {
       "path": "objdir/xpcom/base/Unified_cpp_xpcom_base0.o",
-      "size_bytes": 2254072
+      "size_bytes": 2253792
     },
     {
       "path": "objdir/xpcom/base/Unified_cpp_xpcom_base1.o",
-      "size_bytes": 3579224
+      "size_bytes": 3583352
     },
     {
       "path": "objdir/xpcom/base/Unified_cpp_xpcom_base2.o",
@@ -8674,11 +8633,11 @@
     },
     {
       "path": "objdir/xpcom/ds/Unified_cpp_xpcom_ds0.o",
-      "size_bytes": 2050280
+      "size_bytes": 2058672
     },
     {
       "path": "objdir/xpcom/ds/Unified_cpp_xpcom_ds1.o",
-      "size_bytes": 2194688
+      "size_bytes": 2194352
     },
     {
       "path": "objdir/xpcom/io/Unified_c_xpcom_io0.o",
@@ -8686,7 +8645,7 @@
     },
     {
       "path": "objdir/xpcom/io/Unified_cpp_xpcom_io0.o",
-      "size_bytes": 2967160
+      "size_bytes": 2966824
     },
     {
       "path": "objdir/xpcom/io/Unified_cpp_xpcom_io1.o",
@@ -8694,11 +8653,11 @@
     },
     {
       "path": "objdir/xpcom/components/StaticComponents.o",
-      "size_bytes": 1143808
+      "size_bytes": 1143752
     },
     {
       "path": "objdir/xpcom/components/Unified_cpp_xpcom_components0.o",
-      "size_bytes": 2550248
+      "size_bytes": 2571024
     },
     {
       "path": "objdir/xpcom/threads/IdlePeriodState.o",
@@ -8714,23 +8673,23 @@
     },
     {
       "path": "objdir/xpcom/threads/Unified_cpp_xpcom_threads0.o",
-      "size_bytes": 4176176
+      "size_bytes": 4175896
     },
     {
       "path": "objdir/xpcom/threads/Unified_cpp_xpcom_threads1.o",
-      "size_bytes": 5158432
+      "size_bytes": 5158152
     },
     {
       "path": "objdir/xpcom/reflect/xptinfo/xptdata.o",
-      "size_bytes": 264904
+      "size_bytes": 264848
     },
     {
       "path": "objdir/xpcom/reflect/xptinfo/Unified_cpp_reflect_xptinfo0.o",
-      "size_bytes": 111024
+      "size_bytes": 110968
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/xptcall.o",
-      "size_bytes": 158056
+      "size_bytes": 158008
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/md/unix/xptcinvoke_asm_aarch64.o",
@@ -8742,15 +8701,15 @@
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/md/unix/xptcinvoke_aarch64.o",
-      "size_bytes": 109864
+      "size_bytes": 109816
     },
     {
       "path": "objdir/xpcom/reflect/xptcall/md/unix/xptcstubs_aarch64.o",
-      "size_bytes": 132984
+      "size_bytes": 132928
     },
     {
       "path": "objdir/chrome/Unified_cpp_chrome0.o",
-      "size_bytes": 879880
+      "size_bytes": 882480
     },
     {
       "path": "objdir/xpcom/build/NSPRInterposer.o",
@@ -8761,12 +8720,8 @@
       "size_bytes": 3296
     },
     {
-      "path": "objdir/xpcom/build/Services.o",
-      "size_bytes": 95560
-    },
-    {
       "path": "objdir/xpcom/build/Unified_cpp_xpcom_build0.o",
-      "size_bytes": 1585480
+      "size_bytes": 1585200
     },
     {
       "path": "objdir/ipc/chromium/process_util_linux.o",
@@ -8782,11 +8737,11 @@
     },
     {
       "path": "objdir/ipc/chromium/Unified_cpp_ipc_chromium0.o",
-      "size_bytes": 3533184
+      "size_bytes": 3532896
     },
     {
       "path": "objdir/ipc/chromium/Unified_cpp_ipc_chromium1.o",
-      "size_bytes": 3072376
+      "size_bytes": 3072096
     },
     {
       "path": "objdir/ipc/chromium/Unified_cpp_ipc_chromium2.o",
@@ -8798,7 +8753,7 @@
     },
     {
       "path": "objdir/ipc/glue/Unified_cpp_ipc_glue0.o",
-      "size_bytes": 4481024
+      "size_bytes": 4480744
     },
     {
       "path": "objdir/ipc/glue/Unified_cpp_ipc_glue1.o",
@@ -8818,27 +8773,27 @@
     },
     {
       "path": "objdir/storage/mozStorageBindingParams.o",
-      "size_bytes": 833424
+      "size_bytes": 833368
     },
     {
       "path": "objdir/storage/mozStorageConnection.o",
-      "size_bytes": 2221464
+      "size_bytes": 2221136
     },
     {
       "path": "objdir/storage/Unified_cpp_storage0.o",
-      "size_bytes": 1525072
+      "size_bytes": 1525016
     },
     {
       "path": "objdir/storage/Unified_cpp_storage1.o",
-      "size_bytes": 1849408
+      "size_bytes": 1849072
     },
     {
       "path": "objdir/caps/BasePrincipal.o",
-      "size_bytes": 521120
+      "size_bytes": 521040
     },
     {
       "path": "objdir/caps/Unified_cpp_caps0.o",
-      "size_bytes": 672344
+      "size_bytes": 672264
     },
     {
       "path": "objdir/security/certverifier/Unified_cpp_certverifier0.o",
@@ -8854,15 +8809,15 @@
     },
     {
       "path": "objdir/security/manager/ssl/Unified_cpp_security_manager_ssl0.o",
-      "size_bytes": 1430400
+      "size_bytes": 1430912
     },
     {
       "path": "objdir/security/manager/ssl/Unified_cpp_security_manager_ssl1.o",
-      "size_bytes": 5398592
+      "size_bytes": 5398232
     },
     {
       "path": "objdir/security/manager/ssl/Unified_cpp_security_manager_ssl2.o",
-      "size_bytes": 2624664
+      "size_bytes": 2623232
     },
     {
       "path": "objdir/security/nss/lib/mozpkix/mozpkix_mozpkix/pkixbuild.o",
@@ -8910,7 +8865,7 @@
     },
     {
       "path": "objdir/intl/components/Unified_cpp_intl_components0.o",
-      "size_bytes": 2543648
+      "size_bytes": 2543600
     },
     {
       "path": "objdir/intl/components/Unified_cpp_intl_components1.o",

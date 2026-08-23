@@ -76,7 +76,7 @@
     "ohttp",
     "unicode-bidi"
   ],
-  "cargo_manifest_parse_package_count": 336,
+  "cargo_manifest_parse_package_count": 335,
   "cargo_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -2396,15 +2396,6 @@
       "version": "0.6.3"
     },
     {
-      "manifest_path": "netwerk/base/ssl_tokens_cache/Cargo.toml",
-      "name": "ssl_tokens_cache",
-      "source": null,
-      "target_entry_points": [
-        "netwerk/base/ssl_tokens_cache/src/lib.rs"
-      ],
-      "version": "0.1.0"
-    },
-    {
       "manifest_path": "third_party/rust/stable_deref_trait/Cargo.toml",
       "name": "stable_deref_trait",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3152,7 +3143,7 @@
       "version": "1.0.20"
     }
   ],
-  "cargo_package_count": 310,
+  "cargo_package_count": 308,
   "cargo_packages": [
     {
       "license": "MPL-2.0",
@@ -3165,24 +3156,6 @@
       "name": "abridged_certs",
       "source": null,
       "version": "0.1.0"
-    },
-    {
-      "license": "0BSD OR MIT OR Apache-2.0",
-      "license_candidates": [
-        "third_party/rust/adler2/LICENSE-0BSD",
-        "third_party/rust/adler2/LICENSE-APACHE",
-        "third_party/rust/adler2/LICENSE-MIT"
-      ],
-      "license_coverage": [
-        "third_party/rust/adler2/LICENSE-0BSD",
-        "third_party/rust/adler2/LICENSE-APACHE",
-        "third_party/rust/adler2/LICENSE-MIT"
-      ],
-      "license_file": null,
-      "manifest_path": "third_party/rust/adler2/Cargo.toml",
-      "name": "adler2",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "2.0.1"
     },
     {
       "license": "Unlicense OR MIT",
@@ -6521,18 +6494,6 @@
       "version": "0.6.3"
     },
     {
-      "license": "MPL-2.0",
-      "license_candidates": [],
-      "license_coverage": [
-        "LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "netwerk/base/ssl_tokens_cache/Cargo.toml",
-      "name": "ssl_tokens_cache",
-      "source": null,
-      "version": "0.1.0"
-    },
-    {
       "license": "MIT/Apache-2.0",
       "license_candidates": [
         "third_party/rust/stable_deref_trait/LICENSE-APACHE",
@@ -7636,17 +7597,17 @@
     }
   ],
   "cargo_target": "aarch64-linux-android",
-  "cargo_workspace_member_count": 50,
+  "cargo_workspace_member_count": 49,
   "category_counts": {
-    "cargo:cbindgen-manifest-parse-closure": 363,
-    "cargo:cbindgen-manifest-parse-entry": 420,
+    "cargo:cbindgen-manifest-parse-closure": 362,
+    "cargo:cbindgen-manifest-parse-entry": 419,
     "cargo:git-patch-entry": 29,
     "cargo:git-patch-manifest": 15,
     "cargo:local-patch-metadata": 82,
     "cargo:local-patch-target-entry": 118,
-    "cargo:target-build-closure": 9816,
-    "cargo:target-manifest-parse-closure": 336,
-    "cargo:target-manifest-parse-entry": 387,
+    "cargo:target-build-closure": 9797,
+    "cargo:target-manifest-parse-closure": 335,
+    "cargo:target-manifest-parse-entry": 386,
     "cargo:vendor-checksum-index": 621,
     "make:active-assembly-include": 2,
     "make:active-assembly-source": 10,
@@ -7656,19 +7617,19 @@
     "make:active-source-fragment-input": 36,
     "make:core-build-infrastructure": 15,
     "mozbuild:active-gyp-entry": 1,
-    "objdir:backend.RecursiveMakeBackend.in": 544,
+    "objdir:backend.RecursiveMakeBackend.in": 433,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 245,
     "objdir:generated-action-depfile": 6059,
-    "objdir:generated-action-relative-depfile": 1405,
-    "objdir:generated-make-fragment-source": 1217,
-    "objdir:generated-make-prerequisite": 1208,
+    "objdir:generated-action-relative-depfile": 1406,
+    "objdir:generated-make-fragment-source": 1216,
+    "objdir:generated-make-prerequisite": 1207,
     "objdir:install-manifest-pattern": 511,
-    "objdir:install-manifest-source": 1922,
+    "objdir:install-manifest-source": 1923,
     "python:build-site-manifest": 1,
     "python:build-site-package": 1229
   },
-  "cbindgen_manifest_parse_package_count": 363,
+  "cbindgen_manifest_parse_package_count": 362,
   "cbindgen_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -10053,15 +10014,6 @@
       "version": "0.6.3"
     },
     {
-      "manifest_path": "netwerk/base/ssl_tokens_cache/Cargo.toml",
-      "name": "ssl_tokens_cache",
-      "source": null,
-      "target_entry_points": [
-        "netwerk/base/ssl_tokens_cache/src/lib.rs"
-      ],
-      "version": "0.1.0"
-    },
-    {
       "manifest_path": "third_party/rust/stable_deref_trait/Cargo.toml",
       "name": "stable_deref_trait",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -10996,9 +10948,9 @@
   "collector_sha256": "e46f07ae32fef66efe010e885e486a118b637741361daa93c2fc4ce85a2f5bac",
   "counts": {
     "directory_contracts": 37,
-    "files": 17812
+    "files": 17798
   },
-  "depfile_count": 1407,
+  "depfile_count": 1409,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -15040,11 +14992,6 @@
     "netwerk/base/rust-helper/cbindgen.toml",
     "netwerk/base/rust-helper/moz.build",
     "netwerk/base/rust-helper/src/lib.rs",
-    "netwerk/base/ssl_tokens_cache/Cargo.toml",
-    "netwerk/base/ssl_tokens_cache/README.md",
-    "netwerk/base/ssl_tokens_cache/cbindgen.toml",
-    "netwerk/base/ssl_tokens_cache/moz.build",
-    "netwerk/base/ssl_tokens_cache/src/lib.rs",
     "netwerk/base/uritemplate_glue/Cargo.toml",
     "netwerk/base/uritemplate_glue/UriTemplate.h",
     "netwerk/base/uritemplate_glue/cbindgen.toml",
@@ -19064,17 +19011,7 @@
     "third_party/rust/aa-stroke/.cargo-checksum.json",
     "third_party/rust/adblock/.cargo-checksum.json",
     "third_party/rust/adler2/.cargo-checksum.json",
-    "third_party/rust/adler2/.cargo_vcs_info.json",
-    "third_party/rust/adler2/CHANGELOG.md",
-    "third_party/rust/adler2/Cargo.lock",
     "third_party/rust/adler2/Cargo.toml",
-    "third_party/rust/adler2/Cargo.toml.orig",
-    "third_party/rust/adler2/LICENSE-0BSD",
-    "third_party/rust/adler2/LICENSE-APACHE",
-    "third_party/rust/adler2/LICENSE-MIT",
-    "third_party/rust/adler2/README.md",
-    "third_party/rust/adler2/RELEASE_PROCESS.md",
-    "third_party/rust/adler2/benches/bench.rs",
     "third_party/rust/adler2/src/algo.rs",
     "third_party/rust/adler2/src/lib.rs",
     "third_party/rust/aho-corasick/.cargo-checksum.json",
@@ -28348,7 +28285,6 @@
     "xpcom/build/Omnijar.h",
     "xpcom/build/PoisonIOInterposer.h",
     "xpcom/build/PoisonIOInterposerStub.cpp",
-    "xpcom/build/Services.py",
     "xpcom/build/SmallArrayLRUCache.h",
     "xpcom/build/StaticXREAppData.h",
     "xpcom/build/XPCOMInit.cpp",
@@ -28370,6 +28306,8 @@
     "xpcom/components/ManifestParser.h",
     "xpcom/components/Module.h",
     "xpcom/components/ModuleUtils.h",
+    "xpcom/components/Services.cpp",
+    "xpcom/components/Services.h",
     "xpcom/components/StaticComponents.cpp.in",
     "xpcom/components/StaticComponents.h",
     "xpcom/components/components.conf",
@@ -28853,9 +28791,9 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
-  "generated_makefile_count": 378,
-  "generated_makefiles_sha256": "3d63bb2ed5230edc119cfb4338d0d7e1b3878cd88f407e88e3d21d80e46ad75c",
+  "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
+  "generated_makefile_count": 376,
+  "generated_makefiles_sha256": "d08dc21ce855057f085c7bc47a7be65fa8bc77a4c77ebbc27eb29ae8293449e1",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28866,19 +28804,19 @@
     "dist_public",
     "xpidl"
   ],
-  "install_manifest_record_count": 2629,
-  "install_manifests_sha256": "02c3f91959d0d12025ccbcbb646519304109d9d46e6b6c0f14a7bc2b9c482cd7",
+  "install_manifest_record_count": 2628,
+  "install_manifests_sha256": "2219e5d3bf0f91fa67dae8a84b36792f90721f9eebb10e2eafc4103ac780ccc5",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "86a83d7d84878dab7a4013e8b9c2924de9755ccf5452402ec78e2547cc9facb4",
-  "naivefox_reference_commit": "758c8724469107034736d1a71296a07ffa097900",
+  "naivefox_reference_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "ee4f6057c4cb2f2f1543d14c287b7b8b83094c1e112af5fabf544877cb670671",
+    "backend.RecursiveMakeBackend.in": "7a698efde238d5a718074d622df63d106e0db98c21595dc7b9ef6f3117b87eb6",
     "config_status_deps.in": "44398734e8491bc3150c9a4c453dfbc090606a9414706c9b97dba1848659c192"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "758c8724469107034736d1a71296a07ffa097900",
+  "source_commit": "2b1a6a4ddd4a9f31755928fbb0401364b8168b0a",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
