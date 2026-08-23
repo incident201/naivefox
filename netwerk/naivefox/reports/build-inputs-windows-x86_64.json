@@ -76,7 +76,7 @@
     "ohttp",
     "unicode-bidi"
   ],
-  "cargo_manifest_parse_package_count": 346,
+  "cargo_manifest_parse_package_count": 331,
   "cargo_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -132,15 +132,6 @@
         "third_party/rust/app_units/src/lib.rs"
       ],
       "version": "0.7.8"
-    },
-    {
-      "manifest_path": "third_party/rust/arbitrary/Cargo.toml",
-      "name": "arbitrary",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/arbitrary/src/lib.rs"
-      ],
-      "version": "1.4.1"
     },
     {
       "manifest_path": "third_party/rust/arrayref/Cargo.toml",
@@ -443,15 +434,6 @@
       "version": "0.4.0"
     },
     {
-      "manifest_path": "js/src/builtin/intl/collator_glue/Cargo.toml",
-      "name": "collator_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/builtin/intl/collator_glue/src/lib.rs"
-      ],
-      "version": "0.1.0"
-    },
-    {
       "manifest_path": "third_party/rust/core_maths/Cargo.toml",
       "name": "core_maths",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -586,15 +568,6 @@
         "third_party/rust/deranged/src/lib.rs"
       ],
       "version": "0.5.8"
-    },
-    {
-      "manifest_path": "third_party/rust/derive_arbitrary/Cargo.toml",
-      "name": "derive_arbitrary",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/derive_arbitrary/src/lib.rs"
-      ],
-      "version": "1.4.1"
     },
     {
       "manifest_path": "third_party/rust/derive_more/Cargo.toml",
@@ -833,15 +806,6 @@
       "version": "0.1.0"
     },
     {
-      "manifest_path": "third_party/rust/flagset/Cargo.toml",
-      "name": "flagset",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/flagset/src/lib.rs"
-      ],
-      "version": "0.4.3"
-    },
-    {
       "manifest_path": "third_party/rust/flate2/Cargo.toml",
       "name": "flate2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -1013,15 +977,6 @@
         "third_party/rust/glob/src/lib.rs"
       ],
       "version": "0.3.1"
-    },
-    {
-      "manifest_path": "js/src/fuzz-tests/gluesmith/Cargo.toml",
-      "name": "gluesmith",
-      "source": null,
-      "target_entry_points": [
-        "js/src/fuzz-tests/gluesmith/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "build/rust/goblin/Cargo.toml",
@@ -1309,15 +1264,6 @@
       "version": "2.1.1"
     },
     {
-      "manifest_path": "third_party/rust/icu_time/Cargo.toml",
-      "name": "icu_time",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/icu_time/src/lib.rs"
-      ],
-      "version": "2.1.1"
-    },
-    {
       "manifest_path": "third_party/rust/id-arena/Cargo.toml",
       "name": "id-arena",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -1417,13 +1363,6 @@
       "version": "0.6.4"
     },
     {
-      "manifest_path": "js/src/rust/shared/Cargo.toml",
-      "name": "jsrust_shared",
-      "source": null,
-      "target_entry_points": [],
-      "version": "0.1.0"
-    },
-    {
       "manifest_path": "third_party/rust/lazy_static/Cargo.toml",
       "name": "lazy_static",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -1431,15 +1370,6 @@
         "third_party/rust/lazy_static/src/lib.rs"
       ],
       "version": "1.4.0"
-    },
-    {
-      "manifest_path": "third_party/rust/leb128fmt/Cargo.toml",
-      "name": "leb128fmt",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/leb128fmt/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "third_party/rust/libc/Cargo.toml",
@@ -1488,15 +1418,6 @@
         "third_party/rust/litemap/src/lib.rs"
       ],
       "version": "0.8.0"
-    },
-    {
-      "manifest_path": "js/src/builtin/intl/locale_glue/Cargo.toml",
-      "name": "locale_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/builtin/intl/locale_glue/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "intl/locale/rust/locale_service_glue/Cargo.toml",
@@ -1711,15 +1632,6 @@
         "third_party/rust/nom/src/lib.rs"
       ],
       "version": "7.1.3"
-    },
-    {
-      "manifest_path": "js/src/builtin/normalizer_glue/Cargo.toml",
-      "name": "normalizer_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/builtin/normalizer_glue/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "xpcom/rust/nserror/Cargo.toml",
@@ -1977,15 +1889,6 @@
       "source": null,
       "target_entry_points": [
         "tools/profiler/rust-api/macros/src/lib.rs"
-      ],
-      "version": "0.1.0"
-    },
-    {
-      "manifest_path": "js/src/irregexp/properties_glue/Cargo.toml",
-      "name": "properties_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/irregexp/properties_glue/src/lib.rs"
       ],
       "version": "0.1.0"
     },
@@ -2889,33 +2792,6 @@
       "version": "1.0.2"
     },
     {
-      "manifest_path": "third_party/rust/wasm-encoder/Cargo.toml",
-      "name": "wasm-encoder",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/wasm-encoder/src/lib.rs"
-      ],
-      "version": "0.244.0"
-    },
-    {
-      "manifest_path": "third_party/rust/wasm-smith/Cargo.toml",
-      "name": "wasm-smith",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/wasm-smith/src/lib.rs"
-      ],
-      "version": "0.244.0"
-    },
-    {
-      "manifest_path": "third_party/rust/wasmparser/Cargo.toml",
-      "name": "wasmparser",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/wasmparser/src/lib.rs"
-      ],
-      "version": "0.244.0"
-    },
-    {
       "manifest_path": "third_party/rust/weedle2/Cargo.toml",
       "name": "weedle2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3089,15 +2965,6 @@
       "version": "0.2.2"
     },
     {
-      "manifest_path": "third_party/rust/write16/Cargo.toml",
-      "name": "write16",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/write16/src/lib.rs"
-      ],
-      "version": "1.0.0"
-    },
-    {
       "manifest_path": "third_party/rust/writeable/Cargo.toml",
       "name": "writeable",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3243,7 +3110,7 @@
       "version": "1.0.20"
     }
   ],
-  "cargo_package_count": 323,
+  "cargo_package_count": 316,
   "cargo_packages": [
     {
       "license": "MPL-2.0",
@@ -3784,18 +3651,6 @@
       "name": "clubcard-crlite",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "version": "0.4.0"
-    },
-    {
-      "license": null,
-      "license_candidates": [],
-      "license_coverage": [
-        "LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "js/src/builtin/intl/collator_glue/Cargo.toml",
-      "name": "collator_glue",
-      "source": null,
-      "version": "0.1.0"
     },
     {
       "license": "MIT",
@@ -4994,20 +4849,6 @@
       "version": "2.1.1"
     },
     {
-      "license": "Unicode-3.0",
-      "license_candidates": [
-        "third_party/rust/icu_time/LICENSE"
-      ],
-      "license_coverage": [
-        "third_party/rust/icu_time/LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "third_party/rust/icu_time/Cargo.toml",
-      "name": "icu_time",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "2.1.1"
-    },
-    {
       "license": "MIT/Apache-2.0",
       "license_candidates": [
         "third_party/rust/id-arena/LICENSE-APACHE",
@@ -5156,18 +4997,6 @@
       "version": "0.6.4"
     },
     {
-      "license": "MPL-2.0",
-      "license_candidates": [],
-      "license_coverage": [
-        "LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "js/src/rust/shared/Cargo.toml",
-      "name": "jsrust_shared",
-      "source": null,
-      "version": "0.1.0"
-    },
-    {
       "license": "MIT/Apache-2.0",
       "license_candidates": [
         "third_party/rust/lazy_static/LICENSE-APACHE",
@@ -5258,18 +5087,6 @@
       "name": "litemap",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "version": "0.8.0"
-    },
-    {
-      "license": null,
-      "license_candidates": [],
-      "license_coverage": [
-        "LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "js/src/builtin/intl/locale_glue/Cargo.toml",
-      "name": "locale_glue",
-      "source": null,
-      "version": "0.1.0"
     },
     {
       "license": "MPL-2.0",
@@ -5572,18 +5389,6 @@
       "name": "nom",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "version": "7.1.3"
-    },
-    {
-      "license": "MPL-2.0",
-      "license_candidates": [],
-      "license_coverage": [
-        "LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "js/src/builtin/normalizer_glue/Cargo.toml",
-      "name": "normalizer_glue",
-      "source": null,
-      "version": "0.1.0"
     },
     {
       "license": "MPL-2.0",
@@ -5976,18 +5781,6 @@
       "name": "proc-macro2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "version": "1.0.101"
-    },
-    {
-      "license": null,
-      "license_candidates": [],
-      "license_coverage": [
-        "LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "js/src/irregexp/properties_glue/Cargo.toml",
-      "name": "properties_glue",
-      "source": null,
-      "version": "0.1.0"
     },
     {
       "license": "BSD-2-Clause",
@@ -7690,22 +7483,6 @@
       "version": "0.2.2"
     },
     {
-      "license": "Apache-2.0 OR MIT",
-      "license_candidates": [
-        "third_party/rust/write16/LICENSE-APACHE",
-        "third_party/rust/write16/LICENSE-MIT"
-      ],
-      "license_coverage": [
-        "third_party/rust/write16/LICENSE-APACHE",
-        "third_party/rust/write16/LICENSE-MIT"
-      ],
-      "license_file": null,
-      "manifest_path": "third_party/rust/write16/Cargo.toml",
-      "name": "write16",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "1.0.0"
-    },
-    {
       "license": "Unicode-3.0",
       "license_candidates": [
         "third_party/rust/writeable/LICENSE"
@@ -7919,17 +7696,17 @@
     }
   ],
   "cargo_target": "x86_64-pc-windows-msvc",
-  "cargo_workspace_member_count": 50,
+  "cargo_workspace_member_count": 44,
   "category_counts": {
-    "cargo:cbindgen-manifest-parse-closure": 363,
-    "cargo:cbindgen-manifest-parse-entry": 420,
+    "cargo:cbindgen-manifest-parse-closure": 348,
+    "cargo:cbindgen-manifest-parse-entry": 406,
     "cargo:git-patch-entry": 29,
     "cargo:git-patch-manifest": 15,
     "cargo:local-patch-metadata": 82,
     "cargo:local-patch-target-entry": 118,
-    "cargo:target-build-closure": 10176,
-    "cargo:target-manifest-parse-closure": 346,
-    "cargo:target-manifest-parse-entry": 398,
+    "cargo:target-build-closure": 10128,
+    "cargo:target-manifest-parse-closure": 331,
+    "cargo:target-manifest-parse-entry": 384,
     "cargo:vendor-checksum-index": 621,
     "make:active-jar-manifest": 3,
     "make:active-jar-source": 11,
@@ -7940,7 +7717,7 @@
     "objdir:backend.RecursiveMakeBackend.in": 419,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 126,
-    "objdir:generated-action-depfile": 6236,
+    "objdir:generated-action-depfile": 6225,
     "objdir:generated-action-relative-depfile": 1383,
     "objdir:generated-make-fragment-source": 879,
     "objdir:generated-make-prerequisite": 870,
@@ -7949,7 +7726,7 @@
     "python:build-site-manifest": 1,
     "python:build-site-package": 1229
   },
-  "cbindgen_manifest_parse_package_count": 363,
+  "cbindgen_manifest_parse_package_count": 348,
   "cbindgen_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -8042,15 +7819,6 @@
         "third_party/rust/app_units/src/lib.rs"
       ],
       "version": "0.7.8"
-    },
-    {
-      "manifest_path": "third_party/rust/arbitrary/Cargo.toml",
-      "name": "arbitrary",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/arbitrary/src/lib.rs"
-      ],
-      "version": "1.4.1"
     },
     {
       "manifest_path": "third_party/rust/arrayref/Cargo.toml",
@@ -8353,15 +8121,6 @@
       "version": "0.4.0"
     },
     {
-      "manifest_path": "js/src/builtin/intl/collator_glue/Cargo.toml",
-      "name": "collator_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/builtin/intl/collator_glue/src/lib.rs"
-      ],
-      "version": "0.1.0"
-    },
-    {
       "manifest_path": "third_party/rust/core-foundation-sys/Cargo.toml",
       "name": "core-foundation-sys",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -8505,15 +8264,6 @@
         "third_party/rust/deranged/src/lib.rs"
       ],
       "version": "0.5.8"
-    },
-    {
-      "manifest_path": "third_party/rust/derive_arbitrary/Cargo.toml",
-      "name": "derive_arbitrary",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/derive_arbitrary/src/lib.rs"
-      ],
-      "version": "1.4.1"
     },
     {
       "manifest_path": "third_party/rust/derive_more/Cargo.toml",
@@ -8752,15 +8502,6 @@
       "version": "0.1.0"
     },
     {
-      "manifest_path": "third_party/rust/flagset/Cargo.toml",
-      "name": "flagset",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/flagset/src/lib.rs"
-      ],
-      "version": "0.4.3"
-    },
-    {
       "manifest_path": "third_party/rust/flate2/Cargo.toml",
       "name": "flate2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -8932,15 +8673,6 @@
         "third_party/rust/glob/src/lib.rs"
       ],
       "version": "0.3.1"
-    },
-    {
-      "manifest_path": "js/src/fuzz-tests/gluesmith/Cargo.toml",
-      "name": "gluesmith",
-      "source": null,
-      "target_entry_points": [
-        "js/src/fuzz-tests/gluesmith/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "build/rust/goblin/Cargo.toml",
@@ -9247,15 +8979,6 @@
       "version": "2.1.1"
     },
     {
-      "manifest_path": "third_party/rust/icu_time/Cargo.toml",
-      "name": "icu_time",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/icu_time/src/lib.rs"
-      ],
-      "version": "2.1.1"
-    },
-    {
       "manifest_path": "third_party/rust/id-arena/Cargo.toml",
       "name": "id-arena",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -9364,13 +9087,6 @@
       "version": "0.3.100"
     },
     {
-      "manifest_path": "js/src/rust/shared/Cargo.toml",
-      "name": "jsrust_shared",
-      "source": null,
-      "target_entry_points": [],
-      "version": "0.1.0"
-    },
-    {
       "manifest_path": "third_party/rust/lazy_static/Cargo.toml",
       "name": "lazy_static",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -9378,15 +9094,6 @@
         "third_party/rust/lazy_static/src/lib.rs"
       ],
       "version": "1.4.0"
-    },
-    {
-      "manifest_path": "third_party/rust/leb128fmt/Cargo.toml",
-      "name": "leb128fmt",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/leb128fmt/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "third_party/rust/libc/Cargo.toml",
@@ -9444,15 +9151,6 @@
         "third_party/rust/litemap/src/lib.rs"
       ],
       "version": "0.8.0"
-    },
-    {
-      "manifest_path": "js/src/builtin/intl/locale_glue/Cargo.toml",
-      "name": "locale_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/builtin/intl/locale_glue/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "intl/locale/rust/locale_service_glue/Cargo.toml",
@@ -9667,15 +9365,6 @@
         "third_party/rust/nom/src/lib.rs"
       ],
       "version": "7.1.3"
-    },
-    {
-      "manifest_path": "js/src/builtin/normalizer_glue/Cargo.toml",
-      "name": "normalizer_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/builtin/normalizer_glue/src/lib.rs"
-      ],
-      "version": "0.1.0"
     },
     {
       "manifest_path": "xpcom/rust/nserror/Cargo.toml",
@@ -9942,15 +9631,6 @@
       "source": null,
       "target_entry_points": [
         "tools/profiler/rust-api/macros/src/lib.rs"
-      ],
-      "version": "0.1.0"
-    },
-    {
-      "manifest_path": "js/src/irregexp/properties_glue/Cargo.toml",
-      "name": "properties_glue",
-      "source": null,
-      "target_entry_points": [
-        "js/src/irregexp/properties_glue/src/lib.rs"
       ],
       "version": "0.1.0"
     },
@@ -10890,33 +10570,6 @@
       "version": "0.2.100"
     },
     {
-      "manifest_path": "third_party/rust/wasm-encoder/Cargo.toml",
-      "name": "wasm-encoder",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/wasm-encoder/src/lib.rs"
-      ],
-      "version": "0.244.0"
-    },
-    {
-      "manifest_path": "third_party/rust/wasm-smith/Cargo.toml",
-      "name": "wasm-smith",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/wasm-smith/src/lib.rs"
-      ],
-      "version": "0.244.0"
-    },
-    {
-      "manifest_path": "third_party/rust/wasmparser/Cargo.toml",
-      "name": "wasmparser",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/wasmparser/src/lib.rs"
-      ],
-      "version": "0.244.0"
-    },
-    {
       "manifest_path": "third_party/rust/weedle2/Cargo.toml",
       "name": "weedle2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -11120,15 +10773,6 @@
       "version": "0.2.2"
     },
     {
-      "manifest_path": "third_party/rust/write16/Cargo.toml",
-      "name": "write16",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/write16/src/lib.rs"
-      ],
-      "version": "1.0.0"
-    },
-    {
       "manifest_path": "third_party/rust/writeable/Cargo.toml",
       "name": "writeable",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -11277,9 +10921,9 @@
   "collector_sha256": "e46f07ae32fef66efe010e885e486a118b637741361daa93c2fc4ce85a2f5bac",
   "counts": {
     "directory_contracts": 35,
-    "files": 18006
+    "files": 17958
   },
-  "depfile_count": 1461,
+  "depfile_count": 1478,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -14188,25 +13832,7 @@
     "js/public/shadow/Zone.h",
     "js/src/GeneratePrefs.py",
     "js/src/Makefile.in",
-    "js/src/builtin/intl/collator_glue/Cargo.toml",
-    "js/src/builtin/intl/collator_glue/cbindgen.toml",
-    "js/src/builtin/intl/collator_glue/moz.build",
-    "js/src/builtin/intl/collator_glue/src/lib.rs",
-    "js/src/builtin/intl/locale_glue/Cargo.toml",
-    "js/src/builtin/intl/locale_glue/cbindgen.toml",
-    "js/src/builtin/intl/locale_glue/moz.build",
-    "js/src/builtin/intl/locale_glue/src/lib.rs",
-    "js/src/builtin/normalizer_glue/Cargo.toml",
-    "js/src/builtin/normalizer_glue/cbindgen.toml",
-    "js/src/builtin/normalizer_glue/moz.build",
-    "js/src/builtin/normalizer_glue/src/lib.rs",
     "js/src/configure",
-    "js/src/fuzz-tests/gluesmith/Cargo.toml",
-    "js/src/fuzz-tests/gluesmith/src/lib.rs",
-    "js/src/irregexp/properties_glue/Cargo.toml",
-    "js/src/irregexp/properties_glue/cbindgen.toml",
-    "js/src/irregexp/properties_glue/moz.build",
-    "js/src/irregexp/properties_glue/src/lib.rs",
     "js/src/js-confdefs.h.in",
     "js/src/js-config.h.in",
     "js/src/js-config.mozbuild",
@@ -14215,8 +13841,6 @@
     "js/src/jspubtd.h",
     "js/src/jstypes.h",
     "js/src/moz.build",
-    "js/src/rust/shared/Cargo.toml",
-    "js/src/rust/shared/lib.rs",
     "js/xpconnect/idl/nsIXPCScriptable.idl",
     "js/xpconnect/loader/AutoMemMap.cpp",
     "js/xpconnect/loader/AutoMemMap.h",
@@ -19309,8 +18933,6 @@
     "third_party/rust/app_units/src/app_unit.rs",
     "third_party/rust/app_units/src/lib.rs",
     "third_party/rust/arbitrary/.cargo-checksum.json",
-    "third_party/rust/arbitrary/Cargo.toml",
-    "third_party/rust/arbitrary/src/lib.rs",
     "third_party/rust/array-init/.cargo-checksum.json",
     "third_party/rust/arraydeque/.cargo-checksum.json",
     "third_party/rust/arrayref/.cargo-checksum.json",
@@ -20498,8 +20120,6 @@
     "third_party/rust/deranged/src/tests.rs",
     "third_party/rust/deranged/src/unsafe_wrapper.rs",
     "third_party/rust/derive_arbitrary/.cargo-checksum.json",
-    "third_party/rust/derive_arbitrary/Cargo.toml",
-    "third_party/rust/derive_arbitrary/src/lib.rs",
     "third_party/rust/derive_more-impl/.cargo-checksum.json",
     "third_party/rust/derive_more-impl/.cargo_vcs_info.json",
     "third_party/rust/derive_more-impl/Cargo.lock",
@@ -21284,8 +20904,6 @@
     "third_party/rust/ffi-support/.cargo-checksum.json",
     "third_party/rust/filetime_win/.cargo-checksum.json",
     "third_party/rust/flagset/.cargo-checksum.json",
-    "third_party/rust/flagset/Cargo.toml",
-    "third_party/rust/flagset/src/lib.rs",
     "third_party/rust/flatbuffers/.cargo-checksum.json",
     "third_party/rust/flate2/.cargo-checksum.json",
     "third_party/rust/flate2/Cargo.toml",
@@ -22376,12 +21994,6 @@
     "third_party/rust/icu_segmenter/tests/testdata/test_text_graphclust.json",
     "third_party/rust/icu_segmenter/tests/word_rule_status.rs",
     "third_party/rust/icu_time/.cargo-checksum.json",
-    "third_party/rust/icu_time/.cargo_vcs_info.json",
-    "third_party/rust/icu_time/Cargo.lock",
-    "third_party/rust/icu_time/Cargo.toml",
-    "third_party/rust/icu_time/Cargo.toml.orig",
-    "third_party/rust/icu_time/LICENSE",
-    "third_party/rust/icu_time/README.md",
     "third_party/rust/icu_time/src/ixdtf.rs",
     "third_party/rust/icu_time/src/lib.rs",
     "third_party/rust/icu_time/src/provider/iana.rs",
@@ -22395,7 +22007,6 @@
     "third_party/rust/icu_time/src/zone/offset.rs",
     "third_party/rust/icu_time/src/zone/windows.rs",
     "third_party/rust/icu_time/src/zone/zone_name_timestamp.rs",
-    "third_party/rust/icu_time/tests/data/offset_periods_old.blob",
     "third_party/rust/id-arena/.cargo-checksum.json",
     "third_party/rust/id-arena/.cargo_vcs_info.json",
     "third_party/rust/id-arena/.travis.yml",
@@ -22647,8 +22258,6 @@
     "third_party/rust/lazy_static/tests/no_std.rs",
     "third_party/rust/lazy_static/tests/test.rs",
     "third_party/rust/leb128fmt/.cargo-checksum.json",
-    "third_party/rust/leb128fmt/Cargo.toml",
-    "third_party/rust/leb128fmt/src/lib.rs",
     "third_party/rust/libc/.cargo-checksum.json",
     "third_party/rust/libc/.cargo_vcs_info.json",
     "third_party/rust/libc/.editorconfig",
@@ -27163,14 +26772,8 @@
     "third_party/rust/wasi/Cargo.toml",
     "third_party/rust/wasi/src/lib.rs",
     "third_party/rust/wasm-encoder/.cargo-checksum.json",
-    "third_party/rust/wasm-encoder/Cargo.toml",
-    "third_party/rust/wasm-encoder/src/lib.rs",
     "third_party/rust/wasm-smith/.cargo-checksum.json",
-    "third_party/rust/wasm-smith/Cargo.toml",
-    "third_party/rust/wasm-smith/src/lib.rs",
     "third_party/rust/wasmparser/.cargo-checksum.json",
-    "third_party/rust/wasmparser/Cargo.toml",
-    "third_party/rust/wasmparser/src/lib.rs",
     "third_party/rust/wast/.cargo-checksum.json",
     "third_party/rust/webrtc-sdp/.cargo-checksum.json",
     "third_party/rust/weedle2/.cargo-checksum.json",
@@ -28164,13 +27767,6 @@
     "third_party/rust/wit-bindgen-rt/src/lib.rs",
     "third_party/rust/wpf-gpu-raster/.cargo-checksum.json",
     "third_party/rust/write16/.cargo-checksum.json",
-    "third_party/rust/write16/.cargo_vcs_info.json",
-    "third_party/rust/write16/COPYRIGHT",
-    "third_party/rust/write16/Cargo.toml",
-    "third_party/rust/write16/Cargo.toml.orig",
-    "third_party/rust/write16/LICENSE-APACHE",
-    "third_party/rust/write16/LICENSE-MIT",
-    "third_party/rust/write16/README.md",
     "third_party/rust/write16/src/lib.rs",
     "third_party/rust/writeable/.cargo-checksum.json",
     "third_party/rust/writeable/.cargo_vcs_info.json",
@@ -29343,7 +28939,7 @@
   "install_manifests_sha256": "08d8ffd8685b0809e43e711940eda9beb80c0f751b53a57fc3b90f93b99de620",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b",
-  "naivefox_reference_commit": "b2c177cb608ef9b8ce9fb56a2a1f3c8eeb5ccc5f",
+  "naivefox_reference_commit": "b0497d87b6017b2dd4e2429b7d33b0882dda4859",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "9e638fc1ff166c6e29b063159d162c00b3360b1298d35f35c536c7d7cfa14f16",
     "config_status_deps.in": "0e85d61eede52b95ab74830730798e728c9c53100560990a76817eae37d5d3cf"
@@ -29351,7 +28947,7 @@
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "b2c177cb608ef9b8ce9fb56a2a1f3c8eeb5ccc5f",
+  "source_commit": "b0497d87b6017b2dd4e2429b7d33b0882dda4859",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
