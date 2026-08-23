@@ -7659,10 +7659,10 @@
     "objdir:backend.RecursiveMakeBackend.in": 544,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 245,
-    "objdir:generated-action-depfile": 6057,
+    "objdir:generated-action-depfile": 6059,
     "objdir:generated-action-relative-depfile": 1405,
-    "objdir:generated-make-fragment-source": 1216,
-    "objdir:generated-make-prerequisite": 1207,
+    "objdir:generated-make-fragment-source": 1217,
+    "objdir:generated-make-prerequisite": 1208,
     "objdir:install-manifest-pattern": 511,
     "objdir:install-manifest-source": 1922,
     "python:build-site-manifest": 1,
@@ -10996,9 +10996,9 @@
   "collector_sha256": "e46f07ae32fef66efe010e885e486a118b637741361daa93c2fc4ce85a2f5bac",
   "counts": {
     "directory_contracts": 37,
-    "files": 17810
+    "files": 17812
   },
-  "depfile_count": 1406,
+  "depfile_count": 1407,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -15357,6 +15357,8 @@
     "netwerk/naivefox/SocksServer.h",
     "netwerk/naivefox/SpiderMonkeyCompat.cpp",
     "netwerk/naivefox/StoragePrincipalHelper.h",
+    "netwerk/naivefox/TemporaryTrustStore.cpp",
+    "netwerk/naivefox/TemporaryTrustStore.h",
     "netwerk/naivefox/TunnelSession.cpp",
     "netwerk/naivefox/TunnelSession.h",
     "netwerk/naivefox/UnknownProtocolHandler.cpp",
@@ -28853,7 +28855,7 @@
   ],
   "firefox_base_commit": "7b61047039c98a25b9ef5c6824089ab6c60bf54c",
   "generated_makefile_count": 378,
-  "generated_makefiles_sha256": "9f7e43bc6d9d120448dc6ebdc7ff705f4677dc7260995101fdbdf3045e9cb94d",
+  "generated_makefiles_sha256": "3d63bb2ed5230edc119cfb4338d0d7e1b3878cd88f407e88e3d21d80e46ad75c",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28868,15 +28870,15 @@
   "install_manifests_sha256": "02c3f91959d0d12025ccbcbb646519304109d9d46e6b6c0f14a7bc2b9c482cd7",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "86a83d7d84878dab7a4013e8b9c2924de9755ccf5452402ec78e2547cc9facb4",
-  "naivefox_reference_commit": "be01bea0bacf200dbd1f2b8b4860bf44470de0c7",
+  "naivefox_reference_commit": "758c8724469107034736d1a71296a07ffa097900",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "6e723a65834f184523e5df5fb97980469b511d8985d257edf47fbb60c55ff1bd",
-    "config_status_deps.in": "97fc2b003c060e130939655df072c6c2e7698b2c264c9b1053e27702cdd9424b"
+    "backend.RecursiveMakeBackend.in": "ee4f6057c4cb2f2f1543d14c287b7b8b83094c1e112af5fabf544877cb670671",
+    "config_status_deps.in": "44398734e8491bc3150c9a4c453dfbc090606a9414706c9b97dba1848659c192"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "be01bea0bacf200dbd1f2b8b4860bf44470de0c7",
+  "source_commit": "758c8724469107034736d1a71296a07ffa097900",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
