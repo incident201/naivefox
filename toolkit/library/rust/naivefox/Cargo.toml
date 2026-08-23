@@ -18,6 +18,7 @@ gecko_tracing = { path = "../../../../xpcom/rust/gecko_tracing" }
 gkrust_utils = { path = "../../../../xpcom/rust/gkrust_utils" }
 happy_eyeballs_glue = { path = "../../../../netwerk/protocol/http/happy_eyeballs_glue", default-features = false, features = ["naivefox"] }
 http_sfv = { path = "../../../../netwerk/base/http-sfv" }
+icu4x_unicode_glue = { path = "../../../../intl/icu4x_unicode_glue" }
 idna_glue = { path = "../../../../netwerk/base/idna_glue" }
 icu_locale = { version = "~2.1.1", features = ["compiled_data"] }
 jsrust_shared = { path = "../../../../js/src/rust/shared", features = ["icu4x"] }

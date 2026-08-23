@@ -16,6 +16,14 @@ The supported product graphs are Linux x86-64, Windows x86-64, and Android
 ARM64 embedded. All remain `--enable-project=netwerk/naivefox`; none of the
 commands below configures or builds the Firefox browser or GeckoView.
 
+NaiveFox product mozconfigs pass `--without-intl-api`. This removes the
+SpiderMonkey ECMAScript `Intl` API and the ICU4C source/data graph. The
+minimal graph still builds the locale parser and Unicode helpers required by
+Necko and IDNA, backed by the ICU4X Rust crates already used by the product;
+the closure must contain `icu4x_unicode_glue` and no ICU4C objects or shared
+libraries. Browser-only date/time formatting, collation, and other `Intl`
+components are intentionally not part of this target.
+
 ## 1. Prepare the branch
 
 Start from a clean `naivefox-full-source` checkout after the corresponding

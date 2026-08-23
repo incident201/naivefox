@@ -157,6 +157,12 @@ part of the product gates. Requirements, environment variables, comparison
 semantics, WSL packet handling, and sensitive-data rules are in
 [`../../CAPTURE.md`](../../CAPTURE.md).
 
+Quick capture downloads the current official Nightly binary from the URL in
+`../../tools/firefox-reference-manifest` and compares its observed behavior
+with the same fixture run through NaiveFox. The archive checksum in that
+manifest is refreshed only when Mozilla republishes the same Nightly version;
+the fetch script still verifies both the checksum and the Firefox version.
+
 Optional throughput scripts (`run-throughput-benchmark.sh` and
 `run-h3-throughput-benchmark.sh`) produce local diagnostics; their point-in-time
 numbers are not maintained in active documentation.

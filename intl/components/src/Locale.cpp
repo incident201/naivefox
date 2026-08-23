@@ -9,7 +9,18 @@
 #include "mozilla/TextUtils.h"
 #include "mozilla/Variant.h"
 
-#include "ICU4CGlue.h"
+#ifdef MOZ_NAIVEFOX
+namespace mozilla::intl::ffi {
+extern "C" intptr_t locale_service_likely_subtags_raw(const uint8_t* name,
+                                                        size_t nameLength,
+                                                        bool add, uint8_t* out,
+                                                        size_t outCapacity);
+}  // namespace mozilla::intl::ffi
+#endif
+
+#ifndef MOZ_NAIVEFOX
+#  include "ICU4CGlue.h"
+#endif
 
 #include <algorithm>
 #include <iterator>
@@ -18,8 +29,12 @@
 #include <string.h>
 #include <utility>
 
-#include "unicode/uloc.h"
-#include "unicode/utypes.h"
+#ifndef MOZ_NAIVEFOX
+#  include "unicode/uloc.h"
+#  include "unicode/utypes.h"
+#else
+#  include <locale.h>
+#endif
 
 namespace mozilla::intl {
 
@@ -755,6 +770,7 @@ Locale::CanonicalizeTransformExtension(UniqueChars& aTransformExtension) {
   return Ok();
 }
 
+#ifndef MOZ_NAIVEFOX
 // Zero-terminated ICU Locale ID.
 using LocaleId =
     Vector<char, LanguageLength + 1 + ScriptLength + 1 + RegionLength + 1>;
@@ -941,6 +957,102 @@ ICUResult Locale::AddLikelySubtags() {
 
 ICUResult Locale::RemoveLikelySubtags() {
   return LikelySubtags(LikelySubtags::Remove, *this);
+}
+#else
+// NaiveFox keeps locale parsing and canonicalization in this component, but
+// delegates likely-subtags data to the ICU4X locale-service glue already used
+// by the retained runtime.
+static ICUResult LikelySubtags(bool add, Locale& aTag) {
+  if (add && !aTag.Language().EqualTo("und") && aTag.Script().Present() &&
+      !aTag.Script().EqualTo("Zzzz") && aTag.Region().Present() &&
+      !aTag.Region().EqualTo("ZZ")) {
+    return Ok();
+  }
+  if (!add && !aTag.Language().EqualTo("und") && aTag.Script().Missing() &&
+      aTag.Region().Missing()) {
+    return Ok();
+  }
+
+  class VectorBuffer final {
+   public:
+    using CharType = char;
+
+    explicit VectorBuffer(Vector<char, 64>& aVector) : mVector(aVector) {}
+    bool reserve(size_t aLength) { return mVector.reserve(aLength); }
+    char* data() { return mVector.begin(); }
+    size_t length() const { return mVector.length(); }
+    size_t capacity() const { return mVector.capacity(); }
+    void written(size_t aLength) {
+      MOZ_ALWAYS_TRUE(mVector.resizeUninitialized(aLength));
+    }
+
+   private:
+    Vector<char, 64>& mVector;
+  };
+
+  Vector<char, 64> source;
+  VectorBuffer sourceBuffer(source);
+  MOZ_TRY(aTag.ToString(sourceBuffer));
+
+  char output[64];
+  intptr_t outputLength = ffi::locale_service_likely_subtags_raw(
+      reinterpret_cast<const uint8_t*>(source.begin()), source.length(), add,
+      reinterpret_cast<uint8_t*>(output), sizeof(output));
+  if (outputLength < 0 || outputLength > intptr_t(sizeof(output))) {
+    return Err(ICUError::InternalError);
+  }
+
+  Locale localeTag;
+  auto parsed = LocaleParser::TryParseBaseName(
+      Span<const char>(output, static_cast<size_t>(outputLength)), localeTag);
+  if (parsed.isErr()) {
+    return Err(ICUError::InternalError);
+  }
+
+  aTag.SetLanguage(localeTag.Language());
+  aTag.SetScript(localeTag.Script());
+  aTag.SetRegion(localeTag.Region());
+  if (aTag.CanonicalizeBaseName().isErr()) {
+    return Err(ICUError::InternalError);
+  }
+  return Ok();
+}
+
+ICUResult Locale::AddLikelySubtags() {
+  return LikelySubtags(true, *this);
+}
+
+ICUResult Locale::RemoveLikelySubtags() {
+  return LikelySubtags(false, *this);
+}
+#endif
+
+const char* Locale::GetDefaultLocale() {
+#ifdef MOZ_NAIVEFOX
+  const char* locale = setlocale(LC_CTYPE, nullptr);
+  if (!locale || !*locale || strcmp(locale, "C") == 0 ||
+      strcmp(locale, "POSIX") == 0) {
+    return "en-US";
+  }
+
+  // POSIX locale names commonly use an underscore and an encoding suffix,
+  // while LocaleService consumes BCP 47 language tags.  Normalize the small
+  // fixed-size value without introducing another locale library.
+  static thread_local char normalized[128];
+  size_t length = 0;
+  for (; locale[length] && locale[length] != '.' && locale[length] != '@' &&
+         length + 1 < sizeof(normalized); ++length) {
+    normalized[length] = locale[length] == '_' ? '-' : locale[length];
+  }
+  normalized[length] = '\0';
+  if (!normalized[0] || strcmp(normalized, "C") == 0 ||
+      strcmp(normalized, "POSIX") == 0) {
+    return "en-US";
+  }
+  return normalized;
+#else
+  return uloc_getDefault();
+#endif
 }
 
 UniqueChars Locale::DuplicateStringToUniqueChars(const char* aStr) {

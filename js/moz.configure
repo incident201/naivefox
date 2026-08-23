@@ -1228,9 +1228,13 @@ set_define("MOZ_SYSTEM_ICU", True, when=system_icu)
 option("--without-intl-api", help="Disable ECMAScript Internationalization API")
 
 
-@depends("--with-intl-api", js_standalone)
-def check_intl_api(enabled, js_standalone):
-    if not enabled and not js_standalone:
+@depends("--with-intl-api", js_standalone, build_project)
+def check_intl_api(enabled, js_standalone, build_project):
+    # NaiveFox does not embed SpiderMonkey's ECMAScript Intl API. Its
+    # networking/runtime Unicode needs are provided by retained ICU4X Rust
+    # crates, so do not pull the legacy ICU4C graph into the product.
+    # Keep the upstream restriction for every other Gecko application.
+    if not enabled and not js_standalone and build_project != "netwerk/naivefox":
         die("--without-intl-api is not supported")
 
 

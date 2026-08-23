@@ -265,12 +265,22 @@ def assert_closure(report_path, topsrcdir):
             violations.append(f"GFX implementation object in link closure: {p}")
         if "harfbuzz" in lower:
             violations.append(f"HarfBuzz implementation object in link closure: {p}")
+        if "intl/icu/" in lower or "config/external/icu" in lower:
+            violations.append(f"ICU4C implementation object in link closure: {p}")
 
     # The filtered Cargo graph must not smuggle a platform-specific crate into
     # the other target.  These names are intentionally conservative: a new
     # platform crate should make the audit fail and be reviewed explicitly.
     rust_crates = report.get("rust_closure", {}).get("crates", [])
     crate_names = {str(c.get("name", "")).lower() for c in rust_crates}
+    if any(
+        token in crate_name
+        for crate_name in crate_names
+        for token in ("icu-sys", "icu_capi", "icu_cxx", "icu4c")
+    ):
+        violations.append("ICU4C Rust binding crate is reachable in NaiveFox closure")
+    if "icu4x_unicode_glue" not in crate_names:
+        violations.append("ICU4X Unicode bridge crate is missing from Rust closure")
     if crate_names.intersection({
         "firefox-on-glean",
         "glean",
@@ -311,6 +321,8 @@ def assert_closure(report_path, topsrcdir):
                     violations.append(
                         f"Forbidden desktop UI shared library in DT_NEEDED: {dep}"
                     )
+            if "icu" in dep.lower():
+                violations.append(f"ICU4C shared library in DT_NEEDED: {dep}")
 
     # 4. Assert the minimized Rust closure is present and SpiderMonkey stays
     # out of the NaiveFox product graph.

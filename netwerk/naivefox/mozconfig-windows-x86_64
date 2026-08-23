@@ -24,6 +24,7 @@ ac_add_options --disable-ctypes
 ac_add_options --disable-accessibility
 ac_add_options --disable-necko-wifi
 ac_add_options --without-wasm-sandboxed-libraries
+ac_add_options --without-intl-api
 
 export CC="${CC:-clang-cl}"
 export CXX="${CXX:-clang-cl}"

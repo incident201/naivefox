@@ -76,7 +76,8 @@ const nsUGenCategory sDetailedToGeneralCategory[] = {
     // clang-format on
 };
 
-const hb_unicode_general_category_t sICUtoHBcategory[U_CHAR_CATEGORY_COUNT] = {
+const hb_unicode_general_category_t sICUtoHBcategory[
+    static_cast<size_t>(intl::GeneralCategory::GeneralCategoryCount)] = {
     // clang-format off
   HB_UNICODE_GENERAL_CATEGORY_UNASSIGNED, // U_GENERAL_OTHER_TYPES = 0,
   HB_UNICODE_GENERAL_CATEGORY_UPPERCASE_LETTER, // U_UPPERCASE_LETTER = 1,

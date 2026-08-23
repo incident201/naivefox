@@ -11,8 +11,10 @@
 #include "OSPreferences.h"
 
 #include "mozilla/ClearOnShutdown.h"
+#ifndef MOZ_NAIVEFOX
 #include "mozilla/intl/DateTimePatternGenerator.h"
 #include "mozilla/intl/DateTimeFormat.h"
+#endif
 #include "mozilla/intl/LocaleService.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
@@ -90,6 +92,7 @@ void OSPreferences::PreferenceChanged(const char* aPrefName,
   }
 }
 
+#ifndef MOZ_NAIVEFOX
 /**
  * This method should be called by every method of OSPreferences that
  * retrieves a locale id from external source.
@@ -404,6 +407,48 @@ bool OSPreferences::GetDateTimeConnectorPattern(const nsACString& aLocale,
   aRetVal = NS_ConvertUTF16toUTF8(result.data(), result.size());
   return true;
 }
+
+#else
+
+bool OSPreferences::CanonicalizeLanguageTag(nsCString& aLoc) {
+  return LocaleService::CanonicalizeLanguageId(aLoc);
+}
+
+bool OSPreferences::GetDateTimePatternForStyle(
+    DateTimeFormatStyle, DateTimeFormatStyle, const nsACString&,
+    nsACString& aRetVal) {
+  aRetVal.Truncate();
+  return false;
+}
+
+bool OSPreferences::GetDateTimeSkeletonForStyle(
+    DateTimeFormatStyle, DateTimeFormatStyle, const nsACString&,
+    nsACString& aRetVal) {
+  aRetVal.Truncate();
+  return false;
+}
+
+bool OSPreferences::OverrideDateTimePattern(
+    DateTimeFormatStyle, DateTimeFormatStyle, const nsACString&,
+    nsACString& aRetVal) {
+  aRetVal.Truncate();
+  return false;
+}
+
+bool OSPreferences::GetPatternForSkeleton(const nsACString&,
+                                          const nsACString&,
+                                          nsACString& aRetVal) {
+  aRetVal.Truncate();
+  return false;
+}
+
+bool OSPreferences::GetDateTimeConnectorPattern(const nsACString&,
+                                                nsACString& aRetVal) {
+  aRetVal.Truncate();
+  return false;
+}
+
+#endif  // MOZ_NAIVEFOX
 
 /**
  * mozIOSPreferences methods

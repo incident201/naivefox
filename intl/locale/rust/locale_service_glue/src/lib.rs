@@ -9,17 +9,97 @@ use icu_locale::{
 };
 use nsstring::{nsACString, nsAString};
 
-pub fn langid_for_mozilla(name: &nsACString) -> Result<LanguageIdentifier, ParseError> {
+fn langid_for_bytes(mut name: &[u8]) -> Result<LanguageIdentifier, ParseError> {
     if name.eq_ignore_ascii_case(b"ja-jp-mac") {
         Ok(langid!("ja-JP-macos"))
     } else {
         // Cut out any `.FOO` like `en-US.POSIX`.
-        let mut name: &[u8] = name.as_ref();
         if let Some(ptr) = name.iter().position(|b| b == &b'.') {
             name = &name[..ptr];
         }
+        // Locale::ToString may contain extensions.  Likely subtags operate on
+        // the language/script/region base name, just like the old ICU path.
+        let mut offset = 0;
+        while let Some(relative) = name[offset..].iter().position(|b| b == &b'-') {
+            let start = offset + relative + 1;
+            let end = name[start..]
+                .iter()
+                .position(|b| b == &b'-')
+                .map(|relative| start + relative)
+                .unwrap_or(name.len());
+            if end - start == 1 {
+                name = &name[..offset + relative];
+                break;
+            }
+            offset = end;
+            if offset >= name.len() {
+                break;
+            }
+        }
         LanguageIdentifier::try_from_utf8(name)
     }
+}
+
+pub fn langid_for_mozilla(name: &nsACString) -> Result<LanguageIdentifier, ParseError> {
+    langid_for_bytes(name.as_ref())
+}
+
+/// Apply the UTS #35 likely-subtags operation used by the retained C++ Locale
+/// API.  This keeps the implementation on the same ICU4X data and expander as
+/// the other locale-service helpers instead of reintroducing ICU4C.
+#[no_mangle]
+pub extern "C" fn locale_service_likely_subtags(
+    name: &nsACString,
+    add: bool,
+    out: &mut nsACString,
+) -> bool {
+    let mut langid = match langid_for_mozilla(name) {
+        Ok(langid) => langid,
+        Err(_) => return false,
+    };
+
+    let expander = LocaleExpander::new_extended();
+    if add {
+        expander.maximize(&mut langid);
+    } else {
+        expander.minimize(&mut langid);
+    }
+
+    out.assign(langid.to_string().as_str());
+    true
+}
+
+/// Raw-pointer variant used by the ICU4C-free C++ Locale component.  Keeping
+/// this ABI independent of XPCOM string types lets that small static library
+/// reuse the same ICU4X locale data without inheriting libxul-only headers.
+#[no_mangle]
+pub unsafe extern "C" fn locale_service_likely_subtags_raw(
+    name: *const u8,
+    name_len: usize,
+    add: bool,
+    out: *mut u8,
+    out_capacity: usize,
+) -> isize {
+    if name.is_null() || out.is_null() {
+        return -1;
+    }
+    let input = core::slice::from_raw_parts(name, name_len);
+    let mut langid = match langid_for_bytes(input) {
+        Ok(langid) => langid,
+        Err(_) => return -1,
+    };
+    let expander = LocaleExpander::new_extended();
+    if add {
+        expander.maximize(&mut langid);
+    } else {
+        expander.minimize(&mut langid);
+    }
+    let rendered = langid.to_string();
+    if rendered.len() > out_capacity {
+        return -2;
+    }
+    core::ptr::copy_nonoverlapping(rendered.as_ptr(), out, rendered.len());
+    rendered.len() as isize
 }
 
 /// The unicode ellipsis char "…", or "...", depending on the locale.
@@ -61,11 +141,11 @@ pub extern "C" fn locale_service_insert_separator_before_accesskeys(name: &nsACS
 ///
 /// The default value is either
 ///
-///     $lang, en-US, en
+/// The shape is `<lang>, en-US, en`
 ///
 /// or
 ///
-///     $lang-$region, $lang, en-US, en
+/// or `<lang>-<region>, <lang>, en-US, en` when a region is present.
 ///
 /// if the current locale includes a region subtag.
 ///
@@ -300,5 +380,37 @@ pub extern "C" fn locale_service_default_url_fixup_suffix(name: &nsACString, out
             _ => out.assign(".com"),
         },
         Err(_) => out.assign(".com"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::locale_service_likely_subtags_raw;
+
+    fn transform(input: &[u8], add: bool) -> String {
+        let mut out = [0u8; 64];
+        let length = unsafe {
+            locale_service_likely_subtags_raw(
+                input.as_ptr(),
+                input.len(),
+                add,
+                out.as_mut_ptr(),
+                out.len(),
+            )
+        };
+        assert!(length >= 0);
+        String::from_utf8(out[..length as usize].to_vec()).unwrap()
+    }
+
+    #[test]
+    fn likely_subtags_matches_cldr_examples() {
+        assert_eq!(transform(b"en", true), "en-Latn-US");
+        assert_eq!(transform(b"zh", true), "zh-Hans-CN");
+        assert_eq!(transform(b"zh-Hant-TW", false), "zh-TW");
+    }
+
+    #[test]
+    fn likely_subtags_ignores_extensions() {
+        assert_eq!(transform(b"en-Latn-US-u-ca-gregory", true), "en-Latn-US");
     }
 }

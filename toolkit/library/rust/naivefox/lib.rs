@@ -14,6 +14,7 @@ extern crate gecko_tracing;
 extern crate gkrust_utils;
 extern crate happy_eyeballs_glue;
 extern crate http_sfv;
+extern crate icu4x_unicode_glue;
 extern crate idna_glue;
 extern crate jsrust_shared;
 extern crate locale_service_glue;
