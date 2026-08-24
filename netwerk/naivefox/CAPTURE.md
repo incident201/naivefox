@@ -132,6 +132,33 @@ metadata with exact `Priority: u=0, i`, plus same-origin stylesheet/script
 `Referer`, fetch metadata, and `Priority: u=2`; only pass/fail booleans enter
 the safe summary.
 
+`run-h2-connect-priority-comparison.sh` isolates the scheduling cause of the
+first SOCKS tunnel. It uses the same authenticated Caddy listener for an
+ordinary proxied same-base Firefox navigation, NaiveFox default, and the
+explicit first-tunnel UrgentStart diagnostic. Firefox receives a private
+exact-target channel filter through a system-access Marionette session; the
+filter carries preemptive proxy authorization in memory, never in a profile or
+command line. The decrypted gate rejects a 407, multiple outer TCP/ClientHello
+identities, TLS/SETTINGS mismatch, or missing/ambiguous scheduling evidence.
+The exact first-CONNECT packet must contain one relevant HEADERS occurrence,
+method, and stream plus one priority-flag/dependency/weight field set; an extra
+coalesced HEADERS or PRIORITY occurrence invalidates admission. Before capture,
+both fresh NaiveFox processes must have no applied marker. After workload,
+default must still have none, while the diagnostic must have exactly one safe
+`Connection 1` H2 applied marker ordered before its first CONNECT-established
+evidence. Only the resulting validation booleans are exported. A valid run
+classifies the mechanism as `native-match`, `wire-null`, or `native-mismatch`;
+the latter two remain successful experiments and delete their private raw
+material normally. Safe evidence records only that verdict,
+Priority-header-presence booleans, scheduling equality, header names/order, and
+source/build hashes. It never feeds a passive classifier.
+The current same-base Caddy H2 control produced `mechanism_verdict=wire-null`:
+default NaiveFox, the UrgentStart diagnostic, and proxied Firefox had equal
+observable scheduling, and none carried a CONNECT `Priority` header. Do not
+promote this diagnostic to a camouflage default or spend passive samples on
+it; it remains available only to test another H2 peer or a future Gecko tunnel
+adapter change.
+
 The preamble callback barrier and observed wire ordering are deliberately
 separate claims. On a fast loopback run, Necko can receive a resource response,
 release `tree-early-overlap`, and still schedule the CONNECT HEADERS after the

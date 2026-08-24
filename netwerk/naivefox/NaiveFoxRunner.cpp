@@ -108,6 +108,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
     tunnelConfig.mPreamble = aConfig.mPreamble;
     tunnelConfig.mOuterSessionGate = aConfig.mOuterSessionGate;
+    tunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart =
+        aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
   }
   return tunnelConfigs;
 }

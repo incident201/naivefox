@@ -96,7 +96,9 @@ struct TunnelConfig final {
         mProtocol(aOther.mProtocol),
         mHostResolverRule(aOther.mHostResolverRule),
         mPreamble(aOther.mPreamble),
-        mOuterSessionGate(aOther.mOuterSessionGate) {
+        mOuterSessionGate(aOther.mOuterSessionGate),
+        mDiagnosticFirstSocksTunnelUrgentStart(
+            aOther.mDiagnosticFirstSocksTunnelUrgentStart) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -108,6 +110,8 @@ struct TunnelConfig final {
       mHostResolverRule = aOther.mHostResolverRule;
       mPreamble = aOther.mPreamble;
       mOuterSessionGate = aOther.mOuterSessionGate;
+      mDiagnosticFirstSocksTunnelUrgentStart =
+          aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -122,6 +126,7 @@ struct TunnelConfig final {
   nsTArray<ExtraHeader> mExtraHeaders;
   PreambleConfig mPreamble;
   bool mOuterSessionGate = false;
+  bool mDiagnosticFirstSocksTunnelUrgentStart = false;
 };
 
 class TunnelSession final {
@@ -133,7 +138,8 @@ class TunnelSession final {
   using ClosedCallback = std::function<void(nsresult)>;
 
   TunnelSession(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
-                const TunnelConfig& aConfig, nsIEventTarget* aSocketTarget,
+                const TunnelConfig& aConfig, bool aConnectUrgentStart,
+                nsIEventTarget* aSocketTarget,
                 EstablishedCallback&& aOnEstablished,
                 FailureCallback&& aOnFailure, ClosedCallback&& aOnClosed);
 

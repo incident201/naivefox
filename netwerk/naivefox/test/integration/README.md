@@ -190,6 +190,46 @@ it passes or use the arm for passive causal screening while this outcome is
 nondeterministic, because that would select samples by their observed
 scheduling.
 
+`run-h2-connect-priority-comparison.sh` is a separate same-base causal
+diagnostic for the first SOCKS tunnel. It compares an ordinary top-level HTTPS
+navigation through the fixture's existing authenticated H2 forward proxy with
+NaiveFox default behavior and the opt-in
+`diagnostic-first-socks-tunnel-urgent-start` behavior. A private privileged
+Marionette controller installs an exact-target `nsIProtocolProxyChannelFilter`
+before navigation. The filter constructs Firefox's normal HTTPS proxy info and
+supplies the fixture Basic header preemptively, so the production Caddy route
+is unchanged and a 407 retry cannot contaminate ordering. All three browsers
+are ready before capture and navigate only after capture begins.
+
+Admission requires one physical TCP/H2 identity and one outer ClientHello per
+cohort, equal same-base TLS and SETTINGS semantics, no 407, successful classic
+CONNECT, the expected Naive padding distinction, and non-empty scheduling
+evidence. The first-CONNECT packet is accepted only with exactly one relevant
+HEADERS occurrence/method/stream and exactly one priority-flag, dependency, and
+weight field set; coalesced extra HEADERS or PRIORITY evidence fails closed.
+Both fresh NaiveFox logs must have zero diagnostic markers before capture.
+After workload, default must still have zero and the diagnostic arm exactly one
+`Connection 1` H2 applied marker before the first CONNECT-established log
+evidence. Safe output exposes only pass/fail booleans for that check. Private
+decrypted H2 fields compare the first CONNECT's native scheduling signature and
+observe whether a `Priority` header name is present.
+A valid capture produces one of three mechanism verdicts: `native-match` when
+the urgent arm alone matches Firefox and has compatible Priority-header
+presence; `wire-null` when all three scheduling signatures and header-presence
+states match; or `native-mismatch` for every other valid relationship. Negative
+verdicts are results, not infrastructure failures, and successful cleanup
+deletes their raw data. Only the verdict, equality/presence booleans, header
+names, relative ordering, and source/build hashes enter safe output; no header
+value, credential, authority, port, profile, browser-driver log, NSS secret, or
+capture survives a valid run. This diagnostic is not a passive classifier and
+must not be included in camouflage datasets.
+
+The current same-base Caddy H2 run is `wire-null`: both NaiveFox variants match
+proxied Firefox's observable CONNECT scheduling and all three omit a CONNECT
+`Priority` header. Consequently the opt-in setting is research instrumentation,
+not a camouflage recommendation, and it must not be promoted to a default or
+screened passively without a different peer or tunnel-adapter implementation.
+
 In same-base mode, `run-h3-capture-comparison.sh --compare-arms` performs a
 private decrypted sequence audit of `off`, `gate`, `root` (the
 `document-complete` alias), `tree-complete`, and `tree-overlap`. The

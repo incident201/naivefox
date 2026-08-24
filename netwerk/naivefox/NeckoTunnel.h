@@ -160,17 +160,15 @@ nsresult OpenProxyPreamble(
     const Maybe<HostResolverRule>& aHostResolverRule = {},
     nsIRequest** aOpenedRequest = nullptr);
 
-nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
-                         const nsACString& aTargetAuthority,
-                         const nsACString& aProxyUser,
-                         const nsACString& aProxyPassword,
-                         nsIHttpUpgradeListener* aUpgradeListener,
-                         nsIStreamListener* aChannelListener,
-                         const nsACString& aConnectPadding,
-                         ProxyProtocol aProtocol,
-                         const Maybe<HostResolverRule>& aHostResolverRule = {},
-                         const nsTArray<ExtraHeader>& aExtraHeaders = {},
-                         nsIRequest** aOpenedRequest = nullptr);
+nsresult OpenNeckoTunnel(
+    const nsACString& aProxyUrl, const nsACString& aTargetAuthority,
+    const nsACString& aProxyUser, const nsACString& aProxyPassword,
+    nsIHttpUpgradeListener* aUpgradeListener,
+    nsIStreamListener* aChannelListener, const nsACString& aConnectPadding,
+    ProxyProtocol aProtocol,
+    const Maybe<HostResolverRule>& aHostResolverRule = {},
+    const nsTArray<ExtraHeader>& aExtraHeaders = {},
+    bool aConnectUrgentStart = false, nsIRequest** aOpenedRequest = nullptr);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,

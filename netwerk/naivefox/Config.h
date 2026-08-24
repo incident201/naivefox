@@ -74,6 +74,7 @@ struct Config final {
   nsTArray<ExtraHeader> mExtraHeaders;
   PreambleConfig mPreamble;
   bool mOuterSessionGate = false;
+  bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;

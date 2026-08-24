@@ -1397,7 +1397,8 @@ nsresult OpenNeckoTunnel(
     nsIHttpUpgradeListener* aUpgradeListener,
     nsIStreamListener* aChannelListener, const nsACString& aConnectPadding,
     ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule,
-    const nsTArray<ExtraHeader>& aExtraHeaders, nsIRequest** aOpenedRequest) {
+    const nsTArray<ExtraHeader>& aExtraHeaders, bool aConnectUrgentStart,
+    nsIRequest** aOpenedRequest) {
   if (!aUpgradeListener || !aChannelListener) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -1471,6 +1472,17 @@ nsresult OpenNeckoTunnel(
     MOZ_TRY(internal->SetProxyConnectHeader("padding"_ns, aConnectPadding));
   }
 
+  if (aConnectUrgentStart) {
+    nsCOMPtr<nsIClassOfService> cos = do_QueryInterface(channel);
+    if (!cos) {
+      return NS_ERROR_NO_INTERFACE;
+    }
+    MOZ_TRY(cos->AddClassFlags(nsIClassOfService::UrgentStart));
+    if (StaticPrefs::dom_document_priority_incremental()) {
+      MOZ_TRY(cos->SetIncremental(true));
+    }
+  }
+
   MOZ_TRY(internal->HTTPUpgrade(EmptyCString(), aUpgradeListener));
   MOZ_TRY(channel->AsyncOpen(aChannelListener));
   if (aOpenedRequest) {
@@ -1506,7 +1518,7 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
     nsCOMPtr<nsIRequest> openedRequest;
     MOZ_TRY(OpenNeckoTunnel(aProxyUrl, aTargetAuthority, aProxyUser,
                             aProxyPassword, listener, listener, EmptyCString(),
-                            actualProtocol, {}, {},
+                            actualProtocol, {}, {}, false,
                             getter_AddRefs(openedRequest)));
 
     nsCOMPtr<nsITimer> establishmentTimer;

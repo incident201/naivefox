@@ -18,6 +18,7 @@
 #include "codec/NaivePadding.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/StaticPrefs_dom.h"
 #include "nsCOMPtr.h"
 #include "nsError.h"
 #include "nsIAsyncInputStream.h"
@@ -375,12 +376,13 @@ class TunnelSession::Impl final {
   enum class ActiveRequestKind : uint8_t { None, Tunnel };
 
   Impl(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
-       const TunnelConfig& aConfig, nsIEventTarget* aSocketTarget,
-       EstablishedCallback&& aOnEstablished, FailureCallback&& aOnFailure,
-       ClosedCallback&& aOnClosed)
+       const TunnelConfig& aConfig, bool aConnectUrgentStart,
+       nsIEventTarget* aSocketTarget, EstablishedCallback&& aOnEstablished,
+       FailureCallback&& aOnFailure, ClosedCallback&& aOnClosed)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
         mConfig(aConfig),
+        mConnectUrgentStart(aConnectUrgentStart),
         mSocketTarget(aSocketTarget),
         mConnectionId(
             gNextConnectionId.fetch_add(1, std::memory_order_relaxed)),
@@ -391,6 +393,7 @@ class TunnelSession::Impl final {
   nsCOMPtr<nsIAsyncInputStream> mLocalIn;
   nsCOMPtr<nsIAsyncOutputStream> mLocalOut;
   TunnelConfig mConfig;
+  const bool mConnectUrgentStart;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   const uint64_t mConnectionId;
   EstablishedCallback mOnEstablished;
@@ -402,6 +405,7 @@ class TunnelSession::Impl final {
   ProxyProtocol mAttemptProtocol = ProxyProtocol::H2;
   uint64_t mAttemptGeneration = 0;
   bool mFallbackUsed = false;
+  bool mConnectUrgentStartLogged = false;
   bool mTransportReady = false;
   bool mMetadataReady = false;
   nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
@@ -504,16 +508,14 @@ void TunnelAttempt::CancelEstablishmentTimeout() {
   }
 }
 
-TunnelSession::TunnelSession(nsIAsyncInputStream* aLocalIn,
-                             nsIAsyncOutputStream* aLocalOut,
-                             const TunnelConfig& aConfig,
-                             nsIEventTarget* aSocketTarget,
-                             EstablishedCallback&& aOnEstablished,
-                             FailureCallback&& aOnFailure,
-                             ClosedCallback&& aOnClosed)
-    : mImpl(MakeUnique<Impl>(aLocalIn, aLocalOut, aConfig, aSocketTarget,
-                             std::move(aOnEstablished), std::move(aOnFailure),
-                             std::move(aOnClosed))) {}
+TunnelSession::TunnelSession(
+    nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
+    const TunnelConfig& aConfig, bool aConnectUrgentStart,
+    nsIEventTarget* aSocketTarget, EstablishedCallback&& aOnEstablished,
+    FailureCallback&& aOnFailure, ClosedCallback&& aOnClosed)
+    : mImpl(MakeUnique<Impl>(aLocalIn, aLocalOut, aConfig, aConnectUrgentStart,
+                             aSocketTarget, std::move(aOnEstablished),
+                             std::move(aOnFailure), std::move(aOnClosed))) {}
 
 TunnelSession::~TunnelSession() {
   CancelInternal(NS_BASE_STREAM_CLOSED, false);
@@ -802,8 +804,17 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
         mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
         mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,
         mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
-        getter_AddRefs(openedRequest));
+        mImpl->mConnectUrgentStart, getter_AddRefs(openedRequest));
     if (NS_SUCCEEDED(rv)) {
+      if (mImpl->mConnectUrgentStart && !mImpl->mConnectUrgentStartLogged) {
+        mImpl->mConnectUrgentStartLogged = true;
+        RuntimeLogEvent(
+            "Connection %llu diagnostic-first-socks-tunnel-urgent-start "
+            "applied=1 incremental=%d protocol=%s\n",
+            static_cast<unsigned long long>(mImpl->mConnectionId),
+            StaticPrefs::dom_document_priority_incremental(),
+            ProtocolName(aProtocol));
+      }
       mImpl->mActiveRequest = openedRequest;
       mImpl->mActiveRequestGeneration = aGeneration;
       mImpl->mActiveRequestKind = Impl::ActiveRequestKind::Tunnel;

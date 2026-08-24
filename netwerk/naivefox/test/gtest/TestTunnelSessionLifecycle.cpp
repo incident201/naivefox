@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <array>
+#include <thread>
+
 #include "NeckoTunnel.h"
 #include "SocksServer.h"
 #include "TunnelSession.h"
@@ -43,6 +46,33 @@ TEST(NaiveFoxEmbeddedLifecycle, StopRequestIsLatchedAndIdempotent)
   EXPECT_TRUE(control->StopRequested());
   control->RequestStop();
   EXPECT_TRUE(control->StopRequested());
+}
+
+TEST(NaiveFoxSocksServer, DisabledUrgentStartClaimDoesNotConsumeSelector)
+{
+  detail::FirstSocksTunnelUrgentStartSelector selector;
+  EXPECT_FALSE(selector.Claim(false));
+  EXPECT_TRUE(selector.Claim(true));
+  EXPECT_FALSE(selector.Claim(true));
+}
+
+TEST(NaiveFoxSocksServer, ConcurrentUrgentStartClaimSelectsExactlyOneTunnel)
+{
+  detail::FirstSocksTunnelUrgentStartSelector selector;
+  Atomic<uint32_t, Relaxed> claims{0};
+  std::array<std::thread, 16> workers;
+  for (auto& worker : workers) {
+    worker = std::thread([&]() {
+      if (selector.Claim(true)) {
+        ++claims;
+      }
+    });
+  }
+  for (auto& worker : workers) {
+    worker.join();
+  }
+  EXPECT_EQ(claims, 1U);
+  EXPECT_FALSE(selector.Claim(true));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
@@ -181,8 +211,9 @@ RefPtr<TunnelSession> NewSession(nsIEventTarget* aSocketTarget,
   NS_NewPipe2(getter_AddRefs(localIn), getter_AddRefs(localOut), true, true);
   TunnelConfig config;
   return new TunnelSession(
-      localIn, localOut, config, aSocketTarget, [](const nsACString&, bool) {},
-      [](nsresult) {}, [&aClosedCount](nsresult) { ++aClosedCount; });
+      localIn, localOut, config, false, aSocketTarget,
+      [](const nsACString&, bool) {}, [](nsresult) {},
+      [&aClosedCount](nsresult) { ++aClosedCount; });
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, QueuedChannelStopKeepsSessionAlive)

@@ -12,7 +12,15 @@ TREE_PREAMBLE_MAX_BYTES = 256 * 1024
 TREE_PREAMBLE_MAX_ASSETS = 2
 
 
-def build_config(arm, protocol, socks_port, proxy_port, proxy_user, proxy_pass):
+def build_config(
+    arm,
+    protocol,
+    socks_port,
+    proxy_port,
+    proxy_user,
+    proxy_pass,
+    diagnostic_first_socks_tunnel_urgent_start=False,
+):
     supported_arms = (
         "off",
         "gate",
@@ -56,7 +64,7 @@ def build_config(arm, protocol, socks_port, proxy_port, proxy_user, proxy_pass):
             "max-assets": TREE_PREAMBLE_MAX_ASSETS,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
         }
-    return {
+    config = {
         "listen": f"socks://127.0.0.1:{socks_port}",
         "proxy": f"{scheme}://{user}:{password}@localhost:{proxy_port}",
         "host-resolver-rules": "MAP localhost 127.0.0.1",
@@ -64,6 +72,9 @@ def build_config(arm, protocol, socks_port, proxy_port, proxy_user, proxy_pass):
         "preamble": preamble,
         "log": "",
     }
+    if diagnostic_first_socks_tunnel_urgent_start:
+        config["diagnostic-first-socks-tunnel-urgent-start"] = True
+    return config
 
 
 def write_config(path, config):
@@ -94,6 +105,10 @@ def main():
     parser.add_argument("--protocol", choices=("h2", "h3"), required=True)
     parser.add_argument("--socks-port", type=int, required=True)
     parser.add_argument("--proxy-port", type=int, required=True)
+    parser.add_argument(
+        "--diagnostic-first-socks-tunnel-urgent-start",
+        action="store_true",
+    )
     args = parser.parse_args()
     user = os.environ.get("NAIVEFOX_FIXTURE_USER", "")
     password = os.environ.get("NAIVEFOX_FIXTURE_PASS", "")
@@ -104,6 +119,7 @@ def main():
         args.proxy_port,
         user,
         password,
+        args.diagnostic_first_socks_tunnel_urgent_start,
     )
     write_config(args.output, config)
 

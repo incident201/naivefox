@@ -112,6 +112,7 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_EQ(config.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(config.mPreamble.mMaxBytes, 0U);
   EXPECT_FALSE(config.mOuterSessionGate);
+  EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
 }
 
 TEST(NaiveFoxConfig, OuterSessionGateBoolean)
@@ -136,6 +137,38 @@ TEST(NaiveFoxConfig, RejectsInvalidOuterSessionGate)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":1})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":"true"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":true,"outer-session-gate":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, DiagnosticFirstSocksTunnelUrgentStartBoolean)
+{
+  for (const auto& [value, expected] :
+       {std::pair{"true", true}, std::pair{"false", false}}) {
+    Config config;
+    nsAutoCString error;
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_EQ(config.mDiagnosticFirstSocksTunnelUrgentStart, expected);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidDiagnosticFirstSocksTunnelUrgentStart)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":"true"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":true,"diagnostic-first-socks-tunnel-urgent-start":false})",
   };
   for (const char* json : kInvalid) {
     Config config;
@@ -240,6 +273,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mPreamble.mMaxAssets = 6;
   source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
   source.mOuterSessionGate = true;
+  source.mDiagnosticFirstSocksTunnelUrgentStart = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -255,6 +289,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_EQ(copy->mPreamble.mMaxAssets, 6U);
     EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);
     EXPECT_TRUE(copy->mOuterSessionGate);
+    EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
   }
 }
 

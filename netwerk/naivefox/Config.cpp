@@ -332,6 +332,7 @@ class JsonParser final {
     bool sawInsecureConcurrency = false;
     bool sawPreamble = false;
     bool sawOuterSessionGate = false;
+    bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -398,6 +399,16 @@ class JsonParser final {
         sawOuterSessionGate = true;
         MOZ_TRY(ParseBoolean(parsed.mOuterSessionGate,
                              "outer-session-gate must be a boolean"));
+      } else if (key.EqualsLiteral(
+                     "diagnostic-first-socks-tunnel-urgent-start")) {
+        if (sawDiagnosticFirstSocksTunnelUrgentStart) {
+          return Error(
+              "duplicate diagnostic-first-socks-tunnel-urgent-start field");
+        }
+        sawDiagnosticFirstSocksTunnelUrgentStart = true;
+        MOZ_TRY(ParseBoolean(
+            parsed.mDiagnosticFirstSocksTunnelUrgentStart,
+            "diagnostic-first-socks-tunnel-urgent-start must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");

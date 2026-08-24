@@ -79,12 +79,14 @@ class SocksConnection final : public nsIInputStreamCallback,
                   const nsACString& aListenUser,
                   const nsACString& aListenPassword,
                   nsIEventTarget* aSocketTarget,
+                  std::function<bool()>&& aClaimUrgentStart,
                   std::function<void()>&& aOnClose)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
         mTunnelConfig(aTunnelConfig),
         mSocketTarget(aSocketTarget),
         mParser(aListenUser, aListenPassword),
+        mClaimUrgentStart(std::move(aClaimUrgentStart)),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start() { return WaitForInput(); }
@@ -115,6 +117,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   size_t mReplyLength = 0;
   size_t mReplyOffset = 0;
   RefPtr<TunnelSession> mSession;
+  std::function<bool()> mClaimUrgentStart;
   std::function<void()> mOnClose;
   bool mOpening = false;
   bool mEstablished = false;
@@ -189,9 +192,13 @@ nsresult SocksConnection::FlushReplies() {
 
 nsresult SocksConnection::BeginTunnel(const nsACString& aAuthority,
                                       Span<const uint8_t> aInitialPayload) {
+  // Reaching BeginTunnel means the SOCKS request is fully parsed. Consume the
+  // diagnostic claim before opening the outer channel, including when that
+  // open later fails, so retries cannot change which tunnel was selected.
+  const bool connectUrgentStart = mClaimUrgentStart && mClaimUrgentStart();
   RefPtr self = this;
   mSession = new TunnelSession(
-      mLocalIn, mLocalOut, mTunnelConfig, mSocketTarget,
+      mLocalIn, mLocalOut, mTunnelConfig, connectUrgentStart, mSocketTarget,
       [self](const nsACString& aOuterProtocol, bool aPaddingEnabled) {
         self->TunnelEstablished(aOuterProtocol, aPaddingEnabled);
       },
@@ -446,7 +453,7 @@ nsresult HttpConnectConnection::BeginTunnel(
     const nsACString& aAuthority, Span<const uint8_t> aInitialPayload) {
   RefPtr self = this;
   mSession = new TunnelSession(
-      mLocalIn, mLocalOut, mTunnelConfig, mSocketTarget,
+      mLocalIn, mLocalOut, mTunnelConfig, false, mSocketTarget,
       [self](const nsACString& aOuterProtocol, bool aPaddingEnabled) {
         self->TunnelEstablished(aOuterProtocol, aPaddingEnabled);
       },
@@ -581,6 +588,10 @@ class ServerState final {
       : mMutex("NaiveFox::ServerState::mMutex"),
         mMaxConnections(aMaxConnections) {}
 
+  bool ClaimFirstSocksTunnelUrgentStart(bool aEnabled) {
+    return mFirstSocksTunnelUrgentStart.Claim(aEnabled);
+  }
+
   void AddSocket(nsIServerSocket* aSocket) {
     bool close = false;
     {
@@ -708,6 +719,7 @@ class ServerState final {
   uint32_t mAcceptedConnections MOZ_GUARDED_BY(mMutex) = 0;
   uint64_t mNextConnectionId MOZ_GUARDED_BY(mMutex) = 0;
   bool mStopping MOZ_GUARDED_BY(mMutex) = false;
+  detail::FirstSocksTunnelUrgentStartSelector mFirstSocksTunnelUrgentStart;
 };
 
 class LocalListener final : public nsIServerSocketListener {
@@ -764,9 +776,14 @@ NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
         [state, connectionId]() { state->ConnectionClosed(connectionId); }));
   };
   if (mListener.mType == ListenerType::Socks5) {
+    auto claimUrgentStart =
+        [state,
+         enabled = mTunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart]() {
+          return state->ClaimFirstSocksTunnelUrgentStart(enabled);
+    };
     RefPtr connection = new SocksConnection(
-        localIn, localOut, mTunnelConfig, mListener.mUser,
-        mListener.mPassword, mSocketTarget, std::move(onClose));
+        localIn, localOut, mTunnelConfig, mListener.mUser, mListener.mPassword,
+        mSocketTarget, std::move(claimUrgentStart), std::move(onClose));
     nsCOMPtr<nsIEventTarget> socketTarget = mSocketTarget;
     mState->SetCancellation(
         connectionId, [socketTarget, connection = RefPtr{connection}]() {
