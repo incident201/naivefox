@@ -343,6 +343,7 @@ class CamouflageAnalysisTests(unittest.TestCase):
                 "label",
                 "session_id",
                 "experiment_block",
+                "naivefox_arm",
                 "steady_after_32_packet_count",
             ]
             with open(path, "w", newline="", encoding="utf-8") as stream:
@@ -360,6 +361,9 @@ class CamouflageAnalysisTests(unittest.TestCase):
                         "label": label,
                         "session_id": label,
                         "experiment_block": "block-1",
+                        "naivefox_arm": (
+                            "root" if label == "naivefox" else "reference"
+                        ),
                         "steady_after_32_packet_count": count,
                     })
             rows, names = ANALYZE.load_dataset(path)
@@ -370,6 +374,10 @@ class CamouflageAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(
             {ANALYZE.analysis_group(row) for row in rows}, {"block:block-1"}
+        )
+        self.assertEqual(
+            [row["naivefox_arm"] for row in rows],
+            ["reference", "reference", "root"],
         )
 
 

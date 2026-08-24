@@ -43,6 +43,18 @@ struct ExtraHeader final {
   nsCString mValue;
 };
 
+enum class PreambleMode : uint8_t { Off, Root, Tree };
+
+struct PreambleConfig final {
+  static constexpr uint32_t kMaximumAssets = 6;
+  static constexpr uint32_t kMaximumBytes = 384 * 1024;
+
+  PreambleMode mMode = PreambleMode::Off;
+  nsCString mPath{"/"};
+  uint32_t mMaxAssets = 0;
+  uint32_t mMaxBytes = 0;
+};
+
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
 
 struct Config final {
@@ -50,6 +62,8 @@ struct Config final {
   nsTArray<UpstreamProxyConfig> mProxies;
   Maybe<HostResolverRule> mHostResolverRule;
   nsTArray<ExtraHeader> mExtraHeaders;
+  PreambleConfig mPreamble;
+  bool mOuterSessionGate = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;

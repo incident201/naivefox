@@ -12,6 +12,7 @@
 #include "AutoFallback.h"
 #include "HeaderPadding.h"
 #include "NeckoTunnel.h"
+#include "OuterSessionGate.h"
 #include "PaddingNegotiation.h"
 #include "RuntimeLogging.h"
 #include "codec/NaivePadding.h"
@@ -39,6 +40,7 @@ namespace mozilla::naivefox {
 namespace {
 
 constexpr size_t kPumpBufferSize = 64 * 1024;
+constexpr uint32_t kPreambleTimeoutMs = 1500;
 
 std::atomic<uint64_t> gNextConnectionId{1};
 
@@ -52,6 +54,34 @@ const char* ProtocolName(ProxyProtocol aProtocol) {
       return "auto";
   }
   return "unknown";
+}
+
+void AppendGateKeyComponent(nsCString& aKey, const nsACString& aValue) {
+  aKey.AppendInt(aValue.Length());
+  aKey.Append(':');
+  aKey.Append(aValue);
+  aKey.Append('|');
+}
+
+nsCString MakeOuterGateKey(const TunnelConfig& aConfig,
+                           ProxyProtocol aProtocol) {
+  nsCString key;
+  AppendGateKeyComponent(key, aConfig.mProxyUrl);
+  key.AppendInt(static_cast<uint32_t>(aProtocol));
+  key.Append('|');
+  if (aConfig.mHostResolverRule) {
+    key.AppendLiteral("resolver|");
+    AppendGateKeyComponent(key, aConfig.mHostResolverRule->mLogicalHost);
+    AppendGateKeyComponent(key, aConfig.mHostResolverRule->mPhysicalHost);
+  } else {
+    key.AppendLiteral("no-resolver|");
+  }
+  // Proxy credentials are a per-request Proxy-Authorization header and extra
+  // CONNECT headers are not part of nsHttpConnectionInfo's wildcard pool
+  // hash. Do not split the startup gate on either (or retain their values).
+  // Both request kinds use the system principal and this explicit CIK.
+  key.AppendLiteral("system-principal|naivefox-raw-tunnel");
+  return key;
 }
 
 using net::naivefox::NaivePaddingDecoder;
@@ -341,6 +371,8 @@ NS_IMETHODIMP PumpDirection::OnOutputStreamReady(
 
 class TunnelSession::Impl final {
  public:
+  enum class ActiveRequestKind : uint8_t { None, Preamble, Tunnel };
+
   Impl(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
        const TunnelConfig& aConfig, nsIEventTarget* aSocketTarget,
        EstablishedCallback&& aOnEstablished, FailureCallback&& aOnFailure,
@@ -389,8 +421,15 @@ class TunnelSession::Impl final {
   bool mFailed = false;
   bool mClosed = false;
   std::atomic<bool> mCancelRequested{false};
+  std::atomic<bool> mOuterGateRegistered{false};
+  std::atomic<bool> mOuterGateReleaseRequested{false};
+  nsCString mOuterGateKey;
   nsCOMPtr<nsIRequest> mActiveRequest;
   uint64_t mActiveRequestGeneration = 0;
+  ActiveRequestKind mActiveRequestKind = ActiveRequestKind::None;
+  nsCOMPtr<nsITimer> mPreambleTimer;
+  detail::PreambleSequenceState mPreambleSequence;
+  bool mPreambleTimedOut = false;
 };
 
 class TunnelAttempt final : public nsIHttpUpgradeListener,
@@ -519,21 +558,198 @@ void TunnelSession::OpenAttemptOnMain(uint64_t aGeneration,
   if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
     return;
   }
+  // Without the optional gate every tunnel is its own experiment arm and runs
+  // the configured preamble. With it, only the cold-route leader does so;
+  // queued and already-warm participants proceed directly to CONNECT.
+  bool coldLeader = true;
+  if (ShouldGateOuterSession(mImpl->mConfig)) {
+    if (!mImpl->mOuterGateRegistered.load(std::memory_order_acquire)) {
+      mImpl->mOuterGateKey = MakeOuterGateKey(mImpl->mConfig, aProtocol);
+      mImpl->mOuterGateRegistered.store(true, std::memory_order_release);
+    }
+    RefPtr self = this;
+    nsCString authority(aTargetAuthority);
+    const auto admission = OuterSessionGate::Get().Enter(
+        mImpl->mOuterGateKey, mImpl->mConnectionId,
+        [self, aGeneration, aProtocol, authority = std::move(authority)]() {
+          self->OpenAttemptOnMain(aGeneration, aProtocol, authority);
+        });
+    if (admission == OuterSessionGate::Admission::Queued) {
+      RuntimeLogEvent("Connection %llu queued behind outer session gate\n",
+                      static_cast<unsigned long long>(mImpl->mConnectionId));
+      return;
+    }
+    coldLeader = admission == OuterSessionGate::Admission::Leader;
+  }
+
+  if (detail::ShouldRunPreamble(mImpl->mConfig.mPreamble.mMode, coldLeader)) {
+    BeginPreambleOnMain(aGeneration, aProtocol, aTargetAuthority);
+    return;
+  }
+
+  OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
+}
+
+void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
+                                        ProxyProtocol aProtocol,
+                                        const nsACString& aTargetAuthority) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    return;
+  }
+  if (!mImpl->mPreambleSequence.Begin(aGeneration, aProtocol)) {
+    if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol)) {
+      OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
+    }
+    return;
+  }
+
+  mImpl->mPreambleTimedOut = false;
+  if (mImpl->mConfig.mPreamble.mMode == PreambleMode::Tree) {
+    RuntimeLogEvent(
+        "Connection %llu preamble tree mode uses root-only experimental "
+        "sequencing protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
+  }
+
+  RefPtr self = this;
+  nsCString authority(aTargetAuthority);
+  nsCOMPtr<nsIRequest> openedRequest;
+  nsresult rv = OpenProxyPreamble(
+      mImpl->mConfig.mProxyUrl, mImpl->mConfig.mProxyUser,
+      mImpl->mConfig.mProxyPassword, mImpl->mConfig.mPreamble.mPath,
+      mImpl->mConfig.mPreamble.mMaxBytes, aProtocol,
+      [self, aGeneration, aProtocol,
+       authority = std::move(authority)](ProxyPreambleResult aResult) {
+        self->FinishPreambleOnMain(aGeneration, aProtocol, authority,
+                                   aResult.mStatus, aResult.mHttpStatus,
+                                   aResult.mBodyBytes);
+      },
+      mImpl->mConfig.mHostResolverRule, getter_AddRefs(openedRequest));
+  if (NS_FAILED(rv)) {
+    MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
+    RuntimeLogEvent(
+        "Connection %llu preamble result=open-error status=0x%08x http=0 "
+        "bytes=0 protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        static_cast<unsigned>(rv), ProtocolName(aProtocol));
+    // Preamble failures never enter AutoFallback. Continue exactly once with
+    // CONNECT on the same generation and protocol.
+    OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
+    return;
+  }
+
+  mImpl->mActiveRequest = openedRequest;
+  mImpl->mActiveRequestGeneration = aGeneration;
+  mImpl->mActiveRequestKind = Impl::ActiveRequestKind::Preamble;
+  auto timer = NS_NewTimerWithCallback(
+      [self, aGeneration, aProtocol](nsITimer*) {
+        self->PreambleTimeoutOnMain(aGeneration, aProtocol);
+      },
+      kPreambleTimeoutMs, nsITimer::TYPE_ONE_SHOT,
+      "NaiveFox::ProxyPreambleTimeout"_ns);
+  if (timer.isErr()) {
+    rv = timer.unwrapErr();
+    MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
+    nsCOMPtr<nsIRequest> request = std::move(mImpl->mActiveRequest);
+    mImpl->mActiveRequestGeneration = 0;
+    mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
+    (void)request->Cancel(rv);
+    RuntimeLogEvent(
+        "Connection %llu preamble result=timer-error status=0x%08x http=0 "
+        "bytes=0 protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        static_cast<unsigned>(rv), ProtocolName(aProtocol));
+    OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
+    return;
+  }
+  mImpl->mPreambleTimer = timer.unwrap();
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    CancelRequestOnMain(NS_ERROR_ABORT);
+  }
+}
+
+void TunnelSession::FinishPreambleOnMain(uint64_t aGeneration,
+                                         ProxyProtocol aProtocol,
+                                         const nsACString& aTargetAuthority,
+                                         nsresult aStatus, uint32_t aHttpStatus,
+                                         uint32_t aBodyBytes) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol) ||
+      mImpl->mActiveRequestKind != Impl::ActiveRequestKind::Preamble ||
+      mImpl->mActiveRequestGeneration != aGeneration) {
+    return;
+  }
+  if (mImpl->mPreambleTimer) {
+    (void)mImpl->mPreambleTimer->Cancel();
+    mImpl->mPreambleTimer = nullptr;
+  }
+  mImpl->mActiveRequest = nullptr;
+  mImpl->mActiveRequestGeneration = 0;
+  mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
+  MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
+  const bool timedOut = mImpl->mPreambleTimedOut;
+  if (timedOut) {
+    aStatus = NS_ERROR_NET_TIMEOUT;
+  }
+  const bool succeeded =
+      NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
+  const char* result = timedOut                           ? "timeout"
+                       : aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
+                       : succeeded                        ? "success"
+                       : NS_FAILED(aStatus)               ? "network-error"
+                                                          : "http-error";
+  RuntimeLogEvent(
+      "Connection %llu preamble result=%s status=0x%08x http=%u bytes=%u "
+      "protocol=%s\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId), result,
+      static_cast<unsigned>(aStatus), aHttpStatus, aBodyBytes,
+      ProtocolName(aProtocol));
+  if (!mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
+  }
+}
+
+void TunnelSession::PreambleTimeoutOnMain(uint64_t aGeneration,
+                                          ProxyProtocol aProtocol) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol) ||
+      mImpl->mActiveRequestKind != Impl::ActiveRequestKind::Preamble ||
+      mImpl->mActiveRequestGeneration != aGeneration ||
+      !mImpl->mActiveRequest) {
+    return;
+  }
+  mImpl->mPreambleTimer = nullptr;
+  mImpl->mPreambleTimedOut = true;
+  // Let OnStopRequest provide the final byte count. The in-flight phase stays
+  // armed until that callback, which is also the single continuation point.
+  (void)mImpl->mActiveRequest->Cancel(NS_ERROR_NET_TIMEOUT);
+}
+
+void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
+                                      ProxyProtocol aProtocol,
+                                      const nsACString& aTargetAuthority) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire) ||
+      !mImpl->mPreambleSequence.TryStartConnect(aGeneration)) {
+    return;
+  }
   nsAutoCString padding;
   nsresult rv = GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
     RefPtr<TunnelAttempt> attempt =
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
     nsCOMPtr<nsIRequest> openedRequest;
-    rv = OpenNeckoTunnel(mImpl->mConfig.mProxyUrl, aTargetAuthority,
-                         mImpl->mConfig.mProxyUser,
-                         mImpl->mConfig.mProxyPassword, attempt, attempt,
-                         padding, aProtocol, mImpl->mConfig.mHostResolverRule,
-                         mImpl->mConfig.mExtraHeaders,
-                         getter_AddRefs(openedRequest));
+    rv = OpenNeckoTunnel(
+        mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
+        mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,
+        mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
+        getter_AddRefs(openedRequest));
     if (NS_SUCCEEDED(rv)) {
       mImpl->mActiveRequest = openedRequest;
       mImpl->mActiveRequestGeneration = aGeneration;
+      mImpl->mActiveRequestKind = Impl::ActiveRequestKind::Tunnel;
       if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
         CancelRequestOnMain(NS_ERROR_ABORT);
       } else if (mImpl->mConfig.mProtocol == ProxyProtocol::Auto &&
@@ -634,9 +850,17 @@ NS_IMETHODIMP TunnelAttempt::OnStopRequest(nsIRequest* aRequest,
 
 void TunnelSession::CancelRequestOnMain(nsresult aStatus) {
   MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mPreambleTimer) {
+    (void)mImpl->mPreambleTimer->Cancel();
+    mImpl->mPreambleTimer = nullptr;
+  }
   if (mImpl->mActiveRequest) {
+    if (mImpl->mActiveRequestKind == Impl::ActiveRequestKind::Preamble) {
+      mImpl->mPreambleSequence.Cancel();
+    }
     nsCOMPtr<nsIRequest> request = std::move(mImpl->mActiveRequest);
     mImpl->mActiveRequestGeneration = 0;
+    mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
     (void)request->Cancel(aStatus);
   }
 }
@@ -648,6 +872,7 @@ void TunnelSession::ClearRequestOnMain(uint64_t aGeneration,
       mImpl->mActiveRequest == aRequest) {
     mImpl->mActiveRequest = nullptr;
     mImpl->mActiveRequestGeneration = 0;
+    mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
   }
 }
 
@@ -791,6 +1016,14 @@ bool TunnelSession::IsCurrentAttempt(uint64_t aGeneration,
          aProtocol == mImpl->mAttemptProtocol;
 }
 
+bool TunnelSession::ShouldGateOuterSession(const TunnelConfig& aConfig) {
+  // A queued Auto attempt captures H3. If its leader falls back and warms an
+  // H2 route, releasing that stale H3 callback would recreate the startup
+  // race. Keep Auto's existing per-session H3 -> H2 generation semantics
+  // until the winning protocol can be propagated to queued attempts.
+  return aConfig.mOuterSessionGate && aConfig.mProtocol != ProxyProtocol::Auto;
+}
+
 void TunnelSession::ResetAttemptState() {
   if (mImpl->mPendingTunnelIn) {
     (void)mImpl->mPendingTunnelIn->CloseWithStatus(NS_ERROR_ABORT);
@@ -867,6 +1100,7 @@ void TunnelSession::TunnelReady() {
     return;
   }
   mImpl->mReady = true;
+  NotifyOuterGateReady();
   RuntimeLogEvent("Connection %llu established target=%s outer=%s padding=%s\n",
                   static_cast<unsigned long long>(mImpl->mConnectionId),
                   mImpl->mTargetAuthority.get(), mImpl->mOuterProtocol.get(),
@@ -901,6 +1135,7 @@ void TunnelSession::Fail(nsresult aStatus) {
   }
   mImpl->mFailed = true;
   mImpl->mCancelRequested.store(true, std::memory_order_release);
+  ReleaseOuterGate();
   RefPtr self = this;
   (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
       "NaiveFox::CancelFailedTunnelRequest",
@@ -933,6 +1168,7 @@ void TunnelSession::CancelInternal(nsresult aStatus, bool aCancelRequest) {
   }
   mImpl->mClosed = true;
   mImpl->mCancelRequested.store(true, std::memory_order_release);
+  ReleaseOuterGate();
   if (aCancelRequest) {
     RefPtr self = this;
     (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
@@ -962,6 +1198,43 @@ void TunnelSession::CancelInternal(nsresult aStatus, bool aCancelRequest) {
     auto onClosed = std::move(mImpl->mOnClosed);
     onClosed(aStatus);
   }
+}
+
+void TunnelSession::NotifyOuterGateReady() {
+  if (!ShouldGateOuterSession(mImpl->mConfig) ||
+      !mImpl->mOuterGateRegistered.load(std::memory_order_acquire) ||
+      mImpl->mOuterGateReleaseRequested.load(std::memory_order_acquire)) {
+    return;
+  }
+  RefPtr self = this;
+  (void)NS_DispatchToMainThread(
+      NS_NewRunnableFunction("NaiveFox::OuterSessionGateReady", [self]() {
+        if (!self->mImpl->mOuterGateReleaseRequested.load(
+                std::memory_order_acquire)) {
+          OuterSessionGate::Get().MarkReady(self->mImpl->mOuterGateKey,
+                                            self->mImpl->mConnectionId);
+        }
+      }));
+}
+
+void TunnelSession::ReleaseOuterGate() {
+  if (!ShouldGateOuterSession(mImpl->mConfig) ||
+      mImpl->mOuterGateReleaseRequested.exchange(true,
+                                                 std::memory_order_acq_rel)) {
+    return;
+  }
+  if (!mImpl->mOuterGateRegistered.exchange(false,
+                                             std::memory_order_acq_rel)) {
+    return;
+  }
+  nsCString routeKey(mImpl->mOuterGateKey);
+  const uint64_t participant = mImpl->mConnectionId;
+  (void)NS_DispatchToMainThread(
+      NS_NewRunnableFunction("NaiveFox::OuterSessionGateLeave",
+                             [routeKey = std::move(routeKey), participant]() {
+                               OuterSessionGate::Get().Leave(routeKey,
+                                                             participant);
+                             }));
 }
 
 }  // namespace mozilla::naivefox

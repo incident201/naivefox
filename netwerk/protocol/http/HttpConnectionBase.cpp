@@ -136,6 +136,13 @@ void HttpConnectionBase::ChangeState(HttpConnectionState newState) {
 
 nsresult HttpConnectionBase::CheckTunnelIsNeeded(
     nsAHttpTransaction* aTransaction) {
+  if (mState == HttpConnectionState::UNINITIALIZED &&
+      (aTransaction->Caps() & NS_HTTP_PROXY_PREAMBLE) &&
+      aTransaction->ConnectionInfo()->UsingHttpsProxy()) {
+    ChangeState(HttpConnectionState::REQUEST);
+    return NS_OK;
+  }
+
   switch (mState) {
     case HttpConnectionState::UNINITIALIZED: {
       // This is is called first time. Check if we need a tunnel.

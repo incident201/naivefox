@@ -8,6 +8,7 @@ UNIFIED_SOURCES += [
     "TestHeaderPadding.cpp",
     "TestHttpConnectParser.cpp",
     "TestNaivePadding.cpp",
+    "TestOuterSessionGate.cpp",
     "TestPaddingNegotiation.cpp",
     "TestSocks5Parser.cpp",
     "TestTunnelSessionLifecycle.cpp",

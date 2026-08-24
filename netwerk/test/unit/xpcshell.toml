@@ -1623,6 +1623,8 @@ skip-if = [
 
 ["test_proxyconnect_padding_header.js"]
 
+["test_proxy_preamble.js"]
+
 ["test_proxyconnect_raw.js"]
 skip-if = [
   "socketprocess_networking", # Bug 1614708

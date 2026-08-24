@@ -4172,6 +4172,14 @@ HttpBaseChannel::SetProxyConnectHeader(const nsACString& aHeader,
 }
 
 NS_IMETHODIMP
+HttpBaseChannel::SetProxyPreamble() {
+  ENSURE_CALLED_BEFORE_CONNECT();
+
+  mCaps |= NS_HTTP_PROXY_PREAMBLE;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 HttpBaseChannel::GetAllowSpdy(bool* aAllowSpdy) {
   NS_ENSURE_ARG_POINTER(aAllowSpdy);
 

@@ -16,7 +16,7 @@ REQUIRED_METADATA_FIELDS = {
     "label",
     "session_id",
 }
-OPTIONAL_METADATA_FIELDS = {"experiment_block"}
+OPTIONAL_METADATA_FIELDS = {"experiment_block", "naivefox_arm"}
 METADATA_FIELDS = REQUIRED_METADATA_FIELDS | OPTIONAL_METADATA_FIELDS
 FEATURE_PREFIXES = (
     "initial_",
@@ -147,6 +147,13 @@ def load_dataset(path):
                 raise SystemExit("invalid protocol metadata")
             if source["label"] not in {"firefox_a", "firefox_b", "naivefox"}:
                 raise SystemExit("invalid label metadata")
+            arm = source.get("naivefox_arm") or None
+            if arm not in {None, "reference", "off", "gate", "root"}:
+                raise SystemExit("invalid NaiveFox arm metadata")
+            if arm == "reference" and source["label"] == "naivefox":
+                raise SystemExit("NaiveFox row cannot use reference arm metadata")
+            if arm in {"off", "gate", "root"} and source["label"] != "naivefox":
+                raise SystemExit("Firefox row cannot use NaiveFox arm metadata")
             values = {}
             for name in feature_names:
                 try:
@@ -162,6 +169,7 @@ def load_dataset(path):
                 "label": source["label"],
                 "session_id": source["session_id"],
                 "experiment_block": source.get("experiment_block") or None,
+                "naivefox_arm": arm,
                 "features": values,
             })
     group_labels = {}

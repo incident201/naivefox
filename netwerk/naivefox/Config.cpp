@@ -281,6 +281,29 @@ bool IsProtectedProxyConnectHeader(const nsACString& aName) {
          aName.LowerCaseEqualsLiteral("alpn");
 }
 
+bool IsValidPreamblePath(const nsACString& aPath) {
+  if (aPath.IsEmpty() || aPath.Length() > 2048 || aPath.First() != '/' ||
+      (aPath.Length() >= 2 && aPath.CharAt(1) == '/')) {
+    return false;
+  }
+  for (size_t index = 0; index < aPath.Length(); ++index) {
+    const unsigned char value = aPath.CharAt(index);
+    if (value <= 0x20 || value >= 0x7f || value == '?' || value == '#' ||
+        value == '\\') {
+      return false;
+    }
+    if (value == '%' &&
+        (aPath.Length() - index < 3 || !IsHex(aPath.CharAt(index + 1)) ||
+         !IsHex(aPath.CharAt(index + 2)))) {
+      return false;
+    }
+    if (value == '%') {
+      index += 2;
+    }
+  }
+  return true;
+}
+
 class JsonParser final {
  public:
   JsonParser(const nsACString& aInput, nsACString& aError)
@@ -307,6 +330,8 @@ class JsonParser final {
     bool sawExtraHeaders = false;
     bool sawNoPostQuantum = false;
     bool sawInsecureConcurrency = false;
+    bool sawPreamble = false;
+    bool sawOuterSessionGate = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -360,6 +385,19 @@ class JsonParser final {
         sawNoPostQuantum = true;
         MOZ_TRY(ParseBoolean(parsed.mNoPostQuantum,
                              "no-post-quantum must be a boolean"));
+      } else if (key.EqualsLiteral("preamble")) {
+        if (sawPreamble) {
+          return Error("duplicate preamble field");
+        }
+        sawPreamble = true;
+        MOZ_TRY(ParsePreamble(parsed.mPreamble));
+      } else if (key.EqualsLiteral("outer-session-gate")) {
+        if (sawOuterSessionGate) {
+          return Error("duplicate outer-session-gate field");
+        }
+        sawOuterSessionGate = true;
+        MOZ_TRY(ParseBoolean(parsed.mOuterSessionGate,
+                             "outer-session-gate must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -438,6 +476,153 @@ class JsonParser final {
       return NS_OK;
     }
     return Error(aTypeError);
+  }
+
+  nsresult ParseBoundedUnsignedInteger(uint32_t& aOutput, uint32_t aMaximum,
+                                       const char* aTypeError,
+                                       const char* aRangeError) {
+    const size_t start = mPosition;
+    if (mPosition == mInput.Length() || mInput.CharAt(mPosition) < '0' ||
+        mInput.CharAt(mPosition) > '9') {
+      return Error(aTypeError);
+    }
+    if (mInput.CharAt(mPosition) == '0') {
+      ++mPosition;
+      if (mPosition < mInput.Length() && mInput.CharAt(mPosition) >= '0' &&
+          mInput.CharAt(mPosition) <= '9') {
+        return Error(aTypeError);
+      }
+    } else {
+      while (mPosition < mInput.Length() && mInput.CharAt(mPosition) >= '0' &&
+             mInput.CharAt(mPosition) <= '9') {
+        ++mPosition;
+      }
+    }
+    if (mPosition < mInput.Length() &&
+        !IsWhitespace(mInput.CharAt(mPosition)) &&
+        mInput.CharAt(mPosition) != ',' && mInput.CharAt(mPosition) != '}') {
+      return Error(aTypeError);
+    }
+    uint64_t parsed = 0;
+    for (size_t index = start; index < mPosition; ++index) {
+      const uint64_t digit = mInput.CharAt(index) - '0';
+      if (parsed > (std::numeric_limits<uint64_t>::max() - digit) / 10) {
+        return Error(aRangeError);
+      }
+      parsed = parsed * 10 + digit;
+    }
+    if (parsed > aMaximum) {
+      return Error(aRangeError);
+    }
+    aOutput = static_cast<uint32_t>(parsed);
+    return NS_OK;
+  }
+
+  nsresult ParsePreamble(PreambleConfig& aPreamble) {
+    if (!Consume('{')) {
+      return Error("preamble must be an object");
+    }
+    SkipWhitespace();
+    if (Consume('}')) {
+      return Error("preamble requires a mode field");
+    }
+
+    bool sawMode = false;
+    bool sawPath = false;
+    bool sawMaxAssets = false;
+    bool sawMaxBytes = false;
+    while (true) {
+      nsAutoCString key;
+      MOZ_TRY(ParseString(key, "preamble field name must be a string"));
+      SkipWhitespace();
+      if (!Consume(':')) {
+        return Error("expected ':' after preamble field name");
+      }
+      SkipWhitespace();
+      if (key.EqualsLiteral("mode")) {
+        if (sawMode) {
+          return Error("duplicate preamble mode field");
+        }
+        sawMode = true;
+        nsAutoCString mode;
+        MOZ_TRY(ParseString(mode, "preamble mode must be a string"));
+        if (mode.EqualsLiteral("off")) {
+          aPreamble.mMode = PreambleMode::Off;
+        } else if (mode.EqualsLiteral("root")) {
+          aPreamble.mMode = PreambleMode::Root;
+        } else if (mode.EqualsLiteral("tree")) {
+          aPreamble.mMode = PreambleMode::Tree;
+        } else {
+          return Error("unsupported preamble mode");
+        }
+      } else if (key.EqualsLiteral("path")) {
+        if (sawPath) {
+          return Error("duplicate preamble path field");
+        }
+        sawPath = true;
+        MOZ_TRY(ParseString(aPreamble.mPath, "preamble path must be a string"));
+        if (!IsValidPreamblePath(aPreamble.mPath)) {
+          return Error("preamble path must be an absolute origin-form path");
+        }
+      } else if (key.EqualsLiteral("max-assets")) {
+        if (sawMaxAssets) {
+          return Error("duplicate preamble max-assets field");
+        }
+        sawMaxAssets = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            aPreamble.mMaxAssets, PreambleConfig::kMaximumAssets,
+            "preamble max-assets must be a non-negative integer",
+            "preamble max-assets exceeds the hard limit"));
+      } else if (key.EqualsLiteral("max-bytes")) {
+        if (sawMaxBytes) {
+          return Error("duplicate preamble max-bytes field");
+        }
+        sawMaxBytes = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            aPreamble.mMaxBytes, PreambleConfig::kMaximumBytes,
+            "preamble max-bytes must be a non-negative integer",
+            "preamble max-bytes exceeds the hard limit"));
+      } else {
+        return Error("unsupported preamble field");
+      }
+
+      SkipWhitespace();
+      if (Consume('}')) {
+        break;
+      }
+      if (!Consume(',')) {
+        return Error("expected ',' or '}' after preamble field");
+      }
+      SkipWhitespace();
+    }
+
+    if (!sawMode) {
+      return Error("preamble requires a mode field");
+    }
+    if (aPreamble.mMode == PreambleMode::Off) {
+      if (sawPath || sawMaxAssets || sawMaxBytes) {
+        return Error("disabled preamble must not specify path or budgets");
+      }
+      return NS_OK;
+    }
+    if (!sawPath) {
+      return Error("active preamble requires an explicit path");
+    }
+    if (!sawMaxBytes) {
+      aPreamble.mMaxBytes =
+          aPreamble.mMode == PreambleMode::Root ? 64 * 1024 : 256 * 1024;
+    }
+    if (aPreamble.mMaxBytes == 0) {
+      return Error("active preamble max-bytes must be positive");
+    }
+    if (aPreamble.mMode == PreambleMode::Root) {
+      if (aPreamble.mMaxAssets != 0) {
+        return Error("root preamble max-assets must be zero");
+      }
+    } else if (!sawMaxAssets) {
+      aPreamble.mMaxAssets = 2;
+    }
+    return NS_OK;
   }
 
   nsresult ParsePositiveCompatibilityInteger(const char* aTypeError) {

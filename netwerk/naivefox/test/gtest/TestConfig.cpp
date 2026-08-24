@@ -10,6 +10,7 @@
 
 #include "Config.h"
 #include "NeckoTunnel.h"
+#include "TunnelSession.h"
 #include "gtest/gtest.h"
 
 namespace mozilla::naivefox {
@@ -106,6 +107,143 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user"));
   EXPECT_TRUE(config.mProxies[0].mPassword.EqualsLiteral("pass"));
   EXPECT_EQ(config.mLogMode, RuntimeLogMode::Disabled);
+  EXPECT_EQ(config.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_TRUE(config.mPreamble.mPath.EqualsLiteral("/"));
+  EXPECT_EQ(config.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(config.mPreamble.mMaxBytes, 0U);
+  EXPECT_FALSE(config.mOuterSessionGate);
+}
+
+TEST(NaiveFoxConfig, OuterSessionGateBoolean)
+{
+  for (const auto& [value, expected] :
+       {std::pair{"true", true}, std::pair{"false", false}}) {
+    Config config;
+    nsAutoCString error;
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_EQ(config.mOuterSessionGate, expected);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidOuterSessionGate)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":"true"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":true,"outer-session-gate":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, PreambleModesAndBudgets)
+{
+  struct Expected {
+    const char* mJson;
+    PreambleMode mMode;
+    const char* mPath;
+    uint32_t mMaxAssets;
+    uint32_t mMaxBytes;
+  };
+  static constexpr Expected kExpected[] = {
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off"}})",
+       PreambleMode::Off, "/", 0, 0},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/"}})",
+       PreambleMode::Root, "/", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/camouflage/index.html"}})",
+       PreambleMode::Tree, "/camouflage/index.html", 2, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"path":"/a%20b","max-bytes":393216,"max-assets":6,"mode":"tree"}})",
+       PreambleMode::Tree, "/a%20b", 6, 384 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/health","max-assets":0,"max-bytes":1}})",
+       PreambleMode::Root, "/health", 0, 1},
+  };
+
+  for (const auto& expected : kExpected) {
+    Config config;
+    nsAutoCString error;
+    ASSERT_EQ(ParseConfig(nsDependentCString(expected.mJson), config, error),
+              NS_OK)
+        << expected.mJson << ": " << error.get();
+    EXPECT_EQ(config.mPreamble.mMode, expected.mMode);
+    EXPECT_TRUE(config.mPreamble.mPath.Equals(expected.mPath));
+    EXPECT_EQ(config.mPreamble.mMaxAssets, expected.mMaxAssets);
+    EXPECT_EQ(config.mPreamble.mMaxBytes, expected.mMaxBytes);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidPreamble)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"invalid"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":""}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"https://example.com/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"//example.com/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page?query"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page#fragment"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/bad\\path"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/bad%2"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/space here"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/caf\u00e9"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","max-bytes":0}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/","max-bytes":0}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-assets":7}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-bytes":393217}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-assets":-1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-assets":1.0}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-bytes":"1"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","mode":"tree","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/","extra":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off"},"preamble":{"mode":"off"}})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
+{
+  TunnelConfig source;
+  source.mPreamble.mMode = PreambleMode::Tree;
+  source.mPreamble.mPath.AssignLiteral("/camouflage/");
+  source.mPreamble.mMaxAssets = 6;
+  source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
+  source.mOuterSessionGate = true;
+
+  TunnelConfig constructed(source);
+  TunnelConfig assigned;
+  assigned = source;
+  source.mPreamble.mMode = PreambleMode::Off;
+  source.mPreamble.mPath.AssignLiteral("/");
+  source.mPreamble.mMaxAssets = 0;
+  source.mPreamble.mMaxBytes = 0;
+
+  for (const TunnelConfig* copy : {&constructed, &assigned}) {
+    EXPECT_EQ(copy->mPreamble.mMode, PreambleMode::Tree);
+    EXPECT_TRUE(copy->mPreamble.mPath.EqualsLiteral("/camouflage/"));
+    EXPECT_EQ(copy->mPreamble.mMaxAssets, 6U);
+    EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);
+    EXPECT_TRUE(copy->mOuterSessionGate);
+  }
 }
 
 TEST(NaiveFoxConfig, MixedListenersQuicAndConsoleLog)

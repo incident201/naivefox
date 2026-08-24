@@ -195,6 +195,35 @@ WebTransport, CONNECT-UDP, and non-tunnel reset handling are unchanged; slow
 drain, large integrity, bounded memory, proxy loss, and concurrent-stream tests
 pass.
 
+## NF-UPSTREAM-010: ordinary request on an outer proxy session
+
+Files:
+
+```text
+netwerk/protocol/http/nsHttp.h
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.h
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/HttpConnectionBase.cpp
+netwerk/protocol/http/nsHttpConnection.h
+netwerk/protocol/http/nsHttpConnectionMgr.cpp
+netwerk/protocol/http/HttpConnectionUDP.cpp
+netwerk/protocol/http/Http3Session.cpp
+netwerk/test/unit/test_proxy_preamble.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Adds a pre-open internal transaction flag that sends an ordinary request on
+the selected outer HTTPS proxy session. The flagged request bypasses proxy
+CONNECT creation and the H3 proxy's CONNECT-UDP stream selection while still
+using Necko's normal H2/H3 request streams and wildcard proxy pool.
+
+Review obligations: the flag is opt-in and pre-open only; unflagged Firefox
+proxy traffic is unchanged; the first H2/H3 activation safely reaches the
+wildcard pool; the request is an ordinary GET rather than CONNECT or
+CONNECT-UDP; and the resulting outer connection remains eligible for a
+subsequent proxy CONNECT.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

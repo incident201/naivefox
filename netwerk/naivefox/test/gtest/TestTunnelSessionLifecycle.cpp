@@ -23,6 +23,10 @@ class TunnelSessionTestPeer final {
   static void ApplyChannelStop(TunnelSession* aSession) {
     aSession->ApplyChannelStop(0, ProxyProtocol::H2, NS_OK);
   }
+
+  static bool ShouldGateOuterSession(const TunnelConfig& aConfig) {
+    return TunnelSession::ShouldGateOuterSession(aConfig);
+  }
 };
 
 namespace {
@@ -38,6 +42,52 @@ TEST(NaiveFoxEmbeddedLifecycle, StopRequestIsLatchedAndIdempotent)
   EXPECT_TRUE(control->StopRequested());
   control->RequestStop();
   EXPECT_TRUE(control->StopRequested());
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
+{
+  TunnelConfig config;
+  EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+
+  config.mOuterSessionGate = true;
+  config.mProtocol = ProxyProtocol::H2;
+  EXPECT_TRUE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+  config.mProtocol = ProxyProtocol::H3;
+  EXPECT_TRUE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+  config.mProtocol = ProxyProtocol::Auto;
+  EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
+{
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Off, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Off, false));
+
+  // A leader (or every ungated tunnel) runs the single root request. Queued
+  // and warm gate participants both reach this decision as non-leaders.
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Root, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Root, false));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Tree, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Tree, false));
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, LatePreambleCallbackCannotDoubleOpen)
+{
+  detail::PreambleSequenceState state;
+  constexpr uint64_t generation = 7;
+
+  EXPECT_TRUE(state.Begin(generation, ProxyProtocol::H3));
+  EXPECT_FALSE(state.Begin(generation, ProxyProtocol::H3));
+  EXPECT_TRUE(state.Complete(generation, ProxyProtocol::H3));
+  EXPECT_FALSE(state.Complete(generation, ProxyProtocol::H3));
+  EXPECT_TRUE(state.TryStartConnect(generation));
+  EXPECT_FALSE(state.TryStartConnect(generation));
+  EXPECT_FALSE(state.Begin(generation, ProxyProtocol::H3));
+
+  // Canceling the request disarms a later OnStopRequest callback as well.
+  EXPECT_TRUE(state.Begin(generation + 1, ProxyProtocol::H2));
+  state.Cancel();
+  EXPECT_FALSE(state.Complete(generation + 1, ProxyProtocol::H2));
 }
 
 RefPtr<TunnelSession> NewSession(nsIEventTarget* aSocketTarget,

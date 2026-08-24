@@ -10,6 +10,9 @@ init_paths
 mode=smoke
 protocol_selection=both
 inner_transport=https
+naivefox_arm=off
+naivefox_arm_explicit=0
+experiment_design=single
 samples_per_cohort=
 seed=
 while [[ $# -gt 0 ]]; do
@@ -26,6 +29,15 @@ while [[ $# -gt 0 ]]; do
       inner_transport=${2:-}
       shift 2
       ;;
+    --naivefox-arm)
+      naivefox_arm=${2:-}
+      naivefox_arm_explicit=1
+      shift 2
+      ;;
+    --multi-arm-superblocks)
+      experiment_design=multi_arm_superblocks
+      shift
+      ;;
     --samples-per-cohort)
       samples_per_cohort=${2:-}
       shift 2
@@ -35,7 +47,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https] [--naivefox-arm off|gate|root | --multi-arm-superblocks] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -115,6 +127,17 @@ case $inner_transport in
     exit 2
     ;;
 esac
+case $naivefox_arm in
+  off | gate | root) ;;
+  *)
+    printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
+    exit 2
+    ;;
+esac
+if [[ $experiment_design == multi_arm_superblocks && $naivefox_arm_explicit -eq 1 ]]; then
+  printf '%s\n' '--naivefox-arm cannot be combined with --multi-arm-superblocks' >&2
+  exit 2
+fi
 if [[ -z $samples_per_cohort ]]; then
   samples_per_cohort=$default_samples
 fi
@@ -184,6 +207,10 @@ case $capture_mode in
     exit 2
     ;;
 esac
+if [[ $experiment_design == multi_arm_superblocks && $capture_mode != same-base ]]; then
+  printf '%s\n' '--multi-arm-superblocks requires NAIVEFOX_CAPTURE_MODE=same-base' >&2
+  exit 2
+fi
 NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
 NAIVEFOX_LIBDIR="${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$BIN}"
 for artifact in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
@@ -200,8 +227,10 @@ run_id=$(openssl rand -hex 8)
 private_dir="$STATE_ROOT/camouflage-captures/$run_id"
 safe_dir="$STATE_ROOT/camouflage-safe/$run_id"
 feature_fragments="$private_dir/features"
+sensitive_values="$private_dir/sensitive-values.txt"
 capture_stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/naivefox-camouflage.XXXXXX")
 mkdir -p "$private_dir" "$feature_fragments" "$safe_dir"
+: >"$sensitive_values"
 chmod 0700 "$private_dir" "$feature_fragments" "$safe_dir"
 chmod 0700 "$capture_stage_dir"
 
@@ -381,16 +410,9 @@ user_pref("network.http.speculative-parallel-limit", 0);
 user_pref("network.http.http3.enable", $direct_h3);
 EOF
   if [[ -n $socks_port ]]; then
-    cat >>"$destination/user.js" <<EOF
-user_pref("network.proxy.type", 1);
-user_pref("network.proxy.socks", "127.0.0.1");
-user_pref("network.proxy.socks_port", $socks_port);
-user_pref("network.proxy.socks_version", 5);
-user_pref("network.proxy.socks_remote_dns", true);
-user_pref("network.proxy.no_proxies_on", "");
-user_pref("network.proxy.allow_hijacking_localhost", true);
-user_pref("network.proxy.failover_direct", false);
-EOF
+    "$browser_python" \
+      "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+      --generate-pac-user-js "$socks_port" >>"$destination/user.js"
   fi
   if [[ $direct_h3 == true ]]; then
     cat >>"$destination/user.js" <<EOF
@@ -589,12 +611,14 @@ extract_sample() {
   local session_id=$4
   local pcap=$5
   local experiment_block=$6
+  local arm=$7
   strict_transport_check "$protocol" "$pcap"
   python3 "$INTEGRATION_DIR/camouflage_features.py" extract \
     --pcap "$pcap" --protocol "$protocol" \
     --server-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --scenario "$scenario" \
     --label "$label" --session-id "$session_id" \
     --experiment-block "$experiment_block" \
+    --naivefox-arm "$arm" \
     --output "$feature_fragments/$session_id.json"
 }
 
@@ -620,7 +644,7 @@ run_reference_sample() {
   run_browser_workload "$sample_dir"
   stop_capture
   extract_sample "$protocol" "$scenario" "$label" "$session_id" "$pcap" \
-    "$experiment_block"
+    "$experiment_block" reference
   stop_browser_controller
 }
 
@@ -629,8 +653,10 @@ run_naivefox_sample() {
   local scenario=$2
   local session_id=$3
   local experiment_block=$4
+  local arm=$5
   local sample_dir="$private_dir/$session_id"
   local naivefox_profile="$sample_dir/naivefox-profile"
+  local naivefox_config="$sample_dir/naivefox-config.json"
   local browser_profile="$sample_dir/browser-profile"
   local pcap="$sample_dir/capture.pcapng"
   local log="$sample_dir/naivefox.log"
@@ -651,12 +677,16 @@ run_naivefox_sample() {
   mkdir -m 0700 -- "$sample_dir"
   make_profile "$naivefox_profile" "$protocol"
   make_profile "$browser_profile" "$protocol" "$socks_port"
-  env -u SSLKEYLOGFILE "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
-    NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
-    NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-    "$NAIVEFOX_BIN" --profile "$naivefox_profile" --protocol "$protocol" \
-    --socks-listen "127.0.0.1:$socks_port" \
-    --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" >"$log" 2>&1 &
+  NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
+    NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
+    python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
+    --output "$naivefox_config" --arm "$arm" \
+    --protocol "$protocol" --socks-port "$socks_port" \
+    --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
+  env -u SSLKEYLOGFILE -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+    "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
+    NAIVEFOX_PROFILE="$naivefox_profile" \
+    "$NAIVEFOX_BIN" "$naivefox_config" >"$log" 2>&1 &
   naivefox_pid=$!
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
   start_browser_controller "$browser_profile" \
@@ -673,7 +703,10 @@ run_naivefox_sample() {
     return 1
   fi
   extract_sample "$protocol" "$scenario" naivefox "$session_id" "$pcap" \
-    "$experiment_block"
+    "$experiment_block" "$arm"
+  python3 "$INTEGRATION_DIR/camouflage_sample_validation.py" \
+    --arm "$arm" --protocol "$protocol" --log "$log" \
+    --features "$feature_fragments/$session_id.json"
   stop_browser_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
@@ -681,14 +714,39 @@ run_naivefox_sample() {
 
 scenario_csv=$(IFS=,; printf '%s' "${scenarios[*]}")
 session_counter=0
+if [[ $experiment_design == multi_arm_superblocks ]]; then
+  members_per_block=5
+else
+  members_per_block=3
+fi
 for protocol in "${protocols[@]}"; do
   "$INTEGRATION_DIR/start.sh" --mode "$protocol"
   run_dir=$(<"$ACTIVE_RUN_FILE")
   # shellcheck source=/dev/null
   source "$run_dir/fixture.env"
+  NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
+    NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
+    python3 - "$sensitive_values" <<'PY'
+import os
+import sys
+from urllib.parse import quote
+
+with open(sys.argv[1], "a", encoding="utf-8") as stream:
+    for name in ("NAIVEFOX_FIXTURE_USER", "NAIVEFOX_FIXTURE_PASS"):
+        value = os.environ[name]
+        stream.write(value + "\n")
+        encoded = quote(value, safe="")
+        if encoded != value:
+            stream.write(encoded + "\n")
+PY
   schedule="$private_dir/$protocol-schedule.tsv"
-  python3 - "$seed" "$protocol" "$samples_per_cohort" "$scenario_csv" \
-    >"$schedule" <<'PY'
+  if [[ $experiment_design == multi_arm_superblocks ]]; then
+    python3 "$INTEGRATION_DIR/camouflage_superblocks.py" schedule \
+      --seed "$seed" --protocol "$protocol" --blocks "$samples_per_cohort" \
+      --scenarios "$scenario_csv" >"$schedule"
+  else
+    python3 - "$seed" "$protocol" "$samples_per_cohort" "$scenario_csv" \
+      "$naivefox_arm" >"$schedule" <<'PY'
 import random
 import sys
 
@@ -696,6 +754,7 @@ seed = int(sys.argv[1])
 protocol = sys.argv[2]
 count = int(sys.argv[3])
 scenarios = sys.argv[4].split(",")
+naivefox_arm = sys.argv[5]
 items = []
 rng = random.Random(f"{seed}:{protocol}")
 for index in range(count):
@@ -703,19 +762,21 @@ for index in range(count):
     rng.shuffle(labels)
     block = f"{protocol}_b{index:06d}"
     for label in labels:
-        items.append((label, scenarios[index % len(scenarios)], block))
-for label, scenario, block in items:
-    print(label, scenario, block, sep="\t")
+        arm = naivefox_arm if label == "naivefox" else "reference"
+        items.append((label, arm, scenarios[index % len(scenarios)], block))
+for label, arm, scenario, block in items:
+    print(label, arm, scenario, block, sep="\t")
 PY
-  while IFS=$'\t' read -r label scenario experiment_block; do
+  fi
+  while IFS=$'\t' read -r label sample_arm scenario experiment_block; do
     session_counter=$((session_counter + 1))
     session_id=$(printf '%s_s%06d' "$protocol" "$session_counter")
     printf 'Collecting %s %s %s (%d/%d)\n' \
       "$protocol" "$label" "$scenario" "$session_counter" \
-      "$((samples_per_cohort * 3 * ${#protocols[@]}))"
+      "$((samples_per_cohort * members_per_block * ${#protocols[@]}))"
     if [[ $label == naivefox ]]; then
       run_naivefox_sample "$protocol" "$scenario" "$session_id" \
-        "$experiment_block"
+        "$experiment_block" "$sample_arm"
     else
       run_reference_sample "$protocol" "$scenario" "$label" "$session_id" \
         "$experiment_block"
@@ -724,16 +785,38 @@ PY
   "$INTEGRATION_DIR/stop.sh" --quiet
 done
 
-python3 "$INTEGRATION_DIR/camouflage_features.py" merge \
-  --input-dir "$feature_fragments" --output "$safe_dir/features.csv" \
-  --expected-per-cohort "$samples_per_cohort"
+analyze_dataset() {
+  local features=$1
+  local output_dir=$2
+  python3 "$INTEGRATION_DIR/analyze-camouflage.py" \
+    --features "$features" --output-json "$output_dir/metrics.json" \
+    --output-summary "$output_dir/summary.txt" --mode "$mode" --seed "$seed" \
+    --bootstrap 1000 --permutations "$permutations" \
+    --refit-bootstrap "$refit_bootstrap" \
+    --max-features "$max_features" --iterations "$model_iterations"
+}
 
-python3 "$INTEGRATION_DIR/analyze-camouflage.py" \
-  --features "$safe_dir/features.csv" --output-json "$safe_dir/metrics.json" \
-  --output-summary "$safe_dir/summary.txt" --mode "$mode" --seed "$seed" \
-  --bootstrap 1000 --permutations "$permutations" \
-  --refit-bootstrap "$refit_bootstrap" \
-  --max-features "$max_features" --iterations "$model_iterations"
+if [[ $experiment_design == multi_arm_superblocks ]]; then
+  superblock_features="$safe_dir/features-superblocks.csv"
+  python3 "$INTEGRATION_DIR/camouflage_features.py" merge \
+    --input-dir "$feature_fragments" --output "$superblock_features" \
+    --expected-superblocks "$samples_per_cohort"
+  python3 "$INTEGRATION_DIR/camouflage_superblocks.py" materialize \
+    --features "$superblock_features" --output-dir "$safe_dir/arms" \
+    --expected-blocks "$samples_per_cohort"
+  for arm in off gate root; do
+    analyze_dataset "$safe_dir/arms/$arm/features.csv" "$safe_dir/arms/$arm"
+  done
+  metadata_naivefox_arm=multi
+  metadata_naivefox_arms=off,gate,root
+else
+  python3 "$INTEGRATION_DIR/camouflage_features.py" merge \
+    --input-dir "$feature_fragments" --output "$safe_dir/features.csv" \
+    --expected-per-cohort "$samples_per_cohort"
+  analyze_dataset "$safe_dir/features.csv" "$safe_dir"
+  metadata_naivefox_arm=$naivefox_arm
+  metadata_naivefox_arms=$naivefox_arm
+fi
 
 reference_version=$(LD_LIBRARY_PATH="$REFERENCE_LIBDIR" "$REFERENCE_BIN" --version 2>/dev/null)
 naivefox_version=$(LD_LIBRARY_PATH="$NAIVEFOX_LIBDIR" "$NAIVEFOX_BIN" --version 2>/dev/null)
@@ -751,6 +834,9 @@ refit_bootstrap_iterations=$refit_bootstrap
 permutation_iterations=$permutations
 protocol_selection=$protocol_selection
 inner_transport=$inner_transport
+experiment_design=$experiment_design
+naivefox_arm=$metadata_naivefox_arm
+naivefox_arms=$metadata_naivefox_arms
 samples_per_cohort=$samples_per_cohort
 reference_mode=$capture_mode
 os_id=$os_id
@@ -772,20 +858,20 @@ capture_drop_policy=reject_nonzero
 workload_driver=controlled_firefox_navigation
 workload_completion=target_server_marker
 browser_controller_backends=$(sort -u "$controller_backends" | paste -sd, -)
+naivefox_browser_proxy_policy=fail_closed_pac_loopback_only
 process_shutdown_in_primary_capture=no
 tls_keylog=disabled
 raw_capture_material=deleted_after_success
 EOF
 
-chmod 0600 "$safe_dir/features.csv" "$safe_dir/metrics.json" \
-  "$safe_dir/summary.txt" "$safe_dir/metadata.txt"
+find "$safe_dir" -type d -exec chmod 0700 {} +
+find "$safe_dir" -type f -exec chmod 0600 {} +
 if find "$safe_dir" -type f \( -name '*.pcap' -o -name '*.pcapng' -o \
      -name '*.keys' -o -name '*.log' \) -print -quit | rg -q .; then
   printf 'private capture material reached camouflage-safe output\n' >&2
   exit 1
 fi
-if rg -F "$NAIVEFOX_FIXTURE_USER" "$safe_dir" ||
-   rg -F "$NAIVEFOX_FIXTURE_PASS" "$safe_dir" ||
+if rg -F -f "$sensitive_values" "$safe_dir" ||
    rg -i -e proxy-authorization -e sslkeylogfile -e 'localhost:' "$safe_dir"; then
   printf 'sensitive or endpoint-specific data reached camouflage-safe output\n' >&2
   exit 1

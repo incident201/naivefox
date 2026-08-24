@@ -64,7 +64,7 @@ interface nsIHttpUpgradeListener : nsISupports
  * using any feature exposed by this interface, be aware that this interface
  * will change and you will be broken.  You have been warned.
  */
-[builtinclass, scriptable, uuid(4e28263d-1e03-46f4-aa5c-9512f91957f9)]
+[builtinclass, scriptable, uuid(14356de3-aa79-4749-b37d-69dbac9bcb00)]
 interface nsIHttpChannelInternal : nsISupports
 {
     /**
@@ -228,6 +228,12 @@ interface nsIHttpChannelInternal : nsISupports
      */
     [must_use] void setProxyConnectHeader(in ACString aHeader,
                                           in ACString aValue);
+
+    /**
+     * Send this request directly on its outer HTTPS proxy session rather than
+     * creating a CONNECT tunnel. Must be called before the channel is opened.
+     */
+    [must_use] void setProxyPreamble();
 
     /**
      * True iff the channel is CONNECT only.

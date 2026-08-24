@@ -106,6 +106,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mProtocol = proxy.mProtocol;
     tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
     tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
+    tunnelConfig.mPreamble = aConfig.mPreamble;
+    tunnelConfig.mOuterSessionGate = aConfig.mOuterSessionGate;
   }
   return tunnelConfigs;
 }

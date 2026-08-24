@@ -5,9 +5,12 @@
 #ifndef netwerk_naivefox_NeckoTunnel_h
 #define netwerk_naivefox_NeckoTunnel_h
 
+#include <functional>
+
 #include "Config.h"
 #include "ProxyProtocol.h"
 #include "mozilla/Maybe.h"
+#include "nsError.h"
 #include "nsTArray.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
@@ -24,14 +27,37 @@ nsresult BuildProxyAuthorization(const nsACString& aUser,
                                  const nsACString& aPassword,
                                  nsACString& aAuthorization);
 
-nsresult OpenNeckoTunnel(
-    const nsACString& aProxyUrl, const nsACString& aTargetAuthority,
-    const nsACString& aProxyUser, const nsACString& aProxyPassword,
-    nsIHttpUpgradeListener* aUpgradeListener,
-    nsIStreamListener* aChannelListener, const nsACString& aConnectPadding,
-    ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule = {},
-    const nsTArray<ExtraHeader>& aExtraHeaders = {},
+struct ProxyPreambleResult final {
+  nsresult mStatus = NS_ERROR_NOT_INITIALIZED;
+  uint32_t mHttpStatus = 0;
+  uint32_t mBodyBytes = 0;
+
+  bool Succeeded() const {
+    return NS_SUCCEEDED(mStatus) && mHttpStatus >= 200 && mHttpStatus < 300;
+  }
+};
+
+using ProxyPreambleCallback = std::function<void(ProxyPreambleResult)>;
+
+nsresult OpenProxyPreamble(
+    const nsACString& aProxyUrl, const nsACString& aProxyUser,
+    const nsACString& aProxyPassword, const nsACString& aPath,
+    uint32_t aMaxBytes, ProxyProtocol aProtocol,
+    ProxyPreambleCallback&& aCallback,
+    const Maybe<HostResolverRule>& aHostResolverRule = {},
     nsIRequest** aOpenedRequest = nullptr);
+
+nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
+                         const nsACString& aTargetAuthority,
+                         const nsACString& aProxyUser,
+                         const nsACString& aProxyPassword,
+                         nsIHttpUpgradeListener* aUpgradeListener,
+                         nsIStreamListener* aChannelListener,
+                         const nsACString& aConnectPadding,
+                         ProxyProtocol aProtocol,
+                         const Maybe<HostResolverRule>& aHostResolverRule = {},
+                         const nsTArray<ExtraHeader>& aExtraHeaders = {},
+                         nsIRequest** aOpenedRequest = nullptr);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,

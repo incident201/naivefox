@@ -7,12 +7,14 @@
 #include <algorithm>
 #include <cstdio>
 #include <limits>
+#include <utility>
 
 #include "AutoFallback.h"
 #include "mozilla/Base64.h"
 #include "mozilla/ErrorNames.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/SpinEventLoopUntil.h"
+#include "mozilla/TextUtils.h"
 #include "nsCOMPtr.h"
 #include "nsError.h"
 #include "nsIAsyncInputStream.h"
@@ -50,6 +52,79 @@ namespace {
 
 constexpr uint32_t kResponseLimit = 64 * 1024;
 constexpr auto kExpectedMarker = "naivefox-fixture-small"_ns;
+
+struct ExplicitProxyRoute {
+  nsCOMPtr<nsIURI> mProxyUri;
+  nsCOMPtr<nsIProxyInfo> mProxyInfo;
+};
+
+class ProxyPreambleListener final : public nsIStreamListener {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSIREQUESTOBSERVER
+  NS_DECL_NSISTREAMLISTENER
+
+  ProxyPreambleListener(uint32_t aMaxBytes, ProxyPreambleCallback&& aCallback)
+      : mMaxBytes(aMaxBytes), mCallback(std::move(aCallback)) {}
+
+ private:
+  ~ProxyPreambleListener() = default;
+
+  const uint32_t mMaxBytes;
+  ProxyPreambleCallback mCallback;
+  uint32_t mBodyBytes = 0;
+  uint32_t mHttpStatus = 0;
+  nsresult mFailure = NS_OK;
+};
+
+NS_IMPL_ISUPPORTS(ProxyPreambleListener, nsIStreamListener, nsIRequestObserver)
+
+NS_IMETHODIMP ProxyPreambleListener::OnStartRequest(nsIRequest* aRequest) {
+  nsCOMPtr<nsIHttpChannel> channel = do_QueryInterface(aRequest);
+  if (!channel) {
+    mFailure = NS_ERROR_UNEXPECTED;
+    return mFailure;
+  }
+  nsresult rv = channel->GetResponseStatus(&mHttpStatus);
+  if (NS_FAILED(rv)) {
+    mFailure = rv;
+  }
+  return rv;
+}
+
+NS_IMETHODIMP ProxyPreambleListener::OnDataAvailable(
+    nsIRequest* aRequest, nsIInputStream* aInputStream, uint64_t aOffset,
+    uint32_t aCount) {
+  if (aCount > mMaxBytes - mBodyBytes) {
+    mFailure = NS_ERROR_FILE_TOO_BIG;
+    return mFailure;
+  }
+
+  char discard[4096];
+  uint32_t remaining = aCount;
+  while (remaining > 0) {
+    uint32_t read = 0;
+    nsresult rv = aInputStream->Read(
+        discard, std::min<uint32_t>(remaining, sizeof(discard)), &read);
+    if (NS_FAILED(rv) || read == 0) {
+      mFailure = NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+      return mFailure;
+    }
+    remaining -= read;
+    mBodyBytes += read;
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP ProxyPreambleListener::OnStopRequest(nsIRequest* aRequest,
+                                                   nsresult aStatus) {
+  if (mCallback) {
+    auto callback = std::move(mCallback);
+    callback(
+        {NS_FAILED(mFailure) ? mFailure : aStatus, mHttpStatus, mBodyBytes});
+  }
+  return NS_OK;
+}
 
 class TunnelSmoke final : public nsIHttpUpgradeListener,
                           public nsIStreamListener,
@@ -374,31 +449,38 @@ nsresult MakeBasicAuthorization(const nsACString& aUser,
   return Base64EncodeAppend(userPass, aAuthorization);
 }
 
-}  // namespace
-
-nsresult BuildProxyAuthorization(const nsACString& aUser,
-                                 const nsACString& aPassword,
-                                 nsACString& aAuthorization) {
-  return MakeBasicAuthorization(aUser, aPassword, aAuthorization);
+bool IsValidPreamblePath(const nsACString& aPath) {
+  if (aPath.IsEmpty() || aPath.Length() > 2048 || aPath.First() != '/' ||
+      (aPath.Length() >= 2 && aPath.CharAt(1) == '/')) {
+    return false;
+  }
+  for (size_t index = 0; index < aPath.Length(); ++index) {
+    const unsigned char value = aPath.CharAt(index);
+    if (value <= 0x20 || value >= 0x7f || value == '?' || value == '#' ||
+        value == '\\') {
+      return false;
+    }
+    if (value == '%') {
+      if (aPath.Length() - index < 3 ||
+          !IsAsciiHexDigit(aPath.CharAt(index + 1)) ||
+          !IsAsciiHexDigit(aPath.CharAt(index + 2))) {
+        return false;
+      }
+      index += 2;
+    }
+  }
+  return true;
 }
 
-nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
-                         const nsACString& aTargetAuthority,
-                         const nsACString& aProxyUser,
-                         const nsACString& aProxyPassword,
-                         nsIHttpUpgradeListener* aUpgradeListener,
-                         nsIStreamListener* aChannelListener,
-                         const nsACString& aConnectPadding,
-                         ProxyProtocol aProtocol,
-                         const Maybe<HostResolverRule>& aHostResolverRule,
-                         const nsTArray<ExtraHeader>& aExtraHeaders,
-                         nsIRequest** aOpenedRequest) {
-  if (!aUpgradeListener || !aChannelListener) {
-    return NS_ERROR_INVALID_ARG;
-  }
+nsresult BuildExplicitProxyRoute(
+    const nsACString& aProxyUrl, const nsACString& aProxyUser,
+    const nsACString& aProxyPassword, ProxyProtocol aProtocol,
+    const Maybe<HostResolverRule>& aHostResolverRule,
+    bool aIncludeAuthorization, ExplicitProxyRoute& aRoute) {
   if (aProtocol == ProxyProtocol::Auto) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
+
   nsCOMPtr<nsIURI> proxyUri;
   MOZ_TRY(NS_NewURI(getter_AddRefs(proxyUri), aProxyUrl));
 
@@ -421,33 +503,10 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
     return NS_ERROR_INVALID_ARG;
   }
 
-  nsAutoCString targetUrl("http://"_ns);
-  targetUrl.Append(aTargetAuthority);
-  targetUrl.Append('/');
-  nsCOMPtr<nsIURI> targetUri;
-  MOZ_TRY(NS_NewURI(getter_AddRefs(targetUri), targetUrl));
-
-  nsAutoCString targetScheme;
-  nsAutoCString targetHost;
-  nsAutoCString targetUserPass;
-  int32_t targetPort = -1;
-  MOZ_TRY(targetUri->GetScheme(targetScheme));
-  MOZ_TRY(targetUri->GetAsciiHost(targetHost));
-  MOZ_TRY(targetUri->GetUserPass(targetUserPass));
-  MOZ_TRY(targetUri->GetPort(&targetPort));
-  if (targetPort == -1) {
-    // The synthetic carrier is HTTP, so Gecko canonicalizes an explicit
-    // :80 to the default-port sentinel. CONNECT still targets TCP port 80.
-    targetPort = 80;
-  }
-  if (!targetScheme.EqualsLiteral("http") || targetHost.IsEmpty() ||
-      !targetUserPass.IsEmpty() || targetPort <= 0 ||
-      targetPort > std::numeric_limits<uint16_t>::max()) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
   nsAutoCString authorization;
-  MOZ_TRY(BuildProxyAuthorization(aProxyUser, aProxyPassword, authorization));
+  if (aIncludeAuthorization) {
+    MOZ_TRY(MakeBasicAuthorization(aProxyUser, aProxyPassword, authorization));
+  }
 
   nsCOMPtr<nsIProtocolProxyService> proxyService =
       do_GetService(NS_PROTOCOLPROXYSERVICE_CONTRACTID);
@@ -488,6 +547,131 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
     concreteProxy->SetNaiveFoxPhysicalHost(aHostResolverRule->mPhysicalHost);
   }
 
+  aRoute.mProxyUri = proxyUri;
+  aRoute.mProxyInfo = proxyInfo;
+  return NS_OK;
+}
+
+}  // namespace
+
+nsresult BuildProxyAuthorization(const nsACString& aUser,
+                                 const nsACString& aPassword,
+                                 nsACString& aAuthorization) {
+  return MakeBasicAuthorization(aUser, aPassword, aAuthorization);
+}
+
+nsresult OpenProxyPreamble(const nsACString& aProxyUrl,
+                           const nsACString& aProxyUser,
+                           const nsACString& aProxyPassword,
+                           const nsACString& aPath, uint32_t aMaxBytes,
+                           ProxyProtocol aProtocol,
+                           ProxyPreambleCallback&& aCallback,
+                           const Maybe<HostResolverRule>& aHostResolverRule,
+                           nsIRequest** aOpenedRequest) {
+  if (!aCallback || !IsValidPreamblePath(aPath) || aMaxBytes == 0 ||
+      aMaxBytes > PreambleConfig::kMaximumBytes) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  ExplicitProxyRoute route;
+  MOZ_TRY(BuildExplicitProxyRoute(aProxyUrl, aProxyUser, aProxyPassword,
+                                  aProtocol, aHostResolverRule, false, route));
+
+  nsAutoCString preambleUrl;
+  MOZ_TRY(route.mProxyUri->GetPrePath(preambleUrl));
+  preambleUrl.Append(aPath);
+  nsCOMPtr<nsIURI> preambleUri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(preambleUri), preambleUrl));
+
+  nsCOMPtr<nsIPrincipal> principal;
+  MOZ_TRY(GetSystemPrincipal(getter_AddRefs(principal)));
+  nsCOMPtr<nsIChannel> templateChannel;
+  MOZ_TRY(
+      NS_NewChannel(getter_AddRefs(templateChannel), preambleUri, principal,
+                    nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+                        nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS |
+                        nsILoadInfo::SEC_COOKIES_OMIT,
+                    nsIContentPolicy::TYPE_OTHER));
+  nsCOMPtr<nsILoadInfo> loadInfo = templateChannel->LoadInfo();
+
+  nsCOMPtr<nsIProxiedProtocolHandler> protocolHandler =
+      do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
+  if (!protocolHandler) {
+    return NS_ERROR_FAILURE;
+  }
+  nsCOMPtr<nsIChannel> channel;
+  MOZ_TRY(protocolHandler->NewProxiedChannel(preambleUri, route.mProxyInfo, 0,
+                                             nullptr, loadInfo,
+                                             getter_AddRefs(channel)));
+
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
+  nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel);
+  if (!internal || !httpChannel) {
+    return NS_ERROR_FAILURE;
+  }
+  MOZ_TRY(httpChannel->SetRequestMethod("GET"_ns));
+  MOZ_TRY(internal->SetAllowSpdy(true));
+  MOZ_TRY(internal->SetAllowHttp3(aProtocol == ProxyProtocol::H3));
+  MOZ_TRY(internal->SetBlockAuthPrompt(true));
+  MOZ_TRY(internal->SetProxyPreamble());
+  // Raw CONNECT upgrades are anonymous at the connection-info layer. Match
+  // that flag so the preamble's wildcard H2/H3 pool key is identical; proxy
+  // credentials remain absent and nsHttpChannel suppresses auth-cache reuse
+  // explicitly for NS_HTTP_PROXY_PREAMBLE.
+  MOZ_TRY(channel->SetLoadFlags(
+      nsIRequest::INHIBIT_CACHING | nsIRequest::LOAD_BYPASS_CACHE |
+      nsIRequest::LOAD_ANONYMOUS |
+      nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+
+  RefPtr<ProxyPreambleListener> listener =
+      new ProxyPreambleListener(aMaxBytes, std::move(aCallback));
+  MOZ_TRY(channel->AsyncOpen(listener));
+  if (aOpenedRequest) {
+    nsCOMPtr<nsIRequest> request = channel;
+    request.forget(aOpenedRequest);
+  }
+  return NS_OK;
+}
+
+nsresult OpenNeckoTunnel(
+    const nsACString& aProxyUrl, const nsACString& aTargetAuthority,
+    const nsACString& aProxyUser, const nsACString& aProxyPassword,
+    nsIHttpUpgradeListener* aUpgradeListener,
+    nsIStreamListener* aChannelListener, const nsACString& aConnectPadding,
+    ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule,
+    const nsTArray<ExtraHeader>& aExtraHeaders, nsIRequest** aOpenedRequest) {
+  if (!aUpgradeListener || !aChannelListener) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  ExplicitProxyRoute route;
+  MOZ_TRY(BuildExplicitProxyRoute(aProxyUrl, aProxyUser, aProxyPassword,
+                                  aProtocol, aHostResolverRule, true, route));
+
+  nsAutoCString targetUrl("http://"_ns);
+  targetUrl.Append(aTargetAuthority);
+  targetUrl.Append('/');
+  nsCOMPtr<nsIURI> targetUri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(targetUri), targetUrl));
+
+  nsAutoCString targetScheme;
+  nsAutoCString targetHost;
+  nsAutoCString targetUserPass;
+  int32_t targetPort = -1;
+  MOZ_TRY(targetUri->GetScheme(targetScheme));
+  MOZ_TRY(targetUri->GetAsciiHost(targetHost));
+  MOZ_TRY(targetUri->GetUserPass(targetUserPass));
+  MOZ_TRY(targetUri->GetPort(&targetPort));
+  if (targetPort == -1) {
+    // The synthetic carrier is HTTP, so Gecko canonicalizes an explicit
+    // :80 to the default-port sentinel. CONNECT still targets TCP port 80.
+    targetPort = 80;
+  }
+  if (!targetScheme.EqualsLiteral("http") || targetHost.IsEmpty() ||
+      !targetUserPass.IsEmpty() || targetPort <= 0 ||
+      targetPort > std::numeric_limits<uint16_t>::max()) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
   nsCOMPtr<nsIPrincipal> principal;
   MOZ_TRY(GetSystemPrincipal(getter_AddRefs(principal)));
   nsCOMPtr<nsIChannel> templateChannel;
@@ -502,8 +686,9 @@ nsresult OpenNeckoTunnel(const nsACString& aProxyUrl,
     return NS_ERROR_FAILURE;
   }
   nsCOMPtr<nsIChannel> channel;
-  MOZ_TRY(protocolHandler->NewProxiedChannel(
-      targetUri, proxyInfo, 0, nullptr, loadInfo, getter_AddRefs(channel)));
+  MOZ_TRY(protocolHandler->NewProxiedChannel(targetUri, route.mProxyInfo, 0,
+                                             nullptr, loadInfo,
+                                             getter_AddRefs(channel)));
 
   nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
   if (!internal) {

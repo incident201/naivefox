@@ -12,6 +12,21 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 	log
 	tls {$NAIVEFOX_FIXTURE_PROXY_CERT} {$NAIVEFOX_FIXTURE_PROXY_KEY}
 	route {
+		@preambleOriginAuthLeak {
+			path /assets/runtime.js
+			header Authorization *
+		}
+		respond @preambleOriginAuthLeak "preamble must not carry Authorization" 403
+		@preambleProxyAuthLeak {
+			path /assets/runtime.js
+			header Proxy-Authorization *
+		}
+		respond @preambleProxyAuthLeak "preamble must not carry Proxy-Authorization" 403
+		header /assets/runtime.js {
+			Content-Type "application/javascript; charset=utf-8"
+			Cache-Control "public, max-age=3600"
+		}
+		respond /assets/runtime.js `(()=>{"use strict";const e={api:"/api/v1",locale:"en-US"};globalThis.appRuntime=e;})();` 200
 		forward_proxy {
 			basic_auth {$NAIVEFOX_FIXTURE_USER} {$NAIVEFOX_FIXTURE_PASS}
 			hosts localhost

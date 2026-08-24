@@ -1447,7 +1447,8 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
 
   Http3StreamBase* stream = nullptr;
 
-  if (trans && mConnInfo->IsHttp3ProxyConnection() && !mIsInTunnel) {
+  if (trans && mConnInfo->IsHttp3ProxyConnection() && !mIsInTunnel &&
+      !(trans->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
     LOG3(("Http3Session::AddStream new connect-udp stream %p atrans=%p.\n",
           this, aHttpTransaction));
     stream = new Http3ConnectUDPStream(aHttpTransaction, this,

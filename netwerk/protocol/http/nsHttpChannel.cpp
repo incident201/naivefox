@@ -3646,6 +3646,17 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
       break;
     case 401:
     case 407:
+      if (mCaps & NS_HTTP_PROXY_PREAMBLE) {
+        // A proxy preamble is deliberately an unauthenticated, ordinary
+        // origin request. Never reuse cached origin/proxy credentials or
+        // retry it through the authentication machinery.
+        if (mAuthProvider) {
+          (void)mAuthProvider->Disconnect(NS_ERROR_ABORT);
+          mAuthProvider = nullptr;
+        }
+        rv = ProcessNormal();
+        break;
+      }
       if (MOZ_UNLIKELY(httpStatus == 407 && transactionRestarted)) {
         // The transaction has been internally restarted.  We want to
         // authenticate to the proxy again, so reuse either cached credentials
@@ -8578,10 +8589,12 @@ nsresult nsHttpChannel::BeginConnect() {
 
   // check to see if authorization headers should be included
   // CustomAuthHeader is set in AsyncOpen if we find Authorization header
-  rv = mAuthProvider->AddAuthorizationHeaders(LoadCustomAuthHeader());
-  if (NS_FAILED(rv)) {
-    LOG(("nsHttpChannel %p AddAuthorizationHeaders failed (%08x)", this,
-         static_cast<uint32_t>(rv)));
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE)) {
+    rv = mAuthProvider->AddAuthorizationHeaders(LoadCustomAuthHeader());
+    if (NS_FAILED(rv)) {
+      LOG(("nsHttpChannel %p AddAuthorizationHeaders failed (%08x)", this,
+           static_cast<uint32_t>(rv)));
+    }
   }
 
   // if this somehow fails we can go on without it

@@ -278,6 +278,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD SetConnectOnly(bool aTlsTunnel) override;
   NS_IMETHOD SetProxyConnectHeader(const nsACString& aHeader,
                                    const nsACString& aValue) override;
+  NS_IMETHOD SetProxyPreamble() override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
   NS_IMETHOD SetAllowSpdy(bool aAllowSpdy) override;
   NS_IMETHOD GetAllowHttp3(bool* aAllowHttp3) override;

@@ -186,10 +186,13 @@ listener. Its target uses HTTPS inside CONNECT by default; the fixture CA is
 trusted only by the isolated test profile. `--inner-transport http` selects a
 separate cleartext diagnostic dataset. Forced Alt-Svc applies only to the
 direct H3 reference browser; the SOCKS browser leaves origin H3 disabled while
-NaiveFox independently owns the selected outer H2 or H3 transport. A Selenium
-controller is preferred for H2 when available. H3 uses the long-lived
-command-line backend, and the same backend is used for every H3 cohort. The
-command-line backend is also the dependency-free H2 fallback. The target
+NaiveFox independently owns the selected outer H2 or H3 transport. A
+fail-closed PAC sends exact loopback destinations to the sample's SOCKS5
+listener and every other hostname to a dead local proxy. It has no `DIRECT`
+fallback, so Mozilla background traffic cannot contaminate the captured outer
+flow. A Selenium controller is preferred for H2 when available. H3 uses the
+long-lived command-line backend, and the same backend is used for every H3
+cohort. The command-line backend is also the dependency-free H2 fallback. The target
 records the browser's completion POST in a private file;
 the controller watches that file without adding an out-of-band network flow.
 The runner stops and validates `dumpcap` before shutting down the browser or
@@ -235,8 +238,49 @@ Run HTTPS and HTTP with the same explicit seed when comparing the primary and
 diagnostic inner transports; each invocation produces its own dataset and
 records `inner_transport` in metadata.
 
-Successful runs retain only `metadata.txt`, `features.csv`, `metrics.json`, and
-`summary.txt` under `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
+`--naivefox-arm off|gate|root` selects a separate one-binary NaiveFox arm.
+All three use the same config-mode startup path. `off` disables the outer-session
+gate and preamble. `gate` enables the gate without a preamble. `root` adds one
+bounded ordinary GET before CONNECT. Reusing an explicit seed across separate
+invocations reproduces schedule order, but does not make independently captured
+samples statistically paired:
+
+```bash
+./run-camouflage-suite.sh --mode gate --protocol both --seed 12345 --naivefox-arm off
+./run-camouflage-suite.sh --mode gate --protocol both --seed 12345 --naivefox-arm gate
+./run-camouflage-suite.sh --mode gate --protocol both --seed 12345 --naivefox-arm root
+```
+
+Config-arm files and their percent-encoded proxy credentials remain under the
+private capture directory. Sanitized metadata records only `naivefox_arm`.
+The runner rejects `off` or `gate` if any preamble result is logged, rejects
+`root` unless exactly one successful result is logged, and requires every
+`gate` or `root` capture to contain exactly one physical outer connection.
+Comparative inference between arms requires randomized multi-arm superblocks
+with shared contemporaneous controls. Enable that design in same-base mode:
+
+```bash
+NAIVEFOX_CAPTURE_MODE=same-base \
+NAIVEFOX_CAPTURE_REFERENCE_BIN=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/objdir \
+./run-camouflage-suite.sh --mode standard --protocol both --seed 12345 \
+  --multi-arm-superblocks
+```
+
+Each seeded superblock captures Firefox A, Firefox B, NaiveFox `off`, `gate`,
+and `root` in randomized order against one scenario. The Firefox controls are
+captured once and shared by all three arm comparisons. `samples-per-cohort`
+means superblocks per protocol in this mode. The sanitized
+`features-superblocks.csv` records both `experiment_block` and `naivefox_arm`;
+`arms/<arm>/features.csv` selects the common controls and that arm, with its own
+`metrics.json` and `summary.txt`. This mode requires same-base Firefox and is
+mutually exclusive with `--naivefox-arm`. The seed determines collection order,
+but it does not turn gate/smoke sample counts into research-grade evidence.
+
+Successful single-arm runs retain only `metadata.txt`, `features.csv`,
+`metrics.json`, and `summary.txt`. Multi-arm runs retain `metadata.txt`,
+`features-superblocks.csv`, and the three sanitized `arms/<arm>/` result sets
+under `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
 Capture files, profiles, bodies, credentials, screenshots, and logs remain
 private and are deleted on success. See `../../CAPTURE.md` for the threat model,
 feature schema, interpretation policy, limitations, and same-base procedure.

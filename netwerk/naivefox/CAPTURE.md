@@ -157,7 +157,11 @@ controlled Firefox page workload. The NaiveFox browser reaches the target
 through its private SOCKS listener. HTTPS/TLS inside CONNECT is the default
 NaiveFox workload; `--inner-transport http` produces a separate cleartext
 diagnostic dataset. Forced Alt-Svc applies only to direct H3 reference traffic,
-not to the SOCKS browser. H2 and H3 are separate datasets. Strict H3 rejects
+not to the SOCKS browser. The SOCKS browser uses a fail-closed PAC: exact
+loopback destinations use the sample's SOCKS5 port, while every other hostname
+goes to a dead local proxy with no `DIRECT` fallback. This keeps Mozilla
+background requests out of the captured NaiveFox flow. H2 and H3 are separate
+datasets. Strict H3 rejects
 established TCP or TCP payload.
 
 The browser controller remains alive until after the primary capture has
@@ -253,8 +257,15 @@ Examples:
 ./run-camouflage-suite.sh --mode research --protocol h3
 ```
 
-Use the same explicit seed for paired HTTPS-primary and HTTP-diagnostic runs.
-Each run retains a separate dataset whose metadata records `inner_transport`.
+The same explicit seed reproduces schedule order for HTTPS-primary and
+HTTP-diagnostic runs, but separately collected samples are not statistically
+paired. For arm comparison, `--multi-arm-superblocks` requires same-base mode
+and collects Firefox A, Firefox B, and NaiveFox `off`, `gate`, and `root` once
+per seeded randomized block. The sanitized full dataset records
+`experiment_block` and `naivefox_arm`, then materializes one arm-specific
+dataset per arm using the same two contemporaneous Firefox controls. In that
+mode `--samples-per-cohort` is the number of five-member blocks per protocol;
+it cannot be combined with `--naivefox-arm`.
 
 The default reference is the pinned current-Nightly artifact already used by
 the quick capture diagnostics, so it is a version-drift experiment. For a
@@ -263,8 +274,10 @@ same-base experiment, set `NAIVEFOX_CAPTURE_MODE=same-base` and the three
 stack-parity mode but is never built implicitly or made an ordinary merge
 prerequisite.
 
-Successful runs leave only `metadata.txt`, `features.csv`, `metrics.json`, and
-`summary.txt` below `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
+Successful single-arm runs leave only `metadata.txt`, `features.csv`,
+`metrics.json`, and `summary.txt` below the sanitized run directory. Multi-arm
+runs instead retain `metadata.txt`, `features-superblocks.csv`, and
+`arms/<arm>/{features.csv,metrics.json,summary.txt}`.
 Metadata includes platform, kernel, architecture, browser/product versions,
 build identifiers, library hashes, capture-tool version, revision, mode, and
 seed, making artifacts suitable for later regression history.
@@ -273,9 +286,10 @@ Current limitations are deliberate: localhost timing is useful only relative
 to its Firefox baseline; smoke samples cannot support a camouflage conclusion;
 current-Nightly differences may be version drift; platform fingerprints must
 not be mixed; optional `tc netem`, persistent-profile and long-idle studies,
-cross-version analytics, no-padding A/B, and a test-only preamble experiment
-remain separate research extensions. No
-production padding, preamble, or network behavior is changed by this suite.
+cross-version analytics and no-padding A/B remain separate research
+extensions. Multi-arm superblocks provide the collection design, but only a
+research-sized run can support a camouflage conclusion. The suite selects
+explicit runtime configuration but never mutates production defaults.
 
 ## Sensitive data handling
 

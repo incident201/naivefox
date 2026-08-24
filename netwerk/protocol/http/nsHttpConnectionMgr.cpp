@@ -1999,7 +1999,8 @@ nsresult nsHttpConnectionMgr::ProcessNewTransaction(nsHttpTransaction* trans) {
     bool isHttp3Proxy = ci->IsHttp3ProxyConnection();
     RefPtr<HttpConnectionBase> conn =
         GetH2orH3ActiveConn(ent, isHttp3Proxy, !isHttp3Proxy);
-    if (ci->UsingHttpsProxy() && ci->UsingConnect()) {
+    if (ci->UsingHttpsProxy() && ci->UsingConnect() &&
+        !(trans->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
       LOG(("About to create new tunnel conn from [%p]", conn.get()));
       ConnectionEntry* specificEnt = mCT.GetWeak(ci->HashKey());
 

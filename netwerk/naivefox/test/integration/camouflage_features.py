@@ -15,6 +15,7 @@ METADATA_FIELDS = (
     "protocol",
     "scenario",
     "label",
+    "naivefox_arm",
     "session_id",
     "experiment_block",
 )
@@ -734,6 +735,7 @@ def extract(args):
         "protocol": args.protocol,
         "scenario": args.scenario,
         "label": args.label,
+        "naivefox_arm": getattr(args, "naivefox_arm", None) or "",
         "session_id": args.session_id,
         "experiment_block": args.experiment_block or "",
         "features": features,
@@ -771,14 +773,18 @@ def merge(args):
             raise SystemExit(f"duplicate session id: {document['session_id']}")
         sessions.add(document["session_id"])
         feature_names.update(document["features"])
-    if args.expected_per_cohort:
+    expected_per_cohort = getattr(args, "expected_per_cohort", None)
+    expected_superblocks = getattr(args, "expected_superblocks", None)
+    if expected_per_cohort and expected_superblocks:
+        raise SystemExit("cohort and superblock expectations are mutually exclusive")
+    if expected_per_cohort:
         protocols = {document["protocol"] for document in documents}
         for protocol in protocols:
             for label in ("firefox_a", "firefox_b", "naivefox"):
-                if counts.get((protocol, label), 0) != args.expected_per_cohort:
+                if counts.get((protocol, label), 0) != expected_per_cohort:
                     raise SystemExit(
                         f"{protocol}/{label} has {counts.get((protocol, label), 0)} "
-                        f"samples, expected {args.expected_per_cohort}"
+                        f"samples, expected {expected_per_cohort}"
                     )
         expected_labels = ["firefox_a", "firefox_b", "naivefox"]
         for (protocol, block), members in sorted(blocks.items()):
@@ -788,6 +794,37 @@ def merge(args):
                 raise SystemExit(
                     f"incomplete experiment block {protocol}/{block}: "
                     f"labels={labels}, scenarios={sorted(scenarios)}"
+                )
+    if expected_superblocks:
+        expected_members = {
+            ("firefox_a", "reference"),
+            ("firefox_b", "reference"),
+            ("naivefox", "off"),
+            ("naivefox", "gate"),
+            ("naivefox", "root"),
+        }
+        protocols = {document["protocol"] for document in documents}
+        for protocol in protocols:
+            protocol_blocks = [key for key in blocks if key[0] == protocol]
+            if len(protocol_blocks) != expected_superblocks:
+                raise SystemExit(
+                    f"{protocol} has {len(protocol_blocks)} superblocks, "
+                    f"expected {expected_superblocks}"
+                )
+        for (protocol, block), members in sorted(blocks.items()):
+            actual_members = {
+                (document["label"], document.get("naivefox_arm", ""))
+                for document in members
+            }
+            scenarios = {document["scenario"] for document in members}
+            if (
+                len(members) != len(expected_members)
+                or actual_members != expected_members
+                or len(scenarios) != 1
+            ):
+                raise SystemExit(
+                    f"incomplete experiment superblock {protocol}/{block}: "
+                    f"members={sorted(actual_members)}, scenarios={sorted(scenarios)}"
                 )
     fieldnames = [*METADATA_FIELDS, *sorted(feature_names)]
     temporary = args.output + ".tmp"
@@ -814,12 +851,16 @@ def main():
     )
     extract_parser.add_argument("--session-id", required=True)
     extract_parser.add_argument("--experiment-block")
+    extract_parser.add_argument(
+        "--naivefox-arm", choices=("reference", "off", "gate", "root")
+    )
     extract_parser.add_argument("--output", required=True)
     extract_parser.set_defaults(function=extract)
     merge_parser = commands.add_parser("merge")
     merge_parser.add_argument("--input-dir", required=True)
     merge_parser.add_argument("--output", required=True)
     merge_parser.add_argument("--expected-per-cohort", type=int)
+    merge_parser.add_argument("--expected-superblocks", type=int)
     merge_parser.set_defaults(function=merge)
     args = parser.parse_args()
     args.function(args)

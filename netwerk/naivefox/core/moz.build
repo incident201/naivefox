@@ -13,6 +13,7 @@ SOURCES += [
     "../MemMapSnapshot.cpp",
     "../NaiveFoxRunner.cpp",
     "../NeckoTunnel.cpp",
+    "../OuterSessionGate.cpp",
     "../PaddingNegotiation.cpp",
     "../RuntimeLogging.cpp",
     "../Socks5Parser.cpp",

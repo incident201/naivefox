@@ -454,7 +454,10 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
   // Important: we must not reset the transaction while the outer connection
   // is still connecting. Resetting here could lead to opening another HTTP/3
   // connection.
-  if (IsProxyConnectInProgress() && !mIsInTunnel && hTrans) {
+  if ((IsProxyConnectInProgress() ||
+       ((caps & NS_HTTP_PROXY_PREAMBLE) &&
+        mConnInfo->IsHttp3ProxyConnection() && !mAlreadyWildcard)) &&
+      !mIsInTunnel && hTrans) {
     if (!mConnected) {
       mQueuedHttpConnectTransaction.AppendElement(hTrans);
       (void)ResumeSend();
@@ -1047,7 +1050,9 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
   bool transInQueue = mQueuedHttpConnectTransaction.Contains(trans) ||
                       mQueuedConnectUdpTransaction.Contains(trans);
   MOZ_ASSERT(trans == mHttp3Session ||
-             (transInQueue && IsProxyConnectInProgress()));
+             (transInQueue &&
+              (IsProxyConnectInProgress() ||
+               (trans->Caps() & NS_HTTP_PROXY_PREAMBLE))));
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   if (NS_SUCCEEDED(reason) || (reason == NS_BASE_STREAM_CLOSED)) {
