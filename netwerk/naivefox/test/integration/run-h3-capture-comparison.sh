@@ -375,6 +375,20 @@ extract_decrypted() {
     -e tls.handshake.extensions_server_name >"$prefix-clienthello.csv"
 
   tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.type==2" \
+    "${TSHARK_FIELDS[@]}" -e quic.connection.number \
+    -e tls.handshake.version \
+    -e tls.handshake.extensions.supported_version \
+    -e tls.handshake.ciphersuite \
+    -e tls.handshake.extensions_key_share_selected_group \
+    >"$prefix-serverhello.csv"
+
+  tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.extensions_alpn_str" \
+    "${TSHARK_FIELDS[@]}" -e quic.connection.number \
+    -e tls.handshake.extensions_alpn_str >"$prefix-alpn.csv"
+
+  tshark -r "$pcap" "${decode[@]}" \
     -Y "udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.quic.parameter.type" \
     "${TSHARK_FIELDS[@]}" -e quic.connection.number \
     -e tls.quic.parameter.type -e tls.quic.parameter.max_idle_timeout \
@@ -420,6 +434,17 @@ extract_decrypted() {
     -e quic.connection.number -e quic.version \
     -e quic.long.packet_type -e quic.dcil -e quic.scil \
     -e quic.packet_number -e quic.packet_length >"$prefix-packets.csv"
+
+  tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && (quic.rsts.stream_id || quic.ss.stream_id || quic.stream.fin==1 || quic.cc.error_code || quic.cc.error_code.app)" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
+    -e udp.srcport -e udp.dstport -e quic.connection.number \
+    -e quic.frame_type -e quic.rsts.stream_id \
+    -e quic.rsts.application_error_code -e quic.rsts.final_size \
+    -e quic.ss.stream_id -e quic.ss.application_error_code \
+    -e quic.stream.stream_id -e quic.stream.fin \
+    -e quic.cc.error_code -e quic.cc.error_code.app \
+    >"$prefix-lifecycle.csv"
 }
 
 extract_passive() {
@@ -476,14 +501,14 @@ safe_dir="$STATE_ROOT/h3-capture-safe/$capture_id"
 mkdir -m 0700 -p "$safe_dir"
 
 python3 - "$capture_dir" "$safe_dir/summary.txt" \
-  "$NAIVEFOX_FIXTURE_PROXY_PORT" <<'PY'
+  "$NAIVEFOX_FIXTURE_PROXY_PORT" "$capture_mode" <<'PY'
 import csv
 import hashlib
 import math
 import os
 import sys
 
-root, destination, proxy_port = sys.argv[1:]
+root, destination, proxy_port, reference_mode = sys.argv[1:]
 
 
 def rows(name):
@@ -506,7 +531,20 @@ def require(condition, message):
         raise SystemExit(message)
 
 
-def config_equal(suffix, ignored=("quic.connection.number",), unordered=()):
+def grease(value):
+    try:
+        parsed = int(value, 0)
+    except ValueError:
+        return value
+    return "GREASE" if parsed <= 0xffff and parsed & 0x0f0f == 0x0a0a else value
+
+
+def config_equal(
+    suffix,
+    ignored=("quic.connection.number",),
+    unordered=(),
+    grease_values=False,
+):
     unordered = set(unordered)
     def normalized(name):
         result = []
@@ -515,8 +553,14 @@ def config_equal(suffix, ignored=("quic.connection.number",), unordered=()):
             for key, value in row.items():
                 if key in ignored:
                     continue
+                pieces = [
+                    grease(item) if grease_values else item
+                    for item in value.split(";")
+                    if item
+                ]
                 if key in unordered:
-                    value = ";".join(sorted(filter(None, value.split(";"))))
+                    pieces.sort()
+                value = ";".join(pieces)
                 values.append((key, value))
             result.append(tuple(values))
         return sorted(set(result))
@@ -530,13 +574,26 @@ def config_equal(suffix, ignored=("quic.connection.number",), unordered=()):
 
 
 hello_equal = config_equal(
-    "clienthello", unordered=("tls.handshake.extension.type",
-                              "tls.handshake.sig_hash_alg")
+    "clienthello", unordered=(
+        "tls.handshake.extension.type",
+        "tls.handshake.ciphersuite",
+        "tls.handshake.extensions_supported_group",
+        "tls.handshake.sig_hash_alg",
+        "tls.handshake.extensions_key_share_group",
+    ), grease_values=True
 )
+serverhello_equal = config_equal("serverhello")
+alpn_equal = config_equal("alpn")
 transport_equal = config_equal("transport")
 settings_equal = config_equal(
     "settings", ("quic.connection.number", "quic.stream.stream_id")
 )
+if reference_mode == "same-base":
+    require(hello_equal, "same-base H3 semantic ClientHello differs")
+    require(serverhello_equal, "same-base H3 server negotiation differs")
+    require(alpn_equal, "same-base H3 selected ALPN differs")
+    require(transport_equal, "same-base H3 transport parameters differ")
+    require(settings_equal, "same-base H3/QPACK SETTINGS differ")
 # The reference is an independently downloaded current Firefox, while
 # NaiveFox is intentionally pinned to its validated Firefox snapshot.  A
 # version update may legitimately change ClientHello, transport parameters, or
@@ -686,12 +743,21 @@ require(packet_summaries[("decrypted", "reference")]["versions"] ==
 def normalized_hello(name):
     result = []
     for row in rows(name):
-        result.append(tuple(
-            (key, ";".join(sorted(filter(None, value.split(";"))))
-             if key in {"tls.handshake.extension.type",
-                        "tls.handshake.sig_hash_alg"} else value)
-            for key, value in row.items() if key != "quic.connection.number"
-        ))
+        values = []
+        for key, value in row.items():
+            if key == "quic.connection.number":
+                continue
+            pieces = [grease(item) for item in value.split(";") if item]
+            if key in {
+                "tls.handshake.extension.type",
+                "tls.handshake.ciphersuite",
+                "tls.handshake.extensions_supported_group",
+                "tls.handshake.sig_hash_alg",
+                "tls.handshake.extensions_key_share_group",
+            }:
+                pieces.sort()
+            values.append((key, ";".join(pieces)))
+        result.append(tuple(values))
     return sorted(set(result))
 
 
@@ -715,8 +781,27 @@ fingerprint_source = repr(
 ).encode()
 fingerprint = hashlib.sha256(fingerprint_source).hexdigest()
 
+def lifecycle_summary(side):
+    data = rows(f"decrypted-{side}-lifecycle.csv")
+    return {
+        "reset_stream": sum(bool(row["quic.rsts.stream_id"]) for row in data),
+        "stop_sending": sum(bool(row["quic.ss.stream_id"]) for row in data),
+        "stream_fin": sum(
+            any(value in {"1", "true", "True"}
+                for value in row["quic.stream.fin"].split(";"))
+            for row in data
+        ),
+        "connection_close": sum(
+            bool(row["quic.cc.error_code"] or row["quic.cc.error_code.app"])
+            for row in data
+        ),
+    }
+
+lifecycle = {side: lifecycle_summary(side) for side in ("reference", "naivefox")}
+
 with open(destination, "w", encoding="utf-8") as output:
     output.write("capture_scope=local_strict_h3_firefox_vs_naivefox\n")
+    output.write(f"reference_mode={reference_mode}\n")
     output.write("capture_interface=any_sll_transmit_copy\n")
     output.write("strict_udp_quic_only=yes\n")
     output.write("tcp_sessions_established=0\n")
@@ -726,10 +811,13 @@ with open(destination, "w", encoding="utf-8") as output:
     output.write("decrypted_naivefox_method=CONNECT\n")
     output.write(f"quic_versions={packet_summaries[('decrypted', 'reference')]['versions']}\n")
     output.write(f"tls_clienthello_semantic_config_equal={'yes' if hello_equal else 'no'}\n")
+    output.write(f"tls_server_negotiation_equal={'yes' if serverhello_equal else 'no'}\n")
+    output.write(f"selected_alpn_equal={'yes' if alpn_equal else 'no'}\n")
     output.write("tls_extension_order_expected_randomized=yes\n")
     output.write(f"client_transport_parameters_equal={'yes' if transport_equal else 'no'}\n")
     output.write(f"h3_settings_equal={'yes' if settings_equal else 'no'}\n")
     output.write("qpack_settings_compared=max_table_capacity,blocked_streams\n")
+    output.write("h3_lifecycle_frames_recorded=RESET_STREAM,STOP_SENDING,STREAM_FIN,CONNECTION_CLOSE\n")
     output.write(f"clienthello_canonical_sha256={fingerprint}\n")
     output.write("synthetic_marker_names=none\n")
     output.write("padding_request_header_name=present\n")
@@ -750,6 +838,9 @@ with open(destination, "w", encoding="utf-8") as output:
         for side in ("reference", "naivefox"):
             for key, value in packet_summaries[(pass_name, side)].items():
                 output.write(f"{pass_name}_{side}_{key}={value}\n")
+    for side, values in lifecycle.items():
+        for key, value in values.items():
+            output.write(f"decrypted_{side}_lifecycle_{key}={value}\n")
     output.write("raw_capture_material=deleted_after_success\n")
 PY
 chmod 0600 "$safe_dir/summary.txt"

@@ -17,9 +17,11 @@ From the repository root, run:
 ```
 
 The command runs H2, H3, Auto, config/listener, failure-path, padding,
-integrity, backpressure, lifecycle, and quick capture checks sequentially with
-the same NaiveFox binary. Strict H3 uses a UDP-only Caddy proxy port with no TCP
-listener, and therefore cannot pass by falling back to H2.
+integrity, backpressure, lifecycle, quick capture, and the structural passive
+camouflage gate sequentially with the same NaiveFox binary. Strict H3 uses a
+UDP-only Caddy proxy port with no TCP listener, and therefore cannot pass by
+falling back to H2. The two-sample camouflage gate validates collection,
+analysis, and sanitization; it never makes a statistical camouflage claim.
 
 Protocol-only aggregate suites are:
 
@@ -51,6 +53,7 @@ applicable aggregate:
 | Simultaneous SOCKS/HTTP config listeners | `run-h2-config-tests.sh`, `run-h3-config-tests.sh` |
 | Profile and logging policy | `run-config-runtime-behavior-tests.sh` |
 | Malformed local requests | `run-malformed-socks-tests.sh` where present |
+| Passive dataset/analyzer structure | `run-camouflage-self-tests.sh`, `run-camouflage-suite.sh --mode gate --protocol both` |
 
 Robustness covers deterministic large uploads/downloads, bounded slow
 producer/consumer behavior, request half-close followed by response, local and
@@ -149,6 +152,7 @@ The capture commands are:
 ./run-capture-comparison.sh
 ./run-h3-capture-comparison.sh
 ./run-observer-comparison.sh
+./run-camouflage-suite.sh --mode smoke --protocol both
 ```
 
 Their default quick mode does not build Firefox. A full ordinary Firefox build
@@ -166,6 +170,54 @@ the fetch script still verifies both the checksum and the Firefox version.
 Optional throughput scripts (`run-throughput-benchmark.sh` and
 `run-h3-throughput-benchmark.sh`) produce local diagnostics; their point-in-time
 numbers are not maintained in active documentation.
+
+## Passive camouflage dataset
+
+`run-camouflage-suite.sh` builds separate H2 and H3 datasets that actively try
+to classify Firefox versus NaiveFox. It reuses the normal fixture, browser
+reference download, private capture staging, profile handling, strict-H3
+checks, sanitization, and cleanup. A seeded interleaved schedule collects two
+independent Firefox cohorts and one NaiveFox cohort through the same endpoint,
+Caddy, certificate, IP, port, namespace, and interface.
+
+The controlled workloads are cold initial, browser-page navigation, warm
+sequential, burst/concurrent streams, bulk download, bulk upload,
+bidirectional, and idle/resume. Features include only passive-visible packet or
+datagram direction, lengths, timing and bursts, TLS records, public handshake
+capabilities, TCP SYN/lifecycle/recovery state, and QUIC Initial/CID/phase plus
+strict-endpoint TCP probe state. Ports, process information, absolute
+timestamps, paths, labels, HTTP
+plaintext and decrypted protocol state are rejected from classifier input.
+
+The dependency-free analyzer uses grouped workload-stratified cross-validation
+with train-only preprocessing, a regularized logistic classifier, a separate
+Firefox-A-versus-Firefox-B baseline, clustered bootstrap confidence intervals,
+permutation tests, coefficient importance, and leave-one-workload-out checks.
+It reports whole, initial packet/time, steady-state, and lifecycle views as raw
+JSON plus a human-readable summary. `D = max(AUC, 1 - AUC)` makes an inverted
+classifier visible instead of treating it as harmless.
+
+```bash
+./run-camouflage-self-tests.sh
+./run-camouflage-suite.sh --mode gate --protocol both
+./run-camouflage-suite.sh --mode smoke --protocol both
+./run-camouflage-suite.sh --mode standard --protocol both
+./run-camouflage-suite.sh --mode research --protocol both
+```
+
+Gate uses two, smoke ten, standard sixty, and research 240 samples per cohort
+and protocol. Override with `--samples-per-cohort` only for a deliberate local
+experiment. Gate and smoke are always `INCONCLUSIVE`; only research applies
+the documented GREEN/YELLOW/RED policy. Default quick-reference runs measure
+drift against pinned current Nightly. Set `NAIVEFOX_CAPTURE_MODE=same-base` and
+the `NAIVEFOX_CAPTURE_REFERENCE_*` paths described in `../../CAPTURE.md` for an
+explicit same-source experiment; no Firefox build is started automatically.
+
+Successful runs retain only `metadata.txt`, `features.csv`, `metrics.json`, and
+`summary.txt` under `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
+Capture files, profiles, bodies, credentials, screenshots, and logs remain
+private and are deleted on success. See `../../CAPTURE.md` for the threat model,
+feature schema, interpretation policy, limitations, and same-base procedure.
 
 ## Interactive fixture lifecycle
 

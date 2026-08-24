@@ -22,5 +22,6 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 			}
 		}
 		reverse_proxy /observer* 127.0.0.1:{$NAIVEFOX_FIXTURE_HTTP_PORT}
+		reverse_proxy /camouflage* 127.0.0.1:{$NAIVEFOX_FIXTURE_HTTP_PORT}
 	}
 }

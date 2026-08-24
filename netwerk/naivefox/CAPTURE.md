@@ -32,6 +32,7 @@ Run the H2, H3, and passive comparisons from the integration directory:
 ./run-capture-comparison.sh
 ./run-h3-capture-comparison.sh
 ./run-observer-comparison.sh
+./run-camouflage-suite.sh --mode smoke --protocol both
 ```
 
 For same-base mode, provide the reference paths required by the runner:
@@ -114,6 +115,104 @@ parameters may still be inspected; HTTP/3 headers and 1-RTT plaintext may not.
 Packet counts, lengths, timing, and TCP probes are recorded, not normalized or
 treated as equality requirements. Any established TCP transport or TCP payload
 in a strict-H3 NaiveFox case is a failure.
+
+## Statistical camouflage experiment
+
+`run-camouflage-suite.sh` attacks the project assumption from the point of
+view of a passive traffic classifier. It does not prove indistinguishability.
+It attempts to distinguish ordinary Firefox from NaiveFox using selected
+externally observable features, reports the measured classifier advantage, and
+compares that advantage with an independent Firefox-versus-Firefox baseline.
+
+The collector interleaves three cohorts with a seeded schedule: Firefox A,
+Firefox B, and NaiveFox. Each sample gets a fresh, symmetric trusted profile.
+All cohorts run on the same host and network namespace, use the same capture
+interface, endpoint IP and port, certificate, target, and Caddy process. H2 and
+H3 are separate datasets. Strict H3 rejects established TCP or TCP payload.
+
+Controlled workloads cover a cold small operation, a browser page with CSS,
+JavaScript, images, and an API response, warm sequential requests, burst and
+concurrent requests, bulk download and upload, bidirectional transfer, and an
+idle-then-resume lifecycle. The runner keeps request counts and byte budgets
+comparable where the protocol roles allow it; payload equality is not assumed.
+
+The safe feature extractor uses only information available on the wire:
+
+- signed direction and normalized IP/TCP-payload or UDP-datagram lengths for
+  the first 128 packets, plus 16/32/64/128-packet aggregates;
+- inter-packet timing, response delay, bursts, idle gaps, direction n-grams and
+  run lengths, and byte/packet windows through two seconds;
+- visible TLS-over-TCP record boundaries and lengths;
+- TCP SYN options, FIN/RST/reconnect behavior, and actual retransmission or
+  out-of-order observations;
+- public TLS ClientHello capability sets with GREASE values normalized;
+- for QUIC, version, Initial sizes and ordering, CID lengths, Retry/version
+  negotiation, public ClientHello and transport parameters, packet phases, and
+  observable TCP probe attempts at the strict-H3 endpoint.
+
+It deliberately excludes labels and harness artifacts, filenames, process
+data, source/destination ports, absolute timestamps, profile paths, credentials,
+queries, decrypted H2/H3 headers and frames, CONNECT authority, plaintext,
+private NSS secrets, and NaiveFox logs. H2/H3 decryption remains available only
+to the separate wire-parity diagnostics.
+
+The analyzer is dependency-free Python. It fits an L2-regularized logistic
+classifier after train-only standardization and feature screening. Splits are
+grouped by session and stratified by workload; the two Firefox cohorts form the
+experimental baseline. It reports ROC AUC and direction-independent
+`D = max(AUC, 1 - AUC)`, an outer-fold threshold learned only from training
+data, confusion metrics, standardized coefficient importance, a clustered
+session bootstrap confidence interval, a workload-stratified permutation test,
+and leave-one-workload-out generalization. Whole-flow, initial packet windows,
+initial time windows, steady state, and lifecycle views are reported
+separately. Raw metrics are retained so policy thresholds can be changed
+without recapturing traffic.
+
+Run levels are:
+
+- `gate`: two samples per cohort and protocol; structural collection, analysis,
+  and sanitization only;
+- `smoke`: ten samples per cohort and protocol; end-to-end validation only;
+- `standard`: sixty samples per cohort and protocol; preliminary statistics;
+- `research`: 240 samples per cohort and protocol; the only level that emits a
+  GREEN/YELLOW/RED research classification.
+
+Gate and smoke results are always `INCONCLUSIVE`, regardless of their point
+estimate. Research policy currently treats a sufficiently narrow, validated
+`D <= 0.60` and no more than 0.05 advantage over the Firefox baseline as
+GREEN, approximately 0.60--0.70 or uncertain evidence as YELLOW, and stable
+`D >= 0.70` as RED. These are project policy thresholds, not a security proof.
+
+Examples:
+
+```bash
+./run-camouflage-self-tests.sh
+./run-camouflage-suite.sh --mode gate --protocol both
+./run-camouflage-suite.sh --mode smoke --protocol h2
+./run-camouflage-suite.sh --mode standard --protocol both --seed 20260824
+./run-camouflage-suite.sh --mode research --protocol h3
+```
+
+The default reference is the pinned current-Nightly artifact already used by
+the quick capture diagnostics, so it is a version-drift experiment. For a
+same-base experiment, set `NAIVEFOX_CAPTURE_MODE=same-base` and the three
+`NAIVEFOX_CAPTURE_REFERENCE_*` paths shown above. Same-base is the primary
+stack-parity mode but is never built implicitly or made an ordinary merge
+prerequisite.
+
+Successful runs leave only `metadata.txt`, `features.csv`, `metrics.json`, and
+`summary.txt` below `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
+Metadata includes platform, kernel, architecture, browser/product versions,
+build identifiers, library hashes, capture-tool version, revision, mode, and
+seed, making artifacts suitable for later regression history.
+
+Current limitations are deliberate: localhost timing is useful only relative
+to its Firefox baseline; smoke samples cannot support a camouflage conclusion;
+current-Nightly differences may be version drift; platform fingerprints must
+not be mixed; optional `tc netem`, persistent-profile and long-idle studies,
+cross-version analytics, no-padding A/B, and a test-only preamble experiment
+remain separate research extensions. No
+production padding, preamble, or network behavior is changed by this suite.
 
 ## Sensitive data handling
 

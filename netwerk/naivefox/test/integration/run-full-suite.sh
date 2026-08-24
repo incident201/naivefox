@@ -14,4 +14,8 @@ printf '%s\n' 'Running complete H3 suite'
 "$integration_dir/run-h3-suite.sh"
 "$integration_dir/run-h3-config-tests.sh"
 
+printf '%s\n' 'Running passive camouflage structural gate'
+"$integration_dir/run-camouflage-self-tests.sh"
+"$integration_dir/run-camouflage-suite.sh" --mode gate --protocol both
+
 printf '%s\n' 'NaiveFox complete H2 and H3 integration suite passed'

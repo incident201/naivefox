@@ -299,9 +299,46 @@ extract_client_hello() {
     -e tls.handshake.extensions.supported_version \
     -e tls.handshake.ciphersuite -e tls.handshake.extension.type \
     -e tls.handshake.extensions_supported_group \
-    -e tls.handshake.sig_hash_alg -e tls.handshake.extensions_alpn_str \
+    -e tls.handshake.sig_hash_alg \
+    -e tls.handshake.extensions_key_share_group \
+    -e tls.handshake.extensions_alpn_str \
     -e tls.handshake.extensions_server_name \
     >"$output"
+}
+
+extract_server_hello() {
+  local pcap=$1
+  local keys=$2
+  local output=$3
+  tshark -r "$pcap" -o "tls.keylog_file:$keys" \
+    -Y "tcp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.type==2" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e tcp.stream \
+    -e tls.handshake.version -e tls.handshake.extensions.supported_version \
+    -e tls.handshake.ciphersuite \
+    -e tls.handshake.extensions_key_share_selected_group >"$output"
+}
+
+extract_tls_records() {
+  local pcap=$1
+  local keys=$2
+  local output=$3
+  tshark -r "$pcap" -o "tls.keylog_file:$keys" \
+    -Y "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.record.length" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
+    -e tcp.srcport -e tcp.dstport -e tcp.stream \
+    -e tls.record.content_type -e tls.record.length >"$output"
+}
+
+extract_tcp_syn() {
+  local pcap=$1
+  local output=$2
+  tshark -r "$pcap" \
+    -Y "tcp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && tcp.flags.syn==1 && tcp.flags.ack==0" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e tcp.stream \
+    -e tcp.window_size_value -e tcp.options -e tcp.options.mss_val \
+    -e tcp.options.wscale.shift -e tcp.options.timestamp.tsval \
+    -e tcp.options.tfo.request -e tcp.options.tfo.cookie \
+    -e tcp.flags.ece -e tcp.flags.cwr >"$output"
 }
 
 extract_alpn() {
@@ -338,6 +375,20 @@ extract_timeline() {
     "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
     -e tcp.srcport -e tcp.dstport -e tcp.stream -e http2.type \
     -e http2.flags -e http2.length -e http2.streamid \
+    -e http2.window_update.window_size_increment >"$output"
+}
+
+extract_lifecycle() {
+  local pcap=$1
+  local keys=$2
+  local output=$3
+  tshark -r "$pcap" -o "tls.keylog_file:$keys" \
+    -Y "http2 && (tcp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT || tcp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT) && (http2.type==0 || http2.type==1 || http2.type==3 || http2.type==4 || http2.type==7 || http2.type==8)" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
+    -e tcp.srcport -e tcp.dstport -e tcp.stream -e http2.type \
+    -e http2.flags -e http2.flags.end_stream -e http2.length \
+    -e http2.streamid -e http2.rst_stream.error \
+    -e http2.goaway.last_stream_id -e http2.goaway.error \
     -e http2.window_update.window_size_increment >"$output"
 }
 
@@ -393,9 +444,13 @@ for side in reference naivefox; do
     method=CONNECT
   fi
   extract_client_hello "$pcap" "$keys" "$capture_dir/$side-clienthello.csv"
+  extract_server_hello "$pcap" "$keys" "$capture_dir/$side-serverhello.csv"
+  extract_tls_records "$pcap" "$keys" "$capture_dir/$side-tls-records.csv"
+  extract_tcp_syn "$pcap" "$capture_dir/$side-tcp-syn.csv"
   extract_alpn "$pcap" "$keys" "$capture_dir/$side-alpn.csv"
   extract_settings "$pcap" "$keys" "$capture_dir/$side-settings.csv"
   extract_timeline "$pcap" "$keys" "$capture_dir/$side-timeline.csv"
+  extract_lifecycle "$pcap" "$keys" "$capture_dir/$side-lifecycle.csv"
   extract_requests "$pcap" "$keys" "$method" "$capture_dir/$side-requests.csv"
 done
 
@@ -405,9 +460,12 @@ extract_names "$naivefox_pcap" "$naivefox_keys" \
 extract_names "$naivefox_pcap" "$naivefox_keys" \
   'http2.header.name=="padding"' "$capture_dir/naivefox-padding.csv" padding
 
-for required in reference-clienthello reference-alpn reference-settings \
-                reference-timeline reference-requests naivefox-clienthello \
-                naivefox-alpn naivefox-settings naivefox-timeline \
+for required in reference-clienthello reference-serverhello \
+                reference-tls-records reference-tcp-syn reference-alpn \
+                reference-settings reference-timeline reference-lifecycle \
+                reference-requests naivefox-clienthello naivefox-serverhello \
+                naivefox-tls-records naivefox-tcp-syn naivefox-alpn \
+                naivefox-settings naivefox-timeline naivefox-lifecycle \
                 naivefox-requests; do
   if [[ $(wc -l <"$capture_dir/$required.csv") -lt 2 ]]; then
     printf 'safe capture extract has no data rows: %s\n' "$required" >&2
@@ -429,7 +487,8 @@ if [[ $(wc -l <"$capture_dir/naivefox-padding.csv") -lt 3 ]]; then
   exit 1
 fi
 
-read -r clienthello_equal settings_equal < <(
+read -r clienthello_semantic_equal clienthello_order_equal \
+  serverhello_equal alpn_equal settings_equal tcp_syn_equal < <(
   python3 - "$capture_dir" <<'PY'
 import csv
 import os
@@ -442,15 +501,107 @@ def normalized(name, ignored):
         return [tuple(value for key, value in row.items() if key not in ignored)
                 for row in csv.DictReader(source)]
 
-hello_ignored = {"frame.number", "tcp.stream"}
+def grease(value):
+    try:
+        parsed = int(value, 0)
+    except ValueError:
+        return value
+    return "GREASE" if parsed & 0x0f0f == 0x0a0a else value
+
+def hello(name, ordered):
+    result = []
+    for row in csv.DictReader(open(os.path.join(root, name), newline="", encoding="utf-8")):
+        values = []
+        for key, value in row.items():
+            if key in {"frame.number", "tcp.stream"}:
+                continue
+            split = [grease(item) for item in value.split(";") if item]
+            if not ordered and key in {
+                "tls.handshake.extension.type",
+                "tls.handshake.ciphersuite",
+                "tls.handshake.extensions_supported_group",
+                "tls.handshake.sig_hash_alg",
+                "tls.handshake.extensions_key_share_group",
+            }:
+                split.sort()
+            values.append((key, ";".join(split)))
+        result.append(tuple(values))
+    return result
+
+clienthello_semantic_equal = hello("reference-clienthello.csv", False) == hello(
+    "naivefox-clienthello.csv", False
+)
+clienthello_order_equal = hello("reference-clienthello.csv", True) == hello(
+    "naivefox-clienthello.csv", True
+)
+serverhello_equal = normalized(
+    "reference-serverhello.csv", {"frame.number", "tcp.stream"}
+) == normalized("naivefox-serverhello.csv", {"frame.number", "tcp.stream"})
+alpn_equal = normalized(
+    "reference-alpn.csv", {"frame.number", "tcp.stream"}
+) == normalized("naivefox-alpn.csv", {"frame.number", "tcp.stream"})
 settings_ignored = {"frame.number", "tcp.stream"}
-hello_equal = normalized("reference-clienthello.csv", hello_ignored) == normalized(
-    "naivefox-clienthello.csv", hello_ignored)
 settings_equal = normalized("reference-settings.csv", settings_ignored) == normalized(
     "naivefox-settings.csv", settings_ignored)
-print("yes" if hello_equal else "no", "yes" if settings_equal else "no")
+
+def option_kinds(value):
+    raw = "".join(character for character in value if character in "0123456789abcdefABCDEF")
+    if not raw or len(raw) % 2:
+        return ""
+    data = bytes.fromhex(raw)
+    result = []
+    offset = 0
+    while offset < len(data):
+        kind = data[offset]
+        result.append(str(kind))
+        if kind == 0:
+            break
+        if kind == 1:
+            offset += 1
+            continue
+        if offset + 1 >= len(data) or data[offset + 1] < 2:
+            break
+        offset += data[offset + 1]
+    return ",".join(result)
+
+def tcp_syn(name):
+    rows = []
+    for row in csv.DictReader(open(os.path.join(root, name), newline="", encoding="utf-8")):
+        rows.append(tuple(
+            (key, option_kinds(value) if key == "tcp.options" else
+             "present" if key in {
+                 "tcp.options.timestamp.tsval", "tcp.options.tfo.cookie"
+             } and value else value)
+            for key, value in row.items()
+            if key not in {"frame.number", "tcp.stream"}
+        ))
+    return rows
+
+tcp_syn_equal = tcp_syn("reference-tcp-syn.csv") == tcp_syn("naivefox-tcp-syn.csv")
+print(
+    "yes" if clienthello_semantic_equal else "no",
+    "yes" if clienthello_order_equal else "no",
+    "yes" if serverhello_equal else "no",
+    "yes" if alpn_equal else "no",
+    "yes" if settings_equal else "no",
+    "yes" if tcp_syn_equal else "no",
+)
 PY
 )
+
+if [[ $capture_mode == same-base ]]; then
+  for comparison in \
+    "semantic ClientHello:$clienthello_semantic_equal" \
+    "server negotiation:$serverhello_equal" \
+    "selected ALPN:$alpn_equal" \
+    "HTTP/2 SETTINGS:$settings_equal" \
+    "TCP SYN fingerprint:$tcp_syn_equal"; do
+    if [[ ${comparison##*:} != yes ]]; then
+      printf 'same-base H2 parity mismatch: %s\n' "${comparison%%:*}" >&2
+      exit 1
+    fi
+  done
+fi
 
 reuse_summary=$(python3 - "$capture_dir/naivefox-requests.csv" <<'PY'
 import csv
@@ -468,17 +619,48 @@ PY
 safe_dir="$STATE_ROOT/capture-safe/$capture_id"
 mkdir -m 0700 -p "$safe_dir"
 safe_files=(
-  reference-clienthello.csv reference-alpn.csv reference-settings.csv
-  reference-timeline.csv reference-requests.csv naivefox-clienthello.csv
-  naivefox-alpn.csv naivefox-settings.csv naivefox-timeline.csv
-  naivefox-requests.csv naivefox-markers.csv naivefox-padding.csv
+  reference-clienthello.csv reference-serverhello.csv reference-tls-records.csv
+  reference-tcp-syn.csv reference-alpn.csv reference-settings.csv
+  reference-timeline.csv reference-lifecycle.csv reference-requests.csv
+  naivefox-clienthello.csv naivefox-serverhello.csv naivefox-tls-records.csv
+  naivefox-tcp-syn.csv naivefox-alpn.csv naivefox-settings.csv
+  naivefox-timeline.csv naivefox-lifecycle.csv naivefox-requests.csv
+  naivefox-markers.csv naivefox-padding.csv
 )
 for file in "${safe_files[@]}"; do
-  cp -- "$capture_dir/$file" "$safe_dir/$file"
+  python3 - "$capture_dir/$file" "$safe_dir/$file" \
+    "$NAIVEFOX_FIXTURE_PROXY_PORT" <<'PY'
+import csv
+import sys
+
+source, destination, proxy_port = sys.argv[1:]
+with open(source, newline="", encoding="utf-8") as stream:
+    reader = csv.DictReader(stream)
+    fieldnames = list(reader.fieldnames or ())
+    rows = list(reader)
+port_fields = {"tcp.srcport", "tcp.dstport"}
+if port_fields <= set(fieldnames):
+    fieldnames = [name for name in fieldnames if name not in port_fields]
+    fieldnames.append("direction")
+    for row in rows:
+        if row["tcp.dstport"] == proxy_port:
+            row["direction"] = "client"
+        elif row["tcp.srcport"] == proxy_port:
+            row["direction"] = "server"
+        else:
+            row["direction"] = "other"
+        for name in port_fields:
+            row.pop(name, None)
+with open(destination, "w", newline="", encoding="utf-8") as stream:
+    writer = csv.DictWriter(stream, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+PY
   chmod 0600 "$safe_dir/$file"
 done
 cat >"$safe_dir/summary.txt" <<EOF
 capture_revision=$(git -C "$SOURCE_ROOT" rev-parse HEAD)
+reference_mode=$capture_mode
 reference_binary=$(readelf -n "$REFERENCE_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)
 naivefox_binary=$(readelf -n "$NAIVEFOX_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)
 reference_libxul_sha256=$(sha256sum "$REFERENCE_LIBDIR/libxul.so" | cut -d' ' -f1)
@@ -489,8 +671,14 @@ endpoint=localhost:$NAIVEFOX_FIXTURE_PROXY_PORT
 reference_method=GET
 naivefox_method=CONNECT
 selected_alpn=h2
-ordered_clienthello_fields_equal=$clienthello_equal
+semantic_clienthello_fields_equal=$clienthello_semantic_equal
+ordered_clienthello_fields_equal=$clienthello_order_equal
+server_negotiation_equal=$serverhello_equal
+selected_alpn_equal=$alpn_equal
 client_settings_equal=$settings_equal
+tcp_syn_fingerprint_equal=$tcp_syn_equal
+tls_record_layout_recorded=yes
+h2_lifecycle_frames_recorded=DATA,HEADERS,RST_STREAM,SETTINGS,GOAWAY,WINDOW_UPDATE
 synthetic_marker_names=none
 padding_header_name=present
 naivefox_reuse=$reuse_summary
