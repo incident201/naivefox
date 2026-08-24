@@ -82,6 +82,7 @@ EXPORTS.mozilla.dom += [
     "/netwerk/naivefox/ClientInfo.h",
     "/netwerk/naivefox/FeaturePolicy.h",
     "/netwerk/naivefox/Promise.h",
+    "/netwerk/naivefox/ReferrerPolicyBinding.h",
     "/netwerk/naivefox/RequestBinding.h",
     "/netwerk/naivefox/ServiceWorkerDescriptor.h",
 ]

@@ -4,8 +4,11 @@ import csv
 import importlib.util
 import os
 import random
+import subprocess
+import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 HERE = os.path.dirname(__file__)
 SPEC = importlib.util.spec_from_file_location(
@@ -44,6 +47,148 @@ def synthetic_rows(count=12, signal=True):
 
 
 class CamouflageAnalysisTests(unittest.TestCase):
+    def test_research_inference_requires_240_samples_per_cohort(self):
+        insufficient = ANALYZE.absolute_inference_status(
+            synthetic_rows(239), "research"
+        )
+        self.assertFalse(insufficient["supports_absolute_verdict"])
+        self.assertFalse(insufficient["research_samples_sufficient"])
+        self.assertEqual(len(insufficient["research_sample_shortfalls"]), 3)
+        self.assertTrue(
+            all(
+                item["minimum"] == ANALYZE.MIN_RESEARCH_SAMPLES_PER_COHORT
+                for item in insufficient["research_sample_shortfalls"]
+            )
+        )
+
+        sufficient = ANALYZE.absolute_inference_status(
+            synthetic_rows(240), "research"
+        )
+        self.assertTrue(sufficient["supports_absolute_verdict"])
+        self.assertTrue(sufficient["research_samples_sufficient"])
+
+    def test_multi_arm_screening_disables_absolute_research_verdict(self):
+        status = ANALYZE.absolute_inference_status(
+            synthetic_rows(240), "research", screening_only=True
+        )
+        self.assertTrue(status["research_samples_sufficient"])
+        self.assertFalse(status["supports_absolute_verdict"])
+        self.assertEqual(status["status"], "INCONCLUSIVE")
+        self.assertTrue(any("screening" in reason for reason in status["reasons"]))
+
+    def test_screening_report_forces_all_classifications_inconclusive(self):
+        baseline = {
+            "available": True,
+            "auc": 0.5,
+            "auc_ci95": [0.45, 0.55],
+            "distinguishability": 0.5,
+            "refit_bootstrap": {"auc_ci95": [0.45, 0.55]},
+        }
+        target = {
+            "available": True,
+            "auc": 0.8,
+            "auc_ci95": [0.7, 0.9],
+            "distinguishability": 0.8,
+            "refit_bootstrap": {"auc_ci95": [0.7, 0.9]},
+            "permutation_test": {"p_value": 0.001},
+        }
+        original_analyze = ANALYZE.analyze_comparison
+        original_cross = ANALYZE.cross_workload
+        original_handshake = ANALYZE.passive_handshake_differences
+
+        def fixed_comparison(selected_rows, _labels, *_args, **_kwargs):
+            has_naivefox = any(row["label"] == "naivefox" for row in selected_rows)
+            return dict(target if has_naivefox else baseline)
+
+        ANALYZE.analyze_comparison = fixed_comparison
+        ANALYZE.cross_workload = lambda *_args, **_kwargs: {
+            "macro_auc": None,
+            "holdouts": {},
+        }
+        ANALYZE.passive_handshake_differences = lambda *_args, **_kwargs: {
+            "different_feature_count": 0,
+            "top_differences": [],
+        }
+        try:
+            report = ANALYZE.build_report(
+                SimpleNamespace(
+                    mode="research",
+                    screening_only=True,
+                    seed=91,
+                    max_features=2,
+                    l2=0.05,
+                    iterations=20,
+                    bootstrap=100,
+                    permutations=99,
+                    refit_bootstrap=20,
+                    folds=5,
+                ),
+                synthetic_rows(240),
+                ["whole_signal", "whole_noise"],
+            )
+        finally:
+            ANALYZE.analyze_comparison = original_analyze
+            ANALYZE.cross_workload = original_cross
+            ANALYZE.passive_handshake_differences = original_handshake
+        self.assertFalse(report["inference"]["supports_absolute_verdict"])
+        self.assertEqual(
+            report["conclusion"]["naivefox_distinguishable_by_selected_classifiers"],
+            "INCONCLUSIVE",
+        )
+        for protocol in report["protocols"].values():
+            for view in protocol["views"].values():
+                self.assertEqual(view["classification"], "inconclusive")
+
+    def test_research_cli_rejects_undersized_dataset_before_analysis(self):
+        with tempfile.TemporaryDirectory() as directory:
+            features = os.path.join(directory, "features.csv")
+            output_json = os.path.join(directory, "metrics.json")
+            output_summary = os.path.join(directory, "summary.txt")
+            with open(features, "w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(
+                    stream,
+                    fieldnames=(
+                        "schema_version",
+                        "protocol",
+                        "scenario",
+                        "label",
+                        "session_id",
+                        "whole_packet_count",
+                    ),
+                )
+                writer.writeheader()
+                for label in ANALYZE.COHORT_LABELS:
+                    writer.writerow({
+                        "schema_version": 1,
+                        "protocol": "h2",
+                        "scenario": "initial",
+                        "label": label,
+                        "session_id": label,
+                        "whole_packet_count": 1,
+                    })
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    os.path.join(HERE, "analyze-camouflage.py"),
+                    "--features",
+                    features,
+                    "--output-json",
+                    output_json,
+                    "--output-summary",
+                    output_summary,
+                    "--mode",
+                    "research",
+                    "--seed",
+                    "1",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("at least 240 samples", result.stderr)
+            self.assertFalse(os.path.exists(output_json))
+            self.assertFalse(os.path.exists(output_summary))
+
     def test_auc_ties_and_inversion(self):
         self.assertEqual(ANALYZE.auc([0, 1, 0, 1], [0.5] * 4), 0.5)
         value = ANALYZE.auc([0, 0, 1, 1], [0.1, 0.2, 0.8, 0.9])
@@ -275,7 +420,14 @@ class CamouflageAnalysisTests(unittest.TestCase):
     def test_feature_views_do_not_accept_decrypted_boundaries(self):
         names = [
             "packet_001_direction",
+            "packet_016_wire_size_signed",
+            "packet_017_wire_size_signed",
+            "packet_032_transport_size_signed",
             "packet_033_direction",
+            "tls_record_016_signed_length",
+            "tls_record_017_signed_length",
+            "tls_record_032_signed_length",
+            "tls_record_033_signed_length",
             "initial_16_packet_count",
             "steady_after_32_packet_count",
             "lifecycle_connection_count",
@@ -286,6 +438,17 @@ class CamouflageAnalysisTests(unittest.TestCase):
         self.assertIn("packet_001_direction", initial)
         self.assertIn("quic_tcp_probe_client_syn_count", initial)
         self.assertNotIn("packet_033_direction", initial)
+        second_window = ANALYZE.view_feature_names(names, "packets_17_32")
+        self.assertEqual(
+            second_window,
+            [
+                "packet_017_wire_size_signed",
+                "packet_032_transport_size_signed",
+                "tls_record_017_signed_length",
+                "tls_record_032_signed_length",
+            ],
+        )
+        self.assertNotIn("quic_tcp_probe_client_syn_count", second_window)
         self.assertEqual(
             ANALYZE.view_feature_names(names, "steady_after_32"),
             ["steady_after_32_packet_count"],
@@ -306,6 +469,11 @@ class CamouflageAnalysisTests(unittest.TestCase):
             "whole_source_port",
             "whole_label",
             "whole_session_id",
+            "whole_naivefox_arm",
+            "quic_decrypted_method",
+            "whole_plaintext_header",
+            "whole_stream_id",
+            "whole_status",
         ):
             with self.subTest(
                 leakage=leakage

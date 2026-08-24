@@ -7,6 +7,10 @@
 #include <netinet/in.h>
 
 #include "mozilla/Mutex.h"
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla/Atomics.h"
+#  include "mozilla/Logging.h"
+#endif
 #include "mozilla/SHA1.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/UniquePtr.h"
@@ -20,6 +24,37 @@
 struct nlmsghdr;
 
 namespace mozilla::net {
+
+#ifdef MOZ_NAIVEFOX
+extern LazyLogModule gNaiveFoxNetworkStartupLog;
+#  define NAIVEFOX_NETWORK_STARTUP_LOG(args)                         \
+    MOZ_LOG(mozilla::net::gNaiveFoxNetworkStartupLog,                \
+            mozilla::LogLevel::Debug, args)
+
+enum class InitialNetworkState : uint32_t {
+  Pending,
+  Ready,
+  Failed,
+};
+
+// Initial convergence has exactly one terminal transition.  Keeping this
+// rule in a constexpr helper makes the invariant independently testable and
+// prevents a late worker failure from undoing a successful startup.
+constexpr InitialNetworkState AdvanceInitialNetworkState(
+    InitialNetworkState aCurrent, InitialNetworkState aRequested) {
+  return aCurrent == InitialNetworkState::Pending
+             ? aRequested
+             : aCurrent;
+}
+
+constexpr bool InitialNetworkStateIsTerminal(InitialNetworkState aState) {
+  return aState != InitialNetworkState::Pending;
+}
+
+constexpr bool InitialNetworkStateAllowsStartup(InitialNetworkState aState) {
+  return aState == InitialNetworkState::Ready;
+}
+#endif
 
 class NetlinkAddress;
 class NetlinkNeighbor;
@@ -56,8 +91,20 @@ class NetlinkService : public nsIRunnable {
   nsresult GetResolvers(nsTArray<NetAddr>& aResolvers);
 
   static bool HasNonLocalIPv6Address();
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox opens a local proxy immediately after XPCOM startup.  The public
+  // linkStatusKnown bit is set after the initial netlink dump, before the
+  // delayed route checks have converged.  Expose the stronger, latched boundary
+  // so that the local listener cannot race the first network-change cleanup.
+  static InitialNetworkState GetInitialNetworkState();
+#endif
 
  private:
+#ifdef MOZ_NAIVEFOX
+  static void BeginInitialNetworkState();
+  static bool FinishInitialNetworkState(InitialNetworkState aState,
+                                        const char* aReason);
+#endif
   void EnqueueGenMsg(uint16_t aMsgType, uint8_t aFamily);
   void EnqueueRtMsg(uint8_t aFamily, void* aAddress);
   void RemovePendingMsg();
@@ -73,7 +120,9 @@ class NetlinkService : public nsIRunnable {
 
   void UpdateLinkStatus();
 
-  void TriggerNetworkIDCalculation();
+  void TriggerNetworkIDCalculation(const char* aSource,
+                                   uint16_t aNetlinkType = 0,
+                                   uint32_t aNetlinkSequence = 0);
   int GetPollWait();
   void GetGWNeighboursForFamily(uint8_t aFamily,
                                 nsTArray<NetlinkNeighbor*>& aGwNeighbors);
@@ -84,6 +133,13 @@ class NetlinkService : public nsIRunnable {
   nsCOMPtr<nsIThread> mThread;
 
   bool mInitialScanFinished{false};
+
+#ifdef MOZ_NAIVEFOX
+  static mozilla::Atomic<InitialNetworkState, mozilla::ReleaseAcquire>
+      sInitialNetworkState;
+  uint64_t mNetworkTriggerSequence{0};
+  uint64_t mNetworkCalculationGeneration{0};
+#endif
 
   // A pipe to signal shutdown with.
   int mShutdownPipe[2]{-1, -1};

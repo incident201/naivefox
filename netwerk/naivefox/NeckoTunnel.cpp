@@ -10,20 +10,24 @@
 #include <utility>
 
 #include "AutoFallback.h"
+#include "ReferrerInfo.h"
 #include "mozilla/Base64.h"
 #include "mozilla/ErrorNames.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/SpinEventLoopUntil.h"
+#include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/TextUtils.h"
 #include "nsCOMPtr.h"
 #include "nsError.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
 #include "nsIChannel.h"
+#include "nsIClassOfService.h"
 #include "nsIContentPolicy.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInputStream.h"
+#include "nsILoadGroup.h"
 #include "nsILoadInfo.h"
 #include "nsIPrincipal.h"
 #include "nsIProtocolHandler.h"
@@ -31,6 +35,7 @@
 #include "nsIProxiedChannel.h"
 #include "nsIProxiedProtocolHandler.h"
 #include "nsIProxyInfo.h"
+#include "nsIReferrerInfo.h"
 #include "nsIRequest.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsISocketTransport.h"
@@ -554,6 +559,573 @@ nsresult BuildExplicitProxyRoute(
 
 }  // namespace
 
+class ProxyPreambleOperation::Impl final {
+ public:
+  struct Stream final {
+    nsCOMPtr<nsIURI> mUri;
+    nsCOMPtr<nsIRequest> mRequest;
+    uint32_t mHttpStatus = 0;
+    bool mHeadersReceived = false;
+    bool mResponseHeadersReceived = false;
+    bool mDone = false;
+  };
+
+  ExplicitProxyRoute mRoute;
+  nsCOMPtr<nsIPrincipal> mPrincipal;
+  nsCOMPtr<nsILoadGroup> mLoadGroup;
+  PreambleConfig mConfig;
+  ProxyProtocol mProtocol = ProxyProtocol::H2;
+  ProxyPreambleCallback mBarrierCallback;
+  std::function<void()> mFinishedCallback;
+  nsTArray<Stream> mStreams;
+  nsTArray<nsCString> mDiscoveredSpecs;
+  nsCOMPtr<nsIReferrerInfo> mRootReferrerInfo;
+  nsCString mRootPrePath;
+  nsCString mHtml;
+  uint32_t mParseOffset = 0;
+  uint32_t mBodyBytes = 0;
+  nsresult mFirstFailure = NS_OK;
+  bool mRootDone = false;
+  bool mBarrierFired = false;
+  bool mFinishedFired = false;
+  bool mCancelled = false;
+};
+
+class ProxyPreambleOperation::StreamListener final : public nsIStreamListener {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSIREQUESTOBSERVER
+  NS_DECL_NSISTREAMLISTENER
+
+  StreamListener(ProxyPreambleOperation* aOwner, uint32_t aStreamId)
+      : mOwner(aOwner), mStreamId(aStreamId) {}
+
+ private:
+  ~StreamListener() = default;
+
+  RefPtr<ProxyPreambleOperation> mOwner;
+  const uint32_t mStreamId;
+};
+
+NS_IMPL_ISUPPORTS(ProxyPreambleOperation::StreamListener, nsIStreamListener,
+                  nsIRequestObserver)
+
+NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnStartRequest(
+    nsIRequest* aRequest) {
+  return mOwner->OnStartRequest(mStreamId, aRequest);
+}
+
+NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnDataAvailable(
+    nsIRequest* aRequest, nsIInputStream* aInputStream, uint64_t aOffset,
+    uint32_t aCount) {
+  return mOwner->OnDataAvailable(mStreamId, aInputStream, aCount);
+}
+
+NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnStopRequest(
+    nsIRequest* aRequest, nsresult aStatus) {
+  mOwner->OnStopRequest(mStreamId, aStatus);
+  mOwner = nullptr;
+  return NS_OK;
+}
+
+namespace {
+
+void LowercaseAscii(nsACString& aValue) {
+  char* values = aValue.BeginWriting();
+  for (uint32_t index = 0; index < aValue.Length(); ++index) {
+    char& value = values[index];
+    if (value >= 'A' && value <= 'Z') {
+      value += 'a' - 'A';
+    }
+  }
+}
+
+bool IsHtmlSpace(char aValue) {
+  return aValue == ' ' || aValue == '\t' || aValue == '\r' || aValue == '\n' ||
+         aValue == '\f';
+}
+
+bool StartsWithTagName(const nsACString& aLowerTag, const nsACString& aName) {
+  if (aLowerTag.Length() < aName.Length() + 2 || aLowerTag.CharAt(0) != '<' ||
+      !Substring(aLowerTag, 1, aName.Length()).Equals(aName)) {
+    return false;
+  }
+  const char boundary = aLowerTag.CharAt(aName.Length() + 1);
+  return IsHtmlSpace(boundary) || boundary == '>' || boundary == '/';
+}
+
+bool ExtractQuotedAttribute(const nsACString& aTag, const nsACString& aLowerTag,
+                            const nsACString& aName, nsACString& aValue) {
+  uint32_t searchFrom = 0;
+  while (searchFrom < aLowerTag.Length()) {
+    int32_t found = aLowerTag.Find(aName, searchFrom);
+    if (found < 0) {
+      return false;
+    }
+    const uint32_t nameStart = static_cast<uint32_t>(found);
+    const uint32_t nameEnd = nameStart + aName.Length();
+    if ((nameStart == 0 || IsHtmlSpace(aLowerTag.CharAt(nameStart - 1))) &&
+        (nameEnd == aLowerTag.Length() ||
+         IsHtmlSpace(aLowerTag.CharAt(nameEnd)) ||
+         aLowerTag.CharAt(nameEnd) == '=')) {
+      uint32_t cursor = nameEnd;
+      while (cursor < aLowerTag.Length() &&
+             IsHtmlSpace(aLowerTag.CharAt(cursor))) {
+        ++cursor;
+      }
+      if (cursor < aLowerTag.Length() && aLowerTag.CharAt(cursor) == '=') {
+        ++cursor;
+        while (cursor < aLowerTag.Length() &&
+               IsHtmlSpace(aLowerTag.CharAt(cursor))) {
+          ++cursor;
+        }
+        if (cursor < aLowerTag.Length() && (aLowerTag.CharAt(cursor) == '\'' ||
+                                            aLowerTag.CharAt(cursor) == '"')) {
+          const char quote = aLowerTag.CharAt(cursor++);
+          int32_t end = aLowerTag.FindChar(quote, cursor);
+          if (end > static_cast<int32_t>(cursor)) {
+            aValue.Assign(
+                Substring(aTag, cursor, static_cast<uint32_t>(end) - cursor));
+            return true;
+          }
+        }
+      }
+    }
+    searchFrom = nameEnd;
+  }
+  return false;
+}
+
+}  // namespace
+
+ProxyPreambleOperation::ProxyPreambleOperation() : mImpl(MakeUnique<Impl>()) {}
+
+ProxyPreambleOperation::~ProxyPreambleOperation() {
+  MOZ_ASSERT(!mImpl || mImpl->mCancelled || mImpl->mFinishedFired ||
+             mImpl->mStreams.IsEmpty());
+}
+
+void ProxyPreambleOperation::Cancel(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mFinishedFired) {
+    return;
+  }
+  mImpl->mCancelled = true;
+  // Clear externally owned continuations before Cancel(), which can dispatch
+  // OnStopRequest reentrantly on some channel implementations.
+  mImpl->mBarrierCallback = nullptr;
+  mImpl->mFinishedCallback = nullptr;
+  nsTArray<nsCOMPtr<nsIRequest>> requests;
+  for (auto& stream : mImpl->mStreams) {
+    if (stream.mRequest) {
+      requests.AppendElement(stream.mRequest.forget());
+    }
+    stream.mDone = true;
+  }
+  for (const auto& request : requests) {
+    (void)request->Cancel(aStatus);
+  }
+}
+
+nsresult ProxyPreambleOperation::Start(
+    const nsACString& aProxyUrl, const nsACString& aProxyUser,
+    const nsACString& aProxyPassword, const PreambleConfig& aConfig,
+    ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
+    std::function<void()>&& aFinishedCallback,
+    const Maybe<HostResolverRule>& aHostResolverRule) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!aBarrierCallback || aConfig.mMode == PreambleMode::Off ||
+      !IsValidPreamblePath(aConfig.mPath) || aConfig.mMaxBytes == 0 ||
+      aConfig.mMaxBytes > PreambleConfig::kMaximumBytes ||
+      aConfig.mMaxAssets > PreambleConfig::kMaximumAssets) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  mImpl->mConfig = aConfig;
+  mImpl->mProtocol = aProtocol;
+  mImpl->mBarrierCallback = std::move(aBarrierCallback);
+  mImpl->mFinishedCallback = std::move(aFinishedCallback);
+  MOZ_TRY(BuildExplicitProxyRoute(aProxyUrl, aProxyUser, aProxyPassword,
+                                  aProtocol, aHostResolverRule, false,
+                                  mImpl->mRoute));
+  MOZ_TRY(GetSystemPrincipal(getter_AddRefs(mImpl->mPrincipal)));
+  MOZ_TRY(
+      NS_NewLoadGroup(getter_AddRefs(mImpl->mLoadGroup), mImpl->mPrincipal));
+
+  nsAutoCString rootSpec;
+  MOZ_TRY(mImpl->mRoute.mProxyUri->GetPrePath(rootSpec));
+  mImpl->mRootPrePath = rootSpec;
+  rootSpec.Append(aConfig.mPath);
+  nsCOMPtr<nsIURI> rootUri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(rootUri), rootSpec));
+
+  auto openStream = [this](nsIURI* aUri, nsContentPolicyType aContentPolicyType,
+                           uint32_t& aStreamId) -> nsresult {
+    nsCOMPtr<nsIChannel> templateChannel;
+    MOZ_TRY(
+        NS_NewChannel(getter_AddRefs(templateChannel), aUri, mImpl->mPrincipal,
+                      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+                          nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS |
+                          nsILoadInfo::SEC_COOKIES_OMIT,
+                      aContentPolicyType, nullptr, nullptr, mImpl->mLoadGroup));
+    nsCOMPtr<nsILoadInfo> loadInfo = templateChannel->LoadInfo();
+    nsCOMPtr<nsIProxiedProtocolHandler> protocolHandler =
+        do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
+    if (!protocolHandler) {
+      return NS_ERROR_FAILURE;
+    }
+    nsCOMPtr<nsIChannel> channel;
+    MOZ_TRY(protocolHandler->NewProxiedChannel(aUri, mImpl->mRoute.mProxyInfo,
+                                               0, nullptr, loadInfo,
+                                               getter_AddRefs(channel)));
+    nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
+    nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel);
+    if (!internal || !httpChannel) {
+      return NS_ERROR_FAILURE;
+    }
+    MOZ_TRY(httpChannel->SetRequestMethod("GET"_ns));
+    MOZ_TRY(internal->SetAllowSpdy(true));
+    MOZ_TRY(internal->SetAllowHttp3(mImpl->mProtocol == ProxyProtocol::H3));
+    MOZ_TRY(internal->SetBlockAuthPrompt(true));
+    MOZ_TRY(internal->SetProxyPreamble());
+    MOZ_TRY(internal->SetDocumentURI(aUri));
+    MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
+    MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
+                                  nsIRequest::LOAD_ANONYMOUS |
+                                  nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+    // Mirror the native top-level document scheduling cause from nsDocShell.
+    // Necko derives transport priority from class-of-service state; do not
+    // synthesize an HTTP Priority header or tune the resulting frame size.
+    if (aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
+      nsCOMPtr<nsIClassOfService> cos = do_QueryInterface(channel);
+      if (cos) {
+        cos->AddClassFlags(nsIClassOfService::UrgentStart);
+        if (StaticPrefs::dom_document_priority_incremental()) {
+          cos->SetIncremental(true);
+        }
+      }
+    }
+
+    aStreamId = mImpl->mStreams.Length();
+    auto& stream = *mImpl->mStreams.AppendElement();
+    stream.mUri = aUri;
+    stream.mRequest = channel;
+    RefPtr<StreamListener> listener = new StreamListener(this, aStreamId);
+    nsresult rv = channel->AsyncOpen(listener);
+    if (NS_FAILED(rv)) {
+      mImpl->mStreams.RemoveLastElement();
+      return rv;
+    }
+    return NS_OK;
+  };
+
+  uint32_t rootStreamId = 0;
+  return openStream(rootUri, nsIContentPolicy::TYPE_DOCUMENT, rootStreamId);
+}
+
+nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
+                                                nsIRequest* aRequest) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length()) {
+    return NS_ERROR_ABORT;
+  }
+  auto& stream = mImpl->mStreams[aStreamId];
+  stream.mHeadersReceived = true;
+  nsCOMPtr<nsIHttpChannel> channel = do_QueryInterface(aRequest);
+  if (!channel) {
+    if (aStreamId == 0) {
+      mImpl->mFirstFailure = NS_ERROR_UNEXPECTED;
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  nsresult rv = channel->GetResponseStatus(&stream.mHttpStatus);
+  stream.mResponseHeadersReceived = NS_SUCCEEDED(rv);
+  if (aStreamId == 0 && NS_FAILED(rv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
+    mImpl->mFirstFailure = rv;
+  }
+  if (aStreamId == 0) {
+    nsAutoCString policyHeader;
+    mozilla::dom::ReferrerPolicy policy = mozilla::dom::ReferrerPolicy::_empty;
+    if (NS_SUCCEEDED(
+            channel->GetResponseHeader("referrer-policy"_ns, policyHeader))) {
+      policy = mozilla::dom::ReferrerInfo::ReferrerPolicyFromHeaderString(
+          NS_ConvertUTF8toUTF16(policyHeader));
+    }
+    mImpl->mRootReferrerInfo =
+        new mozilla::dom::ReferrerInfo(stream.mUri, policy, true);
+  }
+  MaybeFireBarrier();
+  return rv;
+}
+
+nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
+                                                 nsIInputStream* aInputStream,
+                                                 uint32_t aCount) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length()) {
+    return NS_ERROR_ABORT;
+  }
+  if (aCount > mImpl->mConfig.mMaxBytes - mImpl->mBodyBytes) {
+    if (NS_SUCCEEDED(mImpl->mFirstFailure)) {
+      mImpl->mFirstFailure = NS_ERROR_FILE_TOO_BIG;
+    }
+    return NS_ERROR_FILE_TOO_BIG;
+  }
+
+  nsAutoCString body;
+  if (aStreamId == 0) {
+    if (!body.SetLength(aCount, fallible)) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
+  }
+  char discard[4096];
+  uint32_t offset = 0;
+  while (offset < aCount) {
+    uint32_t read = 0;
+    char* destination = aStreamId == 0 ? body.BeginWriting() + offset : discard;
+    const uint32_t capacity =
+        aStreamId == 0 ? aCount - offset
+                       : std::min<uint32_t>(aCount - offset, sizeof(discard));
+    nsresult rv = aInputStream->Read(destination, capacity, &read);
+    if (NS_FAILED(rv) || read == 0) {
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    offset += read;
+    mImpl->mBodyBytes += read;
+  }
+
+  if (aStreamId != 0 ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
+      mImpl->mStreams.Length() - 1 >= mImpl->mConfig.mMaxAssets) {
+    return NS_OK;
+  }
+  mImpl->mHtml.Append(body);
+
+  while (mImpl->mStreams.Length() - 1 < mImpl->mConfig.mMaxAssets) {
+    int32_t tagStart = mImpl->mHtml.FindChar('<', mImpl->mParseOffset);
+    if (tagStart < 0) {
+      mImpl->mParseOffset = mImpl->mHtml.Length();
+      break;
+    }
+    int32_t tagEnd = mImpl->mHtml.FindChar('>', tagStart + 1);
+    if (tagEnd < 0) {
+      mImpl->mParseOffset = static_cast<uint32_t>(tagStart);
+      break;
+    }
+    mImpl->mParseOffset = static_cast<uint32_t>(tagEnd) + 1;
+    nsAutoCString tag(Substring(mImpl->mHtml, tagStart,
+                                static_cast<uint32_t>(tagEnd - tagStart + 1)));
+    nsAutoCString lowerTag(tag);
+    LowercaseAscii(lowerTag);
+
+    nsContentPolicyType contentPolicyType = nsIContentPolicy::TYPE_OTHER;
+    nsAutoCString attributeName;
+    if (StartsWithTagName(lowerTag, "link"_ns)) {
+      nsAutoCString rel;
+      if (!ExtractQuotedAttribute(tag, lowerTag, "rel"_ns, rel)) {
+        continue;
+      }
+      LowercaseAscii(rel);
+      bool stylesheet = false;
+      uint32_t tokenStart = 0;
+      while (tokenStart < rel.Length()) {
+        while (tokenStart < rel.Length() && IsHtmlSpace(rel[tokenStart])) {
+          ++tokenStart;
+        }
+        uint32_t tokenEnd = tokenStart;
+        while (tokenEnd < rel.Length() && !IsHtmlSpace(rel[tokenEnd])) {
+          ++tokenEnd;
+        }
+        stylesheet |= Substring(rel, tokenStart, tokenEnd - tokenStart)
+                          .EqualsLiteral("stylesheet");
+        tokenStart = tokenEnd;
+      }
+      if (!stylesheet) {
+        continue;
+      }
+      contentPolicyType = nsIContentPolicy::TYPE_STYLESHEET;
+      attributeName.AssignLiteral("href");
+    } else if (StartsWithTagName(lowerTag, "script"_ns)) {
+      contentPolicyType = nsIContentPolicy::TYPE_SCRIPT;
+      attributeName.AssignLiteral("src");
+    } else if (StartsWithTagName(lowerTag, "img"_ns)) {
+      contentPolicyType = nsIContentPolicy::TYPE_IMAGE;
+      attributeName.AssignLiteral("src");
+    } else {
+      continue;
+    }
+    nsAutoCString reference;
+    if (!ExtractQuotedAttribute(tag, lowerTag, attributeName, reference) ||
+        reference.IsEmpty()) {
+      continue;
+    }
+    nsCOMPtr<nsIURI> resourceUri;
+    if (NS_FAILED(NS_NewURI(getter_AddRefs(resourceUri), reference, nullptr,
+                            mImpl->mStreams[0].mUri))) {
+      continue;
+    }
+    nsAutoCString prePath;
+    nsAutoCString spec;
+    if (NS_FAILED(resourceUri->GetPrePath(prePath)) ||
+        !prePath.Equals(mImpl->mRootPrePath) ||
+        NS_FAILED(resourceUri->GetSpec(spec)) ||
+        mImpl->mDiscoveredSpecs.Contains(spec)) {
+      continue;
+    }
+    mImpl->mDiscoveredSpecs.AppendElement(spec);
+
+    uint32_t streamId = 0;
+    // Resource discovery is intentionally incremental: AsyncOpen happens as
+    // soon as a complete tag arrives, while the root response is still being
+    // consumed, allowing Necko/Neqo to multiplex the native request streams.
+    nsresult rv = [&]() -> nsresult {
+      nsCOMPtr<nsIChannel> templateChannel;
+      MOZ_TRY(NS_NewChannel(
+          getter_AddRefs(templateChannel), resourceUri, mImpl->mPrincipal,
+          nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+              nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS |
+              nsILoadInfo::SEC_COOKIES_OMIT,
+          contentPolicyType, nullptr, nullptr, mImpl->mLoadGroup));
+      nsCOMPtr<nsILoadInfo> loadInfo = templateChannel->LoadInfo();
+      nsCOMPtr<nsIProxiedProtocolHandler> protocolHandler =
+          do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
+      if (!protocolHandler) {
+        return NS_ERROR_FAILURE;
+      }
+      nsCOMPtr<nsIChannel> channel;
+      MOZ_TRY(protocolHandler->NewProxiedChannel(
+          resourceUri, mImpl->mRoute.mProxyInfo, 0, nullptr, loadInfo,
+          getter_AddRefs(channel)));
+      nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
+      nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel);
+      if (!internal || !httpChannel) {
+        return NS_ERROR_FAILURE;
+      }
+      MOZ_TRY(httpChannel->SetRequestMethod("GET"_ns));
+      MOZ_TRY(internal->SetAllowSpdy(true));
+      MOZ_TRY(internal->SetAllowHttp3(mImpl->mProtocol == ProxyProtocol::H3));
+      MOZ_TRY(internal->SetBlockAuthPrompt(true));
+      MOZ_TRY(internal->SetProxyPreamble());
+      MOZ_TRY(internal->SetDocumentURI(mImpl->mStreams[0].mUri));
+      if (!mImpl->mRootReferrerInfo) {
+        return NS_ERROR_NOT_INITIALIZED;
+      }
+      MOZ_TRY(httpChannel->SetReferrerInfo(mImpl->mRootReferrerInfo));
+      MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
+      MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
+                                    nsIRequest::LOAD_ANONYMOUS |
+                                    nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+      streamId = mImpl->mStreams.Length();
+      auto& stream = *mImpl->mStreams.AppendElement();
+      stream.mUri = resourceUri;
+      stream.mRequest = channel;
+      RefPtr<StreamListener> listener = new StreamListener(this, streamId);
+      nsresult openRv = channel->AsyncOpen(listener);
+      if (NS_FAILED(openRv)) {
+        mImpl->mStreams.RemoveLastElement();
+      }
+      return openRv;
+    }();
+    // A browser navigation survives a failed subresource. The attempted
+    // stream still participates in the complete/overlap barrier when opened,
+    // but failure to open an asset must not turn a successful document into a
+    // failed preamble.
+    (void)rv;
+  }
+  return NS_OK;
+}
+
+void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
+                                           nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length()) {
+    return;
+  }
+  auto& stream = mImpl->mStreams[aStreamId];
+  stream.mRequest = nullptr;
+  stream.mDone = true;
+  if (aStreamId == 0 && NS_FAILED(aStatus) &&
+      NS_SUCCEEDED(mImpl->mFirstFailure)) {
+    mImpl->mFirstFailure = aStatus;
+  }
+  if (aStreamId == 0) {
+    mImpl->mRootDone = true;
+  }
+
+  MaybeFireBarrier();
+  MaybeFinish();
+}
+
+void ProxyPreambleOperation::FireBarrierCallback() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mBarrierFired || !mImpl->mBarrierCallback) {
+    return;
+  }
+  mImpl->mBarrierFired = true;
+  auto callback = std::move(mImpl->mBarrierCallback);
+  const uint32_t rootStatus =
+      mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams[0].mHttpStatus;
+  callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes});
+}
+
+void ProxyPreambleOperation::MaybeFireBarrier() {
+  MOZ_ASSERT(NS_IsMainThread());
+  const uint32_t assetCount =
+      mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams.Length() - 1;
+  uint32_t assetsWithHeadersNotDone = 0;
+  uint32_t assetsWithHeadersOrDone = 0;
+  uint32_t assetsDone = 0;
+  for (uint32_t index = 1; index < mImpl->mStreams.Length(); ++index) {
+    const auto& candidate = mImpl->mStreams[index];
+    assetsWithHeadersNotDone +=
+        candidate.mResponseHeadersReceived && !candidate.mDone;
+    assetsWithHeadersOrDone += candidate.mHeadersReceived || candidate.mDone;
+    assetsDone += candidate.mDone;
+  }
+  const bool barrierReached = detail::PreambleBarrierReached(
+      mImpl->mConfig.mMode, mImpl->mRootDone, assetCount,
+      assetsWithHeadersNotDone, assetsWithHeadersOrDone, assetsDone);
+  if (barrierReached) {
+    FireBarrierCallback();
+  }
+}
+
+void ProxyPreambleOperation::MaybeFinish() {
+  MOZ_ASSERT(NS_IsMainThread());
+  bool allDone = !mImpl->mStreams.IsEmpty();
+  for (const auto& candidate : mImpl->mStreams) {
+    allDone &= candidate.mDone;
+  }
+  if (allDone && !mImpl->mFinishedFired) {
+    mImpl->mFinishedFired = true;
+    // No future stream transition can satisfy early-overlap admission once
+    // every stream is done. Continue CONNECT immediately instead of waiting
+    // for the outer preamble timeout.
+    if (detail::PreambleNeedsCompletionFallback(mImpl->mConfig.mMode,
+                                                mImpl->mBarrierFired)) {
+      FireBarrierCallback();
+    }
+    auto callback = std::move(mImpl->mFinishedCallback);
+    if (callback) {
+      callback();
+    }
+  }
+}
+
+nsresult OpenProxyPreambleOperation(
+    const nsACString& aProxyUrl, const nsACString& aProxyUser,
+    const nsACString& aProxyPassword, const PreambleConfig& aConfig,
+    ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
+    std::function<void()>&& aFinishedCallback,
+    const Maybe<HostResolverRule>& aHostResolverRule,
+    RefPtr<ProxyPreambleOperation>& aOperation) {
+  RefPtr operation = new ProxyPreambleOperation();
+  MOZ_TRY(operation->Start(aProxyUrl, aProxyUser, aProxyPassword, aConfig,
+                           aProtocol, std::move(aBarrierCallback),
+                           std::move(aFinishedCallback), aHostResolverRule));
+  aOperation = std::move(operation);
+  return NS_OK;
+}
+
 nsresult BuildProxyAuthorization(const nsACString& aUser,
                                  const nsACString& aPassword,
                                  nsACString& aAuthorization) {
@@ -618,10 +1190,9 @@ nsresult OpenProxyPreamble(const nsACString& aProxyUrl,
   // that flag so the preamble's wildcard H2/H3 pool key is identical; proxy
   // credentials remain absent and nsHttpChannel suppresses auth-cache reuse
   // explicitly for NS_HTTP_PROXY_PREAMBLE.
-  MOZ_TRY(channel->SetLoadFlags(
-      nsIRequest::INHIBIT_CACHING | nsIRequest::LOAD_BYPASS_CACHE |
-      nsIRequest::LOAD_ANONYMOUS |
-      nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+  MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
+                                nsIRequest::LOAD_ANONYMOUS |
+                                nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
 
   RefPtr<ProxyPreambleListener> listener =
       new ProxyPreambleListener(aMaxBytes, std::move(aCallback));

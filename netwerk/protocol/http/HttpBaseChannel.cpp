@@ -11,9 +11,7 @@
 #include "HttpBaseChannel.h"
 #include "HttpLog.h"
 #include "LoadInfo.h"
-#ifndef MOZ_NAIVEFOX
-#  include "ReferrerInfo.h"
-#endif
+#include "ReferrerInfo.h"
 #ifndef MOZ_NAIVEFOX
 #  include "mozIRemoteLazyInputStream.h"
 #endif
@@ -2029,13 +2027,6 @@ HttpBaseChannel::GetReferrerInfo(nsIReferrerInfo** aReferrerInfo) {
 nsresult HttpBaseChannel::SetReferrerInfoInternal(
     nsIReferrerInfo* aReferrerInfo, bool aClone, bool aCompute,
     bool aRespectBeforeConnect) {
-#ifdef MOZ_NAIVEFOX
-  if (aRespectBeforeConnect) {
-    ENSURE_CALLED_BEFORE_CONNECT();
-  }
-  mReferrerInfo = aReferrerInfo;
-  return ClearReferrerHeader();
-#else
   LOG(
       ("HttpBaseChannel::SetReferrerInfoInternal [this=%p aClone(%d) "
        "aCompute(%d)]\n",
@@ -2088,7 +2079,6 @@ nsresult HttpBaseChannel::SetReferrerInfoInternal(
   }
 
   return SetReferrerHeader(spec, aRespectBeforeConnect);
-#endif
 }
 
 NS_IMETHODIMP

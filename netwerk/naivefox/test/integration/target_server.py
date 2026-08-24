@@ -21,6 +21,34 @@ SVG_SUFFIX = b'--><rect width="8" height="8" fill="#476f9f"/></svg>'
 COMPLETIONS = set()
 COMPLETIONS_LOCK = threading.Lock()
 COMPLETION_TOKEN = re.compile(r"^[0-9a-f]{32}$")
+CAMOUFLAGE_STYLE_SIZE = 64 * 1024
+CAMOUFLAGE_SCRIPT_SIZE = 128 * 1024
+
+
+def sized_source_asset(size, prefix, filler):
+    if len(prefix) > size:
+        raise ValueError("source asset prefix exceeds its declared size")
+    repetitions, padding = divmod(size - len(prefix), len(filler))
+    return prefix + filler * repetitions + b" " * padding
+
+
+CAMOUFLAGE_STYLE_CSS = sized_source_asset(
+    CAMOUFLAGE_STYLE_SIZE,
+    (
+        b":root{color-scheme:light;background:#f4f6f8;color:#243447}"
+        b"body{margin:0;font-family:system-ui,sans-serif}"
+        b"main{max-width:72rem;margin:auto;padding:2rem}\n"
+    ),
+    b"/* controlled component stylesheet module */\n",
+)
+CAMOUFLAGE_APP_JS = sized_source_asset(
+    CAMOUFLAGE_SCRIPT_SIZE,
+    (
+        b'(()=>{"use strict";document.documentElement.dataset.fixture='
+        b'"controlled";})();\n'
+    ),
+    b"/* controlled browser application module */\n",
+)
 
 
 def pattern_bytes(offset, length):
@@ -46,10 +74,14 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, _format, *_args):
         pass
 
-    def send_bytes(self, status, body, content_type="application/octet-stream"):
+    def send_bytes(
+        self, status, body, content_type="application/octet-stream", headers=()
+    ):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        for name, value in headers:
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
 
@@ -190,15 +222,16 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
             if body is None:
                 self.send_error(400)
                 return
-            self.send_bytes(200, body, "text/html; charset=utf-8")
-        elif parsed.path == "/camouflage/style.css":
-            body = b"body{background:#f4f6f8;color:#243447}" + b" " * 4054
-            self.send_bytes(200, body, "text/css")
-        elif parsed.path == "/camouflage/app.js":
-            body = (
-                b"document.documentElement.dataset.fixture='controlled';" + b" " * 8140
+            self.send_bytes(
+                200,
+                body,
+                "text/html; charset=utf-8",
+                (("Referrer-Policy", "strict-origin-when-cross-origin"),),
             )
-            self.send_bytes(200, body, "application/javascript")
+        elif parsed.path == "/camouflage/style.css":
+            self.send_bytes(200, CAMOUFLAGE_STYLE_CSS, "text/css")
+        elif parsed.path == "/camouflage/app.js":
+            self.send_bytes(200, CAMOUFLAGE_APP_JS, "application/javascript")
         elif parsed.path == "/camouflage/api":
             self.send_bytes(
                 200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"

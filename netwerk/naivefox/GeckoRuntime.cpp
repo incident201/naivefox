@@ -18,6 +18,7 @@
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/Utf8.h"
@@ -26,14 +27,21 @@
 #include "nsDirectoryServiceUtils.h"
 #include "nsIFile.h"
 #include "nsIIOService.h"
+#include "nsINetworkLinkService.h"
 #include "nsIObserverService.h"
+#include "nsISocketTransportService.h"
 #include "nsISimpleEnumerator.h"
+#include "nsITimer.h"
 #include "nsLocalFile.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
+#if defined(XP_LINUX) || defined(ANDROID)
+#  include "NetlinkService.h"
+#endif
 #ifdef MOZ_NAIVEFOX
 #  include "xpcpublic.h"
 #endif
@@ -41,6 +49,64 @@
 namespace mozilla::naivefox {
 
 namespace {
+
+constexpr uint32_t kNetworkStartupBarrierTimeoutMs = 5000;
+
+class StartupBarrierState final {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(StartupBarrierState)
+
+  void Complete() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mComplete = true;
+  }
+
+  void Timeout() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mTimedOut = true;
+  }
+
+  bool IsComplete() const {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mComplete;
+  }
+
+  bool IsTimedOut() const {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mTimedOut;
+  }
+
+ private:
+  ~StartupBarrierState() = default;
+
+  bool mComplete = false;
+  bool mTimedOut = false;
+};
+
+template <typename Predicate>
+nsresult WaitForStartupCondition(const nsACString& aName,
+                                 Predicate&& aPredicate) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  RefPtr<StartupBarrierState> deadline = new StartupBarrierState();
+  nsCOMPtr<nsITimer> timer;
+  MOZ_TRY(NS_NewTimerWithCallback(
+      getter_AddRefs(timer),
+      [deadline](nsITimer*) { deadline->Timeout(); },
+      kNetworkStartupBarrierTimeoutMs, nsITimer::TYPE_ONE_SHOT, aName));
+
+  const bool processed = SpinEventLoopUntil(aName, [&]() {
+    return aPredicate() || deadline->IsTimedOut();
+  });
+  (void)timer->Cancel();
+
+  if (!processed) {
+    return NS_ERROR_FAILURE;
+  }
+  // Prefer a condition that became true on the same event-loop turn as the
+  // deadline.  Otherwise a real timer event makes the wait fail closed.
+  return aPredicate() ? NS_OK : NS_ERROR_NET_TIMEOUT;
+}
 
 class DirectoryProvider final : public nsIDirectoryServiceProvider {
  public:
@@ -342,7 +408,79 @@ nsresult GeckoRuntime::InitializeWithLocations(
   }
 
   mIOService = do_GetIOService();
-  return mIOService ? NS_OK : NS_ERROR_FAILURE;
+  if (!mIOService) {
+    return NS_ERROR_FAILURE;
+  }
+  return WaitForNetworkStartup();
+}
+
+nsresult GeckoRuntime::WaitForNetworkStartup() {
+  MOZ_ASSERT(NS_IsMainThread());
+
+#if defined(XP_LINUX) || defined(ANDROID)
+  nsCOMPtr<nsINetworkLinkService> linkService =
+      do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID);
+  const auto initialState = net::NetlinkService::GetInitialNetworkState();
+  NAIVEFOX_NETWORK_STARTUP_LOG(
+      ("barrier.wait link_service=%d initial_state=%u", !!linkService,
+       static_cast<unsigned>(initialState)));
+  if (!linkService) {
+    return NS_ERROR_FAILURE;
+  }
+
+  MOZ_TRY(WaitForStartupCondition(
+      "NaiveFox::InitialNetworkState"_ns, []() {
+        return net::InitialNetworkStateIsTerminal(
+            net::NetlinkService::GetInitialNetworkState());
+      }));
+  if (!net::InitialNetworkStateAllowsStartup(
+          net::NetlinkService::GetInitialNetworkState())) {
+    NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-failed"));
+    return NS_ERROR_FAILURE;
+  }
+  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-ready"));
+#endif
+
+  // The readiness latch is set on the netlink thread after it queued any
+  // initial up/down/changed notifications.  Drain the main-thread queue first
+  // so every observer has posted its connection-manager work.
+  RefPtr<StartupBarrierState> mainThreadBarrier = new StartupBarrierState();
+  MOZ_TRY(NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+      "NaiveFox::NetworkMainThreadBarrier",
+      [mainThreadBarrier]() { mainThreadBarrier->Complete(); })));
+  MOZ_TRY(WaitForStartupCondition(
+      "NaiveFox::NetworkMainThreadBarrier"_ns,
+      [mainThreadBarrier]() { return mainThreadBarrier->IsComplete(); }));
+#if defined(XP_LINUX) || defined(ANDROID)
+  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.main-drained"));
+#endif
+
+  // nsHttpConnectionMgr posts VerifyTraffic to the socket thread.  This FIFO
+  // barrier reports back to main only after all work caused by the initial
+  // network-state convergence has finished.
+  nsCOMPtr<nsIEventTarget> socketTarget =
+      do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID);
+  if (!socketTarget) {
+    return NS_ERROR_FAILURE;
+  }
+  RefPtr<StartupBarrierState> socketThreadBarrier = new StartupBarrierState();
+  MOZ_TRY(socketTarget->Dispatch(NS_NewRunnableFunction(
+      "NaiveFox::NetworkSocketThreadBarrier",
+      [socketThreadBarrier]() {
+        // Return to the main thread only after all earlier socket-thread work
+        // has run.  The refcounted state remains safe if startup times out.
+        (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+            "NaiveFox::NetworkSocketThreadBarrierComplete",
+            [socketThreadBarrier]() { socketThreadBarrier->Complete(); }));
+      })));
+  nsresult rv = WaitForStartupCondition(
+      "NaiveFox::NetworkSocketThreadBarrier"_ns,
+      [socketThreadBarrier]() { return socketThreadBarrier->IsComplete(); });
+#if defined(XP_LINUX) || defined(ANDROID)
+  NAIVEFOX_NETWORK_STARTUP_LOG(
+      ("barrier.socket-drained rv=%08x", static_cast<uint32_t>(rv)));
+#endif
+  return rv;
 }
 
 nsresult GeckoRuntime::RunEventLoopSmoke() {

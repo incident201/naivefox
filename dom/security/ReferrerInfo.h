@@ -7,10 +7,15 @@
 
 #include "mozilla/HashFunctions.h"
 #include "mozilla/Maybe.h"
-#include "mozilla/dom/ReferrerPolicyBinding.h"
+#ifdef MOZ_NAIVEFOX
+#  include "ReferrerPolicyBinding.h"
+#else
+#  include "mozilla/dom/ReferrerPolicyBinding.h"
+#endif
 #include "nsCOMPtr.h"
 #include "nsIReferrerInfo.h"
 #include "nsReadableUtils.h"
+#include "nsString.h"
 
 namespace IPC {
 class MessageReader;

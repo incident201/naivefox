@@ -6,13 +6,23 @@ umask 077
 # shellcheck source=netwerk/naivefox/test/integration/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
+original_args=("$@")
 
 mode=smoke
 protocol_selection=both
 inner_transport=https
 naivefox_arm=off
 naivefox_arm_explicit=0
+naivefox_arm_option_count=0
 experiment_design=single
+multi_arm_arms_csv=off,gate,root
+multi_arm_views_csv=all
+scenario_override=
+scenario_option_count=0
+private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
+diagnostic_naivefox_only=${NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY:-0}
+isolated_network=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0}
+isolated_network_entered=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED:-0}
 samples_per_cohort=
 seed=
 while [[ $# -gt 0 ]]; do
@@ -32,11 +42,27 @@ while [[ $# -gt 0 ]]; do
     --naivefox-arm)
       naivefox_arm=${2:-}
       naivefox_arm_explicit=1
+      naivefox_arm_option_count=$((naivefox_arm_option_count + 1))
       shift 2
       ;;
     --multi-arm-superblocks)
       experiment_design=multi_arm_superblocks
       shift
+      ;;
+    --multi-arm-arms)
+      multi_arm_arms_csv=${2:-}
+      experiment_design=multi_arm_superblocks
+      shift 2
+      ;;
+    --multi-arm-views)
+      multi_arm_views_csv=${2:-}
+      experiment_design=multi_arm_superblocks
+      shift 2
+      ;;
+    --scenario)
+      scenario_override=${2:-}
+      scenario_option_count=$((scenario_option_count + 1))
+      shift 2
       ;;
     --samples-per-cohort)
       samples_per_cohort=${2:-}
@@ -47,7 +73,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https] [--naivefox-arm off|gate|root | --multi-arm-superblocks] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https] [--scenario NAME] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,...] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -111,6 +137,16 @@ case $mode in
     exit 2
     ;;
 esac
+if [[ -n $scenario_override ]]; then
+  case $scenario_override in
+    initial | browser_page | sequential | concurrent_2 | concurrent_4 | concurrent_8 | concurrent_16 | burst_8 | bulk_download_256k | bulk_download_1m | bulk_download_4m | bulk_download_16m | bulk_upload_256k | bulk_upload_1m | bulk_upload_4m | bidirectional_256k | bidirectional_1m | bidirectional_4m | idle_5s | idle_30s | idle_120s) ;;
+    *)
+      printf 'unsupported camouflage scenario: %s\n' "$scenario_override" >&2
+      exit 2
+      ;;
+  esac
+  scenarios=("$scenario_override")
+fi
 case $protocol_selection in
   h2) protocols=(h2) ;;
   h3) protocols=(h3) ;;
@@ -127,22 +163,129 @@ case $inner_transport in
     exit 2
     ;;
 esac
+case $private_h3_keylog in
+  0 | 1) ;;
+  *)
+    printf 'NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG must be 0 or 1\n' >&2
+    exit 2
+    ;;
+esac
+case $diagnostic_naivefox_only in
+  0 | 1) ;;
+  *)
+    printf 'NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY must be 0 or 1\n' >&2
+    exit 2
+    ;;
+esac
+case $isolated_network in
+  0 | 1) ;;
+  *)
+    printf 'NAIVEFOX_CAPTURE_ISOLATED_NETWORK must be 0 or 1\n' >&2
+    exit 2
+    ;;
+esac
+case $isolated_network_entered in
+  0 | 1) ;;
+  *)
+    printf 'invalid internal isolated-network marker\n' >&2
+    exit 2
+    ;;
+esac
+if [[ $isolated_network_entered == 1 && $isolated_network != 1 ]]; then
+  printf 'isolated-network marker requires isolated-network mode\n' >&2
+  exit 2
+fi
+if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
+  printf 'private H3 key logging is restricted to gate/smoke diagnostics\n' >&2
+  exit 2
+fi
 case $naivefox_arm in
-  off | gate | root) ;;
+  off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
     ;;
 esac
 if [[ $experiment_design == multi_arm_superblocks && $naivefox_arm_explicit -eq 1 ]]; then
-  printf '%s\n' '--naivefox-arm cannot be combined with --multi-arm-superblocks' >&2
+  printf '%s\n' '--naivefox-arm cannot be combined with a multi-arm design' >&2
   exit 2
+fi
+if [[ $experiment_design == multi_arm_superblocks ]]; then
+  IFS=, read -r -a multi_arm_arms <<<"$multi_arm_arms_csv"
+  if [[ ${#multi_arm_arms[@]} -lt 2 ]]; then
+    printf 'multi-arm screening requires at least two arms\n' >&2
+    exit 2
+  fi
+  declare -A seen_multi_arms=()
+  for arm in "${multi_arm_arms[@]}"; do
+    case $arm in
+      off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-overlap) ;;
+      *)
+        printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
+        exit 2
+        ;;
+    esac
+    if [[ -n ${seen_multi_arms[$arm]:-} ]]; then
+      printf 'duplicate multi-arm NaiveFox arm: %s\n' "$arm" >&2
+      exit 2
+    fi
+    seen_multi_arms[$arm]=1
+  done
+  if [[ -n ${seen_multi_arms[root]:-} &&
+        -n ${seen_multi_arms[document-complete]:-} ]]; then
+    printf 'root and document-complete are aliases; select only one\n' >&2
+    exit 2
+  fi
+  if [[ $multi_arm_views_csv != all ]]; then
+    IFS=, read -r -a multi_arm_views <<<"$multi_arm_views_csv"
+    if [[ ${#multi_arm_views[@]} -eq 0 ]]; then
+      printf 'multi-arm feature view list cannot be empty\n' >&2
+      exit 2
+    fi
+    declare -A seen_multi_views=()
+    for view in "${multi_arm_views[@]}"; do
+      case $view in
+        whole | initial_packets_16 | packets_17_32 | initial_packets_32 | initial_packets_64 | initial_packets_128 | initial_time_250ms | initial_time_500ms | initial_time_1000ms | initial_time_2000ms | steady_after_32 | steady_after_2000ms | lifecycle) ;;
+        *)
+          printf 'unsupported multi-arm feature view: %s\n' "$view" >&2
+          exit 2
+          ;;
+      esac
+      if [[ -n ${seen_multi_views[$view]:-} ]]; then
+        printf 'duplicate multi-arm feature view: %s\n' "$view" >&2
+        exit 2
+      fi
+      seen_multi_views[$view]=1
+    done
+  fi
+fi
+if [[ $diagnostic_naivefox_only == 1 ]]; then
+  if [[ $mode != gate && $mode != smoke ]]; then
+    printf 'NaiveFox-only diagnostics are restricted to gate/smoke mode\n' >&2
+    exit 2
+  fi
+  if [[ $scenario_option_count -ne 1 ]]; then
+    printf 'NaiveFox-only diagnostics require exactly one --scenario\n' >&2
+    exit 2
+  fi
+  if [[ $naivefox_arm_option_count -ne 1 ]]; then
+    printf 'NaiveFox-only diagnostics require exactly one --naivefox-arm\n' >&2
+    exit 2
+  fi
+  if [[ $experiment_design != single ]]; then
+    printf 'NaiveFox-only diagnostics cannot use a multi-arm design\n' >&2
+    exit 2
+  fi
 fi
 if [[ -z $samples_per_cohort ]]; then
   samples_per_cohort=$default_samples
 fi
 if [[ ! $samples_per_cohort =~ ^[1-9][0-9]*$ ]]; then
   printf 'samples per cohort must be a positive integer\n' >&2
+  exit 2
+fi
+if [[ $mode == research && $samples_per_cohort -lt 240 ]]; then
+  printf 'research mode requires at least 240 samples per cohort\n' >&2
   exit 2
 fi
 if [[ -z $seed ]]; then
@@ -223,6 +366,22 @@ for artifact in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
   }
 done
 
+if [[ $isolated_network == 1 && $isolated_network_entered == 0 ]]; then
+  if [[ $capture_mode != same-base ]]; then
+    printf 'isolated-network capture requires same-base mode\n' >&2
+    exit 2
+  fi
+  for tool in unshare ip ethtool; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      printf 'isolated-network capture requires %s\n' "$tool" >&2
+      exit 1
+    }
+  done
+  exec unshare --net --mount-proc \
+    "$INTEGRATION_DIR/run-camouflage-isolated-network.sh" \
+    "$0" "${original_args[@]}"
+fi
+
 run_id=$(openssl rand -hex 8)
 private_dir="$STATE_ROOT/camouflage-captures/$run_id"
 safe_dir="$STATE_ROOT/camouflage-safe/$run_id"
@@ -241,6 +400,11 @@ capture_log=
 browser_controller_pid=
 browser_stop_file=
 naivefox_pid=
+network_monitor_pid=
+network_monitor_events=
+network_monitor_ready=
+network_monitor_done=
+network_mutation_validated_samples=0
 controller_backends="$private_dir/controller-backends.txt"
 success=0
 
@@ -273,6 +437,55 @@ stop_process_group() {
     fi
   fi
   wait "$pid" 2>/dev/null || true
+}
+
+start_network_mutation_monitor() {
+  local sample_dir=$1
+  network_monitor_events="$sample_dir/network-mutations.log"
+  network_monitor_ready="$sample_dir/network-monitor-ready"
+  network_monitor_done="$sample_dir/network-monitor-done"
+  python3 "$INTEGRATION_DIR/monitor-network-mutations.py" \
+    --ready "$network_monitor_ready" --events "$network_monitor_events" \
+    --done "$network_monitor_done" &
+  network_monitor_pid=$!
+  wait_for_file "$network_monitor_ready" "$network_monitor_pid" \
+    'network mutation monitor' 100
+}
+
+stop_network_mutation_monitor() {
+  [[ -n $network_monitor_pid ]] || return 0
+  local monitor_status=0
+  if kill -0 "$network_monitor_pid" 2>/dev/null; then
+    kill -TERM "$network_monitor_pid" 2>/dev/null || true
+  else
+    wait "$network_monitor_pid" 2>/dev/null || true
+    network_monitor_pid=
+    printf 'network mutation monitor stopped before the sample was complete\n' >&2
+    return 1
+  fi
+  if wait "$network_monitor_pid" 2>/dev/null; then
+    monitor_status=0
+  else
+    monitor_status=$?
+  fi
+  network_monitor_pid=
+  network_monitor_ready=
+  if [[ $monitor_status -ne 0 ]]; then
+    printf 'network mutation monitor exited unexpectedly (status %s)\n' \
+      "$monitor_status" >&2
+    return 1
+  fi
+  if [[ ! -f $network_monitor_done ]]; then
+    printf 'network mutation monitor did not confirm a drained stop\n' >&2
+    return 1
+  fi
+  network_monitor_done=
+  if [[ -s $network_monitor_events ]]; then
+    printf 'network route/address/link mutation invalidated the sample\n' >&2
+    return 1
+  fi
+  network_monitor_events=
+  network_mutation_validated_samples=$((network_mutation_validated_samples + 1))
 }
 
 stop_capture() {
@@ -311,6 +524,9 @@ stop_capture() {
 cleanup() {
   local status=$?
   stop_capture || true
+  if ! stop_network_mutation_monitor; then
+    status=1
+  fi
   [[ -z $browser_stop_file ]] || : >"$browser_stop_file"
   stop_process_group "$browser_controller_pid"
   stop_pid "$naivefox_pid"
@@ -389,14 +605,77 @@ wait_for_log() {
   return 1
 }
 
+validate_profile_role() {
+  local destination=$1
+  local protocol=$2
+  local participant=$3
+  local mapping_pref='network.http.http3.alt-svc-mapping-for-testing'
+  local force_pref='network.http.http3.force-use-alt-svc-mapping-for-testing'
+  local expect_test_mapping=false
+  [[ $participant == reference && $protocol == h3 ]] && expect_test_mapping=true
+
+  if [[ -e $destination/AlternateServices.bin ]]; then
+    printf 'fresh %s profile unexpectedly contains AlternateServices.bin\n' \
+      "$participant" >&2
+    return 1
+  fi
+  if [[ $expect_test_mapping == true ]]; then
+    rg -q -F "$mapping_pref" "$destination/user.js" &&
+      rg -q -F "$force_pref" "$destination/user.js" || {
+        printf 'direct H3 reference profile lacks its test Alt-Svc mapping\n' >&2
+        return 1
+      }
+  elif find "$destination" -maxdepth 1 -type f \
+       \( -name user.js -o -name prefs.js \) \
+       -exec rg -q -F -e "$mapping_pref" -e "$force_pref" {} +; then
+    printf '%s profile is contaminated by a test Alt-Svc mapping\n' \
+      "$participant" >&2
+    return 1
+  fi
+
+  if [[ $participant == naivefox && $protocol == h3 ]]; then
+    rg -q -F 'user_pref("network.http.http3.enable", true);' \
+      "$destination/user.js" || {
+        printf 'NaiveFox H3 profile does not enable the real H3 stack\n' >&2
+        return 1
+      }
+  fi
+}
+
 make_profile() {
   local destination=$1
   local protocol=$2
-  local socks_port=${3:-}
+  local participant=$3
+  local socks_port=${4:-}
   local direct_h3=false
-  if [[ $protocol == h3 && -z $socks_port ]]; then
-    direct_h3=true
-  fi
+  local enable_h3=false
+  case $participant in
+    reference)
+      [[ -z $socks_port ]] || {
+        printf 'reference profile must not receive a SOCKS port\n' >&2
+        return 2
+      }
+      [[ $protocol == h3 ]] && direct_h3=true
+      enable_h3=$direct_h3
+      ;;
+    naivefox)
+      [[ -z $socks_port ]] || {
+        printf 'NaiveFox profile must not receive a SOCKS port\n' >&2
+        return 2
+      }
+      [[ $protocol == h3 ]] && enable_h3=true
+      ;;
+    socks-browser)
+      [[ -n $socks_port ]] || {
+        printf 'SOCKS browser profile requires a SOCKS port\n' >&2
+        return 2
+      }
+      ;;
+    *)
+      printf 'unknown profile participant: %s\n' "$participant" >&2
+      return 2
+      ;;
+  esac
   mkdir -m 0700 "$destination"
   cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$destination/"
   cat >"$destination/user.js" <<EOF
@@ -407,21 +686,26 @@ user_pref("network.connectivity-service.enabled", false);
 user_pref("network.dns.disableIPv6", true);
 user_pref("network.prefetch-next", false);
 user_pref("network.http.speculative-parallel-limit", 0);
-user_pref("network.http.http3.enable", $direct_h3);
+user_pref("network.http.http3.enable", $enable_h3);
 EOF
-  if [[ -n $socks_port ]]; then
+  if [[ $participant == socks-browser ]]; then
     "$browser_python" \
       "$INTEGRATION_DIR/camouflage_browser_controller.py" \
       --generate-pac-user-js "$socks_port" >>"$destination/user.js"
   fi
+  if [[ $protocol == h3 && $participant != socks-browser ]]; then
+    cat >>"$destination/user.js" <<'EOF'
+user_pref("network.http.http3.disable_when_third_party_roots_found", false);
+EOF
+  fi
   if [[ $direct_h3 == true ]]; then
     cat >>"$destination/user.js" <<EOF
-user_pref("network.http.http3.disable_when_third_party_roots_found", false);
 user_pref("network.http.http3.alt-svc-mapping-for-testing", "localhost;h3=:$NAIVEFOX_FIXTURE_PROXY_PORT");
 user_pref("network.http.http3.force-use-alt-svc-mapping-for-testing", true);
 EOF
   fi
   chmod 0600 "$destination/user.js"
+  validate_profile_role "$destination" "$protocol" "$participant"
 }
 
 scenario_parameters() {
@@ -467,6 +751,7 @@ strict_transport_check() {
     local tcp_payload
     local first_frame
     local initial_frame
+    local oversized_udp_frame
     local stream
     udp_count=$(tshark -r "$pcap" -d "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,quic" \
       -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && quic" -T fields -e frame.number | wc -l)
@@ -479,6 +764,14 @@ strict_transport_check() {
     if [[ $udp_count -eq 0 || $tcp_established -ne 0 || $tcp_payload -ne 0 ]]; then
       printf 'strict H3 sample failed transport check (udp=%s tcp=%s payload=%s)\n' \
         "$udp_count" "$tcp_established" "$tcp_payload" >&2
+      return 1
+    fi
+    oversized_udp_frame=$(tshark -r "$pcap" \
+      -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && udp.length>1500" \
+      -T fields -e frame.number | sed -n '1p')
+    if [[ -n $oversized_udp_frame ]]; then
+      printf 'strict H3 sample contains a UDP offload superframe at frame %s\n' \
+        "$oversized_udp_frame" >&2
       return 1
     fi
     mapfile -t udp_streams < <(tshark -r "$pcap" \
@@ -636,13 +929,15 @@ run_reference_sample() {
   completion=$(openssl rand -hex 16)
   path=$(scenario_path "$scenario" "$completion")
   mkdir -m 0700 -- "$sample_dir"
-  make_profile "$profile" "$protocol"
+  make_profile "$profile" "$protocol" reference
+  start_network_mutation_monitor "$sample_dir"
   start_browser_controller "$profile" \
     "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" \
     "$completion" "$sample_dir" "$protocol"
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
   stop_capture
+  stop_network_mutation_monitor
   extract_sample "$protocol" "$scenario" "$label" "$session_id" "$pcap" \
     "$experiment_block" reference
   stop_browser_controller
@@ -660,6 +955,9 @@ run_naivefox_sample() {
   local browser_profile="$sample_dir/browser-profile"
   local pcap="$sample_dir/capture.pcapng"
   local log="$sample_dir/naivefox.log"
+  local keylog="$sample_dir/naivefox.keys"
+  local -a sslkeylog_unset=(-u SSLKEYLOGFILE)
+  local -a sslkeylog_assignment=()
   local completion
   local outer_count
   local padding_count
@@ -675,15 +973,24 @@ run_naivefox_sample() {
     target_port=$NAIVEFOX_FIXTURE_HTTP_PORT
   fi
   mkdir -m 0700 -- "$sample_dir"
-  make_profile "$naivefox_profile" "$protocol"
-  make_profile "$browser_profile" "$protocol" "$socks_port"
+  make_profile "$naivefox_profile" "$protocol" naivefox
+  make_profile "$browser_profile" "$protocol" socks-browser "$socks_port"
+  if [[ $private_h3_keylog == 1 && $protocol == h3 ]]; then
+    : >"$keylog"
+    chmod 0600 "$keylog"
+    sslkeylog_unset=()
+    sslkeylog_assignment=("SSLKEYLOGFILE=$keylog")
+  fi
   NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
     NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
-    python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
+  python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
     --output "$naivefox_config" --arm "$arm" \
     --protocol "$protocol" --socks-port "$socks_port" \
     --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
-  env -u SSLKEYLOGFILE -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+  start_network_mutation_monitor "$sample_dir"
+  env "${sslkeylog_unset[@]}" \
+    -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+    "${sslkeylog_assignment[@]}" \
     "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
     NAIVEFOX_PROFILE="$naivefox_profile" \
     "$NAIVEFOX_BIN" "$naivefox_config" >"$log" 2>&1 &
@@ -695,6 +1002,7 @@ run_naivefox_sample() {
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
   stop_capture
+  stop_network_mutation_monitor
   outer_count=$(rg -c "^Outer protocol: $protocol$" "$log" || true)
   padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)
   if [[ $outer_count -eq 0 || $padding_count -ne $outer_count ]]; then
@@ -715,7 +1023,9 @@ run_naivefox_sample() {
 scenario_csv=$(IFS=,; printf '%s' "${scenarios[*]}")
 session_counter=0
 if [[ $experiment_design == multi_arm_superblocks ]]; then
-  members_per_block=5
+  members_per_block=$((2 + ${#multi_arm_arms[@]}))
+elif [[ $diagnostic_naivefox_only == 1 ]]; then
+  members_per_block=1
 else
   members_per_block=3
 fi
@@ -740,10 +1050,22 @@ with open(sys.argv[1], "a", encoding="utf-8") as stream:
             stream.write(encoded + "\n")
 PY
   schedule="$private_dir/$protocol-schedule.tsv"
-  if [[ $experiment_design == multi_arm_superblocks ]]; then
+  if [[ $diagnostic_naivefox_only == 1 ]]; then
+    python3 - "$protocol" "$samples_per_cohort" "$scenario_override" \
+      "$naivefox_arm" >"$schedule" <<'PY'
+import sys
+
+protocol = sys.argv[1]
+count = int(sys.argv[2])
+scenario = sys.argv[3]
+arm = sys.argv[4]
+for index in range(count):
+    print("naivefox", arm, scenario, f"{protocol}_d{index:06d}", sep="\t")
+PY
+  elif [[ $experiment_design == multi_arm_superblocks ]]; then
     python3 "$INTEGRATION_DIR/camouflage_superblocks.py" schedule \
       --seed "$seed" --protocol "$protocol" --blocks "$samples_per_cohort" \
-      --scenarios "$scenario_csv" >"$schedule"
+      --scenarios "$scenario_csv" --arms "$multi_arm_arms_csv" >"$schedule"
   else
     python3 - "$seed" "$protocol" "$samples_per_cohort" "$scenario_csv" \
       "$naivefox_arm" >"$schedule" <<'PY'
@@ -785,37 +1107,110 @@ PY
   "$INTEGRATION_DIR/stop.sh" --quiet
 done
 
+if [[ $isolated_network == 1 ]]; then
+  capture_offload_policy=namespace_loopback_gro_gso_tso_udp_gso_disabled
+else
+  capture_offload_policy=host_interface_offload_state_unmodified
+fi
+
+if [[ $diagnostic_naivefox_only == 1 ]]; then
+  diagnostic_protocols=$(IFS=,; printf '%s' "${protocols[*]}")
+  cat >"$safe_dir/diagnostic-summary.txt" <<EOF
+diagnostic=naivefox_only_lifecycle
+sample_count=$session_counter
+samples_per_protocol=$samples_per_cohort
+naivefox_arm=$naivefox_arm
+scenario=$scenario_override
+protocols=$diagnostic_protocols
+isolated_network=$isolated_network
+network_mutation_policy=reject_route_address_link
+network_mutation_monitor=netlink_route_v1_fail_closed
+network_mutation_validated_samples=$network_mutation_validated_samples
+capture_offload_policy=$capture_offload_policy
+h3_udp_superframe_policy=reject_udp_length_gt_1500
+EOF
+  find "$safe_dir" -type d -exec chmod 0700 {} +
+  find "$safe_dir" -type f -exec chmod 0600 {} +
+  if find "$safe_dir" -type f ! -name diagnostic-summary.txt -print -quit |
+     rg -q .; then
+    printf 'unexpected output reached NaiveFox-only diagnostic summary\n' >&2
+    exit 1
+  fi
+  if rg -F -f "$sensitive_values" "$safe_dir" ||
+     rg -i -e proxy-authorization -e sslkeylogfile -e 'localhost:' "$safe_dir"; then
+    printf 'sensitive or endpoint-specific data reached diagnostic summary\n' >&2
+    exit 1
+  fi
+  success=1
+  printf 'NaiveFox-only lifecycle diagnostic completed\n'
+  printf 'sanitized diagnostic summary: %s\n' "$safe_dir"
+  exit 0
+fi
+
 analyze_dataset() {
   local features=$1
   local output_dir=$2
-  python3 "$INTEGRATION_DIR/analyze-camouflage.py" \
-    --features "$features" --output-json "$output_dir/metrics.json" \
-    --output-summary "$output_dir/summary.txt" --mode "$mode" --seed "$seed" \
-    --bootstrap 1000 --permutations "$permutations" \
-    --refit-bootstrap "$refit_bootstrap" \
+  local analysis_role=${3:-confirmatory}
+  local -a analyzer_args=(
+    --features "$features" --output-json "$output_dir/metrics.json"
+    --output-summary "$output_dir/summary.txt" --mode "$mode" --seed "$seed"
+    --bootstrap 1000 --permutations "$permutations"
+    --refit-bootstrap "$refit_bootstrap"
     --max-features "$max_features" --iterations "$model_iterations"
+  )
+  if [[ $analysis_role == screening ]]; then
+    analyzer_args+=(--screening-only)
+  fi
+  python3 "$INTEGRATION_DIR/analyze-camouflage.py" "${analyzer_args[@]}"
 }
 
 if [[ $experiment_design == multi_arm_superblocks ]]; then
   superblock_features="$safe_dir/features-superblocks.csv"
   python3 "$INTEGRATION_DIR/camouflage_features.py" merge \
     --input-dir "$feature_fragments" --output "$superblock_features" \
-    --expected-superblocks "$samples_per_cohort"
+    --expected-superblocks "$samples_per_cohort" \
+    --expected-superblock-arms "$multi_arm_arms_csv"
   python3 "$INTEGRATION_DIR/camouflage_superblocks.py" materialize \
     --features "$superblock_features" --output-dir "$safe_dir/arms" \
-    --expected-blocks "$samples_per_cohort"
-  for arm in off gate root; do
-    analyze_dataset "$safe_dir/arms/$arm/features.csv" "$safe_dir/arms/$arm"
+    --expected-blocks "$samples_per_cohort" --arms "$multi_arm_arms_csv"
+  for arm in "${multi_arm_arms[@]}"; do
+    analyze_dataset \
+      "$safe_dir/arms/$arm/features.csv" "$safe_dir/arms/$arm" screening
   done
+  arm_analyzer_args=(
+    --features "$superblock_features" \
+    --output-json "$safe_dir/arm-comparison.json" \
+    --output-summary "$safe_dir/arm-comparison.txt" \
+    --mode "$mode" --seed "$seed" --bootstrap 2000 --permutations 9999
+  )
+  if [[ $multi_arm_views_csv != all ]]; then
+    arm_analyzer_args+=(--views "$multi_arm_views_csv")
+  fi
+  python3 "$INTEGRATION_DIR/analyze-camouflage-arms.py" \
+    "${arm_analyzer_args[@]}"
   metadata_naivefox_arm=multi
-  metadata_naivefox_arms=off,gate,root
+  metadata_naivefox_arms=$multi_arm_arms_csv
+  metadata_arm_comparison_views=$multi_arm_views_csv
+  metadata_arm_specific_analysis=screening_only
 else
   python3 "$INTEGRATION_DIR/camouflage_features.py" merge \
     --input-dir "$feature_fragments" --output "$safe_dir/features.csv" \
     --expected-per-cohort "$samples_per_cohort"
-  analyze_dataset "$safe_dir/features.csv" "$safe_dir"
+  single_arm_analysis=confirmatory
+  if [[ $naivefox_arm == tree-complete ||
+        $naivefox_arm == tree-early-overlap ||
+        $naivefox_arm == tree-overlap ]]; then
+    single_arm_analysis=screening
+  fi
+  analyze_dataset "$safe_dir/features.csv" "$safe_dir" "$single_arm_analysis"
   metadata_naivefox_arm=$naivefox_arm
   metadata_naivefox_arms=$naivefox_arm
+  metadata_arm_comparison_views=not_applicable
+  if [[ $single_arm_analysis == screening ]]; then
+    metadata_arm_specific_analysis=screening_only
+  else
+    metadata_arm_specific_analysis=single_arm
+  fi
 fi
 
 reference_version=$(LD_LIBRARY_PATH="$REFERENCE_LIBDIR" "$REFERENCE_BIN" --version 2>/dev/null)
@@ -829,14 +1224,24 @@ schema_version=1
 revision=$(git -C "$SOURCE_ROOT" rev-parse HEAD)
 mode=$mode
 seed=$seed
+scenarios=$scenario_csv
 conditional_bootstrap_iterations=1000
 refit_bootstrap_iterations=$refit_bootstrap
 permutation_iterations=$permutations
 protocol_selection=$protocol_selection
 inner_transport=$inner_transport
+private_h3_keylog=$private_h3_keylog
+isolated_network=$isolated_network
+network_mutation_policy=reject_route_address_link
+network_mutation_monitor=netlink_route_v1_fail_closed
+network_mutation_validated_samples=$network_mutation_validated_samples
+capture_offload_policy=$capture_offload_policy
+h3_udp_superframe_policy=reject_udp_length_gt_1500
 experiment_design=$experiment_design
 naivefox_arm=$metadata_naivefox_arm
 naivefox_arms=$metadata_naivefox_arms
+arm_comparison_views=$metadata_arm_comparison_views
+arm_specific_analysis=$metadata_arm_specific_analysis
 samples_per_cohort=$samples_per_cohort
 reference_mode=$capture_mode
 os_id=$os_id

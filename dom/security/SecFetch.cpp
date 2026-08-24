@@ -4,17 +4,45 @@
 
 #include "SecFetch.h"
 
-#include "mozIThirdPartyUtil.h"
 #include "mozilla/BasePrincipal.h"
-#include "mozilla/StaticPrefs_dom.h"
-#include "mozilla/dom/RequestBinding.h"
-#include "nsContentSecurityManager.h"
-#include "nsContentUtils.h"
+#include "nsCOMPtr.h"
+#include "nsIContentPolicy.h"
 #include "nsIHttpChannel.h"
-#include "nsIRedirectHistoryEntry.h"
+#include "nsIHttpChannelInternal.h"
+#include "nsILoadInfo.h"
+#include "nsIPrincipal.h"
 #include "nsIReferrerInfo.h"
-#include "nsMixedContentBlocker.h"
+#include "nsIURI.h"
+#include "nsString.h"
 #include "nsNetUtil.h"
+
+#ifndef MOZ_NAIVEFOX
+#  include "mozIThirdPartyUtil.h"
+#  include "mozilla/StaticPrefs_dom.h"
+#  include "mozilla/dom/RequestBinding.h"
+#  include "nsContentSecurityManager.h"
+#  include "nsContentUtils.h"
+#  include "nsIRedirectHistoryEntry.h"
+#  include "nsMixedContentBlocker.h"
+#  include "nsNetUtil.h"
+#endif
+
+#ifdef MOZ_NAIVEFOX
+nsCString mozilla::dom::ComputeNaiveFoxSecFetchSite(
+    nsContentPolicyType aContentType, nsIURI* aDocumentURI,
+    nsIURI* aRequestURI) {
+  if (aContentType == nsIContentPolicy::TYPE_DOCUMENT ||
+      aContentType == nsIContentPolicy::TYPE_SUBDOCUMENT) {
+    return "none"_ns;
+  }
+  if (!aDocumentURI || !aRequestURI) {
+    return {};
+  }
+  return NS_SecurityCompareURIs(aDocumentURI, aRequestURI, true)
+             ? "same-origin"_ns
+             : "cross-site"_ns;
+}
+#endif
 
 // Helper function which maps an internal content policy type
 // to the corresponding destination for the context of SecFetch.
@@ -128,6 +156,7 @@ nsCString MapInternalContentPolicyTypeToDest(nsContentPolicyType aType) {
   MOZ_CRASH("Unhandled nsContentPolicyType value");
 }
 
+#ifndef MOZ_NAIVEFOX
 // Helper function to determine if a ExpandedPrincipal is of the same-origin as
 // a URI in the sec-fetch context.
 void IsExpandedPrincipalSameOrigin(
@@ -237,6 +266,7 @@ bool IsSameSite(nsIChannel* aHTTPChannel) {
   // must be a same-site request
   return true;
 }
+#endif
 
 // Helper function to determine whether a request was triggered
 // by the end user in the context of SecFetch.
@@ -319,8 +349,28 @@ void mozilla::dom::SecFetch::AddSecFetchMode(nsIHttpChannel* aHTTPChannel) {
   } else if (externalType == ExtContentPolicy::TYPE_WEBSOCKET) {
     mode = "websocket"_ns;
   } else {
+#ifdef MOZ_NAIVEFOX
+    if (securityMode ==
+            nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_INHERITS_SEC_CONTEXT ||
+        securityMode ==
+            nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_IS_BLOCKED) {
+      mode.AssignLiteral("same-origin");
+    } else if (securityMode ==
+               nsILoadInfo::SEC_REQUIRE_CORS_INHERITS_SEC_CONTEXT) {
+      mode.AssignLiteral("cors");
+    } else {
+      MOZ_ASSERT(
+          securityMode ==
+                  nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_INHERITS_SEC_CONTEXT ||
+              securityMode ==
+                  nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
+          "unhandled security mode");
+      mode.AssignLiteral("no-cors");
+    }
+#else
     mode = GetEnumString(
         nsContentSecurityManager::SecurityModeToRequestMode(securityMode));
+#endif
   }
 
   nsresult rv =
@@ -329,21 +379,42 @@ void mozilla::dom::SecFetch::AddSecFetchMode(nsIHttpChannel* aHTTPChannel) {
 }
 
 void mozilla::dom::SecFetch::AddSecFetchSite(nsIHttpChannel* aHTTPChannel) {
-  nsAutoCString site("same-origin");
+  nsCOMPtr<nsILoadInfo> loadInfo = aHTTPChannel->LoadInfo();
+  nsAutoCString site;
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aHTTPChannel);
+  nsCOMPtr<nsIURI> documentURI;
+  nsCOMPtr<nsIURI> requestURI;
+  if (internal) {
+    (void)internal->GetDocumentURI(getter_AddRefs(documentURI));
+  }
+  (void)aHTTPChannel->GetURI(getter_AddRefs(requestURI));
+  site = ComputeNaiveFoxSecFetchSite(loadInfo->InternalContentPolicyType(),
+                                     documentURI, requestURI);
+  if (site.IsEmpty()) {
+    return;
+  }
+#else
+  if (loadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
+    site.AssignLiteral("none");
+  } else {
+    site.AssignLiteral("same-origin");
 
-  bool isSameOrigin = IsSameOrigin(aHTTPChannel);
-  if (!isSameOrigin) {
-    bool isSameSite = IsSameSite(aHTTPChannel);
-    if (isSameSite) {
-      site = "same-site"_ns;
-    } else {
-      site = "cross-site"_ns;
+    bool isSameOrigin = IsSameOrigin(aHTTPChannel);
+    if (!isSameOrigin) {
+      bool isSameSite = IsSameSite(aHTTPChannel);
+      if (isSameSite) {
+        site = "same-site"_ns;
+      } else {
+        site = "cross-site"_ns;
+      }
+    }
+
+    if (IsUserTriggeredForSecFetchSite(aHTTPChannel)) {
+      site = "none"_ns;
     }
   }
-
-  if (IsUserTriggeredForSecFetchSite(aHTTPChannel)) {
-    site = "none"_ns;
-  }
+#endif
 
   nsresult rv =
       aHTTPChannel->SetRequestHeader("Sec-Fetch-Site"_ns, site, false);
@@ -380,12 +451,20 @@ void mozilla::dom::SecFetch::AddSecFetchHeader(nsIHttpChannel* aHTTPChannel) {
     return;
   }
 
+  // The lean product only creates proxy preambles for HTTPS proxy origins.
+#ifdef MOZ_NAIVEFOX
+  if (!uri || !uri->SchemeIs("https")) {
+    return;
+  }
+#else
   // if we are not dealing with a potentially trustworthy URL, then
   // there is nothing to do here
   if (!nsMixedContentBlocker::IsPotentiallyTrustworthyOrigin(uri)) {
     return;
   }
+#endif
 
+#ifndef MOZ_NAIVEFOX
   // If we're dealing with a system XMLHttpRequest or fetch, don't add
   // Sec- headers.
   nsCOMPtr<nsILoadInfo> loadInfo = aHTTPChannel->LoadInfo();
@@ -396,6 +475,7 @@ void mozilla::dom::SecFetch::AddSecFetchHeader(nsIHttpChannel* aHTTPChannel) {
       return;
     }
   }
+#endif
 
   AddSecFetchDest(aHTTPChannel);
   AddSecFetchMode(aHTTPChannel);

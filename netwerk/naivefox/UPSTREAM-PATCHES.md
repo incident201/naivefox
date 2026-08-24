@@ -224,6 +224,54 @@ wildcard pool; the request is an ordinary GET rather than CONNECT or
 CONNECT-UDP; and the resulting outer connection remains eligible for a
 subsequent proxy CONNECT.
 
+## NF-UPSTREAM-011: minimal Firefox navigation semantics for proxy preambles
+
+Files:
+
+```text
+dom/security/SecFetch.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+```
+
+Restores the upstream document-request causes needed by the lean product
+without adding docshell, layout, graphics, or the full DOM security graph.
+Only a system-principal HTTPS proxy preamble with `TYPE_DOCUMENT` receives the
+normal navigation UIR and Fetch Metadata path. `Alt-Used` remains derived from
+a real Alt-Svc mapping; the narrow preamble exception permits that automatic
+header while retaining the anonymous connection key and credential isolation.
+
+Review obligations: ordinary Firefox behavior is unchanged; non-document and
+non-preamble NaiveFox channels do not gain navigation headers; the lean
+SecFetch branch stays a strict subset of upstream behavior; anonymous
+credentials, cookies, client certificates, and auth retries remain suppressed;
+and decrypted diagnostics verify semantics without exporting header values or
+feeding them into passive classifiers.
+
+## NF-UPSTREAM-012: initial Linux network convergence boundary
+
+Files:
+
+```text
+netwerk/system/netlink/NetlinkService.h
+netwerk/system/netlink/NetlinkService.cpp
+```
+
+Exposes a NaiveFox-only, process-latched boundary after the first complete
+Linux/Android route-check and `CalculateNetworkID()` cycle. The NaiveFox runtime
+then drains already queued main-thread network observers and performs a FIFO
+socket-thread barrier before it publishes local proxy listeners. This prevents
+the first outer H3 connection from racing Gecko's initial
+`VerifyTraffic -> DontReuse` cleanup. It does not suppress, delay, or reinterpret
+any later kernel network event.
+
+Review obligations: the latch remains after the completed calculation rather
+than the earlier `linkStatusKnown`; the main-thread and socket-thread drains
+remain ordered before listener publication; later
+`network:link-status-changed` notifications still execute the normal
+`VerifyTraffic` path; and the isolated cold-start stress retains one physical
+outer QUIC connection while a focused post-start network-change regression is
+still allowed to replace it.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

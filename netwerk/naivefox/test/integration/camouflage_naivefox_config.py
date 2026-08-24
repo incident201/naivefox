@@ -6,13 +6,27 @@ import os
 from pathlib import Path
 from urllib.parse import quote
 
-PREAMBLE_PATH = "/assets/runtime.js"
+PREAMBLE_PATH = "/camouflage/index.html"
 PREAMBLE_MAX_BYTES = 64 * 1024
+TREE_PREAMBLE_MAX_BYTES = 256 * 1024
+TREE_PREAMBLE_MAX_ASSETS = 2
 
 
 def build_config(arm, protocol, socks_port, proxy_port, proxy_user, proxy_pass):
-    if arm not in ("off", "gate", "root"):
-        raise ValueError("config arm must be off, gate, or root")
+    supported_arms = (
+        "off",
+        "gate",
+        "root",
+        "document-complete",
+        "tree-complete",
+        "tree-early-overlap",
+        "tree-overlap",
+    )
+    if arm not in supported_arms:
+        raise ValueError(
+            "config arm must be off, gate, root, document-complete, "
+            "tree-complete, tree-early-overlap, or tree-overlap"
+        )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
@@ -29,11 +43,18 @@ def build_config(arm, protocol, socks_port, proxy_port, proxy_user, proxy_pass):
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm == "root":
+    if arm in ("root", "document-complete"):
         preamble = {
-            "mode": "root",
+            "mode": "document-complete",
             "path": PREAMBLE_PATH,
             "max-bytes": PREAMBLE_MAX_BYTES,
+        }
+    elif arm in ("tree-complete", "tree-early-overlap", "tree-overlap"):
+        preamble = {
+            "mode": arm,
+            "path": PREAMBLE_PATH,
+            "max-assets": TREE_PREAMBLE_MAX_ASSETS,
+            "max-bytes": TREE_PREAMBLE_MAX_BYTES,
         }
     return {
         "listen": f"socks://127.0.0.1:{socks_port}",
@@ -57,7 +78,19 @@ def write_config(path, config):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
-    parser.add_argument("--arm", choices=("off", "gate", "root"), required=True)
+    parser.add_argument(
+        "--arm",
+        choices=(
+            "off",
+            "gate",
+            "root",
+            "document-complete",
+            "tree-complete",
+            "tree-early-overlap",
+            "tree-overlap",
+        ),
+        required=True,
+    )
     parser.add_argument("--protocol", choices=("h2", "h3"), required=True)
     parser.add_argument("--socks-port", type=int, required=True)
     parser.add_argument("--proxy-port", type=int, required=True)

@@ -43,7 +43,17 @@ struct ExtraHeader final {
   nsCString mValue;
 };
 
-enum class PreambleMode : uint8_t { Off, Root, Tree };
+enum class PreambleMode : uint8_t {
+  Off,
+  DocumentComplete,
+  TreeComplete,
+  TreeOverlap,
+  TreeEarlyOverlap,
+
+  // Compatibility names for the first experimental configuration surface.
+  Root = DocumentComplete,
+  Tree = TreeComplete,
+};
 
 struct PreambleConfig final {
   static constexpr uint32_t kMaximumAssets = 6;

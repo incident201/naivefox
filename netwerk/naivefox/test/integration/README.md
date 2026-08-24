@@ -171,6 +171,41 @@ Optional throughput scripts (`run-throughput-benchmark.sh` and
 `run-h3-throughput-benchmark.sh`) produce local diagnostics; their point-in-time
 numbers are not maintained in active documentation.
 
+In same-base mode, `run-h3-capture-comparison.sh --compare-arms` performs a
+private decrypted sequence audit of `off`, `gate`, `root` (the
+`document-complete` alias), `tree-complete`, and `tree-overlap`. The
+experimental `tree-early-overlap` arm is available only by explicitly
+selecting it together with `tree-complete`. Repeat `--compare-arm ARM` to
+select a candidate set. The audit drives the
+same browser-page document and resources for the reference, preamble, and inner
+HTTPS workload. Sanitized output retains request ordering, observed stream-FIN
+ordering, and whether a response header or observed FIN followed CONNECT; it
+never retains header values or key material. A transient private CSV contains
+only GET header blocks so the complete/overlap root, stylesheet, and script can
+be checked for equal selected request values and order. For
+`tree-early-overlap`, another private extract checks that its two response
+`Content-Length` values equal `tree-complete`. Both are deleted with the
+capture staging directory; safe output records only equality booleans such as
+`tree_request_semantics_match=yes`,
+`tree_early_overlap_request_semantics_match=yes`,
+`tree_early_overlap_asset_sizes_match=yes`, and
+`tree_expected_request_semantics=yes`. The latter requires a navigation-style
+root request and same-origin stylesheet/script subresource semantics, including
+referers exactly equal to the root URL computed from its private pseudo-header
+values, without exporting any of those values.
+
+The controlled browser page serves a 64 KiB stylesheet and a 128 KiB script.
+The root document plus those two discovered assets stays below the tree
+preamble's 256 KiB aggregate limit. These ordinary resource-sized bodies are
+shared by direct Firefox, the preamble traversal, and the inner browser
+workload. Their causal purpose is to keep normal resource response streams
+alive long enough for `tree-overlap` or `tree-early-overlap` to overlap CONNECT
+on loopback; their
+contents and sizes are fixed workload parameters, not fitted packet patterns.
+The origin and Caddy route intentionally apply no `Content-Encoding`; enabling
+gzip or zstd would collapse the repeated fixture body on the wire and invalidate
+this overlap workload.
+
 ## Passive camouflage dataset
 
 `run-camouflage-suite.sh` builds separate H2 and H3 datasets that actively try
@@ -229,8 +264,10 @@ visible without changing policy.
 
 Gate uses two, smoke ten, standard sixty, and research 240 samples per cohort
 and protocol. Override with `--samples-per-cohort` only for a deliberate local
-experiment. Gate and smoke are always `INCONCLUSIVE`; only research applies
-the documented GREEN/YELLOW/RED policy. Default quick-reference runs measure
+experiment; research mode has a hard minimum of 240 and rejects smaller
+overrides. Gate and smoke are always `INCONCLUSIVE`; only a non-screening
+research run with at least 240 samples in every cohort and protocol applies the
+documented GREEN/YELLOW/RED policy. Default quick-reference runs measure
 drift against pinned current Nightly. Set `NAIVEFOX_CAPTURE_MODE=same-base` and
 the `NAIVEFOX_CAPTURE_REFERENCE_*` paths described in `../../CAPTURE.md` for an
 explicit same-source experiment; no Firefox build is started automatically.
@@ -238,12 +275,86 @@ Run HTTPS and HTTP with the same explicit seed when comparing the primary and
 diagnostic inner transports; each invocation produces its own dataset and
 records `inner_transport` in metadata.
 
-`--naivefox-arm off|gate|root` selects a separate one-binary NaiveFox arm.
-All three use the same config-mode startup path. `off` disables the outer-session
-gate and preamble. `gate` enables the gate without a preamble. `root` adds one
-bounded ordinary GET before CONNECT. Reusing an explicit seed across separate
-invocations reproduces schedule order, but does not make independently captured
-samples statistically paired:
+`--scenario NAME` repeats one controlled workload across the requested blocks.
+It is useful for private lifecycle diagnostics such as stressing `sequential`
+connection reuse; the selected scenario is recorded in sanitized metadata and
+does not relax any capture-health or sample-count rule.
+
+To diagnose a NaiveFox lifecycle race without collecting flaky direct-Firefox
+reference samples, set `NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY=1`. This
+private mode is restricted to gate/smoke, requires exactly one explicit
+`--scenario` and one explicit `--naivefox-arm`, and rejects multi-arm designs.
+It collects only the requested number of NaiveFox samples while retaining the
+strict per-sample transport and arm validator:
+
+```bash
+NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY=1 \
+NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG=1 \
+./run-camouflage-suite.sh --mode smoke --protocol h3 \
+  --scenario sequential --naivefox-arm tree-complete \
+  --samples-per-cohort 10
+```
+
+No classifier, comparison, or verdict is run in this mode. A successful run
+deletes pcaps, extracted features, logs, and key logs, leaving only a sanitized
+summary with sample counts, arm, scenario, and protocol. A failed run preserves
+the private directory for lifecycle analysis.
+
+For a private H3 lifecycle diagnosis only, set
+`NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG=1` in gate/smoke mode. The NaiveFox process
+then writes TLS secrets beside that sample's raw pcap; normal passive runs
+still unset `SSLKEYLOGFILE`. Key logs never enter feature extraction or safe
+output, are deleted after success, and survive only with failed private
+diagnostics so GOAWAY/CONNECTION_CLOSE/RESET state can be checked.
+
+For controlled same-base experiments on a host whose WSL mirrored networking
+inherits VPN or adapter churn, set `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`. The
+runner re-executes itself in a private Linux network namespace containing only
+loopback and a stable TEST-NET dummy default route. Caddy, NaiveFox, both
+Firefox participants, and packet capture all remain in that namespace; the
+Windows host, its VPN, and other WSL processes are untouched. This mode is
+restricted to same-base runs so it cannot unexpectedly block reference
+downloads.
+
+Every sample also starts a route-netlink mutation monitor before either the
+reference browser or the NaiveFox process. Any link, address, or route
+add/delete from that boundary through the end of capture invalidates the
+sample. Stopping uses a drain-and-confirm handshake so an event already queued
+by the kernel cannot be lost at the right boundary. An early monitor exit,
+truncated/error netlink input, missing completion confirmation, or non-empty
+event log fails closed. The private log stores only event type,
+sequence/process metadata, flags, and elapsed time; it never records interface
+names, addresses, gateways, or routes. A stable isolated namespace should
+therefore produce an empty mutation log for every sample.
+
+When a failed sample contains both `capture.pcapng` and `naivefox.keys`, inspect
+only the original outer connection before the second physical ClientHello with:
+
+```bash
+python3 ./analyze-private-h3-lifecycle.py \
+  --pcap PRIVATE_SAMPLE/capture.pcapng \
+  --keylog PRIVATE_SAMPLE/naivefox.keys \
+  --proxy-port OUTER_PROXY_PORT
+```
+
+The private-only report includes H3 GOAWAY, QUIC CONNECTION_CLOSE,
+RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
+request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
+was absent unless H3 frames from the first connection were actually decrypted.
+
+`--naivefox-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-overlap`
+selects a separate one-binary NaiveFox arm. All use the same config-mode startup
+path. `off` disables the outer-session gate and preamble. `gate` enables the
+gate without a preamble. `root` is the short alias for `document-complete` and
+adds one bounded document GET before CONNECT. The tree modes also fetch two
+resources from that browser page; `tree-complete` waits for them, while
+`tree-overlap` may overlap their completion with CONNECT.
+`tree-early-overlap` completes the root first, then starts CONNECT only after
+at least one resource response has begun while leaving that same CSS or JS
+stream unfinished. Its decrypted audit requires exactly the same root/CSS/JS
+request semantics and asset sizes as `tree-complete`. Reusing an explicit
+seed across separate invocations reproduces schedule order, but does not make
+independently captured samples statistically paired:
 
 ```bash
 ./run-camouflage-suite.sh --mode gate --protocol both --seed 12345 --naivefox-arm off
@@ -251,11 +362,35 @@ samples statistically paired:
 ./run-camouflage-suite.sh --mode gate --protocol both --seed 12345 --naivefox-arm root
 ```
 
+Discard all tree results produced before the H3 diagnostic profile split.
+Those runs mistakenly installed the direct-Firefox
+`alt-svc-mapping-for-testing` preferences in NaiveFox too, so document and
+resource GETs could be routed over different physical QUIC connections. The
+preserved private diagnostic `20260824T123959Z-725a1454` demonstrates that
+harness artifact and is not valid product evidence. The current diagnostic
+keeps the forced mapping only in the direct Firefox reference profile and
+requires exactly one physical outer QUIC connection shared by every preamble
+GET and CONNECT.
+
 Config-arm files and their percent-encoded proxy credentials remain under the
 private capture directory. Sanitized metadata records only `naivefox_arm`.
-The runner rejects `off` or `gate` if any preamble result is logged, rejects
-`root` unless exactly one successful result is logged, and requires every
-`gate` or `root` capture to contain exactly one physical outer connection.
+The runner rejects `off` or `gate` if any preamble result is logged, rejects a
+document/tree arm unless exactly one successful result is logged, and requires
+every gated capture to contain exactly one physical outer connection. Tree arms
+are opt-in screening diagnostics even in `research` mode. They are not added to
+the large default superblock: its five-member `off`/`gate`/`root` design keeps
+collection cost bounded and remains screening-only. `--multi-arm-arms` can opt
+a deliberate screening run into a different arm list without increasing every
+routine run.
+
+Profiles have explicit participant roles. Direct H3 Firefox alone receives
+the local test Alt-Svc mapping; the NaiveFox process profile enables the real
+H3 stack without that mapping, and the workload browser uses only its
+fail-closed SOCKS PAC. The runner validates those generated profiles before
+capture and rejects inherited `AlternateServices.bin` state. Private run
+`5f45fb110cc57517` predated this role separation and stopped after exposing a
+second resumed QUIC route; all of its samples are invalid harness evidence.
+
 Comparative inference between arms requires randomized multi-arm superblocks
 with shared contemporaneous controls. Enable that design in same-base mode:
 
@@ -273,14 +408,92 @@ captured once and shared by all three arm comparisons. `samples-per-cohort`
 means superblocks per protocol in this mode. The sanitized
 `features-superblocks.csv` records both `experiment_block` and `naivefox_arm`;
 `arms/<arm>/features.csv` selects the common controls and that arm, with its own
-`metrics.json` and `summary.txt`. This mode requires same-base Firefox and is
-mutually exclusive with `--naivefox-arm`. The seed determines collection order,
-but it does not turn gate/smoke sample counts into research-grade evidence.
+`metrics.json` and `summary.txt`. The runner also writes
+`arm-comparison.json` and `arm-comparison.txt`. This paired report ranks
+`off`, `gate`, and `root` inside each protocol and passive feature view using
+the same Firefox A/B controls from each `experiment_block`; it does not train a
+classifier or select features from the arm labels. Its bounded distance is the
+featurewise excess outside the matched Firefox A/B envelope, calibrated only
+from Firefox control disagreement. Paired block bootstrap intervals and
+within-block sign-flip tests are reported, with Holm correction across all
+eligible protocol/view/arm-pair tests.
+
+For the first preamble-shape screen, collect the four product modes against one
+common Firefox A/B pair in every randomized six-member block and restrict the
+paired report to the earliest packet windows:
+
+```bash
+NAIVEFOX_CAPTURE_MODE=same-base \
+NAIVEFOX_CAPTURE_REFERENCE_BIN=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/objdir \
+./run-camouflage-suite.sh --mode standard --protocol both --seed 12345 \
+  --multi-arm-arms gate,root,tree-complete,tree-overlap \
+  --multi-arm-views initial_packets_16,packets_17_32,initial_packets_32
+```
+
+Here `root` is the document-complete mode. Every selected arm is compared with
+the same controls inside its block; the paired analyzer infers the selected
+arms, emits every selected arm pair, and applies Holm correction across only
+the protocol/view/pair family actually reported. This remains candidate
+screening, never an absolute camouflage verdict.
+
+For the scheduling-only follow-up, replace `gate` with
+`tree-early-overlap`. The early arm uses exactly the same root, stylesheet,
+script, and response sizes as the two existing tree arms; only the CONNECT
+admission point changes.
+
+Controlled H3 packet-shape screening must run with
+`NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`. The private namespace disables loopback
+GRO/GSO/TSO and UDP segmentation offloads, and the runner rejects captured
+proxy UDP frames larger than 1500 bytes. Older run `909bdbd9c1d68824` predates
+this check and contains 13--20 KiB UDP GSO superframes. It is invalid as
+wire-level packet evidence and must not be used to rank the preamble arms.
+
+The three views answer different mechanism questions: `initial_packets_16`
+is the earliest cumulative window, `packets_17_32` isolates the next sixteen
+positions without repeating handshake features, and `initial_packets_32`
+checks the combined early shape. For each view, `arm-comparison.json` retains
+diagnostic top passive features plus aggregate signed transport/wire-size
+sequences. The Firefox A/B mean absolute difference is written beside each
+arm's mean delta from the matched Firefox midpoint, so a small run can reveal
+whether a packet-13--20 feature shrank or only moved later. These summaries are
+not used for arm ranking or inference and contain no decrypted/header/stream,
+endpoint, or raw timestamp data.
+
+The selected arm-specific classifier reports are candidate-screening diagnostics,
+including when the collection mode is `research`. Their JSON records
+`screening_only=true`, every classification is `INCONCLUSIVE`, and they cannot
+emit an absolute GREEN/RED verdict. After choosing an arm, preregister the
+configuration and seed policy, then collect a fresh single-arm confirmation;
+for example:
+
+```bash
+NAIVEFOX_CAPTURE_MODE=same-base \
+NAIVEFOX_CAPTURE_REFERENCE_BIN=/path/to/firefox \
+NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/objdir \
+./run-camouflage-suite.sh --mode research --protocol both --seed 67890 \
+  --naivefox-arm root
+```
+
+Do not reuse the multi-arm screening samples for that confirmation.
+
+The paired report is deliberately relative. Because Firefox A/B define the
+control envelope, there is no independent third Firefox observation that could
+serve as an absolute null. It can rank arms but cannot establish absolute
+indistinguishability. Gate and smoke runs, fewer than 30 blocks per protocol,
+or workloads represented by only one block are marked
+`INSUFFICIENT_FOR_INFERENCE` even though diagnostic point estimates are still
+written. Feature views overlap heavily and use equal feature weighting, so
+even research-sized rankings remain conditional on this declared passive
+distance. This mode requires same-base Firefox and is mutually exclusive with
+`--naivefox-arm`. The seed determines collection order, but it does not turn
+gate/smoke sample counts into research-grade evidence.
 
 Successful single-arm runs retain only `metadata.txt`, `features.csv`,
 `metrics.json`, and `summary.txt`. Multi-arm runs retain `metadata.txt`,
-`features-superblocks.csv`, and the three sanitized `arms/<arm>/` result sets
-under `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
+`features-superblocks.csv`, `arm-comparison.{json,txt}`, and the selected
+sanitized `arms/<arm>/` result sets under
+`<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.
 Capture files, profiles, bodies, credentials, screenshots, and logs remain
 private and are deleted on success. See `../../CAPTURE.md` for the threat model,
 feature schema, interpretation policy, limitations, and same-base procedure.

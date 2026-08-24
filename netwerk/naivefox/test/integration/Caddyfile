@@ -13,12 +13,12 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 	tls {$NAIVEFOX_FIXTURE_PROXY_CERT} {$NAIVEFOX_FIXTURE_PROXY_KEY}
 	route {
 		@preambleOriginAuthLeak {
-			path /assets/runtime.js
+			path /assets/runtime.js /camouflage*
 			header Authorization *
 		}
 		respond @preambleOriginAuthLeak "preamble must not carry Authorization" 403
 		@preambleProxyAuthLeak {
-			path /assets/runtime.js
+			path /assets/runtime.js /camouflage*
 			header Proxy-Authorization *
 		}
 		respond @preambleProxyAuthLeak "preamble must not carry Proxy-Authorization" 403

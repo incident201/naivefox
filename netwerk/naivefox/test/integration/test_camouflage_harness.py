@@ -3,8 +3,10 @@
 import base64
 import csv
 import importlib.util
+import io
 import json
 import os
+import shlex
 import stat
 import subprocess
 import sys
@@ -14,6 +16,7 @@ from types import SimpleNamespace
 from urllib.parse import unquote, urlsplit
 
 HERE = os.path.dirname(__file__)
+SOURCE_ROOT = os.path.abspath(os.path.join(HERE, "../../../.."))
 
 
 def load(name, filename):
@@ -33,6 +36,85 @@ TARGET = load("target_server", "target_server.py")
 
 
 class CamouflageHarnessTests(unittest.TestCase):
+    def test_cold_listener_follows_network_and_socket_barriers(self):
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk/naivefox/GeckoRuntime.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            runtime = stream.read()
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk/naivefox/NaiveFoxRunner.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            runner = stream.read()
+
+        wait_body = runtime[
+            runtime.index("nsresult GeckoRuntime::WaitForNetworkStartup()") :
+            runtime.index("nsresult GeckoRuntime::RunEventLoopSmoke()")
+        ]
+        self.assertLess(
+            wait_body.index('"NaiveFox::InitialNetworkState"'),
+            wait_body.index('"NaiveFox::NetworkMainThreadBarrier"'),
+        )
+        self.assertLess(
+            wait_body.index('"NaiveFox::NetworkMainThreadBarrier"'),
+            wait_body.index('"NaiveFox::NetworkSocketThreadBarrier"'),
+        )
+        self.assertIn("WaitForStartupCondition", wait_body)
+        self.assertIn("NS_NewTimerWithCallback", runtime)
+        self.assertIn("InitialNetworkStateAllowsStartup", wait_body)
+        self.assertIn("return WaitForNetworkStartup();", runtime)
+        embedded = runner[
+            runner.index("NaiveFoxRunEmbedded") : runner.index("NaiveFoxMain")
+        ]
+        self.assertLess(
+            embedded.index("runtime.InitializeEmbedded("),
+            embedded.index("RunLocalProxyServer(config.mListeners"),
+        )
+        standalone = runner[
+            runner.index("const bool configMode") : runner.index("nsCString profile;")
+        ]
+        self.assertLess(
+            standalone.index("runtime.Initialize(aArgc"),
+            standalone.index("RunLocalProxyServer(config.mListeners"),
+        )
+
+    def test_post_start_network_change_still_invalidates_h3(self):
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk/protocol/http/nsHttpHandler.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            handler = stream.read()
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk/protocol/http/ConnectionEntry.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            entry = stream.read()
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk/test/unit/test_http3_network_change.js"),
+            encoding="utf-8",
+        ) as stream:
+            regression = stream.read()
+
+        observe = handler[handler.index('!strcmp(topic, NS_NETWORK_LINK_TOPIC)') :]
+        self.assertIn("mConnMgr->VerifyTraffic()", observe)
+        verify = entry[
+            entry.index("void ConnectionEntry::VerifyTraffic()") :
+            entry.index("void ConnectionEntry::InsertIntoIdleConnections_internal")
+        ]
+        self.assertIn(
+            "network_http_move_to_pending_list_after_network_change", verify
+        )
+        self.assertIn("MakeConnectionPendingAndDontReuse(connUDP)", verify)
+        self.assertIn(
+            'notifyObservers(null, "network:link-status-changed", "changed")',
+            regression,
+        )
+        self.assertIn(
+            '"network.http.move_to_pending_list_after_network_change",\n    true',
+            regression,
+        )
+
     def test_multi_arm_schedule_is_seeded_randomized_and_complete(self):
         first = SUPERBLOCKS.schedule_rows(1234, "h3", 4, ["initial", "page"])
         self.assertEqual(
@@ -64,18 +146,16 @@ class CamouflageHarnessTests(unittest.TestCase):
         for index, member in enumerate(
             SUPERBLOCKS.schedule_rows(9, "h2", 2, ["initial"])
         ):
-            rows.append(
-                {
-                    "schema_version": "1",
-                    "protocol": "h2",
-                    "scenario": member["scenario"],
-                    "label": member["label"],
-                    "naivefox_arm": member["naivefox_arm"],
-                    "session_id": f"s{index}",
-                    "experiment_block": member["experiment_block"],
-                    "whole_packet_count": str(index),
-                }
-            )
+            rows.append({
+                "schema_version": "1",
+                "protocol": "h2",
+                "scenario": member["scenario"],
+                "label": member["label"],
+                "naivefox_arm": member["naivefox_arm"],
+                "session_id": f"s{index}",
+                "experiment_block": member["experiment_block"],
+                "whole_packet_count": str(index),
+            })
         with tempfile.TemporaryDirectory() as directory:
             source = os.path.join(directory, "features-superblocks.csv")
             with open(source, "w", newline="", encoding="utf-8") as stream:
@@ -112,17 +192,293 @@ class CamouflageHarnessTests(unittest.TestCase):
         rows = SUPERBLOCKS.schedule_rows(1, "h2", 1, ["initial"])
         rows = [row for row in rows if row["naivefox_arm"] != "root"]
         with self.assertRaisesRegex(ValueError, "incomplete superblock"):
-            SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1)
+            SUPERBLOCKS.validate_superblocks(
+                rows, expected_blocks=1, arms=SUPERBLOCKS.DEFAULT_ARMS
+            )
+
+    def test_opt_in_superblock_arms_share_one_control_pair(self):
+        arms = (
+            "gate",
+            "root",
+            "tree-complete",
+            "tree-early-overlap",
+            "tree-overlap",
+        )
+        rows = SUPERBLOCKS.schedule_rows(
+            17, "h3", 2, ["browser_page"], arms=arms
+        )
+        SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
+        self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
+        for index in range(2):
+            members = rows[index * 7 : (index + 1) * 7]
+            self.assertEqual(
+                {(row["label"], row["naivefox_arm"]) for row in members},
+                {
+                    ("firefox_a", "reference"),
+                    ("firefox_b", "reference"),
+                    *(("naivefox", arm) for arm in arms),
+                },
+            )
+
+    def test_multi_arm_parser_rejects_alias_duplication(self):
+        with self.assertRaisesRegex(ValueError, "aliases"):
+            SUPERBLOCKS.parse_arms("gate,root,document-complete")
 
     def test_runner_preserves_single_arm_and_adds_same_base_superblocks(self):
         path = os.path.join(HERE, "run-camouflage-suite.sh")
         with open(path, encoding="utf-8") as stream:
             runner = stream.read()
         self.assertIn("--multi-arm-superblocks", runner)
-        self.assertIn("--naivefox-arm off|gate|root", runner)
+        self.assertIn("--multi-arm-arms", runner)
+        self.assertIn("--multi-arm-views", runner)
+        self.assertIn("multi_arm_arms_csv=off,gate,root", runner)
         self.assertIn("requires NAIVEFOX_CAPTURE_MODE=same-base", runner)
         self.assertIn("features-superblocks.csv", runner)
-        self.assertIn('for arm in off gate root; do', runner)
+        self.assertIn("analyze-camouflage-arms.py", runner)
+        self.assertIn("arm-comparison.json", runner)
+        self.assertIn("arm-comparison.txt", runner)
+        self.assertIn('for arm in "${multi_arm_arms[@]}"; do', runner)
+        self.assertIn("analyzer_args+=(--screening-only)", runner)
+        self.assertIn("metadata_arm_specific_analysis=screening_only", runner)
+        self.assertIn('--views "$multi_arm_views_csv"', runner)
+        self.assertIn("packets_17_32", runner)
+        self.assertIn("--scenario", runner)
+        self.assertIn('scenarios=("$scenario_override")', runner)
+
+    def test_runner_rejects_unknown_scenario_before_capture(self):
+        result = subprocess.run(
+            [
+                "bash",
+                os.path.join(HERE, "run-camouflage-suite.sh"),
+                "--scenario",
+                "not-a-workload",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unsupported camouflage scenario", result.stderr)
+
+    def test_private_h3_keylog_is_explicit_and_diagnostic_only(self):
+        path = os.path.join(HERE, "run-camouflage-suite.sh")
+        with open(path, encoding="utf-8") as stream:
+            runner = stream.read()
+        self.assertIn("NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG", runner)
+        self.assertIn('local keylog="$sample_dir/naivefox.keys"', runner)
+        self.assertIn('sslkeylog_unset=(-u SSLKEYLOGFILE)', runner)
+        self.assertIn("restricted to gate/smoke diagnostics", runner)
+
+        environment = os.environ.copy()
+        environment["NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG"] = "invalid"
+        result = subprocess.run(
+            ["bash", path],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("must be 0 or 1", result.stderr)
+
+    def test_naivefox_only_lifecycle_mode_is_private_and_non_statistical(self):
+        path = os.path.join(HERE, "run-camouflage-suite.sh")
+        with open(path, encoding="utf-8") as stream:
+            runner = stream.read()
+        self.assertIn("NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY", runner)
+        self.assertIn('print("naivefox", arm, scenario', runner)
+        branch_start = runner.index("if [[ $diagnostic_naivefox_only == 1 ]]; then\n  diagnostic_protocols=")
+        analyzer_start = runner.index("\nanalyze_dataset()", branch_start)
+        diagnostic_branch = runner[branch_start:analyzer_start]
+        self.assertIn("diagnostic-summary.txt", diagnostic_branch)
+        self.assertIn("sample_count=$session_counter", diagnostic_branch)
+        self.assertIn("exit 0", diagnostic_branch)
+        self.assertNotIn("analyze-camouflage", diagnostic_branch)
+        self.assertNotIn("features.csv", diagnostic_branch)
+
+    def test_naivefox_only_lifecycle_mode_rejects_unsafe_shapes(self):
+        path = os.path.join(HERE, "run-camouflage-suite.sh")
+        environment = os.environ.copy()
+        environment["NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY"] = "1"
+
+        missing_scenario = subprocess.run(
+            ["bash", path, "--mode", "gate", "--naivefox-arm", "gate"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(missing_scenario.returncode, 2)
+        self.assertIn("require exactly one --scenario", missing_scenario.stderr)
+
+        missing_arm = subprocess.run(
+            ["bash", path, "--mode", "gate", "--scenario", "sequential"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(missing_arm.returncode, 2)
+        self.assertIn("require exactly one --naivefox-arm", missing_arm.stderr)
+
+        repeated_scenario = subprocess.run(
+            [
+                "bash",
+                path,
+                "--mode",
+                "gate",
+                "--scenario",
+                "initial",
+                "--scenario",
+                "sequential",
+                "--naivefox-arm",
+                "gate",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(repeated_scenario.returncode, 2)
+        self.assertIn("require exactly one --scenario", repeated_scenario.stderr)
+
+        repeated_arm = subprocess.run(
+            [
+                "bash",
+                path,
+                "--mode",
+                "gate",
+                "--scenario",
+                "sequential",
+                "--naivefox-arm",
+                "gate",
+                "--naivefox-arm",
+                "tree-complete",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(repeated_arm.returncode, 2)
+        self.assertIn("require exactly one --naivefox-arm", repeated_arm.stderr)
+
+        standard = subprocess.run(
+            [
+                "bash",
+                path,
+                "--mode",
+                "standard",
+                "--scenario",
+                "sequential",
+                "--naivefox-arm",
+                "gate",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(standard.returncode, 2)
+        self.assertIn("restricted to gate/smoke", standard.stderr)
+
+        invalid_environment = environment.copy()
+        invalid_environment["NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY"] = "yes"
+        invalid = subprocess.run(
+            ["bash", path],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=invalid_environment,
+        )
+        self.assertEqual(invalid.returncode, 2)
+        self.assertIn("must be 0 or 1", invalid.stderr)
+
+    def test_isolated_network_mode_is_explicit_and_fail_closed(self):
+        runner_path = os.path.join(HERE, "run-camouflage-suite.sh")
+        helper_path = os.path.join(HERE, "run-camouflage-isolated-network.sh")
+        monitor_path = os.path.join(HERE, "monitor-network-mutations.py")
+        with open(runner_path, encoding="utf-8") as stream:
+            runner = stream.read()
+        with open(helper_path, encoding="utf-8") as stream:
+            helper = stream.read()
+        with open(monitor_path, encoding="utf-8") as stream:
+            monitor = stream.read()
+
+        self.assertIn("NAIVEFOX_CAPTURE_ISOLATED_NETWORK", runner)
+        self.assertIn("exec unshare --net --mount-proc", runner)
+        self.assertIn("isolated-network capture requires same-base mode", runner)
+        self.assertIn("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED=1", helper)
+        self.assertIn("ethtool -K lo gro off gso off tso off", helper)
+        self.assertIn("tx-udp-segmentation off tx-gso-list off", helper)
+        self.assertIn("offload_state=$(ethtool -k lo)", helper)
+        self.assertIn("isolated loopback offload remained enabled", helper)
+        self.assertIn("udp.length>1500", runner)
+        self.assertIn(
+            "capture_offload_policy=host_interface_offload_state_unmodified",
+            runner,
+        )
+        self.assertIn("UDP offload superframe", runner)
+        self.assertIn("ip link add naivefox0 type dummy", helper)
+        self.assertIn("192.0.2.1/32", helper)
+        self.assertNotIn("/etc/wsl.conf", helper)
+        self.assertNotIn(".wslconfig", helper)
+        self.assertTrue(os.access(helper_path, os.X_OK))
+        self.assertIn("network route/address/link mutation invalidated", runner)
+        self.assertIn("network mutation monitor stopped before the sample", runner)
+        self.assertIn("network mutation monitor did not confirm a drained stop", runner)
+        self.assertIn("network_mutation_monitor=netlink_route_v1_fail_closed", runner)
+        self.assertIn("RTMGRP_LINK", monitor)
+        self.assertIn('20: "new-address"', monitor)
+        self.assertIn('25: "del-route"', monitor)
+        self.assertNotIn("IFA_ADDRESS", monitor)
+        self.assertNotIn("RTA_GATEWAY", monitor)
+
+        naivefox_sample = runner[
+            runner.index("run_naivefox_sample()") : runner.index("scenario_csv=")
+        ]
+        self.assertLess(
+            naivefox_sample.index('start_network_mutation_monitor "$sample_dir"'),
+            naivefox_sample.index('"$NAIVEFOX_BIN" "$naivefox_config"'),
+        )
+
+        environment = os.environ.copy()
+        environment["NAIVEFOX_CAPTURE_ISOLATED_NETWORK"] = "invalid"
+        result = subprocess.run(
+            ["bash", runner_path],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("must be 0 or 1", result.stderr)
+
+        invalid_helper = subprocess.run(
+            ["bash", helper_path, "/bin/true"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(invalid_helper.returncode, 2)
+        self.assertIn("invalid isolated camouflage network invocation", invalid_helper.stderr)
+
+    def test_runner_rejects_undersized_research_capture(self):
+        result = subprocess.run(
+            [
+                "bash",
+                os.path.join(HERE, "run-camouflage-suite.sh"),
+                "--mode",
+                "research",
+                "--samples-per-cohort",
+                "239",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("at least 240 samples per cohort", result.stderr)
 
     def test_off_arm_uses_same_config_shape_without_gate_or_preamble(self):
         config = CONFIG.build_config(
@@ -152,12 +508,31 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertEqual(unquote(proxy.password), password)
         self.assertNotIn(user, config["proxy"])
         self.assertNotIn(password, config["proxy"])
+        self.assertEqual(config["preamble"]["mode"], "document-complete")
         self.assertEqual(config["preamble"]["path"], CONFIG.PREAMBLE_PATH)
         self.assertLessEqual(config["preamble"]["max-bytes"], 64 * 1024)
         self.assertTrue(config["outer-session-gate"])
 
+    def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
+        for arm in ("tree-complete", "tree-early-overlap", "tree-overlap"):
+            config = CONFIG.build_config(
+                arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
+            )
+            self.assertEqual(config["preamble"]["mode"], arm)
+            self.assertEqual(config["preamble"]["path"], "/camouflage/index.html")
+            self.assertEqual(
+                config["preamble"]["max-assets"],
+                CONFIG.TREE_PREAMBLE_MAX_ASSETS,
+            )
+            self.assertLessEqual(config["preamble"]["max-bytes"], 256 * 1024)
+            self.assertTrue(config["outer-session-gate"])
+        alias = CONFIG.build_config(
+            "document-complete", "h2", 1080, 4433, "user", "pass"
+        )
+        self.assertEqual(alias["preamble"]["mode"], "document-complete")
+
     def test_config_arm_validation_rejects_unknown_arm_and_invalid_ports(self):
-        with self.assertRaisesRegex(ValueError, "off, gate, or root"):
+        with self.assertRaisesRegex(ValueError, "document-complete"):
             CONFIG.build_config("unknown", "h2", 1080, 4433, "user", "pass")
         for port in (0, 65536, True):
             with self.assertRaisesRegex(ValueError, "outside 1..65535"):
@@ -211,9 +586,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         with open(os.path.join(HERE, "Caddyfile"), encoding="utf-8") as stream:
             caddyfile = stream.read()
         path = CONFIG.PREAMBLE_PATH
-        self.assertLess(
-            caddyfile.index(f"respond {path}"), caddyfile.index("forward_proxy")
-        )
+        self.assertEqual(path, "/camouflage/index.html")
+        self.assertIn("reverse_proxy /camouflage*", caddyfile)
         preamble_route = caddyfile[
             caddyfile.index("@preambleOriginAuthLeak") : caddyfile.index(
                 "forward_proxy"
@@ -225,6 +599,57 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("@preambleProxyAuthLeak", preamble_route)
         self.assertIn("preamble must not carry Authorization", preamble_route)
         self.assertIn("preamble must not carry Proxy-Authorization", preamble_route)
+        self.assertNotRegex(caddyfile, r"(?m)^\s*encode(?:\s|$)")
+
+    def test_tree_preamble_uses_browser_page_root_and_resources(self):
+        page = TARGET.Handler.camouflage_page(
+            object(), {"scenario": ["browser_page"]}
+        ).decode()
+        self.assertIn("/camouflage/style.css", page)
+        self.assertIn("/camouflage/app.js", page)
+        self.assertIn("/camouflage/resource?size=65536", page)
+        self.assertIn("/camouflage/api", page)
+        self.assertLess(page.index("/camouflage/style.css"), page.index("<img"))
+        self.assertLess(page.index("/camouflage/app.js"), page.index("<img"))
+
+    def test_tree_fixture_assets_leave_streams_live_within_budget(self):
+        page = TARGET.Handler.camouflage_page(
+            object(), {"scenario": ["browser_page"]}
+        )
+        self.assertEqual(len(TARGET.CAMOUFLAGE_STYLE_CSS), 64 * 1024)
+        self.assertEqual(len(TARGET.CAMOUFLAGE_APP_JS), 128 * 1024)
+        self.assertTrue(TARGET.CAMOUFLAGE_STYLE_CSS.startswith(b":root{"))
+        self.assertTrue(TARGET.CAMOUFLAGE_APP_JS.startswith(b"(()=>{"))
+        aggregate = (
+            len(page)
+            + len(TARGET.CAMOUFLAGE_STYLE_CSS)
+            + len(TARGET.CAMOUFLAGE_APP_JS)
+        )
+        self.assertLess(aggregate, CONFIG.TREE_PREAMBLE_MAX_BYTES)
+        self.assertEqual(CONFIG.TREE_PREAMBLE_MAX_ASSETS, 2)
+
+        class ResponseRecorder:
+            def __init__(self):
+                self.headers = {}
+                self.wfile = io.BytesIO()
+
+            def send_response(self, _status):
+                pass
+
+            def send_header(self, name, value):
+                self.headers[name] = value
+
+            def end_headers(self):
+                pass
+
+        for body, content_type in (
+            (TARGET.CAMOUFLAGE_STYLE_CSS, "text/css"),
+            (TARGET.CAMOUFLAGE_APP_JS, "application/javascript"),
+        ):
+            response = ResponseRecorder()
+            TARGET.Handler.send_bytes(response, 200, body, content_type)
+            self.assertEqual(response.headers["Content-Length"], str(len(body)))
+            self.assertNotIn("Content-Encoding", response.headers)
 
     def test_sample_validation_accepts_expected_arm_evidence(self):
         one_connection = {
@@ -240,6 +665,19 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=91 protocol=h3\n",
             one_connection,
         )
+        for arm in (
+            "document-complete",
+            "tree-complete",
+            "tree-early-overlap",
+            "tree-overlap",
+        ):
+            SAMPLE.validate_sample(
+                arm,
+                "h3",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=12000 protocol=h3\n",
+                one_connection,
+            )
 
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
         two_connections = {
@@ -318,6 +756,83 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertTrue(pac_url.startswith(prefix))
         pac = base64.b64decode(pac_url.removeprefix(prefix)).decode()
         self.assertEqual(pac, CONTROLLER.proxy_pac_script(1080))
+
+    def test_suite_profile_roles_keep_test_alt_svc_out_of_naivefox(self):
+        path = os.path.join(HERE, "run-camouflage-suite.sh")
+        with open(path, encoding="utf-8") as stream:
+            runner = stream.read()
+
+        mapping_pref = "network.http.http3.alt-svc-mapping-for-testing"
+        force_pref = "network.http.http3.force-use-alt-svc-mapping-for-testing"
+        self.assertEqual(runner.count(f'user_pref("{mapping_pref}"'), 1)
+        self.assertEqual(runner.count(f'user_pref("{force_pref}"'), 1)
+        self.assertIn("case $participant in", runner)
+        self.assertIn('make_profile "$profile" "$protocol" reference', runner)
+        self.assertIn(
+            'make_profile "$naivefox_profile" "$protocol" naivefox', runner
+        )
+        self.assertIn(
+            'make_profile "$browser_profile" "$protocol" socks-browser '
+            '"$socks_port"',
+            runner,
+        )
+        self.assertIn("if [[ $direct_h3 == true ]]", runner)
+        self.assertIn(
+            'validate_profile_role "$destination" "$protocol" "$participant"',
+            runner,
+        )
+        self.assertIn("unexpectedly contains AlternateServices.bin", runner)
+        self.assertIn("is contaminated by a test Alt-Svc mapping", runner)
+
+    def test_suite_generates_role_isolated_h3_profiles(self):
+        runner_path = os.path.join(HERE, "run-camouflage-suite.sh")
+        with open(runner_path, encoding="utf-8") as stream:
+            runner = stream.read()
+        start = runner.index("validate_profile_role()")
+        end = runner.index("\nscenario_parameters()", start)
+        profile_functions = runner[start:end]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            trusted = os.path.join(temporary, "trusted")
+            os.mkdir(trusted)
+            with open(os.path.join(trusted, "prefs.js"), "w", encoding="utf-8"):
+                pass
+            reference = os.path.join(temporary, "reference")
+            naivefox = os.path.join(temporary, "naivefox")
+            socks = os.path.join(temporary, "socks")
+            variables = {
+                "browser_python": sys.executable,
+                "INTEGRATION_DIR": HERE,
+                "NAIVEFOX_FIXTURE_TRUSTED_PROFILE": trusted,
+                "NAIVEFOX_FIXTURE_PROXY_PORT": "4433",
+            }
+            setup = "\n".join(
+                f"{name}={shlex.quote(value)}" for name, value in variables.items()
+            )
+            script = "\n".join(
+                (
+                    "set -euo pipefail",
+                    setup,
+                    profile_functions,
+                    f"make_profile {shlex.quote(reference)} h3 reference",
+                    f"make_profile {shlex.quote(naivefox)} h3 naivefox",
+                    f"make_profile {shlex.quote(socks)} h3 socks-browser 1080",
+                )
+            )
+            subprocess.run(["bash"], input=script, text=True, check=True)
+
+            with open(os.path.join(reference, "user.js"), encoding="utf-8") as stream:
+                reference_prefs = stream.read()
+            with open(os.path.join(naivefox, "user.js"), encoding="utf-8") as stream:
+                naivefox_prefs = stream.read()
+            with open(os.path.join(socks, "user.js"), encoding="utf-8") as stream:
+                socks_prefs = stream.read()
+            mapping_pref = "network.http.http3.alt-svc-mapping-for-testing"
+            self.assertIn(mapping_pref, reference_prefs)
+            self.assertIn('network.http.http3.enable", true', naivefox_prefs)
+            self.assertNotIn(mapping_pref, naivefox_prefs)
+            self.assertNotIn(mapping_pref, socks_prefs)
+            self.assertIn('network.http.http3.enable", false', socks_prefs)
 
     def test_proxy_pac_sends_only_loopback_hosts_to_sample_socks(self):
         pac = CONTROLLER.proxy_pac_script(1080)
@@ -479,9 +994,11 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             members = (
                 ("firefox_a", "reference"),
                 ("firefox_b", "reference"),
-                ("naivefox", "off"),
                 ("naivefox", "gate"),
                 ("naivefox", "root"),
+                ("naivefox", "tree-complete"),
+                ("naivefox", "tree-early-overlap"),
+                ("naivefox", "tree-overlap"),
             )
             for index, (label, arm) in enumerate(members):
                 document = {
@@ -507,14 +1024,24 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     output=output,
                     expected_per_cohort=None,
                     expected_superblocks=1,
+                    expected_superblock_arms=(
+                        "gate,root,tree-complete,tree-early-overlap,tree-overlap"
+                    ),
                 )
             )
             with open(output, newline="", encoding="utf-8") as stream:
                 rows = list(csv.DictReader(stream))
-            self.assertEqual(len(rows), 5)
+            self.assertEqual(len(rows), 7)
             self.assertEqual(
                 {row["naivefox_arm"] for row in rows},
-                {"reference", "off", "gate", "root"},
+                {
+                    "reference",
+                    "gate",
+                    "root",
+                    "tree-complete",
+                    "tree-early-overlap",
+                    "tree-overlap",
+                },
             )
 
 

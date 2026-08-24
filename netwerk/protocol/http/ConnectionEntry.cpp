@@ -13,6 +13,8 @@
 
 #include "ConnectionEntry.h"
 #include "HttpConnectionUDP.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "NaiveFoxReuseLog.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/net/neqo_glue_ffi_generated.h"
 #include "nsHttpConnectionMgr.h"
@@ -65,12 +67,32 @@ bool ConnectionEntry::HasActiveH3Connection() const {
 }
 
 bool ConnectionEntry::AvailableForDispatchNow() {
-  if (mIdleConns.Length() && mIdleConns[0]->CanReuseLikely()) {
+  bool idleReusable = mIdleConns.Length() && mIdleConns[0]->CanReuseLikely();
+  if (idleReusable) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("entry.available ci=%p entry=%p idle=%zu active=%zu candidate=%p "
+           "candidate_kind=idle reusable=1 result=1",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mIdleConns.Length(),
+           mActiveConns.Length(), mIdleConns[0].get()));
+    }
+#endif
     return true;
   }
 
-  return gHttpHandler->ConnMgr()->GetH2orH3ActiveConn(this, false, false) !=
-         nullptr;
+  HttpConnectionBase* active =
+      gHttpHandler->ConnMgr()->GetH2orH3ActiveConn(this, false, false);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("entry.available ci=%p entry=%p idle=%zu active=%zu candidate=%p "
+         "candidate_kind=active reusable=%d result=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mIdleConns.Length(),
+         mActiveConns.Length(), active, active != nullptr, active != nullptr));
+  }
+#endif
+  return active != nullptr;
 }
 
 void ConnectionEntry::RemoveConnectionAttempt(ConnectionAttempt* sock,
@@ -429,10 +451,27 @@ already_AddRefed<nsHttpConnection> ConnectionEntry::GetIdleConnection(
 nsresult ConnectionEntry::RemoveActiveConnection(HttpConnectionBase* conn) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
-  if (!mActiveConns.RemoveElement(conn)) {
+  bool removed = mActiveConns.RemoveElement(conn);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("active.remove ci=%p entry=%p conn=%p removed=%d active_after=%zu "
+         "pending=%zu owner_before_release=%p",
+         NaiveFoxConnectionInfoId(mConnInfo), this, conn, removed,
+         mActiveConns.Length(), mPendingConns.Length(), conn->OwnerEntry()));
+  }
+#endif
+  if (!removed) {
     return NS_ERROR_UNEXPECTED;
   }
   conn->SetOwner(nullptr);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("owner.release ci=%p entry=%p conn=%p cause=remove-active owner=%p",
+         NaiveFoxConnectionInfoId(mConnInfo), this, conn, conn->OwnerEntry()));
+  }
+#endif
   gHttpHandler->ConnMgr()->DecrementActiveConnCount(conn);
 
   return NS_OK;
@@ -508,10 +547,22 @@ void ConnectionEntry::MakeConnectionPendingAndDontReuse(
 }
 
 void ConnectionEntry::MoveUnusableH3ConnsToPending() {
+#ifdef MOZ_NAIVEFOX
+  bool traceReuse = NAIVEFOX_REUSE_LOG_ENABLED();
+#endif
   // A WebTransport connection reports CanReuse()==false for its whole lifetime
   // (pooling is disabled while it carries a WebTransport session), so it must
   // not be treated as unusable and torn down here.
   if (mConnInfo->GetWebTransport()) {
+#ifdef MOZ_NAIVEFOX
+    if (traceReuse) {
+      NAIVEFOX_REUSE_LOG(
+          ("pending.scan ci=%p entry=%p active=%zu pending=%zu skipped=1 "
+           "reason=webtransport-entry",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mActiveConns.Length(),
+           mPendingConns.Length()));
+    }
+#endif
     return;
   }
 
@@ -521,7 +572,20 @@ void ConnectionEntry::MoveUnusableH3ConnsToPending() {
     // has connected and become unusable; a still-handshaking connection reports
     // CanReuse()==false too but must not be torn down here.
     RefPtr<HttpConnectionUDP> connUDP = do_QueryObject(mActiveConns[i]);
-    if (!connUDP || !connUDP->IsConnectedAndUnusable()) {
+    bool connectedAndUnusable =
+        connUDP && connUDP->IsConnectedAndUnusable();
+#ifdef MOZ_NAIVEFOX
+    if (traceReuse) {
+      NAIVEFOX_REUSE_LOG(
+          ("pending.evaluate ci=%p entry=%p candidate=%p index=%d active=%zu "
+           "pending=%zu is_h3=%d experienced=%d connected_unusable=%d",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mActiveConns[i].get(), i,
+           mActiveConns.Length(), mPendingConns.Length(), connUDP != nullptr,
+           connUDP ? connUDP->IsExperienced() : false,
+           connectedAndUnusable));
+    }
+#endif
+    if (!connectedAndUnusable) {
       continue;
     }
     RefPtr<HttpConnectionBase> conn = mActiveConns[i];
@@ -532,6 +596,15 @@ void ConnectionEntry::MoveUnusableH3ConnsToPending() {
     mActiveConns.RemoveElementAt(i);
     conn->SetOwner(nullptr);
     MakeConnectionPendingAndDontReuse(conn);
+#ifdef MOZ_NAIVEFOX
+    if (traceReuse) {
+      NAIVEFOX_REUSE_LOG(
+          ("pending.move ci=%p entry=%p candidate=%p active=%zu pending=%zu "
+           "moved=1",
+           NaiveFoxConnectionInfoId(mConnInfo), this, conn.get(),
+           mActiveConns.Length(), mPendingConns.Length()));
+    }
+#endif
   }
 }
 
@@ -569,6 +642,15 @@ void ConnectionEntry::VerifyTraffic() {
       } else if (connUDP &&
                  StaticPrefs::
                      network_http_move_to_pending_list_after_network_change()) {
+#ifdef MOZ_NAIVEFOX
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("verify-traffic.h3-move ci=%p entry=%p conn=%p "
+               "cause=network-change active_before=%zu pending_before=%zu",
+               NaiveFoxConnectionInfoId(mConnInfo), this, connUDP.get(),
+               mActiveConns.Length(), mPendingConns.Length()));
+        }
+#endif
         mActiveConns.RemoveElementAt(index);
         connUDP->SetOwner(nullptr);
         MakeConnectionPendingAndDontReuse(connUDP);
@@ -699,7 +781,18 @@ HttpConnectionBase* ConnectionEntry::GetH2orH3ActiveConn(bool aNoHttp2,
   // take a conn who can activate and is experienced
   for (uint32_t index = 0; index < activeLen; ++index) {
     HttpConnectionBase* tmp = mActiveConns[index];
-    if (tmp->CanDirectlyActivate()) {
+    bool canDirectlyActivate = tmp->CanDirectlyActivate();
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("candidate.evaluate ci=%p entry=%p candidate=%p index=%u "
+           "h2=%d h3=%d experienced=%d directly_activatable=%d",
+           NaiveFoxConnectionInfoId(mConnInfo), this, tmp, index,
+           tmp->UsingSpdy(), tmp->UsingHttp3(), tmp->IsExperienced(),
+           canDirectlyActivate));
+    }
+#endif
+    if (canDirectlyActivate) {
       if (tmp->IsExperienced()) {
         experienced = tmp;
         break;
@@ -737,8 +830,24 @@ HttpConnectionBase* ConnectionEntry::GetH2orH3ActiveConn(bool aNoHttp2,
          "entry\n",
          this, mConnInfo->HashKey().get(), experienced));
     if (!allowedToReturn(experienced, aNoHttp2, aNoHttp3)) {
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+        NAIVEFOX_REUSE_LOG(
+            ("candidate.reject ci=%p entry=%p candidate=%p reason=protocol-"
+             "disallowed no_h2=%d no_h3=%d",
+             NaiveFoxConnectionInfoId(mConnInfo), this, experienced, aNoHttp2,
+             aNoHttp3));
+      }
+#endif
       return nullptr;
     }
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("candidate.accept ci=%p entry=%p candidate=%p experienced=1",
+           NaiveFoxConnectionInfoId(mConnInfo), this, experienced));
+    }
+#endif
     return experienced;
   }
 
@@ -749,11 +858,35 @@ HttpConnectionBase* ConnectionEntry::GetH2orH3ActiveConn(bool aNoHttp2,
          "entry\n",
          this, mConnInfo->HashKey().get(), noExperience));
     if (!allowedToReturn(noExperience, aNoHttp2, aNoHttp3)) {
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+        NAIVEFOX_REUSE_LOG(
+            ("candidate.reject ci=%p entry=%p candidate=%p reason=protocol-"
+             "disallowed no_h2=%d no_h3=%d",
+             NaiveFoxConnectionInfoId(mConnInfo), this, noExperience, aNoHttp2,
+             aNoHttp3));
+      }
+#endif
       return nullptr;
     }
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("candidate.accept ci=%p entry=%p candidate=%p experienced=0",
+           NaiveFoxConnectionInfoId(mConnInfo), this, noExperience));
+    }
+#endif
     return noExperience;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("candidate.none ci=%p entry=%p active=%u no_h2=%d no_h3=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, activeLen, aNoHttp2,
+         aNoHttp3));
+  }
+#endif
   return nullptr;
 }
 
@@ -875,6 +1008,16 @@ void ConnectionEntry::MoveConnection(HttpConnectionBase* proxyConn,
   if (mActiveConns.RemoveElement(proxyConn)) {
     otherEnt->mActiveConns.AppendElement(proxyConn);
     proxyConn->SetOwner(otherEnt);
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("wildcard.result source_ci=%p target_ci=%p conn=%p success=1 "
+           "kind=active source_entry=%p target_entry=%p",
+           NaiveFoxConnectionInfoId(mConnInfo),
+           NaiveFoxConnectionInfoId(otherEnt->mConnInfo), proxyConn, this,
+           otherEnt));
+    }
+#endif
     return;
   }
 
@@ -882,9 +1025,29 @@ void ConnectionEntry::MoveConnection(HttpConnectionBase* proxyConn,
   if (proxyConnTCP) {
     if (mIdleConns.RemoveElement(proxyConnTCP)) {
       otherEnt->InsertIntoIdleConnections_internal(proxyConnTCP);
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+        NAIVEFOX_REUSE_LOG(
+            ("wildcard.result source_ci=%p target_ci=%p conn=%p success=1 "
+             "kind=idle source_entry=%p target_entry=%p",
+             NaiveFoxConnectionInfoId(mConnInfo),
+             NaiveFoxConnectionInfoId(otherEnt->mConnInfo), proxyConn, this,
+             otherEnt));
+      }
+#endif
       return;
     }
   }
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("wildcard.result source_ci=%p target_ci=%p conn=%p success=0 "
+         "kind=not-owned source_entry=%p target_entry=%p",
+         NaiveFoxConnectionInfoId(mConnInfo),
+         NaiveFoxConnectionInfoId(otherEnt->mConnInfo), proxyConn, this,
+         otherEnt));
+  }
+#endif
 }
 
 HttpRetParams ConnectionEntry::GetConnectionData() {

@@ -124,6 +124,37 @@ For H3, compare:
 - no established TCP fallback at the strict H3 endpoint;
 - padding negotiation and absence of synthetic markers.
 
+Same-base `run-h3-capture-comparison.sh --compare-arms` additionally audits
+document/tree preamble ordering against the browser-page root and resources.
+The experimental `tree-early-overlap` arm is opt-in and must be selected
+together with `tree-complete`.
+Use repeated `--compare-arm` options to restrict the candidate set. Its safe
+event table reports only method/status sequencing, connection/stream indices,
+packet positions, and observable response-header or stream-FIN overlap; raw
+headers, values, captures, and NSS keys remain private. For tree causal
+validation, a transient private GET-only extract compares selected root/CSS/JS
+request values and ordering between complete and overlap. For
+`tree-early-overlap`, a second private-only extract proves that the two asset
+`Content-Length` values also equal `tree-complete`; all values are deleted with
+the private capture directory. The safe summary retains only booleans:
+`tree_request_semantics_match=yes` for complete/overlap equality,
+`tree_early_overlap_request_semantics_match=yes` and
+`tree_early_overlap_asset_sizes_match=yes` for the experimental arm, and
+`tree_expected_request_semantics=yes` after the root has navigation/site-none
+semantics and CSS/JS have same-origin no-cors subresource semantics with
+referers exactly equal to the root URL computed from its private pseudo-header
+values.
+
+The browser-page fixture uses a 64 KiB stylesheet and a 128 KiB script, with
+the root document and both assets remaining below the configured 256 KiB tree
+budget. Direct Firefox, preamble traversal, and the inner browser load all use
+those same URLs and response bodies. This controlled size increase is intended
+to keep ordinary resource streams alive when `tree-overlap` or
+`tree-early-overlap` starts CONNECT on loopback; it is not tuned to reproduce
+any packet sequence. Neither the origin
+nor Caddy applies `Content-Encoding` to these fixture assets: adding gzip or
+zstd would invalidate the intended on-wire stream lifetime.
+
 Do not require equality for connection IDs, random values, GREASE values, or
 TLS extension order. NSS may independently randomize extension order. In quick
 mode, record version-dependent differences instead of presenting them as a
@@ -235,7 +266,8 @@ Run levels are:
 - `smoke`: ten samples per cohort and protocol; end-to-end validation only;
 - `standard`: sixty samples per cohort and protocol; preliminary statistics;
 - `research`: 240 samples per cohort and protocol; the only level that emits a
-  GREEN/YELLOW/RED research classification.
+  GREEN/YELLOW/RED research classification. This is a hard minimum: the runner
+  and non-screening analyzer reject a smaller research dataset.
 
 Gate and smoke results are always `INCONCLUSIVE`, regardless of their point
 estimate. Research policy currently treats a sufficiently narrow, validated
@@ -267,6 +299,74 @@ dataset per arm using the same two contemporaneous Firefox controls. In that
 mode `--samples-per-cohort` is the number of five-member blocks per protocol;
 it cannot be combined with `--naivefox-arm`.
 
+The default remains that bounded five-member design. A deliberate screening
+run may instead select arms with `--multi-arm-arms`; for the first preamble
+shape screen use
+`gate,root,tree-complete,tree-overlap` (`root` is document-complete). A causal
+follow-up may replace `gate` with the opt-in `tree-early-overlap` control while
+keeping the root, CSS, JavaScript, and asset sizes identical. Add
+`--multi-arm-views initial_packets_16,packets_17_32,initial_packets_32` to
+report both the cumulative early views and the non-overlapping 17--32 packet
+slice. `packets_17_32` contains only passive per-packet (and, for H2,
+per-record) sequence features from those positions; it does not repeat the
+handshake or first-16 aggregates. That creates randomized six-member blocks: the four
+selected modes are all paired against the same Firefox A/B controls. The
+analyzer emits every selected pair and its Holm family contains only the
+protocols and views in that report. This opt-in design is screening-only and
+cannot produce an absolute verdict.
+
+Each paired view also retains diagnostic-only top passive features and mean
+signed packet-size sequences. The sequence records the Firefox A/B mean
+absolute disagreement (the local noise floor) and each arm's mean delta from
+the matched Firefox midpoint. These aggregates help distinguish a reduced
+13--20 signal from a divergence merely shifted after packet 16. They never
+enter the arm distance, bootstrap, sign-flip tests, or Holm family, and contain
+no decrypted fields, HTTP semantics, stream identifiers, endpoints, or raw
+timestamps.
+
+Tree results collected before the decrypted H3 profile split are invalid.
+Those runs injected `network.http.http3.alt-svc-mapping-for-testing` into the
+NaiveFox process even though its outer H3 route was already explicit. The root
+GET could use the proxy connection while the resource GETs used the newly
+ready test mapping and a second QUIC connection. In particular, private
+capture `20260824T123959Z-725a1454` diagnoses harness contamination; it is not
+product evidence and must not be used in passive or decrypted conclusions.
+The direct same-base Firefox profile still needs the test mapping, while every
+NaiveFox arm profile must omit it.
+
+Controlled same-base screening must also exclude host network mutation as an
+experimental variable. WSL mirrored networking can project host VPN
+route/address churn into Linux, where Gecko correctly emits
+`network:link-status-changed`, runs `VerifyTraffic`, and marks an active H3
+session `DontReuse`. This is real Firefox network-change behavior, not a pool
+reuse defect and not something production code may suppress. Use
+`NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1` to run the complete localhost experiment
+inside a stable private Linux network namespace. Independently of that mode,
+the harness rejects every sample that observes a link/address/route mutation
+after its sample monitor starts. The monitor is active before NaiveFox startup
+or reference-browser startup, fails closed if its own process or netlink parser
+fails, and drains queued events before confirming the sample boundary closed.
+
+H3 packet-shape screening inside the private namespace also disables loopback
+GRO, GSO, TSO, UDP segmentation, and GSO-list aggregation. The harness rejects
+any proxy UDP frame whose captured UDP length exceeds 1500 bytes. Without this
+step, Linux can expose one host-side UDP GSO superframe as a 13--20 KiB
+"packet" even though it is segmented into ordinary QUIC datagrams before the
+wire. Private run `909bdbd9c1d68824` was collected before this invariant was
+added. Its arm rankings and packet-13--20 sequence are offload-contaminated and
+must not be cited as wire-level camouflage evidence.
+
+The first passive multi-arm attempt after that fix, private run
+`5f45fb110cc57517`, exposed the same contamination in a second harness entry
+point and was stopped after two samples. Its shell profile helper had inferred
+"direct H3 reference" from the absence of a SOCKS port, which also describes
+the private profile owned by the NaiveFox process. That entire run, including
+its gate sample, is invalid and must be discarded. Profile creation now
+requires an explicit `reference`, `naivefox`, or `socks-browser` role and
+fails before capture if a NaiveFox/SOCKS profile contains either forced test
+mapping preference or a pre-existing `AlternateServices.bin`. Only the direct
+H3 reference role may contain the mapping.
+
 The default reference is the pinned current-Nightly artifact already used by
 the quick capture diagnostics, so it is a version-drift experiment. For a
 same-base experiment, set `NAIVEFOX_CAPTURE_MODE=same-base` and the three
@@ -276,8 +376,38 @@ prerequisite.
 
 Successful single-arm runs leave only `metadata.txt`, `features.csv`,
 `metrics.json`, and `summary.txt` below the sanitized run directory. Multi-arm
-runs instead retain `metadata.txt`, `features-superblocks.csv`, and
-`arms/<arm>/{features.csv,metrics.json,summary.txt}`.
+runs instead retain `metadata.txt`, `features-superblocks.csv`,
+`arm-comparison.{json,txt}`, and
+`arms/<arm>/{features.csv,metrics.json,summary.txt}`. The paired arm report is a
+model-free, within-`experiment_block` relative ranking. For every protocol and
+passive feature view it measures bounded featurewise excess outside the common
+Firefox A/B envelope, with feature scales derived only from Firefox control
+disagreement. It reports workload-stratified paired-block bootstrap intervals,
+paired sign-flip tests, and a Holm family-wise correction across eligible
+comparisons. Arm labels are never classifier inputs and no arm-dependent
+feature screening is performed.
+
+Arm-specific classifier reports from a multi-arm run are explicitly
+screening-only, even when 240 blocks were collected in `research` mode. They
+retain descriptive metrics and refit uncertainty, but record
+`supports_absolute_verdict=false`; all classifications and the overall
+conclusion remain `INCONCLUSIVE`. Select a candidate with the paired report,
+then preregister it and collect a fresh single-arm confirmation such as
+`--mode research --naivefox-arm root`. Experimental
+`tree-complete`, `tree-early-overlap`, and `tree-overlap` single-arm runs remain
+screening-only, and
+the fixed default superblock deliberately excludes them to bound collection
+cost. Screening rows must not be reused as
+confirmatory evidence.
+
+This ranking is not an absolute camouflage verdict: the same Firefox A/B rows
+define the envelope, so there is no independent third Firefox null observation.
+Gate and smoke mode, fewer than 30 paired blocks per protocol, or any workload
+with only one block are explicitly insufficient for paired inference. The
+distance also gives equal weight to correlated engineered features and its
+bootstrap intervals are conditional on the observed Firefox-only scales. These
+limitations are recorded in both paired output files rather than left as an
+interpretation convention.
 Metadata includes platform, kernel, architecture, browser/product versions,
 build identifiers, library hashes, capture-tool version, revision, mode, and
 seed, making artifacts suitable for later regression history.
@@ -287,9 +417,10 @@ to its Firefox baseline; smoke samples cannot support a camouflage conclusion;
 current-Nightly differences may be version drift; platform fingerprints must
 not be mixed; optional `tc netem`, persistent-profile and long-idle studies,
 cross-version analytics and no-padding A/B remain separate research
-extensions. Multi-arm superblocks provide the collection design, but only a
-research-sized run can support a camouflage conclusion. The suite selects
-explicit runtime configuration but never mutates production defaults.
+extensions. Multi-arm superblocks provide the screening collection design but
+cannot support an absolute camouflage conclusion; that requires a fresh,
+preregistered single-arm research run. The suite selects explicit runtime
+configuration but never mutates production defaults.
 
 ## Sensitive data handling
 

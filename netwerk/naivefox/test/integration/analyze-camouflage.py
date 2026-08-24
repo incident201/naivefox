@@ -9,6 +9,8 @@ import random
 import statistics
 
 SCHEMA_VERSION = 1
+MIN_RESEARCH_SAMPLES_PER_COHORT = 240
+COHORT_LABELS = ("firefox_a", "firefox_b", "naivefox")
 REQUIRED_METADATA_FIELDS = {
     "schema_version",
     "protocol",
@@ -35,20 +37,28 @@ FORBIDDEN_FEATURE_TERMS = (
     "cohort",
     "credential",
     "destination_port",
+    "decrypted",
     "experiment_block",
     "filename",
+    "header",
     "label",
+    "method",
+    "naivefox_arm",
     "password",
     "path",
+    "plaintext",
     "process_duration",
     "profile",
     "query",
     "session_id",
     "source_port",
+    "status",
+    "stream_id",
 )
 VIEWS = (
     "whole",
     "initial_packets_16",
+    "packets_17_32",
     "initial_packets_32",
     "initial_packets_64",
     "initial_packets_128",
@@ -148,11 +158,20 @@ def load_dataset(path):
             if source["label"] not in {"firefox_a", "firefox_b", "naivefox"}:
                 raise SystemExit("invalid label metadata")
             arm = source.get("naivefox_arm") or None
-            if arm not in {None, "reference", "off", "gate", "root"}:
+            naivefox_arms = {
+                "off",
+                "gate",
+                "root",
+                "document-complete",
+                "tree-complete",
+                "tree-early-overlap",
+                "tree-overlap",
+            }
+            if arm not in {None, "reference", *naivefox_arms}:
                 raise SystemExit("invalid NaiveFox arm metadata")
             if arm == "reference" and source["label"] == "naivefox":
                 raise SystemExit("NaiveFox row cannot use reference arm metadata")
-            if arm in {"off", "gate", "root"} and source["label"] != "naivefox":
+            if arm in naivefox_arms and source["label"] != "naivefox":
                 raise SystemExit("Firefox row cannot use NaiveFox arm metadata")
             values = {}
             for name in feature_names:
@@ -247,6 +266,22 @@ def view_feature_names(all_names, view):
     )
     if view == "whole":
         return list(all_names)
+    if view == "packets_17_32":
+        selected = []
+        for name in all_names:
+            if name.startswith("packet_"):
+                try:
+                    index = int(name.split("_", 2)[1])
+                except (IndexError, ValueError):
+                    continue
+                if 17 <= index <= 32:
+                    selected.append(name)
+            elif name.startswith("tls_record_"):
+                parts = name.split("_")
+                if len(parts) > 2 and parts[2].isdigit():
+                    if 17 <= int(parts[2]) <= 32:
+                        selected.append(name)
+        return selected
     if view.startswith("initial_packets_"):
         count = int(view.rsplit("_", 1)[1])
         selected = []
@@ -1070,11 +1105,72 @@ def passive_handshake_differences(rows, feature_names):
     }
 
 
+def absolute_inference_status(rows, mode, screening_only=False):
+    protocol_samples = {}
+    for protocol in sorted({row["protocol"] for row in rows}):
+        protocol_rows = [row for row in rows if row["protocol"] == protocol]
+        protocol_samples[protocol] = {
+            label: len({
+                analysis_group(row)
+                for row in protocol_rows
+                if row["label"] == label
+            })
+            for label in COHORT_LABELS
+        }
+    research_shortfalls = []
+    for protocol, samples in protocol_samples.items():
+        for label, count in samples.items():
+            if count < MIN_RESEARCH_SAMPLES_PER_COHORT:
+                research_shortfalls.append({
+                    "protocol": protocol,
+                    "cohort": label,
+                    "samples": count,
+                    "minimum": MIN_RESEARCH_SAMPLES_PER_COHORT,
+                })
+    research_samples_sufficient = bool(protocol_samples) and not research_shortfalls
+    reasons = []
+    if screening_only:
+        reasons.append(
+            "multi-arm screening analysis cannot emit an absolute verdict"
+        )
+    if mode != "research":
+        reasons.append(f"{mode} mode is non-inferential")
+    elif not research_samples_sufficient:
+        reasons.append(
+            "research mode requires at least "
+            f"{MIN_RESEARCH_SAMPLES_PER_COHORT} samples in every cohort and protocol"
+        )
+    supports_absolute_verdict = (
+        mode == "research" and not screening_only and research_samples_sufficient
+    )
+    return {
+        "status": (
+            "RESEARCH_VERDICT_ENABLED"
+            if supports_absolute_verdict
+            else "INCONCLUSIVE"
+        ),
+        "supports_absolute_verdict": supports_absolute_verdict,
+        "screening_only": bool(screening_only),
+        "minimum_research_samples_per_cohort": MIN_RESEARCH_SAMPLES_PER_COHORT,
+        "protocol_samples": protocol_samples,
+        "research_samples_sufficient": research_samples_sufficient,
+        "research_sample_shortfalls": research_shortfalls,
+        "reasons": reasons,
+    }
+
+
 def build_report(args, rows, all_feature_names):
+    inference = absolute_inference_status(
+        rows, args.mode, getattr(args, "screening_only", False)
+    )
+    verdict_mode = (
+        "research" if inference["supports_absolute_verdict"] else "standard"
+    )
     report = {
         "schema_version": SCHEMA_VERSION,
         "mode": args.mode,
         "seed": args.seed,
+        "inference": inference,
         "methodology": {
             "classifier": "dependency-free L2 logistic regression",
             "split": (
@@ -1166,7 +1262,7 @@ def build_report(args, rows, all_feature_names):
             view_report["classification"] = classify(
                 view_report["firefox_vs_naivefox"],
                 view_report["firefox_baseline"],
-                args.mode,
+                verdict_mode,
             )
             if view_report["firefox_baseline"].get("available") and view_report[
                 "firefox_vs_naivefox"
@@ -1205,7 +1301,7 @@ def build_report(args, rows, all_feature_names):
             workload_report["classification"] = classify(
                 workload_report["firefox_vs_naivefox"],
                 workload_report["firefox_baseline"],
-                args.mode,
+                verdict_mode,
             )
             protocol_report["workloads"][scenario] = workload_report
         report["protocols"][protocol] = protocol_report
@@ -1216,9 +1312,9 @@ def build_report(args, rows, all_feature_names):
             classification = protocol_report["views"][view]["classification"]
             red.append(classification == "red")
             green.append(classification == "green")
-    if args.mode == "research" and any(red):
+    if inference["supports_absolute_verdict"] and any(red):
         conclusion = "YES"
-    elif args.mode == "research" and green and all(green):
+    elif inference["supports_absolute_verdict"] and green and all(green):
         conclusion = "NO_SIGNAL_FOUND"
     else:
         conclusion = "INCONCLUSIVE"
@@ -1248,15 +1344,21 @@ def format_metric(result):
 
 
 def write_summary(path, report):
+    inference = report["inference"]
     lines = [
         "NaiveFox passive camouflage experiment",
         f"mode={report['mode']} seed={report['seed']}",
+        f"inference_status={inference['status']}",
+        "absolute_verdict_enabled="
+        + str(inference["supports_absolute_verdict"]).lower(),
         (
             "Interpretation: selected classifiers attempt to distinguish cohorts using "
             "externally observable wire features."
         ),
-        "",
     ]
+    for reason in inference["reasons"]:
+        lines.append(f"inconclusive: {reason}")
+    lines.append("")
     for protocol, data in report["protocols"].items():
         lines.append(protocol.upper())
         lines.append(
@@ -1266,6 +1368,7 @@ def write_summary(path, report):
         for view in (
             "whole",
             "initial_packets_16",
+            "packets_17_32",
             "initial_packets_32",
             "initial_packets_64",
             "initial_time_250ms",
@@ -1328,12 +1431,24 @@ def main():
     parser.add_argument("--max-features", type=int, default=64)
     parser.add_argument("--l2", type=float, default=0.05)
     parser.add_argument("--iterations", type=int, default=180)
+    parser.add_argument(
+        "--screening-only",
+        action="store_true",
+        help="disable absolute verdicts for multi-arm candidate screening",
+    )
     args = parser.parse_args()
     if args.bootstrap < 100:
         raise SystemExit("bootstrap iterations must be at least 100")
     if args.refit_bootstrap not in (0,) and args.refit_bootstrap < 20:
         raise SystemExit("refit bootstrap iterations must be zero or at least 20")
     rows, feature_names = load_dataset(args.features)
+    inference = absolute_inference_status(rows, args.mode, args.screening_only)
+    if (
+        args.mode == "research"
+        and not args.screening_only
+        and not inference["research_samples_sufficient"]
+    ):
+        raise SystemExit("; ".join(inference["reasons"]))
     report = build_report(args, rows, feature_names)
     with open(args.output_json, "w", encoding="utf-8") as stream:
         json.dump(report, stream, indent=2, sort_keys=True)

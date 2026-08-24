@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "NeckoTunnel.h"
 #include "SocksServer.h"
 #include "TunnelSession.h"
 #include "gtest/gtest.h"
@@ -63,12 +64,95 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Off, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Off, false));
 
-  // A leader (or every ungated tunnel) runs the single root request. Queued
+  // A leader (or every ungated tunnel) runs the configured operation. Queued
   // and warm gate participants both reach this decision as non-leaders.
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Root, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Root, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Tree, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Tree, false));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentComplete, true));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeComplete, true));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeOverlap, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::TreeOverlap, false));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeEarlyOverlap, true));
+  EXPECT_FALSE(
+      detail::ShouldRunPreamble(PreambleMode::TreeEarlyOverlap, false));
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
+{
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,
+                                              false, 0, 0, 0, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,
+                                             true, 0, 0, 0, 0));
+
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
+                                              2, 0, 2, 1));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
+                                             2, 0, 2, 2));
+
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeOverlap, true,
+                                              2, 1, 1, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeOverlap, true, 2,
+                                             0, 2, 2));
+
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
+                                              false, 2, 1, 1, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
+                                              true, 0, 0, 0, 0));
+  // A failed or completed asset without response headers is not admission.
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
+                                              true, 2, 0, 2, 2));
+  // Response headers are insufficient once that same asset has completed.
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
+                                              true, 2, 1, 2, 2));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
+                                             true, 2, 1, 1, 0));
+
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeEarlyOverlap));
+  EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
+{
+  struct TerminalState {
+    const char* mDescription;
+    bool mRootDone;
+    uint32_t mAssetCount;
+    uint32_t mAssetsWithHeadersNotDone;
+    uint32_t mAssetsWithHeadersOrDone;
+    uint32_t mAssetsDone;
+  };
+  static constexpr TerminalState kTerminalStates[] = {
+      {"zero assets", true, 0, 0, 0, 0},
+      {"assets finished before root", true, 2, 0, 2, 2},
+      {"root failure without assets", true, 0, 0, 0, 0},
+  };
+
+  for (const auto& state : kTerminalStates) {
+    const bool barrierFired = detail::PreambleBarrierReached(
+        PreambleMode::TreeEarlyOverlap, state.mRootDone, state.mAssetCount,
+        state.mAssetsWithHeadersNotDone, state.mAssetsWithHeadersOrDone,
+        state.mAssetsDone);
+    EXPECT_FALSE(barrierFired) << state.mDescription;
+    EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
+        PreambleMode::TreeEarlyOverlap, barrierFired))
+        << state.mDescription;
+  }
+
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeEarlyOverlap, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeOverlap, false));
+
+  detail::PreambleSequenceState sequence;
+  constexpr uint64_t generation = 17;
+  EXPECT_TRUE(sequence.Begin(generation, ProxyProtocol::H2));
+  EXPECT_TRUE(sequence.Complete(generation, ProxyProtocol::H2));
+  EXPECT_FALSE(sequence.Complete(generation, ProxyProtocol::H2));
+  EXPECT_TRUE(sequence.TryStartConnect(generation));
+  EXPECT_FALSE(sequence.TryStartConnect(generation));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, LatePreambleCallbackCannotDoubleOpen)

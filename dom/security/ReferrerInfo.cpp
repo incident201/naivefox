@@ -4,36 +4,44 @@
 
 #include "ReferrerInfo.h"
 
-#include "ipc/IPCMessageUtilsSpecializations.h"
-#include "mozilla/BasePrincipal.h"
-#include "mozilla/ContentBlockingAllowList.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/StorageAccess.h"
-#include "mozilla/StyleSheet.h"
-#include "mozilla/dom/Document.h"
-#include "mozilla/dom/Element.h"
-#include "mozilla/dom/FetchIPCTypes.h"
-#include "mozilla/dom/ReferrerPolicyBinding.h"
+#ifdef MOZ_NAIVEFOX
+#  include "ReferrerPolicyBinding.h"
+#else
+#  include "mozilla/dom/ReferrerPolicyBinding.h"
+#endif
 #include "mozilla/dom/RequestBinding.h"
-#include "mozilla/glean/DomSecurityMetrics.h"
-#include "mozilla/ipc/URIUtils.h"
-#include "mozilla/net/CookieJarSettings.h"
 #include "mozilla/net/HttpBaseChannel.h"
 #include "nsCharSeparatedTokenizer.h"
-#include "nsContentUtils.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsIHttpChannel.h"
+#include "nsIHttpChannelInternal.h"
 #include "nsIOService.h"
-#include "nsIObjectInputStream.h"
-#include "nsIObjectOutputStream.h"
-#include "nsIPipe.h"
 #include "nsIURL.h"
-#include "nsIWebProgressListener.h"
 #include "nsNetUtil.h"
-#include "nsScriptSecurityManager.h"
-#include "nsStreamUtils.h"
+
+#ifndef MOZ_NAIVEFOX
+#  include "ipc/IPCMessageUtilsSpecializations.h"
+#  include "mozilla/BasePrincipal.h"
+#  include "mozilla/ContentBlockingAllowList.h"
+#  include "mozilla/StorageAccess.h"
+#  include "mozilla/StyleSheet.h"
+#  include "mozilla/dom/Document.h"
+#  include "mozilla/dom/Element.h"
+#  include "mozilla/dom/FetchIPCTypes.h"
+#  include "mozilla/glean/DomSecurityMetrics.h"
+#  include "mozilla/ipc/URIUtils.h"
+#  include "mozilla/net/CookieJarSettings.h"
+#  include "nsContentUtils.h"
+#  include "nsIObjectInputStream.h"
+#  include "nsIObjectOutputStream.h"
+#  include "nsIPipe.h"
+#  include "nsIWebProgressListener.h"
+#  include "nsScriptSecurityManager.h"
+#  include "nsStreamUtils.h"
+#endif
 
 static mozilla::LazyLogModule gReferrerInfoLog("ReferrerInfo");
 #define LOG(msg) MOZ_LOG(gReferrerInfoLog, mozilla::LogLevel::Debug, msg)
@@ -131,8 +139,29 @@ ReferrerPolicy ReferrerPolicyFromToken(const nsAString& aContent,
   }
 
   // Return no referrer policy (empty string) if it's not a valid enum value.
+#ifdef MOZ_NAIVEFOX
+  static constexpr LegacyReferrerPolicyTokenMap kPolicies[] = {
+      {"no-referrer", ReferrerPolicy::No_referrer},
+      {"no-referrer-when-downgrade",
+       ReferrerPolicy::No_referrer_when_downgrade},
+      {"origin", ReferrerPolicy::Origin},
+      {"origin-when-cross-origin", ReferrerPolicy::Origin_when_cross_origin},
+      {"unsafe-url", ReferrerPolicy::Unsafe_url},
+      {"same-origin", ReferrerPolicy::Same_origin},
+      {"strict-origin", ReferrerPolicy::Strict_origin},
+      {"strict-origin-when-cross-origin",
+       ReferrerPolicy::Strict_origin_when_cross_origin},
+  };
+  for (const auto& candidate : kPolicies) {
+    if (lowerContent.EqualsASCII(candidate.mToken)) {
+      return candidate.mPolicy;
+    }
+  }
+  return ReferrerPolicy::_empty;
+#else
   return StringToEnum<ReferrerPolicy>(lowerContent)
       .valueOr(ReferrerPolicy::_empty);
+#endif
 }
 
 // static
@@ -212,6 +241,13 @@ uint32_t ReferrerInfo::GetUserXOriginTrimmingPolicy() {
 ReferrerPolicy ReferrerInfo::GetDefaultReferrerPolicy(nsIHttpChannel* aChannel,
                                                       nsIURI* aURI,
                                                       bool aPrivateBrowsing) {
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox has no cookie jar or content-blocking subsystem.  Preamble
+  // channels are first-party loads, so retain Firefox's first-party policy
+  // preference without manufacturing tracker state.
+  return DefaultReferrerPolicyToReferrerPolicy(
+      GetDefaultFirstPartyReferrerPolicyPref(aPrivateBrowsing));
+#else
   bool thirdPartyTrackerIsolated = false;
   if (aChannel && aURI) {
     nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
@@ -253,6 +289,7 @@ ReferrerPolicy ReferrerInfo::GetDefaultReferrerPolicy(nsIHttpChannel* aChannel,
       thirdPartyTrackerIsolated
           ? GetDefaultThirdPartyReferrerPolicyPref(aPrivateBrowsing)
           : GetDefaultFirstPartyReferrerPolicyPref(aPrivateBrowsing));
+#endif
 }
 
 /* static */
@@ -484,6 +521,25 @@ nsresult ReferrerInfo::HandleUserReferrerSendingPolicy(nsIHttpChannel* aChannel,
 
 /* static */
 bool ReferrerInfo::IsCrossOriginRequest(nsIHttpChannel* aChannel) {
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aChannel);
+  nsCOMPtr<nsIURI> source;
+  if (internal) {
+    (void)internal->GetDocumentURI(getter_AddRefs(source));
+  }
+  if (!source) {
+    nsCOMPtr<nsIReferrerInfo> referrerInfo = aChannel->GetReferrerInfo();
+    if (referrerInfo) {
+      (void)referrerInfo->GetOriginalReferrer(getter_AddRefs(source));
+    }
+  }
+  nsCOMPtr<nsIURI> target;
+  if (!source || NS_FAILED(aChannel->GetURI(getter_AddRefs(target))) ||
+      !target) {
+    return true;
+  }
+  return !NS_SecurityCompareURIs(source, target, true);
+#else
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
 
   if (!loadInfo->TriggeringPrincipal()->GetIsContentPrincipal()) {
@@ -504,11 +560,19 @@ bool ReferrerInfo::IsCrossOriginRequest(nsIHttpChannel* aChannel) {
   }
 
   return !loadInfo->TriggeringPrincipal()->IsSameOrigin(uri);
+#endif
 }
 
 /* static */
 bool ReferrerInfo::IsReferrerCrossOrigin(nsIHttpChannel* aChannel,
                                          nsIURI* aReferrer) {
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIURI> uri;
+  if (!aReferrer || NS_FAILED(aChannel->GetURI(getter_AddRefs(uri))) || !uri) {
+    return true;
+  }
+  return !NS_SecurityCompareURIs(uri, aReferrer, true);
+#else
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
 
   if (!loadInfo->TriggeringPrincipal()->GetIsContentPrincipal()) {
@@ -523,10 +587,17 @@ bool ReferrerInfo::IsReferrerCrossOrigin(nsIHttpChannel* aChannel,
   }
 
   return !nsScriptSecurityManager::SecurityCompareURIs(uri, aReferrer);
+#endif
 }
 
 /* static */
 bool ReferrerInfo::IsCrossSiteRequest(nsIHttpChannel* aChannel) {
+#ifdef MOZ_NAIVEFOX
+  // Preamble resources only need the first-party same-origin path. Treat a
+  // different origin conservatively as cross-site without manufacturing a
+  // content principal merely to access its eTLD helpers.
+  return IsCrossOriginRequest(aChannel);
+#else
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
 
   if (!loadInfo->TriggeringPrincipal()->GetIsContentPrincipal()) {
@@ -553,6 +624,7 @@ bool ReferrerInfo::IsCrossSiteRequest(nsIHttpChannel* aChannel) {
   }
 
   return isCrossSite;
+#endif
 }
 
 ReferrerInfo::TrimmingPolicy ReferrerInfo::ComputeTrimmingPolicy(
@@ -716,6 +788,12 @@ nsresult ReferrerInfo::TrimReferrerWithPolicy(nsIURI* aReferrer,
 
 bool ReferrerInfo::ShouldIgnoreLessRestrictedPolicies(
     nsIHttpChannel* aChannel, const ReferrerPolicyEnum aPolicy) const {
+#ifdef MOZ_NAIVEFOX
+  // NaiveFox has no ETP/content-blocking state. The server-provided policy is
+  // therefore used as-is, while an empty policy still falls through to the
+  // normal first-party default preference in ComputeReferrer().
+  return false;
+#else
   MOZ_ASSERT(aChannel);
 
   // We only care about the less restricted policies.
@@ -810,11 +888,16 @@ bool ReferrerInfo::ShouldIgnoreLessRestrictedPolicies(
   }
 
   return isCrossSite;
+#endif
 }
 
 void ReferrerInfo::LogMessageToConsole(
     nsIHttpChannel* aChannel, const char* aMsg,
     const nsTArray<nsString>& aParams) const {
+#ifdef MOZ_NAIVEFOX
+  // The lean executable has no window/console plumbing.
+  return;
+#else
   MOZ_ASSERT(aChannel);
 
   nsCOMPtr<nsIURI> uri;
@@ -853,6 +936,7 @@ void ReferrerInfo::LogMessageToConsole(
       localizedMsg, nsIScriptError::infoFlag, "Security"_ns, windowID,
       SourceLocation(std::move(uri)));
   (void)NS_WARN_IF(NS_FAILED(rv));
+#endif
 }
 
 ReferrerPolicy ReferrerPolicyIDLToReferrerPolicy(
@@ -941,22 +1025,28 @@ ReferrerInfo::ReferrerInfo()
 
 ReferrerInfo::ReferrerInfo(const Document& aDoc, const bool aSendReferrer)
     : ReferrerInfo() {
+#ifndef MOZ_NAIVEFOX
   InitWithDocument(&aDoc);
   mSendReferrer = aSendReferrer;
+#endif
 }
 
 ReferrerInfo::ReferrerInfo(const Element& aElement) : ReferrerInfo() {
+#ifndef MOZ_NAIVEFOX
   InitWithElement(&aElement);
+#endif
 }
 
 ReferrerInfo::ReferrerInfo(const Element& aElement,
                            ReferrerPolicyEnum aOverridePolicy)
     : ReferrerInfo(aElement) {
+#ifndef MOZ_NAIVEFOX
   // Override referrer policy if not empty
   if (aOverridePolicy != ReferrerPolicyEnum::_empty) {
     mPolicy = aOverridePolicy;
     mOriginalPolicy = aOverridePolicy;
   }
+#endif
 }
 
 ReferrerInfo::ReferrerInfo(nsIURI* aOriginalReferrer,
@@ -980,6 +1070,9 @@ ReferrerInfo::ReferrerInfo(const ReferrerInfo& rhs)
       mComputedReferrer(rhs.mComputedReferrer) {}
 
 void ReferrerInfo::Serialize(IPC::MessageWriter* aWriter) const {
+#ifdef MOZ_NAIVEFOX
+  MOZ_CRASH("ReferrerInfo IPC serialization is unavailable in NaiveFox");
+#else
   MOZ_ASSERT(mInitialized);
   nsCOMPtr<nsIURI> originalReferrer = mOriginalReferrer;
   WriteParam(aWriter, originalReferrer.get());
@@ -988,11 +1081,15 @@ void ReferrerInfo::Serialize(IPC::MessageWriter* aWriter) const {
   WriteParam(aWriter, mSendReferrer);
   WriteParam(aWriter, mOverridePolicyByDefault);
   WriteParam(aWriter, mComputedReferrer);
+#endif
 }
 
 // static
 bool ReferrerInfo::Deserialize(IPC::MessageReader* aReader,
                                RefPtr<nsIReferrerInfo>* aResult) {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   RefPtr<nsIURI> originalReferrer;
   if (!ReadParam(aReader, &originalReferrer)) {
     return false;
@@ -1033,6 +1130,7 @@ bool ReferrerInfo::Deserialize(IPC::MessageReader* aReader,
   info->mComputedReferrer = std::move(computedReferrer);
   *aResult = info.forget();
   return true;
+#endif
 }
 
 already_AddRefed<ReferrerInfo> ReferrerInfo::Clone() const {
@@ -1071,7 +1169,39 @@ ReferrerInfo::GetReferrerPolicy(
 
 NS_IMETHODIMP
 ReferrerInfo::GetReferrerPolicyString(nsACString& aResult) {
+#ifdef MOZ_NAIVEFOX
+  switch (mPolicy) {
+    case ReferrerPolicy::No_referrer:
+      aResult.AssignLiteral("no-referrer");
+      break;
+    case ReferrerPolicy::No_referrer_when_downgrade:
+      aResult.AssignLiteral("no-referrer-when-downgrade");
+      break;
+    case ReferrerPolicy::Origin:
+      aResult.AssignLiteral("origin");
+      break;
+    case ReferrerPolicy::Origin_when_cross_origin:
+      aResult.AssignLiteral("origin-when-cross-origin");
+      break;
+    case ReferrerPolicy::Unsafe_url:
+      aResult.AssignLiteral("unsafe-url");
+      break;
+    case ReferrerPolicy::Same_origin:
+      aResult.AssignLiteral("same-origin");
+      break;
+    case ReferrerPolicy::Strict_origin:
+      aResult.AssignLiteral("strict-origin");
+      break;
+    case ReferrerPolicy::Strict_origin_when_cross_origin:
+      aResult.AssignLiteral("strict-origin-when-cross-origin");
+      break;
+    case ReferrerPolicy::_empty:
+      aResult.Truncate();
+      break;
+  }
+#else
   aResult.AssignASCII(GetEnumString(mPolicy));
+#endif
   return NS_OK;
 }
 
@@ -1172,6 +1302,9 @@ ReferrerInfo::Init(nsIReferrerInfo::ReferrerPolicyIDL aReferrerPolicy,
 
 NS_IMETHODIMP
 ReferrerInfo::InitWithDocument(const Document* aDocument) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_ASSERT(!mInitialized);
   if (mInitialized) {
     return NS_ERROR_ALREADY_INITIALIZED;
@@ -1183,6 +1316,7 @@ ReferrerInfo::InitWithDocument(const Document* aDocument) {
   mOriginalReferrer = aDocument->GetDocumentURIAsReferrer();
   mInitialized = true;
   return NS_OK;
+#endif
 }
 
 /**
@@ -1191,6 +1325,7 @@ ReferrerInfo::InitWithDocument(const Document* aDocument) {
  * Currently, referrerpolicy attribute is supported in a, area, img, iframe,
  * script, or link element.
  */
+#ifndef MOZ_NAIVEFOX
 static ReferrerPolicy ReferrerPolicyFromAttribute(const Element& aElement) {
   if (!aElement.IsAnyOfHTMLElements(nsGkAtoms::a, nsGkAtoms::area,
                                     nsGkAtoms::script, nsGkAtoms::iframe,
@@ -1199,9 +1334,13 @@ static ReferrerPolicy ReferrerPolicyFromAttribute(const Element& aElement) {
   }
   return aElement.GetReferrerPolicyAsEnum();
 }
+#endif
 
 NS_IMETHODIMP
 ReferrerInfo::InitWithElement(const Element* aElement) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_ASSERT(!mInitialized);
   if (mInitialized) {
     return NS_ERROR_ALREADY_INITIALIZED;
@@ -1222,12 +1361,16 @@ ReferrerInfo::InitWithElement(const Element* aElement) {
 
   mInitialized = true;
   return NS_OK;
+#endif
 }
 
 /* static */
 already_AddRefed<nsIReferrerInfo>
 ReferrerInfo::CreateFromDocumentAndPolicyOverride(
     Document* aDoc, ReferrerPolicyEnum aPolicyOverride) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   MOZ_ASSERT(aDoc);
   ReferrerPolicyEnum policy = aPolicyOverride != ReferrerPolicy::_empty
                                   ? aPolicyOverride
@@ -1235,11 +1378,15 @@ ReferrerInfo::CreateFromDocumentAndPolicyOverride(
   nsCOMPtr<nsIReferrerInfo> referrerInfo =
       new ReferrerInfo(aDoc->GetDocumentURIAsReferrer(), policy);
   return referrerInfo.forget();
+#endif
 }
 
 /* static */
 already_AddRefed<nsIReferrerInfo> ReferrerInfo::CreateForFetch(
     nsIPrincipal* aPrincipal, Document* aDoc) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   MOZ_ASSERT(aPrincipal);
 
   nsCOMPtr<nsIReferrerInfo> referrerInfo;
@@ -1277,12 +1424,16 @@ already_AddRefed<nsIReferrerInfo> ReferrerInfo::CreateForFetch(
   aPrincipal->CreateReferrerInfo(aDoc->GetReferrerPolicy(),
                                  getter_AddRefs(referrerInfo));
   return referrerInfo.forget();
+#endif
 }
 
 /* static */
 already_AddRefed<nsIReferrerInfo> ReferrerInfo::CreateForExternalCSSResources(
     mozilla::StyleSheet* aExternalSheet, nsIURI* aExternalSheetURI,
     ReferrerPolicyEnum aPolicy) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   MOZ_ASSERT(aExternalSheet);
   MOZ_ASSERT(aExternalSheetURI);
   // Step 2
@@ -1292,14 +1443,19 @@ already_AddRefed<nsIReferrerInfo> ReferrerInfo::CreateForExternalCSSResources(
   nsCOMPtr<nsIReferrerInfo> referrerInfo =
       new ReferrerInfo(aExternalSheetURI, aPolicy);
   return referrerInfo.forget();
+#endif
 }
 
 /* static */
 already_AddRefed<nsIReferrerInfo>
 ReferrerInfo::CreateForInternalCSSAndSVGResources(Document* aDocument) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   MOZ_ASSERT(aDocument);
   return do_AddRef(new ReferrerInfo(aDocument->GetDocumentURI(),
                                     aDocument->GetReferrerPolicy()));
+#endif
 }
 
 nsresult ReferrerInfo::ComputeReferrer(nsIHttpChannel* aChannel) {
@@ -1478,6 +1634,9 @@ nsresult ReferrerInfo::ComputeReferrer(nsIHttpChannel* aChannel) {
 
 nsresult ReferrerInfo::ReadTailDataBeforeGecko100(
     const uint32_t& aData, nsIObjectInputStream* aInputStream) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_ASSERT(aInputStream);
 
   nsCOMPtr<nsIInputStream> reader;
@@ -1566,10 +1725,14 @@ nsresult ReferrerInfo::ReadTailDataBeforeGecko100(
   }
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 ReferrerInfo::Read(nsIObjectInputStream* aStream) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   bool nonNull;
   nsresult rv = aStream->ReadBoolean(&nonNull);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -1654,10 +1817,14 @@ ReferrerInfo::Read(nsIObjectInputStream* aStream) {
   }
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 ReferrerInfo::Write(nsIObjectOutputStream* aStream) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   bool nonNull = (mOriginalReferrer != nullptr);
   nsresult rv = aStream->WriteBoolean(nonNull);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -1715,6 +1882,7 @@ ReferrerInfo::Write(nsIObjectOutputStream* aStream) {
     return rv;
   }
   return NS_OK;
+#endif
 }
 
 }  // namespace mozilla::dom

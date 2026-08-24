@@ -548,10 +548,16 @@ class JsonParser final {
         MOZ_TRY(ParseString(mode, "preamble mode must be a string"));
         if (mode.EqualsLiteral("off")) {
           aPreamble.mMode = PreambleMode::Off;
-        } else if (mode.EqualsLiteral("root")) {
-          aPreamble.mMode = PreambleMode::Root;
-        } else if (mode.EqualsLiteral("tree")) {
-          aPreamble.mMode = PreambleMode::Tree;
+        } else if (mode.EqualsLiteral("document-complete") ||
+                   mode.EqualsLiteral("root")) {
+          aPreamble.mMode = PreambleMode::DocumentComplete;
+        } else if (mode.EqualsLiteral("tree-complete") ||
+                   mode.EqualsLiteral("tree")) {
+          aPreamble.mMode = PreambleMode::TreeComplete;
+        } else if (mode.EqualsLiteral("tree-overlap")) {
+          aPreamble.mMode = PreambleMode::TreeOverlap;
+        } else if (mode.EqualsLiteral("tree-early-overlap")) {
+          aPreamble.mMode = PreambleMode::TreeEarlyOverlap;
         } else {
           return Error("unsupported preamble mode");
         }
@@ -609,15 +615,16 @@ class JsonParser final {
       return Error("active preamble requires an explicit path");
     }
     if (!sawMaxBytes) {
-      aPreamble.mMaxBytes =
-          aPreamble.mMode == PreambleMode::Root ? 64 * 1024 : 256 * 1024;
+      aPreamble.mMaxBytes = aPreamble.mMode == PreambleMode::DocumentComplete
+                                ? 64 * 1024
+                                : 256 * 1024;
     }
     if (aPreamble.mMaxBytes == 0) {
       return Error("active preamble max-bytes must be positive");
     }
-    if (aPreamble.mMode == PreambleMode::Root) {
+    if (aPreamble.mMode == PreambleMode::DocumentComplete) {
       if (aPreamble.mMaxAssets != 0) {
-        return Error("root preamble max-assets must be zero");
+        return Error("document-complete preamble max-assets must be zero");
       }
     } else if (!sawMaxAssets) {
       aPreamble.mMaxAssets = 2;

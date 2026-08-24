@@ -158,7 +158,9 @@ class TunnelSession final {
                             const nsACString& aTargetAuthority,
                             nsresult aStatus, uint32_t aHttpStatus,
                             uint32_t aBodyBytes);
+  void FinishPreambleOperationOnMain(uint64_t aGeneration);
   void PreambleTimeoutOnMain(uint64_t aGeneration, ProxyProtocol aProtocol);
+  void PreambleDrainTimeoutOnMain(uint64_t aGeneration);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
   void NotifyOuterGateReady();

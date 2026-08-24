@@ -26,6 +26,11 @@ SOURCES += [
     "ProfilerNaiveFoxStub.cpp",
 ]
 
+SOURCES += [
+    "/dom/security/ReferrerInfo.cpp",
+    "/dom/security/SecFetch.cpp",
+]
+
 GeneratedFile(
     "NaiveFoxVersion.cpp",
     script="generate_version_source.py",
@@ -47,8 +52,11 @@ EXPORTS.mozilla += ["../StoragePrincipalHelper.h"]
 EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
 EXPORTS += ["../nsContentUtils.h"]
 
+LOCAL_INCLUDES += ["/dom/security"]
 LOCAL_INCLUDES += ["/netwerk/base"]
 LOCAL_INCLUDES += ["/netwerk/naivefox"]
+LOCAL_INCLUDES += ["/netwerk/protocol/http"]
+LOCAL_INCLUDES += ["/netwerk/system/netlink"]
 LOCAL_INCLUDES += ["/security/manager/ssl"]
 LOCAL_INCLUDES += ["/tools/profiler/core"]
 LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]

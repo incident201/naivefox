@@ -5,16 +5,83 @@ umask 077
 
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
+original_args=("$@")
+
+comparison_design=legacy
+comparison_arms=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --compare-arms)
+      comparison_design=arms
+      shift
+      ;;
+    --compare-arm)
+      comparison_design=arms
+      comparison_arms+=("${2:-}")
+      shift 2
+      ;;
+    --help)
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-overlap ...]\n' "$0"
+      exit 0
+      ;;
+    *)
+      printf 'unknown H3 capture comparison argument: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ $comparison_design == arms && ${#comparison_arms[@]} -eq 0 ]]; then
+  comparison_arms=(off gate root tree-complete tree-overlap)
+fi
+declare -A seen_comparison_arms=()
+for arm in "${comparison_arms[@]}"; do
+  case $arm in
+    off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-overlap) ;;
+    *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
+  esac
+  if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
+    printf 'duplicate comparison arm: %s\n' "$arm" >&2
+    exit 2
+  fi
+  seen_comparison_arms[$arm]=1
+done
 
 capture_pid=
 capture_pcap=
 capture_raw=
+capture_log=
 capture_stage_dir=
 capture_stage_raw=
 firefox_pid=
 naivefox_pid=
 capture_dir=
+safe_dir=
+network_monitor_pid=
+network_monitor_events=
+network_monitor_ready=
+network_monitor_done=
 success=0
+
+source_worktree_dirty() {
+  if git -C "$SOURCE_ROOT" diff --quiet --no-ext-diff HEAD -- &&
+     [[ -z $(git -C "$SOURCE_ROOT" ls-files --others --exclude-standard) ]]; then
+    printf 'no'
+  else
+    printf 'yes'
+  fi
+}
+
+source_state_sha256() {
+  {
+    git -C "$SOURCE_ROOT" diff --binary --no-ext-diff HEAD --
+    while IFS= read -r -d '' source_path; do
+      printf 'untracked:%s\0' "$source_path"
+      sha256sum "$SOURCE_ROOT/$source_path"
+    done < <(git -C "$SOURCE_ROOT" ls-files --others --exclude-standard -z |
+             sort -z)
+  } | sha256sum | cut -d' ' -f1
+}
 
 stop_pid() {
   local pid=${1:-}
@@ -30,32 +97,69 @@ stop_pid() {
 }
 
 stop_capture() {
+  [[ -n $capture_pid ]] || return 0
+  local was_running=0
+  local status=0
   if [[ -n $capture_pid ]] && kill -0 "$capture_pid" 2>/dev/null; then
+    was_running=1
     kill -INT "$capture_pid" 2>/dev/null || true
   fi
   [[ -z $capture_pid ]] || wait "$capture_pid" 2>/dev/null || true
   capture_pid=
+  if [[ $was_running -ne 1 ]]; then
+    printf 'dumpcap stopped before the H3 workload capture was complete\n' >&2
+    status=1
+  fi
+  if ! python3 "$INTEGRATION_DIR/camouflage_capture_health.py" "$capture_log"; then
+    status=1
+  fi
   if [[ -n $capture_stage_raw && -s $capture_stage_raw ]]; then
     # The WSL `any` interface records loopback transmit and receive copies.
-    # Retain the transmit copy before QUIC dissection so duplicate packet
-    # numbers cannot perturb Wireshark's key-phase state machine.  The transmit
-    # copy also preserves the sender's handshake/application packet order.
-    tshark -r "$capture_stage_raw" -Y 'sll.pkttype==4' -w "$capture_pcap"
-    rm -f -- "$capture_stage_raw"
+    # Retain the transmit copy when the capture link type exposes one before
+    # QUIC dissection.  A private network namespace can expose loopback without
+    # pkttype=4; in that case the raw capture is already the sole usable view.
+    if [[ -n $(tshark -r "$capture_stage_raw" -Y 'sll.pkttype==4' \
+      -T fields -e frame.number 2>/dev/null | sed -n '1p') ]]; then
+      tshark -r "$capture_stage_raw" -Y 'sll.pkttype==4' -w "$capture_pcap" \
+        >/dev/null 2>&1
+      rm -f -- "$capture_stage_raw"
+    else
+      mv -f -- "$capture_stage_raw" "$capture_pcap"
+    fi
   fi
   capture_pcap=
   capture_raw=
+  capture_log=
   capture_stage_raw=
+  return "$status"
 }
 
 cleanup() {
   local status=$?
-  stop_capture
+  if ! stop_capture; then
+    status=1
+  fi
+  if declare -F stop_network_mutation_monitor >/dev/null && \
+     ! stop_network_mutation_monitor; then
+    status=1
+  fi
   stop_pid "$firefox_pid"
   stop_pid "$naivefox_pid"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   if [[ -n $capture_stage_dir ]]; then
     rm -rf -- "$capture_stage_dir"
+  fi
+  if [[ -n $safe_dir && ($status -ne 0 || $success -ne 1) ]]; then
+    local safe_root="$STATE_ROOT/h3-capture-safe"
+    if [[ $(dirname -- "$safe_dir") == "$safe_root" &&
+          $(basename -- "$safe_dir") != . &&
+          $(basename -- "$safe_dir") != .. ]]; then
+      rm -rf -- "$safe_dir"
+    else
+      printf 'refusing to remove unexpected safe H3 path: %s\n' \
+        "$safe_dir" >&2
+      status=1
+    fi
   fi
   if [[ -n $capture_dir ]]; then
     case $capture_dir in
@@ -94,11 +198,6 @@ if [[ $EUID -ne 0 ]] &&
   exit 1
 fi
 
-"$INTEGRATION_DIR/start.sh" --mode h3
-run_dir=$(<"$ACTIVE_RUN_FILE")
-source "$run_dir/fixture.env"
-[[ $NAIVEFOX_FIXTURE_MODE == h3 ]]
-
 BIN="$OBJDIR/dist/bin"
 capture_mode=${NAIVEFOX_CAPTURE_MODE:-quick}
 case "$capture_mode" in
@@ -129,6 +228,33 @@ case "$capture_mode" in
     exit 2
     ;;
 esac
+if [[ $comparison_design == arms && $capture_mode != same-base ]]; then
+  printf '%s\n' '--compare-arms requires NAIVEFOX_CAPTURE_MODE=same-base' >&2
+  exit 2
+fi
+if [[ $comparison_design == arms ]]; then
+  isolated_network_entered=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED:-0}
+  case $isolated_network_entered in
+    0 | 1) ;;
+    *) printf 'invalid internal isolated-network marker\n' >&2; exit 2 ;;
+  esac
+  if [[ $isolated_network_entered == 0 ]]; then
+    for tool in unshare ip ethtool; do
+      command -v "$tool" >/dev/null 2>&1 || {
+        printf 'H3 arm comparison isolation requires %s\n' "$tool" >&2
+        exit 1
+      }
+    done
+    export NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1
+    exec unshare --net --mount-proc \
+      "$INTEGRATION_DIR/run-camouflage-isolated-network.sh" \
+      "$0" "${original_args[@]}"
+  fi
+  if [[ ${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0} != 1 ]]; then
+    printf 'isolated H3 arm comparison marker is inconsistent\n' >&2
+    exit 2
+  fi
+fi
 NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
 NAIVEFOX_LIBDIR="${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$BIN}"
 for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
@@ -146,6 +272,11 @@ if [[ -n "$REFERENCE_OBJDIR" ]]; then
     exit 1
   fi
 fi
+
+"$INTEGRATION_DIR/start.sh" --mode h3
+run_dir=$(<"$ACTIVE_RUN_FILE")
+source "$run_dir/fixture.env"
+[[ $NAIVEFOX_FIXTURE_MODE == h3 ]]
 
 capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 capture_dir="$STATE_ROOT/h3-captures/$capture_id"
@@ -168,6 +299,7 @@ start_capture() {
   local pcap=$1
   local log=$2
   capture_pcap=$pcap
+  capture_log=$log
   capture_stage_raw="$capture_stage_dir/$(basename "${pcap%.pcapng}.raw.pcapng")"
   : >"$log"
   chmod 0600 "$log"
@@ -207,6 +339,57 @@ wait_for_log() {
   return 1
 }
 
+start_network_mutation_monitor() {
+  local label=$1
+  network_monitor_events="$capture_dir/$label-network-mutations.log"
+  network_monitor_ready="$capture_dir/$label-network-monitor-ready"
+  network_monitor_done="$capture_dir/$label-network-monitor-done"
+  python3 "$INTEGRATION_DIR/monitor-network-mutations.py" \
+    --ready "$network_monitor_ready" --events "$network_monitor_events" \
+    --done "$network_monitor_done" &
+  network_monitor_pid=$!
+  for ((i = 0; i < 100; i++)); do
+    [[ -f $network_monitor_ready ]] && return 0
+    kill -0 "$network_monitor_pid" 2>/dev/null || {
+      printf 'network mutation monitor exited before readiness\n' >&2
+      return 1
+    }
+    sleep 0.1
+  done
+  printf 'timed out waiting for network mutation monitor readiness\n' >&2
+  return 1
+}
+
+stop_network_mutation_monitor() {
+  [[ -n $network_monitor_pid ]] || return 0
+  local monitor_status=0
+  if kill -0 "$network_monitor_pid" 2>/dev/null; then
+    kill -TERM "$network_monitor_pid" 2>/dev/null || true
+  else
+    wait "$network_monitor_pid" 2>/dev/null || true
+    network_monitor_pid=
+    printf 'network mutation monitor stopped before capture completion\n' >&2
+    return 1
+  fi
+  if wait "$network_monitor_pid" 2>/dev/null; then
+    monitor_status=0
+  else
+    monitor_status=$?
+  fi
+  network_monitor_pid=
+  if [[ $monitor_status -ne 0 || ! -f $network_monitor_done ]]; then
+    printf 'network mutation monitor failed to drain cleanly\n' >&2
+    return 1
+  fi
+  if [[ -s $network_monitor_events ]]; then
+    printf 'network route/address/link mutation invalidated H3 capture\n' >&2
+    return 1
+  fi
+  network_monitor_events=
+  network_monitor_ready=
+  network_monitor_done=
+}
+
 reference_profile="$capture_dir/reference-profile"
 mkdir -m 0700 "$reference_profile"
 cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$reference_profile/"
@@ -229,6 +412,10 @@ run_reference() {
   local log="$capture_dir/$pass-reference-firefox.log"
   local screenshot="$capture_dir/$pass-reference.png"
   local keylog="$capture_dir/$pass-reference.keys"
+  local workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass"
+  if [[ $comparison_design == arms ]]; then
+    workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page"
+  fi
   local -a command_env=(env -u SSLKEYLOGFILE \
     "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
@@ -241,11 +428,12 @@ run_reference() {
   fi
   : >"$log"
   chmod 0600 "$log"
+  start_network_mutation_monitor "$pass-reference"
   start_capture "$pcap" "$capture_dir/$pass-reference-dumpcap.log"
   timeout 35 "${command_env[@]}" \
     "$REFERENCE_BIN" --headless --new-instance --no-remote \
     --profile "$reference_profile" --screenshot "$screenshot" \
-    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass" \
+    "$workload_url" \
     >"$log" 2>&1 &
   firefox_pid=$!
   set +e
@@ -254,6 +442,7 @@ run_reference() {
   set -e
   firefox_pid=
   stop_capture
+  stop_network_mutation_monitor
   if [[ $status -ne 0 && $status -ne 124 ]]; then
     printf 'reference Firefox %s pass exited with status %s; evaluating capture\n' \
       "$pass" "$status" >&2
@@ -281,6 +470,7 @@ run_naivefox() {
   local socks_port
   socks_port=$(python3 -c \
     'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+  start_network_mutation_monitor "$pass-naivefox"
   start_capture "$pcap" "$capture_dir/$pass-naivefox-dumpcap.log"
   "${command_env[@]}" \
     NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
@@ -306,18 +496,117 @@ run_naivefox() {
   wait "$naivefox_pid"
   naivefox_pid=
   stop_capture
+  stop_network_mutation_monitor
   [[ $(rg -c '^Outer protocol: h3$' "$log") -eq 2 ]]
   [[ $(rg -c '^Padding negotiated: yes$' "$log") -eq 2 ]]
   ! rg -q -e '^Outer protocol: h2$' -e '^Padding negotiated: no$' "$log"
 }
 
-run_reference decrypted
-run_naivefox decrypted
-run_reference passive
-run_naivefox passive
+run_naivefox_arm() {
+  local arm=$1
+  local pcap="$capture_dir/decrypted-$arm.pcapng"
+  local log="$capture_dir/decrypted-$arm-naivefox.log"
+  local keylog="$capture_dir/decrypted-$arm.keys"
+  local naivefox_profile="$capture_dir/decrypted-$arm-naivefox-profile"
+  local browser_profile="$capture_dir/decrypted-$arm-browser-profile"
+  local browser_log="$capture_dir/decrypted-$arm-firefox.log"
+  local screenshot="$capture_dir/decrypted-$arm.png"
+  local config="$capture_dir/decrypted-$arm-config.json"
+  local socks_port
+  socks_port=$(python3 -c \
+    'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+  mkdir -m 0700 "$naivefox_profile" "$browser_profile"
+  cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$naivefox_profile/"
+  cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$browser_profile/"
+  cat >>"$naivefox_profile/user.js" <<EOF
+user_pref("network.http.http3.enable", true);
+user_pref("network.http.http3.disable_when_third_party_roots_found", false);
+EOF
+  python3 "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+    --generate-pac-user-js "$socks_port" >>"$browser_profile/user.js"
+  cat >>"$browser_profile/user.js" <<'EOF'
+user_pref("app.update.enabled", false);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("network.captive-portal-service.enabled", false);
+user_pref("network.connectivity-service.enabled", false);
+user_pref("network.dns.disableIPv6", true);
+user_pref("network.prefetch-next", false);
+user_pref("network.http.speculative-parallel-limit", 0);
+user_pref("network.http.http3.enable", false);
+EOF
+  chmod 0600 "$browser_profile/user.js"
+  NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
+    NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
+    python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
+    --output "$config" --arm "$arm" --protocol h3 \
+    --socks-port "$socks_port" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
+  : >"$keylog"
+  : >"$log"
+  : >"$browser_log"
+  chmod 0600 "$keylog" "$log" "$browser_log"
+  start_network_mutation_monitor "decrypted-$arm"
+  start_capture "$pcap" "$capture_dir/decrypted-$arm-dumpcap.log"
+  env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+    "SSLKEYLOGFILE=$keylog" \
+    "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" NAIVEFOX_PROFILE="$naivefox_profile" \
+    "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
+  naivefox_pid=$!
+  wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
+  set +e
+  timeout 35 env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
+    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
+    "$REFERENCE_BIN" --headless --new-instance --no-remote \
+    --profile "$browser_profile" --screenshot "$screenshot" \
+    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&arm=$arm" \
+    >"$browser_log" 2>&1 &
+  firefox_pid=$!
+  wait "$firefox_pid"
+  local browser_status=$?
+  firefox_pid=
+  set -e
+  if [[ $browser_status -ne 0 && $browser_status -ne 124 ]]; then
+    printf 'same-base Firefox through %s arm exited with status %s; evaluating capture\n' \
+      "$arm" "$browser_status" >&2
+  fi
+  sleep 0.25
+  stop_capture
+  stop_network_mutation_monitor
+  stop_pid "$naivefox_pid"
+  naivefox_pid=
+  local outer_count padding_count preamble_count
+  outer_count=$(rg -c '^Outer protocol: h3$' "$log" || true)
+  padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)
+  preamble_count=$(rg -c ' preamble result=' "$log" || true)
+  [[ $outer_count -ge 1 && $padding_count -eq $outer_count ]]
+  if [[ $arm == root || $arm == document-complete ||
+        $arm == tree-complete || $arm == tree-early-overlap ||
+        $arm == tree-overlap ]]; then
+    [[ $preamble_count -eq 1 ]]
+    rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
+  else
+    [[ $preamble_count -eq 0 ]]
+  fi
+  ! rg -q -e '^Outer protocol: h2$' -e '^Padding negotiated: no$' "$log"
+}
 
-for pass in decrypted passive; do
-  for side in reference naivefox; do
+if [[ $comparison_design == arms ]]; then
+  run_reference decrypted
+  for arm in "${comparison_arms[@]}"; do
+    run_naivefox_arm "$arm"
+  done
+  capture_passes=(decrypted)
+  capture_sides=(reference "${comparison_arms[@]}")
+else
+  run_reference decrypted
+  run_naivefox decrypted
+  run_reference passive
+  run_naivefox passive
+  capture_passes=(decrypted passive)
+  capture_sides=(reference naivefox)
+fi
+
+for pass in "${capture_passes[@]}"; do
+  for side in "${capture_sides[@]}"; do
     pcap="$capture_dir/$pass-$side.pcapng"
     [[ -s $pcap ]] || {
       printf 'H3 capture is empty: %s\n' "$pcap" >&2
@@ -332,20 +621,29 @@ for pass in decrypted passive; do
     tcp_payload=$(tshark -r "$pcap" \
       -Y "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && tcp.len>0" -T fields \
       -e frame.number | wc -l)
+    oversized_udp_frame=$(tshark -r "$pcap" \
+      -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && udp.length>1500" \
+      -T fields -e frame.number | sed -n '1p')
     if [[ $udp_count -eq 0 || $tcp_established -ne 0 || $tcp_payload -ne 0 ]]; then
       printf '%s/%s is not strict QUIC (udp=%s tcp-established=%s tcp-payload=%s)\n' \
         "$pass" "$side" "$udp_count" "$tcp_established" "$tcp_payload" >&2
       exit 1
     fi
+    if [[ -n $oversized_udp_frame ]]; then
+      printf '%s/%s contains a UDP offload superframe at frame %s\n' \
+        "$pass" "$side" "$oversized_udp_frame" >&2
+      exit 1
+    fi
   done
 done
 
-for keys in "$capture_dir/decrypted-reference.keys" \
-            "$capture_dir/decrypted-naivefox.keys"; do
+for side in "${capture_sides[@]}"; do
+  keys="$capture_dir/decrypted-$side.keys"
   [[ -s $keys ]]
   rg -q '^(CLIENT|SERVER)_(HANDSHAKE_)?TRAFFIC_SECRET' "$keys"
 done
-if find "$capture_dir" -maxdepth 1 -name 'passive-*.keys' -print -quit |
+if [[ $comparison_design == legacy ]] && \
+   find "$capture_dir" -maxdepth 1 -name 'passive-*.keys' -print -quit |
    grep -q .; then
   printf 'passive pass unexpectedly created a key log\n' >&2
   exit 1
@@ -417,7 +715,8 @@ extract_decrypted() {
 
   tshark -r "$pcap" "${decode[@]}" \
     -Y "http3.headers.method || http3.headers.status" \
-    "${TSHARK_FIELDS[@]}" -e frame.number -e udp.srcport -e udp.dstport \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
+    -e udp.srcport -e udp.dstport \
     -e quic.connection.number -e quic.stream.stream_id \
     -e http3.headers.method -e http3.headers.status >"$prefix-requests.csv"
 
@@ -426,6 +725,27 @@ extract_decrypted() {
     "${TSHARK_FIELDS[@]}" -e frame.number -e udp.srcport -e udp.dstport \
     -e quic.connection.number -e quic.stream.stream_id \
     -e http3.header.header.name >"$prefix-header-names.csv"
+
+  # Private-only GET semantics for the complete/overlap causal invariant.
+  # A unit separator avoids ambiguity with semicolons inside header values.
+  local semantic_aggregator=$'\x1f'
+  tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && http3.headers.method==\"GET\" && http3.header.header.name && !(http3.header.header.name contains \"authorization\")" \
+    -T fields -E header=y -E separator=, -E quote=d \
+    -E occurrence=a -E "aggregator=$semantic_aggregator" \
+    -e frame.number -e udp.srcport -e udp.dstport \
+    -e quic.connection.number -e quic.stream.stream_id \
+    -e http3.headers.method -e http3.header.header.name \
+    -e http3.headers.header.value >"$prefix-get-header-values.csv"
+
+  tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && http3.headers.status==200 && http3.header.header.name" \
+    -T fields -E header=y -E separator=, -E quote=d \
+    -E occurrence=a -E "aggregator=$semantic_aggregator" \
+    -e frame.number -e udp.srcport -e udp.dstport \
+    -e quic.connection.number -e quic.stream.stream_id \
+    -e http3.headers.status -e http3.header.header.name \
+    -e http3.headers.header.value >"$prefix-response-header-values.csv"
 
   tshark -r "$pcap" "${decode[@]}" \
     -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && quic" \
@@ -492,13 +812,68 @@ extract_passive() {
     >"$prefix-packets.csv"
 }
 
-for side in reference naivefox; do
+for side in "${capture_sides[@]}"; do
   extract_decrypted "$side"
-  extract_passive "$side"
+  if [[ $comparison_design == legacy ]]; then
+    extract_passive "$side"
+  fi
 done
 
 safe_dir="$STATE_ROOT/h3-capture-safe/$capture_id"
 mkdir -m 0700 -p "$safe_dir"
+
+if [[ $comparison_design == arms ]]; then
+  python3 "$INTEGRATION_DIR/h3_decrypted_arm_summary.py" \
+    --input-dir "$capture_dir" \
+    --events "$safe_dir/outer-h3-events.csv" \
+    --summary "$safe_dir/summary.txt" \
+    --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    --arms "$(IFS=,; printf '%s' "${comparison_arms[*]}")"
+  {
+    printf 'isolated_network=yes\n'
+    printf 'network_mutation_monitor=netlink_route_v1_fail_closed\n'
+    printf 'capture_offload_policy=namespace_loopback_offload_disabled_and_verified\n'
+    printf 'h3_udp_superframe_policy=reject_udp_length_gt_1500\n'
+    printf 'capture_revision=%s\n' "$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
+    printf 'capture_worktree_dirty=%s\n' "$(source_worktree_dirty)"
+    printf 'capture_source_state_sha256=%s\n' "$(source_state_sha256)"
+    printf 'tshark_version=%s\n' "$(tshark --version | head -n 1)"
+    printf 'reference_binary=%s\n' \
+      "$(readelf -n "$REFERENCE_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)"
+    printf 'naivefox_binary=%s\n' \
+      "$(readelf -n "$NAIVEFOX_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)"
+    printf 'reference_libxul_sha256=%s\n' \
+      "$(sha256sum "$REFERENCE_LIBDIR/libxul.so" | cut -d' ' -f1)"
+    printf 'naivefox_libxul_sha256=%s\n' \
+      "$(sha256sum "$NAIVEFOX_LIBDIR/libxul.so" | cut -d' ' -f1)"
+  } >>"$safe_dir/summary.txt"
+  find "$safe_dir" -type f -exec chmod 0600 {} +
+  if find "$safe_dir" -type f \( -name '*.pcap' -o -name '*.pcapng' -o \
+       -name '*.keys' -o -name '*.log' \) -print -quit | grep -q .; then
+    printf 'private capture material reached safe H3 arm output\n' >&2
+    exit 1
+  fi
+  fixture_user_encoded=$(python3 -c \
+    'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' \
+    "$NAIVEFOX_FIXTURE_USER")
+  fixture_pass_encoded=$(python3 -c \
+    'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' \
+    "$NAIVEFOX_FIXTURE_PASS")
+  if rg -F "$NAIVEFOX_FIXTURE_USER" "$safe_dir" ||
+     rg -F "$NAIVEFOX_FIXTURE_PASS" "$safe_dir" ||
+     rg -F "$fixture_user_encoded" "$safe_dir" ||
+     rg -F "$fixture_pass_encoded" "$safe_dir" ||
+     rg -i -e proxy-authorization -e authorization: -e 'localhost:' \
+       -e sslkeylogfile -e client_random -e traffic_secret \
+       -e exporter_secret "$safe_dir"; then
+    printf 'credential-bearing data reached safe H3 arm output\n' >&2
+    exit 1
+  fi
+  success=1
+  printf 'Firefox/NaiveFox same-base H3 arm comparison passed\n'
+  printf 'sanitized aggregates: %s\n' "$safe_dir"
+  exit 0
+fi
 
 python3 - "$capture_dir" "$safe_dir/summary.txt" \
   "$NAIVEFOX_FIXTURE_PROXY_PORT" "$capture_mode" <<'PY'
@@ -847,6 +1222,8 @@ chmod 0600 "$safe_dir/summary.txt"
 
 {
   printf 'capture_revision=%s\n' "$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
+  printf 'capture_worktree_dirty=%s\n' "$(source_worktree_dirty)"
+  printf 'capture_source_state_sha256=%s\n' "$(source_state_sha256)"
   printf 'tshark_version=%s\n' "$(tshark --version | head -n 1)"
   printf 'reference_binary=%s\n' \
     "$(readelf -n "$REFERENCE_BIN" | sed -n 's/^ *Build ID: //p' | head -n 1)"

@@ -25,16 +25,23 @@ FORBIDDEN_FEATURE_TERMS = (
     "canary",
     "cohort",
     "credential",
+    "decrypted",
     "destination_port",
     "filename",
+    "header",
     "label",
+    "method",
+    "naivefox_arm",
     "password",
     "path",
+    "plaintext",
     "process_duration",
     "profile",
     "query",
     "session_id",
     "source_port",
+    "status",
+    "stream_id",
 )
 
 
@@ -775,6 +782,9 @@ def merge(args):
         feature_names.update(document["features"])
     expected_per_cohort = getattr(args, "expected_per_cohort", None)
     expected_superblocks = getattr(args, "expected_superblocks", None)
+    expected_superblock_arms = getattr(
+        args, "expected_superblock_arms", "off,gate,root"
+    )
     if expected_per_cohort and expected_superblocks:
         raise SystemExit("cohort and superblock expectations are mutually exclusive")
     if expected_per_cohort:
@@ -796,12 +806,13 @@ def merge(args):
                     f"labels={labels}, scenarios={sorted(scenarios)}"
                 )
     if expected_superblocks:
+        selected_arms = tuple(
+            arm.strip() for arm in expected_superblock_arms.split(",") if arm.strip()
+        )
         expected_members = {
             ("firefox_a", "reference"),
             ("firefox_b", "reference"),
-            ("naivefox", "off"),
-            ("naivefox", "gate"),
-            ("naivefox", "root"),
+            *(("naivefox", arm) for arm in selected_arms),
         }
         protocols = {document["protocol"] for document in documents}
         for protocol in protocols:
@@ -852,7 +863,17 @@ def main():
     extract_parser.add_argument("--session-id", required=True)
     extract_parser.add_argument("--experiment-block")
     extract_parser.add_argument(
-        "--naivefox-arm", choices=("reference", "off", "gate", "root")
+        "--naivefox-arm",
+        choices=(
+            "reference",
+            "off",
+            "gate",
+            "root",
+            "document-complete",
+            "tree-complete",
+            "tree-early-overlap",
+            "tree-overlap",
+        ),
     )
     extract_parser.add_argument("--output", required=True)
     extract_parser.set_defaults(function=extract)
@@ -861,6 +882,9 @@ def main():
     merge_parser.add_argument("--output", required=True)
     merge_parser.add_argument("--expected-per-cohort", type=int)
     merge_parser.add_argument("--expected-superblocks", type=int)
+    merge_parser.add_argument(
+        "--expected-superblock-arms", default="off,gate,root"
+    )
     merge_parser.set_defaults(function=merge)
     args = parser.parse_args()
     args.function(args)

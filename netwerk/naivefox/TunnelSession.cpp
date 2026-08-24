@@ -41,6 +41,7 @@ namespace {
 
 constexpr size_t kPumpBufferSize = 64 * 1024;
 constexpr uint32_t kPreambleTimeoutMs = 1500;
+constexpr uint32_t kPreambleDrainTimeoutMs = 1500;
 
 std::atomic<uint64_t> gNextConnectionId{1};
 
@@ -371,7 +372,7 @@ NS_IMETHODIMP PumpDirection::OnOutputStreamReady(
 
 class TunnelSession::Impl final {
  public:
-  enum class ActiveRequestKind : uint8_t { None, Preamble, Tunnel };
+  enum class ActiveRequestKind : uint8_t { None, Tunnel };
 
   Impl(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
        const TunnelConfig& aConfig, nsIEventTarget* aSocketTarget,
@@ -428,8 +429,11 @@ class TunnelSession::Impl final {
   uint64_t mActiveRequestGeneration = 0;
   ActiveRequestKind mActiveRequestKind = ActiveRequestKind::None;
   nsCOMPtr<nsITimer> mPreambleTimer;
+  nsCOMPtr<nsITimer> mPreambleDrainTimer;
+  RefPtr<ProxyPreambleOperation> mPreambleOperation;
+  uint64_t mPreambleOperationGeneration = 0;
+  nsCString mPreambleTargetAuthority;
   detail::PreambleSequenceState mPreambleSequence;
-  bool mPreambleTimedOut = false;
 };
 
 class TunnelAttempt final : public nsIHttpUpgradeListener,
@@ -558,6 +562,17 @@ void TunnelSession::OpenAttemptOnMain(uint64_t aGeneration,
   if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
     return;
   }
+  if (mImpl->mPreambleOperation &&
+      mImpl->mPreambleOperationGeneration != aGeneration) {
+    if (mImpl->mPreambleDrainTimer) {
+      (void)mImpl->mPreambleDrainTimer->Cancel();
+      mImpl->mPreambleDrainTimer = nullptr;
+    }
+    RefPtr operation = std::move(mImpl->mPreambleOperation);
+    mImpl->mPreambleOperationGeneration = 0;
+    mImpl->mPreambleTargetAuthority.Truncate();
+    operation->Cancel(NS_ERROR_ABORT);
+  }
   // Without the optional gate every tunnel is its own experiment arm and runs
   // the configured preamble. With it, only the cold-route leader does so;
   // queued and already-warm participants proceed directly to CONNECT.
@@ -604,29 +619,22 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
     return;
   }
 
-  mImpl->mPreambleTimedOut = false;
-  if (mImpl->mConfig.mPreamble.mMode == PreambleMode::Tree) {
-    RuntimeLogEvent(
-        "Connection %llu preamble tree mode uses root-only experimental "
-        "sequencing protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        ProtocolName(aProtocol));
-  }
-
   RefPtr self = this;
   nsCString authority(aTargetAuthority);
-  nsCOMPtr<nsIRequest> openedRequest;
-  nsresult rv = OpenProxyPreamble(
+  RefPtr<ProxyPreambleOperation> operation;
+  nsresult rv = OpenProxyPreambleOperation(
       mImpl->mConfig.mProxyUrl, mImpl->mConfig.mProxyUser,
-      mImpl->mConfig.mProxyPassword, mImpl->mConfig.mPreamble.mPath,
-      mImpl->mConfig.mPreamble.mMaxBytes, aProtocol,
+      mImpl->mConfig.mProxyPassword, mImpl->mConfig.mPreamble, aProtocol,
       [self, aGeneration, aProtocol,
        authority = std::move(authority)](ProxyPreambleResult aResult) {
         self->FinishPreambleOnMain(aGeneration, aProtocol, authority,
                                    aResult.mStatus, aResult.mHttpStatus,
                                    aResult.mBodyBytes);
       },
-      mImpl->mConfig.mHostResolverRule, getter_AddRefs(openedRequest));
+      [self, aGeneration]() {
+        self->FinishPreambleOperationOnMain(aGeneration);
+      },
+      mImpl->mConfig.mHostResolverRule, operation);
   if (NS_FAILED(rv)) {
     MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
     RuntimeLogEvent(
@@ -640,9 +648,9 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
     return;
   }
 
-  mImpl->mActiveRequest = openedRequest;
-  mImpl->mActiveRequestGeneration = aGeneration;
-  mImpl->mActiveRequestKind = Impl::ActiveRequestKind::Preamble;
+  mImpl->mPreambleOperation = std::move(operation);
+  mImpl->mPreambleOperationGeneration = aGeneration;
+  mImpl->mPreambleTargetAuthority = aTargetAuthority;
   auto timer = NS_NewTimerWithCallback(
       [self, aGeneration, aProtocol](nsITimer*) {
         self->PreambleTimeoutOnMain(aGeneration, aProtocol);
@@ -652,10 +660,10 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   if (timer.isErr()) {
     rv = timer.unwrapErr();
     MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
-    nsCOMPtr<nsIRequest> request = std::move(mImpl->mActiveRequest);
-    mImpl->mActiveRequestGeneration = 0;
-    mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
-    (void)request->Cancel(rv);
+    RefPtr operation = std::move(mImpl->mPreambleOperation);
+    mImpl->mPreambleOperationGeneration = 0;
+    mImpl->mPreambleTargetAuthority.Truncate();
+    operation->Cancel(rv);
     RuntimeLogEvent(
         "Connection %llu preamble result=timer-error status=0x%08x http=0 "
         "bytes=0 protocol=%s\n",
@@ -677,29 +685,39 @@ void TunnelSession::FinishPreambleOnMain(uint64_t aGeneration,
                                          uint32_t aBodyBytes) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol) ||
-      mImpl->mActiveRequestKind != Impl::ActiveRequestKind::Preamble ||
-      mImpl->mActiveRequestGeneration != aGeneration) {
+      !mImpl->mPreambleOperation ||
+      mImpl->mPreambleOperationGeneration != aGeneration) {
     return;
   }
   if (mImpl->mPreambleTimer) {
     (void)mImpl->mPreambleTimer->Cancel();
     mImpl->mPreambleTimer = nullptr;
   }
-  mImpl->mActiveRequest = nullptr;
-  mImpl->mActiveRequestGeneration = 0;
-  mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
   MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
-  const bool timedOut = mImpl->mPreambleTimedOut;
-  if (timedOut) {
-    aStatus = NS_ERROR_NET_TIMEOUT;
+  if (detail::PreambleOverlapsConnect(mImpl->mConfig.mPreamble.mMode) &&
+      mImpl->mPreambleOperation) {
+    RefPtr self = this;
+    auto timer = NS_NewTimerWithCallback(
+        [self, aGeneration](nsITimer*) {
+          self->PreambleDrainTimeoutOnMain(aGeneration);
+        },
+        kPreambleDrainTimeoutMs, nsITimer::TYPE_ONE_SHOT,
+        "NaiveFox::ProxyPreambleDrainTimeout"_ns);
+    if (timer.isOk()) {
+      mImpl->mPreambleDrainTimer = timer.unwrap();
+    } else {
+      RefPtr operation = std::move(mImpl->mPreambleOperation);
+      mImpl->mPreambleOperationGeneration = 0;
+      mImpl->mPreambleTargetAuthority.Truncate();
+      operation->Cancel(timer.unwrapErr());
+    }
   }
   const bool succeeded =
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
-  const char* result = timedOut                           ? "timeout"
-                       : aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
-                       : succeeded                        ? "success"
-                       : NS_FAILED(aStatus)               ? "network-error"
-                                                          : "http-error";
+  const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
+                       : succeeded                      ? "success"
+                       : NS_FAILED(aStatus)             ? "network-error"
+                                                        : "http-error";
   RuntimeLogEvent(
       "Connection %llu preamble result=%s status=0x%08x http=%u bytes=%u "
       "protocol=%s\n",
@@ -711,20 +729,59 @@ void TunnelSession::FinishPreambleOnMain(uint64_t aGeneration,
   }
 }
 
+void TunnelSession::FinishPreambleOperationOnMain(uint64_t aGeneration) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mPreambleOperationGeneration != aGeneration) {
+    return;
+  }
+  if (mImpl->mPreambleDrainTimer) {
+    (void)mImpl->mPreambleDrainTimer->Cancel();
+    mImpl->mPreambleDrainTimer = nullptr;
+  }
+  mImpl->mPreambleOperation = nullptr;
+  mImpl->mPreambleOperationGeneration = 0;
+  mImpl->mPreambleTargetAuthority.Truncate();
+}
+
+void TunnelSession::PreambleDrainTimeoutOnMain(uint64_t aGeneration) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mImpl->mPreambleOperation ||
+      mImpl->mPreambleOperationGeneration != aGeneration) {
+    return;
+  }
+  mImpl->mPreambleDrainTimer = nullptr;
+  RefPtr operation = std::move(mImpl->mPreambleOperation);
+  mImpl->mPreambleOperationGeneration = 0;
+  mImpl->mPreambleTargetAuthority.Truncate();
+  operation->Cancel(NS_ERROR_NET_TIMEOUT);
+  RuntimeLogEvent("Connection %llu preamble background drain timed out\n",
+                  static_cast<unsigned long long>(mImpl->mConnectionId));
+}
+
 void TunnelSession::PreambleTimeoutOnMain(uint64_t aGeneration,
                                           ProxyProtocol aProtocol) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol) ||
-      mImpl->mActiveRequestKind != Impl::ActiveRequestKind::Preamble ||
-      mImpl->mActiveRequestGeneration != aGeneration ||
-      !mImpl->mActiveRequest) {
+      !mImpl->mPreambleOperation ||
+      mImpl->mPreambleOperationGeneration != aGeneration) {
     return;
   }
   mImpl->mPreambleTimer = nullptr;
-  mImpl->mPreambleTimedOut = true;
-  // Let OnStopRequest provide the final byte count. The in-flight phase stays
-  // armed until that callback, which is also the single continuation point.
-  (void)mImpl->mActiveRequest->Cancel(NS_ERROR_NET_TIMEOUT);
+  MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
+  RefPtr operation = std::move(mImpl->mPreambleOperation);
+  mImpl->mPreambleOperationGeneration = 0;
+  nsCString authority(std::move(mImpl->mPreambleTargetAuthority));
+  // ProxyPreambleOperation clears its callbacks before cancelling channels,
+  // so no late root/resource stop can become a second CONNECT continuation.
+  operation->Cancel(NS_ERROR_NET_TIMEOUT);
+  RuntimeLogEvent(
+      "Connection %llu preamble result=timeout status=0x%08x http=0 "
+      "bytes=0 protocol=%s\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId),
+      static_cast<unsigned>(NS_ERROR_NET_TIMEOUT), ProtocolName(aProtocol));
+  if (!mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    OpenConnectOnMain(aGeneration, aProtocol, authority);
+  }
 }
 
 void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
@@ -854,10 +911,18 @@ void TunnelSession::CancelRequestOnMain(nsresult aStatus) {
     (void)mImpl->mPreambleTimer->Cancel();
     mImpl->mPreambleTimer = nullptr;
   }
+  if (mImpl->mPreambleDrainTimer) {
+    (void)mImpl->mPreambleDrainTimer->Cancel();
+    mImpl->mPreambleDrainTimer = nullptr;
+  }
+  if (mImpl->mPreambleOperation) {
+    mImpl->mPreambleSequence.Cancel();
+    RefPtr operation = std::move(mImpl->mPreambleOperation);
+    mImpl->mPreambleOperationGeneration = 0;
+    mImpl->mPreambleTargetAuthority.Truncate();
+    operation->Cancel(aStatus);
+  }
   if (mImpl->mActiveRequest) {
-    if (mImpl->mActiveRequestKind == Impl::ActiveRequestKind::Preamble) {
-      mImpl->mPreambleSequence.Cancel();
-    }
     nsCOMPtr<nsIRequest> request = std::move(mImpl->mActiveRequest);
     mImpl->mActiveRequestGeneration = 0;
     mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;

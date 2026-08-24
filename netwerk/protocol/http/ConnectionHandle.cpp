@@ -12,6 +12,8 @@
 #define LOG_ENABLED() LOG5_ENABLED()
 
 #include "ConnectionHandle.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "NaiveFoxReuseLog.h"
 #include "nsHttpHandler.h"
 
 namespace mozilla {
@@ -19,7 +21,20 @@ namespace net {
 
 ConnectionHandle::~ConnectionHandle() {
   if (mConn) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("handle.destroy_reclaim handle=%p conn=%p", this, mConn.get()));
+    }
+#endif
     nsresult rv = gHttpHandler->ReclaimConnection(mConn);
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("handle.destroy_reclaim_result handle=%p conn=%p rv=%08x", this,
+           mConn.get(), static_cast<uint32_t>(rv)));
+    }
+#endif
     if (NS_FAILED(rv)) {
       LOG(
           ("ConnectionHandle::~ConnectionHandle\n"
@@ -27,6 +42,16 @@ ConnectionHandle::~ConnectionHandle() {
            mConn.get()));
     }
   }
+}
+
+void ConnectionHandle::Reset() {
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("handle.reset handle=%p conn=%p", this, mConn.get()));
+  }
+#endif
+  mConn = nullptr;
 }
 
 nsresult ConnectionHandle::OnHeadersAvailable(nsAHttpTransaction* trans,

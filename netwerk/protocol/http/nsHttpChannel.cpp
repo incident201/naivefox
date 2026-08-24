@@ -67,7 +67,9 @@
 #ifndef MOZ_NAIVEFOX
 #  include "mozilla/dom/ReferrerInfo.h"
 #endif
-#ifndef MOZ_NAIVEFOX
+#ifdef MOZ_NAIVEFOX
+#  include "SecFetch.h"
+#else
 #  include "mozilla/dom/SecFetch.h"
 #  include "mozilla/dom/ServiceWorkerUtils.h"
 #  include "mozilla/dom/WindowGlobalParent.h"
@@ -957,9 +959,17 @@ nsresult nsHttpChannel::OnBeforeConnect() {
   // header for *all* navigational requests instead of all requests as
   // defined in the spec, see:
   // https://www.w3.org/TR/upgrade-insecure-requests/#preference
-#ifndef MOZ_NAIVEFOX
   ExtContentPolicyType type = mLoadInfo->GetExternalContentPolicyType();
 
+#ifdef MOZ_NAIVEFOX
+  if (mCaps & NS_HTTP_PROXY_PREAMBLE) {
+    if (type == ExtContentPolicy::TYPE_DOCUMENT) {
+      rv = SetRequestHeader("Upgrade-Insecure-Requests"_ns, "1"_ns, false);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+    SecFetch::AddSecFetchHeader(this);
+  }
+#else
   if (type == ExtContentPolicy::TYPE_DOCUMENT ||
       type == ExtContentPolicy::TYPE_SUBDOCUMENT) {
     rv = SetRequestHeader("Upgrade-Insecure-Requests"_ns, "1"_ns, false);
@@ -8445,7 +8455,13 @@ nsresult nsHttpChannel::BeginConnect() {
          scheme.get(), mapping->AlternateHost().get(), mapping->AlternatePort(),
          mapping->HashKey().get()));
 
-    if (!(mLoadFlags & LOAD_ANONYMOUS) && !mPrivateBrowsing) {
+    bool sendAltUsed = !(mLoadFlags & LOAD_ANONYMOUS);
+#ifdef MOZ_NAIVEFOX
+    sendAltUsed =
+        sendAltUsed || ((mCaps & NS_HTTP_PROXY_PREAMBLE) &&
+                        mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal());
+#endif
+    if (sendAltUsed && !mPrivateBrowsing) {
       nsAutoCString altUsedLine(mapping->AlternateHost());
       bool defaultPort =
           mapping->AlternatePort() ==

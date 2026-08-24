@@ -6,8 +6,22 @@
 #define mozilla_dom_SecFetch_h
 
 class nsIHttpChannel;
+#ifdef MOZ_NAIVEFOX
+class nsIURI;
+#  include "nsIContentPolicy.h"
+#  include "nsString.h"
+#endif
 
 namespace mozilla::dom {
+
+#ifdef MOZ_NAIVEFOX
+// Pure routing-context classifier used by the lean preamble path. System
+// ownership is deliberately not an input: request class and the
+// document/request origin relationship determine the result.
+nsCString ComputeNaiveFoxSecFetchSite(nsContentPolicyType aContentType,
+                                      nsIURI* aDocumentURI,
+                                      nsIURI* aRequestURI);
+#endif
 
 class SecFetch final {
  public:

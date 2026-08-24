@@ -4,6 +4,8 @@
 
 // HttpLog.h should generally be included first
 #include "HttpLog.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "NaiveFoxReuseLog.h"
 
 // Log on level :5, instead of default :4.
 #undef LOG
@@ -170,6 +172,13 @@ nsresult HttpConnectionBase::CheckTunnelIsNeeded(
 }
 
 void HttpConnectionBase::SetOwner(ConnectionEntry* aEntry) {
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("owner.set ci=%p conn=%p from=%p to=%p",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mOwnerEntry.get(), aEntry));
+  }
+#endif
   mOwnerEntry = aEntry;
 }
 

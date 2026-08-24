@@ -43,6 +43,7 @@ class GeckoRuntime final {
                                    ProxyProtocol aProtocol,
                                    const nsACString* aAndroidRuntimePath,
                                    bool aNoPostQuantum);
+  nsresult WaitForNetworkStartup();
   void Shutdown();
 
   nsCOMPtr<nsIFile> mExecutable;

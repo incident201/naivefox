@@ -12,7 +12,16 @@ PREAMBLE_RESULT = re.compile(
 
 
 def validate_sample(arm, protocol, log_text, feature_document):
-    if arm not in ("off", "gate", "root"):
+    supported_arms = (
+        "off",
+        "gate",
+        "root",
+        "document-complete",
+        "tree-complete",
+        "tree-early-overlap",
+        "tree-overlap",
+    )
+    if arm not in supported_arms:
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
@@ -23,18 +32,25 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
         raise ValueError("malformed preamble result evidence")
-    if arm == "root":
+    preamble_arms = (
+        "root",
+        "document-complete",
+        "tree-complete",
+        "tree-early-overlap",
+        "tree-overlap",
+    )
+    if arm in preamble_arms:
         if len(parsed_results) != 1:
-            raise ValueError("root arm requires exactly one preamble result")
+            raise ValueError(f"{arm} arm requires exactly one preamble result")
         result = parsed_results[0]
         if result.group(1) != "success" or result.group(4) != protocol:
-            raise ValueError("root arm preamble did not succeed on selected protocol")
+            raise ValueError(f"{arm} arm preamble did not succeed on selected protocol")
         if not 200 <= int(result.group(2)) < 300:
-            raise ValueError("root arm preamble success has invalid HTTP status")
+            raise ValueError(f"{arm} arm preamble success has invalid HTTP status")
     elif parsed_results:
         raise ValueError(f"{arm} arm unexpectedly ran a preamble")
 
-    if arm in ("gate", "root"):
+    if arm != "off":
         if feature_document.get("protocol") != protocol:
             raise ValueError("feature document protocol does not match sample")
         connections = feature_document.get("features", {}).get(
@@ -48,7 +64,19 @@ def validate_sample(arm, protocol, log_text, feature_document):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--arm", choices=("off", "gate", "root"), required=True)
+    parser.add_argument(
+        "--arm",
+        choices=(
+            "off",
+            "gate",
+            "root",
+            "document-complete",
+            "tree-complete",
+            "tree-early-overlap",
+            "tree-overlap",
+        ),
+        required=True,
+    )
     parser.add_argument("--protocol", choices=("h2", "h3"), required=True)
     parser.add_argument("--log", required=True)
     parser.add_argument("--features", required=True)
