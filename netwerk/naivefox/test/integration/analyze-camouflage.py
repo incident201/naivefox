@@ -8,9 +8,16 @@ import math
 import random
 import statistics
 
-
 SCHEMA_VERSION = 1
-METADATA_FIELDS = {"schema_version", "protocol", "scenario", "label", "session_id"}
+REQUIRED_METADATA_FIELDS = {
+    "schema_version",
+    "protocol",
+    "scenario",
+    "label",
+    "session_id",
+}
+OPTIONAL_METADATA_FIELDS = {"experiment_block"}
+METADATA_FIELDS = REQUIRED_METADATA_FIELDS | OPTIONAL_METADATA_FIELDS
 FEATURE_PREFIXES = (
     "initial_",
     "lifecycle_",
@@ -20,6 +27,24 @@ FEATURE_PREFIXES = (
     "tcp_syn_",
     "tls_",
     "whole_",
+)
+FORBIDDEN_FEATURE_TERMS = (
+    "absolute_timestamp",
+    "authority",
+    "canary",
+    "cohort",
+    "credential",
+    "destination_port",
+    "experiment_block",
+    "filename",
+    "label",
+    "password",
+    "path",
+    "process_duration",
+    "profile",
+    "query",
+    "session_id",
+    "source_port",
 )
 VIEWS = (
     "whole",
@@ -35,6 +60,22 @@ VIEWS = (
     "steady_after_2000ms",
     "lifecycle",
 )
+PRIMARY_VIEWS = ("initial_packets_32", "steady_after_32", "lifecycle")
+PHASE_COUNT_FEATURES = (
+    "initial_16_packet_count",
+    "initial_32_packet_count",
+    "initial_64_packet_count",
+    "initial_128_packet_count",
+    "initial_50ms_packet_count",
+    "initial_100ms_packet_count",
+    "initial_250ms_packet_count",
+    "initial_500ms_packet_count",
+    "initial_1000ms_packet_count",
+    "initial_2000ms_packet_count",
+    "steady_after_32_packet_count",
+    "steady_after_2000ms_packet_count",
+    "lifecycle_tail_16_packet_count",
+)
 
 
 def percentile(values, fraction):
@@ -47,8 +88,7 @@ def percentile(values, fraction):
     if lower == upper:
         return float(ordered[lower])
     return float(
-        ordered[lower] * (upper - position)
-        + ordered[upper] * (position - lower)
+        ordered[lower] * (upper - position) + ordered[upper] * (position - lower)
     )
 
 
@@ -83,12 +123,19 @@ def load_dataset(path):
         reader = csv.DictReader(stream)
         if not reader.fieldnames:
             raise SystemExit("feature dataset has no header")
-        missing = METADATA_FIELDS - set(reader.fieldnames)
+        missing = REQUIRED_METADATA_FIELDS - set(reader.fieldnames)
         if missing:
-            raise SystemExit(f"feature dataset lacks metadata fields: {sorted(missing)}")
-        feature_names = [name for name in reader.fieldnames if name not in METADATA_FIELDS]
+            raise SystemExit(
+                f"feature dataset lacks metadata fields: {sorted(missing)}"
+            )
+        feature_names = [
+            name for name in reader.fieldnames if name not in METADATA_FIELDS
+        ]
         invalid = [
-            name for name in feature_names if not name.startswith(FEATURE_PREFIXES)
+            name
+            for name in feature_names
+            if not name.startswith(FEATURE_PREFIXES)
+            or any(term in name for term in FORBIDDEN_FEATURE_TERMS)
         ]
         if invalid:
             raise SystemExit(f"unknown or unsafe feature columns: {invalid[:8]}")
@@ -109,21 +156,64 @@ def load_dataset(path):
                 if not math.isfinite(value):
                     raise SystemExit(f"non-finite feature {name}")
                 values[name] = value
-            rows.append(
-                {
-                    "protocol": source["protocol"],
-                    "scenario": source["scenario"],
-                    "label": source["label"],
-                    "session_id": source["session_id"],
-                    "features": values,
-                }
-            )
+            rows.append({
+                "protocol": source["protocol"],
+                "scenario": source["scenario"],
+                "label": source["label"],
+                "session_id": source["session_id"],
+                "experiment_block": source.get("experiment_block") or None,
+                "features": values,
+            })
     group_labels = {}
     for row in rows:
         existing = group_labels.setdefault(row["session_id"], row["label"])
         if existing != row["label"]:
             raise SystemExit(f"mixed labels in session {row['session_id']}")
+    block_members = {}
+    for row in rows:
+        block = row["experiment_block"]
+        if not block:
+            continue
+        key = (row["protocol"], block)
+        block_members.setdefault(key, []).append(row)
+    if block_members and any(not row["experiment_block"] for row in rows):
+        raise SystemExit("experiment block metadata is missing from some rows")
+    expected_labels = ["firefox_a", "firefox_b", "naivefox"]
+    for (protocol, block), members in block_members.items():
+        scenarios = {row["scenario"] for row in members}
+        labels = sorted(row["label"] for row in members)
+        if len(scenarios) != 1:
+            raise SystemExit(
+                f"experiment block {block} spans multiple scenarios for {protocol}"
+            )
+        if labels != expected_labels:
+            raise SystemExit(
+                f"experiment block {block} has incomplete cohorts for {protocol}: "
+                f"{labels}"
+            )
+    for count_name in PHASE_COUNT_FEATURES:
+        if count_name not in feature_names:
+            continue
+        indicator_name = count_name.removesuffix("_packet_count") + "_present"
+        if indicator_name in feature_names:
+            continue
+        feature_names.append(indicator_name)
+        for row in rows:
+            row["features"][indicator_name] = float(
+                row["features"].get(count_name, 0.0) > 0.0
+            )
     return rows, feature_names
+
+
+def analysis_group(row):
+    if row.get("_analysis_group"):
+        return row["_analysis_group"]
+    block = row.get("experiment_block")
+    return f"block:{block}" if block else f"session:{row['session_id']}"
+
+
+def sample_weight_group(row):
+    return row.get("_weight_group") or analysis_group(row)
 
 
 def view_feature_names(all_names, view):
@@ -178,9 +268,7 @@ def view_feature_names(all_names, view):
     if view == "steady_after_32":
         return [name for name in all_names if name.startswith("steady_after_32_")]
     if view == "steady_after_2000ms":
-        return [
-            name for name in all_names if name.startswith("steady_after_2000ms_")
-        ]
+        return [name for name in all_names if name.startswith("steady_after_2000ms_")]
     if view == "lifecycle":
         return [name for name in all_names if name.startswith("lifecycle_")]
     raise ValueError(f"unknown feature view: {view}")
@@ -207,14 +295,15 @@ def grouped_folds(rows, labels, requested, seed):
     groups = {}
     for index, (row, label) in enumerate(zip(rows, labels)):
         group = groups.setdefault(
-            row["session_id"],
-            {"indices": [], "label": label, "scenario": row["scenario"]},
+            analysis_group(row),
+            {"indices": [], "labels": set(), "scenario": row["scenario"]},
         )
-        if group["label"] != label:
-            raise ValueError("one session has both classifier labels")
+        if group["scenario"] != row["scenario"]:
+            raise ValueError("one analysis group spans multiple scenarios")
         group["indices"].append(index)
+        group["labels"].add(label)
     class_groups = {
-        label: [name for name, group in groups.items() if group["label"] == label]
+        label: [name for name, group in groups.items() if label in group["labels"]]
         for label in (0, 1)
     }
     folds = min(requested, len(class_groups[0]), len(class_groups[1]))
@@ -222,15 +311,31 @@ def grouped_folds(rows, labels, requested, seed):
         raise ValueError("at least two independent sessions per class are required")
     assigned = [set() for _ in range(folds)]
     scenarios = sorted({group["scenario"] for group in groups.values()})
+    single_label_groups = all(len(group["labels"]) == 1 for group in groups.values())
     for scenario_index, scenario in enumerate(scenarios):
-        for label in (0, 1):
-            names = sorted(
-                name
-                for name, group in groups.items()
-                if group["label"] == label and group["scenario"] == scenario
-            )
+        if single_label_groups:
+            partitions = [
+                sorted(
+                    name
+                    for name, group in groups.items()
+                    if group["labels"] == {label} and group["scenario"] == scenario
+                )
+                for label in (0, 1)
+            ]
+        else:
+            partitions = [
+                sorted(
+                    name
+                    for name, group in groups.items()
+                    if group["scenario"] == scenario
+                )
+            ]
+        for partition_index, names in enumerate(partitions):
             rng = random.Random(
-                seed + stable_offset(f"{scenario}:{label}", 1_000_003)
+                seed
+                + stable_offset(
+                    f"{scenario}:{partition_index}:{len(partitions)}", 1_000_003
+                )
             )
             rng.shuffle(names)
             for occurrence, name in enumerate(names):
@@ -243,9 +348,10 @@ def grouped_folds(rows, labels, requested, seed):
         train_groups = all_groups - test_groups
         train = [index for name in train_groups for index in groups[name]["indices"]]
         test = [index for name in test_groups for index in groups[name]["indices"]]
-        if len({labels[index] for index in train}) < 2 or len(
-            {labels[index] for index in test}
-        ) < 2:
+        if (
+            len({labels[index] for index in train}) < 2
+            or len({labels[index] for index in test}) < 2
+        ):
             raise ValueError("grouped fold lacks one classifier class")
         result.append((train, test))
     if len(result) < 2:
@@ -256,9 +362,11 @@ def grouped_folds(rows, labels, requested, seed):
 def sample_weights(rows, labels, indices):
     per_group = {}
     for index in indices:
-        group = rows[index]["session_id"]
+        group = sample_weight_group(rows[index])
         per_group[group] = per_group.get(group, 0) + 1
-    base = {index: 1.0 / per_group[rows[index]["session_id"]] for index in indices}
+    base = {
+        index: 1.0 / per_group[sample_weight_group(rows[index])] for index in indices
+    }
     totals = {
         label: sum(base[index] for index in indices if labels[index] == label)
         for label in (0, 1)
@@ -271,14 +379,19 @@ def sample_weights(rows, labels, indices):
 
 def weighted_stats(rows, indices, weights, name):
     total = sum(weights[index] for index in indices)
-    mean = sum(
-        weights[index] * rows[index]["features"].get(name, 0.0) for index in indices
-    ) / total
-    variance = sum(
-        weights[index]
-        * (rows[index]["features"].get(name, 0.0) - mean) ** 2
-        for index in indices
-    ) / total
+    mean = (
+        sum(
+            weights[index] * rows[index]["features"].get(name, 0.0) for index in indices
+        )
+        / total
+    )
+    variance = (
+        sum(
+            weights[index] * (rows[index]["features"].get(name, 0.0) - mean) ** 2
+            for index in indices
+        )
+        / total
+    )
     return mean, math.sqrt(max(variance, 0.0))
 
 
@@ -287,7 +400,8 @@ def fit_model(rows, labels, indices, feature_names, max_features, l2, iterations
     candidates = []
     stats = {}
     class_indices = {
-        label: [index for index in indices if labels[index] == label] for label in (0, 1)
+        label: [index for index in indices if labels[index] == label]
+        for label in (0, 1)
     }
     for name in feature_names:
         mean, deviation = weighted_stats(rows, indices, weights, name)
@@ -313,17 +427,21 @@ def fit_model(rows, labels, indices, feature_names, max_features, l2, iterations
     model_weights = [0.0] * len(selected)
     bias = 0.0
     normalization = sum(weights.values())
+    standardized = {
+        index: [
+            (rows[index]["features"].get(name, 0.0) - stats[name][0]) / stats[name][1]
+            for name in selected
+        ]
+        for index in indices
+    }
     for iteration in range(iterations):
         gradient = [0.0] * len(selected)
         bias_gradient = 0.0
         for index in indices:
-            values = [
-                (rows[index]["features"].get(name, 0.0) - stats[name][0])
-                / stats[name][1]
-                for name in selected
-            ]
+            values = standardized[index]
             prediction = sigmoid(
-                bias + sum(weight * value for weight, value in zip(model_weights, values))
+                bias
+                + sum(weight * value for weight, value in zip(model_weights, values))
             )
             error = (prediction - labels[index]) * weights[index]
             bias_gradient += error
@@ -332,7 +450,9 @@ def fit_model(rows, labels, indices, feature_names, max_features, l2, iterations
         rate = 0.25 / math.sqrt(1.0 + iteration / 20.0)
         bias -= rate * bias_gradient / normalization
         for position in range(len(model_weights)):
-            regularized = gradient[position] / normalization + l2 * model_weights[position]
+            regularized = (
+                gradient[position] / normalization + l2 * model_weights[position]
+            )
             model_weights[position] -= rate * regularized
     return {
         "features": selected,
@@ -361,8 +481,12 @@ def best_threshold(labels, scores):
     for threshold in candidates:
         tp = sum(label and score >= threshold for label, score in zip(labels, scores))
         fn = sum(label and score < threshold for label, score in zip(labels, scores))
-        tn = sum(not label and score < threshold for label, score in zip(labels, scores))
-        fp = sum(not label and score >= threshold for label, score in zip(labels, scores))
+        tn = sum(
+            not label and score < threshold for label, score in zip(labels, scores)
+        )
+        fp = sum(
+            not label and score >= threshold for label, score in zip(labels, scores)
+        )
         tpr = tp / (tp + fn) if tp + fn else 0.0
         tnr = tn / (tn + fp) if tn + fp else 0.0
         balanced = (tpr + tnr) / 2
@@ -375,7 +499,9 @@ def best_threshold(labels, scores):
 def confusion_metrics(labels, predictions):
     tp = sum(label and prediction for label, prediction in zip(labels, predictions))
     fn = sum(label and not prediction for label, prediction in zip(labels, predictions))
-    tn = sum(not label and not prediction for label, prediction in zip(labels, predictions))
+    tn = sum(
+        not label and not prediction for label, prediction in zip(labels, predictions)
+    )
     fp = sum(not label and prediction for label, prediction in zip(labels, predictions))
     accuracy = (tp + tn) / len(labels)
     recall = tp / (tp + fn) if tp + fn else 0.0
@@ -390,34 +516,109 @@ def confusion_metrics(labels, predictions):
     }
 
 
-def clustered_bootstrap(rows, labels, scores, iterations, seed):
-    group_rows = {}
-    for index, row in enumerate(rows):
-        group_rows.setdefault(row["session_id"], []).append(index)
-    class_groups = {
-        label: [
-            group
-            for group, indices in group_rows.items()
-            if labels[indices[0]] == label
-        ]
-        for label in (0, 1)
+def fold_auc_metrics(labels, scores, fold_ids):
+    fold_results = []
+    for fold_id in sorted(set(fold_ids)):
+        indices = [index for index, value in enumerate(fold_ids) if value == fold_id]
+        fold_labels = [labels[index] for index in indices]
+        fold_scores = [scores[index] for index in indices]
+        positives = sum(fold_labels)
+        negatives = len(fold_labels) - positives
+        if not positives or not negatives:
+            raise ValueError("outer fold AUC requires both classes")
+        fold_results.append({
+            "fold": fold_id,
+            "auc": auc(fold_labels, fold_scores),
+            "positive": positives,
+            "negative": negatives,
+            "pairs": positives * negatives,
+        })
+    pair_count = sum(item["pairs"] for item in fold_results)
+    value = sum(item["auc"] * item["pairs"] for item in fold_results) / pair_count
+    return {
+        "auc": value,
+        "macro_auc": statistics.fmean(item["auc"] for item in fold_results),
+        "fold_auc": fold_results,
+        "comparable_pairs": pair_count,
     }
+
+
+def fit_cross_validated(
+    rows,
+    labels,
+    feature_names,
+    folds,
+    seed,
+    max_features,
+    l2,
+    iterations,
+    diagnostics,
+):
+    split = grouped_folds(rows, labels, folds, seed)
+    scores = [0.0] * len(rows)
+    hard_predictions = [False] * len(rows)
+    fold_ids = [-1] * len(rows)
+    coefficients = {}
+    thresholds = []
+    for fold_id, (train, test) in enumerate(split):
+        model = fit_model(
+            rows, labels, train, feature_names, max_features, l2, iterations
+        )
+        if diagnostics:
+            train_scores = [predict(model, rows[index]) for index in train]
+            threshold = best_threshold([labels[index] for index in train], train_scores)
+            thresholds.append(threshold)
+        for index in test:
+            scores[index] = predict(model, rows[index])
+            fold_ids[index] = fold_id
+            if diagnostics:
+                hard_predictions[index] = scores[index] >= threshold
+        if diagnostics:
+            for name, weight in zip(model["features"], model["weights"]):
+                coefficients.setdefault(name, []).append(weight)
+    if any(fold_id < 0 for fold_id in fold_ids):
+        raise ValueError("grouped split did not produce one prediction per row")
+    return {
+        "split": split,
+        "scores": scores,
+        "hard_predictions": hard_predictions,
+        "fold_ids": fold_ids,
+        "coefficients": coefficients,
+        "thresholds": thresholds,
+    }
+
+
+def clustered_bootstrap(rows, labels, scores, fold_ids, iterations, seed):
+    fold_groups = {}
+    for index, (row, fold_id) in enumerate(zip(rows, fold_ids)):
+        fold_groups.setdefault(fold_id, {}).setdefault(analysis_group(row), []).append(
+            index
+        )
     rng = random.Random(seed)
     auc_values = []
     d_values = []
     for _ in range(iterations):
-        sampled = []
-        for label in (0, 1):
-            sampled.extend(
-                rng.choice(class_groups[label]) for _ in range(len(class_groups[label]))
-            )
-        boot_labels = []
-        boot_scores = []
-        for group in sampled:
-            for index in group_rows[group]:
-                boot_labels.append(labels[index])
-                boot_scores.append(scores[index])
-        value = auc(boot_labels, boot_scores)
+        fold_values = []
+        fold_pairs = []
+        for groups in fold_groups.values():
+            strata = {}
+            for group, indices in groups.items():
+                signature = tuple(sorted({labels[index] for index in indices}))
+                strata.setdefault(signature, []).append(group)
+            sampled_indices = []
+            for group_names in strata.values():
+                for _ in group_names:
+                    sampled_indices.extend(groups[rng.choice(group_names)])
+            sampled_labels = [labels[index] for index in sampled_indices]
+            sampled_scores = [scores[index] for index in sampled_indices]
+            positives = sum(sampled_labels)
+            negatives = len(sampled_labels) - positives
+            fold_values.append(auc(sampled_labels, sampled_scores))
+            fold_pairs.append(positives * negatives)
+        value = sum(
+            fold_value * pair_count
+            for fold_value, pair_count in zip(fold_values, fold_pairs)
+        ) / sum(fold_pairs)
         auc_values.append(value)
         d_values.append(max(value, 1 - value))
     return {
@@ -427,38 +628,180 @@ def clustered_bootstrap(rows, labels, scores, iterations, seed):
             percentile(d_values, 0.025),
             percentile(d_values, 0.975),
         ],
-        "method": "grouped bootstrap of pooled out-of-fold predictions",
+        "method": (
+            "conditional clustered bootstrap of held-out groups within outer "
+            "folds; outer models remain fixed"
+        ),
     }
 
 
-def permutation_test(rows, labels, scores, iterations, seed):
-    if not iterations:
-        return None
+def refit_clustered_bootstrap(
+    rows,
+    labels,
+    feature_names,
+    folds,
+    seed,
+    max_features,
+    l2,
+    fit_iterations,
+    bootstrap_iterations,
+):
     groups = {}
     for index, row in enumerate(rows):
-        groups.setdefault(row["session_id"], []).append(index)
+        group = groups.setdefault(
+            analysis_group(row),
+            {"indices": [], "scenario": row["scenario"]},
+        )
+        if group["scenario"] != row["scenario"]:
+            raise ValueError("one bootstrap group spans multiple scenarios")
+        group["indices"].append(index)
     strata = {}
-    for group, indices in groups.items():
-        strata.setdefault(rows[indices[0]]["scenario"], []).append(group)
-    observed_auc = auc(labels, scores)
-    observed = max(observed_auc, 1 - observed_auc)
+    for name, group in groups.items():
+        signature = tuple(sorted({labels[index] for index in group["indices"]}))
+        strata.setdefault((group["scenario"], signature), []).append(name)
+    rng = random.Random(seed)
+    auc_values = []
+    attempts = 0
+    while len(auc_values) < bootstrap_iterations and attempts < max(
+        bootstrap_iterations * 5, 20
+    ):
+        attempts += 1
+        sampled_rows = []
+        sampled_labels = []
+        occurrence = 0
+        for group_names in strata.values():
+            for _ in group_names:
+                selected_name = rng.choice(group_names)
+                synthetic_group = f"refit-bootstrap-source:{selected_name}"
+                weight_group = f"refit-bootstrap-occurrence:{occurrence}"
+                occurrence += 1
+                for index in groups[selected_name]["indices"]:
+                    row = dict(rows[index])
+                    row["_analysis_group"] = synthetic_group
+                    row["_weight_group"] = weight_group
+                    sampled_rows.append(row)
+                    sampled_labels.append(labels[index])
+        try:
+            fitted = fit_cross_validated(
+                sampled_rows,
+                sampled_labels,
+                feature_names,
+                folds,
+                rng.randrange(2**31),
+                max_features,
+                l2,
+                fit_iterations,
+                False,
+            )
+            value = fold_auc_metrics(
+                sampled_labels, fitted["scores"], fitted["fold_ids"]
+            )["auc"]
+        except ValueError:
+            continue
+        auc_values.append(value)
+    if len(auc_values) < bootstrap_iterations:
+        raise ValueError("refit bootstrap produced too few valid grouped splits")
+    d_values = [max(value, 1 - value) for value in auc_values]
+    return {
+        "iterations": len(auc_values),
+        "auc_ci95": [percentile(auc_values, 0.025), percentile(auc_values, 0.975)],
+        "distinguishability_ci95": [
+            percentile(d_values, 0.025),
+            percentile(d_values, 0.975),
+        ],
+        "method": (
+            "workload-stratified cluster bootstrap with full grouped-CV pipeline "
+            "refit, including feature screening and standardization"
+        ),
+    }
+
+
+def permuted_session_labels(rows, labels, rng):
+    sessions = {}
+    for index, row in enumerate(rows):
+        session = sessions.setdefault(
+            row["session_id"],
+            {
+                "indices": [],
+                "label": labels[index],
+                "scenario": row["scenario"],
+                "block": row.get("experiment_block"),
+            },
+        )
+        if session["label"] != labels[index]:
+            raise ValueError("one session has both classifier labels")
+        if session["scenario"] != row["scenario"]:
+            raise ValueError("one session spans multiple scenarios")
+        session["indices"].append(index)
+    use_blocks = any(session["block"] for session in sessions.values())
+    strata = {}
+    for name, session in sessions.items():
+        if use_blocks and session["block"]:
+            key = (session["scenario"], f"block:{session['block']}")
+        else:
+            key = (session["scenario"], "unblocked")
+        strata.setdefault(key, []).append(name)
+    permuted = list(labels)
+    for session_names in strata.values():
+        shuffled = [sessions[name]["label"] for name in session_names]
+        rng.shuffle(shuffled)
+        for name, label in zip(session_names, shuffled):
+            for index in sessions[name]["indices"]:
+                permuted[index] = label
+    return permuted
+
+
+def permutation_test(
+    rows,
+    labels,
+    observed,
+    feature_names,
+    folds,
+    max_features,
+    l2,
+    fit_iterations,
+    iterations,
+    seed,
+):
+    if not iterations:
+        return None
     rng = random.Random(seed)
     extreme = 0
-    for _ in range(iterations):
-        permuted = list(labels)
-        for group_names in strata.values():
-            group_labels = [labels[groups[group][0]] for group in group_names]
-            rng.shuffle(group_labels)
-            for group, label in zip(group_names, group_labels):
-                for index in groups[group]:
-                    permuted[index] = label
-        value = auc(permuted, scores)
-        if max(value, 1 - value) >= observed:
+    completed = 0
+    attempts = 0
+    while completed < iterations and attempts < max(iterations * 5, 20):
+        attempts += 1
+        permuted = permuted_session_labels(rows, labels, rng)
+        try:
+            fitted = fit_cross_validated(
+                rows,
+                permuted,
+                feature_names,
+                folds,
+                seed,
+                max_features,
+                l2,
+                fit_iterations,
+                False,
+            )
+            value = fold_auc_metrics(permuted, fitted["scores"], fitted["fold_ids"])[
+                "auc"
+            ]
+        except ValueError:
+            continue
+        completed += 1
+        if value >= observed:
             extreme += 1
+    if completed < iterations:
+        raise ValueError("permutation refits produced too few valid grouped splits")
     return {
-        "iterations": iterations,
-        "p_value": (extreme + 1) / (iterations + 1),
-        "method": "group-label permutation within workload on fixed out-of-fold scores",
+        "iterations": completed,
+        "p_value": (extreme + 1) / (completed + 1),
+        "alternative": "orientation-fixed AUC greater than the null",
+        "method": (
+            "session-label permutation within experiment block and workload "
+            "with full grouped-CV pipeline refit"
+        ),
     }
 
 
@@ -473,65 +816,111 @@ def analyze_comparison(
     iterations,
     bootstrap_iterations,
     permutation_iterations,
+    refit_bootstrap_iterations=0,
 ):
     try:
-        split = grouped_folds(rows, labels, folds, seed)
+        fitted = fit_cross_validated(
+            rows,
+            labels,
+            feature_names,
+            folds,
+            seed,
+            max_features,
+            l2,
+            iterations,
+            True,
+        )
     except ValueError as error:
         return {"available": False, "reason": str(error)}
-    scores = [0.0] * len(rows)
-    hard_predictions = [False] * len(rows)
-    coefficients = {}
-    thresholds = []
-    for train, test in split:
-        model = fit_model(
-            rows, labels, train, feature_names, max_features, l2, iterations
-        )
-        train_scores = [predict(model, rows[index]) for index in train]
-        threshold = best_threshold([labels[index] for index in train], train_scores)
-        thresholds.append(threshold)
-        for index in test:
-            scores[index] = predict(model, rows[index])
-            hard_predictions[index] = scores[index] >= threshold
-        for name, weight in zip(model["features"], model["weights"]):
-            coefficients.setdefault(name, []).append(weight)
-    auc_value = auc(labels, scores)
+    split = fitted["split"]
+    scores = fitted["scores"]
+    hard_predictions = fitted["hard_predictions"]
+    coefficients = fitted["coefficients"]
+    thresholds = fitted["thresholds"]
+    auc_metrics = fold_auc_metrics(labels, scores, fitted["fold_ids"])
+    auc_value = auc_metrics["auc"]
     distinguishability = max(auc_value, 1 - auc_value)
     metrics = confusion_metrics(labels, hard_predictions)
     importance = []
     for name, values in coefficients.items():
         padded = values + [0.0] * (len(split) - len(values))
-        importance.append(
-            {
-                "feature": name,
-                "mean_abs_standardized_coefficient": statistics.fmean(
-                    abs(value) for value in padded
-                ),
-                "mean_signed_standardized_coefficient": statistics.fmean(padded),
-                "selection_count": len(values),
-            }
-        )
+        importance.append({
+            "feature": name,
+            "mean_abs_standardized_coefficient": statistics.fmean(
+                abs(value) for value in padded
+            ),
+            "mean_signed_standardized_coefficient": statistics.fmean(padded),
+            "selection_count": len(values),
+        })
     importance.sort(
         key=lambda item: (-item["mean_abs_standardized_coefficient"], item["feature"])
     )
     result = {
         "available": True,
         "samples": {"negative": labels.count(0), "positive": labels.count(1)},
-        "groups": len({row["session_id"] for row in rows}),
+        "groups": len({analysis_group(row) for row in rows}),
+        "sessions": len({row["session_id"] for row in rows}),
+        "grouping": (
+            "experiment_block"
+            if any(row.get("experiment_block") for row in rows)
+            else "session_id"
+        ),
         "folds": len(split),
         "features_considered": len(feature_names),
         "max_features_per_fold": max_features,
         "auc": auc_value,
+        "macro_fold_auc": auc_metrics["macro_auc"],
+        "fold_auc": auc_metrics["fold_auc"],
+        "comparable_pairs": auc_metrics["comparable_pairs"],
         "distinguishability": distinguishability,
         "train_selected_threshold_median": statistics.median(thresholds),
         **metrics,
         **clustered_bootstrap(
-            rows, labels, scores, bootstrap_iterations, seed + 104729
-        ),
-        "permutation_test": permutation_test(
-            rows, labels, scores, permutation_iterations, seed + 130363
+            rows,
+            labels,
+            scores,
+            fitted["fold_ids"],
+            bootstrap_iterations,
+            seed + 104729,
         ),
         "top_features": importance[:12],
     }
+    try:
+        result["permutation_test"] = permutation_test(
+            rows,
+            labels,
+            auc_value,
+            feature_names,
+            folds,
+            max_features,
+            l2,
+            iterations,
+            permutation_iterations,
+            seed + 130363,
+        )
+    except ValueError as error:
+        result["permutation_test"] = {
+            "available": False,
+            "reason": str(error),
+        }
+    if refit_bootstrap_iterations:
+        try:
+            result["refit_bootstrap"] = refit_clustered_bootstrap(
+                rows,
+                labels,
+                feature_names,
+                folds,
+                seed + 155921,
+                max_features,
+                l2,
+                iterations,
+                refit_bootstrap_iterations,
+            )
+        except ValueError as error:
+            result["refit_bootstrap"] = {
+                "available": False,
+                "reason": str(error),
+            }
     return result
 
 
@@ -540,14 +929,56 @@ def classify(target, baseline, mode):
         return "inconclusive"
     if mode != "research":
         return "inconclusive"
-    value = target["distinguishability"]
-    lower, upper = target["distinguishability_ci95"]
-    delta = value - baseline["distinguishability"]
-    if value >= 0.70 and lower >= 0.60:
+    target_uncertainty = target.get("refit_bootstrap")
+    baseline_uncertainty = baseline.get("refit_bootstrap")
+    if not isinstance(target_uncertainty, dict) or not isinstance(
+        baseline_uncertainty, dict
+    ):
+        return "inconclusive"
+    if (
+        target_uncertainty.get("available") is False
+        or baseline_uncertainty.get("available") is False
+    ):
+        return "inconclusive"
+    value = target["auc"]
+    lower, upper = target_uncertainty["auc_ci95"]
+    baseline_value = baseline["auc"]
+    baseline_lower, baseline_upper = baseline_uncertainty["auc_ci95"]
+    baseline_healthy = (
+        0.40 <= baseline_value <= 0.60
+        and 0.40 <= baseline_lower <= 0.50 <= baseline_upper <= 0.60
+        and baseline_upper - baseline_lower <= 0.12
+    )
+    if not baseline_healthy:
+        return "yellow"
+    permutation = target.get("permutation_test")
+    significant = bool(
+        permutation
+        and permutation.get("p_value") is not None
+        and permutation["p_value"] <= 0.05
+    )
+    if value >= 0.70 and lower >= 0.60 and significant:
         return "red"
-    if value <= 0.60 and delta <= 0.05 and upper <= 0.65 and upper - lower <= 0.12:
+    target_advantage = abs(value - 0.50)
+    baseline_advantage = abs(baseline_value - 0.50)
+    if (
+        0.40 <= lower
+        and upper <= 0.60
+        and upper - lower <= 0.12
+        and target_advantage - baseline_advantage <= 0.05
+    ):
         return "green"
     return "yellow"
+
+
+def permutation_plan(view, comparison, requested):
+    if comparison != "firefox_vs_naivefox":
+        return 0, "the Firefox-A-versus-Firefox-B baseline is not a verdict test"
+    if view not in PRIMARY_VIEWS:
+        return 0, "permutation refits are reserved for the predeclared primary views"
+    if not requested:
+        return 0, "disabled by --permutations=0"
+    return requested, None
 
 
 def cross_workload(rows, feature_names, seed, max_features, l2, iterations):
@@ -555,11 +986,16 @@ def cross_workload(rows, feature_names, seed, max_features, l2, iterations):
     scenarios = sorted({row["scenario"] for row in selected})
     results = {}
     for scenario in scenarios:
-        train = [index for index, row in enumerate(selected) if row["scenario"] != scenario]
-        test = [index for index, row in enumerate(selected) if row["scenario"] == scenario]
-        if len({labels[index] for index in train}) < 2 or len(
-            {labels[index] for index in test}
-        ) < 2:
+        train = [
+            index for index, row in enumerate(selected) if row["scenario"] != scenario
+        ]
+        test = [
+            index for index, row in enumerate(selected) if row["scenario"] == scenario
+        ]
+        if (
+            len({labels[index] for index in train}) < 2
+            or len({labels[index] for index in test}) < 2
+        ):
             continue
         if min(sum(labels[index] == label for index in test) for label in (0, 1)) < 2:
             continue
@@ -576,6 +1012,11 @@ def cross_workload(rows, feature_names, seed, max_features, l2, iterations):
         }
     return {
         "holdouts": results,
+        "macro_auc": (
+            statistics.fmean(item["auc"] for item in results.values())
+            if results
+            else None
+        ),
         "macro_distinguishability": (
             statistics.fmean(item["distinguishability"] for item in results.values())
             if results
@@ -588,7 +1029,13 @@ def passive_handshake_differences(rows, feature_names):
     names = [
         name
         for name in feature_names
-        if name.startswith(("tls_", "tcp_syn_", "quic_initial_", "quic_tp_", "quic_version_"))
+        if name.startswith((
+            "tls_",
+            "tcp_syn_",
+            "quic_initial_",
+            "quic_tp_",
+            "quic_version_",
+        ))
     ]
     firefox = [row for row in rows if row["label"].startswith("firefox_")]
     naivefox = [row for row in rows if row["label"] == "naivefox"]
@@ -597,8 +1044,17 @@ def passive_handshake_differences(rows, feature_names):
         left = statistics.fmean(row["features"].get(name, 0.0) for row in firefox)
         right = statistics.fmean(row["features"].get(name, 0.0) for row in naivefox)
         if abs(left - right) > 1e-12:
-            differences.append({"feature": name, "firefox_mean": left, "naivefox_mean": right})
-    differences.sort(key=lambda item: (-abs(item["firefox_mean"] - item["naivefox_mean"]), item["feature"]))
+            differences.append({
+                "feature": name,
+                "firefox_mean": left,
+                "naivefox_mean": right,
+            })
+    differences.sort(
+        key=lambda item: (
+            -abs(item["firefox_mean"] - item["naivefox_mean"]),
+            item["feature"],
+        )
+    )
     return {
         "scope": "passively visible handshake fields only; not decrypted H2/H3 parity",
         "different_feature_count": len(differences),
@@ -613,10 +1069,34 @@ def build_report(args, rows, all_feature_names):
         "seed": args.seed,
         "methodology": {
             "classifier": "dependency-free L2 logistic regression",
-            "split": "stratified grouped cross-validation by session_id",
+            "split": (
+                "workload-stratified grouped cross-validation by experiment_block "
+                "when present, otherwise session_id"
+            ),
             "preprocessing": "train-only standardization and feature screening",
-            "metric": "D=max(ROC_AUC,1-ROC_AUC)",
+            "primary_metric": (
+                "orientation-fixed ROC AUC, pair-weighted across outer folds; "
+                "NaiveFox or Firefox-B is always the positive class"
+            ),
+            "diagnostic_metric": "D=max(ROC_AUC,1-ROC_AUC), never used for verdicts",
+            "missing_phases": (
+                "structural zeros plus explicit present indicators derived from "
+                "observable phase packet counts"
+            ),
+            "bootstrap": (
+                "conditional clustered resampling within outer folds; no comparisons "
+                "between uncalibrated fold score scales"
+            ),
+            "verdict_uncertainty": (
+                "workload-stratified cluster bootstrap with full grouped-CV "
+                "pipeline refit for both comparisons in primary views"
+            ),
+            "permutation": "full grouped-CV pipeline refit",
+            "permutation_scope": (
+                "Firefox-vs-NaiveFox in the three predeclared primary views only"
+            ),
             "bootstrap_iterations": args.bootstrap,
+            "refit_bootstrap_iterations": args.refit_bootstrap,
             "permutation_iterations": args.permutations,
             "labels_excluded_from_features": True,
             "decrypted_features_used": False,
@@ -653,18 +1133,28 @@ def build_report(args, rows, all_feature_names):
             view_report = {}
             for comparison in ("firefox_baseline", "firefox_vs_naivefox"):
                 selected, labels = comparison_rows(protocol_rows, comparison)
-                view_report[comparison] = analyze_comparison(
+                permutation_iterations, permutation_reason = permutation_plan(
+                    view, comparison, args.permutations
+                )
+                refit_iterations = args.refit_bootstrap if view in PRIMARY_VIEWS else 0
+                comparison_report = analyze_comparison(
                     selected,
                     labels,
                     names,
                     args.folds,
-                    args.seed + stable_offset(f"{protocol}:{view}:{comparison}", 100000),
+                    args.seed
+                    + stable_offset(f"{protocol}:{view}:{comparison}", 100000),
                     args.max_features,
                     args.l2,
                     args.iterations,
                     args.bootstrap,
-                    args.permutations,
+                    permutation_iterations,
+                    refit_iterations,
                 )
+                if not permutation_iterations:
+                    comparison_report["permutation_test"] = None
+                    comparison_report["permutation_test_reason"] = permutation_reason
+                view_report[comparison] = comparison_report
             view_report["classification"] = classify(
                 view_report["firefox_vs_naivefox"],
                 view_report["firefox_baseline"],
@@ -674,27 +1164,36 @@ def build_report(args, rows, all_feature_names):
                 "firefox_vs_naivefox"
             ].get("available"):
                 view_report["baseline_delta"] = (
-                    view_report["firefox_vs_naivefox"]["distinguishability"]
-                    - view_report["firefox_baseline"]["distinguishability"]
+                    view_report["firefox_vs_naivefox"]["auc"]
+                    - view_report["firefox_baseline"]["auc"]
                 )
             protocol_report["views"][view] = view_report
         for scenario in sorted({row["scenario"] for row in protocol_rows}):
-            workload_rows = [row for row in protocol_rows if row["scenario"] == scenario]
+            workload_rows = [
+                row for row in protocol_rows if row["scenario"] == scenario
+            ]
             workload_report = {}
             for comparison in ("firefox_baseline", "firefox_vs_naivefox"):
                 selected, labels = comparison_rows(workload_rows, comparison)
-                workload_report[comparison] = analyze_comparison(
+                comparison_report = analyze_comparison(
                     selected,
                     labels,
                     view_feature_names(all_feature_names, "whole"),
                     args.folds,
-                    args.seed + stable_offset(f"{protocol}:{scenario}:{comparison}", 100000),
+                    args.seed
+                    + stable_offset(f"{protocol}:{scenario}:{comparison}", 100000),
                     args.max_features,
                     args.l2,
                     args.iterations,
                     args.bootstrap,
                     0,
+                    0,
                 )
+                comparison_report["permutation_test"] = None
+                comparison_report["permutation_test_reason"] = (
+                    "per-workload results are exploratory, not primary verdict tests"
+                )
+                workload_report[comparison] = comparison_report
             workload_report["classification"] = classify(
                 workload_report["firefox_vs_naivefox"],
                 workload_report["firefox_baseline"],
@@ -702,11 +1201,10 @@ def build_report(args, rows, all_feature_names):
             )
             protocol_report["workloads"][scenario] = workload_report
         report["protocols"][protocol] = protocol_report
-    primary_views = ("initial_packets_32", "steady_after_32", "lifecycle")
     red = []
     green = []
     for protocol, protocol_report in report["protocols"].items():
-        for view in primary_views:
+        for view in PRIMARY_VIEWS:
             classification = protocol_report["views"][view]["classification"]
             red.append(classification == "red")
             green.append(classification == "green")
@@ -729,11 +1227,16 @@ def build_report(args, rows, all_feature_names):
 def format_metric(result):
     if not result.get("available"):
         return f"unavailable ({result.get('reason', 'insufficient data')})"
-    lower, upper = result["distinguishability_ci95"]
-    return (
-        f"D={result['distinguishability']:.3f} "
-        f"AUC={result['auc']:.3f} CI95=[{lower:.3f},{upper:.3f}]"
+    lower, upper = result["auc_ci95"]
+    text = (
+        f"AUC={result['auc']:.3f} CI95=[{lower:.3f},{upper:.3f}] "
+        f"diagnostic_D={result['distinguishability']:.3f}"
     )
+    refit = result.get("refit_bootstrap")
+    if isinstance(refit, dict) and "auc_ci95" in refit:
+        refit_lower, refit_upper = refit["auc_ci95"]
+        text += f" refit_CI95=[{refit_lower:.3f},{refit_upper:.3f}]"
+    return text
 
 
 def write_summary(path, report):
@@ -749,7 +1252,8 @@ def write_summary(path, report):
     for protocol, data in report["protocols"].items():
         lines.append(protocol.upper())
         lines.append(
-            "samples=" + ", ".join(f"{name}:{count}" for name, count in data["samples"].items())
+            "samples="
+            + ", ".join(f"{name}:{count}" for name, count in data["samples"].items())
         )
         for view in (
             "whole",
@@ -765,7 +1269,9 @@ def write_summary(path, report):
             "lifecycle",
         ):
             item = data["views"][view]
-            lines.append(f"{view} Firefox-vs-Firefox: {format_metric(item['firefox_baseline'])}")
+            lines.append(
+                f"{view} Firefox-vs-Firefox: {format_metric(item['firefox_baseline'])}"
+            )
             lines.append(
                 f"{view} Firefox-vs-NaiveFox: "
                 f"{format_metric(item['firefox_vs_naivefox'])} {item['classification'].upper()}"
@@ -775,7 +1281,7 @@ def write_summary(path, report):
                 lines.append(
                     "  top=" + ", ".join(feature["feature"] for feature in top)
                 )
-        cross = data["cross_workload"]["macro_distinguishability"]
+        cross = data["cross_workload"]["macro_auc"]
         holdouts = data["cross_workload"]["holdouts"]
         lines.append(
             "cross_workload_holdouts="
@@ -784,7 +1290,8 @@ def write_summary(path, report):
             + str(sum(item["samples"] for item in holdouts.values()))
         )
         lines.append(
-            "cross_workload_macro_D=" + ("unavailable" if cross is None else f"{cross:.3f}")
+            "cross_workload_macro_AUC="
+            + ("unavailable" if cross is None else f"{cross:.3f}")
         )
         lines.append("same_base_decrypted_parity=not_run_by_passive_suite")
         lines.append("")
@@ -802,10 +1309,13 @@ def main():
     parser.add_argument("--features", required=True)
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--output-summary", required=True)
-    parser.add_argument("--mode", choices=("gate", "smoke", "standard", "research"), required=True)
+    parser.add_argument(
+        "--mode", choices=("gate", "smoke", "standard", "research"), required=True
+    )
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--bootstrap", type=int, default=1000)
+    parser.add_argument("--refit-bootstrap", type=int, default=0)
     parser.add_argument("--permutations", type=int, default=0)
     parser.add_argument("--max-features", type=int, default=64)
     parser.add_argument("--l2", type=float, default=0.05)
@@ -813,6 +1323,8 @@ def main():
     args = parser.parse_args()
     if args.bootstrap < 100:
         raise SystemExit("bootstrap iterations must be at least 100")
+    if args.refit_bootstrap not in (0,) and args.refit_bootstrap < 20:
+        raise SystemExit("refit bootstrap iterations must be zero or at least 20")
     rows, feature_names = load_dataset(args.features)
     report = build_report(args, rows, feature_names)
     with open(args.output_json, "w", encoding="utf-8") as stream:

@@ -7,12 +7,17 @@ import json
 import math
 import os
 import re
-import statistics
 import subprocess
 
-
 SCHEMA_VERSION = 1
-METADATA_FIELDS = ("schema_version", "protocol", "scenario", "label", "session_id")
+METADATA_FIELDS = (
+    "schema_version",
+    "protocol",
+    "scenario",
+    "label",
+    "session_id",
+    "experiment_block",
+)
 FORBIDDEN_FEATURE_TERMS = (
     "absolute_timestamp",
     "authority",
@@ -21,11 +26,13 @@ FORBIDDEN_FEATURE_TERMS = (
     "credential",
     "destination_port",
     "filename",
+    "label",
     "password",
     "path",
     "process_duration",
     "profile",
     "query",
+    "session_id",
     "source_port",
 )
 
@@ -61,8 +68,7 @@ def percentile(values, fraction):
     if lower == upper:
         return float(ordered[lower])
     return float(
-        ordered[lower] * (upper - position)
-        + ordered[upper] * (position - lower)
+        ordered[lower] * (upper - position) + ordered[upper] * (position - lower)
     )
 
 
@@ -117,8 +123,7 @@ def tshark_rows(pcap, decode, display_filter, fields):
     result = subprocess.run(
         command,
         check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
     )
     return list(csv.DictReader(io.StringIO(result.stdout)))
@@ -166,20 +171,12 @@ def parse_tcp_option_order(raw):
 def extract_handshake(pcap, protocol, server_port, features):
     if protocol == "h2":
         decode = ["-d", f"tcp.port=={server_port},tls"]
-        client_filter = (
-            f"tcp.dstport=={server_port} && tls.handshake.type==1"
-        )
-        server_filter = (
-            f"tcp.srcport=={server_port} && tls.handshake.type==2"
-        )
+        client_filter = f"tcp.dstport=={server_port} && tls.handshake.type==1"
+        server_filter = f"tcp.srcport=={server_port} && tls.handshake.type==2"
     else:
         decode = ["-d", f"udp.port=={server_port},quic"]
-        client_filter = (
-            f"udp.dstport=={server_port} && tls.handshake.type==1"
-        )
-        server_filter = (
-            f"udp.srcport=={server_port} && tls.handshake.type==2"
-        )
+        client_filter = f"udp.dstport=={server_port} && tls.handshake.type==1"
+        server_filter = f"udp.srcport=={server_port} && tls.handshake.type==2"
     fields = [
         "tls.handshake.length",
         "tls.record.version",
@@ -206,7 +203,11 @@ def extract_handshake(pcap, protocol, server_port, features):
             bool(split_values(hello["tls.handshake.extensions_server_name"]))
         )
         for name, field, ordered in (
-            ("tls_supported_version", "tls.handshake.extensions.supported_version", False),
+            (
+                "tls_supported_version",
+                "tls.handshake.extensions.supported_version",
+                False,
+            ),
             ("tls_cipher", "tls.handshake.ciphersuite", True),
             ("tls_extension", "tls.handshake.extension.type", True),
             ("tls_group", "tls.handshake.extensions_supported_group", True),
@@ -232,7 +233,10 @@ def extract_handshake(pcap, protocol, server_port, features):
         for name, field in (
             ("tls_server_version", "tls.handshake.extensions.supported_version"),
             ("tls_server_cipher", "tls.handshake.ciphersuite"),
-            ("tls_server_key_share", "tls.handshake.extensions_key_share_selected_group"),
+            (
+                "tls_server_key_share",
+                "tls.handshake.extensions_key_share_selected_group",
+            ),
         ):
             values = split_values(hello[field])
             if values:
@@ -307,13 +311,11 @@ def packet_events_h2(pcap, server_port):
         }
         events.append(event)
         for length in split_values(row["tls.record.length"]):
-            records.append(
-                {
-                    "time": event["time"],
-                    "direction": event["direction"],
-                    "length": integer(length),
-                }
-            )
+            records.append({
+                "time": event["time"],
+                "direction": event["direction"],
+                "length": integer(length),
+            })
     return sorted(events, key=lambda item: (item["time"], item["frame"])), records
 
 
@@ -351,28 +353,26 @@ def packet_events_h3(pcap, server_port):
         if not wire_size:
             wire_size = integer(row["frame.len"])
         packet_types = split_values(row["quic.long.packet_type"])
-        events.append(
-            {
-                "frame": integer(row["frame.number"]),
-                "time": number(row["frame.time_relative"]),
-                "direction": 1 if outbound else -1,
-                "transport_size": integer(row["udp.length"]),
-                "wire_size": wire_size,
-                "flow": row["quic.connection.number"],
-                "versions": split_values(row["quic.version"]),
-                "packet_types": packet_types,
-                "dcil": split_values(row["quic.dcil"]),
-                "scil": split_values(row["quic.scil"]),
-                "syn": False,
-                "ack": False,
-                "fin": False,
-                "rst": False,
-                "retransmission": False,
-                "out_of_order": False,
-                "lost_segment": False,
-                "row": row,
-            }
-        )
+        events.append({
+            "frame": integer(row["frame.number"]),
+            "time": number(row["frame.time_relative"]),
+            "direction": 1 if outbound else -1,
+            "transport_size": integer(row["udp.length"]),
+            "wire_size": wire_size,
+            "flow": row["quic.connection.number"],
+            "versions": split_values(row["quic.version"]),
+            "packet_types": packet_types,
+            "dcil": split_values(row["quic.dcil"]),
+            "scil": split_values(row["quic.scil"]),
+            "syn": False,
+            "ack": False,
+            "fin": False,
+            "rst": False,
+            "retransmission": False,
+            "out_of_order": False,
+            "lost_segment": False,
+            "row": row,
+        })
     return sorted(events, key=lambda item: (item["time"], item["frame"])), []
 
 
@@ -397,10 +397,16 @@ def add_h3_tcp_probe_features(pcap, server_port, features):
         len({row["tcp.stream"] for row in rows if row["tcp.stream"]})
     )
     features["quic_tcp_probe_client_syn_count"] = float(
-        sum(truthy(row["tcp.flags.syn"]) and not truthy(row["tcp.flags.ack"]) for row in client)
+        sum(
+            truthy(row["tcp.flags.syn"]) and not truthy(row["tcp.flags.ack"])
+            for row in client
+        )
     )
     features["quic_tcp_probe_server_syn_ack_count"] = float(
-        sum(truthy(row["tcp.flags.syn"]) and truthy(row["tcp.flags.ack"]) for row in server)
+        sum(
+            truthy(row["tcp.flags.syn"]) and truthy(row["tcp.flags.ack"])
+            for row in server
+        )
     )
     features["quic_tcp_probe_client_rst_count"] = float(
         sum(truthy(row["tcp.flags.reset"]) for row in client)
@@ -539,9 +545,7 @@ def add_sequence_features(features, events):
         add_aggregate(features, f"initial_{window}", events[:window])
     for milliseconds in (50, 100, 250, 500, 1000, 2000):
         selected = [
-            event
-            for event in events
-            if (event["time"] - origin) * 1000 <= milliseconds
+            event for event in events if (event["time"] - origin) * 1000 <= milliseconds
         ]
         add_aggregate(features, f"initial_{milliseconds}ms", selected)
     add_aggregate(features, "steady_after_32", events[32:])
@@ -586,7 +590,9 @@ def add_h2_features(features, events):
         ("client_rst", lambda event: event["rst"] and event["direction"] > 0),
         ("server_rst", lambda event: event["rst"] and event["direction"] < 0),
     ):
-        features[f"lifecycle_{name}_count"] = float(sum(predicate(event) for event in events))
+        features[f"lifecycle_{name}_count"] = float(
+            sum(predicate(event) for event in events)
+        )
     add_aggregate(features, "lifecycle_tail_16", events[-16:])
     client_syns = [
         event
@@ -729,6 +735,7 @@ def extract(args):
         "scenario": args.scenario,
         "label": args.label,
         "session_id": args.session_id,
+        "experiment_block": args.experiment_block or "",
         "features": features,
     }
     temporary = args.output + ".tmp"
@@ -752,11 +759,14 @@ def merge(args):
     if not documents:
         raise SystemExit("no extracted feature documents found")
     counts = {}
+    blocks = {}
     sessions = set()
     feature_names = set()
     for document in documents:
         key = (document["protocol"], document["label"])
         counts[key] = counts.get(key, 0) + 1
+        block = document.get("experiment_block") or document["session_id"]
+        blocks.setdefault((document["protocol"], block), []).append(document)
         if document["session_id"] in sessions:
             raise SystemExit(f"duplicate session id: {document['session_id']}")
         sessions.add(document["session_id"])
@@ -770,13 +780,22 @@ def merge(args):
                         f"{protocol}/{label} has {counts.get((protocol, label), 0)} "
                         f"samples, expected {args.expected_per_cohort}"
                     )
+        expected_labels = ["firefox_a", "firefox_b", "naivefox"]
+        for (protocol, block), members in sorted(blocks.items()):
+            labels = sorted(document["label"] for document in members)
+            scenarios = {document["scenario"] for document in members}
+            if labels != expected_labels or len(scenarios) != 1:
+                raise SystemExit(
+                    f"incomplete experiment block {protocol}/{block}: "
+                    f"labels={labels}, scenarios={sorted(scenarios)}"
+                )
     fieldnames = [*METADATA_FIELDS, *sorted(feature_names)]
     temporary = args.output + ".tmp"
     with open(temporary, "w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         for document in documents:
-            row = {name: document[name] for name in METADATA_FIELDS}
+            row = {name: document.get(name, "") for name in METADATA_FIELDS}
             row.update(document["features"])
             writer.writerow(row)
     os.replace(temporary, args.output)
@@ -794,6 +813,7 @@ def main():
         "--label", choices=("firefox_a", "firefox_b", "naivefox"), required=True
     )
     extract_parser.add_argument("--session-id", required=True)
+    extract_parser.add_argument("--experiment-block")
     extract_parser.add_argument("--output", required=True)
     extract_parser.set_defaults(function=extract)
     merge_parser = commands.add_parser("merge")

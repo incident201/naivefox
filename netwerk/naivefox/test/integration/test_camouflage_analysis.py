@@ -7,7 +7,6 @@ import random
 import tempfile
 import unittest
 
-
 HERE = os.path.dirname(__file__)
 SPEC = importlib.util.spec_from_file_location(
     "analyze_camouflage", os.path.join(HERE, "analyze-camouflage.py")
@@ -31,18 +30,16 @@ def synthetic_rows(count=12, signal=True):
             value = (4.0 if positive else -4.0) + rng.uniform(-0.25, 0.25)
             if not signal:
                 value = rng.uniform(-1.0, 1.0)
-            rows.append(
-                {
-                    "protocol": "h2",
-                    "scenario": "initial" if index % 2 else "browser_page",
-                    "label": label,
-                    "session_id": f"{label}-{index}",
-                    "features": {
-                        "whole_signal": value,
-                        "whole_noise": rng.uniform(-1.0, 1.0),
-                    },
-                }
-            )
+            rows.append({
+                "protocol": "h2",
+                "scenario": "initial" if index % 2 else "browser_page",
+                "label": label,
+                "session_id": f"{label}-{index}",
+                "features": {
+                    "whole_signal": value,
+                    "whole_noise": rng.uniform(-1.0, 1.0),
+                },
+            })
     return rows
 
 
@@ -64,6 +61,17 @@ class CamouflageAnalysisTests(unittest.TestCase):
             test_groups = {selected[index]["session_id"] for index in test}
             self.assertFalse(train_groups & test_groups)
 
+    def test_experiment_blocks_are_kept_in_one_fold(self):
+        rows = synthetic_rows(10)
+        for row in rows:
+            row["experiment_block"] = "block-" + row["session_id"].rsplit("-", 1)[1]
+        selected, labels = ANALYZE.comparison_rows(rows, "firefox_vs_naivefox")
+        split = ANALYZE.grouped_folds(selected, labels, 5, 42)
+        for train, test in split:
+            train_groups = {ANALYZE.analysis_group(selected[index]) for index in train}
+            test_groups = {ANALYZE.analysis_group(selected[index]) for index in test}
+            self.assertFalse(train_groups & test_groups)
+
     def test_strong_signal_is_found_and_explained(self):
         rows = synthetic_rows(12)
         selected, labels = ANALYZE.comparison_rows(rows, "firefox_vs_naivefox")
@@ -80,8 +88,189 @@ class CamouflageAnalysisTests(unittest.TestCase):
             0,
         )
         self.assertTrue(result["available"])
-        self.assertGreater(result["distinguishability"], 0.95)
+        self.assertGreater(result["auc"], 0.95)
         self.assertEqual(result["top_features"][0]["feature"], "whole_signal")
+
+    def test_null_signal_stays_at_chance(self):
+        rows = synthetic_rows(12)
+        for row in rows:
+            row["features"] = {"whole_constant": 1.0}
+        selected, labels = ANALYZE.comparison_rows(rows, "firefox_vs_naivefox")
+        result = ANALYZE.analyze_comparison(
+            selected,
+            labels,
+            ["whole_constant"],
+            5,
+            73,
+            1,
+            0.05,
+            40,
+            100,
+            9,
+        )
+        self.assertEqual(result["auc"], 0.5)
+        self.assertEqual(result["auc_ci95"], [0.5, 0.5])
+        self.assertEqual(result["permutation_test"]["p_value"], 1.0)
+
+    def test_permutation_refits_the_full_pipeline(self):
+        rows = synthetic_rows(8)
+        selected, labels = ANALYZE.comparison_rows(rows, "firefox_vs_naivefox")
+        original = ANALYZE.fit_cross_validated
+        calls = []
+
+        def counted(*args, **kwargs):
+            calls.append(1)
+            return original(*args, **kwargs)
+
+        ANALYZE.fit_cross_validated = counted
+        try:
+            result = ANALYZE.analyze_comparison(
+                selected,
+                labels,
+                ["whole_signal", "whole_noise"],
+                4,
+                79,
+                2,
+                0.05,
+                40,
+                100,
+                7,
+            )
+        finally:
+            ANALYZE.fit_cross_validated = original
+        self.assertEqual(len(calls), 8)
+        self.assertIn("pipeline refit", result["permutation_test"]["method"])
+
+    def test_unblocked_permutation_changes_session_labels(self):
+        rows = synthetic_rows(4)
+        selected, labels = ANALYZE.comparison_rows(rows, "firefox_vs_naivefox")
+
+        class ReverseRandom:
+            @staticmethod
+            def shuffle(values):
+                values.reverse()
+
+        permuted = ANALYZE.permuted_session_labels(selected, labels, ReverseRandom())
+        self.assertNotEqual(permuted, labels)
+
+    def test_auc_is_compared_only_within_outer_folds(self):
+        labels = [0, 1, 0, 1]
+        scores = [0.1, 0.2, 0.8, 0.9]
+        result = ANALYZE.fold_auc_metrics(labels, scores, [0, 0, 1, 1])
+        self.assertEqual(result["auc"], 1.0)
+        self.assertEqual(ANALYZE.auc(labels, scores), 0.75)
+
+    def test_verdict_does_not_invert_held_out_auc(self):
+        target = {
+            "available": True,
+            "auc": 0.2,
+            "auc_ci95": [0.15, 0.25],
+            "distinguishability": 0.8,
+            "distinguishability_ci95": [0.75, 0.85],
+            "refit_bootstrap": {"auc_ci95": [0.15, 0.25]},
+        }
+        baseline = {
+            "available": True,
+            "auc": 0.5,
+            "distinguishability": 0.5,
+            "refit_bootstrap": {"auc_ci95": [0.45, 0.55]},
+        }
+        self.assertEqual(ANALYZE.classify(target, baseline, "research"), "yellow")
+
+    def test_red_verdict_requires_permutation_support(self):
+        target = {
+            "available": True,
+            "auc": 0.8,
+            "auc_ci95": [0.7, 0.9],
+            "distinguishability": 0.8,
+            "permutation_test": None,
+            "refit_bootstrap": {"auc_ci95": [0.7, 0.9]},
+        }
+        baseline = {
+            "available": True,
+            "auc": 0.5,
+            "distinguishability": 0.5,
+            "refit_bootstrap": {"auc_ci95": [0.45, 0.55]},
+        }
+        self.assertEqual(ANALYZE.classify(target, baseline, "research"), "yellow")
+        target["permutation_test"] = {"p_value": 0.01}
+        self.assertEqual(ANALYZE.classify(target, baseline, "research"), "red")
+
+    def test_unhealthy_firefox_baseline_cannot_produce_green(self):
+        target = {
+            "available": True,
+            "auc": 0.54,
+            "refit_bootstrap": {"auc_ci95": [0.48, 0.59]},
+        }
+        baseline = {
+            "available": True,
+            "auc": 0.9,
+            "refit_bootstrap": {"auc_ci95": [0.82, 0.96]},
+        }
+        self.assertEqual(ANALYZE.classify(target, baseline, "research"), "yellow")
+        baseline["auc"] = 0.5
+        baseline["refit_bootstrap"] = {"auc_ci95": [0.0, 1.0]}
+        self.assertEqual(ANALYZE.classify(target, baseline, "research"), "yellow")
+        baseline["refit_bootstrap"] = {"auc_ci95": [0.45, 0.55]}
+        self.assertEqual(ANALYZE.classify(target, baseline, "research"), "green")
+
+    def test_refit_bootstrap_refits_grouped_cv_pipeline(self):
+        rows = synthetic_rows(8)
+        selected, labels = ANALYZE.comparison_rows(rows, "firefox_vs_naivefox")
+        original = ANALYZE.fit_cross_validated
+        duplicate_seen = []
+
+        def checked(sampled_rows, *args, **kwargs):
+            groups_by_session = {}
+            for row in sampled_rows:
+                groups_by_session.setdefault(row["session_id"], set()).add(
+                    ANALYZE.analysis_group(row)
+                )
+            duplicated = [
+                session
+                for session, groups in groups_by_session.items()
+                if sum(row["session_id"] == session for row in sampled_rows) > 1
+            ]
+            if duplicated:
+                duplicate_seen.append(True)
+                self.assertTrue(
+                    all(len(groups_by_session[session]) == 1 for session in duplicated)
+                )
+            return original(sampled_rows, *args, **kwargs)
+
+        ANALYZE.fit_cross_validated = checked
+        try:
+            result = ANALYZE.refit_clustered_bootstrap(
+                selected,
+                labels,
+                ["whole_signal", "whole_noise"],
+                4,
+                83,
+                2,
+                0.05,
+                40,
+                20,
+            )
+        finally:
+            ANALYZE.fit_cross_validated = original
+        self.assertEqual(result["iterations"], 20)
+        self.assertIn("pipeline refit", result["method"])
+        self.assertGreater(result["auc_ci95"][0], 0.9)
+        self.assertTrue(duplicate_seen)
+
+    def test_permutation_refits_are_limited_to_primary_target_views(self):
+        self.assertEqual(
+            ANALYZE.permutation_plan("initial_packets_32", "firefox_vs_naivefox", 19),
+            (19, None),
+        )
+        count, reason = ANALYZE.permutation_plan("whole", "firefox_vs_naivefox", 19)
+        self.assertEqual(count, 0)
+        self.assertIn("primary views", reason)
+        count, reason = ANALYZE.permutation_plan(
+            "initial_packets_32", "firefox_baseline", 19
+        )
+        self.assertEqual(count, 0)
+        self.assertIn("baseline", reason)
 
     def test_feature_views_do_not_accept_decrypted_boundaries(self):
         names = [
@@ -112,33 +301,76 @@ class CamouflageAnalysisTests(unittest.TestCase):
         self.assertEqual(FEATURES.quic_transport_parameter_token("0x04"), "0x0004")
 
     def test_dataset_rejects_unknown_leakage_column(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = os.path.join(directory, "features.csv")
-            with open(path, "w", newline="", encoding="utf-8") as stream:
-                writer = csv.DictWriter(
-                    stream,
-                    fieldnames=[
-                        "schema_version",
-                        "protocol",
-                        "scenario",
-                        "label",
-                        "session_id",
-                        "source_port",
-                    ],
-                )
-                writer.writeheader()
-                writer.writerow(
-                    {
+        for leakage in (
+            "source_port",
+            "whole_source_port",
+            "whole_label",
+            "whole_session_id",
+        ):
+            with self.subTest(
+                leakage=leakage
+            ), tempfile.TemporaryDirectory() as directory:
+                path = os.path.join(directory, "features.csv")
+                fieldnames = [
+                    "schema_version",
+                    "protocol",
+                    "scenario",
+                    "label",
+                    "session_id",
+                    leakage,
+                ]
+                with open(path, "w", newline="", encoding="utf-8") as stream:
+                    writer = csv.DictWriter(stream, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerow({
                         "schema_version": 1,
                         "protocol": "h2",
                         "scenario": "initial",
                         "label": "firefox_a",
                         "session_id": "s1",
-                        "source_port": 49152,
-                    }
-                )
-            with self.assertRaises(SystemExit):
-                ANALYZE.load_dataset(path)
+                        leakage: 49152,
+                    })
+                with self.assertRaises(SystemExit):
+                    ANALYZE.load_dataset(path)
+
+    def test_dataset_accepts_optional_blocks_and_adds_phase_presence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "features.csv")
+            fieldnames = [
+                "schema_version",
+                "protocol",
+                "scenario",
+                "label",
+                "session_id",
+                "experiment_block",
+                "steady_after_32_packet_count",
+            ]
+            with open(path, "w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=fieldnames)
+                writer.writeheader()
+                for label, count in (
+                    ("firefox_a", ""),
+                    ("firefox_b", ""),
+                    ("naivefox", "5"),
+                ):
+                    writer.writerow({
+                        "schema_version": 1,
+                        "protocol": "h2",
+                        "scenario": "initial",
+                        "label": label,
+                        "session_id": label,
+                        "experiment_block": "block-1",
+                        "steady_after_32_packet_count": count,
+                    })
+            rows, names = ANALYZE.load_dataset(path)
+        self.assertIn("steady_after_32_present", names)
+        self.assertEqual(
+            [row["features"]["steady_after_32_present"] for row in rows],
+            [0.0, 0.0, 1.0],
+        )
+        self.assertEqual(
+            {ANALYZE.analysis_group(row) for row in rows}, {"block:block-1"}
+        )
 
 
 if __name__ == "__main__":

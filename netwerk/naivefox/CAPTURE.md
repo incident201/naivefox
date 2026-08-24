@@ -48,6 +48,31 @@ NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/firefox-objdir \
 The H3 runner accepts the same selection variables. Keep the Firefox and
 NaiveFox packages and object directories isolated.
 
+Create the ordinary Firefox reference once with the dedicated builder:
+
+```bash
+netwerk/naivefox/tools/build-firefox-same-base.sh --dry-run
+netwerk/naivefox/tools/build-firefox-same-base.sh
+netwerk/naivefox/tools/build-firefox-same-base.sh --verify
+netwerk/naivefox/tools/build-firefox-same-base.sh --reuse
+```
+
+The builder derives the exact merge-base of the current NaiveFox revision and
+`firefox-upstream`, checks it out as a detached pristine worktree, and performs
+one optimized non-PGO browser build with four jobs by default. It runs
+`mach package` and records the source revisions, full mozconfig, mozinfo,
+toolchain and sccache identity, application and ELF build IDs, NSS key-log
+define, and hashes of the package and capture runtime in a private manifest
+below the reference object directory.
+
+The reference is reusable by later NaiveFox revisions that retain the same
+Firefox merge-base. A completed manifest is verified instead of rebuilding;
+an exact prepared manifest may resume an interrupted build. The builder never
+deletes or clobbers an existing worktree or object directory and refuses any
+unrecognized directory. `--reuse` prints the verified paths expected by the
+capture runners. Override the external paths only with `--worktree` and
+`--objdir`; use `--sccache off` when compiler caching is not wanted.
+
 ## Capture prerequisites
 
 The host needs `dumpcap` and `tshark` plus loopback capture permission. Grant
@@ -124,11 +149,22 @@ It attempts to distinguish ordinary Firefox from NaiveFox using selected
 externally observable features, reports the measured classifier advantage, and
 compares that advantage with an independent Firefox-versus-Firefox baseline.
 
-The collector interleaves three cohorts with a seeded schedule: Firefox A,
+The collector uses seeded complete blocks for three cohorts: Firefox A,
 Firefox B, and NaiveFox. Each sample gets a fresh, symmetric trusted profile.
 All cohorts run on the same host and network namespace, use the same capture
-interface, endpoint IP and port, certificate, target, and Caddy process. H2 and
-H3 are separate datasets. Strict H3 rejects established TCP or TCP payload.
+interface, endpoint IP and port, certificate, target, Caddy process, and
+controlled Firefox page workload. The NaiveFox browser reaches the target
+through its private SOCKS listener. H2 and H3 are separate datasets. Strict H3
+rejects established TCP or TCP payload.
+
+The browser controller remains alive until after the primary capture has
+stopped. After receiving the browser's completion POST, the target writes a
+private completion file which the controller watches without generating a
+second network flow. Browser or NaiveFox process shutdown is therefore not part
+of the primary sample.
+`dumpcap` readiness uses its runtime marker rather than pcap header creation.
+Every sample rejects nonzero capture drops, an H2 flow missing its opening
+client SYN and ClientHello, or an H3 flow missing its opening client Initial.
 
 Controlled workloads cover a cold small operation, a browser page with CSS,
 JavaScript, images, and an API response, warm sequential requests, burst and
@@ -158,12 +194,29 @@ to the separate wire-parity diagnostics.
 
 The analyzer is dependency-free Python. It fits an L2-regularized logistic
 classifier after train-only standardization and feature screening. Splits are
-grouped by session and stratified by workload; the two Firefox cohorts form the
-experimental baseline. It reports ROC AUC and direction-independent
-`D = max(AUC, 1 - AUC)`, an outer-fold threshold learned only from training
-data, confusion metrics, standardized coefficient importance, a clustered
-session bootstrap confidence interval, a workload-stratified permutation test,
-and leave-one-workload-out generalization. Whole-flow, initial packet windows,
+grouped by experiment block when that metadata is present, otherwise by
+session, and stratified by workload; the two Firefox cohorts form the
+experimental baseline. The primary metric is orientation-fixed ROC AUC with
+NaiveFox, or Firefox B in the baseline, always treated as the positive class.
+AUC is calculated within each outer fold and pair-weighted across folds, so
+uncalibrated scores from different models are never pooled. The report retains
+`D = max(AUC, 1 - AUC)` only as a diagnostic and never uses it for a verdict.
+
+Empty steady or lifecycle phases have explicit observable presence indicators.
+The general diagnostic confidence interval uses a conditional clustered
+bootstrap of held-out groups within their outer folds. Research verdicts do not
+use that fixed-model interval: for both the target comparison and its Firefox
+negative control, the three primary views additionally resample complete
+workload blocks and refit the entire grouped-CV pipeline, including feature
+screening and standardization. The workload/block-stratified permutation test
+also refits that pipeline after reshuffling session labels. Expensive
+permutation refits run only for Firefox-versus-NaiveFox in the three
+predeclared verdict views: initial 32 packets, steady state after 32 packets,
+and lifecycle. Secondary reports explicitly record why refit inference was not
+run.
+The report also includes an outer-fold threshold learned only from training
+data, confusion metrics, standardized coefficient importance, and
+leave-one-workload-out generalization. Whole-flow, initial packet windows,
 initial time windows, steady state, and lifecycle views are reported
 separately. Raw metrics are retained so policy thresholds can be changed
 without recapturing traffic.
@@ -179,9 +232,12 @@ Run levels are:
 
 Gate and smoke results are always `INCONCLUSIVE`, regardless of their point
 estimate. Research policy currently treats a sufficiently narrow, validated
-`D <= 0.60` and no more than 0.05 advantage over the Firefox baseline as
-GREEN, approximately 0.60--0.70 or uncertain evidence as YELLOW, and stable
-`D >= 0.70` as RED. These are project policy thresholds, not a security proof.
+refit-bootstrap interval contained within `0.40--0.60`, a healthy Firefox
+negative control whose interval contains chance, and no more than 0.05 excess
+absolute advantage over that control as GREEN. Reverse-oriented, confounded,
+or uncertain evidence is YELLOW. Stable `AUC >= 0.70` is RED only when its
+refit lower bound is at least 0.60 and the full-refit permutation test also has
+`p <= 0.05`. These are project policy thresholds, not a security proof.
 
 Examples:
 

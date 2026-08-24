@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+# shellcheck source=netwerk/naivefox/test/integration/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
 fixture_mode=h2
@@ -30,7 +31,8 @@ umask 077
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 6)"
 RUN_DIR="$STATE_ROOT/runs/$run_id"
 mkdir -p "$RUN_DIR" "$RUN_DIR/xdg-data" "$RUN_DIR/xdg-config" \
-  "$RUN_DIR/profiles/trusted" "$RUN_DIR/profiles/untrusted" "$RUN_DIR/pki"
+  "$RUN_DIR/profiles/trusted" "$RUN_DIR/profiles/untrusted" "$RUN_DIR/pki" \
+  "$RUN_DIR/completions"
 printf '%s\n' "$RUN_DIR" >"$ACTIVE_RUN_FILE"
 
 started=0
@@ -108,6 +110,7 @@ fi
 ready_file="$RUN_DIR/target-ready.json"
 python3 "$INTEGRATION_DIR/target_server.py" \
   --cert "$RUN_DIR/pki/target.crt" --key "$RUN_DIR/pki/target.key" \
+  --completion-dir "$RUN_DIR/completions" \
   --ready-file "$ready_file" >"$RUN_DIR/target.log" 2>&1 &
 target_pid=$!
 printf '%s\n' "$target_pid" >"$RUN_DIR/target.pid"

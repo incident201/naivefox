@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import signal
 import socket
 import ssl
@@ -12,18 +13,31 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-
 SMALL_BODY = b"naivefox-fixture-small\n"
 PATTERN = bytes(range(251))
 MAX_BODY = 64 * 1024 * 1024
 SVG_PREFIX = b'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><!--'
 SVG_SUFFIX = b'--><rect width="8" height="8" fill="#476f9f"/></svg>'
+COMPLETIONS = set()
+COMPLETIONS_LOCK = threading.Lock()
+COMPLETION_TOKEN = re.compile(r"^[0-9a-f]{32}$")
 
 
 def pattern_bytes(offset, length):
     start = offset % len(PATTERN)
     data = PATTERN[start:] + PATTERN[:start]
     return (data * ((length + len(data) - 1) // len(data)))[:length]
+
+
+def write_completion(completion_dir, token):
+    path = os.path.join(completion_dir, token)
+    temporary = f"{path}.{threading.get_native_id()}.tmp"
+    descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    try:
+        os.write(descriptor, b"complete\n")
+    finally:
+        os.close(descriptor)
+    os.replace(temporary, path)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -116,6 +130,15 @@ get();let end=performance.now()+{idle_ms};while(performance.now()<end){{}}get();
 </script>"""
         else:
             return None
+        completion = query.get("completion", [""])[0]
+        if completion:
+            if not COMPLETION_TOKEN.fullmatch(completion):
+                return None
+            body += f"""<script>
+window.addEventListener('load',async()=>{{
+await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
+}});
+</script>"""
         return (head + body).encode()
 
     def do_GET(self):
@@ -172,10 +195,19 @@ get();let end=performance.now()+{idle_ms};while(performance.now()<end){{}}get();
             body = b"body{background:#f4f6f8;color:#243447}" + b" " * 4054
             self.send_bytes(200, body, "text/css")
         elif parsed.path == "/camouflage/app.js":
-            body = b"document.documentElement.dataset.fixture='controlled';" + b" " * 8140
+            body = (
+                b"document.documentElement.dataset.fixture='controlled';" + b" " * 8140
+            )
             self.send_bytes(200, body, "application/javascript")
         elif parsed.path == "/camouflage/api":
-            self.send_bytes(200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json")
+            self.send_bytes(
+                200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"
+            )
+        elif parsed.path == "/camouflage/status":
+            token = query.get("token", [""])[0]
+            with COMPLETIONS_LOCK:
+                complete = token in COMPLETIONS
+            self.send_bytes(200 if complete else 202, b"\n", "text/plain")
         elif parsed.path == "/camouflage/resource":
             size = min(max(int(query.get("size", [65536])[0]), 1), MAX_BODY)
             self.send_svg(size)
@@ -184,6 +216,18 @@ get();let end=performance.now()+{idle_ms};while(performance.now()<end){{}}get();
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/camouflage/complete":
+            query = parse_qs(parsed.query)
+            token = query.get("token", [""])[0]
+            if not COMPLETION_TOKEN.fullmatch(token):
+                self.send_error(400)
+                return
+            with COMPLETIONS_LOCK:
+                COMPLETIONS.add(token)
+            self.send_bytes(204, b"")
+            self.wfile.flush()
+            write_completion(self.completion_dir, token)
+            return
         if parsed.path not in ("/upload", "/slow-upload", "/camouflage/upload"):
             self.send_error(404)
             return
@@ -211,13 +255,17 @@ get();let end=performance.now()+{idle_ms};while(performance.now()<end){{}}get();
             remaining -= len(chunk)
             if delay_ms:
                 time.sleep(delay_ms / 1000)
-        body = json.dumps(
-            {"bytes": total, "sha256": digest.hexdigest()}, sort_keys=True
-        ).encode() + b"\n"
+        body = (
+            json.dumps(
+                {"bytes": total, "sha256": digest.hexdigest()}, sort_keys=True
+            ).encode()
+            + b"\n"
+        )
         self.send_bytes(200, body, "application/json")
 
 
 def serve(args):
+    Handler.completion_dir = args.completion_dir
     httpd = ThreadingHTTPServer(("127.0.0.1", args.http_port), Handler)
     httpsd = ThreadingHTTPServer(("127.0.0.1", args.https_port), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -255,6 +303,7 @@ def main():
     parser.add_argument("--https-port", type=int, default=0)
     parser.add_argument("--cert", required=True)
     parser.add_argument("--key", required=True)
+    parser.add_argument("--completion-dir", required=True)
     parser.add_argument("--ready-file", required=True)
     serve(parser.parse_args())
 

@@ -3,6 +3,7 @@
 set -euo pipefail
 umask 077
 
+# shellcheck source=netwerk/naivefox/test/integration/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 init_paths
 
@@ -45,6 +46,7 @@ case $mode in
     scenarios=(initial browser_page)
     sample_timeout=45
     permutations=0
+    refit_bootstrap=0
     max_features=24
     model_iterations=80
     ;;
@@ -55,7 +57,8 @@ case $mode in
       bulk_download_256k bulk_upload_256k bidirectional_256k idle_5s
     )
     sample_timeout=55
-    permutations=50
+    permutations=0
+    refit_bootstrap=0
     max_features=32
     model_iterations=100
     ;;
@@ -67,7 +70,8 @@ case $mode in
       bulk_upload_256k bulk_upload_1m bidirectional_1m idle_5s idle_30s
     )
     sample_timeout=75
-    permutations=200
+    permutations=19
+    refit_bootstrap=0
     max_features=48
     model_iterations=120
     ;;
@@ -80,7 +84,8 @@ case $mode in
       bulk_upload_4m bidirectional_1m bidirectional_4m idle_5s idle_30s idle_120s
     )
     sample_timeout=180
-    permutations=1000
+    permutations=99
+    refit_bootstrap=99
     max_features=64
     model_iterations=160
     ;;
@@ -113,12 +118,25 @@ if [[ ! $seed =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-for tool in dumpcap tshark curl getcap openssl python3 readelf rg sha256sum; do
+for tool in dumpcap tshark curl getcap openssl python3 readelf rg setsid sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || {
     printf 'required camouflage tool not found: %s\n' "$tool" >&2
     exit 1
   }
 done
+browser_python=${NAIVEFOX_CAMOUFLAGE_PYTHON:-}
+if [[ -z $browser_python && -x "$OBJDIR/camouflage-venv/bin/python" ]]; then
+  browser_python="$OBJDIR/camouflage-venv/bin/python"
+fi
+browser_python=${browser_python:-$(command -v python3)}
+browser_backend=${NAIVEFOX_CAMOUFLAGE_BROWSER_BACKEND:-auto}
+case $browser_backend in
+  auto | selenium | commandline) ;;
+  *)
+    printf 'unknown camouflage browser backend: %s\n' "$browser_backend" >&2
+    exit 2
+    ;;
+esac
 dumpcap_path=$(command -v dumpcap)
 dumpcap_caps=$(getcap "$dumpcap_path" 2>/dev/null || true)
 if [[ $EUID -ne 0 ]] &&
@@ -171,15 +189,18 @@ private_dir="$STATE_ROOT/camouflage-captures/$run_id"
 safe_dir="$STATE_ROOT/camouflage-safe/$run_id"
 feature_fragments="$private_dir/features"
 capture_stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/naivefox-camouflage.XXXXXX")
-mkdir -m 0700 -p "$private_dir" "$feature_fragments" "$safe_dir"
+mkdir -p "$private_dir" "$feature_fragments" "$safe_dir"
+chmod 0700 "$private_dir" "$feature_fragments" "$safe_dir"
 chmod 0700 "$capture_stage_dir"
 
 capture_pid=
 capture_stage_pcap=
 capture_pcap=
-firefox_pid=
+capture_log=
+browser_controller_pid=
+browser_stop_file=
 naivefox_pid=
-workload_pids=()
+controller_backends="$private_dir/controller-backends.txt"
 success=0
 
 stop_pid() {
@@ -190,17 +211,46 @@ stop_pid() {
       kill -0 "$pid" 2>/dev/null || break
       sleep 0.1
     done
-    kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
   fi
   [[ -z $pid ]] || wait "$pid" 2>/dev/null || true
 }
 
+stop_process_group() {
+  local pid=${1:-}
+  [[ -n $pid ]] || return 0
+  if kill -0 -- "-$pid" 2>/dev/null; then
+    kill -TERM -- "-$pid" 2>/dev/null || true
+    for ((i = 0; i < 50; i++)); do
+      kill -0 -- "-$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 -- "-$pid" 2>/dev/null; then
+      kill -KILL -- "-$pid" 2>/dev/null || true
+    fi
+  fi
+  wait "$pid" 2>/dev/null || true
+}
+
 stop_capture() {
+  [[ -n $capture_pid ]] || return 0
+  local was_running=0
+  local status=0
   if [[ -n $capture_pid ]] && kill -0 "$capture_pid" 2>/dev/null; then
+    was_running=1
     kill -INT "$capture_pid" 2>/dev/null || true
   fi
   [[ -z $capture_pid ]] || wait "$capture_pid" 2>/dev/null || true
   capture_pid=
+  if [[ $was_running -ne 1 ]]; then
+    printf 'dumpcap stopped before the workload capture was complete\n' >&2
+    status=1
+  fi
+  if ! python3 "$INTEGRATION_DIR/camouflage_capture_health.py" "$capture_log"; then
+    status=1
+  fi
   if [[ -n $capture_stage_pcap && -s $capture_stage_pcap ]]; then
     if [[ -n $(tshark -r "$capture_stage_pcap" -Y 'sll.pkttype==4' \
       -T fields -e frame.number 2>/dev/null | sed -n '1p') ]]; then
@@ -213,16 +263,15 @@ stop_capture() {
   fi
   capture_stage_pcap=
   capture_pcap=
+  capture_log=
+  return "$status"
 }
 
 cleanup() {
   local status=$?
-  stop_capture
-  local pid
-  for pid in "${workload_pids[@]}"; do
-    stop_pid "$pid"
-  done
-  stop_pid "$firefox_pid"
+  stop_capture || true
+  [[ -z $browser_stop_file ]] || : >"$browser_stop_file"
+  stop_process_group "$browser_controller_pid"
   stop_pid "$naivefox_pid"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   rm -rf -- "$capture_stage_dir"
@@ -261,7 +310,8 @@ start_capture() {
   local destination=$1
   local log=$2
   capture_pcap=$destination
-  capture_stage_pcap="$capture_stage_dir/$(basename "${destination%.pcapng}").raw.pcapng"
+  capture_stage_pcap="$capture_stage_dir/$(basename "$(dirname "$destination")").raw.pcapng"
+  capture_log=$log
   : >"$log"
   dumpcap -q -i any \
     -f "tcp port $NAIVEFOX_FIXTURE_PROXY_PORT or udp port $NAIVEFOX_FIXTURE_PROXY_PORT" \
@@ -273,10 +323,12 @@ start_capture() {
       printf 'dumpcap exited before camouflage capture readiness\n' >&2
       return 1
     }
-    [[ -s $capture_stage_pcap ]] && return 0
+    if rg -q '^Capturing on ' "$log" && rg -q '^File: ' "$log"; then
+      return 0
+    fi
     sleep 0.1
   done
-  printf 'timed out waiting for camouflage capture\n' >&2
+  printf 'timed out waiting for dumpcap readiness marker\n' >&2
   return 1
 }
 
@@ -299,6 +351,7 @@ wait_for_log() {
 make_profile() {
   local destination=$1
   local protocol=$2
+  local socks_port=${3:-}
   mkdir -m 0700 "$destination"
   cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$destination/"
   cat >"$destination/user.js" <<EOF
@@ -311,6 +364,18 @@ user_pref("network.prefetch-next", false);
 user_pref("network.http.speculative-parallel-limit", 0);
 user_pref("network.http.http3.enable", $( [[ $protocol == h3 ]] && printf true || printf false ));
 EOF
+  if [[ -n $socks_port ]]; then
+    cat >>"$destination/user.js" <<EOF
+user_pref("network.proxy.type", 1);
+user_pref("network.proxy.socks", "127.0.0.1");
+user_pref("network.proxy.socks_port", $socks_port);
+user_pref("network.proxy.socks_version", 5);
+user_pref("network.proxy.socks_remote_dns", true);
+user_pref("network.proxy.no_proxies_on", "");
+user_pref("network.proxy.allow_hijacking_localhost", true);
+user_pref("network.proxy.failover_direct", false);
+EOF
+  fi
   if [[ $protocol == h3 ]]; then
     cat >>"$destination/user.js" <<EOF
 user_pref("network.http.http3.disable_when_third_party_roots_found", false);
@@ -348,27 +413,11 @@ scenario_parameters() {
 
 scenario_path() {
   local scenario=$1
+  local completion=$2
   scenario_parameters "$scenario"
-  if [[ $scenario_kind == initial ]]; then
-    printf '/camouflage/api\n'
-  else
-    printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s\n' \
-      "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms"
-  fi
-}
-
-scenario_connections() {
-  local scenario=$1
-  scenario_parameters "$scenario"
-  case $scenario_kind in
-    initial) printf '1\n' ;;
-    browser_page) printf '7\n' ;;
-    sequential) printf '5\n' ;;
-    concurrent | burst) printf '%s\n' "$((scenario_count + 1))" ;;
-    bulk_download | bulk_upload) printf '2\n' ;;
-    bidirectional | idle) printf '3\n' ;;
-    *) printf '1\n' ;;
-  esac
+  printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&completion=%s\n' \
+    "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
+    "$completion"
 }
 
 strict_transport_check() {
@@ -378,6 +427,9 @@ strict_transport_check() {
     local udp_count
     local tcp_established
     local tcp_payload
+    local first_frame
+    local initial_frame
+    local stream
     udp_count=$(tshark -r "$pcap" -d "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,quic" \
       -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && quic" -T fields -e frame.number | wc -l)
     tcp_established=$(tshark -r "$pcap" \
@@ -391,14 +443,143 @@ strict_transport_check() {
         "$udp_count" "$tcp_established" "$tcp_payload" >&2
       return 1
     fi
-  else
-    if [[ -z $(tshark -r "$pcap" -d "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,tls" \
-      -Y "tcp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.type==1" \
-      -T fields -e frame.number | sed -n '1p') ]]; then
-      printf 'H2 sample has no visible TLS ClientHello\n' >&2
+    mapfile -t udp_streams < <(tshark -r "$pcap" \
+      -d "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,quic" \
+      -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && quic" \
+      -T fields -e udp.stream | sed '/^$/d' | sort -nu)
+    if [[ ${#udp_streams[@]} -eq 0 ]]; then
+      printf 'strict H3 sample has no identifiable QUIC flow\n' >&2
       return 1
     fi
+    for stream in "${udp_streams[@]}"; do
+      first_frame=$(tshark -r "$pcap" \
+        -d "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,quic" \
+        -Y "udp.stream==$stream && udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT" \
+        -T fields -e frame.number | sed -n '1p')
+      initial_frame=$(tshark -r "$pcap" \
+        -d "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,quic" \
+        -Y "udp.stream==$stream && udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && ((quic.long.packet_type==0) || (quic.long.packet_type_v2==1))" \
+        -T fields -e frame.number | sed -n '1p')
+      if [[ -z $initial_frame || $first_frame != "$initial_frame" ]]; then
+        printf 'strict H3 flow %s does not begin with a client Initial\n' \
+          "$stream" >&2
+        return 1
+      fi
+    done
+    mapfile -t tcp_streams < <(tshark -r "$pcap" \
+      -Y "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT" \
+      -T fields -e tcp.stream | sed '/^$/d' | sort -nu)
+    for stream in "${tcp_streams[@]}"; do
+      IFS=$'\t' read -r destination syn ack < <(tshark -r "$pcap" \
+        -Y "tcp.stream==$stream" -T fields -E separator=$'\t' \
+        -e tcp.dstport -e tcp.flags.syn -e tcp.flags.ack | sed -n '1p')
+      if [[ $destination != "$NAIVEFOX_FIXTURE_PROXY_PORT" ||
+            $syn != True || $ack != False ]]; then
+        printf 'strict H3 TCP probe %s does not begin with a client SYN\n' \
+          "$stream" >&2
+        return 1
+      fi
+    done
+  else
+    local ack
+    local destination
+    local stream
+    local syn
+    mapfile -t tcp_streams < <(tshark -r "$pcap" \
+      -Y "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT" \
+      -T fields -e tcp.stream | sed '/^$/d' | sort -nu)
+    if [[ ${#tcp_streams[@]} -eq 0 ]]; then
+      printf 'H2 sample has no identifiable TCP flow\n' >&2
+      return 1
+    fi
+    for stream in "${tcp_streams[@]}"; do
+      IFS=$'\t' read -r destination syn ack < <(tshark -r "$pcap" \
+        -Y "tcp.stream==$stream" -T fields -E separator=$'\t' \
+        -e tcp.dstport -e tcp.flags.syn -e tcp.flags.ack | sed -n '1p')
+      if [[ $destination != "$NAIVEFOX_FIXTURE_PROXY_PORT" ||
+            $syn != True || $ack != False ]]; then
+        printf 'H2 flow %s does not begin with a client SYN\n' "$stream" >&2
+        return 1
+      fi
+      if [[ -z $(tshark -r "$pcap" \
+        -d "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,tls" \
+        -Y "tcp.stream==$stream && tcp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.type==1" \
+        -T fields -e frame.number | sed -n '1p') ]]; then
+        printf 'H2 flow %s has no visible TLS ClientHello\n' "$stream" >&2
+        return 1
+      fi
+    done
   fi
+}
+
+start_browser_controller() {
+  local profile=$1
+  local url=$2
+  local completion=$3
+  local sample_dir=$4
+  local protocol=$5
+  local socks_port=${6:-0}
+  local effective_backend=$browser_backend
+  if [[ $effective_backend == auto && $protocol == h3 ]]; then
+    effective_backend=commandline
+  fi
+  local ready_file="$sample_dir/browser-ready.json"
+  local navigate_file="$sample_dir/browser-navigate"
+  local done_file="$sample_dir/browser-done"
+  browser_stop_file="$sample_dir/browser-stop"
+  setsid env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
+    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
+    "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+    --binary "$REFERENCE_BIN" --profile "$profile" --backend "$effective_backend" \
+    --protocol "$protocol" \
+    --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --socks-port "$socks_port" \
+    --url "$url" \
+    --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion" \
+    --ready-file "$ready_file" --navigate-file "$navigate_file" \
+    --done-file "$done_file" --stop-file "$browser_stop_file" \
+    --browser-log "$sample_dir/firefox.log" \
+    --webdriver-log "$sample_dir/webdriver.log" \
+    --timeout "$sample_timeout" >"$sample_dir/controller.log" 2>&1 &
+  browser_controller_pid=$!
+  wait_for_file "$ready_file" "$browser_controller_pid" \
+    'Firefox browser controller' 300
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["backend"])' \
+    "$ready_file" >>"$controller_backends"
+}
+
+run_browser_workload() {
+  local sample_dir=$1
+  : >"$sample_dir/browser-navigate"
+  wait_for_file "$sample_dir/browser-done" "$browser_controller_pid" \
+    'controlled Firefox workload' "$((sample_timeout * 10 + 50))"
+  sleep 0.25
+}
+
+stop_browser_controller() {
+  : >"$browser_stop_file"
+  if ! timeout 20 tail --pid="$browser_controller_pid" -f /dev/null; then
+    printf 'Firefox browser controller did not stop cleanly\n' >&2
+    return 1
+  fi
+  wait "$browser_controller_pid"
+  browser_controller_pid=
+  browser_stop_file=
+}
+
+extract_sample() {
+  local protocol=$1
+  local scenario=$2
+  local label=$3
+  local session_id=$4
+  local pcap=$5
+  local experiment_block=$6
+  strict_transport_check "$protocol" "$pcap"
+  python3 "$INTEGRATION_DIR/camouflage_features.py" extract \
+    --pcap "$pcap" --protocol "$protocol" \
+    --server-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --scenario "$scenario" \
+    --label "$label" --session-id "$session_id" \
+    --experiment-block "$experiment_block" \
+    --output "$feature_fragments/$session_id.json"
 }
 
 run_reference_sample() {
@@ -406,170 +587,74 @@ run_reference_sample() {
   local scenario=$2
   local label=$3
   local session_id=$4
+  local experiment_block=$5
   local sample_dir="$private_dir/$session_id"
   local profile="$sample_dir/profile"
   local pcap="$sample_dir/capture.pcapng"
-  local log="$sample_dir/firefox.log"
-  mkdir -m 0700 -p "$sample_dir"
-  make_profile "$profile" "$protocol"
-  start_capture "$pcap" "$sample_dir/dumpcap.log"
+  local completion
   local path
-  path=$(scenario_path "$scenario")
-  timeout "$sample_timeout" env -u SSLKEYLOGFILE \
-    "${firefox_runtime_env[@]}" "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
-    "$REFERENCE_BIN" --headless --new-instance --no-remote \
-    --profile "$profile" --window-size 1280,720 \
-    --screenshot "$sample_dir/reference.png" \
-    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" >"$log" 2>&1 &
-  firefox_pid=$!
-  set +e
-  wait "$firefox_pid"
-  local status=$?
-  set -e
-  firefox_pid=
+  completion=$(openssl rand -hex 16)
+  path=$(scenario_path "$scenario" "$completion")
+  mkdir -m 0700 -- "$sample_dir"
+  make_profile "$profile" "$protocol"
+  start_browser_controller "$profile" \
+    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" \
+    "$completion" "$sample_dir" "$protocol"
+  start_capture "$pcap" "$sample_dir/dumpcap.log"
+  run_browser_workload "$sample_dir"
   stop_capture
-  if [[ $status -ne 0 ]]; then
-    printf 'reference Firefox sample %s exited with status %s\n' \
-      "$session_id" "$status" >&2
-    return 1
-  fi
-  strict_transport_check "$protocol" "$pcap"
-  python3 "$INTEGRATION_DIR/camouflage_features.py" extract \
-    --pcap "$pcap" --protocol "$protocol" \
-    --server-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --scenario "$scenario" \
-    --label "$label" --session-id "$session_id" \
-    --output "$feature_fragments/$session_id.json"
-}
-
-nf_curl() {
-  local socks_port=$1
-  local method=$2
-  local path=$3
-  local size=${4:-0}
-  if [[ $method == GET ]]; then
-    timeout "$sample_timeout" curl --fail --silent --show-error --noproxy '' \
-      --socks5-hostname "127.0.0.1:$socks_port" \
-      "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT$path" --output /dev/null
-  else
-    head -c "$size" /dev/zero | timeout "$sample_timeout" \
-      curl --fail --silent --show-error --noproxy '' \
-      --socks5-hostname "127.0.0.1:$socks_port" \
-      --header 'Content-Type: application/octet-stream' --data-binary @- \
-      "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT$path" --output /dev/null
-  fi
-}
-
-run_naivefox_workload() {
-  local scenario=$1
-  local socks_port=$2
-  scenario_parameters "$scenario"
-  local page
-  page=$(scenario_path "$scenario")
-  case $scenario_kind in
-    initial)
-      nf_curl "$socks_port" GET /camouflage/api
-      ;;
-    browser_page)
-      nf_curl "$socks_port" GET "$page"
-      workload_pids=()
-      local resource
-      for resource in \
-        /camouflage/style.css /camouflage/app.js \
-        '/camouflage/resource?size=65536' \
-        '/camouflage/resource?size=131072' \
-        '/camouflage/resource?size=262144' /camouflage/api; do
-        nf_curl "$socks_port" GET "$resource" &
-        workload_pids+=("$!")
-      done
-      local pid
-      for pid in "${workload_pids[@]}"; do wait "$pid"; done
-      workload_pids=()
-      ;;
-    sequential)
-      nf_curl "$socks_port" GET "$page"
-      nf_curl "$socks_port" GET /camouflage/api
-      sleep 0.1
-      nf_curl "$socks_port" GET /camouflage/api
-      sleep 0.5
-      nf_curl "$socks_port" GET /camouflage/api
-      sleep 2
-      nf_curl "$socks_port" GET /camouflage/api
-      ;;
-    concurrent | burst)
-      nf_curl "$socks_port" GET "$page"
-      workload_pids=()
-      for ((i = 0; i < scenario_count; i++)); do
-        nf_curl "$socks_port" GET \
-          "/camouflage/resource?size=$scenario_size&item=$i" &
-        workload_pids+=("$!")
-      done
-      for pid in "${workload_pids[@]}"; do wait "$pid"; done
-      workload_pids=()
-      ;;
-    bulk_download)
-      nf_curl "$socks_port" GET "$page"
-      nf_curl "$socks_port" GET "/camouflage/resource?size=$scenario_size"
-      ;;
-    bulk_upload)
-      nf_curl "$socks_port" GET "$page"
-      nf_curl "$socks_port" POST /camouflage/upload "$scenario_size"
-      ;;
-    bidirectional)
-      nf_curl "$socks_port" GET "$page"
-      nf_curl "$socks_port" POST /camouflage/upload "$scenario_size"
-      nf_curl "$socks_port" GET "/camouflage/resource?size=$scenario_size"
-      ;;
-    idle)
-      nf_curl "$socks_port" GET "$page"
-      nf_curl "$socks_port" GET /camouflage/api
-      python3 -c 'import sys,time; time.sleep(int(sys.argv[1]) / 1000)' \
-        "$scenario_idle_ms"
-      nf_curl "$socks_port" GET /camouflage/api
-      ;;
-  esac
+  extract_sample "$protocol" "$scenario" "$label" "$session_id" "$pcap" \
+    "$experiment_block"
+  stop_browser_controller
 }
 
 run_naivefox_sample() {
   local protocol=$1
   local scenario=$2
   local session_id=$3
+  local experiment_block=$4
   local sample_dir="$private_dir/$session_id"
-  local profile="$sample_dir/profile"
+  local naivefox_profile="$sample_dir/naivefox-profile"
+  local browser_profile="$sample_dir/browser-profile"
   local pcap="$sample_dir/capture.pcapng"
   local log="$sample_dir/naivefox.log"
+  local completion
+  local outer_count
+  local padding_count
+  local path
   local socks_port
-  local connection_count
   socks_port=$(choose_port)
-  connection_count=$(scenario_connections "$scenario")
-  mkdir -m 0700 -p "$sample_dir"
-  make_profile "$profile" "$protocol"
-  start_capture "$pcap" "$sample_dir/dumpcap.log"
+  completion=$(openssl rand -hex 16)
+  path=$(scenario_path "$scenario" "$completion")
+  mkdir -m 0700 -- "$sample_dir"
+  make_profile "$naivefox_profile" "$protocol"
+  make_profile "$browser_profile" "$protocol" "$socks_port"
   env -u SSLKEYLOGFILE "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
     NAIVEFOX_PROXY_USER="$NAIVEFOX_FIXTURE_USER" \
     NAIVEFOX_PROXY_PASS="$NAIVEFOX_FIXTURE_PASS" \
-    "$NAIVEFOX_BIN" --profile "$profile" --protocol "$protocol" \
+    "$NAIVEFOX_BIN" --profile "$naivefox_profile" --protocol "$protocol" \
     --socks-listen "127.0.0.1:$socks_port" \
-    --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" \
-    --max-connections "$connection_count" >"$log" 2>&1 &
+    --proxy "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT" >"$log" 2>&1 &
   naivefox_pid=$!
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
-  run_naivefox_workload "$scenario" "$socks_port"
-  if ! timeout "$sample_timeout" tail --pid="$naivefox_pid" -f /dev/null; then
-    printf 'NaiveFox sample %s did not exit after its controlled workload\n' \
+  start_browser_controller "$browser_profile" \
+    "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT$path" \
+    "$completion" "$sample_dir" "$protocol" "$socks_port"
+  start_capture "$pcap" "$sample_dir/dumpcap.log"
+  run_browser_workload "$sample_dir"
+  stop_capture
+  outer_count=$(rg -c "^Outer protocol: $protocol$" "$log" || true)
+  padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)
+  if [[ $outer_count -eq 0 || $padding_count -ne $outer_count ]]; then
+    printf 'NaiveFox sample %s has incomplete protocol/padding evidence\n' \
       "$session_id" >&2
     return 1
   fi
-  wait "$naivefox_pid"
+  extract_sample "$protocol" "$scenario" naivefox "$session_id" "$pcap" \
+    "$experiment_block"
+  stop_browser_controller
+  stop_pid "$naivefox_pid"
   naivefox_pid=
-  stop_capture
-  [[ $(rg -c "^Outer protocol: $protocol$" "$log") -eq $connection_count ]]
-  [[ $(rg -c '^Padding negotiated: yes$' "$log") -eq $connection_count ]]
-  strict_transport_check "$protocol" "$pcap"
-  python3 "$INTEGRATION_DIR/camouflage_features.py" extract \
-    --pcap "$pcap" --protocol "$protocol" \
-    --server-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --scenario "$scenario" \
-    --label naivefox --session-id "$session_id" \
-    --output "$feature_fragments/$session_id.json"
 }
 
 scenario_csv=$(IFS=,; printf '%s' "${scenarios[*]}")
@@ -577,33 +662,41 @@ session_counter=0
 for protocol in "${protocols[@]}"; do
   "$INTEGRATION_DIR/start.sh" --mode "$protocol"
   run_dir=$(<"$ACTIVE_RUN_FILE")
+  # shellcheck source=/dev/null
   source "$run_dir/fixture.env"
   schedule="$private_dir/$protocol-schedule.tsv"
-  python3 - "$seed" "$samples_per_cohort" "$scenario_csv" >"$schedule" <<'PY'
+  python3 - "$seed" "$protocol" "$samples_per_cohort" "$scenario_csv" \
+    >"$schedule" <<'PY'
 import random
 import sys
 
 seed = int(sys.argv[1])
-count = int(sys.argv[2])
-scenarios = sys.argv[3].split(",")
+protocol = sys.argv[2]
+count = int(sys.argv[3])
+scenarios = sys.argv[4].split(",")
 items = []
-for label in ("firefox_a", "firefox_b", "naivefox"):
-    for index in range(count):
-        items.append((label, scenarios[index % len(scenarios)]))
-random.Random(seed).shuffle(items)
-for label, scenario in items:
-    print(label, scenario, sep="\t")
+rng = random.Random(f"{seed}:{protocol}")
+for index in range(count):
+    labels = ["firefox_a", "firefox_b", "naivefox"]
+    rng.shuffle(labels)
+    block = f"{protocol}_b{index:06d}"
+    for label in labels:
+        items.append((label, scenarios[index % len(scenarios)], block))
+for label, scenario, block in items:
+    print(label, scenario, block, sep="\t")
 PY
-  while IFS=$'\t' read -r label scenario; do
+  while IFS=$'\t' read -r label scenario experiment_block; do
     session_counter=$((session_counter + 1))
     session_id=$(printf '%s_s%06d' "$protocol" "$session_counter")
     printf 'Collecting %s %s %s (%d/%d)\n' \
       "$protocol" "$label" "$scenario" "$session_counter" \
       "$((samples_per_cohort * 3 * ${#protocols[@]}))"
     if [[ $label == naivefox ]]; then
-      run_naivefox_sample "$protocol" "$scenario" "$session_id"
+      run_naivefox_sample "$protocol" "$scenario" "$session_id" \
+        "$experiment_block"
     else
-      run_reference_sample "$protocol" "$scenario" "$label" "$session_id"
+      run_reference_sample "$protocol" "$scenario" "$label" "$session_id" \
+        "$experiment_block"
     fi
   done <"$schedule"
   "$INTEGRATION_DIR/stop.sh" --quiet
@@ -617,20 +710,28 @@ python3 "$INTEGRATION_DIR/analyze-camouflage.py" \
   --features "$safe_dir/features.csv" --output-json "$safe_dir/metrics.json" \
   --output-summary "$safe_dir/summary.txt" --mode "$mode" --seed "$seed" \
   --bootstrap 1000 --permutations "$permutations" \
+  --refit-bootstrap "$refit_bootstrap" \
   --max-features "$max_features" --iterations "$model_iterations"
 
 reference_version=$(LD_LIBRARY_PATH="$REFERENCE_LIBDIR" "$REFERENCE_BIN" --version 2>/dev/null)
 naivefox_version=$(LD_LIBRARY_PATH="$NAIVEFOX_LIBDIR" "$NAIVEFOX_BIN" --version 2>/dev/null)
+# shellcheck source=/etc/os-release
+source /etc/os-release
+os_id=$ID
+os_version=$VERSION_ID
 cat >"$safe_dir/metadata.txt" <<EOF
 schema_version=1
 revision=$(git -C "$SOURCE_ROOT" rev-parse HEAD)
 mode=$mode
 seed=$seed
+conditional_bootstrap_iterations=1000
+refit_bootstrap_iterations=$refit_bootstrap
+permutation_iterations=$permutations
 protocol_selection=$protocol_selection
 samples_per_cohort=$samples_per_cohort
 reference_mode=$capture_mode
-os_id=$(source /etc/os-release && printf '%s' "$ID")
-os_version=$(source /etc/os-release && printf '%s' "$VERSION_ID")
+os_id=$os_id
+os_version=$os_version
 kernel=$(uname -sr)
 architecture=$(uname -m)
 reference_version=$reference_version
@@ -643,6 +744,12 @@ naivefox_libxul_sha256=$(sha256sum "$NAIVEFOX_LIBDIR/libxul.so" | cut -d' ' -f1)
 naivefox_libssl3_sha256=$(sha256sum "$NAIVEFOX_LIBDIR/libssl3.so" | cut -d' ' -f1)
 tshark_version=$(tshark --version | sed -n '1p')
 capture_interface=any_sll_transmit_copy_when_available
+capture_readiness=dumpcap_runtime_marker
+capture_drop_policy=reject_nonzero
+workload_driver=controlled_firefox_navigation
+workload_completion=target_server_marker
+browser_controller_backends=$(sort -u "$controller_backends" | paste -sd, -)
+process_shutdown_in_primary_capture=no
 tls_keylog=disabled
 raw_capture_material=deleted_after_success
 EOF

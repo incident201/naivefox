@@ -176,9 +176,21 @@ numbers are not maintained in active documentation.
 `run-camouflage-suite.sh` builds separate H2 and H3 datasets that actively try
 to classify Firefox versus NaiveFox. It reuses the normal fixture, browser
 reference download, private capture staging, profile handling, strict-H3
-checks, sanitization, and cleanup. A seeded interleaved schedule collects two
+checks, sanitization, and cleanup. Seeded complete blocks collect two
 independent Firefox cohorts and one NaiveFox cohort through the same endpoint,
 Caddy, certificate, IP, port, namespace, and interface.
+
+All cohorts use the selected reference Firefox to execute the controlled page.
+The NaiveFox cohort configures that browser to use the sample's private SOCKS
+listener. A Selenium controller is preferred for H2 when available. H3 uses
+the long-lived command-line backend so Firefox consumes the exact on-disk
+test profile containing its forced Alt-Svc mapping; the same backend is used
+for every H3 cohort. The command-line backend is also the dependency-free H2
+fallback. The target records the browser's completion POST in a private file;
+the controller watches that file without adding an out-of-band network flow.
+The runner stops and validates `dumpcap` before shutting down the browser or
+NaiveFox, rejects capture drops, and rejects H2/H3 flows whose client SYN or
+Initial was not captured.
 
 The controlled workloads are cold initial, browser-page navigation, warm
 sequential, burst/concurrent streams, bulk download, bulk upload,
@@ -191,11 +203,13 @@ plaintext and decrypted protocol state are rejected from classifier input.
 
 The dependency-free analyzer uses grouped workload-stratified cross-validation
 with train-only preprocessing, a regularized logistic classifier, a separate
-Firefox-A-versus-Firefox-B baseline, clustered bootstrap confidence intervals,
-permutation tests, coefficient importance, and leave-one-workload-out checks.
+Firefox-A-versus-Firefox-B baseline, conditional diagnostic intervals, full
+pipeline refit bootstrap for research verdicts, permutation tests, coefficient
+importance, and leave-one-workload-out checks.
 It reports whole, initial packet/time, steady-state, and lifecycle views as raw
-JSON plus a human-readable summary. `D = max(AUC, 1 - AUC)` makes an inverted
-classifier visible instead of treating it as harmless.
+JSON plus a human-readable summary. Orientation-fixed AUC drives the verdict.
+`D = max(AUC, 1 - AUC)` remains a diagnostic that makes an inverted classifier
+visible without changing policy.
 
 ```bash
 ./run-camouflage-self-tests.sh
