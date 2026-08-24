@@ -9,6 +9,7 @@ init_paths
 
 mode=smoke
 protocol_selection=both
+inner_transport=https
 samples_per_cohort=
 seed=
 while [[ $# -gt 0 ]]; do
@@ -21,6 +22,10 @@ while [[ $# -gt 0 ]]; do
       protocol_selection=${2:-}
       shift 2
       ;;
+    --inner-transport)
+      inner_transport=${2:-}
+      shift 2
+      ;;
     --samples-per-cohort)
       samples_per_cohort=${2:-}
       shift 2
@@ -30,7 +35,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -100,6 +105,13 @@ case $protocol_selection in
   both) protocols=(h2 h3) ;;
   *)
     printf 'unsupported protocol selection: %s\n' "$protocol_selection" >&2
+    exit 2
+    ;;
+esac
+case $inner_transport in
+  http | https) ;;
+  *)
+    printf 'unsupported inner transport: %s\n' "$inner_transport" >&2
     exit 2
     ;;
 esac
@@ -352,6 +364,10 @@ make_profile() {
   local destination=$1
   local protocol=$2
   local socks_port=${3:-}
+  local direct_h3=false
+  if [[ $protocol == h3 && -z $socks_port ]]; then
+    direct_h3=true
+  fi
   mkdir -m 0700 "$destination"
   cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$destination/"
   cat >"$destination/user.js" <<EOF
@@ -362,7 +378,7 @@ user_pref("network.connectivity-service.enabled", false);
 user_pref("network.dns.disableIPv6", true);
 user_pref("network.prefetch-next", false);
 user_pref("network.http.speculative-parallel-limit", 0);
-user_pref("network.http.http3.enable", $( [[ $protocol == h3 ]] && printf true || printf false ));
+user_pref("network.http.http3.enable", $direct_h3);
 EOF
   if [[ -n $socks_port ]]; then
     cat >>"$destination/user.js" <<EOF
@@ -376,7 +392,7 @@ user_pref("network.proxy.allow_hijacking_localhost", true);
 user_pref("network.proxy.failover_direct", false);
 EOF
   fi
-  if [[ $protocol == h3 ]]; then
+  if [[ $direct_h3 == true ]]; then
     cat >>"$destination/user.js" <<EOF
 user_pref("network.http.http3.disable_when_third_party_roots_found", false);
 user_pref("network.http.http3.alt-svc-mapping-for-testing", "localhost;h3=:$NAIVEFOX_FIXTURE_PROXY_PORT");
@@ -623,9 +639,15 @@ run_naivefox_sample() {
   local padding_count
   local path
   local socks_port
+  local target_port
   socks_port=$(choose_port)
   completion=$(openssl rand -hex 16)
   path=$(scenario_path "$scenario" "$completion")
+  if [[ $inner_transport == https ]]; then
+    target_port=$NAIVEFOX_FIXTURE_HTTPS_PORT
+  else
+    target_port=$NAIVEFOX_FIXTURE_HTTP_PORT
+  fi
   mkdir -m 0700 -- "$sample_dir"
   make_profile "$naivefox_profile" "$protocol"
   make_profile "$browser_profile" "$protocol" "$socks_port"
@@ -638,7 +660,7 @@ run_naivefox_sample() {
   naivefox_pid=$!
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
   start_browser_controller "$browser_profile" \
-    "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT$path" \
+    "$inner_transport://localhost:$target_port$path" \
     "$completion" "$sample_dir" "$protocol" "$socks_port"
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
@@ -728,6 +750,7 @@ conditional_bootstrap_iterations=1000
 refit_bootstrap_iterations=$refit_bootstrap
 permutation_iterations=$permutations
 protocol_selection=$protocol_selection
+inner_transport=$inner_transport
 samples_per_cohort=$samples_per_cohort
 reference_mode=$capture_mode
 os_id=$os_id

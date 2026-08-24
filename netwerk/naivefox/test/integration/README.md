@@ -182,11 +182,15 @@ Caddy, certificate, IP, port, namespace, and interface.
 
 All cohorts use the selected reference Firefox to execute the controlled page.
 The NaiveFox cohort configures that browser to use the sample's private SOCKS
-listener. A Selenium controller is preferred for H2 when available. H3 uses
-the long-lived command-line backend so Firefox consumes the exact on-disk
-test profile containing its forced Alt-Svc mapping; the same backend is used
-for every H3 cohort. The command-line backend is also the dependency-free H2
-fallback. The target records the browser's completion POST in a private file;
+listener. Its target uses HTTPS inside CONNECT by default; the fixture CA is
+trusted only by the isolated test profile. `--inner-transport http` selects a
+separate cleartext diagnostic dataset. Forced Alt-Svc applies only to the
+direct H3 reference browser; the SOCKS browser leaves origin H3 disabled while
+NaiveFox independently owns the selected outer H2 or H3 transport. A Selenium
+controller is preferred for H2 when available. H3 uses the long-lived
+command-line backend, and the same backend is used for every H3 cohort. The
+command-line backend is also the dependency-free H2 fallback. The target
+records the browser's completion POST in a private file;
 the controller watches that file without adding an out-of-band network flow.
 The runner stops and validates `dumpcap` before shutting down the browser or
 NaiveFox, rejects capture drops, and rejects H2/H3 flows whose client SYN or
@@ -214,6 +218,7 @@ visible without changing policy.
 ```bash
 ./run-camouflage-self-tests.sh
 ./run-camouflage-suite.sh --mode gate --protocol both
+./run-camouflage-suite.sh --mode gate --protocol both --inner-transport http
 ./run-camouflage-suite.sh --mode smoke --protocol both
 ./run-camouflage-suite.sh --mode standard --protocol both
 ./run-camouflage-suite.sh --mode research --protocol both
@@ -226,6 +231,9 @@ the documented GREEN/YELLOW/RED policy. Default quick-reference runs measure
 drift against pinned current Nightly. Set `NAIVEFOX_CAPTURE_MODE=same-base` and
 the `NAIVEFOX_CAPTURE_REFERENCE_*` paths described in `../../CAPTURE.md` for an
 explicit same-source experiment; no Firefox build is started automatically.
+Run HTTPS and HTTP with the same explicit seed when comparing the primary and
+diagnostic inner transports; each invocation produces its own dataset and
+records `inner_transport` in metadata.
 
 Successful runs retain only `metadata.txt`, `features.csv`, `metrics.json`, and
 `summary.txt` under `<objdir>/naivefox-fixture/camouflage-safe/<run-id>/`.

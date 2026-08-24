@@ -154,8 +154,11 @@ Firefox B, and NaiveFox. Each sample gets a fresh, symmetric trusted profile.
 All cohorts run on the same host and network namespace, use the same capture
 interface, endpoint IP and port, certificate, target, Caddy process, and
 controlled Firefox page workload. The NaiveFox browser reaches the target
-through its private SOCKS listener. H2 and H3 are separate datasets. Strict H3
-rejects established TCP or TCP payload.
+through its private SOCKS listener. HTTPS/TLS inside CONNECT is the default
+NaiveFox workload; `--inner-transport http` produces a separate cleartext
+diagnostic dataset. Forced Alt-Svc applies only to direct H3 reference traffic,
+not to the SOCKS browser. H2 and H3 are separate datasets. Strict H3 rejects
+established TCP or TCP payload.
 
 The browser controller remains alive until after the primary capture has
 stopped. After receiving the browser's completion POST, the target writes a
@@ -244,10 +247,14 @@ Examples:
 ```bash
 ./run-camouflage-self-tests.sh
 ./run-camouflage-suite.sh --mode gate --protocol both
+./run-camouflage-suite.sh --mode gate --protocol both --inner-transport http
 ./run-camouflage-suite.sh --mode smoke --protocol h2
 ./run-camouflage-suite.sh --mode standard --protocol both --seed 20260824
 ./run-camouflage-suite.sh --mode research --protocol h3
 ```
+
+Use the same explicit seed for paired HTTPS-primary and HTTP-diagnostic runs.
+Each run retains a separate dataset whose metadata records `inner_transport`.
 
 The default reference is the pinned current-Nightly artifact already used by
 the quick capture diagnostics, so it is a version-drift experiment. For a

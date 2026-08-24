@@ -8,6 +8,44 @@ import subprocess
 import time
 
 
+def firefox_preferences(protocol, proxy_port, socks_port):
+    direct_h3 = protocol == "h3" and not socks_port
+    preferences = {
+        "app.update.enabled": False,
+        "browser.shell.checkDefaultBrowser": False,
+        "network.captive-portal-service.enabled": False,
+        "network.connectivity-service.enabled": False,
+        "network.dns.disableIPv6": True,
+        "network.prefetch-next": False,
+        "network.http.speculative-parallel-limit": 0,
+        "network.http.http3.enable": direct_h3,
+    }
+    if direct_h3:
+        preferences.update(
+            {
+                "network.http.http3.disable_when_third_party_roots_found": False,
+                "network.http.http3.alt-svc-mapping-for-testing": (
+                    f"localhost;h3=:{proxy_port}"
+                ),
+                "network.http.http3.force-use-alt-svc-mapping-for-testing": True,
+            }
+        )
+    if socks_port:
+        preferences.update(
+            {
+                "network.proxy.type": 1,
+                "network.proxy.socks": "127.0.0.1",
+                "network.proxy.socks_port": socks_port,
+                "network.proxy.socks_version": 5,
+                "network.proxy.socks_remote_dns": True,
+                "network.proxy.no_proxies_on": "",
+                "network.proxy.allow_hijacking_localhost": True,
+                "network.proxy.failover_direct": False,
+            }
+        )
+    return preferences
+
+
 class Controller:
     def __init__(self, args):
         self.args = args
@@ -31,34 +69,10 @@ class Controller:
         options.add_argument("-headless")
         options.add_argument("--width=1280")
         options.add_argument("--height=720")
-        options.set_preference("app.update.enabled", False)
-        options.set_preference("browser.shell.checkDefaultBrowser", False)
-        options.set_preference("network.captive-portal-service.enabled", False)
-        options.set_preference("network.connectivity-service.enabled", False)
-        options.set_preference("network.dns.disableIPv6", True)
-        options.set_preference("network.prefetch-next", False)
-        options.set_preference("network.http.speculative-parallel-limit", 0)
-        options.set_preference("network.http.http3.enable", self.args.protocol == "h3")
-        if self.args.protocol == "h3":
-            options.set_preference(
-                "network.http.http3.disable_when_third_party_roots_found", False
-            )
-            options.set_preference(
-                "network.http.http3.alt-svc-mapping-for-testing",
-                f"localhost;h3=:{self.args.proxy_port}",
-            )
-            options.set_preference(
-                "network.http.http3.force-use-alt-svc-mapping-for-testing", True
-            )
-        if self.args.socks_port:
-            options.set_preference("network.proxy.type", 1)
-            options.set_preference("network.proxy.socks", "127.0.0.1")
-            options.set_preference("network.proxy.socks_port", self.args.socks_port)
-            options.set_preference("network.proxy.socks_version", 5)
-            options.set_preference("network.proxy.socks_remote_dns", True)
-            options.set_preference("network.proxy.no_proxies_on", "")
-            options.set_preference("network.proxy.allow_hijacking_localhost", True)
-            options.set_preference("network.proxy.failover_direct", False)
+        for name, value in firefox_preferences(
+            self.args.protocol, self.args.proxy_port, self.args.socks_port
+        ).items():
+            options.set_preference(name, value)
         service = Service(log_output=self.args.webdriver_log)
         self.driver = webdriver.Firefox(options=options, service=service)
         self.driver.set_page_load_timeout(self.args.timeout)

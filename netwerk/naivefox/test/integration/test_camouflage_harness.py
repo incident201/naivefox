@@ -20,11 +20,30 @@ def load(name, filename):
 
 
 CAPTURE = load("camouflage_capture_health", "camouflage_capture_health.py")
+CONTROLLER = load(
+    "camouflage_browser_controller", "camouflage_browser_controller.py"
+)
 FEATURES = load("camouflage_features", "camouflage_features.py")
 TARGET = load("target_server", "target_server.py")
 
 
 class CamouflageHarnessTests(unittest.TestCase):
+    def test_direct_h3_browser_gets_forced_alt_svc_mapping(self):
+        preferences = CONTROLLER.firefox_preferences("h3", 4433, 0)
+        self.assertTrue(preferences["network.http.http3.enable"])
+        self.assertEqual(
+            preferences["network.http.http3.alt-svc-mapping-for-testing"],
+            "localhost;h3=:4433",
+        )
+
+    def test_socks_browser_does_not_get_outer_h3_mapping(self):
+        preferences = CONTROLLER.firefox_preferences("h3", 4433, 1080)
+        self.assertFalse(preferences["network.http.http3.enable"])
+        self.assertNotIn(
+            "network.http.http3.alt-svc-mapping-for-testing", preferences
+        )
+        self.assertEqual(preferences["network.proxy.socks_port"], 1080)
+
     def test_dumpcap_clean_shutdown_is_accepted(self):
         CAPTURE.validate_dumpcap_log(
             """Capturing on 'any'
