@@ -45,6 +45,29 @@ using ProxyPreambleCallback = std::function<void(ProxyPreambleResult)>;
 
 namespace detail {
 
+enum class PreambleResourceKind : uint8_t {
+  Other,
+  Stylesheet,
+  Script,
+};
+
+// Preserve the native scheduling cause used by Gecko's stylesheet and script
+// loaders. The caller classifies the parsed resource; the channel layer then
+// derives HTTP Priority and transport priority state from class-of-service.
+constexpr bool PreambleResourceNeedsLeader(PreambleResourceKind aKind,
+                                           bool aDeferred, bool aParserBlocking,
+                                           bool aDiscoveredInHead) {
+  if (aKind == PreambleResourceKind::Stylesheet) {
+    return !aDeferred;
+  }
+  return aKind == PreambleResourceKind::Script && aParserBlocking &&
+         aDiscoveredInHead;
+}
+
+bool PreambleStylesheetIsNonDeferred(const nsACString& aLowerTag,
+                                     bool aAlternate);
+bool PreambleScriptIsParserBlockingClassic(const nsACString& aLowerTag);
+
 constexpr bool PreambleBarrierReached(PreambleMode aMode, bool aRootDone,
                                       uint32_t aAssetCount,
                                       uint32_t aAssetsWithHeadersNotDone,

@@ -585,6 +585,7 @@ class ProxyPreambleOperation::Impl final {
   uint32_t mParseOffset = 0;
   uint32_t mBodyBytes = 0;
   nsresult mFirstFailure = NS_OK;
+  bool mParserInHead = true;
   bool mRootDone = false;
   bool mBarrierFired = false;
   bool mFinishedFired = false;
@@ -696,7 +697,158 @@ bool ExtractQuotedAttribute(const nsACString& aTag, const nsACString& aLowerTag,
   return false;
 }
 
+bool GetHtmlAttributeValue(const nsACString& aLowerTag, const nsACString& aName,
+                           nsACString& aValue) {
+  aValue.Truncate();
+  uint32_t cursor = 1;
+  if (cursor < aLowerTag.Length() && aLowerTag.CharAt(cursor) == '/') {
+    ++cursor;
+  }
+  while (cursor < aLowerTag.Length() &&
+         !IsHtmlSpace(aLowerTag.CharAt(cursor)) &&
+         aLowerTag.CharAt(cursor) != '>' && aLowerTag.CharAt(cursor) != '/') {
+    ++cursor;
+  }
+
+  while (cursor < aLowerTag.Length()) {
+    while (cursor < aLowerTag.Length() &&
+           IsHtmlSpace(aLowerTag.CharAt(cursor))) {
+      ++cursor;
+    }
+    if (cursor >= aLowerTag.Length() || aLowerTag.CharAt(cursor) == '>' ||
+        aLowerTag.CharAt(cursor) == '/') {
+      return false;
+    }
+
+    const uint32_t nameStart = cursor;
+    while (cursor < aLowerTag.Length() &&
+           !IsHtmlSpace(aLowerTag.CharAt(cursor)) &&
+           aLowerTag.CharAt(cursor) != '=' && aLowerTag.CharAt(cursor) != '>' &&
+           aLowerTag.CharAt(cursor) != '/') {
+      ++cursor;
+    }
+    const uint32_t nameEnd = cursor;
+    while (cursor < aLowerTag.Length() &&
+           IsHtmlSpace(aLowerTag.CharAt(cursor))) {
+      ++cursor;
+    }
+
+    uint32_t valueStart = cursor;
+    uint32_t valueEnd = cursor;
+    if (cursor < aLowerTag.Length() && aLowerTag.CharAt(cursor) == '=') {
+      ++cursor;
+      while (cursor < aLowerTag.Length() &&
+             IsHtmlSpace(aLowerTag.CharAt(cursor))) {
+        ++cursor;
+      }
+      if (cursor < aLowerTag.Length() && (aLowerTag.CharAt(cursor) == '\'' ||
+                                          aLowerTag.CharAt(cursor) == '"')) {
+        const char quote = aLowerTag.CharAt(cursor++);
+        valueStart = cursor;
+        while (cursor < aLowerTag.Length() &&
+               aLowerTag.CharAt(cursor) != quote) {
+          ++cursor;
+        }
+        valueEnd = cursor;
+        if (cursor < aLowerTag.Length()) {
+          ++cursor;
+        }
+      } else {
+        valueStart = cursor;
+        while (cursor < aLowerTag.Length() &&
+               !IsHtmlSpace(aLowerTag.CharAt(cursor)) &&
+               aLowerTag.CharAt(cursor) != '>') {
+          ++cursor;
+        }
+        valueEnd = cursor;
+      }
+    }
+
+    if (Substring(aLowerTag, nameStart, nameEnd - nameStart).Equals(aName)) {
+      aValue.Assign(Substring(aLowerTag, valueStart, valueEnd - valueStart));
+      aValue.Trim(" \t\r\n\f");
+      return true;
+    }
+  }
+  return false;
+}
+
+bool StartsWithClosingTagName(const nsACString& aLowerTag,
+                              const nsACString& aName) {
+  if (aLowerTag.Length() < aName.Length() + 3 || aLowerTag.CharAt(0) != '<' ||
+      aLowerTag.CharAt(1) != '/' ||
+      !Substring(aLowerTag, 2, aName.Length()).Equals(aName)) {
+    return false;
+  }
+  const char boundary = aLowerTag.CharAt(aName.Length() + 2);
+  return IsHtmlSpace(boundary) || boundary == '>';
+}
+
+bool KeepsParserInHead(const nsACString& aLowerTag) {
+  if (StringBeginsWith(aLowerTag, "<!"_ns) ||
+      StringBeginsWith(aLowerTag, "</"_ns)) {
+    return true;
+  }
+  return StartsWithTagName(aLowerTag, "html"_ns) ||
+         StartsWithTagName(aLowerTag, "head"_ns) ||
+         StartsWithTagName(aLowerTag, "base"_ns) ||
+         StartsWithTagName(aLowerTag, "link"_ns) ||
+         StartsWithTagName(aLowerTag, "meta"_ns) ||
+         StartsWithTagName(aLowerTag, "noscript"_ns) ||
+         StartsWithTagName(aLowerTag, "script"_ns) ||
+         StartsWithTagName(aLowerTag, "style"_ns) ||
+         StartsWithTagName(aLowerTag, "template"_ns) ||
+         StartsWithTagName(aLowerTag, "title"_ns);
+}
+
 }  // namespace
+
+namespace detail {
+
+bool PreambleStylesheetIsNonDeferred(const nsACString& aLowerTag,
+                                     bool aAlternate) {
+  if (aAlternate) {
+    return false;
+  }
+  nsAutoCString ignored;
+  if (GetHtmlAttributeValue(aLowerTag, "disabled"_ns, ignored)) {
+    return false;
+  }
+  nsAutoCString media;
+  return !GetHtmlAttributeValue(aLowerTag, "media"_ns, media) ||
+         media.IsEmpty() || media.EqualsLiteral("all");
+}
+
+bool PreambleScriptIsParserBlockingClassic(const nsACString& aLowerTag) {
+  nsAutoCString ignored;
+  if (GetHtmlAttributeValue(aLowerTag, "async"_ns, ignored) ||
+      GetHtmlAttributeValue(aLowerTag, "defer"_ns, ignored)) {
+    return false;
+  }
+
+  nsAutoCString type;
+  if (!GetHtmlAttributeValue(aLowerTag, "type"_ns, type) || type.IsEmpty()) {
+    return true;
+  }
+  return type.EqualsLiteral("application/ecmascript") ||
+         type.EqualsLiteral("application/javascript") ||
+         type.EqualsLiteral("application/x-ecmascript") ||
+         type.EqualsLiteral("application/x-javascript") ||
+         type.EqualsLiteral("text/ecmascript") ||
+         type.EqualsLiteral("text/javascript") ||
+         type.EqualsLiteral("text/javascript1.0") ||
+         type.EqualsLiteral("text/javascript1.1") ||
+         type.EqualsLiteral("text/javascript1.2") ||
+         type.EqualsLiteral("text/javascript1.3") ||
+         type.EqualsLiteral("text/javascript1.4") ||
+         type.EqualsLiteral("text/javascript1.5") ||
+         type.EqualsLiteral("text/jscript") ||
+         type.EqualsLiteral("text/livescript") ||
+         type.EqualsLiteral("text/x-ecmascript") ||
+         type.EqualsLiteral("text/x-javascript");
+}
+
+}  // namespace detail
 
 ProxyPreambleOperation::ProxyPreambleOperation() : mImpl(MakeUnique<Impl>()) {}
 
@@ -917,7 +1069,18 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
     nsAutoCString lowerTag(tag);
     LowercaseAscii(lowerTag);
 
+    if (StartsWithClosingTagName(lowerTag, "head"_ns) ||
+        StartsWithTagName(lowerTag, "body"_ns) ||
+        (mImpl->mParserInHead && !KeepsParserInHead(lowerTag))) {
+      mImpl->mParserInHead = false;
+    }
+    const bool discoveredInHead = mImpl->mParserInHead;
+
     nsContentPolicyType contentPolicyType = nsIContentPolicy::TYPE_OTHER;
+    detail::PreambleResourceKind resourceKind =
+        detail::PreambleResourceKind::Other;
+    bool deferredResource = false;
+    bool parserBlockingScript = false;
     nsAutoCString attributeName;
     if (StartsWithTagName(lowerTag, "link"_ns)) {
       nsAutoCString rel;
@@ -926,6 +1089,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       }
       LowercaseAscii(rel);
       bool stylesheet = false;
+      bool alternate = false;
       uint32_t tokenStart = 0;
       while (tokenStart < rel.Length()) {
         while (tokenStart < rel.Length() && IsHtmlSpace(rel[tokenStart])) {
@@ -935,17 +1099,30 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
         while (tokenEnd < rel.Length() && !IsHtmlSpace(rel[tokenEnd])) {
           ++tokenEnd;
         }
-        stylesheet |= Substring(rel, tokenStart, tokenEnd - tokenStart)
-                          .EqualsLiteral("stylesheet");
+        const auto token = Substring(rel, tokenStart, tokenEnd - tokenStart);
+        stylesheet |= token.EqualsLiteral("stylesheet");
+        alternate |= token.EqualsLiteral("alternate");
         tokenStart = tokenEnd;
       }
       if (!stylesheet) {
         continue;
       }
       contentPolicyType = nsIContentPolicy::TYPE_STYLESHEET;
+      resourceKind = detail::PreambleResourceKind::Stylesheet;
+      // Without a DOM/media environment, only classify stylesheets which are
+      // unambiguously non-deferred. This covers an ordinary render-blocking
+      // <link rel=stylesheet> without guessing media-query state.
+      deferredResource =
+          !detail::PreambleStylesheetIsNonDeferred(lowerTag, alternate);
       attributeName.AssignLiteral("href");
     } else if (StartsWithTagName(lowerTag, "script"_ns)) {
       contentPolicyType = nsIContentPolicy::TYPE_SCRIPT;
+      resourceKind = detail::PreambleResourceKind::Script;
+      // A classic head script without async/defer follows Gecko's
+      // parser-blocking ScriptLoader path. The type classifier accepts the
+      // standard JavaScript MIME values but excludes modules and data blocks.
+      parserBlockingScript =
+          detail::PreambleScriptIsParserBlockingClassic(lowerTag);
       attributeName.AssignLiteral("src");
     } else if (StartsWithTagName(lowerTag, "img"_ns)) {
       contentPolicyType = nsIContentPolicy::TYPE_IMAGE;
@@ -1014,6 +1191,16 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
                                     nsIRequest::LOAD_ANONYMOUS |
                                     nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+      if (detail::PreambleResourceNeedsLeader(resourceKind, deferredResource,
+                                              parserBlockingScript,
+                                              discoveredInHead)) {
+        nsCOMPtr<nsIClassOfService> cos = do_QueryInterface(channel);
+        if (cos) {
+          // Match the native CSS/ScriptLoader cause. nsHttpChannel derives the
+          // Priority header; do not synthesize that wire output here.
+          cos->AddClassFlags(nsIClassOfService::Leader);
+        }
+      }
       streamId = mImpl->mStreams.Length();
       auto& stream = *mImpl->mStreams.AppendElement();
       stream.mUri = resourceUri;

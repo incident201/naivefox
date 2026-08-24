@@ -30,6 +30,7 @@ Run the H2, H3, and passive comparisons from the integration directory:
 
 ```bash
 ./run-capture-comparison.sh
+./run-h2-capture-comparison.sh --arm root
 ./run-h3-capture-comparison.sh
 ./run-observer-comparison.sh
 ./run-camouflage-suite.sh --mode smoke --protocol both
@@ -113,6 +114,31 @@ For H2, compare:
 - multiple CONNECT stream IDs on one outer connection;
 - `padding` request/response header names;
 - absence of synthetic `alpn`, `upgrade`, and `connection` request headers.
+
+`run-h2-capture-comparison.sh` is the hardened same-base sequence admission
+for camouflage arms. It always re-executes inside the private capture network,
+starts a route-netlink mutation monitor before each participant, disables and
+verifies namespace-local loopback offloads, rejects dumpcap drops or early
+exit, and requires direct Firefox and NaiveFox to use one physical TCP/H2
+connection. Private key logs drive ALPN, client SETTINGS, and per-stream
+GET/CONNECT/response/END_STREAM reconstruction. Safe output retains only
+header names, relative timing and ordering, stream indices, equality booleans, and build
+identity; header values, endpoint values, credentials, profiles, captures, and
+keys are deleted after success. Both cohorts deliberately use a command-line
+cold Firefox start after capture begins, and that backend/start state is
+recorded so warm Selenium and cold command-line runs cannot be mixed silently.
+For tree arms, private admission also requires native HTTPS document fetch
+metadata with exact `Priority: u=0, i`, plus same-origin stylesheet/script
+`Referer`, fetch metadata, and `Priority: u=2`; only pass/fail booleans enter
+the safe summary.
+
+The preamble callback barrier and observed wire ordering are deliberately
+separate claims. On a fast loopback run, Necko can receive a resource response,
+release `tree-early-overlap`, and still schedule the CONNECT HEADERS after the
+resource END_STREAM. The decrypted validator rejects that trace. Do not
+selectively recapture only passing traces or use this arm for passive causal
+screening until wire-level overlap is deterministic; doing so would condition
+the dataset on the scheduling outcome being measured.
 
 For H3, compare:
 

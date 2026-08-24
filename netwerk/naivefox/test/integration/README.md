@@ -171,6 +171,25 @@ Optional throughput scripts (`run-throughput-benchmark.sh` and
 `run-h3-throughput-benchmark.sh`) produce local diagnostics; their point-in-time
 numbers are not maintained in active documentation.
 
+`run-h2-capture-comparison.sh --arm root` is the hardened same-base decrypted
+H2 sequence check. It uses the isolated namespace and mutation monitor,
+requires healthy loss-free capture, verifies one TCP/H2 connection, `h2` ALPN,
+equal client SETTINGS, padding, and per-stream preamble GET/CONNECT ordering,
+then exports only a sanitized event sequence with relative timing and a
+summary. Both reference and
+inner Firefox use an explicitly recorded cold command-line start after capture
+begins; the diagnostic never silently mixes that cohort with warm Selenium.
+Tree admission privately verifies the document plus same-origin CSS/JS
+`Referer`, `Sec-Fetch-*`, exact document `Priority: u=0, i`, and naturally
+computed resource `Priority: u=2` semantics;
+the safe output contains only boolean results, never those header values.
+The callback used by `tree-early-overlap` can release CONNECT while a resource
+is live yet still lose the wire-level race to that resource's END_STREAM. The
+decrypted check intentionally rejects such a run. Do not keep retrying until
+it passes or use the arm for passive causal screening while this outcome is
+nondeterministic, because that would select samples by their observed
+scheduling.
+
 In same-base mode, `run-h3-capture-comparison.sh --compare-arms` performs a
 private decrypted sequence audit of `off`, `gate`, `root` (the
 `document-complete` alias), `tree-complete`, and `tree-overlap`. The
@@ -349,10 +368,13 @@ gate without a preamble. `root` is the short alias for `document-complete` and
 adds one bounded document GET before CONNECT. The tree modes also fetch two
 resources from that browser page; `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
-`tree-early-overlap` completes the root first, then starts CONNECT only after
+`tree-early-overlap` completes the root first, then releases CONNECT only after
 at least one resource response has begun while leaving that same CSS or JS
-stream unfinished. Its decrypted audit requires exactly the same root/CSS/JS
-request semantics and asset sizes as `tree-complete`. Reusing an explicit
+stream unfinished at the callback boundary. Necko can nevertheless serialize
+CONNECT after the resource END_STREAM; the decrypted audit rejects that
+outcome and the arm must not be selectively resampled. The audit also requires
+exactly the same root/CSS/JS request semantics and asset sizes as
+`tree-complete`. Reusing an explicit
 seed across separate invocations reproduces schedule order, but does not make
 independently captured samples statistically paired:
 
