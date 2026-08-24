@@ -216,6 +216,17 @@ request semantics and asset sizes to match the paired `tree-complete` arm
 exactly. H2 uses the same fixture/config and validates expected request
 semantics, but does not claim paired asset-size equality.
 
+Two harness-only aliases isolate resource count without another product build.
+`tree-complete-css` maps to production `tree-complete` and
+`tree-root-overlap-css` maps to production `tree-root-overlap`; both set
+`max-assets=1`, yielding root plus the first CSS request. The ordinary modes
+remain at two assets. Passive validation requires exactly one started and one
+successfully completed resource. H3 decrypted comparison requires the aliases
+as a pair and proves one physical QUIC connection, equal root/CSS selected
+request semantics and CSS `Content-Length`, root FIN before CONNECT, and a CSS
+FIN somewhere in the complete capture. Whether that CSS FIN precedes or follows
+CONNECT in the overlap alias is report-only.
+
 `run-h2-connect-priority-comparison.sh` is a separate same-base causal
 diagnostic for the first SOCKS tunnel. It compares an ordinary top-level HTTPS
 navigation through the fixture's existing authenticated H2 forward proxy with
@@ -427,7 +438,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap`
+`--naivefox-arm off|gate|root|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and

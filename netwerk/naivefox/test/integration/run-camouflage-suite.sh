@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap) ;;
+  off | gate | root | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -219,7 +219,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap) ;;
+      off | gate | root | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -1001,9 +1001,11 @@ run_naivefox_sample() {
     "$completion" "$sample_dir" "$protocol" "$socks_port"
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
-  if [[ $arm == tree-root-overlap ]]; then
+  if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
+    local expected_resources=2
+    [[ $arm == tree-root-overlap-css ]] && expected_resources=1
     wait_for_log "$naivefox_pid" "$log" \
-      " preamble root-overlap drain=complete completed_resources=2 protocol=$protocol$"
+      " preamble root-overlap drain=complete completed_resources=$expected_resources protocol=$protocol$"
   fi
   stop_capture
   stop_network_mutation_monitor
@@ -1202,8 +1204,10 @@ else
     --expected-per-cohort "$samples_per_cohort"
   single_arm_analysis=confirmatory
   if [[ $naivefox_arm == tree-complete ||
+        $naivefox_arm == tree-complete-css ||
         $naivefox_arm == tree-early-overlap ||
         $naivefox_arm == tree-root-overlap ||
+        $naivefox_arm == tree-root-overlap-css ||
         $naivefox_arm == tree-overlap ]]; then
     single_arm_analysis=screening
   fi

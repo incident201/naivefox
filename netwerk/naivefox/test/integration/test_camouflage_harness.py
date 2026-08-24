@@ -201,8 +201,10 @@ class CamouflageHarnessTests(unittest.TestCase):
             "gate",
             "root",
             "tree-complete",
+            "tree-complete-css",
             "tree-early-overlap",
             "tree-root-overlap",
+            "tree-root-overlap-css",
             "tree-overlap",
         )
         rows = SUPERBLOCKS.schedule_rows(
@@ -211,7 +213,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
-            members = rows[index * 8 : (index + 1) * 8]
+            members = rows[index * 10 : (index + 1) * 10]
             self.assertEqual(
                 {(row["label"], row["naivefox_arm"]) for row in members},
                 {
@@ -532,6 +534,16 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
             self.assertLessEqual(config["preamble"]["max-bytes"], 256 * 1024)
             self.assertTrue(config["outer-session-gate"])
+        for arm, mode in (
+            ("tree-complete-css", "tree-complete"),
+            ("tree-root-overlap-css", "tree-root-overlap"),
+        ):
+            config = CONFIG.build_config(
+                arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
+            )
+            self.assertEqual(config["preamble"]["mode"], mode)
+            self.assertEqual(config["preamble"]["max-assets"], 1)
+            self.assertEqual(config["preamble"]["path"], CONFIG.PREAMBLE_PATH)
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -697,6 +709,46 @@ class CamouflageHarnessTests(unittest.TestCase):
             one_connection,
         )
         SAMPLE.validate_sample(
+            "tree-root-overlap-css",
+            "h3",
+            "Connection 1 preamble root-overlap admission=started-resources "
+            "root_done=1 started_resources=1 protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
+            "Connection 1 preamble root-overlap drain=complete "
+            "completed_resources=1 protocol=h3\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "causal admission state"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap-css",
+                "h3",
+                "Connection 1 preamble root-overlap admission=started-resources "
+                "root_done=1 started_resources=2 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=12000 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble root-overlap drain=complete "
+                "completed_resources=2 protocol=h3\n",
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "completion count"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap-css",
+                "h3",
+                "Connection 1 preamble root-overlap admission=started-resources "
+                "root_done=1 started_resources=1 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=12000 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble root-overlap drain=complete "
+                "completed_resources=2 protocol=h3\n",
+                one_connection,
+            )
+        SAMPLE.validate_sample(
             "tree-root-overlap",
             "h3",
             "Connection 1 preamble root-overlap admission=started-resources "
@@ -819,6 +871,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "tree-root-overlap",
                 marker + result + established + drain + timeout,
             ),
+            (
+                "tree-root-overlap-css",
+                marker.replace("started_resources=2", "started_resources=1")
+                + result
+                + established
+                + drain.replace("completed_resources=2", "completed_resources=1")
+                + timeout,
+            ),
             ("tree-overlap", result + timeout),
         ):
             with self.subTest(arm=arm), self.assertRaisesRegex(
@@ -841,10 +901,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 if filename.startswith("run-h3"):
                     body = runner.split("run_naivefox_arm() {", 1)[1]
                 body = body.split(function_end, 1)[0]
-                marker = (
-                    "preamble root-overlap drain=complete "
-                    "completed_resources=2 protocol="
-                )
+                marker = "preamble root-overlap drain=complete completed_resources="
                 self.assertIn(marker, body)
                 self.assertLess(body.index(marker), body.index("stop_capture"))
                 self.assertIn("admission_connection ==", body)
@@ -860,10 +917,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         reference_body = suite.split("run_reference_sample() {", 1)[1].split(
             "run_naivefox_sample() {", 1
         )[0]
-        marker = (
-            "preamble root-overlap drain=complete "
-            "completed_resources=2 protocol="
-        )
+        marker = "preamble root-overlap drain=complete completed_resources="
         self.assertIn(marker, body)
         self.assertNotIn(marker, reference_body)
         self.assertLess(body.index(marker), body.index("stop_capture"))

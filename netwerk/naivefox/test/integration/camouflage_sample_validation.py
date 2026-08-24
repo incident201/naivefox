@@ -38,8 +38,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root",
         "document-complete",
         "tree-complete",
+        "tree-complete-css",
         "tree-early-overlap",
         "tree-root-overlap",
+        "tree-root-overlap-css",
         "tree-overlap",
     )
     if arm not in supported_arms:
@@ -57,13 +59,16 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root",
         "document-complete",
         "tree-complete",
+        "tree-complete-css",
         "tree-early-overlap",
         "tree-root-overlap",
+        "tree-root-overlap-css",
         "tree-overlap",
     )
     overlapping_arms = (
         "tree-early-overlap",
         "tree-root-overlap",
+        "tree-root-overlap-css",
         "tree-overlap",
     )
     if arm in preamble_arms:
@@ -104,7 +109,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
-    if arm == "tree-root-overlap":
+    if arm in ("tree-root-overlap", "tree-root-overlap-css"):
+        expected_resources = 1 if arm.endswith("-css") else 2
         if len(parsed_admissions) != 1:
             raise ValueError(
                 "tree-root-overlap requires exactly one causal admission marker"
@@ -113,7 +119,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if (
             admission["admission"] != "started-resources"
             or admission["root_done"] != "1"
-            or int(admission["started_resources"]) != 2
+            or int(admission["started_resources"]) != expected_resources
             or admission["protocol"] != protocol
         ):
             raise ValueError("tree-root-overlap causal admission state is invalid")
@@ -140,7 +146,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["protocol"] != protocol
         ):
             raise ValueError("tree-root-overlap lifecycle marker identity differs")
-        if int(drain["completed_resources"]) != 2:
+        if int(drain["completed_resources"]) != expected_resources:
             raise ValueError(
                 "tree-root-overlap fixture resource completion count is invalid"
             )
@@ -180,8 +186,10 @@ def main():
             "root",
             "document-complete",
             "tree-complete",
+            "tree-complete-css",
             "tree-early-overlap",
             "tree-root-overlap",
+            "tree-root-overlap-css",
             "tree-overlap",
         ),
         required=True,

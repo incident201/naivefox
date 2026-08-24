@@ -32,6 +32,20 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     ("tree-root-overlap",),
                 )
 
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-root-overlap-css decrypted validation requires "
+                "tree-complete-css",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-root-overlap-css",),
+                )
+
     def test_runner_supports_selectable_document_and_tree_arms(self):
         path = os.path.join(HERE, "run-h3-capture-comparison.sh")
         with open(path, encoding="utf-8") as stream:
@@ -640,6 +654,53 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     "4433",
                     ("tree-complete", "tree-root-overlap"),
                 )
+
+    def test_tree_root_overlap_css_pairs_one_asset_and_keeps_overlap_report_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 4, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(11, 0.013, "server", 4, status="200"),
+                self.event(13, 0.015, "client", 8, method="CONNECT"),
+                self.event(14, 0.016, "server", 8, status="200"),
+            ]
+            self.make_cohort(directory, "tree-complete-css", common)
+            self.make_cohort(directory, "tree-root-overlap-css", common)
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("tree-complete-css", "tree-root-overlap-css"),
+            )
+            safe_summary = destination.read_text(encoding="utf-8")
+            self.assertIn(
+                "tree-root-overlap-css_outer_get_count=2", safe_summary
+            )
+            self.assertIn(
+                "tree-root-overlap-css_overlap_observed=no", safe_summary
+            )
+            self.assertIn(
+                "tree_root_overlap_css_request_semantics_match=yes",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_root_overlap_css_asset_sizes_match=yes", safe_summary
+            )
+            self.assertIn(
+                "tree_root_overlap_css_wire_overlap_is_admission=no",
+                safe_summary,
+            )
 
     def test_tree_arms_reject_different_selected_header_values(self):
         with tempfile.TemporaryDirectory() as directory:

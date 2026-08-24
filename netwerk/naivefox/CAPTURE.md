@@ -197,6 +197,17 @@ root/CSS/JS request semantics and response sizes. H2 uses the same fixed
 fixture/config and validates expected request semantics, but does not claim a
 paired asset-size proof.
 
+`tree-complete-css` and `tree-root-overlap-css` are harness-only one-asset
+controls. They map to the unchanged production `tree-complete` and
+`tree-root-overlap` modes with `max-assets=1`, so the parsed root opens only the
+first stylesheet and never the later script. Passive admission requires exact
+`started_resources=1` and `completed_resources=1` lifecycle evidence. The H3
+decrypted diagnostic admits `tree-root-overlap-css` only beside
+`tree-complete-css`; it proves one QUIC identity, identical root/CSS selected
+request semantics and response size, root FIN before CONNECT, and an observed
+CSS FIN. CSS FIN ordering relative to CONNECT remains report-only and is never
+a resampling criterion.
+
 For H3, compare:
 
 - QUIC version and negotiated `h3`;

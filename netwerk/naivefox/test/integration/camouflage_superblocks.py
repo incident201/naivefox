@@ -13,8 +13,10 @@ SUPPORTED_ARMS = (
     "root",
     "document-complete",
     "tree-complete",
+    "tree-complete-css",
     "tree-early-overlap",
     "tree-root-overlap",
+    "tree-root-overlap-css",
     "tree-overlap",
 )
 REFERENCE_ARM = "reference"
