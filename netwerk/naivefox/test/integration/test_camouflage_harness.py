@@ -202,6 +202,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "root",
             "tree-complete",
             "tree-early-overlap",
+            "tree-root-overlap",
             "tree-overlap",
         )
         rows = SUPERBLOCKS.schedule_rows(
@@ -210,7 +211,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
-            members = rows[index * 7 : (index + 1) * 7]
+            members = rows[index * 8 : (index + 1) * 8]
             self.assertEqual(
                 {(row["label"], row["naivefox_arm"]) for row in members},
                 {
@@ -514,7 +515,12 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertTrue(config["outer-session-gate"])
 
     def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
-        for arm in ("tree-complete", "tree-early-overlap", "tree-overlap"):
+        for arm in (
+            "tree-complete",
+            "tree-early-overlap",
+            "tree-root-overlap",
+            "tree-overlap",
+        ):
             config = CONFIG.build_config(
                 arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
             )
@@ -678,6 +684,189 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "http=200 bytes=12000 protocol=h3\n",
                 one_connection,
             )
+        SAMPLE.validate_sample(
+            "tree-root-overlap",
+            "h3",
+            "Connection 1 preamble root-overlap admission=started-resources "
+            "root_done=1 started_resources=2 protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
+            "Connection 1 preamble root-overlap drain=complete "
+            "completed_resources=2 protocol=h3\n",
+            one_connection,
+        )
+        SAMPLE.validate_sample(
+            "tree-root-overlap",
+            "h3",
+            "Connection 1 preamble root-overlap admission=started-resources "
+            "root_done=1 started_resources=2 protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 2 established target=localhost:443 outer=h3 padding=yes\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
+            "Connection 1 preamble root-overlap drain=complete "
+            "completed_resources=2 protocol=h3\n",
+            one_connection,
+        )
+
+    def test_root_overlap_sample_requires_causal_admission_marker(self):
+        one_connection = {
+            "protocol": "h3",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        result = (
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+        )
+        with self.assertRaisesRegex(ValueError, "causal admission marker"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap", "h3", result, one_connection
+            )
+        fallback = (
+            "Connection 1 preamble root-overlap admission=terminal-fallback "
+            "root_done=1 started_resources=0 protocol=h3\n"
+        )
+        with self.assertRaisesRegex(ValueError, "causal admission state"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap", "h3", fallback + result, one_connection
+            )
+        late_marker = (
+            "Connection 1 preamble root-overlap admission=started-resources "
+            "root_done=1 started_resources=2 protocol=h3\n"
+        )
+        drain = (
+            "Connection 1 preamble root-overlap drain=complete "
+            "completed_resources=2 protocol=h3\n"
+        )
+        established = (
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+        )
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap",
+                "h3",
+                result + late_marker + established + drain,
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "completed drain marker"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap",
+                "h3",
+                late_marker + result + established,
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "lifecycle marker identity"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap",
+                "h3",
+                late_marker
+                + result
+                + established
+                + "Connection 2 preamble root-overlap drain=complete "
+                "completed_resources=2 protocol=h3\n",
+                one_connection,
+            )
+        partial_admission = (
+            "Connection 1 preamble root-overlap admission=started-resources "
+            "root_done=1 started_resources=1 protocol=h3\n"
+        )
+        partial_drain = (
+            "Connection 1 preamble root-overlap drain=complete "
+            "completed_resources=1 protocol=h3\n"
+        )
+        with self.assertRaisesRegex(ValueError, "causal admission state"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap",
+                "h3",
+                partial_admission + result + established + partial_drain,
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "completion count"):
+            SAMPLE.validate_sample(
+                "tree-root-overlap",
+                "h3",
+                late_marker + result + established + partial_drain,
+                one_connection,
+            )
+
+    def test_overlapping_sample_rejects_background_drain_timeout(self):
+        one_connection = {
+            "protocol": "h3",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        result = (
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+        )
+        marker = (
+            "Connection 1 preamble root-overlap admission=started-resources "
+            "root_done=1 started_resources=2 protocol=h3\n"
+        )
+        established = (
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+        )
+        drain = (
+            "Connection 1 preamble root-overlap drain=complete "
+            "completed_resources=2 protocol=h3\n"
+        )
+        timeout = "Connection 1 preamble background drain timed out\n"
+        for arm, evidence in (
+            ("tree-early-overlap", result + timeout),
+            (
+                "tree-root-overlap",
+                marker + result + established + drain + timeout,
+            ),
+            ("tree-overlap", result + timeout),
+        ):
+            with self.subTest(arm=arm), self.assertRaisesRegex(
+                ValueError, "background drain timed out"
+            ):
+                SAMPLE.validate_sample(arm, "h3", evidence, one_connection)
+
+    def test_root_overlap_runners_wait_for_normal_drain_before_capture_stop(self):
+        for filename, function_end in (
+            ("run-h2-capture-comparison.sh", "run_reference\nrun_candidate"),
+            (
+                "run-h3-capture-comparison.sh",
+                "if [[ $comparison_design == arms ]]",
+            ),
+        ):
+            with self.subTest(filename=filename):
+                with open(os.path.join(HERE, filename), encoding="utf-8") as stream:
+                    runner = stream.read()
+                body = runner.split("run_candidate() {", 1)[-1]
+                if filename.startswith("run-h3"):
+                    body = runner.split("run_naivefox_arm() {", 1)[1]
+                body = body.split(function_end, 1)[0]
+                marker = (
+                    "preamble root-overlap drain=complete "
+                    "completed_resources=2 protocol="
+                )
+                self.assertIn(marker, body)
+                self.assertLess(body.index(marker), body.index("stop_capture"))
+                self.assertIn("admission_connection ==", body)
+                self.assertIn("$result_line -lt $drain_line", body)
+
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            suite = stream.read()
+        body = suite.split("run_naivefox_sample() {", 1)[1].split(
+            "scenario_csv=", 1
+        )[0]
+        reference_body = suite.split("run_reference_sample() {", 1)[1].split(
+            "run_naivefox_sample() {", 1
+        )[0]
+        marker = (
+            "preamble root-overlap drain=complete "
+            "completed_resources=2 protocol="
+        )
+        self.assertIn(marker, body)
+        self.assertNotIn(marker, reference_body)
+        self.assertLess(body.index(marker), body.index("stop_capture"))
 
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
         two_connections = {
@@ -998,6 +1187,7 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                 ("naivefox", "root"),
                 ("naivefox", "tree-complete"),
                 ("naivefox", "tree-early-overlap"),
+                ("naivefox", "tree-root-overlap"),
                 ("naivefox", "tree-overlap"),
             )
             for index, (label, arm) in enumerate(members):
@@ -1025,13 +1215,14 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     expected_per_cohort=None,
                     expected_superblocks=1,
                     expected_superblock_arms=(
-                        "gate,root,tree-complete,tree-early-overlap,tree-overlap"
+                        "gate,root,tree-complete,tree-early-overlap,"
+                        "tree-root-overlap,tree-overlap"
                     ),
                 )
             )
             with open(output, newline="", encoding="utf-8") as stream:
                 rows = list(csv.DictReader(stream))
-            self.assertEqual(len(rows), 7)
+            self.assertEqual(len(rows), 8)
             self.assertEqual(
                 {row["naivefox_arm"] for row in rows},
                 {
@@ -1040,6 +1231,7 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     "root",
                     "tree-complete",
                     "tree-early-overlap",
+                    "tree-root-overlap",
                     "tree-overlap",
                 },
             )

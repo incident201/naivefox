@@ -381,6 +381,70 @@ class H2DecryptedParitySummaryTests(unittest.TestCase):
             "same-server-tls",
             (6, "0", "3"),
         )
+        completed_before_connect = [
+            {**candidate, "end_stream_frame": min(candidate["frame"] + 1, 11)}
+            if candidate["direction"] == "server" and candidate["status"] == "200"
+            else dict(candidate)
+            for candidate in arm
+        ]
+        SUMMARY.validate(
+            reference,
+            completed_before_connect,
+            "tree-root-overlap",
+            "same-settings",
+            "same-settings",
+            "same-client-tls",
+            "same-client-tls",
+            "same-server-tls",
+            "same-server-tls",
+            (6, "0", "3"),
+        )
+        missing_asset_end = [
+            {**candidate, "end_stream_frame": ""}
+            if candidate["direction"] == "server"
+            and candidate["status"] == "200"
+            and candidate["stream"] == "5"
+            else dict(candidate)
+            for candidate in completed_before_connect
+        ]
+        with self.assertRaisesRegex(
+            ValueError, "lacks END_STREAM for an expected resource"
+        ):
+            SUMMARY.validate(
+                reference,
+                missing_asset_end,
+                "tree-root-overlap",
+                "same-settings",
+                "same-settings",
+                "same-client-tls",
+                "same-client-tls",
+                "same-server-tls",
+                "same-server-tls",
+                (6, "0", "3"),
+            )
+        root_after_connect = [
+            {**candidate, "end_stream_frame": 13}
+            if candidate["direction"] == "server"
+            and candidate["status"] == "200"
+            and candidate["stream"] == "3"
+            else dict(candidate)
+            for candidate in completed_before_connect
+        ]
+        with self.assertRaisesRegex(
+            ValueError, "tree-root-overlap root did not complete before CONNECT"
+        ):
+            SUMMARY.validate(
+                reference,
+                root_after_connect,
+                "tree-root-overlap",
+                "same-settings",
+                "same-settings",
+                "same-client-tls",
+                "same-client-tls",
+                "same-server-tls",
+                "same-server-tls",
+                (6, "0", "3"),
+            )
         with self.assertRaisesRegex(
             ValueError, "root did not complete before CONNECT"
         ):

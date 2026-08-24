@@ -107,6 +107,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeEarlyOverlap, true));
   EXPECT_FALSE(
       detail::ShouldRunPreamble(PreambleMode::TreeEarlyOverlap, false));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeRootOverlap, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::TreeRootOverlap, false));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
@@ -139,8 +141,18 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
                                              true, 2, 1, 1, 0));
 
+  // Root-overlap is defined by client-side scheduling state, not by whether
+  // response HEADERS or FIN happened to win a transport race.
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeRootOverlap,
+                                              false, 1, 0, 0, 1));
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeRootOverlap,
+                                              true, 0, 0, 0, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeRootOverlap,
+                                             true, 1, 0, 0, 1));
+
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeEarlyOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeRootOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -176,6 +188,11 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeOverlap, false));
 
+  EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeRootOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeRootOverlap, true));
+
   detail::PreambleSequenceState sequence;
   constexpr uint64_t generation = 17;
   EXPECT_TRUE(sequence.Begin(generation, ProxyProtocol::H2));
@@ -183,6 +200,18 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
   EXPECT_FALSE(sequence.Complete(generation, ProxyProtocol::H2));
   EXPECT_TRUE(sequence.TryStartConnect(generation));
   EXPECT_FALSE(sequence.TryStartConnect(generation));
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, ResourceDrainRequiresSuccessfulHttp)
+{
+  EXPECT_TRUE(detail::PreambleResourceCompletedSuccessfully(true, 200, NS_OK));
+  EXPECT_TRUE(detail::PreambleResourceCompletedSuccessfully(true, 299, NS_OK));
+  EXPECT_FALSE(
+      detail::PreambleResourceCompletedSuccessfully(false, 200, NS_OK));
+  EXPECT_FALSE(detail::PreambleResourceCompletedSuccessfully(true, 199, NS_OK));
+  EXPECT_FALSE(detail::PreambleResourceCompletedSuccessfully(true, 300, NS_OK));
+  EXPECT_FALSE(detail::PreambleResourceCompletedSuccessfully(
+      true, 200, NS_ERROR_NET_RESET));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, LatePreambleCallbackCannotDoubleOpen)

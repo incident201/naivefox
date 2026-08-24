@@ -14,6 +14,7 @@ SUPPORTED_ARMS = (
     "document-complete",
     "tree-complete",
     "tree-early-overlap",
+    "tree-root-overlap",
     "tree-overlap",
 )
 REFERENCE_ARM = "reference"

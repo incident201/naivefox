@@ -5,13 +5,33 @@ import json
 import re
 
 PREAMBLE_RESULT = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Connection \d+ preamble result=(\S+) "
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble result=(?P<result>\S+) "
     r"status=0x[0-9a-fA-F]+ "
-    r"http=(\d+) bytes=(\d+) protocol=(h2|h3)$"
+    r"http=(?P<http>\d+) bytes=(?P<bytes>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+ROOT_OVERLAP_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble root-overlap admission=(?P<admission>\S+) "
+    r"root_done=(?P<root_done>[01]) "
+    r"started_resources=(?P<started_resources>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+ROOT_OVERLAP_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble root-overlap drain=complete "
+    r"completed_resources=(?P<completed_resources>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+ESTABLISHED = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"established target=\S+ outer=(?P<protocol>h2|h3) padding=yes$"
 )
 
 
 def validate_sample(arm, protocol, log_text, feature_document):
+    log_lines = log_text.splitlines()
     supported_arms = (
         "off",
         "gate",
@@ -19,6 +39,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-complete",
         "tree-complete",
         "tree-early-overlap",
+        "tree-root-overlap",
         "tree-overlap",
     )
     if arm not in supported_arms:
@@ -27,7 +48,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported outer protocol")
 
     result_lines = [
-        line for line in log_text.splitlines() if " preamble result=" in line
+        line for line in log_lines if " preamble result=" in line
     ]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
@@ -37,18 +58,105 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-complete",
         "tree-complete",
         "tree-early-overlap",
+        "tree-root-overlap",
+        "tree-overlap",
+    )
+    overlapping_arms = (
+        "tree-early-overlap",
+        "tree-root-overlap",
         "tree-overlap",
     )
     if arm in preamble_arms:
         if len(parsed_results) != 1:
             raise ValueError(f"{arm} arm requires exactly one preamble result")
         result = parsed_results[0]
-        if result.group(1) != "success" or result.group(4) != protocol:
+        if result["result"] != "success" or result["protocol"] != protocol:
             raise ValueError(f"{arm} arm preamble did not succeed on selected protocol")
-        if not 200 <= int(result.group(2)) < 300:
+        if not 200 <= int(result["http"]) < 300:
             raise ValueError(f"{arm} arm preamble success has invalid HTTP status")
     elif parsed_results:
         raise ValueError(f"{arm} arm unexpectedly ran a preamble")
+
+    if arm in overlapping_arms and any(
+        " preamble background drain timed out" in line for line in log_lines
+    ):
+        raise ValueError(f"{arm} arm preamble background drain timed out")
+
+    admission_lines = [
+        line
+        for line in log_lines
+        if " preamble root-overlap admission=" in line
+    ]
+    parsed_admissions = [
+        ROOT_OVERLAP_ADMISSION.fullmatch(line) for line in admission_lines
+    ]
+    if any(admission is None for admission in parsed_admissions):
+        raise ValueError("malformed tree-root-overlap admission evidence")
+    drain_lines = [
+        line for line in log_lines if " preamble root-overlap drain=" in line
+    ]
+    parsed_drains = [ROOT_OVERLAP_DRAIN.fullmatch(line) for line in drain_lines]
+    if any(drain is None for drain in parsed_drains):
+        raise ValueError("malformed tree-root-overlap drain evidence")
+    established_lines = [
+        line for line in log_lines if " established target=" in line
+    ]
+    parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
+    if any(established is None for established in parsed_established):
+        raise ValueError("malformed CONNECT-established evidence")
+    if arm == "tree-root-overlap":
+        if len(parsed_admissions) != 1:
+            raise ValueError(
+                "tree-root-overlap requires exactly one causal admission marker"
+            )
+        admission = parsed_admissions[0]
+        if (
+            admission["admission"] != "started-resources"
+            or admission["root_done"] != "1"
+            or int(admission["started_resources"]) != 2
+            or admission["protocol"] != protocol
+        ):
+            raise ValueError("tree-root-overlap causal admission state is invalid")
+        if len(parsed_drains) != 1:
+            raise ValueError(
+                "tree-root-overlap requires exactly one completed drain marker"
+            )
+        matching_established = [
+            (line, established)
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == admission["connection"]
+            and established["protocol"] == protocol
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "tree-root-overlap requires exactly one matching "
+                "CONNECT-established marker"
+            )
+        drain = parsed_drains[0]
+        established_line, established = matching_established[0]
+        if (
+            result["connection"] != admission["connection"]
+            or drain["connection"] != admission["connection"]
+            or drain["protocol"] != protocol
+        ):
+            raise ValueError("tree-root-overlap lifecycle marker identity differs")
+        if int(drain["completed_resources"]) != 2:
+            raise ValueError(
+                "tree-root-overlap fixture resource completion count is invalid"
+            )
+        admission_index = log_lines.index(admission_lines[0])
+        result_index = log_lines.index(result_lines[0])
+        drain_index = log_lines.index(drain_lines[0])
+        established_index = log_lines.index(established_line)
+        if not (
+            admission_index < result_index < drain_index
+            and result_index < established_index
+        ):
+            raise ValueError(
+                "tree-root-overlap lifecycle markers have invalid ordering"
+            )
+    elif parsed_admissions or parsed_drains:
+        raise ValueError(f"{arm} arm unexpectedly logged root-overlap lifecycle")
 
     if arm != "off":
         if feature_document.get("protocol") != protocol:
@@ -73,6 +181,7 @@ def main():
             "document-complete",
             "tree-complete",
             "tree-early-overlap",
+            "tree-root-overlap",
             "tree-overlap",
         ),
         required=True,

@@ -165,6 +165,7 @@ def load_dataset(path):
                 "document-complete",
                 "tree-complete",
                 "tree-early-overlap",
+                "tree-root-overlap",
                 "tree-overlap",
             }
             if arm not in {None, "reference", *naivefox_arms}:

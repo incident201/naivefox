@@ -18,6 +18,7 @@ SUPPORTED_ARMS = {
     "document-complete",
     "tree-complete",
     "tree-early-overlap",
+    "tree-root-overlap",
     "tree-overlap",
 }
 SELECTED_GET_SEMANTIC_HEADERS = {
@@ -519,6 +520,51 @@ def validate(
                 and event["stream"] == root_get["stream"]
             ]
             require(root_responses and all(event["end_stream_frame"] != "" and event["end_stream_frame"] < connect["frame"] for event in root_responses), "tree-early-overlap root did not complete before CONNECT")
+    elif arm == "tree-root-overlap":
+        require(
+            root_request_identity is not None,
+            "tree-root-overlap lacks private root path identity",
+        )
+        root_gets = [
+            event
+            for event in gets
+            if (event["frame"], event["tcp_stream"], event["stream"])
+            == root_request_identity
+        ]
+        require(
+            len(root_gets) == 1,
+            "tree-root-overlap private root identity is ambiguous",
+        )
+        root_get = root_gets[0]
+        root_responses = [
+            event
+            for event in responses
+            if event["tcp_stream"] == root_get["tcp_stream"]
+            and event["stream"] == root_get["stream"]
+        ]
+        require(
+            root_responses
+            and all(
+                event["end_stream_frame"] != ""
+                and event["end_stream_frame"] < connect["frame"]
+                for event in root_responses
+            ),
+            "tree-root-overlap root did not complete before CONNECT",
+        )
+        require(
+            all(
+                any(
+                    response["tcp_stream"] == get["tcp_stream"]
+                    and response["stream"] == get["stream"]
+                    and response["end_stream_frame"] != ""
+                    for response in responses
+                )
+                for get in gets
+            ),
+            "tree-root-overlap lacks END_STREAM for an expected resource",
+        )
+        # Asset END_STREAM order relative to CONNECT is report-only. Product
+        # admission is established by the causal lifecycle markers.
 
 
 def write_outputs(root, events_path, summary_path, proxy_port, arm):
@@ -556,6 +602,23 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
     root_request_identity = validate_expected_get_request_semantics(
         arm, candidate_semantics, arm
     )
+    root_overlap_observed = None
+    if arm == "tree-root-overlap":
+        connect_frame = min(event["frame"] for event in candidate_connects)
+        root_key = (root_request_identity[1], root_request_identity[2])
+        asset_streams = {
+            (event["tcp_stream"], event["stream"])
+            for event in candidate_gets
+            if (event["tcp_stream"], event["stream"]) != root_key
+        }
+        root_overlap_observed = any(
+            (event["tcp_stream"], event["stream"]) in asset_streams
+            and event["frame"] < connect_frame < event["end_stream_frame"]
+            for event in candidate
+            if event["direction"] == "server"
+            and event["status"] == "200"
+            and event["end_stream_frame"] != ""
+        )
     validate(
         reference,
         candidate,
@@ -599,6 +662,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
             output.write(f"{arm}_root_document_request_semantics=yes\n")
         if arm.startswith("tree-"):
             output.write(f"{arm}_resource_request_semantics=yes\n")
+        if arm == "tree-root-overlap":
+            output.write("tree-root-overlap_wire_overlap_is_admission=no\n")
+            output.write(
+                "tree-root-overlap_wire_overlap_observed="
+                f"{'yes' if root_overlap_observed else 'no'}\n"
+            )
         output.write("header_values_retained=no\n")
         output.write("credential_header_names_redacted=yes\n")
         output.write("raw_capture_material=deleted_after_success\n")

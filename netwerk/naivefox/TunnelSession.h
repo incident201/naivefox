@@ -163,8 +163,12 @@ class TunnelSession final {
   void FinishPreambleOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                             const nsACString& aTargetAuthority,
                             nsresult aStatus, uint32_t aHttpStatus,
-                            uint32_t aBodyBytes);
-  void FinishPreambleOperationOnMain(uint64_t aGeneration);
+                            uint32_t aBodyBytes, uint32_t aStartedResources,
+                            bool aRootDone);
+  void FinishPreambleOperationOnMain(uint64_t aGeneration,
+                                     ProxyProtocol aProtocol,
+                                     bool aCompletedNormally,
+                                     uint32_t aCompletedSuccessfulResources);
   void PreambleTimeoutOnMain(uint64_t aGeneration, ProxyProtocol aProtocol);
   void PreambleDrainTimeoutOnMain(uint64_t aGeneration);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,

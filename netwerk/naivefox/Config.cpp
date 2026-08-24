@@ -569,6 +569,8 @@ class JsonParser final {
           aPreamble.mMode = PreambleMode::TreeOverlap;
         } else if (mode.EqualsLiteral("tree-early-overlap")) {
           aPreamble.mMode = PreambleMode::TreeEarlyOverlap;
+        } else if (mode.EqualsLiteral("tree-root-overlap")) {
+          aPreamble.mMode = PreambleMode::TreeRootOverlap;
         } else {
           return Error("unsupported preamble mode");
         }

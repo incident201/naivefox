@@ -629,12 +629,16 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
       mImpl->mConfig.mProxyPassword, mImpl->mConfig.mPreamble, aProtocol,
       [self, aGeneration, aProtocol,
        authority = std::move(authority)](ProxyPreambleResult aResult) {
-        self->FinishPreambleOnMain(aGeneration, aProtocol, authority,
-                                   aResult.mStatus, aResult.mHttpStatus,
-                                   aResult.mBodyBytes);
+        self->FinishPreambleOnMain(
+            aGeneration, aProtocol, authority, aResult.mStatus,
+            aResult.mHttpStatus, aResult.mBodyBytes, aResult.mStartedResources,
+            aResult.mRootDone);
       },
-      [self, aGeneration]() {
-        self->FinishPreambleOperationOnMain(aGeneration);
+      [self, aGeneration, aProtocol](bool aCompletedNormally,
+                                     uint32_t aCompletedSuccessfulResources) {
+        self->FinishPreambleOperationOnMain(aGeneration, aProtocol,
+                                            aCompletedNormally,
+                                            aCompletedSuccessfulResources);
       },
       mImpl->mConfig.mHostResolverRule, operation);
   if (NS_FAILED(rv)) {
@@ -680,11 +684,10 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   }
 }
 
-void TunnelSession::FinishPreambleOnMain(uint64_t aGeneration,
-                                         ProxyProtocol aProtocol,
-                                         const nsACString& aTargetAuthority,
-                                         nsresult aStatus, uint32_t aHttpStatus,
-                                         uint32_t aBodyBytes) {
+void TunnelSession::FinishPreambleOnMain(
+    uint64_t aGeneration, ProxyProtocol aProtocol,
+    const nsACString& aTargetAuthority, nsresult aStatus, uint32_t aHttpStatus,
+    uint32_t aBodyBytes, uint32_t aStartedResources, bool aRootDone) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol) ||
       !mImpl->mPreambleOperation ||
@@ -716,6 +719,15 @@ void TunnelSession::FinishPreambleOnMain(uint64_t aGeneration,
   }
   const bool succeeded =
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
+  if (mImpl->mConfig.mPreamble.mMode == PreambleMode::TreeRootOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble root-overlap admission=%s root_done=%d "
+        "started_resources=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aRootDone && aStartedResources > 0 ? "started-resources"
+                                           : "terminal-fallback",
+        aRootDone, aStartedResources, ProtocolName(aProtocol));
+  }
   const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
                        : succeeded                      ? "success"
                        : NS_FAILED(aStatus)             ? "network-error"
@@ -731,7 +743,9 @@ void TunnelSession::FinishPreambleOnMain(uint64_t aGeneration,
   }
 }
 
-void TunnelSession::FinishPreambleOperationOnMain(uint64_t aGeneration) {
+void TunnelSession::FinishPreambleOperationOnMain(
+    uint64_t aGeneration, ProxyProtocol aProtocol, bool aCompletedNormally,
+    uint32_t aCompletedSuccessfulResources) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mPreambleOperationGeneration != aGeneration) {
     return;
@@ -739,6 +753,14 @@ void TunnelSession::FinishPreambleOperationOnMain(uint64_t aGeneration) {
   if (mImpl->mPreambleDrainTimer) {
     (void)mImpl->mPreambleDrainTimer->Cancel();
     mImpl->mPreambleDrainTimer = nullptr;
+  }
+  if (aCompletedNormally &&
+      mImpl->mConfig.mPreamble.mMode == PreambleMode::TreeRootOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble root-overlap drain=complete "
+        "completed_resources=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aCompletedSuccessfulResources, ProtocolName(aProtocol));
   }
   mImpl->mPreambleOperation = nullptr;
   mImpl->mPreambleOperationGeneration = 0;

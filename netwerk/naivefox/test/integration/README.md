@@ -190,6 +190,32 @@ it passes or use the arm for passive causal screening while this outcome is
 nondeterministic, because that would select samples by their observed
 scheduling.
 
+`tree-root-overlap` tests a different and deterministic client-side cause. The
+normal root parser starts the same CSS/JS channels, root completion is observed,
+and CONNECT is admitted when at least one resource `AsyncOpen` succeeded,
+without consulting resource response HEADERS or FIN. The operation remains
+owned and drains after CONNECT. A zero-resource terminal tree falls through to
+CONNECT immediately rather than waiting for a timeout. The runner requires the
+safe `root_done=1 started_resources=2` marker and then a distinct normal
+`drain=complete completed_resources=2` marker before ending capture or running
+any passive analysis. The latter is emitted only when both opened assets have
+response headers, HTTP 2xx, and successful completion. Thus a synchronous
+failure to open the second fixture asset is rejected even though the generic
+production barrier remains valid with one started asset. Its bounded watchdog
+only invalidates the sample. H3 decrypted use
+must select it together with `tree-complete` so the same run proves equal
+request semantics and asset sizes.
+
+That request-scheduling order does not guarantee wire overlap. H2/H3 response
+FIN may already have won the transport race. Decrypted output reports the
+observed order only; it never rejects `tree-root-overlap` for lacking
+HEADERS/FIN overlap, and samples must not be selectively retried. Private
+semantic validation still requires root completion before CONNECT and a FIN
+for every expected root/CSS/JS response. H3 additionally requires its selected
+request semantics and asset sizes to match the paired `tree-complete` arm
+exactly. H2 uses the same fixture/config and validates expected request
+semantics, but does not claim paired asset-size equality.
+
 `run-h2-connect-priority-comparison.sh` is a separate same-base causal
 diagnostic for the first SOCKS tunnel. It compares an ordinary top-level HTTPS
 navigation through the fixture's existing authenticated H2 forward proxy with
@@ -401,7 +427,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-overlap`
+`--naivefox-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -417,6 +443,12 @@ exactly the same root/CSS/JS request semantics and asset sizes as
 `tree-complete`. Reusing an explicit
 seed across separate invocations reproduces schedule order, but does not make
 independently captured samples statistically paired:
+
+`tree-root-overlap` also completes the root first, but its barrier depends only
+on at least one successfully started resource channel. Consequently its causal
+state is stable across fast and slow servers while actual asset/CONNECT wire
+overlap remains a report-only outcome. The capture is retained only after all
+expected response streams have a FIN; root FIN must precede CONNECT.
 
 ```bash
 ./run-camouflage-suite.sh --mode gate --protocol both --seed 12345 --naivefox-arm off
@@ -503,6 +535,18 @@ For the scheduling-only follow-up, replace `gate` with
 `tree-early-overlap`. The early arm uses exactly the same root, stylesheet,
 script, and response sizes as the two existing tree arms; only the CONNECT
 admission point changes.
+
+An isolated ten-block same-base H3/inner-HTTPS smoke of
+`root,tree-complete,tree-root-overlap` is retained as safe artifact
+`183164d35decbb0f` (seed `24082420`). Descriptively, it found the new arm closest on packets
+17--32 (0.53163 versus 0.56326 and 0.64406) and packets 1--32 (0.20633 versus
+0.22243 and 0.23118). `root` remained closest on packets 1--16 and the whole
+flow. These are screening distances and support neither relative inference nor
+an absolute camouflage verdict. The paired decrypted run independently proved equal
+request semantics and asset sizes and observed real resource/CONNECT overlap
+without selecting samples on that outcome. The next low-cost screen should
+hold the admission rule fixed and vary only how many discovered resources are
+opened, rather than tune packet sizes or add sleeps.
 
 Controlled H3 packet-shape screening must run with
 `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`. The private namespace disables loopback

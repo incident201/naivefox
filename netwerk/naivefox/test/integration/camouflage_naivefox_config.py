@@ -28,12 +28,14 @@ def build_config(
         "document-complete",
         "tree-complete",
         "tree-early-overlap",
+        "tree-root-overlap",
         "tree-overlap",
     )
     if arm not in supported_arms:
         raise ValueError(
             "config arm must be off, gate, root, document-complete, "
-            "tree-complete, tree-early-overlap, or tree-overlap"
+            "tree-complete, tree-early-overlap, tree-root-overlap, or "
+            "tree-overlap"
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
@@ -57,7 +59,12 @@ def build_config(
             "path": PREAMBLE_PATH,
             "max-bytes": PREAMBLE_MAX_BYTES,
         }
-    elif arm in ("tree-complete", "tree-early-overlap", "tree-overlap"):
+    elif arm in (
+        "tree-complete",
+        "tree-early-overlap",
+        "tree-root-overlap",
+        "tree-overlap",
+    ):
         preamble = {
             "mode": arm,
             "path": PREAMBLE_PATH,
@@ -98,6 +105,7 @@ def main():
             "document-complete",
             "tree-complete",
             "tree-early-overlap",
+            "tree-root-overlap",
             "tree-overlap",
         ),
         required=True,

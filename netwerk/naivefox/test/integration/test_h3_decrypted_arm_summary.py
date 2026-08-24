@@ -18,6 +18,20 @@ PRIVATE_SEMANTIC_MARKER = "private-tree-authority.invalid"
 
 
 class H3DecryptedArmSummaryTests(unittest.TestCase):
+    def test_tree_root_overlap_requires_complete_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-root-overlap decrypted validation requires tree-complete",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-root-overlap",),
+                )
+
     def test_runner_supports_selectable_document_and_tree_arms(self):
         path = os.path.join(HERE, "run-h3-capture-comparison.sh")
         with open(path, encoding="utf-8") as stream:
@@ -556,6 +570,75 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     destination,
                     "4433",
                     ("tree-complete", "tree-early-overlap"),
+                )
+
+    def test_tree_root_overlap_keeps_wire_overlap_report_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 4, method="GET"),
+                self.event(9, 0.011, "client", 8, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(11, 0.013, "server", 4, status="200"),
+                self.event(12, 0.014, "server", 8, status="200"),
+                self.event(13, 0.015, "client", 12, method="CONNECT"),
+                self.event(14, 0.016, "server", 12, status="200"),
+            ]
+            self.make_cohort(directory, "tree-complete", common)
+            # Every resource FIN precedes CONNECT. The new arm remains valid:
+            # wire overlap is an outcome, not a selection predicate.
+            self.make_cohort(directory, "tree-root-overlap", common)
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("tree-complete", "tree-root-overlap"),
+            )
+            safe_summary = destination.read_text(encoding="utf-8")
+            self.assertIn("tree-root-overlap_overlap_observed=no", safe_summary)
+            self.assertIn(
+                "tree_root_overlap_request_semantics_match=yes", safe_summary
+            )
+            self.assertIn("tree_root_overlap_asset_sizes_match=yes", safe_summary)
+            self.assertIn(
+                "tree_root_overlap_wire_overlap_is_admission=no", safe_summary
+            )
+            lifecycle = (
+                Path(directory)
+                / "decrypted-tree-root-overlap-lifecycle.csv"
+            )
+            with lifecycle.open(newline="", encoding="utf-8") as stream:
+                reader = csv.DictReader(stream)
+                lifecycle_rows = list(reader)
+                lifecycle_fields = reader.fieldnames
+            lifecycle_rows = [
+                row
+                for row in lifecycle_rows
+                if row["quic.stream.stream_id"] != "8"
+            ]
+            with lifecycle.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=lifecycle_fields)
+                writer.writeheader()
+                writer.writerows(lifecycle_rows)
+            with self.assertRaisesRegex(
+                ValueError, "lacks an observed FIN for every asset stream"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events-missing-fin.csv",
+                    Path(directory) / "summary-missing-fin.txt",
+                    "4433",
+                    ("tree-complete", "tree-root-overlap"),
                 )
 
     def test_tree_arms_reject_different_selected_header_values(self):

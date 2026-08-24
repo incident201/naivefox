@@ -872,6 +872,7 @@ def main():
             "document-complete",
             "tree-complete",
             "tree-early-overlap",
+            "tree-root-overlap",
             "tree-overlap",
         ),
     )

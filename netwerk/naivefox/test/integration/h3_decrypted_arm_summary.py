@@ -12,6 +12,7 @@ SUPPORTED_ARMS = (
     "document-complete",
     "tree-complete",
     "tree-early-overlap",
+    "tree-root-overlap",
     "tree-overlap",
 )
 REDACTED_HEADER_NAMES = {
@@ -609,6 +610,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "document-complete",
             "tree-complete",
             "tree-early-overlap",
+            "tree-root-overlap",
             "tree-overlap",
         ):
             expected_gets = 3 if arm.startswith("tree-") else 1
@@ -735,7 +737,35 @@ def validate(cohorts, connections, client_hellos, arms):
                         ),
                         "tree-early-overlap lacks resource HEADERS < CONNECT < same-resource FIN evidence",
                     )
-                else:
+                elif arm == "tree-root-overlap":
+                    root_stream = (
+                        ordered_gets[0]["connection_index"],
+                        ordered_gets[0]["stream_id"],
+                    )
+                    root_responses = [
+                        row
+                        for row in response_headers
+                        if (row["connection_index"], row["stream_id"])
+                        == root_stream
+                    ]
+                    require(
+                        root_responses
+                        and all(
+                            row["stream_fin_packet_position"] != ""
+                            and row["stream_fin_packet_position"]
+                            < connects[0]["packet_position"]
+                            for row in root_responses
+                        ),
+                        "tree-root-overlap root FIN did not precede CONNECT",
+                    )
+                    require(
+                        all(
+                            row["stream_fin_packet_position"] != ""
+                            for row in asset_responses
+                        ),
+                        "tree-root-overlap lacks an observed FIN for every asset stream",
+                    )
+                elif arm == "tree-overlap":
                     require(
                         any(
                             row["packet_position"]
@@ -797,6 +827,31 @@ def validate(cohorts, connections, client_hellos, arms):
                 and complete["header_name_set"] == early["header_name_set"],
                 f"tree {role} GET request semantics differ between complete and early-overlap",
             )
+    if {"tree-complete", "tree-root-overlap"}.issubset(arms):
+        complete_gets = sorted(
+            (
+                row
+                for row in cohorts["tree-complete"]
+                if row["direction"] == "client" and row["method"] == "GET"
+            ),
+            key=lambda row: row["packet_position"],
+        )
+        root_overlap_gets = sorted(
+            (
+                row
+                for row in cohorts["tree-root-overlap"]
+                if row["direction"] == "client" and row["method"] == "GET"
+            ),
+            key=lambda row: row["packet_position"],
+        )
+        for role, complete, root_overlap in zip(
+            ("root", "stylesheet", "script"), complete_gets, root_overlap_gets
+        ):
+            require(
+                complete["header_name_order"] == root_overlap["header_name_order"]
+                and complete["header_name_set"] == root_overlap["header_name_set"],
+                f"tree {role} GET request semantics differ between complete and root-overlap",
+            )
     for arm in arms:
         if arm != "off":
             require(
@@ -816,6 +871,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
     require(
         "tree-early-overlap" not in arms or "tree-complete" in arms,
         "tree-early-overlap decrypted validation requires tree-complete",
+    )
+    require(
+        "tree-root-overlap" not in arms or "tree-complete" in arms,
+        "tree-root-overlap decrypted validation requires tree-complete",
     )
     cohorts_to_read = ("reference", *arms)
     cohorts = {}
@@ -869,6 +928,18 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         require(
             tree_asset_sizes["tree-complete"] == tree_asset_sizes["tree-early-overlap"],
             "tree asset content-lengths differ between complete and early-overlap",
+        )
+    if {"tree-complete", "tree-root-overlap"}.issubset(arms):
+        for role in ("root", "stylesheet", "script"):
+            require(
+                tree_semantics["tree-complete"][role]
+                == tree_semantics["tree-root-overlap"][role],
+                f"tree {role} GET selected header values/order differ between complete and root-overlap",
+            )
+        require(
+            tree_asset_sizes["tree-complete"]
+            == tree_asset_sizes["tree-root-overlap"],
+            "tree asset content-lengths differ between complete and root-overlap",
         )
     fieldnames = [
         "cohort",
@@ -947,7 +1018,11 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
                     position > connect_position for position in fin_positions
                 )
                 resource_stream_overlap = False
-                if cohort in ("tree-early-overlap", "tree-overlap"):
+                if cohort in (
+                    "tree-early-overlap",
+                    "tree-root-overlap",
+                    "tree-overlap",
+                ):
                     ordered_gets = sorted(gets, key=lambda row: row["packet_position"])
                     asset_streams = {
                         (row["connection_index"], row["stream_id"])
@@ -1002,6 +1077,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         if {"tree-complete", "tree-early-overlap"}.issubset(arms):
             destination.write("tree_early_overlap_request_semantics_match=yes\n")
             destination.write("tree_early_overlap_asset_sizes_match=yes\n")
+        if {"tree-complete", "tree-root-overlap"}.issubset(arms):
+            destination.write("tree_root_overlap_request_semantics_match=yes\n")
+            destination.write("tree_root_overlap_asset_sizes_match=yes\n")
+            destination.write("tree_root_overlap_wire_overlap_is_admission=no\n")
         if any(arm.startswith("tree-") for arm in arms):
             destination.write("tree_expected_request_semantics=yes\n")
         destination.write("raw_capture_material=deleted_after_success\n")

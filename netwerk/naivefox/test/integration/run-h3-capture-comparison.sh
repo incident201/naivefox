@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|document-complete|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +37,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-overlap) ;;
+    off | gate | root | document-complete | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -46,6 +46,11 @@ for arm in "${comparison_arms[@]}"; do
   fi
   seen_comparison_arms[$arm]=1
 done
+if [[ -n ${seen_comparison_arms[tree-root-overlap]:-} &&
+      -z ${seen_comparison_arms[tree-complete]:-} ]]; then
+  printf 'tree-root-overlap comparison requires tree-complete\n' >&2
+  exit 2
+fi
 
 capture_pid=
 capture_pcap=
@@ -568,6 +573,10 @@ EOF
     printf 'same-base Firefox through %s arm exited with status %s; evaluating capture\n' \
       "$arm" "$browser_status" >&2
   fi
+  if [[ $arm == tree-root-overlap ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble root-overlap drain=complete completed_resources=2 protocol=h3$'
+  fi
   sleep 0.25
   stop_capture
   stop_network_mutation_monitor
@@ -580,11 +589,41 @@ EOF
   [[ $outer_count -ge 1 && $padding_count -eq $outer_count ]]
   if [[ $arm == root || $arm == document-complete ||
         $arm == tree-complete || $arm == tree-early-overlap ||
+        $arm == tree-root-overlap ||
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
+    if [[ $arm == tree-early-overlap || $arm == tree-root-overlap ||
+          $arm == tree-overlap ]]; then
+      ! rg -q ' preamble background drain timed out' "$log"
+    fi
+    if [[ $arm == tree-root-overlap ]]; then
+      [[ $(rg -c ' preamble root-overlap admission=' "$log" || true) -eq 1 ]]
+      [[ $(rg -c ' preamble root-overlap drain=' "$log" || true) -eq 1 ]]
+      rg -q ' preamble root-overlap admission=started-resources root_done=1 started_resources=2 protocol=h3$' "$log"
+      rg -q ' preamble root-overlap drain=complete completed_resources=2 protocol=h3$' "$log"
+      local admission_connection result_connection drain_connection
+      admission_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble root-overlap admission=.*/\2/p' "$log")
+      result_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble result=.*/\2/p' "$log")
+      drain_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble root-overlap drain=.*/\2/p' "$log")
+      [[ $admission_connection == "$result_connection" &&
+         $admission_connection == "$drain_connection" ]]
+      [[ $(rg -c "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" || true) -eq 1 ]]
+      local admission_line result_line drain_line established_line
+      admission_line=$(rg -n -m1 ' preamble root-overlap admission=' "$log" | cut -d: -f1)
+      result_line=$(rg -n -m1 ' preamble result=' "$log" | cut -d: -f1)
+      drain_line=$(rg -n -m1 ' preamble root-overlap drain=' "$log" | cut -d: -f1)
+      established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" | cut -d: -f1)
+      [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
+         $result_line -lt $established_line ]]
+    else
+      ! rg -q -e ' preamble root-overlap admission=' \
+        -e ' preamble root-overlap drain=' "$log"
+    fi
   else
     [[ $preamble_count -eq 0 ]]
+    ! rg -q -e ' preamble root-overlap admission=' \
+      -e ' preamble root-overlap drain=' "$log"
   fi
   ! rg -q -e '^Outer protocol: h2$' -e '^Padding negotiated: no$' "$log"
 }

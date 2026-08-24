@@ -576,7 +576,7 @@ class ProxyPreambleOperation::Impl final {
   PreambleConfig mConfig;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
   ProxyPreambleCallback mBarrierCallback;
-  std::function<void()> mFinishedCallback;
+  std::function<void(bool, uint32_t)> mFinishedCallback;
   nsTArray<Stream> mStreams;
   nsTArray<nsCString> mDiscoveredSpecs;
   nsCOMPtr<nsIReferrerInfo> mRootReferrerInfo;
@@ -590,6 +590,8 @@ class ProxyPreambleOperation::Impl final {
   bool mBarrierFired = false;
   bool mFinishedFired = false;
   bool mCancelled = false;
+  bool mAllStreamsCompletedNormally = true;
+  uint32_t mCompletedSuccessfulResources = 0;
 };
 
 class ProxyPreambleOperation::StreamListener final : public nsIStreamListener {
@@ -883,7 +885,7 @@ nsresult ProxyPreambleOperation::Start(
     const nsACString& aProxyUrl, const nsACString& aProxyUser,
     const nsACString& aProxyPassword, const PreambleConfig& aConfig,
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
-    std::function<void()>&& aFinishedCallback,
+    std::function<void(bool, uint32_t)>&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!aBarrierCallback || aConfig.mMode == PreambleMode::Off ||
@@ -1230,6 +1232,19 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   auto& stream = mImpl->mStreams[aStreamId];
   stream.mRequest = nullptr;
   stream.mDone = true;
+  if (NS_FAILED(aStatus)) {
+    mImpl->mAllStreamsCompletedNormally = false;
+  }
+  if (aStreamId > 0) {
+    const bool resourceSucceeded =
+        detail::PreambleResourceCompletedSuccessfully(
+            stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus);
+    if (resourceSucceeded) {
+      ++mImpl->mCompletedSuccessfulResources;
+    } else {
+      mImpl->mAllStreamsCompletedNormally = false;
+    }
+  }
   if (aStreamId == 0 && NS_FAILED(aStatus) &&
       NS_SUCCEEDED(mImpl->mFirstFailure)) {
     mImpl->mFirstFailure = aStatus;
@@ -1251,7 +1266,10 @@ void ProxyPreambleOperation::FireBarrierCallback() {
   auto callback = std::move(mImpl->mBarrierCallback);
   const uint32_t rootStatus =
       mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams[0].mHttpStatus;
-  callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes});
+  const uint32_t startedResources =
+      mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams.Length() - 1;
+  callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes,
+            startedResources, mImpl->mRootDone});
 }
 
 void ProxyPreambleOperation::MaybeFireBarrier() {
@@ -1284,16 +1302,17 @@ void ProxyPreambleOperation::MaybeFinish() {
   }
   if (allDone && !mImpl->mFinishedFired) {
     mImpl->mFinishedFired = true;
-    // No future stream transition can satisfy early-overlap admission once
-    // every stream is done. Continue CONNECT immediately instead of waiting
-    // for the outer preamble timeout.
+    // No future stream transition can satisfy an overlap admission fallback
+    // once every stream is done. Continue CONNECT immediately instead of
+    // waiting for the outer preamble timeout.
     if (detail::PreambleNeedsCompletionFallback(mImpl->mConfig.mMode,
                                                 mImpl->mBarrierFired)) {
       FireBarrierCallback();
     }
     auto callback = std::move(mImpl->mFinishedCallback);
     if (callback) {
-      callback();
+      callback(mImpl->mAllStreamsCompletedNormally,
+               mImpl->mCompletedSuccessfulResources);
     }
   }
 }
@@ -1302,7 +1321,7 @@ nsresult OpenProxyPreambleOperation(
     const nsACString& aProxyUrl, const nsACString& aProxyUser,
     const nsACString& aProxyPassword, const PreambleConfig& aConfig,
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
-    std::function<void()>&& aFinishedCallback,
+    std::function<void(bool, uint32_t)>&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule,
     RefPtr<ProxyPreambleOperation>& aOperation) {
   RefPtr operation = new ProxyPreambleOperation();

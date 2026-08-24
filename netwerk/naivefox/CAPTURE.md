@@ -167,6 +167,36 @@ selectively recapture only passing traces or use this arm for passive causal
 screening until wire-level overlap is deterministic; doing so would condition
 the dataset on the scheduling outcome being measured.
 
+`tree-root-overlap` is a separate production-shaped scheduling arm and does
+not change any older mode. It discovers and opens the same resource channels
+while parsing the root, then admits CONNECT once the root has completed and at
+least one resource channel was successfully started. It does not wait for a
+resource response callback. A safe product marker records only
+`root_done=1`, the non-zero started-resource count, protocol, and admission
+kind; sample validation requires exactly one such marker before passive
+analysis. The controlled fixture requires exactly two started resources. It
+also waits for a separate safe `drain=complete completed_resources=2` marker,
+emitted only after both opened assets received response headers, HTTP 2xx, and
+a successful `OnStopRequest`, while every preamble stream stopped normally. A
+bounded watchdog invalidates the sample and never substitutes for that
+completion. The H3 decrypted
+comparison requires `tree-root-overlap` to be
+selected with `tree-complete` so private request and response-size parity is
+proved in the same run. If the tree contains no successfully started resource, terminal
+operation completion releases CONNECT immediately instead of waiting for the
+preamble timeout.
+
+This is a client scheduling intervention, not a promise that QUIC/H2 frames
+will appear in the same order. Resource response HEADERS or FIN may precede
+CONNECT on a fast path. Decrypted diagnostics report observed overlap, but do
+not use it for admission, retry a failed ordering, or filter passive samples by
+that outcome. They still require a completed root before CONNECT and an
+observed FIN for every expected root/CSS/JS response. In the paired H3
+diagnostic, `tree-complete` and `tree-root-overlap` must retain identical
+root/CSS/JS request semantics and response sizes. H2 uses the same fixed
+fixture/config and validates expected request semantics, but does not claim a
+paired asset-size proof.
+
 For H3, compare:
 
 - QUIC version and negotiated `h3`;
@@ -368,6 +398,22 @@ analyzer emits every selected pair and its Holm family contains only the
 protocols and views in that report. This opt-in design is screening-only and
 cannot produce an absolute verdict.
 
+The first isolated same-base H3/inner-HTTPS smoke for
+`root,tree-complete,tree-root-overlap` is retained as safe artifact
+`183164d35decbb0f` (seed `24082420`). It used ten paired blocks and therefore
+supports neither relative nor absolute inference. Descriptively,
+`tree-root-overlap` was closest to the shared Firefox A/B
+controls for packets 17--32 (0.53163 versus 0.56326 for `tree-complete` and
+0.64406 for `root`) and for packets 1--32 (0.20633 versus 0.22243 and
+0.23118). `root` remained closest for packets 1--16 and for the whole-flow
+view. Together with the paired decrypted trace, which observed CONNECT at
+packet 19 while both resource responses were still active, this supports the
+root-complete/start-resources admission mechanism but does not support making
+it the default. The remaining early signal is concentrated around packets 12,
+14, and 17, while the whole-flow penalty remains dominated by tree response
+volume. A follow-up should vary the number of naturally opened resources with
+the same admission rule before adding delays or packet-size targets.
+
 Each paired view also retains diagnostic-only top passive features and mean
 signed packet-size sequences. The sequence records the Firefox A/B mean
 absolute disagreement (the local noise floor) and each arm's mean delta from
@@ -447,7 +493,7 @@ retain descriptive metrics and refit uncertainty, but record
 conclusion remain `INCONCLUSIVE`. Select a candidate with the paired report,
 then preregister it and collect a fresh single-arm confirmation such as
 `--mode research --naivefox-arm root`. Experimental
-`tree-complete`, `tree-early-overlap`, and `tree-overlap` single-arm runs remain
+`tree-complete`, `tree-early-overlap`, `tree-root-overlap`, and `tree-overlap` single-arm runs remain
 screening-only, and
 the fixed default superblock deliberately excludes them to bound collection
 cost. Screening rows must not be reused as
