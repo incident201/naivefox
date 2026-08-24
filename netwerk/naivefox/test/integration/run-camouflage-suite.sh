@@ -200,12 +200,16 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
     ;;
 esac
+if [[ $naivefox_arm == root-pmtud-control && $protocol_selection != h3 ]]; then
+  printf 'root-pmtud-control requires --protocol h3\n' >&2
+  exit 2
+fi
 if [[ $experiment_design == multi_arm_superblocks && $naivefox_arm_explicit -eq 1 ]]; then
   printf '%s\n' '--naivefox-arm cannot be combined with a multi-arm design' >&2
   exit 2
@@ -219,7 +223,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -234,6 +238,11 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   if [[ -n ${seen_multi_arms[root]:-} &&
         -n ${seen_multi_arms[document-complete]:-} ]]; then
     printf 'root and document-complete are aliases; select only one\n' >&2
+    exit 2
+  fi
+  if [[ -n ${seen_multi_arms[root-pmtud-control]:-} &&
+        $protocol_selection != h3 ]]; then
+    printf 'root-pmtud-control multi-arm screening requires --protocol h3\n' >&2
     exit 2
   fi
   if [[ $multi_arm_views_csv != all ]]; then
@@ -609,8 +618,10 @@ validate_profile_role() {
   local destination=$1
   local protocol=$2
   local participant=$3
+  local arm=${4:-}
   local mapping_pref='network.http.http3.alt-svc-mapping-for-testing'
   local force_pref='network.http.http3.force-use-alt-svc-mapping-for-testing'
+  local pmtud_pref='network.http.http3.pmtud'
   local expect_test_mapping=false
   [[ $participant == reference && $protocol == h3 ]] && expect_test_mapping=true
 
@@ -640,6 +651,20 @@ validate_profile_role() {
         return 1
       }
   fi
+  if [[ $participant == naivefox && $protocol == h3 &&
+        $arm == root-pmtud-control ]]; then
+    rg -q -F 'user_pref("network.http.http3.pmtud", true);' \
+      "$destination/user.js" || {
+        printf 'PMTUD control profile does not enable the global H3 preference\n' >&2
+        return 1
+      }
+  elif find "$destination" -maxdepth 1 -type f \
+       \( -name user.js -o -name prefs.js \) \
+       -exec rg -q -F "$pmtud_pref" {} +; then
+    printf '%s profile unexpectedly overrides the global H3 PMTUD preference\n' \
+      "$participant" >&2
+    return 1
+  fi
 }
 
 make_profile() {
@@ -647,6 +672,7 @@ make_profile() {
   local protocol=$2
   local participant=$3
   local socks_port=${4:-}
+  local arm=${5:-}
   local direct_h3=false
   local enable_h3=false
   case $participant in
@@ -698,6 +724,11 @@ EOF
 user_pref("network.http.http3.disable_when_third_party_roots_found", false);
 EOF
   fi
+  if [[ $participant == naivefox && $arm == root-pmtud-control ]]; then
+    cat >>"$destination/user.js" <<'EOF'
+user_pref("network.http.http3.pmtud", true);
+EOF
+  fi
   if [[ $direct_h3 == true ]]; then
     cat >>"$destination/user.js" <<EOF
 user_pref("network.http.http3.alt-svc-mapping-for-testing", "localhost;h3=:$NAIVEFOX_FIXTURE_PROXY_PORT");
@@ -705,7 +736,7 @@ user_pref("network.http.http3.force-use-alt-svc-mapping-for-testing", true);
 EOF
   fi
   chmod 0600 "$destination/user.js"
-  validate_profile_role "$destination" "$protocol" "$participant"
+  validate_profile_role "$destination" "$protocol" "$participant" "$arm"
 }
 
 scenario_parameters() {
@@ -973,7 +1004,7 @@ run_naivefox_sample() {
     target_port=$NAIVEFOX_FIXTURE_HTTP_PORT
   fi
   mkdir -m 0700 -- "$sample_dir"
-  make_profile "$naivefox_profile" "$protocol" naivefox
+  make_profile "$naivefox_profile" "$protocol" naivefox "" "$arm"
   make_profile "$browser_profile" "$protocol" socks-browser "$socks_port"
   if [[ $private_h3_keylog == 1 && $protocol == h3 ]]; then
     : >"$keylog"
@@ -1204,6 +1235,7 @@ else
     --expected-per-cohort "$samples_per_cohort"
   single_arm_analysis=confirmatory
   if [[ $naivefox_arm == tree-complete ||
+        $naivefox_arm == root-pmtud-control ||
         $naivefox_arm == tree-complete-css ||
         $naivefox_arm == tree-early-overlap ||
         $naivefox_arm == tree-root-overlap ||

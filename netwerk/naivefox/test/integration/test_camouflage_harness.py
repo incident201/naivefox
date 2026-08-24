@@ -200,6 +200,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         arms = (
             "gate",
             "root",
+            "root-pmtud-control",
             "tree-complete",
             "tree-complete-css",
             "tree-early-overlap",
@@ -213,7 +214,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
-            members = rows[index * 10 : (index + 1) * 10]
+            members = rows[index * 11 : (index + 1) * 11]
             self.assertEqual(
                 {(row["label"], row["naivefox_arm"]) for row in members},
                 {
@@ -221,6 +222,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                     ("firefox_b", "reference"),
                     *(("naivefox", arm) for arm in arms),
                 },
+            )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
+                arms=("root", "root-pmtud-control"),
             )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
@@ -515,6 +524,13 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertEqual(config["preamble"]["path"], CONFIG.PREAMBLE_PATH)
         self.assertLessEqual(config["preamble"]["max-bytes"], 64 * 1024)
         self.assertTrue(config["outer-session-gate"])
+        control = CONFIG.build_config(
+            "root-pmtud-control", "h3", 1081, 4433, user, password
+        )
+        self.assertEqual(control["preamble"], config["preamble"])
+        self.assertEqual(control["outer-session-gate"], config["outer-session-gate"])
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config("root-pmtud-control", "h2", 1081, 4433, user, password)
 
     def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
         for arm in (
@@ -683,6 +699,21 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=91 protocol=h3\n",
             one_connection,
         )
+        SAMPLE.validate_sample(
+            "root-pmtud-control",
+            "h3",
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=91 protocol=h3\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SAMPLE.validate_sample(
+                "root-pmtud-control",
+                "h2",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=91 protocol=h2\n",
+                {"protocol": "h2", "features": {"lifecycle_connection_count": 1.0}},
+            )
         for arm in (
             "document-complete",
             "tree-complete",
@@ -1042,6 +1073,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 pass
             reference = os.path.join(temporary, "reference")
             naivefox = os.path.join(temporary, "naivefox")
+            pmtud_control = os.path.join(temporary, "pmtud-control")
             socks = os.path.join(temporary, "socks")
             variables = {
                 "browser_python": sys.executable,
@@ -1052,22 +1084,25 @@ class CamouflageHarnessTests(unittest.TestCase):
             setup = "\n".join(
                 f"{name}={shlex.quote(value)}" for name, value in variables.items()
             )
-            script = "\n".join(
-                (
-                    "set -euo pipefail",
-                    setup,
-                    profile_functions,
-                    f"make_profile {shlex.quote(reference)} h3 reference",
-                    f"make_profile {shlex.quote(naivefox)} h3 naivefox",
-                    f"make_profile {shlex.quote(socks)} h3 socks-browser 1080",
-                )
-            )
+            script = "\n".join((
+                "set -euo pipefail",
+                setup,
+                profile_functions,
+                f"make_profile {shlex.quote(reference)} h3 reference",
+                f"make_profile {shlex.quote(naivefox)} h3 naivefox",
+                f"make_profile {shlex.quote(pmtud_control)} h3 naivefox '' root-pmtud-control",
+                f"make_profile {shlex.quote(socks)} h3 socks-browser 1080",
+            ))
             subprocess.run(["bash"], input=script, text=True, check=True)
 
             with open(os.path.join(reference, "user.js"), encoding="utf-8") as stream:
                 reference_prefs = stream.read()
             with open(os.path.join(naivefox, "user.js"), encoding="utf-8") as stream:
                 naivefox_prefs = stream.read()
+            with open(
+                os.path.join(pmtud_control, "user.js"), encoding="utf-8"
+            ) as stream:
+                pmtud_control_prefs = stream.read()
             with open(os.path.join(socks, "user.js"), encoding="utf-8") as stream:
                 socks_prefs = stream.read()
             mapping_pref = "network.http.http3.alt-svc-mapping-for-testing"
@@ -1076,6 +1111,11 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertNotIn(mapping_pref, naivefox_prefs)
             self.assertNotIn(mapping_pref, socks_prefs)
             self.assertIn('network.http.http3.enable", false', socks_prefs)
+            pmtud_pref = 'user_pref("network.http.http3.pmtud", true);'
+            self.assertNotIn(pmtud_pref, reference_prefs)
+            self.assertNotIn(pmtud_pref, naivefox_prefs)
+            self.assertNotIn(pmtud_pref, socks_prefs)
+            self.assertIn(pmtud_pref, pmtud_control_prefs)
 
     def test_proxy_pac_sends_only_loopback_hosts_to_sample_socks(self):
         pac = CONTROLLER.proxy_pac_script(1080)

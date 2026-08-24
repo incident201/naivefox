@@ -272,6 +272,31 @@ remain ordered before listener publication; later
 outer QUIC connection while a focused post-start network-change regression is
 still allowed to replace it.
 
+## NF-UPSTREAM-013: opt out of automatic outer-proxy PMTUD forcing
+
+Files:
+
+```text
+netwerk/base/nsIProxyInfo.idl
+netwerk/protocol/http/Http3Session.cpp
+netwerk/test/gtest/TestProtocolProxyService.cpp
+netwerk/test/unit/test_http3_proxy_pmtud_opt_out.js
+netwerk/test/unit/xpcshell.toml
+```
+
+Adds an opt-in HTTP/3 proxy flag that suppresses only Necko's automatic PMTUD
+force for an outer proxy connection. NaiveFox sets it on its strict H3 route so
+the normal socket follows Firefox's ordinary PMTUD preference instead of being
+unconditionally opted in. Setting `network.http.http3.pmtud=true` still enables
+PMTUD through the existing global preference, and unflagged Firefox outer H3
+proxy behavior is unchanged.
+
+Review obligations: the flag remains limited to the final Neqo PMTUD input and
+does not alter outer-connection identity, TLS host selection, extended CONNECT
+state, strict fallback policy, or Rust; proxy cloning preserves both strict-H3
+and PMTUD flags; and the focused H3 proxy regression proves the flagged route
+works without claiming wire-level PMTUD behavior that it does not observe.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

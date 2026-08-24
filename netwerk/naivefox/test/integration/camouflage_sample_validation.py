@@ -36,6 +36,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "off",
         "gate",
         "root",
+        "root-pmtud-control",
         "document-complete",
         "tree-complete",
         "tree-complete-css",
@@ -48,6 +49,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
+    if arm == "root-pmtud-control" and protocol != "h3":
+        raise ValueError("root-pmtud-control requires h3")
 
     result_lines = [
         line for line in log_lines if " preamble result=" in line
@@ -57,6 +60,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("malformed preamble result evidence")
     preamble_arms = (
         "root",
+        "root-pmtud-control",
         "document-complete",
         "tree-complete",
         "tree-complete-css",
@@ -184,6 +188,7 @@ def main():
             "off",
             "gate",
             "root",
+            "root-pmtud-control",
             "document-complete",
             "tree-complete",
             "tree-complete-css",

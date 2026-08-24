@@ -208,6 +208,16 @@ request semantics and response size, root FIN before CONNECT, and an observed
 CSS FIN. CSS FIN ordering relative to CONNECT remains report-only and is never
 a resampling criterion.
 
+`root-pmtud-control` is an H3-only, same-binary harness control. It uses the
+same production `document-complete` configuration and root workload as `root`,
+but only the NaiveFox participant profile explicitly sets
+`network.http.http3.pmtud=true`. Passive screening can therefore compare the
+new default route with the former forced-PMTUD behavior without changing the
+socket, product binary, or preamble semantics. Decrypted admission proves one
+complete root GET with equal selected request semantics and response size; it
+does not claim PMTUD wire equivalence. That conclusion requires the passive
+capture itself.
+
 For H3, compare:
 
 - QUIC version and negotiated `h3`;

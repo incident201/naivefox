@@ -11,6 +11,7 @@ SUPPORTED_ARMS = (
     "off",
     "gate",
     "root",
+    "root-pmtud-control",
     "document-complete",
     "tree-complete",
     "tree-complete-css",
@@ -66,6 +67,8 @@ def infer_arms(rows):
 
 def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
     arms = validate_arm_sequence(arms)
+    if protocol != "h3" and "root-pmtud-control" in arms:
+        raise ValueError("root-pmtud-control requires h3 superblocks")
     rng = random.Random(f"{seed}:{protocol}:multi-arm-superblocks")
     rows = []
     for index in range(count):
@@ -106,6 +109,11 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
     for row in rows:
         if row["naivefox_arm"] not in {*SUPPORTED_ARMS, REFERENCE_ARM}:
             raise ValueError(f"invalid arm label: {row['naivefox_arm']}")
+        if (
+            row["naivefox_arm"] == "root-pmtud-control"
+            and row["protocol"] != "h3"
+        ):
+            raise ValueError("root-pmtud-control requires h3 superblocks")
         key = (row["protocol"], row["experiment_block"])
         blocks.setdefault(key, []).append(row)
     if expected_blocks is not None:

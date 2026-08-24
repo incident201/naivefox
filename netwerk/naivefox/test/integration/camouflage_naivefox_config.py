@@ -25,6 +25,7 @@ def build_config(
         "off",
         "gate",
         "root",
+        "root-pmtud-control",
         "document-complete",
         "tree-complete",
         "tree-complete-css",
@@ -35,13 +36,16 @@ def build_config(
     )
     if arm not in supported_arms:
         raise ValueError(
-            "config arm must be off, gate, root, document-complete, "
+            "config arm must be off, gate, root, root-pmtud-control, "
+            "document-complete, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, or "
             "tree-overlap"
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
+    if arm == "root-pmtud-control" and protocol != "h3":
+        raise ValueError("root-pmtud-control requires h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -56,7 +60,7 @@ def build_config(
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm in ("root", "document-complete"):
+    if arm in ("root", "root-pmtud-control", "document-complete"):
         preamble = {
             "mode": "document-complete",
             "path": PREAMBLE_PATH,
@@ -77,7 +81,8 @@ def build_config(
             }.get(arm, arm),
             "path": PREAMBLE_PATH,
             "max-assets": (
-                1 if arm in ("tree-complete-css", "tree-root-overlap-css")
+                1
+                if arm in ("tree-complete-css", "tree-root-overlap-css")
                 else TREE_PREAMBLE_MAX_ASSETS
             ),
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
@@ -113,6 +118,7 @@ def main():
             "off",
             "gate",
             "root",
+            "root-pmtud-control",
             "document-complete",
             "tree-complete",
             "tree-complete-css",

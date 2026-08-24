@@ -114,15 +114,16 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
   // When `isOuterConnection` is true, this Http3Session represents the *outer*
   // connection between Firefox and the proxy (e.g., when using CONNECT-UDP).
   //
-  // We track this flag for two main reasons:
-  // 1. To select the correct hostname during TLS negotiation on the outer
-  //    connection.
-  // 2. To explicitly enable Path MTU Discovery (PMTUD) on the outer connection,
-  //    since the outer path’s MTU must be at least as large as the inner one.
+  // We track this flag to select the correct hostname during TLS negotiation
+  // and to identify the outer proxy connection.
   bool isOuterConnection = false;
+  bool forcePmtudForOuterConnection = false;
   if (!aIsTunnel) {
     if (auto* proxyInfo = aConnInfo->ProxyInfo()) {
       isOuterConnection = proxyInfo->IsHttp3Proxy();
+      forcePmtudForOuterConnection =
+          isOuterConnection &&
+          !(proxyInfo->Flags() & nsIProxyInfo::DO_NOT_FORCE_HTTP3_PROXY_PMTUD);
     }
   }
 
@@ -191,7 +192,7 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
         StaticPrefs::network_http_http3_max_stream_data(),
         StaticPrefs::network_http_http3_version_negotiation_enabled(),
         mConnInfo->GetWebTransport(), gHttpHandler->Http3QlogDir(), idleTimeout,
-        fastPto, socket->GetFileDescriptor(), isOuterConnection,
+        fastPto, socket->GetFileDescriptor(), forcePmtudForOuterConnection,
         getter_AddRefs(mHttp3Connection));
   }
   if (NS_FAILED(rv)) {

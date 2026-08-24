@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +37,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -46,6 +46,11 @@ for arm in "${comparison_arms[@]}"; do
   fi
   seen_comparison_arms[$arm]=1
 done
+if [[ -n ${seen_comparison_arms[root-pmtud-control]:-} &&
+      -z ${seen_comparison_arms[root]:-} ]]; then
+  printf 'root-pmtud-control comparison requires root\n' >&2
+  exit 2
+fi
 if [[ -n ${seen_comparison_arms[tree-root-overlap]:-} &&
       -z ${seen_comparison_arms[tree-complete]:-} ]]; then
   printf 'tree-root-overlap comparison requires tree-complete\n' >&2
@@ -532,6 +537,20 @@ run_naivefox_arm() {
 user_pref("network.http.http3.enable", true);
 user_pref("network.http.http3.disable_when_third_party_roots_found", false);
 EOF
+  if [[ $arm == root-pmtud-control ]]; then
+    cat >>"$naivefox_profile/user.js" <<'EOF'
+user_pref("network.http.http3.pmtud", true);
+EOF
+  fi
+  if [[ $arm == root-pmtud-control ]]; then
+    rg -q -F 'user_pref("network.http.http3.pmtud", true);' \
+      "$naivefox_profile/user.js"
+  else
+    ! rg -q -F 'network.http.http3.pmtud' "$naivefox_profile/user.js"
+  fi
+  ! rg -q -F 'network.http.http3.pmtud' \
+    "$reference_profile/user.js" "$browser_profile/user.js"
+  chmod 0600 "$naivefox_profile/user.js"
   python3 "$INTEGRATION_DIR/camouflage_browser_controller.py" \
     --generate-pac-user-js "$socks_port" >>"$browser_profile/user.js"
   cat >>"$browser_profile/user.js" <<'EOF'
@@ -594,7 +613,8 @@ EOF
   padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)
   preamble_count=$(rg -c ' preamble result=' "$log" || true)
   [[ $outer_count -ge 1 && $padding_count -eq $outer_count ]]
-  if [[ $arm == root || $arm == document-complete ||
+  if [[ $arm == root || $arm == root-pmtud-control ||
+        $arm == document-complete ||
         $arm == tree-complete || $arm == tree-complete-css ||
         $arm == tree-early-overlap ||
         $arm == tree-root-overlap ||

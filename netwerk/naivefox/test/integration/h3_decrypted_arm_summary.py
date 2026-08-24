@@ -9,6 +9,7 @@ SUPPORTED_ARMS = (
     "off",
     "gate",
     "root",
+    "root-pmtud-control",
     "document-complete",
     "tree-complete",
     "tree-complete-css",
@@ -285,11 +286,12 @@ def read_get_request_semantics(root, cohort, proxy_port):
                     f"{cohort} private GET stream id is not numeric"
                 ) from error
             blocks.append((int(row["frame.number"]), numeric_stream, selected))
-    roles = (
-        ("root", "stylesheet")
-        if cohort in ("tree-complete-css", "tree-root-overlap-css")
-        else ("root", "stylesheet", "script")
-    )
+    if cohort in ("tree-complete-css", "tree-root-overlap-css"):
+        roles = ("root", "stylesheet")
+    elif cohort.startswith("tree-"):
+        roles = ("root", "stylesheet", "script")
+    else:
+        roles = ("root",)
     require(
         len(blocks) == len(roles),
         f"{cohort} private GET semantics have the wrong resource count",
@@ -615,6 +617,7 @@ def validate(cohorts, connections, client_hellos, arms):
         gets = [row for row in requests if row["method"] == "GET"]
         if arm in (
             "root",
+            "root-pmtud-control",
             "document-complete",
             "tree-complete",
             "tree-complete-css",
@@ -626,7 +629,9 @@ def validate(cohorts, connections, client_hellos, arms):
             expected_gets = (
                 2
                 if arm in ("tree-complete-css", "tree-root-overlap-css")
-                else 3 if arm.startswith("tree-") else 1
+                else 3
+                if arm.startswith("tree-")
+                else 1
             )
             require(
                 len(gets) == expected_gets,
@@ -669,6 +674,7 @@ def validate(cohorts, connections, client_hellos, arms):
             ]
             if arm in (
                 "root",
+                "root-pmtud-control",
                 "document-complete",
                 "tree-complete",
                 "tree-complete-css",
@@ -680,12 +686,19 @@ def validate(cohorts, connections, client_hellos, arms):
                     ),
                     f"{arm} CONNECT preceded a preamble response header",
                 )
-                if arm in ("root", "document-complete"):
+                if arm in ("root", "root-pmtud-control", "document-complete"):
                     observed_fins = [
                         row["stream_fin_packet_position"]
                         for row in response_headers
                         if row["stream_fin_packet_position"] != ""
                     ]
+                    if arm == "root-pmtud-control" or (
+                        arm == "root" and "root-pmtud-control" in arms
+                    ):
+                        require(
+                            len(observed_fins) == len(response_headers),
+                            f"{arm} lacks an observed root stream FIN",
+                        )
                     if observed_fins:
                         require(
                             all(
@@ -893,6 +906,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "tree-early-overlap decrypted validation requires tree-complete",
     )
     require(
+        "root-pmtud-control" not in arms or "root" in arms,
+        "root-pmtud-control decrypted validation requires root",
+    )
+    require(
         "tree-root-overlap" not in arms or "tree-complete" in arms,
         "tree-root-overlap decrypted validation requires tree-complete",
     )
@@ -911,6 +928,34 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             client_hellos[cohort],
         ) = summarize_cohort(root, cohort, proxy_port)
     validate(cohorts, connections, client_hellos, arms)
+    root_semantics = {}
+    root_response_sizes = {}
+    if {"root", "root-pmtud-control"}.issubset(arms):
+        for arm in ("root", "root-pmtud-control"):
+            root_semantics[arm] = read_get_request_semantics(root, arm, proxy_port)
+            validate_expected_get_request_semantics(arm, root_semantics[arm])
+            response_lengths = read_response_content_lengths(root, arm, proxy_port)
+            root_gets = [
+                row
+                for row in cohorts[arm]
+                if row["direction"] == "client" and row["method"] == "GET"
+            ]
+            require(len(root_gets) == 1, f"{arm} must have exactly one root GET")
+            root_stream = root_gets[0]["stream_id"]
+            require(
+                root_stream in response_lengths,
+                f"{arm} lacks root content-length evidence",
+            )
+            root_response_sizes[arm] = response_lengths[root_stream]
+        require(
+            root_semantics["root"]["root"]
+            == root_semantics["root-pmtud-control"]["root"],
+            "root selected header values/order differ for PMTUD control",
+        )
+        require(
+            root_response_sizes["root"] == root_response_sizes["root-pmtud-control"],
+            "root response content-length differs for PMTUD control",
+        )
     tree_semantics = {}
     tree_asset_sizes = {}
     for arm in arms:
@@ -1026,7 +1071,11 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
                         f"{selected[0]['time_from_first_packet_ms']}\n"
                     )
             if cohort in arms and cohort not in ("off", "gate"):
-                preamble_mode = "document-complete" if cohort == "root" else cohort
+                preamble_mode = (
+                    "document-complete"
+                    if cohort in ("root", "root-pmtud-control")
+                    else cohort
+                )
                 gets = [row for row in requests if row["method"] == "GET"]
                 connects = [row for row in requests if row["method"] == "CONNECT"]
                 connect_position = connects[0]["packet_position"]
@@ -1126,6 +1175,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write(
                 "tree_root_overlap_css_wire_overlap_is_admission=no\n"
             )
+        if {"root", "root-pmtud-control"}.issubset(arms):
+            destination.write("root_pmtud_control_request_semantics_match=yes\n")
+            destination.write("root_pmtud_control_response_size_match=yes\n")
+            destination.write("root_pmtud_control_wire_pmtud_claim=no\n")
         if any(arm.startswith("tree-") for arm in arms):
             destination.write("tree_expected_request_semantics=yes\n")
         destination.write("raw_capture_material=deleted_after_success\n")

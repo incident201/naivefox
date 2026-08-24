@@ -219,6 +219,12 @@ MASQUE-type proxy route to create a regular classic CONNECT through
 `Http3StreamTunnel`; it does not use CONNECT-UDP or a standalone Neqo client.
 Connection pooling remains owned by Necko in both modes.
 
+NaiveFox's H3 route suppresses only Firefox's automatic PMTUD force for an
+outer H3 proxy connection. The normal `network.http.http3.pmtud` preference
+still applies, so an explicit global enable retains Firefox's existing PMTUD
+behavior. This does not change H3 proxy identity, TLS, pooling, CONNECT, or
+strict fallback behavior.
+
 The target's TLS session belongs to the application using the local proxy.
 NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 

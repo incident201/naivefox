@@ -162,6 +162,7 @@ def load_dataset(path):
                 "off",
                 "gate",
                 "root",
+                "root-pmtud-control",
                 "document-complete",
                 "tree-complete",
                 "tree-complete-css",
@@ -172,6 +173,8 @@ def load_dataset(path):
             }
             if arm not in {None, "reference", *naivefox_arms}:
                 raise SystemExit("invalid NaiveFox arm metadata")
+            if arm == "root-pmtud-control" and source["protocol"] != "h3":
+                raise SystemExit("root-pmtud-control requires h3")
             if arm == "reference" and source["label"] == "naivefox":
                 raise SystemExit("NaiveFox row cannot use reference arm metadata")
             if arm in naivefox_arms and source["label"] != "naivefox":

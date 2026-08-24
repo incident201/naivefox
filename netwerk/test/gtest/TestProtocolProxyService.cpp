@@ -289,5 +289,37 @@ TEST(TestProtocolProxyService, Proxy_Env_Vars)
 }
 #endif  // !ANDROID
 
+TEST(TestProtocolProxyService, MASQUEProxyFlagsSurviveResolveFlagClone)
+{
+  nsCOMPtr<nsIProtocolProxyService2> service =
+      do_GetService(NS_PROTOCOLPROXYSERVICE_CID);
+  ASSERT_TRUE(service);
+
+  constexpr uint32_t proxyFlags = nsIProxyInfo::DISABLE_HTTP3_PROXY_FALLBACK |
+                                  nsIProxyInfo::DO_NOT_FORCE_HTTP3_PROXY_PMTUD;
+  nsCOMPtr<nsIProxyInfo> proxyInfo;
+  ASSERT_EQ(service->NewMASQUEProxyInfo(
+                "proxy.example"_ns, 443,
+                "/.well-known/masque/udp/{target_host}/{target_port}/"_ns,
+                ""_ns, "pmtud-test"_ns, proxyFlags, UINT32_MAX, nullptr,
+                getter_AddRefs(proxyInfo)),
+            NS_OK);
+  ASSERT_TRUE(proxyInfo);
+  uint32_t actualFlags = 0;
+  ASSERT_EQ(proxyInfo->GetFlags(&actualFlags), NS_OK);
+  EXPECT_EQ(actualFlags, proxyFlags);
+
+  nsCOMPtr<nsProxyInfo> concrete = do_QueryInterface(proxyInfo);
+  ASSERT_TRUE(concrete);
+  nsCOMPtr<nsIProxyInfo> clone = concrete->CloneProxyInfoWithNewResolveFlags(
+      nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL);
+  ASSERT_TRUE(clone);
+  ASSERT_EQ(clone->GetFlags(&actualFlags), NS_OK);
+  EXPECT_EQ(actualFlags, proxyFlags);
+  uint32_t resolveFlags = 0;
+  ASSERT_EQ(clone->GetResolveFlags(&resolveFlags), NS_OK);
+  EXPECT_EQ(resolveFlags, nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL);
+}
+
 }  // namespace net
 }  // namespace mozilla

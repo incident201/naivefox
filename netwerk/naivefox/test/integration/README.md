@@ -227,6 +227,15 @@ request semantics and CSS `Content-Length`, root FIN before CONNECT, and a CSS
 FIN somewhere in the complete capture. Whether that CSS FIN precedes or follows
 CONNECT in the overlap alias is report-only.
 
+`root-pmtud-control` is a separate H3-only harness arm for the PMTUD policy.
+It maps to the same production `document-complete` preamble as `root`, while
+only its NaiveFox profile sets `network.http.http3.pmtud=true`. The ordinary
+`root` profile leaves the preference unset. Multi-arm passive screening thus
+compares both policies with one binary and the normal socket. The paired H3
+decrypted check requires one physical QUIC connection, one complete root GET,
+and equal selected request semantics and response `Content-Length`; it records
+no wire PMTUD claim.
+
 `run-h2-connect-priority-comparison.sh` is a separate same-base causal
 diagnostic for the first SOCKS tunnel. It compares an ordinary top-level HTTPS
 navigation through the fixture's existing authenticated H2 forward proxy with
@@ -438,7 +447,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and

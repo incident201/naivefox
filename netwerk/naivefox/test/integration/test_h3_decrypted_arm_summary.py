@@ -22,6 +22,19 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
+                "root-pmtud-control decrypted validation requires root",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("root-pmtud-control",),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
                 "tree-root-overlap decrypted validation requires tree-complete",
             ):
                 summary.write_outputs(
@@ -84,6 +97,8 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn("fixture_user_encoded", runner)
         self.assertIn("fixture_pass_encoded", runner)
         self.assertIn("traffic_secret", runner)
+        self.assertIn("root-pmtud-control comparison requires root", runner)
+        self.assertIn('user_pref("network.http.http3.pmtud", true);', runner)
 
         reference_body = runner.split("run_reference()", 1)[1].split(
             "run_naivefox()", 1
@@ -701,6 +716,39 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 "tree_root_overlap_css_wire_overlap_is_admission=no",
                 safe_summary,
             )
+
+    def test_root_pmtud_control_pairs_identical_complete_root_workload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 4, method="CONNECT"),
+                self.event(14, 0.016, "server", 4, status="200"),
+            ]
+            self.make_cohort(directory, "root", common)
+            self.make_cohort(directory, "root-pmtud-control", common)
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("root", "root-pmtud-control"),
+            )
+            safe_summary = destination.read_text(encoding="utf-8")
+            self.assertIn(
+                "root_pmtud_control_request_semantics_match=yes", safe_summary
+            )
+            self.assertIn("root_pmtud_control_response_size_match=yes", safe_summary)
+            self.assertIn("root_pmtud_control_wire_pmtud_claim=no", safe_summary)
 
     def test_tree_arms_reject_different_selected_header_values(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1412,9 +1460,9 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "http3.header.header.name",
             "http3.headers.header.value",
         ]
-        asset_streams = {
+        response_sizes = {
             row["quic.stream.stream_id"]: size
-            for row, size in zip(get_rows[1:], ("16384", "8192"))
+            for row, size in zip(get_rows, ("4096", "16384", "8192"))
         }
         response_semantics = []
         for row in requests:
@@ -1422,7 +1470,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 continue
             names = [":status"]
             values = ["200"]
-            size = asset_streams.get(row["quic.stream.stream_id"])
+            size = response_sizes.get(row["quic.stream.stream_id"])
             if size:
                 names.append("content-length")
                 values.append(size)

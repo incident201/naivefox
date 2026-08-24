@@ -522,7 +522,8 @@ nsresult BuildExplicitProxyRoute(
                         nsIProxyInfo::ALWAYS_TUNNEL_VIA_PROXY;
   nsCOMPtr<nsIProxyInfo> proxyInfo;
   if (aProtocol == ProxyProtocol::H3) {
-    proxyFlags |= nsIProxyInfo::DISABLE_HTTP3_PROXY_FALLBACK;
+    proxyFlags |= nsIProxyInfo::DISABLE_HTTP3_PROXY_FALLBACK |
+                  nsIProxyInfo::DO_NOT_FORCE_HTTP3_PROXY_PMTUD;
     MOZ_TRY(proxyService->NewMASQUEProxyInfo(
         proxyHost, proxyPort,
         "/.well-known/masque/udp/{target_host}/{target_port}/"_ns,

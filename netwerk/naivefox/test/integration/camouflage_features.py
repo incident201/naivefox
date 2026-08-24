@@ -719,6 +719,8 @@ def validate_features(features):
 
 
 def extract(args):
+    if args.naivefox_arm == "root-pmtud-control" and args.protocol != "h3":
+        raise SystemExit("root-pmtud-control requires h3")
     features = {}
     extract_handshake(args.pcap, args.protocol, args.server_port, features)
     if args.protocol == "h2":
@@ -869,6 +871,7 @@ def main():
             "off",
             "gate",
             "root",
+            "root-pmtud-control",
             "document-complete",
             "tree-complete",
             "tree-complete-css",
