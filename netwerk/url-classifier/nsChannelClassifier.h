@@ -26,6 +26,11 @@ class nsChannelClassifier final : public nsIURIClassifierCallback,
   // Calls nsIURIClassifier.Classify with the principal of the given channel,
   // and cancels the channel on a bad verdict.
   void Start();
+#ifdef MOZ_NAIVEFOX
+  // The diagnostic preamble must fail closed unless the genuine classifier
+  // promised an asynchronous callback and suspended the channel.
+  nsresult StartForNaiveFoxPreamble();
+#endif
 
  private:
   // True if the channel is on the allow list.

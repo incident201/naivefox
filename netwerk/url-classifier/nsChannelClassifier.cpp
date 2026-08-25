@@ -10,8 +10,16 @@
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
-#include "mozilla/net/ChannelClassifierUtils.h"
-#include "mozilla/net/UrlClassifierCommon.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/ChannelClassifierUtils.h"
+#  include "mozilla/net/UrlClassifierCommon.h"
+#else
+#  include "mozilla/BasePrincipal.h"
+#  include "ChannelClassifierLog.h"
+#  include "NaiveFoxLifecycleLog.h"
+#  include "nsHttpChannel.h"
+#  include "nsQueryObject.h"
+#endif
 #include "nsCharSeparatedTokenizer.h"
 #include "nsICacheEntry.h"
 #include "nsICachingChannel.h"
@@ -26,6 +34,13 @@
 
 namespace mozilla {
 namespace net {
+
+#ifdef MOZ_NAIVEFOX
+LazyLogModule gChannelClassifierLog("nsChannelClassifier");
+LazyLogModule gChannelClassifierLogLeak("nsChannelClassifierLeak");
+
+constexpr nsCString::size_type kNaiveFoxClassifierMaxSpecLength = 128;
+#endif
 
 #define URLCLASSIFIER_EXCEPTION_HOSTNAMES "urlclassifier.skipHostnames"
 
@@ -124,9 +139,20 @@ void nsChannelClassifier::Start() {
   }
 }
 
+#ifdef MOZ_NAIVEFOX
+nsresult nsChannelClassifier::StartForNaiveFoxPreamble() {
+  return StartInternal();
+}
+#endif
+
 nsresult nsChannelClassifier::StartInternal() {
   // Should only be called in the parent process.
   MOZ_ASSERT(XRE_IsParentProcess());
+
+#ifdef MOZ_NAIVEFOX
+  RefPtr<nsHttpChannel> naiveFoxHttpChannel = do_QueryObject(mChannel);
+  NS_ENSURE_TRUE(naiveFoxHttpChannel, NS_ERROR_UNEXPECTED);
+#endif
 
   // Don't bother to run the classifier on a load that has already failed.
   // (this might happen after a redirect)
@@ -189,22 +215,94 @@ nsresult nsChannelClassifier::StartInternal() {
     return NS_ERROR_NOT_AVAILABLE;
   }
   NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr<nsIScriptSecurityManager> securityManager =
-      mozilla::components::ScriptSecurityManager::Service(&rv);
-  NS_ENSURE_SUCCESS(rv, rv);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=classifier-db-service channel=%p "
+         "exists=1",
+         naiveFoxHttpChannel.get()));
+  }
+#endif
 
   nsCOMPtr<nsIPrincipal> principal;
+  nsCOMPtr<nsIScriptSecurityManager> securityManager =
+      do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
   rv = securityManager->GetChannelURIPrincipal(mChannel,
                                                getter_AddRefs(principal));
   NS_ENSURE_SUCCESS(rv, rv);
+#ifdef MOZ_NAIVEFOX
+  NS_ENSURE_TRUE(principal, NS_ERROR_UNEXPECTED);
+  nsCOMPtr<nsILoadInfo> loadInfo = mChannel->LoadInfo();
+  NS_ENSURE_TRUE(loadInfo, NS_ERROR_UNEXPECTED);
+  nsCOMPtr<nsIPrincipal> triggeringPrincipal =
+      loadInfo->TriggeringPrincipal();
+  NS_ENSURE_TRUE(triggeringPrincipal, NS_ERROR_UNEXPECTED);
 
-  bool expectCallback;
+  nsCOMPtr<nsIURI> finalURI;
+  rv = NS_GetFinalChannelURI(mChannel, getter_AddRefs(finalURI));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIURI> principalURI;
+  rv = principal->GetURI(getter_AddRefs(principalURI));
+  NS_ENSURE_SUCCESS(rv, rv);
+  bool uriMatches = false;
+  if (principalURI && finalURI) {
+    rv = principalURI->Equals(finalURI, &uriMatches);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  const bool triggeringSystem = triggeringPrincipal->IsSystemPrincipal();
+  const bool uriSystem = principal->IsSystemPrincipal();
+  auto* basePrincipal = BasePrincipal::Cast(principal);
+  const bool uriContent = basePrincipal->IsContentPrincipal();
+  const OriginAttributes& principalAttrs =
+      basePrincipal->OriginAttributesRef();
+  const bool attrsMatch =
+      principalAttrs == loadInfo->GetOriginAttributes();
+  if (!triggeringSystem || uriSystem || !uriContent || !uriMatches ||
+      !attrsMatch) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    nsAutoCString spec;
+    nsAutoCString suffix;
+    principalURI->GetSpec(spec);
+    principalAttrs.CreateSuffix(suffix);
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=classifier-uri-principal channel=%p "
+         "triggering_system=%d uri_system=%d uri_content=%d uri_match=%d "
+         "attrs_match=%d uri=%s origin_attributes=%s",
+         naiveFoxHttpChannel.get(), triggeringSystem, uriSystem, uriContent,
+         uriMatches, attrsMatch, spec.get(), suffix.get()));
+  }
+#endif
+
+  bool expectCallback = false;
+#ifdef MOZ_NAIVEFOX
+  const bool realTimeMode =
+      Preferences::GetBool("browser.safebrowsing.realTime.enabled", false) &&
+      Preferences::GetBool("browser.safebrowsing.globalCache.enabled", false) &&
+      Preferences::GetBool("browser.safebrowsing.provider.google5.enabled",
+                           false);
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=classifier-mode channel=%p "
+         "local_db=1 real_time_mode=%d",
+         naiveFoxHttpChannel.get(), realTimeMode));
+  }
+  NS_ENSURE_FALSE(realTimeMode, NS_ERROR_NOT_AVAILABLE);
+#endif
   if (UC_LOG_ENABLED()) {
     nsCOMPtr<nsIURI> principalURI;
     nsCString spec;
     principal->GetAsciiSpec(spec);
-    spec.Truncate(std::min(spec.Length(), UrlClassifierCommon::sMaxSpecLength));
+    spec.Truncate(std::min(
+        spec.Length(),
+#ifdef MOZ_NAIVEFOX
+        kNaiveFoxClassifierMaxSpecLength
+#else
+        UrlClassifierCommon::sMaxSpecLength
+#endif
+        ));
     UC_LOG(
         ("nsChannelClassifier::StartInternal - classifying principal %s on "
          "channel %p [this=%p]",
@@ -213,6 +311,15 @@ nsresult nsChannelClassifier::StartInternal() {
   // The classify is running in parent process, no need to give a valid event
   // target
   rv = uriClassifier->Classify(principal, this, &expectCallback);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=classifier-classify channel=%p "
+         "status=%08x expect_callback=%d",
+         naiveFoxHttpChannel.get(), static_cast<uint32_t>(rv),
+         expectCallback));
+  }
+#endif
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -278,8 +385,12 @@ void nsChannelClassifier::MarkEntryClassified(nsresult status) {
   MOZ_ASSERT(XRE_IsParentProcess());
 
   // Don't cache tracking classifications because we support allowlisting.
+#ifdef MOZ_NAIVEFOX
+  if (NS_FAILED(status) || mIsAllowListed) {
+#else
   if (ChannelClassifierUtils::IsClassifierBlockingErrorCode(status) ||
       mIsAllowListed) {
+#endif
     return;
   }
 
@@ -290,7 +401,14 @@ void nsChannelClassifier::MarkEntryClassified(nsresult status) {
     mChannel->GetURI(getter_AddRefs(uri));
     nsAutoCString spec;
     uri->GetAsciiSpec(spec);
-    spec.Truncate(std::min(spec.Length(), UrlClassifierCommon::sMaxSpecLength));
+    spec.Truncate(std::min(
+        spec.Length(),
+#ifdef MOZ_NAIVEFOX
+        kNaiveFoxClassifierMaxSpecLength
+#else
+        UrlClassifierCommon::sMaxSpecLength
+#endif
+        ));
     UC_LOG(
         ("nsChannelClassifier::MarkEntryClassified - result is %s "
          "for uri %s [this=%p, channel=%p]",
@@ -387,8 +505,10 @@ nsChannelClassifier::OnClassifyComplete(nsresult aErrorCode,
                                         const nsACString& aFullHash) {
   // Should only be called in the parent process.
   MOZ_ASSERT(XRE_IsParentProcess());
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(
       !ChannelClassifierUtils::IsClassifierBlockingErrorCode(aErrorCode));
+#endif
 
   if (mSuspendedChannel) {
     MarkEntryClassified(aErrorCode);
@@ -401,8 +521,14 @@ nsChannelClassifier::OnClassifyComplete(nsresult aErrorCode,
         nsCOMPtr<nsIURI> uri;
         mChannel->GetURI(getter_AddRefs(uri));
         nsCString spec = uri->GetSpecOrDefault();
-        spec.Truncate(
-            std::min(spec.Length(), UrlClassifierCommon::sMaxSpecLength));
+        spec.Truncate(std::min(
+            spec.Length(),
+#ifdef MOZ_NAIVEFOX
+            kNaiveFoxClassifierMaxSpecLength
+#else
+            UrlClassifierCommon::sMaxSpecLength
+#endif
+            ));
         UC_LOG(
             ("nsChannelClassifier::OnClassifyComplete - cancelling channel %p "
              "for %s "
@@ -413,8 +539,10 @@ nsChannelClassifier::OnClassifyComplete(nsresult aErrorCode,
       // Channel will be cancelled (page element blocked) due to Safe Browsing.
       // Do update the security state of the document and fire a security
       // change event.
+#ifndef MOZ_NAIVEFOX
       ChannelClassifierUtils::SetBlockedContent(mChannel, aErrorCode, aList,
                                                 aProvider, aFullHash);
+#endif
 
       if (aErrorCode == NS_ERROR_MALWARE_URI ||
           aErrorCode == NS_ERROR_PHISHING_URI ||
@@ -429,7 +557,13 @@ nsChannelClassifier::OnClassifyComplete(nsresult aErrorCode,
         ("nsChannelClassifier::OnClassifyComplete - resuming channel %p "
          "[this=%p]",
          mChannel.get(), this));
-    mChannel->Resume();
+    nsresult resumeRv = mChannel->Resume();
+#ifdef MOZ_NAIVEFOX
+    if (RefPtr<nsHttpChannel> channel = do_QueryObject(mChannel)) {
+      channel->MarkProxyPreambleNativeChannelClassifierComplete(aErrorCode,
+                                                                 resumeRv);
+    }
+#endif
   }
 
   mChannel = nullptr;
