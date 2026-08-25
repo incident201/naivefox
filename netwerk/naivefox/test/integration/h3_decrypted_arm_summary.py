@@ -1194,6 +1194,11 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
                     f"{cohort}_overlap_evidence="
                     f"{','.join(evidence) if evidence else 'none-observed'}\n"
                 )
+        for cohort in sorted(tree_asset_sizes):
+            destination.write(
+                f"{cohort}_asset_content_lengths="
+                f"{','.join(str(size) for size in tree_asset_sizes[cohort])}\n"
+            )
         if {"tree-complete", "tree-overlap"}.issubset(arms):
             destination.write("tree_request_semantics_match=yes\n")
             destination.write("tree_asset_sizes_match=yes\n")

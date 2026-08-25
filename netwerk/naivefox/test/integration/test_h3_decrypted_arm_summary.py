@@ -680,6 +680,13 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             )
             safe_summary = destination.read_text(encoding="utf-8")
             self.assertIn("tree-root-overlap_overlap_observed=no", safe_summary)
+            self.assertIn(
+                "tree-complete_asset_content_lengths=16384,8192", safe_summary
+            )
+            self.assertIn(
+                "tree-root-overlap_asset_content_lengths=16384,8192",
+                safe_summary,
+            )
             self.assertIn("tree_root_overlap_request_semantics_match=yes", safe_summary)
             self.assertIn("tree_root_overlap_asset_sizes_match=yes", safe_summary)
             self.assertIn(
