@@ -158,12 +158,18 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/"
             "camouflage/index.html?scenario=browser_page"
         )
-        arm_url = (
-            "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/"
-            "camouflage/index.html?scenario=browser_page"
-        )
         self.assertEqual(runner.count(reference_url), 1)
-        self.assertEqual(runner.count(arm_url), 1)
+        self.assertIn(
+            'local preamble_path="/camouflage/index.html?scenario=browser_page',
+            runner,
+        )
+        self.assertIn('--preamble-path "$preamble_path"', runner)
+        self.assertEqual(
+            runner.count(
+                '"https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT$preamble_path"'
+            ),
+            1,
+        )
         self.assertNotIn("&arm=$arm", runner)
         self.assertIn("camouflage_browser_controller.py", runner)
         self.assertIn("--backend commandline", runner)

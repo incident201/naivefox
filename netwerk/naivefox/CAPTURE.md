@@ -584,6 +584,23 @@ Firefox server phase. The two older document modes remained descriptively
 indistinguishable from one another. Consequently none of these modes warrants
 a 30-block confirmation from this run.
 
+A subsequent exact-path decrypted diagnostic mapped the early phase boundary
+for Firefox and `document-complete`. Both used the same full scenario/query
+path and a 494-byte root response. Their packet 9 H3 control/SETTINGS and QPACK
+encoder/decoder stream initialization matched semantically, with no dynamic
+QPACK instructions. NaiveFox then emitted document GET HEADERS in outer packet
+10, before receiving its server post-handshake bundle in packet 11. Firefox
+first received the post-handshake transport work (`HANDSHAKE_DONE`, session
+ticket/token, and ACK), with its navigation GET appearing only later; the exact
+GET index varied across controlled traces while this ordering remained stable.
+Packets 13--18 were consequently different lifecycle phases: Firefox still
+contained PMTUD/ACK/navigation work while NaiveFox had already completed the
+document and opened CONNECT. This rules out a post-document drain fence as the
+primary repair for the earliest split and motivates an H3-only causal control
+which queues the document transaction normally but releases its HEADERS only
+after QUIC handshake confirmation. Packet positions remain outcomes, never the
+barrier definition.
+
 Future paired captures pass the exact same scenario path and block-scoped wire
 token to the direct reference, the candidate outer preamble, and the inner
 browser. The local completion file is still removed before every participant,

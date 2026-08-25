@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -39,6 +40,10 @@ SELECTED_GET_SEMANTIC_HEADERS = {
     "priority",
 }
 REQUIRED_GET_PSEUDO_HEADERS = {":method", ":scheme", ":authority", ":path"}
+ROOT_PATH_PATTERN = re.compile(
+    r"/camouflage/index\.html\?scenario=browser_page&size=262144&count=4"
+    r"&idle_ms=5000&completion=[0-9a-f]{32}"
+)
 
 
 def split_values(value):
@@ -390,7 +395,6 @@ def read_response_content_lengths(root, cohort, proxy_port):
 def validate_expected_get_request_semantics(cohort, semantics):
     expected = {
         "root": {
-            ":path": "/camouflage/index.html",
             "sec-fetch-site": "none",
             "sec-fetch-mode": "navigate",
             "sec-fetch-dest": "document",
@@ -421,6 +425,13 @@ def validate_expected_get_request_semantics(cohort, semantics):
             f"{cohort} {role} selected request semantics contain duplicates",
         )
         actual = dict(selected)
+        if role == "root":
+            root_path = actual.get(":path", "")
+            require(
+                root_path == "/camouflage/index.html"
+                or ROOT_PATH_PATTERN.fullmatch(root_path) is not None,
+                f"{cohort} root expected request path differs",
+            )
         require(
             all(actual.get(name) == value for name, value in expected_values.items()),
             f"{cohort} {role} expected request semantics differ",

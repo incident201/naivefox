@@ -642,7 +642,9 @@ run_naivefox_arm() {
   local naivefox_profile="$capture_dir/decrypted-$arm-naivefox-profile"
   local browser_profile="$capture_dir/decrypted-$arm-browser-profile"
   local browser_log="$capture_dir/decrypted-$arm-firefox.log"
-  local completion
+  local completion=$comparison_completion
+  local preamble_path="/camouflage/index.html?scenario=browser_page"
+  preamble_path+="&size=262144&count=4&idle_ms=5000&completion=$completion"
   local config="$capture_dir/decrypted-$arm-config.json"
   local socks_port
   socks_port=$(python3 -c \
@@ -685,7 +687,8 @@ EOF
     NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
     python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
     --output "$config" --arm "$arm" --protocol h3 \
-    --socks-port "$socks_port" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
+    --socks-port "$socks_port" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    --preamble-path "$preamble_path"
   : >"$keylog"
   : >"$log"
   : >"$browser_log"
@@ -698,9 +701,8 @@ EOF
     "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
   naivefox_pid=$!
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
-  completion=$comparison_completion
   start_browser_controller "$browser_profile" \
-    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion" \
+    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT$preamble_path" \
     "$completion" "decrypted-$arm" "$socks_port"
   run_browser_workload "decrypted-$arm"
   if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
