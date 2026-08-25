@@ -13,6 +13,7 @@ SUPPORTED_ARMS = (
     "root",
     "root-pmtud-control",
     "document-complete",
+    "document-overlap",
     "tree-complete",
     "tree-complete-css",
     "tree-early-overlap",

@@ -47,6 +47,7 @@ struct ExtraHeader final {
 enum class PreambleMode : uint8_t {
   Off,
   DocumentComplete,
+  DocumentOverlap,
   TreeComplete,
   TreeOverlap,
   TreeEarlyOverlap,

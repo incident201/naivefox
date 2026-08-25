@@ -24,6 +24,19 @@ ROOT_OVERLAP_DRAIN = re.compile(
     r"completed_resources=(?P<completed_resources>\d+) "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+DOCUMENT_OVERLAP_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble document-overlap admission=(?P<admission>\S+) "
+    r"response_accepted=(?P<response_accepted>[01]) "
+    r"root_done=(?P<root_done>[01]) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+DOCUMENT_OVERLAP_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble document-overlap drain=complete root_done=1 "
+    r"completed_resources=(?P<completed_resources>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 ESTABLISHED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"established target=\S+ outer=(?P<protocol>h2|h3) padding=yes$"
@@ -38,6 +51,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-overlap",
         "tree-complete",
         "tree-complete-css",
         "tree-early-overlap",
@@ -62,6 +76,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-overlap",
         "tree-complete",
         "tree-complete-css",
         "tree-early-overlap",
@@ -70,6 +85,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-overlap",
     )
     overlapping_arms = (
+        "document-overlap",
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
@@ -90,6 +106,26 @@ def validate_sample(arm, protocol, log_text, feature_document):
         " preamble background drain timed out" in line for line in log_lines
     ):
         raise ValueError(f"{arm} arm preamble background drain timed out")
+
+    document_admission_lines = [
+        line
+        for line in log_lines
+        if " preamble document-overlap admission=" in line
+    ]
+    parsed_document_admissions = [
+        DOCUMENT_OVERLAP_ADMISSION.fullmatch(line)
+        for line in document_admission_lines
+    ]
+    if any(admission is None for admission in parsed_document_admissions):
+        raise ValueError("malformed document-overlap admission evidence")
+    document_drain_lines = [
+        line for line in log_lines if " preamble document-overlap drain=" in line
+    ]
+    parsed_document_drains = [
+        DOCUMENT_OVERLAP_DRAIN.fullmatch(line) for line in document_drain_lines
+    ]
+    if any(drain is None for drain in parsed_document_drains):
+        raise ValueError("malformed document-overlap drain evidence")
 
     admission_lines = [
         line
@@ -113,6 +149,56 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
+    if arm == "document-overlap":
+        if len(parsed_document_admissions) != 1:
+            raise ValueError(
+                "document-overlap requires exactly one causal admission marker"
+            )
+        admission = parsed_document_admissions[0]
+        if (
+            admission["admission"] != "response-headers"
+            or admission["response_accepted"] != "1"
+            or admission["root_done"] != "0"
+            or admission["protocol"] != protocol
+        ):
+            raise ValueError("document-overlap causal admission state is invalid")
+        if len(parsed_document_drains) != 1:
+            raise ValueError(
+                "document-overlap requires exactly one completed drain marker"
+            )
+        drain = parsed_document_drains[0]
+        matching_established = [
+            (line, established)
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == admission["connection"]
+            and established["protocol"] == protocol
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "document-overlap requires exactly one matching "
+                "CONNECT-established marker"
+            )
+        established_line, _ = matching_established[0]
+        if (
+            result["connection"] != admission["connection"]
+            or drain["connection"] != admission["connection"]
+            or drain["protocol"] != protocol
+            or int(drain["completed_resources"]) != 0
+        ):
+            raise ValueError("document-overlap lifecycle marker identity differs")
+        admission_index = log_lines.index(document_admission_lines[0])
+        result_index = log_lines.index(result_lines[0])
+        drain_index = log_lines.index(document_drain_lines[0])
+        established_index = log_lines.index(established_line)
+        if not (
+            admission_index < result_index < drain_index
+            and result_index < established_index
+        ):
+            raise ValueError(
+                "document-overlap lifecycle markers have invalid ordering"
+            )
+    elif parsed_document_admissions or parsed_document_drains:
+        raise ValueError(f"{arm} arm unexpectedly logged document-overlap lifecycle")
     if arm in ("tree-root-overlap", "tree-root-overlap-css"):
         expected_resources = 1 if arm.endswith("-css") else 2
         if len(parsed_admissions) != 1:
@@ -190,6 +276,7 @@ def main():
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-overlap",
             "tree-complete",
             "tree-complete-css",
             "tree-early-overlap",

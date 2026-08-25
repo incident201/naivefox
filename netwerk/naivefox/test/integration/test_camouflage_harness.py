@@ -772,6 +772,20 @@ class CamouflageHarnessTests(unittest.TestCase):
                 one_connection,
             )
         SAMPLE.validate_sample(
+            "document-overlap",
+            "h3",
+            "Connection 1 preamble document-overlap "
+            "admission=response-headers response_accepted=1 "
+            "root_done=0 protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=0 protocol=h3\n"
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Connection 1 preamble document-overlap drain=complete "
+            "root_done=1 completed_resources=0 protocol=h3\n",
+            one_connection,
+        )
+        SAMPLE.validate_sample(
             "tree-root-overlap",
             "h3",
             "Connection 1 preamble root-overlap admission=started-resources "
@@ -915,6 +929,36 @@ class CamouflageHarnessTests(unittest.TestCase):
                 one_connection,
             )
 
+    def test_document_overlap_rejects_drain_before_result(self):
+        one_connection = {
+            "protocol": "h3",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        admission = (
+            "Connection 1 preamble document-overlap "
+            "admission=response-headers response_accepted=1 "
+            "root_done=0 protocol=h3\n"
+        )
+        drain = (
+            "Connection 1 preamble document-overlap drain=complete "
+            "root_done=1 completed_resources=0 protocol=h3\n"
+        )
+        result = (
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=0 protocol=h3\n"
+        )
+        established = (
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+        )
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            SAMPLE.validate_sample(
+                "document-overlap",
+                "h3",
+                admission + drain + result + established,
+                one_connection,
+            )
+
     def test_overlapping_sample_rejects_background_drain_timeout(self):
         one_connection = {
             "protocol": "h3",
@@ -937,6 +981,17 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         timeout = "Connection 1 preamble background drain timed out\n"
         for arm, evidence in (
+            (
+                "document-overlap",
+                "Connection 1 preamble document-overlap "
+                "admission=response-headers response_accepted=1 "
+                "root_done=0 protocol=h3\n"
+                + result
+                + established
+                + "Connection 1 preamble document-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+                + timeout,
+            ),
             ("tree-early-overlap", result + timeout),
             (
                 "tree-root-overlap",

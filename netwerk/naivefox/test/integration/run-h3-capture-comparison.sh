@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +37,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -49,6 +49,11 @@ done
 if [[ -n ${seen_comparison_arms[tree-overlap]:-} &&
       -z ${seen_comparison_arms[tree-complete]:-} ]]; then
   printf 'tree-overlap comparison requires tree-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[document-overlap]:-} &&
+      -z ${seen_comparison_arms[document-complete]:-} ]]; then
+  printf 'document-overlap comparison requires document-complete\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[tree-early-overlap]:-} &&
@@ -79,6 +84,9 @@ capture_log=
 capture_stage_dir=
 capture_stage_raw=
 firefox_pid=
+browser_controller_pid=
+browser_stop_file=
+comparison_completion=
 naivefox_pid=
 capture_dir=
 safe_dir=
@@ -119,6 +127,30 @@ stop_pid() {
     kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
   fi
   [[ -z $pid ]] || wait "$pid" 2>/dev/null || true
+}
+
+stop_process_group() {
+  local pid=${1:-}
+  if [[ -z $pid ]]; then
+    return 0
+  fi
+  local pgid
+  pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+  if [[ $pgid != "$pid" ]]; then
+    stop_pid "$pid"
+    return 0
+  fi
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -TERM -- "-$pid" 2>/dev/null || true
+    for ((i = 0; i < 50; i++)); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL -- "-$pid" 2>/dev/null || true
+    fi
+  fi
+  wait "$pid" 2>/dev/null || true
 }
 
 stop_capture() {
@@ -168,6 +200,7 @@ cleanup() {
      ! stop_network_mutation_monitor; then
     status=1
   fi
+  stop_process_group "$browser_controller_pid"
   stop_pid "$firefox_pid"
   stop_pid "$naivefox_pid"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
@@ -306,6 +339,9 @@ source "$run_dir/fixture.env"
 capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 capture_dir="$STATE_ROOT/h3-captures/$capture_id"
 mkdir -m 0700 -p "$capture_dir"
+if [[ $comparison_design == arms ]]; then
+  comparison_completion=$(openssl rand -hex 16)
+fi
 # WSL's dumpcap/AppArmor combination may deny opening a capture directly below
 # /home even when the caller is root.  Capture into a private /tmp staging
 # directory, then write the filtered result into the private diagnostics tree.
@@ -362,6 +398,61 @@ wait_for_log() {
   done
   printf 'timed out waiting for readiness marker: %s\n' "$pattern" >&2
   return 1
+}
+
+start_browser_controller() {
+  local profile=$1
+  local url=$2
+  local completion=$3
+  local label=$4
+  local socks_port=${5:-0}
+  local keylog=${6:-}
+  local ready_file="$capture_dir/$label-browser-ready.json"
+  local navigate_file="$capture_dir/$label-browser-navigate"
+  local done_file="$capture_dir/$label-browser-done"
+  browser_stop_file="$capture_dir/$label-browser-stop"
+  rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
+  local -a keylog_env=(-u SSLKEYLOGFILE)
+  if [[ -n $keylog ]]; then
+    keylog_env=("SSLKEYLOGFILE=$keylog")
+  fi
+  setsid env "${keylog_env[@]}" "${firefox_runtime_env[@]}" \
+    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
+    python3 "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+    --binary "$REFERENCE_BIN" --profile "$profile" --backend commandline \
+    --protocol h3 --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    --socks-port "$socks_port" --url "$url" \
+    --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion" \
+    --ready-file "$ready_file" --navigate-file "$navigate_file" \
+    --done-file "$done_file" --stop-file "$browser_stop_file" \
+    --browser-log "$capture_dir/$label-firefox.log" \
+    --webdriver-log "$capture_dir/$label-webdriver.log" --timeout 35 \
+    >"$capture_dir/$label-controller.log" 2>&1 &
+  browser_controller_pid=$!
+  wait_for_file "$ready_file" "$browser_controller_pid" \
+    "controlled Firefox for $label" 300
+}
+
+run_browser_workload() {
+  local label=$1
+  : >"$capture_dir/$label-browser-navigate"
+  wait_for_file "$capture_dir/$label-browser-done" "$browser_controller_pid" \
+    "controlled Firefox workload for $label" 400
+}
+
+stop_browser_controller() {
+  [[ -n $browser_controller_pid ]] || return 0
+  : >"$browser_stop_file"
+  if ! timeout 20 tail --pid="$browser_controller_pid" -f /dev/null; then
+    printf 'controlled Firefox did not stop cleanly\n' >&2
+    stop_process_group "$browser_controller_pid"
+    browser_controller_pid=
+    browser_stop_file=
+    return 1
+  fi
+  wait "$browser_controller_pid"
+  browser_controller_pid=
+  browser_stop_file=
 }
 
 start_network_mutation_monitor() {
@@ -435,15 +526,16 @@ run_reference() {
   local pass=$1
   local pcap="$capture_dir/$pass-reference.pcapng"
   local log="$capture_dir/$pass-reference-firefox.log"
-  local screenshot="$capture_dir/$pass-reference.png"
   local keylog="$capture_dir/$pass-reference.keys"
-  local workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass"
-  if [[ $comparison_design == arms ]]; then
-    workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page"
-  fi
+  local completion
   local -a command_env=(env -u SSLKEYLOGFILE \
     "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
+  local workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass"
+  if [[ $comparison_design == arms ]]; then
+    completion=$comparison_completion
+    workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion"
+  fi
   if [[ $pass == decrypted ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
@@ -453,29 +545,33 @@ run_reference() {
   fi
   : >"$log"
   chmod 0600 "$log"
+  if [[ $comparison_design == arms ]]; then
+    start_browser_controller "$reference_profile" "$workload_url" \
+      "$completion" "$pass-reference" 0 "$keylog"
+  fi
   start_network_mutation_monitor "$pass-reference"
   start_capture "$pcap" "$capture_dir/$pass-reference-dumpcap.log"
-  timeout 35 "${command_env[@]}" \
-    "$REFERENCE_BIN" --headless --new-instance --no-remote \
-    --profile "$reference_profile" --screenshot "$screenshot" \
-    "$workload_url" \
-    >"$log" 2>&1 &
-  firefox_pid=$!
-  set +e
-  wait "$firefox_pid"
-  local status=$?
-  set -e
-  firefox_pid=
+  if [[ $comparison_design == arms ]]; then
+    run_browser_workload "$pass-reference"
+  else
+    if ! timeout 35 "${command_env[@]}" \
+        "$REFERENCE_BIN" --headless --new-instance --no-remote \
+        --profile "$reference_profile" --screenshot \
+        "$capture_dir/$pass-reference.png" "$workload_url" \
+        >"$log" 2>&1; then
+      printf 'reference Firefox %s pass did not complete successfully\n' \
+        "$pass" >&2
+      return 1
+    fi
+    if [[ ! -s $capture_dir/$pass-reference.png ]]; then
+      printf 'reference Firefox %s pass produced no screenshot\n' "$pass" >&2
+      return 1
+    fi
+  fi
   stop_capture
   stop_network_mutation_monitor
-  if [[ $status -ne 0 ]]; then
-    printf 'reference Firefox %s pass exited with status %s\n' \
-      "$pass" "$status" >&2
-    return 1
-  fi
-  if [[ ! -s $screenshot ]]; then
-    printf 'reference Firefox %s pass produced no screenshot\n' "$pass" >&2
-    return 1
+  if [[ $comparison_design == arms ]]; then
+    stop_browser_controller
   fi
 }
 
@@ -540,7 +636,7 @@ run_naivefox_arm() {
   local naivefox_profile="$capture_dir/decrypted-$arm-naivefox-profile"
   local browser_profile="$capture_dir/decrypted-$arm-browser-profile"
   local browser_log="$capture_dir/decrypted-$arm-firefox.log"
-  local screenshot="$capture_dir/decrypted-$arm.png"
+  local completion
   local config="$capture_dir/decrypted-$arm-config.json"
   local socks_port
   socks_port=$(python3 -c \
@@ -596,37 +692,23 @@ EOF
     "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
   naivefox_pid=$!
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
-  set +e
-  timeout 35 env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
-    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
-    "$REFERENCE_BIN" --headless --new-instance --no-remote \
-    --profile "$browser_profile" --screenshot "$screenshot" \
-    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page" \
-    >"$browser_log" 2>&1 &
-  firefox_pid=$!
-  wait "$firefox_pid"
-  local browser_status=$?
-  firefox_pid=
-  set -e
-  if [[ $browser_status -ne 0 ]]; then
-    printf 'same-base Firefox through %s arm exited with status %s\n' \
-      "$arm" "$browser_status" >&2
-    return 1
-  fi
-  if [[ ! -s $screenshot ]]; then
-    printf 'same-base Firefox through %s arm produced no screenshot\n' \
-      "$arm" >&2
-    return 1
-  fi
+  completion=$comparison_completion
+  start_browser_controller "$browser_profile" \
+    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion" \
+    "$completion" "decrypted-$arm" "$socks_port"
+  run_browser_workload "decrypted-$arm"
   if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
     local expected_resources=2
     [[ $arm == tree-root-overlap-css ]] && expected_resources=1
     wait_for_log "$naivefox_pid" "$log" \
       " preamble root-overlap drain=complete completed_resources=$expected_resources protocol=h3$"
+  elif [[ $arm == document-overlap ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$'
   fi
-  sleep 0.25
   stop_capture
   stop_network_mutation_monitor
+  stop_browser_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
   local outer_count padding_count preamble_count
@@ -636,6 +718,7 @@ EOF
   [[ $outer_count -ge 1 && $padding_count -eq $outer_count ]]
   if [[ $arm == root || $arm == root-pmtud-control ||
         $arm == document-complete ||
+        $arm == document-overlap ||
         $arm == tree-complete || $arm == tree-complete-css ||
         $arm == tree-early-overlap ||
         $arm == tree-root-overlap ||
@@ -643,7 +726,8 @@ EOF
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
-    if [[ $arm == tree-early-overlap || $arm == tree-root-overlap ||
+    if [[ $arm == document-overlap || $arm == tree-early-overlap ||
+          $arm == tree-root-overlap ||
           $arm == tree-root-overlap-css ||
           $arm == tree-overlap ]]; then
       ! rg -q ' preamble background drain timed out' "$log"
@@ -669,9 +753,30 @@ EOF
       established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" | cut -d: -f1)
       [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
          $result_line -lt $established_line ]]
+    elif [[ $arm == document-overlap ]]; then
+      [[ $(rg -c ' preamble document-overlap admission=' "$log" || true) -eq 1 ]]
+      [[ $(rg -c ' preamble document-overlap drain=' "$log" || true) -eq 1 ]]
+      rg -q ' preamble document-overlap admission=response-headers response_accepted=1 root_done=0 protocol=h3$' "$log"
+      rg -q ' preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$' "$log"
+      local admission_connection result_connection drain_connection
+      admission_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble document-overlap admission=.*/\2/p' "$log")
+      result_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble result=.*/\2/p' "$log")
+      drain_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble document-overlap drain=.*/\2/p' "$log")
+      [[ $admission_connection == "$result_connection" &&
+         $admission_connection == "$drain_connection" ]]
+      [[ $(rg -c "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" || true) -eq 1 ]]
+      local admission_line result_line drain_line established_line
+      admission_line=$(rg -n -m1 ' preamble document-overlap admission=' "$log" | cut -d: -f1)
+      result_line=$(rg -n -m1 ' preamble result=' "$log" | cut -d: -f1)
+      drain_line=$(rg -n -m1 ' preamble document-overlap drain=' "$log" | cut -d: -f1)
+      established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" | cut -d: -f1)
+      [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
+         $result_line -lt $established_line ]]
     else
       ! rg -q -e ' preamble root-overlap admission=' \
-        -e ' preamble root-overlap drain=' "$log"
+        -e ' preamble root-overlap drain=' \
+        -e ' preamble document-overlap admission=' \
+        -e ' preamble document-overlap drain=' "$log"
     fi
   else
     [[ $preamble_count -eq 0 ]]

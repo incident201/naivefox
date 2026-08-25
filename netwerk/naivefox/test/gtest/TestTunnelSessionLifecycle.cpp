@@ -101,6 +101,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Tree, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Tree, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentComplete, true));
+  EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentOverlap, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::DocumentOverlap, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeComplete, true));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeOverlap, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::TreeOverlap, false));
@@ -140,42 +142,50 @@ TEST(NaiveFoxTunnelSessionLifecycle, ProtocolSpecificPreambleModeSelection)
 TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
 {
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,
-                                              false, 0, 0, 0, 0));
+                                              false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,
-                                             true, 0, 0, 0, 0));
+                                             true, true, 0, 0, 0, 0));
+
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentOverlap,
+                                              false, false, 0, 0, 0, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::DocumentOverlap,
+                                             true, false, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentOverlap,
+                                              true, true, 0, 0, 0, 0));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
-                                              2, 0, 2, 1));
+                                              true, 2, 0, 2, 1));
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
-                                             2, 0, 2, 2));
+                                             true, 2, 0, 2, 2));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeOverlap, true,
-                                              2, 1, 1, 0));
-  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeOverlap, true, 2,
-                                             0, 2, 2));
+                                              true, 2, 1, 1, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeOverlap, true,
+                                             true, 2, 0, 2, 2));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
-                                              false, 2, 1, 1, 0));
+                                              false, false, 2, 1, 1, 0));
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
-                                              true, 0, 0, 0, 0));
+                                              true, true, 0, 0, 0, 0));
   // A failed or completed asset without response headers is not admission.
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
-                                              true, 2, 0, 2, 2));
+                                              true, true, 2, 0, 2, 2));
   // Response headers are insufficient once that same asset has completed.
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
-                                              true, 2, 1, 2, 2));
+                                              true, true, 2, 1, 2, 2));
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeEarlyOverlap,
-                                             true, 2, 1, 1, 0));
+                                             true, true, 2, 1, 1, 0));
 
   // Root-overlap is defined by client-side scheduling state, not by whether
   // response HEADERS or FIN happened to win a transport race.
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeRootOverlap,
-                                              false, 1, 0, 0, 1));
+                                              false, false, 1, 0, 0, 1));
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeRootOverlap,
-                                              true, 0, 0, 0, 0));
+                                              true, true, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::TreeRootOverlap,
-                                             true, 1, 0, 0, 1));
+                                             true, true, 1, 0, 0, 1));
 
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeEarlyOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeRootOverlap));
@@ -200,9 +210,9 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
 
   for (const auto& state : kTerminalStates) {
     const bool barrierFired = detail::PreambleBarrierReached(
-        PreambleMode::TreeEarlyOverlap, state.mRootDone, state.mAssetCount,
-        state.mAssetsWithHeadersNotDone, state.mAssetsWithHeadersOrDone,
-        state.mAssetsDone);
+        PreambleMode::TreeEarlyOverlap, state.mRootDone, state.mRootDone,
+        state.mAssetCount, state.mAssetsWithHeadersNotDone,
+        state.mAssetsWithHeadersOrDone, state.mAssetsDone);
     EXPECT_FALSE(barrierFired) << state.mDescription;
     EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
         PreambleMode::TreeEarlyOverlap, barrierFired))
@@ -213,6 +223,11 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeEarlyOverlap, true));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeOverlap, false));
+
+  EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::DocumentOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::DocumentOverlap, true));
 
   EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeRootOverlap, false));

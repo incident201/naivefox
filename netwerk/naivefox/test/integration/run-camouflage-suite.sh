@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -223,7 +223,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -1037,6 +1037,9 @@ run_naivefox_sample() {
     [[ $arm == tree-root-overlap-css ]] && expected_resources=1
     wait_for_log "$naivefox_pid" "$log" \
       " preamble root-overlap drain=complete completed_resources=$expected_resources protocol=$protocol$"
+  elif [[ $arm == document-overlap ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      " preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
   fi
   stop_capture
   stop_network_mutation_monitor
@@ -1235,6 +1238,7 @@ else
     --expected-per-cohort "$samples_per_cohort"
   single_arm_analysis=confirmatory
   if [[ $naivefox_arm == tree-complete ||
+        $naivefox_arm == document-overlap ||
         $naivefox_arm == root-pmtud-control ||
         $naivefox_arm == tree-complete-css ||
         $naivefox_arm == tree-early-overlap ||

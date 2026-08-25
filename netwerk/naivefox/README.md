@@ -77,8 +77,9 @@ The supported config is a strict NaiveProxy-compatible subset:
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
-  `tree-complete`, `tree-overlap`, `tree-early-overlap`, and
-  `tree-root-overlap`; `root` and `tree` are compatibility aliases. Active
+  `document-overlap`, `tree-complete`, `tree-overlap`,
+  `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
+  compatibility aliases. Active
   modes share one absolute origin-form `path` and bounded `max-bytes` budget.
   `max-assets` is allowed when at least one effective protocol mode is a tree
   mode and is ignored by a document-only effective mode. Protocol overrides
@@ -95,6 +96,13 @@ The supported config is a strict NaiveProxy-compatible subset:
     "max-bytes": 262144
   }
   ```
+  `document-overlap` is an experimental scheduling control: after a successful
+  2xx response HEADERS event it permits CONNECT while the normal document
+  channel continues to completion. It never discovers assets and requires
+  `max-assets=0`. Physical HEADERS/DATA/FIN overlap is deliberately not a
+  success criterion because that would make the policy depend on response size
+  and packetization. The current screening evidence does not make this mode a
+  recommended default.
 - `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path

@@ -70,12 +70,19 @@ bool PreambleStylesheetIsNonDeferred(const nsACString& aLowerTag,
                                      bool aAlternate);
 bool PreambleScriptIsParserBlockingClassic(const nsACString& aLowerTag);
 
-constexpr bool PreambleBarrierReached(PreambleMode aMode, bool aRootDone,
-                                      uint32_t aAssetCount,
+constexpr bool PreambleBarrierReached(PreambleMode aMode,
+                                      bool aRootResponseAccepted,
+                                      bool aRootDone, uint32_t aAssetCount,
                                       uint32_t aAssetsWithHeadersNotDone,
                                       uint32_t aAssetsWithHeadersOrDone,
                                       uint32_t aAssetsDone) {
-  if (!aRootDone || aMode == PreambleMode::Off) {
+  if (aMode == PreambleMode::Off) {
+    return false;
+  }
+  if (aMode == PreambleMode::DocumentOverlap) {
+    return aRootResponseAccepted && !aRootDone;
+  }
+  if (!aRootDone) {
     return false;
   }
   if (aMode == PreambleMode::DocumentComplete) {
@@ -95,14 +102,16 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode, bool aRootDone,
 }
 
 constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
-  return aMode == PreambleMode::TreeOverlap ||
+  return aMode == PreambleMode::DocumentOverlap ||
+         aMode == PreambleMode::TreeOverlap ||
          aMode == PreambleMode::TreeEarlyOverlap ||
          aMode == PreambleMode::TreeRootOverlap;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
                                                bool aBarrierFired) {
-  return (aMode == PreambleMode::TreeEarlyOverlap ||
+  return (aMode == PreambleMode::DocumentOverlap ||
+          aMode == PreambleMode::TreeEarlyOverlap ||
           aMode == PreambleMode::TreeRootOverlap) &&
          !aBarrierFired;
 }

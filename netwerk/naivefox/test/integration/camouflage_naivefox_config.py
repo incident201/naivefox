@@ -27,6 +27,7 @@ def build_config(
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-overlap",
         "tree-complete",
         "tree-complete-css",
         "tree-early-overlap",
@@ -37,7 +38,7 @@ def build_config(
     if arm not in supported_arms:
         raise ValueError(
             "config arm must be off, gate, root, root-pmtud-control, "
-            "document-complete, "
+            "document-complete, document-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, or "
             "tree-overlap"
@@ -60,9 +61,18 @@ def build_config(
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm in ("root", "root-pmtud-control", "document-complete"):
+    if arm in (
+        "root",
+        "root-pmtud-control",
+        "document-complete",
+        "document-overlap",
+    ):
         preamble = {
-            "mode": "document-complete",
+            "mode": (
+                "document-overlap"
+                if arm == "document-overlap"
+                else "document-complete"
+            ),
             "path": PREAMBLE_PATH,
             "max-bytes": PREAMBLE_MAX_BYTES,
         }
@@ -120,6 +130,7 @@ def main():
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-overlap",
             "tree-complete",
             "tree-complete-css",
             "tree-early-overlap",

@@ -477,13 +477,18 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
 adds one bounded document GET before CONNECT. The tree modes also fetch two
 resources from that browser page; `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
+`document-overlap` uses the identical single document request but releases
+CONNECT after accepted 2xx response HEADERS while the root listener is still
+active. Its normal root drain is mandatory. Root FIN ordering is report-only,
+so this arm cannot be selected or resampled according to response size or
+whether physical overlap happened to appear.
 `tree-early-overlap` completes the root first, then releases CONNECT only after
 at least one resource response has begun while leaving that same CSS or JS
 stream unfinished at the callback boundary. Necko can nevertheless serialize

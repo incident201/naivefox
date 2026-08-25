@@ -628,7 +628,8 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   RefPtr<ProxyPreambleOperation> operation;
   PreambleConfig preamble = mImpl->mConfig.mPreamble;
   preamble.mMode = preamble.ModeForProtocol(aProtocol);
-  if (preamble.mMode == PreambleMode::DocumentComplete) {
+  if (preamble.mMode == PreambleMode::DocumentComplete ||
+      preamble.mMode == PreambleMode::DocumentOverlap) {
     preamble.mMaxAssets = 0;
   }
   nsresult rv = OpenProxyPreambleOperation(
@@ -737,6 +738,14 @@ void TunnelSession::FinishPreambleOnMain(
                                            : "terminal-fallback",
         aRootDone, aStartedResources, ProtocolName(aProtocol));
   }
+  if (preambleMode == PreambleMode::DocumentOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble document-overlap admission=%s "
+        "response_accepted=%d root_done=%d protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aRootDone ? "terminal-fallback" : "response-headers", !aRootDone,
+        aRootDone, ProtocolName(aProtocol));
+  }
   const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
                        : succeeded                      ? "success"
                        : NS_FAILED(aStatus)             ? "network-error"
@@ -763,11 +772,19 @@ void TunnelSession::FinishPreambleOperationOnMain(
     (void)mImpl->mPreambleDrainTimer->Cancel();
     mImpl->mPreambleDrainTimer = nullptr;
   }
-  if (aCompletedNormally && mImpl->mConfig.mPreamble.ModeForProtocol(
-                                aProtocol) == PreambleMode::TreeRootOverlap) {
+  const PreambleMode preambleMode =
+      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  if (aCompletedNormally && preambleMode == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble root-overlap drain=complete "
         "completed_resources=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aCompletedSuccessfulResources, ProtocolName(aProtocol));
+  }
+  if (aCompletedNormally && preambleMode == PreambleMode::DocumentOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble document-overlap drain=complete "
+        "root_done=1 completed_resources=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aCompletedSuccessfulResources, ProtocolName(aProtocol));
   }

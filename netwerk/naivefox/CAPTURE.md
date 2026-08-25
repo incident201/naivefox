@@ -5,6 +5,25 @@ NSS/PSM, and Neqo wire machinery without accidental project-specific markers.
 It is diagnostic: a browser GET and padded proxy CONNECT are different
 workloads, so packet timing and volume are not fingerprint-equality targets.
 
+## Size-independent mechanism rule
+
+Fixture asset sizes are diagnostic inputs, not camouflage parameters. A
+candidate must not be selected by searching for a response size which happens
+to improve a packet index, time window, or classifier score. Production code
+may retain bounded byte budgets for safety, but it must derive scheduling,
+headers, priorities, cache behavior, and stream lifecycle from normal Gecko
+causes. Any topology candidate should remain directionally stable across a
+small predeclared range of ordinary fixture sizes before promotion.
+
+`document-overlap` is the size-independent control for document scheduling. It
+admits CONNECT after successful 2xx document response HEADERS while the Necko
+listener is still active, and then requires a normal document drain. Decrypted
+admission requires one QUIC identity, one outer ClientHello, matching
+`document-complete` request semantics and response `Content-Length`, and the
+product lifecycle order `response-headers admission -> CONNECT -> normal
+drain`. Whether server FIN happens before or after CONNECT is report-only: it
+must never trigger sample replacement or fixture-size adjustment.
+
 ## Modes and policy
 
 The runners support two reference modes:

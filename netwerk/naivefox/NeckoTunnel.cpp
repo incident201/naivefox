@@ -1050,6 +1050,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
 
   if (aStreamId != 0 ||
       mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
       mImpl->mStreams.Length() - 1 >= mImpl->mConfig.mMaxAssets) {
     return NS_OK;
   }
@@ -1252,6 +1253,10 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   }
   if (aStreamId == 0) {
     mImpl->mRootDone = true;
+    if (!detail::PreambleResourceCompletedSuccessfully(
+            stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus)) {
+      mImpl->mAllStreamsCompletedNormally = false;
+    }
   }
 
   MaybeFireBarrier();
@@ -1277,6 +1282,11 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
   MOZ_ASSERT(NS_IsMainThread());
   const uint32_t assetCount =
       mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams.Length() - 1;
+  const bool rootResponseAccepted =
+      !mImpl->mStreams.IsEmpty() &&
+      mImpl->mStreams[0].mResponseHeadersReceived &&
+      mImpl->mStreams[0].mHttpStatus >= 200 &&
+      mImpl->mStreams[0].mHttpStatus < 300 && !mImpl->mStreams[0].mDone;
   uint32_t assetsWithHeadersNotDone = 0;
   uint32_t assetsWithHeadersOrDone = 0;
   uint32_t assetsDone = 0;
@@ -1288,7 +1298,7 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
     assetsDone += candidate.mDone;
   }
   const bool barrierReached = detail::PreambleBarrierReached(
-      mImpl->mConfig.mMode, mImpl->mRootDone, assetCount,
+      mImpl->mConfig.mMode, rootResponseAccepted, mImpl->mRootDone, assetCount,
       assetsWithHeadersNotDone, assetsWithHeadersOrDone, assetsDone);
   if (barrierReached) {
     FireBarrierCallback();

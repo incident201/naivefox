@@ -22,6 +22,19 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
+                "document-overlap decrypted validation requires document-complete",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-overlap",),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
                 "root-pmtud-control decrypted validation requires root",
             ):
                 summary.write_outputs(
@@ -135,9 +148,11 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertEqual(runner.count(reference_url), 1)
         self.assertEqual(runner.count(arm_url), 1)
         self.assertNotIn("&arm=$arm", runner)
-        self.assertIn("reference Firefox %s pass exited with status %s", runner)
-        self.assertIn("same-base Firefox through %s arm exited with status %s", runner)
-        self.assertGreaterEqual(runner.count("[[ ! -s $screenshot ]]"), 2)
+        self.assertIn("camouflage_browser_controller.py", runner)
+        self.assertIn("--backend commandline", runner)
+        self.assertIn("--completion-file", runner)
+        self.assertIn('run_browser_workload "$pass-reference"', runner)
+        self.assertIn('run_browser_workload "decrypted-$arm"', runner)
 
         reference_body = runner.split("run_reference()", 1)[1].split(
             "run_naivefox()", 1
@@ -147,11 +162,19 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         )[0]
         self.assertLess(
             reference_body.index("start_network_mutation_monitor"),
-            reference_body.index('"$REFERENCE_BIN" --headless'),
+            reference_body.index("start_capture"),
+        )
+        self.assertLess(
+            reference_body.index("start_capture"),
+            reference_body.index('run_browser_workload "$pass-reference"'),
         )
         self.assertLess(
             arm_body.index("start_network_mutation_monitor"),
             arm_body.index('"$NAIVEFOX_BIN" "$config"'),
+        )
+        self.assertLess(
+            arm_body.index("start_capture"),
+            arm_body.index('run_browser_workload "decrypted-$arm"'),
         )
 
     def test_failed_h3_comparison_removes_only_its_exact_safe_directory(self):
@@ -790,6 +813,43 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             )
             self.assertIn("root_pmtud_control_response_size_match=yes", safe_summary)
             self.assertIn("root_pmtud_control_wire_pmtud_claim=no", safe_summary)
+
+    def test_document_overlap_pairs_identical_root_and_keeps_fin_report_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 4, method="CONNECT"),
+                self.event(14, 0.016, "server", 4, status="200"),
+            ]
+            self.make_cohort(directory, "document-complete", common)
+            self.make_cohort(
+                directory,
+                "document-overlap",
+                common,
+                fin_frames={"0": 16},
+            )
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("document-complete", "document-overlap"),
+            )
+            safe_summary = destination.read_text(encoding="utf-8")
+            self.assertIn("document_overlap_request_semantics_match=yes", safe_summary)
+            self.assertIn("document_overlap_response_size_match=yes", safe_summary)
+            self.assertIn("document_overlap_wire_overlap_is_admission=no", safe_summary)
+            self.assertIn("document-overlap_overlap_observed=yes", safe_summary)
 
     def test_tree_arms_reject_different_selected_header_values(self):
         with tempfile.TemporaryDirectory() as directory:

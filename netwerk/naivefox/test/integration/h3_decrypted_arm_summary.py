@@ -11,6 +11,7 @@ SUPPORTED_ARMS = (
     "root",
     "root-pmtud-control",
     "document-complete",
+    "document-overlap",
     "tree-complete",
     "tree-complete-css",
     "tree-early-overlap",
@@ -604,6 +605,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-overlap",
             "tree-complete",
             "tree-complete-css",
             "tree-early-overlap",
@@ -689,6 +691,14 @@ def validate(cohorts, connections, client_hellos, arms):
                         ),
                         f"{arm} CONNECT preceded the completed root stream",
                     )
+            if arm == "document-overlap":
+                require(
+                    all(
+                        row["packet_position"] < connects[0]["packet_position"]
+                        for row in response_headers
+                    ),
+                    "document-overlap CONNECT preceded root response HEADERS",
+                )
             if arm.startswith("tree-"):
                 ordered_gets = sorted(gets, key=lambda row: row["packet_position"])
                 asset_streams = {
@@ -909,6 +919,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "unsupported NaiveFox arm",
     )
     require(
+        "document-overlap" not in arms or "document-complete" in arms,
+        "document-overlap decrypted validation requires document-complete",
+    )
+    require(
         "tree-early-overlap" not in arms or "tree-complete" in arms,
         "tree-early-overlap decrypted validation requires tree-complete",
     )
@@ -978,6 +992,17 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         require(
             root_response_sizes["root"] == root_response_sizes["root-pmtud-control"],
             "root response content-length differs for PMTUD control",
+        )
+    if {"document-complete", "document-overlap"}.issubset(arms):
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-overlap"]["root"],
+            "document selected header values/order differ between complete and overlap",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-overlap"],
+            "document response content-length differs between complete and overlap",
         )
     tree_semantics = {}
     tree_asset_sizes = {}
@@ -1217,6 +1242,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("root_pmtud_control_request_semantics_match=yes\n")
             destination.write("root_pmtud_control_response_size_match=yes\n")
             destination.write("root_pmtud_control_wire_pmtud_claim=no\n")
+        if {"document-complete", "document-overlap"}.issubset(arms):
+            destination.write("document_overlap_request_semantics_match=yes\n")
+            destination.write("document_overlap_response_size_match=yes\n")
+            destination.write("document_overlap_wire_overlap_is_admission=no\n")
         if preamble_arms:
             destination.write("root_semantics_and_content_length_validated=yes\n")
         if "tree-complete" in arms and len(preamble_arms) > 1:
