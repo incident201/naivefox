@@ -215,6 +215,9 @@ TEST(NaiveFoxConfig, PreambleModesAndBudgets)
        PreambleMode::TreeRootOverlap, "/camouflage/", 0, 256 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"path":"/a%20b","max-bytes":393216,"max-assets":6,"mode":"tree"}})",
        PreambleMode::Tree, "/a%20b", 6, 384 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page?scenario=browser_page&completion=0123456789abcdef"}})",
+       PreambleMode::Root,
+       "/page?scenario=browser_page&completion=0123456789abcdef", 0, 64 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/health","max-assets":0,"max-bytes":1}})",
        PreambleMode::Root, "/health", 0, 1},
   };
@@ -244,7 +247,6 @@ TEST(NaiveFoxConfig, RejectsInvalidPreamble)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":""}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"https://example.com/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"//example.com/"}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page?query"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page#fragment"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/bad\\path"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/bad%2"}})",

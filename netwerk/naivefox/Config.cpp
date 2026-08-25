@@ -288,8 +288,7 @@ bool IsValidPreamblePath(const nsACString& aPath) {
   }
   for (size_t index = 0; index < aPath.Length(); ++index) {
     const unsigned char value = aPath.CharAt(index);
-    if (value <= 0x20 || value >= 0x7f || value == '?' || value == '#' ||
-        value == '\\') {
+    if (value <= 0x20 || value >= 0x7f || value == '#' || value == '\\') {
       return false;
     }
     if (value == '%' &&
