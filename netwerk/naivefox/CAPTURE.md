@@ -492,6 +492,29 @@ it the default. The remaining early signal is concentrated around packets 12,
 volume. A follow-up should vary the number of naturally opened resources with
 the same admission rule before adding delays or packet-size targets.
 
+The first ten-block same-base H3/inner-HTTPS screen of
+`document-complete,document-overlap,document-start-overlap` is retained as safe
+artifact `c7ef700ffa3c42ae` (seed `20260825`, revision `2ab204178e4b`). All 50
+participants passed the isolated-network mutation monitor and physical-QUIC
+checks. This is scheduling evidence only: the reference used the measured
+scenario query while the outer preamble still used the shorter fixed document
+path. Relative to the common Firefox A/B envelope, request-committed overlap
+was worse in every selected view: 0.13721 versus 0.08776/0.08299 for packets
+1--16, 0.63527 versus 0.61094/0.61219 for packets 17--32, and 0.23219 versus
+0.20479/0.20280 for packets 1--32. Its new packet-13 client phase opposed the
+Firefox server phase. The two older document modes remained descriptively
+indistinguishable from one another. Consequently none of these modes warrants
+a 30-block confirmation from this run.
+
+Future paired captures pass the exact same scenario path and block-scoped wire
+token to the direct reference, the candidate outer preamble, and the inner
+browser. The local completion file is still removed before every participant,
+so reusing a wire token cannot satisfy the next controller from a stale marker.
+Safe metadata records this token/reset policy, the fixed
+`browser-done + 250 ms` cutoff, and fail-closed preamble-drain admission. This
+removes request-target and root-body differences without tuning a response
+size or copying decrypted fields into the passive classifier.
+
 Each paired view also retains diagnostic-only top passive features and mean
 signed packet-size sequences. The sequence records the Firefox A/B mean
 absolute disagreement (the local noise floor) and each arm's mean delta from

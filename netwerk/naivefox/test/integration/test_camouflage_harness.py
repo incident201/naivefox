@@ -574,6 +574,31 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertEqual(config["preamble"]["mode"], arm)
             self.assertNotIn("max-assets", config["preamble"])
             self.assertEqual(config["preamble"]["path"], CONFIG.PREAMBLE_PATH)
+        measured_path = (
+            "/camouflage/index.html?scenario=browser_page&size=0&count=0&"
+            "idle_ms=0&completion=0123456789abcdef0123456789abcdef"
+        )
+        matched = CONFIG.build_config(
+            "document-complete",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+            preamble_path=measured_path,
+        )
+        self.assertEqual(matched["preamble"]["path"], measured_path)
+        for invalid_path in ("/other", CONFIG.PREAMBLE_PATH + "#fragment", "\n"):
+            with self.assertRaisesRegex(ValueError, "camouflage document path"):
+                CONFIG.build_config(
+                    "document-complete",
+                    "h3",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                    preamble_path=invalid_path,
+                )
 
     def test_config_arm_validation_rejects_unknown_arm_and_invalid_ports(self):
         with self.assertRaisesRegex(ValueError, "document-complete"):
@@ -1198,8 +1223,23 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn('NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER"', sample_runner)
         self.assertIn('NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS"', sample_runner)
         self.assertIn('NAIVEFOX_PROFILE="$naivefox_profile"', sample_runner)
+        self.assertIn('--preamble-path "$path"', sample_runner)
         self.assertNotIn("--socks-listen", sample_runner)
         self.assertNotIn("--profile", sample_runner)
+
+    def test_camouflage_metadata_records_pairing_and_cutoff_provenance(self):
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            runner = stream.read()
+        for marker in (
+            "completion_token_scope=experiment_block_wire_url",
+            "completion_marker_reset=before_each_participant",
+            "capture_cutoff=browser_done_plus_250ms",
+            "preamble_drain_policy=reject_if_incomplete_at_capture_cutoff",
+            "preamble_root_url_parity=reference_and_candidate_outer_exact_path",
+        ):
+            self.assertIn(marker, runner)
 
     def test_direct_h3_browser_gets_forced_alt_svc_mapping(self):
         preferences = CONTROLLER.firefox_preferences("h3", 4433, 0)

@@ -20,6 +20,7 @@ def build_config(
     proxy_user,
     proxy_pass,
     diagnostic_first_socks_tunnel_urgent_start=False,
+    preamble_path=PREAMBLE_PATH,
 ):
     supported_arms = (
         "off",
@@ -57,6 +58,17 @@ def build_config(
             raise ValueError(f"{name} port is outside 1..65535")
     if not proxy_user or not proxy_pass:
         raise ValueError("proxy credentials must be non-empty")
+    if (
+        not isinstance(preamble_path, str)
+        or not (
+            preamble_path == PREAMBLE_PATH
+            or preamble_path.startswith(PREAMBLE_PATH + "?")
+        )
+        or len(preamble_path) > 2048
+        or "#" in preamble_path
+        or any(ord(character) < 0x20 for character in preamble_path)
+    ):
+        raise ValueError("preamble path must be a bounded camouflage document path")
 
     scheme = "https" if protocol == "h2" else "quic"
     user = quote(proxy_user, safe="")
@@ -75,7 +87,7 @@ def build_config(
                 if arm in ("document-overlap", "document-start-overlap")
                 else "document-complete"
             ),
-            "path": PREAMBLE_PATH,
+            "path": preamble_path,
             "max-bytes": PREAMBLE_MAX_BYTES,
         }
     elif arm in (
@@ -91,7 +103,7 @@ def build_config(
                 "tree-complete-css": "tree-complete",
                 "tree-root-overlap-css": "tree-root-overlap",
             }.get(arm, arm),
-            "path": PREAMBLE_PATH,
+            "path": preamble_path,
             "max-assets": (
                 1
                 if arm in ("tree-complete-css", "tree-root-overlap-css")
@@ -146,6 +158,7 @@ def main():
     parser.add_argument("--protocol", choices=("h2", "h3"), required=True)
     parser.add_argument("--socks-port", type=int, required=True)
     parser.add_argument("--proxy-port", type=int, required=True)
+    parser.add_argument("--preamble-path", default=PREAMBLE_PATH)
     parser.add_argument(
         "--diagnostic-first-socks-tunnel-urgent-start",
         action="store_true",
@@ -160,7 +173,10 @@ def main():
         args.proxy_port,
         user,
         password,
-        args.diagnostic_first_socks_tunnel_urgent_start,
+        diagnostic_first_socks_tunnel_urgent_start=(
+            args.diagnostic_first_socks_tunnel_urgent_start
+        ),
+        preamble_path=args.preamble_path,
     )
     write_config(args.output, config)
 

@@ -1018,7 +1018,7 @@ run_naivefox_sample() {
   python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
     --output "$naivefox_config" --arm "$arm" \
     --protocol "$protocol" --socks-port "$socks_port" \
-    --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
+    --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --preamble-path "$path"
   start_network_mutation_monitor "$sample_dir"
   env "${sslkeylog_unset[@]}" \
     -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
@@ -1328,6 +1328,11 @@ capture_readiness=dumpcap_runtime_marker
 capture_drop_policy=reject_nonzero
 workload_driver=controlled_firefox_navigation
 workload_completion=target_server_marker
+completion_token_scope=experiment_block_wire_url
+completion_marker_reset=before_each_participant
+capture_cutoff=browser_done_plus_250ms
+preamble_drain_policy=reject_if_incomplete_at_capture_cutoff
+preamble_root_url_parity=reference_and_candidate_outer_exact_path
 browser_controller_backends=$(sort -u "$controller_backends" | paste -sd, -)
 naivefox_browser_proxy_policy=fail_closed_pac_loopback_only
 process_shutdown_in_primary_capture=no
