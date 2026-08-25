@@ -445,6 +445,10 @@ cache_validated_participants=0
 controller_backends="$private_dir/controller-backends.txt"
 cache_semantics_records="$private_dir/cache-semantics.txt"
 : >"$cache_semantics_records"
+proxy_restart_records="$private_dir/proxy-restarts.txt"
+: >"$proxy_restart_records"
+proxy_restart_count=0
+fixture_caddy_child_pid=
 success=0
 
 stop_pid() {
@@ -597,6 +601,8 @@ cleanup() {
   [[ -z $browser_stop_file ]] || : >"$browser_stop_file"
   stop_process_group "$browser_controller_pid"
   stop_pid "$naivefox_pid"
+  stop_pid "$fixture_caddy_child_pid"
+  fixture_caddy_child_pid=
   "$INTEGRATION_DIR/stop.sh" --quiet || true
   rm -rf -- "$capture_stage_dir"
   if [[ $status -eq 0 && $success -eq 1 ]]; then
@@ -628,6 +634,148 @@ fi
 choose_port() {
   python3 -c \
     'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()'
+}
+
+restart_fixture_proxy() {
+  local phase=$1
+  local pid_file="$NAIVEFOX_FIXTURE_RUN_DIR/caddy.pid"
+  local old_pid
+  local old_status=not_child
+  local old_starttime
+  local current_starttime
+  local process_state
+  local actual_executable
+  local expected_executable
+  local caddy_log="$NAIVEFOX_FIXTURE_RUN_DIR/caddy.log"
+  local log_offset
+  local target_pid
+  local target_starttime
+  local target_executable
+  local current_target_starttime
+  local current_target_executable
+  local journal_identity
+  local journal_size
+  local current_journal_identity
+  local current_journal_size
+  [[ $NAIVEFOX_FIXTURE_MODE == h3 && -r $pid_file ]] || {
+    printf 'proxy restart requires an active H3 fixture\n' >&2
+    return 1
+  }
+  old_pid=$(<"$pid_file")
+  [[ $old_pid =~ ^[1-9][0-9]*$ ]] || {
+    printf 'proxy restart found an invalid Caddy pid\n' >&2
+    return 1
+  }
+  actual_executable=$(readlink -f "/proc/$old_pid/exe" 2>/dev/null || true)
+  expected_executable=$(readlink -f "$CADDY_BIN")
+  if [[ $actual_executable != "$expected_executable" ]]; then
+    printf 'proxy restart pid does not identify the fixture Caddy binary\n' >&2
+    return 1
+  fi
+  old_starttime=$(awk '{print $22}' "/proc/$old_pid/stat")
+  target_pid=$(<"$NAIVEFOX_FIXTURE_RUN_DIR/target.pid")
+  target_starttime=$(awk '{print $22}' "/proc/$target_pid/stat" 2>/dev/null || true)
+  target_executable=$(readlink -f "/proc/$target_pid/exe" 2>/dev/null || true)
+  if [[ -z $target_starttime || -z $target_executable ]]; then
+    printf 'proxy restart found no exact target process identity\n' >&2
+    return 1
+  fi
+  journal_identity=absent
+  journal_size=0
+  if [[ -e $NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL ]]; then
+    journal_identity=$(stat -c '%d:%i' "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL")
+    journal_size=$(stat -c %s "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL")
+  fi
+  kill -TERM "$old_pid" 2>/dev/null || {
+    printf 'proxy restart could not stop Caddy\n' >&2
+    return 1
+  }
+  for ((i = 0; i < 100; i++)); do
+    process_state=gone
+    if [[ -r /proc/$old_pid/stat ]]; then
+      read -r _ _ process_state _ <"/proc/$old_pid/stat"
+      current_starttime=$(awk '{print $22}' "/proc/$old_pid/stat")
+      if [[ $current_starttime != "$old_starttime" ]]; then
+        process_state=gone
+      fi
+    fi
+    if [[ $process_state == gone || $process_state == Z ]]; then
+      break
+    fi
+    sleep 0.1
+  done
+  if [[ $process_state != gone && $process_state != Z ]]; then
+    printf 'proxy restart timed out waiting for Caddy shutdown\n' >&2
+    return 1
+  fi
+  if [[ $old_pid == "$fixture_caddy_child_pid" ]]; then
+    old_status=0
+    wait "$old_pid" 2>/dev/null || old_status=$?
+    fixture_caddy_child_pid=
+  fi
+  if [[ -n $(ss -H -lun "sport = :$NAIVEFOX_FIXTURE_PROXY_PORT") ]]; then
+    printf 'proxy restart found the old UDP listener after Caddy shutdown\n' >&2
+    return 1
+  fi
+  log_offset=$(stat -c %s "$caddy_log")
+  env XDG_DATA_HOME="$NAIVEFOX_FIXTURE_RUN_DIR/xdg-data" \
+    XDG_CONFIG_HOME="$NAIVEFOX_FIXTURE_RUN_DIR/xdg-config" \
+    "$CADDY_BIN" run --config "$NAIVEFOX_FIXTURE_RUN_DIR/adapted.json" \
+    >>"$caddy_log" 2>&1 &
+  local new_pid=$!
+  fixture_caddy_child_pid=$new_pid
+  printf '%s\n' "$new_pid" >"$pid_file.tmp"
+  mv -f -- "$pid_file.tmp" "$pid_file"
+  if [[ $new_pid == "$old_pid" ]]; then
+    printf 'proxy restart reused the old process id\n' >&2
+    return 1
+  fi
+  local ready=0
+  for ((i = 0; i < 150; i++)); do
+    kill -0 "$new_pid" 2>/dev/null || {
+      printf 'restarted Caddy exited before H3 readiness\n' >&2
+      return 1
+    }
+    if [[ -n $(ss -H -lun "sport = :$NAIVEFOX_FIXTURE_PROXY_PORT") &&
+          -z $(ss -H -ltn "sport = :$NAIVEFOX_FIXTURE_PROXY_PORT") ]] &&
+       tail -c "+$((log_offset + 1))" "$caddy_log" |
+         rg -q 'enabling HTTP/3 listener'; then
+      ready=1
+      break
+    fi
+    sleep 0.1
+  done
+  if [[ $ready -ne 1 ]]; then
+    printf 'restarted Caddy did not publish fresh H3 readiness\n' >&2
+    return 1
+  fi
+  current_journal_identity=absent
+  current_journal_size=0
+  if [[ -e $NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL ]]; then
+    current_journal_identity=$(stat -c '%d:%i' \
+      "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL")
+    current_journal_size=$(stat -c %s \
+      "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL")
+  fi
+  current_target_starttime=$(awk '{print $22}' "/proc/$target_pid/stat" \
+    2>/dev/null || true)
+  current_target_executable=$(readlink -f "/proc/$target_pid/exe" \
+    2>/dev/null || true)
+  if [[ $(<"$NAIVEFOX_FIXTURE_RUN_DIR/target.pid") != "$target_pid" ]] ||
+     ! kill -0 "$target_pid" 2>/dev/null ||
+     [[ $current_target_starttime != "$target_starttime" ]] ||
+     [[ $current_target_executable != "$target_executable" ]] ||
+     [[ $current_journal_identity != "$journal_identity" ]] ||
+     [[ $current_journal_size != "$journal_size" ]]; then
+    printf 'proxy restart changed target or request-journal identity\n' >&2
+    return 1
+  fi
+  proxy_restart_count=$((proxy_restart_count + 1))
+  printf '%s\t%s\told_pid=%s\told_status=%s\tnew_pid=%s\tport=%s\tconfig_sha256=%s\n' \
+    "$proxy_restart_count" "$phase" "$old_pid" "$old_status" "$new_pid" \
+    "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    "$(sha256sum "$NAIVEFOX_FIXTURE_RUN_DIR/adapted.json" | cut -d' ' -f1)" \
+    >>"$proxy_restart_records"
 }
 
 start_capture() {
@@ -1099,6 +1247,16 @@ warm_reference_cache() {
   stop_browser_controller
 }
 
+cold_proxy_reset_applies() {
+  local protocol=$1
+  [[ $protocol == h3 ]] || return 1
+  if [[ $experiment_design == multi_arm_superblocks ]]; then
+    [[ ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ]]
+  else
+    [[ $naivefox_arm == tree-root-overlap-css ]]
+  fi
+}
+
 validate_cache_evidence() {
   local role=$1
   local warm_token=$2
@@ -1166,6 +1324,9 @@ run_reference_sample() {
     warm_token=$(openssl rand -hex 16)
     warm_reference_cache "$profile" "$protocol" "$sample_dir" "$warm_token"
     validate_no_tls_token_persistence "$profile"
+    restart_fixture_proxy "$session_id:reference_measure"
+  elif cold_proxy_reset_applies "$protocol"; then
+    restart_fixture_proxy "$session_id:reference_cold_measure"
   fi
   start_browser_controller "$profile" \
     "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" \
@@ -1273,6 +1434,9 @@ run_naivefox_sample() {
     stop_pid_clean "$naivefox_pid" "$warm_log"
     naivefox_pid=
     validate_no_tls_token_persistence "$naivefox_profile"
+    restart_fixture_proxy "$session_id:naivefox_measure"
+  elif cold_proxy_reset_applies "$protocol"; then
+    restart_fixture_proxy "$session_id:naivefox_cold_measure"
   fi
   NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
     NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
@@ -1434,7 +1598,26 @@ PY
     fi
   done <"$schedule"
   "$INTEGRATION_DIR/stop.sh" --quiet
+  if [[ -n $fixture_caddy_child_pid ]]; then
+    wait "$fixture_caddy_child_pid" 2>/dev/null || true
+    fixture_caddy_child_pid=
+  fi
 done
+
+expected_proxy_restart_count=0
+if [[ " ${protocols[*]} " == *" h3 "* ]]; then
+  if [[ $naivefox_arm == tree-warm-css-304 ]] ||
+     [[ $naivefox_arm == tree-root-overlap-css ]] ||
+     [[ $experiment_design == multi_arm_superblocks &&
+        ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ]]; then
+    expected_proxy_restart_count=$((samples_per_cohort * members_per_block))
+  fi
+fi
+if [[ $proxy_restart_count -ne $expected_proxy_restart_count ]]; then
+  printf 'fixture proxy restarted %s times, expected %s\n' \
+    "$proxy_restart_count" "$expected_proxy_restart_count" >&2
+  exit 1
+fi
 
 cache_condition=cold_default
 if [[ $naivefox_arm == tree-root-overlap-css ]]; then
@@ -1603,6 +1786,14 @@ fi
 
 reference_version=$(LD_LIBRARY_PATH="$REFERENCE_LIBDIR" "$REFERENCE_BIN" --version 2>/dev/null)
 naivefox_version=$(LD_LIBRARY_PATH="$NAIVEFOX_LIBDIR" "$NAIVEFOX_BIN" --version 2>/dev/null)
+fixture_proxy_reset_policy=not_applicable
+if [[ $naivefox_arm == tree-warm-css-304 ]]; then
+  fixture_proxy_reset_policy=warm_after_drain_and_symmetric_cold_before_measure
+elif [[ $naivefox_arm == tree-root-overlap-css ]] ||
+     [[ $experiment_design == multi_arm_superblocks &&
+        ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ]]; then
+  fixture_proxy_reset_policy=cold_before_measure
+fi
 # shellcheck source=/etc/os-release
 source /etc/os-release
 os_id=$ID
@@ -1621,6 +1812,9 @@ inner_transport=$inner_transport
 camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE
 camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE
 cache_condition=$cache_condition
+fixture_proxy_reset_policy=$fixture_proxy_reset_policy
+fixture_proxy_restart_count=$proxy_restart_count
+fixture_proxy_expected_restart_count=$expected_proxy_restart_count
 private_h3_keylog=$private_h3_keylog
 isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link

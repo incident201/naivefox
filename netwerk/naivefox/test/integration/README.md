@@ -235,6 +235,10 @@ participant the runner creates a fresh temporary profile, performs one private
 warm navigation before capture, restarts Firefox/NaiveFox with that same
 profile, and captures only the measured navigation. The profile is never
 shared between participants or samples and is deleted with the private run.
+Only Caddy is restarted between the warm and measured phases, reusing the same
+origin, port, certificate, config, target server, and request journal. This
+removes the previous server-side QUIC session deterministically. The separate
+`tree-root-overlap-css` cold control receives the same pre-measure Caddy reset.
 The target journals only CSS cache evidence and the runner fails closed unless
 the warm phase is an unconditional 200 with a stable ETag and the measured
 outer request is a Gecko-generated `If-None-Match` followed by 304. For

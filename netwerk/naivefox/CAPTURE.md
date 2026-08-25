@@ -259,12 +259,18 @@ identity, one ClientHello, and no 0-RTT packet. Its network-mutation monitor
 runs continuously from before warm-up through the measured capture cutoff.
 Firefox A/B and NaiveFox receive condition-specific warm controls; a fresh
 `tree-root-overlap-css` run under the same fixture revision and binary build is
-the separate cold dataset. Cross-dataset warm/cold interpretation is therefore
+the separate cold dataset. The harness restarts only the local Caddy process
+between the warm and measured phases, on the same origin and port, while the
+target server and its append-only journal remain alive. This deterministically
+removes prior QUIC session state without a quiescence timeout. The cold control
+gets the same Caddy reset immediately before measurement. Cross-dataset
+warm/cold interpretation is therefore
 descriptive causal screening, not paired or confirmatory inference.
 
 The first fully fail-closed one-block same-base H3/inner-HTTPS admission run for
-this diagnostic is retained as safe artifact `d26f91c82a29ceed` (seed `305`, NaiveFox binary
-build ID `b1820e20442018465574f71995c69460`). Firefox A, Firefox B, and NaiveFox
+this diagnostic is retained as safe artifact `d26f91c82a29ceed` (seed `305`,
+NaiveFox binary build ID `b1820e20442018465574f71995c69460`). Firefox A,
+Firefox B, and NaiveFox
 each produced an unconditional warm 200 followed by a measured native Gecko
 conditional request and 304 with identical selected outer request semantics.
 The fresh inner Firefox behind NaiveFox independently received 200. Every
@@ -276,6 +282,28 @@ the closed warm 5-tuple before the measured client Initial. The harness now
 preserves that full pcap on failure and defines the passive sample origin at
 the first client Initial, while rejecting any client traffic before it or
 stale flow continuing afterward.
+
+A later ten-block predecessor run was discarded in full when an old Caddy QUIC
+flow continued after a measured client Initial. The deterministic Caddy reset
+above closes that contamination path; the post-reset one-block gate is retained
+as safe artifact `211be50a1f1af4bd` (seed `307`). The accepted ten-block warm
+screen is `4a2b14495599e0a4` (seed `20260825307`), with the matching fresh-profile
+cold control `6343c2cbe6c99bfd` (seed `20260825309`). All 30 participants in each
+dataset passed the cache/transport/network admission invariants.
+
+The result rejects cache persistence as a camouflage mechanism. Firefox versus
+NaiveFox remained perfectly separable in the selected 1--16, 17--32, and 1--32
+packet views in this small non-inferential screen. Removing the cold CSS body
+did not correct the phase boundary: packet 16 still arrived around 8 ms for
+NaiveFox versus roughly 25--28 ms for Firefox. Cold body packets had merely
+made part of packets 22--32 look closer by signed byte size despite arriving
+roughly 127 ms too early. With 304, that accidental byte-shape similarity
+disappeared and the early CONNECT/control phase became more exposed. The 250 ms
+aggregate improved modestly, but Firefox A/B noise also increased and whole-run
+volume differences were essentially unchanged. The useful causal conclusion is
+therefore limited: response-body volume affects the observed 17--32 shape, but
+resource cache state does not repair the underlying topology/scheduling gap.
+No product behavior should depend on warm or persistent cache state.
 
 `tree-complete-css` and `tree-root-overlap-css` are harness-only one-asset
 controls. They map to the unchanged production `tree-complete` and

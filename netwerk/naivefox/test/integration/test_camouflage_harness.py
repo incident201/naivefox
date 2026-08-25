@@ -1587,6 +1587,20 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn("camouflage_cache_validation.py", runner)
         self.assertIn("temporary_participant_sample_warm_measure_then_deleted", runner)
         self.assertIn("warm_traffic_excluded_measure_only", runner)
+        self.assertIn('$session_id:reference_measure', runner)
+        self.assertIn('$session_id:naivefox_measure', runner)
+        self.assertIn("reference_cold_measure", runner)
+        self.assertIn("naivefox_cold_measure", runner)
+        self.assertIn("cold_proxy_reset_applies()", runner)
+        self.assertIn("[[ $protocol == h3 ]] || return 1", runner)
+        self.assertIn(
+            "[[ ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ]]", runner
+        )
+        self.assertIn("pid does not identify the fixture Caddy binary", runner)
+        self.assertIn("found no exact target process identity", runner)
+        self.assertIn("enabling HTTP/3 listener", runner)
+        self.assertIn("fixture_proxy_restart_count=$proxy_restart_count", runner)
+        self.assertIn("proxy_restart_count -ne $expected_proxy_restart_count", runner)
         self.assertEqual(runner.count('normalize_h3_capture_origin "$pcap"'), 2)
         origin = runner[
             runner.index("normalize_h3_capture_origin() {") : runner.index(
