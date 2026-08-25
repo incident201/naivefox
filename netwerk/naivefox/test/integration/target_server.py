@@ -21,8 +21,27 @@ SVG_SUFFIX = b'--><rect width="8" height="8" fill="#476f9f"/></svg>'
 COMPLETIONS = set()
 COMPLETIONS_LOCK = threading.Lock()
 COMPLETION_TOKEN = re.compile(r"^[0-9a-f]{32}$")
-CAMOUFLAGE_STYLE_SIZE = 64 * 1024
-CAMOUFLAGE_SCRIPT_SIZE = 128 * 1024
+
+
+def configured_camouflage_asset_size(name, default):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        size = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if not 1024 <= size <= 4 * 1024 * 1024:
+        raise ValueError(f"{name} must be between 1024 and 4194304 bytes")
+    return size
+
+
+CAMOUFLAGE_STYLE_SIZE = configured_camouflage_asset_size(
+    "NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE", 64 * 1024
+)
+CAMOUFLAGE_SCRIPT_SIZE = configured_camouflage_asset_size(
+    "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE", 128 * 1024
+)
 
 
 def sized_source_asset(size, prefix, filler):

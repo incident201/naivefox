@@ -210,6 +210,14 @@ request semantics and response size, and root FIN before CONNECT. Any observed
 CSS FIN ordering relative to CONNECT remains report-only and is never a
 resampling criterion.
 
+Controlled causal screens may set
+`NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE` and
+`NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE` before starting the fixture. The
+defaults remain 64 KiB and 128 KiB. Both values are bounded and recorded in
+safe metadata. Vary them only as a declared response-profile condition while
+keeping the normal CSS/Script channels and orchestration unchanged; never
+select them from observed packet positions.
+
 `root-pmtud-control` is an H3-only, same-binary harness control. It uses the
 same production `document-complete` configuration and root workload as `root`,
 but only the NaiveFox participant profile explicitly sets

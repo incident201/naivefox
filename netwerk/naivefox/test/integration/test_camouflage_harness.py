@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 from urllib.parse import unquote, urlsplit
 
 HERE = os.path.dirname(__file__)
@@ -49,8 +50,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             runner = stream.read()
 
         wait_body = runtime[
-            runtime.index("nsresult GeckoRuntime::WaitForNetworkStartup()") :
-            runtime.index("nsresult GeckoRuntime::RunEventLoopSmoke()")
+            runtime.index(
+                "nsresult GeckoRuntime::WaitForNetworkStartup()"
+            ) : runtime.index("nsresult GeckoRuntime::RunEventLoopSmoke()")
         ]
         self.assertLess(
             wait_body.index('"NaiveFox::InitialNetworkState"'),
@@ -96,15 +98,14 @@ class CamouflageHarnessTests(unittest.TestCase):
         ) as stream:
             regression = stream.read()
 
-        observe = handler[handler.index('!strcmp(topic, NS_NETWORK_LINK_TOPIC)') :]
+        observe = handler[handler.index("!strcmp(topic, NS_NETWORK_LINK_TOPIC)") :]
         self.assertIn("mConnMgr->VerifyTraffic()", observe)
         verify = entry[
-            entry.index("void ConnectionEntry::VerifyTraffic()") :
-            entry.index("void ConnectionEntry::InsertIntoIdleConnections_internal")
+            entry.index("void ConnectionEntry::VerifyTraffic()") : entry.index(
+                "void ConnectionEntry::InsertIntoIdleConnections_internal"
+            )
         ]
-        self.assertIn(
-            "network_http_move_to_pending_list_after_network_change", verify
-        )
+        self.assertIn("network_http_move_to_pending_list_after_network_change", verify)
         self.assertIn("MakeConnectionPendingAndDontReuse(connUDP)", verify)
         self.assertIn(
             'notifyObservers(null, "network:link-status-changed", "changed")',
@@ -208,9 +209,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-root-overlap-css",
             "tree-overlap",
         )
-        rows = SUPERBLOCKS.schedule_rows(
-            17, "h3", 2, ["browser_page"], arms=arms
-        )
+        rows = SUPERBLOCKS.schedule_rows(17, "h3", 2, ["browser_page"], arms=arms)
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
@@ -278,7 +277,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             runner = stream.read()
         self.assertIn("NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG", runner)
         self.assertIn('local keylog="$sample_dir/naivefox.keys"', runner)
-        self.assertIn('sslkeylog_unset=(-u SSLKEYLOGFILE)', runner)
+        self.assertIn("sslkeylog_unset=(-u SSLKEYLOGFILE)", runner)
         self.assertIn("restricted to gate/smoke diagnostics", runner)
 
         environment = os.environ.copy()
@@ -299,7 +298,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             runner = stream.read()
         self.assertIn("NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY", runner)
         self.assertIn('print("naivefox", arm, scenario', runner)
-        branch_start = runner.index("if [[ $diagnostic_naivefox_only == 1 ]]; then\n  diagnostic_protocols=")
+        branch_start = runner.index(
+            "if [[ $diagnostic_naivefox_only == 1 ]]; then\n  diagnostic_protocols="
+        )
         analyzer_start = runner.index("\nanalyze_dataset()", branch_start)
         diagnostic_branch = runner[branch_start:analyzer_start]
         self.assertIn("diagnostic-summary.txt", diagnostic_branch)
@@ -473,7 +474,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(invalid_helper.returncode, 2)
-        self.assertIn("invalid isolated camouflage network invocation", invalid_helper.stderr)
+        self.assertIn(
+            "invalid isolated camouflage network invocation", invalid_helper.stderr
+        )
 
     def test_runner_rejects_undersized_research_capture(self):
         result = subprocess.run(
@@ -647,20 +650,61 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertLess(page.index("/camouflage/app.js"), page.index("<img"))
 
     def test_tree_fixture_assets_leave_streams_live_within_budget(self):
-        page = TARGET.Handler.camouflage_page(
-            object(), {"scenario": ["browser_page"]}
-        )
+        page = TARGET.Handler.camouflage_page(object(), {"scenario": ["browser_page"]})
         self.assertEqual(len(TARGET.CAMOUFLAGE_STYLE_CSS), 64 * 1024)
         self.assertEqual(len(TARGET.CAMOUFLAGE_APP_JS), 128 * 1024)
         self.assertTrue(TARGET.CAMOUFLAGE_STYLE_CSS.startswith(b":root{"))
         self.assertTrue(TARGET.CAMOUFLAGE_APP_JS.startswith(b"(()=>{"))
         aggregate = (
-            len(page)
-            + len(TARGET.CAMOUFLAGE_STYLE_CSS)
-            + len(TARGET.CAMOUFLAGE_APP_JS)
+            len(page) + len(TARGET.CAMOUFLAGE_STYLE_CSS) + len(TARGET.CAMOUFLAGE_APP_JS)
         )
         self.assertLess(aggregate, CONFIG.TREE_PREAMBLE_MAX_BYTES)
         self.assertEqual(CONFIG.TREE_PREAMBLE_MAX_ASSETS, 2)
+
+    def test_tree_fixture_asset_profile_is_bounded_and_explicit(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE": "16384",
+                "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE": "32768",
+            },
+        ):
+            self.assertEqual(
+                TARGET.configured_camouflage_asset_size(
+                    "NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE", 64 * 1024
+                ),
+                16 * 1024,
+            )
+            self.assertEqual(
+                TARGET.configured_camouflage_asset_size(
+                    "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE", 128 * 1024
+                ),
+                32 * 1024,
+            )
+        with mock.patch.dict(
+            os.environ,
+            {"NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE": "512"},
+        ):
+            with self.assertRaises(ValueError):
+                TARGET.configured_camouflage_asset_size(
+                    "NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE", 64 * 1024
+                )
+
+        with open(os.path.join(HERE, "start.sh"), encoding="utf-8") as stream:
+            fixture_start = stream.read()
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            suite = stream.read()
+        self.assertIn("asset_size < 1024 || asset_size > 4194304", fixture_start)
+        self.assertIn(
+            "camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE",
+            suite,
+        )
+        self.assertIn(
+            "camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE",
+            suite,
+        )
 
         class ResponseRecorder:
             def __init__(self):
@@ -803,9 +847,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=12000 protocol=h3\n"
         )
         with self.assertRaisesRegex(ValueError, "causal admission marker"):
-            SAMPLE.validate_sample(
-                "tree-root-overlap", "h3", result, one_connection
-            )
+            SAMPLE.validate_sample("tree-root-overlap", "h3", result, one_connection)
         fallback = (
             "Connection 1 preamble root-overlap admission=terminal-fallback "
             "root_done=1 started_resources=0 protocol=h3\n"
@@ -823,8 +865,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "completed_resources=2 protocol=h3\n"
         )
         established = (
-            "Connection 1 established target=localhost:443 "
-            "outer=h3 padding=yes\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
         )
         with self.assertRaisesRegex(ValueError, "invalid ordering"):
             SAMPLE.validate_sample(
@@ -888,8 +929,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "root_done=1 started_resources=2 protocol=h3\n"
         )
         established = (
-            "Connection 1 established target=localhost:443 "
-            "outer=h3 padding=yes\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
         )
         drain = (
             "Connection 1 preamble root-overlap drain=complete "
@@ -942,9 +982,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
         ) as stream:
             suite = stream.read()
-        body = suite.split("run_naivefox_sample() {", 1)[1].split(
-            "scenario_csv=", 1
-        )[0]
+        body = suite.split("run_naivefox_sample() {", 1)[1].split("scenario_csv=", 1)[0]
         reference_body = suite.split("run_reference_sample() {", 1)[1].split(
             "run_naivefox_sample() {", 1
         )[0]
@@ -1042,12 +1080,9 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertEqual(runner.count(f'user_pref("{force_pref}"'), 1)
         self.assertIn("case $participant in", runner)
         self.assertIn('make_profile "$profile" "$protocol" reference', runner)
+        self.assertIn('make_profile "$naivefox_profile" "$protocol" naivefox', runner)
         self.assertIn(
-            'make_profile "$naivefox_profile" "$protocol" naivefox', runner
-        )
-        self.assertIn(
-            'make_profile "$browser_profile" "$protocol" socks-browser '
-            '"$socks_port"',
+            'make_profile "$browser_profile" "$protocol" socks-browser "$socks_port"',
             runner,
         )
         self.assertIn("if [[ $direct_h3 == true ]]", runner)

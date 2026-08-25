@@ -22,6 +22,18 @@ case $fixture_mode in
     ;;
 esac
 
+camouflage_style_size=${NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE:-65536}
+camouflage_script_size=${NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE:-131072}
+for asset_size in "$camouflage_style_size" "$camouflage_script_size"; do
+  if [[ ! $asset_size =~ ^[0-9]+$ ]] ||
+     (( asset_size < 1024 || asset_size > 4194304 )); then
+    printf 'camouflage asset sizes must be integers in 1024..4194304\n' >&2
+    exit 2
+  fi
+done
+export NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE=$camouflage_style_size
+export NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE=$camouflage_script_size
+
 init_paths
 "$INTEGRATION_DIR/setup.sh"
 find_certutil
@@ -200,6 +212,8 @@ NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE=$RUN_DIR/profiles/untrusted
 NAIVEFOX_FIXTURE_CADDY_PID=$caddy_pid
 NAIVEFOX_FIXTURE_TARGET_PID=$target_pid
 NAIVEFOX_FIXTURE_PROXY_IP_SAN=${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-}
+NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE=$camouflage_style_size
+NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE=$camouflage_script_size
 EOF
 chmod 0600 "$RUN_DIR/fixture.env"
 
@@ -214,6 +228,8 @@ chmod 0600 "$RUN_DIR/fixture.env"
   printf 'https_target=127.0.0.1:%s\n' "$https_port"
   printf 'caddy_pid=%s\n' "$caddy_pid"
   printf 'target_pid=%s\n' "$target_pid"
+  printf 'camouflage_style_size=%s\n' "$camouflage_style_size"
+  printf 'camouflage_script_size=%s\n' "$camouflage_script_size"
 } >"$RUN_DIR/diagnostics.txt"
 
 started=1

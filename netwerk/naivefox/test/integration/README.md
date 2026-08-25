@@ -229,6 +229,15 @@ request semantics and CSS `Content-Length`, and root FIN before CONNECT. Any
 observed CSS FIN ordering relative to CONNECT in the overlap alias is
 report-only.
 
+For a response-volume causal control, set
+`NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE` and
+`NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE` before the suite. Defaults are 64 KiB
+and 128 KiB; the fixture accepts only 1 KiB through 4 MiB and records the exact
+values in sanitized metadata. This changes the controlled server response
+profile without changing the production preamble mode, request classes,
+priorities, or resource count. Sizes must be chosen before capture from a
+declared content profile, never from packet indices.
+
 `root-pmtud-control` is a separate H3-only harness arm for the PMTUD policy.
 It maps to the same production `document-complete` preamble as `root`, while
 only its NaiveFox profile sets `network.http.http3.pmtud=true`. The ordinary
