@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -223,7 +223,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -889,6 +889,7 @@ start_browser_controller() {
   local navigate_file="$sample_dir/browser-navigate"
   local done_file="$sample_dir/browser-done"
   browser_stop_file="$sample_dir/browser-stop"
+  rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
   setsid env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
     "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
@@ -914,7 +915,6 @@ run_browser_workload() {
   : >"$sample_dir/browser-navigate"
   wait_for_file "$sample_dir/browser-done" "$browser_controller_pid" \
     'controlled Firefox workload' "$((sample_timeout * 10 + 50))"
-  sleep 0.25
 }
 
 stop_browser_controller() {
@@ -952,12 +952,11 @@ run_reference_sample() {
   local label=$3
   local session_id=$4
   local experiment_block=$5
+  local completion=$6
   local sample_dir="$private_dir/$session_id"
   local profile="$sample_dir/profile"
   local pcap="$sample_dir/capture.pcapng"
-  local completion
   local path
-  completion=$(openssl rand -hex 16)
   path=$(scenario_path "$scenario" "$completion")
   mkdir -m 0700 -- "$sample_dir"
   make_profile "$profile" "$protocol" reference
@@ -967,6 +966,7 @@ run_reference_sample() {
     "$completion" "$sample_dir" "$protocol"
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
+  sleep 0.25
   stop_capture
   stop_network_mutation_monitor
   extract_sample "$protocol" "$scenario" "$label" "$session_id" "$pcap" \
@@ -980,6 +980,7 @@ run_naivefox_sample() {
   local session_id=$3
   local experiment_block=$4
   local arm=$5
+  local completion=$6
   local sample_dir="$private_dir/$session_id"
   local naivefox_profile="$sample_dir/naivefox-profile"
   local naivefox_config="$sample_dir/naivefox-config.json"
@@ -989,14 +990,14 @@ run_naivefox_sample() {
   local keylog="$sample_dir/naivefox.keys"
   local -a sslkeylog_unset=(-u SSLKEYLOGFILE)
   local -a sslkeylog_assignment=()
-  local completion
+  local drain_pattern=
+  local drain_ready=1
   local outer_count
   local padding_count
   local path
   local socks_port
   local target_port
   socks_port=$(choose_port)
-  completion=$(openssl rand -hex 16)
   path=$(scenario_path "$scenario" "$completion")
   if [[ $inner_transport == https ]]; then
     target_port=$NAIVEFOX_FIXTURE_HTTPS_PORT
@@ -1035,14 +1036,26 @@ run_naivefox_sample() {
   if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
     local expected_resources=2
     [[ $arm == tree-root-overlap-css ]] && expected_resources=1
-    wait_for_log "$naivefox_pid" "$log" \
-      " preamble root-overlap drain=complete completed_resources=$expected_resources protocol=$protocol$"
+    drain_pattern=" preamble root-overlap drain=complete completed_resources=$expected_resources protocol=$protocol$"
   elif [[ $arm == document-overlap ]]; then
-    wait_for_log "$naivefox_pid" "$log" \
-      " preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
+    drain_pattern=" preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
+  elif [[ $arm == document-start-overlap ]]; then
+    drain_pattern=" preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
+  fi
+  sleep 0.25
+  if [[ -n $drain_pattern ]] && ! rg -q "$drain_pattern" "$log"; then
+    drain_ready=0
   fi
   stop_capture
   stop_network_mutation_monitor
+  if [[ $drain_ready -eq 0 ]]; then
+    stop_browser_controller
+    stop_pid "$naivefox_pid"
+    naivefox_pid=
+    printf 'NaiveFox sample %s did not drain its preamble by the fixed capture cutoff\n' \
+      "$session_id" >&2
+    return 1
+  fi
   outer_count=$(rg -c "^Outer protocol: $protocol$" "$log" || true)
   padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)
   if [[ $outer_count -eq 0 || $padding_count -ne $outer_count ]]; then
@@ -1130,18 +1143,23 @@ for label, arm, scenario, block in items:
     print(label, arm, scenario, block, sep="\t")
 PY
   fi
+  declare -A block_completion_tokens=()
   while IFS=$'\t' read -r label sample_arm scenario experiment_block; do
     session_counter=$((session_counter + 1))
     session_id=$(printf '%s_s%06d' "$protocol" "$session_counter")
     printf 'Collecting %s %s %s (%d/%d)\n' \
       "$protocol" "$label" "$scenario" "$session_counter" \
       "$((samples_per_cohort * members_per_block * ${#protocols[@]}))"
+    if [[ -z ${block_completion_tokens[$experiment_block]:-} ]]; then
+      block_completion_tokens[$experiment_block]=$(openssl rand -hex 16)
+    fi
+    completion=${block_completion_tokens[$experiment_block]}
     if [[ $label == naivefox ]]; then
       run_naivefox_sample "$protocol" "$scenario" "$session_id" \
-        "$experiment_block" "$sample_arm"
+        "$experiment_block" "$sample_arm" "$completion"
     else
       run_reference_sample "$protocol" "$scenario" "$label" "$session_id" \
-        "$experiment_block"
+        "$experiment_block" "$completion"
     fi
   done <"$schedule"
   "$INTEGRATION_DIR/stop.sh" --quiet
@@ -1239,6 +1257,7 @@ else
   single_arm_analysis=confirmatory
   if [[ $naivefox_arm == tree-complete ||
         $naivefox_arm == document-overlap ||
+        $naivefox_arm == document-start-overlap ||
         $naivefox_arm == root-pmtud-control ||
         $naivefox_arm == tree-complete-css ||
         $naivefox_arm == tree-early-overlap ||

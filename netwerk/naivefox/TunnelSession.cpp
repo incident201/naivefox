@@ -629,7 +629,8 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   PreambleConfig preamble = mImpl->mConfig.mPreamble;
   preamble.mMode = preamble.ModeForProtocol(aProtocol);
   if (preamble.mMode == PreambleMode::DocumentComplete ||
-      preamble.mMode == PreambleMode::DocumentOverlap) {
+      preamble.mMode == PreambleMode::DocumentOverlap ||
+      preamble.mMode == PreambleMode::DocumentStartOverlap) {
     preamble.mMaxAssets = 0;
   }
   nsresult rv = OpenProxyPreambleOperation(
@@ -642,11 +643,12 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
             aResult.mHttpStatus, aResult.mBodyBytes, aResult.mStartedResources,
             aResult.mRootDone);
       },
-      [self, aGeneration, aProtocol](bool aCompletedNormally,
-                                     uint32_t aCompletedSuccessfulResources) {
-        self->FinishPreambleOperationOnMain(aGeneration, aProtocol,
-                                            aCompletedNormally,
-                                            aCompletedSuccessfulResources);
+      [self, aGeneration, aProtocol](ProxyPreambleFinalResult aFinalResult) {
+        self->FinishPreambleOperationOnMain(
+            aGeneration, aProtocol, aFinalResult.mStatus,
+            aFinalResult.mHttpStatus, aFinalResult.mBodyBytes,
+            aFinalResult.mRootDone, aFinalResult.mCompletedNormally,
+            aFinalResult.mCompletedSuccessfulResources);
       },
       mImpl->mConfig.mHostResolverRule, operation);
   if (NS_FAILED(rv)) {
@@ -746,24 +748,35 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone ? "terminal-fallback" : "response-headers", !aRootDone,
         aRootDone, ProtocolName(aProtocol));
   }
-  const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
-                       : succeeded                      ? "success"
-                       : NS_FAILED(aStatus)             ? "network-error"
-                                                        : "http-error";
-  RuntimeLogEvent(
-      "Connection %llu preamble result=%s status=0x%08x http=%u bytes=%u "
-      "protocol=%s\n",
-      static_cast<unsigned long long>(mImpl->mConnectionId), result,
-      static_cast<unsigned>(aStatus), aHttpStatus, aBodyBytes,
-      ProtocolName(aProtocol));
+  if (preambleMode == PreambleMode::DocumentStartOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble document-start-overlap admission=%s "
+        "request_committed=%d root_done=%d protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aRootDone ? "terminal-fallback" : "request-committed", !aRootDone,
+        aRootDone, ProtocolName(aProtocol));
+  }
+  if (preambleMode != PreambleMode::DocumentStartOverlap) {
+    const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
+                         : succeeded                      ? "success"
+                         : NS_FAILED(aStatus)             ? "network-error"
+                                                          : "http-error";
+    RuntimeLogEvent(
+        "Connection %llu preamble result=%s status=0x%08x http=%u bytes=%u "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), result,
+        static_cast<unsigned>(aStatus), aHttpStatus, aBodyBytes,
+        ProtocolName(aProtocol));
+  }
   if (!mImpl->mCancelRequested.load(std::memory_order_acquire)) {
     OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
   }
 }
 
 void TunnelSession::FinishPreambleOperationOnMain(
-    uint64_t aGeneration, ProxyProtocol aProtocol, bool aCompletedNormally,
-    uint32_t aCompletedSuccessfulResources) {
+    uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
+    uint32_t aHttpStatus, uint32_t aBodyBytes, bool aRootDone,
+    bool aCompletedNormally, uint32_t aCompletedSuccessfulResources) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mPreambleOperationGeneration != aGeneration) {
     return;
@@ -774,6 +787,21 @@ void TunnelSession::FinishPreambleOperationOnMain(
   }
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  if (preambleMode == PreambleMode::DocumentStartOverlap) {
+    const bool succeeded = aRootDone && aCompletedNormally &&
+                           NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 &&
+                           aHttpStatus < 300;
+    const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
+                         : succeeded                      ? "success"
+                         : NS_FAILED(aStatus)             ? "network-error"
+                                                          : "http-error";
+    RuntimeLogEvent(
+        "Connection %llu preamble result=%s status=0x%08x http=%u bytes=%u "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), result,
+        static_cast<unsigned>(aStatus), aHttpStatus, aBodyBytes,
+        ProtocolName(aProtocol));
+  }
   if (aCompletedNormally && preambleMode == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble root-overlap drain=complete "
@@ -784,6 +812,14 @@ void TunnelSession::FinishPreambleOperationOnMain(
   if (aCompletedNormally && preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap drain=complete "
+        "root_done=1 completed_resources=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aCompletedSuccessfulResources, ProtocolName(aProtocol));
+  }
+  if (aRootDone && aCompletedNormally &&
+      preambleMode == PreambleMode::DocumentStartOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble document-start-overlap drain=complete "
         "root_done=1 completed_resources=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aCompletedSuccessfulResources, ProtocolName(aProtocol));

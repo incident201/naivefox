@@ -77,7 +77,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
-  `document-overlap`, `tree-complete`, `tree-overlap`,
+  `document-overlap`, `document-start-overlap`, `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
   compatibility aliases. Active
   modes share one absolute origin-form `path` and bounded `max-bytes` budget.
@@ -103,6 +103,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   success criterion because that would make the policy depend on response size
   and packetization. The current screening evidence does not make this mode a
   recommended default.
+  `document-start-overlap` is a stricter request-scheduling experiment. Its
+  root channel exposes the normal per-channel `WAITING_FOR` progress event
+  only after the H2/H3 request stream has accepted and committed the GET. It
+  then permits CONNECT while the response continues. Admission and final HTTP
+  result are separate events; a normal 2xx root drain remains mandatory.
 - `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path

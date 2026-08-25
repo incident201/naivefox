@@ -199,6 +199,8 @@ TEST(NaiveFoxConfig, PreambleModesAndBudgets)
        PreambleMode::DocumentComplete, "/camouflage/", 0, 64 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-overlap","path":"/camouflage/"}})",
        PreambleMode::DocumentOverlap, "/camouflage/", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-start-overlap","path":"/camouflage/"}})",
+       PreambleMode::DocumentStartOverlap, "/camouflage/", 0, 64 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-complete","path":"/camouflage/"}})",
        PreambleMode::TreeComplete, "/camouflage/", 2, 256 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-overlap","path":"/camouflage/"}})",
@@ -334,6 +336,21 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
   EXPECT_EQ(documentOverlap.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(documentOverlap.mPreamble.mMaxBytes, 64U * 1024U);
 
+  Config documentStartOverlap;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h3-mode":"document-start-overlap","path":"/camouflage/"}})"_ns,
+          documentStartOverlap, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(documentStartOverlap.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(documentStartOverlap.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(documentStartOverlap.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentStartOverlap.mPreamble.mMaxBytes, 64U * 1024U);
+
   static constexpr const char* kInvalid[] = {
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h2-mode":"root","h2-mode":"off","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h3-mode":"invalid","path":"/"}})",
@@ -341,6 +358,7 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"off","h3-mode":"off","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h2-mode":"document-complete","h3-mode":"off","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-start-overlap","path":"/","max-assets":1}})",
   };
   for (const char* json : kInvalid) {
     Config invalid;

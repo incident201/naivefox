@@ -45,6 +45,18 @@ struct ProxyPreambleResult final {
 
 using ProxyPreambleCallback = std::function<void(ProxyPreambleResult)>;
 
+struct ProxyPreambleFinalResult final {
+  nsresult mStatus = NS_ERROR_NOT_INITIALIZED;
+  uint32_t mHttpStatus = 0;
+  uint32_t mBodyBytes = 0;
+  uint32_t mCompletedSuccessfulResources = 0;
+  bool mRootDone = false;
+  bool mCompletedNormally = false;
+};
+
+using ProxyPreambleFinishedCallback =
+    std::function<void(ProxyPreambleFinalResult)>;
+
 namespace detail {
 
 enum class PreambleResourceKind : uint8_t {
@@ -82,6 +94,9 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
   if (aMode == PreambleMode::DocumentOverlap) {
     return aRootResponseAccepted && !aRootDone;
   }
+  if (aMode == PreambleMode::DocumentStartOverlap) {
+    return false;
+  }
   if (!aRootDone) {
     return false;
   }
@@ -103,6 +118,7 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
 
 constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
   return aMode == PreambleMode::DocumentOverlap ||
+         aMode == PreambleMode::DocumentStartOverlap ||
          aMode == PreambleMode::TreeOverlap ||
          aMode == PreambleMode::TreeEarlyOverlap ||
          aMode == PreambleMode::TreeRootOverlap;
@@ -111,6 +127,7 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
                                                bool aBarrierFired) {
   return (aMode == PreambleMode::DocumentOverlap ||
+          aMode == PreambleMode::DocumentStartOverlap ||
           aMode == PreambleMode::TreeEarlyOverlap ||
           aMode == PreambleMode::TreeRootOverlap) &&
          !aBarrierFired;
@@ -143,7 +160,7 @@ class ProxyPreambleOperation final {
   friend nsresult OpenProxyPreambleOperation(
       const nsACString&, const nsACString&, const nsACString&,
       const PreambleConfig&, ProxyProtocol, ProxyPreambleCallback&&,
-      std::function<void(bool, uint32_t)>&&, const Maybe<HostResolverRule>&,
+      ProxyPreambleFinishedCallback&&, const Maybe<HostResolverRule>&,
       RefPtr<ProxyPreambleOperation>&);
   class Impl;
 
@@ -154,11 +171,12 @@ class ProxyPreambleOperation final {
                  const nsACString& aProxyPassword,
                  const PreambleConfig& aConfig, ProxyProtocol aProtocol,
                  ProxyPreambleCallback&& aBarrierCallback,
-                 std::function<void(bool, uint32_t)>&& aFinishedCallback,
+                 ProxyPreambleFinishedCallback&& aFinishedCallback,
                  const Maybe<HostResolverRule>& aHostResolverRule);
   nsresult OnStartRequest(uint32_t aStreamId, nsIRequest* aRequest);
   nsresult OnDataAvailable(uint32_t aStreamId, nsIInputStream* aInputStream,
                            uint32_t aCount);
+  void OnRequestCommitted(uint32_t aStreamId, nsIRequest* aRequest);
   void OnStopRequest(uint32_t aStreamId, nsresult aStatus);
   void FireBarrierCallback();
   void MaybeFireBarrier();
@@ -171,7 +189,7 @@ nsresult OpenProxyPreambleOperation(
     const nsACString& aProxyUrl, const nsACString& aProxyUser,
     const nsACString& aProxyPassword, const PreambleConfig& aConfig,
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
-    std::function<void(bool, uint32_t)>&& aFinishedCallback,
+    ProxyPreambleFinishedCallback&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule,
     RefPtr<ProxyPreambleOperation>& aOperation);
 

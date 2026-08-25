@@ -166,8 +166,9 @@ class TunnelSession final {
                             uint32_t aBodyBytes, uint32_t aStartedResources,
                             bool aRootDone);
   void FinishPreambleOperationOnMain(uint64_t aGeneration,
-                                     ProxyProtocol aProtocol,
-                                     bool aCompletedNormally,
+                                     ProxyProtocol aProtocol, nsresult aStatus,
+                                     uint32_t aHttpStatus, uint32_t aBodyBytes,
+                                     bool aRootDone, bool aCompletedNormally,
                                      uint32_t aCompletedSuccessfulResources);
   void PreambleTimeoutOnMain(uint64_t aGeneration, ProxyProtocol aProtocol);
   void PreambleDrainTimeoutOnMain(uint64_t aGeneration);

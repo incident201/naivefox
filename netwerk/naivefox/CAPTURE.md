@@ -24,6 +24,15 @@ product lifecycle order `response-headers admission -> CONNECT -> normal
 drain`. Whether server FIN happens before or after CONNECT is report-only: it
 must never trigger sample replacement or fixture-size adjustment.
 
+`document-start-overlap` moves the barrier earlier without using a main-loop
+turn as a proxy for socket progress. The root channel's own
+`NS_NET_STATUS_WAITING_FOR` event proves that Gecko committed the bodyless GET
+to its H2/H3 stream path before CONNECT is admitted. The final response result
+and normal drain are recorded separately. H3 decrypted admission requires GET
+HEADERS to precede CONNECT HEADERS on the sole QUIC identity; failure rejects
+the mechanism and never causes selective recapture. Response HEADERS and FIN
+ordering remain outcomes rather than admission criteria.
+
 ## Modes and policy
 
 The runners support two reference modes:

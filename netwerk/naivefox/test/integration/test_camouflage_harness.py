@@ -567,6 +567,13 @@ class CamouflageHarnessTests(unittest.TestCase):
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
         self.assertEqual(alias["preamble"]["mode"], "document-complete")
+        for arm in ("document-overlap", "document-start-overlap"):
+            config = CONFIG.build_config(
+                arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
+            )
+            self.assertEqual(config["preamble"]["mode"], arm)
+            self.assertNotIn("max-assets", config["preamble"])
+            self.assertEqual(config["preamble"]["path"], CONFIG.PREAMBLE_PATH)
 
     def test_config_arm_validation_rejects_unknown_arm_and_invalid_ports(self):
         with self.assertRaisesRegex(ValueError, "document-complete"):
@@ -786,6 +793,20 @@ class CamouflageHarnessTests(unittest.TestCase):
             one_connection,
         )
         SAMPLE.validate_sample(
+            "document-start-overlap",
+            "h3",
+            "Connection 1 preamble document-start-overlap "
+            "admission=request-committed request_committed=1 "
+            "root_done=0 protocol=h3\n"
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 1 preamble document-start-overlap drain=complete "
+            "root_done=1 completed_resources=0 protocol=h3\n",
+            one_connection,
+        )
+        SAMPLE.validate_sample(
             "tree-root-overlap",
             "h3",
             "Connection 1 preamble root-overlap admission=started-resources "
@@ -959,6 +980,46 @@ class CamouflageHarnessTests(unittest.TestCase):
                 one_connection,
             )
 
+    def test_document_start_overlap_rejects_uncommitted_or_misordered_root(self):
+        one_connection = {
+            "protocol": "h3",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        admission = (
+            "Connection 1 preamble document-start-overlap "
+            "admission=request-committed request_committed=1 "
+            "root_done=0 protocol=h3\n"
+        )
+        established = (
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+        )
+        result = (
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+        )
+        drain = (
+            "Connection 1 preamble document-start-overlap drain=complete "
+            "root_done=1 completed_resources=0 protocol=h3\n"
+        )
+        with self.assertRaisesRegex(ValueError, "causal admission state"):
+            SAMPLE.validate_sample(
+                "document-start-overlap",
+                "h3",
+                admission.replace("request_committed=1", "request_committed=0")
+                + established
+                + result
+                + drain,
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            SAMPLE.validate_sample(
+                "document-start-overlap",
+                "h3",
+                established + admission + result + drain,
+                one_connection,
+            )
+
     def test_overlapping_sample_rejects_background_drain_timeout(self):
         one_connection = {
             "protocol": "h3",
@@ -989,6 +1050,17 @@ class CamouflageHarnessTests(unittest.TestCase):
                 + result
                 + established
                 + "Connection 1 preamble document-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+                + timeout,
+            ),
+            (
+                "document-start-overlap",
+                "Connection 1 preamble document-start-overlap "
+                "admission=request-committed request_committed=1 "
+                "root_done=0 protocol=h3\n"
+                + established
+                + result
+                + "Connection 1 preamble document-start-overlap drain=complete "
                 "root_done=1 completed_resources=0 protocol=h3\n"
                 + timeout,
             ),
@@ -1045,6 +1117,32 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(marker, body)
         self.assertNotIn(marker, reference_body)
         self.assertLess(body.index(marker), body.index("stop_capture"))
+
+    def test_superblock_reuses_wire_completion_token_with_fresh_marker(self):
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            runner = stream.read()
+        self.assertIn("declare -A block_completion_tokens=()", runner)
+        self.assertIn(
+            "completion=${block_completion_tokens[$experiment_block]}", runner
+        )
+        self.assertIn(
+            'rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"',
+            runner,
+        )
+        candidate = runner.split("run_naivefox_sample() {", 1)[1].split(
+            "extract_sample() {", 1
+        )[0]
+        drain = "preamble document-start-overlap drain=complete"
+        cutoff = candidate.index("sleep 0.25")
+        drain_check = candidate.index('rg -q "$drain_pattern" "$log"')
+        capture_stop = candidate.index("stop_capture")
+        self.assertLess(candidate.index(drain), cutoff)
+        self.assertLess(cutoff, drain_check)
+        self.assertLess(drain_check, capture_stop)
+        self.assertEqual(candidate[:capture_stop].count("wait_for_log"), 1)
+        self.assertIn("did not drain its preamble by the fixed capture cutoff", candidate)
 
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
         two_connections = {

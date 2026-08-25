@@ -103,6 +103,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentComplete, true));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentOverlap, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::DocumentOverlap, false));
+  EXPECT_TRUE(
+      detail::ShouldRunPreamble(PreambleMode::DocumentStartOverlap, true));
+  EXPECT_FALSE(
+      detail::ShouldRunPreamble(PreambleMode::DocumentStartOverlap, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeComplete, true));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::TreeOverlap, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::TreeOverlap, false));
@@ -152,6 +156,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
                                              true, false, 0, 0, 0, 0));
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentOverlap,
                                               true, true, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentStartOverlap, false, false, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentStartOverlap, true, false, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentStartOverlap, true, true, 0, 0, 0, 0));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
                                               true, 2, 0, 2, 1));
@@ -186,6 +196,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
                                              true, true, 1, 0, 0, 1));
 
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
+  EXPECT_TRUE(
+      detail::PreambleOverlapsConnect(PreambleMode::DocumentStartOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeEarlyOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeRootOverlap));
@@ -228,6 +240,11 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::DocumentOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::DocumentOverlap, true));
+
+  EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::DocumentStartOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::DocumentStartOverlap, true));
 
   EXPECT_TRUE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeRootOverlap, false));

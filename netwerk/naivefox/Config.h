@@ -48,6 +48,7 @@ enum class PreambleMode : uint8_t {
   Off,
   DocumentComplete,
   DocumentOverlap,
+  DocumentStartOverlap,
   TreeComplete,
   TreeOverlap,
   TreeEarlyOverlap,

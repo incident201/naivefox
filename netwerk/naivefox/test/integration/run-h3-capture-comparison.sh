@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +37,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -54,6 +54,12 @@ fi
 if [[ -n ${seen_comparison_arms[document-overlap]:-} &&
       -z ${seen_comparison_arms[document-complete]:-} ]]; then
   printf 'document-overlap comparison requires document-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[document-start-overlap]:-} &&
+      (-z ${seen_comparison_arms[document-complete]:-} ||
+       -z ${seen_comparison_arms[document-overlap]:-}) ]]; then
+  printf 'document-start-overlap comparison requires document-complete and document-overlap\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[tree-early-overlap]:-} &&
@@ -705,6 +711,9 @@ EOF
   elif [[ $arm == document-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$'
+  elif [[ $arm == document-start-overlap ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$'
   fi
   stop_capture
   stop_network_mutation_monitor
@@ -719,6 +728,7 @@ EOF
   if [[ $arm == root || $arm == root-pmtud-control ||
         $arm == document-complete ||
         $arm == document-overlap ||
+        $arm == document-start-overlap ||
         $arm == tree-complete || $arm == tree-complete-css ||
         $arm == tree-early-overlap ||
         $arm == tree-root-overlap ||
@@ -726,7 +736,9 @@ EOF
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
-    if [[ $arm == document-overlap || $arm == tree-early-overlap ||
+    if [[ $arm == document-overlap ||
+          $arm == document-start-overlap ||
+          $arm == tree-early-overlap ||
           $arm == tree-root-overlap ||
           $arm == tree-root-overlap-css ||
           $arm == tree-overlap ]]; then
@@ -772,16 +784,41 @@ EOF
       established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" | cut -d: -f1)
       [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
          $result_line -lt $established_line ]]
+    elif [[ $arm == document-start-overlap ]]; then
+      [[ $(rg -c ' preamble document-start-overlap admission=' "$log" || true) -eq 1 ]]
+      [[ $(rg -c ' preamble document-start-overlap drain=' "$log" || true) -eq 1 ]]
+      rg -q ' preamble document-start-overlap admission=request-committed request_committed=1 root_done=0 protocol=h3$' "$log"
+      rg -q ' preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$' "$log"
+      local admission_connection result_connection drain_connection
+      admission_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble document-start-overlap admission=.*/\2/p' "$log")
+      result_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble result=.*/\2/p' "$log")
+      drain_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble document-start-overlap drain=.*/\2/p' "$log")
+      [[ $admission_connection == "$result_connection" &&
+         $admission_connection == "$drain_connection" ]]
+      [[ $(rg -c "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" || true) -eq 1 ]]
+      local admission_line result_line drain_line established_line
+      admission_line=$(rg -n -m1 ' preamble document-start-overlap admission=' "$log" | cut -d: -f1)
+      result_line=$(rg -n -m1 ' preamble result=' "$log" | cut -d: -f1)
+      drain_line=$(rg -n -m1 ' preamble document-start-overlap drain=' "$log" | cut -d: -f1)
+      established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" | cut -d: -f1)
+      [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
+         $admission_line -lt $established_line ]]
     else
       ! rg -q -e ' preamble root-overlap admission=' \
         -e ' preamble root-overlap drain=' \
         -e ' preamble document-overlap admission=' \
-        -e ' preamble document-overlap drain=' "$log"
+        -e ' preamble document-overlap drain=' \
+        -e ' preamble document-start-overlap admission=' \
+        -e ' preamble document-start-overlap drain=' "$log"
     fi
   else
     [[ $preamble_count -eq 0 ]]
     ! rg -q -e ' preamble root-overlap admission=' \
-      -e ' preamble root-overlap drain=' "$log"
+      -e ' preamble root-overlap drain=' \
+      -e ' preamble document-overlap admission=' \
+      -e ' preamble document-overlap drain=' \
+      -e ' preamble document-start-overlap admission=' \
+      -e ' preamble document-start-overlap drain=' "$log"
   fi
   ! rg -q -e '^Outer protocol: h2$' -e '^Padding negotiated: no$' "$log"
 }

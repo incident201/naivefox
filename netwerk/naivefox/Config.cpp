@@ -554,6 +554,8 @@ class JsonParser final {
         aMode = PreambleMode::DocumentComplete;
       } else if (mode.EqualsLiteral("document-overlap")) {
         aMode = PreambleMode::DocumentOverlap;
+      } else if (mode.EqualsLiteral("document-start-overlap")) {
+        aMode = PreambleMode::DocumentStartOverlap;
       } else if (mode.EqualsLiteral("tree-complete") ||
                  mode.EqualsLiteral("tree")) {
         aMode = PreambleMode::TreeComplete;
@@ -647,7 +649,8 @@ class JsonParser final {
     const auto isTreeMode = [](PreambleMode aMode) {
       return aMode != PreambleMode::Off &&
              aMode != PreambleMode::DocumentComplete &&
-             aMode != PreambleMode::DocumentOverlap;
+             aMode != PreambleMode::DocumentOverlap &&
+             aMode != PreambleMode::DocumentStartOverlap;
     };
     const bool anyTree = isTreeMode(h2Mode) || isTreeMode(h3Mode);
     if (!anyActive) {

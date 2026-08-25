@@ -45,6 +45,23 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     ("root-pmtud-control",),
                 )
 
+        for arms in (
+            ("document-start-overlap",),
+            ("document-complete", "document-start-overlap"),
+        ):
+            with self.subTest(arms=arms), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "document-start-overlap decrypted validation requires",
+                ):
+                    summary.write_outputs(
+                        Path(directory),
+                        Path(directory) / "events.csv",
+                        Path(directory) / "summary.txt",
+                        "4433",
+                        arms,
+                    )
+
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
@@ -837,19 +854,43 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 common,
                 fin_frames={"0": 16},
             )
+            self.make_cohort(
+                directory,
+                "document-start-overlap",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="CONNECT"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(14, 0.016, "server", 4, status="200"),
+                ],
+                fin_frames={"0": 16},
+            )
             destination = Path(directory) / "summary.txt"
             summary.write_outputs(
                 Path(directory),
                 Path(directory) / "events.csv",
                 destination,
                 "4433",
-                ("document-complete", "document-overlap"),
+                (
+                    "document-complete",
+                    "document-overlap",
+                    "document-start-overlap",
+                ),
             )
             safe_summary = destination.read_text(encoding="utf-8")
             self.assertIn("document_overlap_request_semantics_match=yes", safe_summary)
             self.assertIn("document_overlap_response_size_match=yes", safe_summary)
             self.assertIn("document_overlap_wire_overlap_is_admission=no", safe_summary)
             self.assertIn("document-overlap_overlap_observed=yes", safe_summary)
+            self.assertIn(
+                "document_start_overlap_request_semantics_match=yes", safe_summary
+            )
+            self.assertIn(
+                "document_start_overlap_response_size_match=yes", safe_summary
+            )
+            self.assertIn(
+                "document_start_overlap_get_before_connect=yes", safe_summary
+            )
 
     def test_tree_arms_reject_different_selected_header_values(self):
         with tempfile.TemporaryDirectory() as directory:

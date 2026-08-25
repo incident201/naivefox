@@ -27,9 +27,11 @@
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInputStream.h"
+#include "nsIInterfaceRequestor.h"
 #include "nsILoadGroup.h"
 #include "nsILoadInfo.h"
 #include "nsIPrincipal.h"
+#include "nsIProgressEventSink.h"
 #include "nsIProtocolHandler.h"
 #include "nsIProtocolProxyService.h"
 #include "nsIProxiedChannel.h"
@@ -577,7 +579,7 @@ class ProxyPreambleOperation::Impl final {
   PreambleConfig mConfig;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
   ProxyPreambleCallback mBarrierCallback;
-  std::function<void(bool, uint32_t)> mFinishedCallback;
+  ProxyPreambleFinishedCallback mFinishedCallback;
   nsTArray<Stream> mStreams;
   nsTArray<nsCString> mDiscoveredSpecs;
   nsCOMPtr<nsIReferrerInfo> mRootReferrerInfo;
@@ -595,11 +597,16 @@ class ProxyPreambleOperation::Impl final {
   uint32_t mCompletedSuccessfulResources = 0;
 };
 
-class ProxyPreambleOperation::StreamListener final : public nsIStreamListener {
+class ProxyPreambleOperation::StreamListener final
+    : public nsIStreamListener,
+      public nsIInterfaceRequestor,
+      public nsIProgressEventSink {
  public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER
+  NS_DECL_NSIINTERFACEREQUESTOR
+  NS_DECL_NSIPROGRESSEVENTSINK
 
   StreamListener(ProxyPreambleOperation* aOwner, uint32_t aStreamId)
       : mOwner(aOwner), mStreamId(aStreamId) {}
@@ -612,7 +619,29 @@ class ProxyPreambleOperation::StreamListener final : public nsIStreamListener {
 };
 
 NS_IMPL_ISUPPORTS(ProxyPreambleOperation::StreamListener, nsIStreamListener,
-                  nsIRequestObserver)
+                  nsIRequestObserver, nsIInterfaceRequestor,
+                  nsIProgressEventSink)
+
+NS_IMETHODIMP ProxyPreambleOperation::StreamListener::GetInterface(
+    const nsIID& aIID, void** aResult) {
+  if (aIID.Equals(NS_GET_IID(nsIProgressEventSink))) {
+    return QueryInterface(aIID, aResult);
+  }
+  return NS_ERROR_NO_INTERFACE;
+}
+
+NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnStatus(
+    nsIRequest* aRequest, nsresult aStatus, const char16_t* aStatusArg) {
+  if (mOwner && aStatus == NS_NET_STATUS_WAITING_FOR) {
+    mOwner->OnRequestCommitted(mStreamId, aRequest);
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnProgress(
+    nsIRequest* aRequest, int64_t aProgress, int64_t aProgressMax) {
+  return NS_OK;
+}
 
 NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnStartRequest(
     nsIRequest* aRequest) {
@@ -886,7 +915,7 @@ nsresult ProxyPreambleOperation::Start(
     const nsACString& aProxyUrl, const nsACString& aProxyUser,
     const nsACString& aProxyPassword, const PreambleConfig& aConfig,
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
-    std::function<void(bool, uint32_t)>&& aFinishedCallback,
+    ProxyPreambleFinishedCallback&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!aBarrierCallback || aConfig.mMode == PreambleMode::Off ||
@@ -965,6 +994,10 @@ nsresult ProxyPreambleOperation::Start(
     stream.mUri = aUri;
     stream.mRequest = channel;
     RefPtr<StreamListener> listener = new StreamListener(this, aStreamId);
+    if (mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap &&
+        aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
+      MOZ_TRY(channel->SetNotificationCallbacks(listener));
+    }
     nsresult rv = channel->AsyncOpen(listener);
     if (NS_FAILED(rv)) {
       mImpl->mStreams.RemoveLastElement();
@@ -975,6 +1008,18 @@ nsresult ProxyPreambleOperation::Start(
 
   uint32_t rootStreamId = 0;
   return openStream(rootUri, nsIContentPolicy::TYPE_DOCUMENT, rootStreamId);
+}
+
+void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
+                                                nsIRequest* aRequest) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled ||
+      mImpl->mConfig.mMode != PreambleMode::DocumentStartOverlap ||
+      aStreamId != 0 || aStreamId >= mImpl->mStreams.Length() ||
+      !SameCOMIdentity(mImpl->mStreams[aStreamId].mRequest, aRequest)) {
+    return;
+  }
+  FireBarrierCallback();
 }
 
 nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
@@ -1051,6 +1096,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
   if (aStreamId != 0 ||
       mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
       mImpl->mStreams.Length() - 1 >= mImpl->mConfig.mMaxAssets) {
     return NS_OK;
   }
@@ -1322,8 +1368,11 @@ void ProxyPreambleOperation::MaybeFinish() {
     }
     auto callback = std::move(mImpl->mFinishedCallback);
     if (callback) {
-      callback(mImpl->mAllStreamsCompletedNormally,
-               mImpl->mCompletedSuccessfulResources);
+      const uint32_t rootStatus =
+          mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams[0].mHttpStatus;
+      callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes,
+                mImpl->mCompletedSuccessfulResources, mImpl->mRootDone,
+                mImpl->mAllStreamsCompletedNormally});
     }
   }
 }
@@ -1332,7 +1381,7 @@ nsresult OpenProxyPreambleOperation(
     const nsACString& aProxyUrl, const nsACString& aProxyUser,
     const nsACString& aProxyPassword, const PreambleConfig& aConfig,
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
-    std::function<void(bool, uint32_t)>&& aFinishedCallback,
+    ProxyPreambleFinishedCallback&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule,
     RefPtr<ProxyPreambleOperation>& aOperation) {
   RefPtr operation = new ProxyPreambleOperation();

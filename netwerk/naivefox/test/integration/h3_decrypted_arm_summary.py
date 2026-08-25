@@ -12,6 +12,7 @@ SUPPORTED_ARMS = (
     "root-pmtud-control",
     "document-complete",
     "document-overlap",
+    "document-start-overlap",
     "tree-complete",
     "tree-complete-css",
     "tree-early-overlap",
@@ -606,6 +607,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "root-pmtud-control",
             "document-complete",
             "document-overlap",
+            "document-start-overlap",
             "tree-complete",
             "tree-complete-css",
             "tree-early-overlap",
@@ -923,6 +925,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "document-overlap decrypted validation requires document-complete",
     )
     require(
+        "document-start-overlap" not in arms
+        or {"document-complete", "document-overlap"}.issubset(arms),
+        "document-start-overlap decrypted validation requires "
+        "document-complete and document-overlap",
+    )
+    require(
         "tree-early-overlap" not in arms or "tree-complete" in arms,
         "tree-early-overlap decrypted validation requires tree-complete",
     )
@@ -1003,6 +1011,21 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes["document-complete"]
             == root_response_sizes["document-overlap"],
             "document response content-length differs between complete and overlap",
+        )
+    if {
+        "document-complete",
+        "document-overlap",
+        "document-start-overlap",
+    }.issubset(arms):
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-start-overlap"]["root"],
+            "document selected header values/order differ for start overlap",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-start-overlap"],
+            "document response content-length differs for start overlap",
         )
     tree_semantics = {}
     tree_asset_sizes = {}
@@ -1246,6 +1269,18 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("document_overlap_request_semantics_match=yes\n")
             destination.write("document_overlap_response_size_match=yes\n")
             destination.write("document_overlap_wire_overlap_is_admission=no\n")
+        if {
+            "document-complete",
+            "document-overlap",
+            "document-start-overlap",
+        }.issubset(arms):
+            destination.write(
+                "document_start_overlap_request_semantics_match=yes\n"
+            )
+            destination.write(
+                "document_start_overlap_response_size_match=yes\n"
+            )
+            destination.write("document_start_overlap_get_before_connect=yes\n")
         if preamble_arms:
             destination.write("root_semantics_and_content_length_validated=yes\n")
         if "tree-complete" in arms and len(preamble_arms) > 1:
