@@ -810,6 +810,13 @@ nsresult Http3Session::ProcessEvents() {
         // zero-rtt-rejected transactions.
         MaybeResumeSend();
       } break;
+      case Http3Event::Tag::HandshakeConfirmed: {
+        LOG(("Http3Session::ProcessEvents - HandshakeConfirmed"));
+        if (IsClosing()) {
+          break;
+        }
+        mUdpConn->OnHandshakeConfirmed();
+      } break;
       case Http3Event::Tag::GoawayReceived:
         LOG(("Http3Session::ProcessEvents - GoawayReceived"));
         mUdpConn->SetCloseReason(ConnectionCloseReason::GO_AWAY);

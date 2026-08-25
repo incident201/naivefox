@@ -2207,6 +2207,7 @@ pub enum Http3Event {
     AuthenticationNeeded,
     ZeroRttRejected,
     ConnectionConnected,
+    HandshakeConfirmed,
     GoawayReceived,
     ConnectionClosing {
         error: CloseError,
@@ -2347,6 +2348,8 @@ pub extern "C" fn neqo_http3conn_event(
             Http3ClientEvent::RequestsCreatable => Http3Event::RequestsCreatable,
             Http3ClientEvent::AuthenticationNeeded => Http3Event::AuthenticationNeeded,
             Http3ClientEvent::ZeroRttRejected => Http3Event::ZeroRttRejected,
+            #[cfg(feature = "naivefox")]
+            Http3ClientEvent::HandshakeConfirmed => Http3Event::HandshakeConfirmed,
             Http3ClientEvent::ResumptionToken(token) => {
                 // expiration_time time is Instant, transform it into microseconds it will
                 // be valid for. Necko code will add the value to PR_Now() to get the expiration

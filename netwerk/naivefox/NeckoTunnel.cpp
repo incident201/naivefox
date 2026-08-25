@@ -972,6 +972,15 @@ nsresult ProxyPreambleOperation::Start(
     MOZ_TRY(internal->SetAllowHttp3(mImpl->mProtocol == ProxyProtocol::H3));
     MOZ_TRY(internal->SetBlockAuthPrompt(true));
     MOZ_TRY(internal->SetProxyPreamble());
+    if (mImpl->mConfig.mMode ==
+        PreambleMode::DocumentHandshakeConfirmed) {
+      if (mImpl->mProtocol != ProxyProtocol::H3 ||
+          aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
+        return NS_ERROR_INVALID_ARG;
+      }
+      MOZ_TRY(
+          internal->SetProxyPreambleWaitForHandshakeConfirmation());
+    }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
     // The navigation is never cache-backed.  The diagnostic cache arm only
@@ -1103,6 +1112,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
 
   if (aStreamId != 0 ||
       mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
       mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
       mImpl->mStreams.Length() - 1 >= mImpl->mConfig.mMaxAssets) {

@@ -47,6 +47,7 @@ struct ExtraHeader final {
 enum class PreambleMode : uint8_t {
   Off,
   DocumentComplete,
+  DocumentHandshakeConfirmed,
   DocumentOverlap,
   DocumentStartOverlap,
   TreeComplete,
@@ -62,6 +63,7 @@ enum class PreambleMode : uint8_t {
 constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
   return aMode != PreambleMode::Off &&
          aMode != PreambleMode::DocumentComplete &&
+         aMode != PreambleMode::DocumentHandshakeConfirmed &&
          aMode != PreambleMode::DocumentOverlap &&
          aMode != PreambleMode::DocumentStartOverlap;
 }

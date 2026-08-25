@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +37,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -54,6 +54,11 @@ fi
 if [[ -n ${seen_comparison_arms[document-overlap]:-} &&
       -z ${seen_comparison_arms[document-complete]:-} ]]; then
   printf 'document-overlap comparison requires document-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[document-handshake-confirmed]:-} &&
+      -z ${seen_comparison_arms[document-complete]:-} ]]; then
+  printf 'document-handshake-confirmed comparison requires document-complete\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[document-start-overlap]:-} &&
@@ -244,6 +249,8 @@ cleanup() {
   return "$status"
 }
 trap cleanup EXIT
+trap 'status=$?; printf "H3 capture command failed at line %s (status=%s): %s\n" \
+  "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -642,6 +649,8 @@ run_naivefox_arm() {
   local naivefox_profile="$capture_dir/decrypted-$arm-naivefox-profile"
   local browser_profile="$capture_dir/decrypted-$arm-browser-profile"
   local browser_log="$capture_dir/decrypted-$arm-firefox.log"
+  local lifecycle_log_base="$capture_dir/decrypted-$arm-private-lifecycle"
+  local lifecycle_log="$lifecycle_log_base.moz_log"
   local completion=$comparison_completion
   local preamble_path="/camouflage/index.html?scenario=browser_page"
   preamble_path+="&size=262144&count=4&idle_ms=5000&completion=$completion"
@@ -695,7 +704,12 @@ EOF
   chmod 0600 "$keylog" "$log" "$browser_log"
   start_network_mutation_monitor "decrypted-$arm"
   start_capture "$pcap" "$capture_dir/decrypted-$arm-dumpcap.log"
+  local -a lifecycle_env=(-u MOZ_LOG -u MOZ_LOG_FILE)
+  if [[ $arm == document-handshake-confirmed ]]; then
+    lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
+  fi
   env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+    "${lifecycle_env[@]}" \
     "SSLKEYLOGFILE=$keylog" \
     "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" NAIVEFOX_PROFILE="$naivefox_profile" \
     "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
@@ -729,6 +743,7 @@ EOF
   [[ $outer_count -ge 1 && $padding_count -eq $outer_count ]]
   if [[ $arm == root || $arm == root-pmtud-control ||
         $arm == document-complete ||
+        $arm == document-handshake-confirmed ||
         $arm == document-overlap ||
         $arm == document-start-overlap ||
         $arm == tree-complete || $arm == tree-complete-css ||
@@ -738,6 +753,9 @@ EOF
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
+    if [[ $arm == document-handshake-confirmed ]]; then
+      [[ -s $lifecycle_log ]]
+    fi
     if [[ $arm == document-overlap ||
           $arm == document-start-overlap ||
           $arm == tree-early-overlap ||
@@ -918,6 +936,12 @@ extract_decrypted() {
     >"$prefix-serverhello.csv"
 
   tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && quic.frame_type==0x1e" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
+    -e udp.srcport -e udp.dstport -e quic.connection.number \
+    -e quic.frame_type >"$prefix-handshake-done.csv"
+
+  tshark -r "$pcap" "${decode[@]}" \
     -Y "udp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.extensions_alpn_str" \
     "${TSHARK_FIELDS[@]}" -e quic.connection.number \
     -e tls.handshake.extensions_alpn_str >"$prefix-alpn.csv"
@@ -948,6 +972,12 @@ extract_decrypted() {
     -e http3.settings.max_field_section_size \
     -e http3.settings.extended_connect -e http3.settings.h3_datagram \
     -e http3.settings.webtransport >"$prefix-settings.csv"
+
+  tshark -r "$pcap" "${decode[@]}" \
+    -Y "udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && http3.stream_uni_type" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e udp.srcport -e udp.dstport \
+    -e quic.connection.number -e quic.stream.stream_id \
+    -e http3.stream_uni_type >"$prefix-unidirectional-streams.csv"
 
   tshark -r "$pcap" "${decode[@]}" \
     -Y "http3.headers.method || http3.headers.status" \

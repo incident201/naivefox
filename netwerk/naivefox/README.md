@@ -83,9 +83,12 @@ The supported config is a strict NaiveProxy-compatible subset:
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
-  `document-overlap`, `document-start-overlap`, `tree-complete`, `tree-overlap`,
+  `document-handshake-confirmed`, `document-overlap`,
+  `document-start-overlap`, `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
-  compatibility aliases. Active
+  compatibility aliases. `document-handshake-confirmed` is an H3-only causal
+  diagnostic and therefore must be selected explicitly through `h3-mode`; the
+  resolved H2 mode must remain a different supported mode. Active
   modes share one absolute origin-form `path` and bounded `max-bytes` budget.
   `max-assets` is allowed when at least one effective protocol mode is a tree
   mode and is ignored by a document-only effective mode. Protocol overrides

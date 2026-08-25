@@ -4170,6 +4170,21 @@ HttpBaseChannel::SetProxyPreamble() {
 }
 
 NS_IMETHODIMP
+HttpBaseChannel::SetProxyPreambleWaitForHandshakeConfirmation() {
+  ENSURE_CALLED_BEFORE_CONNECT();
+
+#ifdef MOZ_NAIVEFOX
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE)) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  mProxyPreambleWaitForHandshakeConfirmation = true;
+  return NS_OK;
+#else
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+NS_IMETHODIMP
 HttpBaseChannel::GetAllowSpdy(bool* aAllowSpdy) {
   NS_ENSURE_ARG_POINTER(aAllowSpdy);
 

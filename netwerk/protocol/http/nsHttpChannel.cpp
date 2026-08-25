@@ -2398,6 +2398,13 @@ nsresult nsHttpChannel::InitTransaction() {
     return rv;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
+    transaction->SetWaitForH3HandshakeConfirmation(
+        mProxyPreambleWaitForHandshakeConfirmation);
+  }
+#endif
+
   return rv;
 }
 

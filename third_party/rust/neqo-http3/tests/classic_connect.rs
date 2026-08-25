@@ -67,6 +67,8 @@ fn classic_connect() {
             | Http3ClientEvent::RequestsCreatable
             | Http3ClientEvent::ResumptionToken { .. }
             | Http3ClientEvent::DataWritable { .. } => {}
+            #[cfg(feature = "naivefox")]
+            Http3ClientEvent::HandshakeConfirmed => {}
             e => {
                 next_event = Some(e);
                 break;

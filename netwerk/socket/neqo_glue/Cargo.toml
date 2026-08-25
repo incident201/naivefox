@@ -40,7 +40,7 @@ features = ["gecko"]
 [features]
 default = ["glean"]
 glean = ["dep:firefox-on-glean"]
-naivefox = []
+naivefox = ["neqo-http3/naivefox"]
 bench = [] # no-op, see <https://github.com/mozilla/neqo/issues/2390>
 fuzzing = ["neqo-http3/disable-encryption"]
 

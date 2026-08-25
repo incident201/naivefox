@@ -203,6 +203,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "gate",
             "root",
             "root-pmtud-control",
+            "document-handshake-confirmed",
             "tree-complete",
             "tree-complete-css",
             "tree-early-overlap",
@@ -214,7 +215,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
-            members = rows[index * 11 : (index + 1) * 11]
+            members = rows[index * 12 : (index + 1) * 12]
             self.assertEqual(
                 {(row["label"], row["naivefox_arm"]) for row in members},
                 {
@@ -230,6 +231,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 1,
                 ["browser_page"],
                 arms=("root", "root-pmtud-control"),
+            )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
+                arms=("root", "document-handshake-confirmed"),
             )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
@@ -253,6 +262,11 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("analyzer_args+=(--screening-only)", runner)
         self.assertIn("metadata_arm_specific_analysis=screening_only", runner)
         self.assertIn('--views "$multi_arm_views_csv"', runner)
+        self.assertIn(
+            "document-handshake-confirmed multi-arm screening requires "
+            "--protocol h3",
+            runner,
+        )
         self.assertIn("packets_17_32", runner)
         self.assertIn("--scenario", runner)
         self.assertIn('scenarios=("$scenario_override")', runner)
@@ -536,6 +550,35 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires h3"):
             CONFIG.build_config("root-pmtud-control", "h2", 1081, 4433, user, password)
 
+    def test_handshake_confirmed_arm_is_explicitly_h3_only(self):
+        config = CONFIG.build_config(
+            "document-handshake-confirmed",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "document-handshake-confirmed",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-bytes": CONFIG.PREAMBLE_MAX_BYTES,
+            },
+        )
+        self.assertTrue(config["outer-session-gate"])
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "document-handshake-confirmed",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+
     def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
         for arm in (
             "tree-complete",
@@ -801,6 +844,21 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires h3"):
             SAMPLE.validate_sample(
                 "root-pmtud-control",
+                "h2",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=91 protocol=h2\n",
+                {"protocol": "h2", "features": {"lifecycle_connection_count": 1.0}},
+            )
+        SAMPLE.validate_sample(
+            "document-handshake-confirmed",
+            "h3",
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=91 protocol=h3\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SAMPLE.validate_sample(
+                "document-handshake-confirmed",
                 "h2",
                 "Connection 1 preamble result=success status=0x00000000 "
                 "http=200 bytes=91 protocol=h2\n",

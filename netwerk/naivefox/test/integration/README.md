@@ -509,7 +509,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -521,6 +521,15 @@ CONNECT after accepted 2xx response HEADERS while the root listener is still
 active. Its normal root drain is mandatory. Root FIN ordering is report-only,
 so this arm cannot be selected or resampled according to response size or
 whether physical overlap happened to appear.
+`document-handshake-confirmed` is an H3-only causal diagnostic. It lets the
+ordinary document transaction establish the cold outer session, but retains
+that first marked preamble transaction until Neqo reports transport
+`Confirmed`. Decrypted admission requires one physical QUIC connection, one
+ClientHello, H3 control/QPACK initialization before server HANDSHAKE_DONE,
+transport confirmation before GET HEADERS, unchanged document semantics and
+response size, and document FIN before CONNECT. This arm tests whether
+pre-confirmation preamble activation causes the early split; it is not a claim
+that ordinary Firefox explicitly waits for HANDSHAKE_DONE.
 `document-start-overlap` uses the same root request but waits for the root
 channel's `NS_NET_STATUS_WAITING_FOR` event, which follows H2/H3 request-stream
 commit, before releasing CONNECT. It does not infer socket ordering from
@@ -642,6 +651,20 @@ request semantics and asset sizes and observed real resource/CONNECT overlap
 without selecting samples on that outcome. The next low-cost screen should
 hold the admission rule fixed and vary only how many discovered resources are
 opened, rather than tune packet sizes or add sleeps.
+
+An isolated ten-block same-base H3/inner-HTTPS paired screen of
+`document-complete,document-handshake-confirmed` is retained as safe artifact
+`89f06084e323ff50` (seed `25082501`). Two independent decrypted admissions
+moved the first preamble GET from packet 10 to packet 12, after transport
+confirmation, while the same-base Firefox GET appeared at packet 14 or 15.
+The passive paired result nevertheless rejected a bare confirmation barrier as
+a camouflage improvement: its distance was worse on packets 1--16 (0.11245
+versus 0.06598), packets 1--32 (0.22852 versus 0.19602), the first 250 ms
+(0.14197 versus 0.12561), and the whole flow (0.36925 versus 0.35642).
+Packets 17--32 improved only marginally (0.57514 versus 0.58116). This is a
+screening result, but it shows that reproducing only the confirmation boundary
+creates an artificial sequence; any production candidate should instead
+investigate the ordinary Firefox connection-winner/adoption lifecycle.
 
 Controlled H3 packet-shape screening must run with
 `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`. The private namespace disables loopback

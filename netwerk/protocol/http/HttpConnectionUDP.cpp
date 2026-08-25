@@ -480,8 +480,24 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
        ((caps & NS_HTTP_PROXY_PREAMBLE) &&
         mConnInfo->IsHttp3ProxyConnection() && !mAlreadyWildcard)) &&
       !mIsInTunnel && hTrans) {
-    if (!mConnected) {
+    bool waitForHandshakeConfirmation = false;
+#ifdef MOZ_NAIVEFOX
+    waitForHandshakeConfirmation =
+        (caps & NS_HTTP_PROXY_PREAMBLE) &&
+        hTrans->WaitForH3HandshakeConfirmation() && !mAlreadyWildcard &&
+        !mHandshakeConfirmed;
+#endif
+    if (!mConnected || waitForHandshakeConfirmation) {
+      MOZ_ASSERT(!mQueuedHttpConnectTransaction.Contains(hTrans));
       mQueuedHttpConnectTransaction.AppendElement(hTrans);
+#ifdef MOZ_NAIVEFOX
+      if (waitForHandshakeConfirmation && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.preamble_confirm_gate action=wait session=%p ci=%p "
+             "transport_confirmed=0",
+             mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
+      }
+#endif
       (void)ResumeSend();
     } else {
       // Don't call ResetTransaction() directly here.
@@ -580,10 +596,52 @@ void HttpConnectionUDP::OnConnected() {
     return;
   }
 
-  for (const auto& trans : mQueuedHttpConnectTransaction) {
+  nsTArray<RefPtr<nsHttpTransaction>> queued =
+      std::move(mQueuedHttpConnectTransaction);
+  for (const auto& trans : queued) {
+#ifdef MOZ_NAIVEFOX
+    if (trans->WaitForH3HandshakeConfirmation() && !mHandshakeConfirmed) {
+      mQueuedHttpConnectTransaction.AppendElement(trans);
+      continue;
+    }
+#endif
     ResetTransaction(trans);
   }
-  mQueuedHttpConnectTransaction.Clear();
+}
+
+void HttpConnectionUDP::OnHandshakeConfirmed() {
+  LOG(("HttpConnectionUDP::OnHandshakeConfirmed %p", this));
+
+#ifdef MOZ_NAIVEFOX
+  if (mHandshakeConfirmed) {
+    return;
+  }
+  mHandshakeConfirmed = true;
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.transport_confirmation action=observed session=%p ci=%p "
+         "transport_confirmed=1",
+         mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
+  }
+
+  if (mIsInTunnel || mDontReuse || mQueuedHttpConnectTransaction.IsEmpty()) {
+    return;
+  }
+
+  RefPtr<HttpConnectionUDP> self(this);
+  nsTArray<RefPtr<nsHttpTransaction>> queued =
+      std::move(mQueuedHttpConnectTransaction);
+  for (const auto& trans : queued) {
+    if (trans->WaitForH3HandshakeConfirmation() &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.preamble_confirm_gate action=release session=%p ci=%p "
+           "transport_confirmed=1",
+           mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
+    }
+    ResetTransaction(trans);
+  }
+#endif
 }
 
 already_AddRefed<nsIInputStream> HttpConnectionUDP::CreateProxyConnectStream(

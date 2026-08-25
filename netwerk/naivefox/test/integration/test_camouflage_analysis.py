@@ -524,13 +524,15 @@ class CamouflageAnalysisTests(unittest.TestCase):
                 ):
                     writer.writerow({
                         "schema_version": 1,
-                        "protocol": "h2",
+                        "protocol": "h3",
                         "scenario": "initial",
                         "label": label,
                         "session_id": label,
                         "experiment_block": "block-1",
                         "naivefox_arm": (
-                            "root" if label == "naivefox" else "reference"
+                            "document-handshake-confirmed"
+                            if label == "naivefox"
+                            else "reference"
                         ),
                         "steady_after_32_packet_count": count,
                     })
@@ -545,7 +547,7 @@ class CamouflageAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(
             [row["naivefox_arm"] for row in rows],
-            ["reference", "reference", "root"],
+            ["reference", "reference", "document-handshake-confirmed"],
         )
 
 

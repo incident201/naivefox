@@ -18,6 +18,98 @@ PRIVATE_SEMANTIC_MARKER = "private-tree-authority.invalid"
 
 
 class H3DecryptedArmSummaryTests(unittest.TestCase):
+    def test_handshake_confirmed_requires_document_complete_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "document-handshake-confirmed decrypted validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-handshake-confirmed",),
+                )
+
+    def test_handshake_confirmed_admission_and_safe_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.015, "server", 0, status="200"),
+                self.event(11, 0.017, "client", 4, method="CONNECT"),
+                self.event(14, 0.022, "server", 4, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(directory, "document-complete", common)
+            self.make_cohort(directory, "document-handshake-confirmed", common)
+            self.make_confirmed_evidence(directory, handshake_frame=6)
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("document-complete", "document-handshake-confirmed"),
+            )
+            safe_summary = destination.read_text(encoding="utf-8")
+            for key in (
+                "single_connection",
+                "single_client_hello",
+                "server_handshake_done_before_get",
+                "h3_initialization_before_handshake_done",
+                "settings_match",
+                "no_client_zero_rtt",
+                "request_semantics_match",
+                "response_size_match",
+                "root_fin_before_connect",
+                "lifecycle_exact",
+                "lifecycle_order_valid",
+                "lifecycle_ids_match",
+            ):
+                self.assertIn(
+                    f"document_handshake_confirmed_{key}=yes", safe_summary
+                )
+            self.assertNotIn("0x111", safe_summary)
+            self.assertNotIn("0x222", safe_summary)
+
+    def test_handshake_confirmed_rejects_get_before_handshake_done(self):
+        with tempfile.TemporaryDirectory() as directory:
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.015, "server", 0, status="200"),
+                self.event(11, 0.017, "client", 4, method="CONNECT"),
+                self.event(14, 0.022, "server", 4, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(directory, "document-complete", common)
+            self.make_cohort(directory, "document-handshake-confirmed", common)
+            self.make_confirmed_evidence(directory, handshake_frame=8)
+            with self.assertRaisesRegex(
+                ValueError, "initialization < HANDSHAKE_DONE < GET"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-complete", "document-handshake-confirmed"),
+                )
+
     def test_tree_root_overlap_requires_complete_control(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
@@ -151,6 +243,14 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn("fixture_pass_encoded", runner)
         self.assertIn("traffic_secret", runner)
         self.assertIn("root-pmtud-control comparison requires root", runner)
+        self.assertIn(
+            "document-handshake-confirmed comparison requires document-complete",
+            runner,
+        )
+        self.assertIn('"MOZ_LOG=NaiveFoxLifecycle:5"', runner)
+        self.assertIn('"MOZ_LOG_FILE=$lifecycle_log_base"', runner)
+        self.assertIn('quic.frame_type==0x1e', runner)
+        self.assertIn('>"$prefix-handshake-done.csv"', runner)
         self.assertIn("tree-overlap comparison requires tree-complete", runner)
         self.assertIn("tree-early-overlap comparison requires tree-complete", runner)
         self.assertIn('user_pref("network.http.http3.pmtud", true);', runner)
@@ -1534,6 +1634,44 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             ],
         )
 
+    def make_confirmed_evidence(self, directory, handshake_frame):
+        self.write_csv(
+            directory,
+            "document-handshake-confirmed",
+            "handshake-done",
+            [
+                "frame.number",
+                "frame.time_relative",
+                "udp.srcport",
+                "udp.dstport",
+                "quic.connection.number",
+                "quic.frame_type",
+            ],
+            [
+                {
+                    "frame.number": str(handshake_frame),
+                    "frame.time_relative": "0.008",
+                    "udp.srcport": "4433",
+                    "udp.dstport": "55000",
+                    "quic.connection.number": "0",
+                    "quic.frame_type": "0x1e",
+                }
+            ],
+        )
+        lifecycle = Path(directory) / (
+            "decrypted-document-handshake-confirmed-private-lifecycle.moz_log"
+        )
+        lifecycle.write_text(
+            "h3.preamble_confirm_gate action=wait session=0x111 ci=0x222 "
+            "transport_confirmed=0\n"
+            "h3.state session=0x111 ci=0x333 from=0 to=2 cause=connected\n"
+            "h3.transport_confirmation action=observed session=0x111 ci=0x222 "
+            "transport_confirmed=1\n"
+            "h3.preamble_confirm_gate action=release session=0x111 ci=0x222 "
+            "transport_confirmed=1\n",
+            encoding="utf-8",
+        )
+
     def make_cohort(self, directory, cohort, requests, fin_frames=None):
         fin_frames = fin_frames or {}
         request_fields = [
@@ -1771,6 +1909,58 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "clienthello",
             ["quic.connection.number"],
             [{"quic.connection.number": "0"}],
+        )
+        self.write_csv(
+            directory,
+            cohort,
+            "unidirectional-streams",
+            [
+                "frame.number",
+                "udp.srcport",
+                "udp.dstport",
+                "quic.connection.number",
+                "quic.stream.stream_id",
+                "http3.stream_uni_type",
+            ],
+            [
+                {
+                    "frame.number": "3",
+                    "udp.srcport": "55000",
+                    "udp.dstport": "4433",
+                    "quic.connection.number": "0",
+                    "quic.stream.stream_id": "2;6;10",
+                    "http3.stream_uni_type": "0;2;3",
+                }
+            ],
+        )
+        self.write_csv(
+            directory,
+            cohort,
+            "settings",
+            [
+                "quic.connection.number",
+                "quic.stream.stream_id",
+                "http3.settings.id",
+                "http3.settings.qpack.max_table_capacity",
+                "http3.settings.qpack.blocked_streams",
+                "http3.settings.max_field_section_size",
+                "http3.settings.extended_connect",
+                "http3.settings.h3_datagram",
+                "http3.settings.webtransport",
+            ],
+            [
+                {
+                    "quic.connection.number": "0",
+                    "quic.stream.stream_id": "2",
+                    "http3.settings.id": "1;7",
+                    "http3.settings.qpack.max_table_capacity": "0",
+                    "http3.settings.qpack.blocked_streams": "",
+                    "http3.settings.max_field_section_size": "65536",
+                    "http3.settings.extended_connect": "",
+                    "http3.settings.h3_datagram": "",
+                    "http3.settings.webtransport": "",
+                }
+            ],
         )
 
     @staticmethod

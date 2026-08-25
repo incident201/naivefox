@@ -164,6 +164,7 @@ def load_dataset(path):
                 "root",
                 "root-pmtud-control",
                 "document-complete",
+                "document-handshake-confirmed",
                 "document-overlap",
                 "document-start-overlap",
                 "tree-complete",
@@ -178,6 +179,11 @@ def load_dataset(path):
                 raise SystemExit("invalid NaiveFox arm metadata")
             if arm == "root-pmtud-control" and source["protocol"] != "h3":
                 raise SystemExit("root-pmtud-control requires h3")
+            if (
+                arm == "document-handshake-confirmed"
+                and source["protocol"] != "h3"
+            ):
+                raise SystemExit("document-handshake-confirmed requires h3")
             if arm == "reference" and source["label"] == "naivefox":
                 raise SystemExit("NaiveFox row cannot use reference arm metadata")
             if arm in naivefox_arms and source["label"] != "naivefox":

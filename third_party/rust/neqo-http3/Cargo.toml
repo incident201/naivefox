@@ -59,6 +59,7 @@ mode = "walltime"
 memory = false
 
 [features]
+naivefox = []
 bench = [
     "neqo-common/bench",
     "neqo-qpack/bench",

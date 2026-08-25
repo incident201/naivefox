@@ -629,6 +629,7 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   PreambleConfig preamble = mImpl->mConfig.mPreamble;
   preamble.mMode = preamble.ModeForProtocol(aProtocol);
   if (preamble.mMode == PreambleMode::DocumentComplete ||
+      preamble.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       preamble.mMode == PreambleMode::DocumentOverlap ||
       preamble.mMode == PreambleMode::DocumentStartOverlap) {
     preamble.mMaxAssets = 0;

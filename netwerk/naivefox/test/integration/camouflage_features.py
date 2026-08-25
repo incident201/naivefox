@@ -735,6 +735,11 @@ def validate_features(features):
 def extract(args):
     if args.naivefox_arm == "root-pmtud-control" and args.protocol != "h3":
         raise SystemExit("root-pmtud-control requires h3")
+    if (
+        args.naivefox_arm == "document-handshake-confirmed"
+        and args.protocol != "h3"
+    ):
+        raise SystemExit("document-handshake-confirmed requires h3")
     features = {}
     extract_handshake(args.pcap, args.protocol, args.server_port, features)
     if args.protocol == "h2":
@@ -887,6 +892,7 @@ def main():
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
             "tree-complete",

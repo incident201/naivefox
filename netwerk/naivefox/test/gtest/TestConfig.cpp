@@ -415,6 +415,23 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
   EXPECT_EQ(documentStartOverlap.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(documentStartOverlap.mPreamble.mMaxBytes, 64U * 1024U);
 
+  Config documentHandshakeConfirmed;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-handshake-confirmed","path":"/camouflage/"}})"_ns,
+          documentHandshakeConfirmed, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.ModeForProtocol(
+                ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::DocumentHandshakeConfirmed);
+  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.mMaxBytes, 64U * 1024U);
+
   static constexpr const char* kInvalid[] = {
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h2-mode":"root","h2-mode":"off","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h3-mode":"invalid","path":"/"}})",
@@ -423,6 +440,8 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h2-mode":"document-complete","h3-mode":"off","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-overlap","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-start-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-handshake-confirmed","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-handshake-confirmed","path":"/"}})",
   };
   for (const char* json : kInvalid) {
     Config invalid;

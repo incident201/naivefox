@@ -101,6 +101,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Tree, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Tree, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentComplete, true));
+  EXPECT_TRUE(detail::ShouldRunPreamble(
+      PreambleMode::DocumentHandshakeConfirmed, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(
+      PreambleMode::DocumentHandshakeConfirmed, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentOverlap, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::DocumentOverlap, false));
   EXPECT_TRUE(
@@ -170,6 +174,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
                                               false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,
                                              true, true, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentHandshakeConfirmed, false, false, 0, 0, 0, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentHandshakeConfirmed, true, true, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleOverlapsConnect(
+      PreambleMode::DocumentHandshakeConfirmed));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentOverlap,
                                               false, false, 0, 0, 0, 0));

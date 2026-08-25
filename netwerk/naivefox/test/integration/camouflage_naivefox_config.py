@@ -29,6 +29,7 @@ def build_config(
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
         "tree-complete",
@@ -42,7 +43,8 @@ def build_config(
     if arm not in supported_arms:
         raise ValueError(
             "config arm must be off, gate, root, root-pmtud-control, "
-            "document-complete, document-overlap, document-start-overlap, "
+            "document-complete, document-handshake-confirmed, "
+            "document-overlap, document-start-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, tree-warm-css-304, or "
             "tree-overlap"
@@ -51,6 +53,8 @@ def build_config(
         raise ValueError("protocol must be h2 or h3")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
+    if arm == "document-handshake-confirmed" and protocol != "h3":
+        raise ValueError("document-handshake-confirmed requires h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -82,7 +86,14 @@ def build_config(
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm in (
+    if arm == "document-handshake-confirmed":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "document-handshake-confirmed",
+            "path": preamble_path,
+            "max-bytes": PREAMBLE_MAX_BYTES,
+        }
+    elif arm in (
         "root",
         "root-pmtud-control",
         "document-complete",
@@ -163,6 +174,7 @@ def main():
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
             "tree-complete",

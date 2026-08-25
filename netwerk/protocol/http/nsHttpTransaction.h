@@ -92,6 +92,15 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   bool IsHttp2Websocket() override { return mIsHttp2Websocket; }
   bool Closed() { return mClosed; }
 
+#ifdef MOZ_NAIVEFOX
+  void SetWaitForH3HandshakeConfirmation(bool aValue) {
+    mWaitForH3HandshakeConfirmation = aValue;
+  }
+  bool WaitForH3HandshakeConfirmation() const {
+    return mWaitForH3HandshakeConfirmation;
+  }
+#endif
+
   void SetTRRInfo(nsIRequest::TRRMode aMode,
                   TRRSkippedReason aSkipReason) override {
     mEffectiveTRRMode = aMode;
@@ -512,6 +521,9 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   Atomic<bool, ReleaseAcquire> mResponseIsComplete{false};
   Atomic<bool, ReleaseAcquire> mClosed{false};
   Atomic<bool, Relaxed> mIsHttp3Used{false};
+#ifdef MOZ_NAIVEFOX
+  Atomic<bool, ReleaseAcquire> mWaitForH3HandshakeConfirmation{false};
+#endif
 
   // True iff WriteSegments was called while this transaction should be
   // throttled (stop reading) Used to resume read on unblock of reading.  Conn

@@ -279,6 +279,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD SetProxyConnectHeader(const nsACString& aHeader,
                                    const nsACString& aValue) override;
   NS_IMETHOD SetProxyPreamble() override;
+  NS_IMETHOD SetProxyPreambleWaitForHandshakeConfirmation() override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
   NS_IMETHOD SetAllowSpdy(bool aAllowSpdy) override;
   NS_IMETHOD GetAllowHttp3(bool* aAllowHttp3) override;
@@ -899,6 +900,9 @@ class HttpBaseChannel : public nsHashPropertyBag,
 
   Atomic<uint32_t, Relaxed> mLoadFlags{LOAD_NORMAL};
   uint32_t mCaps{0};
+#ifdef MOZ_NAIVEFOX
+  bool mProxyPreambleWaitForHandshakeConfirmation{false};
+#endif
 
   ClassOfService mClassOfService;
   // This should be set the the actual TRR mode used to resolve the request.

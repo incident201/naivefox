@@ -12,6 +12,7 @@ SUPPORTED_ARMS = (
     "root",
     "root-pmtud-control",
     "document-complete",
+    "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",
     "tree-complete",
@@ -44,6 +45,23 @@ ROOT_PATH_PATTERN = re.compile(
     r"/camouflage/index\.html\?scenario=browser_page&size=262144&count=4"
     r"&idle_ms=5000&completion=[0-9a-f]{32}"
 )
+CONFIRMED_LIFECYCLE_PATTERNS = {
+    "connected": re.compile(
+        r"h3\.state session=(\S+) ci=(\S+) .*cause=connected(?:\s|$)"
+    ),
+    "wait": re.compile(
+        r"h3\.preamble_confirm_gate action=wait session=(\S+) ci=(\S+) "
+        r"transport_confirmed=0(?:\s|$)"
+    ),
+    "observed": re.compile(
+        r"h3\.transport_confirmation action=observed session=(\S+) ci=(\S+) "
+        r"transport_confirmed=1(?:\s|$)"
+    ),
+    "release": re.compile(
+        r"h3\.preamble_confirm_gate action=release session=(\S+) ci=(\S+) "
+        r"transport_confirmed=1(?:\s|$)"
+    ),
+}
 
 
 def split_values(value):
@@ -449,6 +467,155 @@ def validate_expected_get_request_semantics(cohort, semantics):
             )
 
 
+def read_handshake_done_position(root, cohort, proxy_port):
+    rows = read_rows(root, cohort, "handshake-done")
+    require(rows, f"{cohort} has no decrypted server HANDSHAKE_DONE")
+    packet_connections = set()
+    for row in read_rows(root, cohort, "packets"):
+        connections = ordered_unique(split_values(row["quic.connection.number"]))
+        require(
+            len(connections) == 1,
+            f"{cohort} QUIC packet connection identity is ambiguous",
+        )
+        packet_connections.add(connections[0])
+    require(
+        len(packet_connections) == 1,
+        f"{cohort} must use exactly one physical outer QUIC connection",
+    )
+
+    evidence = []
+    for row in rows:
+        require(
+            direction(row, proxy_port) == "server",
+            f"{cohort} HANDSHAKE_DONE is not server-to-client",
+        )
+        connections = ordered_unique(split_values(row["quic.connection.number"]))
+        require(
+            len(connections) == 1 and connections[0] in packet_connections,
+            f"{cohort} HANDSHAKE_DONE connection identity is ambiguous",
+        )
+        frame_types = split_values(row["quic.frame_type"])
+        matching_types = []
+        for frame_type in frame_types:
+            try:
+                if int(frame_type, 0) == 0x1E:
+                    matching_types.append(frame_type)
+            except ValueError as error:
+                raise ValueError(
+                    f"{cohort} HANDSHAKE_DONE frame type is ambiguous"
+                ) from error
+        require(
+            bool(matching_types),
+            f"{cohort} HANDSHAKE_DONE frame cardinality is ambiguous",
+        )
+        evidence.append(int(row["frame.number"]))
+    return min(evidence)
+
+
+def validate_confirmed_lifecycle(root, cohort):
+    path = root / f"decrypted-{cohort}-private-lifecycle.moz_log"
+    require(path.is_file(), f"{cohort} private lifecycle log is missing")
+    events = {name: [] for name in CONFIRMED_LIFECYCLE_PATTERNS}
+    with path.open(encoding="utf-8", errors="replace") as source:
+        for line_number, line in enumerate(source, start=1):
+            for name, pattern in CONFIRMED_LIFECYCLE_PATTERNS.items():
+                match = pattern.search(line)
+                if match:
+                    events[name].append((line_number, match.group(1), match.group(2)))
+    for name, matches in events.items():
+        require(
+            len(matches) == 1,
+            f"{cohort} lifecycle must contain exactly one {name} marker",
+        )
+    sessions = {match[1] for matches in events.values() for match in matches}
+    require(
+        len(sessions) == 1,
+        f"{cohort} lifecycle markers do not share one H3 session id",
+    )
+    outer_connection_infos = {
+        events[name][0][2] for name in ("wait", "observed", "release")
+    }
+    require(
+        len(outer_connection_infos) == 1,
+        f"{cohort} confirmation gate markers do not share one outer connection-info id",
+    )
+    positions = {name: matches[0][0] for name, matches in events.items()}
+    require(
+        positions["wait"] < positions["observed"] < positions["release"]
+        and positions["connected"] < positions["observed"] < positions["release"],
+        f"{cohort} lifecycle marker order is invalid",
+    )
+
+
+def read_h3_initialization_position(root, cohort, proxy_port):
+    rows = read_rows(root, cohort, "unidirectional-streams")
+    require(rows, f"{cohort} has no client H3 unidirectional stream initialization")
+    type_streams = defaultdict(set)
+    type_frames = defaultdict(list)
+    connections_seen = set()
+    for row in rows:
+        require(
+            direction(row, proxy_port) == "client",
+            f"{cohort} H3 initialization contains a server stream",
+        )
+        stream_types = split_values(row["http3.stream_uni_type"])
+        streams = split_values(row["quic.stream.stream_id"])
+        connections = split_values(row["quic.connection.number"])
+        require(
+            bool(stream_types) and len(stream_types) == len(streams),
+            f"{cohort} H3 initialization type/stream cardinality is ambiguous",
+        )
+        require_one_connection(
+            connections, len(streams), f"{cohort} H3 initialization"
+        )
+        connections_seen.add(connections[0])
+        for stream_type, stream in zip(stream_types, streams):
+            try:
+                numeric_type = int(stream_type, 0)
+            except ValueError as error:
+                raise ValueError(
+                    f"{cohort} H3 unidirectional stream type is ambiguous"
+                ) from error
+            type_streams[numeric_type].add(stream)
+            type_frames[numeric_type].append(int(row["frame.number"]))
+    require(
+        len(connections_seen) == 1,
+        f"{cohort} H3 initialization used multiple outer connections",
+    )
+    require(
+        set(type_streams) == {0, 2, 3}
+        and all(len(streams) == 1 for streams in type_streams.values()),
+        f"{cohort} lacks exact control/QPACK stream initialization",
+    )
+    return max(frame for frames in type_frames.values() for frame in frames)
+
+
+def normalized_h3_settings(root, cohort):
+    rows = read_rows(root, cohort, "settings")
+    require(rows, f"{cohort} has no client H3 SETTINGS")
+    normalized = []
+    connections_seen = set()
+    for row in rows:
+        connections = ordered_unique(split_values(row["quic.connection.number"]))
+        require(
+            len(connections) == 1,
+            f"{cohort} H3 SETTINGS connection identity is ambiguous",
+        )
+        connections_seen.add(connections[0])
+        normalized.append(
+            tuple(
+                (name, tuple(split_values(value)))
+                for name, value in row.items()
+                if name != "quic.connection.number"
+            )
+        )
+    require(
+        len(connections_seen) == 1,
+        f"{cohort} H3 SETTINGS used multiple outer connections",
+    )
+    return tuple(normalized)
+
+
 def summarize_cohort(root, cohort, proxy_port):
     request_rows = read_rows(root, cohort, "requests")
     header_rows = read_rows(root, cohort, "header-names")
@@ -617,6 +784,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
             "tree-complete",
@@ -680,6 +848,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 "root",
                 "root-pmtud-control",
                 "document-complete",
+                "document-handshake-confirmed",
                 "tree-complete",
                 "tree-complete-css",
             ):
@@ -690,7 +859,12 @@ def validate(cohorts, connections, client_hellos, arms):
                     ),
                     f"{arm} CONNECT preceded a preamble response header",
                 )
-                if arm in ("root", "root-pmtud-control", "document-complete"):
+                if arm in (
+                    "root",
+                    "root-pmtud-control",
+                    "document-complete",
+                    "document-handshake-confirmed",
+                ):
                     observed_fins = [
                         row["stream_fin_packet_position"]
                         for row in response_headers
@@ -936,6 +1110,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "document-overlap decrypted validation requires document-complete",
     )
     require(
+        "document-handshake-confirmed" not in arms
+        or "document-complete" in arms,
+        "document-handshake-confirmed decrypted validation requires "
+        "document-complete",
+    )
+    require(
         "document-start-overlap" not in arms
         or {"document-complete", "document-overlap"}.issubset(arms),
         "document-start-overlap decrypted validation requires "
@@ -972,6 +1152,47 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             client_hellos[cohort],
         ) = summarize_cohort(root, cohort, proxy_port)
     validate(cohorts, connections, client_hellos, arms)
+    confirmed_admission_validated = False
+    if "document-handshake-confirmed" in arms:
+        cohort = "document-handshake-confirmed"
+        for row in read_rows(root, cohort, "packets"):
+            if direction(row, proxy_port) != "client":
+                continue
+            for packet_type in split_values(row["quic.long.packet_type"]):
+                try:
+                    is_zero_rtt = int(packet_type, 0) == 1
+                except ValueError as error:
+                    raise ValueError(
+                        f"{cohort} client long-header packet type is ambiguous"
+                    ) from error
+                require(
+                    not is_zero_rtt,
+                    f"{cohort} unexpectedly emitted client 0-RTT",
+                )
+        initialization_position = read_h3_initialization_position(
+            root, cohort, proxy_port
+        )
+        handshake_done_position = read_handshake_done_position(
+            root, cohort, proxy_port
+        )
+        gets = [
+            row
+            for row in cohorts[cohort]
+            if row["direction"] == "client" and row["method"] == "GET"
+        ]
+        require(
+            len(gets) == 1
+            and initialization_position < handshake_done_position
+            < gets[0]["packet_position"],
+            f"{cohort} did not preserve H3 initialization < HANDSHAKE_DONE < GET",
+        )
+        require(
+            normalized_h3_settings(root, "document-complete")
+            == normalized_h3_settings(root, cohort),
+            "document H3 SETTINGS differ for handshake-confirmed",
+        )
+        validate_confirmed_lifecycle(root, cohort)
+        confirmed_admission_validated = True
     preamble_semantics = {}
     root_response_sizes = {}
     preamble_arms = [
@@ -1022,6 +1243,17 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes["document-complete"]
             == root_response_sizes["document-overlap"],
             "document response content-length differs between complete and overlap",
+        )
+    if {"document-complete", "document-handshake-confirmed"}.issubset(arms):
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-handshake-confirmed"]["root"],
+            "document selected header values/order differ for handshake-confirmed",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-handshake-confirmed"],
+            "document response content-length differs for handshake-confirmed",
         )
     if {
         "document-complete",
@@ -1280,6 +1512,43 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("document_overlap_request_semantics_match=yes\n")
             destination.write("document_overlap_response_size_match=yes\n")
             destination.write("document_overlap_wire_overlap_is_admission=no\n")
+        if confirmed_admission_validated:
+            destination.write(
+                "document_handshake_confirmed_single_connection=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_single_client_hello=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_server_handshake_done_before_get=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_h3_initialization_before_handshake_done=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_settings_match=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_no_client_zero_rtt=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_request_semantics_match=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_response_size_match=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_root_fin_before_connect=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_lifecycle_exact=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_lifecycle_order_valid=yes\n"
+            )
+            destination.write(
+                "document_handshake_confirmed_lifecycle_ids_match=yes\n"
+            )
         if {
             "document-complete",
             "document-overlap",

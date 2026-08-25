@@ -562,6 +562,8 @@ class JsonParser final {
       } else if (mode.EqualsLiteral("document-complete") ||
                  mode.EqualsLiteral("root")) {
         aMode = PreambleMode::DocumentComplete;
+      } else if (mode.EqualsLiteral("document-handshake-confirmed")) {
+        aMode = PreambleMode::DocumentHandshakeConfirmed;
       } else if (mode.EqualsLiteral("document-overlap")) {
         aMode = PreambleMode::DocumentOverlap;
       } else if (mode.EqualsLiteral("document-start-overlap")) {
@@ -662,6 +664,17 @@ class JsonParser final {
     }
     const PreambleMode h2Mode = aPreamble.ModeForProtocol(ProxyProtocol::H2);
     const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
+    if (h2Mode == PreambleMode::DocumentHandshakeConfirmed) {
+      return Error(
+          "document-handshake-confirmed preamble is only supported for H3");
+    }
+    if (h3Mode == PreambleMode::DocumentHandshakeConfirmed &&
+        (!sawH3Mode || aPreamble.mH3Mode !=
+                           Some(PreambleMode::DocumentHandshakeConfirmed))) {
+      return Error(
+          "document-handshake-confirmed must be selected explicitly with "
+          "h3-mode");
+    }
     const bool anyActive =
         h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
     const bool anyTree =

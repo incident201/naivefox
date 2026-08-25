@@ -236,6 +236,13 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setProxyPreamble();
 
     /**
+     * For the experimental first cold HTTP/3 proxy preamble only, keep the
+     * transaction queued until the QUIC transport handshake is confirmed.
+     * Must be called after setProxyPreamble() and before the channel is opened.
+     */
+    [must_use] void setProxyPreambleWaitForHandshakeConfirmation();
+
+    /**
      * True iff the channel is CONNECT only.
      */
     [must_use] readonly attribute boolean onlyConnect;
