@@ -7,15 +7,10 @@
 #include "SystemPrincipal.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/ClearOnShutdown.h"
-#include "mozilla/OriginAttributes.h"
 #include "mozilla/StaticPtr.h"
 #include "nsIChannel.h"
 #include "nsIDomainPolicy.h"
-#include "nsILoadInfo.h"
-#include "nsIProtocolHandler.h"
 #include "nsIURI.h"
-#include "nsJSPrincipals.h"
-#include "nsNetUtil.h"
 #include "nsString.h"
 
 using namespace mozilla;
@@ -25,75 +20,6 @@ std::atomic<bool> nsScriptSecurityManager::sStrictFileOriginPolicy = true;
 nsIStringBundle* nsScriptSecurityManager::sStrBundle = nullptr;
 
 static StaticRefPtr<nsScriptSecurityManager> gScriptSecMan;
-
-namespace {
-
-// The lean runtime intentionally keeps result and triggering principals
-// system-owned. Safe Browsing is the narrow exception which needs the
-// codebase principal of the final channel URI, matching the upstream
-// GetChannelURIPrincipal contract without restoring the browser principal
-// graph.
-class NaiveFoxChannelURIPrincipal final : public BasePrincipal {
- public:
-  NaiveFoxChannelURIPrincipal(nsIURI* aURI, const nsACString& aOrigin,
-                              const OriginAttributes& aAttrs)
-      : BasePrincipal(eContentPrincipal, aOrigin, aAttrs), mURI(aURI) {}
-
-  NS_IMETHOD_(MozExternalRefCountType) AddRef() override {
-    return nsJSPrincipals::AddRef();
-  }
-  NS_IMETHOD_(MozExternalRefCountType) Release() override {
-    return nsJSPrincipals::Release();
-  }
-  NS_IMETHOD QueryInterface(REFNSIID aIID, void** aInstancePtr) override;
-  NS_IMETHOD GetURI(nsIURI** aURI) override {
-    NS_IF_ADDREF(*aURI = mURI);
-    return NS_OK;
-  }
-  NS_IMETHOD GetDomain(nsIURI** aDomain) override {
-    *aDomain = nullptr;
-    return NS_OK;
-  }
-  NS_IMETHOD SetDomain(nsIURI*) override { return NS_ERROR_NOT_AVAILABLE; }
-  NS_IMETHOD GetBaseDomain(nsACString& aBaseDomain) override {
-    return mURI->GetHost(aBaseDomain);
-  }
-  NS_IMETHOD GetAddonId(nsAString& aAddonId) override {
-    aAddonId.Truncate();
-    return NS_OK;
-  }
-  NS_IMETHOD GetIsOriginPotentiallyTrustworthy(bool* aResult) override {
-    *aResult = mURI->SchemeIs("https") || mURI->SchemeIs("wss");
-    return NS_OK;
-  }
-  nsresult GetScriptLocation(nsACString& aStr) override {
-    return mURI->GetSpec(aStr);
-  }
-  nsresult GetSiteIdentifier(SiteIdentifier& aSite) override {
-    aSite.Init(this);
-    return NS_OK;
-  }
-  bool IsContentPrincipal() const override { return true; }
-
- private:
-  ~NaiveFoxChannelURIPrincipal() override = default;
-  bool SubsumesInternal(nsIPrincipal* aOther,
-                        DocumentDomainConsideration) override {
-    nsCOMPtr<nsIURI> other;
-    return aOther && NS_SUCCEEDED(aOther->GetURI(getter_AddRefs(other))) &&
-           other && MayLoadInternal(other);
-  }
-  bool MayLoadInternal(nsIURI* aURI) override {
-    bool equal = false;
-    return aURI && NS_SUCCEEDED(mURI->EqualsExceptRef(aURI, &equal)) && equal;
-  }
-
-  nsCOMPtr<nsIURI> mURI;
-};
-
-NS_IMPL_QUERY_INTERFACE(NaiveFoxChannelURIPrincipal, nsIPrincipal)
-
-}  // namespace
 
 NS_IMPL_ISUPPORTS(nsScriptSecurityManager, nsIScriptSecurityManager)
 
@@ -292,43 +218,11 @@ nsresult nsScriptSecurityManager::GetChannelResultPrincipalIfNotSandboxed(
 }
 
 NS_IMETHODIMP nsScriptSecurityManager::GetChannelURIPrincipal(
-    nsIChannel* aChannel, nsIPrincipal** aResult) {
-  NS_ENSURE_ARG_POINTER(aChannel);
-  NS_ENSURE_ARG_POINTER(aResult);
-  *aResult = nullptr;
-
-  nsCOMPtr<nsIURI> uri;
-  nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
-  NS_ENSURE_SUCCESS(rv, rv);
-  NS_ENSURE_TRUE(uri, NS_ERROR_UNEXPECTED);
-  NS_ENSURE_TRUE(uri->SchemeIs("http") || uri->SchemeIs("https"),
-                 NS_ERROR_NOT_AVAILABLE);
-
-  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
-  NS_ENSURE_TRUE(loadInfo, NS_ERROR_UNEXPECTED);
-
-  bool inheritsPrincipal = false;
-  rv = NS_URIChainHasFlags(uri,
-                           nsIProtocolHandler::URI_INHERITS_SECURITY_CONTEXT,
-                           &inheritsPrincipal);
-  NS_ENSURE_SUCCESS(rv, rv);
-  NS_ENSURE_FALSE(inheritsPrincipal, NS_ERROR_NOT_AVAILABLE);
-
-  nsAutoCString origin;
-  nsAutoCString hostPort;
-  rv = uri->GetAsciiHostPort(hostPort);
-  NS_ENSURE_SUCCESS(rv, rv);
-  NS_ENSURE_FALSE(hostPort.IsEmpty(), NS_ERROR_UNEXPECTED);
-  rv = uri->GetScheme(origin);
-  NS_ENSURE_SUCCESS(rv, rv);
-  origin.AppendLiteral("://");
-  origin.Append(hostPort);
-
-  RefPtr<NaiveFoxChannelURIPrincipal> principal =
-      new NaiveFoxChannelURIPrincipal(uri, origin,
-                                      loadInfo->GetOriginAttributes());
-  principal.forget(aResult);
-  return NS_OK;
+    nsIChannel*, nsIPrincipal** aResult) {
+  // The lean runtime keeps channel security semantics system-owned. The
+  // classifier-only URI principal needed by one diagnostic is private to
+  // nsChannelClassifier and must never escape through this general API.
+  return GetSystemPrincipal(aResult);
 }
 
 NS_IMETHODIMP nsScriptSecurityManager::ActivateDomainPolicy(

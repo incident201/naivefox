@@ -651,6 +651,11 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn('kill -TERM -- "-$browser_controller_pid"', runner)
         self.assertIn('kill -KILL -- "-$browser_controller_pid"', runner)
         self.assertIn("--completion-file", runner)
+        self.assertIn(
+            "browser_env=(-u SSLKEYLOGFILE -u MOZ_LOG -u MOZ_LOG_FILE)", runner
+        )
+        self.assertIn('browser_env+=("SSLKEYLOGFILE=$keylog")', runner)
+        self.assertIn('setsid env "${browser_env[@]}"', runner)
         self.assertIn('run_browser_workload "$pass-reference"', runner)
         self.assertIn('run_browser_workload "decrypted-$arm"', runner)
 

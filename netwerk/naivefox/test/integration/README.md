@@ -633,8 +633,22 @@ packet 15--18 delay was browser-startup contamination, not a required Necko
 transport phase. A two-block fail-closed passive control
 `7b3a8e636ebd6f16` ranked the native arm closer in packets 1--16, packets
 1--32, and the first 250 ms, while whole-flow distance was effectively tied;
-it is explicitly insufficient for inference and only justifies a larger
-paired screen.
+it was explicitly insufficient for inference. The subsequent ten-block
+pre-launched screen `3f3c464064e0d510` (seed `84622`) reversed that hint and
+ranked `document-complete` closer in every selected view: packets 1--16
+`0.11904` versus `0.13597`, packets 17--32 `0.60661` versus `0.61389`, packets
+1--32 `0.20744` versus `0.21865`, the first 250 ms `0.13268` versus `0.13675`,
+and whole `0.37567` versus `0.38481`. This remains screening-only evidence,
+but it does not justify a 30-block inference run or moving the native channel
+lifecycle toward the default. The arm remains a fail-closed diagnostic.
+
+Review then narrowed its synthetic URI principal to the classifier's single
+local `Classify()` call; the general lean channel-principal API remains
+system-owned. Lean shutdown also explicitly unregisters the classifier
+feature's preference callbacks before XPCOM teardown. Post-fix strict artifact
+`20260825T185749Z-cb8bbaf2` passed the complete admission contract with all
+three first GETs at packet 10 (Firefox 3.991 ms, complete 4.634 ms, native
+4.335 ms).
 
 `document-start-overlap` uses the same root request but waits for the root
 channel's `NS_NET_STATUS_WAITING_FOR` event, which follows H2/H3 request-stream

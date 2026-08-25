@@ -747,6 +747,43 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-pass",
             )
 
+    def test_native_classifier_principal_and_shutdown_are_lean_private(self):
+        with open(
+            os.path.join(SOURCE_ROOT, "caps", "nsScriptSecurityManagerNaiveFox.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            security_manager = stream.read()
+        with open(
+            os.path.join(
+                SOURCE_ROOT, "netwerk", "url-classifier", "nsChannelClassifier.cpp"
+            ),
+            encoding="utf-8",
+        ) as stream:
+            classifier = stream.read()
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk", "naivefox", "GeckoRuntime.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            runtime = stream.read()
+
+        channel_principal = security_manager.split(
+            "nsScriptSecurityManager::GetChannelURIPrincipal", 1
+        )[1].split("nsScriptSecurityManager::ActivateDomainPolicy", 1)[0]
+        self.assertIn("return GetSystemPrincipal(aResult);", channel_principal)
+        self.assertNotIn("NaiveFoxClassifierURIPrincipal", security_manager)
+        self.assertIn("class NaiveFoxClassifierURIPrincipal", classifier)
+        classify_region = classifier.split("nsChannelClassifier::StartInternal", 1)[1]
+        self.assertIn("principal = new NaiveFoxClassifierURIPrincipal", classify_region)
+        self.assertLess(
+            classify_region.index("principal = new NaiveFoxClassifierURIPrincipal"),
+            classify_region.index("uriClassifier->Classify(principal"),
+        )
+        shutdown = runtime.split("void GeckoRuntime::Shutdown()", 1)[1]
+        self.assertLess(
+            shutdown.index("UrlClassifierFeatureFactory::Shutdown()"),
+            shutdown.index("NS_ShutdownXPCOM(nullptr)"),
+        )
+
     def test_cold_winner_handoff_arm_is_explicitly_h3_only(self):
         config = CONFIG.build_config(
             "document-cold-winner-handoff",

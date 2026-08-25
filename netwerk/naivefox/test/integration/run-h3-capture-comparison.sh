@@ -491,18 +491,20 @@ start_browser_controller() {
       --warmup-completion-file "$warmup_completion_file"
     )
   fi
-  local -a keylog_env=(-u SSLKEYLOGFILE)
+  # GNU env options must precede every NAME=VALUE operand. Build one ordered
+  # vector so the non-private-trace path cannot accidentally execute `-u` as
+  # the command after an SSLKEYLOGFILE assignment.
+  local -a browser_env=(-u SSLKEYLOGFILE -u MOZ_LOG -u MOZ_LOG_FILE)
   if [[ -n $keylog ]]; then
-    keylog_env=("SSLKEYLOGFILE=$keylog")
+    browser_env+=("SSLKEYLOGFILE=$keylog")
   fi
-  local -a event_trace_env=(-u MOZ_LOG -u MOZ_LOG_FILE)
   if [[ $private_event_trace -eq 1 && $socks_port -eq 0 ]]; then
-    event_trace_env=(
+    browser_env+=(
       "MOZ_LOG=timestamp,nsHttp:5,UDPSocket:5,nsChannelClassifier:5,UrlClassifierDbService:5"
       "MOZ_LOG_FILE=$capture_dir/$label-private-event-trace"
     )
   fi
-  setsid env "${keylog_env[@]}" "${event_trace_env[@]}" \
+  setsid env "${browser_env[@]}" \
     "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
     "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
