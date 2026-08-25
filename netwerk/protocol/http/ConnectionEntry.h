@@ -64,6 +64,9 @@ class ConnectionEntry : public SupportsWeakPtr {
   void InsertIntoActiveConns(HttpConnectionBase* conn);
   bool IsInActiveConns(HttpConnectionBase* conn);
   nsresult RemoveActiveConnection(HttpConnectionBase* conn);
+#ifdef MOZ_NAIVEFOX
+  nsresult RemoveProvisionalActiveConnection(HttpConnectionBase* conn);
+#endif
   nsresult RemovePendingConnection(HttpConnectionBase* conn);
   void MakeAllDontReuseExcept(HttpConnectionBase* conn);
   bool FindConnToClaim(PendingTransactionInfo* pendingTransInfo);

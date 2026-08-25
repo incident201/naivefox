@@ -165,6 +165,7 @@ def load_dataset(path):
                 "root-pmtud-control",
                 "document-complete",
                 "document-carrier-dispatch",
+                "document-cold-winner-handoff",
                 "document-native-cache-open",
                 "document-handshake-confirmed",
                 "document-overlap",
@@ -188,6 +189,11 @@ def load_dataset(path):
                 raise SystemExit("document-handshake-confirmed requires h3")
             if arm == "document-carrier-dispatch" and source["protocol"] != "h3":
                 raise SystemExit("document-carrier-dispatch requires h3")
+            if (
+                arm == "document-cold-winner-handoff"
+                and source["protocol"] != "h3"
+            ):
+                raise SystemExit("document-cold-winner-handoff requires h3")
             if arm == "document-native-cache-open" and source["protocol"] != "h3":
                 raise SystemExit("document-native-cache-open requires h3")
             if arm == "reference" and source["label"] == "naivefox":

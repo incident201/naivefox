@@ -104,6 +104,16 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   }
   void SetUseH3CarrierDispatch(bool aValue) { mUseH3CarrierDispatch = aValue; }
   bool UseH3CarrierDispatch() const { return mUseH3CarrierDispatch; }
+  void SetUseH3ColdWinnerHandoff(bool aValue) {
+    mUseH3ColdWinnerHandoff = aValue;
+  }
+  bool UseH3ColdWinnerHandoff() const { return mUseH3ColdWinnerHandoff; }
+  void SetH3ColdWinnerHandoffSucceeded(bool aValue) {
+    mH3ColdWinnerHandoffSucceeded = aValue;
+  }
+  bool H3ColdWinnerHandoffSucceeded() const {
+    return mH3ColdWinnerHandoffSucceeded;
+  }
   void SetH3CarrierDispatchGate(H3CarrierDispatchGate* aGate);
   H3CarrierDispatchGate* CarrierDispatchGate() const;
 #endif
@@ -531,6 +541,8 @@ class nsHttpTransaction final : public nsAHttpTransaction,
 #ifdef MOZ_NAIVEFOX
   Atomic<bool, ReleaseAcquire> mWaitForH3HandshakeConfirmation{false};
   Atomic<bool, ReleaseAcquire> mUseH3CarrierDispatch{false};
+  Atomic<bool, ReleaseAcquire> mUseH3ColdWinnerHandoff{false};
+  Atomic<bool, ReleaseAcquire> mH3ColdWinnerHandoffSucceeded{false};
   RefPtr<H3CarrierDispatchGate> mH3CarrierDispatchGate;
 #endif
 

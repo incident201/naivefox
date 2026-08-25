@@ -60,7 +60,8 @@ class HappyEyeballsTransaction final : public SpeculativeTransaction {
                            StatusForwarder&& aStatusForwarder,
                            ClientAuthForwarder&& aClientAuthRequestedForwarder,
                            ClientAuthForwarder&& aClientAuthSelectedForwarder,
-                           ZeroRttHandle* aZeroRttHandle);
+                           ZeroRttHandle* aZeroRttHandle,
+                           bool aAllowZeroRtt = true);
 
   // Forward the real transaction's BrowserId: PSM's client-cert dialog looks
   // up a BrowsingContext.
@@ -100,6 +101,9 @@ class HappyEyeballsTransaction final : public SpeculativeTransaction {
   // mRealTxn is sticky: set in Adopt(), never cleared. So IsAdopted()
   // is true after Adopt regardless of subsequent Close transitions.
   bool IsAdopted() const { return !!mRealTxn; }
+  bool IsSingleProxyColdWinnerCarrier() const {
+    return !mAllowZeroRtt;
+  }
 
   // nsAHttpTransaction virtuals we override. Only the methods that
   // have HT-specific behavior (RACING-phase 0-RTT driving, disqualify
@@ -184,6 +188,7 @@ class HappyEyeballsTransaction final : public SpeculativeTransaction {
   ClientAuthForwarder mClientAuthRequestedForwarder;
   ClientAuthForwarder mClientAuthSelectedForwarder;
   RefPtr<ZeroRttHandle> mZeroRttHandle;
+  bool mAllowZeroRtt = true;
   uint64_t mBrowserId = 0;
 
   // Non-null only after Adopt(). Backs QueryHttpTransaction() so

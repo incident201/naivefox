@@ -448,6 +448,23 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
   EXPECT_EQ(documentCarrierDispatch.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(documentCarrierDispatch.mPreamble.mMaxBytes, 64U * 1024U);
 
+  Config documentColdWinnerHandoff;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-cold-winner-handoff","path":"/camouflage/"}})"_ns,
+          documentColdWinnerHandoff, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      documentColdWinnerHandoff.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentColdWinnerHandoff.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentColdWinnerHandoff);
+  EXPECT_EQ(documentColdWinnerHandoff.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentColdWinnerHandoff.mPreamble.mMaxBytes, 64U * 1024U);
+
   Config documentNativeCacheOpen;
   error.Truncate();
   ASSERT_EQ(
@@ -477,6 +494,8 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-handshake-confirmed","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-carrier-dispatch","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-carrier-dispatch","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-cold-winner-handoff","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-cold-winner-handoff","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-native-cache-open","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-cache-open","path":"/"}})",
   };

@@ -59,6 +59,12 @@ NATIVE_CACHE_OPEN = re.compile(
     r"preamble native-cache-open cache=readonly-miss "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+COLD_WINNER_HANDOFF = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble cold-winner-handoff "
+    r"establishment=requestless-single-proxy dispatch=exact-winner "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 
 
 def validate_sample(arm, protocol, log_text, feature_document):
@@ -70,6 +76,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root-pmtud-control",
         "document-complete",
         "document-carrier-dispatch",
+        "document-cold-winner-handoff",
         "document-native-cache-open",
         "document-handshake-confirmed",
         "document-overlap",
@@ -92,6 +99,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-handshake-confirmed requires h3")
     if arm == "document-carrier-dispatch" and protocol != "h3":
         raise ValueError("document-carrier-dispatch requires h3")
+    if arm == "document-cold-winner-handoff" and protocol != "h3":
+        raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
 
@@ -104,6 +113,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root-pmtud-control",
         "document-complete",
         "document-carrier-dispatch",
+        "document-cold-winner-handoff",
         "document-native-cache-open",
         "document-handshake-confirmed",
         "document-overlap",
@@ -226,6 +236,37 @@ def validate_sample(arm, protocol, log_text, feature_document):
             raise ValueError("native cache-open lifecycle markers have invalid ordering")
     elif parsed_native_cache:
         raise ValueError(f"{arm} arm unexpectedly logged native cache-open lifecycle")
+    cold_winner_lines = [
+        line for line in log_lines if " preamble cold-winner-handoff " in line
+    ]
+    parsed_cold_winner = [
+        COLD_WINNER_HANDOFF.fullmatch(line) for line in cold_winner_lines
+    ]
+    if any(marker is None for marker in parsed_cold_winner):
+        raise ValueError("malformed cold winner-handoff evidence")
+    if arm == "document-cold-winner-handoff":
+        if len(parsed_cold_winner) != 1:
+            raise ValueError(
+                "document-cold-winner-handoff requires one exact winner marker"
+            )
+        marker = parsed_cold_winner[0]
+        matching_established = [
+            (line, established)
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == marker["connection"]
+            and established["protocol"] == protocol
+        ]
+        if len(matching_established) != 1 or marker["protocol"] != protocol:
+            raise ValueError(
+                "cold winner-handoff marker identity differs from CONNECT"
+            )
+        if not (
+            log_lines.index(cold_winner_lines[0]) < log_lines.index(result_lines[0])
+            < log_lines.index(matching_established[0][0])
+        ):
+            raise ValueError("cold winner-handoff markers have invalid ordering")
+    elif parsed_cold_winner:
+        raise ValueError(f"{arm} arm unexpectedly logged cold winner lifecycle")
     if arm == "document-overlap":
         if len(parsed_document_admissions) != 1:
             raise ValueError(
@@ -410,6 +451,7 @@ def main():
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-cold-winner-handoff",
             "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",

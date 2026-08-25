@@ -630,6 +630,7 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   preamble.mMode = preamble.ModeForProtocol(aProtocol);
   if (preamble.mMode == PreambleMode::DocumentComplete ||
       preamble.mMode == PreambleMode::DocumentCarrierDispatch ||
+      preamble.mMode == PreambleMode::DocumentColdWinnerHandoff ||
       preamble.mMode == PreambleMode::DocumentNativeCacheOpen ||
       preamble.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       preamble.mMode == PreambleMode::DocumentOverlap ||
@@ -762,6 +763,14 @@ void TunnelSession::FinishPreambleOnMain(
   if (preambleMode == PreambleMode::DocumentNativeCacheOpen && succeeded) {
     RuntimeLogEvent(
         "Connection %llu preamble native-cache-open cache=readonly-miss "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
+  }
+  if (preambleMode == PreambleMode::DocumentColdWinnerHandoff && succeeded) {
+    RuntimeLogEvent(
+        "Connection %llu preamble cold-winner-handoff "
+        "establishment=requestless-single-proxy dispatch=exact-winner "
         "protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));

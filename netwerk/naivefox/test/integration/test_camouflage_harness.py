@@ -204,6 +204,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "root",
             "root-pmtud-control",
             "document-carrier-dispatch",
+            "document-cold-winner-handoff",
             "document-handshake-confirmed",
             "tree-complete",
             "tree-complete-css",
@@ -216,7 +217,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
-            members = rows[index * 13 : (index + 1) * 13]
+            block_size = 2 + len(arms)
+            members = rows[index * block_size : (index + 1) * block_size]
             self.assertEqual(
                 {(row["label"], row["naivefox_arm"]) for row in members},
                 {
@@ -255,6 +257,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "h2",
                 1,
                 ["browser_page"],
+                arms=("root", "document-cold-winner-handoff"),
+            )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
                 arms=("root", "document-native-cache-open"),
             )
 
@@ -286,6 +296,10 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         self.assertIn(
             "document-carrier-dispatch multi-arm screening requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "document-cold-winner-handoff multi-arm screening requires --protocol h3",
             runner,
         )
         self.assertIn(
@@ -662,6 +676,35 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-pass",
             )
 
+    def test_cold_winner_handoff_arm_is_explicitly_h3_only(self):
+        config = CONFIG.build_config(
+            "document-cold-winner-handoff",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "document-cold-winner-handoff",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-bytes": CONFIG.PREAMBLE_MAX_BYTES,
+            },
+        )
+        self.assertTrue(config["outer-session-gate"])
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "document-cold-winner-handoff",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+
     def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
         for arm in (
             "tree-complete",
@@ -954,6 +997,26 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=91 protocol=h3\n",
             one_connection,
         )
+        SAMPLE.validate_sample(
+            "document-cold-winner-handoff",
+            "h3",
+            "Connection 1 preamble cold-winner-handoff "
+            "establishment=requestless-single-proxy dispatch=exact-winner "
+            "protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=91 protocol=h3\n"
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "exact winner marker"):
+            SAMPLE.validate_sample(
+                "document-cold-winner-handoff",
+                "h3",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=91 protocol=h3\n",
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "requires h3"):
             SAMPLE.validate_sample(
                 "document-carrier-dispatch",

@@ -978,6 +978,14 @@ nsresult ProxyPreambleOperation::Start(
       }
       MOZ_TRY(internal->SetProxyPreambleUseCarrierDispatch());
     }
+    if (mImpl->mConfig.mMode ==
+        PreambleMode::DocumentColdWinnerHandoff) {
+      if (mImpl->mProtocol != ProxyProtocol::H3 ||
+          aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
+        return NS_ERROR_INVALID_ARG;
+      }
+      MOZ_TRY(internal->SetProxyPreambleUseColdWinnerHandoff());
+    }
     if (mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen) {
       if (mImpl->mProtocol != ProxyProtocol::H3 ||
           aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
@@ -1078,6 +1086,18 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
       return NS_ERROR_UNEXPECTED;
     }
   }
+  if (aStreamId == 0 &&
+      mImpl->mConfig.mMode == PreambleMode::DocumentColdWinnerHandoff) {
+    nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aRequest);
+    bool handoffSucceeded = false;
+    if (!internal ||
+        NS_FAILED(internal->GetProxyPreambleColdWinnerHandoffSucceeded(
+            &handoffSucceeded)) ||
+        !handoffSucceeded) {
+      mImpl->mFirstFailure = NS_ERROR_UNEXPECTED;
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
   nsresult rv = channel->GetResponseStatus(&stream.mHttpStatus);
   stream.mResponseHeadersReceived = NS_SUCCEEDED(rv);
   if (aStreamId == 0 && NS_FAILED(rv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
@@ -1137,6 +1157,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
   if (aStreamId != 0 ||
       mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
       mImpl->mConfig.mMode == PreambleMode::DocumentCarrierDispatch ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentColdWinnerHandoff ||
       mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen ||
       mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||

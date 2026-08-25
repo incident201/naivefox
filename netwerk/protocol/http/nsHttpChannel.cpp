@@ -1848,6 +1848,19 @@ void nsHttpChannel::SpeculativeConnect() {
   // Before we take the latency hit of dealing with the cache, try and
   // get the TCP (and SSL) handshakes going so they can overlap.
 
+#ifdef MOZ_NAIVEFOX
+  // The cold-winner handoff deliberately starts establishment from
+  // MakeNewConnection(), after the real document has entered the pending
+  // queue.  A channel-level speculative connect would create and publish a
+  // usable H3 proxy session first, so the real transaction would never reach
+  // the single-candidate winner path that owns its exact PendingTransactionInfo.
+  // This also matches the controlled Firefox reference, whose speculative
+  // parallel limit is zero.
+  if (mProxyPreambleUseColdWinnerHandoff) {
+    return;
+  }
+#endif
+
   // don't speculate if we are offline, when doing http upgrade (i.e.
   // websockets bootstrap), or if we can't do keep-alive (because then we
   // couldn't reuse the speculative connection anyhow).
@@ -2511,6 +2524,8 @@ nsresult nsHttpChannel::InitTransaction() {
     transaction->SetWaitForH3HandshakeConfirmation(
         mProxyPreambleWaitForHandshakeConfirmation);
     transaction->SetUseH3CarrierDispatch(mProxyPreambleUseCarrierDispatch);
+    transaction->SetUseH3ColdWinnerHandoff(
+        mProxyPreambleUseColdWinnerHandoff);
     transaction->SetH3CarrierDispatchGate(
         mProxyPreambleCarrierDispatchGate);
     if (mProxyPreambleUseCarrierDispatch &&
@@ -2523,6 +2538,13 @@ nsresult nsHttpChannel::InitTransaction() {
                                        ? mProxyPreambleCarrierDispatchGate
                                              ->CarrierId()
                                        : 0),
+           transaction, mConnectionInfo.get(), mCaps));
+    }
+    if (mProxyPreambleUseColdWinnerHandoff &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=document-configured document=%p "
+           "ci=%p caps=%08x",
            transaction, mConnectionInfo.get(), mCaps));
     }
   }
@@ -2582,6 +2604,20 @@ HttpTrafficCategory nsHttpChannel::CreateTrafficCategory() {
   return HttpTrafficAnalyzer::CreateTrafficCategory(
       NS_UsePrivateBrowsing(this), isSystemPrincipal, isThirdParty, cos, tc);
 #endif
+}
+
+NS_IMETHODIMP
+nsHttpChannel::GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) {
+  NS_ENSURE_ARG_POINTER(aValue);
+  *aValue = false;
+#ifdef MOZ_NAIVEFOX
+  if (mTransaction) {
+    if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
+      *aValue = transaction->H3ColdWinnerHandoffSucceeded();
+    }
+  }
+#endif
+  return NS_OK;
 }
 
 void nsHttpChannel::SetCachedContentType() {

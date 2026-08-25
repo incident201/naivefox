@@ -14,6 +14,7 @@ SUPPORTED_ARMS = (
     "root-pmtud-control",
     "document-complete",
     "document-carrier-dispatch",
+    "document-cold-winner-handoff",
     "document-native-cache-open",
     "document-handshake-confirmed",
     "document-overlap",
@@ -79,6 +80,8 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         raise ValueError("document-handshake-confirmed requires h3 superblocks")
     if protocol != "h3" and "document-carrier-dispatch" in arms:
         raise ValueError("document-carrier-dispatch requires h3 superblocks")
+    if protocol != "h3" and "document-cold-winner-handoff" in arms:
+        raise ValueError("document-cold-winner-handoff requires h3 superblocks")
     if protocol != "h3" and "document-native-cache-open" in arms:
         raise ValueError("document-native-cache-open requires h3 superblocks")
     rng = random.Random(f"{seed}:{protocol}:multi-arm-superblocks")
@@ -136,6 +139,13 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
             and row["protocol"] != "h3"
         ):
             raise ValueError("document-carrier-dispatch requires h3 superblocks")
+        if (
+            row["naivefox_arm"] == "document-cold-winner-handoff"
+            and row["protocol"] != "h3"
+        ):
+            raise ValueError(
+                "document-cold-winner-handoff requires h3 superblocks"
+            )
         if (
             row["naivefox_arm"] == "document-native-cache-open"
             and row["protocol"] != "h3"

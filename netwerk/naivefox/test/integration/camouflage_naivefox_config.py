@@ -30,6 +30,7 @@ def build_config(
         "root-pmtud-control",
         "document-complete",
         "document-carrier-dispatch",
+        "document-cold-winner-handoff",
         "document-native-cache-open",
         "document-handshake-confirmed",
         "document-overlap",
@@ -46,6 +47,7 @@ def build_config(
         raise ValueError(
             "config arm must be off, gate, root, root-pmtud-control, "
             "document-complete, document-carrier-dispatch, "
+            "document-cold-winner-handoff, "
             "document-native-cache-open, "
             "document-handshake-confirmed, "
             "document-overlap, document-start-overlap, "
@@ -61,6 +63,8 @@ def build_config(
         raise ValueError("document-handshake-confirmed requires h3")
     if arm == "document-carrier-dispatch" and protocol != "h3":
         raise ValueError("document-carrier-dispatch requires h3")
+    if arm == "document-cold-winner-handoff" and protocol != "h3":
+        raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
@@ -97,6 +101,7 @@ def build_config(
     if arm in (
         "document-handshake-confirmed",
         "document-carrier-dispatch",
+        "document-cold-winner-handoff",
         "document-native-cache-open",
     ):
         preamble = {
@@ -187,6 +192,7 @@ def main():
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-cold-winner-handoff",
             "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",

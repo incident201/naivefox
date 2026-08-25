@@ -18,6 +18,43 @@ PRIVATE_SEMANTIC_MARKER = "private-tree-authority.invalid"
 
 
 class H3DecryptedArmSummaryTests(unittest.TestCase):
+    def test_cold_winner_lifecycle_requires_exact_single_proxy_handoff(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / (
+                "decrypted-document-cold-winner-handoff-private-lifecycle.moz_log"
+            )
+            path.write_text(
+                "h3.cold_winner_handoff action=document-configured document=aa ci=11 caps=1\n"
+                "h3.cold_winner_handoff action=attempt-selected document=aa entry=22 ci=11 speculative=0 pending=1 transport=proxy-h3 attempts=1 route-match=1\n"
+                "h3.cold_winner_handoff action=init-post document=aa attempt=33 pending-owned=1\n"
+                "h3.cold_winner_handoff action=init-run document=aa attempt=33 registered=1\n"
+                "h3.cold_winner_handoff action=dns-start document=aa attempt=33 physical-proxy=1 candidates-max=1\n"
+                "h3.cold_winner_handoff action=dns-complete document=aa attempt=33 rv=00000000\n"
+                "h3.cold_winner_handoff action=udp-attempt-start document=aa attempt=33 candidate=1 candidates-total=1 protocol=h3 proxy-aware=1\n"
+                "h3.cold_winner_handoff action=connection-racing carrier=44 conn=55 racing=1 before-activate=1\n"
+                "h3.cold_winner_handoff action=activate-callback-post carrier=44 rv=00000000\n"
+                "h3.cold_winner_handoff action=activate-callback-run carrier=44 rv=00000000\n"
+                "h3.cold_winner_handoff action=winner-ready document=aa carrier=44 conn=55 racing=1\n"
+                "h3.cold_winner_handoff action=exact-dispatch-complete document=aa carrier=44 conn=55 pending-removed=1 dispatched=1 racing=1\n"
+                "h3.cold_winner_handoff action=winner-publish document=aa conn=55 racing=0 exact-dispatch=1\n",
+                encoding="utf-8",
+            )
+            identities = summary.validate_cold_winner_handoff_lifecycle(
+                Path(directory), "document-cold-winner-handoff"
+            )
+            self.assertEqual(identities["document_id"], "aa")
+            self.assertEqual(identities["carrier_id"], "44")
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "action=winner-publish", "action=terminal-failure"
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "terminal failure"):
+                summary.validate_cold_winner_handoff_lifecycle(
+                    Path(directory), "document-cold-winner-handoff"
+                )
+
     def test_native_cache_open_lifecycle_requires_async_readonly_miss(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / (

@@ -477,6 +477,25 @@ nsresult ConnectionEntry::RemoveActiveConnection(HttpConnectionBase* conn) {
   return NS_OK;
 }
 
+#ifdef MOZ_NAIVEFOX
+nsresult ConnectionEntry::RemoveProvisionalActiveConnection(
+    HttpConnectionBase* conn) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (!mActiveConns.RemoveElement(conn)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  conn->SetOwner(nullptr);
+  gHttpHandler->ConnMgr()->DecrementProvisionalActiveConnCount();
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.cold_winner_handoff action=provisional-rollback conn=%p "
+         "entry=%p active-after=%zu published=0",
+         conn, this, mActiveConns.Length()));
+  }
+  return NS_OK;
+}
+#endif
+
 nsresult ConnectionEntry::RemovePendingConnection(HttpConnectionBase* conn) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 

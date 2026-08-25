@@ -509,7 +509,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -547,6 +547,32 @@ missing/failed carrier read or completion, null/reused lifecycle identities, a
 document stream-id mismatch, dispatch before carrier completion, any
 confirmation-gate wait/release, changed document request/response semantics,
 or CONNECT before document FIN.
+
+`document-cold-winner-handoff` reconstructs the later cold Firefox lifecycle
+at `MakeNewConnection`, after the real document is pending. It suppresses only
+that channel's earlier speculative preconnect, starts one request-less H3
+proxy carrier, keeps its connection racing and unpublished through
+`ConnectionConnected`, then uses the normal posted activation callback and
+exact pending-transaction dispatch before publishing the winner. It bypasses
+the Rust multi-candidate race and has a single-candidate terminal failure path;
+there is no retry, 0-RTT, confirmation barrier, transaction swap, dummy HTTP
+request, timer, or fallback-policy change. Decrypted admission proves one QUIC
+identity and ClientHello, identical document semantics, the complete ordered
+ownership lifecycle, no carrier request, and GET/200/FIN before CONNECT.
+
+Accepted same-base decrypted artifact `20260825T164347Z-53b8e44f` falsified
+the intended scheduling hypothesis: Firefox emitted its first GET at packet
+18 / 33.301 ms, while both `document-complete` and the exact cold winner path
+emitted it at packet 10 (5.548 and 4.851 ms). The ten-block H3/inner-HTTPS
+screen is retained as safe artifact `c95c4bce98e1c840` (seed `25082502`). The
+cold winner was only nominally closer on packets 1--16 (0.08792 versus
+0.08959) and the first 250 ms (0.13444 versus 0.13814), but was worse on
+packets 17--32 (0.72760 versus 0.72547), packets 1--32 (0.23630 versus
+0.23606), and whole flow (0.41899 versus 0.41459). Smoke mode is insufficient
+for inference; together with the unchanged GET position it rules out moving
+this mechanism toward the default and directs the next diagnostic to socket-
+thread event ordering around carrier close, activation callback, `RecvData`,
+`ResumeSend`, and Neqo output.
 
 The isolated ten-block same-base H3/inner-HTTPS paired screen is retained as
 safe artifact `c63340cad667a8c4` (seed `25082502`). The carrier drain fence was

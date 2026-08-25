@@ -282,6 +282,8 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD SetProxyPreambleWaitForHandshakeConfirmation() override;
   NS_IMETHOD SetProxyPreambleUseCarrierDispatch() override;
   NS_IMETHOD SetProxyPreambleUseNativeCacheOpen() override;
+  NS_IMETHOD SetProxyPreambleUseColdWinnerHandoff() override;
+  NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) override;
   NS_IMETHOD GetProxyPreambleNativeCacheReadOnlyMiss(bool* aValue) override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
   NS_IMETHOD SetAllowSpdy(bool aAllowSpdy) override;
@@ -906,6 +908,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
 #ifdef MOZ_NAIVEFOX
   bool mProxyPreambleWaitForHandshakeConfirmation{false};
   bool mProxyPreambleUseCarrierDispatch{false};
+  bool mProxyPreambleUseColdWinnerHandoff{false};
   bool mProxyPreambleUseNativeCacheOpen{false};
   bool mProxyPreambleNativeCacheOpenCallActive{false};
   bool mProxyPreambleNativeCacheReadOnlyMiss{false};

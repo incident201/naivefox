@@ -105,6 +105,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
       detail::ShouldRunPreamble(PreambleMode::DocumentCarrierDispatch, true));
   EXPECT_FALSE(
       detail::ShouldRunPreamble(PreambleMode::DocumentCarrierDispatch, false));
+  EXPECT_TRUE(detail::ShouldRunPreamble(
+      PreambleMode::DocumentColdWinnerHandoff, true));
+  EXPECT_FALSE(detail::ShouldRunPreamble(
+      PreambleMode::DocumentColdWinnerHandoff, false));
   EXPECT_TRUE(
       detail::ShouldRunPreamble(PreambleMode::DocumentNativeCacheOpen, true));
   EXPECT_FALSE(
@@ -188,6 +192,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::DocumentCarrierDispatch, true, true, 0, 0, 0, 0));
   EXPECT_FALSE(
       detail::PreambleOverlapsConnect(PreambleMode::DocumentCarrierDispatch));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentColdWinnerHandoff, false, false, 0, 0, 0, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentColdWinnerHandoff, true, true, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleOverlapsConnect(
+      PreambleMode::DocumentColdWinnerHandoff));
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::DocumentNativeCacheOpen, false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(

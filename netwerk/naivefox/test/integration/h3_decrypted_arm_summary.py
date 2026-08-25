@@ -13,6 +13,7 @@ SUPPORTED_ARMS = (
     "root-pmtud-control",
     "document-complete",
     "document-carrier-dispatch",
+    "document-cold-winner-handoff",
     "document-native-cache-open",
     "document-handshake-confirmed",
     "document-overlap",
@@ -829,6 +830,173 @@ def validate_native_cache_open_lifecycle(root, cohort):
     )
 
 
+def validate_cold_winner_handoff_lifecycle(root, cohort):
+    path = root / f"decrypted-{cohort}-private-lifecycle.moz_log"
+    require(path.is_file(), f"{cohort} private lifecycle log is missing")
+    expected = (
+        "document-configured",
+        "attempt-selected",
+        "init-post",
+        "init-run",
+        "dns-start",
+        "dns-complete",
+        "udp-attempt-start",
+        "connection-racing",
+        "activate-callback-post",
+        "activate-callback-run",
+        "winner-ready",
+        "exact-dispatch-complete",
+        "winner-publish",
+    )
+    events = {action: [] for action in expected}
+    with path.open(encoding="utf-8", errors="replace") as source:
+        for line_number, line in enumerate(source, start=1):
+            unrelated_carrier_dispatch = any(
+                f"h3.carrier_dispatch action={action}" in line
+                for action in (
+                    "carrier-created",
+                    "carrier-establishment-start",
+                    "document-configured",
+                    "document-waiting",
+                    "carrier-read-complete",
+                    "carrier-complete",
+                    "document-normal-dispatch",
+                    "document-activated",
+                    "document-attached",
+                    "document-headers-emitted",
+                )
+            )
+            require(
+                "h3.preamble_confirm_gate action=wait" not in line
+                and "h3.preamble_confirm_gate action=release" not in line
+                and not unrelated_carrier_dispatch,
+                f"{cohort} used an unrelated preamble scheduling mechanism",
+            )
+            if "h3.cold_winner_handoff" not in line:
+                continue
+            require(
+                "action=terminal-failure" not in line,
+                f"{cohort} cold winner handoff reached terminal failure",
+            )
+            action_match = re.search(r"action=([a-z-]+)", line)
+            require(action_match is not None, f"{cohort} malformed winner marker")
+            action = action_match.group(1)
+            require(action in events, f"{cohort} unknown cold winner marker {action}")
+            fields = dict(
+                re.findall(
+                    r"\b(document|attempt|carrier|conn|ci)=([^\s]+)", line
+                )
+            )
+            events[action].append((line_number, fields, line))
+
+    for action, matches in events.items():
+        require(
+            len(matches) == 1,
+            f"{cohort} lifecycle must contain exactly one {action} marker",
+        )
+    positions = [events[action][0][0] for action in expected]
+    require(
+        positions == sorted(positions) and len(set(positions)) == len(positions),
+        f"{cohort} cold winner lifecycle order is invalid",
+    )
+
+    documents = {
+        match[1]["document"]
+        for action in (
+            "document-configured",
+            "attempt-selected",
+            "init-post",
+            "init-run",
+            "dns-start",
+            "dns-complete",
+            "udp-attempt-start",
+            "winner-ready",
+            "exact-dispatch-complete",
+            "winner-publish",
+        )
+        for match in events[action]
+    }
+    attempts = {
+        match[1]["attempt"]
+        for action in (
+            "init-post",
+            "init-run",
+            "dns-start",
+            "dns-complete",
+            "udp-attempt-start",
+        )
+        for match in events[action]
+    }
+    carriers = {
+        match[1]["carrier"]
+        for action in (
+            "connection-racing",
+            "activate-callback-post",
+            "activate-callback-run",
+            "winner-ready",
+            "exact-dispatch-complete",
+        )
+        for match in events[action]
+    }
+    connections = {
+        match[1]["conn"]
+        for action in (
+            "connection-racing",
+            "winner-ready",
+            "exact-dispatch-complete",
+            "winner-publish",
+        )
+        for match in events[action]
+    }
+    require(
+        len(documents) == len(attempts) == len(carriers) == len(connections) == 1,
+        f"{cohort} cold winner ownership identities changed",
+    )
+    document = next(iter(documents))
+    carrier = next(iter(carriers))
+    require(
+        document != carrier,
+        f"{cohort} establishment carrier is the real document",
+    )
+    for identity, role in (
+        (document, "document"),
+        (next(iter(attempts)), "attempt"),
+        (carrier, "carrier"),
+        (next(iter(connections)), "connection"),
+    ):
+        try:
+            normalized = identity[2:] if identity.startswith("0x") else identity
+            valid = bool(normalized) and int(normalized, 16) != 0
+        except ValueError:
+            valid = False
+        require(valid, f"{cohort} has invalid {role} identity")
+
+    require(
+        "speculative=0 pending=1 transport=proxy-h3 attempts=1"
+        in events["attempt-selected"][0][2]
+        and "route-match=1" in events["attempt-selected"][0][2]
+        and "pending-owned=1" in events["init-post"][0][2]
+        and "registered=1" in events["init-run"][0][2]
+        and "physical-proxy=1 candidates-max=1" in events["dns-start"][0][2]
+        and "candidate=1 candidates-total=1 protocol=h3 proxy-aware=1"
+        in events["udp-attempt-start"][0][2]
+        and "racing=1 before-activate=1"
+        in events["connection-racing"][0][2]
+        and "rv=00000000" in events["dns-complete"][0][2]
+        and "rv=00000000" in events["activate-callback-post"][0][2]
+        and "rv=00000000" in events["activate-callback-run"][0][2]
+        and "pending-removed=1 dispatched=1 racing=1"
+        in events["exact-dispatch-complete"][0][2]
+        and "racing=0 exact-dispatch=1" in events["winner-publish"][0][2],
+        f"{cohort} cold winner contract fields are invalid",
+    )
+    return {
+        "document_id": document,
+        "carrier_id": carrier,
+        "connection_id": next(iter(connections)),
+    }
+
+
 def observed_client_bidirectional_streams(root, cohort):
     streams = set()
     for row in read_rows(root, cohort, "lifecycle"):
@@ -1077,7 +1245,10 @@ def validate(cohorts, connections, client_hellos, arms):
                 f"{arm} CONNECT has no response padding header",
             )
         gets = [row for row in requests if row["method"] == "GET"]
-        if arm == "document-carrier-dispatch":
+        if arm in (
+            "document-carrier-dispatch",
+            "document-cold-winner-handoff",
+        ):
             request_methods = [row["method"] for row in requests if row["method"]]
             require(
                 request_methods.count("GET") == 1
@@ -1099,6 +1270,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-cold-winner-handoff",
             "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",
@@ -1165,6 +1337,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 "root-pmtud-control",
                 "document-complete",
                 "document-carrier-dispatch",
+                "document-cold-winner-handoff",
                 "document-native-cache-open",
                 "document-handshake-confirmed",
                 "tree-complete",
@@ -1182,6 +1355,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "root-pmtud-control",
                     "document-complete",
                     "document-carrier-dispatch",
+                    "document-cold-winner-handoff",
                     "document-native-cache-open",
                     "document-handshake-confirmed",
                 ):
@@ -1440,6 +1614,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "document-carrier-dispatch decrypted validation requires document-complete",
     )
     require(
+        "document-cold-winner-handoff" not in arms or "document-complete" in arms,
+        "document-cold-winner-handoff decrypted validation requires document-complete",
+    )
+    require(
         "document-native-cache-open" not in arms or "document-complete" in arms,
         "document-native-cache-open decrypted validation requires document-complete",
     )
@@ -1482,6 +1660,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
     validate(cohorts, connections, client_hellos, arms)
     confirmed_admission_validated = False
     carrier_dispatch_admission_validated = False
+    cold_winner_handoff_admission_validated = False
     native_cache_open_admission_validated = False
     if "document-carrier-dispatch" in arms:
         cohort = "document-carrier-dispatch"
@@ -1511,6 +1690,41 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             f"{cohort} contains an unexplained client bidirectional stream",
         )
         carrier_dispatch_admission_validated = True
+    if "document-cold-winner-handoff" in arms:
+        cohort = "document-cold-winner-handoff"
+        validate_cold_winner_handoff_lifecycle(root, cohort)
+        winner_gets = [
+            row
+            for row in cohorts[cohort]
+            if row["direction"] == "client" and row["method"] == "GET"
+        ]
+        winner_connects = [
+            row
+            for row in cohorts[cohort]
+            if row["direction"] == "client" and row["method"] == "CONNECT"
+        ]
+        require(len(winner_gets) == 1, f"{cohort} must emit exactly one GET")
+        expected_bidi_streams = {
+            row["stream_id"] for row in (*winner_gets, *winner_connects)
+        }
+        observed_bidi_streams = observed_client_bidirectional_streams(root, cohort)
+        require(
+            winner_gets[0]["stream_id"] in observed_bidi_streams
+            and observed_bidi_streams <= expected_bidi_streams,
+            f"{cohort} contains a carrier request or unexplained client stream",
+        )
+        for row in read_rows(root, cohort, "packets"):
+            if direction(row, proxy_port) != "client":
+                continue
+            for packet_type in split_values(row["quic.long.packet_type"]):
+                try:
+                    is_zero_rtt = int(packet_type, 0) == 1
+                except ValueError as error:
+                    raise ValueError(
+                        f"{cohort} client long-header packet type is ambiguous"
+                    ) from error
+                require(not is_zero_rtt, f"{cohort} unexpectedly emitted 0-RTT")
+        cold_winner_handoff_admission_validated = True
     if "document-native-cache-open" in arms:
         validate_native_cache_open_lifecycle(root, "document-native-cache-open")
         native_cache_open_admission_validated = True
@@ -1643,6 +1857,34 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes["document-complete"]
             == root_response_sizes["document-carrier-dispatch"],
             "document response content-length differs for carrier-dispatch",
+        )
+    if {"document-complete", "document-cold-winner-handoff"}.issubset(arms):
+        complete_wire_get = next(
+            row
+            for row in cohorts["document-complete"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        winner_wire_get = next(
+            row
+            for row in cohorts["document-cold-winner-handoff"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        require(
+            complete_wire_get["header_name_order"]
+            == winner_wire_get["header_name_order"]
+            and complete_wire_get["header_name_set"]
+            == winner_wire_get["header_name_set"],
+            "document sanitized header names/order differ for cold winner",
+        )
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-cold-winner-handoff"]["root"],
+            "document selected header values/order differ for cold winner",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-cold-winner-handoff"],
+            "document response content-length differs for cold winner",
         )
     if {"document-complete", "document-native-cache-open"}.issubset(arms):
         complete_wire_get = next(
@@ -1940,6 +2182,20 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("document_carrier_dispatch_response_size_match=yes\n")
             destination.write("document_carrier_dispatch_root_fin_before_connect=yes\n")
             destination.write("document_carrier_dispatch_lifecycle_exact=yes\n")
+        if cold_winner_handoff_admission_validated:
+            destination.write("document_cold_winner_single_connection=yes\n")
+            destination.write("document_cold_winner_single_client_hello=yes\n")
+            destination.write("document_cold_winner_single_proxy_attempt=yes\n")
+            destination.write("document_cold_winner_no_carrier_request=yes\n")
+            destination.write("document_cold_winner_no_zero_rtt=yes\n")
+            destination.write("document_cold_winner_real_document_pending=yes\n")
+            destination.write("document_cold_winner_racing_until_dispatch=yes\n")
+            destination.write("document_cold_winner_async_activation_callback=yes\n")
+            destination.write("document_cold_winner_exact_dispatch=yes\n")
+            destination.write("document_cold_winner_publish_after_dispatch=yes\n")
+            destination.write("document_cold_winner_request_semantics_match=yes\n")
+            destination.write("document_cold_winner_response_size_match=yes\n")
+            destination.write("document_cold_winner_root_fin_before_connect=yes\n")
         if native_cache_open_admission_validated:
             destination.write("document_native_cache_open_single_connection=yes\n")
             destination.write("document_native_cache_open_single_client_hello=yes\n")

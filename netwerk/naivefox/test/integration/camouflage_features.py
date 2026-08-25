@@ -742,6 +742,11 @@ def extract(args):
         raise SystemExit("document-handshake-confirmed requires h3")
     if args.naivefox_arm == "document-carrier-dispatch" and args.protocol != "h3":
         raise SystemExit("document-carrier-dispatch requires h3")
+    if (
+        args.naivefox_arm == "document-cold-winner-handoff"
+        and args.protocol != "h3"
+    ):
+        raise SystemExit("document-cold-winner-handoff requires h3")
     if args.naivefox_arm == "document-native-cache-open" and args.protocol != "h3":
         raise SystemExit("document-native-cache-open requires h3")
     features = {}
@@ -897,6 +902,7 @@ def main():
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-cold-winner-handoff",
             "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",

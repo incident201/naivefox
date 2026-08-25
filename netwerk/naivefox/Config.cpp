@@ -563,6 +563,8 @@ class JsonParser final {
         aMode = PreambleMode::DocumentComplete;
       } else if (mode.EqualsLiteral("document-carrier-dispatch")) {
         aMode = PreambleMode::DocumentCarrierDispatch;
+      } else if (mode.EqualsLiteral("document-cold-winner-handoff")) {
+        aMode = PreambleMode::DocumentColdWinnerHandoff;
       } else if (mode.EqualsLiteral("document-native-cache-open")) {
         aMode = PreambleMode::DocumentNativeCacheOpen;
       } else if (mode.EqualsLiteral("document-handshake-confirmed")) {
@@ -668,6 +670,7 @@ class JsonParser final {
     const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
     if (h2Mode == PreambleMode::DocumentHandshakeConfirmed ||
         h2Mode == PreambleMode::DocumentCarrierDispatch ||
+        h2Mode == PreambleMode::DocumentColdWinnerHandoff ||
         h2Mode == PreambleMode::DocumentNativeCacheOpen) {
       return Error("selected diagnostic preamble is only supported for H3");
     }
@@ -683,6 +686,14 @@ class JsonParser final {
          aPreamble.mH3Mode != Some(PreambleMode::DocumentCarrierDispatch))) {
       return Error(
           "document-carrier-dispatch must be selected explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::DocumentColdWinnerHandoff &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::DocumentColdWinnerHandoff))) {
+      return Error(
+          "document-cold-winner-handoff must be selected explicitly with "
+          "h3-mode");
     }
     if (h3Mode == PreambleMode::DocumentNativeCacheOpen &&
         (!sawH3Mode ||

@@ -45,8 +45,11 @@ class FakeHttpConnection final : public HttpConnectionBase {
  public:
   NS_DECL_THREADSAFE_ISUPPORTS
 
-  explicit FakeHttpConnection(bool aUsingHttp3, bool aUsingSpdy)
-      : mUsingHttp3(aUsingHttp3), mUsingSpdy(aUsingSpdy) {}
+  explicit FakeHttpConnection(bool aUsingHttp3, bool aUsingSpdy,
+                              nsHttpConnectionInfo* aConnInfo = nullptr)
+      : mUsingHttp3(aUsingHttp3), mUsingSpdy(aUsingSpdy) {
+    mConnInfo = aConnInfo;
+  }
 
   bool UsingSpdy() override { return mUsingSpdy; }
   bool UsingHttp3() override { return mUsingHttp3; }
@@ -55,7 +58,10 @@ class FakeHttpConnection final : public HttpConnectionBase {
                                   int32_t) override {
     return NS_OK;
   }
-  void Close(nsresult, bool) override {}
+  void Close(nsresult aReason, bool) override {
+    ++mCloseCount;
+    mCloseReason = aReason;
+  }
   bool CanReuse() override { return false; }
   bool CanDirectlyActivate() override { return false; }
   void DontReuse() override {}
@@ -117,6 +123,9 @@ class FakeHttpConnection final : public HttpConnectionBase {
                                             bool) override {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
+
+  uint32_t mCloseCount = 0;
+  nsresult mCloseReason = NS_OK;
 
  private:
   ~FakeHttpConnection() = default;
@@ -196,8 +205,9 @@ class FakeConnectionEstablisherFactory final
 class RecordingConnMgrDelegate final : public HappyEyeballsConnMgrDelegate {
  public:
   already_AddRefed<PendingTransactionInfo> FindTransaction(
-      bool, ConnectionEntry*, nsAHttpTransaction*) override {
+      bool aRemoveWhenFound, ConnectionEntry*, nsAHttpTransaction*) override {
     mCalls.AppendElement("FindTransaction"_ns);
+    mFindRemoveFlags.AppendElement(aRemoveWhenFound);
     return do_AddRef(mFindResult);
   }
   nsresult DispatchTransaction(ConnectionEntry*, nsHttpTransaction* aTrans,
@@ -228,8 +238,12 @@ class RecordingConnMgrDelegate final : public HappyEyeballsConnMgrDelegate {
   void ProcessSpdyPendingQ(ConnectionEntry*) override {
     mCalls.AppendElement("ProcessSpdyPendingQ"_ns);
   }
-  void InsertIntoActiveConns(ConnectionEntry*, HttpConnectionBase*) override {
+  void InsertIntoActiveConns(ConnectionEntry* aEntry,
+                             HttpConnectionBase* aConn) override {
     mCalls.AppendElement("InsertIntoActiveConns"_ns);
+    if (mUseRealActiveConnStorage) {
+      aEntry->InsertIntoActiveConns(aConn);
+    }
   }
   void RemoveConnectionAttempt(ConnectionEntry*, ConnectionAttempt*,
                                bool) override {
@@ -267,6 +281,15 @@ class RecordingConnMgrDelegate final : public HappyEyeballsConnMgrDelegate {
     return n;
   }
 
+  int32_t FirstIndexOf(const char* aName) const {
+    for (size_t i = 0; i < mCalls.Length(); ++i) {
+      if (mCalls[i].EqualsASCII(aName)) {
+        return static_cast<int32_t>(i);
+      }
+    }
+    return -1;
+  }
+
   // Clear the connection handles created by DispatchTransaction so their
   // destructors don't reclaim the fake connections.
   void ResetHandles() {
@@ -280,6 +303,8 @@ class RecordingConnMgrDelegate final : public HappyEyeballsConnMgrDelegate {
   nsresult mDispatchRv = NS_OK;
   nsresult mStartRetryRv = NS_OK;
   bool mSimulateDispatchBindsConnection = false;
+  bool mUseRealActiveConnStorage = false;
+  nsTArray<bool> mFindRemoveFlags;
   nsTArray<RefPtr<ConnectionHandle>> mDispatchHandles;
 };
 
@@ -339,6 +364,9 @@ static void RunOnSocketThread(std::function<void()>&& aFn) {
 
 }  // namespace
 
+static already_AddRefed<nsHttpTransaction> MakeRealTransaction(
+    nsHttpConnectionInfo* aCi, nsHttpRequestHead* aReqHead);
+
 // Init() with an IP-literal origin should drive the engine to attempt a
 // connection through the injected factory rather than opening a real socket.
 TEST(HappyEyeballsConnectionAttempt, FactorySeamUsed)
@@ -384,6 +412,152 @@ TEST(HappyEyeballsConnectionAttempt, TcpSuccessRunsDispatchViaDelegate)
     EXPECT_EQ(h.mDelegate->Count("ReportSpdyConnection"), 1);
   });
 }
+
+#ifdef MOZ_NAIVEFOX
+// The single-proxy winner stays provisional while the exact real document is
+// checked and removed from the pending queue.  Only a successful direct
+// dispatch makes it non-racing and publishes it as the shared H3 connection.
+TEST(HappyEyeballsConnectionAttempt,
+     SingleProxyWinnerDispatchesExactPendingBeforePublish)
+{
+  EnsureHttpHandler();
+  RunOnSocketThread([]() {
+    TestHarness h(/*caps*/ 0, /*realTransaction*/ true);
+    nsHttpTransaction* realTrans = h.mTrans->QueryHttpTransaction();
+    ASSERT_TRUE(realTrans);
+    h.mHE = new HappyEyeballsConnectionAttempt(
+        h.mConnInfo, h.mTrans, /*caps*/ 0, /*speculative*/ false,
+        /*urgentStart*/ false, /*retryWithoutTRR*/ false,
+        /*singleProxyColdWinnerHandoff*/ true);
+    h.mHE->SetConnMgrDelegateForTesting(h.mDelegate);
+    h.mDelegate->mFindResult = new PendingTransactionInfo(realTrans);
+
+    RefPtr<FakeHttpConnection> conn = new FakeHttpConnection(
+        /*usingHttp3*/ true, /*usingSpdy*/ false, h.mConnInfo);
+    conn->SetIsRacing(true);
+    h.mHE->ProcessSingleProxyWinnerForTesting(conn, h.mEntry);
+
+    ASSERT_EQ(h.mDelegate->mFindRemoveFlags.Length(), 2u);
+    EXPECT_FALSE(h.mDelegate->mFindRemoveFlags[0])
+        << "winner must preflight the exact pending document first";
+    EXPECT_TRUE(h.mDelegate->mFindRemoveFlags[1])
+        << "winner must remove that exact document before dispatch";
+    const int32_t insert = h.mDelegate->FirstIndexOf("InsertIntoActiveConns");
+    const int32_t dispatch = h.mDelegate->FirstIndexOf("DispatchTransaction");
+    const int32_t report = h.mDelegate->FirstIndexOf("ReportHttp3Connection");
+    ASSERT_GE(insert, 0);
+    ASSERT_GE(dispatch, 0);
+    ASSERT_GE(report, 0);
+    EXPECT_LT(insert, dispatch);
+    EXPECT_LT(dispatch, report);
+    EXPECT_TRUE(h.mHE->WasTransactionAdoptedForTesting());
+    EXPECT_FALSE(conn->IsRacing());
+    EXPECT_EQ(conn->mCloseCount, 0u);
+  });
+}
+
+// If the real document is no longer the exact pending owner, the provisional
+// winner must fail closed before it is inserted or published.
+TEST(HappyEyeballsConnectionAttempt,
+     SingleProxyWinnerPendingPreflightFailureNeverPublishes)
+{
+  EnsureHttpHandler();
+  RunOnSocketThread([]() {
+    TestHarness h(/*caps*/ 0, /*realTransaction*/ true);
+    nsHttpRequestHead reqHead;
+    h.mTrans = MakeRealTransaction(h.mConnInfo, &reqHead);
+    h.mHE = new HappyEyeballsConnectionAttempt(
+        h.mConnInfo, h.mTrans, /*caps*/ 0, /*speculative*/ false,
+        /*urgentStart*/ false, /*retryWithoutTRR*/ false,
+        /*singleProxyColdWinnerHandoff*/ true);
+    h.mHE->SetConnMgrDelegateForTesting(h.mDelegate);
+    // A null lookup result models a document already claimed elsewhere.
+    h.mDelegate->mFindResult = nullptr;
+
+    RefPtr<FakeHttpConnection> conn = new FakeHttpConnection(
+        /*usingHttp3*/ true, /*usingSpdy*/ false, h.mConnInfo);
+    conn->SetIsRacing(true);
+    h.mHE->ProcessSingleProxyWinnerForTesting(conn, h.mEntry);
+
+    EXPECT_EQ(h.mDelegate->Count("FindTransaction"), 1);
+    EXPECT_EQ(h.mDelegate->Count("InsertIntoActiveConns"), 0);
+    EXPECT_EQ(h.mDelegate->Count("DispatchTransaction"), 0);
+    EXPECT_EQ(h.mDelegate->Count("ReportHttp3Connection"), 0);
+    EXPECT_FALSE(h.mHE->WasTransactionAdoptedForTesting());
+    EXPECT_FALSE(conn->IsRacing());
+    EXPECT_EQ(conn->mCloseCount, 1u);
+    EXPECT_EQ(conn->mCloseReason, NS_ERROR_UNEXPECTED);
+  });
+}
+
+// A failed exact dispatch rolls back the provisional active-list insertion.
+// The connection was never reported as H3, so the rollback must not touch the
+// published H3 counter or leave the winner selectable by the scheduler.
+TEST(HappyEyeballsConnectionAttempt,
+     SingleProxyWinnerDispatchFailureRollsBackProvisionalConnection)
+{
+  EnsureHttpHandler();
+  RunOnSocketThread([]() {
+    TestHarness h(/*caps*/ 0, /*realTransaction*/ true);
+    nsHttpRequestHead reqHead;
+    h.mTrans = MakeRealTransaction(h.mConnInfo, &reqHead);
+    nsHttpTransaction* realTrans = h.mTrans->QueryHttpTransaction();
+    ASSERT_TRUE(realTrans);
+    h.mHE = new HappyEyeballsConnectionAttempt(
+        h.mConnInfo, h.mTrans, /*caps*/ 0, /*speculative*/ false,
+        /*urgentStart*/ false, /*retryWithoutTRR*/ false,
+        /*singleProxyColdWinnerHandoff*/ true);
+    h.mHE->SetConnMgrDelegateForTesting(h.mDelegate);
+    h.mDelegate->mFindResult = new PendingTransactionInfo(realTrans);
+    h.mDelegate->mDispatchRv = NS_ERROR_FAILURE;
+    // Use the real ConnectionEntry storage/counting for this case so the
+    // production provisional rollback is exercised, not merely recorded.
+    h.mDelegate->mUseRealActiveConnStorage = true;
+
+    RefPtr<FakeHttpConnection> conn = new FakeHttpConnection(
+        /*usingHttp3*/ true, /*usingSpdy*/ false, h.mConnInfo);
+    conn->SetIsRacing(true);
+    h.mHE->ProcessSingleProxyWinnerForTesting(conn, h.mEntry);
+
+    EXPECT_EQ(h.mDelegate->Count("InsertIntoActiveConns"), 1);
+    EXPECT_EQ(h.mDelegate->Count("DispatchTransaction"), 1);
+    EXPECT_EQ(h.mDelegate->Count("ReportHttp3Connection"), 0);
+    EXPECT_FALSE(h.mEntry->IsInActiveConns(conn));
+    EXPECT_EQ(conn->OwnerEntry(), nullptr);
+    EXPECT_FALSE(conn->IsRacing());
+    EXPECT_EQ(conn->mCloseCount, 1u);
+    EXPECT_EQ(conn->mCloseReason, NS_ERROR_FAILURE);
+    EXPECT_FALSE(h.mHE->WasTransactionAdoptedForTesting());
+  });
+}
+
+// The new mode is opt-in.  A default HCA winner retains the upstream UDP
+// behavior: one removing lookup, direct dispatch, then ordinary H3 report.
+TEST(HappyEyeballsConnectionAttempt,
+     DefaultUdpWinnerPathUnchangedBySingleProxyMode)
+{
+  EnsureHttpHandler();
+  RunOnSocketThread([]() {
+    TestHarness h(/*caps*/ 0, /*realTransaction*/ true);
+    nsHttpTransaction* realTrans = h.mTrans->QueryHttpTransaction();
+    ASSERT_TRUE(realTrans);
+    h.mDelegate->mFindResult = new PendingTransactionInfo(realTrans);
+
+    RefPtr<FakeHttpConnection> conn = new FakeHttpConnection(
+        /*usingHttp3*/ true, /*usingSpdy*/ false, h.mConnInfo);
+    conn->SetIsRacing(true);
+    h.mHE->ProcessSingleProxyWinnerForTesting(conn, h.mEntry);
+
+    ASSERT_EQ(h.mDelegate->mFindRemoveFlags.Length(), 1u);
+    EXPECT_TRUE(h.mDelegate->mFindRemoveFlags[0]);
+    EXPECT_EQ(h.mDelegate->Count("InsertIntoActiveConns"), 1);
+    EXPECT_EQ(h.mDelegate->Count("DispatchTransaction"), 1);
+    EXPECT_EQ(h.mDelegate->Count("ReportHttp3Connection"), 1);
+    EXPECT_TRUE(h.mHE->WasTransactionAdoptedForTesting());
+    EXPECT_FALSE(conn->IsRacing());
+  });
+}
+#endif
 
 // A failing connection result (the only address) drives the engine to Failed
 // and EnterFailed, which removes the attempt and never dispatches.

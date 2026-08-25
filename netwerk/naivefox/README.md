@@ -83,12 +83,13 @@ The supported config is a strict NaiveProxy-compatible subset:
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
-  `document-carrier-dispatch`, `document-native-cache-open`,
+  `document-carrier-dispatch`, `document-cold-winner-handoff`,
+  `document-native-cache-open`,
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
   compatibility aliases. `document-carrier-dispatch`,
-  `document-native-cache-open`, and
+  `document-cold-winner-handoff`, `document-native-cache-open`, and
   `document-handshake-confirmed` are H3-only causal diagnostics and therefore
   must be selected explicitly through `h3-mode`; the resolved H2 mode must
   remain a different supported mode. Active
@@ -133,6 +134,19 @@ The supported config is a strict NaiveProxy-compatible subset:
   Same-base screening found this drain fence worse than `document-complete` in
   every measured view, so it remains a negative diagnostic rather than a
   recommended default.
+  `document-cold-winner-handoff` is a narrower H3-only reconstruction of the
+  ordinary cold Firefox winner lifecycle. The real document first enters the
+  normal pending queue; one request-less proxy-aware H3 carrier owns
+  establishment while the connection remains `IsRacing`, and the existing
+  asynchronous activation callback dispatches that exact document onto the
+  exact winner before publishing it. It does not start a speculative
+  preconnect, use the Rust address race, enable 0-RTT, wait for confirmation,
+  swap transactions, or change proxy fallback. Every failure is terminal for
+  this single candidate and releases the real transaction without feeding an
+  artificial result into the Rust race machine. Same-base decrypted and
+  passive screening left the first GET at packet 10 and did not improve the
+  overall distance, so this remains a falsified causal diagnostic rather than
+  a default.
   `document-native-cache-open` is a cold H3-only diagnostic that restores the
   native asynchronous cache2 phase removed by the lean preamble shortcut. It
   preserves `INHIBIT_CACHING`, requires an `OPEN_READONLY` miss before normal

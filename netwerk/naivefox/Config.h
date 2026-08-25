@@ -48,6 +48,7 @@ enum class PreambleMode : uint8_t {
   Off,
   DocumentComplete,
   DocumentCarrierDispatch,
+  DocumentColdWinnerHandoff,
   DocumentNativeCacheOpen,
   DocumentHandshakeConfirmed,
   DocumentOverlap,
@@ -66,6 +67,7 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
   return aMode != PreambleMode::Off &&
          aMode != PreambleMode::DocumentComplete &&
          aMode != PreambleMode::DocumentCarrierDispatch &&
+         aMode != PreambleMode::DocumentColdWinnerHandoff &&
          aMode != PreambleMode::DocumentNativeCacheOpen &&
          aMode != PreambleMode::DocumentHandshakeConfirmed &&
          aMode != PreambleMode::DocumentOverlap &&

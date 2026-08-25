@@ -251,6 +251,18 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setProxyPreambleUseCarrierDispatch();
 
     /**
+     * For the experimental first cold HTTP/3 proxy preamble only, keep the
+     * real document pending while a request-less transaction establishes one
+     * provisional H3 connection, then dispatch that exact document onto the
+     * exact winner before publishing the connection generally.
+     * Must be called after setProxyPreamble() and before the channel is opened.
+     */
+    [must_use] void setProxyPreambleUseColdWinnerHandoff();
+
+    /** True only after exact cold H3 winner dispatch completed. */
+    [must_use] readonly attribute boolean proxyPreambleColdWinnerHandoffSucceeded;
+
+    /**
      * For the experimental first cold HTTP/3 proxy document, preserve
      * INHIBIT_CACHING but run the native asynchronous cache2 read-only lookup
      * before the real network transaction is triggered.

@@ -2198,6 +2198,20 @@ void nsHttpConnectionMgr::DecrementActiveConnCount(HttpConnectionBase* conn) {
   ConditionallyStopTimeoutTick();
 }
 
+#ifdef MOZ_NAIVEFOX
+void nsHttpConnectionMgr::DecrementProvisionalActiveConnCount() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  MOZ_DIAGNOSTIC_ASSERT(mNumActiveConns > 0);
+  if (mNumActiveConns > 0) {
+    mNumActiveConns--;
+  }
+  // A provisional racing H3 winner has been inserted into the active entry,
+  // but ReportHttp3Connection has deliberately not published it yet.  Roll
+  // back only the generic active count; the H3/SPDY count was never raised.
+  ConditionallyStopTimeoutTick();
+}
+#endif
+
 void nsHttpConnectionMgr::StartedConnect() {
   mNumActiveConns++;
   ActivateTimeoutTick();  // likely disabled by RecvdConnect()
