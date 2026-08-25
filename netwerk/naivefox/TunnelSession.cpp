@@ -599,7 +599,9 @@ void TunnelSession::OpenAttemptOnMain(uint64_t aGeneration,
     coldLeader = admission == OuterSessionGate::Admission::Leader;
   }
 
-  if (detail::ShouldRunPreamble(mImpl->mConfig.mPreamble.mMode, coldLeader)) {
+  const PreambleMode preambleMode =
+      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  if (detail::ShouldRunPreamble(preambleMode, coldLeader)) {
     BeginPreambleOnMain(aGeneration, aProtocol, aTargetAuthority);
     return;
   }
@@ -624,9 +626,14 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   RefPtr self = this;
   nsCString authority(aTargetAuthority);
   RefPtr<ProxyPreambleOperation> operation;
+  PreambleConfig preamble = mImpl->mConfig.mPreamble;
+  preamble.mMode = preamble.ModeForProtocol(aProtocol);
+  if (preamble.mMode == PreambleMode::DocumentComplete) {
+    preamble.mMaxAssets = 0;
+  }
   nsresult rv = OpenProxyPreambleOperation(
       mImpl->mConfig.mProxyUrl, mImpl->mConfig.mProxyUser,
-      mImpl->mConfig.mProxyPassword, mImpl->mConfig.mPreamble, aProtocol,
+      mImpl->mConfig.mProxyPassword, preamble, aProtocol,
       [self, aGeneration, aProtocol,
        authority = std::move(authority)](ProxyPreambleResult aResult) {
         self->FinishPreambleOnMain(
@@ -699,7 +706,9 @@ void TunnelSession::FinishPreambleOnMain(
     mImpl->mPreambleTimer = nullptr;
   }
   MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
-  if (detail::PreambleOverlapsConnect(mImpl->mConfig.mPreamble.mMode) &&
+  const PreambleMode preambleMode =
+      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  if (detail::PreambleOverlapsConnect(preambleMode) &&
       mImpl->mPreambleOperation) {
     RefPtr self = this;
     auto timer = NS_NewTimerWithCallback(
@@ -719,7 +728,7 @@ void TunnelSession::FinishPreambleOnMain(
   }
   const bool succeeded =
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
-  if (mImpl->mConfig.mPreamble.mMode == PreambleMode::TreeRootOverlap) {
+  if (preambleMode == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble root-overlap admission=%s root_done=%d "
         "started_resources=%u protocol=%s\n",
@@ -754,8 +763,8 @@ void TunnelSession::FinishPreambleOperationOnMain(
     (void)mImpl->mPreambleDrainTimer->Cancel();
     mImpl->mPreambleDrainTimer = nullptr;
   }
-  if (aCompletedNormally &&
-      mImpl->mConfig.mPreamble.mMode == PreambleMode::TreeRootOverlap) {
+  if (aCompletedNormally && mImpl->mConfig.mPreamble.ModeForProtocol(
+                                aProtocol) == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble root-overlap drain=complete "
         "completed_resources=%u protocol=%s\n",

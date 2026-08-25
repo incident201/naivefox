@@ -76,7 +76,9 @@ CONFIG_PATH=$config_file PROXY_SCHEME=$proxy_scheme \
   PROXY_USER=$NAIVEFOX_FIXTURE_USER PROXY_PASS=$NAIVEFOX_FIXTURE_PASS \
   SOCKS_PORT=$socks_port HTTP_PORT=$http_port \
   AUTH_SOCKS_PORT=$auth_socks_port LISTEN_USER=$listen_user \
-  LISTEN_PASS=$listen_pass python3 - <<'PY'
+  LISTEN_PASS=$listen_pass \
+  TEST_PROTOCOL_SPLIT_PREAMBLE=${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} \
+  python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -107,6 +109,14 @@ config = {
     "no-post-quantum": True,
     "log": "",
 }
+if os.environ["TEST_PROTOCOL_SPLIT_PREAMBLE"] == "1":
+    config["preamble"] = {
+        "mode": "document-complete",
+        "h3-mode": "tree-root-overlap",
+        "path": "/camouflage/index.html",
+        "max-assets": 2,
+        "max-bytes": 256 * 1024,
+    }
 path = Path(os.environ["CONFIG_PATH"])
 path.write_text(json.dumps(config), encoding="utf-8")
 path.chmod(0o600)
@@ -267,6 +277,20 @@ done
 [[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 11 ]]
 ! rg -q '^Padding negotiated: no$' "$client_log"
 ! rg -Fq "$NAIVEFOX_FIXTURE_PASS" "$client_log"
+
+if [[ ${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} == 1 ]]; then
+  rg -q " preamble result=success .* protocol=$protocol$" "$client_log"
+  if [[ $protocol == h2 ]]; then
+    ! rg -q ' preamble root-overlap ' "$client_log"
+  else
+    rg -q \
+      ' preamble root-overlap admission=started-resources .* protocol=h3$' \
+      "$client_log"
+    rg -q \
+      ' preamble root-overlap drain=complete completed_resources=2 protocol=h3$' \
+      "$client_log"
+  fi
+fi
 
 kill "$client_pid"
 set +e

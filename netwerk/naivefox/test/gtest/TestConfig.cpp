@@ -269,10 +269,77 @@ TEST(NaiveFoxConfig, RejectsInvalidPreamble)
   }
 }
 
+TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h2-mode":"document-complete","h3-mode":"tree-root-overlap","path":"/camouflage/","max-assets":2}})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mPreamble.mMode, PreambleMode::DocumentComplete);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeRootOverlap);
+  EXPECT_EQ(config.mPreamble.mMaxAssets, 2U);
+  EXPECT_EQ(config.mPreamble.mMaxBytes, 256U * 1024U);
+
+  Config h3Only;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-root-overlap","path":"/camouflage/"}})"_ns,
+          h3Only, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(h3Only.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(h3Only.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeRootOverlap);
+  EXPECT_EQ(h3Only.mPreamble.mMaxAssets, 2U);
+  EXPECT_EQ(h3Only.mPreamble.mMaxBytes, 256U * 1024U);
+
+  Config legacy;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/camouflage/"}})"_ns,
+          legacy, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(legacy.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(legacy.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(legacy.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(legacy.mPreamble.mMaxBytes, 64U * 1024U);
+
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h2-mode":"root","h2-mode":"off","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h3-mode":"invalid","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"h3-mode":"tree-root-overlap","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"off","h3-mode":"off","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h2-mode":"document-complete","h3-mode":"off","path":"/","max-assets":1}})",
+  };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
 TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
 {
   TunnelConfig source;
   source.mPreamble.mMode = PreambleMode::Tree;
+  source.mPreamble.mH2Mode = Some(PreambleMode::DocumentComplete);
+  source.mPreamble.mH3Mode = Some(PreambleMode::TreeRootOverlap);
   source.mPreamble.mPath.AssignLiteral("/camouflage/");
   source.mPreamble.mMaxAssets = 6;
   source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
@@ -289,6 +356,10 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
 
   for (const TunnelConfig* copy : {&constructed, &assigned}) {
     EXPECT_EQ(copy->mPreamble.mMode, PreambleMode::Tree);
+    EXPECT_EQ(copy->mPreamble.ModeForProtocol(ProxyProtocol::H2),
+              PreambleMode::DocumentComplete);
+    EXPECT_EQ(copy->mPreamble.ModeForProtocol(ProxyProtocol::H3),
+              PreambleMode::TreeRootOverlap);
     EXPECT_TRUE(copy->mPreamble.mPath.EqualsLiteral("/camouflage/"));
     EXPECT_EQ(copy->mPreamble.mMaxAssets, 6U);
     EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);

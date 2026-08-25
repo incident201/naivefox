@@ -72,6 +72,29 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
+- `preamble` is optional and defaults to `off`. `mode` remains the required
+  default when the object is present; optional `h2-mode` and `h3-mode`
+  override it only for that negotiated outer protocol. This allows Auto mode
+  to choose a fresh policy on fallback instead of reusing the failed H3
+  attempt's policy. Supported modes are `off`, `document-complete`,
+  `tree-complete`, `tree-overlap`, `tree-early-overlap`, and
+  `tree-root-overlap`; `root` and `tree` are compatibility aliases. Active
+  modes share one absolute origin-form `path` and bounded `max-bytes` budget.
+  `max-assets` is allowed when at least one effective protocol mode is a tree
+  mode and is ignored by a document-only effective mode. Protocol overrides
+  are explicit policy, not an automatic camouflage verdict. For example, an
+  experimental split policy can keep H2 on a document request while using the
+  two-resource root-overlap mode for H3:
+
+  ```json
+  {
+    "mode": "document-complete",
+    "h3-mode": "tree-root-overlap",
+    "path": "/",
+    "max-assets": 2,
+    "max-bytes": 262144
+  }
+  ```
 - `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path

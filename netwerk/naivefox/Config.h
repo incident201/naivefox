@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #include "ProxyProtocol.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Maybe.h"
 #include "nsString.h"
 #include "nsTArray.h"
@@ -61,9 +62,22 @@ struct PreambleConfig final {
   static constexpr uint32_t kMaximumBytes = 384 * 1024;
 
   PreambleMode mMode = PreambleMode::Off;
+  Maybe<PreambleMode> mH2Mode;
+  Maybe<PreambleMode> mH3Mode;
   nsCString mPath{"/"};
   uint32_t mMaxAssets = 0;
   uint32_t mMaxBytes = 0;
+
+  PreambleMode ModeForProtocol(ProxyProtocol aProtocol) const {
+    MOZ_ASSERT(aProtocol != ProxyProtocol::Auto);
+    if (aProtocol == ProxyProtocol::H2 && mH2Mode.isSome()) {
+      return *mH2Mode;
+    }
+    if (aProtocol == ProxyProtocol::H3 && mH3Mode.isSome()) {
+      return *mH3Mode;
+    }
+    return mMode;
+  }
 };
 
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };

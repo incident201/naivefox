@@ -111,6 +111,32 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::TreeRootOverlap, false));
 }
 
+TEST(NaiveFoxTunnelSessionLifecycle, ProtocolSpecificPreambleModeSelection)
+{
+  PreambleConfig config;
+  config.mMode = PreambleMode::DocumentComplete;
+  config.mH3Mode = Some(PreambleMode::TreeRootOverlap);
+
+  const PreambleMode h3FirstAttempt = config.ModeForProtocol(ProxyProtocol::H3);
+  EXPECT_EQ(h3FirstAttempt, PreambleMode::TreeRootOverlap);
+  EXPECT_TRUE(detail::ShouldRunPreamble(h3FirstAttempt, true));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(h3FirstAttempt));
+
+  // Auto fallback must resolve the mode again for the new H2 attempt instead
+  // of retaining the failed H3 attempt's effective mode.
+  const PreambleMode h2Fallback = config.ModeForProtocol(ProxyProtocol::H2);
+  EXPECT_EQ(h2Fallback, PreambleMode::DocumentComplete);
+  EXPECT_TRUE(detail::ShouldRunPreamble(h2Fallback, true));
+  EXPECT_FALSE(detail::PreambleOverlapsConnect(h2Fallback));
+
+  PreambleConfig legacy;
+  legacy.mMode = PreambleMode::TreeComplete;
+  EXPECT_EQ(legacy.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::TreeComplete);
+  EXPECT_EQ(legacy.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeComplete);
+}
+
 TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
 {
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,

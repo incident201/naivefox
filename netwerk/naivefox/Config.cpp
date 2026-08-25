@@ -539,9 +539,33 @@ class JsonParser final {
     }
 
     bool sawMode = false;
+    bool sawH2Mode = false;
+    bool sawH3Mode = false;
     bool sawPath = false;
     bool sawMaxAssets = false;
     bool sawMaxBytes = false;
+    auto parseMode = [&](PreambleMode& aMode) -> nsresult {
+      nsAutoCString mode;
+      MOZ_TRY(ParseString(mode, "preamble mode must be a string"));
+      if (mode.EqualsLiteral("off")) {
+        aMode = PreambleMode::Off;
+      } else if (mode.EqualsLiteral("document-complete") ||
+                 mode.EqualsLiteral("root")) {
+        aMode = PreambleMode::DocumentComplete;
+      } else if (mode.EqualsLiteral("tree-complete") ||
+                 mode.EqualsLiteral("tree")) {
+        aMode = PreambleMode::TreeComplete;
+      } else if (mode.EqualsLiteral("tree-overlap")) {
+        aMode = PreambleMode::TreeOverlap;
+      } else if (mode.EqualsLiteral("tree-early-overlap")) {
+        aMode = PreambleMode::TreeEarlyOverlap;
+      } else if (mode.EqualsLiteral("tree-root-overlap")) {
+        aMode = PreambleMode::TreeRootOverlap;
+      } else {
+        return Error("unsupported preamble mode");
+      }
+      return NS_OK;
+    };
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "preamble field name must be a string"));
@@ -555,24 +579,20 @@ class JsonParser final {
           return Error("duplicate preamble mode field");
         }
         sawMode = true;
-        nsAutoCString mode;
-        MOZ_TRY(ParseString(mode, "preamble mode must be a string"));
-        if (mode.EqualsLiteral("off")) {
-          aPreamble.mMode = PreambleMode::Off;
-        } else if (mode.EqualsLiteral("document-complete") ||
-                   mode.EqualsLiteral("root")) {
-          aPreamble.mMode = PreambleMode::DocumentComplete;
-        } else if (mode.EqualsLiteral("tree-complete") ||
-                   mode.EqualsLiteral("tree")) {
-          aPreamble.mMode = PreambleMode::TreeComplete;
-        } else if (mode.EqualsLiteral("tree-overlap")) {
-          aPreamble.mMode = PreambleMode::TreeOverlap;
-        } else if (mode.EqualsLiteral("tree-early-overlap")) {
-          aPreamble.mMode = PreambleMode::TreeEarlyOverlap;
-        } else if (mode.EqualsLiteral("tree-root-overlap")) {
-          aPreamble.mMode = PreambleMode::TreeRootOverlap;
+        MOZ_TRY(parseMode(aPreamble.mMode));
+      } else if (key.EqualsLiteral("h2-mode") || key.EqualsLiteral("h3-mode")) {
+        bool& sawProtocolMode =
+            key.EqualsLiteral("h2-mode") ? sawH2Mode : sawH3Mode;
+        if (sawProtocolMode) {
+          return Error("duplicate protocol preamble mode field");
+        }
+        sawProtocolMode = true;
+        PreambleMode mode;
+        MOZ_TRY(parseMode(mode));
+        if (key.EqualsLiteral("h2-mode")) {
+          aPreamble.mH2Mode = Some(mode);
         } else {
-          return Error("unsupported preamble mode");
+          aPreamble.mH3Mode = Some(mode);
         }
       } else if (key.EqualsLiteral("path")) {
         if (sawPath) {
@@ -618,7 +638,16 @@ class JsonParser final {
     if (!sawMode) {
       return Error("preamble requires a mode field");
     }
-    if (aPreamble.mMode == PreambleMode::Off) {
+    const PreambleMode h2Mode = aPreamble.ModeForProtocol(ProxyProtocol::H2);
+    const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
+    const bool anyActive =
+        h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
+    const auto isTreeMode = [](PreambleMode aMode) {
+      return aMode != PreambleMode::Off &&
+             aMode != PreambleMode::DocumentComplete;
+    };
+    const bool anyTree = isTreeMode(h2Mode) || isTreeMode(h3Mode);
+    if (!anyActive) {
       if (sawPath || sawMaxAssets || sawMaxBytes) {
         return Error("disabled preamble must not specify path or budgets");
       }
@@ -628,16 +657,14 @@ class JsonParser final {
       return Error("active preamble requires an explicit path");
     }
     if (!sawMaxBytes) {
-      aPreamble.mMaxBytes = aPreamble.mMode == PreambleMode::DocumentComplete
-                                ? 64 * 1024
-                                : 256 * 1024;
+      aPreamble.mMaxBytes = anyTree ? 256 * 1024 : 64 * 1024;
     }
     if (aPreamble.mMaxBytes == 0) {
       return Error("active preamble max-bytes must be positive");
     }
-    if (aPreamble.mMode == PreambleMode::DocumentComplete) {
+    if (!anyTree) {
       if (aPreamble.mMaxAssets != 0) {
-        return Error("document-complete preamble max-assets must be zero");
+        return Error("document-only preamble max-assets must be zero");
       }
     } else if (!sawMaxAssets) {
       aPreamble.mMaxAssets = 2;
