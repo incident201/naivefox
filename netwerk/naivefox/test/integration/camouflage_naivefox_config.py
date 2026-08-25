@@ -29,6 +29,7 @@ def build_config(
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-carrier-dispatch",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -43,7 +44,8 @@ def build_config(
     if arm not in supported_arms:
         raise ValueError(
             "config arm must be off, gate, root, root-pmtud-control, "
-            "document-complete, document-handshake-confirmed, "
+            "document-complete, document-carrier-dispatch, "
+            "document-handshake-confirmed, "
             "document-overlap, document-start-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, tree-warm-css-304, or "
@@ -55,6 +57,8 @@ def build_config(
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
         raise ValueError("document-handshake-confirmed requires h3")
+    if arm == "document-carrier-dispatch" and protocol != "h3":
+        raise ValueError("document-carrier-dispatch requires h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -86,10 +90,10 @@ def build_config(
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm == "document-handshake-confirmed":
+    if arm in ("document-handshake-confirmed", "document-carrier-dispatch"):
         preamble = {
             "mode": "off",
-            "h3-mode": "document-handshake-confirmed",
+            "h3-mode": arm,
             "path": preamble_path,
             "max-bytes": PREAMBLE_MAX_BYTES,
         }
@@ -174,6 +178,7 @@ def main():
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-carrier-dispatch",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",

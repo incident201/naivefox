@@ -101,6 +101,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::Tree, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Tree, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(PreambleMode::DocumentComplete, true));
+  EXPECT_TRUE(
+      detail::ShouldRunPreamble(PreambleMode::DocumentCarrierDispatch, true));
+  EXPECT_FALSE(
+      detail::ShouldRunPreamble(PreambleMode::DocumentCarrierDispatch, false));
   EXPECT_TRUE(detail::ShouldRunPreamble(
       PreambleMode::DocumentHandshakeConfirmed, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(
@@ -159,10 +163,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, ResourceCacheFollowsEffectiveTreeMode)
   config.mCacheResources = true;
   EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H2));
   EXPECT_TRUE(config.CacheResourcesForProtocol(ProxyProtocol::H3));
-  EXPECT_FALSE(detail::PreambleChannelUsesCache(config, ProxyProtocol::H3,
-                                                false));
-  EXPECT_TRUE(detail::PreambleChannelUsesCache(config, ProxyProtocol::H3,
-                                               true));
+  EXPECT_FALSE(
+      detail::PreambleChannelUsesCache(config, ProxyProtocol::H3, false));
+  EXPECT_TRUE(
+      detail::PreambleChannelUsesCache(config, ProxyProtocol::H3, true));
 
   config.mH3Mode = Some(PreambleMode::Off);
   EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H3));
@@ -174,6 +178,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
                                               false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,
                                              true, true, 0, 0, 0, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentCarrierDispatch, false, false, 0, 0, 0, 0));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::DocumentCarrierDispatch, true, true, 0, 0, 0, 0));
+  EXPECT_FALSE(
+      detail::PreambleOverlapsConnect(PreambleMode::DocumentCarrierDispatch));
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::DocumentHandshakeConfirmed, false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(

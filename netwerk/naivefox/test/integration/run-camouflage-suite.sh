@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -213,6 +213,11 @@ fi
 if [[ $naivefox_arm == document-handshake-confirmed &&
       $protocol_selection != h3 ]]; then
   printf 'document-handshake-confirmed requires --protocol h3\n' >&2
+  exit 2
+fi
+if [[ $naivefox_arm == document-carrier-dispatch &&
+      $protocol_selection != h3 ]]; then
+  printf 'document-carrier-dispatch requires --protocol h3\n' >&2
   exit 2
 fi
 if [[ $experiment_design == multi_arm_superblocks && $naivefox_arm_explicit -eq 1 ]]; then
@@ -228,7 +233,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -257,6 +262,11 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   if [[ -n ${seen_multi_arms[document-handshake-confirmed]:-} &&
         $protocol_selection != h3 ]]; then
     printf 'document-handshake-confirmed multi-arm screening requires --protocol h3\n' >&2
+    exit 2
+  fi
+  if [[ -n ${seen_multi_arms[document-carrier-dispatch]:-} &&
+        $protocol_selection != h3 ]]; then
+    printf 'document-carrier-dispatch multi-arm screening requires --protocol h3\n' >&2
     exit 2
   fi
   if [[ $multi_arm_views_csv != all ]]; then
@@ -1773,6 +1783,7 @@ else
   single_arm_analysis=confirmatory
   if [[ $naivefox_arm == tree-complete ||
         $naivefox_arm == document-overlap ||
+        $naivefox_arm == document-carrier-dispatch ||
         $naivefox_arm == document-handshake-confirmed ||
         $naivefox_arm == document-start-overlap ||
         $naivefox_arm == root-pmtud-control ||

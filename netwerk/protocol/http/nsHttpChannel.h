@@ -52,6 +52,9 @@ namespace net {
 
 class nsChannelClassifier;
 class HttpChannelSecurityWarningReporter;
+#ifdef MOZ_NAIVEFOX
+class H3CarrierDispatchGate;
+#endif
 
 using DNSPromise = MozPromise<nsCOMPtr<nsIDNSRecord>, nsresult, false>;
 
@@ -635,6 +638,9 @@ class nsHttpChannel final : public HttpBaseChannel,
   nsCOMPtr<nsIRequest> mTransactionPump;
   RefPtr<HttpTransactionShell> mTransaction;
   RefPtr<HttpTransactionShell> mTransactionSticky;
+#ifdef MOZ_NAIVEFOX
+  RefPtr<H3CarrierDispatchGate> mProxyPreambleCarrierDispatchGate;
+#endif
 
   uint64_t mLogicalOffset{0};
 

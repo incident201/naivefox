@@ -629,6 +629,7 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   PreambleConfig preamble = mImpl->mConfig.mPreamble;
   preamble.mMode = preamble.ModeForProtocol(aProtocol);
   if (preamble.mMode == PreambleMode::DocumentComplete ||
+      preamble.mMode == PreambleMode::DocumentCarrierDispatch ||
       preamble.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       preamble.mMode == PreambleMode::DocumentOverlap ||
       preamble.mMode == PreambleMode::DocumentStartOverlap) {
@@ -1384,18 +1385,16 @@ void TunnelSession::ReleaseOuterGate() {
                                                  std::memory_order_acq_rel)) {
     return;
   }
-  if (!mImpl->mOuterGateRegistered.exchange(false,
-                                             std::memory_order_acq_rel)) {
+  if (!mImpl->mOuterGateRegistered.exchange(false, std::memory_order_acq_rel)) {
     return;
   }
   nsCString routeKey(mImpl->mOuterGateKey);
   const uint64_t participant = mImpl->mConnectionId;
-  (void)NS_DispatchToMainThread(
-      NS_NewRunnableFunction("NaiveFox::OuterSessionGateLeave",
-                             [routeKey = std::move(routeKey), participant]() {
-                               OuterSessionGate::Get().Leave(routeKey,
-                                                             participant);
-                             }));
+  (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::OuterSessionGateLeave",
+      [routeKey = std::move(routeKey), participant]() {
+        OuterSessionGate::Get().Leave(routeKey, participant);
+      }));
 }
 
 }  // namespace mozilla::naivefox

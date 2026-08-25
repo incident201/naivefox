@@ -13,6 +13,7 @@ SUPPORTED_ARMS = (
     "root",
     "root-pmtud-control",
     "document-complete",
+    "document-carrier-dispatch",
     "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",
@@ -75,6 +76,8 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         raise ValueError("root-pmtud-control requires h3 superblocks")
     if protocol != "h3" and "document-handshake-confirmed" in arms:
         raise ValueError("document-handshake-confirmed requires h3 superblocks")
+    if protocol != "h3" and "document-carrier-dispatch" in arms:
+        raise ValueError("document-carrier-dispatch requires h3 superblocks")
     rng = random.Random(f"{seed}:{protocol}:multi-arm-superblocks")
     rows = []
     for index in range(count):
@@ -125,6 +128,11 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
             and row["protocol"] != "h3"
         ):
             raise ValueError("document-handshake-confirmed requires h3 superblocks")
+        if (
+            row["naivefox_arm"] == "document-carrier-dispatch"
+            and row["protocol"] != "h3"
+        ):
+            raise ValueError("document-carrier-dispatch requires h3 superblocks")
         key = (row["protocol"], row["experiment_block"])
         blocks.setdefault(key, []).append(row)
     if expected_blocks is not None:

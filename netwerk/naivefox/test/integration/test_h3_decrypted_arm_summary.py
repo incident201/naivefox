@@ -18,6 +18,233 @@ PRIVATE_SEMANTIC_MARKER = "private-tree-authority.invalid"
 
 
 class H3DecryptedArmSummaryTests(unittest.TestCase):
+    def test_carrier_dispatch_requires_document_complete_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "document-carrier-dispatch decrypted validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-carrier-dispatch",),
+                )
+
+    def test_carrier_dispatch_admission_and_safe_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.015, "server", 0, status="200"),
+                self.event(11, 0.017, "client", 4, method="CONNECT"),
+                self.event(14, 0.022, "server", 4, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(directory, "document-complete", common)
+            self.make_cohort(directory, "document-carrier-dispatch", common)
+            self.make_carrier_dispatch_evidence(directory)
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("document-complete", "document-carrier-dispatch"),
+            )
+            safe_summary = destination.read_text(encoding="utf-8")
+            for key in (
+                "single_connection",
+                "single_client_hello",
+                "no_carrier_request",
+                "real_document_deferred",
+                "normal_cm_dispatch",
+                "same_session",
+                "request_semantics_match",
+                "response_size_match",
+                "root_fin_before_connect",
+                "lifecycle_exact",
+            ):
+                self.assertIn(f"document_carrier_dispatch_{key}=yes", safe_summary)
+            self.assertNotIn("0x111", safe_summary)
+            self.assertNotIn("0x222", safe_summary)
+
+    def test_carrier_dispatch_rejects_lifecycle_reordering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_carrier_dispatch_evidence(directory)
+            path = Path(directory) / (
+                "decrypted-document-carrier-dispatch-private-lifecycle.moz_log"
+            )
+            lines = path.read_text(encoding="utf-8").splitlines()
+            lines[8], lines[9] = lines[9], lines[8]
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "marker order is invalid"):
+                summary.validate_carrier_dispatch_lifecycle(
+                    Path(directory), "document-carrier-dispatch"
+                )
+
+    def test_carrier_dispatch_rejects_unknown_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_carrier_dispatch_evidence(directory)
+            path = Path(directory) / (
+                "decrypted-document-carrier-dispatch-private-lifecycle.moz_log"
+            )
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "h3.carrier_dispatch action=unexpected session=0x111 "
+                    "carrier=0x222 document=0x333\n"
+                )
+            with self.assertRaisesRegex(ValueError, "unknown or ambiguous"):
+                summary.validate_carrier_dispatch_lifecycle(
+                    Path(directory), "document-carrier-dispatch"
+                )
+
+    def test_carrier_dispatch_rejects_any_extra_http_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            control = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.015, "server", 0, status="200"),
+                self.event(11, 0.017, "client", 4, method="CONNECT"),
+                self.event(14, 0.022, "server", 4, status="200"),
+            ]
+            carrier = [
+                self.event(6, 0.008, "client", 8, method="HEAD"),
+                *control,
+            ]
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(directory, "document-complete", control)
+            self.make_cohort(directory, "document-carrier-dispatch", carrier)
+            self.make_carrier_dispatch_evidence(directory)
+            with self.assertRaisesRegex(ValueError, "unexpected outer HTTP request"):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-complete", "document-carrier-dispatch"),
+                )
+
+    def test_carrier_dispatch_rejects_unexplained_bidi_stream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.015, "server", 0, status="200"),
+                self.event(11, 0.017, "client", 4, method="CONNECT"),
+                self.event(14, 0.022, "server", 4, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(directory, "document-complete", common)
+            self.make_cohort(directory, "document-carrier-dispatch", common)
+            self.make_carrier_dispatch_evidence(directory)
+            rows = summary.read_rows(
+                Path(directory), "document-carrier-dispatch", "lifecycle"
+            )
+            extra = dict(rows[0])
+            extra["frame.number"] = "6"
+            extra["quic.stream.stream_id"] = "8"
+            self.write_csv(
+                directory,
+                "document-carrier-dispatch",
+                "lifecycle",
+                tuple(rows[0]),
+                [*rows, extra],
+            )
+            with self.assertRaisesRegex(ValueError, "unexplained client bidirectional"):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-complete", "document-carrier-dispatch"),
+                )
+
+    def test_carrier_dispatch_rejects_identity_and_stream_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_carrier_dispatch_evidence(directory)
+            path = Path(directory) / (
+                "decrypted-document-carrier-dispatch-private-lifecycle.moz_log"
+            )
+            text = path.read_text(encoding="utf-8").replace(
+                "carrier=0x222", "carrier=0x333"
+            )
+            path.write_text(text, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "transaction ids must differ"):
+                summary.validate_carrier_dispatch_lifecycle(
+                    Path(directory), "document-carrier-dispatch"
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_carrier_dispatch_evidence(directory)
+            path = Path(directory) / (
+                "decrypted-document-carrier-dispatch-private-lifecycle.moz_log"
+            )
+            text = path.read_text(encoding="utf-8").replace(
+                "stream_id=0 carrier_complete=1",
+                "stream_id=8 carrier_complete=1",
+            )
+            path.write_text(text, encoding="utf-8")
+            common = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.015, "server", 0, status="200"),
+                self.event(11, 0.017, "client", 4, method="CONNECT"),
+                self.event(14, 0.022, "server", 4, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(directory, "document-complete", common)
+            self.make_cohort(directory, "document-carrier-dispatch", common)
+            with self.assertRaisesRegex(ValueError, "does not match the wire GET"):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("document-complete", "document-carrier-dispatch"),
+                )
+
+    def test_carrier_dispatch_rejects_confirmed_gate_contamination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_carrier_dispatch_evidence(directory)
+            path = Path(directory) / (
+                "decrypted-document-carrier-dispatch-private-lifecycle.moz_log"
+            )
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "h3.preamble_confirm_gate action=wait session=0x111 "
+                    "ci=0x444 transport_confirmed=0\n"
+                )
+            with self.assertRaisesRegex(ValueError, "handshake-confirmed gate"):
+                summary.validate_carrier_dispatch_lifecycle(
+                    Path(directory), "document-carrier-dispatch"
+                )
+
     def test_handshake_confirmed_requires_document_complete_control(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
@@ -1669,6 +1896,44 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "transport_confirmed=1\n"
             "h3.preamble_confirm_gate action=release session=0x111 ci=0x222 "
             "transport_confirmed=1\n",
+            encoding="utf-8",
+        )
+
+    def make_carrier_dispatch_evidence(self, directory):
+        lifecycle = Path(directory) / (
+            "decrypted-document-carrier-dispatch-private-lifecycle.moz_log"
+        )
+        lifecycle.write_text(
+            "h3.carrier_dispatch action=carrier-created gate=0x555 "
+            "carrier=0x222 ci=0x444 use_he=0 fetch_https_rr=0 parallel_limit=1\n"
+            "h3.carrier_dispatch action=document-configured gate=0x555 "
+            "carrier=0x222 document=0x333 ci=0x444 caps=00000001\n"
+            "h3.carrier_dispatch action=carrier-establishment-start gate=0x555 "
+            "carrier=0x222 ci=0x444\n"
+            "h3.carrier_dispatch action=document-waiting gate=0x555 "
+            "carrier=0x222 document=0x333 carrier_complete=0\n"
+            "h3.carrier_dispatch action=carrier-activated connection=0x666 "
+            "session=0x111 carrier=0x222 connected=0\n"
+            "h3.state session=0x111 ci=0x777 from=0 to=2 cause=connected\n"
+            "h3.carrier_dispatch action=connection-connected connection=0x666 "
+            "session=0x111\n"
+            "h3.carrier_dispatch action=document-waiting gate=0x555 "
+            "carrier=0x222 document=0x333 carrier_complete=0 path=spdy-pending\n"
+            "h3.carrier_dispatch action=carrier-read-complete gate=0x555 "
+            "carrier=0x222 request_bytes=0 result=base-stream-closed rv=80470002\n"
+            "h3.carrier_dispatch action=carrier-complete gate=0x555 "
+            "carrier=0x222 result=00000000 carrier_read_complete=1\n"
+            "h3.carrier_dispatch action=document-normal-dispatch gate=0x555 "
+            "carrier=0x222 document=0x333 carrier_complete=1 path=spdy-pending\n"
+            "h3.carrier_dispatch action=document-activated gate=0x555 "
+            "carrier=0x222 connection=0x666 session=0x111 document=0x333 "
+            "connected=1 wildcard=1\n"
+            "h3.carrier_dispatch action=document-attached gate=0x555 "
+            "carrier=0x222 session=0x111 document=0x333 via=add-stream "
+            "carrier_complete=1\n"
+            "h3.carrier_dispatch action=document-headers-emitted gate=0x555 "
+            "carrier=0x222 session=0x111 document=0x333 stream_id=0 "
+            "carrier_complete=1\n",
             encoding="utf-8",
         )
 

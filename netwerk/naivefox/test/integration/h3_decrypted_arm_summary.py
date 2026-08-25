@@ -12,6 +12,7 @@ SUPPORTED_ARMS = (
     "root",
     "root-pmtud-control",
     "document-complete",
+    "document-carrier-dispatch",
     "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",
@@ -62,6 +63,72 @@ CONFIRMED_LIFECYCLE_PATTERNS = {
         r"transport_confirmed=1(?:\s|$)"
     ),
 }
+CARRIER_DISPATCH_LIFECYCLE_PATTERNS = {
+    "created": re.compile(
+        r"h3\.carrier_dispatch action=carrier-created gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) ci=(?P<ci>\S+) use_he=0 "
+        r"fetch_https_rr=0 parallel_limit=1\s*$"
+    ),
+    "establishment": re.compile(
+        r"h3\.carrier_dispatch action=carrier-establishment-start "
+        r"gate=(?P<gate>\S+) carrier=(?P<carrier>\S+) ci=(?P<ci>\S+)\s*$"
+    ),
+    "configured": re.compile(
+        r"h3\.carrier_dispatch action=document-configured gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) document=(?P<document>\S+) "
+        r"ci=(?P<ci>\S+) caps=[0-9a-fA-F]+\s*$"
+    ),
+    "waiting": re.compile(
+        r"h3\.carrier_dispatch action=document-waiting gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) document=(?P<document>\S+) "
+        r"carrier_complete=0(?: path=spdy-pending)?\s*$"
+    ),
+    "carrier_activated": re.compile(
+        r"h3\.carrier_dispatch action=carrier-activated connection=\S+ "
+        r"session=(?P<session>\S+) carrier=(?P<carrier>\S+) connected=0\s*$"
+    ),
+    "connection_connected": re.compile(
+        r"h3\.carrier_dispatch action=connection-connected connection=\S+ "
+        r"session=(?P<session>\S+)\s*$"
+    ),
+    "read": re.compile(
+        r"h3\.carrier_dispatch action=carrier-read-complete gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) request_bytes=0 "
+        r"result=base-stream-closed rv=(?P<rv>[0-9a-fA-F]+)\s*$"
+    ),
+    "complete": re.compile(
+        r"h3\.carrier_dispatch action=carrier-complete gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) result=00000000 "
+        r"carrier_read_complete=1\s*$"
+    ),
+    "dispatch": re.compile(
+        r"h3\.carrier_dispatch action=document-normal-dispatch "
+        r"gate=(?P<gate>\S+) carrier=(?P<carrier>\S+) "
+        r"document=(?P<document>\S+) carrier_complete=1"
+        r"(?: path=spdy-pending)?\s*$"
+    ),
+    "document_activated": re.compile(
+        r"h3\.carrier_dispatch action=document-activated gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) connection=\S+ "
+        r"session=(?P<session>\S+) document=(?P<document>\S+) "
+        r"connected=1 wildcard=[01]\s*$"
+    ),
+    "document_attached": re.compile(
+        r"h3\.carrier_dispatch action=document-attached gate=(?P<gate>\S+) "
+        r"carrier=(?P<carrier>\S+) session=(?P<session>\S+) "
+        r"document=(?P<document>\S+) via=add-stream carrier_complete=1\s*$"
+    ),
+    "headers": re.compile(
+        r"h3\.carrier_dispatch action=document-headers-emitted "
+        r"gate=(?P<gate>\S+) carrier=(?P<carrier>\S+) "
+        r"session=(?P<session>\S+) document=(?P<document>\S+) "
+        r"stream_id=(?P<stream_id>\d+) carrier_complete=1\s*$"
+    ),
+}
+CARRIER_CONNECTED_PATTERN = re.compile(
+    r"h3\.state session=(?P<session>\S+) ci=(?P<ci>\S+) .*"
+    r"cause=connected(?:\s|$)"
+)
 
 
 def split_values(value):
@@ -547,6 +614,191 @@ def validate_confirmed_lifecycle(root, cohort):
     )
 
 
+def validate_carrier_dispatch_lifecycle(root, cohort):
+    path = root / f"decrypted-{cohort}-private-lifecycle.moz_log"
+    require(path.is_file(), f"{cohort} private lifecycle log is missing")
+    events = {name: [] for name in CARRIER_DISPATCH_LIFECYCLE_PATTERNS}
+    connected = []
+    carrier_lines = 0
+    with path.open(encoding="utf-8", errors="replace") as source:
+        for line_number, line in enumerate(source, start=1):
+            require(
+                "h3.preamble_confirm_gate action=wait" not in line
+                and "h3.preamble_confirm_gate action=release" not in line,
+                f"{cohort} unexpectedly used the handshake-confirmed gate",
+            )
+            connected_match = CARRIER_CONNECTED_PATTERN.search(line)
+            if connected_match:
+                connected.append((line_number, connected_match.groupdict()))
+            if "h3.carrier_dispatch" not in line:
+                continue
+            carrier_lines += 1
+            matches = []
+            for name, pattern in CARRIER_DISPATCH_LIFECYCLE_PATTERNS.items():
+                match = pattern.search(line)
+                if match:
+                    matches.append((name, match))
+            require(
+                len(matches) == 1,
+                f"{cohort} contains an unknown or ambiguous carrier lifecycle marker",
+            )
+            name, match = matches[0]
+            events[name].append((line_number, match.groupdict()))
+    require(
+        carrier_lines == sum(len(matches) for matches in events.values()),
+        f"{cohort} carrier marker count is invalid",
+    )
+    singleton_events = (
+        "created",
+        "establishment",
+        "carrier_activated",
+        "connection_connected",
+        "read",
+        "complete",
+        "document_attached",
+        "headers",
+    )
+    for name in singleton_events:
+        require(
+            len(events[name]) == 1,
+            f"{cohort} lifecycle must contain exactly one {name} marker",
+        )
+    for name in ("configured", "waiting", "dispatch", "document_activated"):
+        require(events[name], f"{cohort} lifecycle has no {name} marker")
+    require(connected, f"{cohort} lifecycle has no connected H3 state marker")
+
+    gates = {
+        data["gate"]
+        for name, matches in events.items()
+        for _, data in matches
+        if "gate" in data
+    }
+    carriers = {
+        data["carrier"]
+        for name, matches in events.items()
+        for _, data in matches
+        if "carrier" in data
+    }
+    require(
+        len(gates) == 1 and len(carriers) == 1,
+        f"{cohort} carrier lifecycle gate or carrier ids do not match",
+    )
+    connection_infos = {
+        data["ci"]
+        for name in ("created", "establishment", "configured")
+        for _, data in events[name]
+    }
+    require(
+        len(connection_infos) == 1,
+        f"{cohort} carrier lifecycle connection-info ids do not match",
+    )
+    carrier_session = events["carrier_activated"][0][1]["session"]
+    connected_for_session = [
+        event for event in connected if event[1]["session"] == carrier_session
+    ]
+    require(
+        len(connected_for_session) == 1,
+        f"{cohort} lifecycle must contain exactly one connected state for the carrier session",
+    )
+    session_ids = {
+        data["session"]
+        for name in (
+            "carrier_activated",
+            "connection_connected",
+            "document_activated",
+            "document_attached",
+            "headers",
+        )
+        for _, data in events[name]
+    }
+    session_ids.add(connected_for_session[0][1]["session"])
+    require(
+        len(session_ids) == 1,
+        f"{cohort} carrier lifecycle markers do not share one H3 session id",
+    )
+    gate_id = next(iter(gates))
+    carrier_id = next(iter(carriers))
+    session_id = next(iter(session_ids))
+    configured_documents = {
+        data["document"] for _, data in events["configured"]
+    }
+    dispatched_documents = {
+        data["document"] for _, data in events["dispatch"]
+    }
+    activated_documents = {
+        data["document"] for _, data in events["document_activated"]
+    }
+    final_document_id = events["headers"][0][1]["document"]
+    for value, role in (
+        (gate_id, "gate"),
+        (session_id, "session"),
+        (carrier_id, "carrier"),
+        (final_document_id, "document"),
+    ):
+        try:
+            normalized = value[2:] if value.startswith("0x") else value
+            valid_id = bool(normalized) and int(normalized, 16) != 0
+        except ValueError:
+            valid_id = False
+        require(valid_id, f"{cohort} lifecycle has an invalid {role} id")
+    require(
+        carrier_id != final_document_id,
+        f"{cohort} carrier and document transaction ids must differ",
+    )
+    require(
+        final_document_id in configured_documents
+        and final_document_id in dispatched_documents
+        and final_document_id in activated_documents
+        and events["document_attached"][0][1]["document"] == final_document_id,
+        f"{cohort} final document identity is not preserved through normal dispatch",
+    )
+    created_position = events["created"][0][0]
+    establishment_position = events["establishment"][0][0]
+    connected_position = connected_for_session[0][0]
+    carrier_activated_position = events["carrier_activated"][0][0]
+    connection_connected_position = events["connection_connected"][0][0]
+    read_position = events["read"][0][0]
+    complete_position = events["complete"][0][0]
+    attached_position = events["document_attached"][0][0]
+    headers_position = events["headers"][0][0]
+    require(
+        created_position < establishment_position
+        and any(position < connected_position for position, _ in events["waiting"])
+        and establishment_position < carrier_activated_position
+        < connected_position
+        < connection_connected_position
+        < read_position
+        < complete_position
+        and all(position > complete_position for position, _ in events["dispatch"])
+        and all(
+            position > complete_position for position, _ in events["document_activated"]
+        )
+        and complete_position < attached_position < headers_position,
+        f"{cohort} carrier lifecycle marker order is invalid",
+    )
+    return {
+        "session_id": session_id,
+        "carrier_id": carrier_id,
+        "document_id": final_document_id,
+        "stream_id": events["headers"][0][1]["stream_id"],
+    }
+
+
+def observed_client_bidirectional_streams(root, cohort):
+    streams = set()
+    for row in read_rows(root, cohort, "lifecycle"):
+        for value in split_values(row["quic.stream.stream_id"]):
+            try:
+                stream_id = int(value, 0)
+            except ValueError as error:
+                raise ValueError(
+                    f"{cohort} contains an ambiguous QUIC stream id"
+                ) from error
+            if stream_id % 4 == 0:
+                streams.add(str(stream_id))
+    return streams
+
+
 def read_h3_initialization_position(root, cohort, proxy_port):
     rows = read_rows(root, cohort, "unidirectional-streams")
     require(rows, f"{cohort} has no client H3 unidirectional stream initialization")
@@ -780,10 +1032,20 @@ def validate(cohorts, connections, client_hellos, arms):
                 f"{arm} CONNECT has no response padding header",
             )
         gets = [row for row in requests if row["method"] == "GET"]
+        if arm == "document-carrier-dispatch":
+            request_methods = [row["method"] for row in requests if row["method"]]
+            require(
+                request_methods.count("GET") == 1
+                and request_methods.count("CONNECT") >= 1
+                and len(request_methods)
+                == 1 + request_methods.count("CONNECT"),
+                f"{arm} emitted an unexpected outer HTTP request",
+            )
         if arm in (
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-carrier-dispatch",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
@@ -848,6 +1110,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 "root",
                 "root-pmtud-control",
                 "document-complete",
+                "document-carrier-dispatch",
                 "document-handshake-confirmed",
                 "tree-complete",
                 "tree-complete-css",
@@ -863,6 +1126,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "root",
                     "root-pmtud-control",
                     "document-complete",
+                    "document-carrier-dispatch",
                     "document-handshake-confirmed",
                 ):
                     observed_fins = [
@@ -1116,6 +1380,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "document-complete",
     )
     require(
+        "document-carrier-dispatch" not in arms or "document-complete" in arms,
+        "document-carrier-dispatch decrypted validation requires document-complete",
+    )
+    require(
         "document-start-overlap" not in arms
         or {"document-complete", "document-overlap"}.issubset(arms),
         "document-start-overlap decrypted validation requires "
@@ -1153,6 +1421,35 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         ) = summarize_cohort(root, cohort, proxy_port)
     validate(cohorts, connections, client_hellos, arms)
     confirmed_admission_validated = False
+    carrier_dispatch_admission_validated = False
+    if "document-carrier-dispatch" in arms:
+        cohort = "document-carrier-dispatch"
+        carrier_identity = validate_carrier_dispatch_lifecycle(root, cohort)
+        carrier_gets = [
+            row
+            for row in cohorts[cohort]
+            if row["direction"] == "client" and row["method"] == "GET"
+        ]
+        carrier_connects = [
+            row
+            for row in cohorts[cohort]
+            if row["direction"] == "client" and row["method"] == "CONNECT"
+        ]
+        require(
+            len(carrier_gets) == 1
+            and carrier_identity["stream_id"] == carrier_gets[0]["stream_id"],
+            f"{cohort} lifecycle document stream does not match the wire GET",
+        )
+        expected_bidi_streams = {
+            row["stream_id"] for row in (*carrier_gets, *carrier_connects)
+        }
+        observed_bidi_streams = observed_client_bidirectional_streams(root, cohort)
+        require(
+            carrier_gets[0]["stream_id"] in observed_bidi_streams
+            and observed_bidi_streams <= expected_bidi_streams,
+            f"{cohort} contains an unexplained client bidirectional stream",
+        )
+        carrier_dispatch_admission_validated = True
     if "document-handshake-confirmed" in arms:
         cohort = "document-handshake-confirmed"
         for row in read_rows(root, cohort, "packets"):
@@ -1254,6 +1551,34 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes["document-complete"]
             == root_response_sizes["document-handshake-confirmed"],
             "document response content-length differs for handshake-confirmed",
+        )
+    if {"document-complete", "document-carrier-dispatch"}.issubset(arms):
+        complete_wire_get = next(
+            row
+            for row in cohorts["document-complete"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        carrier_wire_get = next(
+            row
+            for row in cohorts["document-carrier-dispatch"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        require(
+            complete_wire_get["header_name_order"]
+            == carrier_wire_get["header_name_order"]
+            and complete_wire_get["header_name_set"]
+            == carrier_wire_get["header_name_set"],
+            "document sanitized header names/order differ for carrier-dispatch",
+        )
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-carrier-dispatch"]["root"],
+            "document selected header values/order differ for carrier-dispatch",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-carrier-dispatch"],
+            "document response content-length differs for carrier-dispatch",
         )
     if {
         "document-complete",
@@ -1512,6 +1837,17 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("document_overlap_request_semantics_match=yes\n")
             destination.write("document_overlap_response_size_match=yes\n")
             destination.write("document_overlap_wire_overlap_is_admission=no\n")
+        if carrier_dispatch_admission_validated:
+            destination.write("document_carrier_dispatch_single_connection=yes\n")
+            destination.write("document_carrier_dispatch_single_client_hello=yes\n")
+            destination.write("document_carrier_dispatch_no_carrier_request=yes\n")
+            destination.write("document_carrier_dispatch_real_document_deferred=yes\n")
+            destination.write("document_carrier_dispatch_normal_cm_dispatch=yes\n")
+            destination.write("document_carrier_dispatch_same_session=yes\n")
+            destination.write("document_carrier_dispatch_request_semantics_match=yes\n")
+            destination.write("document_carrier_dispatch_response_size_match=yes\n")
+            destination.write("document_carrier_dispatch_root_fin_before_connect=yes\n")
+            destination.write("document_carrier_dispatch_lifecycle_exact=yes\n")
         if confirmed_admission_validated:
             destination.write(
                 "document_handshake_confirmed_single_connection=yes\n"

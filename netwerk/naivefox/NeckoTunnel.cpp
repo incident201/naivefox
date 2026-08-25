@@ -921,8 +921,7 @@ nsresult ProxyPreambleOperation::Start(
       !IsValidPreamblePath(aConfig.mPath) || aConfig.mMaxBytes == 0 ||
       aConfig.mMaxBytes > PreambleConfig::kMaximumBytes ||
       aConfig.mMaxAssets > PreambleConfig::kMaximumAssets ||
-      (aConfig.mCacheResources &&
-       !PreambleModeUsesResources(aConfig.mMode))) {
+      (aConfig.mCacheResources && !PreambleModeUsesResources(aConfig.mMode))) {
     return NS_ERROR_INVALID_ARG;
   }
   mImpl->mConfig = aConfig;
@@ -972,22 +971,27 @@ nsresult ProxyPreambleOperation::Start(
     MOZ_TRY(internal->SetAllowHttp3(mImpl->mProtocol == ProxyProtocol::H3));
     MOZ_TRY(internal->SetBlockAuthPrompt(true));
     MOZ_TRY(internal->SetProxyPreamble());
-    if (mImpl->mConfig.mMode ==
-        PreambleMode::DocumentHandshakeConfirmed) {
+    if (mImpl->mConfig.mMode == PreambleMode::DocumentCarrierDispatch) {
       if (mImpl->mProtocol != ProxyProtocol::H3 ||
           aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
         return NS_ERROR_INVALID_ARG;
       }
-      MOZ_TRY(
-          internal->SetProxyPreambleWaitForHandshakeConfirmation());
+      MOZ_TRY(internal->SetProxyPreambleUseCarrierDispatch());
+    }
+    if (mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed) {
+      if (mImpl->mProtocol != ProxyProtocol::H3 ||
+          aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
+        return NS_ERROR_INVALID_ARG;
+      }
+      MOZ_TRY(internal->SetProxyPreambleWaitForHandshakeConfirmation());
     }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
     // The navigation is never cache-backed.  The diagnostic cache arm only
     // changes discovered resource channels, keeping root request semantics
     // and every default configuration unchanged.
-    uint32_t loadFlags = nsIRequest::LOAD_ANONYMOUS |
-                         nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+    uint32_t loadFlags =
+        nsIRequest::LOAD_ANONYMOUS | nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
     if (!detail::PreambleChannelUsesCache(mImpl->mConfig, mImpl->mProtocol,
                                           false)) {
       loadFlags |= nsIRequest::INHIBIT_CACHING;
@@ -1112,6 +1116,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
 
   if (aStreamId != 0 ||
       mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentCarrierDispatch ||
       mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
       mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
@@ -1256,8 +1261,8 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       }
       MOZ_TRY(httpChannel->SetReferrerInfo(mImpl->mRootReferrerInfo));
       MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
-      uint32_t loadFlags = nsIRequest::LOAD_ANONYMOUS |
-                           nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+      uint32_t loadFlags =
+          nsIRequest::LOAD_ANONYMOUS | nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
       if (!detail::PreambleChannelUsesCache(mImpl->mConfig, mImpl->mProtocol,
                                             true)) {
         loadFlags |= nsIRequest::INHIBIT_CACHING;

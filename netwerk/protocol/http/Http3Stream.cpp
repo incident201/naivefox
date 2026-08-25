@@ -9,6 +9,8 @@
 
 #include "Http3Session.h"
 #include "HttpLog.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "SpeculativeTransaction.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
 #include "nsHttpHandler.h"
@@ -116,8 +118,29 @@ nsresult Http3Stream::TryActivating() {
   }
 #endif
 
-  return mSession->TryActivating(method, scheme, authorityHeader, path,
-                                 mFlatHttpRequestHeaders, &mStreamId, this);
+  rv = mSession->TryActivating(method, scheme, authorityHeader, path,
+                               mFlatHttpRequestHeaders, &mStreamId, this);
+#ifdef MOZ_NAIVEFOX
+  if (NS_SUCCEEDED(rv)) {
+    if (nsHttpTransaction* transaction = mTransaction->QueryHttpTransaction();
+        transaction && transaction->UseH3CarrierDispatch() &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=document-headers-emitted gate=%p "
+           "carrier=%p session=%p document=%p stream_id=%" PRIu64
+           " carrier_complete=%d",
+           transaction->CarrierDispatchGate(),
+           reinterpret_cast<void*>(transaction->CarrierDispatchGate()
+                                       ? transaction->CarrierDispatchGate()
+                                             ->CarrierId()
+                                       : 0),
+           mSession.get(), transaction, mStreamId,
+           transaction->CarrierDispatchGate() &&
+               transaction->CarrierDispatchGate()->IsComplete()));
+    }
+  }
+#endif
+  return rv;
 }
 
 void Http3Stream::CurrentBrowserIdChanged(uint64_t id) {

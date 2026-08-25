@@ -243,6 +243,14 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setProxyPreambleWaitForHandshakeConfirmation();
 
     /**
+     * For the experimental first cold HTTP/3 proxy preamble only, establish
+     * the session with a request-less carrier, then dispatch this transaction
+     * normally after the connected activation callback.
+     * Must be called after setProxyPreamble() and before the channel is opened.
+     */
+    [must_use] void setProxyPreambleUseCarrierDispatch();
+
+    /**
      * True iff the channel is CONNECT only.
      */
     [must_use] readonly attribute boolean onlyConnect;

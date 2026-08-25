@@ -238,8 +238,7 @@ bool IsHostOrAddress(const nsACString& aHost) {
 }
 
 bool IsHeaderTokenCharacter(char aValue) {
-  if ((aValue >= '0' && aValue <= '9') ||
-      (aValue >= 'A' && aValue <= 'Z') ||
+  if ((aValue >= '0' && aValue <= '9') || (aValue >= 'A' && aValue <= 'Z') ||
       (aValue >= 'a' && aValue <= 'z')) {
     return true;
   }
@@ -562,6 +561,8 @@ class JsonParser final {
       } else if (mode.EqualsLiteral("document-complete") ||
                  mode.EqualsLiteral("root")) {
         aMode = PreambleMode::DocumentComplete;
+      } else if (mode.EqualsLiteral("document-carrier-dispatch")) {
+        aMode = PreambleMode::DocumentCarrierDispatch;
       } else if (mode.EqualsLiteral("document-handshake-confirmed")) {
         aMode = PreambleMode::DocumentHandshakeConfirmed;
       } else if (mode.EqualsLiteral("document-overlap")) {
@@ -642,9 +643,8 @@ class JsonParser final {
           return Error("duplicate preamble cache-resources field");
         }
         sawCacheResources = true;
-        MOZ_TRY(ParseBoolean(
-            aPreamble.mCacheResources,
-            "preamble cache-resources must be a boolean"));
+        MOZ_TRY(ParseBoolean(aPreamble.mCacheResources,
+                             "preamble cache-resources must be a boolean"));
       } else {
         return Error("unsupported preamble field");
       }
@@ -664,16 +664,22 @@ class JsonParser final {
     }
     const PreambleMode h2Mode = aPreamble.ModeForProtocol(ProxyProtocol::H2);
     const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
-    if (h2Mode == PreambleMode::DocumentHandshakeConfirmed) {
-      return Error(
-          "document-handshake-confirmed preamble is only supported for H3");
+    if (h2Mode == PreambleMode::DocumentHandshakeConfirmed ||
+        h2Mode == PreambleMode::DocumentCarrierDispatch) {
+      return Error("selected diagnostic preamble is only supported for H3");
     }
     if (h3Mode == PreambleMode::DocumentHandshakeConfirmed &&
-        (!sawH3Mode || aPreamble.mH3Mode !=
-                           Some(PreambleMode::DocumentHandshakeConfirmed))) {
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentHandshakeConfirmed))) {
       return Error(
           "document-handshake-confirmed must be selected explicitly with "
           "h3-mode");
+    }
+    if (h3Mode == PreambleMode::DocumentCarrierDispatch &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentCarrierDispatch))) {
+      return Error(
+          "document-carrier-dispatch must be selected explicitly with h3-mode");
     }
     const bool anyActive =
         h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
@@ -697,8 +703,7 @@ class JsonParser final {
     }
     if (!anyTree) {
       if (sawCacheResources) {
-        return Error(
-            "preamble cache-resources requires a tree/resource mode");
+        return Error("preamble cache-resources requires a tree/resource mode");
       }
       if (aPreamble.mMaxAssets != 0) {
         return Error("document-only preamble max-assets must be zero");
@@ -781,8 +786,7 @@ class JsonParser final {
     if (negative) {
       signedValue = -signedValue;
     }
-    if (signedValue <= 0 ||
-        signedValue > std::numeric_limits<int32_t>::max()) {
+    if (signedValue <= 0 || signedValue > std::numeric_limits<int32_t>::max()) {
       return Error(aTypeError);
     }
     return NS_OK;
@@ -923,17 +927,15 @@ class JsonParser final {
     nsTArray<nsCString> tokens;
     size_t position = 0;
     while (position < aValue.Length()) {
-      while (position < aValue.Length() &&
-             (aValue.CharAt(position) == ' ' ||
-              aValue.CharAt(position) == '\t')) {
+      while (position < aValue.Length() && (aValue.CharAt(position) == ' ' ||
+                                            aValue.CharAt(position) == '\t')) {
         ++position;
       }
       if (position == aValue.Length()) {
         break;
       }
       const size_t start = position;
-      while (position < aValue.Length() &&
-             aValue.CharAt(position) != ' ' &&
+      while (position < aValue.Length() && aValue.CharAt(position) != ' ' &&
              aValue.CharAt(position) != '\t') {
         if (aValue.CharAt(position) == '\r' ||
             aValue.CharAt(position) == '\n') {
@@ -983,14 +985,12 @@ class JsonParser final {
       }
       size_t valueStart = static_cast<size_t>(colon + 1);
       size_t valueEnd = line.Length();
-      while (valueStart < valueEnd &&
-             (line.CharAt(valueStart) == ' ' ||
-              line.CharAt(valueStart) == '\t')) {
+      while (valueStart < valueEnd && (line.CharAt(valueStart) == ' ' ||
+                                       line.CharAt(valueStart) == '\t')) {
         ++valueStart;
       }
-      while (valueEnd > valueStart &&
-             (line.CharAt(valueEnd - 1) == ' ' ||
-              line.CharAt(valueEnd - 1) == '\t')) {
+      while (valueEnd > valueStart && (line.CharAt(valueEnd - 1) == ' ' ||
+                                       line.CharAt(valueEnd - 1) == '\t')) {
         --valueEnd;
       }
       header.mValue.Assign(Substring(line, valueStart, valueEnd - valueStart));
@@ -1125,8 +1125,8 @@ class JsonParser final {
         return Error("listener URI requires username and password");
       }
       MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aListener.mUser));
-      MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1),
-                            aListener.mPassword));
+      MOZ_TRY(
+          PercentDecode(Substring(userInfo, colon + 1), aListener.mPassword));
       if (aListener.mUser.IsEmpty() || aListener.mPassword.IsEmpty() ||
           aListener.mUser.Length() > 255 ||
           aListener.mPassword.Length() > 255) {
@@ -1256,8 +1256,8 @@ class JsonParser final {
     nsAutoCString host;
     bool ipv6 = false;
     uint16_t port = 443;
-    MOZ_TRY(ParseHostPort(Substring(authority, endpointStart), false, host, ipv6,
-                          port));
+    MOZ_TRY(ParseHostPort(Substring(authority, endpointStart), false, host,
+                          ipv6, port));
     in_addr ipv4Address{};
     if (!ipv6 &&
         ParseNetworkAddress(AF_INET, PromiseFlatCString(host).get(),

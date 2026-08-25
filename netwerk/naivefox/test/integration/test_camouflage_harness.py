@@ -203,6 +203,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "gate",
             "root",
             "root-pmtud-control",
+            "document-carrier-dispatch",
             "document-handshake-confirmed",
             "tree-complete",
             "tree-complete-css",
@@ -215,7 +216,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
         self.assertEqual(SUPERBLOCKS.infer_arms(rows), arms)
         for index in range(2):
-            members = rows[index * 12 : (index + 1) * 12]
+            members = rows[index * 13 : (index + 1) * 13]
             self.assertEqual(
                 {(row["label"], row["naivefox_arm"]) for row in members},
                 {
@@ -239,6 +240,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 1,
                 ["browser_page"],
                 arms=("root", "document-handshake-confirmed"),
+            )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
+                arms=("root", "document-carrier-dispatch"),
             )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
@@ -265,6 +274,10 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(
             "document-handshake-confirmed multi-arm screening requires "
             "--protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "document-carrier-dispatch multi-arm screening requires --protocol h3",
             runner,
         )
         self.assertIn("packets_17_32", runner)
@@ -579,6 +592,35 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-pass",
             )
 
+    def test_carrier_dispatch_arm_is_explicitly_h3_only(self):
+        config = CONFIG.build_config(
+            "document-carrier-dispatch",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "document-carrier-dispatch",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-bytes": CONFIG.PREAMBLE_MAX_BYTES,
+            },
+        )
+        self.assertTrue(config["outer-session-gate"])
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "document-carrier-dispatch",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+
     def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
         for arm in (
             "tree-complete",
@@ -859,6 +901,21 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires h3"):
             SAMPLE.validate_sample(
                 "document-handshake-confirmed",
+                "h2",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=91 protocol=h2\n",
+                {"protocol": "h2", "features": {"lifecycle_connection_count": 1.0}},
+            )
+        SAMPLE.validate_sample(
+            "document-carrier-dispatch",
+            "h3",
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=91 protocol=h3\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SAMPLE.validate_sample(
+                "document-carrier-dispatch",
                 "h2",
                 "Connection 1 preamble result=success status=0x00000000 "
                 "http=200 bytes=91 protocol=h2\n",

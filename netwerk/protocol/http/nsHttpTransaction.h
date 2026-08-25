@@ -8,9 +8,9 @@
 #include "ARefBase.h"
 #include "EventTokenBucket.h"
 #include "HttpTransactionShell.h"
-#include "mozilla/net/ClassOfService.h"
 #include "TimingStruct.h"
 #include "mozilla/StaticPrefs_security.h"
+#include "mozilla/net/ClassOfService.h"
 #include "mozilla/net/DNS.h"
 #include "mozilla/net/NeckoChannelParams.h"
 #include "nsAHttpConnection.h"
@@ -45,6 +45,9 @@ class nsHttpRequestHead;
 class nsHttpResponseHead;
 class NullHttpTransaction;
 class Http2ConnectTransaction;
+#ifdef MOZ_NAIVEFOX
+class H3CarrierDispatchGate;
+#endif
 
 //-----------------------------------------------------------------------------
 // nsHttpTransaction represents a single HTTP transaction.  It is thread-safe,
@@ -99,6 +102,10 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   bool WaitForH3HandshakeConfirmation() const {
     return mWaitForH3HandshakeConfirmation;
   }
+  void SetUseH3CarrierDispatch(bool aValue) { mUseH3CarrierDispatch = aValue; }
+  bool UseH3CarrierDispatch() const { return mUseH3CarrierDispatch; }
+  void SetH3CarrierDispatchGate(H3CarrierDispatchGate* aGate);
+  H3CarrierDispatchGate* CarrierDispatchGate() const;
 #endif
 
   void SetTRRInfo(nsIRequest::TRRMode aMode,
@@ -523,6 +530,8 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   Atomic<bool, Relaxed> mIsHttp3Used{false};
 #ifdef MOZ_NAIVEFOX
   Atomic<bool, ReleaseAcquire> mWaitForH3HandshakeConfirmation{false};
+  Atomic<bool, ReleaseAcquire> mUseH3CarrierDispatch{false};
+  RefPtr<H3CarrierDispatchGate> mH3CarrierDispatchGate;
 #endif
 
   // True iff WriteSegments was called while this transaction should be

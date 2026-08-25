@@ -14,6 +14,8 @@
 #  include "CookieService.h"
 #endif
 #include "HttpLog.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "SpeculativeTransaction.h"
 #include "HttpTrafficAnalyzer.h"
 #include "LoadContextInfo.h"
 #ifndef MOZ_NAIVEFOX
@@ -146,6 +148,7 @@
 #include "nsIDNSRecord.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsIHttpChannelInternal.h"
+#include "nsInterfaceRequestorAgg.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsINetworkErrorLogging.h"
 #ifndef MOZ_NAIVEFOX
@@ -154,9 +157,9 @@
 #include "nsINetworkLinkService.h"
 #include "nsIOService.h"
 #include "nsIPrincipal.h"
+#include "nsIProgressEventSink.h"
 #include "nsIPrompt.h"
 #include "nsIProtocolProxyService2.h"
-#include "nsIProgressEventSink.h"
 #include "nsIRedirectResultListener.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
@@ -1820,8 +1823,7 @@ void nsHttpChannel::SpeculativeConnect() {
 #endif
 
   if (gIOService->IsOffline() || mUpgradeProtocolCallback ||
-      !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) ||
-      forceOffline) {
+      !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) || forceOffline) {
     return;
   }
 
@@ -1844,12 +1846,81 @@ void nsHttpChannel::SpeculativeConnect() {
   // it.
   bool httpsRRAllowed = !(mCaps & NS_HTTP_DISALLOW_HTTPS_RR) &&
                         !(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS);
-  (void)gHttpHandler->MaybeSpeculativeConnectWithHTTPSRR(
-      mConnectionInfo, callbacks,
+  uint32_t speculativeCaps =
       mCaps & (NS_HTTP_DISALLOW_SPDY | NS_HTTP_TRR_MODE_MASK |
                NS_HTTP_DISABLE_IPV4 | NS_HTTP_DISABLE_IPV6 |
-               NS_HTTP_DISALLOW_HTTP3 | NS_HTTP_REFRESH_DNS),
-      nsHttpHandler::EchConfigEnabled() && httpsRRAllowed);
+               NS_HTTP_DISALLOW_HTTP3 | NS_HTTP_REFRESH_DNS);
+  bool fetchHTTPSRR = nsHttpHandler::EchConfigEnabled() && httpsRRAllowed;
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseCarrierDispatch) {
+    if (mProxyPreambleCarrierDispatchGate) {
+      return;
+    }
+
+    speculativeCaps |= mConnectionInfo->GetAnonymous()
+                           ? NS_HTTP_LOAD_ANONYMOUS
+                           : 0;
+    speculativeCaps |= NS_HTTP_ERROR_SOFTLY;
+
+    nsCOMPtr<nsIInterfaceRequestor> carrierCallbacks;
+    NS_NewInterfaceRequestorAggregation(callbacks, nullptr,
+                                        getter_AddRefs(carrierCallbacks));
+    if (!carrierCallbacks) {
+      return;
+    }
+
+    RefPtr<H3CarrierDispatchGate> gate = new H3CarrierDispatchGate();
+    RefPtr<nsHttpConnectionInfo> gateConnectionInfo = mConnectionInfo;
+    RefPtr<SpeculativeTransaction> carrier = new SpeculativeTransaction(
+        mConnectionInfo, carrierCallbacks, speculativeCaps,
+        [gate, gateConnectionInfo](nsresult aReason) {
+          MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+          nsresult result = aReason;
+          if (!gate->CarrierReadComplete()) {
+            result = NS_ERROR_UNEXPECTED;
+          } else if (gate->CarrierReadResult() != NS_BASE_STREAM_CLOSED) {
+            result = gate->CarrierReadResult();
+          }
+          gate->Complete(result);
+          if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+            NAIVEFOX_LIFECYCLE_LOG(
+                ("h3.carrier_dispatch action=carrier-complete gate=%p "
+                 "carrier=%p result=%08x carrier_read_complete=%d",
+                 gate.get(), reinterpret_cast<void*>(gate->CarrierId()),
+                 static_cast<uint32_t>(result),
+                 gate->CarrierReadComplete()));
+          }
+          (void)gHttpHandler->ProcessPendingQ(gateConnectionInfo);
+        });
+    gate->SetCarrierId(reinterpret_cast<uintptr_t>(carrier.get()));
+    carrier->SetH3CarrierDispatchGate(gate);
+    // This product-owned carrier is the single establishment transaction for
+    // the marked preamble, not background browser speculation. Keep it usable
+    // when the embedding profile disables general speculative preconnects.
+    carrier->SetParallelSpeculativeConnectLimit(1);
+    mProxyPreambleCarrierDispatchGate = gate;
+
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=carrier-created gate=%p carrier=%p "
+           "ci=%p use_he=0 fetch_https_rr=%d parallel_limit=1",
+           gate.get(), carrier.get(), mConnectionInfo.get(), false));
+    }
+    // Explicit HTTP/3 proxy routing already selects the outer transport. HTTPS
+    // RR is origin routing work and DoSpeculativeConnectionInternal normally
+    // suppresses it for proxies; keep the request-less carrier on that path.
+    nsresult rv = gHttpHandler->MaybeSpeculativeConnectWithHTTPSRR(
+        mConnectionInfo, carrierCallbacks, speculativeCaps, false, carrier);
+    if (NS_FAILED(rv)) {
+      gate->Complete(rv);
+    }
+    return;
+  }
+#endif
+
+  (void)gHttpHandler->MaybeSpeculativeConnectWithHTTPSRR(
+      mConnectionInfo, callbacks, speculativeCaps, fetchHTTPSRR);
 }
 
 void nsHttpChannel::DoNotifyListenerCleanup() {
@@ -2342,10 +2413,10 @@ nsresult nsHttpChannel::InitTransaction() {
   mTransaction->SetIsForWebTransport(!!mWebTransportSessionEventListener);
 
 #ifndef MOZ_NAIVEFOX
-#ifndef MOZ_NAIVEFOX
+#  ifndef MOZ_NAIVEFOX
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-#endif
+#  endif
 
   nsILoadInfo::IPAddressSpace parentAddressSpace =
       nsILoadInfo::IPAddressSpace::Unknown;
@@ -2402,6 +2473,21 @@ nsresult nsHttpChannel::InitTransaction() {
   if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
     transaction->SetWaitForH3HandshakeConfirmation(
         mProxyPreambleWaitForHandshakeConfirmation);
+    transaction->SetUseH3CarrierDispatch(mProxyPreambleUseCarrierDispatch);
+    transaction->SetH3CarrierDispatchGate(
+        mProxyPreambleCarrierDispatchGate);
+    if (mProxyPreambleUseCarrierDispatch &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=document-configured gate=%p "
+           "carrier=%p document=%p ci=%p caps=%08x",
+           mProxyPreambleCarrierDispatchGate.get(),
+           reinterpret_cast<void*>(mProxyPreambleCarrierDispatchGate
+                                       ? mProxyPreambleCarrierDispatchGate
+                                             ->CarrierId()
+                                       : 0),
+           transaction, mConnectionInfo.get(), mCaps));
+    }
   }
 #endif
 
@@ -3028,7 +3114,7 @@ nsresult nsHttpChannel::ProcessWAICTHeader() {
 #ifdef MOZ_NAIVEFOX
   return NS_OK;
 #else
-#ifdef NIGHTLY_BUILD
+#  ifdef NIGHTLY_BUILD
   if (!StaticPrefs::security_waict_downgrade_protection_enable()) {
     return NS_OK;
   }
@@ -3088,7 +3174,7 @@ nsresult nsHttpChannel::ProcessWAICTHeader() {
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
-#endif
+#  endif
 
   return NS_OK;
 #endif  // MOZ_NAIVEFOX
@@ -3155,8 +3241,7 @@ void nsHttpChannel::ProcessSSLInformation() {
   }
 
   uint32_t state;
-  if (NS_SUCCEEDED(mSecurityInfo->GetSecurityState(&state)) &&
-      (state & 1U)) {
+  if (NS_SUCCEEDED(mSecurityInfo->GetSecurityState(&state)) && (state & 1U)) {
     // Send weak crypto warnings to the web console
     if (state & 33554432U) {
       nsString consoleErrorTag = u"WeakCipherSuiteWarning"_ns;

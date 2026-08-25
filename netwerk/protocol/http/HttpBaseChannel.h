@@ -9,8 +9,8 @@
 
 #include <utility>
 
-#include "OpaqueResponseUtils.h"
 #include "ClassOfService.h"
+#include "OpaqueResponseUtils.h"
 #include "mozilla/AtomicBitfields.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/CompactPair.h"
@@ -280,6 +280,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
                                    const nsACString& aValue) override;
   NS_IMETHOD SetProxyPreamble() override;
   NS_IMETHOD SetProxyPreambleWaitForHandshakeConfirmation() override;
+  NS_IMETHOD SetProxyPreambleUseCarrierDispatch() override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
   NS_IMETHOD SetAllowSpdy(bool aAllowSpdy) override;
   NS_IMETHOD GetAllowHttp3(bool* aAllowHttp3) override;
@@ -902,6 +903,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
   uint32_t mCaps{0};
 #ifdef MOZ_NAIVEFOX
   bool mProxyPreambleWaitForHandshakeConfirmation{false};
+  bool mProxyPreambleUseCarrierDispatch{false};
 #endif
 
   ClassOfService mClassOfService;

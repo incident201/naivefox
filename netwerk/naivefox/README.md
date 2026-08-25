@@ -83,12 +83,13 @@ The supported config is a strict NaiveProxy-compatible subset:
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
-  `document-handshake-confirmed`, `document-overlap`,
+  `document-carrier-dispatch`, `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
-  compatibility aliases. `document-handshake-confirmed` is an H3-only causal
-  diagnostic and therefore must be selected explicitly through `h3-mode`; the
-  resolved H2 mode must remain a different supported mode. Active
+  compatibility aliases. `document-carrier-dispatch` and
+  `document-handshake-confirmed` are H3-only causal diagnostics and therefore
+  must be selected explicitly through `h3-mode`; the resolved H2 mode must
+  remain a different supported mode. Active
   modes share one absolute origin-form `path` and bounded `max-bytes` budget.
   `max-assets` is allowed when at least one effective protocol mode is a tree
   mode and is ignored by a document-only effective mode. Protocol overrides
@@ -117,6 +118,19 @@ The supported config is a strict NaiveProxy-compatible subset:
   only after the H2/H3 request stream has accepted and committed the GET. It
   then permits CONNECT while the response continues. Admission and final HTTP
   result are separate events; a normal 2xx root drain remains mandatory.
+  `document-carrier-dispatch` uses one request-less Gecko
+  `SpeculativeTransaction` to establish the first cold outer H3 session. The
+  real document remains pending until the carrier's normal zero-byte
+  `ReadSegments`/`Close` lifecycle completes, then returns through the ordinary
+  connection-manager dispatch onto that same session. The carrier has an
+  explicit one-connection limit so profiles may continue to disable general
+  speculative preconnects.
+  The mode does not enable Happy Eyeballs, use transaction swapping, wait for
+  QUIC confirmation, or change proxy fallback policy. If normal dispatch does
+  not select the carrier-established connection, the transaction fails closed.
+  Same-base screening found this drain fence worse than `document-complete` in
+  every measured view, so it remains a negative diagnostic rather than a
+  recommended default.
   `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
   is accepted only when at least one effective protocol mode is a tree mode.
   It enables Gecko's ordinary HTTP cache path only for discovered resource

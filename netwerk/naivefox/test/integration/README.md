@@ -509,7 +509,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -530,6 +530,34 @@ transport confirmation before GET HEADERS, unchanged document semantics and
 response size, and document FIN before CONNECT. This arm tests whether
 pre-confirmation preamble activation causes the early split; it is not a claim
 that ordinary Firefox explicitly waits for HANDSHAKE_DONE.
+`document-carrier-dispatch` is the product-oriented H3 lifecycle experiment.
+A request-less Gecko `SpeculativeTransaction` owns establishment of one cold
+H3 proxy connection while the real document remains an inactive ordinary
+`nsHttpTransaction`. The document stays in the normal pending queue through
+`ConnectionConnected` and is released only after the carrier's normal
+zero-byte `ReadSegments -> Close`; the callback posts ordinary
+connection-manager processing, which must activate it with normal
+`Http3Session::AddStream` on the carrier-established connection. Its explicit
+single-carrier limit is independent of the profile setting that disables
+general speculative preconnects. It uses no Happy Eyeballs flag or race, no
+`Confirmed` gate, no `SwapTransaction`, and no proxy-fallback change.
+Decrypted admission rejects a second physical QUIC
+identity or ClientHello, any unexpected HTTP request or client bidi stream,
+missing/failed carrier read or completion, null/reused lifecycle identities, a
+document stream-id mismatch, dispatch before carrier completion, any
+confirmation-gate wait/release, changed document request/response semantics,
+or CONNECT before document FIN.
+
+The isolated ten-block same-base H3/inner-HTTPS paired screen is retained as
+safe artifact `c63340cad667a8c4` (seed `25082502`). The carrier drain fence was
+worse than `document-complete` in every selected view: packets 1--16
+`0.10395` versus `0.07986`, packets 17--32 `0.72861` versus `0.71992`, packets
+1--32 `0.24091` versus `0.22342`, the first 250 ms `0.10758` versus `0.09208`,
+and whole-flow `0.37200` versus `0.35077`. Decrypted traces also kept the first
+GET at packet 10 while same-base Firefox placed it around packets 15--17. This
+is screening evidence, but it falsifies carrier drain alone as a default
+camouflage mechanism; a follow-up must preserve Firefox's provisional racing
+connection and winner-handoff semantics instead of adding another delay.
 `document-start-overlap` uses the same root request but waits for the root
 channel's `NS_NET_STATUS_WAITING_FOR` event, which follows H2/H3 request-stream
 commit, before releasing CONNECT. It does not infer socket ordering from

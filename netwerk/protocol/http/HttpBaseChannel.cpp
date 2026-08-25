@@ -74,8 +74,8 @@
 #include "mozilla/net/SFV.h"
 #include "nsBufferedStreams.h"
 #include "nsCOMPtr.h"
-#include "nsComponentManagerUtils.h"
 #include "nsCRT.h"
+#include "nsComponentManagerUtils.h"
 #ifndef MOZ_NAIVEFOX
 #  include "nsContentSecurityManager.h"
 #endif
@@ -117,8 +117,8 @@
 #include "nsIOService.h"
 #include "nsIObserverService.h"
 #include "nsIPrincipal.h"
-#include "nsIProtocolProxyService.h"
 #include "nsIProgressEventSink.h"
+#include "nsIProtocolProxyService.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsISecurityConsoleMessage.h"
@@ -362,9 +362,8 @@ void HttpBaseChannel::AddClassificationFlags(uint32_t aClassificationFlags,
 static bool isSecureOrTrustworthyURL(nsIURI* aURI) {
   return aURI->SchemeIs("https")
 #ifndef MOZ_NAIVEFOX
-         ||
-         (StaticPrefs::network_http_encoding_trustworthy_is_https() &&
-          nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackURL(aURI))
+         || (StaticPrefs::network_http_encoding_trustworthy_is_https() &&
+             nsMixedContentBlocker::IsPotentiallyTrustworthyLoopbackURL(aURI))
 #endif
       ;
 }
@@ -450,9 +449,7 @@ nsresult HttpBaseChannel::Init(nsIURI* aURI, uint32_t aCaps,
 #endif
 
   rv = gHttpHandler->AddStandardRequestHeaders(
-      &mRequestHead, aURI, isHTTPS, contentPolicyType,
-      false,
-      languageOverride);
+      &mRequestHead, aURI, isHTTPS, contentPolicyType, false, languageOverride);
   if (NS_FAILED(rv)) return rv;
 
   nsAutoCString type;
@@ -2611,7 +2608,7 @@ nsresult HttpBaseChannel::GetTopWindowURI(nsIURI* aURIBeingLoaded,
                                       getter_AddRefs(win));
     if (NS_SUCCEEDED(rv)) {
       rv = util->GetURIFromWindow(win, getter_AddRefs(mTopWindowURI));
-#if DEBUG
+#  if DEBUG
       if (mTopWindowURI) {
         nsCString spec;
         if (NS_SUCCEEDED(mTopWindowURI->GetSpec(spec))) {
@@ -2619,7 +2616,7 @@ nsresult HttpBaseChannel::GetTopWindowURI(nsIURI* aURIBeingLoaded,
                spec.get(), this));
         }
       }
-#endif
+#  endif
     }
   }
   *aTopWindowURI = do_AddRef(mTopWindowURI).take();
@@ -4185,6 +4182,22 @@ HttpBaseChannel::SetProxyPreambleWaitForHandshakeConfirmation() {
 }
 
 NS_IMETHODIMP
+HttpBaseChannel::SetProxyPreambleUseCarrierDispatch() {
+  ENSURE_CALLED_BEFORE_CONNECT();
+
+#ifdef MOZ_NAIVEFOX
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
+      mProxyPreambleWaitForHandshakeConfirmation) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  mProxyPreambleUseCarrierDispatch = true;
+  return NS_OK;
+#else
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+NS_IMETHODIMP
 HttpBaseChannel::GetAllowSpdy(bool* aAllowSpdy) {
   NS_ENSURE_ARG_POINTER(aAllowSpdy);
 
@@ -5241,8 +5254,8 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
 #ifndef MOZ_NAIVEFOX
   // Transfer the timing data (if we are dealing with an nsITimedChannel).
   nsCOMPtr<nsITimedChannel> newTimedChannel(do_QueryInterface(newChannel));
-#ifndef MOZ_NAIVEFOX
-#ifndef MOZ_NAIVEFOX
+#  ifndef MOZ_NAIVEFOX
+#    ifndef MOZ_NAIVEFOX
   if (config.timedChannelInfo && newTimedChannel) {
     // If we're an internal redirect, or a document channel replacement,
     // then we shouldn't record any new timing for this and just copy
@@ -5332,8 +5345,8 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
     newTimedChannel->SetHandleFetchEventEnd(
         config.timedChannelInfo->handleFetchEventEnd());
   }
-#endif
-#endif
+#    endif
+#  endif
 #endif
 
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(newChannel);

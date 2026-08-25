@@ -15,6 +15,7 @@
 #include "HttpLog.h"
 #include "NaiveFoxLifecycleLog.h"
 #include "NaiveFoxReuseLog.h"
+#include "SpeculativeTransaction.h"
 #include "QuicSocketControl.h"
 #include "SSLServerCertVerification.h"
 #include "SSLTokensCache.h"
@@ -452,15 +453,14 @@ Http3Session::~Http3Session() {
   LOG3(("Http3Session::~Http3Session %p", this));
 #ifdef MOZ_NAIVEFOX
   if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-    NAIVEFOX_LIFECYCLE_LOG(
-        ("h3.destroy session=%p ci=%p connection=%p udp=%p state=%d "
-         "error=%08x socket_error=%08x clean_shutdown=%d closed_by_neqo=%d "
-         "goaway=%d should_close=%d active_streams=%d",
-         this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
-         mUdpConn.get(),
-         static_cast<int>(mState), static_cast<uint32_t>(mError),
-         static_cast<uint32_t>(mSocketError), mCleanShutdown, mIsClosedByNeqo,
-         mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
+    NAIVEFOX_LIFECYCLE_LOG((
+        "h3.destroy session=%p ci=%p connection=%p udp=%p state=%d "
+        "error=%08x socket_error=%08x clean_shutdown=%d closed_by_neqo=%d "
+        "goaway=%d should_close=%d active_streams=%d",
+        this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
+        mUdpConn.get(), static_cast<int>(mState), static_cast<uint32_t>(mError),
+        static_cast<uint32_t>(mSocketError), mCleanShutdown, mIsClosedByNeqo,
+        mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
   }
 #endif
 #ifndef ANDROID
@@ -1516,6 +1516,18 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
 
   mStreamTransactionHash.InsertOrUpdate(aHttpTransaction, RefPtr{stream});
 
+#ifdef MOZ_NAIVEFOX
+  if (trans && trans->UseH3CarrierDispatch() &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    H3CarrierDispatchGate* gate = trans->CarrierDispatchGate();
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=document-attached gate=%p carrier=%p "
+         "session=%p document=%p via=add-stream carrier_complete=%d",
+         gate, reinterpret_cast<void*>(gate ? gate->CarrierId() : 0), this,
+         trans, gate && gate->IsComplete()));
+  }
+#endif
+
   if (mState == ZERORTT) {
     if (!stream->Do0RTT()) {
       LOG(("Http3Session %p will not get early data from Http3Stream %p", this,
@@ -2233,11 +2245,10 @@ void Http3Session::Close(nsresult aReason) {
          "state=%d error=%08x socket_error=%08x clean_shutdown=%d "
          "closed_by_neqo=%d goaway=%d should_close=%d active_streams=%d",
          this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
-         mUdpConn.get(),
-         static_cast<uint32_t>(aReason), static_cast<int>(mState),
-         static_cast<uint32_t>(mError), static_cast<uint32_t>(mSocketError),
-         mCleanShutdown, mIsClosedByNeqo, mGoawayReceived, mShouldClose,
-         !HasNoActiveStreams()));
+         mUdpConn.get(), static_cast<uint32_t>(aReason),
+         static_cast<int>(mState), static_cast<uint32_t>(mError),
+         static_cast<uint32_t>(mSocketError), mCleanShutdown, mIsClosedByNeqo,
+         mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
   }
 #endif
 
@@ -2267,8 +2278,8 @@ void Http3Session::Close(nsresult aReason) {
 #ifdef MOZ_NAIVEFOX
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
       NAIVEFOX_LIFECYCLE_LOG(
-          ("h3.state session=%p ci=%p from=%d to=%d cause=close-release",
-           this, NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+          ("h3.state session=%p ci=%p from=%d to=%d cause=close-release", this,
+           NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
            static_cast<int>(CLOSED)));
     }
 #endif
@@ -2284,9 +2295,8 @@ void Http3Session::Close(nsresult aReason) {
         ("h3.close.end session=%p ci=%p connection=%p udp=%p reason=%08x "
          "state=%d error=%08x",
          this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
-         mUdpConn.get(),
-         static_cast<uint32_t>(aReason), static_cast<int>(mState),
-         static_cast<uint32_t>(mError)));
+         mUdpConn.get(), static_cast<uint32_t>(aReason),
+         static_cast<int>(mState), static_cast<uint32_t>(mError)));
   }
 #endif
 }
@@ -2581,9 +2591,8 @@ void Http3Session::DontReuse() {
          "on_socket_thread=%d state=%d goaway=%d should_close=%d "
          "active_streams=%d",
          this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
-         mUdpConn.get(),
-         OnSocketThread(), static_cast<int>(mState), mGoawayReceived,
-         mShouldClose, !HasNoActiveStreams()));
+         mUdpConn.get(), OnSocketThread(), static_cast<int>(mState),
+         mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
   }
 #endif
   if (!OnSocketThread()) {

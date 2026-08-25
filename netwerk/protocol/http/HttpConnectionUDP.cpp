@@ -21,6 +21,7 @@
 #include "HttpConnectionUDP.h"
 #include "NaiveFoxLifecycleLog.h"
 #include "NaiveFoxReuseLog.h"
+#include "SpeculativeTransaction.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "nsComponentManagerUtils.h"
@@ -468,6 +469,25 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
     return mErrorBeforeConnect;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (trans->IsNullTransaction() && mConnInfo->IsHttp3ProxyConnection() &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=carrier-activated connection=%p "
+         "session=%p carrier=%p connected=%d",
+         this, mHttp3Session.get(), trans, mConnected));
+  }
+  if ((caps & NS_HTTP_PROXY_PREAMBLE) && hTrans &&
+      hTrans->UseH3CarrierDispatch() && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    H3CarrierDispatchGate* gate = hTrans->CarrierDispatchGate();
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=document-activated gate=%p carrier=%p "
+         "connection=%p session=%p document=%p connected=%d wildcard=%d",
+         gate, reinterpret_cast<void*>(gate ? gate->CarrierId() : 0), this,
+         mHttp3Session.get(), hTrans, mConnected, mAlreadyWildcard));
+  }
+#endif
+
   // When mIsInTunnel is false, this HttpConnectionUDP represents the *outer*
   // connection to the proxy. If a proxy CONNECT is still in progress,
   // we need to queue the transaction until the outer connection is fully
@@ -482,10 +502,9 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
       !mIsInTunnel && hTrans) {
     bool waitForHandshakeConfirmation = false;
 #ifdef MOZ_NAIVEFOX
-    waitForHandshakeConfirmation =
-        (caps & NS_HTTP_PROXY_PREAMBLE) &&
-        hTrans->WaitForH3HandshakeConfirmation() && !mAlreadyWildcard &&
-        !mHandshakeConfirmed;
+    waitForHandshakeConfirmation = (caps & NS_HTTP_PROXY_PREAMBLE) &&
+                                   hTrans->WaitForH3HandshakeConfirmation() &&
+                                   !mAlreadyWildcard && !mHandshakeConfirmed;
 #endif
     if (!mConnected || waitForHandshakeConfirmation) {
       MOZ_ASSERT(!mQueuedHttpConnectTransaction.Contains(hTrans));
@@ -561,6 +580,16 @@ void HttpConnectionUDP::OnConnected() {
   MOZ_ASSERT(!mConnected, "Called more than once");
 
   mConnected = true;
+
+#ifdef MOZ_NAIVEFOX
+  if (mConnInfo->IsHttp3ProxyConnection() &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=connection-connected connection=%p "
+         "session=%p",
+         this, mHttp3Session.get()));
+  }
+#endif
 
   // Deferred LNA check: now that the QUIC handshake has succeeded (and the
   // peer presented a valid certificate for the requested name), check
@@ -1213,9 +1242,8 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
   }
 #endif
   MOZ_ASSERT(trans == mHttp3Session ||
-             (transInQueue &&
-              (IsProxyConnectInProgress() ||
-               (trans->Caps() & NS_HTTP_PROXY_PREAMBLE))));
+             (transInQueue && (IsProxyConnectInProgress() ||
+                               (trans->Caps() & NS_HTTP_PROXY_PREAMBLE))));
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   if (NS_SUCCEEDED(reason) || (reason == NS_BASE_STREAM_CLOSED)) {

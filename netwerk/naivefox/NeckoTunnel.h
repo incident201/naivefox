@@ -107,6 +107,7 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
     return false;
   }
   if (aMode == PreambleMode::DocumentComplete ||
+      aMode == PreambleMode::DocumentCarrierDispatch ||
       aMode == PreambleMode::DocumentHandshakeConfirmed) {
     return true;
   }

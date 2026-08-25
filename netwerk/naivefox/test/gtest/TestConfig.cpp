@@ -276,8 +276,7 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
       NS_OK)
       << error.get();
   EXPECT_TRUE(config.mPreamble.mCacheResources);
-  EXPECT_FALSE(
-      config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H2));
+  EXPECT_FALSE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H2));
   EXPECT_TRUE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H3));
 
   static constexpr const char* kInvalid[] = {
@@ -423,14 +422,31 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
           documentHandshakeConfirmed, error),
       NS_OK)
       << error.get();
-  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.ModeForProtocol(
-                ProxyProtocol::H2),
-            PreambleMode::Off);
-  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.ModeForProtocol(
-                ProxyProtocol::H3),
-            PreambleMode::DocumentHandshakeConfirmed);
+  EXPECT_EQ(
+      documentHandshakeConfirmed.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentHandshakeConfirmed.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentHandshakeConfirmed);
   EXPECT_EQ(documentHandshakeConfirmed.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(documentHandshakeConfirmed.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentCarrierDispatch;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-carrier-dispatch","path":"/camouflage/"}})"_ns,
+          documentCarrierDispatch, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      documentCarrierDispatch.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentCarrierDispatch.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentCarrierDispatch);
+  EXPECT_EQ(documentCarrierDispatch.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentCarrierDispatch.mPreamble.mMaxBytes, 64U * 1024U);
 
   static constexpr const char* kInvalid[] = {
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h2-mode":"root","h2-mode":"off","path":"/"}})",
@@ -442,6 +458,8 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-start-overlap","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-handshake-confirmed","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-handshake-confirmed","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-carrier-dispatch","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-carrier-dispatch","path":"/"}})",
   };
   for (const char* json : kInvalid) {
     Config invalid;
@@ -554,7 +572,8 @@ TEST(NaiveFoxConfig, OptionalUpstreamCredentials)
       NS_OK)
       << error.get();
   ASSERT_EQ(config.mProxies.Length(), 2U);
-  EXPECT_TRUE(config.mProxies[0].mUrl.EqualsLiteral("https://proxy.example:443"));
+  EXPECT_TRUE(
+      config.mProxies[0].mUrl.EqualsLiteral("https://proxy.example:443"));
   EXPECT_TRUE(config.mProxies[0].mUser.IsEmpty());
   EXPECT_TRUE(config.mProxies[0].mPassword.IsEmpty());
   EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H2);
@@ -769,10 +788,11 @@ TEST(NaiveFoxConfig, NoPostQuantumBoolean)
 
   Config config;
   nsAutoCString error;
-  ASSERT_EQ(ParseConfig(
-                R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example"})"_ns,
-                config, error),
-            NS_OK)
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example"})"_ns,
+          config, error),
+      NS_OK)
       << error.get();
   EXPECT_FALSE(config.mNoPostQuantum);
 }
@@ -886,13 +906,11 @@ TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
 
 TEST(NaiveFoxConfig, RejectsOversizedListenerCredentials)
 {
-  nsAutoCString json(
-      R"({"listen":"socks://user:)"_ns);
+  nsAutoCString json(R"({"listen":"socks://user:)"_ns);
   for (size_t index = 0; index < 256; ++index) {
     json.Append('p');
   }
-  json.AppendLiteral(
-      R"(@127.0.0.1:1080","proxy":"https://example.com"})");
+  json.AppendLiteral(R"(@127.0.0.1:1080","proxy":"https://example.com"})");
   Config config;
   nsAutoCString error;
   EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
@@ -954,10 +972,18 @@ TEST(NaiveFoxConfig, RejectsInvalidExtraHeaders)
   }
 
   static constexpr const char* kProtected[] = {
-      "padding",           "Host",               "Connection",
-      "Proxy-Connection", "Keep-Alive",         "Transfer-Encoding",
-      "TE",                "Trailer",            "Upgrade",
-      "Content-Length",    "Proxy-Authorization", "Proxy-Authenticate",
+      "padding",
+      "Host",
+      "Connection",
+      "Proxy-Connection",
+      "Keep-Alive",
+      "Transfer-Encoding",
+      "TE",
+      "Trailer",
+      "Upgrade",
+      "Content-Length",
+      "Proxy-Authorization",
+      "Proxy-Authenticate",
       "ALPN",
   };
   for (const char* name : kProtected) {
@@ -968,8 +994,8 @@ TEST(NaiveFoxConfig, RejectsInvalidExtraHeaders)
     Config config;
     nsAutoCString error;
     EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error))) << name;
-    EXPECT_TRUE(error.EqualsLiteral(
-        "extra-headers contains a protected header name"))
+    EXPECT_TRUE(
+        error.EqualsLiteral("extra-headers contains a protected header name"))
         << name << ": " << error.get();
   }
 }

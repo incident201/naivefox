@@ -64,6 +64,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-carrier-dispatch",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -83,6 +84,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
         raise ValueError("document-handshake-confirmed requires h3")
+    if arm == "document-carrier-dispatch" and protocol != "h3":
+        raise ValueError("document-carrier-dispatch requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -92,6 +95,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-carrier-dispatch",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -367,6 +371,7 @@ def main():
             "root",
             "root-pmtud-control",
             "document-complete",
+            "document-carrier-dispatch",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
