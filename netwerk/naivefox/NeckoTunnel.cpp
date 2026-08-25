@@ -993,6 +993,13 @@ nsresult ProxyPreambleOperation::Start(
       }
       MOZ_TRY(internal->SetProxyPreambleUseNativeCacheOpen());
     }
+    if (mImpl->mConfig.mMode == PreambleMode::DocumentNativeChannelOpen) {
+      if (mImpl->mProtocol != ProxyProtocol::H3 ||
+          aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
+        return NS_ERROR_INVALID_ARG;
+      }
+      MOZ_TRY(internal->SetProxyPreambleUseNativeChannelOpen());
+    }
     if (mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed) {
       if (mImpl->mProtocol != ProxyProtocol::H3 ||
           aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
@@ -1002,10 +1009,9 @@ nsresult ProxyPreambleOperation::Start(
     }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
-    // DocumentNativeCacheOpen deliberately keeps INHIBIT_CACHING: its channel
-    // runs the native asynchronous cache2 OPEN_READONLY miss without writing
-    // state.  The resource-cache diagnostic remains the only mode that removes
-    // this flag.
+    // DocumentNativeCacheOpen deliberately keeps INHIBIT_CACHING and performs
+    // an OPEN_READONLY miss. DocumentNativeChannelOpen deliberately removes it
+    // for the ordinary Firefox OPEN_NORMALLY new-entry lifecycle.
     uint32_t loadFlags =
         nsIRequest::LOAD_ANONYMOUS | nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
     if (!detail::PreambleChannelUsesCache(mImpl->mConfig, mImpl->mProtocol,
@@ -1087,6 +1093,18 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
     }
   }
   if (aStreamId == 0 &&
+      mImpl->mConfig.mMode == PreambleMode::DocumentNativeChannelOpen) {
+    nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aRequest);
+    bool nativeChannelSucceeded = false;
+    if (!internal ||
+        NS_FAILED(internal->GetProxyPreambleNativeChannelOpenSucceeded(
+            &nativeChannelSucceeded)) ||
+        !nativeChannelSucceeded) {
+      mImpl->mFirstFailure = NS_ERROR_UNEXPECTED;
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
+  if (aStreamId == 0 &&
       mImpl->mConfig.mMode == PreambleMode::DocumentColdWinnerHandoff) {
     nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aRequest);
     bool handoffSucceeded = false;
@@ -1159,6 +1177,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       mImpl->mConfig.mMode == PreambleMode::DocumentCarrierDispatch ||
       mImpl->mConfig.mMode == PreambleMode::DocumentColdWinnerHandoff ||
       mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentNativeChannelOpen ||
       mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
       mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||

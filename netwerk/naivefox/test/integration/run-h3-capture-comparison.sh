@@ -9,6 +9,14 @@ original_args=("$@")
 
 comparison_design=legacy
 comparison_arms=()
+private_event_trace=${NAIVEFOX_CAPTURE_PRIVATE_EVENT_TRACE:-0}
+case $private_event_trace in
+  0|1) ;;
+  *)
+    printf '%s\n' 'NAIVEFOX_CAPTURE_PRIVATE_EVENT_TRACE must be 0 or 1' >&2
+    exit 2
+    ;;
+esac
 while [[ $# -gt 0 ]]; do
   case $1 in
     --compare-arms)
@@ -21,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +45,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -74,6 +82,11 @@ fi
 if [[ -n ${seen_comparison_arms[document-native-cache-open]:-} &&
       -z ${seen_comparison_arms[document-complete]:-} ]]; then
   printf 'document-native-cache-open comparison requires document-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[document-native-channel-open]:-} &&
+      -z ${seen_comparison_arms[document-complete]:-} ]]; then
+  printf 'document-native-channel-open comparison requires document-complete\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[document-start-overlap]:-} &&
@@ -248,8 +261,11 @@ cleanup() {
   if [[ -n $capture_dir ]]; then
     case $capture_dir in
       "$STATE_ROOT"/h3-captures/*)
-        if [[ $status -eq 0 && $success -eq 1 ]]; then
+        if [[ $status -eq 0 && $success -eq 1 &&
+              $private_event_trace -eq 0 ]]; then
           rm -rf -- "$capture_dir"
+        elif [[ $status -eq 0 && $success -eq 1 ]]; then
+          printf 'private H3 event trace retained at %s\n' "$capture_dir" >&2
         else
           printf 'H3 capture comparison failed; private diagnostics preserved at %s\n' \
             "$capture_dir" >&2
@@ -275,6 +291,29 @@ for tool in dumpcap tshark curl getcap openssl python3 readelf rg sha256sum; do
     exit 1
   }
 done
+browser_python=${NAIVEFOX_CAMOUFLAGE_PYTHON:-}
+if [[ -z $browser_python && -x "$OBJDIR/camouflage-venv/bin/python" ]]; then
+  browser_python="$OBJDIR/camouflage-venv/bin/python"
+fi
+browser_python=${browser_python:-$(command -v python3)}
+browser_backend=${NAIVEFOX_CAMOUFLAGE_BROWSER_BACKEND:-selenium}
+case $browser_backend in
+  selenium | commandline) ;;
+  *)
+    printf 'unknown H3 capture browser backend: %s\n' "$browser_backend" >&2
+    exit 2
+    ;;
+esac
+if [[ $comparison_design == arms ]]; then
+  [[ $browser_backend == selenium ]] || {
+    printf 'H3 arm comparison requires a pre-launched Selenium browser\n' >&2
+    exit 2
+  }
+  "$browser_python" -c 'import selenium' || {
+    printf 'H3 arm comparison requires Selenium\n' >&2
+    exit 1
+  }
+fi
 
 dumpcap_path=$(command -v dumpcap)
 dumpcap_caps=$(getcap "$dumpcap_path" 2>/dev/null || true)
@@ -440,17 +479,38 @@ start_browser_controller() {
   local done_file="$capture_dir/$label-browser-done"
   browser_stop_file="$capture_dir/$label-browser-stop"
   rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
+  local -a warmup_args=()
+  if [[ $comparison_design == arms && $socks_port -eq 0 ]]; then
+    local warmup_completion
+    warmup_completion=$(openssl rand -hex 16)
+    local warmup_completion_file="$NAIVEFOX_FIXTURE_RUN_DIR/completions/$warmup_completion"
+    rm -f -- "$warmup_completion_file"
+    warmup_args=(
+      --warmup-url
+      "https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=initial&completion=$warmup_completion"
+      --warmup-completion-file "$warmup_completion_file"
+    )
+  fi
   local -a keylog_env=(-u SSLKEYLOGFILE)
   if [[ -n $keylog ]]; then
     keylog_env=("SSLKEYLOGFILE=$keylog")
   fi
-  setsid env "${keylog_env[@]}" "${firefox_runtime_env[@]}" \
+  local -a event_trace_env=(-u MOZ_LOG -u MOZ_LOG_FILE)
+  if [[ $private_event_trace -eq 1 && $socks_port -eq 0 ]]; then
+    event_trace_env=(
+      "MOZ_LOG=timestamp,nsHttp:5,UDPSocket:5,nsChannelClassifier:5,UrlClassifierDbService:5"
+      "MOZ_LOG_FILE=$capture_dir/$label-private-event-trace"
+    )
+  fi
+  setsid env "${keylog_env[@]}" "${event_trace_env[@]}" \
+    "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
-    python3 "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-    --binary "$REFERENCE_BIN" --profile "$profile" --backend commandline \
+    "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+    --binary "$REFERENCE_BIN" --profile "$profile" --backend "$browser_backend" \
     --protocol h3 --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
     --socks-port "$socks_port" --url "$url" \
     --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion" \
+    "${warmup_args[@]}" \
     --ready-file "$ready_file" --navigate-file "$navigate_file" \
     --done-file "$done_file" --stop-file "$browser_stop_file" \
     --browser-log "$capture_dir/$label-firefox.log" \
@@ -470,15 +530,51 @@ run_browser_workload() {
 
 stop_browser_controller() {
   [[ -n $browser_controller_pid ]] || return 0
+  local controlled_sigterm=0
   : >"$browser_stop_file"
   if ! timeout 20 tail --pid="$browser_controller_pid" -f /dev/null; then
-    printf 'controlled Firefox did not stop cleanly\n' >&2
-    stop_process_group "$browser_controller_pid"
+    # A fresh same-base Firefox profile can wedge in browser AsyncShutdown
+    # after WebDriver has already completed the measured workload.  Capture is
+    # stopped before this function is called, so terminate only the isolated
+    # Selenium process group and require it to disappear without SIGKILL.
+    local controller_pgid
+    controller_pgid=$(ps -o pgid= -p "$browser_controller_pid" 2>/dev/null |
+      tr -d ' ')
+    if [[ $controller_pgid != "$browser_controller_pid" ]]; then
+      printf 'controlled Firefox lacks its isolated process group\n' >&2
+      stop_process_group "$browser_controller_pid"
+      browser_controller_pid=
+      browser_stop_file=
+      return 1
+    fi
+    printf 'WebDriver quit timed out; using controlled Firefox process-group SIGTERM\n' \
+      >&2
+    controlled_sigterm=1
+    kill -TERM -- "-$browser_controller_pid" 2>/dev/null || true
+    if ! timeout 5 tail --pid="$browser_controller_pid" -f /dev/null; then
+      printf 'controlled Firefox required SIGKILL after shutdown timeout\n' >&2
+      kill -KILL -- "-$browser_controller_pid" 2>/dev/null || true
+      wait "$browser_controller_pid" 2>/dev/null || true
+      browser_controller_pid=
+      browser_stop_file=
+      return 1
+    fi
+  fi
+  if [[ $controlled_sigterm -eq 1 ]]; then
+    wait "$browser_controller_pid" 2>/dev/null || true
+  elif ! wait "$browser_controller_pid"; then
+    printf 'controlled Firefox browser controller exited unsuccessfully\n' >&2
     browser_controller_pid=
     browser_stop_file=
     return 1
   fi
-  wait "$browser_controller_pid"
+  if kill -0 -- "-$browser_controller_pid" 2>/dev/null; then
+    printf 'controlled Firefox left processes in its isolated process group\n' >&2
+    kill -KILL -- "-$browser_controller_pid" 2>/dev/null || true
+    browser_controller_pid=
+    browser_stop_file=
+    return 1
+  fi
   browser_controller_pid=
   browser_stop_file=
 }
@@ -534,12 +630,15 @@ stop_network_mutation_monitor() {
   network_monitor_done=
 }
 
-reference_profile="$capture_dir/reference-profile"
+reference_profile="$capture_dir/reference-profile-template"
 mkdir -m 0700 "$reference_profile"
 cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$reference_profile/"
 cat >"$reference_profile/user.js" <<EOF
 user_pref("app.update.enabled", false);
 user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.safebrowsing.realTime.enabled", false);
+user_pref("browser.safebrowsing.globalCache.enabled", false);
+user_pref("browser.safebrowsing.provider.google5.enabled", false);
 user_pref("network.captive-portal-service.enabled", false);
 user_pref("network.connectivity-service.enabled", false);
 user_pref("network.dns.disableIPv6", true);
@@ -550,8 +649,19 @@ user_pref("network.http.http3.force-use-alt-svc-mapping-for-testing", true);
 EOF
 chmod 0600 "$reference_profile/user.js"
 
+validate_native_channel_fresh_cache() {
+  local profile=$1
+  local participant=$2
+  if [[ -e $profile/cache2 || -L $profile/cache2 ]]; then
+    printf 'document-native-channel-open %s profile is not cache-cold: cache2 exists\n' \
+      "$participant" >&2
+    return 1
+  fi
+}
+
 run_reference() {
   local pass=$1
+  local run_profile="$capture_dir/$pass-reference-profile"
   local pcap="$capture_dir/$pass-reference.pcapng"
   local log="$capture_dir/$pass-reference-firefox.log"
   local keylog="$capture_dir/$pass-reference.keys"
@@ -560,6 +670,8 @@ run_reference() {
     "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
   local workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass"
+  mkdir -m 0700 "$run_profile"
+  cp -aL -- "$reference_profile/." "$run_profile/"
   if [[ $comparison_design == arms ]]; then
     completion=$comparison_completion
     workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion"
@@ -574,7 +686,10 @@ run_reference() {
   : >"$log"
   chmod 0600 "$log"
   if [[ $comparison_design == arms ]]; then
-    start_browser_controller "$reference_profile" "$workload_url" \
+    if [[ -n ${seen_comparison_arms[document-native-channel-open]:-} ]]; then
+      validate_native_channel_fresh_cache "$run_profile" reference
+    fi
+    start_browser_controller "$run_profile" "$workload_url" \
       "$completion" "$pass-reference" 0 "$keylog"
   fi
   start_network_mutation_monitor "$pass-reference"
@@ -584,7 +699,7 @@ run_reference() {
   else
     if ! timeout 35 "${command_env[@]}" \
         "$REFERENCE_BIN" --headless --new-instance --no-remote \
-        --profile "$reference_profile" --screenshot \
+        --profile "$run_profile" --screenshot \
         "$capture_dir/$pass-reference.png" "$workload_url" \
         >"$log" 2>&1; then
       printf 'reference Firefox %s pass did not complete successfully\n' \
@@ -621,6 +736,12 @@ run_naivefox() {
   chmod 0600 "$log"
   mkdir -m 0700 "$profile"
   cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$profile/"
+  cat >>"$profile/user.js" <<'EOF'
+user_pref("browser.safebrowsing.realTime.enabled", false);
+user_pref("browser.safebrowsing.globalCache.enabled", false);
+user_pref("browser.safebrowsing.provider.google5.enabled", false);
+EOF
+  chmod 0600 "$profile/user.js"
   local socks_port
   socks_port=$(python3 -c \
     'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
@@ -677,6 +798,9 @@ run_naivefox_arm() {
   cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$naivefox_profile/"
   cp -aL -- "$NAIVEFOX_FIXTURE_TRUSTED_PROFILE/." "$browser_profile/"
   cat >>"$naivefox_profile/user.js" <<EOF
+user_pref("browser.safebrowsing.realTime.enabled", false);
+user_pref("browser.safebrowsing.globalCache.enabled", false);
+user_pref("browser.safebrowsing.provider.google5.enabled", false);
 user_pref("network.http.http3.enable", true);
 user_pref("network.http.http3.disable_when_third_party_roots_found", false);
 EOF
@@ -723,8 +847,20 @@ EOF
   if [[ $arm == document-handshake-confirmed ||
         $arm == document-carrier-dispatch ||
         $arm == document-cold-winner-handoff ||
-        $arm == document-native-cache-open ]]; then
+        $arm == document-native-cache-open ||
+        $arm == document-native-channel-open ]]; then
     lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
+  fi
+  if [[ $private_event_trace -eq 1 &&
+        ( $arm == document-cold-winner-handoff ||
+          $arm == document-native-channel-open ) ]]; then
+    lifecycle_env=(
+      "MOZ_LOG=timestamp,NaiveFoxLifecycle:5,nsHttp:5,UDPSocket:5,nsChannelClassifier:5,UrlClassifierDbService:5"
+      "MOZ_LOG_FILE=$lifecycle_log_base"
+    )
+  fi
+  if [[ $arm == document-native-channel-open ]]; then
+    validate_native_channel_fresh_cache "$naivefox_profile" naivefox
   fi
   env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
     "${lifecycle_env[@]}" \
@@ -764,6 +900,7 @@ EOF
         $arm == document-carrier-dispatch ||
         $arm == document-cold-winner-handoff ||
         $arm == document-native-cache-open ||
+        $arm == document-native-channel-open ||
         $arm == document-handshake-confirmed ||
         $arm == document-overlap ||
         $arm == document-start-overlap ||
@@ -777,7 +914,8 @@ EOF
     if [[ $arm == document-handshake-confirmed ||
           $arm == document-carrier-dispatch ||
           $arm == document-cold-winner-handoff ||
-          $arm == document-native-cache-open ]]; then
+          $arm == document-native-cache-open ||
+          $arm == document-native-channel-open ]]; then
       [[ -s $lifecycle_log ]]
     fi
     if [[ $arm == document-overlap ||
@@ -1159,6 +1297,11 @@ if [[ $comparison_design == arms ]]; then
     printf 'credential-bearing data reached safe H3 arm output\n' >&2
     exit 1
   fi
+  if [[ $private_event_trace -eq 1 ]]; then
+    sed -i \
+      's/^raw_capture_material=deleted_after_success$/raw_capture_material=retained_private_event_trace/' \
+      "$safe_dir/summary.txt"
+  fi
   success=1
   printf 'Firefox/NaiveFox same-base H3 arm comparison passed\n'
   printf 'sanitized aggregates: %s\n' "$safe_dir"
@@ -1509,6 +1652,12 @@ with open(destination, "w", encoding="utf-8") as output:
     output.write("raw_capture_material=deleted_after_success\n")
 PY
 chmod 0600 "$safe_dir/summary.txt"
+
+if [[ $private_event_trace -eq 1 ]]; then
+  sed -i \
+    's/^raw_capture_material=deleted_after_success$/raw_capture_material=retained_private_event_trace/' \
+    "$safe_dir/summary.txt"
+fi
 
 {
   printf 'capture_revision=%s\n' "$(git -C "$SOURCE_ROOT" rev-parse HEAD)"

@@ -167,6 +167,7 @@ def load_dataset(path):
                 "document-carrier-dispatch",
                 "document-cold-winner-handoff",
                 "document-native-cache-open",
+                "document-native-channel-open",
                 "document-handshake-confirmed",
                 "document-overlap",
                 "document-start-overlap",
@@ -196,6 +197,8 @@ def load_dataset(path):
                 raise SystemExit("document-cold-winner-handoff requires h3")
             if arm == "document-native-cache-open" and source["protocol"] != "h3":
                 raise SystemExit("document-native-cache-open requires h3")
+            if arm == "document-native-channel-open" and source["protocol"] != "h3":
+                raise SystemExit("document-native-channel-open requires h3")
             if arm == "reference" and source["label"] == "naivefox":
                 raise SystemExit("NaiveFox row cannot use reference arm metadata")
             if arm in naivefox_arms and source["label"] != "naivefox":

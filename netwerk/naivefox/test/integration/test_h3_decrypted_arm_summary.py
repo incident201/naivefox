@@ -85,6 +85,52 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     Path(directory), "document-native-cache-open"
                 )
 
+    def test_native_channel_open_lifecycle_requires_real_classifier_callback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / (
+                "decrypted-document-native-channel-open-private-lifecycle.moz_log"
+            )
+            path.write_text(
+                "h3.native_channel_open action=open-begin channel=abc "
+                "inhibit_caching=0 expected_mode=normal\n"
+                "h3.native_channel_open action=callback-pending channel=abc\n"
+                "h3.native_channel_open action=classifier-predicate channel=abc "
+                "result=1 type=6 triggering_system=1 bypass=0 be_conservative=0\n"
+                "h3.native_channel_open action=classifier-db-service channel=abc "
+                "exists=1\n"
+                "h3.native_channel_open action=classifier-uri-principal channel=abc "
+                "triggering_system=1 uri_system=0 uri_content=1 uri_match=1 "
+                "attrs_match=1 uri=https://localhost:4433/camouflage/index.html?"
+                "scenario=browser_page&size=262144&count=4&idle_ms=5000&"
+                "completion=0123456789abcdef0123456789abcdef origin_attributes=\n"
+                "h3.native_channel_open action=classifier-mode channel=abc "
+                "local_db=1 real_time_mode=0\n"
+                "h3.native_channel_open action=classifier-classify channel=abc "
+                "status=00000000 expect_callback=1\n"
+                "h3.native_channel_open action=classifier-suspended channel=abc "
+                "suspend_count=1\n"
+                "h3.native_channel_open action=callback channel=abc entry=def "
+                "new=1 status=00000000\n"
+                "h3.native_channel_open action=trigger-network channel=abc "
+                "new_writable_entry=1 classifier_started=1\n"
+                "h3.native_channel_open action=classifier-complete channel=abc "
+                "status=00000000 resume_status=00000000 asynchronous=1\n",
+                encoding="utf-8",
+            )
+            summary.validate_native_channel_open_lifecycle(
+                Path(directory), "document-native-channel-open"
+            )
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "expect_callback=1", "expect_callback=0"
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "genuine asynchronous"):
+                summary.validate_native_channel_open_lifecycle(
+                    Path(directory), "document-native-channel-open"
+                )
+
     def test_carrier_dispatch_requires_document_complete_control(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
@@ -546,6 +592,30 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn('quic.frame_type==0x1e', runner)
         self.assertIn('>"$prefix-handshake-done.csv"', runner)
         self.assertIn("tree-overlap comparison requires tree-complete", runner)
+        self.assertIn(
+            "document-native-channel-open comparison requires document-complete",
+            runner,
+        )
+        self.assertIn(
+            'reference_profile="$capture_dir/reference-profile-template"', runner
+        )
+        self.assertIn(
+            'local run_profile="$capture_dir/$pass-reference-profile"', runner
+        )
+        self.assertIn('cp -aL -- "$reference_profile/." "$run_profile/"', runner)
+        self.assertIn(
+            'validate_native_channel_fresh_cache "$run_profile" reference', runner
+        )
+        self.assertIn(
+            'validate_native_channel_fresh_cache "$naivefox_profile" naivefox',
+            runner,
+        )
+        for pref in (
+            "browser.safebrowsing.realTime.enabled",
+            "browser.safebrowsing.globalCache.enabled",
+            "browser.safebrowsing.provider.google5.enabled",
+        ):
+            self.assertEqual(runner.count(f'user_pref("{pref}", false);'), 3)
         self.assertIn("tree-early-overlap comparison requires tree-complete", runner)
         self.assertIn('user_pref("network.http.http3.pmtud", true);', runner)
         reference_url = (
@@ -566,7 +636,20 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         )
         self.assertNotIn("&arm=$arm", runner)
         self.assertIn("camouflage_browser_controller.py", runner)
-        self.assertIn("--backend commandline", runner)
+        self.assertIn(
+            "browser_backend=${NAIVEFOX_CAMOUFLAGE_BROWSER_BACKEND:-selenium}",
+            runner,
+        )
+        self.assertIn('--backend "$browser_backend"', runner)
+        self.assertIn(
+            "H3 arm comparison requires a pre-launched Selenium browser", runner
+        )
+        self.assertIn(
+            "WebDriver quit timed out; using controlled Firefox process-group SIGTERM",
+            runner,
+        )
+        self.assertIn('kill -TERM -- "-$browser_controller_pid"', runner)
+        self.assertIn('kill -KILL -- "-$browser_controller_pid"', runner)
         self.assertIn("--completion-file", runner)
         self.assertIn('run_browser_workload "$pass-reference"', runner)
         self.assertIn('run_browser_workload "decrypted-$arm"', runner)
@@ -2498,6 +2581,45 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 [
                     self.event(9, 0.012, "client", "4;8", method="CONNECT"),
                     self.event(13, 0.021, "server", 8, status="200"),
+                ],
+            )
+            with self.assertRaisesRegex(
+                ValueError, "HEADERS/stream mapping is ambiguous"
+            ):
+                summary.summarize_cohort(Path(directory), "off", "4433")
+
+    def test_future_headers_stream_is_not_assigned_to_current_block(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "off",
+                [
+                    self.event(9, 0.012, "client", "4;8", method="GET"),
+                    self.event(10, 0.013, "client", 8, method="CONNECT"),
+                    self.event(13, 0.021, "server", 4, status="200"),
+                    self.event(14, 0.022, "server", 8, status="200"),
+                ],
+            )
+            rows, _, _ = summary.summarize_cohort(
+                Path(directory), "off", "4433"
+            )
+            requests = {
+                row["method"]: row
+                for row in rows
+                if row["direction"] == "client" and row["method"]
+            }
+            self.assertEqual(requests["GET"]["stream_id"], "4")
+            self.assertEqual(requests["CONNECT"]["stream_id"], "8")
+
+    def test_ambiguous_future_headers_row_does_not_force_assignment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "off",
+                [
+                    self.event(9, 0.012, "client", "4;8", method="GET"),
+                    self.event(10, 0.013, "client", "8;12", method="CONNECT"),
+                    self.event(13, 0.021, "server", 4, status="200"),
                 ],
             )
             with self.assertRaisesRegex(

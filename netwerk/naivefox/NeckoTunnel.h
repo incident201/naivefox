@@ -68,6 +68,11 @@ enum class PreambleResourceKind : uint8_t {
 inline bool PreambleChannelUsesCache(const PreambleConfig& aConfig,
                                      ProxyProtocol aProtocol,
                                      bool aIsResource) {
+  if (!aIsResource &&
+      aConfig.ModeForProtocol(aProtocol) ==
+          PreambleMode::DocumentNativeChannelOpen) {
+    return true;
+  }
   return aIsResource && aConfig.CacheResourcesForProtocol(aProtocol);
 }
 
@@ -110,6 +115,7 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
       aMode == PreambleMode::DocumentCarrierDispatch ||
       aMode == PreambleMode::DocumentColdWinnerHandoff ||
       aMode == PreambleMode::DocumentNativeCacheOpen ||
+      aMode == PreambleMode::DocumentNativeChannelOpen ||
       aMode == PreambleMode::DocumentHandshakeConfirmed) {
     return true;
   }

@@ -84,6 +84,10 @@ class nsHttpChannel final : public HttpBaseChannel,
  public:
   NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(
       bool* aValue) override;
+#ifdef MOZ_NAIVEFOX
+  void MarkProxyPreambleNativeChannelClassifierComplete(nsresult aStatus,
+                                                         nsresult aResumeRv);
+#endif
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER
@@ -570,9 +574,7 @@ class nsHttpChannel final : public HttpBaseChannel,
   void SetDoNotTrack();
   void SetGlobalPrivacyControl();
 
-#ifndef MOZ_NAIVEFOX
   already_AddRefed<nsChannelClassifier> GetOrCreateChannelClassifier();
-#endif
 
   // Start an internal redirect to a new InterceptedHttpChannel which will
   // resolve in firing a ServiceWorker FetchEvent.
@@ -603,9 +605,7 @@ class nsHttpChannel final : public HttpBaseChannel,
   // nsChannelClassifier will be invoked twice in InitLocalBlockList() and
   // BeginConnect(), so save the nsChannelClassifier here to keep the
   // state of whether tracking protection is enabled or not.
-#ifndef MOZ_NAIVEFOX
   RefPtr<nsChannelClassifier> mChannelClassifier;
-#endif
 
   // Dictionary entry for the entry being used to decompress this stream
   // (i.e. we added Dictionary-Available to the request).

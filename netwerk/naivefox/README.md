@@ -84,12 +84,13 @@ The supported config is a strict NaiveProxy-compatible subset:
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
   `document-carrier-dispatch`, `document-cold-winner-handoff`,
-  `document-native-cache-open`,
+  `document-native-cache-open`, `document-native-channel-open`,
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
   compatibility aliases. `document-carrier-dispatch`,
-  `document-cold-winner-handoff`, `document-native-cache-open`, and
+  `document-cold-winner-handoff`, `document-native-cache-open`,
+  `document-native-channel-open`, and
   `document-handshake-confirmed` are H3-only causal diagnostics and therefore
   must be selected explicitly through `h3-mode`; the resolved H2 mode must
   remain a different supported mode. Active
@@ -152,6 +153,16 @@ The supported config is a strict NaiveProxy-compatible subset:
   preserves `INHIBIT_CACHING`, requires an `OPEN_READONLY` miss before normal
   network dispatch, and never writes the response cache. Synchronous callbacks,
   hits, timeouts, and other cache outcomes fail before the document GET.
+  `document-native-channel-open` is the stricter cold H3 channel-lifecycle
+  diagnostic. It keeps the system triggering principal, but requires Safe
+  Browsing to classify the fixture URI through a non-system URI/codebase
+  principal with matching origin attributes. It also requires a normal
+  writable new cache2 entry and a genuine local-DB asynchronous classifier
+  callback that suspends and resumes the channel. Missing services,
+  `expectCallback=false`, synchronous completion, principal mismatch, cache
+  reuse, and real-time classifier paths fail closed. Controlled runs use a
+  fresh temporary profile; this mode does not introduce a persistent cache
+  dependency.
   `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
   is accepted only when at least one effective protocol mode is a tree mode.
   It enables Gecko's ordinary HTTP cache path only for discovered resource

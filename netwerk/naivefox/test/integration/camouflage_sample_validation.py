@@ -59,6 +59,12 @@ NATIVE_CACHE_OPEN = re.compile(
     r"preamble native-cache-open cache=readonly-miss "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+NATIVE_CHANNEL_OPEN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-channel-open cache=new-writable-entry "
+    r"classifier=async-suspend-resume "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 COLD_WINNER_HANDOFF = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble cold-winner-handoff "
@@ -78,6 +84,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-carrier-dispatch",
         "document-cold-winner-handoff",
         "document-native-cache-open",
+        "document-native-channel-open",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -103,6 +110,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
+    if arm == "document-native-channel-open" and protocol != "h3":
+        raise ValueError("document-native-channel-open requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -115,6 +124,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-carrier-dispatch",
         "document-cold-winner-handoff",
         "document-native-cache-open",
+        "document-native-channel-open",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -236,6 +246,39 @@ def validate_sample(arm, protocol, log_text, feature_document):
             raise ValueError("native cache-open lifecycle markers have invalid ordering")
     elif parsed_native_cache:
         raise ValueError(f"{arm} arm unexpectedly logged native cache-open lifecycle")
+    native_channel_lines = [
+        line for line in log_lines if " preamble native-channel-open " in line
+    ]
+    parsed_native_channel = [
+        NATIVE_CHANNEL_OPEN.fullmatch(line) for line in native_channel_lines
+    ]
+    if any(marker is None for marker in parsed_native_channel):
+        raise ValueError("malformed native channel-open evidence")
+    if arm == "document-native-channel-open":
+        if len(parsed_native_channel) != 1:
+            raise ValueError(
+                "document-native-channel-open requires one strict success marker"
+            )
+        marker = parsed_native_channel[0]
+        matching_established = [
+            (line, established)
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == marker["connection"]
+            and established["protocol"] == protocol
+        ]
+        if len(matching_established) != 1 or marker["protocol"] != protocol:
+            raise ValueError(
+                "document-native-channel-open marker identity differs from CONNECT"
+            )
+        if not (
+            log_lines.index(native_channel_lines[0]) < log_lines.index(result_lines[0])
+            < log_lines.index(matching_established[0][0])
+        ):
+            raise ValueError(
+                "native channel-open lifecycle markers have invalid ordering"
+            )
+    elif parsed_native_channel:
+        raise ValueError(f"{arm} arm unexpectedly logged native channel lifecycle")
     cold_winner_lines = [
         line for line in log_lines if " preamble cold-winner-handoff " in line
     ]
@@ -453,6 +496,7 @@ def main():
             "document-carrier-dispatch",
             "document-cold-winner-handoff",
             "document-native-cache-open",
+            "document-native-channel-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",

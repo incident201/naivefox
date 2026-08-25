@@ -274,6 +274,17 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] readonly attribute boolean proxyPreambleNativeCacheReadOnlyMiss;
 
     /**
+     * For the experimental first cold HTTP/3 proxy document, keep Firefox's
+     * ordinary speculative-connect, writable cache-open, and Safe Browsing
+     * classifier suspend/resume lifecycle before dispatching the real request.
+     * Must be called after setProxyPreamble() and before the channel is opened.
+     */
+    [must_use] void setProxyPreambleUseNativeChannelOpen();
+
+    /** True only after a new cache entry and asynchronous classifier resume. */
+    [must_use] readonly attribute boolean proxyPreambleNativeChannelOpenSucceeded;
+
+    /**
      * True iff the channel is CONNECT only.
      */
     [must_use] readonly attribute boolean onlyConnect;

@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -230,6 +230,11 @@ if [[ $naivefox_arm == document-native-cache-open &&
   printf 'document-native-cache-open requires --protocol h3\n' >&2
   exit 2
 fi
+if [[ $naivefox_arm == document-native-channel-open &&
+      $protocol_selection != h3 ]]; then
+  printf 'document-native-channel-open requires --protocol h3\n' >&2
+  exit 2
+fi
 if [[ $experiment_design == multi_arm_superblocks && $naivefox_arm_explicit -eq 1 ]]; then
   printf '%s\n' '--naivefox-arm cannot be combined with a multi-arm design' >&2
   exit 2
@@ -243,7 +248,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -287,6 +292,11 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   if [[ -n ${seen_multi_arms[document-native-cache-open]:-} &&
         $protocol_selection != h3 ]]; then
     printf 'document-native-cache-open multi-arm screening requires --protocol h3\n' >&2
+    exit 2
+  fi
+  if [[ -n ${seen_multi_arms[document-native-channel-open]:-} &&
+        $protocol_selection != h3 ]]; then
+    printf 'document-native-channel-open multi-arm screening requires --protocol h3\n' >&2
     exit 2
   fi
   if [[ $multi_arm_views_csv != all ]]; then
@@ -390,6 +400,17 @@ case $browser_backend in
     exit 2
     ;;
 esac
+if [[ $experiment_design == multi_arm_superblocks &&
+      $protocol_selection == h3 ]]; then
+  [[ $browser_backend != commandline ]] || {
+    printf 'H3 multi-arm screening requires a pre-launched Selenium browser\n' >&2
+    exit 2
+  }
+  "$browser_python" -c 'import selenium' || {
+    printf 'H3 multi-arm screening requires Selenium\n' >&2
+    exit 1
+  }
+fi
 dumpcap_path=$(command -v dumpcap)
 dumpcap_caps=$(getcap "$dumpcap_path" 2>/dev/null || true)
 if [[ $EUID -ne 0 ]] &&
@@ -873,6 +894,16 @@ validate_no_tls_token_persistence() {
   fi
 }
 
+validate_native_channel_fresh_cache() {
+  local profile=$1
+  local participant=$2
+  if [[ -e $profile/cache2 || -L $profile/cache2 ]]; then
+    printf 'document-native-channel-open %s profile is not cache-cold: cache2 exists\n' \
+      "$participant" >&2
+    return 1
+  fi
+}
+
 validate_profile_role() {
   local destination=$1
   local protocol=$2
@@ -973,6 +1004,13 @@ user_pref("network.prefetch-next", false);
 user_pref("network.http.speculative-parallel-limit", 0);
 user_pref("network.http.http3.enable", $enable_h3);
 EOF
+  if [[ $participant == reference || $participant == naivefox ]]; then
+    cat >>"$destination/user.js" <<'EOF'
+user_pref("browser.safebrowsing.realTime.enabled", false);
+user_pref("browser.safebrowsing.globalCache.enabled", false);
+user_pref("browser.safebrowsing.provider.google5.enabled", false);
+EOF
+  fi
   if [[ $arm == tree-warm-css-304 &&
         ( $participant == reference || $participant == naivefox ) ]]; then
     cat >>"$destination/user.js" <<'EOF'
@@ -1205,8 +1243,9 @@ start_browser_controller() {
   local protocol=$5
   local socks_port=${6:-0}
   local effective_backend=$browser_backend
-  if [[ $effective_backend == auto && $protocol == h3 ]]; then
-    effective_backend=commandline
+  if [[ $effective_backend == auto && $protocol == h3 &&
+        $experiment_design == multi_arm_superblocks ]]; then
+    effective_backend=selenium
   fi
   local ready_file="$sample_dir/browser-ready.json"
   local navigate_file="$sample_dir/browser-navigate"
@@ -1214,6 +1253,19 @@ start_browser_controller() {
   browser_stop_file="$sample_dir/browser-stop"
   browser_shutdown_file="$sample_dir/browser-shutdown.json"
   rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
+  local -a warmup_args=()
+  if [[ $effective_backend == selenium && $protocol == h3 &&
+        $experiment_design == multi_arm_superblocks && $socks_port -eq 0 ]]; then
+    local warmup_completion
+    warmup_completion=$(openssl rand -hex 16)
+    local warmup_completion_file="$NAIVEFOX_FIXTURE_RUN_DIR/completions/$warmup_completion"
+    rm -f -- "$warmup_completion_file"
+    warmup_args=(
+      --warmup-url
+      "https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=initial&completion=$warmup_completion"
+      --warmup-completion-file "$warmup_completion_file"
+    )
+  fi
   setsid env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
     "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
@@ -1222,6 +1274,7 @@ start_browser_controller() {
     --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --socks-port "$socks_port" \
     --url "$url" \
     --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion" \
+    "${warmup_args[@]}" \
     --ready-file "$ready_file" --navigate-file "$navigate_file" \
     --done-file "$done_file" --stop-file "$browser_stop_file" \
     --shutdown-file "$browser_shutdown_file" \
@@ -1243,12 +1296,38 @@ run_browser_workload() {
 }
 
 stop_browser_controller() {
+  local controller_pid=$browser_controller_pid
   : >"$browser_stop_file"
-  if ! timeout 20 tail --pid="$browser_controller_pid" -f /dev/null; then
-    printf 'Firefox browser controller did not stop cleanly\n' >&2
-    return 1
+  if ! timeout 10 tail --pid="$controller_pid" -f /dev/null; then
+    local controller_pgid
+    controller_pgid=$(ps -o pgid= -p "$controller_pid" 2>/dev/null |
+      tr -d ' ')
+    if [[ $controller_pgid != "$controller_pid" ]]; then
+      printf 'Firefox browser controller lacks its isolated process group\n' >&2
+      stop_process_group "$controller_pid"
+      return 1
+    fi
+    printf 'WebDriver quit timed out; using post-capture process-group SIGTERM\n' \
+      >&2
+    kill -TERM -- "-$controller_pid" 2>/dev/null || true
+    if ! timeout 5 tail --pid="$controller_pid" -f /dev/null; then
+      printf 'Firefox browser controller required SIGKILL\n' >&2
+      kill -KILL -- "-$controller_pid" 2>/dev/null || true
+      wait "$controller_pid" 2>/dev/null || true
+      return 1
+    fi
+    wait "$controller_pid" 2>/dev/null || true
+    if kill -0 -- "-$controller_pid" 2>/dev/null; then
+      printf 'Firefox browser controller left process-group members\n' >&2
+      kill -KILL -- "-$controller_pid" 2>/dev/null || true
+      return 1
+    fi
+    browser_controller_pid=
+    browser_stop_file=
+    browser_shutdown_file=
+    return 0
   fi
-  wait "$browser_controller_pid"
+  wait "$controller_pid"
   python3 - "$browser_shutdown_file" <<'PY'
 import json
 import sys
@@ -1368,6 +1447,9 @@ run_reference_sample() {
   elif cold_proxy_reset_applies "$protocol"; then
     restart_fixture_proxy "$session_id:reference_cold_measure"
   fi
+  if [[ $naivefox_arm == document-native-channel-open ]]; then
+    validate_native_channel_fresh_cache "$profile" reference
+  fi
   start_browser_controller "$profile" \
     "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" \
     "$completion" "$sample_dir" "$protocol"
@@ -1484,6 +1566,9 @@ run_naivefox_sample() {
     --output "$naivefox_config" --arm "$arm" \
     --protocol "$protocol" --socks-port "$socks_port" \
     --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --preamble-path "$path"
+  if [[ $arm == document-native-channel-open ]]; then
+    validate_native_channel_fresh_cache "$naivefox_profile" naivefox
+  fi
   env "${sslkeylog_unset[@]}" \
     -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
     "${sslkeylog_assignment[@]}" \
@@ -1806,6 +1891,7 @@ else
         $naivefox_arm == document-carrier-dispatch ||
         $naivefox_arm == document-cold-winner-handoff ||
         $naivefox_arm == document-native-cache-open ||
+        $naivefox_arm == document-native-channel-open ||
         $naivefox_arm == document-handshake-confirmed ||
         $naivefox_arm == document-start-overlap ||
         $naivefox_arm == root-pmtud-control ||

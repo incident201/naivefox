@@ -44,6 +44,11 @@ UNIFIED_SOURCES += [
     "UrlClassifierTelemetryUtils.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    # The lean proxy only restores the local DB lookup used by
+    # nsChannelClassifier. Updater/UI/test components remain browser-owned.
+    UNIFIED_SOURCES.remove("nsUrlClassifierTestUtils.cpp")
+
 # define conflicting LOG() macros
 SOURCES += [
     "nsUrlClassifierPrefixSet.cpp",
@@ -51,22 +56,25 @@ SOURCES += [
     "VariableLengthPrefixSet.cpp",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    SOURCES.remove("nsUrlClassifierStreamUpdater.cpp")
+
 # contains variables that conflict with LookupCache.cpp
 SOURCES += [
     "HashStore.cpp",
 ]
 
-EXTRA_JS_MODULES += [
+if not CONFIG["MOZ_NAIVEFOX"]:
+    EXTRA_JS_MODULES += [
     "SafeBrowsing.sys.mjs",
     "UrlClassifierHashCompleter.sys.mjs",
     "UrlClassifierLib.sys.mjs",
     "UrlClassifierListManager.sys.mjs",
     "UrlClassifierRemoteSettingsService.sys.mjs",
-]
+    ]
 
-XPCOM_MANIFESTS += [
-    "components.conf",
-]
+if not CONFIG["MOZ_NAIVEFOX"]:
+    XPCOM_MANIFESTS += ["components.conf"]
 
 EXPORTS += [
     "chromium/safebrowsing.pb.h",
@@ -87,6 +95,7 @@ FINAL_LIBRARY = "xul"
 
 LOCAL_INCLUDES += [
     "../build",
+    "/third_party/abseil-cpp",
     "/xpcom/io",
 ]
 

@@ -15,6 +15,7 @@ SUPPORTED_ARMS = (
     "document-carrier-dispatch",
     "document-cold-winner-handoff",
     "document-native-cache-open",
+    "document-native-channel-open",
     "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",
@@ -229,7 +230,8 @@ def read_http3_events(request_rows, header_rows, cohort, proxy_port):
     seen_streams = defaultdict(set)
     events = {}
     used_header_packets = set()
-    for row in sorted(request_rows, key=lambda item: int(item["frame.number"])):
+    ordered_rows = sorted(request_rows, key=lambda item: int(item["frame.number"]))
+    for row_index, row in enumerate(ordered_rows):
         event_direction = direction(row, proxy_port)
         frame = int(row["frame.number"])
         event_time = float(row["frame.time_relative"])
@@ -281,6 +283,37 @@ def read_http3_events(request_rows, header_rows, cohort, proxy_port):
             for stream in streams
             if stream not in seen_streams[(event_direction, connection)]
         ]
+        if len(candidate_streams) > len(blocks):
+            forced_future_header_streams = set()
+            for future_row in ordered_rows[row_index + 1 :]:
+                if direction(future_row, proxy_port) != event_direction:
+                    continue
+                future_connections = split_values(
+                    future_row["quic.connection.number"]
+                )
+                if connection not in future_connections:
+                    continue
+                future_streams = ordered_unique(
+                    split_values(future_row["quic.stream.stream_id"])
+                )
+                future_methods = split_values(
+                    future_row["http3.headers.method"]
+                )
+                future_statuses = split_values(
+                    future_row["http3.headers.status"]
+                )
+                if bool(future_methods) == bool(future_statuses):
+                    continue
+                future_values = (
+                    future_methods if future_methods else future_statuses
+                )
+                if len(future_streams) == len(future_values):
+                    forced_future_header_streams.update(future_streams)
+            candidate_streams = [
+                stream
+                for stream in candidate_streams
+                if stream not in forced_future_header_streams
+            ]
         require(
             len(candidate_streams) == len(blocks),
             f"{cohort} H3 HEADERS/stream mapping is ambiguous",
@@ -830,6 +863,125 @@ def validate_native_cache_open_lifecycle(root, cohort):
     )
 
 
+def validate_native_channel_open_lifecycle(root, cohort):
+    path = root / f"decrypted-{cohort}-private-lifecycle.moz_log"
+    require(path.is_file(), f"{cohort} private lifecycle log is missing")
+    expected = (
+        "open-begin",
+        "callback-pending",
+        "classifier-predicate",
+        "classifier-db-service",
+        "classifier-uri-principal",
+        "classifier-mode",
+        "classifier-classify",
+        "classifier-suspended",
+        "callback",
+        "trigger-network",
+        "classifier-complete",
+    )
+    events = {action: [] for action in expected}
+    with path.open(encoding="utf-8", errors="replace") as source:
+        for line_number, line in enumerate(source, start=1):
+            if "h3.native_channel_open" not in line:
+                continue
+            require(
+                "action=contract-failed" not in line
+                and "action=open-failed" not in line,
+                f"{cohort} native channel-open contract failed",
+            )
+            match = re.search(
+                r"action=([a-z-]+).*channel=((?:0x)?[0-9a-fA-F]+)", line
+            )
+            require(match is not None, f"{cohort} malformed native channel marker")
+            action = match.group(1)
+            require(action in events, f"{cohort} unknown native channel marker")
+            events[action].append((line_number, match.group(2), line))
+    for action, matches in events.items():
+        require(
+            len(matches) == 1,
+            f"{cohort} lifecycle must contain exactly one {action} marker",
+        )
+    channels = {matches[0][1] for matches in events.values()}
+    require(len(channels) == 1, f"{cohort} native channel markers changed channel")
+
+    line = {action: events[action][0][2] for action in expected}
+    require(
+        "inhibit_caching=0" in line["open-begin"]
+        and "expected_mode=normal" in line["open-begin"],
+        f"{cohort} did not use a normal writable cache open",
+    )
+    require(
+        "result=1" in line["classifier-predicate"]
+        and "triggering_system=1" in line["classifier-predicate"]
+        and "bypass=0" in line["classifier-predicate"],
+        f"{cohort} Safe Browsing classification predicate is invalid",
+    )
+    require(
+        "exists=1" in line["classifier-db-service"],
+        f"{cohort} local URL classifier DB service is unavailable",
+    )
+    principal = line["classifier-uri-principal"]
+    require(
+        "triggering_system=1" in principal
+        and "uri_system=0" in principal
+        and "uri_content=1" in principal
+        and "uri_match=1" in principal
+        and "attrs_match=1" in principal,
+        f"{cohort} classifier principal contract is invalid",
+    )
+    fixture_uri = re.search(r"\buri=(\S+)", principal)
+    require(
+        fixture_uri is not None
+        and re.fullmatch(
+            r"https://localhost:\d+/camouflage/index\.html"
+            r"\?scenario=browser_page&size=262144&count=4"
+            r"&idle_ms=5000&completion=[0-9a-f]{32}",
+            fixture_uri.group(1),
+        )
+        is not None,
+        f"{cohort} classifier URI is not the fixture document URI",
+    )
+    require(
+        "local_db=1" in line["classifier-mode"]
+        and "real_time_mode=0" in line["classifier-mode"],
+        f"{cohort} classifier did not use the controlled local DB path",
+    )
+    require(
+        "status=00000000" in line["classifier-classify"]
+        and "expect_callback=1" in line["classifier-classify"],
+        f"{cohort} classifier did not start a genuine asynchronous callback",
+    )
+    suspended = re.search(r"suspend_count=(\d+)", line["classifier-suspended"])
+    require(
+        suspended is not None and int(suspended.group(1)) > 0,
+        f"{cohort} classifier did not suspend the channel",
+    )
+    callback = line["callback"]
+    require(
+        re.search(r"entry=(?!\(nil\)|0(?:x0)?(?:\s|$))\S+", callback)
+        is not None
+        and "new=1" in callback
+        and "status=00000000" in callback,
+        f"{cohort} cache callback was not a new writable entry",
+    )
+    require(
+        "new_writable_entry=1" in line["trigger-network"]
+        and "classifier_started=1" in line["trigger-network"],
+        f"{cohort} network trigger preceded cache/classifier admission",
+    )
+    require(
+        "status=00000000" in line["classifier-complete"]
+        and "resume_status=00000000" in line["classifier-complete"]
+        and "asynchronous=1" in line["classifier-complete"],
+        f"{cohort} classifier did not complete and resume asynchronously",
+    )
+    positions = [events[action][0][0] for action in expected]
+    require(
+        positions == sorted(positions) and len(set(positions)) == len(positions),
+        f"{cohort} native channel lifecycle order is invalid",
+    )
+
+
 def validate_cold_winner_handoff_lifecycle(root, cohort):
     path = root / f"decrypted-{cohort}-private-lifecycle.moz_log"
     require(path.is_file(), f"{cohort} private lifecycle log is missing")
@@ -1257,7 +1409,10 @@ def validate(cohorts, connections, client_hellos, arms):
                 == 1 + request_methods.count("CONNECT"),
                 f"{arm} emitted an unexpected outer HTTP request",
             )
-        if arm == "document-native-cache-open":
+        if arm in (
+            "document-native-cache-open",
+            "document-native-channel-open",
+        ):
             request_methods = [row["method"] for row in requests if row["method"]]
             require(
                 request_methods.count("GET") == 1
@@ -1272,6 +1427,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "document-carrier-dispatch",
             "document-cold-winner-handoff",
             "document-native-cache-open",
+            "document-native-channel-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
@@ -1339,6 +1495,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 "document-carrier-dispatch",
                 "document-cold-winner-handoff",
                 "document-native-cache-open",
+                "document-native-channel-open",
                 "document-handshake-confirmed",
                 "tree-complete",
                 "tree-complete-css",
@@ -1357,6 +1514,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "document-carrier-dispatch",
                     "document-cold-winner-handoff",
                     "document-native-cache-open",
+                    "document-native-channel-open",
                     "document-handshake-confirmed",
                 ):
                     observed_fins = [
@@ -1622,6 +1780,11 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "document-native-cache-open decrypted validation requires document-complete",
     )
     require(
+        "document-native-channel-open" not in arms or "document-complete" in arms,
+        "document-native-channel-open decrypted validation requires "
+        "document-complete",
+    )
+    require(
         "document-start-overlap" not in arms
         or {"document-complete", "document-overlap"}.issubset(arms),
         "document-start-overlap decrypted validation requires "
@@ -1662,6 +1825,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
     carrier_dispatch_admission_validated = False
     cold_winner_handoff_admission_validated = False
     native_cache_open_admission_validated = False
+    native_channel_open_admission_validated = False
     if "document-carrier-dispatch" in arms:
         cohort = "document-carrier-dispatch"
         carrier_identity = validate_carrier_dispatch_lifecycle(root, cohort)
@@ -1728,6 +1892,11 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
     if "document-native-cache-open" in arms:
         validate_native_cache_open_lifecycle(root, "document-native-cache-open")
         native_cache_open_admission_validated = True
+    if "document-native-channel-open" in arms:
+        validate_native_channel_open_lifecycle(
+            root, "document-native-channel-open"
+        )
+        native_channel_open_admission_validated = True
     if "document-handshake-confirmed" in arms:
         cohort = "document-handshake-confirmed"
         for row in read_rows(root, cohort, "packets"):
@@ -1913,6 +2082,34 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes["document-complete"]
             == root_response_sizes["document-native-cache-open"],
             "document response content-length differs for native cache-open",
+        )
+    if {"document-complete", "document-native-channel-open"}.issubset(arms):
+        complete_wire_get = next(
+            row
+            for row in cohorts["document-complete"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        channel_wire_get = next(
+            row
+            for row in cohorts["document-native-channel-open"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        require(
+            complete_wire_get["header_name_order"]
+            == channel_wire_get["header_name_order"]
+            and complete_wire_get["header_name_set"]
+            == channel_wire_get["header_name_set"],
+            "document sanitized header names/order differ for native channel-open",
+        )
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-native-channel-open"]["root"],
+            "document selected header values/order differ for native channel-open",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-native-channel-open"],
+            "document response content-length differs for native channel-open",
         )
     if {
         "document-complete",
@@ -2205,6 +2402,18 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("document_native_cache_open_request_semantics_match=yes\n")
             destination.write("document_native_cache_open_response_size_match=yes\n")
             destination.write("document_native_cache_open_root_fin_before_connect=yes\n")
+        if native_channel_open_admission_validated:
+            destination.write("document_native_channel_open_single_connection=yes\n")
+            destination.write("document_native_channel_open_single_client_hello=yes\n")
+            destination.write("document_native_channel_open_cache_new_writable=yes\n")
+            destination.write("document_native_channel_open_triggering_system=yes\n")
+            destination.write("document_native_channel_open_uri_principal=yes\n")
+            destination.write("document_native_channel_open_local_db=yes\n")
+            destination.write("document_native_channel_open_expect_callback=yes\n")
+            destination.write("document_native_channel_open_suspend_resume=yes\n")
+            destination.write("document_native_channel_open_request_semantics_match=yes\n")
+            destination.write("document_native_channel_open_response_size_match=yes\n")
+            destination.write("document_native_channel_open_root_fin_before_connect=yes\n")
         if confirmed_admission_validated:
             destination.write(
                 "document_handshake_confirmed_single_connection=yes\n"

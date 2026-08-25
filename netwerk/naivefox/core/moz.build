@@ -42,6 +42,13 @@ SOURCES += ["!NaiveFoxVersion.cpp"]
 XPCOM_MANIFESTS += ["components.conf"]
 
 SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
+SOURCES += ["/toolkit/components/build/nsToolkitCompsModule.cpp"]
+SOURCES += [
+    "/netwerk/url-classifier/UrlClassifierFeatureBase.cpp",
+    "/netwerk/url-classifier/UrlClassifierFeaturePhishingProtection.cpp",
+    "/netwerk/url-classifier/UrlClassifierFeatureResult.cpp",
+    "NaiveFoxUrlClassifierFeatureFactory.cpp",
+]
 SOURCES += ["/js/xpconnect/src/XPCString.cpp"]
 SOURCES += ["!/ipc/ipdl/PrefsTypes.cpp"]
 
@@ -50,6 +57,10 @@ EXPORTS.mozilla += ["/toolkit/xre/CmdLineAndEnvUtils.h"]
 EXPORTS.mozilla += ["/toolkit/xre/GeckoArgs.h"]
 EXPORTS.mozilla += ["../StoragePrincipalHelper.h"]
 EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
+EXPORTS.mozilla.net += [
+    "/netwerk/url-classifier/UrlClassifierFeatureFactory.h",
+    "/netwerk/url-classifier/UrlClassifierFeatureResult.h",
+]
 EXPORTS += ["../nsContentUtils.h"]
 
 LOCAL_INCLUDES += ["/dom/security"]
@@ -59,6 +70,10 @@ LOCAL_INCLUDES += ["/netwerk/protocol/http"]
 LOCAL_INCLUDES += ["/netwerk/system/netlink"]
 LOCAL_INCLUDES += ["/security/manager/ssl"]
 LOCAL_INCLUDES += ["/tools/profiler/core"]
+LOCAL_INCLUDES += ["/netwerk/url-classifier"]
+LOCAL_INCLUDES += ["/toolkit/components/build"]
+LOCAL_INCLUDES += ["/toolkit/components/url-classifier"]
+LOCAL_INCLUDES += ["/third_party/abseil-cpp"]
 LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]
 LOCAL_INCLUDES += ["/ipc/chromium/src"]
 

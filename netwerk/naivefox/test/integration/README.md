@@ -392,10 +392,15 @@ NaiveFox independently owns the selected outer H2 or H3 transport. A
 fail-closed PAC sends exact loopback destinations to the sample's SOCKS5
 listener and every other hostname to a dead local proxy. It has no `DIRECT`
 fallback, so Mozilla background traffic cannot contaminate the captured outer
-flow. A Selenium controller is preferred for H2 when available. H3 uses the
-long-lived command-line backend, and the same backend is used for every H3
-cohort. The command-line backend is also the dependency-free H2 fallback. The target
-records the browser's completion POST in a private file;
+flow. A Selenium controller is preferred for H2 when available. Same-base H3
+multi-arm screening requires Selenium and launches Firefox before capture;
+the command-line backend is rejected because its readiness marker precedes
+Firefox process startup. Direct H3 reference participants first complete an
+uncaptured HTTPS warmup on the distinct `127.0.0.1` origin and return to
+`about:blank`. This initializes the same browser process and Alt-Svc storage
+without warming the measured `localhost` origin or contacting the measured H3
+proxy port. The command-line backend remains only the dependency-free H2
+fallback. The target records the browser's completion POST in a private file;
 the controller watches that file without adding an out-of-band network flow.
 The runner stops and validates `dumpcap` before shutting down the browser or
 NaiveFox, rejects capture drops, and rejects H2/H3 flows whose client SYN or
@@ -509,7 +514,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -560,6 +565,16 @@ request, timer, or fallback-policy change. Decrypted admission proves one QUIC
 identity and ClientHello, identical document semantics, the complete ordered
 ownership lifecycle, no carrier request, and GET/200/FIN before CONNECT.
 
+The H3 early-scheduling results below that used the command-line browser
+backend are superseded. That backend wrote its ready marker without launching
+Firefox, so direct Firefox process startup and its busy main-thread queue were
+inside capture, while NaiveFox was already running in a separate process.
+Those artifacts remain useful for decrypted lifecycle admission and negative
+mechanism checks, but their Firefox GET packet index, Initial-to-GET timing,
+and passive early-window rankings are not valid same-state camouflage
+comparisons. New H3 multi-arm results must use the pre-launched Selenium
+contract above; no old sample is silently reused or resampled.
+
 Accepted same-base decrypted artifact `20260825T164347Z-53b8e44f` falsified
 the intended scheduling hypothesis: Firefox emitted its first GET at packet
 18 / 33.301 ms, while both `document-complete` and the exact cold winner path
@@ -595,6 +610,32 @@ while Firefox emitted its first GET at packet 15 (27.621 ms). The paired
 native arm worse on packets 1--16, packets 1--32, 250 ms, and whole, with only
 a small 17--32 improvement. Together with unchanged GET ordering this closes
 the cache-open-only hypothesis; the arm is not a default candidate.
+`document-native-channel-open` restores the larger native cold document
+lifecycle: generic request-less speculative H3 establishment, normal writable
+cache2 open, and genuine local Safe Browsing classification. Admission requires
+`TYPE_DOCUMENT`, a system triggering principal, a distinct non-system URI
+principal matching the exact fixture URI and origin attributes, an available
+URL-classifier DB, `Classify()==NS_OK`, `expectCallback=true`, a positive
+suspend count, a successful asynchronous clean callback and Resume, and a new
+writable cache entry before network trigger. The real-time/global-cache/google5
+paths are disabled in both controlled Firefox and NaiveFox profiles. Every
+reference participant and NaiveFox sample gets a separate fresh profile, and
+the runner rejects a pre-existing `cache2` directory rather than deleting or
+reusing it. Any fail-open classifier path makes the sample invalid.
+Accepted pre-launched same-base decrypted artifact
+`20260825T182825Z-918ced97` replaced the earlier cold-start interpretation:
+Firefox emitted its first GET at packet 11 / 5.000 ms,
+`document-complete` at packet 10 / 5.821 ms, and
+`document-native-channel-open` at packet 11 / 5.362 ms. All three used one
+physical QUIC identity and one ClientHello, and the native arm passed its full
+cache/principal/classifier/Suspend/Resume admission. Thus the old Firefox
+packet 15--18 delay was browser-startup contamination, not a required Necko
+transport phase. A two-block fail-closed passive control
+`7b3a8e636ebd6f16` ranked the native arm closer in packets 1--16, packets
+1--32, and the first 250 ms, while whole-flow distance was effectively tied;
+it is explicitly insufficient for inference and only justifies a larger
+paired screen.
+
 `document-start-overlap` uses the same root request but waits for the root
 channel's `NS_NET_STATUS_WAITING_FOR` event, which follows H2/H3 request-stream
 commit, before releasing CONNECT. It does not infer socket ordering from

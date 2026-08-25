@@ -1586,13 +1586,13 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
 
 #ifdef MOZ_NAIVEFOX
   // Preserve the lean client's direct transport path for every ordinary
-  // channel and cache-inhibited proxy preamble. DocumentNativeCacheOpen is the
-  // narrow exception: it preserves INHIBIT_CACHING so OpenCacheEntry selects
-  // OPEN_READONLY, but restores Firefox's asynchronous cache lookup before
-  // TriggerNetwork.
+  // channel and cache-inhibited proxy preamble. The two native-open diagnostics
+  // restore Firefox's asynchronous cache phase before TriggerNetwork; the
+  // channel-open variant additionally uses a normal writable new entry.
   if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
       ((mLoadFlags & nsIRequest::INHIBIT_CACHING) &&
-       !mProxyPreambleUseNativeCacheOpen)) {
+       !mProxyPreambleUseNativeCacheOpen &&
+       !mProxyPreambleUseNativeChannelOpen)) {
     return TriggerNetwork();
   }
   if (mProxyPreambleUseNativeCacheOpen &&
@@ -1602,6 +1602,13 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
          "inhibit_caching=%d expected_mode=readonly",
          this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
   }
+  if (mProxyPreambleUseNativeChannelOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=open-begin channel=%p "
+         "inhibit_caching=%d expected_mode=normal",
+         this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+  }
 #endif
 
   // open a cache entry for this channel...
@@ -1609,11 +1616,17 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   if (mProxyPreambleUseNativeCacheOpen) {
     mProxyPreambleNativeCacheOpenCallActive = true;
   }
+  if (mProxyPreambleUseNativeChannelOpen) {
+    mProxyPreambleNativeChannelOpenCallActive = true;
+  }
 #endif
   rv = OpenCacheEntry(mURI->SchemeIs("https"));
 #ifdef MOZ_NAIVEFOX
   if (mProxyPreambleUseNativeCacheOpen) {
     mProxyPreambleNativeCacheOpenCallActive = false;
+  }
+  if (mProxyPreambleUseNativeChannelOpen) {
+    mProxyPreambleNativeChannelOpenCallActive = false;
   }
 #endif
 
@@ -1631,6 +1644,23 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
       NAIVEFOX_LIFECYCLE_LOG(
           ("h3.native_cache_open action=callback-pending channel=%p", this));
+    }
+  }
+  if (mProxyPreambleUseNativeChannelOpen) {
+    if (NS_FAILED(rv) || !AwaitingCacheCallbacks() ||
+        (mLoadFlags & nsIRequest::INHIBIT_CACHING)) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.native_channel_open action=open-failed channel=%p rv=%08x "
+             "awaiting_callback=%d inhibit_caching=%d",
+             this, static_cast<uint32_t>(rv), AwaitingCacheCallbacks(),
+             !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+      }
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_channel_open action=callback-pending channel=%p", this));
     }
   }
 #endif
@@ -1981,9 +2011,7 @@ void nsHttpChannel::DoNotifyListenerCleanup() {
 void nsHttpChannel::ReleaseListeners() {
   HttpBaseChannel::ReleaseListeners();
 
-#ifndef MOZ_NAIVEFOX
   mChannelClassifier = nullptr;
-#endif
   mWarningReporter = nullptr;
   mEarlyHintObserver = nullptr;
   mWebTransportSessionEventListener = nullptr;
@@ -2619,6 +2647,27 @@ nsHttpChannel::GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) {
 #endif
   return NS_OK;
 }
+
+#ifdef MOZ_NAIVEFOX
+void nsHttpChannel::MarkProxyPreambleNativeChannelClassifierComplete(
+    nsresult aStatus, nsresult aResumeRv) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mProxyPreambleUseNativeChannelOpen) {
+    return;
+  }
+  const bool asynchronous =
+      !mProxyPreambleNativeChannelClassifierStartCallActive;
+  mProxyPreambleNativeChannelClassifierCompleted =
+      asynchronous && NS_SUCCEEDED(aStatus) && NS_SUCCEEDED(aResumeRv);
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=classifier-complete channel=%p "
+         "status=%08x resume_status=%08x asynchronous=%d",
+         this, static_cast<uint32_t>(aStatus),
+         static_cast<uint32_t>(aResumeRv), asynchronous));
+  }
+}
+#endif
 
 void nsHttpChannel::SetCachedContentType() {
   if (!mResponseHead) {
@@ -6035,6 +6084,13 @@ nsHttpChannel::OnCacheEntryAvailable(nsICacheEntry* entry, bool aNew,
          "status=%08x",
          this, entry, aNew, static_cast<uint32_t>(status)));
   }
+  if (mProxyPreambleUseNativeChannelOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=callback channel=%p entry=%p new=%d "
+         "status=%08x",
+         this, entry, aNew, static_cast<uint32_t>(status)));
+  }
 #endif
 
   // The cache callback arrived (or we're tearing down); the backstop timer is
@@ -6088,6 +6144,16 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
     }
     return NS_ERROR_UNEXPECTED;
   }
+  if (mProxyPreambleUseNativeChannelOpen &&
+      mProxyPreambleNativeChannelOpenCallActive) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_channel_open action=contract-failed channel=%p "
+           "entry=%p new=%d status=%08x reason=synchronous-callback",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
   if (mProxyPreambleUseNativeCacheOpen &&
       (status != NS_ERROR_CACHE_KEY_NOT_FOUND || entry || aNew)) {
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
@@ -6100,6 +6166,19 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
   }
   if (mProxyPreambleUseNativeCacheOpen) {
     mProxyPreambleNativeCacheReadOnlyMiss = true;
+  }
+  if (mProxyPreambleUseNativeChannelOpen &&
+      (NS_FAILED(status) || !entry || !aNew)) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_channel_open action=contract-failed channel=%p "
+           "entry=%p new=%d status=%08x reason=not-new-writable-entry",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeChannelOpen) {
+    mProxyPreambleNativeChannelNewEntry = true;
   }
 #endif
 
@@ -6125,6 +6204,13 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
         ("h3.native_cache_open action=trigger-network channel=%p "
          "cold_readonly_miss=1",
          this));
+  }
+  if (mProxyPreambleUseNativeChannelOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_channel_open action=trigger-network channel=%p "
+         "new_writable_entry=1 classifier_started=%d",
+         this, mProxyPreambleNativeChannelClassifierStarted));
   }
 #endif
 
@@ -8491,7 +8577,6 @@ nsresult nsHttpChannel::AsyncOpenOnTailUnblock() {
   return AsyncOpen(mListener);
 }
 
-#ifndef MOZ_NAIVEFOX
 already_AddRefed<nsChannelClassifier>
 nsHttpChannel::GetOrCreateChannelClassifier() {
   if (!mChannelClassifier) {
@@ -8503,7 +8588,6 @@ nsHttpChannel::GetOrCreateChannelClassifier() {
   RefPtr<nsChannelClassifier> classifier = mChannelClassifier;
   return classifier.forget();
 }
-#endif
 
 nsIHttpChannelInternal::ProxyDNSStrategy
 nsHttpChannel::ComputeProxyDNSStrategy() {
@@ -8932,6 +9016,57 @@ nsresult nsHttpChannel::BeginConnect() {
     LOG(("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]",
          channelClassifier.get(), this));
     channelClassifier->Start();
+  }
+#else
+  if (mProxyPreambleUseNativeChannelOpen) {
+    const bool shouldClassify =
+        NS_ShouldClassifyChannel(this, ClassifyType::SafeBrowsing);
+    const auto policyType = mLoadInfo->GetExternalContentPolicyType();
+    const bool triggeringSystem =
+        mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal();
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_channel_open action=classifier-predicate channel=%p "
+           "result=%d type=%u triggering_system=%d bypass=%d "
+           "be_conservative=%d",
+           this, shouldClassify, static_cast<unsigned>(policyType),
+           triggeringSystem,
+           !!(mLoadFlags & nsIChannel::LOAD_BYPASS_URL_CLASSIFIER),
+           LoadBeConservative()));
+    }
+    if (!shouldClassify || policyType != ExtContentPolicy::TYPE_DOCUMENT ||
+        !triggeringSystem) {
+      return NS_ERROR_UNEXPECTED;
+    }
+
+    RefPtr<nsChannelClassifier> channelClassifier =
+        GetOrCreateChannelClassifier();
+    mProxyPreambleNativeChannelClassifierStartCallActive = true;
+    nsresult classifierRv = channelClassifier->StartForNaiveFoxPreamble();
+    mProxyPreambleNativeChannelClassifierStartCallActive = false;
+    if (NS_FAILED(classifierRv) ||
+        mProxyPreambleNativeChannelClassifierCompleted || !mSuspendCount) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.native_channel_open action=contract-failed channel=%p "
+             "reason=%s status=%08x",
+             this,
+             NS_FAILED(classifierRv)
+                 ? "classifier-no-async-callback"
+                 : (mProxyPreambleNativeChannelClassifierCompleted
+                        ? "classifier-synchronous-callback"
+                        : "classifier-not-suspended"),
+             static_cast<uint32_t>(classifierRv)));
+      }
+      return NS_FAILED(classifierRv) ? classifierRv : NS_ERROR_UNEXPECTED;
+    }
+    mProxyPreambleNativeChannelClassifierStarted = true;
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_channel_open action=classifier-suspended channel=%p "
+           "suspend_count=%u",
+           this, mSuspendCount));
+    }
   }
 #endif
 
@@ -12830,11 +12965,13 @@ nsresult nsHttpChannel::OnCacheWaitTimeout() {
   }
 
 #ifdef MOZ_NAIVEFOX
-  if (mProxyPreambleUseNativeCacheOpen) {
+  if (mProxyPreambleUseNativeCacheOpen ||
+      mProxyPreambleUseNativeChannelOpen) {
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
       NAIVEFOX_LIFECYCLE_LOG(
-          ("h3.native_cache_open action=contract-failed channel=%p "
-           "reason=cache-wait-timeout",
+          ("%s action=contract-failed channel=%p reason=cache-wait-timeout",
+           mProxyPreambleUseNativeChannelOpen ? "h3.native_channel_open"
+                                               : "h3.native_cache_open",
            this));
     }
     StoreWaitForCacheEntry(LoadWaitForCacheEntry() & ~WAIT_FOR_CACHE_ENTRY);

@@ -7,7 +7,11 @@
 #include "nsArrayUtils.h"
 #include "nsCRT.h"
 #include "nsIObserverService.h"
-#include "nsIPermissionManager.h"
+#include "nsIRequestObserver.h"
+#include "nsIStreamListener.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIPermissionManager.h"
+#endif
 #include "nsIPrefBranch.h"
 #include "nsIXULRuntime.h"
 #include "nsToolkitCompsCID.h"
@@ -15,7 +19,9 @@
 #include "nsUrlClassifierDBService.h"
 #include "nsUrlClassifierUtils.h"
 #include "nsUrlClassifierProxies.h"
-#include "nsURILoader.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsURILoader.h"
+#endif
 #include "nsString.h"
 #include "nsReadableUtils.h"
 #include "nsTArray.h"
@@ -44,10 +50,12 @@
 #include "ProtocolParser.h"
 #include "nsContentUtils.h"
 #include "mozilla/Components.h"
-#include "mozilla/dom/ContentChild.h"
-#include "mozilla/ContentClassifierService.h"
-#include "mozilla/dom/PermissionMessageUtils.h"
-#include "mozilla/dom/URLClassifierChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ContentClassifierService.h"
+#  include "mozilla/dom/ContentChild.h"
+#  include "mozilla/dom/PermissionMessageUtils.h"
+#  include "mozilla/dom/URLClassifierChild.h"
+#endif
 #include "mozilla/net/UrlClassifierFeatureFactory.h"
 #include "mozilla/net/UrlClassifierFeatureResult.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -2071,10 +2079,12 @@ nsresult nsUrlClassifierDBService::Init() {
 
   Preferences::AddStrongObserver(this, DISALLOW_COMPLETION_TABLE_PREF);
 
+#ifndef MOZ_NAIVEFOX
   // Initialize the ContentClassifierService early so that filter lists are
   // loaded before the first network request is classified.
   RefPtr<ContentClassifierService> contentClassifier =
       ContentClassifierService::GetInstance();
+#endif
 
   return NS_OK;
 }
@@ -2092,6 +2102,7 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
     return NS_OK;
   }
 
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsContentProcess()) {
     using namespace mozilla::dom;
 
@@ -2110,9 +2121,14 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
     actor->SetCallback(c);
     return NS_OK;
   }
+#else
+  MOZ_ASSERT(XRE_IsParentProcess());
+#endif
 
   NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
 
+  nsresult rv;
+#ifndef MOZ_NAIVEFOX
   nsCOMPtr<nsIPermissionManager> permissionManager =
       components::PermissionManager::Service();
   if (NS_WARN_IF(!permissionManager)) {
@@ -2120,7 +2136,7 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
   }
 
   uint32_t perm;
-  nsresult rv = permissionManager->TestPermissionFromPrincipal(
+  rv = permissionManager->TestPermissionFromPrincipal(
       aPrincipal, "safe-browsing"_ns, &perm);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -2128,6 +2144,7 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
     *aResult = false;
     return NS_OK;
   }
+#endif
 
   if (Classifier::IsRealTimeModeEnabled()) {
     RefPtr<nsUrlClassifierClassifyCallback> callback =
@@ -2886,6 +2903,7 @@ nsUrlClassifierDBService::AsyncClassifyLocalWithFeatures(
   nsresult rv = utilsService->GetKeyForURI(uri, key);
   NS_ENSURE_SUCCESS(rv, rv);
 
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsContentProcess()) {
     using namespace mozilla::dom;
     using namespace mozilla::ipc;
@@ -2923,8 +2941,10 @@ nsUrlClassifierDBService::AsyncClassifyLocalWithFeatures(
     actor->SetFeaturesAndCallback(aFeatures, aCallback);
     return NS_OK;
   }
+#else
+  MOZ_ASSERT(XRE_IsParentProcess());
+#endif
 
-  using namespace mozilla::Telemetry;
   auto startTime = TimeStamp::Now();  // For telemetry.
 
   // Let's keep the features alive and release them on the correct thread.
@@ -3004,6 +3024,9 @@ nsUrlClassifierDBService::AsyncClassifyLocalWithFeatureNames(
                                           true);
   }
 
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_AVAILABLE;
+#else
   mozilla::dom::ContentChild* content =
       mozilla::dom::ContentChild::GetSingleton();
   if (NS_WARN_IF(!content || content->IsShuttingDown())) {
@@ -3019,6 +3042,7 @@ nsUrlClassifierDBService::AsyncClassifyLocalWithFeatureNames(
 
   actor->SetFeaturesAndCallback(aFeatureNames, aCallback);
   return NS_OK;
+#endif
 }
 
 bool nsUrlClassifierDBService::AsyncClassifyLocalWithFeaturesUsingPreferences(

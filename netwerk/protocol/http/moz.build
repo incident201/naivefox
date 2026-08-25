@@ -283,6 +283,11 @@ LOCAL_INCLUDES += [
     "/netwerk/url-classifier",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    # Restore only the genuine Safe Browsing channel suspend/resume primitive.
+    # The browser's ETP feature graph remains outside the lean product.
+    SOURCES += ["/netwerk/url-classifier/nsChannelClassifier.cpp"]
+
 DEFINES["MOZ_APP_UA_NAME"] = f'"{CONFIG["MOZ_APP_UA_NAME"]}"'
 
 if CONFIG["MOZ_AUTH_EXTENSION"]:

@@ -749,6 +749,8 @@ def extract(args):
         raise SystemExit("document-cold-winner-handoff requires h3")
     if args.naivefox_arm == "document-native-cache-open" and args.protocol != "h3":
         raise SystemExit("document-native-cache-open requires h3")
+    if args.naivefox_arm == "document-native-channel-open" and args.protocol != "h3":
+        raise SystemExit("document-native-channel-open requires h3")
     features = {}
     extract_handshake(args.pcap, args.protocol, args.server_port, features)
     if args.protocol == "h2":
@@ -904,6 +906,7 @@ def main():
             "document-carrier-dispatch",
             "document-cold-winner-handoff",
             "document-native-cache-open",
+            "document-native-channel-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",

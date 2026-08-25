@@ -205,6 +205,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "root-pmtud-control",
             "document-carrier-dispatch",
             "document-cold-winner-handoff",
+            "document-native-channel-open",
             "document-handshake-confirmed",
             "tree-complete",
             "tree-complete-css",
@@ -267,6 +268,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ["browser_page"],
                 arms=("root", "document-native-cache-open"),
             )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
+                arms=("root", "document-native-channel-open"),
+            )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
@@ -290,6 +299,17 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("metadata_arm_specific_analysis=screening_only", runner)
         self.assertIn('--views "$multi_arm_views_csv"', runner)
         self.assertIn(
+            "H3 multi-arm screening requires a pre-launched Selenium browser",
+            runner,
+        )
+        self.assertIn("effective_backend=selenium", runner)
+        self.assertIn("--warmup-url", runner)
+        self.assertIn(
+            '"https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/', runner
+        )
+        self.assertIn("post-capture process-group SIGTERM", runner)
+        self.assertIn("Firefox browser controller required SIGKILL", runner)
+        self.assertIn(
             "document-handshake-confirmed multi-arm screening requires "
             "--protocol h3",
             runner,
@@ -307,6 +327,28 @@ class CamouflageHarnessTests(unittest.TestCase):
             runner,
         )
         self.assertIn("packets_17_32", runner)
+        self.assertIn(
+            "document-native-channel-open multi-arm screening requires "
+            "--protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "if [[ $participant == reference || $participant == naivefox ]]",
+            runner,
+        )
+        for pref in (
+            "browser.safebrowsing.realTime.enabled",
+            "browser.safebrowsing.globalCache.enabled",
+            "browser.safebrowsing.provider.google5.enabled",
+        ):
+            self.assertIn(f'user_pref("{pref}", false);', runner)
+        self.assertIn(
+            'validate_native_channel_fresh_cache "$profile" reference', runner
+        )
+        self.assertIn(
+            'validate_native_channel_fresh_cache "$naivefox_profile" naivefox',
+            runner,
+        )
         self.assertIn("--scenario", runner)
         self.assertIn('scenarios=("$scenario_override")', runner)
 
@@ -669,6 +711,35 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires h3"):
             CONFIG.build_config(
                 "document-native-cache-open",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+
+    def test_native_channel_open_arm_is_explicitly_h3_only(self):
+        config = CONFIG.build_config(
+            "document-native-channel-open",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "document-native-channel-open",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-bytes": CONFIG.PREAMBLE_MAX_BYTES,
+            },
+        )
+        self.assertTrue(config["outer-session-gate"])
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "document-native-channel-open",
                 "h2",
                 1080,
                 4433,
@@ -1039,6 +1110,26 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "read-only miss marker"):
             SAMPLE.validate_sample(
                 "document-native-cache-open",
+                "h3",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=91 protocol=h3\n",
+                one_connection,
+            )
+        SAMPLE.validate_sample(
+            "document-native-channel-open",
+            "h3",
+            "Connection 1 preamble native-channel-open "
+            "cache=new-writable-entry classifier=async-suspend-resume "
+            "protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=91 protocol=h3\n"
+            "Connection 1 established target=example.test:443 outer=h3 "
+            "padding=yes\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "strict success marker"):
+            SAMPLE.validate_sample(
+                "document-native-channel-open",
                 "h3",
                 "Connection 1 preamble result=success status=0x00000000 "
                 "http=200 bytes=91 protocol=h3\n",

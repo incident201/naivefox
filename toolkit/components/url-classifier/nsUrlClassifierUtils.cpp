@@ -19,10 +19,14 @@
 #include "mozilla/Sprintf.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Mutex.h"
-#include "nsIRedirectHistoryEntry.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIRedirectHistoryEntry.h"
+#endif
 #include "nsIHttpChannelInternal.h"
-#include "mozIThirdPartyUtil.h"
-#include "nsIDocShell.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozIThirdPartyUtil.h"
+#  include "nsIDocShell.h"
+#endif
 #include "mozilla/TextUtils.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
@@ -32,8 +36,10 @@
 #include "nsIObserverService.h"
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
-#include "nsPIDOMWindow.h"
-#include "nsPIDOMWindowInlines.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsPIDOMWindow.h"
+#  include "nsPIDOMWindowInlines.h"
+#endif
 #include "nsServiceManagerUtils.h"
 #include "nsThreadManager.h"
 #include "nsTHashSet.h"
@@ -767,6 +773,7 @@ static nsresult AddThreatSourceFromChannel(ThreatHit& aHit,
   }
   return NS_OK;
 }
+#ifndef MOZ_NAIVEFOX
 static nsresult AddThreatSourceFromRedirectEntry(
     ThreatHit& aHit, nsIRedirectHistoryEntry* aRedirectEntry,
     ThreatHit_ThreatSourceType aType) {
@@ -866,6 +873,7 @@ static nsresult AddTabThreatSources(ThreatHit& aHit, nsIChannel* aChannel) {
 
   return NS_OK;
 }
+#endif
 
 NS_IMETHODIMP
 nsUrlClassifierUtils::MakeThreatHitReport(nsIChannel* aChannel,
@@ -901,8 +909,10 @@ nsUrlClassifierUtils::MakeThreatHitReport(nsIChannel* aChannel,
                                   ThreatHit_ThreatSourceType_MATCHING_URL);
   (void)NS_WARN_IF(NS_FAILED(rv));
   // Set tab url, tab resource url and redirect sources
+#ifndef MOZ_NAIVEFOX
   rv = AddTabThreatSources(hit, aChannel);
   (void)NS_WARN_IF(NS_FAILED(rv));
+#endif
 
   hit.set_allocated_client_info(CreateClientInfo());
 
@@ -1357,6 +1367,12 @@ bool nsUrlClassifierUtils::IsTestTable(const nsACString& aTableName) {
 }
 
 bool nsUrlClassifierUtils::IsInSafeMode() {
+#ifdef MOZ_NAIVEFOX
+  // The lean parent-only runtime has no XUL runtime service and no browser
+  // safe-mode concept. Local Safe Browsing still needs the ordinary database
+  // path, so its exact product state is deterministically not-in-safe-mode.
+  return false;
+#else
   static Maybe<bool> sIsInSafeMode;
 
   if (!sIsInSafeMode.isSome()) {
@@ -1370,4 +1386,5 @@ bool nsUrlClassifierUtils::IsInSafeMode() {
   }
 
   return sIsInSafeMode.value();
+#endif
 }

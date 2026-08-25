@@ -155,10 +155,11 @@ class Controller:
                 return False
         return self.process is not None and self.process.poll() is None
 
-    def wait_for_completion(self):
+    def wait_for_completion(self, completion_file=None):
+        completion_file = completion_file or self.args.completion_file
         deadline = time.monotonic() + self.args.timeout
         while time.monotonic() < deadline and not self.stopping:
-            if os.path.isfile(self.args.completion_file):
+            if os.path.isfile(completion_file):
                 return
             if not self.browser_alive():
                 raise RuntimeError("Firefox exited before workload completion")
@@ -190,6 +191,14 @@ class Controller:
 
     def run(self):
         backend = self.start()
+        if self.args.warmup_url:
+            if backend != "selenium":
+                raise RuntimeError("browser warmup requires Selenium")
+            self.driver.get(self.args.warmup_url)
+            self.wait_for_completion(self.args.warmup_completion_file)
+            self.driver.get("about:blank")
+            if self.driver.current_url != "about:blank":
+                raise RuntimeError("browser warmup did not drain to about:blank")
         temporary = self.args.ready_file + ".tmp"
         with open(temporary, "w", encoding="utf-8") as stream:
             json.dump({"backend": backend}, stream, sort_keys=True)
@@ -223,6 +232,8 @@ def main():
     parser.add_argument("--socks-port", type=int, default=0)
     parser.add_argument("--url", required=True)
     parser.add_argument("--completion-file", required=True)
+    parser.add_argument("--warmup-url")
+    parser.add_argument("--warmup-completion-file")
     parser.add_argument("--ready-file", required=True)
     parser.add_argument("--navigate-file", required=True)
     parser.add_argument("--done-file", required=True)
@@ -232,6 +243,8 @@ def main():
     parser.add_argument("--timeout", type=int, required=True)
     parser.add_argument("--shutdown-file")
     args = parser.parse_args()
+    if bool(args.warmup_url) != bool(args.warmup_completion_file):
+        parser.error("--warmup-url and --warmup-completion-file must be used together")
     controller = Controller(args)
     signal.signal(signal.SIGTERM, controller.stop)
     signal.signal(signal.SIGINT, controller.stop)

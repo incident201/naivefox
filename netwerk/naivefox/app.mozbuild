@@ -151,6 +151,7 @@ DIRS += [
     "/intl",
     "/modules/brotli",
     "/modules/libpref",
+    "/config/external/abseil-cpp",
     "/netwerk/naivefox/idl",
     "/netwerk",
     "/xpcom",
@@ -164,6 +165,8 @@ DIRS += [
     "/security/certverifier",
     "/security/manager",
     "/toolkit/components/glean",
+    "/toolkit/components/protobuf",
+    "/toolkit/components/url-classifier",
     "/toolkit/library",
     "/tools/profiler",
 ]
