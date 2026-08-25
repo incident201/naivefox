@@ -210,8 +210,10 @@ That request-scheduling order does not guarantee wire overlap. H2/H3 response
 FIN may already have won the transport race. Decrypted output reports the
 observed order only; it never rejects `tree-root-overlap` for lacking
 HEADERS/FIN overlap, and samples must not be selectively retried. Private
-semantic validation still requires root completion before CONNECT and a FIN
-for every expected root/CSS/JS response. H3 additionally requires its selected
+semantic validation still requires root completion before CONNECT, while the
+production normal-completion marker accounts for every expected CSS/JS
+response. Asset FIN is report-only because a fully consumed known-length H3
+response may use `H3_REQUEST_CANCELLED`. H3 additionally requires its selected
 request semantics and asset sizes to match the paired `tree-complete` arm
 exactly. H2 uses the same fixture/config and validates expected request
 semantics, but does not claim paired asset-size equality.
@@ -223,9 +225,9 @@ Two harness-only aliases isolate resource count without another product build.
 remain at two assets. Passive validation requires exactly one started and one
 successfully completed resource. H3 decrypted comparison requires the aliases
 as a pair and proves one physical QUIC connection, equal root/CSS selected
-request semantics and CSS `Content-Length`, root FIN before CONNECT, and a CSS
-FIN somewhere in the complete capture. Whether that CSS FIN precedes or follows
-CONNECT in the overlap alias is report-only.
+request semantics and CSS `Content-Length`, and root FIN before CONNECT. Any
+observed CSS FIN ordering relative to CONNECT in the overlap alias is
+report-only.
 
 `root-pmtud-control` is a separate H3-only harness arm for the PMTUD policy.
 It maps to the same production `document-complete` preamble as `root`, while
@@ -235,6 +237,25 @@ compares both policies with one binary and the normal socket. The paired H3
 decrypted check requires one physical QUIC connection, one complete root GET,
 and equal selected request semantics and response `Content-Length`; it records
 no wire PMTUD claim.
+
+The dedicated H3 comparison uses the identical inner HTTPS URL for every
+NaiveFox arm, while the direct reference loads the same path and query on the
+outer fixture. Firefox must exit successfully and produce a nonempty screenshot
+in every cohort. Every preamble GET must have a successful response and
+`Content-Length`, while the root must have an observed FIN before CONNECT.
+Asset FIN is not a universal application-completion predicate: upstream
+Firefox may close a fully consumed, known-length H3 response with
+`H3_REQUEST_CANCELLED`. Root semantics and size are checked for every arm and
+against `tree-complete` whenever it is selected.
+`tree-overlap`, `tree-early-overlap`, and `tree-root-overlap` are admitted only
+beside `tree-complete`, including exact asset-size parity. Only
+`tree-root-overlap` has an existing deterministic normal-drain runtime marker;
+the other overlapping modes therefore cannot be selectively retried when an
+available decrypted ordering predicate is absent. Asset FIN is not treated as
+a universal proof of application completion. Until exact H3 DATA-byte
+accounting is implemented, `tree-early-overlap` and `tree-overlap` are not
+admissible for a strict whole-volume conclusion; `tree-root-overlap` supplies
+the deterministic all-resource drain marker required for that comparison.
 
 `run-h2-connect-priority-comparison.sh` is a separate same-base causal
 diagnostic for the first SOCKS tunnel. It compares an ordinary top-level HTTPS

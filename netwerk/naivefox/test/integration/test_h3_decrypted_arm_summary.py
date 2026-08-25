@@ -48,8 +48,33 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
-                "tree-root-overlap-css decrypted validation requires "
-                "tree-complete-css",
+                "tree-overlap decrypted validation requires tree-complete",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-overlap",),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-early-overlap decrypted validation requires tree-complete",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-early-overlap",),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-root-overlap-css decrypted validation requires tree-complete-css",
             ):
                 summary.write_outputs(
                     Path(directory),
@@ -85,26 +110,40 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn("run-camouflage-isolated-network.sh", runner)
         self.assertIn("monitor-network-mutations.py", runner)
         self.assertIn("network route/address/link mutation invalidated", runner)
-        self.assertIn(
-            'camouflage_capture_health.py" "$capture_log"', runner
-        )
+        self.assertIn('camouflage_capture_health.py" "$capture_log"', runner)
         self.assertIn(
             "dumpcap stopped before the H3 workload capture was complete", runner
         )
         self.assertIn("capture_worktree_dirty", runner)
         self.assertIn("capture_source_state_sha256", runner)
-        self.assertIn("git -C \"$SOURCE_ROOT\" diff --binary", runner)
+        self.assertIn('git -C "$SOURCE_ROOT" diff --binary', runner)
         self.assertIn("fixture_user_encoded", runner)
         self.assertIn("fixture_pass_encoded", runner)
         self.assertIn("traffic_secret", runner)
         self.assertIn("root-pmtud-control comparison requires root", runner)
+        self.assertIn("tree-overlap comparison requires tree-complete", runner)
+        self.assertIn("tree-early-overlap comparison requires tree-complete", runner)
         self.assertIn('user_pref("network.http.http3.pmtud", true);', runner)
+        reference_url = (
+            "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/"
+            "camouflage/index.html?scenario=browser_page"
+        )
+        arm_url = (
+            "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/"
+            "camouflage/index.html?scenario=browser_page"
+        )
+        self.assertEqual(runner.count(reference_url), 1)
+        self.assertEqual(runner.count(arm_url), 1)
+        self.assertNotIn("&arm=$arm", runner)
+        self.assertIn("reference Firefox %s pass exited with status %s", runner)
+        self.assertIn("same-base Firefox through %s arm exited with status %s", runner)
+        self.assertGreaterEqual(runner.count("[[ ! -s $screenshot ]]"), 2)
 
         reference_body = runner.split("run_reference()", 1)[1].split(
             "run_naivefox()", 1
         )[0]
         arm_body = runner.split("run_naivefox_arm()", 1)[1].split(
-            'if [[ $comparison_design == arms ]]', 1
+            "if [[ $comparison_design == arms ]]", 1
         )[0]
         self.assertLess(
             reference_body.index("start_network_mutation_monitor"),
@@ -122,7 +161,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         cleanup = runner.split("cleanup() {", 1)[1].split("trap cleanup EXIT", 1)[0]
         self.assertIn("safe_dir=", runner.split("stop_pid()", 1)[0])
         self.assertIn(
-            '[[ -n $safe_dir && ($status -ne 0 || $success -ne 1) ]]',
+            "[[ -n $safe_dir && ($status -ne 0 || $success -ne 1) ]]",
             cleanup,
         )
         self.assertIn('safe_root="$STATE_ROOT/h3-capture-safe"', cleanup)
@@ -238,7 +277,9 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             ("packets", "QUIC packet connection identity is ambiguous"),
             ("clienthello", "outer ClientHello connection identity is ambiguous"),
         ):
-            with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as directory:
+            with self.subTest(
+                suffix=suffix
+            ), tempfile.TemporaryDirectory() as directory:
                 self.make_cohort(
                     directory,
                     "reference",
@@ -359,7 +400,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     ("tree-complete",),
                 )
 
-    def test_tree_complete_requires_fin_for_both_asset_streams(self):
+    def test_tree_complete_does_not_treat_asset_fin_as_application_completion(self):
         with tempfile.TemporaryDirectory() as directory:
             self.make_cohort(
                 directory,
@@ -393,16 +434,18 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 writer.writeheader()
                 writer.writerows(rows)
 
-            with self.assertRaisesRegex(
-                ValueError, "lacks an observed FIN for every asset stream"
-            ):
-                summary.write_outputs(
-                    Path(directory),
-                    Path(directory) / "events.csv",
-                    Path(directory) / "summary.txt",
-                    "4433",
-                    ("tree-complete",),
-                )
+            destination = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                destination,
+                "4433",
+                ("tree-complete",),
+            )
+            self.assertIn(
+                "tree_expected_request_semantics=yes",
+                destination.read_text(encoding="utf-8"),
+            )
 
     def test_tree_overlap_requires_headers_and_late_fin_on_same_asset(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -414,6 +457,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     self.event(12, 0.020, "server", 0, status="200"),
                 ],
             )
+            self.make_tree_complete_control(directory)
             self.make_cohort(
                 directory,
                 "tree-overlap",
@@ -438,7 +482,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     Path(directory) / "events.csv",
                     Path(directory) / "summary.txt",
                     "4433",
-                    ("tree-overlap",),
+                    ("tree-complete", "tree-overlap"),
                 )
 
     def test_tree_overlap_accepts_one_asset_stream_spanning_connect(self):
@@ -451,6 +495,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     self.event(12, 0.020, "server", 0, status="200"),
                 ],
             )
+            self.make_tree_complete_control(directory)
             self.make_cohort(
                 directory,
                 "tree-overlap",
@@ -472,7 +517,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 Path(directory) / "events.csv",
                 destination,
                 "4433",
-                ("tree-overlap",),
+                ("tree-complete", "tree-overlap"),
             )
             safe_summary = destination.read_text(encoding="utf-8")
             self.assertIn(
@@ -480,7 +525,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 "server-fin-after-connect,resource-stream-spans-connect",
                 safe_summary,
             )
-            self.assertNotIn("tree_request_semantics_match", safe_summary)
+            self.assertIn("tree_request_semantics_match=yes", safe_summary)
             self.assertIn("tree_expected_request_semantics=yes", safe_summary)
 
     def test_tree_early_overlap_requires_completed_root_and_matching_assets(self):
@@ -635,40 +680,35 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             )
             safe_summary = destination.read_text(encoding="utf-8")
             self.assertIn("tree-root-overlap_overlap_observed=no", safe_summary)
-            self.assertIn(
-                "tree_root_overlap_request_semantics_match=yes", safe_summary
-            )
+            self.assertIn("tree_root_overlap_request_semantics_match=yes", safe_summary)
             self.assertIn("tree_root_overlap_asset_sizes_match=yes", safe_summary)
             self.assertIn(
                 "tree_root_overlap_wire_overlap_is_admission=no", safe_summary
             )
-            lifecycle = (
-                Path(directory)
-                / "decrypted-tree-root-overlap-lifecycle.csv"
-            )
+            lifecycle = Path(directory) / "decrypted-tree-root-overlap-lifecycle.csv"
             with lifecycle.open(newline="", encoding="utf-8") as stream:
                 reader = csv.DictReader(stream)
                 lifecycle_rows = list(reader)
                 lifecycle_fields = reader.fieldnames
             lifecycle_rows = [
-                row
-                for row in lifecycle_rows
-                if row["quic.stream.stream_id"] != "8"
+                row for row in lifecycle_rows if row["quic.stream.stream_id"] != "8"
             ]
             with lifecycle.open("w", newline="", encoding="utf-8") as stream:
                 writer = csv.DictWriter(stream, fieldnames=lifecycle_fields)
                 writer.writeheader()
                 writer.writerows(lifecycle_rows)
-            with self.assertRaisesRegex(
-                ValueError, "lacks an observed FIN for every asset stream"
-            ):
-                summary.write_outputs(
-                    Path(directory),
-                    Path(directory) / "events-missing-fin.csv",
-                    Path(directory) / "summary-missing-fin.txt",
-                    "4433",
-                    ("tree-complete", "tree-root-overlap"),
-                )
+            missing_fin_destination = Path(directory) / "summary-missing-fin.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events-missing-fin.csv",
+                missing_fin_destination,
+                "4433",
+                ("tree-complete", "tree-root-overlap"),
+            )
+            self.assertIn(
+                "tree_root_overlap_wire_overlap_is_admission=no",
+                missing_fin_destination.read_text(encoding="utf-8"),
+            )
 
     def test_tree_root_overlap_css_pairs_one_asset_and_keeps_overlap_report_only(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -699,19 +739,13 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 ("tree-complete-css", "tree-root-overlap-css"),
             )
             safe_summary = destination.read_text(encoding="utf-8")
-            self.assertIn(
-                "tree-root-overlap-css_outer_get_count=2", safe_summary
-            )
-            self.assertIn(
-                "tree-root-overlap-css_overlap_observed=no", safe_summary
-            )
+            self.assertIn("tree-root-overlap-css_outer_get_count=2", safe_summary)
+            self.assertIn("tree-root-overlap-css_overlap_observed=no", safe_summary)
             self.assertIn(
                 "tree_root_overlap_css_request_semantics_match=yes",
                 safe_summary,
             )
-            self.assertIn(
-                "tree_root_overlap_css_asset_sizes_match=yes", safe_summary
-            )
+            self.assertIn("tree_root_overlap_css_asset_sizes_match=yes", safe_summary)
             self.assertIn(
                 "tree_root_overlap_css_wire_overlap_is_admission=no",
                 safe_summary,
@@ -858,6 +892,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     self.event(12, 0.020, "server", 0, status="200"),
                 ],
             )
+            self.make_tree_complete_control(directory)
             self.make_cohort(
                 directory,
                 "tree-overlap",
@@ -902,7 +937,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     Path(directory) / "events.csv",
                     Path(directory) / "summary.txt",
                     "4433",
-                    ("tree-overlap",),
+                    ("tree-complete", "tree-overlap"),
                 )
             for row in rows:
                 names = row["http3.header.header.name"].split(
@@ -933,7 +968,63 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     Path(directory) / "events.csv",
                     Path(directory) / "summary.txt",
                     "4433",
-                    ("tree-overlap",),
+                    ("tree-complete", "tree-overlap"),
+                )
+
+    def test_tree_overlap_requires_control_root_and_asset_size_parity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_tree_complete_control(directory)
+            self.make_cohort(
+                directory,
+                "tree-overlap",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="GET"),
+                    self.event(9, 0.011, "client", 8, method="GET"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(11, 0.013, "server", 4, status="200"),
+                    self.event(12, 0.014, "server", 8, status="200"),
+                    self.event(13, 0.015, "client", 12, method="CONNECT"),
+                    self.event(14, 0.016, "server", 12, status="200"),
+                ],
+                fin_frames={"4": 15},
+            )
+            response_headers = (
+                Path(directory) / "decrypted-tree-overlap-response-header-values.csv"
+            )
+            with response_headers.open(newline="", encoding="utf-8") as stream:
+                rows = list(csv.DictReader(stream))
+            for row in rows:
+                if row["quic.stream.stream_id"] == "4":
+                    values = row["http3.headers.header.value"].split(
+                        summary.PRIVATE_VALUE_SEPARATOR
+                    )
+                    values[-1] = "32768"
+                    row["http3.headers.header.value"] = (
+                        summary.PRIVATE_VALUE_SEPARATOR.join(values)
+                    )
+            with response_headers.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=rows[0].keys())
+                writer.writeheader()
+                writer.writerows(rows)
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree asset content-lengths differ between complete and overlap",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-complete", "tree-overlap"),
                 )
 
     def test_private_semantics_align_actual_multiplexed_header_blocks(self):
@@ -1067,7 +1158,9 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 {"8": 33, "4": 22},
             )
 
-    def test_private_response_fails_closed_when_data_stream_makes_mapping_ambiguous(self):
+    def test_private_response_fails_closed_when_data_stream_makes_mapping_ambiguous(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as directory:
             separator = summary.PRIVATE_VALUE_SEPARATOR
             self.write_csv(
@@ -1178,19 +1271,21 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     "http3.header.header.name",
                     "http3.headers.header.value",
                 ],
-                [{
-                    "frame.number": "24",
-                    "udp.srcport": "4433",
-                    "udp.dstport": "55000",
-                    "quic.connection.number": "0",
-                    "quic.stream.stream_id": separator.join(("20", "16")),
-                    "http3.headers.status": "200",
-                    "http3.header.header.name": separator.join((
-                        ":status",
-                        "padding",
-                    )),
-                    "http3.headers.header.value": separator.join(("200", "x")),
-                }],
+                [
+                    {
+                        "frame.number": "24",
+                        "udp.srcport": "4433",
+                        "udp.dstport": "55000",
+                        "quic.connection.number": "0",
+                        "quic.stream.stream_id": separator.join(("20", "16")),
+                        "http3.headers.status": "200",
+                        "http3.header.header.name": separator.join((
+                            ":status",
+                            "padding",
+                        )),
+                        "http3.headers.header.value": separator.join(("200", "x")),
+                    }
+                ],
             )
             self.assertEqual(
                 summary.read_response_content_lengths(
@@ -1309,6 +1404,22 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             writer.writeheader()
             writer.writerows(rows)
 
+    def make_tree_complete_control(self, directory):
+        self.make_cohort(
+            directory,
+            "tree-complete",
+            [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 4, method="GET"),
+                self.event(9, 0.011, "client", 8, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(11, 0.013, "server", 4, status="200"),
+                self.event(12, 0.014, "server", 8, status="200"),
+                self.event(17, 0.019, "client", 12, method="CONNECT"),
+                self.event(18, 0.020, "server", 12, status="200"),
+            ],
+        )
+
     def make_cohort(self, directory, cohort, requests, fin_frames=None):
         fin_frames = fin_frames or {}
         request_fields = [
@@ -1369,9 +1480,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 block = ":method;:scheme;:authority;:path;user-agent"
                 if cohort == "reference":
                     block += ";alt-used"
-                names = ";".join(
-                    block for _ in row["http3.headers.method"].split(";")
-                )
+                names = ";".join(block for _ in row["http3.headers.method"].split(";"))
             else:
                 names = ";".join(
                     ":status;content-length;padding"
@@ -1719,12 +1828,8 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 directory,
                 "off",
                 [
-                    self.event(
-                        9, 0.012, "client", "4;8", method="GET;CONNECT"
-                    ),
-                    self.event(
-                        13, 0.021, "server", "4;8", status="200;200"
-                    ),
+                    self.event(9, 0.012, "client", "4;8", method="GET;CONNECT"),
+                    self.event(13, 0.021, "server", "4;8", status="200;200"),
                 ],
             )
             headers = Path(directory) / "decrypted-off-header-names.csv"
@@ -1740,20 +1845,14 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 writer.writeheader()
                 writer.writerows(rows)
 
-            events, _, _ = summary.summarize_cohort(
-                Path(directory), "off", "4433"
-            )
+            events, _, _ = summary.summarize_cohort(Path(directory), "off", "4433")
             requests = {
                 row["method"]: row
                 for row in events
                 if row["direction"] == "client" and row["method"]
             }
-            self.assertNotIn(
-                "padding", requests["GET"]["header_name_set"].split(";")
-            )
-            self.assertIn(
-                "padding", requests["CONNECT"]["header_name_set"].split(";")
-            )
+            self.assertNotIn("padding", requests["GET"]["header_name_set"].split(";"))
+            self.assertIn("padding", requests["CONNECT"]["header_name_set"].split(";"))
 
     def test_unseen_data_stream_beside_headers_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:

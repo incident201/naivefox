@@ -190,8 +190,10 @@ This is a client scheduling intervention, not a promise that QUIC/H2 frames
 will appear in the same order. Resource response HEADERS or FIN may precede
 CONNECT on a fast path. Decrypted diagnostics report observed overlap, but do
 not use it for admission, retry a failed ordering, or filter passive samples by
-that outcome. They still require a completed root before CONNECT and an
-observed FIN for every expected root/CSS/JS response. In the paired H3
+that outcome. They still require a completed root before CONNECT and validate
+the production normal-completion marker for every expected CSS/JS response.
+Observed asset FIN is report-only because a fully consumed known-length H3
+response may use `H3_REQUEST_CANCELLED` instead. In the paired H3
 diagnostic, `tree-complete` and `tree-root-overlap` must retain identical
 root/CSS/JS request semantics and response sizes. H2 uses the same fixed
 fixture/config and validates expected request semantics, but does not claim a
@@ -204,9 +206,9 @@ first stylesheet and never the later script. Passive admission requires exact
 `started_resources=1` and `completed_resources=1` lifecycle evidence. The H3
 decrypted diagnostic admits `tree-root-overlap-css` only beside
 `tree-complete-css`; it proves one QUIC identity, identical root/CSS selected
-request semantics and response size, root FIN before CONNECT, and an observed
-CSS FIN. CSS FIN ordering relative to CONNECT remains report-only and is never
-a resampling criterion.
+request semantics and response size, and root FIN before CONNECT. Any observed
+CSS FIN ordering relative to CONNECT remains report-only and is never a
+resampling criterion.
 
 `root-pmtud-control` is an H3-only, same-binary harness control. It uses the
 same production `document-complete` configuration and root workload as `root`,
@@ -217,6 +219,25 @@ socket, product binary, or preamble semantics. Decrypted admission proves one
 complete root GET with equal selected request semantics and response size; it
 does not claim PMTUD wire equivalence. That conclusion requires the passive
 capture itself.
+
+The dedicated H3 diagnostic gives every NaiveFox arm the same inner HTTPS URL;
+the direct reference uses the same page path and query on the outer fixture.
+It rejects any Firefox nonzero exit or empty screenshot and requires
+successful response headers and `Content-Length` for every preamble GET plus
+an observed root FIN before CONNECT. Application completion at a known response
+length may make upstream Firefox end an H3 fetch with
+`H3_REQUEST_CANCELLED` instead of waiting for the peer FIN, so asset FIN is not
+used as a universal completion predicate. The diagnostic checks every root
+against Firefox navigation semantics and uses
+`tree-complete` as the required root/resource-size control for all two-resource
+overlap modes. `tree-early-overlap` and `tree-overlap` have no existing private
+normal-drain completion marker, so their available decrypted ordering
+predicates must pass directly; a missing predicate is not repaired with a wait
+heuristic or selective resampling. Until exact H3 DATA-byte accounting is
+available, do not use those two arms for a strict whole-volume conclusion: one
+background asset can complete by known `Content-Length` without an observed
+FIN. `tree-root-overlap` has the deterministic all-resource drain marker used
+for that comparison.
 
 For H3, compare:
 

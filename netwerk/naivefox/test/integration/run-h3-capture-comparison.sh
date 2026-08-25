@@ -46,6 +46,16 @@ for arm in "${comparison_arms[@]}"; do
   fi
   seen_comparison_arms[$arm]=1
 done
+if [[ -n ${seen_comparison_arms[tree-overlap]:-} &&
+      -z ${seen_comparison_arms[tree-complete]:-} ]]; then
+  printf 'tree-overlap comparison requires tree-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-early-overlap]:-} &&
+      -z ${seen_comparison_arms[tree-complete]:-} ]]; then
+  printf 'tree-early-overlap comparison requires tree-complete\n' >&2
+  exit 2
+fi
 if [[ -n ${seen_comparison_arms[root-pmtud-control]:-} &&
       -z ${seen_comparison_arms[root]:-} ]]; then
   printf 'root-pmtud-control comparison requires root\n' >&2
@@ -458,9 +468,14 @@ run_reference() {
   firefox_pid=
   stop_capture
   stop_network_mutation_monitor
-  if [[ $status -ne 0 && $status -ne 124 ]]; then
-    printf 'reference Firefox %s pass exited with status %s; evaluating capture\n' \
+  if [[ $status -ne 0 ]]; then
+    printf 'reference Firefox %s pass exited with status %s\n' \
       "$pass" "$status" >&2
+    return 1
+  fi
+  if [[ ! -s $screenshot ]]; then
+    printf 'reference Firefox %s pass produced no screenshot\n' "$pass" >&2
+    return 1
   fi
 }
 
@@ -586,16 +601,22 @@ EOF
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
     "$REFERENCE_BIN" --headless --new-instance --no-remote \
     --profile "$browser_profile" --screenshot "$screenshot" \
-    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&arm=$arm" \
+    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page" \
     >"$browser_log" 2>&1 &
   firefox_pid=$!
   wait "$firefox_pid"
   local browser_status=$?
   firefox_pid=
   set -e
-  if [[ $browser_status -ne 0 && $browser_status -ne 124 ]]; then
-    printf 'same-base Firefox through %s arm exited with status %s; evaluating capture\n' \
+  if [[ $browser_status -ne 0 ]]; then
+    printf 'same-base Firefox through %s arm exited with status %s\n' \
       "$arm" "$browser_status" >&2
+    return 1
+  fi
+  if [[ ! -s $screenshot ]]; then
+    printf 'same-base Firefox through %s arm produced no screenshot\n' \
+      "$arm" >&2
+    return 1
   fi
   if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
     local expected_resources=2
