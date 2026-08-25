@@ -251,6 +251,17 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setProxyPreambleUseCarrierDispatch();
 
     /**
+     * For the experimental first cold HTTP/3 proxy document, preserve
+     * INHIBIT_CACHING but run the native asynchronous cache2 read-only lookup
+     * before the real network transaction is triggered.
+     * Must be called after setProxyPreamble() and before the channel is opened.
+     */
+    [must_use] void setProxyPreambleUseNativeCacheOpen();
+
+    /** True only after the marked preamble completed its cold read-only miss. */
+    [must_use] readonly attribute boolean proxyPreambleNativeCacheReadOnlyMiss;
+
+    /**
      * True iff the channel is CONNECT only.
      */
     [must_use] readonly attribute boolean onlyConnect;

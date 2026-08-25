@@ -1586,17 +1586,54 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
 
 #ifdef MOZ_NAIVEFOX
   // Preserve the lean client's direct transport path for every ordinary
-  // channel and cache-inhibited proxy preamble.  Only the explicit diagnostic
-  // resource-cache arm marks a proxy-preamble resource cache-eligible and
-  // reaches the normal Gecko OpenCacheEntry path below.
+  // channel and cache-inhibited proxy preamble. DocumentNativeCacheOpen is the
+  // narrow exception: it preserves INHIBIT_CACHING so OpenCacheEntry selects
+  // OPEN_READONLY, but restores Firefox's asynchronous cache lookup before
+  // TriggerNetwork.
   if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      (mLoadFlags & nsIRequest::INHIBIT_CACHING)) {
+      ((mLoadFlags & nsIRequest::INHIBIT_CACHING) &&
+       !mProxyPreambleUseNativeCacheOpen)) {
     return TriggerNetwork();
+  }
+  if (mProxyPreambleUseNativeCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_cache_open action=open-begin channel=%p "
+         "inhibit_caching=%d expected_mode=readonly",
+         this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
   }
 #endif
 
   // open a cache entry for this channel...
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    mProxyPreambleNativeCacheOpenCallActive = true;
+  }
+#endif
   rv = OpenCacheEntry(mURI->SchemeIs("https"));
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    mProxyPreambleNativeCacheOpenCallActive = false;
+  }
+#endif
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    if (NS_FAILED(rv) || !AwaitingCacheCallbacks()) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.native_cache_open action=open-failed channel=%p rv=%08x "
+             "awaiting_callback=%d",
+             this, static_cast<uint32_t>(rv), AwaitingCacheCallbacks()));
+      }
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=callback-pending channel=%p", this));
+    }
+  }
+#endif
 
   // do not continue if asyncOpenCacheEntry is in progress
   if (AwaitingCacheCallbacks()) {
@@ -5954,6 +5991,16 @@ nsHttpChannel::OnCacheEntryAvailable(nsICacheEntry* entry, bool aNew,
        "new=%d status=%" PRIx32 "] for %s",
        this, entry, aNew, static_cast<uint32_t>(status), mSpec.get()));
 
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_cache_open action=callback channel=%p entry=%p new=%d "
+         "status=%08x",
+         this, entry, aNew, static_cast<uint32_t>(status)));
+  }
+#endif
+
   // The cache callback arrived (or we're tearing down); the backstop timer is
   // no longer needed.
   CancelCacheWaitTimer();
@@ -5994,6 +6041,32 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
     return mStatus;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen &&
+      mProxyPreambleNativeCacheOpenCallActive) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=contract-failed channel=%p entry=%p "
+           "new=%d status=%08x reason=synchronous-callback",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeCacheOpen &&
+      (status != NS_ERROR_CACHE_KEY_NOT_FOUND || entry || aNew)) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=contract-failed channel=%p entry=%p "
+           "new=%d status=%08x reason=not-cold-readonly-miss",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeCacheOpen) {
+    mProxyPreambleNativeCacheReadOnlyMiss = true;
+  }
+#endif
+
   rv = OnNormalCacheEntryAvailable(entry, aNew, status);
 
   if (NS_FAILED(rv) && (mLoadFlags & LOAD_ONLY_FROM_CACHE)) {
@@ -6008,6 +6081,16 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
   if (AwaitingCacheCallbacks()) {
     return NS_OK;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_cache_open action=trigger-network channel=%p "
+         "cold_readonly_miss=1",
+         this));
+  }
+#endif
 
   return TriggerNetwork();
 }
@@ -12709,6 +12792,21 @@ nsresult nsHttpChannel::OnCacheWaitTimeout() {
   if (!LoadIsPending() || !AwaitingCacheCallbacks()) {
     return NS_OK;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=contract-failed channel=%p "
+           "reason=cache-wait-timeout",
+           this));
+    }
+    StoreWaitForCacheEntry(LoadWaitForCacheEntry() & ~WAIT_FOR_CACHE_ENTRY);
+    CloseCacheEntry(false);
+    (void)AsyncAbort(NS_ERROR_NET_TIMEOUT);
+    return NS_ERROR_NET_TIMEOUT;
+  }
+#endif
 
   LOG(("  cache entry wait timed out, forcing network [this=%p]", this));
   mCacheWaitTimedOut = true;

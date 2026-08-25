@@ -184,7 +184,7 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
                                   const nsACString& aProfilePath,
                                   ProxyProtocol aProtocol,
                                   bool aNoPostQuantum,
-                                  bool aEnablePreambleResourceCache) {
+                                  bool aEnablePreambleCache2) {
   if (mXPCOMInitialized || aProfilePath.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -216,14 +216,14 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
 
   return InitializeWithLocations(profile, mBinDirectory, mExecutable, aProtocol,
                                  nullptr, aNoPostQuantum,
-                                 aEnablePreambleResourceCache);
+                                 aEnablePreambleCache2);
 }
 
 nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
                                           const nsACString& aRuntimePath,
                                           ProxyProtocol aProtocol,
                                           bool aNoPostQuantum,
-                                          bool aEnablePreambleResourceCache) {
+                                          bool aEnablePreambleCache2) {
   if (mXPCOMInitialized) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -248,11 +248,11 @@ nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
   MOZ_TRY(binDirectory->GetNativePath(normalizedRuntimePath));
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
                                  &normalizedRuntimePath, aNoPostQuantum,
-                                 aEnablePreambleResourceCache);
+                                 aEnablePreambleCache2);
 #else
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
                                  nullptr, aNoPostQuantum,
-                                 aEnablePreambleResourceCache);
+                                 aEnablePreambleCache2);
 #endif
 }
 
@@ -304,7 +304,7 @@ nsresult GeckoRuntime::ValidateEmbeddedLocations(
 nsresult GeckoRuntime::InitializeWithLocations(
     nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
     ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath,
-    bool aNoPostQuantum, bool aEnablePreambleResourceCache) {
+    bool aNoPostQuantum, bool aEnablePreambleCache2) {
   if (mXPCOMInitialized || !aProfile || !aBinDirectory || !aExecutable) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -392,12 +392,12 @@ nsresult GeckoRuntime::InitializeWithLocations(
   nsCOMPtr<mozIStorageService> storage =
       do_GetService("@mozilla.org/storage/service;1", &storageRv);
   MOZ_TRY(storageRv);
-  // The minimized runtime does not start Firefox's browser cache graph.  Opt
-  // in only for the explicit preamble resource-cache diagnostic, and do so
-  // before profile-do-change so CacheObserver sees the normal profile event.
-  if (aEnablePreambleResourceCache) {
+  // The minimized runtime does not start Firefox's browser cache graph. Opt in
+  // only for an explicit preamble cache2 experiment, before profile-do-change
+  // so CacheObserver sees the normal profile event.
+  if (aEnablePreambleCache2) {
     MOZ_TRY(net::CacheObserver::Init());
-    mPreambleResourceCacheInitialized = true;
+    mPreambleCache2Initialized = true;
   }
   MOZ_TRY(observers->NotifyObservers(nullptr, "profile-do-change", u"startup"));
   net_EnsurePSMInit();
@@ -551,12 +551,12 @@ void GeckoRuntime::Shutdown() {
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdown);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownQM);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownTelemetry);
-    if (mPreambleResourceCacheInitialized) {
+    if (mPreambleCache2Initialized) {
       // AppShutdown has already delivered profile-before-change, which drains
       // CacheStorageService and CacheFileIOManager.  Pair our explicit Init
       // before XPCOM tears down the observer service.
       (void)net::CacheObserver::Shutdown();
-      mPreambleResourceCacheInitialized = false;
+      mPreambleCache2Initialized = false;
     }
     (void)NS_ShutdownXPCOM(nullptr);
     mXPCOMInitialized = false;

@@ -4171,7 +4171,8 @@ HttpBaseChannel::SetProxyPreambleWaitForHandshakeConfirmation() {
   ENSURE_CALLED_BEFORE_CONNECT();
 
 #ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE)) {
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
+      mProxyPreambleUseNativeCacheOpen) {
     return NS_ERROR_NOT_INITIALIZED;
   }
   mProxyPreambleWaitForHandshakeConfirmation = true;
@@ -4187,7 +4188,8 @@ HttpBaseChannel::SetProxyPreambleUseCarrierDispatch() {
 
 #ifdef MOZ_NAIVEFOX
   if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      mProxyPreambleWaitForHandshakeConfirmation) {
+      mProxyPreambleWaitForHandshakeConfirmation ||
+      mProxyPreambleUseNativeCacheOpen) {
     return NS_ERROR_NOT_INITIALIZED;
   }
   mProxyPreambleUseCarrierDispatch = true;
@@ -4195,6 +4197,34 @@ HttpBaseChannel::SetProxyPreambleUseCarrierDispatch() {
 #else
   return NS_ERROR_NOT_IMPLEMENTED;
 #endif
+}
+
+NS_IMETHODIMP
+HttpBaseChannel::SetProxyPreambleUseNativeCacheOpen() {
+  ENSURE_CALLED_BEFORE_CONNECT();
+
+#ifdef MOZ_NAIVEFOX
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
+      mProxyPreambleWaitForHandshakeConfirmation ||
+      mProxyPreambleUseCarrierDispatch || mProxyPreambleUseNativeCacheOpen) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  mProxyPreambleUseNativeCacheOpen = true;
+  return NS_OK;
+#else
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+NS_IMETHODIMP
+HttpBaseChannel::GetProxyPreambleNativeCacheReadOnlyMiss(bool* aValue) {
+  NS_ENSURE_ARG_POINTER(aValue);
+#ifdef MOZ_NAIVEFOX
+  *aValue = mProxyPreambleNativeCacheReadOnlyMiss;
+#else
+  *aValue = false;
+#endif
+  return NS_OK;
 }
 
 NS_IMETHODIMP

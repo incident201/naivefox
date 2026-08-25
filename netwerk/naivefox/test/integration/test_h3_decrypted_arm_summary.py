@@ -18,6 +18,36 @@ PRIVATE_SEMANTIC_MARKER = "private-tree-authority.invalid"
 
 
 class H3DecryptedArmSummaryTests(unittest.TestCase):
+    def test_native_cache_open_lifecycle_requires_async_readonly_miss(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / (
+                "decrypted-document-native-cache-open-private-lifecycle.moz_log"
+            )
+            path.write_text(
+                "h3.native_cache_open action=open-begin channel=abc "
+                "inhibit_caching=1 expected_mode=readonly\n"
+                "h3.native_cache_open action=callback-pending channel=abc\n"
+                "h3.native_cache_open action=callback channel=abc entry=0 "
+                "new=0 status=804b003d\n"
+                "h3.native_cache_open action=trigger-network channel=abc "
+                "cold_readonly_miss=1\n",
+                encoding="utf-8",
+            )
+            summary.validate_native_cache_open_lifecycle(
+                Path(directory), "document-native-cache-open"
+            )
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "entry=0 new=0 status=804b003d",
+                    "entry=abc new=0 status=00000000",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "cold read-only miss"):
+                summary.validate_native_cache_open_lifecycle(
+                    Path(directory), "document-native-cache-open"
+                )
+
     def test_carrier_dispatch_requires_document_complete_control(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(

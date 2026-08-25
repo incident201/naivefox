@@ -83,10 +83,12 @@ The supported config is a strict NaiveProxy-compatible subset:
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
-  `document-carrier-dispatch`, `document-handshake-confirmed`, `document-overlap`,
+  `document-carrier-dispatch`, `document-native-cache-open`,
+  `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
-  compatibility aliases. `document-carrier-dispatch` and
+  compatibility aliases. `document-carrier-dispatch`,
+  `document-native-cache-open`, and
   `document-handshake-confirmed` are H3-only causal diagnostics and therefore
   must be selected explicitly through `h3-mode`; the resolved H2 mode must
   remain a different supported mode. Active
@@ -131,6 +133,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   Same-base screening found this drain fence worse than `document-complete` in
   every measured view, so it remains a negative diagnostic rather than a
   recommended default.
+  `document-native-cache-open` is a cold H3-only diagnostic that restores the
+  native asynchronous cache2 phase removed by the lean preamble shortcut. It
+  preserves `INHIBIT_CACHING`, requires an `OPEN_READONLY` miss before normal
+  network dispatch, and never writes the response cache. Synchronous callbacks,
+  hits, timeouts, and other cache outcomes fail before the document GET.
   `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
   is accepted only when at least one effective protocol mode is a tree mode.
   It enables Gecko's ordinary HTTP cache path only for discovered resource

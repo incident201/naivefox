@@ -249,6 +249,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ["browser_page"],
                 arms=("root", "document-carrier-dispatch"),
             )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
+                arms=("root", "document-native-cache-open"),
+            )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
@@ -278,6 +286,10 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         self.assertIn(
             "document-carrier-dispatch multi-arm screening requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "document-native-cache-open multi-arm screening requires --protocol h3",
             runner,
         )
         self.assertIn("packets_17_32", runner)
@@ -621,6 +633,35 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-pass",
             )
 
+    def test_native_cache_open_arm_is_explicitly_h3_only(self):
+        config = CONFIG.build_config(
+            "document-native-cache-open",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "document-native-cache-open",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-bytes": CONFIG.PREAMBLE_MAX_BYTES,
+            },
+        )
+        self.assertTrue(config["outer-session-gate"])
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "document-native-cache-open",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+
     def test_tree_arm_configs_use_browser_page_and_bounded_assets(self):
         for arm in (
             "tree-complete",
@@ -920,6 +961,25 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "Connection 1 preamble result=success status=0x00000000 "
                 "http=200 bytes=91 protocol=h2\n",
                 {"protocol": "h2", "features": {"lifecycle_connection_count": 1.0}},
+            )
+        SAMPLE.validate_sample(
+            "document-native-cache-open",
+            "h3",
+            "Connection 1 preamble native-cache-open cache=readonly-miss "
+            "protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=91 protocol=h3\n"
+            "Connection 1 established target=example.test:443 outer=h3 "
+            "padding=yes\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "read-only miss marker"):
+            SAMPLE.validate_sample(
+                "document-native-cache-open",
+                "h3",
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=91 protocol=h3\n",
+                one_connection,
             )
         for arm in (
             "document-complete",

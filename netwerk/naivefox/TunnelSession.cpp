@@ -630,6 +630,7 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
   preamble.mMode = preamble.ModeForProtocol(aProtocol);
   if (preamble.mMode == PreambleMode::DocumentComplete ||
       preamble.mMode == PreambleMode::DocumentCarrierDispatch ||
+      preamble.mMode == PreambleMode::DocumentNativeCacheOpen ||
       preamble.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       preamble.mMode == PreambleMode::DocumentOverlap ||
       preamble.mMode == PreambleMode::DocumentStartOverlap) {
@@ -757,6 +758,13 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aRootDone ? "terminal-fallback" : "request-committed", !aRootDone,
         aRootDone, ProtocolName(aProtocol));
+  }
+  if (preambleMode == PreambleMode::DocumentNativeCacheOpen && succeeded) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-cache-open cache=readonly-miss "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
   }
   if (preambleMode != PreambleMode::DocumentStartOverlap) {
     const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"

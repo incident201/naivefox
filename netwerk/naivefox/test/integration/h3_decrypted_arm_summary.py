@@ -13,6 +13,7 @@ SUPPORTED_ARMS = (
     "root-pmtud-control",
     "document-complete",
     "document-carrier-dispatch",
+    "document-native-cache-open",
     "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",
@@ -784,6 +785,50 @@ def validate_carrier_dispatch_lifecycle(root, cohort):
     }
 
 
+def validate_native_cache_open_lifecycle(root, cohort):
+    path = root / f"decrypted-{cohort}-private-lifecycle.moz_log"
+    require(path.is_file(), f"{cohort} private lifecycle log is missing")
+    expected = ("open-begin", "callback-pending", "callback", "trigger-network")
+    events = {action: [] for action in expected}
+    with path.open(encoding="utf-8", errors="replace") as source:
+        for line_number, line in enumerate(source, start=1):
+            if "h3.native_cache_open" not in line:
+                continue
+            require(
+                "action=contract-failed" not in line
+                and "action=open-failed" not in line,
+                f"{cohort} native cache-open contract failed",
+            )
+            match = re.search(
+                r"action=([a-z-]+).*channel=((?:0x)?[0-9a-fA-F]+)", line
+            )
+            require(match is not None, f"{cohort} malformed native cache marker")
+            action = match.group(1)
+            require(action in events, f"{cohort} unknown native cache marker")
+            events[action].append((line_number, match.group(2), line))
+    for action, matches in events.items():
+        require(
+            len(matches) == 1,
+            f"{cohort} lifecycle must contain exactly one {action} marker",
+        )
+    channels = {matches[0][1] for matches in events.values()}
+    require(len(channels) == 1, f"{cohort} native cache markers changed channel")
+    callback_line = events["callback"][0][2]
+    callback_status = re.search(r"status=([0-9a-fA-F]{8})", callback_line)
+    require(
+        re.search(r"entry=(?:\(nil\)|0|0x0)(?:\s|$)", callback_line) is not None
+        and "new=0" in callback_line
+        and callback_status is not None
+        and int(callback_status.group(1), 16) != 0,
+        f"{cohort} native cache callback was not a cold read-only miss",
+    )
+    positions = [events[action][0][0] for action in expected]
+    require(
+        positions == sorted(positions) and len(set(positions)) == len(positions),
+        f"{cohort} native cache lifecycle order is invalid",
+    )
+
+
 def observed_client_bidirectional_streams(root, cohort):
     streams = set()
     for row in read_rows(root, cohort, "lifecycle"):
@@ -1041,11 +1086,20 @@ def validate(cohorts, connections, client_hellos, arms):
                 == 1 + request_methods.count("CONNECT"),
                 f"{arm} emitted an unexpected outer HTTP request",
             )
+        if arm == "document-native-cache-open":
+            request_methods = [row["method"] for row in requests if row["method"]]
+            require(
+                request_methods.count("GET") == 1
+                and request_methods.count("CONNECT") >= 1
+                and len(request_methods) == 1 + request_methods.count("CONNECT"),
+                f"{arm} emitted an unexpected outer HTTP request",
+            )
         if arm in (
             "root",
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
@@ -1111,6 +1165,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 "root-pmtud-control",
                 "document-complete",
                 "document-carrier-dispatch",
+                "document-native-cache-open",
                 "document-handshake-confirmed",
                 "tree-complete",
                 "tree-complete-css",
@@ -1127,6 +1182,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "root-pmtud-control",
                     "document-complete",
                     "document-carrier-dispatch",
+                    "document-native-cache-open",
                     "document-handshake-confirmed",
                 ):
                     observed_fins = [
@@ -1384,6 +1440,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "document-carrier-dispatch decrypted validation requires document-complete",
     )
     require(
+        "document-native-cache-open" not in arms or "document-complete" in arms,
+        "document-native-cache-open decrypted validation requires document-complete",
+    )
+    require(
         "document-start-overlap" not in arms
         or {"document-complete", "document-overlap"}.issubset(arms),
         "document-start-overlap decrypted validation requires "
@@ -1422,6 +1482,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
     validate(cohorts, connections, client_hellos, arms)
     confirmed_admission_validated = False
     carrier_dispatch_admission_validated = False
+    native_cache_open_admission_validated = False
     if "document-carrier-dispatch" in arms:
         cohort = "document-carrier-dispatch"
         carrier_identity = validate_carrier_dispatch_lifecycle(root, cohort)
@@ -1450,6 +1511,9 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             f"{cohort} contains an unexplained client bidirectional stream",
         )
         carrier_dispatch_admission_validated = True
+    if "document-native-cache-open" in arms:
+        validate_native_cache_open_lifecycle(root, "document-native-cache-open")
+        native_cache_open_admission_validated = True
     if "document-handshake-confirmed" in arms:
         cohort = "document-handshake-confirmed"
         for row in read_rows(root, cohort, "packets"):
@@ -1579,6 +1643,34 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes["document-complete"]
             == root_response_sizes["document-carrier-dispatch"],
             "document response content-length differs for carrier-dispatch",
+        )
+    if {"document-complete", "document-native-cache-open"}.issubset(arms):
+        complete_wire_get = next(
+            row
+            for row in cohorts["document-complete"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        cache_wire_get = next(
+            row
+            for row in cohorts["document-native-cache-open"]
+            if row["direction"] == "client" and row["method"] == "GET"
+        )
+        require(
+            complete_wire_get["header_name_order"]
+            == cache_wire_get["header_name_order"]
+            and complete_wire_get["header_name_set"]
+            == cache_wire_get["header_name_set"],
+            "document sanitized header names/order differ for native cache-open",
+        )
+        require(
+            preamble_semantics["document-complete"]["root"]
+            == preamble_semantics["document-native-cache-open"]["root"],
+            "document selected header values/order differ for native cache-open",
+        )
+        require(
+            root_response_sizes["document-complete"]
+            == root_response_sizes["document-native-cache-open"],
+            "document response content-length differs for native cache-open",
         )
     if {
         "document-complete",
@@ -1848,6 +1940,15 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("document_carrier_dispatch_response_size_match=yes\n")
             destination.write("document_carrier_dispatch_root_fin_before_connect=yes\n")
             destination.write("document_carrier_dispatch_lifecycle_exact=yes\n")
+        if native_cache_open_admission_validated:
+            destination.write("document_native_cache_open_single_connection=yes\n")
+            destination.write("document_native_cache_open_single_client_hello=yes\n")
+            destination.write("document_native_cache_open_readonly_miss=yes\n")
+            destination.write("document_native_cache_open_callback_async=yes\n")
+            destination.write("document_native_cache_open_trigger_after_callback=yes\n")
+            destination.write("document_native_cache_open_request_semantics_match=yes\n")
+            destination.write("document_native_cache_open_response_size_match=yes\n")
+            destination.write("document_native_cache_open_root_fin_before_connect=yes\n")
         if confirmed_admission_validated:
             destination.write(
                 "document_handshake_confirmed_single_connection=yes\n"

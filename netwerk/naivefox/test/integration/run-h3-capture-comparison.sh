@@ -21,7 +21,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -37,7 +37,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -64,6 +64,11 @@ fi
 if [[ -n ${seen_comparison_arms[document-carrier-dispatch]:-} &&
       -z ${seen_comparison_arms[document-complete]:-} ]]; then
   printf 'document-carrier-dispatch comparison requires document-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[document-native-cache-open]:-} &&
+      -z ${seen_comparison_arms[document-complete]:-} ]]; then
+  printf 'document-native-cache-open comparison requires document-complete\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[document-start-overlap]:-} &&
@@ -711,7 +716,8 @@ EOF
   start_capture "$pcap" "$capture_dir/decrypted-$arm-dumpcap.log"
   local -a lifecycle_env=(-u MOZ_LOG -u MOZ_LOG_FILE)
   if [[ $arm == document-handshake-confirmed ||
-        $arm == document-carrier-dispatch ]]; then
+        $arm == document-carrier-dispatch ||
+        $arm == document-native-cache-open ]]; then
     lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
   fi
   env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
@@ -750,6 +756,7 @@ EOF
   if [[ $arm == root || $arm == root-pmtud-control ||
         $arm == document-complete ||
         $arm == document-carrier-dispatch ||
+        $arm == document-native-cache-open ||
         $arm == document-handshake-confirmed ||
         $arm == document-overlap ||
         $arm == document-start-overlap ||
@@ -761,7 +768,8 @@ EOF
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
     if [[ $arm == document-handshake-confirmed ||
-          $arm == document-carrier-dispatch ]]; then
+          $arm == document-carrier-dispatch ||
+          $arm == document-native-cache-open ]]; then
       [[ -s $lifecycle_log ]]
     fi
     if [[ $arm == document-overlap ||

@@ -978,6 +978,13 @@ nsresult ProxyPreambleOperation::Start(
       }
       MOZ_TRY(internal->SetProxyPreambleUseCarrierDispatch());
     }
+    if (mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen) {
+      if (mImpl->mProtocol != ProxyProtocol::H3 ||
+          aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
+        return NS_ERROR_INVALID_ARG;
+      }
+      MOZ_TRY(internal->SetProxyPreambleUseNativeCacheOpen());
+    }
     if (mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed) {
       if (mImpl->mProtocol != ProxyProtocol::H3 ||
           aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
@@ -987,9 +994,10 @@ nsresult ProxyPreambleOperation::Start(
     }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
-    // The navigation is never cache-backed.  The diagnostic cache arm only
-    // changes discovered resource channels, keeping root request semantics
-    // and every default configuration unchanged.
+    // DocumentNativeCacheOpen deliberately keeps INHIBIT_CACHING: its channel
+    // runs the native asynchronous cache2 OPEN_READONLY miss without writing
+    // state.  The resource-cache diagnostic remains the only mode that removes
+    // this flag.
     uint32_t loadFlags =
         nsIRequest::LOAD_ANONYMOUS | nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
     if (!detail::PreambleChannelUsesCache(mImpl->mConfig, mImpl->mProtocol,
@@ -1058,6 +1066,18 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
     }
     return NS_ERROR_UNEXPECTED;
   }
+  if (aStreamId == 0 &&
+      mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen) {
+    nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aRequest);
+    bool readOnlyMiss = false;
+    if (!internal ||
+        NS_FAILED(internal->GetProxyPreambleNativeCacheReadOnlyMiss(
+            &readOnlyMiss)) ||
+        !readOnlyMiss) {
+      mImpl->mFirstFailure = NS_ERROR_UNEXPECTED;
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
   nsresult rv = channel->GetResponseStatus(&stream.mHttpStatus);
   stream.mResponseHeadersReceived = NS_SUCCEEDED(rv);
   if (aStreamId == 0 && NS_FAILED(rv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
@@ -1117,6 +1137,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
   if (aStreamId != 0 ||
       mImpl->mConfig.mMode == PreambleMode::DocumentComplete ||
       mImpl->mConfig.mMode == PreambleMode::DocumentCarrierDispatch ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen ||
       mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
       mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||

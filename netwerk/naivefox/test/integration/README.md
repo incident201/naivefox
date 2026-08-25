@@ -509,7 +509,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -558,6 +558,17 @@ GET at packet 10 while same-base Firefox placed it around packets 15--17. This
 is screening evidence, but it falsifies carrier drain alone as a default
 camouflage mechanism; a follow-up must preserve Firefox's provisional racing
 connection and winner-handoff semantics instead of adding another delay.
+`document-native-cache-open` restores the native channel sequence
+`SpeculativeConnect -> asynchronous cache2 read-only miss -> TriggerNetwork`.
+It uses only the temporary profile, retains `INHIBIT_CACHING`, and rejects a
+synchronous callback, cache hit, timeout, or any result other than the cold
+read-only miss. Accepted decrypted run `20260825T154313Z-ec3f2b9e` showed GET
+at packet 10 for both complete and native-cache arms (5.029 ms and 5.368 ms),
+while Firefox emitted its first GET at packet 15 (27.621 ms). The paired
+10-block H3/inner-HTTPS smoke `7c168177d3fa6928` (seed `25082503`) ranked the
+native arm worse on packets 1--16, packets 1--32, 250 ms, and whole, with only
+a small 17--32 improvement. Together with unchanged GET ordering this closes
+the cache-open-only hypothesis; the arm is not a default candidate.
 `document-start-overlap` uses the same root request but waits for the root
 channel's `NS_NET_STATUS_WAITING_FOR` event, which follows H2/H3 request-stream
 commit, before releasing CONNECT. It does not infer socket ordering from

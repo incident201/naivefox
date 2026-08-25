@@ -563,6 +563,8 @@ class JsonParser final {
         aMode = PreambleMode::DocumentComplete;
       } else if (mode.EqualsLiteral("document-carrier-dispatch")) {
         aMode = PreambleMode::DocumentCarrierDispatch;
+      } else if (mode.EqualsLiteral("document-native-cache-open")) {
+        aMode = PreambleMode::DocumentNativeCacheOpen;
       } else if (mode.EqualsLiteral("document-handshake-confirmed")) {
         aMode = PreambleMode::DocumentHandshakeConfirmed;
       } else if (mode.EqualsLiteral("document-overlap")) {
@@ -665,7 +667,8 @@ class JsonParser final {
     const PreambleMode h2Mode = aPreamble.ModeForProtocol(ProxyProtocol::H2);
     const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
     if (h2Mode == PreambleMode::DocumentHandshakeConfirmed ||
-        h2Mode == PreambleMode::DocumentCarrierDispatch) {
+        h2Mode == PreambleMode::DocumentCarrierDispatch ||
+        h2Mode == PreambleMode::DocumentNativeCacheOpen) {
       return Error("selected diagnostic preamble is only supported for H3");
     }
     if (h3Mode == PreambleMode::DocumentHandshakeConfirmed &&
@@ -680,6 +683,13 @@ class JsonParser final {
          aPreamble.mH3Mode != Some(PreambleMode::DocumentCarrierDispatch))) {
       return Error(
           "document-carrier-dispatch must be selected explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::DocumentNativeCacheOpen &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentNativeCacheOpen))) {
+      return Error(
+          "document-native-cache-open must be selected explicitly with "
+          "h3-mode");
     }
     const bool anyActive =
         h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;

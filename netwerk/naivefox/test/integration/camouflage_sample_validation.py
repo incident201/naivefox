@@ -54,6 +54,11 @@ ESTABLISHED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"established target=\S+ outer=(?P<protocol>h2|h3) padding=yes$"
 )
+NATIVE_CACHE_OPEN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-cache-open cache=readonly-miss "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 
 
 def validate_sample(arm, protocol, log_text, feature_document):
@@ -65,6 +70,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root-pmtud-control",
         "document-complete",
         "document-carrier-dispatch",
+        "document-native-cache-open",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -86,6 +92,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-handshake-confirmed requires h3")
     if arm == "document-carrier-dispatch" and protocol != "h3":
         raise ValueError("document-carrier-dispatch requires h3")
+    if arm == "document-native-cache-open" and protocol != "h3":
+        raise ValueError("document-native-cache-open requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -96,6 +104,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "root-pmtud-control",
         "document-complete",
         "document-carrier-dispatch",
+        "document-native-cache-open",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -188,6 +197,35 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
+    native_cache_lines = [
+        line for line in log_lines if " preamble native-cache-open cache=" in line
+    ]
+    parsed_native_cache = [NATIVE_CACHE_OPEN.fullmatch(line) for line in native_cache_lines]
+    if any(marker is None for marker in parsed_native_cache):
+        raise ValueError("malformed native cache-open evidence")
+    if arm == "document-native-cache-open":
+        if len(parsed_native_cache) != 1:
+            raise ValueError(
+                "document-native-cache-open requires one read-only miss marker"
+            )
+        marker = parsed_native_cache[0]
+        matching_established = [
+            (line, established)
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == marker["connection"]
+            and established["protocol"] == protocol
+        ]
+        if len(matching_established) != 1 or marker["protocol"] != protocol:
+            raise ValueError(
+                "document-native-cache-open marker identity differs from CONNECT"
+            )
+        if not (
+            log_lines.index(native_cache_lines[0]) < log_lines.index(result_lines[0])
+            < log_lines.index(matching_established[0][0])
+        ):
+            raise ValueError("native cache-open lifecycle markers have invalid ordering")
+    elif parsed_native_cache:
+        raise ValueError(f"{arm} arm unexpectedly logged native cache-open lifecycle")
     if arm == "document-overlap":
         if len(parsed_document_admissions) != 1:
             raise ValueError(
@@ -372,6 +410,7 @@ def main():
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",

@@ -30,6 +30,7 @@ def build_config(
         "root-pmtud-control",
         "document-complete",
         "document-carrier-dispatch",
+        "document-native-cache-open",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -45,6 +46,7 @@ def build_config(
         raise ValueError(
             "config arm must be off, gate, root, root-pmtud-control, "
             "document-complete, document-carrier-dispatch, "
+            "document-native-cache-open, "
             "document-handshake-confirmed, "
             "document-overlap, document-start-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
@@ -59,6 +61,8 @@ def build_config(
         raise ValueError("document-handshake-confirmed requires h3")
     if arm == "document-carrier-dispatch" and protocol != "h3":
         raise ValueError("document-carrier-dispatch requires h3")
+    if arm == "document-native-cache-open" and protocol != "h3":
+        raise ValueError("document-native-cache-open requires h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -90,7 +94,11 @@ def build_config(
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm in ("document-handshake-confirmed", "document-carrier-dispatch"):
+    if arm in (
+        "document-handshake-confirmed",
+        "document-carrier-dispatch",
+        "document-native-cache-open",
+    ):
         preamble = {
             "mode": "off",
             "h3-mode": arm,
@@ -179,6 +187,7 @@ def main():
             "root-pmtud-control",
             "document-complete",
             "document-carrier-dispatch",
+            "document-native-cache-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",
