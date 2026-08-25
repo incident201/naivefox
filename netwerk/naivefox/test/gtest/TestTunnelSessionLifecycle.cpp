@@ -143,6 +143,27 @@ TEST(NaiveFoxTunnelSessionLifecycle, ProtocolSpecificPreambleModeSelection)
             PreambleMode::TreeComplete);
 }
 
+TEST(NaiveFoxTunnelSessionLifecycle, ResourceCacheFollowsEffectiveTreeMode)
+{
+  PreambleConfig config;
+  config.mMode = PreambleMode::DocumentComplete;
+  config.mH3Mode = Some(PreambleMode::TreeRootOverlap);
+
+  EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H2));
+  EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H3));
+
+  config.mCacheResources = true;
+  EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H2));
+  EXPECT_TRUE(config.CacheResourcesForProtocol(ProxyProtocol::H3));
+  EXPECT_FALSE(detail::PreambleChannelUsesCache(config, ProxyProtocol::H3,
+                                                false));
+  EXPECT_TRUE(detail::PreambleChannelUsesCache(config, ProxyProtocol::H3,
+                                               true));
+
+  config.mH3Mode = Some(PreambleMode::Off);
+  EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H3));
+}
+
 TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
 {
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::DocumentComplete,

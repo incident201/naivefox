@@ -329,6 +329,7 @@ class JsonParser final {
     bool sawExtraHeaders = false;
     bool sawNoPostQuantum = false;
     bool sawInsecureConcurrency = false;
+    bool sawMaxConnections = false;
     bool sawPreamble = false;
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
@@ -385,6 +386,15 @@ class JsonParser final {
         sawNoPostQuantum = true;
         MOZ_TRY(ParseBoolean(parsed.mNoPostQuantum,
                              "no-post-quantum must be a boolean"));
+      } else if (key.EqualsLiteral("max-connections")) {
+        if (sawMaxConnections) {
+          return Error("duplicate max-connections field");
+        }
+        sawMaxConnections = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            parsed.mMaxConnections, std::numeric_limits<uint32_t>::max(),
+            "max-connections must be a non-negative integer",
+            "max-connections exceeds the supported range"));
       } else if (key.EqualsLiteral("preamble")) {
         if (sawPreamble) {
           return Error("duplicate preamble field");
@@ -543,6 +553,7 @@ class JsonParser final {
     bool sawPath = false;
     bool sawMaxAssets = false;
     bool sawMaxBytes = false;
+    bool sawCacheResources = false;
     auto parseMode = [&](PreambleMode& aMode) -> nsresult {
       nsAutoCString mode;
       MOZ_TRY(ParseString(mode, "preamble mode must be a string"));
@@ -624,6 +635,14 @@ class JsonParser final {
             aPreamble.mMaxBytes, PreambleConfig::kMaximumBytes,
             "preamble max-bytes must be a non-negative integer",
             "preamble max-bytes exceeds the hard limit"));
+      } else if (key.EqualsLiteral("cache-resources")) {
+        if (sawCacheResources) {
+          return Error("duplicate preamble cache-resources field");
+        }
+        sawCacheResources = true;
+        MOZ_TRY(ParseBoolean(
+            aPreamble.mCacheResources,
+            "preamble cache-resources must be a boolean"));
       } else {
         return Error("unsupported preamble field");
       }
@@ -645,16 +664,12 @@ class JsonParser final {
     const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
     const bool anyActive =
         h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
-    const auto isTreeMode = [](PreambleMode aMode) {
-      return aMode != PreambleMode::Off &&
-             aMode != PreambleMode::DocumentComplete &&
-             aMode != PreambleMode::DocumentOverlap &&
-             aMode != PreambleMode::DocumentStartOverlap;
-    };
-    const bool anyTree = isTreeMode(h2Mode) || isTreeMode(h3Mode);
+    const bool anyTree =
+        PreambleModeUsesResources(h2Mode) || PreambleModeUsesResources(h3Mode);
     if (!anyActive) {
-      if (sawPath || sawMaxAssets || sawMaxBytes) {
-        return Error("disabled preamble must not specify path or budgets");
+      if (sawPath || sawMaxAssets || sawMaxBytes || sawCacheResources) {
+        return Error(
+            "disabled preamble must not specify path, budgets, or caching");
       }
       return NS_OK;
     }
@@ -668,6 +683,10 @@ class JsonParser final {
       return Error("active preamble max-bytes must be positive");
     }
     if (!anyTree) {
+      if (sawCacheResources) {
+        return Error(
+            "preamble cache-resources requires a tree/resource mode");
+      }
       if (aPreamble.mMaxAssets != 0) {
         return Error("document-only preamble max-assets must be zero");
       }

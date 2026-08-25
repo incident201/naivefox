@@ -229,6 +229,34 @@ request semantics and CSS `Content-Length`, and root FIN before CONNECT. Any
 observed CSS FIN ordering relative to CONNECT in the overlap alias is
 report-only.
 
+`tree-warm-css-304` is a separate cache-mechanism diagnostic. It maps to
+`tree-root-overlap` with one CSS resource and `cache-resources=true`. For every
+participant the runner creates a fresh temporary profile, performs one private
+warm navigation before capture, restarts Firefox/NaiveFox with that same
+profile, and captures only the measured navigation. The profile is never
+shared between participants or samples and is deleted with the private run.
+The target journals only CSS cache evidence and the runner fails closed unless
+the warm phase is an unconditional 200 with a stable ETag and the measured
+outer request is a Gecko-generated `If-None-Match` followed by 304. For
+NaiveFox it additionally requires the fresh inner browser's CSS request to
+remain an unconditional 200. No conditional header is injected by the
+harness. The arm is limited to single-arm H3 gate/smoke diagnostics and cannot
+be used for confirmation; `tree-root-overlap-css` is its cold control.
+Persistent TLS token storage and H3 0-RTT are disabled for the two reused outer
+profiles, and the runner rejects token-cache files, extra physical QUIC
+identities, extra ClientHellos, or any measured 0-RTT packet. The network
+mutation monitor spans warm-up, controlled shutdown, restart, and measured
+capture. On failure the untrimmed pcap is preserved with private diagnostics,
+while passive extraction begins at the first measured client Initial. Only a
+server-only tail before that point is admissible; client traffic before it or a
+different endpoint UDP 5-tuple after it is a hard failure, even when Wireshark
+cannot decode that payload as QUIC. Exact
+Referer/authority/Accept/fetch-metadata/Priority semantics of
+the measured conditional CSS must match among the block's Firefox A, Firefox B,
+and NaiveFox participants. Run the cold control separately under the same
+fixture revision and build; warm/cold comparison remains descriptive rather
+than a shared-reference paired result.
+
 For a response-volume causal control, set
 `NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE` and
 `NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE` before the suite. Defaults are 64 KiB
@@ -477,7 +505,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and

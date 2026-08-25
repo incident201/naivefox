@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -223,7 +223,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -235,6 +235,10 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
     fi
     seen_multi_arms[$arm]=1
   done
+  if [[ -n ${seen_multi_arms[tree-warm-css-304]:-} ]]; then
+    printf 'tree-warm-css-304 cannot share cold superblock references\n' >&2
+    exit 2
+  fi
   if [[ -n ${seen_multi_arms[root]:-} &&
         -n ${seen_multi_arms[document-complete]:-} ]]; then
     printf 'root and document-complete are aliases; select only one\n' >&2
@@ -266,6 +270,28 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
       fi
       seen_multi_views[$view]=1
     done
+  fi
+fi
+if [[ $naivefox_arm == tree-warm-css-304 ]]; then
+  if [[ $experiment_design != single || $protocol_selection != h3 ]]; then
+    printf 'tree-warm-css-304 requires a single-arm H3 run\n' >&2
+    exit 2
+  fi
+  if [[ $scenario_override != browser_page ]]; then
+    printf 'tree-warm-css-304 requires --scenario browser_page\n' >&2
+    exit 2
+  fi
+  if [[ $mode != gate && $mode != smoke ]]; then
+    printf 'tree-warm-css-304 is restricted to diagnostic gate/smoke runs\n' >&2
+    exit 2
+  fi
+  if [[ $private_h3_keylog == 1 ]]; then
+    printf 'tree-warm-css-304 does not admit private decrypted captures\n' >&2
+    exit 2
+  fi
+  if [[ $diagnostic_naivefox_only == 1 ]]; then
+    printf 'tree-warm-css-304 requires its condition-specific Firefox A/B controls\n' >&2
+    exit 2
   fi
 fi
 if [[ $diagnostic_naivefox_only == 1 ]]; then
@@ -408,13 +434,17 @@ capture_pcap=
 capture_log=
 browser_controller_pid=
 browser_stop_file=
+browser_shutdown_file=
 naivefox_pid=
 network_monitor_pid=
 network_monitor_events=
 network_monitor_ready=
 network_monitor_done=
 network_mutation_validated_samples=0
+cache_validated_participants=0
 controller_backends="$private_dir/controller-backends.txt"
+cache_semantics_records="$private_dir/cache-semantics.txt"
+: >"$cache_semantics_records"
 success=0
 
 stop_pid() {
@@ -430,6 +460,34 @@ stop_pid() {
     fi
   fi
   [[ -z $pid ]] || wait "$pid" 2>/dev/null || true
+}
+
+stop_pid_clean() {
+  local pid=${1:-}
+  local log=${2:-}
+  [[ -n $pid ]] || return 0
+  for ((i = 0; i < 100; i++)); do
+    local process_state=gone
+    if [[ -r /proc/$pid/stat ]]; then
+      read -r _ _ process_state _ <"/proc/$pid/stat"
+    fi
+    if [[ $process_state == gone || $process_state == Z ]]; then
+      local status=0
+      wait "$pid" 2>/dev/null || status=$?
+      if [[ $status -ne 0 ]]; then
+        printf 'warm NaiveFox exited with status %s\n' "$status" >&2
+        return 1
+      fi
+      rg -q '^NaiveFox completed successfully$' "$log" || {
+        printf 'warm NaiveFox lacks successful completion evidence\n' >&2
+        return 1
+      }
+      return 0
+    fi
+    sleep 0.1
+  done
+  printf 'bounded warm NaiveFox did not exit after its tunnel drained\n' >&2
+  return 1
 }
 
 stop_process_group() {
@@ -614,6 +672,19 @@ wait_for_log() {
   return 1
 }
 
+wait_for_cache_log() {
+  wait_for_log "$@"
+}
+
+validate_no_tls_token_persistence() {
+  local profile=$1
+  if find "$profile" -maxdepth 1 -type f -name 'ssl_tokens_cache*' \
+       -print -quit | rg -q .; then
+    printf 'warm-cache profile persisted TLS resumption tokens\n' >&2
+    return 1
+  fi
+}
+
 validate_profile_role() {
   local destination=$1
   local protocol=$2
@@ -714,6 +785,14 @@ user_pref("network.prefetch-next", false);
 user_pref("network.http.speculative-parallel-limit", 0);
 user_pref("network.http.http3.enable", $enable_h3);
 EOF
+  if [[ $arm == tree-warm-css-304 &&
+        ( $participant == reference || $participant == naivefox ) ]]; then
+    cat >>"$destination/user.js" <<'EOF'
+user_pref("network.ssl_tokens_cache_persistence", false);
+user_pref("network.http.http3.enable_0rtt", false);
+user_pref("security.tls.enable_0rtt_data", false);
+EOF
+  fi
   if [[ $participant == socks-browser ]]; then
     "$browser_python" \
       "$INTEGRATION_DIR/camouflage_browser_controller.py" \
@@ -771,6 +850,62 @@ scenario_path() {
   printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&completion=%s\n' \
     "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
     "$completion"
+}
+
+normalize_h3_capture_origin() {
+  local pcap=$1
+  local first_initial_frame
+  local measured_udp_stream
+  local foreign_udp_frame
+  local invalid_prefix_frame
+  local prefix_count
+  local full_pcap="${pcap%.pcapng}.before-origin-trim.pcapng"
+  local trimmed_pcap="${pcap%.pcapng}.origin-trim.tmp.pcapng"
+  local report="$(dirname "$pcap")/capture-origin.txt"
+  first_initial_frame=$(tshark -r "$pcap" \
+    -d "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,quic" \
+    -Y "udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && ((quic.long.packet_type==0) || (quic.long.packet_type_v2==1))" \
+    -T fields -e frame.number | sed -n '1p')
+  if [[ -z $first_initial_frame ]]; then
+    printf 'warm-cache H3 capture has no client Initial\n' >&2
+    return 1
+  fi
+  measured_udp_stream=$(tshark -r "$pcap" \
+    -Y "frame.number==$first_initial_frame" -T fields -e udp.stream |
+    sed -n '1p')
+  if [[ -z $measured_udp_stream ]]; then
+    printf 'warm-cache H3 Initial has no UDP flow identity\n' >&2
+    return 1
+  fi
+  invalid_prefix_frame=$(tshark -r "$pcap" \
+    -Y "frame.number<$first_initial_frame && (tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT || udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT)" \
+    -T fields -e frame.number | sed -n '1p')
+  if [[ -n $invalid_prefix_frame ]]; then
+    printf 'warm-cache H3 capture has client traffic before Initial at frame %s\n' \
+      "$invalid_prefix_frame" >&2
+    return 1
+  fi
+  foreign_udp_frame=$(tshark -r "$pcap" \
+    -Y "frame.number>=$first_initial_frame && udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && udp.stream!=$measured_udp_stream" \
+    -T fields -e frame.number | sed -n '1p')
+  if [[ -n $foreign_udp_frame ]]; then
+    printf 'warm-cache H3 capture has a foreign UDP flow after Initial at frame %s\n' \
+      "$foreign_udp_frame" >&2
+    return 1
+  fi
+  prefix_count=$(tshark -r "$pcap" -Y "frame.number<$first_initial_frame" \
+    -T fields -e frame.number | wc -l)
+  if ! tshark -r "$pcap" -Y "frame.number>=$first_initial_frame" \
+       -w "$trimmed_pcap" >/dev/null 2>&1; then
+    rm -f -- "$trimmed_pcap"
+    printf 'failed to normalize warm-cache H3 capture origin\n' >&2
+    return 1
+  fi
+  mv -f -- "$pcap" "$full_pcap"
+  mv -f -- "$trimmed_pcap" "$pcap"
+  printf 'first_client_initial_frame=%s\nmeasured_udp_stream=%s\ndiscarded_server_only_prefix_packets=%s\nfull_capture=%s\n' \
+    "$first_initial_frame" "$measured_udp_stream" "$prefix_count" \
+    "$(basename "$full_pcap")" >"$report"
 }
 
 strict_transport_check() {
@@ -889,6 +1024,7 @@ start_browser_controller() {
   local navigate_file="$sample_dir/browser-navigate"
   local done_file="$sample_dir/browser-done"
   browser_stop_file="$sample_dir/browser-stop"
+  browser_shutdown_file="$sample_dir/browser-shutdown.json"
   rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
   setsid env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
@@ -900,6 +1036,7 @@ start_browser_controller() {
     --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion" \
     --ready-file "$ready_file" --navigate-file "$navigate_file" \
     --done-file "$done_file" --stop-file "$browser_stop_file" \
+    --shutdown-file "$browser_shutdown_file" \
     --browser-log "$sample_dir/firefox.log" \
     --webdriver-log "$sample_dir/webdriver.log" \
     --timeout "$sample_timeout" >"$sample_dir/controller.log" 2>&1 &
@@ -924,8 +1061,68 @@ stop_browser_controller() {
     return 1
   fi
   wait "$browser_controller_pid"
+  python3 - "$browser_shutdown_file" <<'PY'
+import json
+import sys
+
+record = json.load(open(sys.argv[1], encoding="utf-8"))
+if (
+    not record["browser_process_exited"]
+    or record["forced_kill"]
+    or record.get("shutdown_failed", False)
+):
+    raise SystemExit("Firefox controller required forced or incomplete shutdown")
+if record["shutdown_method"] not in ("webdriver_quit", "controlled_sigterm"):
+    raise SystemExit("Firefox controller lacks a controlled shutdown method")
+if (
+    record["shutdown_method"] == "controlled_sigterm"
+    and record["process_returncode"] not in (0, -15)
+):
+    raise SystemExit("Firefox command-line process exited unexpectedly")
+PY
   browser_controller_pid=
   browser_stop_file=
+  browser_shutdown_file=
+}
+
+warm_reference_cache() {
+  local profile=$1
+  local protocol=$2
+  local sample_dir=$3
+  local warm_token=$4
+  local warm_dir="$sample_dir/cache-warm"
+  mkdir -m 0700 -- "$warm_dir"
+  start_browser_controller "$profile" \
+    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=warm_css&completion=$warm_token" \
+    "$warm_token" "$warm_dir" "$protocol"
+  run_browser_workload "$warm_dir"
+  stop_browser_controller
+}
+
+validate_cache_evidence() {
+  local role=$1
+  local warm_token=$2
+  local measure_token=$3
+  local sample_dir=$4
+  local start_offset=$5
+  local experiment_block=$6
+  python3 "$INTEGRATION_DIR/camouflage_cache_validation.py" \
+    --journal "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL" \
+    --role "$role" --warm-token "$warm_token" \
+    --measure-token "$measure_token" \
+    --start-offset "$start_offset" \
+    --features "$feature_fragments/$(basename "$sample_dir").json" \
+    --output "$sample_dir/cache-validation.txt"
+  local semantics_hash
+  semantics_hash=$(sed -n 's/^semantics_sha256=//p' \
+    "$sample_dir/cache-validation.txt")
+  [[ $semantics_hash =~ ^[0-9a-f]{64}$ ]] || {
+    printf 'cache diagnostic produced invalid semantics digest\n' >&2
+    return 1
+  }
+  printf '%s\t%s\t%s\n' "$experiment_block" "$role" "$semantics_hash" \
+    >>"$cache_semantics_records"
+  cache_validated_participants=$((cache_validated_participants + 1))
 }
 
 extract_sample() {
@@ -957,10 +1154,19 @@ run_reference_sample() {
   local profile="$sample_dir/profile"
   local pcap="$sample_dir/capture.pcapng"
   local path
+  local warm_token=
+  local cache_journal_start=0
   path=$(scenario_path "$scenario" "$completion")
   mkdir -m 0700 -- "$sample_dir"
-  make_profile "$profile" "$protocol" reference
+  make_profile "$profile" "$protocol" reference "" "$naivefox_arm"
   start_network_mutation_monitor "$sample_dir"
+  if [[ $naivefox_arm == tree-warm-css-304 ]]; then
+    cache_journal_start=$(stat -c %s \
+      "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL" 2>/dev/null || printf 0)
+    warm_token=$(openssl rand -hex 16)
+    warm_reference_cache "$profile" "$protocol" "$sample_dir" "$warm_token"
+    validate_no_tls_token_persistence "$profile"
+  fi
   start_browser_controller "$profile" \
     "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" \
     "$completion" "$sample_dir" "$protocol"
@@ -968,10 +1174,18 @@ run_reference_sample() {
   run_browser_workload "$sample_dir"
   sleep 0.25
   stop_capture
+  if [[ $naivefox_arm == tree-warm-css-304 ]]; then
+    normalize_h3_capture_origin "$pcap"
+  fi
   stop_network_mutation_monitor
   extract_sample "$protocol" "$scenario" "$label" "$session_id" "$pcap" \
     "$experiment_block" reference
   stop_browser_controller
+  if [[ $naivefox_arm == tree-warm-css-304 ]]; then
+    validate_cache_evidence reference "$warm_token" "$completion" \
+      "$sample_dir" "$cache_journal_start" "$experiment_block"
+    validate_no_tls_token_persistence "$profile"
+  fi
 }
 
 run_naivefox_sample() {
@@ -997,6 +1211,12 @@ run_naivefox_sample() {
   local path
   local socks_port
   local target_port
+  local warm_browser_profile="$sample_dir/warm-browser-profile"
+  local warm_config="$sample_dir/naivefox-warm-config.json"
+  local warm_log="$sample_dir/naivefox-warm.log"
+  local warm_outer_token=
+  local warm_trigger_token=
+  local cache_journal_start=0
   socks_port=$(choose_port)
   path=$(scenario_path "$scenario" "$completion")
   if [[ $inner_transport == https ]]; then
@@ -1007,11 +1227,52 @@ run_naivefox_sample() {
   mkdir -m 0700 -- "$sample_dir"
   make_profile "$naivefox_profile" "$protocol" naivefox "" "$arm"
   make_profile "$browser_profile" "$protocol" socks-browser "$socks_port"
+  start_network_mutation_monitor "$sample_dir"
   if [[ $private_h3_keylog == 1 && $protocol == h3 ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
     sslkeylog_unset=()
     sslkeylog_assignment=("SSLKEYLOGFILE=$keylog")
+  fi
+  if [[ $arm == tree-warm-css-304 ]]; then
+    local warm_socks_port
+    local warm_target_port=$target_port
+    local warm_dir="$sample_dir/cache-warm"
+    warm_socks_port=$(choose_port)
+    cache_journal_start=$(stat -c %s \
+      "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL" 2>/dev/null || printf 0)
+    warm_outer_token=$(openssl rand -hex 16)
+    warm_trigger_token=$(openssl rand -hex 16)
+    mkdir -m 0700 -- "$warm_dir"
+    make_profile "$warm_browser_profile" "$protocol" socks-browser \
+      "$warm_socks_port"
+    NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
+      NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
+    python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
+      --output "$warm_config" --arm "$arm" --protocol "$protocol" \
+      --socks-port "$warm_socks_port" \
+      --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+      --max-connections 1 \
+      --preamble-path "/camouflage/index.html?scenario=warm_css&completion=$warm_outer_token"
+    env "${sslkeylog_unset[@]}" \
+      -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+      "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
+      NAIVEFOX_PROFILE="$naivefox_profile" \
+      "$NAIVEFOX_BIN" "$warm_config" >"$warm_log" 2>&1 &
+    naivefox_pid=$!
+    wait_for_cache_log "$naivefox_pid" "$warm_log" '^SOCKS5 listening on '
+    start_browser_controller "$warm_browser_profile" \
+      "$inner_transport://localhost:$warm_target_port/camouflage/index.html?scenario=initial&completion=$warm_trigger_token" \
+      "$warm_trigger_token" "$warm_dir" "$protocol" "$warm_socks_port"
+    run_browser_workload "$warm_dir"
+    wait_for_cache_log "$naivefox_pid" "$warm_log" \
+      ' preamble root-overlap drain=complete completed_resources=1 protocol=h3$'
+    wait_for_cache_log "$naivefox_pid" "$warm_log" \
+      ' preamble result=success status=0x[0-9a-fA-F]+ http=2[0-9][0-9] bytes=[0-9]+ protocol=h3$'
+    stop_browser_controller
+    stop_pid_clean "$naivefox_pid" "$warm_log"
+    naivefox_pid=
+    validate_no_tls_token_persistence "$naivefox_profile"
   fi
   NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
     NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
@@ -1019,7 +1280,6 @@ run_naivefox_sample() {
     --output "$naivefox_config" --arm "$arm" \
     --protocol "$protocol" --socks-port "$socks_port" \
     --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --preamble-path "$path"
-  start_network_mutation_monitor "$sample_dir"
   env "${sslkeylog_unset[@]}" \
     -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
     "${sslkeylog_assignment[@]}" \
@@ -1033,9 +1293,12 @@ run_naivefox_sample() {
     "$completion" "$sample_dir" "$protocol" "$socks_port"
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
-  if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
+  if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ||
+        $arm == tree-warm-css-304 ]]; then
     local expected_resources=2
-    [[ $arm == tree-root-overlap-css ]] && expected_resources=1
+    if [[ $arm == tree-root-overlap-css || $arm == tree-warm-css-304 ]]; then
+      expected_resources=1
+    fi
     drain_pattern=" preamble root-overlap drain=complete completed_resources=$expected_resources protocol=$protocol$"
   elif [[ $arm == document-overlap ]]; then
     drain_pattern=" preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
@@ -1047,6 +1310,9 @@ run_naivefox_sample() {
     drain_ready=0
   fi
   stop_capture
+  if [[ $arm == tree-warm-css-304 ]]; then
+    normalize_h3_capture_origin "$pcap"
+  fi
   stop_network_mutation_monitor
   if [[ $drain_ready -eq 0 ]]; then
     stop_browser_controller
@@ -1071,6 +1337,11 @@ run_naivefox_sample() {
   stop_browser_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
+  if [[ $arm == tree-warm-css-304 ]]; then
+    validate_cache_evidence naivefox "$warm_outer_token" "$completion" \
+      "$sample_dir" "$cache_journal_start" "$experiment_block"
+    validate_no_tls_token_persistence "$naivefox_profile"
+  fi
 }
 
 scenario_csv=$(IFS=,; printf '%s' "${scenarios[*]}")
@@ -1164,6 +1435,58 @@ PY
   done <"$schedule"
   "$INTEGRATION_DIR/stop.sh" --quiet
 done
+
+cache_condition=cold_default
+if [[ $naivefox_arm == tree-root-overlap-css ]]; then
+  cache_condition=cold_css_200_control
+elif [[ $naivefox_arm == tree-warm-css-304 ]]; then
+  cache_condition=warm_css_304
+  expected_cache_participants=$((samples_per_cohort * 3))
+  if [[ $cache_validated_participants -ne $expected_cache_participants ]]; then
+    printf 'cache diagnostic validated %s participants, expected %s\n' \
+      "$cache_validated_participants" "$expected_cache_participants" >&2
+    exit 1
+  fi
+  if [[ $cache_validated_participants -ne $session_counter ]]; then
+    printf 'cache diagnostic did not validate every collected participant\n' >&2
+    exit 1
+  fi
+  python3 - "$cache_semantics_records" "$samples_per_cohort" <<'PY'
+import collections
+import sys
+
+groups = collections.defaultdict(list)
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        block, role, digest = line.rstrip("\n").split("\t")
+        groups[block].append((role, digest))
+if len(groups) != int(sys.argv[2]):
+    raise SystemExit("cache semantics evidence has incomplete block coverage")
+for block, rows in groups.items():
+    if len(rows) != 3 or sorted(role for role, _ in rows) != [
+        "naivefox", "reference", "reference"
+    ]:
+        raise SystemExit(f"cache semantics block {block} has incomplete roles")
+    if len({digest for _, digest in rows}) != 1:
+        raise SystemExit(
+            f"warm Firefox A/B and NaiveFox CSS semantics differ in block {block}"
+        )
+PY
+  cat >"$safe_dir/cache-diagnostic.txt" <<EOF
+cache_condition=warm_css_304
+validated_participants=$cache_validated_participants
+warm_response=200_with_stable_etag
+measured_outer_response=304_after_gecko_if_none_match
+measured_inner_response=fresh_200
+outer_request_semantics=equal_across_firefox_a_firefox_b_naivefox
+outer_quic_identity=one_per_measured_participant
+outer_client_hello=one_per_measured_participant
+outer_h3_0rtt=absent
+tls_token_persistence=disabled_and_absent
+profile_scope=participant_sample_warm_measure_then_deleted
+inference=diagnostic_causal_screening_only
+EOF
+fi
 
 if [[ $isolated_network == 1 ]]; then
   capture_offload_policy=namespace_loopback_gro_gso_tso_udp_gso_disabled
@@ -1263,6 +1586,7 @@ else
         $naivefox_arm == tree-early-overlap ||
         $naivefox_arm == tree-root-overlap ||
         $naivefox_arm == tree-root-overlap-css ||
+        $naivefox_arm == tree-warm-css-304 ||
         $naivefox_arm == tree-overlap ]]; then
     single_arm_analysis=screening
   fi
@@ -1296,6 +1620,7 @@ protocol_selection=$protocol_selection
 inner_transport=$inner_transport
 camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE
 camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE
+cache_condition=$cache_condition
 private_h3_keylog=$private_h3_keylog
 isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link
@@ -1332,6 +1657,11 @@ completion_token_scope=experiment_block_wire_url
 completion_marker_reset=before_each_participant
 capture_cutoff=browser_done_plus_250ms
 preamble_drain_policy=reject_if_incomplete_at_capture_cutoff
+preamble_cache_policy=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf diagnostic_per_sample_warm_304 || printf cold)
+cache_profile_scope=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf temporary_participant_sample_warm_measure_then_deleted || printf not_applicable)
+cache_header_policy=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf gecko_generated_if_none_match || printf not_applicable)
+cache_capture_policy=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf warm_traffic_excluded_measure_only || printf not_applicable)
+cache_validated_participants=$cache_validated_participants
 preamble_root_url_parity=reference_and_candidate_outer_exact_path
 browser_controller_backends=$(sort -u "$controller_backends" | paste -sd, -)
 naivefox_browser_proxy_policy=fail_closed_pac_loopback_only

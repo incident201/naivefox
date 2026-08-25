@@ -20,6 +20,7 @@ SUPPORTED_ARMS = (
     "tree-early-overlap",
     "tree-root-overlap",
     "tree-root-overlap-css",
+    "tree-warm-css-304",
     "tree-overlap",
 )
 REFERENCE_ARM = "reference"

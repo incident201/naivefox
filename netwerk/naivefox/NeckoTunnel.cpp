@@ -920,7 +920,9 @@ nsresult ProxyPreambleOperation::Start(
   if (!aBarrierCallback || aConfig.mMode == PreambleMode::Off ||
       !IsValidPreamblePath(aConfig.mPath) || aConfig.mMaxBytes == 0 ||
       aConfig.mMaxBytes > PreambleConfig::kMaximumBytes ||
-      aConfig.mMaxAssets > PreambleConfig::kMaximumAssets) {
+      aConfig.mMaxAssets > PreambleConfig::kMaximumAssets ||
+      (aConfig.mCacheResources &&
+       !PreambleModeUsesResources(aConfig.mMode))) {
     return NS_ERROR_INVALID_ARG;
   }
   mImpl->mConfig = aConfig;
@@ -972,9 +974,16 @@ nsresult ProxyPreambleOperation::Start(
     MOZ_TRY(internal->SetProxyPreamble());
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
-    MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
-                                  nsIRequest::LOAD_ANONYMOUS |
-                                  nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+    // The navigation is never cache-backed.  The diagnostic cache arm only
+    // changes discovered resource channels, keeping root request semantics
+    // and every default configuration unchanged.
+    uint32_t loadFlags = nsIRequest::LOAD_ANONYMOUS |
+                         nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+    if (!detail::PreambleChannelUsesCache(mImpl->mConfig, mImpl->mProtocol,
+                                          false)) {
+      loadFlags |= nsIRequest::INHIBIT_CACHING;
+    }
+    MOZ_TRY(channel->SetLoadFlags(loadFlags));
     // Mirror the native top-level document scheduling cause from nsDocShell.
     // Necko derives transport priority from class-of-service state; do not
     // synthesize an HTTP Priority header or tune the resulting frame size.
@@ -1237,9 +1246,13 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       }
       MOZ_TRY(httpChannel->SetReferrerInfo(mImpl->mRootReferrerInfo));
       MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
-      MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
-                                    nsIRequest::LOAD_ANONYMOUS |
-                                    nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+      uint32_t loadFlags = nsIRequest::LOAD_ANONYMOUS |
+                           nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+      if (!detail::PreambleChannelUsesCache(mImpl->mConfig, mImpl->mProtocol,
+                                            true)) {
+        loadFlags |= nsIRequest::INHIBIT_CACHING;
+      }
+      MOZ_TRY(channel->SetLoadFlags(loadFlags));
       if (detail::PreambleResourceNeedsLeader(resourceKind, deferredResource,
                                               parserBlockingScript,
                                               discoveredInHead)) {

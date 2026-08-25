@@ -44,6 +44,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   "host-resolver-rules": "MAP proxy.example 127.0.0.1",
   "extra-headers": "X-NaiveFox-Test: enabled\r\n",
   "no-post-quantum": false,
+  "max-connections": 0,
   "log": ""
 }
 ```
@@ -63,6 +64,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   NaiveProxy/Exclave config compatibility. NaiveFox validates the value and
   ignores it; connection pooling, concurrency, and tunnel lifecycle remain
   controlled by Firefox Necko.
+- `max-connections` is an optional non-negative integer, defaulting to `0`
+  (unbounded). A positive value closes the listeners after that many accepted
+  local connections and exits after those connections drain; a peer that does
+  not complete SOCKS parsing still consumes the bound. It is useful for bounded
+  tests and orderly one-shot diagnostics.
 - Strict H2/H3 modes never silently fall back.
 - Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
   An explicit nonzero port is required.
@@ -108,6 +114,14 @@ The supported config is a strict NaiveProxy-compatible subset:
   only after the H2/H3 request stream has accepted and committed the GET. It
   then permits CONNECT while the response continues. Admission and final HTTP
   result are separate events; a normal 2xx root drain remains mandatory.
+  `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
+  is accepted only when at least one effective protocol mode is a tree mode.
+  It enables Gecko's ordinary HTTP cache path only for discovered resource
+  channels; the root document remains cache-inhibited, as do direct requests,
+  CONNECT, and every preamble under the default configuration. The cache lives
+  in the run's selected profile. NaiveFox still creates a temporary profile by
+  default, so this mechanism is useful for controlled repeated loads within a
+  process and does not introduce a persistent-profile product dependency.
 - `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path

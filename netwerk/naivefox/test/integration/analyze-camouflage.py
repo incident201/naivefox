@@ -171,6 +171,7 @@ def load_dataset(path):
                 "tree-early-overlap",
                 "tree-root-overlap",
                 "tree-root-overlap-css",
+                "tree-warm-css-304",
                 "tree-overlap",
             }
             if arm not in {None, "reference", *naivefox_arms}:

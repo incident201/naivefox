@@ -111,8 +111,37 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mPreamble.mPath.EqualsLiteral("/"));
   EXPECT_EQ(config.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(config.mPreamble.mMaxBytes, 0U);
+  EXPECT_EQ(config.mMaxConnections, 0U);
   EXPECT_FALSE(config.mOuterSessionGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
+}
+
+TEST(NaiveFoxConfig, MaxConnectionsIsBoundedAndExplicit)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":1})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mMaxConnections, 1U);
+
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":-1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":"1"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":4294967296})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":1,"max-connections":2})",
+  };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
 }
 
 TEST(NaiveFoxConfig, OuterSessionGateBoolean)
@@ -232,6 +261,39 @@ TEST(NaiveFoxConfig, PreambleModesAndBudgets)
     EXPECT_TRUE(config.mPreamble.mPath.Equals(expected.mPath));
     EXPECT_EQ(config.mPreamble.mMaxAssets, expected.mMaxAssets);
     EXPECT_EQ(config.mPreamble.mMaxBytes, expected.mMaxBytes);
+    EXPECT_FALSE(config.mPreamble.mCacheResources);
+  }
+}
+
+TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h3-mode":"tree-root-overlap","path":"/camouflage/","cache-resources":true}})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_TRUE(config.mPreamble.mCacheResources);
+  EXPECT_FALSE(
+      config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H2));
+  EXPECT_TRUE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H3));
+
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
+  };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
   }
 }
 
@@ -381,6 +443,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mPreamble.mPath.AssignLiteral("/camouflage/");
   source.mPreamble.mMaxAssets = 6;
   source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
+  source.mPreamble.mCacheResources = true;
   source.mOuterSessionGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
 
@@ -401,6 +464,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mPreamble.mPath.EqualsLiteral("/camouflage/"));
     EXPECT_EQ(copy->mPreamble.mMaxAssets, 6U);
     EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);
+    EXPECT_TRUE(copy->mPreamble.mCacheResources);
     EXPECT_TRUE(copy->mOuterSessionGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
   }

@@ -208,7 +208,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
       rv = runtime.InitializeEmbedded(nsDependentCString(aProfilePath),
                                       nsDependentCString(aRuntimePath),
                                       RuntimeProtocol(config),
-                                      config.mNoPostQuantum);
+                                      config.mNoPostQuantum,
+                                      config.mPreamble.mCacheResources);
       if (NS_SUCCEEDED(rv)) {
         MarkEmbeddedRunning();
         mozilla::naivefox::RuntimeLogEvent(
@@ -216,8 +217,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
             static_cast<unsigned>(config.mListeners.Length()),
             static_cast<unsigned>(config.mProxies.Length()));
         auto tunnelConfigs = MakeTunnelConfigs(config);
-        rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
-                                                    tunnelConfigs, 0, control);
+        rv = mozilla::naivefox::RunLocalProxyServer(
+            config.mListeners, tunnelConfigs, config.mMaxConnections, control);
       }
       status =
           NS_SUCCEEDED(rv) ? NAIVEFOX_STATUS_OK : NAIVEFOX_STATUS_RUNTIME_ERROR;
@@ -267,7 +268,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
 
     mozilla::naivefox::GeckoRuntime runtime;
     rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol,
-                            config.mNoPostQuantum);
+                            config.mNoPostQuantum,
+                            config.mPreamble.mCacheResources);
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started listeners=%u upstreams=%u\n",
@@ -282,7 +284,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       }
       auto tunnelConfigs = MakeTunnelConfigs(config);
       rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
-                                                  tunnelConfigs);
+                                                  tunnelConfigs,
+                                                  config.mMaxConnections);
     }
     if (NS_FAILED(rv)) {
       std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",

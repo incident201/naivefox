@@ -1582,9 +1582,14 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   SpeculativeConnect();
 
 #ifdef MOZ_NAIVEFOX
-  // The lean client has no browser cache component graph.  Network channels
-  // are intentionally uncached, so go directly to the transport path.
-  return TriggerNetwork();
+  // Preserve the lean client's direct transport path for every ordinary
+  // channel and cache-inhibited proxy preamble.  Only the explicit diagnostic
+  // resource-cache arm marks a proxy-preamble resource cache-eligible and
+  // reaches the normal Gecko OpenCacheEntry path below.
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
+      (mLoadFlags & nsIRequest::INHIBIT_CACHING)) {
+    return TriggerNetwork();
+  }
 #endif
 
   // open a cache entry for this channel...

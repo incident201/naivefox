@@ -123,6 +123,7 @@ ready_file="$RUN_DIR/target-ready.json"
 python3 "$INTEGRATION_DIR/target_server.py" \
   --cert "$RUN_DIR/pki/target.crt" --key "$RUN_DIR/pki/target.key" \
   --completion-dir "$RUN_DIR/completions" \
+  --request-journal "$RUN_DIR/cache-requests.jsonl" \
   --ready-file "$ready_file" >"$RUN_DIR/target.log" 2>&1 &
 target_pid=$!
 printf '%s\n' "$target_pid" >"$RUN_DIR/target.pid"
@@ -211,6 +212,7 @@ NAIVEFOX_FIXTURE_TRUSTED_PROFILE=$RUN_DIR/profiles/trusted
 NAIVEFOX_FIXTURE_UNTRUSTED_PROFILE=$RUN_DIR/profiles/untrusted
 NAIVEFOX_FIXTURE_CADDY_PID=$caddy_pid
 NAIVEFOX_FIXTURE_TARGET_PID=$target_pid
+NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL=$RUN_DIR/cache-requests.jsonl
 NAIVEFOX_FIXTURE_PROXY_IP_SAN=${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-}
 NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE=$camouflage_style_size
 NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE=$camouflage_script_size

@@ -21,6 +21,7 @@ def build_config(
     proxy_pass,
     diagnostic_first_socks_tunnel_urgent_start=False,
     preamble_path=PREAMBLE_PATH,
+    max_connections=0,
 ):
     supported_arms = (
         "off",
@@ -35,6 +36,7 @@ def build_config(
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-warm-css-304",
         "tree-overlap",
     )
     if arm not in supported_arms:
@@ -42,7 +44,7 @@ def build_config(
             "config arm must be off, gate, root, root-pmtud-control, "
             "document-complete, document-overlap, document-start-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
-            "tree-root-overlap, tree-root-overlap-css, or "
+            "tree-root-overlap, tree-root-overlap-css, tree-warm-css-304, or "
             "tree-overlap"
         )
     if protocol not in ("h2", "h3"):
@@ -58,6 +60,12 @@ def build_config(
             raise ValueError(f"{name} port is outside 1..65535")
     if not proxy_user or not proxy_pass:
         raise ValueError("proxy credentials must be non-empty")
+    if (
+        not isinstance(max_connections, int)
+        or isinstance(max_connections, bool)
+        or not 0 <= max_connections <= 0xFFFFFFFF
+    ):
+        raise ValueError("max connections is outside 0..4294967295")
     if (
         not isinstance(preamble_path, str)
         or not (
@@ -96,21 +104,30 @@ def build_config(
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-warm-css-304",
         "tree-overlap",
     ):
         preamble = {
             "mode": {
                 "tree-complete-css": "tree-complete",
                 "tree-root-overlap-css": "tree-root-overlap",
+                "tree-warm-css-304": "tree-root-overlap",
             }.get(arm, arm),
             "path": preamble_path,
             "max-assets": (
                 1
-                if arm in ("tree-complete-css", "tree-root-overlap-css")
+                if arm
+                in (
+                    "tree-complete-css",
+                    "tree-root-overlap-css",
+                    "tree-warm-css-304",
+                )
                 else TREE_PREAMBLE_MAX_ASSETS
             ),
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
         }
+        if arm == "tree-warm-css-304":
+            preamble["cache-resources"] = True
     config = {
         "listen": f"socks://127.0.0.1:{socks_port}",
         "proxy": f"{scheme}://{user}:{password}@localhost:{proxy_port}",
@@ -121,6 +138,8 @@ def build_config(
     }
     if diagnostic_first_socks_tunnel_urgent_start:
         config["diagnostic-first-socks-tunnel-urgent-start"] = True
+    if max_connections:
+        config["max-connections"] = max_connections
     return config
 
 
@@ -151,6 +170,7 @@ def main():
             "tree-early-overlap",
             "tree-root-overlap",
             "tree-root-overlap-css",
+            "tree-warm-css-304",
             "tree-overlap",
         ),
         required=True,
@@ -159,6 +179,7 @@ def main():
     parser.add_argument("--socks-port", type=int, required=True)
     parser.add_argument("--proxy-port", type=int, required=True)
     parser.add_argument("--preamble-path", default=PREAMBLE_PATH)
+    parser.add_argument("--max-connections", type=int, default=0)
     parser.add_argument(
         "--diagnostic-first-socks-tunnel-urgent-start",
         action="store_true",
@@ -177,6 +198,7 @@ def main():
             args.diagnostic_first_socks_tunnel_urgent_start
         ),
         preamble_path=args.preamble_path,
+        max_connections=args.max_connections,
     )
     write_config(args.output, config)
 

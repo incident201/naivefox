@@ -28,13 +28,15 @@ class GeckoRuntime final {
 
   nsresult Initialize(int aArgc, char* aArgv[], const nsACString& aProfilePath,
                       ProxyProtocol aProtocol,
-                      bool aNoPostQuantum = false);
+                      bool aNoPostQuantum = false,
+                      bool aEnablePreambleResourceCache = false);
   static nsresult ValidateEmbeddedLocations(const nsACString& aProfilePath,
                                             const nsACString& aRuntimePath);
   nsresult InitializeEmbedded(const nsACString& aProfilePath,
                               const nsACString& aRuntimePath,
                               ProxyProtocol aProtocol,
-                              bool aNoPostQuantum = false);
+                              bool aNoPostQuantum = false,
+                              bool aEnablePreambleResourceCache = false);
   nsresult RunEventLoopSmoke();
 
  private:
@@ -42,7 +44,8 @@ class GeckoRuntime final {
                                    nsIFile* aExecutable,
                                    ProxyProtocol aProtocol,
                                    const nsACString* aAndroidRuntimePath,
-                                   bool aNoPostQuantum);
+                                   bool aNoPostQuantum,
+                                   bool aEnablePreambleResourceCache);
   nsresult WaitForNetworkStartup();
   void Shutdown();
 
@@ -53,6 +56,7 @@ class GeckoRuntime final {
   UniquePtr<AutoSQLiteLifetime> mSQLiteLifetime;
   UniquePtr<TemporaryTrustStore> mTemporaryTrustStore;
   bool mXPCOMInitialized = false;
+  bool mPreambleResourceCacheInitialized = false;
   bool mNoPostQuantumApplied = false;
   bool mSslCertFileApplied = false;
   bool mHadKyberPref = false;

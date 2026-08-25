@@ -71,6 +71,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-warm-css-304",
         "tree-overlap",
     )
     if arm not in supported_arms:
@@ -80,9 +81,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
 
-    result_lines = [
-        line for line in log_lines if " preamble result=" in line
-    ]
+    result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
         raise ValueError("malformed preamble result evidence")
@@ -97,6 +96,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-warm-css-304",
         "tree-overlap",
     )
     overlapping_arms = (
@@ -105,6 +105,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-warm-css-304",
         "tree-overlap",
     )
     if arm in preamble_arms:
@@ -124,13 +125,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(f"{arm} arm preamble background drain timed out")
 
     document_admission_lines = [
-        line
-        for line in log_lines
-        if " preamble document-overlap admission=" in line
+        line for line in log_lines if " preamble document-overlap admission=" in line
     ]
     parsed_document_admissions = [
-        DOCUMENT_OVERLAP_ADMISSION.fullmatch(line)
-        for line in document_admission_lines
+        DOCUMENT_OVERLAP_ADMISSION.fullmatch(line) for line in document_admission_lines
     ]
     if any(admission is None for admission in parsed_document_admissions):
         raise ValueError("malformed document-overlap admission evidence")
@@ -155,9 +153,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(admission is None for admission in parsed_document_start_admissions):
         raise ValueError("malformed document-start-overlap admission evidence")
     document_start_drain_lines = [
-        line
-        for line in log_lines
-        if " preamble document-start-overlap drain=" in line
+        line for line in log_lines if " preamble document-start-overlap drain=" in line
     ]
     parsed_document_start_drains = [
         DOCUMENT_START_OVERLAP_DRAIN.fullmatch(line)
@@ -167,9 +163,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("malformed document-start-overlap drain evidence")
 
     admission_lines = [
-        line
-        for line in log_lines
-        if " preamble root-overlap admission=" in line
+        line for line in log_lines if " preamble root-overlap admission=" in line
     ]
     parsed_admissions = [
         ROOT_OVERLAP_ADMISSION.fullmatch(line) for line in admission_lines
@@ -182,9 +176,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_drains = [ROOT_OVERLAP_DRAIN.fullmatch(line) for line in drain_lines]
     if any(drain is None for drain in parsed_drains):
         raise ValueError("malformed tree-root-overlap drain evidence")
-    established_lines = [
-        line for line in log_lines if " established target=" in line
-    ]
+    established_lines = [line for line in log_lines if " established target=" in line]
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
@@ -233,9 +225,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             admission_index < result_index < drain_index
             and result_index < established_index
         ):
-            raise ValueError(
-                "document-overlap lifecycle markers have invalid ordering"
-            )
+            raise ValueError("document-overlap lifecycle markers have invalid ordering")
     elif parsed_document_admissions or parsed_document_drains:
         raise ValueError(f"{arm} arm unexpectedly logged document-overlap lifecycle")
     if arm == "document-start-overlap":
@@ -250,9 +240,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or admission["root_done"] != "0"
             or admission["protocol"] != protocol
         ):
-            raise ValueError(
-                "document-start-overlap causal admission state is invalid"
-            )
+            raise ValueError("document-start-overlap causal admission state is invalid")
         if len(parsed_document_start_drains) != 1:
             raise ValueError(
                 "document-start-overlap requires exactly one completed drain marker"
@@ -276,9 +264,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["protocol"] != protocol
             or int(drain["completed_resources"]) != 0
         ):
-            raise ValueError(
-                "document-start-overlap lifecycle marker identity differs"
-            )
+            raise ValueError("document-start-overlap lifecycle marker identity differs")
         admission_index = log_lines.index(document_start_admission_lines[0])
         result_index = log_lines.index(result_lines[0])
         drain_index = log_lines.index(document_start_drain_lines[0])
@@ -294,8 +280,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(
             f"{arm} arm unexpectedly logged document-start-overlap lifecycle"
         )
-    if arm in ("tree-root-overlap", "tree-root-overlap-css"):
-        expected_resources = 1 if arm.endswith("-css") else 2
+    if arm in (
+        "tree-root-overlap",
+        "tree-root-overlap-css",
+        "tree-warm-css-304",
+    ):
+        expected_resources = (
+            1 if arm in ("tree-root-overlap-css", "tree-warm-css-304") else 2
+        )
         if len(parsed_admissions) != 1:
             raise ValueError(
                 "tree-root-overlap requires exactly one causal admission marker"
@@ -378,6 +370,7 @@ def main():
             "tree-early-overlap",
             "tree-root-overlap",
             "tree-root-overlap-css",
+            "tree-warm-css-304",
             "tree-overlap",
         ),
         required=True,

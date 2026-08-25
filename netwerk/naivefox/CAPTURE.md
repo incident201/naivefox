@@ -227,6 +227,56 @@ root/CSS/JS request semantics and response sizes. H2 uses the same fixed
 fixture/config and validates expected request semantics, but does not claim a
 paired asset-size proof.
 
+Resource-cache experiments use the orthogonal `cache-resources` preamble
+setting. The default is off. When enabled for a tree/resource mode, only CSS,
+JS, and other discovered resource channels enter Gecko's native HTTP cache;
+the root navigation stays cache-inhibited. This is a mechanism diagnostic for
+separating resource topology from cold response-body volume. It is not a
+persistent-profile design: normal NaiveFox temporary-profile startup remains
+valid, and product behavior must not depend on state surviving a process run.
+
+The passive harness exposes that question only as `tree-warm-css-304`. It maps
+to `tree-root-overlap`, selects one CSS resource, and enables
+`cache-resources`. Every reference or NaiveFox participant receives a newly
+created profile which is reused only for its private warm→measure pair and then
+deleted. The measured passive window begins at its publicly observable client
+Initial. The complete pcap is preserved with other private diagnostics when a
+run fails; a server-only tail from the closed warm 5-tuple may precede the
+Initial and is excluded from classifier features. Any client traffic before
+that Initial, or any other endpoint UDP 5-tuple after it (regardless of whether
+its payload decodes as QUIC), invalidates the sample.
+The fixture serves the stable CSS
+with `ETag` and `Cache-Control: no-cache`; admission fails unless Gecko first
+receives an unconditional 200 and later generates `If-None-Match` which earns
+a 304. The NaiveFox inner measurement browser remains fresh and must still
+receive its own cold 200. This arm is H3 gate/smoke diagnostic evidence only:
+it cannot enter a shared superblock or a confirmatory/research run, and it is
+never a proposal for persistent `NAIVEFOX_PROFILE` state. The unchanged
+`tree-root-overlap-css` arm remains the cold control.
+The warm arm disables persistent TLS token storage and H3 0-RTT in both outer
+profiles, rejects any `ssl_tokens_cache*` file, and requires one measured QUIC
+identity, one ClientHello, and no 0-RTT packet. Its network-mutation monitor
+runs continuously from before warm-up through the measured capture cutoff.
+Firefox A/B and NaiveFox receive condition-specific warm controls; a fresh
+`tree-root-overlap-css` run under the same fixture revision and binary build is
+the separate cold dataset. Cross-dataset warm/cold interpretation is therefore
+descriptive causal screening, not paired or confirmatory inference.
+
+The first fully fail-closed one-block same-base H3/inner-HTTPS admission run for
+this diagnostic is retained as safe artifact `d26f91c82a29ceed` (seed `305`, NaiveFox binary
+build ID `b1820e20442018465574f71995c69460`). Firefox A, Firefox B, and NaiveFox
+each produced an unconditional warm 200 followed by a measured native Gecko
+conditional request and 304 with identical selected outer request semantics.
+The fresh inner Firefox behind NaiveFox independently received 200. Every
+measured participant had one QUIC identity, one ClientHello, no 0-RTT, no TLS
+token persistence, and no route/address/link mutation. This is admission
+evidence only; one block contains no classifier inference. The predecessor
+private run `da04d2419e6c9715` discovered two delayed server-only datagrams from
+the closed warm 5-tuple before the measured client Initial. The harness now
+preserves that full pcap on failure and defines the passive sample origin at
+the first client Initial, while rejecting any client traffic before it or
+stale flow continuing afterward.
+
 `tree-complete-css` and `tree-root-overlap-css` are harness-only one-asset
 controls. They map to the unchanged production `tree-complete` and
 `tree-root-overlap` modes with `max-assets=1`, so the parsed root opens only the
@@ -594,7 +644,8 @@ retain descriptive metrics and refit uncertainty, but record
 conclusion remain `INCONCLUSIVE`. Select a candidate with the paired report,
 then preregister it and collect a fresh single-arm confirmation such as
 `--mode research --naivefox-arm root`. Experimental
-`tree-complete`, `tree-early-overlap`, `tree-root-overlap`, and `tree-overlap` single-arm runs remain
+`tree-complete`, `tree-early-overlap`, `tree-root-overlap`,
+`tree-warm-css-304`, and `tree-overlap` single-arm runs remain
 screening-only, and
 the fixed default superblock deliberately excludes them to bound collection
 cost. Screening rows must not be reused as

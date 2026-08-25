@@ -59,6 +59,13 @@ enum class PreambleMode : uint8_t {
   Tree = TreeComplete,
 };
 
+constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
+  return aMode != PreambleMode::Off &&
+         aMode != PreambleMode::DocumentComplete &&
+         aMode != PreambleMode::DocumentOverlap &&
+         aMode != PreambleMode::DocumentStartOverlap;
+}
+
 struct PreambleConfig final {
   static constexpr uint32_t kMaximumAssets = 6;
   static constexpr uint32_t kMaximumBytes = 384 * 1024;
@@ -69,6 +76,7 @@ struct PreambleConfig final {
   nsCString mPath{"/"};
   uint32_t mMaxAssets = 0;
   uint32_t mMaxBytes = 0;
+  bool mCacheResources = false;
 
   PreambleMode ModeForProtocol(ProxyProtocol aProtocol) const {
     MOZ_ASSERT(aProtocol != ProxyProtocol::Auto);
@@ -80,6 +88,11 @@ struct PreambleConfig final {
     }
     return mMode;
   }
+
+  bool CacheResourcesForProtocol(ProxyProtocol aProtocol) const {
+    return mCacheResources &&
+           PreambleModeUsesResources(ModeForProtocol(aProtocol));
+  }
 };
 
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
@@ -90,6 +103,7 @@ struct Config final {
   Maybe<HostResolverRule> mHostResolverRule;
   nsTArray<ExtraHeader> mExtraHeaders;
   PreambleConfig mPreamble;
+  uint32_t mMaxConnections = 0;
   bool mOuterSessionGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mNoPostQuantum = false;

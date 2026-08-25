@@ -29,6 +29,7 @@ def load(name, filename):
 
 CAPTURE = load("camouflage_capture_health", "camouflage_capture_health.py")
 CONFIG = load("camouflage_naivefox_config", "camouflage_naivefox_config.py")
+CACHE = load("camouflage_cache_validation", "camouflage_cache_validation.py")
 CONTROLLER = load("camouflage_browser_controller", "camouflage_browser_controller.py")
 FEATURES = load("camouflage_features", "camouflage_features.py")
 SAMPLE = load("camouflage_sample_validation", "camouflage_sample_validation.py")
@@ -71,7 +72,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         ]
         self.assertLess(
             embedded.index("runtime.InitializeEmbedded("),
-            embedded.index("RunLocalProxyServer(config.mListeners"),
+            embedded.index("RunLocalProxyServer("),
         )
         standalone = runner[
             runner.index("const bool configMode") : runner.index("nsCString profile;")
@@ -556,6 +557,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         for arm, mode in (
             ("tree-complete-css", "tree-complete"),
             ("tree-root-overlap-css", "tree-root-overlap"),
+            ("tree-warm-css-304", "tree-root-overlap"),
         ):
             config = CONFIG.build_config(
                 arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
@@ -563,10 +565,24 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertEqual(config["preamble"]["mode"], mode)
             self.assertEqual(config["preamble"]["max-assets"], 1)
             self.assertEqual(config["preamble"]["path"], CONFIG.PREAMBLE_PATH)
+            if arm == "tree-warm-css-304":
+                self.assertTrue(config["preamble"]["cache-resources"])
+            else:
+                self.assertNotIn("cache-resources", config["preamble"])
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
         self.assertEqual(alias["preamble"]["mode"], "document-complete")
+        bounded = CONFIG.build_config(
+            "tree-warm-css-304",
+            "h3",
+            1080,
+            4433,
+            "user",
+            "pass",
+            max_connections=1,
+        )
+        self.assertEqual(bounded["max-connections"], 1)
         for arm in ("document-overlap", "document-start-overlap"):
             config = CONFIG.build_config(
                 arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
@@ -994,8 +1010,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=0 protocol=h3\n"
         )
         established = (
-            "Connection 1 established target=localhost:443 "
-            "outer=h3 padding=yes\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
         )
         with self.assertRaisesRegex(ValueError, "invalid ordering"):
             SAMPLE.validate_sample(
@@ -1016,8 +1031,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "root_done=0 protocol=h3\n"
         )
         established = (
-            "Connection 1 established target=localhost:443 "
-            "outer=h3 padding=yes\n"
+            "Connection 1 established target=localhost:443 outer=h3 padding=yes\n"
         )
         result = (
             "Connection 1 preamble result=success status=0x00000000 "
@@ -1075,8 +1089,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 + result
                 + established
                 + "Connection 1 preamble document-overlap drain=complete "
-                "root_done=1 completed_resources=0 protocol=h3\n"
-                + timeout,
+                "root_done=1 completed_resources=0 protocol=h3\n" + timeout,
             ),
             (
                 "document-start-overlap",
@@ -1086,8 +1099,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 + established
                 + result
                 + "Connection 1 preamble document-start-overlap drain=complete "
-                "root_done=1 completed_resources=0 protocol=h3\n"
-                + timeout,
+                "root_done=1 completed_resources=0 protocol=h3\n" + timeout,
             ),
             ("tree-early-overlap", result + timeout),
             (
@@ -1167,7 +1179,9 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertLess(cutoff, drain_check)
         self.assertLess(drain_check, capture_stop)
         self.assertEqual(candidate[:capture_stop].count("wait_for_log"), 1)
-        self.assertIn("did not drain its preamble by the fixed capture cutoff", candidate)
+        self.assertIn(
+            "did not drain its preamble by the fixed capture cutoff", candidate
+        )
 
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
         two_connections = {
@@ -1426,6 +1440,171 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             with open(path, encoding="utf-8") as stream:
                 self.assertEqual(stream.read(), "complete\n")
             self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+
+    def test_warm_css_page_uses_the_measured_resource_url(self):
+        token = "c" * 32
+        page = TARGET.Handler.camouflage_page(
+            object(), {"scenario": ["warm_css"], "completion": [token]}
+        ).decode()
+        self.assertIn('href="/camouflage/style.css"', page)
+        self.assertNotIn("app.js", page)
+        self.assertIn(f"/camouflage/complete?token={token}", page)
+        self.assertEqual(
+            TARGET.CAMOUFLAGE_STYLE_ETAG,
+            '"naivefox-style-'
+            + __import__("hashlib").sha256(TARGET.CAMOUFLAGE_STYLE_CSS).hexdigest()
+            + '"',
+        )
+
+    def test_warm_cache_evidence_requires_natural_304_and_fresh_inner(self):
+        warm = "d" * 32
+        measured = "e" * 32
+        etag = '"stable"'
+        semantics = {
+            "accept": "text/css,*/*;q=0.1",
+            "host": "localhost:443",
+            "listener": "http",
+            "method": "GET",
+            "path": "/camouflage/style.css",
+            "priority": "u=2",
+            "referer": f"https://localhost/camouflage/index.html?completion={measured}",
+            "sec_fetch_dest": "style",
+            "sec_fetch_mode": "no-cors",
+            "sec_fetch_site": "same-origin",
+        }
+        reference = [
+            dict(
+                semantics,
+                **{
+                    "completion": warm,
+                    "etag": etag,
+                    "if_none_match": "",
+                    "status": 200,
+                },
+            ),
+            dict(
+                semantics,
+                **{
+                    "completion": measured,
+                    "etag": etag,
+                    "if_none_match": etag,
+                    "status": 304,
+                },
+            ),
+        ]
+        result = CACHE.validate_cache_sequence(reference, "reference", warm, measured)
+        self.assertEqual(result["fresh_inner_200"], 0)
+        self.assertRegex(result["semantics_sha256"], r"^[0-9a-f]{64}$")
+        candidate = reference + [
+            dict(
+                semantics,
+                **{
+                    "completion": measured,
+                    "etag": etag,
+                    "if_none_match": "",
+                    "listener": "https",
+                    "status": 200,
+                },
+            )
+        ]
+        self.assertEqual(
+            CACHE.validate_cache_sequence(candidate, "naivefox", warm, measured)[
+                "fresh_inner_200"
+            ],
+            1,
+        )
+        candidate[1]["status"] = 200
+        with self.assertRaisesRegex(ValueError, "did not receive 304"):
+            CACHE.validate_cache_sequence(candidate, "naivefox", warm, measured)
+        candidate[1]["status"] = 304
+        with self.assertRaisesRegex(ValueError, "unexpected CSS requests"):
+            CACHE.validate_cache_sequence(
+                candidate + [dict(candidate[-1])], "naivefox", warm, measured
+            )
+
+    def test_warm_cache_transport_rejects_reconnect_or_zero_rtt(self):
+        document = {
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+                "quic_zero_rtt_packet_count": 0.0,
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "features.json")
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(document, stream)
+            CACHE.validate_transport(path)
+            document["features"]["quic_zero_rtt_packet_count"] = 1.0
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(document, stream)
+            with self.assertRaisesRegex(ValueError, "forbids measured H3 0-RTT"):
+                CACHE.validate_transport(path)
+
+    def test_quic_v2_zero_rtt_is_normalized_for_passive_features(self):
+        row = {
+            "frame.number": "1",
+            "frame.time_relative": "0",
+            "frame.len": "1200",
+            "sll.pkttype": "0",
+            "ip.len": "1200",
+            "ipv6.plen": "",
+            "udp.srcport": "50000",
+            "udp.dstport": "443",
+            "udp.length": "1180",
+            "quic.connection.number": "0",
+            "quic.version": "0x6b3343cf",
+            "quic.long.packet_type": "",
+            "quic.long.packet_type_v2": "2",
+            "quic.dcil": "8",
+            "quic.scil": "3",
+            "quic.packet_length": "1160",
+        }
+        with mock.patch.object(FEATURES, "tshark_rows", return_value=[row]):
+            events, _ = FEATURES.packet_events_h3("sample.pcapng", 443)
+        features = {}
+        FEATURES.add_h3_features(features, events)
+        self.assertEqual(features["quic_zero_rtt_packet_count"], 1.0)
+
+    def test_warm_cache_runner_is_ephemeral_and_fail_closed(self):
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            runner = stream.read()
+        self.assertIn("tree-warm-css-304 requires a single-arm H3 run", runner)
+        self.assertIn(
+            "tree-warm-css-304 requires --scenario browser_page", runner
+        )
+        self.assertIn(
+            "tree-warm-css-304 cannot share cold superblock references", runner
+        )
+        self.assertLess(
+            runner.index('warm_reference_cache "$profile"'),
+            runner.index(
+                'start_capture "$pcap"', runner.index("run_reference_sample()")
+            ),
+        )
+        self.assertIn("camouflage_cache_validation.py", runner)
+        self.assertIn("temporary_participant_sample_warm_measure_then_deleted", runner)
+        self.assertIn("warm_traffic_excluded_measure_only", runner)
+        self.assertEqual(runner.count('normalize_h3_capture_origin "$pcap"'), 2)
+        origin = runner[
+            runner.index("normalize_h3_capture_origin() {") : runner.index(
+                "strict_transport_check() {"
+            )
+        ]
+        self.assertIn("client traffic before Initial", origin)
+        self.assertIn("foreign UDP flow after Initial", origin)
+        self.assertIn('udp.stream!=$measured_udp_stream', origin)
+        self.assertIn("before-origin-trim.pcapng", origin)
+        self.assertIn('frame.number>=$first_initial_frame', origin)
+        self.assertIn("cache_validated_participants -ne $session_counter", runner)
+        self.assertIn("network.ssl_tokens_cache_persistence", runner)
+        self.assertIn("network.http.http3.enable_0rtt", runner)
+        self.assertIn("--max-connections 1", runner)
+        self.assertNotIn('kill -TERM "$pid"', runner[runner.index("stop_pid_clean()") : runner.index("stop_process_group()")])
+        self.assertIn("requires its condition-specific Firefox A/B controls", runner)
+        self.assertIn("warm NaiveFox lacks successful completion evidence", runner)
 
     def test_feature_merge_preserves_complete_blocks_and_old_fragments(self):
         with tempfile.TemporaryDirectory() as directory:

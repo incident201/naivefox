@@ -65,6 +65,12 @@ enum class PreambleResourceKind : uint8_t {
   Script,
 };
 
+inline bool PreambleChannelUsesCache(const PreambleConfig& aConfig,
+                                     ProxyProtocol aProtocol,
+                                     bool aIsResource) {
+  return aIsResource && aConfig.CacheResourcesForProtocol(aProtocol);
+}
+
 // Preserve the native scheduling cause used by Gecko's stylesheet and script
 // loaders. The caller classifies the parsed resource; the channel layer then
 // derives HTTP Priority and transport priority state from class-of-service.

@@ -341,6 +341,7 @@ def packet_events_h3(pcap, server_port):
         "quic.connection.number",
         "quic.version",
         "quic.long.packet_type",
+        "quic.long.packet_type_v2",
         "quic.dcil",
         "quic.scil",
         "quic.packet_length",
@@ -361,6 +362,15 @@ def packet_events_h3(pcap, server_port):
         if not wire_size:
             wire_size = integer(row["frame.len"])
         packet_types = split_values(row["quic.long.packet_type"])
+        packet_types.extend(
+            {
+                "0": "3",  # Retry
+                "1": "0",  # Initial
+                "2": "1",  # 0-RTT
+                "3": "2",  # Handshake
+            }.get(value, value)
+            for value in split_values(row["quic.long.packet_type_v2"])
+        )
         events.append({
             "frame": integer(row["frame.number"]),
             "time": number(row["frame.time_relative"]),
@@ -675,6 +685,7 @@ def add_h3_features(features, events):
     phases = []
     initial = []
     retry_count = 0
+    zero_rtt_count = 0
     version_negotiation = 0
     for event in events:
         packet_types = event["packet_types"] or ["short"]
@@ -690,10 +701,13 @@ def add_h3_features(features, events):
                 initial.append(event)
             if phase == "retry":
                 retry_count += 1
+            if phase == "zero_rtt":
+                zero_rtt_count += 1
         if any(value in {"0", "0x00000000"} for value in event["versions"]):
             version_negotiation += 1
     features["quic_initial_packet_count"] = float(len(initial))
     features["quic_retry_packet_count"] = float(retry_count)
+    features["quic_zero_rtt_packet_count"] = float(zero_rtt_count)
     features["quic_version_negotiation_packet_count"] = float(version_negotiation)
     dcid = [value for event in initial for value in event["dcil"]]
     scid = [value for event in initial for value in event["scil"]]
@@ -880,6 +894,7 @@ def main():
             "tree-early-overlap",
             "tree-root-overlap",
             "tree-root-overlap-css",
+            "tree-warm-css-304",
             "tree-overlap",
         ),
     )
@@ -890,9 +905,7 @@ def main():
     merge_parser.add_argument("--output", required=True)
     merge_parser.add_argument("--expected-per-cohort", type=int)
     merge_parser.add_argument("--expected-superblocks", type=int)
-    merge_parser.add_argument(
-        "--expected-superblock-arms", default="off,gate,root"
-    )
+    merge_parser.add_argument("--expected-superblock-arms", default="off,gate,root")
     merge_parser.set_defaults(function=merge)
     args = parser.parse_args()
     args.function(args)

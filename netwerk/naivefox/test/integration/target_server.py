@@ -21,6 +21,7 @@ SVG_SUFFIX = b'--><rect width="8" height="8" fill="#476f9f"/></svg>'
 COMPLETIONS = set()
 COMPLETIONS_LOCK = threading.Lock()
 COMPLETION_TOKEN = re.compile(r"^[0-9a-f]{32}$")
+REQUEST_JOURNAL_LOCK = threading.Lock()
 
 
 def configured_camouflage_asset_size(name, default):
@@ -68,6 +69,9 @@ CAMOUFLAGE_APP_JS = sized_source_asset(
     ),
     b"/* controlled browser application module */\n",
 )
+CAMOUFLAGE_STYLE_ETAG = (
+    '"naivefox-style-' + hashlib.sha256(CAMOUFLAGE_STYLE_CSS).hexdigest() + '"'
+)
 
 
 def pattern_bytes(offset, length):
@@ -103,6 +107,55 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
+
+    def journal_cache_request(self, status):
+        referer = self.headers.get("Referer", "")
+        completion = ""
+        if referer:
+            completion = parse_qs(urlparse(referer).query).get("completion", [""])[0]
+        entry = {
+            "accept": self.headers.get("Accept", ""),
+            "completion": completion if COMPLETION_TOKEN.fullmatch(completion) else "",
+            "etag": CAMOUFLAGE_STYLE_ETAG,
+            "host": self.headers.get("Host", ""),
+            "if_none_match": self.headers.get("If-None-Match", ""),
+            "listener": "https"
+            if isinstance(self.connection, ssl.SSLSocket)
+            else "http",
+            "method": "GET",
+            "path": "/camouflage/style.css",
+            "priority": self.headers.get("Priority", ""),
+            "referer": referer,
+            "sec_fetch_dest": self.headers.get("Sec-Fetch-Dest", ""),
+            "sec_fetch_mode": self.headers.get("Sec-Fetch-Mode", ""),
+            "sec_fetch_site": self.headers.get("Sec-Fetch-Site", ""),
+            "status": status,
+        }
+        encoded = (json.dumps(entry, sort_keys=True) + "\n").encode()
+        with REQUEST_JOURNAL_LOCK:
+            descriptor = os.open(
+                self.request_journal,
+                os.O_APPEND | os.O_CREAT | os.O_WRONLY,
+                0o600,
+            )
+            try:
+                os.write(descriptor, encoded)
+            finally:
+                os.close(descriptor)
+
+    def send_camouflage_style(self):
+        if_none_match = self.headers.get("If-None-Match", "")
+        status = 304 if if_none_match.strip() == CAMOUFLAGE_STYLE_ETAG else 200
+        self.journal_cache_request(status)
+        self.send_response(status)
+        self.send_header("ETag", CAMOUFLAGE_STYLE_ETAG)
+        self.send_header("Cache-Control", "no-cache")
+        if status == 200:
+            self.send_header("Content-Type", "text/css")
+            self.send_header("Content-Length", str(len(CAMOUFLAGE_STYLE_CSS)))
+        self.end_headers()
+        if status == 200:
+            self.wfile.write(CAMOUFLAGE_STYLE_CSS)
 
     def send_pattern(self, status, size, content_type="application/octet-stream"):
         self.send_response(status)
@@ -150,6 +203,8 @@ class Handler(BaseHTTPRequestHandler):
                 '<img src="/camouflage/resource?size=262144">'
                 '<img src="/camouflage/api">'
             )
+        elif scenario == "warm_css":
+            body = '<link rel="stylesheet" href="/camouflage/style.css">'
         elif scenario == "sequential":
             body = """<script>
 function get(){let x=new XMLHttpRequest();x.open('GET','/camouflage/api',false);x.send()}
@@ -248,7 +303,7 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                 (("Referrer-Policy", "strict-origin-when-cross-origin"),),
             )
         elif parsed.path == "/camouflage/style.css":
-            self.send_bytes(200, CAMOUFLAGE_STYLE_CSS, "text/css")
+            self.send_camouflage_style()
         elif parsed.path == "/camouflage/app.js":
             self.send_bytes(200, CAMOUFLAGE_APP_JS, "application/javascript")
         elif parsed.path == "/camouflage/api":
@@ -318,6 +373,7 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
 
 def serve(args):
     Handler.completion_dir = args.completion_dir
+    Handler.request_journal = args.request_journal
     httpd = ThreadingHTTPServer(("127.0.0.1", args.http_port), Handler)
     httpsd = ThreadingHTTPServer(("127.0.0.1", args.https_port), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -356,6 +412,7 @@ def main():
     parser.add_argument("--cert", required=True)
     parser.add_argument("--key", required=True)
     parser.add_argument("--completion-dir", required=True)
+    parser.add_argument("--request-journal", required=True)
     parser.add_argument("--ready-file", required=True)
     serve(parser.parse_args())
 

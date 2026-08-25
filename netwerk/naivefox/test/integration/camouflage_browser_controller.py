@@ -87,6 +87,9 @@ class Controller:
         self.process = None
         self.process_log = None
         self.stopping = False
+        self.forced_kill = False
+        self.shutdown_method = "not_started"
+        self.shutdown_failed = False
 
     def stop(self, *_args):
         self.stopping = True
@@ -168,15 +171,18 @@ class Controller:
 
     def close(self):
         if self.driver is not None:
+            self.shutdown_method = "webdriver_quit"
             try:
                 self.driver.quit()
             except Exception:
-                pass
+                self.shutdown_failed = True
         if self.process is not None and self.process.poll() is None:
+            self.shutdown_method = "controlled_sigterm"
             self.process.terminate()
             try:
                 self.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
+                self.forced_kill = True
                 self.process.kill()
                 self.process.wait()
         if self.process_log is not None:
@@ -224,14 +230,43 @@ def main():
     parser.add_argument("--browser-log", required=True)
     parser.add_argument("--webdriver-log", required=True)
     parser.add_argument("--timeout", type=int, required=True)
+    parser.add_argument("--shutdown-file")
     args = parser.parse_args()
     controller = Controller(args)
     signal.signal(signal.SIGTERM, controller.stop)
     signal.signal(signal.SIGINT, controller.stop)
+    error = None
     try:
         controller.run()
+    except Exception as caught:
+        error = caught
     finally:
         controller.close()
+        if args.shutdown_file:
+            temporary = args.shutdown_file + ".tmp"
+            with open(temporary, "w", encoding="utf-8") as stream:
+                json.dump(
+                    {
+                        "browser_process_exited": (
+                            controller.process is None
+                            or controller.process.poll() is not None
+                        ),
+                        "forced_kill": controller.forced_kill,
+                        "shutdown_failed": controller.shutdown_failed,
+                        "process_returncode": (
+                            None
+                            if controller.process is None
+                            else controller.process.returncode
+                        ),
+                        "shutdown_method": controller.shutdown_method,
+                    },
+                    stream,
+                    sort_keys=True,
+                )
+                stream.write("\n")
+            os.replace(temporary, args.shutdown_file)
+    if error is not None:
+        raise error
 
 
 if __name__ == "__main__":
