@@ -437,6 +437,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ]
     if any(marker is None for marker in parsed_native_parser_discoveries):
         raise ValueError("malformed native parser preload discovery evidence")
+    native_parser_descriptor_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-preload lifecycle=chunk-flushed " in line
+        and " descriptors=1 " in line
+        and " status=0x00000000 " in line
+        and line.endswith(" protocol=h3")
+    ]
     native_parser_channel_lines = [
         line
         for line in log_lines
@@ -1104,6 +1112,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
         )
 
     if arm == "tree-native-parser-ipc-rendezvous-overlap-css":
+        if len(native_parser_descriptor_lines) != 1:
+            raise ValueError(
+                "native style activation requires one successful parser "
+                "descriptor flush"
+            )
         if len(parsed_native_style_activations) != len(
             NATIVE_STYLE_ACTIVATION_PHASES
         ):
@@ -1155,7 +1168,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             < by_phase["background-ready-received"]
             < by_phase["activation-released"]
             and by_phase["activation-released"] < by_phase["async-open"]
-            and log_lines.index(native_parser_discovery_lines[0])
+            and log_lines.index(native_parser_descriptor_lines[0])
             < by_phase["descriptor-frozen"]
         ):
             raise ValueError(

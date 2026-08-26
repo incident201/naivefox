@@ -1486,6 +1486,9 @@ class CamouflageHarnessTests(unittest.TestCase):
                 one_connection,
             )
         native_parser_log = (
+            "Preamble native-parser-preload lifecycle=chunk-flushed "
+            "sequence=1 descriptors=1 status=0x00000000 generation=1 "
+            "protocol=h3\n"
             "Connection 7 preamble native-parser-preload "
             "parser=html5-speculative-scanner parsers=1 descriptors=1 "
             "provenance=FromParser internal_type=40 protocol=h3\n"
@@ -1589,14 +1592,14 @@ class CamouflageHarnessTests(unittest.TestCase):
             "activation=ipc-rendezvous protocol=h3\n"
             "Native style activation phase=async-open request=41\n"
         )
-        discovery_marker = (
-            "Connection 7 preamble native-parser-preload "
-            "parser=html5-speculative-scanner parsers=1 descriptors=1 "
-            "provenance=FromParser internal_type=40 protocol=h3\n"
+        descriptor_marker = (
+            "Preamble native-parser-preload lifecycle=chunk-flushed "
+            "sequence=1 descriptors=1 status=0x00000000 generation=1 "
+            "protocol=h3\n"
         )
         ipc_rendezvous_log = retarget_lines + native_parser_log.replace(
-            discovery_marker,
-            discovery_marker + activation_lines,
+            descriptor_marker,
+            descriptor_marker + activation_lines,
             1,
         )
         SAMPLE.validate_sample(
