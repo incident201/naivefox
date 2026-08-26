@@ -6,11 +6,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import firefox_repeat_navigation_summary as summary
+import camouflage_browser_controller as browser_controller
 
 
 class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
@@ -334,6 +336,108 @@ class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
         self.assertTrue(result["content_process_stable"])
         self.assertTrue(result["single_tab_stable"])
         self.assertFalse(result["browsing_context_stable"])
+
+    def test_identity_validates_an_arbitrary_navigation_series(self):
+        identity = {
+            "browser_pid": 10,
+            "browsing_context_id": 13,
+            "content_pid": 20,
+            "current_window_handle": "tab-1",
+            "webdriver_session_id": "session-1",
+            "window_handles": ["tab-1"],
+        }
+        evidence = {
+            f"navigation_{index}": {**identity, "browsing_context_id": index}
+            for index in range(1, 9)
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "identity.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            result = summary.validate_browser_identity(path, 8)
+        self.assertTrue(result["content_process_stable"])
+        self.assertFalse(result["browsing_context_stable"])
+
+    def test_pearson_correlation_reports_direction_and_zero_variance(self):
+        self.assertAlmostEqual(
+            summary.pearson_correlation([1, 2, 3, 4], [2, 4, 6, 8]), 1.0
+        )
+        self.assertAlmostEqual(
+            summary.pearson_correlation([1, 2, 3, 4], [8, 6, 4, 2]), -1.0
+        )
+        self.assertIsNone(summary.pearson_correlation([1, 1], [2, 3]))
+        self.assertAlmostEqual(
+            summary.population_covariance([1, 2, 3], [2, 4, 6]), 4 / 3
+        )
+
+    def test_browser_controller_runs_all_additional_navigations(self):
+        class Driver:
+            def __init__(self):
+                self.urls = []
+
+            def get(self, url):
+                self.urls.append(url)
+
+        class Controller(browser_controller.Controller):
+            def __init__(self, args):
+                super().__init__(args)
+                self.driver = Driver()
+                self.completions = []
+                self.identity_index = 0
+
+            def start(self):
+                return "selenium"
+
+            def navigate(self, backend):
+                self.driver.get(self.args.url)
+
+            def wait_for_completion(self, completion_file=None):
+                self.completions.append(completion_file or self.args.completion_file)
+
+            def wait_for_file(self, path):
+                return
+
+            def selenium_identity(self):
+                self.identity_index += 1
+                return {
+                    "browser_pid": 1,
+                    "browsing_context_id": self.identity_index,
+                    "content_pid": 2,
+                    "current_window_handle": "tab",
+                    "webdriver_session_id": "session",
+                    "window_handles": ["tab"],
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            additional = [
+                (f"https://example.test/{index}", str(root / f"done-{index}"))
+                for index in range(2, 9)
+            ]
+            args = SimpleNamespace(
+                additional_navigation=additional,
+                completion_file=str(root / "done-1"),
+                done_file=str(root / "controller-done"),
+                navigation_evidence_file=str(root / "identity.json"),
+                navigate_file=str(root / "navigate"),
+                ready_file=str(root / "ready.json"),
+                second_completion_file=None,
+                second_url=None,
+                stop_file=str(root / "stop"),
+                url="https://example.test/1",
+                warmup_completion_file=None,
+                warmup_url=None,
+            )
+            controller = Controller(args)
+            controller.run()
+            evidence = json.loads(
+                Path(args.navigation_evidence_file).read_text(encoding="utf-8")
+            )
+        self.assertEqual(
+            controller.driver.urls,
+            ["https://example.test/1", *[item[0] for item in additional]],
+        )
+        self.assertEqual(len(evidence), 8)
+        self.assertEqual(controller.completions[0], args.completion_file)
 
 
 if __name__ == "__main__":

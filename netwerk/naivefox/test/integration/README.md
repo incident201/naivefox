@@ -163,18 +163,23 @@ semantics, WSL packet handling, and sensitive-data rules are in
 
 `run-firefox-repeat-navigation-diagnostic.sh` is a same-base, reference-only H3
 control for separating first-navigation startup work from the normal Firefox
-resource-discovery lifecycle. It prelaunches one Firefox instance, captures two
-sequential `browser_page` navigations in the same tab and content process, and
-puts a different random navigation token into the root URL and every asset URL.
+resource-discovery lifecycle. It prelaunches one Firefox instance and captures
+eight sequential `browser_page` navigations by default in the same tab and
+content process. `NAIVEFOX_REPEAT_NAVIGATION_COUNT` can raise the count up to 32
+but cannot reduce it below eight. Every navigation gets a different random token
+in the root URL and every asset URL.
 The analyzer rejects cache reuse, conditional requests, non-200 resources,
 changed request semantics or response sizes, a second QUIC identity or
 ClientHello, network mutation, and ambiguous lifecycle mappings. Its safe
 summary reports `root response HEADERS -> first CSS GET` and the parent/channel,
 HTML5 parser, child-to-parent IPC, transaction-dispatch, H3 `AddStream`, and wire
-sub-intervals for each navigation. The private capture, key log, browser identity
-and Mozilla logs are deliberately retained under `h3-captures`; the sanitized
-summary is written under the matching `h3-capture-safe` directory. Run it only
-with `NAIVEFOX_CAPTURE_MODE=same-base` and the same
+sub-intervals for each navigation. It also reports steady-state spread, the
+first-navigation delta, and Pearson correlations between total root-to-CSS time
+and each exhaustive non-overlapping lifecycle component. The private capture,
+key log, browser identity and Mozilla logs are deliberately retained under
+`h3-captures`; the sanitized summary is written under the matching
+`h3-capture-safe` directory. Run it only with
+`NAIVEFOX_CAPTURE_MODE=same-base` and the same
 `NAIVEFOX_CAPTURE_REFERENCE_*` inputs used by the other same-base diagnostics.
 
 Quick capture downloads the current official Nightly binary from the URL in

@@ -168,10 +168,16 @@ class Controller:
         identity["window_handles"] = self.driver.window_handles
         return identity
 
-    def write_navigation_evidence(self, first, second):
+    def write_navigation_evidence(self, identities):
         temporary = self.args.navigation_evidence_file + ".tmp"
         with open(temporary, "w", encoding="utf-8") as stream:
-            json.dump({"navigation_1": first, "navigation_2": second}, stream)
+            json.dump(
+                {
+                    f"navigation_{index}": identity
+                    for index, identity in enumerate(identities, start=1)
+                },
+                stream,
+            )
             stream.write("\n")
         os.replace(temporary, self.args.navigation_evidence_file)
 
@@ -238,13 +244,21 @@ class Controller:
             return
         self.navigate(backend)
         self.wait_for_completion()
+        repeat_navigations = []
         if self.args.second_url:
+            repeat_navigations.append(
+                (self.args.second_url, self.args.second_completion_file)
+            )
+        repeat_navigations.extend(self.args.additional_navigation)
+        if repeat_navigations:
             if backend != "selenium":
                 raise RuntimeError("repeat navigation requires Selenium")
-            first_identity = self.selenium_identity()
-            self.driver.get(self.args.second_url)
-            self.wait_for_completion(self.args.second_completion_file)
-            self.write_navigation_evidence(first_identity, self.selenium_identity())
+            identities = [self.selenium_identity()]
+            for url, completion_file in repeat_navigations:
+                self.driver.get(url)
+                self.wait_for_completion(completion_file)
+                identities.append(self.selenium_identity())
+            self.write_navigation_evidence(identities)
         with open(self.args.done_file, "w", encoding="utf-8") as stream:
             stream.write("complete\n")
         self.wait_for_file(self.args.stop_file)
@@ -270,6 +284,13 @@ def main():
     parser.add_argument("--completion-file", required=True)
     parser.add_argument("--second-url")
     parser.add_argument("--second-completion-file")
+    parser.add_argument(
+        "--additional-navigation",
+        nargs=2,
+        action="append",
+        metavar=("URL", "COMPLETION_FILE"),
+        default=[],
+    )
     parser.add_argument("--navigation-evidence-file")
     parser.add_argument("--warmup-url")
     parser.add_argument("--warmup-completion-file")
@@ -284,15 +305,14 @@ def main():
     args = parser.parse_args()
     if bool(args.warmup_url) != bool(args.warmup_completion_file):
         parser.error("--warmup-url and --warmup-completion-file must be used together")
-    repeat_arguments = (
-        args.second_url,
-        args.second_completion_file,
-        args.navigation_evidence_file,
-    )
-    if any(repeat_arguments) and not all(repeat_arguments):
+    if bool(args.second_url) != bool(args.second_completion_file):
         parser.error(
-            "--second-url, --second-completion-file, and "
-            "--navigation-evidence-file must be used together"
+            "--second-url and --second-completion-file must be used together"
+        )
+    has_repeat_navigation = bool(args.second_url or args.additional_navigation)
+    if has_repeat_navigation != bool(args.navigation_evidence_file):
+        parser.error(
+            "repeat navigation and --navigation-evidence-file must be used together"
         )
     controller = Controller(args)
     signal.signal(signal.SIGTERM, controller.stop)

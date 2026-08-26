@@ -3,7 +3,9 @@
 import argparse
 import csv
 import json
+import math
 import re
+import statistics
 from datetime import datetime, timezone
 from itertools import combinations
 from pathlib import Path
@@ -19,6 +21,21 @@ ASSET_ROLES = {
     "api": "/camouflage/api?nav={nav}",
 }
 CONDITIONAL_REQUEST_HEADERS = {"if-modified-since", "if-none-match", "if-range"}
+DECOMPOSITION_METRICS = (
+    "root_headers_to_suspend_ms",
+    "root_suspend_to_resume_ms",
+    "root_resume_to_parser_body_ms",
+    "parser_body_to_css_descriptor_ms",
+    "css_descriptor_to_child_async_open_ms",
+    "css_child_async_open_to_parent_recv_ms",
+    "css_parent_recv_to_invoke_ms",
+    "css_parent_invoke_to_channel_async_open_ms",
+    "css_channel_async_open_to_dispatch_ms",
+    "css_dispatch_to_socket_new_ms",
+    "css_socket_new_to_h3_dispatch_ms",
+    "css_h3_dispatch_to_add_stream_ms",
+    "css_add_stream_to_wire_get_ms",
+)
 LOG_PREFIX = re.compile(
     r"^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+) UTC - "
     r"\[(?P<process>[^]]+)\]: [A-Z]/[^ ]+ (?P<message>.*)$"
@@ -173,11 +190,21 @@ def normalized_headers(headers, nav, completion):
     return tuple(normalized)
 
 
-def validate_browser_identity(path):
+def validate_browser_identity(path, expected_count=None):
     with path.open(encoding="utf-8") as source:
         evidence = json.load(source)
-    first = evidence.get("navigation_1", {})
-    second = evidence.get("navigation_2", {})
+    if expected_count is None:
+        expected_count = len(evidence)
+    require(expected_count >= 2, "repeat navigation needs at least two identities")
+    expected_keys = {
+        f"navigation_{index}" for index in range(1, expected_count + 1)
+    }
+    require(set(evidence) == expected_keys, "navigation identity set is incomplete")
+    navigations = [
+        evidence[f"navigation_{index}"]
+        for index in range(1, expected_count + 1)
+    ]
+    first = navigations[0]
     for field in (
         "browser_pid",
         "content_pid",
@@ -185,14 +212,15 @@ def validate_browser_identity(path):
         "webdriver_session_id",
     ):
         require(first.get(field), f"navigation 1 lacks {field}")
-        require(second.get(field), f"navigation 2 lacks {field}")
-        require(first[field] == second[field], f"Firefox changed {field}")
-    for index, navigation in enumerate((first, second), start=1):
+        for index, navigation in enumerate(navigations[1:], start=2):
+            require(navigation.get(field), f"navigation {index} lacks {field}")
+            require(first[field] == navigation[field], f"Firefox changed {field}")
+    for index, navigation in enumerate(navigations, start=1):
         require(
             navigation.get("window_handles") == [navigation["current_window_handle"]],
             f"navigation {index} did not use exactly one stable Firefox tab",
         )
-    for navigation in (first, second):
+    for navigation in navigations:
         require(
             navigation.get("browsing_context_id"),
             "navigation lacks a browsing context id",
@@ -200,12 +228,38 @@ def validate_browser_identity(path):
     return {
         "browser_pid_stable": True,
         "browsing_context_stable": (
-            first["browsing_context_id"] == second["browsing_context_id"]
+            len({item["browsing_context_id"] for item in navigations}) == 1
         ),
         "content_process_stable": True,
         "single_tab_stable": True,
         "webdriver_session_stable": True,
     }
+
+
+def pearson_correlation(left, right):
+    require(len(left) == len(right) and len(left) >= 2, "invalid correlation data")
+    left_mean = statistics.fmean(left)
+    right_mean = statistics.fmean(right)
+    numerator = sum(
+        (left_value - left_mean) * (right_value - right_mean)
+        for left_value, right_value in zip(left, right)
+    )
+    left_square = sum((value - left_mean) ** 2 for value in left)
+    right_square = sum((value - right_mean) ** 2 for value in right)
+    denominator = math.sqrt(left_square * right_square)
+    if denominator == 0:
+        return None
+    return numerator / denominator
+
+
+def population_covariance(left, right):
+    require(len(left) == len(right) and len(left) >= 2, "invalid covariance data")
+    left_mean = statistics.fmean(left)
+    right_mean = statistics.fmean(right)
+    return statistics.fmean(
+        (left_value - left_mean) * (right_value - right_mean)
+        for left_value, right_value in zip(left, right)
+    )
 
 
 def read_lifecycle_lines(paths):
@@ -577,6 +631,7 @@ def parse_navigation_lifecycle(
     )
     return {
         "root_headers_to_css_get_ms": (css_wire - root_wire) * 1000,
+        "root_headers_to_suspend_ms": (suspend["time"] - root_wire) * 1000,
         "root_suspend_to_resume_ms": (resume["time"] - suspend["time"]) * 1000,
         "root_resume_to_parser_body_ms": (parser_body["time"] - resume["time"]) * 1000,
         "parser_body_to_css_descriptor_ms": (descriptor["time"] - parser_body["time"])
@@ -663,7 +718,9 @@ def parse_navigation_lifecycle(
 def analyze(args):
     root = Path(args.root)
     proxy_port = str(args.proxy_port)
-    tokens = (args.nav1, args.nav2, args.completion1, args.completion2)
+    navigations = [tuple(item) for item in args.navigation]
+    require(len(navigations) >= 8, "repeat diagnostic requires at least 8 navigations")
+    tokens = tuple(token for navigation in navigations for token in navigation)
     require(
         all(re.fullmatch(r"[0-9a-f]{32}", token) for token in tokens),
         "navigation/completion token format is invalid",
@@ -693,13 +750,14 @@ def analyze(args):
     responses = response_header_blocks(
         root / "repeat-response-header-values.csv", proxy_port
     )
-    require(len(gets) == 14, "repeat navigation did not emit exactly fourteen GETs")
+    require(
+        len(gets) == 7 * len(navigations),
+        "repeat navigation emitted an unexpected GET count",
+    )
 
     by_navigation = []
     stream_roles = {}
-    for index, (nav, completion) in enumerate(
-        ((args.nav1, args.completion1), (args.nav2, args.completion2)), start=1
-    ):
+    for index, (nav, completion) in enumerate(navigations, start=1):
         roles = {}
         for block in gets:
             headers = dict(block["headers"])
@@ -720,19 +778,21 @@ def analyze(args):
         )
         by_navigation.append(roles)
 
-    require(
-        max(block["frame"] for block in by_navigation[0].values())
-        < by_navigation[1]["root"]["frame"],
-        "navigation request sequences overlap",
-    )
+    for index in range(len(by_navigation) - 1):
+        require(
+            max(block["frame"] for block in by_navigation[index].values())
+            < by_navigation[index + 1]["root"]["frame"],
+            f"navigation {index + 1}/{index + 2} request sequences overlap",
+        )
     for role in ("root", *ASSET_ROLES):
         first = normalized_headers(
-            by_navigation[0][role]["headers"], args.nav1, args.completion1
+            by_navigation[0][role]["headers"], *navigations[0]
         )
-        second = normalized_headers(
-            by_navigation[1][role]["headers"], args.nav2, args.completion2
-        )
-        require(first == second, f"{role} request semantics changed")
+        for index, blocks in enumerate(by_navigation[1:], start=2):
+            current = normalized_headers(
+                blocks[role]["headers"], *navigations[index - 1]
+            )
+            require(first == current, f"navigation {index} {role} semantics changed")
 
     response_by_stream = {}
     for block in responses:
@@ -754,12 +814,14 @@ def analyze(args):
     )
     for role in ("root", *ASSET_ROLES):
         first = by_navigation[0][role]
-        second = by_navigation[1][role]
-        require(
-            response_by_stream[(first["connection"], first["stream"])]
-            == response_by_stream[(second["connection"], second["stream"])],
-            f"{role} response size changed",
-        )
+        first_size = response_by_stream[(first["connection"], first["stream"])]
+        for index, blocks in enumerate(by_navigation[1:], start=2):
+            current = blocks[role]
+            require(
+                first_size
+                == response_by_stream[(current["connection"], current["stream"])],
+                f"navigation {index} {role} response size changed",
+            )
 
     connections = {block["connection"] for block in gets}
     require(len(connections) == 1, "navigations did not share one QUIC identity")
@@ -816,7 +878,17 @@ def analyze(args):
             )
         )
 
-    identity = validate_browser_identity(Path(args.navigation_evidence))
+    identity = validate_browser_identity(
+        Path(args.navigation_evidence), len(navigations)
+    )
+    for index, lifecycle in enumerate(lifecycles, start=1):
+        decomposition = sum(lifecycle[name] for name in DECOMPOSITION_METRICS)
+        residual = lifecycle["root_headers_to_css_get_ms"] - decomposition
+        require(
+            abs(residual) <= 0.001,
+            f"navigation {index} lifecycle decomposition is not exhaustive",
+        )
+        lifecycle["decomposition_residual_ms"] = residual
     result = {
         **identity,
         "cache_busting_asset_urls": True,
@@ -825,11 +897,56 @@ def analyze(args):
         "one_quic_identity": True,
         "request_semantics_equal": True,
         "response_sizes_equal": True,
-        "navigation_2_minus_1_ms": (
-            lifecycles[1]["root_headers_to_css_get_ms"]
-            - lifecycles[0]["root_headers_to_css_get_ms"]
-        ),
+        "navigation_count": len(navigations),
     }
+    total = [item["root_headers_to_css_get_ms"] for item in lifecycles]
+    result["root_headers_to_css_get_mean_ms"] = statistics.fmean(total)
+    result["root_headers_to_css_get_median_ms"] = statistics.median(total)
+    result["root_headers_to_css_get_pstdev_ms"] = statistics.pstdev(total)
+    result["root_headers_to_css_get_min_ms"] = min(total)
+    result["root_headers_to_css_get_max_ms"] = max(total)
+    steady_total = total[1:]
+    result["steady_state_root_headers_to_css_get_mean_ms"] = statistics.fmean(
+        steady_total
+    )
+    result["steady_state_root_headers_to_css_get_pstdev_ms"] = statistics.pstdev(
+        steady_total
+    )
+    result["navigation_1_minus_steady_state_mean_ms"] = (
+        total[0] - statistics.fmean(steady_total)
+    )
+    index_correlation = pearson_correlation(
+        list(range(1, len(lifecycles) + 1)), total
+    )
+    result["correlation_navigation_index_to_root_headers_to_css_get"] = (
+        "undefined" if index_correlation is None else index_correlation
+    )
+    for name in DECOMPOSITION_METRICS:
+        values = [item[name] for item in lifecycles]
+        result[f"{name.removesuffix('_ms')}_mean_ms"] = statistics.fmean(values)
+        result[f"{name.removesuffix('_ms')}_pstdev_ms"] = statistics.pstdev(values)
+        correlation = pearson_correlation(values, total)
+        result[f"correlation_total_vs_{name.removesuffix('_ms')}"] = (
+            "undefined" if correlation is None else correlation
+        )
+        total_variance = statistics.pvariance(total)
+        result[f"variance_share_total_vs_{name.removesuffix('_ms')}"] = (
+            "undefined"
+            if total_variance == 0
+            else population_covariance(values, total) / total_variance
+        )
+    if statistics.pvariance(total) != 0:
+        require(
+            abs(
+                sum(
+                    result[f"variance_share_total_vs_{name.removesuffix('_ms')}"]
+                    for name in DECOMPOSITION_METRICS
+                )
+                - 1.0
+            )
+            <= 0.001,
+            "lifecycle variance shares do not sum to one",
+        )
     for index, lifecycle in enumerate(lifecycles, start=1):
         for name, value in lifecycle.items():
             result[f"navigation_{index}_{name}"] = value
@@ -841,10 +958,13 @@ def main():
     parser.add_argument("--root", required=True)
     parser.add_argument("--proxy-port", type=int, required=True)
     parser.add_argument("--navigation-evidence", required=True)
-    parser.add_argument("--nav1", required=True)
-    parser.add_argument("--nav2", required=True)
-    parser.add_argument("--completion1", required=True)
-    parser.add_argument("--completion2", required=True)
+    parser.add_argument(
+        "--navigation",
+        nargs=2,
+        action="append",
+        metavar=("NAV_TOKEN", "COMPLETION_TOKEN"),
+        required=True,
+    )
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     result = analyze(args)

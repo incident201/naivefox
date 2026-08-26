@@ -57,6 +57,13 @@ if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
   exit 1
 fi
 
+navigation_count=${NAIVEFOX_REPEAT_NAVIGATION_COUNT:-8}
+if [[ ! $navigation_count =~ ^[0-9]+$ || $navigation_count -lt 8 ||
+      $navigation_count -gt 32 ]]; then
+  printf 'NAIVEFOX_REPEAT_NAVIGATION_COUNT must be an integer in 8..32\n' >&2
+  exit 2
+fi
+
 browser_python=${NAIVEFOX_CAMOUFLAGE_PYTHON:-}
 if [[ -z $browser_python && -x "$OBJDIR/camouflage-venv/bin/python" ]]; then
   browser_python="$OBJDIR/camouflage-venv/bin/python"
@@ -208,12 +215,30 @@ chmod 0600 "$profile/user.js"
 }
 
 warm_completion=$(openssl rand -hex 16)
-completion1=$(openssl rand -hex 16)
-completion2=$(openssl rand -hex 16)
-nav1=$(openssl rand -hex 16)
-nav2=$(openssl rand -hex 16)
-[[ $nav1 != "$nav2" && $completion1 != "$completion2" ]]
-for token in "$warm_completion" "$completion1" "$completion2"; do
+navigation_tokens=()
+completion_tokens=()
+navigation_urls=()
+completion_files=()
+for ((index = 0; index < navigation_count; index++)); do
+  navigation_token=$(openssl rand -hex 16)
+  completion_token=$(openssl rand -hex 16)
+  navigation_tokens+=("$navigation_token")
+  completion_tokens+=("$completion_token")
+  navigation_urls+=(
+    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion_token&nav=$navigation_token"
+  )
+  completion_files+=(
+    "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion_token"
+  )
+done
+all_tokens=("$warm_completion" "${navigation_tokens[@]}" \
+  "${completion_tokens[@]}")
+[[ $(printf '%s\n' "${all_tokens[@]}" | sort -u | wc -l) -eq \
+  ${#all_tokens[@]} ]] || {
+  printf 'repeat-navigation random tokens collided\n' >&2
+  exit 1
+}
+for token in "$warm_completion" "${completion_tokens[@]}"; do
   rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$token"
 done
 
@@ -232,28 +257,32 @@ if [[ $EUID -eq 0 ]]; then
   mkdir -m 0700 "$runtime_dir"
   runtime_env=("XDG_RUNTIME_DIR=$runtime_dir")
 fi
-url1="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion1&nav=$nav1"
-url2="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion2&nav=$nav2"
 warm_url="https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=initial&completion=$warm_completion"
+
+controller_args=(
+  --binary "$REFERENCE_BIN" --profile "$profile" --backend selenium
+  --protocol h3 --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
+  --url "${navigation_urls[0]}"
+  --completion-file "${completion_files[0]}"
+  --navigation-evidence-file "$identity_file"
+  --warmup-url "$warm_url"
+  --warmup-completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$warm_completion"
+  --ready-file "$ready_file" --navigate-file "$navigate_file"
+  --done-file "$done_file" --stop-file "$stop_file"
+  --browser-log "$capture_dir/firefox.log"
+  --webdriver-log "$capture_dir/webdriver.log" --timeout 35
+)
+for ((index = 1; index < navigation_count; index++)); do
+  controller_args+=(--additional-navigation "${navigation_urls[index]}" \
+    "${completion_files[index]}")
+done
 
 setsid env "SSLKEYLOGFILE=$keylog" \
   "MOZ_LOG=timestamp,nsHttp:5,nsCSSLoader:5" \
   "MOZ_LOG_FILE=$capture_dir/repeat-lifecycle" "${runtime_env[@]}" \
   "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
   "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-  --binary "$REFERENCE_BIN" --profile "$profile" --backend selenium \
-  --protocol h3 --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
-  --url "$url1" \
-  --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion1" \
-  --second-url "$url2" \
-  --second-completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion2" \
-  --navigation-evidence-file "$identity_file" \
-  --warmup-url "$warm_url" \
-  --warmup-completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$warm_completion" \
-  --ready-file "$ready_file" --navigate-file "$navigate_file" \
-  --done-file "$done_file" --stop-file "$stop_file" \
-  --browser-log "$capture_dir/firefox.log" \
-  --webdriver-log "$capture_dir/webdriver.log" --timeout 35 \
+  "${controller_args[@]}" \
   >"$capture_dir/controller.log" 2>&1 &
 controller_pid=$!
 wait_for_file "$ready_file" "$controller_pid" "pre-launched Firefox" 300
@@ -270,7 +299,7 @@ wait_for_file "$capture_dir/network-monitor-ready" "$monitor_pid" \
 chmod 0600 "$capture_dir/dumpcap.log"
 dumpcap -q -i any \
   -f "udp port $NAIVEFOX_FIXTURE_PROXY_PORT" \
-  -a duration:60 -a filesize:65536 \
+  -a duration:180 -a filesize:65536 \
   -w "$capture_stage_dir/repeat.raw.pcapng" \
   >"$capture_dir/dumpcap.log" 2>&1 &
 capture_pid=$!
@@ -288,7 +317,8 @@ done
 }
 
 : >"$navigate_file"
-wait_for_file "$done_file" "$controller_pid" "two Firefox navigations" 500
+wait_for_file "$done_file" "$controller_pid" \
+  "$navigation_count Firefox navigations" 1200
 sleep 0.25
 stop_capture
 stop_monitor
@@ -349,12 +379,17 @@ tshark -r "$capture_dir/repeat.pcapng" "${decode[@]}" \
   "${fields[@]}" -e quic.connection.number \
   -e tls.handshake.length >"$capture_dir/repeat-clienthello.csv"
 
-python3 "$INTEGRATION_DIR/firefox_repeat_navigation_summary.py" \
-  --root "$capture_dir" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
-  --navigation-evidence "$identity_file" \
-  --nav1 "$nav1" --nav2 "$nav2" \
-  --completion1 "$completion1" --completion2 "$completion2" \
+summary_args=(
+  --root "$capture_dir" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
+  --navigation-evidence "$identity_file"
   --output "$safe_dir/summary.txt"
+)
+for ((index = 0; index < navigation_count; index++)); do
+  summary_args+=(--navigation "${navigation_tokens[index]}" \
+    "${completion_tokens[index]}")
+done
+python3 "$INTEGRATION_DIR/firefox_repeat_navigation_summary.py" \
+  "${summary_args[@]}"
 
 oversized=$(tshark -r "$capture_dir/repeat.pcapng" \
   -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && frame.len>1500" \
@@ -369,6 +404,7 @@ protocol=h3
 design=reference_repeat_navigation
 same_firefox_process=required
 same_content_process=required
+navigation_count=$navigation_count
 resource_cache_contract=unique_navigation_token_and_unconditional_200
 source_commit=$(git -C "$SOURCE_ROOT" rev-parse HEAD)
 reference_binary_sha256=$(sha256sum "$REFERENCE_BIN" | cut -d' ' -f1)
