@@ -45,6 +45,29 @@ packets 17--32 from `0.62052` to `0.50648` and packets 1--32 from `0.22690` to
 stylesheet remains additional traffic. It is therefore not promoted by that
 screen alone.
 
+`tree-native-parser-document-start-navigation-stop` tests whether Firefox's
+normal scoped load-group cancellation can retain that early server-heavy phase
+without paying for the complete synthetic stylesheet. CONNECT is not a member
+of the synthetic navigation load group. Cancellation is admitted only after
+the CONNECT handoff, positive client-to-target tunnel application data, and a
+successful stylesheet `OnStartRequest` with 2xx response headers. These two
+asynchronous runtime predicates may arrive in either order. Decrypted admission
+requires `root GET < CONNECT < CSS GET < CSS 200 < cancellation`, one QUIC
+identity, one ClientHello, and the expected aborted stylesheet drain. It never
+uses elapsed time, packet position, or delivered-byte count as a gate.
+
+The first response-start trace placed the CSS GET at packet 18, CSS 200 at
+packet 22, delivered the server burst through packet 58, and then emitted
+STOP_SENDING/RESET_STREAM; the reset final size was about 51.8 KiB. Safe
+six-block H2-inside-CONNECT screen `125ee98eabf85501` (seed `20260829`) found
+the arm best at packets 1--32 (`0.20573` versus `0.20945` for complete CSS and
+`0.23821` for document-start), but not at packets 17--32, 250 ms, or whole-flow.
+Whole-flow remained `0.41881` versus `0.41220` for document-start. Upstream
+audit confirms the tradeoff is fundamental: a normal FromParser stylesheet
+drains to FIN, while canceling an active H3 load necessarily produces request
+cancel/reset signaling. The arm remains experimental and does not change the
+product default.
+
 ## Modes and policy
 
 The runners support two reference modes:

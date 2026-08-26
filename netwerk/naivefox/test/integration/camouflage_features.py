@@ -768,6 +768,7 @@ def extract(args):
         in (
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -946,6 +947,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",

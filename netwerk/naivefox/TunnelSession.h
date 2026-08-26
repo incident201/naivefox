@@ -172,9 +172,14 @@ class TunnelSession final {
                                      uint32_t aHttpStatus, uint32_t aBodyBytes,
                                      bool aRootDone, bool aCompletedNormally,
                                      uint32_t aCompletedSuccessfulResources,
-                                     uint32_t aNativeCacheNewResources);
+                                     uint32_t aNativeCacheNewResources,
+                                     bool aNavigationStopStyleCommitted,
+                                     bool aNavigationStopStyleResponseStarted,
+                                     bool aNavigationStopStyleAborted);
   void PreambleTimeoutOnMain(uint64_t aGeneration, ProxyProtocol aProtocol);
   void PreambleDrainTimeoutOnMain(uint64_t aGeneration);
+  void TunnelApplicationActiveOnMain(uint64_t aGeneration,
+                                     ProxyProtocol aProtocol);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
   void NotifyOuterGateReady();

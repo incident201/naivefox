@@ -45,6 +45,7 @@ def build_config(
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -69,6 +70,7 @@ def build_config(
             "tree-resource-native-cache-committed-overlap, "
             "tree-native-parser-preload-overlap-css, or "
             "tree-native-parser-document-start-overlap-css, or "
+            "tree-native-parser-document-start-navigation-stop-css, or "
             "tree-native-parser-document-handoff-overlap-css, or "
             "tree-native-parser-retarget-overlap-css, or "
             "tree-native-parser-ipc-rendezvous-overlap-css, or "
@@ -108,6 +110,13 @@ def build_config(
     ):
         raise ValueError(
             "tree-native-parser-document-start-overlap-css requires h3"
+        )
+    if (
+        arm == "tree-native-parser-document-start-navigation-stop-css"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-native-parser-document-start-navigation-stop-css requires h3"
         )
     if (
         arm == "tree-native-parser-document-handoff-overlap-css"
@@ -197,6 +206,15 @@ def build_config(
         preamble = {
             "mode": "off",
             "h3-mode": "tree-native-parser-document-start-overlap",
+            "path": preamble_path,
+            "max-assets": 1,
+            "max-bytes": TREE_PREAMBLE_MAX_BYTES,
+            "cache-resources": True,
+        }
+    elif arm == "tree-native-parser-document-start-navigation-stop-css":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-native-parser-document-start-navigation-stop",
             "path": preamble_path,
             "max-assets": 1,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
@@ -366,6 +384,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",

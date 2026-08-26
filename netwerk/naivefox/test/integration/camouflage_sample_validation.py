@@ -94,6 +94,52 @@ NATIVE_PARSER_DOCUMENT_START_ADMISSION = re.compile(
     r"root_done=(?P<root_done>[01]) "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+NATIVE_PARSER_NAVIGATION_STOP_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop "
+    r"admission=(?P<admission>\S+) "
+    r"request_committed=(?P<request_committed>[01]) "
+    r"root_done=(?P<root_done>[01]) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_NAVIGATION_STOP_STYLESHEET_COMMITTED = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop "
+    r"phase=stylesheet-committed stream=(?P<stream>\d+) "
+    r"status=(?P<status>\S+) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_NAVIGATION_STOP_TUNNEL_ACTIVE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop "
+    r"phase=tunnel-application-active "
+    r"direction=(?P<direction>\S+) "
+    r"bytes_positive=(?P<bytes_positive>[01]) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_NAVIGATION_STOP_RESPONSE_STARTED = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop "
+    r"phase=stylesheet-response-started http=(?P<http>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_NAVIGATION_STOP_ISSUED = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop "
+    r"phase=navigation-stop-issued reason=(?P<reason>\S+) "
+    r"load_group=(?P<load_group>\S+) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_NAVIGATION_STOP_ONSTOP = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop "
+    r"phase=stylesheet-onstop status=(?P<status>\S+) "
+    r"expected=(?P<expected>[01]) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_NAVIGATION_STOP_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start-navigation-stop drain=complete "
+    r"root_done=(?P<root_done>[01]) css_committed=(?P<css_committed>[01]) "
+    r"css_aborted=(?P<css_aborted>[01]) http=(?P<http>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 NATIVE_PARSER_DOCUMENT_HANDOFF = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble native-parser-document-handoff phase=(?P<phase>\S+)"
@@ -874,6 +920,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -912,6 +959,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(
             "tree-native-parser-document-start-overlap-css requires h3"
         )
+    if (
+        arm == "tree-native-parser-document-start-navigation-stop-css"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-native-parser-document-start-navigation-stop-css requires h3"
+        )
     if arm == "tree-native-parser-document-handoff-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-document-handoff-overlap-css requires h3")
     if arm == "tree-native-parser-retarget-overlap-css" and protocol != "h3":
@@ -949,6 +1003,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -968,6 +1023,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1164,6 +1220,92 @@ def validate_sample(arm, protocol, log_text, feature_document):
         for marker in parsed_native_parser_document_start_admissions
     ):
         raise ValueError("malformed native parser document-start admission evidence")
+    native_parser_navigation_stop_evidence_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-document-start-navigation-stop " in line
+    ]
+    native_parser_navigation_stop_admission_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " admission=" in line
+    ]
+    native_parser_navigation_stop_stylesheet_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " phase=stylesheet-committed " in line
+    ]
+    native_parser_navigation_stop_issued_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " phase=navigation-stop-issued " in line
+    ]
+    native_parser_navigation_stop_tunnel_active_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " phase=tunnel-application-active " in line
+    ]
+    native_parser_navigation_stop_response_started_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " phase=stylesheet-response-started " in line
+    ]
+    native_parser_navigation_stop_onstop_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " phase=stylesheet-onstop " in line
+    ]
+    native_parser_navigation_stop_drain_lines = [
+        line
+        for line in native_parser_navigation_stop_evidence_lines
+        if " drain=complete " in line
+    ]
+    native_parser_navigation_stop_groups = (
+        (
+            native_parser_navigation_stop_admission_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_ADMISSION,
+        ),
+        (
+            native_parser_navigation_stop_stylesheet_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_STYLESHEET_COMMITTED,
+        ),
+        (
+            native_parser_navigation_stop_tunnel_active_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_TUNNEL_ACTIVE,
+        ),
+        (
+            native_parser_navigation_stop_response_started_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_RESPONSE_STARTED,
+        ),
+        (
+            native_parser_navigation_stop_issued_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_ISSUED,
+        ),
+        (
+            native_parser_navigation_stop_onstop_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_ONSTOP,
+        ),
+        (
+            native_parser_navigation_stop_drain_lines,
+            NATIVE_PARSER_NAVIGATION_STOP_DRAIN,
+        ),
+    )
+    parsed_native_parser_navigation_stop_groups = tuple(
+        [pattern.fullmatch(line) for line in lines]
+        for lines, pattern in native_parser_navigation_stop_groups
+    )
+    if (
+        sum(len(lines) for lines, _ in native_parser_navigation_stop_groups)
+        != len(native_parser_navigation_stop_evidence_lines)
+        or any(
+            marker is None
+            for markers in parsed_native_parser_navigation_stop_groups
+            for marker in markers
+        )
+    ):
+        raise ValueError(
+            "malformed or unknown native parser navigation-stop evidence"
+        )
     native_parser_document_handoff_lines = [
         line
         for line in log_lines
@@ -1667,7 +1809,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "native parser preload lifecycle markers have invalid ordering"
             )
     elif any(native_parser_markers):
-        if arm != "tree-native-parser-document-start-overlap-css":
+        if arm not in (
+            "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
+        ):
             raise ValueError(
                 f"{arm} arm unexpectedly logged native parser preload lifecycle"
             )
@@ -1734,6 +1879,133 @@ def validate_sample(arm, protocol, log_text, feature_document):
     elif parsed_native_parser_document_start_admissions:
         raise ValueError(
             f"{arm} arm unexpectedly logged native parser document-start admission"
+        )
+
+    if arm == "tree-native-parser-document-start-navigation-stop-css":
+        if any(
+            len(markers) != 1
+            for markers in parsed_native_parser_navigation_stop_groups
+        ):
+            raise ValueError(
+                "native parser navigation-stop arm requires exactly one "
+                "admission, stylesheet commit, response start, tunnel "
+                "activity, stop, abort, and drain marker"
+            )
+        if (
+            parsed_native_parser_discoveries
+            or len(native_parser_descriptor_lines) != 1
+            or parsed_native_parser_channels
+            or len(native_parser_lightweight_open_lines) != 1
+            or parsed_native_parser_drains
+            or parsed_native_parser_admissions
+            or parsed_native_parser_barriers
+        ):
+            raise ValueError(
+                "native parser navigation-stop arm requires one parser "
+                "descriptor and channel without a late parser barrier or "
+                "full CSS drain"
+            )
+        (
+            admissions,
+            stylesheets,
+            tunnel_active_markers,
+            response_started_markers,
+            stops,
+            onstops,
+            drains,
+        ) = parsed_native_parser_navigation_stop_groups
+        admission = admissions[0]
+        stylesheet = stylesheets[0]
+        tunnel_active = tunnel_active_markers[0]
+        response_started = response_started_markers[0]
+        stop = stops[0]
+        onstop = onstops[0]
+        drain = drains[0]
+        connection = admission["connection"]
+        if (
+            admission["admission"] != "request-committed"
+            or admission["request_committed"] != "1"
+            or admission["root_done"] != "0"
+            or stylesheet["stream"] != "1"
+            or stylesheet["status"] != "waiting-for"
+            or tunnel_active["direction"] != "client-to-target"
+            or tunnel_active["bytes_positive"] != "1"
+            or not 200 <= int(response_started["http"]) < 300
+            or stop["reason"] != "NS_BINDING_ABORTED"
+            or stop["load_group"] != "scoped"
+            or onstop["status"] != "NS_BINDING_ABORTED"
+            or onstop["expected"] != "1"
+            or drain["root_done"] != "1"
+            or drain["css_committed"] != "1"
+            or drain["css_aborted"] != "1"
+            or not 200 <= int(drain["http"]) < 300
+            or any(
+                marker["connection"] != connection
+                or marker["protocol"] != "h3"
+                for marker in (
+                    stylesheet,
+                    tunnel_active,
+                    response_started,
+                    stop,
+                    onstop,
+                    drain,
+                )
+            )
+            or admission["protocol"] != "h3"
+            or result["connection"] != connection
+        ):
+            raise ValueError("native parser navigation-stop causal state is invalid")
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == connection
+            and established["protocol"] == "h3"
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "native parser navigation-stop arm requires one matching "
+                "CONNECT marker"
+            )
+        admission_index = log_lines.index(
+            native_parser_navigation_stop_admission_lines[0]
+        )
+        established_index = log_lines.index(matching_established[0])
+        descriptor_index = log_lines.index(native_parser_descriptor_lines[0])
+        open_index = log_lines.index(native_parser_lightweight_open_lines[0])
+        stylesheet_index = log_lines.index(
+            native_parser_navigation_stop_stylesheet_lines[0]
+        )
+        tunnel_active_index = log_lines.index(
+            native_parser_navigation_stop_tunnel_active_lines[0]
+        )
+        response_started_index = log_lines.index(
+            native_parser_navigation_stop_response_started_lines[0]
+        )
+        stop_index = log_lines.index(native_parser_navigation_stop_issued_lines[0])
+        onstop_index = log_lines.index(native_parser_navigation_stop_onstop_lines[0])
+        result_index = log_lines.index(result_lines[0])
+        drain_index = log_lines.index(native_parser_navigation_stop_drain_lines[0])
+        if not (
+            admission_index < established_index < tunnel_active_index
+            and admission_index
+            < established_index
+            < descriptor_index
+            < open_index
+            < stylesheet_index
+            < response_started_index
+            and max(stylesheet_index, tunnel_active_index, response_started_index)
+            < stop_index
+            < onstop_index
+            < result_index
+            < drain_index
+        ):
+            raise ValueError(
+                "native parser navigation-stop lifecycle markers have invalid "
+                "ordering"
+            )
+    elif native_parser_navigation_stop_evidence_lines:
+        raise ValueError(
+            f"{arm} arm unexpectedly logged native parser navigation-stop lifecycle"
         )
 
     if arm == "tree-native-parser-document-handoff-overlap-css":
@@ -2339,6 +2611,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             in (
                 "tree-native-parser-document-handoff-overlap-css",
                 "tree-native-parser-document-start-overlap-css",
+                "tree-native-parser-document-start-navigation-stop-css",
                 "tree-native-parser-retarget-overlap-css",
                 "tree-native-parser-ipc-rendezvous-overlap-css",
                 "tree-native-parser-root-rendezvous-overlap-css",
@@ -2388,6 +2661,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",

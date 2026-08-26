@@ -28,6 +28,7 @@ SUPPORTED_ARMS = (
     "tree-resource-native-cache-committed-overlap",
     "tree-native-parser-preload-overlap-css",
     "tree-native-parser-document-start-overlap-css",
+    "tree-native-parser-document-start-navigation-stop-css",
     "tree-native-parser-document-handoff-overlap-css",
     "tree-native-parser-retarget-overlap-css",
     "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -428,6 +429,7 @@ def read_get_request_semantics(root, cohort, proxy_port):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1478,6 +1480,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1496,6 +1499,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-resource-native-cache-committed-overlap",
                     "tree-native-parser-preload-overlap-css",
                     "tree-native-parser-document-start-overlap-css",
+                    "tree-native-parser-document-start-navigation-stop-css",
                     "tree-native-parser-document-handoff-overlap-css",
                     "tree-native-parser-retarget-overlap-css",
                     "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1516,7 +1520,10 @@ def validate(cohorts, connections, client_hellos, arms):
                     "alt-used" not in get["header_name_set"].split(";"),
                     f"{arm} preamble GET unexpectedly used fixture Alt-Svc mapping",
                 )
-                if arm != "tree-native-parser-document-start-overlap-css":
+                if arm not in (
+                    "tree-native-parser-document-start-overlap-css",
+                    "tree-native-parser-document-start-navigation-stop-css",
+                ):
                     require(
                         get["packet_position"] < connects[0]["packet_position"],
                         f"{arm} GET did not precede CONNECT",
@@ -1547,10 +1554,26 @@ def validate(cohorts, connections, client_hellos, arms):
                     for get in gets
                 )
             ]
-            require(
-                len(response_headers) == len(gets),
-                f"{arm} lacks exactly one successful response for every GET",
-            )
+            if arm == "tree-native-parser-document-start-navigation-stop-css":
+                root_get = sorted(
+                    gets, key=lambda row: row["packet_position"]
+                )[0]
+                root_response_headers = [
+                    row
+                    for row in response_headers
+                    if row["connection_index"] == root_get["connection_index"]
+                    and row["stream_id"] == root_get["stream_id"]
+                ]
+                require(
+                    len(root_response_headers) == 1
+                    and len(response_headers) == len(gets),
+                    f"{arm} lacks exactly one successful response for each GET",
+                )
+            else:
+                require(
+                    len(response_headers) == len(gets),
+                    f"{arm} lacks exactly one successful response for every GET",
+                )
             if arm in (
                 "root",
                 "root-pmtud-control",
@@ -1620,6 +1643,7 @@ def validate(cohorts, connections, client_hellos, arms):
                         "tree-resource-native-cache-committed-overlap",
                         "tree-native-parser-preload-overlap-css",
                         "tree-native-parser-document-start-overlap-css",
+                        "tree-native-parser-document-start-navigation-stop-css",
                         "tree-native-parser-document-handoff-overlap-css",
                         "tree-native-parser-retarget-overlap-css",
                         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1629,10 +1653,11 @@ def validate(cohorts, connections, client_hellos, arms):
                     )
                     else 2
                 )
-                require(
-                    len(asset_responses) == expected_assets,
-                    f"{arm} lacks one or more asset response headers",
-                )
+                if arm != "tree-native-parser-document-start-navigation-stop-css":
+                    require(
+                        len(asset_responses) == expected_assets,
+                        f"{arm} lacks one or more asset response headers",
+                    )
                 root_stream = (
                     ordered_gets[0]["connection_index"],
                     ordered_gets[0]["stream_id"],
@@ -1642,7 +1667,10 @@ def validate(cohorts, connections, client_hellos, arms):
                     for row in response_headers
                     if (row["connection_index"], row["stream_id"]) == root_stream
                 ]
-                if arm != "tree-native-parser-document-start-overlap-css":
+                if arm not in (
+                    "tree-native-parser-document-start-overlap-css",
+                    "tree-native-parser-document-start-navigation-stop-css",
+                ):
                     require(
                         root_responses
                         and all(
@@ -1698,6 +1726,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     )
                 elif arm in (
                     "tree-native-parser-document-start-overlap-css",
+                    "tree-native-parser-document-start-navigation-stop-css",
                     "tree-root-overlap",
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
@@ -1719,7 +1748,10 @@ def validate(cohorts, connections, client_hellos, arms):
                         for row in response_headers
                         if (row["connection_index"], row["stream_id"]) == root_stream
                     ]
-                    if arm != "tree-native-parser-document-start-overlap-css":
+                    if arm not in (
+                        "tree-native-parser-document-start-overlap-css",
+                        "tree-native-parser-document-start-navigation-stop-css",
+                    ):
                         require(
                             root_responses
                             and all(
@@ -1730,7 +1762,7 @@ def validate(cohorts, connections, client_hellos, arms):
                             ),
                             "tree-root-overlap root FIN did not precede CONNECT",
                         )
-                    else:
+                    elif arm == "tree-native-parser-document-start-overlap-css":
                         stylesheet_get = ordered_gets[1]
                         stylesheet_responses = [
                             row
@@ -1758,6 +1790,50 @@ def validate(cohorts, connections, client_hellos, arms):
                                 "stream_fin_packet_position"
                             ],
                             f"{arm} lacks CSS GET < response HEADERS <= CSS FIN",
+                        )
+                    else:
+                        stylesheet_get = ordered_gets[1]
+                        stylesheet_all_responses = [
+                            row
+                            for row in cohorts[arm]
+                            if row["direction"] == "server"
+                            and row["status"]
+                            and row["connection_index"]
+                            == stylesheet_get["connection_index"]
+                            and row["stream_id"] == stylesheet_get["stream_id"]
+                        ]
+                        stylesheet_responses = [
+                            row
+                            for row in asset_responses
+                            if row["connection_index"]
+                            == stylesheet_get["connection_index"]
+                            and row["stream_id"] == stylesheet_get["stream_id"]
+                        ]
+                        connect_position = connects[0]["packet_position"]
+                        require(
+                            ordered_gets[0]["packet_position"]
+                            < connect_position
+                            < stylesheet_get["packet_position"],
+                            f"{arm} lacks root GET < CONNECT < CSS GET",
+                        )
+                        require(
+                            all(
+                                row["status"] == "200"
+                                for row in stylesheet_all_responses
+                            ),
+                            f"{arm} observed a non-200 CSS response",
+                        )
+                        require(
+                            len(stylesheet_responses) == 1,
+                            f"{arm} lacks one successful CSS response HEADERS",
+                        )
+                        require(
+                            all(
+                                stylesheet_get["packet_position"]
+                                < row["packet_position"]
+                                for row in stylesheet_responses
+                            ),
+                            f"{arm} CSS response preceded its GET",
                         )
                     if arm in (
                         "tree-native-parser-preload-overlap-css",
@@ -1948,6 +2024,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         or "document-start-overlap" in arms,
         "tree-native-parser-document-start-overlap-css decrypted validation "
         "requires document-start-overlap",
+    )
+    require(
+        "tree-native-parser-document-start-navigation-stop-css" not in arms
+        or "tree-native-parser-document-start-overlap-css" in arms,
+        "tree-native-parser-document-start-navigation-stop-css decrypted "
+        "validation requires tree-native-parser-document-start-overlap-css",
     )
     require(
         "tree-early-overlap" not in arms or "tree-complete" in arms,
@@ -2371,12 +2453,15 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             key=lambda row: row["packet_position"],
         )
         asset_streams = [row["stream_id"] for row in tree_gets[1:]]
-        require(
-            all(stream in response_lengths for stream in asset_streams),
-            f"{arm} lacks asset content-length evidence",
-        )
+        if arm != "tree-native-parser-document-start-navigation-stop-css":
+            require(
+                all(stream in response_lengths for stream in asset_streams),
+                f"{arm} lacks asset content-length evidence",
+            )
         tree_asset_sizes[arm] = tuple(
-            response_lengths[stream] for stream in asset_streams
+            response_lengths[stream]
+            for stream in asset_streams
+            if stream in response_lengths
         )
     if {
         "document-start-overlap",
@@ -2409,6 +2494,23 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             tree_asset_sizes[baseline] == tree_asset_sizes[treatment],
             "native-parser document-start CSS asset content-length differs "
             "from parser control",
+        )
+    if {
+        "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
+    }.issubset(arms):
+        baseline = "tree-native-parser-document-start-overlap-css"
+        treatment = "tree-native-parser-document-start-navigation-stop-css"
+        for role in ("root", "stylesheet"):
+            require(
+                tree_semantics[baseline][role] == tree_semantics[treatment][role],
+                "native-parser navigation-stop "
+                f"{role} selected header values/order differ from control",
+            )
+        require(
+            root_response_sizes[baseline] == root_response_sizes[treatment],
+            "native-parser navigation-stop root response content-length "
+            "differs from control",
         )
     if "tree-complete" in arms:
         for arm in preamble_arms:
@@ -2801,6 +2903,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
                     f"{','.join(evidence) if evidence else 'none-observed'}\n"
                 )
         for cohort in sorted(tree_asset_sizes):
+            if (
+                cohort
+                == "tree-native-parser-document-start-navigation-stop-css"
+                and not tree_asset_sizes[cohort]
+            ):
+                continue
             destination.write(
                 f"{cohort}_asset_content_lengths="
                 f"{','.join(str(size) for size in tree_asset_sizes[cohort])}\n"
@@ -2890,6 +2998,28 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             )
             destination.write(
                 "tree_native_parser_document_start_parser_control_asset_size_match=yes\n"
+            )
+        if {
+            "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
+        }.issubset(arms):
+            destination.write(
+                "tree_native_parser_navigation_stop_request_semantics_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_navigation_stop_root_response_size_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_navigation_stop_root_get_before_connect=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_navigation_stop_css_get_after_connect=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_navigation_stop_full_css_fin_required=no\n"
+            )
+            destination.write(
+                "tree_native_parser_navigation_stop_runtime_lifecycle_validated=yes\n"
             )
         if {
             "tree-complete-css",

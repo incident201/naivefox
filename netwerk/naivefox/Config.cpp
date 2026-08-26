@@ -595,6 +595,9 @@ class JsonParser final {
                      "tree-native-parser-document-start-overlap")) {
         aMode = PreambleMode::TreeNativeParserDocumentStartOverlap;
       } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-start-navigation-stop")) {
+        aMode = PreambleMode::TreeNativeParserDocumentStartNavigationStop;
+      } else if (mode.EqualsLiteral(
                      "tree-native-parser-document-handoff-overlap")) {
         aMode = PreambleMode::TreeNativeParserDocumentHandoffOverlap;
       } else if (mode.EqualsLiteral("tree-native-parser-retarget-overlap")) {
@@ -768,6 +771,16 @@ class JsonParser final {
           "tree-native-parser-document-start-overlap must be selected "
           "explicitly with h3-mode");
     }
+    if (h3Mode ==
+            PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::
+                      TreeNativeParserDocumentStartNavigationStop))) {
+      return Error(
+          "tree-native-parser-document-start-navigation-stop must be "
+          "selected explicitly with h3-mode");
+    }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentHandoffOverlap &&
         (!sawH3Mode ||
          aPreamble.mH3Mode !=
@@ -888,6 +901,19 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-start-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode ==
+        PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-document-start-navigation-stop requires "
+            "exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-start-navigation-stop requires "
             "cache-resources=true");
       }
     }

@@ -11,12 +11,12 @@
 #include <utility>
 
 #include "AutoFallback.h"
-#include "base/process_util.h"
 #include "NativeStylePreloadActivation.h"
 #include "NativeStylePreloadChannel.h"
 #include "ReferrerInfo.h"
 #include "RuntimeLogging.h"
 #include "StylePreloadKind.h"
+#include "base/process_util.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Base64.h"
 #include "mozilla/ClearOnShutdown.h"
@@ -698,6 +698,11 @@ class ProxyPreambleOperation::Impl final {
   bool mRootCompletedSuccessfully = false;
   bool mBarrierFired = false;
   bool mFinishedFired = false;
+  bool mConnectHandoffAdmitted = false;
+  bool mTunnelApplicationActive = false;
+  bool mNavigationStopStyleResponseStarted = false;
+  bool mNavigationStopIssued = false;
+  bool mNavigationStopStyleAborted = false;
   bool mCancelled = false;
   bool mAllStreamsCompletedNormally = true;
   bool mHaveRootOriginAttributes = false;
@@ -1056,6 +1061,76 @@ ProxyPreambleOperation::~ProxyPreambleOperation() {
              mImpl->mStreams.IsEmpty());
 }
 
+nsresult ProxyPreambleOperation::NotifyConnectHandoffAdmitted() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mConfig.mMode !=
+      PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    return NS_OK;
+  }
+  if (mImpl->mCancelled || mImpl->mFinishedFired ||
+      mImpl->mConnectHandoffAdmitted) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  mImpl->mConnectHandoffAdmitted = true;
+  return MaybeIssueNativeParserNavigationStop();
+}
+
+nsresult ProxyPreambleOperation::NotifyTunnelApplicationActive() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mConfig.mMode !=
+      PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    return NS_OK;
+  }
+  if (mImpl->mCancelled || mImpl->mFinishedFired) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mImpl->mTunnelApplicationActive) {
+    return NS_OK;
+  }
+  mImpl->mTunnelApplicationActive = true;
+  RuntimeLogEvent(
+      "Connection %llu preamble "
+      "native-parser-document-start-navigation-stop "
+      "phase=tunnel-application-active direction=client-to-target "
+      "bytes_positive=1 protocol=h3\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId));
+  return MaybeIssueNativeParserNavigationStop();
+}
+
+nsresult ProxyPreambleOperation::MaybeIssueNativeParserNavigationStop() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mConfig.mMode !=
+      PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    return NS_OK;
+  }
+  if (mImpl->mNavigationStopIssued) {
+    return NS_OK;
+  }
+  if (mImpl->mStreams.Length() != 2 ||
+      !detail::PreambleNavigationStopMayIssue(
+          mImpl->mConfig.mMode, mImpl->mConnectHandoffAdmitted,
+          mImpl->mNavigationStopStyleResponseStarted,
+          mImpl->mTunnelApplicationActive) ||
+      !mImpl->mRootDone || !mImpl->mRootCompletedSuccessfully ||
+      !mImpl->mNativeParserFinished) {
+    return NS_OK;
+  }
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      !mImpl->mBarrierFired || !mImpl->mLoadGroup ||
+      !mImpl->mStreams[1].mRequest || mImpl->mStreams[1].mDone) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  mImpl->mNavigationStopIssued = true;
+  RuntimeLogEvent(
+      "Connection %llu preamble "
+      "native-parser-document-start-navigation-stop "
+      "phase=navigation-stop-issued reason=NS_BINDING_ABORTED "
+      "load_group=scoped protocol=h3\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId));
+  return mImpl->mLoadGroup->CancelWithReason(
+      NS_BINDING_ABORTED, "NaiveFox::ProxyPreambleNavigationStop"_ns);
+}
+
 void ProxyPreambleOperation::Cancel(nsresult aStatus) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mCancelled || mImpl->mFinishedFired) {
@@ -1273,8 +1348,7 @@ nsresult ProxyPreambleOperation::Start(
     stream.mRequest = channel;
     RefPtr<StreamListener> listener = new StreamListener(this, aStreamId);
     if ((mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
-         mImpl->mConfig.mMode ==
-             PreambleMode::TreeNativeParserDocumentStartOverlap) &&
+         PreambleModeUsesNativeParserDocumentStart(mImpl->mConfig.mMode)) &&
         aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
       MOZ_TRY(channel->SetNotificationCallbacks(listener));
     }
@@ -1298,8 +1372,7 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
     return;
   }
   if ((mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
-       mImpl->mConfig.mMode ==
-           PreambleMode::TreeNativeParserDocumentStartOverlap) &&
+       PreambleModeUsesNativeParserDocumentStart(mImpl->mConfig.mMode)) &&
       aStreamId == 0) {
     FireBarrierCallback();
     return;
@@ -1338,9 +1411,27 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
     auto& stream = mImpl->mStreams[aStreamId];
     if (!stream.mRequestCommitted) {
       stream.mRequestCommitted = true;
-      RuntimeLogEvent(
-          "Preamble native-parser-preload lifecycle=resource-committed "
-          "stream=1 status=waiting-for protocol=h3\n");
+      if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+        RuntimeLogEvent(
+            "Connection %llu preamble "
+            "native-parser-document-start-navigation-stop "
+            "phase=stylesheet-committed stream=1 status=waiting-for "
+            "protocol=h3\n",
+            static_cast<unsigned long long>(mImpl->mConnectionId));
+      } else {
+        RuntimeLogEvent(
+            "Preamble native-parser-preload lifecycle=resource-committed "
+            "stream=1 status=waiting-for protocol=h3\n");
+      }
+    }
+    if (mImpl->mConfig.mMode ==
+        PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+      nsresult cancelRv = MaybeIssueNativeParserNavigationStop();
+      if (NS_FAILED(cancelRv)) {
+        FailNativeParserContract(cancelRv, "navigation-stop-cancel-failed");
+      }
+      return;
     }
     MaybeFireBarrier();
   }
@@ -1399,6 +1490,35 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
   }
   nsresult rv = channel->GetResponseStatus(&stream.mHttpStatus);
   stream.mResponseHeadersReceived = NS_SUCCEEDED(rv);
+  if (aStreamId == 1 &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    if (!stream.mResponseHeadersReceived || stream.mHttpStatus < 200 ||
+        stream.mHttpStatus >= 300) {
+      nsresult failure = NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+      FailNativeParserContract(failure,
+                               "navigation-stop-stylesheet-response-rejected");
+      return failure;
+    }
+    if (mImpl->mNavigationStopStyleResponseStarted) {
+      FailNativeParserContract(
+          NS_ERROR_UNEXPECTED,
+          "navigation-stop-stylesheet-response-started-twice");
+      return NS_ERROR_UNEXPECTED;
+    }
+    mImpl->mNavigationStopStyleResponseStarted = true;
+    RuntimeLogEvent(
+        "Connection %llu preamble "
+        "native-parser-document-start-navigation-stop "
+        "phase=stylesheet-response-started http=%u protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        stream.mHttpStatus);
+    nsresult stopRv = MaybeIssueNativeParserNavigationStop();
+    if (NS_FAILED(stopRv)) {
+      FailNativeParserContract(stopRv, "navigation-stop-cancel-failed");
+      return stopRv;
+    }
+  }
   if (aStreamId == 0 && NS_FAILED(rv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
     mImpl->mFirstFailure = rv;
   }
@@ -1447,11 +1567,10 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
       nsresult processRv = StartNativeParserProcessRoot(aRequest, channel);
       if (NS_FAILED(processRv)) {
         FailNativeParserContract(
-            processRv,
-            mImpl->mConfig.mMode ==
-                    PreambleMode::TreeNativeParserFullProcessOverlap
-                ? "full-process-root-start-failed"
-                : "process-root-start-failed");
+            processRv, mImpl->mConfig.mMode ==
+                               PreambleMode::TreeNativeParserFullProcessOverlap
+                           ? "full-process-root-start-failed"
+                           : "process-root-start-failed");
       }
       return processRv;
     }
@@ -1651,10 +1770,9 @@ nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(PreambleModeUsesNativeParserProcess(mImpl->mConfig.mMode));
   if (!aRequest || !aChannel || mImpl->mStreams.IsEmpty() ||
-      mImpl->mNativeProcessRootRequestId ||
-      mImpl->mNativeParserRootSuspended || mImpl->mNativeParserScanner ||
-      mImpl->mNativeParserTarget || !mImpl->mRootReferrerInfo ||
-      !mImpl->mHaveRootOriginAttributes ||
+      mImpl->mNativeProcessRootRequestId || mImpl->mNativeParserRootSuspended ||
+      mImpl->mNativeParserScanner || mImpl->mNativeParserTarget ||
+      !mImpl->mRootReferrerInfo || !mImpl->mHaveRootOriginAttributes ||
       !NativeStylePreloadActivation::IsProcessReady()) {
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1723,8 +1841,7 @@ nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
   RuntimeLogEvent(
       "Connection %llu preamble %s phase=physical-root-"
       "suspended channel=%llu generation=%llu parent_pid=%llu protocol=h3\n",
-      static_cast<unsigned long long>(mImpl->mConnectionId),
-      processMode,
+      static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
       static_cast<unsigned long long>(mImpl->mNativeRootReplacementChannelId),
       static_cast<unsigned long long>(descriptor.mGeneration),
       static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1739,12 +1856,12 @@ nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
       [self, generation](const NativeStylePreloadProcessDescriptor& aStyle) {
         return self->OnNativeParserProcessStyleDiscovered(generation, aStyle);
       };
-  callbacks.mFinished =
-      [self, generation](uint32_t aLastSequence, uint32_t aBodyBytes,
-                         uint32_t aStyleCount, nsresult aStatus) {
-        self->OnNativeParserProcessRootFinished(
-            generation, aLastSequence, aBodyBytes, aStyleCount, aStatus);
-      };
+  callbacks.mFinished = [self, generation](
+                            uint32_t aLastSequence, uint32_t aBodyBytes,
+                            uint32_t aStyleCount, nsresult aStatus) {
+    self->OnNativeParserProcessRootFinished(generation, aLastSequence,
+                                            aBodyBytes, aStyleCount, aStatus);
+  };
   callbacks.mFailed = [self, generation](nsresult aStatus) {
     self->OnNativeParserProcessFailed(generation, aStatus);
   };
@@ -1755,8 +1872,7 @@ nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
     RuntimeLogEvent(
         "Connection %llu preamble %s phase=root-registered "
         "request=%llu generation=%llu parent_pid=%llu protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        processMode,
+        static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
         static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
         static_cast<unsigned long long>(generation),
         static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1784,15 +1900,13 @@ nsresult ProxyPreambleOperation::OnNativeParserProcessRootReady(
   nsresult rv = root->Resume();
   if (NS_SUCCEEDED(rv)) {
     const char* processMode =
-        mImpl->mConfig.mMode ==
-                PreambleMode::TreeNativeParserFullProcessOverlap
+        mImpl->mConfig.mMode == PreambleMode::TreeNativeParserFullProcessOverlap
             ? "native-parser-full-process"
             : "native-parser-process";
     RuntimeLogEvent(
         "Connection %llu preamble %s phase=root-ready-"
         "resume request=%llu generation=%llu parent_pid=%llu protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        processMode,
+        static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
         static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
         static_cast<unsigned long long>(aGeneration),
         static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1834,8 +1948,7 @@ nsresult ProxyPreambleOperation::OnNativeParserProcessStyleDiscovered(
   RuntimeLogEvent(
       "Connection %llu preamble %s phase=style-opened "
       "root=%llu style=%llu sequence=%u parent_pid=%llu protocol=h3\n",
-      static_cast<unsigned long long>(mImpl->mConnectionId),
-      processMode,
+      static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
       static_cast<unsigned long long>(aDescriptor.mRootRequestId),
       static_cast<unsigned long long>(aDescriptor.mStyleRequestId),
       aDescriptor.mDiscoverySequence,
@@ -1853,7 +1966,8 @@ void ProxyPreambleOperation::OnNativeParserProcessRootFinished(
       aGeneration ==
           mImpl->mNativeParserGeneration.load(std::memory_order_acquire) &&
       mImpl->mNativeProcessRootRequestId && mImpl->mNativeProcessRootReady &&
-      mImpl->mRootDone && aLastSequence + 1 == mImpl->mNativeProcessNextSequence &&
+      mImpl->mRootDone &&
+      aLastSequence + 1 == mImpl->mNativeProcessNextSequence &&
       aBodyBytes == mImpl->mNativeParserRetargetBodyBytes.load(
                         std::memory_order_acquire) &&
       aStyleCount == 1 && mImpl->mNativeProcessDiscoverySequence == 1 &&
@@ -1875,8 +1989,7 @@ void ProxyPreambleOperation::OnNativeParserProcessRootFinished(
       "Connection %llu preamble %s phase=parser-finished "
       "request=%llu generation=%llu sequence=%u bytes=%u styles=%u "
       "parent_pid=%llu protocol=h3\n",
-      static_cast<unsigned long long>(mImpl->mConnectionId),
-      processMode,
+      static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
       static_cast<unsigned long long>(requestId),
       static_cast<unsigned long long>(aGeneration), aLastSequence, aBodyBytes,
       aStyleCount, static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1884,8 +1997,8 @@ void ProxyPreambleOperation::OnNativeParserProcessRootFinished(
   MaybeFinish();
 }
 
-void ProxyPreambleOperation::OnNativeParserProcessFailed(
-    uint64_t aGeneration, nsresult aStatus) {
+void ProxyPreambleOperation::OnNativeParserProcessFailed(uint64_t aGeneration,
+                                                         nsresult aStatus) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
       aGeneration !=
@@ -2163,8 +2276,7 @@ nsresult ProxyPreambleOperation::QueueNativeParserRootBody(
           "Connection %llu preamble %s phase=root-data "
           "request=%llu generation=%llu sequence=%u bytes=%u parent_pid=%llu "
           "protocol=h3\n",
-          static_cast<unsigned long long>(mImpl->mConnectionId),
-          processMode,
+          static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
           static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
           static_cast<unsigned long long>(
               mImpl->mNativeParserGeneration.load(std::memory_order_acquire)),
@@ -2644,6 +2756,11 @@ void ProxyPreambleOperation::OnNativeParserOutput(
           mImpl->mNativeRootReplacementRequestId, NS_OK);
       mImpl->mNativeRootReplacementRequestId = 0;
       mImpl->mNativeRootLogicalRequest = nullptr;
+    }
+    nsresult stopRv = MaybeIssueNativeParserNavigationStop();
+    if (NS_FAILED(stopRv)) {
+      FailNativeParserContract(stopRv, "navigation-stop-cancel-failed");
+      return;
     }
   }
   MaybeFireBarrier();
@@ -3422,8 +3539,7 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
           "Connection %llu preamble %s "
           "phase=style-onstop-complete style=%llu status=0x%08x "
           "parent_pid=%llu protocol=h3\n",
-          static_cast<unsigned long long>(mImpl->mConnectionId),
-          processMode,
+          static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
           static_cast<unsigned long long>(styleRequestId),
           static_cast<unsigned>(aStatus),
           static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -3434,11 +3550,10 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
       FailNativeParserContract(aStatus, "process-root-stop-failed");
     } else {
       const uint32_t sequence = mImpl->mNativeProcessNextSequence;
-      nsresult forwardRv =
-          NativeStylePreloadActivation::ForwardProcessRootStop(
-              mImpl->mNativeProcessRootRequestId,
-              mImpl->mNativeParserGeneration.load(std::memory_order_acquire),
-              sequence, aStatus);
+      nsresult forwardRv = NativeStylePreloadActivation::ForwardProcessRootStop(
+          mImpl->mNativeProcessRootRequestId,
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire),
+          sequence, aStatus);
       if (NS_FAILED(forwardRv)) {
         FailNativeParserContract(forwardRv, "process-root-stop-forward-failed");
       } else {
@@ -3452,10 +3567,8 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
             "Connection %llu preamble %s phase=root-stop "
             "request=%llu generation=%llu sequence=%u status=0x%08x "
             "parent_pid=%llu protocol=h3\n",
-            static_cast<unsigned long long>(mImpl->mConnectionId),
-            processMode,
-            static_cast<unsigned long long>(
-                mImpl->mNativeProcessRootRequestId),
+            static_cast<unsigned long long>(mImpl->mConnectionId), processMode,
+            static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
             static_cast<unsigned long long>(
                 mImpl->mNativeParserGeneration.load(std::memory_order_acquire)),
             sequence, static_cast<unsigned>(aStatus),
@@ -3481,17 +3594,34 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   auto& stream = mImpl->mStreams[aStreamId];
   stream.mRequest = nullptr;
   stream.mDone = true;
-  if (NS_FAILED(aStatus)) {
+  const bool expectedNavigationStopStyleAbort =
+      aStreamId == 1 &&
+      detail::PreambleNavigationStopExpectedStyleAbort(
+          mImpl->mConfig.mMode, mImpl->mBarrierFired,
+          mImpl->mNavigationStopStyleResponseStarted,
+          mImpl->mConnectHandoffAdmitted, mImpl->mTunnelApplicationActive,
+          mImpl->mNavigationStopIssued, aStatus);
+  if (expectedNavigationStopStyleAbort) {
+    mImpl->mNavigationStopStyleAborted = true;
+    RuntimeLogEvent(
+        "Connection %llu preamble "
+        "native-parser-document-start-navigation-stop "
+        "phase=stylesheet-onstop status=NS_BINDING_ABORTED expected=1 "
+        "protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId));
+  } else if (NS_FAILED(aStatus)) {
     mImpl->mAllStreamsCompletedNormally = false;
   }
   if (aStreamId > 0) {
-    const bool resourceSucceeded =
-        detail::PreambleResourceCompletedSuccessfully(
-            stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus);
-    if (resourceSucceeded) {
-      ++mImpl->mCompletedSuccessfulResources;
-    } else {
-      mImpl->mAllStreamsCompletedNormally = false;
+    if (!expectedNavigationStopStyleAbort) {
+      const bool resourceSucceeded =
+          detail::PreambleResourceCompletedSuccessfully(
+              stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus);
+      if (resourceSucceeded) {
+        ++mImpl->mCompletedSuccessfulResources;
+      } else {
+        mImpl->mAllStreamsCompletedNormally = false;
+      }
     }
   }
   if (aStreamId == 0 && NS_FAILED(aStatus) &&
@@ -3534,6 +3664,10 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
       if (NS_FAILED(parserRv)) {
         FailNativeParserContract(parserRv, "finish-dispatch-failed");
       }
+    }
+    nsresult stopRv = MaybeIssueNativeParserNavigationStop();
+    if (NS_FAILED(stopRv)) {
+      FailNativeParserContract(stopRv, "navigation-stop-cancel-failed");
     }
   }
 
@@ -3643,7 +3777,11 @@ void ProxyPreambleOperation::MaybeFinish() {
                   }
                   return count;
                 }(),
-                mImpl->mRootDone, mImpl->mAllStreamsCompletedNormally});
+                mImpl->mRootDone, mImpl->mAllStreamsCompletedNormally,
+                mImpl->mStreams.Length() == 2 &&
+                    mImpl->mStreams[1].mRequestCommitted,
+                mImpl->mNavigationStopStyleResponseStarted,
+                mImpl->mNavigationStopStyleAborted});
     }
   }
 }

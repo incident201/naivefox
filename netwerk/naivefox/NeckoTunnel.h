@@ -62,6 +62,9 @@ struct ProxyPreambleFinalResult final {
   uint32_t mNativeCacheNewResources = 0;
   bool mRootDone = false;
   bool mCompletedNormally = false;
+  bool mNavigationStopStyleCommitted = false;
+  bool mNavigationStopStyleResponseStarted = false;
+  bool mNavigationStopStyleAborted = false;
 };
 
 using ProxyPreambleFinishedCallback =
@@ -115,7 +118,7 @@ constexpr bool PreambleBarrierReached(
     return aRootResponseAccepted && !aRootDone;
   }
   if (aMode == PreambleMode::DocumentStartOverlap ||
-      aMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
+      PreambleModeUsesNativeParserDocumentStart(aMode)) {
     return false;
   }
   if (!aRootDone) {
@@ -183,7 +186,7 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeResourceCommittedOverlap ||
          aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
          aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
-         aMode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
+         PreambleModeUsesNativeParserDocumentStart(aMode) ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
          aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
@@ -218,6 +221,37 @@ constexpr bool PreambleResourceCompletedSuccessfully(
          NS_SUCCEEDED(aStopStatus);
 }
 
+constexpr bool PreambleNavigationStopExpectedStyleAbort(
+    PreambleMode aMode, bool aBarrierFired, bool aStyleResponseStarted,
+    bool aConnectHandoffAdmitted, bool aTunnelApplicationActive,
+    bool aNavigationStopIssued, nsresult aStopStatus) {
+  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+         aBarrierFired && aStyleResponseStarted && aConnectHandoffAdmitted &&
+         aTunnelApplicationActive && aNavigationStopIssued &&
+         aStopStatus == NS_BINDING_ABORTED;
+}
+
+constexpr bool PreambleNavigationStopMayIssue(PreambleMode aMode,
+                                              bool aConnectHandoffAdmitted,
+                                              bool aStyleResponseStarted,
+                                              bool aTunnelApplicationActive) {
+  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+         aConnectHandoffAdmitted && aStyleResponseStarted &&
+         aTunnelApplicationActive;
+}
+
+constexpr bool PreambleNavigationStopCompletedSuccessfully(
+    PreambleMode aMode, bool aRootDone, bool aCompletedNormally,
+    nsresult aStatus, uint32_t aHttpStatus,
+    uint32_t aCompletedSuccessfulResources, bool aStyleCommitted,
+    bool aStyleResponseStarted, bool aStyleAborted) {
+  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+         aRootDone && aCompletedNormally && NS_SUCCEEDED(aStatus) &&
+         aHttpStatus >= 200 && aHttpStatus < 300 &&
+         aCompletedSuccessfulResources == 0 && aStyleCommitted &&
+         aStyleResponseStarted && aStyleAborted;
+}
+
 }  // namespace detail
 
 // Owns the complete browser-like preamble load: the document channel and any
@@ -234,6 +268,8 @@ class ProxyPreambleOperation final {
   class StreamListener;
 
   void Cancel(nsresult aStatus);
+  nsresult NotifyConnectHandoffAdmitted();
+  nsresult NotifyTunnelApplicationActive();
 
  private:
   friend nsresult OpenProxyPreambleOperation(
@@ -263,6 +299,7 @@ class ProxyPreambleOperation final {
   nsresult CheckNativeParserRetargetListener(uint32_t aStreamId);
   void OnRequestCommitted(uint32_t aStreamId, nsIRequest* aRequest);
   void OnStopRequest(uint32_t aStreamId, nsresult aStatus);
+  nsresult MaybeIssueNativeParserNavigationStop();
   nsresult DispatchNativeParserChunk(nsCString&& aChunk);
   nsresult DispatchNativeParserFinish();
   nsresult DispatchNativeParserReplacementListenerInstall();

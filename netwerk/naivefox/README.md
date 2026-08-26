@@ -87,6 +87,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   `document-native-cache-open`, `document-native-channel-open`,
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-native-parser-document-start-overlap`,
+  `tree-native-parser-document-start-navigation-stop`,
   `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, `tree-resource-native-cache-committed-overlap`, and
   `tree-root-overlap`; `root` and `tree` are
@@ -133,6 +134,17 @@ The supported config is a strict NaiveProxy-compatible subset:
   shows a strong packets-17--32 improvement but a later volume penalty from
   the additional complete stylesheet, so it remains experimental rather than
   the default until that tradeoff is resolved.
+  `tree-native-parser-document-start-navigation-stop` tests the corresponding
+  upstream cancellation tradeoff. The synthetic root and stylesheet share a
+  scoped load group which excludes CONNECT. After CONNECT is admitted, positive
+  client-to-target tunnel data is observed, and the stylesheet has received
+  successful 2xx response headers, the scoped synthetic navigation is stopped
+  with the normal `NS_BINDING_ABORTED` load-group path. This preserves a real
+  early stylesheet response burst but necessarily emits H3 request-cancel
+  signaling when the response has not reached FIN. Six-block screening improved
+  packets 1--32, but remained worse than `document-start-overlap` at 250 ms and
+  whole-flow. The mode is therefore a negative product experiment and is not a
+  recommended default.
   `document-carrier-dispatch` uses one request-less Gecko
   `SpeculativeTransaction` to establish the first cold outer H3 session. The
   real document remains pending until the carrier's normal zero-byte

@@ -509,6 +509,25 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
+                "tree-native-parser-document-start-navigation-stop-css "
+                "decrypted validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    (
+                        "document-complete",
+                        "document-overlap",
+                        "document-start-overlap",
+                        "tree-native-parser-document-start-navigation-stop-css",
+                    ),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
                 "tree-root-overlap decrypted validation requires tree-complete",
             ):
                 summary.write_outputs(
@@ -2407,14 +2426,160 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     arms,
                 )
 
+    def test_native_parser_navigation_stop_allows_aborted_css_without_fin(self):
+        with tempfile.TemporaryDirectory() as directory:
             self.make_cohort(
                 directory,
-                arm,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            complete = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 4, method="CONNECT"),
+                self.event(14, 0.016, "server", 4, status="200"),
+            ]
+            self.make_cohort(directory, "document-complete", complete)
+            self.make_cohort(
+                directory,
+                "document-overlap",
+                complete,
+                fin_frames={"0": 16},
+            )
+            self.make_cohort(
+                directory,
+                "document-start-overlap",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="CONNECT"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(11, 0.013, "server", 4, status="200"),
+                ],
+                fin_frames={"0": 16},
+            )
+            control = "tree-native-parser-document-start-overlap-css"
+            self.make_cohort(
+                directory,
+                control,
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="CONNECT"),
+                    self.event(9, 0.011, "server", 4, status="200"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(13, 0.015, "client", 8, method="GET"),
+                    self.event(14, 0.016, "server", 8, status="200"),
+                ],
+                fin_frames={"0": 12, "8": 16},
+            )
+            treatment = (
+                "tree-native-parser-document-start-navigation-stop-css"
+            )
+            treatment_events = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 4, method="CONNECT"),
+                self.event(9, 0.011, "server", 4, status="200"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 8, method="GET"),
+                self.event(14, 0.016, "server", 8, status="200"),
+            ]
+            self.make_cohort(
+                directory,
                 treatment,
-                fin_frames={"0": 12, "8": 13},
+                treatment_events,
+                fin_frames={"0": 12, "8": None},
+            )
+            arms = (
+                "document-complete",
+                "document-overlap",
+                "document-start-overlap",
+                control,
+                treatment,
+            )
+            summary_path = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                summary_path,
+                "4433",
+                arms,
+            )
+            safe_summary = summary_path.read_text(encoding="utf-8")
+            for key in (
+                "request_semantics_match",
+                "root_response_size_match",
+                "root_get_before_connect",
+                "css_get_after_connect",
+                "runtime_lifecycle_validated",
+            ):
+                self.assertIn(
+                    f"tree_native_parser_navigation_stop_{key}=yes",
+                    safe_summary,
+                )
+            self.assertIn(
+                "tree_native_parser_navigation_stop_full_css_fin_required=no",
+                safe_summary,
+            )
+            self.assertIn(
+                f"{treatment}_asset_content_lengths=16384", safe_summary
+            )
+
+            self.make_cohort(
+                directory,
+                treatment,
+                treatment_events[:-1],
+                fin_frames={"0": 12},
             )
             with self.assertRaisesRegex(
-                ValueError, "CSS GET < response HEADERS <= CSS FIN"
+                ValueError, "no successful response|successful CSS response"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    summary_path,
+                    "4433",
+                    arms,
+                )
+
+            self.make_cohort(
+                directory,
+                treatment,
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 8, method="GET"),
+                    self.event(9, 0.011, "client", 4, method="CONNECT"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(11, 0.013, "server", 4, status="200"),
+                    self.event(12, 0.014, "server", 8, status="200"),
+                ],
+            )
+            with self.assertRaisesRegex(
+                ValueError, "root GET < CONNECT < CSS GET"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    summary_path,
+                    "4433",
+                    arms,
+                )
+
+            self.make_cohort(
+                directory,
+                treatment,
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="CONNECT"),
+                    self.event(9, 0.011, "server", 4, status="200"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(13, 0.015, "client", 8, method="GET"),
+                    self.event(14, 0.016, "server", 8, status="404"),
+                ],
+            )
+            with self.assertRaisesRegex(
+                ValueError, "no successful response|non-200 CSS response"
             ):
                 summary.write_outputs(
                     Path(directory),
@@ -2916,6 +3081,8 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             fin_frame = fin_frames.get(
                 str(row["quic.stream.stream_id"]), row["frame.number"]
             )
+            if fin_frame is None:
+                continue
             lifecycle.append({
                 "frame.number": str(fin_frame),
                 "frame.time_relative": row["frame.time_relative"],

@@ -323,6 +323,21 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserDocumentStart.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserDocumentStart.mPreamble.mCacheResources);
 
+  Config nativeParserDocumentStartNavigationStop;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartNavigationStop, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserDocumentStartNavigationStop.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserDocumentStartNavigationStop);
+  EXPECT_EQ(nativeParserDocumentStartNavigationStop.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(
+      nativeParserDocumentStartNavigationStop.mPreamble.mCacheResources);
+
   Config nativeParserDocumentHandoff;
   error.Truncate();
   ASSERT_EQ(
@@ -425,6 +440,10 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":2,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",

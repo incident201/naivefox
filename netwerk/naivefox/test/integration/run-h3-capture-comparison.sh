@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -57,7 +57,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -140,6 +140,11 @@ fi
 if [[ -n ${seen_comparison_arms[tree-native-parser-document-start-overlap-css]:-} &&
       -z ${seen_comparison_arms[document-start-overlap]:-} ]]; then
   printf 'tree-native-parser-document-start-overlap-css comparison requires document-start-overlap\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-native-parser-document-start-navigation-stop-css]:-} &&
+      -z ${seen_comparison_arms[tree-native-parser-document-start-overlap-css]:-} ]]; then
+  printf 'tree-native-parser-document-start-navigation-stop-css comparison requires tree-native-parser-document-start-overlap-css\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[tree-early-overlap]:-} &&
@@ -939,6 +944,7 @@ EOF
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
+        $arm == tree-native-parser-document-start-navigation-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -959,6 +965,7 @@ EOF
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
+        $arm == tree-native-parser-document-start-navigation-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -990,6 +997,9 @@ EOF
   elif [[ $arm == tree-resource-native-cache-committed-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=h3$'
+  elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h3$'
   elif [[ $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
@@ -1069,6 +1079,7 @@ EOF
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
+        $arm == tree-native-parser-document-start-navigation-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -1094,6 +1105,7 @@ EOF
           $arm == tree-resource-native-cache-committed-overlap ||
           $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||
+          $arm == tree-native-parser-document-start-navigation-stop-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
           $arm == tree-native-parser-retarget-overlap-css ||
           $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -1152,6 +1164,31 @@ spec.loader.exec_module(module)
 with open(log_path, encoding="utf-8", errors="replace") as stream:
     module.validate_sample(
         "tree-native-parser-document-start-overlap-css",
+        "h3",
+        stream.read(),
+        {
+            "protocol": "h3",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        },
+    )
+PY
+    elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
+      python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" <<'PY'
+import importlib.util
+import sys
+
+module_path, log_path = sys.argv[1:]
+spec = importlib.util.spec_from_file_location(
+    "camouflage_sample_validation", module_path
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+with open(log_path, encoding="utf-8", errors="replace") as stream:
+    module.validate_sample(
+        "tree-native-parser-document-start-navigation-stop-css",
         "h3",
         stream.read(),
         {
@@ -1441,7 +1478,8 @@ PY
         -e ' preamble document-overlap drain=' \
         -e ' preamble document-start-overlap admission=' \
         -e ' preamble document-start-overlap drain=' \
-        -e ' preamble native-parser-document-start admission=' "$log"
+        -e ' preamble native-parser-document-start admission=' \
+        -e ' preamble native-parser-document-start-navigation-stop ' "$log"
     fi
   else
     [[ $preamble_count -eq 0 ]]
@@ -1451,7 +1489,8 @@ PY
       -e ' preamble document-overlap drain=' \
       -e ' preamble document-start-overlap admission=' \
       -e ' preamble document-start-overlap drain=' \
-      -e ' preamble native-parser-document-start admission=' "$log"
+      -e ' preamble native-parser-document-start admission=' \
+      -e ' preamble native-parser-document-start-navigation-stop ' "$log"
   fi
   ! rg -q -e '^Outer protocol: h2$' -e '^Padding negotiated: no$' "$log"
 }
