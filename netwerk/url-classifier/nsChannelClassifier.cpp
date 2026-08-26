@@ -14,12 +14,11 @@
 #  include "mozilla/net/ChannelClassifierUtils.h"
 #  include "mozilla/net/UrlClassifierCommon.h"
 #else
-#  include "mozilla/BasePrincipal.h"
+#  include "mozilla/NaiveFoxURIPrincipal.h"
 #  include "mozilla/OriginAttributes.h"
 #  include "ChannelClassifierLog.h"
 #  include "NaiveFoxLifecycleLog.h"
 #  include "nsHttpChannel.h"
-#  include "nsJSPrincipals.h"
 #  include "nsQueryObject.h"
 #endif
 #include "nsCharSeparatedTokenizer.h"
@@ -51,64 +50,6 @@ constexpr nsCString::size_type kNaiveFoxClassifierMaxSpecLength = 128;
 namespace {
 
 #ifdef MOZ_NAIVEFOX
-// The lean runtime deliberately exposes only the system principal through its
-// general channel-principal APIs. Local Safe Browsing classification needs the
-// final URI and OriginAttributes, but none of the wider principal graph. Keep
-// this deliberately incomplete principal private to the single Classify call.
-class NaiveFoxClassifierURIPrincipal final : public BasePrincipal {
- public:
-  NaiveFoxClassifierURIPrincipal(nsIURI* aURI, const nsACString& aOrigin,
-                                 const OriginAttributes& aAttrs)
-      : BasePrincipal(eContentPrincipal, aOrigin, aAttrs), mURI(aURI) {}
-
-  NS_IMETHOD_(MozExternalRefCountType) AddRef() override {
-    return nsJSPrincipals::AddRef();
-  }
-  NS_IMETHOD_(MozExternalRefCountType) Release() override {
-    return nsJSPrincipals::Release();
-  }
-  NS_IMETHOD QueryInterface(REFNSIID aIID, void** aInstancePtr) override;
-  NS_IMETHOD GetURI(nsIURI** aURI) override {
-    NS_IF_ADDREF(*aURI = mURI);
-    return NS_OK;
-  }
-  NS_IMETHOD GetDomain(nsIURI** aDomain) override {
-    *aDomain = nullptr;
-    return NS_OK;
-  }
-  NS_IMETHOD SetDomain(nsIURI*) override { return NS_ERROR_NOT_AVAILABLE; }
-  NS_IMETHOD GetBaseDomain(nsACString& aBaseDomain) override {
-    return mURI->GetHost(aBaseDomain);
-  }
-  NS_IMETHOD GetAddonId(nsAString& aAddonId) override {
-    aAddonId.Truncate();
-    return NS_OK;
-  }
-  NS_IMETHOD GetIsOriginPotentiallyTrustworthy(bool* aResult) override {
-    *aResult = mURI->SchemeIs("https") || mURI->SchemeIs("wss");
-    return NS_OK;
-  }
-  nsresult GetScriptLocation(nsACString& aStr) override {
-    return mURI->GetSpec(aStr);
-  }
-  nsresult GetSiteIdentifier(SiteIdentifier& aSite) override {
-    aSite.Init(this);
-    return NS_OK;
-  }
-  bool IsContentPrincipal() const override { return true; }
-
- private:
-  ~NaiveFoxClassifierURIPrincipal() override = default;
-  bool SubsumesInternal(nsIPrincipal* aOther,
-                        DocumentDomainConsideration) override {
-    return aOther == this;
-  }
-  bool MayLoadInternal(nsIURI* aURI) override { return aURI == mURI; }
-
-  nsCOMPtr<nsIURI> mURI;
-};
-
-NS_IMPL_QUERY_INTERFACE(NaiveFoxClassifierURIPrincipal, nsIPrincipal)
 #endif
 
 /**
@@ -310,17 +251,8 @@ nsresult nsChannelClassifier::StartInternal() {
       &inheritsPrincipal);
   NS_ENSURE_SUCCESS(rv, rv);
   NS_ENSURE_FALSE(inheritsPrincipal, NS_ERROR_NOT_AVAILABLE);
-  nsAutoCString origin;
-  nsAutoCString hostPort;
-  rv = finalURI->GetAsciiHostPort(hostPort);
-  NS_ENSURE_SUCCESS(rv, rv);
-  NS_ENSURE_FALSE(hostPort.IsEmpty(), NS_ERROR_UNEXPECTED);
-  rv = finalURI->GetScheme(origin);
-  NS_ENSURE_SUCCESS(rv, rv);
-  origin.AppendLiteral("://");
-  origin.Append(hostPort);
-  principal = new NaiveFoxClassifierURIPrincipal(
-      finalURI, origin, loadInfo->GetOriginAttributes());
+  principal = NaiveFoxURIPrincipal::Create(
+      finalURI, loadInfo->GetOriginAttributes());
 
   NS_ENSURE_TRUE(principal, NS_ERROR_UNEXPECTED);
   nsCOMPtr<nsIPrincipal> triggeringPrincipal =

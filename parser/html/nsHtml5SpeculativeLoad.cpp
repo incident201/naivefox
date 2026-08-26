@@ -4,7 +4,9 @@
 
 #include "nsHtml5SpeculativeLoad.h"
 #include "mozilla/Encoding.h"
-#include "nsHtml5TreeOpExecutor.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsHtml5TreeOpExecutor.h"
+#endif
 
 using namespace mozilla;
 
@@ -14,10 +16,30 @@ nsHtml5SpeculativeLoad::nsHtml5SpeculativeLoad()
       mIsDefer(false),
       mIsLinkPreload(false),
       mIsError(false),
+#ifdef MOZ_NAIVEFOX
+      mDescriptorTaken(false),
+#endif
       mEncoding(nullptr) {
   MOZ_COUNT_CTOR(nsHtml5SpeculativeLoad);
   new (&mCharsetOrSrcset) nsString;
 }
+
+#ifdef MOZ_NAIVEFOX
+mozilla::Maybe<nsHtml5StylePreloadDescriptor>
+nsHtml5SpeculativeLoad::TakeStyleDescriptor() && {
+  if (mOpCode != eSpeculativeLoadStyle || mDescriptorTaken) {
+    return mozilla::Nothing();
+  }
+  mDescriptorTaken = true;
+  return mozilla::Some(nsHtml5StylePreloadDescriptor(
+      std::move(mUrlOrSizes), std::move(mCharsetOrSrcset),
+      std::move(mCrossOrigin), std::move(mMedia),
+      std::move(mReferrerPolicyOrIntegrity), std::move(mNonceOrType),
+      std::move(
+          mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity),
+      mIsLinkPreload, std::move(mFetchPriority)));
+}
+#endif
 
 nsHtml5SpeculativeLoad::~nsHtml5SpeculativeLoad() {
   MOZ_COUNT_DTOR(nsHtml5SpeculativeLoad);
@@ -29,6 +51,7 @@ nsHtml5SpeculativeLoad::~nsHtml5SpeculativeLoad() {
   }
 }
 
+#ifndef MOZ_NAIVEFOX
 void nsHtml5SpeculativeLoad::Perform(nsHtml5TreeOpExecutor* aExecutor) {
   switch (mOpCode) {
     case eSpeculativeLoadBase:
@@ -141,3 +164,4 @@ void nsHtml5SpeculativeLoad::Perform(nsHtml5TreeOpExecutor* aExecutor) {
       break;
   }
 }
+#endif

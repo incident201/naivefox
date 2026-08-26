@@ -60,6 +60,7 @@ enum class PreambleMode : uint8_t {
   TreeRootOverlap,
   TreeResourceCommittedOverlap,
   TreeResourceNativeCacheCommittedOverlap,
+  TreeNativeParserPreloadOverlap,
 
   // Compatibility names for the first experimental configuration surface.
   Root = DocumentComplete,

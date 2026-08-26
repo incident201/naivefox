@@ -5,17 +5,30 @@
 #include "mozilla/net/CookieJarSettings.h"
 
 #include "mozIThirdPartyUtil.h"
-#include "mozilla/AntiTrackingUtils.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/AntiTrackingUtils.h"
+#endif
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Components.h"
-#include "mozilla/ContentBlockingAllowList.h"
-#include "mozilla/Permission.h"
-#include "mozilla/PermissionManager.h"
-#include "mozilla/SchedulerGroup.h"
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla/Preferences.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/ContentBlockingAllowList.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/Permission.h"
+#  include "mozilla/PermissionManager.h"
+#  include "mozilla/SchedulerGroup.h"
+#endif
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/StoragePrincipalHelper.h"
-#include "mozilla/dom/BrowsingContext.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/StoragePrincipalHelper.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/BrowsingContext.h"
+#endif
 #include "mozilla/net/NeckoChannelParams.h"
 #include "nsIPrincipal.h"
 #if defined(MOZ_THUNDERBIRD) || defined(MOZ_SUITE)
@@ -27,7 +40,45 @@
 #include "nsICookieService.h"
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
+#include "nsIPermissionManager.h"
 #include "nsNetUtil.h"
+
+#ifdef MOZ_NAIVEFOX
+namespace {
+
+uint32_t MakeLeanCookieBehavior(uint32_t aCookieBehavior) {
+  if (mozilla::OriginAttributes::IsFirstPartyEnabled() &&
+      aCookieBehavior == nsICookieService::BEHAVIOR_PARTITION_FOREIGN) {
+    return nsICookieService::BEHAVIOR_REJECT_TRACKER;
+  }
+  return aCookieBehavior;
+}
+
+}  // namespace
+
+// This upstream preference projection normally lives in CookieService.cpp.
+// The lean runtime keeps CookieJarSettings but intentionally does not link the
+// cookie database/service implementation, so retain the same network-facing
+// setting without restoring that browser subsystem.
+uint32_t nsICookieManager::GetCookieBehavior(bool aIsPrivate) {
+  if (aIsPrivate) {
+    if (mozilla::Preferences::HasUserValue(
+            "network.cookie.cookieBehavior.pbmode")) {
+      return MakeLeanCookieBehavior(
+          mozilla::StaticPrefs::network_cookie_cookieBehavior_pbmode());
+    }
+    if (mozilla::Preferences::HasUserValue(
+            "network.cookie.cookieBehavior")) {
+      return MakeLeanCookieBehavior(
+          mozilla::StaticPrefs::network_cookie_cookieBehavior());
+    }
+    return MakeLeanCookieBehavior(
+        mozilla::StaticPrefs::network_cookie_cookieBehavior_pbmode());
+  }
+  return MakeLeanCookieBehavior(
+      mozilla::StaticPrefs::network_cookie_cookieBehavior());
+}
+#endif
 
 namespace mozilla {
 namespace net {
@@ -128,10 +179,14 @@ already_AddRefed<nsICookieJarSettings> CookieJarSettings::Create(
     nsIPrincipal* aPrincipal) {
   MOZ_ASSERT(NS_IsMainThread());
 
+#ifdef MOZ_NAIVEFOX
+  bool shouldResistFingerprinting = false;
+#else
   bool shouldResistFingerprinting =
       nsContentUtils::ShouldResistFingerprinting_dangerous(
           aPrincipal, "We are constructing CookieJarSettings here.",
           RFPTarget::IsAlwaysEnabledForPrecompute);
+#endif
 
   if (aPrincipal && aPrincipal->OriginAttributesRef().IsPrivateBrowsing()) {
     return Create(ePrivate, shouldResistFingerprinting);
@@ -181,21 +236,25 @@ CookieJarSettings::CookieJarSettings(uint32_t aCookieBehavior,
 }
 
 CookieJarSettings::~CookieJarSettings() {
+#ifndef MOZ_NAIVEFOX
   if (!NS_IsMainThread() && !mCookiePermissions.IsEmpty()) {
     RefPtr<Runnable> r =
         new ReleaseCookiePermissions(std::move(mCookiePermissions));
     MOZ_ASSERT(mCookiePermissions.IsEmpty());
     SchedulerGroup::Dispatch(r.forget());
   }
+#endif
 }
 
 CookieJarSettings::CookiePermissionList&
 CookieJarSettings::GetCookiePermissionsListRef() {
   MOZ_ASSERT_DEBUG_OR_FUZZING(NS_IsMainThread());
 
+#ifndef MOZ_NAIVEFOX
   if (mCookiePermissions.IsEmpty() && !mIPCCookiePermissions.IsEmpty()) {
     mCookiePermissions = DeserializeCookiePermissions(mIPCCookiePermissions);
   }
+#endif
   return mCookiePermissions;
 }
 
@@ -206,6 +265,7 @@ CookieJarSettings::DeserializeCookiePermissions(
   MOZ_ASSERT_DEBUG_OR_FUZZING(NS_IsMainThread());
 
   CookiePermissionList list;
+#ifndef MOZ_NAIVEFOX
   for (const CookiePermissionData& data : aPermissionData) {
     auto principalOrErr = PrincipalInfoToPrincipal(data.principalInfo());
     if (NS_WARN_IF(principalOrErr.isErr())) {
@@ -222,6 +282,7 @@ CookieJarSettings::DeserializeCookiePermissions(
 
     list.AppendElement(permission);
   }
+#endif
   return list;
 }
 
@@ -342,6 +403,9 @@ CookieJarSettings::CookiePermission(nsIPrincipal* aPrincipal,
 
   *aCookiePermission = nsIPermissionManager::UNKNOWN_ACTION;
 
+#ifdef MOZ_NAIVEFOX
+  return NS_OK;
+#else
   nsresult rv;
 
   // Let's see if we know this permission.
@@ -398,9 +462,13 @@ CookieJarSettings::CookiePermission(nsIPrincipal* aPrincipal,
 
   mToBeMerged = true;
   return NS_OK;
+#endif
 }
 
 void CookieJarSettings::Serialize(CookieJarSettingsArgs& aData) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_CRASH("CookieJarSettings IPC is unavailable in NaiveFox");
+#else
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
   aData.isFixed() = mState == eFixed;
@@ -444,11 +512,15 @@ void CookieJarSettings::Serialize(CookieJarSettingsArgs& aData) {
   aData.topLevelWindowContextId() = mTopLevelWindowContextId;
 
   mToBeMerged = false;
+#endif
 }
 
 /* static */ void CookieJarSettings::Deserialize(
     const CookieJarSettingsArgs& aData,
     nsICookieJarSettings** aCookieJarSettings) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_CRASH("CookieJarSettings IPC is unavailable in NaiveFox");
+#else
   RefPtr<CookieJarSettings> cookieJarSettings;
 
   cookieJarSettings = new CookieJarSettings(
@@ -471,10 +543,14 @@ void CookieJarSettings::Serialize(CookieJarSettingsArgs& aData) {
   cookieJarSettings->mTopLevelWindowContextId = aData.topLevelWindowContextId();
 
   cookieJarSettings.forget(aCookieJarSettings);
+#endif
 }
 
 already_AddRefed<nsICookieJarSettings> CookieJarSettings::Merge(
     const CookieJarSettingsArgs& aData) {
+#ifdef MOZ_NAIVEFOX
+  MOZ_CRASH("CookieJarSettings IPC is unavailable in NaiveFox");
+#else
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(
       mCookieBehavior == aData.cookieBehavior() ||
@@ -550,6 +626,7 @@ already_AddRefed<nsICookieJarSettings> CookieJarSettings::Merge(
   }
 
   return newCookieJarSettings.forget();
+#endif
 }
 
 void CookieJarSettings::SetPartitionKey(nsIURI* aURI) {
@@ -564,6 +641,9 @@ void CookieJarSettings::SetPartitionKey(nsIURI* aURI) {
 
 void CookieJarSettings::UpdatePartitionKeyForDocumentLoadedByChannel(
     nsIChannel* aChannel) {
+#ifdef MOZ_NAIVEFOX
+  return;
+#else
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
   bool thirdParty = AntiTrackingUtils::IsThirdPartyChannel(aChannel);
   bool foreignByAncestorContext =
@@ -572,10 +652,15 @@ void CookieJarSettings::UpdatePartitionKeyForDocumentLoadedByChannel(
       mPartitionKey, foreignByAncestorContext);
 
   mToBeMerged = true;
+#endif
 }
 
 void CookieJarSettings::UpdateIsOnContentBlockingAllowList(
     nsIChannel* aChannel) {
+#ifdef MOZ_NAIVEFOX
+  mIsOnContentBlockingAllowListUpdated = true;
+  return;
+#else
   MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(aChannel);
 
@@ -614,6 +699,7 @@ void CookieJarSettings::UpdateIsOnContentBlockingAllowList(
                                         mIsOnContentBlockingAllowList);
 
   mToBeMerged = true;
+#endif
 }
 
 // static
@@ -624,6 +710,9 @@ bool CookieJarSettings::IsRejectThirdPartyContexts(uint32_t aCookieBehavior) {
 
 NS_IMETHODIMP
 CookieJarSettings::Read(nsIObjectInputStream* aStream) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   nsresult rv = aStream->Read32(&mCookieBehavior);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -702,10 +791,14 @@ CookieJarSettings::Read(nsIObjectInputStream* aStream) {
   mCookiePermissions = std::move(list);
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 CookieJarSettings::Write(nsIObjectOutputStream* aStream) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   nsresult rv = aStream->Write32(mCookieBehavior);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -774,6 +867,7 @@ CookieJarSettings::Write(nsIObjectOutputStream* aStream) {
   }
 
   return NS_OK;
+#endif
 }
 
 }  // namespace net

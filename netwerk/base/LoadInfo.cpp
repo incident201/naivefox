@@ -1251,10 +1251,7 @@ already_AddRefed<nsICookieJarSettings> CreateCookieJarSettings(
 
 NS_IMETHODIMP
 LoadInfo::GetCookieJarSettings(nsICookieJarSettings** aCookieJarSettings) {
-#ifdef MOZ_NAIVEFOX
-  *aCookieJarSettings = nullptr;
-  return NS_OK;
-#else
+#ifndef MOZ_NAIVEFOX
   if (!mCookieJarSettings) {
     bool isPrivate = mOriginAttributes.IsPrivateBrowsing();
     nsCOMPtr<nsIPrincipal> loadingPrincipal;
@@ -1268,11 +1265,10 @@ LoadInfo::GetCookieJarSettings(nsICookieJarSettings** aCookieJarSettings) {
         mTriggeringPrincipal, mInternalContentPolicyType, isPrivate,
         shouldResistFingerprinting);
   }
-
+#endif
   nsCOMPtr<nsICookieJarSettings> cookieJarSettings = mCookieJarSettings;
   cookieJarSettings.forget(aCookieJarSettings);
   return NS_OK;
-#endif
 }
 
 NS_IMETHODIMP

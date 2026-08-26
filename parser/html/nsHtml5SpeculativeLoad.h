@@ -6,10 +6,28 @@
 #define nsHtml5SpeculativeLoad_h
 
 #include "nsString.h"
-#include "nsContentUtils.h"
+#ifdef MOZ_NAIVEFOX
+#  define HTML5_TRIM_WHITESPACE(aValue) TrimHtml5Whitespace(aValue)
+inline nsString TrimHtml5Whitespace(nsString aValue) {
+  aValue.Trim(" \t\r\n\f");
+  return aValue;
+}
+#else
+#  include "nsContentUtils.h"
+#  define HTML5_TRIM_WHITESPACE(aValue) \
+    nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(aValue)
+#endif
 #include "nsHtml5DocumentMode.h"
 #include "nsHtml5String.h"
-#include "ReferrerInfo.h"
+#ifdef MOZ_NAIVEFOX
+#  include "mozilla/Encoding.h"
+#  include "mozilla/Maybe.h"
+#  include "mozilla/NotNull.h"
+#  include "nsHtml5StylePreloadDescriptor.h"
+#endif
+#ifndef MOZ_NAIVEFOX
+#  include "ReferrerInfo.h"
+#endif
 
 class nsHtml5TreeOpExecutor;
 
@@ -46,6 +64,10 @@ class nsHtml5SpeculativeLoad {
   nsHtml5SpeculativeLoad(const nsHtml5SpeculativeLoad&) = delete;
   nsHtml5SpeculativeLoad& operator=(const nsHtml5SpeculativeLoad&) = delete;
 
+#ifdef MOZ_NAIVEFOX
+  mozilla::Maybe<nsHtml5StylePreloadDescriptor> TakeStyleDescriptor() &&;
+#endif
+
   inline void InitBase(nsHtml5String aUrl) {
     MOZ_ASSERT(mOpCode == eSpeculativeLoadUninitialized,
                "Trying to reinitialize a speculative load!");
@@ -60,7 +82,7 @@ class nsHtml5SpeculativeLoad {
     nsString csp;  // Not Auto, because using it to hold nsStringBuffer*
     aCSP.ToString(csp);
     mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity.Assign(
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(csp));
+        HTML5_TRIM_WHITESPACE(csp));
   }
 
   inline void InitMetaReferrerPolicy(nsHtml5String aReferrerPolicy) {
@@ -71,8 +93,7 @@ class nsHtml5SpeculativeLoad {
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
     mReferrerPolicyOrIntegrity.Assign(
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
-            referrerPolicy));
+        HTML5_TRIM_WHITESPACE(referrerPolicy));
   }
 
   inline void InitImage(nsHtml5String aUrl, nsHtml5String aCrossOrigin,
@@ -90,8 +111,7 @@ class nsHtml5SpeculativeLoad {
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
     mReferrerPolicyOrIntegrity.Assign(
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
-            referrerPolicy));
+        HTML5_TRIM_WHITESPACE(referrerPolicy));
     aSrcset.ToString(mCharsetOrSrcset);
     aSizes.ToString(
         mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity);
@@ -113,8 +133,7 @@ class nsHtml5SpeculativeLoad {
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
     mReferrerPolicyOrIntegrity.Assign(
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
-            referrerPolicy));
+        HTML5_TRIM_WHITESPACE(referrerPolicy));
     aFetchPriority.ToString(mFetchPriority);
     // This can be only triggered by <link rel=preload type=font>
     mIsLinkPreload = true;
@@ -133,8 +152,7 @@ class nsHtml5SpeculativeLoad {
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
     mReferrerPolicyOrIntegrity.Assign(
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
-            referrerPolicy));
+        HTML5_TRIM_WHITESPACE(referrerPolicy));
     aFetchPriority.ToString(mFetchPriority);
 
     // This method can be only be triggered by <link rel=preload type=fetch>,
@@ -194,12 +212,14 @@ class nsHtml5SpeculativeLoad {
     aIntegrity.ToString(mReferrerPolicyOrIntegrity);
     nsAutoString referrerPolicy;
     aReferrerPolicy.ToString(referrerPolicy);
-    referrerPolicy =
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
-            referrerPolicy);
+    referrerPolicy = HTML5_TRIM_WHITESPACE(referrerPolicy);
+#ifdef MOZ_NAIVEFOX
+    mScriptReferrerPolicy = std::move(referrerPolicy);
+#else
     mScriptReferrerPolicy =
         mozilla::dom::ReferrerInfo::ReferrerPolicyAttributeFromString(
             referrerPolicy);
+#endif
 
     mIsAsync = aAsync;
     mIsDefer = aDefer;
@@ -236,8 +256,7 @@ class nsHtml5SpeculativeLoad {
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
     mReferrerPolicyOrIntegrity.Assign(
-        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
-            referrerPolicy));
+        HTML5_TRIM_WHITESPACE(referrerPolicy));
     aNonce.ToString(mNonceOrType);
     aIntegrity.ToString(
         mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity);
@@ -355,6 +374,10 @@ class nsHtml5SpeculativeLoad {
    */
   bool mCommitEncodingSpeculation;
 
+#ifdef MOZ_NAIVEFOX
+  bool mDescriptorTaken;
+#endif
+
   /* If mOpCode is eSpeculativeLoadPictureSource, this is the value of the
    * "sizes" attribute. If the attribute is not set, this will be a void
    * string. Otherwise it empty or the value of the url.
@@ -428,7 +451,13 @@ class nsHtml5SpeculativeLoad {
    * of the "referrerpolicy" attribute. This field holds one of the values
    * (REFERRER_POLICY_*) defined in nsIHttpChannel.
    */
+#ifdef MOZ_NAIVEFOX
+  nsString mScriptReferrerPolicy;
+#else
   mozilla::dom::ReferrerPolicy mScriptReferrerPolicy;
+#endif
 };
+
+#undef HTML5_TRIM_WHITESPACE
 
 #endif  // nsHtml5SpeculativeLoad_h

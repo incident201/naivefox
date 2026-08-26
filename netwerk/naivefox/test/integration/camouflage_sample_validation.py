@@ -55,6 +55,37 @@ RESOURCE_NATIVE_CACHE_COMMITTED_DRAIN = re.compile(
     r"cache_new=(?P<cache_new>\d+) "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+NATIVE_PARSER_PRELOAD_DISCOVERY = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-preload "
+    r"parser=html5-speculative-scanner parsers=(?P<parsers>\d+) "
+    r"descriptors=(?P<descriptors>\d+) provenance=(?P<provenance>\S+) "
+    r"internal_type=(?P<internal_type>\d+) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_PRELOAD_CHANNEL = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-preload channel=async-open "
+    r"channels=(?P<channels>\d+) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_PRELOAD_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-preload admission=(?P<admission>\S+) "
+    r"root_done=(?P<root_done>[01]) "
+    r"started_resources=(?P<started_resources>\d+) "
+    r"committed_resources=(?P<committed_resources>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_PRELOAD_BARRIER = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-preload barrier=released "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_PRELOAD_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-preload drain=complete "
+    r"completed_resources=(?P<completed_resources>\d+) "
+    r"http=(?P<http>\d+) protocol=(?P<protocol>h2|h3)$"
+)
 DOCUMENT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble document-overlap admission=(?P<admission>\S+) "
@@ -126,6 +157,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
+        "tree-native-parser-preload-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -154,6 +186,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(
             "tree-resource-native-cache-committed-overlap requires h3"
         )
+    if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-preload-overlap-css requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -177,6 +211,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
+        "tree-native-parser-preload-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -188,6 +223,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
+        "tree-native-parser-preload-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -303,6 +339,61 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ]
     if any(marker is None for marker in parsed_resource_native_cache_drains):
         raise ValueError("malformed native resource cache drain evidence")
+    native_parser_discovery_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-preload parser=" in line
+    ]
+    parsed_native_parser_discoveries = [
+        NATIVE_PARSER_PRELOAD_DISCOVERY.fullmatch(line)
+        for line in native_parser_discovery_lines
+    ]
+    if any(marker is None for marker in parsed_native_parser_discoveries):
+        raise ValueError("malformed native parser preload discovery evidence")
+    native_parser_channel_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-preload channel=" in line
+    ]
+    parsed_native_parser_channels = [
+        NATIVE_PARSER_PRELOAD_CHANNEL.fullmatch(line)
+        for line in native_parser_channel_lines
+    ]
+    if any(marker is None for marker in parsed_native_parser_channels):
+        raise ValueError("malformed native parser preload channel evidence")
+    native_parser_admission_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-preload admission=" in line
+    ]
+    parsed_native_parser_admissions = [
+        NATIVE_PARSER_PRELOAD_ADMISSION.fullmatch(line)
+        for line in native_parser_admission_lines
+    ]
+    if any(marker is None for marker in parsed_native_parser_admissions):
+        raise ValueError("malformed native parser preload admission evidence")
+    native_parser_barrier_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-preload barrier=" in line
+    ]
+    parsed_native_parser_barriers = [
+        NATIVE_PARSER_PRELOAD_BARRIER.fullmatch(line)
+        for line in native_parser_barrier_lines
+    ]
+    if any(marker is None for marker in parsed_native_parser_barriers):
+        raise ValueError("malformed native parser preload barrier evidence")
+    native_parser_drain_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-preload drain=" in line
+    ]
+    parsed_native_parser_drains = [
+        NATIVE_PARSER_PRELOAD_DRAIN.fullmatch(line)
+        for line in native_parser_drain_lines
+    ]
+    if any(marker is None for marker in parsed_native_parser_drains):
+        raise ValueError("malformed native parser preload drain evidence")
     established_lines = [line for line in log_lines if " established target=" in line]
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
@@ -658,6 +749,73 @@ def validate_sample(arm, protocol, log_text, feature_document):
             f"{arm} arm unexpectedly logged native resource cache lifecycle"
         )
 
+    native_parser_markers = (
+        parsed_native_parser_discoveries,
+        parsed_native_parser_channels,
+        parsed_native_parser_admissions,
+        parsed_native_parser_barriers,
+        parsed_native_parser_drains,
+    )
+    if arm == "tree-native-parser-preload-overlap-css":
+        if any(len(markers) != 1 for markers in native_parser_markers):
+            raise ValueError(
+                "native parser preload arm requires exactly one parser, "
+                "descriptor, channel, admission, barrier, and drain marker"
+            )
+        discovery = parsed_native_parser_discoveries[0]
+        channel = parsed_native_parser_channels[0]
+        admission = parsed_native_parser_admissions[0]
+        barrier = parsed_native_parser_barriers[0]
+        drain = parsed_native_parser_drains[0]
+        connection = discovery["connection"]
+        if (
+            discovery["parsers"] != "1"
+            or discovery["descriptors"] != "1"
+            or discovery["provenance"] != "FromParser"
+            or discovery["internal_type"] != "40"
+            or channel["channels"] != "1"
+            or admission["admission"] != "request-committed"
+            or admission["root_done"] != "1"
+            or admission["started_resources"] != "1"
+            or admission["committed_resources"] != "1"
+            or drain["completed_resources"] != "1"
+            or not 200 <= int(drain["http"]) < 300
+            or any(
+                marker["connection"] != connection
+                or marker["protocol"] != "h3"
+                for marker in (channel, admission, barrier, drain)
+            )
+            or result["connection"] != connection
+        ):
+            raise ValueError("native parser preload causal state is invalid")
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == connection
+            and established["protocol"] == "h3"
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "native parser preload arm requires one matching CONNECT marker"
+            )
+        indices = (
+            log_lines.index(native_parser_discovery_lines[0]),
+            log_lines.index(native_parser_channel_lines[0]),
+            log_lines.index(native_parser_admission_lines[0]),
+            log_lines.index(native_parser_barrier_lines[0]),
+            log_lines.index(result_lines[0]),
+            log_lines.index(matching_established[0]),
+            log_lines.index(native_parser_drain_lines[0]),
+        )
+        if tuple(sorted(indices)) != indices or len(set(indices)) != len(indices):
+            raise ValueError(
+                "native parser preload lifecycle markers have invalid ordering"
+            )
+    elif any(native_parser_markers):
+        raise ValueError(
+            f"{arm} arm unexpectedly logged native parser preload lifecycle"
+        )
+
     if arm != "off":
         if feature_document.get("protocol") != protocol:
             raise ValueError("feature document protocol does not match sample")
@@ -694,6 +852,7 @@ def main():
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
             "tree-resource-native-cache-committed-overlap",
+            "tree-native-parser-preload-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

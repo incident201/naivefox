@@ -26,6 +26,7 @@ SUPPORTED_ARMS = (
     "tree-root-overlap-css",
     "tree-resource-committed-overlap-css",
     "tree-resource-native-cache-committed-overlap",
+    "tree-native-parser-preload-overlap-css",
     "tree-overlap",
 )
 REDACTED_HEADER_NAMES = {
@@ -418,6 +419,7 @@ def read_get_request_semantics(root, cohort, proxy_port):
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
+        "tree-native-parser-preload-overlap-css",
     ):
         roles = ("root", "stylesheet")
     elif cohort.startswith("tree-"):
@@ -1460,6 +1462,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
             "tree-resource-native-cache-committed-overlap",
+            "tree-native-parser-preload-overlap-css",
             "tree-overlap",
         ):
             expected_gets = (
@@ -1470,6 +1473,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
                     "tree-resource-native-cache-committed-overlap",
+                    "tree-native-parser-preload-overlap-css",
                 )
                 else 3
                 if arm.startswith("tree-")
@@ -1583,7 +1587,10 @@ def validate(cohorts, connections, client_hellos, arms):
                     1
                     if arm.endswith("-css")
                     or arm
-                    == "tree-resource-native-cache-committed-overlap"
+                    in (
+                        "tree-resource-native-cache-committed-overlap",
+                        "tree-native-parser-preload-overlap-css",
+                    )
                     else 2
                 )
                 require(
@@ -1657,6 +1664,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
                     "tree-resource-native-cache-committed-overlap",
+                    "tree-native-parser-preload-overlap-css",
                 ):
                     root_stream = (
                         ordered_gets[0]["connection_index"],
@@ -1677,6 +1685,28 @@ def validate(cohorts, connections, client_hellos, arms):
                         ),
                         "tree-root-overlap root FIN did not precede CONNECT",
                     )
+                    if arm == "tree-native-parser-preload-overlap-css":
+                        stylesheet_get = ordered_gets[1]
+                        root_fin = root_responses[0]["stream_fin_packet_position"]
+                        stylesheet_responses = [
+                            row
+                            for row in asset_responses
+                            if row["connection_index"]
+                            == stylesheet_get["connection_index"]
+                            and row["stream_id"] == stylesheet_get["stream_id"]
+                        ]
+                        require(
+                            root_fin != ""
+                            and root_fin < stylesheet_get["packet_position"],
+                            "native parser preload CSS GET preceded root response DATA/FIN",
+                        )
+                        require(
+                            len(stylesheet_responses) == 1
+                            and stylesheet_get["packet_position"]
+                            < connects[0]["packet_position"]
+                            < stylesheet_responses[0]["stream_fin_packet_position"],
+                            "native parser preload lacks CSS GET < CONNECT < CSS FIN",
+                        )
                 elif arm == "tree-overlap":
                     root_stream = (
                         ordered_gets[0]["connection_index"],
@@ -1861,6 +1891,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         "tree-resource-native-cache-committed-overlap" not in arms
         or "tree-complete-css" in arms,
         "tree-resource-native-cache-committed-overlap decrypted validation "
+        "requires tree-complete-css",
+    )
+    require(
+        "tree-native-parser-preload-overlap-css" not in arms
+        or "tree-complete-css" in arms,
+        "tree-native-parser-preload-overlap-css decrypted validation "
         "requires tree-complete-css",
     )
     cohorts_to_read = ("reference", *arms)
@@ -2292,6 +2328,21 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             ],
             "native-cache-committed CSS asset content-length differs",
         )
+    if {
+        "tree-complete-css",
+        "tree-native-parser-preload-overlap-css",
+    }.issubset(arms):
+        for role in ("root", "stylesheet"):
+            require(
+                tree_semantics["tree-complete-css"][role]
+                == tree_semantics["tree-native-parser-preload-overlap-css"][role],
+                f"native-parser-preload {role} GET selected header values/order differ",
+            )
+        require(
+            tree_asset_sizes["tree-complete-css"]
+            == tree_asset_sizes["tree-native-parser-preload-overlap-css"],
+            "native-parser-preload CSS asset content-length differs",
+        )
     fieldnames = [
         "cohort",
         "event_ordinal",
@@ -2379,6 +2430,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
                     "tree-resource-native-cache-committed-overlap",
+                    "tree-native-parser-preload-overlap-css",
                     "tree-overlap",
                 ):
                     ordered_gets = sorted(gets, key=lambda row: row["packet_position"])
@@ -2472,6 +2524,19 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             )
             destination.write(
                 "tree_resource_native_cache_response_order_is_admission=no\n"
+            )
+        if {
+            "tree-complete-css",
+            "tree-native-parser-preload-overlap-css",
+        }.issubset(arms):
+            destination.write(
+                "tree_native_parser_preload_request_semantics_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_preload_asset_sizes_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_preload_overlap_validated=yes\n"
             )
         if {"root", "root-pmtud-control"}.issubset(arms):
             destination.write("root_pmtud_control_request_semantics_match=yes\n")

@@ -5,8 +5,19 @@
 #ifndef nsHtml5ContentCreatorFunction_h
 #define nsHtml5ContentCreatorFunction_h
 
-#include "nsGenericHTMLElement.h"
-#include "mozilla/dom/SVGElementFactory.h"
+#ifdef MOZ_NAIVEFOX
+#  include <cstddef>
+#  include "nsHtml5LeanContentCreators.h"
+
+namespace mozilla::dom {
+using HTMLContentCreatorFunction = std::nullptr_t;
+using SVGContentCreatorFunction = std::nullptr_t;
+}  // namespace mozilla::dom
+#else
+#  include "nsGenericHTMLElement.h"
+#  include "mozilla/dom/SVGElementFactory.h"
+
+#endif
 
 union nsHtml5ContentCreatorFunction {
   mozilla::dom::HTMLContentCreatorFunction html;

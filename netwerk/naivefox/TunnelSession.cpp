@@ -770,6 +770,30 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone, aStartedResources, aCommittedResources,
         aNativeCacheNewResources, ProtocolName(aProtocol));
   }
+  if (preambleMode == PreambleMode::TreeNativeParserPreloadOverlap &&
+      aProtocol == ProxyProtocol::H3 && succeeded && aRootDone &&
+      !aTerminalFallback && aStartedResources == 1 &&
+      aCommittedResources == 1) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-preload "
+        "parser=html5-speculative-scanner parsers=1 descriptors=1 "
+        "provenance=FromParser internal_type=40 protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId));
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-preload "
+        "channel=async-open channels=1 protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId));
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-preload "
+        "admission=request-committed root_done=%d started_resources=%u "
+        "committed_resources=%u protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), aRootDone,
+        aStartedResources, aCommittedResources);
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-preload barrier=released "
+        "protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId));
+  }
   if (preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
@@ -881,6 +905,16 @@ void TunnelSession::FinishPreambleOperationOnMain(
         aCompletedSuccessfulResources, aNativeCacheNewResources,
         ProtocolName(aProtocol));
   }
+  if (aCompletedNormally && aProtocol == ProxyProtocol::H3 && aRootDone &&
+      NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300 &&
+      aCompletedSuccessfulResources == 1 &&
+      preambleMode == PreambleMode::TreeNativeParserPreloadOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-preload "
+        "drain=complete completed_resources=%u http=%u protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aCompletedSuccessfulResources, aHttpStatus);
+  }
   if (aCompletedNormally && preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap drain=complete "
@@ -956,11 +990,15 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
     RefPtr<TunnelAttempt> attempt =
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
     nsCOMPtr<nsIRequest> openedRequest;
+    const bool useAnonymousConnection =
+        mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol) !=
+        PreambleMode::TreeNativeParserPreloadOverlap;
     rv = OpenNeckoTunnel(
         mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
         mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,
         mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
-        mImpl->mConnectUrgentStart, getter_AddRefs(openedRequest));
+        mImpl->mConnectUrgentStart, useAnonymousConnection,
+        getter_AddRefs(openedRequest));
     if (NS_SUCCEEDED(rv)) {
       if (mImpl->mConnectUrgentStart && !mImpl->mConnectUrgentStartLogged) {
         mImpl->mConnectUrgentStartLogged = true;

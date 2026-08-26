@@ -38,14 +38,23 @@
 #include "nsHtml5ArrayCopy.h"
 #include "nsHtml5AtomTable.h"
 #include "nsHtml5DocumentMode.h"
-#include "nsHtml5Highlighter.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsHtml5Highlighter.h"
+#endif
 #include "nsHtml5Macros.h"
 #include "nsHtml5NamedCharacters.h"
 #include "nsHtml5NamedCharactersAccel.h"
 #include "nsHtml5String.h"
 #include "nsHtml5TreeBuilder.h"
-#include "nsIContent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIContent.h"
+#endif
 #include "nsTraceRefcnt.h"
+
+#ifdef MOZ_NAIVEFOX
+class nsAHtml5TreeOpSink;
+#  include "nsHtml5LeanParserDependencies.h"
+#endif
 #include "mozilla/htmlaccel/htmlaccelEnabled.h"
 
 class nsHtml5StreamParser;

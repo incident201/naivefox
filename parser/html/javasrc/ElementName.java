@@ -106,6 +106,10 @@ public final class ElementName
 
     // CPPONLY: private @SvgCreator Object svgCreator;
 
+    // CPPONLY: #ifdef MOZ_NAIVEFOX
+    // CPPONLY: private boolean mCustom;
+    // CPPONLY: #endif
+
     /**
      * The lowest 7 bits are the dispatch group. The high bits are flags.
      */
@@ -274,6 +278,9 @@ public final class ElementName
         this.camelCaseName = camelCaseName;
         // CPPONLY: this.htmlCreator = htmlCreator;
         // CPPONLY: this.svgCreator = svgCreator;
+        // CPPONLY: #ifdef MOZ_NAIVEFOX
+        // CPPONLY: this.mCustom = false;
+        // CPPONLY: #endif
         this.flags = flags;
     }
 
@@ -282,6 +289,9 @@ public final class ElementName
         this.camelCaseName = null;
         // CPPONLY: this.htmlCreator = NS_NewHTMLUnknownElement;
         // CPPONLY: this.svgCreator = NS_NewSVGUnknownElement;
+        // CPPONLY: #ifdef MOZ_NAIVEFOX
+        // CPPONLY: this.mCustom = false;
+        // CPPONLY: #endif
         this.flags = TreeBuilder.OTHER | NOT_INTERNED;
     }
 
@@ -296,11 +306,16 @@ public final class ElementName
         // C++ case the scoped atom table remembers its own atoms.
         this.name = name;
         this.camelCaseName = name;
+        // CPPONLY: #ifdef MOZ_NAIVEFOX
+        // CPPONLY: this.mCustom = custom;
+        // CPPONLY: this.htmlCreator = nullptr;
+        // CPPONLY: #else
         // CPPONLY: if (custom) {
         // CPPONLY: this.htmlCreator = NS_NewCustomElement;
         // CPPONLY: } else {
         // CPPONLY: this.htmlCreator = NS_NewHTMLUnknownElement;
         // CPPONLY: }
+        // CPPONLY: #endif
         // The assertion below relies on TreeBuilder.OTHER being zero!
         // TreeBuilder.OTHER isn't referenced here, because it would create
         // a circular C++ header dependency given that this method is inlined.
@@ -308,7 +323,11 @@ public final class ElementName
     }
 
     // CPPONLY: @Inline public boolean isCustom() {
+    // CPPONLY: #ifdef MOZ_NAIVEFOX
+    // CPPONLY: return this.mCustom;
+    // CPPONLY: #else
     // CPPONLY: return this.htmlCreator == NS_NewCustomElement;
+    // CPPONLY: #endif
     // CPPONLY: }
 
     public static final ElementName ANNOTATION_XML = new ElementName(

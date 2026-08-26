@@ -8,6 +8,7 @@ XPIDL_MODULE = "html5"
 
 EXPORTS += [
     "jArray.h",
+    "nsAHtml5SpeculativeLoadStage.h",
     "nsAHtml5TreeBuilderState.h",
     "nsAHtml5TreeOpSink.h",
     "nsHtml5ArrayCopy.h",
@@ -20,6 +21,8 @@ EXPORTS += [
     "nsHtml5DocumentBuilder.h",
     "nsHtml5DocumentMode.h",
     "nsHtml5HtmlAttributes.h",
+    "nsHtml5LeanContentCreators.h",
+    "nsHtml5LeanParserDependencies.h",
     "nsHtml5Macros.h",
     "nsHtml5Module.h",
     "nsHtml5NamedCharacters.h",
@@ -32,12 +35,15 @@ EXPORTS += [
     "nsHtml5PortabilityHSupplement.h",
     "nsHtml5Speculation.h",
     "nsHtml5SpeculativeLoad.h",
+    "nsHtml5SpeculativeLoadStage.h",
+    "nsHtml5SpeculativeScanner.h",
     "nsHtml5StreamListener.h",
     "nsHtml5StreamParser.h",
     "nsHtml5StreamParserPtr.h",
     "nsHtml5StreamParserReleaser.h",
     "nsHtml5String.h",
     "nsHtml5StringParser.h",
+    "nsHtml5StylePreloadDescriptor.h",
     "nsHtml5SVGLoadDispatcher.h",
     "nsHtml5TreeOperation.h",
     "nsHtml5TreeOpExecutor.h",
@@ -49,7 +55,7 @@ EXPORTS += [
     "nsParserUtils.h",
 ]
 
-UNIFIED_SOURCES += [
+html5_sources = [
     "nsHtml5AtomTable.cpp",
     "nsHtml5AttributeName.cpp",
     "nsHtml5DependentUTF16Buffer.cpp",
@@ -83,6 +89,30 @@ UNIFIED_SOURCES += [
     "nsHtml5ViewSourceUtils.cpp",
     "nsParserUtils.cpp",
 ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    html5_sources = [
+        "nsHtml5AtomTable.cpp",
+        "nsHtml5AttributeName.cpp",
+        "nsHtml5DependentUTF16Buffer.cpp",
+        "nsHtml5ElementName.cpp",
+        "nsHtml5HtmlAttributes.cpp",
+        "nsHtml5NamedCharacters.cpp",
+        "nsHtml5NamedCharactersAccel.cpp",
+        "nsHtml5OwningUTF16Buffer.cpp",
+        "nsHtml5Portability.cpp",
+        "nsHtml5SpeculativeLoad.cpp",
+        "nsHtml5SpeculativeLoadStage.cpp",
+        "nsHtml5SpeculativeScanner.cpp",
+        "nsHtml5StackNode.cpp",
+        "nsHtml5StateSnapshot.cpp",
+        "nsHtml5String.cpp",
+        "nsHtml5Tokenizer.cpp",
+        "nsHtml5TreeBuilder.cpp",
+        "nsHtml5UTF16Buffer.cpp",
+    ]
+
+UNIFIED_SOURCES += html5_sources
 
 # Each target needs to compile:
 # (nsHtml5TokenizerALU.cpp XOR nsHtml5TokenizerALUStubs.cpp)

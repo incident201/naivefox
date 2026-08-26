@@ -8,6 +8,14 @@ using Encoding = mozilla::Encoding;
 template <typename T>
 using NotNull = mozilla::NotNull<T>;
 
+#ifdef MOZ_NAIVEFOX
+bool mBuilder;
+bool mViewSource;
+nsTArray<nsHtml5SpeculativeLoad> mSpeculativeLoadQueue;
+nsAHtml5SpeculativeLoadStage* mSpeculativeLoadStage;
+nsTArray<mozilla::UniquePtr<uint8_t>> mHandles;
+nsresult mBroken;
+#else
 nsHtml5OplessBuilder* mBuilder;
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // If mBuilder is not null, the tree op machinery is not in use and
@@ -23,6 +31,7 @@ int32_t mHandlesUsed;
 nsTArray<mozilla::UniquePtr<nsIContent*[]>> mOldHandles;
 nsHtml5TreeOpStage* mSpeculativeLoadStage;
 nsresult mBroken;
+#endif
 // Controls whether the current HTML script goes through the more complex
 // path that accommodates the possibility of the script becoming a
 // parser-blocking script and the possibility of the script inserting
@@ -46,7 +55,9 @@ bool mPreventScriptExecution;
  */
 bool mGenerateSpeculativeLoads;
 
+#ifndef MOZ_NAIVEFOX
 bool mHasSeenImportMap;
+#endif
 
 /**
  * A temporary ptr to the CustomElementRegistry for scoped registries.
@@ -54,8 +65,10 @@ bool mHasSeenImportMap;
  * into the parser internals. Whenever SetFragmentContext is called, we
  * want to set this, then clear it out once finished.
  */
+#ifndef MOZ_NAIVEFOX
 mozilla::Maybe<RefPtr<mozilla::dom::CustomElementRegistry>>
     mCustomElementRegistry;
+#endif
 
 #ifdef DEBUG
 bool mActive;
@@ -112,7 +125,11 @@ void accumulateCharactersForced(const char16_t* aBuf, int32_t aStart,
 }
 
 void MarkAsBrokenAndRequestSuspensionWithBuilder(nsresult aRv) {
+#ifdef MOZ_NAIVEFOX
+  MarkAsBroken(aRv);
+#else
   mBuilder->MarkAsBroken(aRv);
+#endif
   requestSuspension();
 }
 
@@ -124,20 +141,28 @@ void MarkAsBrokenAndRequestSuspensionWithoutBuilder(nsresult aRv) {
 void MarkAsBrokenFromPortability(nsresult aRv);
 
 public:
+#ifdef MOZ_NAIVEFOX
+explicit nsHtml5TreeBuilder(nsAHtml5SpeculativeLoadStage* aStage);
+#else
 explicit nsHtml5TreeBuilder(nsHtml5OplessBuilder* aBuilder);
 
 nsHtml5TreeBuilder(nsAHtml5TreeOpSink* aOpSink, nsHtml5TreeOpStage* aStage,
                    bool aGenerateSpeculativeLoads);
+#endif
 
 ~nsHtml5TreeBuilder();
 
 bool WantsLineAndColumn() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
   // Perhaps just checking mBuilder would be sufficient.
   // For createContextualFragment, we have non-null mBuilder and
   // false for mPreventScriptExecution. However, do the line and
   // column that get attached to script elements make any sense
   // anyway in that case?
   return !(mBuilder && mPreventScriptExecution);
+#endif
 }
 
 void StartPlainTextViewSource(const nsAutoString& aTitle);
@@ -148,9 +173,11 @@ void StartPlainTextBody();
 
 bool HasScriptThatMayDocumentWriteOrBlock();
 
+#ifndef MOZ_NAIVEFOX
 void SetOpSink(nsAHtml5TreeOpSink* aOpSink) { mOpSink = aOpSink; }
 
 void ClearOps() { mOpQueue.Clear(); }
+#endif
 
 /**
  * Flushes tree ops.
@@ -195,12 +222,20 @@ void SetPreventScriptExecution(bool aPrevent) {
   mPreventScriptExecution = aPrevent;
 }
 
+#ifndef MOZ_NAIVEFOX
 void SetCustomElementRegistry(
     mozilla::Maybe<RefPtr<mozilla::dom::CustomElementRegistry>> aRegistry) {
   mCustomElementRegistry = std::move(aRegistry);
 }
+#endif
 
-bool HasBuilder() { return mBuilder; }
+bool HasBuilder() {
+#ifdef MOZ_NAIVEFOX
+  return false;
+#else
+  return mBuilder;
+#endif
+}
 
 /**
  * Makes sure the buffers are large enough to be able to tokenize aLength

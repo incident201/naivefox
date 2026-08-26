@@ -4693,4 +4693,8 @@ void nsHtml5TreeBuilder::initializeStatics() {}
 
 void nsHtml5TreeBuilder::releaseStatics() {}
 
-#include "nsHtml5TreeBuilderCppSupplement.h"
+#ifdef MOZ_NAIVEFOX
+#  include "nsHtml5TreeBuilderLeanCppSupplement.h"
+#else
+#  include "nsHtml5TreeBuilderCppSupplement.h"
+#endif

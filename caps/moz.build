@@ -37,6 +37,9 @@ EXPORTS.mozilla = [
     "SystemPrincipal.h",
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    EXPORTS.mozilla += ["NaiveFoxURIPrincipal.h"]
+
 SOURCES += [
     # Compile this separately since nsExceptionHandler.h conflicts
     # with something from NullPrincipal.cpp.
@@ -51,6 +54,7 @@ UNIFIED_SOURCES += [
 
 if CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
+        "NaiveFoxURIPrincipal.cpp",
         "nsScriptSecurityManagerNaiveFox.cpp",
     ]
 else:

@@ -32,6 +32,28 @@
 #define nsHtml5TreeBuilder_h
 
 #include "jArray.h"
+#ifdef MOZ_NAIVEFOX
+#  include "NameSpaceConstants.h"
+#  include "mozilla/Encoding.h"
+#  include "mozilla/NotNull.h"
+#  include "mozilla/UniquePtr.h"
+#  include "nsAHtml5TreeBuilderState.h"
+#  include "nsAHtml5SpeculativeLoadStage.h"
+#  include "nsAtom.h"
+#  include "nsGkAtoms.h"
+#  include "nsHtml5ArrayCopy.h"
+#  include "nsHtml5AtomTable.h"
+#  include "nsHtml5ContentCreatorFunction.h"
+#  include "nsHtml5DocumentMode.h"
+#  include "nsHtml5SpeculativeLoad.h"
+#  include "nsHtml5StackNode.h"
+#  include "nsHtml5StateSnapshot.h"
+#  include "nsHtml5String.h"
+#  include "nsIContentHandle.h"
+#  include "nsTArray.h"
+#  include "nsTraceRefcnt.h"
+#  include "../nsCharsetSource.h"
+#else
 #include "mozilla/ImportScanner.h"
 #include "nsAHtml5TreeBuilderState.h"
 #include "nsAtom.h"
@@ -55,6 +77,7 @@
 #include "nsIContentHandle.h"
 #include "nsNameSpaceManager.h"
 #include "nsTraceRefcnt.h"
+#endif
 
 class nsHtml5StreamParser;
 
@@ -64,6 +87,10 @@ class nsHtml5Tokenizer;
 class nsHtml5UTF16Buffer;
 class nsHtml5StateSnapshot;
 class nsHtml5Portability;
+#ifdef MOZ_NAIVEFOX
+class nsAHtml5SpeculativeLoadStage;
+class nsHtml5Highlighter;
+#endif
 
 class nsHtml5TreeBuilder : public nsAHtml5TreeBuilderState {
  private:
@@ -593,7 +620,11 @@ class nsHtml5TreeBuilder : public nsAHtml5TreeBuilderState {
   static void initializeStatics();
   static void releaseStatics();
 
-#include "nsHtml5TreeBuilderHSupplement.h"
+#ifdef MOZ_NAIVEFOX
+#  include "nsHtml5TreeBuilderHSupplement.h"
+#else
+#  include "nsHtml5TreeBuilderHSupplement.h"
+#endif
 };
 
 #endif

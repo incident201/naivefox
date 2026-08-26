@@ -288,6 +288,23 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
       0, 0, 1, true, 1));
 
+  // Parser preload admission is intentionally stronger than a channel open:
+  // EOF has validated that there was exactly one supported descriptor, the
+  // real stylesheet request reached WAITING_FOR, and its response is still
+  // unfinished when CONNECT is released.
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserPreloadOverlap, true, true, 1, 0, 0, 0, 1,
+      true, 0, false));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserPreloadOverlap, true, true, 1, 0, 0, 1, 1,
+      true, 0, true));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserPreloadOverlap, true, true, 1, 0, 0, 0, 0,
+      true, 0, true));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserPreloadOverlap, true, true, 1, 0, 0, 0, 1,
+      true, 0, true));
+
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(
       detail::PreambleOverlapsConnect(PreambleMode::DocumentStartOverlap));
@@ -298,6 +315,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeResourceCommittedOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeResourceNativeCacheCommittedOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeNativeParserPreloadOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -359,6 +378,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserPreloadOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserPreloadOverlap, true));
 
   detail::PreambleSequenceState sequence;
   constexpr uint64_t generation = 17;

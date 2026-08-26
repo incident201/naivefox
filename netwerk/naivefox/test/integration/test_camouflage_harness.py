@@ -901,6 +901,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        native_parser = CONFIG.build_config(
+            "tree-native-parser-preload-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            native_parser["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-preload-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-preload-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1335,6 +1363,58 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "drain=complete completed_resources=1 cache_new=0 protocol=h3\n",
                 one_connection,
             )
+        native_parser_log = (
+            "Connection 7 preamble native-parser-preload "
+            "parser=html5-speculative-scanner parsers=1 descriptors=1 "
+            "provenance=FromParser internal_type=40 protocol=h3\n"
+            "Connection 7 preamble native-parser-preload "
+            "channel=async-open channels=1 protocol=h3\n"
+            "Connection 7 preamble native-parser-preload "
+            "admission=request-committed root_done=1 started_resources=1 "
+            "committed_resources=1 protocol=h3\n"
+            "Connection 7 preamble native-parser-preload "
+            "barrier=released protocol=h3\n"
+            "Connection 7 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 7 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Connection 7 preamble native-parser-preload "
+            "drain=complete completed_resources=1 http=200 protocol=h3\n"
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-preload-overlap-css",
+            "h3",
+            native_parser_log,
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "exactly one parser"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-preload-overlap-css",
+                "h3",
+                native_parser_log.replace(
+                    "Connection 7 preamble native-parser-preload channel=",
+                    "Connection 7 preamble native-parser-preload "
+                    "channel=async-open channels=1 protocol=h3\n"
+                    "Connection 7 preamble native-parser-preload channel=",
+                    1,
+                ),
+                one_connection,
+            )
+        for old, new in (
+            ("parsers=1", "parsers=2"),
+            ("descriptors=1", "descriptors=2"),
+            ("channels=1", "channels=2"),
+            ("provenance=FromParser", "provenance=None"),
+            ("internal_type=40", "internal_type=4"),
+        ):
+            with self.subTest(invalid_native_parser_field=old):
+                with self.assertRaisesRegex(ValueError, "causal state"):
+                    SAMPLE.validate_sample(
+                        "tree-native-parser-preload-overlap-css",
+                        "h3",
+                        native_parser_log.replace(old, new),
+                        one_connection,
+                    )
         with self.assertRaisesRegex(ValueError, "causal state"):
             SAMPLE.validate_sample(
                 "tree-resource-committed-overlap-css",
@@ -2082,6 +2162,20 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         )
         self.assertIn(
             ",$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-preload-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-preload-overlap-css multi-arm screening "
+            "requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "native-parser-preload drain=complete completed_resources=1 "
+            "http=2[0-9][0-9]",
             runner,
         )
         self.assertIn("pid does not identify the fixture Caddy binary", runner)

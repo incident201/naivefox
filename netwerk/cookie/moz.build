@@ -73,7 +73,6 @@ if CONFIG["MOZ_NAIVEFOX"]:
     for source in (
         "Cookie.cpp",
         "CookieCommons.cpp",
-        "CookieJarSettings.cpp",
         "CookieLogging.cpp",
         "CookieNotification.cpp",
         "CookieParser.cpp",
@@ -116,5 +115,4 @@ if not CONFIG["MOZ_NAIVEFOX"]:
 
 include("/ipc/chromium/chromium-config.mozbuild")
 
-if not CONFIG["MOZ_NAIVEFOX"]:
-    FINAL_LIBRARY = "xul"
+FINAL_LIBRARY = "xul"

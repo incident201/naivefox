@@ -22,6 +22,7 @@ class nsIHttpUpgradeListener;
 class nsIInputStream;
 class nsIRequest;
 class nsIStreamListener;
+class nsHtml5StylePreloadDescriptor;
 
 namespace mozilla::naivefox {
 
@@ -105,7 +106,8 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
                                       uint32_t aAssetsDone,
                                       uint32_t aAssetsCommitted = 0,
                                       bool aRootCompletedSuccessfully = true,
-                                      uint32_t aNativeCacheNewResources = 0) {
+                                      uint32_t aNativeCacheNewResources = 0,
+                                      bool aNativeParserFinished = false) {
   if (aMode == PreambleMode::Off) {
     return false;
   }
@@ -143,6 +145,10 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
     return aRootCompletedSuccessfully && aAssetCount == 1 &&
            aAssetsCommitted == 1 && aNativeCacheNewResources == 1;
   }
+  if (aMode == PreambleMode::TreeNativeParserPreloadOverlap) {
+    return aRootCompletedSuccessfully && aNativeParserFinished &&
+           aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -154,7 +160,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeEarlyOverlap ||
          aMode == PreambleMode::TreeRootOverlap ||
          aMode == PreambleMode::TreeResourceCommittedOverlap ||
-         aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap;
+         aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
+         aMode == PreambleMode::TreeNativeParserPreloadOverlap;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
@@ -212,6 +219,15 @@ class ProxyPreambleOperation final {
                            uint32_t aCount);
   void OnRequestCommitted(uint32_t aStreamId, nsIRequest* aRequest);
   void OnStopRequest(uint32_t aStreamId, nsresult aStatus);
+  nsresult DispatchNativeParserChunk(nsCString&& aChunk);
+  nsresult DispatchNativeParserFinish();
+  void OnNativeParserOutput(
+      uint64_t aGeneration, uint32_t aSequence, bool aFinished,
+      nsresult aStatus,
+      nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
+  nsresult OpenNativeParserStylesheet(
+      nsHtml5StylePreloadDescriptor&& aDescriptor);
+  void FailNativeParserContract(nsresult aStatus, const char* aReason);
   void FireBarrierCallback(bool aTerminalFallback = false);
   void MaybeFireBarrier();
   void MaybeFinish();
@@ -243,13 +259,20 @@ nsresult OpenNeckoTunnel(
     ProxyProtocol aProtocol,
     const Maybe<HostResolverRule>& aHostResolverRule = {},
     const nsTArray<ExtraHeader>& aExtraHeaders = {},
-    bool aConnectUrgentStart = false, nsIRequest** aOpenedRequest = nullptr);
+    bool aConnectUrgentStart = false,
+    bool aUseAnonymousConnection = true,
+    nsIRequest** aOpenedRequest = nullptr);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,
                            const nsACString& aProxyUser,
                            const nsACString& aProxyPassword,
                            ProxyProtocol aProtocol);
+
+// Paired with the process-wide lazy "HTML5 Parser" thread used by the
+// DOM-free native speculative-preload arm. Must run on main before XPCOM
+// thread shutdown.
+void ShutdownProxyPreambleParserThread();
 
 }  // namespace mozilla::naivefox
 

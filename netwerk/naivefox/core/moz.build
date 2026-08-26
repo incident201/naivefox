@@ -12,6 +12,7 @@ SOURCES += [
     "../LeanDOMBindings.cpp",
     "../MemMapSnapshot.cpp",
     "../NaiveFoxRunner.cpp",
+    "../NativeStylePreloadChannel.cpp",
     "../NeckoTunnel.cpp",
     "../OuterSessionGate.cpp",
     "../PaddingNegotiation.cpp",
@@ -64,6 +65,7 @@ EXPORTS.mozilla.net += [
 EXPORTS += ["../nsContentUtils.h"]
 
 LOCAL_INCLUDES += ["/dom/security"]
+LOCAL_INCLUDES += ["/layout/style"]
 LOCAL_INCLUDES += ["/netwerk/base"]
 LOCAL_INCLUDES += ["/netwerk/naivefox"]
 LOCAL_INCLUDES += ["/netwerk/protocol/http"]

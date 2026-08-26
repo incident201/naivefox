@@ -593,6 +593,16 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn('>"$prefix-handshake-done.csv"', runner)
         self.assertIn("tree-overlap comparison requires tree-complete", runner)
         self.assertIn(
+            "tree-native-parser-preload-overlap-css comparison requires "
+            "tree-complete-css",
+            runner,
+        )
+        self.assertIn(
+            "native-parser-preload parser=html5-speculative-scanner "
+            "parsers=1 descriptors=1 provenance=FromParser internal_type=40",
+            runner,
+        )
+        self.assertIn(
             "document-native-channel-open comparison requires document-complete",
             runner,
         )
@@ -2038,6 +2048,85 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             ):
                 summary.read_get_request_semantics(
                     Path(directory), "tree-overlap", "4433"
+                )
+
+    def test_native_parser_preload_requires_root_then_css_get_overlap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            self.make_cohort(
+                directory,
+                "tree-complete-css",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(12, 0.014, "client", 4, method="GET"),
+                    self.event(14, 0.016, "server", 4, status="200"),
+                    self.event(17, 0.019, "client", 8, method="CONNECT"),
+                    self.event(18, 0.020, "server", 8, status="200"),
+                ],
+            )
+            self.make_cohort(
+                directory,
+                "tree-native-parser-preload-overlap-css",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(12, 0.014, "client", 4, method="GET"),
+                    self.event(13, 0.015, "client", 8, method="CONNECT"),
+                    self.event(14, 0.016, "server", 4, status="200"),
+                    self.event(15, 0.017, "server", 8, status="200"),
+                ],
+                fin_frames={"0": 10, "4": 20},
+            )
+            summary_path = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                summary_path,
+                "4433",
+                (
+                    "tree-complete-css",
+                    "tree-native-parser-preload-overlap-css",
+                ),
+            )
+            safe_summary = summary_path.read_text(encoding="utf-8")
+            self.assertIn(
+                "tree_native_parser_preload_overlap_validated=yes",
+                safe_summary,
+            )
+
+            self.make_cohort(
+                directory,
+                "tree-native-parser-preload-overlap-css",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(12, 0.014, "client", 4, method="GET"),
+                    self.event(13, 0.015, "client", 8, method="CONNECT"),
+                    self.event(14, 0.016, "server", 4, status="200"),
+                    self.event(15, 0.017, "server", 8, status="200"),
+                ],
+                fin_frames={"0": 10, "4": 12},
+            )
+            with self.assertRaisesRegex(
+                ValueError, "CSS GET < CONNECT < CSS FIN"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    summary_path,
+                    "4433",
+                    (
+                        "tree-complete-css",
+                        "tree-native-parser-preload-overlap-css",
+                    ),
                 )
 
     def write_csv(self, directory, cohort, suffix, fieldnames, rows):

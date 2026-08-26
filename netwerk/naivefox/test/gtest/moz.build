@@ -6,6 +6,7 @@ UNIFIED_SOURCES += [
     "TestAutoFallback.cpp",
     "TestConfig.cpp",
     "TestHeaderPadding.cpp",
+    "TestHtml5SpeculativeScanner.cpp",
     "TestHttpConnectParser.cpp",
     "TestNaivePadding.cpp",
     "TestNetworkStartupState.cpp",
@@ -18,6 +19,7 @@ UNIFIED_SOURCES += [
 
 LOCAL_INCLUDES += [
     "/dom/security",
+    "/layout/style",
     "/netwerk/naivefox",
     "/netwerk/naivefox/codec",
     "/netwerk/system/netlink",

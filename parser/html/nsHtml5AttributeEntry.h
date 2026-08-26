@@ -6,6 +6,7 @@
 #define nsHtml5AttributeEntry_h
 
 #include "nsHtml5AttributeName.h"
+#include "NameSpaceConstants.h"
 
 struct nsHtml5NameTriple {
   int32_t mNamespace;

@@ -45,6 +45,9 @@ nsHtml5ElementName::nsHtml5ElementName(
       camelCaseName(camelCaseName),
       htmlCreator(htmlCreator),
       svgCreator(svgCreator),
+#ifdef MOZ_NAIVEFOX
+      mCustom(false),
+#endif
       flags(flags) {
   MOZ_COUNT_CTOR(nsHtml5ElementName);
 }
@@ -54,6 +57,9 @@ nsHtml5ElementName::nsHtml5ElementName()
       camelCaseName(nullptr),
       htmlCreator(NS_NewHTMLUnknownElement),
       svgCreator(NS_NewSVGUnknownElement),
+#ifdef MOZ_NAIVEFOX
+      mCustom(false),
+#endif
       flags(nsHtml5TreeBuilder::OTHER | NOT_INTERNED) {
   MOZ_COUNT_CTOR(nsHtml5ElementName);
 }

@@ -9,9 +9,11 @@
 #include "nsHtml5TreeOperation.h"
 #include "nsTArray.h"
 #include "nsAHtml5TreeOpSink.h"
+#include "nsAHtml5SpeculativeLoadStage.h"
 #include "nsHtml5SpeculativeLoad.h"
 
-class nsHtml5TreeOpStage : public nsAHtml5TreeOpSink {
+class nsHtml5TreeOpStage : public nsAHtml5TreeOpSink,
+                           public nsAHtml5SpeculativeLoadStage {
  public:
   nsHtml5TreeOpStage() = default;
 
@@ -40,7 +42,7 @@ class nsHtml5TreeOpStage : public nsAHtml5TreeOpSink {
    * Move the speculative loads from the argument into the staging queue.
    */
   void MoveSpeculativeLoadsFrom(
-      nsTArray<nsHtml5SpeculativeLoad>& aSpeculativeLoadQueue);
+      nsTArray<nsHtml5SpeculativeLoad>& aSpeculativeLoadQueue) override;
 
   /**
    * Retrieve the staged speculative loads into the argument.

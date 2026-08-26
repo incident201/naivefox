@@ -21,7 +21,11 @@ namespace net {
 
 class CookieJarSettingsArgs;
 
+#ifdef MOZ_NAIVEFOX
+using CookiePermissionsArgsData = nsTArray<uint8_t>;
+#else
 using CookiePermissionsArgsData = nsTArray<net::CookiePermissionData>;
+#endif
 
 /**
  * CookieJarSettings

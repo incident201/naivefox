@@ -31,8 +31,12 @@
 #include "nsAtom.h"
 #include "nsHtml5AtomTable.h"
 #include "nsHtml5String.h"
-#include "nsNameSpaceManager.h"
-#include "nsIContent.h"
+#ifdef MOZ_NAIVEFOX
+#  include "NameSpaceConstants.h"
+#else
+#  include "nsNameSpaceManager.h"
+#  include "nsIContent.h"
+#endif
 #include "nsTraceRefcnt.h"
 #include "jArray.h"
 #include "nsHtml5ArrayCopy.h"

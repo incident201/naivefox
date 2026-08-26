@@ -763,6 +763,11 @@ def extract(args):
         raise SystemExit(
             "tree-resource-native-cache-committed-overlap requires h3"
         )
+    if (
+        args.naivefox_arm == "tree-native-parser-preload-overlap-css"
+        and args.protocol != "h3"
+    ):
+        raise SystemExit("tree-native-parser-preload-overlap-css requires h3")
     features = {}
     extract_handshake(args.pcap, args.protocol, args.server_port, features)
     if args.protocol == "h2":
@@ -929,6 +934,7 @@ def main():
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
             "tree-resource-native-cache-committed-overlap",
+            "tree-native-parser-preload-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

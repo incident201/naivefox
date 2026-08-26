@@ -31,7 +31,9 @@
 #include "nsHtml5ByteReadable.h"
 #include "nsHtml5Macros.h"
 #include "nsHtml5String.h"
-#include "nsIContent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIContent.h"
+#endif
 #include "nsIContentHandle.h"
 #include "nsNameSpaceManager.h"
 #include "nsTraceRefcnt.h"

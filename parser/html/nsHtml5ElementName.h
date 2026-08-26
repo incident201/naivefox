@@ -32,7 +32,9 @@
 #include "nsHtml5AtomTable.h"
 #include "nsHtml5String.h"
 #include "nsNameSpaceManager.h"
-#include "nsIContent.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsIContent.h"
+#endif
 #include "nsTraceRefcnt.h"
 #include "jArray.h"
 #include "nsHtml5ArrayCopy.h"
@@ -78,6 +80,11 @@ class nsHtml5ElementName {
   RefPtr<nsAtom> camelCaseName;
   mozilla::dom::HTMLContentCreatorFunction htmlCreator;
   mozilla::dom::SVGContentCreatorFunction svgCreator;
+#ifdef MOZ_NAIVEFOX
+  // The lean parser keeps parser-visible custom-element state without
+  // retaining DOM element factory function pointers.
+  bool mCustom;
+#endif
 
  public:
   int32_t flags;
@@ -227,15 +234,26 @@ class nsHtml5ElementName {
   inline void setNameForNonInterned(nsAtom* name, bool custom) {
     this->name = name;
     this->camelCaseName = name;
+#ifdef MOZ_NAIVEFOX
+    this->mCustom = custom;
+    this->htmlCreator = nullptr;
+#else
     if (custom) {
       this->htmlCreator = NS_NewCustomElement;
     } else {
       this->htmlCreator = NS_NewHTMLUnknownElement;
     }
+#endif
     MOZ_ASSERT(this->flags == nsHtml5ElementName::NOT_INTERNED);
   }
 
-  inline bool isCustom() { return this->htmlCreator == NS_NewCustomElement; }
+  inline bool isCustom() {
+#ifdef MOZ_NAIVEFOX
+    return this->mCustom;
+#else
+    return this->htmlCreator == NS_NewCustomElement;
+#endif
+  }
 
   static nsHtml5ElementName* ELT_ANNOTATION_XML;
   static nsHtml5ElementName* ELT_DIV;
