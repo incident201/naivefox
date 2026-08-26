@@ -613,6 +613,20 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     ("tree-native-parser-process-overlap-css",),
                 )
 
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-native-parser-full-process-overlap-css decrypted "
+                "validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-native-parser-full-process-overlap-css",),
+                )
+
     def test_runner_supports_selectable_document_and_tree_arms(self):
         path = os.path.join(HERE, "run-h3-capture-comparison.sh")
         with open(path, encoding="utf-8") as stream:
@@ -702,6 +716,11 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn(
             "tree-native-parser-process-overlap-css comparison requires "
             "tree-native-parser-root-rendezvous-overlap-css",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-full-process-overlap-css comparison requires "
+            "tree-native-parser-process-overlap-css",
             runner,
         )
         self.assertNotIn(

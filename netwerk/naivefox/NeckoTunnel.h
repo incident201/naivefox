@@ -165,7 +165,7 @@ constexpr bool PreambleBarrierReached(
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
-  if (aMode == PreambleMode::TreeNativeParserProcessOverlap) {
+  if (PreambleModeUsesNativeParserProcess(aMode)) {
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
@@ -186,7 +186,7 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
          aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
          aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap ||
-         aMode == PreambleMode::TreeNativeParserProcessOverlap;
+         PreambleModeUsesNativeParserProcess(aMode);
 }
 
 constexpr bool PreambleRetargetDeliveryVerified(bool aListenerChainAccepted,

@@ -33,6 +33,7 @@ SUPPORTED_ARMS = (
     "tree-native-parser-ipc-rendezvous-overlap-css",
     "tree-native-parser-root-rendezvous-overlap-css",
     "tree-native-parser-process-overlap-css",
+    "tree-native-parser-full-process-overlap-css",
     "tree-warm-css-304",
     "tree-overlap",
 )
@@ -66,6 +67,14 @@ def validate_arm_sequence(arms):
         raise ValueError(
             "tree-native-parser-process-overlap-css requires the "
             "tree-native-parser-root-rendezvous-overlap-css control"
+        )
+    if (
+        "tree-native-parser-full-process-overlap-css" in arms
+        and "tree-native-parser-process-overlap-css" not in arms
+    ):
+        raise ValueError(
+            "tree-native-parser-full-process-overlap-css requires the "
+            "tree-native-parser-process-overlap-css control"
         )
     return arms
 

@@ -49,6 +49,7 @@ def build_config(
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
         "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -71,6 +72,7 @@ def build_config(
             "tree-native-parser-ipc-rendezvous-overlap-css, or "
             "tree-native-parser-root-rendezvous-overlap-css, or "
             "tree-native-parser-process-overlap-css, or "
+            "tree-native-parser-full-process-overlap-css, or "
             "tree-overlap"
         )
     if protocol not in ("h2", "h3"):
@@ -123,6 +125,8 @@ def build_config(
         )
     if arm == "tree-native-parser-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
+    if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -220,6 +224,15 @@ def build_config(
         preamble = {
             "mode": "off",
             "h3-mode": "tree-native-parser-process-overlap",
+            "path": preamble_path,
+            "max-assets": 1,
+            "max-bytes": TREE_PREAMBLE_MAX_BYTES,
+            "cache-resources": True,
+        }
+    elif arm == "tree-native-parser-full-process-overlap-css":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-native-parser-full-process-overlap",
             "path": preamble_path,
             "max-assets": 1,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
@@ -339,6 +352,7 @@ def main():
             "tree-native-parser-ipc-rendezvous-overlap-css",
             "tree-native-parser-root-rendezvous-overlap-css",
             "tree-native-parser-process-overlap-css",
+            "tree-native-parser-full-process-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

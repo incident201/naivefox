@@ -71,7 +71,7 @@ class NativeStylePreloadProcessParentBridge final {
 
   nsresult StartRoot(NativeRootReplacementActivationArgs&& aArgs,
                      uint64_t aExpectedParentPid, uint64_t aExpectedChildPid,
-                     uint32_t aMaximumBodyBytes);
+                     uint32_t aMaximumBodyBytes, bool aFullProcess);
   nsresult SendRootData(uint64_t aRequestId, uint64_t aGeneration,
                         uint32_t aSequence, nsCString&& aData);
   nsresult SendRootStop(uint64_t aRequestId, uint64_t aGeneration,
@@ -95,12 +95,22 @@ class NativeStylePreloadProcessParentBridge final {
 class NativeStylePreloadProcessChildBridge final {
  public:
   class Impl;
+  using RootBackgroundReady = std::function<nsresult(uint64_t, uint64_t)>;
+  using StyleBackgroundReady =
+      std::function<nsresult(uint64_t, uint64_t, uint64_t, uint32_t)>;
   explicit NativeStylePreloadProcessChildBridge(
-      PNativeStylePreloadProcessChild* aManager);
+      PNativeStylePreloadProcessChild* aManager,
+      RootBackgroundReady&& aRootBackgroundReady,
+      StyleBackgroundReady&& aStyleBackgroundReady);
   ~NativeStylePreloadProcessChildBridge();
 
   nsresult Initialize();
   void Shutdown();
+  nsresult ForwardRootOnStart(uint64_t aRequestId, uint64_t aGeneration);
+  nsresult ForwardRootData(uint64_t aRequestId, uint64_t aGeneration,
+                           uint32_t aSequence, nsCString&& aData);
+  nsresult ForwardRootStop(uint64_t aRequestId, uint64_t aGeneration,
+                           uint32_t aSequence, nsresult aStatus);
 
   already_AddRefed<PNativeStylePreloadProcessRootChild> AllocRoot(
       uint64_t aRequestId, uint64_t aGeneration);

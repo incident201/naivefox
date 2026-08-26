@@ -153,23 +153,24 @@ class NativeStylePreloadProcessRootParentActor final
 
   nsresult Start(const NativeRootReplacementActivationArgs& aArgs,
                  uint64_t aExpectedParentPid, uint64_t aExpectedChildPid,
-                 uint32_t aMaximumBodyBytes) {
+                 uint32_t aMaximumBodyBytes, bool aFullProcess) {
     MOZ_ASSERT(NS_IsMainThread());
     if (mStarted || aArgs.requestId() != mRequestId ||
         aArgs.generation() != mGeneration || !aMaximumBodyBytes ||
         aMaximumBodyBytes > PreambleConfig::kMaximumBytes ||
         !SendStart(aArgs, aExpectedParentPid, aExpectedChildPid,
-                   aMaximumBodyBytes)) {
+                   aMaximumBodyBytes, aFullProcess)) {
       return NS_ERROR_FAILURE;
     }
     mStarted = true;
     mMaximumBodyBytes = aMaximumBodyBytes;
+    mFullProcess = aFullProcess;
     return NS_OK;
   }
 
   nsresult Data(uint32_t aSequence, nsCString&& aData) {
     MOZ_ASSERT(NS_IsMainThread());
-    if (!mReady || mTerminal || !mNextSequence ||
+    if (mFullProcess || !mReady || mTerminal || !mNextSequence ||
         aSequence == std::numeric_limits<uint32_t>::max() ||
         aSequence != mNextSequence ||
         !SendData(mRequestId, mGeneration, aSequence, aData)) {
@@ -181,7 +182,7 @@ class NativeStylePreloadProcessRootParentActor final
 
   nsresult Stop(uint32_t aSequence, nsresult aStatus) {
     MOZ_ASSERT(NS_IsMainThread());
-    if (!mReady || mTerminal || mStopSent || !mNextSequence ||
+    if (mFullProcess || !mReady || mTerminal || mStopSent || !mNextSequence ||
         aSequence == std::numeric_limits<uint32_t>::max() ||
         aSequence != mNextSequence ||
         !SendStop(mRequestId, mGeneration, aSequence, aStatus)) {
@@ -228,6 +229,7 @@ class NativeStylePreloadProcessRootParentActor final
   uint32_t mDiscoveredStyleCount = 0;
   uint32_t mMaximumBodyBytes = 0;
   bool mStarted = false;
+  bool mFullProcess = false;
   bool mReady = false;
   bool mStopSent = false;
   bool mFinished = false;
@@ -338,7 +340,8 @@ class NativeStylePreloadProcessRootChildActor final
   IPCResult RecvStart(const NativeRootReplacementActivationArgs& aArgs,
                       const uint64_t& aExpectedParentPid,
                       const uint64_t& aExpectedChildPid,
-                      const uint32_t& aMaximumBodyBytes) final;
+                      const uint32_t& aMaximumBodyBytes,
+                      const bool& aFullProcess) final;
   IPCResult RecvData(const uint64_t& aRequestId, const uint64_t& aGeneration,
                      const uint32_t& aSequence, const nsACString& aData) final;
   IPCResult RecvStop(const uint64_t& aRequestId, const uint64_t& aGeneration,
@@ -355,6 +358,13 @@ class NativeStylePreloadProcessRootChildActor final
       nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
   void Fail(nsresult aStatus);
   void PrepareForShutdown();
+  nsresult ForwardOnStart();
+  nsresult AcceptData(uint64_t aRequestId, uint64_t aGeneration,
+                      uint32_t aSequence, nsCString&& aData,
+                      bool aFromBackground);
+  nsresult AcceptStop(uint64_t aRequestId, uint64_t aGeneration,
+                      uint32_t aSequence, nsresult aStatus,
+                      bool aFromBackground);
 
   NativeStylePreloadProcessChildBridge* const mBridge;
   const uint64_t mRequestId;
@@ -367,6 +377,8 @@ class NativeStylePreloadProcessRootChildActor final
   uint32_t mNextDiscoverySequence = 1;
   uint32_t mStyleCount = 0;
   bool mStarted = false;
+  bool mFullProcess = false;
+  bool mBackgroundOnStart = false;
   bool mStopReceived = false;
   bool mFinishedSent = false;
   bool mCancelReceived = false;
@@ -399,8 +411,14 @@ class NativeStylePreloadProcessParentBridge::Impl final {
 
 class NativeStylePreloadProcessChildBridge::Impl final {
  public:
-  explicit Impl(PNativeStylePreloadProcessChild* aManager)
-      : mManager(aManager) {}
+  Impl(PNativeStylePreloadProcessChild* aManager,
+       NativeStylePreloadProcessChildBridge::RootBackgroundReady&&
+           aRootBackgroundReady,
+       NativeStylePreloadProcessChildBridge::StyleBackgroundReady&&
+           aStyleBackgroundReady)
+      : mManager(aManager),
+        mRootBackgroundReady(std::move(aRootBackgroundReady)),
+        mStyleBackgroundReady(std::move(aStyleBackgroundReady)) {}
 
   nsresult EnsureParserThread() {
     if (mParserThread) {
@@ -432,6 +450,14 @@ class NativeStylePreloadProcessChildBridge::Impl final {
         mStyles.Remove(styleId);
         return NS_ERROR_FAILURE;
       }
+      if (aRoot->mFullProcess &&
+          (!mStyleBackgroundReady ||
+           NS_FAILED(mStyleBackgroundReady(
+               args.rootRequestId(), args.rootGeneration(), styleId,
+               args.discoverySequence())))) {
+        mStyles.Remove(styleId);
+        return NS_ERROR_FAILURE;
+      }
       ++aRoot->mStyleCount;
       RuntimeLogEvent(
           "Native activation child phase=style-discovered root=%llu "
@@ -445,6 +471,10 @@ class NativeStylePreloadProcessChildBridge::Impl final {
   }
 
   PNativeStylePreloadProcessChild* const mManager;
+  NativeStylePreloadProcessChildBridge::RootBackgroundReady
+      mRootBackgroundReady;
+  NativeStylePreloadProcessChildBridge::StyleBackgroundReady
+      mStyleBackgroundReady;
   NativeStylePreloadProcessChildBridge* mOwner = nullptr;
   nsCOMPtr<nsIThread> mParserThread;
   nsTHashMap<nsUint64HashKey, RefPtr<NativeStylePreloadProcessRootChildActor>>
@@ -492,7 +522,8 @@ void NativeStylePreloadProcessStyleParentActor::FinishConstruction() {
 
 nsresult NativeStylePreloadProcessParentBridge::StartRoot(
     NativeRootReplacementActivationArgs&& aArgs, uint64_t aExpectedParentPid,
-    uint64_t aExpectedChildPid, uint32_t aMaximumBodyBytes) {
+    uint64_t aExpectedChildPid, uint32_t aMaximumBodyBytes,
+    bool aFullProcess) {
   MOZ_ASSERT(NS_IsMainThread());
   const uint64_t requestId = aArgs.requestId();
   const uint64_t generation = aArgs.generation();
@@ -510,7 +541,7 @@ nsresult NativeStylePreloadProcessParentBridge::StartRoot(
     return NS_ERROR_FAILURE;
   }
   nsresult rv = actor->Start(aArgs, aExpectedParentPid, aExpectedChildPid,
-                             aMaximumBodyBytes);
+                             aMaximumBodyBytes, aFullProcess);
   if (NS_FAILED(rv)) {
     mImpl->mCanceledRoots.Insert(requestId, generation);
     if (NS_FAILED(actor->Cancel(rv))) {
@@ -685,9 +716,10 @@ IPCResult NativeStylePreloadProcessRootParentActor::RecvParserFinished(
     return IPC_OK();
   }
   if (!mReady || mFinished || !mNextSequence ||
-      aLastSequence != mNextSequence - 1 || !mMaximumBodyBytes ||
+      (!mFullProcess && aLastSequence != mNextSequence - 1) ||
+      !mMaximumBodyBytes ||
       aBodyBytes > mMaximumBodyBytes || aStyleCount != mDiscoveredStyleCount ||
-      (NS_SUCCEEDED(aStatus) && !mStopSent)) {
+      (NS_SUCCEEDED(aStatus) && !mFullProcess && !mStopSent)) {
     return IPC_FAIL_NO_REASON(this);
   }
   mFinished = true;
@@ -728,7 +760,7 @@ IPCResult NativeStylePreloadProcessRootParentActor::RecvCanceled(
 void NativeStylePreloadProcessRootParentActor::ActorDestroy(
     IProtocol::ActorDestroyReason aWhy) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (!mFinished && aWhy != Deletion) {
+  if (!mFinished || (aWhy != Deletion && aWhy != NormalShutdown)) {
     mBridge->mImpl->Fail(NS_ERROR_FAILURE);
   }
   (void)mBridge->DeallocRoot(this);
@@ -745,8 +777,11 @@ void NativeStylePreloadProcessStyleParentActor::ActorDestroy(
 }
 
 NativeStylePreloadProcessChildBridge::NativeStylePreloadProcessChildBridge(
-    PNativeStylePreloadProcessChild* aManager)
-    : mImpl(MakeUnique<Impl>(aManager)) {
+    PNativeStylePreloadProcessChild* aManager,
+    RootBackgroundReady&& aRootBackgroundReady,
+    StyleBackgroundReady&& aStyleBackgroundReady)
+    : mImpl(MakeUnique<Impl>(aManager, std::move(aRootBackgroundReady),
+                             std::move(aStyleBackgroundReady))) {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_RELEASE_ASSERT(aManager);
   mImpl->mOwner = this;
@@ -759,6 +794,37 @@ NativeStylePreloadProcessChildBridge::~NativeStylePreloadProcessChildBridge() {
 nsresult NativeStylePreloadProcessChildBridge::Initialize() {
   MOZ_ASSERT(NS_IsMainThread());
   return mImpl->EnsureParserThread();
+}
+
+nsresult NativeStylePreloadProcessChildBridge::ForwardRootOnStart(
+    uint64_t aRequestId, uint64_t aGeneration) {
+  MOZ_ASSERT(NS_IsMainThread());
+  auto* actor = mImpl->mRoots.Lookup(aRequestId).DataPtrOrNull();
+  return actor && (*actor)->mGeneration == aGeneration
+             ? (*actor)->ForwardOnStart()
+             : NS_ERROR_NOT_AVAILABLE;
+}
+
+nsresult NativeStylePreloadProcessChildBridge::ForwardRootData(
+    uint64_t aRequestId, uint64_t aGeneration, uint32_t aSequence,
+    nsCString&& aData) {
+  MOZ_ASSERT(NS_IsMainThread());
+  auto* actor = mImpl->mRoots.Lookup(aRequestId).DataPtrOrNull();
+  return actor && (*actor)->mGeneration == aGeneration
+             ? (*actor)->AcceptData(aRequestId, aGeneration, aSequence,
+                                    std::move(aData), true)
+             : NS_ERROR_NOT_AVAILABLE;
+}
+
+nsresult NativeStylePreloadProcessChildBridge::ForwardRootStop(
+    uint64_t aRequestId, uint64_t aGeneration, uint32_t aSequence,
+    nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  auto* actor = mImpl->mRoots.Lookup(aRequestId).DataPtrOrNull();
+  return actor && (*actor)->mGeneration == aGeneration
+             ? (*actor)->AcceptStop(aRequestId, aGeneration, aSequence,
+                                    aStatus, true)
+             : NS_ERROR_NOT_AVAILABLE;
 }
 
 void NativeStylePreloadProcessChildBridge::Shutdown() {
@@ -820,7 +886,7 @@ void NativeStylePreloadProcessChildBridge::ProcessActorDestroyed() {
 IPCResult NativeStylePreloadProcessRootChildActor::RecvStart(
     const NativeRootReplacementActivationArgs& aArgs,
     const uint64_t& aExpectedParentPid, const uint64_t& aExpectedChildPid,
-    const uint32_t& aMaximumBodyBytes) {
+    const uint32_t& aMaximumBodyBytes, const bool& aFullProcess) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mStarted || aArgs.requestId() != mRequestId ||
       aArgs.generation() != mGeneration ||
@@ -831,10 +897,17 @@ IPCResult NativeStylePreloadProcessRootChildActor::RecvStart(
     return IPC_FAIL_NO_REASON(this);
   }
   mStarted = true;
+  mFullProcess = aFullProcess;
   mRootArgs = aArgs;
   mParser =
       new ChildParserState(mBridge->mImpl->mParserThread, aMaximumBodyBytes);
   if (!SendReady(mRequestId, mGeneration, uint64_t(base::GetCurrentProcId()))) {
+    return IPC_FAIL_NO_REASON(this);
+  }
+  if (mFullProcess &&
+      (!mBridge->mImpl->mRootBackgroundReady ||
+       NS_FAILED(mBridge->mImpl->mRootBackgroundReady(mRequestId,
+                                                      mGeneration)))) {
     return IPC_FAIL_NO_REASON(this);
   }
   RuntimeLogEvent(
@@ -849,12 +922,33 @@ IPCResult NativeStylePreloadProcessRootChildActor::RecvStart(
 IPCResult NativeStylePreloadProcessRootChildActor::RecvData(
     const uint64_t& aRequestId, const uint64_t& aGeneration,
     const uint32_t& aSequence, const nsACString& aData) {
+  return NS_SUCCEEDED(AcceptData(aRequestId, aGeneration, aSequence,
+                                 nsCString(aData), false))
+             ? IPC_OK()
+             : IPC_FAIL_NO_REASON(this);
+}
+
+nsresult NativeStylePreloadProcessRootChildActor::ForwardOnStart() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mFullProcess || !mStarted || mBackgroundOnStart || mStopReceived ||
+      mFinishedSent) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  mBackgroundOnStart = true;
+  return NS_OK;
+}
+
+nsresult NativeStylePreloadProcessRootChildActor::AcceptData(
+    uint64_t aRequestId, uint64_t aGeneration, uint32_t aSequence,
+    nsCString&& aData, bool aFromBackground) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mStarted || mStopReceived || mFinishedSent || aRequestId != mRequestId ||
       aGeneration != mGeneration || !mNextSequence ||
       aSequence == std::numeric_limits<uint32_t>::max() ||
-      aSequence != mNextSequence || !mParser) {
-    return IPC_FAIL_NO_REASON(this);
+      aSequence != mNextSequence || !mParser ||
+      aFromBackground != mFullProcess ||
+      (aFromBackground && !mBackgroundOnStart)) {
+    return NS_ERROR_UNEXPECTED;
   }
   ++mNextSequence;
   mLastSequence = aSequence;
@@ -869,7 +963,7 @@ IPCResult NativeStylePreloadProcessRootChildActor::RecvData(
   RefPtr parser = mParser;
   nsresult rv = mBridge->mImpl->mParserThread->Dispatch(NS_NewRunnableFunction(
       "NaiveFox::ActivationChildParserData",
-      [self, parser, aSequence, data = nsCString(aData)]() mutable {
+      [self, parser, aSequence, data = std::move(aData)]() mutable {
         const uint32_t bodyBytes = data.Length();
         nsTArray<nsHtml5StylePreloadDescriptor> descriptors;
         nsresult status = parser->Feed(std::move(data), descriptors);
@@ -891,18 +985,29 @@ IPCResult NativeStylePreloadProcessRootChildActor::RecvData(
                                         std::move(descriptors));
             }));
       }));
-  return NS_SUCCEEDED(rv) ? IPC_OK() : IPC_FAIL_NO_REASON(this);
+  return rv;
 }
 
 IPCResult NativeStylePreloadProcessRootChildActor::RecvStop(
     const uint64_t& aRequestId, const uint64_t& aGeneration,
     const uint32_t& aSequence, const nsresult& aStatus) {
+  return NS_SUCCEEDED(AcceptStop(aRequestId, aGeneration, aSequence, aStatus,
+                                 false))
+             ? IPC_OK()
+             : IPC_FAIL_NO_REASON(this);
+}
+
+nsresult NativeStylePreloadProcessRootChildActor::AcceptStop(
+    uint64_t aRequestId, uint64_t aGeneration, uint32_t aSequence,
+    nsresult aStatus, bool aFromBackground) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mStarted || mStopReceived || mFinishedSent || aRequestId != mRequestId ||
       aGeneration != mGeneration || !mNextSequence ||
       aSequence == std::numeric_limits<uint32_t>::max() ||
-      aSequence != mNextSequence || !mParser) {
-    return IPC_FAIL_NO_REASON(this);
+      aSequence != mNextSequence || !mParser ||
+      aFromBackground != mFullProcess ||
+      (aFromBackground && !mBackgroundOnStart)) {
+    return NS_ERROR_UNEXPECTED;
   }
   ++mNextSequence;
   mLastSequence = aSequence;
@@ -945,7 +1050,7 @@ IPCResult NativeStylePreloadProcessRootChildActor::RecvStop(
                                          std::move(descriptors));
             }));
       }));
-  return NS_SUCCEEDED(rv) ? IPC_OK() : IPC_FAIL_NO_REASON(this);
+  return rv;
 }
 
 IPCResult NativeStylePreloadProcessRootChildActor::RecvCancel(
@@ -1053,6 +1158,9 @@ void NativeStylePreloadProcessRootChildActor::PrepareForShutdown() {
 void NativeStylePreloadProcessRootChildActor::ActorDestroy(
     IProtocol::ActorDestroyReason aWhy) {
   MOZ_ASSERT(NS_IsMainThread());
+  if (!mFinishedSent || (aWhy != Deletion && aWhy != NormalShutdown)) {
+    mBridge->ProcessActorDestroyed();
+  }
   RuntimeLogEvent(
       "Native activation child phase=root-actor-destroyed request=%llu "
       "generation=%llu finished=%d reason=%u pid=%llu\n",

@@ -42,6 +42,7 @@ def native_parser_process_lifecycle_lines():
         "Native activation process phase=child-running parent_pid=100 child_pid=200",
         "Native activation process phase=hello parent_pid=100 child_pid=200 "
         "cross_process=1 persistent=1",
+        "Native activation process phase=background-child-ready pid=200",
         "Connection 7 preamble native-parser-process "
         "phase=physical-root-suspended channel=71 generation=5 parent_pid=100 "
         "protocol=h3",
@@ -76,15 +77,54 @@ def native_parser_process_lifecycle_lines():
         "phase=parser-finished request=51 generation=5 sequence=2 bytes=100 "
         "styles=1 parent_pid=100 protocol=h3",
         "Native activation child phase=root-actor-destroyed request=51 generation=5 "
-        "finished=1 reason=4 pid=200",
+        "finished=1 reason=1 pid=200",
         "Connection 7 preamble native-parser-process "
         "phase=style-onstop-complete style=61 status=0x00000000 parent_pid=100 "
         "protocol=h3",
         "Native activation child phase=style-complete request=61 root=51 "
         "generation=5 pid=200 main_thread=1",
         "Native activation child phase=style-actor-destroyed request=61 root=51 "
-        "generation=5 completed=1 reason=4 pid=200",
+        "generation=5 completed=1 reason=1 pid=200",
     ]
+
+
+def native_parser_full_process_lifecycle_lines():
+    lines = [
+        line.replace("native-parser-process", "native-parser-full-process")
+        for line in native_parser_process_lifecycle_lines()
+    ]
+    root_ready = lines.index(
+        "Native activation child phase=root-ready request=51 generation=5 pid=200"
+    )
+    lines[root_ready + 1 : root_ready + 1] = [
+        "Native activation process phase=full-root-primary-ready request=51 "
+        "generation=5 parent_pid=100 child_pid=200",
+        "Native activation process phase=full-root-background-ready request=51 "
+        "generation=5 parent_pid=100 child_pid=200",
+        "Native activation process phase=full-root-verification-queued request=51 "
+        "generation=5 parent_pid=100 child_pid=200",
+        "Native activation process phase=full-root-verification-run request=51 "
+        "generation=5 parent_pid=100 child_pid=200",
+        "Native activation process phase=full-root-onstart-forwarded request=51 "
+        "generation=5 parent_pid=100 child_pid=200",
+    ]
+    style_discovered = lines.index(
+        "Native activation child phase=style-discovered root=51 generation=5 "
+        "style=61 sequence=1 pid=200"
+    )
+    lines[style_discovered + 1 : style_discovered + 1] = [
+        "Native activation process phase=full-style-primary-ready request=51 "
+        "generation=5 style=61 sequence=1 parent_pid=100 child_pid=200",
+        "Native activation process phase=full-style-background-ready request=51 "
+        "generation=5 style=61 sequence=1 parent_pid=100 child_pid=200",
+        "Native activation process phase=full-style-join-released request=51 "
+        "generation=5 style=61 sequence=1 parent_pid=100 child_pid=200",
+    ]
+    lines.append(
+        "Native activation process phase=full-root-background-drained request=51 "
+        "generation=5 canceled=0 parent_pid=100 child_pid=200"
+    )
+    return lines
 
 
 class CamouflageHarnessTests(unittest.TestCase):
@@ -92,6 +132,30 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_native_parser_process(
             native_parser_process_lifecycle_lines(), expected_connection=7
         )
+
+    def test_native_parser_process_validator_distinguishes_full_process(self):
+        full_lines = native_parser_full_process_lifecycle_lines()
+        SAMPLE.validate_native_parser_process(
+            full_lines, expected_connection=7, expected_mode="full-process"
+        )
+        with self.assertRaisesRegex(ValueError, "mode marker differs"):
+            SAMPLE.validate_native_parser_process(
+                native_parser_process_lifecycle_lines(),
+                expected_connection=7,
+                expected_mode="full-process",
+            )
+
+        missing_background = [
+            line
+            for line in full_lines
+            if "phase=full-style-background-ready" not in line
+        ]
+        with self.assertRaisesRegex(ValueError, "one marker per join phase"):
+            SAMPLE.validate_native_parser_process(
+                missing_background,
+                expected_connection=7,
+                expected_mode="full-process",
+            )
 
     def test_native_parser_process_validator_rejects_unknown_or_partial_markers(self):
         lines = native_parser_process_lifecycle_lines()
@@ -113,22 +177,74 @@ class CamouflageHarnessTests(unittest.TestCase):
                 native_parser_process_lifecycle_lines(), expected_connection=8
             )
         lines = native_parser_process_lifecycle_lines()
-        lines[4] = lines[4].replace("pid=200", "pid=201")
+        lines[5] = lines[5].replace("pid=200", "pid=201")
         with self.assertRaisesRegex(ValueError, "child PID changed"):
             SAMPLE.validate_native_parser_process(lines, expected_connection=7)
 
     def test_native_parser_process_validator_rejects_false_descriptor_evidence(self):
         lines = native_parser_process_lifecycle_lines()
-        lines[8] = lines[8].replace("descriptors=1", "descriptors=0")
+        lines[9] = lines[9].replace("descriptors=1", "descriptors=0")
         with self.assertRaisesRegex(ValueError, "descriptor provenance"):
             SAMPLE.validate_native_parser_process(lines, expected_connection=7)
 
     def test_native_parser_process_validator_rejects_early_actor_teardown(self):
         lines = native_parser_process_lifecycle_lines()
-        root_destroyed = lines.pop(16)
-        lines.insert(14, root_destroyed)
+        root_destroyed = lines.pop(17)
+        lines.insert(15, root_destroyed)
         with self.assertRaisesRegex(ValueError, "root actor teardown ordering"):
             SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
+        lines = native_parser_process_lifecycle_lines()
+        lines[-1] = lines[-1].replace("reason=1", "reason=4")
+        with self.assertRaisesRegex(ValueError, "style actor died"):
+            SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
+    def test_full_process_product_callback_failure_is_route_local(self):
+        path = os.path.join(
+            SOURCE_ROOT,
+            "netwerk/naivefox/NativeStylePreloadActivation.cpp",
+        )
+        with open(path, encoding="utf-8") as stream:
+            source = stream.read()
+        root = source[
+            source.index(
+                "nsresult ProcessServiceState::BackgroundRootOnStartForwarded("
+            ) : source.index("nsresult ProcessServiceState::StyleDiscovered(")
+        ]
+        style = source[
+            source.index("nsresult ProcessServiceState::MaybeReleaseFullStyle(") :
+            source.index("void ProcessServiceState::RouteFailed(")
+        ]
+        for body in (root, style):
+            self.assertIn("RouteFailed(", body)
+            self.assertIn("return NS_OK;", body)
+        self.assertNotIn("TransportFailed(", root)
+        self.assertNotIn("TransportFailed(", style)
+
+    def test_process_actor_completion_rejects_abnormal_destroy(self):
+        with open(
+            os.path.join(
+                SOURCE_ROOT,
+                "netwerk/naivefox/NativeStylePreloadProcessBackground.cpp",
+            ),
+            encoding="utf-8",
+        ) as stream:
+            background = stream.read()
+        with open(
+            os.path.join(
+                SOURCE_ROOT,
+                "netwerk/naivefox/NativeStylePreloadProcessBridge.cpp",
+            ),
+            encoding="utf-8",
+        ) as stream:
+            primary = stream.read()
+        self.assertEqual(background.count("(mCompleted && cleanDelete)"), 2)
+        self.assertEqual(
+            primary.count(
+                "(aWhy != Deletion && aWhy != NormalShutdown)"
+            ),
+            4,
+        )
 
     def test_cold_listener_follows_network_and_socket_barriers(self):
         with open(
@@ -307,6 +423,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-root-overlap-css",
             "tree-native-parser-root-rendezvous-overlap-css",
             "tree-native-parser-process-overlap-css",
+            "tree-native-parser-full-process-overlap-css",
             "tree-overlap",
         )
         rows = SUPERBLOCKS.schedule_rows(17, "h3", 2, ["browser_page"], arms=arms)
@@ -381,6 +498,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                     "root",
                     "tree-native-parser-root-rendezvous-overlap-css",
                     "tree-native-parser-process-overlap-css",
+                    "tree-native-parser-full-process-overlap-css",
                 ),
             )
         with self.assertRaisesRegex(ValueError, "root-rendezvous-overlap-css control"):
@@ -390,6 +508,14 @@ class CamouflageHarnessTests(unittest.TestCase):
                 1,
                 ["browser_page"],
                 arms=("root", "tree-native-parser-process-overlap-css"),
+            )
+        with self.assertRaisesRegex(ValueError, "process-overlap-css control"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h3",
+                1,
+                ["browser_page"],
+                arms=("root", "tree-native-parser-full-process-overlap-css"),
             )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
@@ -1191,6 +1317,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        full_process = CONFIG.build_config(
+            "tree-native-parser-full-process-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            full_process["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-full-process-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-full-process-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1975,6 +2129,13 @@ class CamouflageHarnessTests(unittest.TestCase):
                 root_rendezvous_log,
                 one_connection,
             )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-full-process-overlap-css",
+                "h2",
+                root_rendezvous_log,
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "same root channel"):
             SAMPLE.validate_sample(
                 "tree-native-parser-root-rendezvous-overlap-css",
@@ -2438,6 +2599,30 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(marker, candidate)
         self.assertLess(candidate.index("stop_capture"), candidate.index(marker))
 
+    def test_decrypted_process_arms_use_process_validator_not_legacy_actors(self):
+        with open(
+            os.path.join(HERE, "run-h3-capture-comparison.sh"),
+            encoding="utf-8",
+        ) as stream:
+            runner = stream.read()
+        self.assertIn(
+            "if [[ $arm == tree-native-parser-ipc-rendezvous-overlap-css ||\n"
+            "            $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then",
+            runner,
+        )
+        self.assertIn(
+            "if [[ $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then",
+            runner,
+        )
+        self.assertIn(
+            "elif [[ $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then",
+            runner,
+        )
+        self.assertIn(
+            '"$INTEGRATION_DIR/camouflage_sample_validation.py"', runner
+        )
+        self.assertIn("expected_mode=expected_mode", runner)
+
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
         two_connections = {
             "protocol": "h2",
@@ -2876,6 +3061,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-full-process-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
             runner,
@@ -2906,8 +3095,18 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            "tree-native-parser-full-process-overlap-css multi-arm screening "
+            "requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-process-overlap-css multi-arm screening "
             "requires the tree-native-parser-root-rendezvous-overlap-css control",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-full-process-overlap-css multi-arm screening "
+            "requires the tree-native-parser-process-overlap-css control",
             runner,
         )
         self.assertIn("camouflage_sample_validation.py", runner)

@@ -108,7 +108,7 @@ class NativeStylePreloadActivation final {
   static void ShutdownProcess();
   static nsresult StartProcessRoot(
       NativeRootReplacementActivationDescriptor&& aDescriptor,
-      uint32_t aMaximumBodyBytes,
+      uint32_t aMaximumBodyBytes, bool aFullProcess,
       NativeStylePreloadProcessRootCallbacks&& aCallbacks,
       uint64_t& aRequestId);
   static nsresult ForwardProcessRootData(uint64_t aRequestId,

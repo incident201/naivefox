@@ -377,6 +377,20 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserProcess.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserProcess.mPreamble.mCacheResources);
 
+  Config nativeParserFullProcess;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserFullProcess, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserFullProcess.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserFullProcessOverlap);
+  EXPECT_EQ(nativeParserFullProcess.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserFullProcess.mPreamble.mCacheResources);
+
   static constexpr const char*
       kInvalid[] =
           {
@@ -413,6 +427,10 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
           };
   for (const char* json : kInvalid) {
     Config invalid;

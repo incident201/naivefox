@@ -22,7 +22,7 @@ parent:
 child:
   async Start(NativeRootReplacementActivationArgs args,
               uint64_t expectedParentPid, uint64_t expectedChildPid,
-              uint32_t maximumBodyBytes);
+              uint32_t maximumBodyBytes, bool fullProcess);
   async Data(uint64_t requestId, uint64_t generation,
              uint32_t sequence, nsCString data);
   async Stop(uint64_t requestId, uint64_t generation,

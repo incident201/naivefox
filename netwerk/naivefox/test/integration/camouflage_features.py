@@ -772,6 +772,7 @@ def extract(args):
             "tree-native-parser-ipc-rendezvous-overlap-css",
             "tree-native-parser-root-rendezvous-overlap-css",
             "tree-native-parser-process-overlap-css",
+            "tree-native-parser-full-process-overlap-css",
         )
         and args.protocol != "h3"
     ):
@@ -948,6 +949,7 @@ def main():
             "tree-native-parser-ipc-rendezvous-overlap-css",
             "tree-native-parser-root-rendezvous-overlap-css",
             "tree-native-parser-process-overlap-css",
+            "tree-native-parser-full-process-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

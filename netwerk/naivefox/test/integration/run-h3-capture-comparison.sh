@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -45,7 +45,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -75,6 +75,11 @@ fi
 if [[ -n ${seen_comparison_arms[tree-native-parser-process-overlap-css]:-} &&
       -z ${seen_comparison_arms[tree-native-parser-root-rendezvous-overlap-css]:-} ]]; then
   printf 'tree-native-parser-process-overlap-css comparison requires tree-native-parser-root-rendezvous-overlap-css\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-native-parser-full-process-overlap-css]:-} &&
+      -z ${seen_comparison_arms[tree-native-parser-process-overlap-css]:-} ]]; then
+  printf 'tree-native-parser-full-process-overlap-css comparison requires tree-native-parser-process-overlap-css\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[tree-native-parser-retarget-overlap-css]:-} &&
@@ -903,7 +908,8 @@ EOF
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
         $arm == tree-native-parser-root-rendezvous-overlap-css ||
-        $arm == tree-native-parser-process-overlap-css ]]; then
+        $arm == tree-native-parser-process-overlap-css ||
+        $arm == tree-native-parser-full-process-overlap-css ]]; then
     lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
   fi
   if [[ $private_event_trace -eq 1 &&
@@ -921,7 +927,8 @@ EOF
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
         $arm == tree-native-parser-root-rendezvous-overlap-css ||
-        $arm == tree-native-parser-process-overlap-css ]]; then
+        $arm == tree-native-parser-process-overlap-css ||
+        $arm == tree-native-parser-full-process-overlap-css ]]; then
     validate_native_channel_fresh_cache "$naivefox_profile" naivefox
   fi
   env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
@@ -951,7 +958,8 @@ EOF
           $arm == tree-native-parser-retarget-overlap-css ||
           $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
           $arm == tree-native-parser-root-rendezvous-overlap-css ||
-          $arm == tree-native-parser-process-overlap-css ]]; then
+          $arm == tree-native-parser-process-overlap-css ||
+          $arm == tree-native-parser-full-process-overlap-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-preload drain=complete completed_resources=1 http=2[0-9][0-9] protocol=h3$'
   elif [[ $arm == document-overlap ]]; then
@@ -992,6 +1000,7 @@ EOF
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
         $arm == tree-native-parser-root-rendezvous-overlap-css ||
         $arm == tree-native-parser-process-overlap-css ||
+        $arm == tree-native-parser-full-process-overlap-css ||
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
@@ -1015,6 +1024,7 @@ EOF
           $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
           $arm == tree-native-parser-root-rendezvous-overlap-css ||
           $arm == tree-native-parser-process-overlap-css ||
+          $arm == tree-native-parser-full-process-overlap-css ||
           $arm == tree-overlap ]]; then
       ! rg -q ' preamble background drain timed out' "$log"
     fi
@@ -1058,7 +1068,8 @@ EOF
             $arm == tree-native-parser-retarget-overlap-css ||
             $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
             $arm == tree-native-parser-root-rendezvous-overlap-css ||
-            $arm == tree-native-parser-process-overlap-css ]]; then
+            $arm == tree-native-parser-process-overlap-css ||
+            $arm == tree-native-parser-full-process-overlap-css ]]; then
       [[ $(rg -c ' preamble native-parser-preload parser=' "$log" || true) -eq 1 ]]
       [[ $(rg -c ' preamble native-parser-preload channel=' "$log" || true) -eq 1 ]]
       [[ $(rg -c ' preamble native-parser-preload admission=' "$log" || true) -eq 1 ]]
@@ -1129,8 +1140,7 @@ EOF
         [[ $(rg -c ' preamble native-parser-retarget phase=' "$log" || true) -eq 8 ]]
         ! rg -q 'delivery=main-copy-dispatch' "$log"
         ! rg -q 'native-parser-retarget.*(failed|failure|fallback|verified=0)' "$log"
-      elif [[ $arm == tree-native-parser-root-rendezvous-overlap-css ||
-              $arm == tree-native-parser-process-overlap-css ]]; then
+      elif [[ $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then
         local phase
         local previous_line=0
         local retarget_connection=
@@ -1164,8 +1174,7 @@ EOF
         ! rg -q ' preamble native-parser-retarget phase=' "$log"
       fi
       if [[ $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
-            $arm == tree-native-parser-root-rendezvous-overlap-css ||
-            $arm == tree-native-parser-process-overlap-css ]]; then
+            $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then
         local activation_phase
         for activation_phase in descriptor-frozen request-primary-actor-created request-primary-actor-bound child-open-sent background-dispatched request-background-actor-created request-background-actor-bound bg-ready-sent parent-channel-created background-ready-received async-open request-primary-actor-delete-sent request-background-actor-delete-sent request-primary-actor-destroyed request-background-actor-destroyed; do
           [[ $(rg -c "Native style activation phase=${activation_phase} request=[0-9]+$" "$log" || true) -eq 1 ]]
@@ -1206,8 +1215,7 @@ EOF
         ! rg -q 'Native style activation phase=(descriptor-frozen|request-(primary|background)-actor-(created|bound|delete-sent|destroyed)|child-open-sent|background-dispatched|bg-ready-sent|parent-channel-created|background-ready-received|activation-released|async-open|on-stop|request-failed|request-cancelled|activation-callback-failed)' "$log"
         ! rg -q 'Preamble native-parser-preload lifecycle=stylesheet-(channel-created|opened).*activation=ipc-rendezvous' "$log"
       fi
-      if [[ $arm == tree-native-parser-root-rendezvous-overlap-css ||
-            $arm == tree-native-parser-process-overlap-css ]]; then
+      if [[ $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then
         local root_phase root_request root_channel root_generation
         for root_phase in descriptor-frozen request-primary-actor-created request-primary-actor-bound begin-sent begin-received connect-parent-sent background-dispatched request-background-actor-created request-background-actor-bound redirect-verification-started connect-parent-linked redirect-verification-queued redirect-verification-run background-ready bg-linked redirect-verification-callback redirect-verification-resolved ready-to-verify setup-finished forward-sent activation-released resume forward-received forward-start forward-stop-received forward-stop on-stop request-primary-actor-delete-sent request-background-actor-delete-sent request-primary-actor-destroyed request-background-actor-destroyed; do
           [[ $(rg -c "Native root replacement activation phase=${root_phase} request=[0-9]+" "$log" || true) -eq 1 ]]
@@ -1264,6 +1272,29 @@ EOF
       else
         ! rg -q 'Native root replacement activation phase=' "$log"
         ! rg -q ' preamble native-parser-root-replacement phase=' "$log"
+      fi
+      if [[ $arm == tree-native-parser-process-overlap-css ||
+            $arm == tree-native-parser-full-process-overlap-css ]]; then
+        local process_mode=process
+        if [[ $arm == tree-native-parser-full-process-overlap-css ]]; then
+          process_mode=full-process
+        fi
+        python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" \
+          "$log" "$process_mode" <<'PY'
+import importlib.util
+import sys
+
+module_path, log_path, expected_mode = sys.argv[1:]
+spec = importlib.util.spec_from_file_location(
+    "camouflage_sample_validation", module_path
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+with open(log_path, encoding="utf-8", errors="replace") as stream:
+    module.validate_native_parser_process(
+        stream.read().splitlines(), expected_mode=expected_mode
+    )
+PY
       fi
     elif [[ $arm == document-overlap ]]; then
       [[ $(rg -c ' preamble document-overlap admission=' "$log" || true) -eq 1 ]]

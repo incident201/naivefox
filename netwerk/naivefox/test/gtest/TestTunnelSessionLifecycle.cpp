@@ -167,6 +167,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
 {
   EXPECT_TRUE(PreambleModeRequiresFailClosed(
       PreambleMode::TreeNativeParserProcessOverlap));
+  EXPECT_TRUE(PreambleModeRequiresFailClosed(
+      PreambleMode::TreeNativeParserFullProcessOverlap));
   EXPECT_FALSE(PreambleModeRequiresFailClosed(
       PreambleMode::TreeNativeParserRootRendezvousOverlap));
   EXPECT_TRUE(detail::PreambleUsesRetargetedRootDelivery(
@@ -183,6 +185,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
       PreambleMode::TreeNativeParserRootRendezvousOverlap, 1));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserProcessOverlap, 0));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserFullProcessOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
@@ -362,6 +366,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
   EXPECT_TRUE(detail::PreambleBarrierReached(
       PreambleMode::TreeNativeParserProcessOverlap, true, true, 1, 0, 0, 0, 1,
       true, 0, true));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserFullProcessOverlap, true, true, 1, 0, 0, 0,
+      1, true, 0, false));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserFullProcessOverlap, true, true, 1, 0, 0, 0,
+      1, true, 0, true));
 
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(
@@ -385,6 +395,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserRootRendezvousOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserProcessOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeNativeParserFullProcessOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -470,6 +482,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeNativeParserProcessOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserProcessOverlap, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserFullProcessOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserFullProcessOverlap, true));
 
   EXPECT_TRUE(detail::PreambleRetargetDeliveryVerified(true, true, true));
   EXPECT_FALSE(detail::PreambleRetargetDeliveryVerified(false, true, true));

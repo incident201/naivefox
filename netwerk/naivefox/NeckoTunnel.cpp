@@ -1439,11 +1439,15 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
     }
     mImpl->mRootReferrerInfo =
         new mozilla::dom::ReferrerInfo(stream.mUri, policy, true);
-    if (mImpl->mConfig.mMode ==
-        PreambleMode::TreeNativeParserProcessOverlap) {
+    if (PreambleModeUsesNativeParserProcess(mImpl->mConfig.mMode)) {
       nsresult processRv = StartNativeParserProcessRoot(aRequest, channel);
       if (NS_FAILED(processRv)) {
-        FailNativeParserContract(processRv, "process-root-start-failed");
+        FailNativeParserContract(
+            processRv,
+            mImpl->mConfig.mMode ==
+                    PreambleMode::TreeNativeParserFullProcessOverlap
+                ? "full-process-root-start-failed"
+                : "process-root-start-failed");
       }
       return processRv;
     }
@@ -1641,8 +1645,7 @@ nsresult ProxyPreambleOperation::StartNativeParserRootReplacement(
 nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
     nsIRequest* aRequest, nsIHttpChannel* aChannel) {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mImpl->mConfig.mMode ==
-             PreambleMode::TreeNativeParserProcessOverlap);
+  MOZ_ASSERT(PreambleModeUsesNativeParserProcess(mImpl->mConfig.mMode));
   if (!aRequest || !aChannel || mImpl->mStreams.IsEmpty() ||
       mImpl->mNativeProcessRootRequestId ||
       mImpl->mNativeParserRootSuspended || mImpl->mNativeParserScanner ||
@@ -1709,10 +1712,15 @@ nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
   mImpl->mNativeParserRootSuspended = true;
   mImpl->mNativeProcessNextSequence = 1;
   mImpl->mNativeProcessDiscoverySequence = 0;
+  const bool fullProcess =
+      mImpl->mConfig.mMode == PreambleMode::TreeNativeParserFullProcessOverlap;
+  const char* processMode =
+      fullProcess ? "native-parser-full-process" : "native-parser-process";
   RuntimeLogEvent(
-      "Connection %llu preamble native-parser-process phase=physical-root-"
+      "Connection %llu preamble %s phase=physical-root-"
       "suspended channel=%llu generation=%llu parent_pid=%llu protocol=h3\n",
       static_cast<unsigned long long>(mImpl->mConnectionId),
+      processMode,
       static_cast<unsigned long long>(mImpl->mNativeRootReplacementChannelId),
       static_cast<unsigned long long>(descriptor.mGeneration),
       static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1737,13 +1745,14 @@ nsresult ProxyPreambleOperation::StartNativeParserProcessRoot(
     self->OnNativeParserProcessFailed(generation, aStatus);
   };
   nsresult rv = NativeStylePreloadActivation::StartProcessRoot(
-      std::move(descriptor), mImpl->mConfig.mMaxBytes, std::move(callbacks),
-      mImpl->mNativeProcessRootRequestId);
+      std::move(descriptor), mImpl->mConfig.mMaxBytes, fullProcess,
+      std::move(callbacks), mImpl->mNativeProcessRootRequestId);
   if (NS_SUCCEEDED(rv)) {
     RuntimeLogEvent(
-        "Connection %llu preamble native-parser-process phase=root-registered "
+        "Connection %llu preamble %s phase=root-registered "
         "request=%llu generation=%llu parent_pid=%llu protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
+        processMode,
         static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
         static_cast<unsigned long long>(generation),
         static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1755,7 +1764,7 @@ nsresult ProxyPreambleOperation::OnNativeParserProcessRootReady(
     uint64_t aGeneration) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
-      mImpl->mConfig.mMode != PreambleMode::TreeNativeParserProcessOverlap ||
+      !PreambleModeUsesNativeParserProcess(mImpl->mConfig.mMode) ||
       aGeneration !=
           mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
       !mImpl->mNativeProcessRootRequestId ||
@@ -1770,10 +1779,16 @@ nsresult ProxyPreambleOperation::OnNativeParserProcessRootReady(
   mImpl->mNativeParserRootSuspended = false;
   nsresult rv = root->Resume();
   if (NS_SUCCEEDED(rv)) {
+    const char* processMode =
+        mImpl->mConfig.mMode ==
+                PreambleMode::TreeNativeParserFullProcessOverlap
+            ? "native-parser-full-process"
+            : "native-parser-process";
     RuntimeLogEvent(
-        "Connection %llu preamble native-parser-process phase=root-ready-"
+        "Connection %llu preamble %s phase=root-ready-"
         "resume request=%llu generation=%llu parent_pid=%llu protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
+        processMode,
         static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
         static_cast<unsigned long long>(aGeneration),
         static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -1786,7 +1801,7 @@ nsresult ProxyPreambleOperation::OnNativeParserProcessStyleDiscovered(
     const NativeStylePreloadProcessDescriptor& aDescriptor) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
-      mImpl->mConfig.mMode != PreambleMode::TreeNativeParserProcessOverlap ||
+      !PreambleModeUsesNativeParserProcess(mImpl->mConfig.mMode) ||
       aGeneration !=
           mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
       aDescriptor.mRootRequestId != mImpl->mNativeProcessRootRequestId ||
@@ -1808,10 +1823,15 @@ nsresult ProxyPreambleOperation::OnNativeParserProcessStyleDiscovered(
                                      aDescriptor.mStyleRequestId));
   mImpl->mNativeProcessDiscoverySequence = aDescriptor.mDiscoverySequence;
   mImpl->mNativeParserDescriptorAccepted = true;
+  const char* processMode =
+      mImpl->mConfig.mMode == PreambleMode::TreeNativeParserFullProcessOverlap
+          ? "native-parser-full-process"
+          : "native-parser-process";
   RuntimeLogEvent(
-      "Connection %llu preamble native-parser-process phase=style-opened "
+      "Connection %llu preamble %s phase=style-opened "
       "root=%llu style=%llu sequence=%u parent_pid=%llu protocol=h3\n",
       static_cast<unsigned long long>(mImpl->mConnectionId),
+      processMode,
       static_cast<unsigned long long>(aDescriptor.mRootRequestId),
       static_cast<unsigned long long>(aDescriptor.mStyleRequestId),
       aDescriptor.mDiscoverySequence,
@@ -1825,7 +1845,7 @@ void ProxyPreambleOperation::OnNativeParserProcessRootFinished(
   MOZ_ASSERT(NS_IsMainThread());
   const bool valid =
       !mImpl->mCancelled && !mImpl->mNativeParserContractFailed &&
-      mImpl->mConfig.mMode == PreambleMode::TreeNativeParserProcessOverlap &&
+      PreambleModeUsesNativeParserProcess(mImpl->mConfig.mMode) &&
       aGeneration ==
           mImpl->mNativeParserGeneration.load(std::memory_order_acquire) &&
       mImpl->mNativeProcessRootRequestId && mImpl->mNativeProcessRootReady &&
@@ -1843,11 +1863,16 @@ void ProxyPreambleOperation::OnNativeParserProcessRootFinished(
   mImpl->mNativeProcessRootRequestId = 0;
   mImpl->mBodyBytes = aBodyBytes;
   mImpl->mNativeParserFinished = true;
+  const char* processMode =
+      mImpl->mConfig.mMode == PreambleMode::TreeNativeParserFullProcessOverlap
+          ? "native-parser-full-process"
+          : "native-parser-process";
   RuntimeLogEvent(
-      "Connection %llu preamble native-parser-process phase=parser-finished "
+      "Connection %llu preamble %s phase=parser-finished "
       "request=%llu generation=%llu sequence=%u bytes=%u styles=%u "
       "parent_pid=%llu protocol=h3\n",
       static_cast<unsigned long long>(mImpl->mConnectionId),
+      processMode,
       static_cast<unsigned long long>(requestId),
       static_cast<unsigned long long>(aGeneration), aLastSequence, aBodyBytes,
       aStyleCount, static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -2125,11 +2150,17 @@ nsresult ProxyPreambleOperation::QueueNativeParserRootBody(
         sequence, std::move(chunk));
     if (NS_SUCCEEDED(rv)) {
       ++mImpl->mNativeProcessNextSequence;
+      const char* processMode =
+          mImpl->mConfig.mMode ==
+                  PreambleMode::TreeNativeParserFullProcessOverlap
+              ? "native-parser-full-process"
+              : "native-parser-process";
       RuntimeLogEvent(
-          "Connection %llu preamble native-parser-process phase=root-data "
+          "Connection %llu preamble %s phase=root-data "
           "request=%llu generation=%llu sequence=%u bytes=%u parent_pid=%llu "
           "protocol=h3\n",
           static_cast<unsigned long long>(mImpl->mConnectionId),
+          processMode,
           static_cast<unsigned long long>(mImpl->mNativeProcessRootRequestId),
           static_cast<unsigned long long>(
               mImpl->mNativeParserGeneration.load(std::memory_order_acquire)),
@@ -3378,11 +3409,17 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
     if (NS_FAILED(completeRv)) {
       FailNativeParserContract(completeRv, "process-style-complete-failed");
     } else {
+      const char* processMode =
+          mImpl->mConfig.mMode ==
+                  PreambleMode::TreeNativeParserFullProcessOverlap
+              ? "native-parser-full-process"
+              : "native-parser-process";
       RuntimeLogEvent(
-          "Connection %llu preamble native-parser-process "
+          "Connection %llu preamble %s "
           "phase=style-onstop-complete style=%llu status=0x%08x "
           "parent_pid=%llu protocol=h3\n",
           static_cast<unsigned long long>(mImpl->mConnectionId),
+          processMode,
           static_cast<unsigned long long>(styleRequestId),
           static_cast<unsigned>(aStatus),
           static_cast<unsigned long long>(base::GetCurrentProcId()));
@@ -3402,11 +3439,17 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
         FailNativeParserContract(forwardRv, "process-root-stop-forward-failed");
       } else {
         ++mImpl->mNativeProcessNextSequence;
+        const char* processMode =
+            mImpl->mConfig.mMode ==
+                    PreambleMode::TreeNativeParserFullProcessOverlap
+                ? "native-parser-full-process"
+                : "native-parser-process";
         RuntimeLogEvent(
-            "Connection %llu preamble native-parser-process phase=root-stop "
+            "Connection %llu preamble %s phase=root-stop "
             "request=%llu generation=%llu sequence=%u status=0x%08x "
             "parent_pid=%llu protocol=h3\n",
             static_cast<unsigned long long>(mImpl->mConnectionId),
+            processMode,
             static_cast<unsigned long long>(
                 mImpl->mNativeProcessRootRequestId),
             static_cast<unsigned long long>(

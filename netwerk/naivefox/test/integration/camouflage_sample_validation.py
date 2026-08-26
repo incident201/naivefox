@@ -275,9 +275,18 @@ PROCESS_CHILD_RUNNING = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Native activation process phase=child-running "
     r"parent_pid=(?P<parent>\d+) child_pid=(?P<child>\d+)$"
 )
+PROCESS_BACKGROUND_CHILD_READY = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native activation process "
+    r"phase=background-child-ready pid=(?P<pid>\d+)$"
+)
+PROCESS_FULL_PHASE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native activation process "
+    r"phase=(?P<phase>full-[a-z0-9-]+) (?P<fields>.+)$"
+)
 PROCESS_PARENT_PHASE = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) preamble "
-    r"native-parser-process phase=(?P<phase>[a-z0-9-]+) (?P<fields>.+) "
+    r"native-parser-(?P<mode>process|full-process) "
+    r"phase=(?P<phase>[a-z0-9-]+) (?P<fields>.+) "
     r"protocol=h3$"
 )
 PROCESS_CHILD_PHASE = re.compile(
@@ -312,7 +321,11 @@ def _single_process_phase(markers, phase, side):
     return selected[0]
 
 
-def validate_native_parser_process(log_lines, expected_connection=None):
+def validate_native_parser_process(
+    log_lines, expected_connection=None, expected_mode="process"
+):
+    if expected_mode not in ("process", "full-process"):
+        raise ValueError("unsupported native parser process validation mode")
     hellos = [
         (index, match)
         for index, line in enumerate(log_lines)
@@ -336,15 +349,24 @@ def validate_native_parser_process(log_lines, expected_connection=None):
         or int(running[0]["child"]) != child_pid
     ):
         raise ValueError("native parser process child-running identity differs")
+    background_ready = [
+        (index, match)
+        for index, line in enumerate(log_lines)
+        if (match := PROCESS_BACKGROUND_CHILD_READY.fullmatch(line)) is not None
+    ]
+    if len(background_ready) != 1 or int(background_ready[0][1]["pid"]) != child_pid:
+        raise ValueError("native parser process background identity differs")
 
     parent_markers = []
     child_markers = []
+    full_markers = []
     for index, line in enumerate(log_lines):
         parent = PROCESS_PARENT_PHASE.fullmatch(line)
         if parent:
             parent_markers.append({
                 "index": index,
                 "connection": int(parent["connection"]),
+                "mode": parent["mode"],
                 "phase": parent["phase"],
                 "fields": _process_fields(parent["fields"]),
             })
@@ -354,6 +376,13 @@ def validate_native_parser_process(log_lines, expected_connection=None):
                 "index": index,
                 "phase": child["phase"],
                 "fields": _process_fields(child["fields"]),
+            })
+        full = PROCESS_FULL_PHASE.fullmatch(line)
+        if full:
+            full_markers.append({
+                "index": index,
+                "phase": full["phase"],
+                "fields": _process_fields(full["fields"]),
             })
 
     parent_fields = {
@@ -458,6 +487,8 @@ def validate_native_parser_process(log_lines, expected_connection=None):
         },
     }
     for marker in parent_markers:
+        if marker["mode"] != expected_mode:
+            raise ValueError("native parser process mode marker differs")
         expected = parent_fields.get(marker["phase"])
         if expected is None or set(marker["fields"]) != expected:
             raise ValueError("native parser process parent marker schema differs")
@@ -465,6 +496,52 @@ def validate_native_parser_process(log_lines, expected_connection=None):
         expected = child_fields.get(marker["phase"])
         if expected is None or set(marker["fields"]) != expected:
             raise ValueError("native parser process child marker schema differs")
+
+    if expected_mode == "process":
+        if full_markers:
+            raise ValueError("partial native parser process logged full lifecycle")
+    else:
+        full_fields = {
+            "full-root-primary-ready": {
+                "request", "generation", "parent_pid", "child_pid"
+            },
+            "full-root-background-ready": {
+                "request", "generation", "parent_pid", "child_pid"
+            },
+            "full-root-verification-queued": {
+                "request", "generation", "parent_pid", "child_pid"
+            },
+            "full-root-verification-run": {
+                "request", "generation", "parent_pid", "child_pid"
+            },
+            "full-root-onstart-forwarded": {
+                "request", "generation", "parent_pid", "child_pid"
+            },
+            "full-style-primary-ready": {
+                "request", "generation", "style", "sequence",
+                "parent_pid", "child_pid"
+            },
+            "full-style-background-ready": {
+                "request", "generation", "style", "sequence",
+                "parent_pid", "child_pid"
+            },
+            "full-style-join-released": {
+                "request", "generation", "style", "sequence",
+                "parent_pid", "child_pid"
+            },
+            "full-root-background-drained": {
+                "request", "generation", "canceled", "parent_pid", "child_pid"
+            },
+        }
+        if len(full_markers) != len(full_fields):
+            raise ValueError(
+                "full native parser process requires one marker per join phase"
+            )
+        if {marker["phase"] for marker in full_markers} != set(full_fields):
+            raise ValueError("full native parser process join phases differ")
+        for marker in full_markers:
+            if set(marker["fields"]) != full_fields[marker["phase"]]:
+                raise ValueError("full native parser process marker schema differs")
 
     parent_single_phases = (
         "physical-root-suspended",
@@ -493,6 +570,14 @@ def validate_native_parser_process(log_lines, expected_connection=None):
         phase: _single_process_phase(child_markers, phase, "child")
         for phase in child_single_phases
     }
+    full_single = (
+        {
+            marker["phase"]: marker
+            for marker in full_markers
+        }
+        if expected_mode == "full-process"
+        else {}
+    )
 
     connections = {marker["connection"] for marker in parent_markers}
     if len(connections) != 1:
@@ -546,6 +631,23 @@ def validate_native_parser_process(log_lines, expected_connection=None):
         marker_style = fields.get("style", fields.get("request"))
         if marker_style != style:
             raise ValueError("native parser process style request ID changed")
+
+    if expected_mode == "full-process":
+        for marker in full_markers:
+            fields = marker["fields"]
+            if (
+                fields["request"] != request
+                or fields["generation"] != generation
+                or int(fields["parent_pid"]) != parent_pid
+                or int(fields["child_pid"]) != child_pid
+            ):
+                raise ValueError("full native parser process identity changed")
+            if marker["phase"].startswith("full-style-") and (
+                fields["style"] != style or fields["sequence"] != "1"
+            ):
+                raise ValueError("full native parser process style identity changed")
+        if full_single["full-root-background-drained"]["fields"]["canceled"] != "0":
+            raise ValueError("full native parser process clean route was canceled")
 
     parent_data = [
         marker for marker in parent_markers if marker["phase"] == "root-data"
@@ -647,9 +749,15 @@ def validate_native_parser_process(log_lines, expected_connection=None):
         raise ValueError("native parser process discovery sequence is invalid")
     if parent_single["style-onstop-complete"]["fields"]["status"] != "0x00000000":
         raise ValueError("native parser process style completion failed")
-    if child_single["style-actor-destroyed"]["fields"].get("completed") != "1":
+    if (
+        child_single["style-actor-destroyed"]["fields"].get("completed") != "1"
+        or child_single["style-actor-destroyed"]["fields"].get("reason") != "1"
+    ):
         raise ValueError("native parser process style actor died before completion")
-    if child_single["root-actor-destroyed"]["fields"].get("finished") != "1":
+    if (
+        child_single["root-actor-destroyed"]["fields"].get("finished") != "1"
+        or child_single["root-actor-destroyed"]["fields"].get("reason") != "1"
+    ):
         raise ValueError("native parser process root actor died before parser finish")
 
     ordered = (
@@ -679,11 +787,52 @@ def validate_native_parser_process(log_lines, expected_connection=None):
     if not (
         child_single["parser-finished"]["index"]
         < parent_single["parser-finished"]["index"]
+        and child_single["parser-finished"]["index"]
         < child_single["root-actor-destroyed"]["index"]
     ):
         raise ValueError(
             "native parser process root actor teardown ordering is invalid"
         )
+    if expected_mode == "full-process":
+        root_primary = full_single["full-root-primary-ready"]["index"]
+        root_background = full_single["full-root-background-ready"]["index"]
+        verification_queued = full_single[
+            "full-root-verification-queued"
+        ]["index"]
+        verification_run = full_single["full-root-verification-run"]["index"]
+        onstart_forwarded = full_single[
+            "full-root-onstart-forwarded"
+        ]["index"]
+        style_primary = full_single["full-style-primary-ready"]["index"]
+        style_background = full_single[
+            "full-style-background-ready"
+        ]["index"]
+        style_released = full_single["full-style-join-released"]["index"]
+        background_drained = full_single[
+            "full-root-background-drained"
+        ]["index"]
+        if not (
+            parent_single["root-registered"]["index"]
+            < min(root_primary, root_background)
+            and max(root_primary, root_background) < verification_queued
+            < verification_run
+            < onstart_forwarded
+            < parent_single["root-ready-resume"]["index"]
+        ):
+            raise ValueError("full native parser root join ordering is invalid")
+        if not (
+            max(style_primary, style_background) < style_released
+            < parent_single["style-opened"]["index"]
+        ):
+            raise ValueError("full native parser style join ordering is invalid")
+        if not (
+            parent_single["parser-finished"]["index"] < background_drained
+            and parent_single["style-onstop-complete"]["index"]
+            < background_drained
+        ):
+            raise ValueError(
+                "full native parser background actors did not drain terminally"
+            )
     forbidden = (
         "consumer-constructed-main",
         "native-parser-retarget phase=",
@@ -721,6 +870,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
         "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -756,6 +906,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-root-rendezvous-overlap-css requires h3")
     if arm == "tree-native-parser-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
+    if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -785,6 +937,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
         "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -802,6 +955,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
         "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -1417,6 +1571,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
         "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
     ):
         if any(len(markers) != 1 for markers in native_parser_markers):
             raise ValueError(
@@ -2082,13 +2237,23 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "tree-native-parser-ipc-rendezvous-overlap-css",
                 "tree-native-parser-root-rendezvous-overlap-css",
                 "tree-native-parser-process-overlap-css",
+                "tree-native-parser-full-process-overlap-css",
             )
             and feature_document.get("features", {}).get("tls_client_hello_count")
             != 1.0
         ):
             raise ValueError(f"{arm} requires exactly one outer ClientHello")
-    if arm == "tree-native-parser-process-overlap-css":
-        validate_native_parser_process(log_lines, int(result["connection"]))
+    if arm in (
+        "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
+    ):
+        validate_native_parser_process(
+            log_lines,
+            int(result["connection"]),
+            "full-process"
+            if arm == "tree-native-parser-full-process-overlap-css"
+            else "process",
+        )
 
 
 def main():
@@ -2121,6 +2286,7 @@ def main():
             "tree-native-parser-ipc-rendezvous-overlap-css",
             "tree-native-parser-root-rendezvous-overlap-css",
             "tree-native-parser-process-overlap-css",
+            "tree-native-parser-full-process-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),
