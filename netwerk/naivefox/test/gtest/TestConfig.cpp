@@ -323,25 +323,44 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserDocumentHandoff.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserDocumentHandoff.mPreamble.mCacheResources);
 
-  static constexpr const char* kInvalid[] = {
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-  };
+  Config nativeParserRetarget;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserRetarget, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserRetarget.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserRetargetOverlap);
+  EXPECT_EQ(nativeParserRetarget.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserRetarget.mPreamble.mCacheResources);
+
+  static constexpr const char*
+      kInvalid[] =
+          {
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          };
   for (const char* json : kInvalid) {
     Config invalid;
     error.Truncate();

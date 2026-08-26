@@ -768,6 +768,7 @@ def extract(args):
         in (
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-handoff-overlap-css",
+            "tree-native-parser-retarget-overlap-css",
         )
         and args.protocol != "h3"
     ):
@@ -940,6 +941,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-handoff-overlap-css",
+            "tree-native-parser-retarget-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

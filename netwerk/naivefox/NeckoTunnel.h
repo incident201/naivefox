@@ -73,9 +73,8 @@ enum class PreambleResourceKind : uint8_t {
 inline bool PreambleChannelUsesCache(const PreambleConfig& aConfig,
                                      ProxyProtocol aProtocol,
                                      bool aIsResource) {
-  if (!aIsResource &&
-      aConfig.ModeForProtocol(aProtocol) ==
-          PreambleMode::DocumentNativeChannelOpen) {
+  if (!aIsResource && aConfig.ModeForProtocol(aProtocol) ==
+                          PreambleMode::DocumentNativeChannelOpen) {
     return true;
   }
   return aIsResource && aConfig.CacheResourcesForProtocol(aProtocol);
@@ -98,16 +97,12 @@ bool PreambleStylesheetIsNonDeferred(const nsACString& aLowerTag,
                                      bool aAlternate);
 bool PreambleScriptIsParserBlockingClassic(const nsACString& aLowerTag);
 
-constexpr bool PreambleBarrierReached(PreambleMode aMode,
-                                      bool aRootResponseAccepted,
-                                      bool aRootDone, uint32_t aAssetCount,
-                                      uint32_t aAssetsWithHeadersNotDone,
-                                      uint32_t aAssetsWithHeadersOrDone,
-                                      uint32_t aAssetsDone,
-                                      uint32_t aAssetsCommitted = 0,
-                                      bool aRootCompletedSuccessfully = true,
-                                      uint32_t aNativeCacheNewResources = 0,
-                                      bool aNativeParserFinished = false) {
+constexpr bool PreambleBarrierReached(
+    PreambleMode aMode, bool aRootResponseAccepted, bool aRootDone,
+    uint32_t aAssetCount, uint32_t aAssetsWithHeadersNotDone,
+    uint32_t aAssetsWithHeadersOrDone, uint32_t aAssetsDone,
+    uint32_t aAssetsCommitted = 0, bool aRootCompletedSuccessfully = true,
+    uint32_t aNativeCacheNewResources = 0, bool aNativeParserFinished = false) {
   if (aMode == PreambleMode::Off) {
     return false;
   }
@@ -153,6 +148,10 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
+  if (aMode == PreambleMode::TreeNativeParserRetargetOverlap) {
+    return aRootCompletedSuccessfully && aNativeParserFinished &&
+           aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -166,7 +165,20 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeResourceCommittedOverlap ||
          aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
          aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
-         aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap;
+         aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
+         aMode == PreambleMode::TreeNativeParserRetargetOverlap;
+}
+
+constexpr bool PreambleRetargetDeliveryVerified(bool aListenerChainAccepted,
+                                                bool aRetargetSucceeded,
+                                                bool aTargetIdentityMatches) {
+  return aListenerChainAccepted && aRetargetSucceeded && aTargetIdentityMatches;
+}
+
+constexpr bool PreambleUsesRetargetedRootDelivery(PreambleMode aMode,
+                                                  uint32_t aStreamId) {
+  return aMode == PreambleMode::TreeNativeParserRetargetOverlap &&
+         aStreamId == 0;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
@@ -206,8 +218,8 @@ class ProxyPreambleOperation final {
   friend nsresult OpenProxyPreambleOperation(
       const nsACString&, const nsACString&, const nsACString&,
       const PreambleConfig&, ProxyProtocol, ProxyPreambleCallback&&,
-      ProxyPreambleFinishedCallback&&, const Maybe<HostResolverRule>&,
-      uint64_t, RefPtr<ProxyPreambleOperation>&);
+      ProxyPreambleFinishedCallback&&, const Maybe<HostResolverRule>&, uint64_t,
+      RefPtr<ProxyPreambleOperation>&);
   class Impl;
 
   ProxyPreambleOperation();
@@ -223,6 +235,11 @@ class ProxyPreambleOperation final {
   nsresult OnStartRequest(uint32_t aStreamId, nsIRequest* aRequest);
   nsresult OnDataAvailable(uint32_t aStreamId, nsIInputStream* aInputStream,
                            uint32_t aCount);
+  nsresult OnRetargetedDataAvailable(uint32_t aStreamId,
+                                     nsIInputStream* aInputStream,
+                                     uint32_t aCount);
+  nsresult OnRetargetedDataFinished(uint32_t aStreamId, nsresult aStatus);
+  nsresult CheckNativeParserRetargetListener(uint32_t aStreamId);
   void OnRequestCommitted(uint32_t aStreamId, nsIRequest* aRequest);
   void OnStopRequest(uint32_t aStreamId, nsresult aStatus);
   nsresult DispatchNativeParserChunk(nsCString&& aChunk);
@@ -231,10 +248,14 @@ class ProxyPreambleOperation final {
   void OnNativeParserReplacementListenerInstalled(uint64_t aGeneration);
   nsresult ResumeNativeParserDocumentHandoffRoot();
   void LogNativeParserDocumentHandoffPhase(const char* aPhase) const;
+  void LogNativeParserRetargetPhase(const char* aPhase) const;
+  nsresult InstallNativeParserRetargetDelivery(nsIRequest* aRequest);
+  nsresult DispatchNativeParserOutputToMain(
+      uint64_t aGeneration, uint32_t aSequence, bool aFinished,
+      nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
   void OnNativeParserOutput(
       uint64_t aGeneration, uint32_t aSequence, bool aFinished,
-      nsresult aStatus,
-      nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
+      nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
   nsresult OpenNativeParserStylesheet(
       nsHtml5StylePreloadDescriptor&& aDescriptor);
   void FailNativeParserContract(nsresult aStatus, const char* aReason);
@@ -250,8 +271,7 @@ nsresult OpenProxyPreambleOperation(
     const nsACString& aProxyPassword, const PreambleConfig& aConfig,
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
     ProxyPreambleFinishedCallback&& aFinishedCallback,
-    const Maybe<HostResolverRule>& aHostResolverRule,
-    uint64_t aConnectionId,
+    const Maybe<HostResolverRule>& aHostResolverRule, uint64_t aConnectionId,
     RefPtr<ProxyPreambleOperation>& aOperation);
 
 nsresult OpenProxyPreamble(
@@ -270,8 +290,7 @@ nsresult OpenNeckoTunnel(
     ProxyProtocol aProtocol,
     const Maybe<HostResolverRule>& aHostResolverRule = {},
     const nsTArray<ExtraHeader>& aExtraHeaders = {},
-    bool aConnectUrgentStart = false,
-    bool aUseAnonymousConnection = true,
+    bool aConnectUrgentStart = false, bool aUseAnonymousConnection = true,
     nsIRequest** aOpenedRequest = nullptr);
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,

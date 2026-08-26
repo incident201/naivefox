@@ -594,6 +594,8 @@ class JsonParser final {
       } else if (mode.EqualsLiteral(
                      "tree-native-parser-document-handoff-overlap")) {
         aMode = PreambleMode::TreeNativeParserDocumentHandoffOverlap;
+      } else if (mode.EqualsLiteral("tree-native-parser-retarget-overlap")) {
+        aMode = PreambleMode::TreeNativeParserRetargetOverlap;
       } else {
         return Error("unsupported preamble mode");
       }
@@ -702,8 +704,7 @@ class JsonParser final {
     }
     if (h3Mode == PreambleMode::DocumentColdWinnerHandoff &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode !=
-             Some(PreambleMode::DocumentColdWinnerHandoff))) {
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentColdWinnerHandoff))) {
       return Error(
           "document-cold-winner-handoff must be selected explicitly with "
           "h3-mode");
@@ -723,9 +724,8 @@ class JsonParser final {
           "h3-mode");
     }
     if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&
-        (!sawH3Mode ||
-         aPreamble.mH3Mode !=
-             Some(PreambleMode::TreeResourceCommittedOverlap))) {
+        (!sawH3Mode || aPreamble.mH3Mode !=
+                           Some(PreambleMode::TreeResourceCommittedOverlap))) {
       return Error(
           "tree-resource-committed-overlap must be selected explicitly with "
           "h3-mode");
@@ -753,6 +753,14 @@ class JsonParser final {
       return Error(
           "tree-native-parser-document-handoff-overlap must be selected "
           "explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserRetargetOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserRetargetOverlap))) {
+      return Error(
+          "tree-native-parser-retarget-overlap must be selected explicitly "
+          "with h3-mode");
     }
     if (h2Mode == PreambleMode::TreeResourceCommittedOverlap ||
         h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
@@ -826,6 +834,17 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-handoff-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserRetargetOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-retarget-overlap requires exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-retarget-overlap requires "
             "cache-resources=true");
       }
     }

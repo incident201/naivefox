@@ -968,6 +968,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        retarget = CONFIG.build_config(
+            "tree-native-parser-retarget-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            retarget["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-retarget-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-retarget-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1476,6 +1504,56 @@ class CamouflageHarnessTests(unittest.TestCase):
                 document_handoff_log.replace(first_feed, "").replace(
                     channel_marker, first_feed + channel_marker, 1
                 ),
+                one_connection,
+            )
+        retarget_lines = "".join(
+            "Connection 7 preamble native-parser-retarget "
+            f"phase={phase}"
+            f"{' target=html5-parser verified=1' if phase == 'delivery-retargeted' else ''}"
+            f"{' delivery=retargeted-direct' if phase == 'first-parser-feed' else ''} "
+            "protocol=h3\n"
+            for phase in SAMPLE.NATIVE_PARSER_RETARGET_PHASES
+        )
+        retarget_log = retarget_lines + native_parser_log
+        SAMPLE.validate_sample(
+            "tree-native-parser-retarget-overlap-css",
+            "h3",
+            retarget_log,
+            one_connection,
+        )
+        for old, new, error in (
+            ("verified=1", "verified=0", "verification failed"),
+            (
+                "delivery=retargeted-direct",
+                "delivery=main-copy-dispatch",
+                "delivery contract",
+            ),
+            ("target=html5-parser", "target=main", "target contract"),
+        ):
+            with self.subTest(invalid_retarget_field=old):
+                with self.assertRaisesRegex(ValueError, error):
+                    SAMPLE.validate_sample(
+                        "tree-native-parser-retarget-overlap-css",
+                        "h3",
+                        retarget_log.replace(old, new),
+                        one_connection,
+                    )
+        with self.assertRaisesRegex(ValueError, "missing, duplicated"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-retarget-overlap-css",
+                "h3",
+                retarget_log.replace(
+                    "phase=parser-data-finished", "phase=handoff-resume"
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "fallback, failure"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-retarget-overlap-css",
+                "h3",
+                retarget_log
+                + "Connection 7 preamble native-parser-retarget "
+                "fallback=main-copy protocol=h3\n",
                 one_connection,
             )
         with self.assertRaisesRegex(ValueError, "exactly one parser"):
@@ -2264,6 +2342,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-retarget-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
             runner,
@@ -2271,6 +2353,11 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn(
             "tree-native-parser-document-handoff-overlap-css multi-arm "
             "screening requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-retarget-overlap-css multi-arm screening "
+            "requires --protocol h3",
             runner,
         )
         self.assertIn(

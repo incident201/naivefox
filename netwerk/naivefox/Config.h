@@ -62,6 +62,7 @@ enum class PreambleMode : uint8_t {
   TreeResourceNativeCacheCommittedOverlap,
   TreeNativeParserPreloadOverlap,
   TreeNativeParserDocumentHandoffOverlap,
+  TreeNativeParserRetargetOverlap,
 
   // Compatibility names for the first experimental configuration surface.
   Root = DocumentComplete,
@@ -82,7 +83,13 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
 
 constexpr bool PreambleModeUsesNativeParser(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
-         aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap;
+         aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
+         aMode == PreambleMode::TreeNativeParserRetargetOverlap;
+}
+
+constexpr bool PreambleModeUsesNativeParserHandoff(PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
+         aMode == PreambleMode::TreeNativeParserRetargetOverlap;
 }
 
 struct PreambleConfig final {

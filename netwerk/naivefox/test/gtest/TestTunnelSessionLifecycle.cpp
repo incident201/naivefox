@@ -105,8 +105,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
       detail::ShouldRunPreamble(PreambleMode::DocumentCarrierDispatch, true));
   EXPECT_FALSE(
       detail::ShouldRunPreamble(PreambleMode::DocumentCarrierDispatch, false));
-  EXPECT_TRUE(detail::ShouldRunPreamble(
-      PreambleMode::DocumentColdWinnerHandoff, true));
+  EXPECT_TRUE(
+      detail::ShouldRunPreamble(PreambleMode::DocumentColdWinnerHandoff, true));
   EXPECT_FALSE(detail::ShouldRunPreamble(
       PreambleMode::DocumentColdWinnerHandoff, false));
   EXPECT_TRUE(
@@ -159,6 +159,18 @@ TEST(NaiveFoxTunnelSessionLifecycle, ProtocolSpecificPreambleModeSelection)
             PreambleMode::TreeComplete);
 }
 
+TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
+{
+  EXPECT_TRUE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserRetargetOverlap, 0));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserRetargetOverlap, 1));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserDocumentHandoffOverlap, 0));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserPreloadOverlap, 0));
+}
+
 TEST(NaiveFoxTunnelSessionLifecycle, ResourceCacheFollowsEffectiveTreeMode)
 {
   PreambleConfig config;
@@ -176,8 +188,7 @@ TEST(NaiveFoxTunnelSessionLifecycle, ResourceCacheFollowsEffectiveTreeMode)
   EXPECT_TRUE(
       detail::PreambleChannelUsesCache(config, ProxyProtocol::H3, true));
 
-  config.mH3Mode =
-      Some(PreambleMode::TreeResourceNativeCacheCommittedOverlap);
+  config.mH3Mode = Some(PreambleMode::TreeResourceNativeCacheCommittedOverlap);
   // The product arm restores the native cache lifecycle only for the
   // discovered resource; the synthetic root remains cache-inhibited.
   EXPECT_FALSE(
@@ -205,8 +216,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::DocumentColdWinnerHandoff, false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(
       PreambleMode::DocumentColdWinnerHandoff, true, true, 0, 0, 0, 0));
-  EXPECT_FALSE(detail::PreambleOverlapsConnect(
-      PreambleMode::DocumentColdWinnerHandoff));
+  EXPECT_FALSE(
+      detail::PreambleOverlapsConnect(PreambleMode::DocumentColdWinnerHandoff));
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::DocumentNativeCacheOpen, false, false, 0, 0, 0, 0));
   EXPECT_TRUE(detail::PreambleBarrierReached(
@@ -266,14 +277,13 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
                                              true, true, 1, 0, 0, 1));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeResourceCommittedOverlap, true, true, 1, 0, 0, 0,
-      0));
-  EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeResourceCommittedOverlap, true, true, 1, 0, 0, 0, 1,
-      false));
-  EXPECT_TRUE(detail::PreambleBarrierReached(
-      PreambleMode::TreeResourceCommittedOverlap, true, true, 1, 0, 0, 0, 1,
-      true));
+      PreambleMode::TreeResourceCommittedOverlap, true, true, 1, 0, 0, 0, 0));
+  EXPECT_FALSE(
+      detail::PreambleBarrierReached(PreambleMode::TreeResourceCommittedOverlap,
+                                     true, true, 1, 0, 0, 0, 1, false));
+  EXPECT_TRUE(
+      detail::PreambleBarrierReached(PreambleMode::TreeResourceCommittedOverlap,
+                                     true, true, 1, 0, 0, 0, 1, true));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
@@ -305,11 +315,17 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserPreloadOverlap, true, true, 1, 0, 0, 0, 1,
       true, 0, true));
   EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserDocumentHandoffOverlap, true, true, 1, 0,
-      0, 0, 1, true, 0, false));
+      PreambleMode::TreeNativeParserDocumentHandoffOverlap, true, true, 1, 0, 0,
+      0, 1, true, 0, false));
   EXPECT_TRUE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserDocumentHandoffOverlap, true, true, 1, 0,
-      0, 0, 1, true, 0, true));
+      PreambleMode::TreeNativeParserDocumentHandoffOverlap, true, true, 1, 0, 0,
+      0, 1, true, 0, true));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserRetargetOverlap, true, true, 1, 0, 0, 0, 1,
+      true, 0, false));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserRetargetOverlap, true, true, 1, 0, 0, 0, 1,
+      true, 0, true));
 
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(
@@ -325,6 +341,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserPreloadOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeNativeParserRetargetOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -394,6 +412,15 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserRetargetOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserRetargetOverlap, true));
+
+  EXPECT_TRUE(detail::PreambleRetargetDeliveryVerified(true, true, true));
+  EXPECT_FALSE(detail::PreambleRetargetDeliveryVerified(false, true, true));
+  EXPECT_FALSE(detail::PreambleRetargetDeliveryVerified(true, false, true));
+  EXPECT_FALSE(detail::PreambleRetargetDeliveryVerified(true, true, false));
 
   detail::PreambleSequenceState sequence;
   constexpr uint64_t generation = 17;
