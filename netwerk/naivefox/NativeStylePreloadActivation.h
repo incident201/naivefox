@@ -78,7 +78,11 @@ class NativeStylePreloadActivation final {
                                                          nsresult aStatus);
   static void CompleteRootReplacement(uint64_t aRequestId, nsresult aStatus);
   static void CancelRootReplacement(uint64_t aRequestId);
+
+  static nsresult RunProcessBootstrapAdmission();
 };
+
+int RunNativeStylePreloadActivationChild(int aArgc, char* aArgv[]);
 
 }  // namespace mozilla::naivefox
 

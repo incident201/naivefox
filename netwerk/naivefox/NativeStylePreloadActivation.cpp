@@ -5,32 +5,54 @@
 #include "NativeStylePreloadActivation.h"
 
 #include <atomic>
+#include <cstdlib>
+#include <string>
 #include <utility>
+#include <vector>
 
+#if defined(XP_UNIX)
+#  include <limits.h>
+#  include <unistd.h>
+#endif
+
+#include "base/at_exit.h"
+#include "base/message_loop.h"
+#include "base/process_util.h"
 #include "RuntimeLogging.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Logging.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/ScopeExit.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/ipc/IOThread.h"
+#include "mozilla/ipc/NodeController.h"
 #include "mozilla/ipc/ProtocolUtils.h"
+#include "mozilla/GeckoArgs.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationChild.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationParent.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationRequestChild.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationRequestParent.h"
+#include "mozilla/naivefox/PNativeStylePreloadProcessChild.h"
+#include "mozilla/naivefox/PNativeStylePreloadProcessParent.h"
 #include "nsCOMPtr.h"
 #include "nsHashKeys.h"
 #include "nsISerialEventTarget.h"
 #include "nsISocketTransportService.h"
 #include "nsIThread.h"
+#include "nsITimer.h"
 #include "nsNetCID.h"
 #include "nsServiceManagerUtils.h"
 #include "nsTHashMap.h"
 #include "nsThreadUtils.h"
+#include "nsThreadManager.h"
+#include "nsXPCOM.h"
 
 namespace mozilla::naivefox {
+
+bool EnterNativeStylePreloadActivationChildRole();
 
 namespace {
 
@@ -2156,6 +2178,228 @@ void ActivationState::Shutdown() {
 
 }  // namespace
 
+namespace {
+
+constexpr uint32_t kActivationProcessAdmissionTimeoutMs = 10000;
+
+class ProcessAdmissionState final {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ProcessAdmissionState)
+
+  void LaunchFailed(nsresult aStatus) {
+    MOZ_ASSERT(NS_IsMainThread());
+    if (!mTerminal) {
+      mStatus = aStatus;
+      mTerminal = true;
+    }
+  }
+
+  void SetLaunched(base::ProcessHandle aProcess) {
+    MOZ_ASSERT(NS_IsMainThread());
+    mProcess = aProcess;
+  }
+
+  void HelloAccepted() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mHelloAccepted = true;
+  }
+
+  void ActorDestroyed(bool aExpected) {
+    MOZ_ASSERT(NS_IsMainThread());
+    if (!mTerminal) {
+      mStatus = aExpected && mHelloAccepted ? NS_OK : NS_ERROR_FAILURE;
+      mTerminal = true;
+    }
+  }
+
+  bool IsTerminal() const {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mTerminal;
+  }
+
+  nsresult Status() const {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mStatus;
+  }
+
+  base::ProcessHandle TakeProcess() {
+    MOZ_ASSERT(NS_IsMainThread());
+    return std::exchange(mProcess, base::kInvalidProcessHandle);
+  }
+
+ private:
+  ~ProcessAdmissionState() = default;
+
+  base::ProcessHandle mProcess = base::kInvalidProcessHandle;
+  nsresult mStatus = NS_ERROR_FAILURE;
+  bool mHelloAccepted = false;
+  bool mTerminal = false;
+};
+
+class ActivationProcessParent final : public PNativeStylePreloadProcessParent {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ActivationProcessParent, override)
+
+  ActivationProcessParent(ProcessAdmissionState* aState,
+                          base::ProcessId aExpectedChildPid,
+                          base::ProcessId aExpectedParentPid)
+      : mState(aState),
+        mExpectedChildPid(aExpectedChildPid),
+        mExpectedParentPid(aExpectedParentPid) {}
+
+ private:
+  ~ActivationProcessParent() = default;
+
+  IPCResult RecvHello(const uint64_t& aChildPid,
+                      const uint64_t& aObservedParentPid) final {
+    MOZ_ASSERT(NS_IsMainThread());
+    if (mHelloReceived || aChildPid != uint64_t(mExpectedChildPid) ||
+        aObservedParentPid != uint64_t(mExpectedParentPid) ||
+        OtherPid() != mExpectedChildPid) {
+      return IPC_FAIL_NO_REASON(this);
+    }
+    mHelloReceived = true;
+    mState->HelloAccepted();
+    RuntimeLogEvent(
+        "Native activation process phase=hello parent_pid=%llu "
+        "child_pid=%llu cross_process=1\n",
+        static_cast<unsigned long long>(mExpectedParentPid),
+        static_cast<unsigned long long>(mExpectedChildPid));
+    if (!SendShutdown()) {
+      return IPC_FAIL_NO_REASON(this);
+    }
+    mShutdownSent = true;
+    return IPC_OK();
+  }
+
+  void ActorDestroy(IProtocol::ActorDestroyReason aWhy) final {
+    MOZ_ASSERT(NS_IsMainThread());
+    mState->ActorDestroyed(mHelloReceived && mShutdownSent &&
+                           (aWhy == Deletion || aWhy == NormalShutdown));
+  }
+
+  const RefPtr<ProcessAdmissionState> mState;
+  const base::ProcessId mExpectedChildPid;
+  const base::ProcessId mExpectedParentPid;
+  bool mHelloReceived = false;
+  bool mShutdownSent = false;
+};
+
+class ActivationProcessChild final : public PNativeStylePreloadProcessChild {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ActivationProcessChild, override)
+
+  ActivationProcessChild(base::ProcessId aParentPid, bool* aDone)
+      : mParentPid(aParentPid), mDone(aDone) {}
+
+  bool Start() {
+    return SendHello(uint64_t(base::GetCurrentProcId()), uint64_t(mParentPid));
+  }
+
+ private:
+  ~ActivationProcessChild() = default;
+
+  IPCResult RecvShutdown() final {
+    MOZ_ASSERT(NS_IsMainThread());
+    if (mShutdownReceived) {
+      return IPC_FAIL_NO_REASON(this);
+    }
+    mShutdownReceived = true;
+    Close();
+    return IPC_OK();
+  }
+
+  void ActorDestroy(IProtocol::ActorDestroyReason) final {
+    MOZ_ASSERT(NS_IsMainThread());
+    *mDone = true;
+  }
+
+  const base::ProcessId mParentPid;
+  bool* const mDone;
+  bool mShutdownReceived = false;
+};
+
+#if defined(XP_UNIX) && !defined(ANDROID)
+void LaunchActivationProcess(ProcessAdmissionState* aState) {
+  MOZ_ASSERT(ipc::IOThread::Get()->GetEventTarget()->IsOnCurrentThread());
+
+  IPC::Channel::ChannelHandle clientHandle;
+  ipc::ScopedPort initialPort;
+  ipc::NodeChannel* rawNodeChannel = nullptr;
+  if (!ipc::NodeController::GetSingleton()->InviteChildProcess(
+          nullptr, &clientHandle, &initialPort, &rawNodeChannel)) {
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::ActivationProcessInviteFailed",
+        [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
+    return;
+  }
+  RefPtr<ipc::NodeChannel> nodeChannel = dont_AddRef(rawNodeChannel);
+
+  auto* unixHandle = std::get_if<UniqueFileHandle>(&clientHandle);
+  if (!unixHandle || !*unixHandle) {
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::ActivationProcessHandleFailed",
+        [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
+    return;
+  }
+
+  geckoargs::ChildProcessArgs childArgs;
+  geckoargs::sIPCHandle.Put(std::move(*unixHandle), childArgs);
+  const base::ProcessId parentPid = base::GetCurrentProcId();
+  geckoargs::sParentPid.Put(uint64_t(parentPid), childArgs);
+  const nsID channelId = nsID::GenerateUUID();
+  char channelIdString[NSID_LENGTH];
+  channelId.ToProvidedString(channelIdString);
+  geckoargs::sInitialChannelID.Put(channelIdString, childArgs);
+
+  char executablePath[PATH_MAX + 1];
+  const ssize_t executableLength =
+      readlink("/proc/self/exe", executablePath, PATH_MAX);
+  if (executableLength <= 0 || executableLength > PATH_MAX) {
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::ActivationProcessExecutableFailed",
+        [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
+    return;
+  }
+  executablePath[executableLength] = '\0';
+
+  std::vector<std::string> argv{executablePath,
+                                "--naivefox-activation-child"};
+  argv.insert(argv.end(), childArgs.mArgs.begin(), childArgs.mArgs.end());
+  base::LaunchOptions options;
+  geckoargs::AddToFdsToRemap(childArgs, options.fds_to_remap);
+  base::ProcessHandle childProcess = base::kInvalidProcessHandle;
+  if (base::LaunchApp(argv, std::move(options), &childProcess).isErr() ||
+      childProcess == base::kInvalidProcessHandle) {
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::ActivationProcessLaunchFailed",
+        [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
+    return;
+  }
+
+  Endpoint<PNativeStylePreloadProcessParent> endpoint(
+      ipc::PrivateIPDLInterface{}, std::move(initialPort), channelId,
+      ipc::EndpointProcInfo::Current(),
+      ipc::EndpointProcInfo{.mPid = childProcess, .mChildID = 1});
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::BindActivationProcessParent",
+      [state = RefPtr{aState}, endpoint = std::move(endpoint), childProcess,
+       parentPid, nodeChannel = std::move(nodeChannel)]() mutable {
+        state->SetLaunched(childProcess);
+        RefPtr<ActivationProcessParent> actor =
+            new ActivationProcessParent(state, childProcess, parentPid);
+        if (!endpoint.Bind(actor)) {
+          state->LaunchFailed(NS_ERROR_FAILURE);
+        }
+      }));
+  if (NS_FAILED(rv)) {
+    (void)base::KillProcess(childProcess, 1);
+  }
+}
+#endif
+
+}  // namespace
+
 nsresult NativeStylePreloadActivation::Initialize() {
   MOZ_ASSERT(NS_IsMainThread());
   if (sActivationState) {
@@ -2277,6 +2521,123 @@ void NativeStylePreloadActivation::CancelRootReplacement(uint64_t aRequestId) {
   if (sActivationState) {
     sActivationState->CancelRoot(aRequestId);
   }
+}
+
+nsresult NativeStylePreloadActivation::RunProcessBootstrapAdmission() {
+  MOZ_ASSERT(NS_IsMainThread());
+#if !defined(XP_UNIX) || defined(ANDROID)
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
+  if (!ipc::IOThread::Get()) {
+    ipc::IOThread::Startup();
+  }
+  RefPtr<ProcessAdmissionState> state = new ProcessAdmissionState();
+  nsresult rv = ipc::IOThread::Get()->GetEventTarget()->Dispatch(
+      NS_NewRunnableFunction("NaiveFox::LaunchActivationProcess",
+                             [state]() { LaunchActivationProcess(state); }));
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  nsCOMPtr<nsITimer> deadline;
+  MOZ_TRY(NS_NewTimerWithCallback(
+      getter_AddRefs(deadline),
+      [state](nsITimer*) { state->LaunchFailed(NS_ERROR_NET_TIMEOUT); },
+      kActivationProcessAdmissionTimeoutMs, nsITimer::TYPE_ONE_SHOT,
+      "NaiveFox::ActivationProcessAdmissionTimeout"_ns));
+  const bool processed = SpinEventLoopUntil(
+      "NaiveFox::ActivationProcessAdmission"_ns,
+      [&]() { return state->IsTerminal(); });
+  (void)deadline->Cancel();
+  if (!processed) {
+    return NS_ERROR_FAILURE;
+  }
+
+  const nsresult status = state->Status();
+  const base::ProcessHandle childProcess = state->TakeProcess();
+  if (childProcess != base::kInvalidProcessHandle) {
+    if (NS_FAILED(status)) {
+      (void)base::KillProcess(childProcess, 1);
+    }
+    int processInfo = 0;
+    const base::ProcessStatus processStatus = base::WaitForProcess(
+        childProcess, base::BlockingWait::Yes, &processInfo);
+    if (NS_SUCCEEDED(status) &&
+        (processStatus != base::ProcessStatus::Exited || processInfo != 0)) {
+      return NS_ERROR_FAILURE;
+    }
+  }
+  return status;
+#endif
+}
+
+int RunNativeStylePreloadActivationChild(int aArgc, char* aArgv[]) {
+#if !defined(XP_UNIX) || defined(ANDROID)
+  return 2;
+#else
+  base::AtExitManager atExit;
+  MessageLoopForUI mainLoop(MessageLoop::TYPE_MOZILLA_CHILD);
+  NS_LogInit();
+  auto logging = MakeScopeExit([] { NS_LogTerm(); });
+  LogModule::Init(aArgc, aArgv);
+
+  Maybe<UniqueFileHandle> ipcHandle =
+      geckoargs::sIPCHandle.Get(aArgc, aArgv);
+  Maybe<uint64_t> parentPid = geckoargs::sParentPid.Get(aArgc, aArgv);
+  Maybe<const char*> channelIdString =
+      geckoargs::sInitialChannelID.Get(aArgc, aArgv);
+  nsID channelId;
+  if (ipcHandle.isNothing() || !*ipcHandle || parentPid.isNothing() ||
+      *parentPid > uint64_t(INT32_MAX) || channelIdString.isNothing() ||
+      !channelId.Parse(nsDependentCString(*channelIdString))) {
+    return 2;
+  }
+
+  nsresult rv = NS_InitMinimalXPCOM();
+  if (NS_FAILED(rv) || !EnterNativeStylePreloadActivationChildRole()) {
+    if (NS_SUCCEEDED(rv)) {
+      (void)NS_ShutdownXPCOM(nullptr);
+    }
+    return 2;
+  }
+  auto ioThread = MakeUnique<ipc::IOThreadChild>(
+      IPC::Channel::ChannelHandle{std::move(*ipcHandle)},
+      base::ProcessId(*parentPid));
+  Endpoint<PNativeStylePreloadProcessChild> endpoint(
+      ipc::PrivateIPDLInterface{}, ioThread->TakeInitialPort(), channelId,
+      ipc::EndpointProcInfo::Current(),
+      ipc::EndpointProcInfo{.mPid = base::ProcessId(*parentPid), .mChildID = 0});
+
+  bool done = false;
+  RefPtr<ActivationProcessChild> actor =
+      new ActivationProcessChild(base::ProcessId(*parentPid), &done);
+  if (!endpoint.Bind(actor)) {
+    ioThread = nullptr;
+    (void)NS_ShutdownXPCOM(nullptr);
+    return 2;
+  }
+  if (!actor->Start()) {
+    actor->Close();
+    (void)SpinEventLoopUntil("NaiveFox::ActivationChildBindFailure"_ns,
+                             [&]() { return done; });
+    actor = nullptr;
+    ioThread = nullptr;
+    (void)NS_ShutdownXPCOM(nullptr);
+    return 2;
+  }
+
+  RuntimeLogEvent(
+      "Native activation process phase=child-running parent_pid=%llu "
+      "child_pid=%llu\n",
+      static_cast<unsigned long long>(*parentPid),
+      static_cast<unsigned long long>(base::GetCurrentProcId()));
+  const bool processed = SpinEventLoopUntil(
+      "NaiveFox::ActivationChildLifetime"_ns, [&]() { return done; });
+  actor = nullptr;
+  ioThread = nullptr;
+  const nsresult shutdownRv = NS_ShutdownXPCOM(nullptr);
+  return processed && NS_SUCCEEDED(shutdownRv) ? 0 : 2;
+#endif
 }
 
 }  // namespace mozilla::naivefox

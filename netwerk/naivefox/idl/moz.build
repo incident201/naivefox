@@ -72,6 +72,7 @@ IPDL_SOURCES += [
     "NativeStylePreloadActivationTypes.ipdlh",
     "PNativeStylePreloadActivation.ipdl",
     "PNativeStylePreloadActivationRequest.ipdl",
+    "PNativeStylePreloadProcess.ipdl",
     "PrefsTypes.ipdlh",
 ]
 

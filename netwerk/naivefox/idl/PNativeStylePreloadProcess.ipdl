@@ -1,0 +1,18 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+namespace mozilla {
+namespace naivefox {
+
+[ChildProc=any, ChildImpl=virtual, ParentImpl=virtual, NeedsOtherPid]
+async protocol PNativeStylePreloadProcess {
+parent:
+  async Hello(uint64_t childPid, uint64_t observedParentPid);
+
+child:
+  async Shutdown();
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

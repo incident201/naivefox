@@ -48,11 +48,15 @@ SOURCES += [
     "!/ipc/ipdl/PNativeStylePreloadActivationRequest.cpp",
     "!/ipc/ipdl/PNativeStylePreloadActivationRequestChild.cpp",
     "!/ipc/ipdl/PNativeStylePreloadActivationRequestParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcess.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessParent.cpp",
 ]
 
 XPCOM_MANIFESTS += ["components.conf"]
 
 SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
+SOURCES += ["/toolkit/xre/GeckoArgs.cpp"]
 SOURCES += ["/toolkit/components/build/nsToolkitCompsModule.cpp"]
 SOURCES += [
     "/netwerk/url-classifier/UrlClassifierFeatureBase.cpp",

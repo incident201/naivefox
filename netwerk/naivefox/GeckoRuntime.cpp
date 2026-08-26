@@ -4,6 +4,7 @@
 
 #include "GeckoRuntime.h"
 
+#include "NaiveFoxAPI.h"
 #include "NativeStylePreloadActivation.h"
 
 #ifdef XP_WIN
@@ -13,6 +14,7 @@
 #  include <unistd.h>
 #endif
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -20,6 +22,7 @@
 #include "CacheObserver.h"
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
+#include "mozilla/ipc/IOThread.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
@@ -51,6 +54,12 @@
 #endif
 
 namespace mozilla::naivefox {
+
+#if !defined(ANDROID) && !defined(__ANDROID__)
+// Implemented by the lean activation transport. Keep the exported C entry
+// point below independent from the C++ actor implementation.
+int RunNativeStylePreloadActivationChild(int aArgc, char* aArgv[]);
+#endif
 
 namespace {
 
@@ -592,28 +601,70 @@ constexpr const volatile xpc::ReadOnlyPage xpc::ReadOnlyPage::sInstance;
 
 void xpc::ReadOnlyPage::Init() {}
 
-GeckoProcessType XRE_GetProcessType() { return GeckoProcessType_Default; }
+namespace {
 
-const char* XRE_GetProcessTypeString() { return "default"; }
+std::atomic<GeckoProcessType> sNaiveFoxProcessType{
+    GeckoProcessType_Default};
+std::atomic<bool> sNaiveFoxActivationChildEntered{false};
 
-GeckoChildID XRE_GetChildID() { return 0; }
+}  // namespace
+
+namespace mozilla::naivefox {
+
+bool EnterNativeStylePreloadActivationChildRole() {
+  bool expected = false;
+  if (!sNaiveFoxActivationChildEntered.compare_exchange_strong(
+          expected, true, std::memory_order_acq_rel,
+          std::memory_order_acquire)) {
+    return false;
+  }
+  sNaiveFoxProcessType.store(GeckoProcessType_Utility,
+                             std::memory_order_release);
+  return true;
+}
+
+}  // namespace mozilla::naivefox
+
+GeckoProcessType XRE_GetProcessType() {
+  return sNaiveFoxProcessType.load(std::memory_order_acquire);
+}
+
+const char* XRE_GetProcessTypeString() {
+  return XRE_GetProcessType() == GeckoProcessType_Utility ? "utility"
+                                                          : "default";
+}
+
+GeckoChildID XRE_GetChildID() {
+  return XRE_GetProcessType() == GeckoProcessType_Default ? 0 : 1;
+}
 
 bool XRE_IsE10sParentProcess() { return false; }
 
 #  define GECKO_PROCESS_TYPE(enum_value, enum_name, string_name,               \
                              proc_typename, process_bin_type,                  \
                              procinfo_typename, webidl_typename, allcaps_name) \
-    bool XRE_Is##proc_typename##Process() { return enum_value == 0; }
+    bool XRE_Is##proc_typename##Process() {                                    \
+      return XRE_GetProcessType() == GeckoProcessType_##enum_name;             \
+    }
 #  include "mozilla/GeckoProcessTypes.h"
 #  undef GECKO_PROCESS_TYPE
 
 bool XRE_UseNativeEventProcessing() { return false; }
 
 nsISerialEventTarget* XRE_GetAsyncIOEventTarget() {
-  static nsCOMPtr<nsISerialEventTarget> sTarget =
-      mozilla::GetMainThreadSerialEventTarget();
-  return sTarget;
+  if (mozilla::ipc::IOThread* ioThread = mozilla::ipc::IOThread::Get()) {
+    return ioThread->GetEventTarget();
+  }
+  return mozilla::GetMainThreadSerialEventTarget();
 }
+
+#  if !defined(ANDROID) && !defined(__ANDROID__)
+extern "C" NAIVEFOX_EXPORT int NaiveFoxActivationChildMain(int aArgc,
+                                                            char* aArgv[]) {
+  return mozilla::naivefox::RunNativeStylePreloadActivationChild(aArgc,
+                                                                 aArgv);
+}
+#  endif
 
 nsresult XRE_GetFileFromPath(const char* aPath, nsIFile** aResult) {
 #  ifdef XP_WIN

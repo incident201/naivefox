@@ -12,6 +12,7 @@
 #include "HttpClient.h"
 #include "NaiveFoxAPI.h"
 #include "NeckoTunnel.h"
+#include "NativeStylePreloadActivation.h"
 #include "ProfilerControl.h"
 #include "ProxyProtocol.h"
 #include "RuntimeLogging.h"
@@ -48,12 +49,13 @@ void PrintUsage(const char* aProgram) {
       "Usage: %s [CONFIG_PATH]\n"
       "       %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
+      "       %s --profile PATH --activation-process-smoke\n"
       "       %s --profile PATH --fetch URL\n"
       "       %s --profile PATH --raw-tunnel-smoke PROXY_URL TARGET "
       "[--protocol h2|h3|auto]\n"
       "       %s --profile PATH --socks-listen 127.0.0.1:PORT "
       "--proxy PROXY_URL [--protocol h2|h3|auto] [--max-connections N]\n",
-      aProgram, aProgram, aProgram, aProgram, aProgram, aProgram);
+      aProgram, aProgram, aProgram, aProgram, aProgram, aProgram, aProgram);
 }
 
 bool ParseProxyProtocol(const char* aValue,
@@ -320,6 +322,7 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       mozilla::naivefox::ProxyProtocol::H2;
   uint32_t maxConnections = 0;
   bool runtimeSmoke = false;
+  bool activationProcessSmoke = false;
   bool protocolSpecified = false;
 
   for (int i = 1; i < aArgc; ++i) {
@@ -329,6 +332,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       fetchUrl.Assign(aArgv[++i]);
     } else if (std::strcmp(aArgv[i], "--runtime-smoke") == 0) {
       runtimeSmoke = true;
+    } else if (std::strcmp(aArgv[i], "--activation-process-smoke") == 0) {
+      activationProcessSmoke = true;
     } else if (std::strcmp(aArgv[i], "--raw-tunnel-smoke") == 0 &&
                i + 2 < aArgc) {
       rawProxyUrl.Assign(aArgv[++i]);
@@ -362,7 +367,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     }
   }
 
-  int modes = static_cast<int>(runtimeSmoke) + !fetchUrl.IsEmpty() +
+  int modes = static_cast<int>(runtimeSmoke) +
+              static_cast<int>(activationProcessSmoke) + !fetchUrl.IsEmpty() +
               !rawProxyUrl.IsEmpty() + !socksListen.IsEmpty();
   if (profile.IsEmpty() || modes != 1 ||
       (rawProxyUrl.IsEmpty() != rawTarget.IsEmpty()) ||
@@ -386,6 +392,9 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   if (NS_SUCCEEDED(rv)) {
     if (runtimeSmoke) {
       rv = runtime.RunEventLoopSmoke();
+    } else if (activationProcessSmoke) {
+      rv = mozilla::naivefox::NativeStylePreloadActivation::
+          RunProcessBootstrapAdmission();
     } else if (!fetchUrl.IsEmpty()) {
       rv = mozilla::naivefox::FetchWithNecko(fetchUrl);
     } else if (!rawProxyUrl.IsEmpty()) {
