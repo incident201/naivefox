@@ -113,7 +113,88 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_EQ(config.mPreamble.mMaxBytes, 0U);
   EXPECT_EQ(config.mMaxConnections, 0U);
   EXPECT_FALSE(config.mOuterSessionGate);
+  EXPECT_FALSE(config.mImplicitH3PreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
+}
+
+TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitH3Only)
+{
+  nsAutoCString error;
+  Config implicitH3;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example"})"_ns,
+          implicitH3, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(implicitH3.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_EQ(implicitH3.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(implicitH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_TRUE(implicitH3.mPreamble.mPath.EqualsLiteral("/"));
+  EXPECT_EQ(implicitH3.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(implicitH3.mPreamble.mMaxBytes,
+            PreambleConfig::kDefaultDocumentMaxBytes);
+  EXPECT_FALSE(implicitH3.mPreamble.mCacheResources);
+  EXPECT_FALSE(implicitH3.mOuterSessionGate);
+  EXPECT_TRUE(implicitH3.mImplicitH3PreambleGate);
+
+  Config explicitOff;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","preamble":{"mode":"off"}})"_ns,
+          explicitOff, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(explicitOff.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_EQ(explicitOff.mPreamble.mMaxBytes, 0U);
+  EXPECT_FALSE(explicitOff.mOuterSessionGate);
+  EXPECT_FALSE(explicitOff.mImplicitH3PreambleGate);
+
+  Config explicitGateOnly;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","preamble":{"mode":"off"},"outer-session-gate":true})"_ns,
+          explicitGateOnly, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(explicitGateOnly.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_TRUE(explicitGateOnly.mOuterSessionGate);
+  EXPECT_FALSE(explicitGateOnly.mImplicitH3PreambleGate);
+
+  Config mixedProtocols;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://h2.example","quic://h3.example"]})"_ns,
+          mixedProtocols, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_TRUE(mixedProtocols.mImplicitH3PreambleGate);
+
+  for (const auto& [value, expected] :
+       {std::pair{"false", false}, std::pair{"true", true}}) {
+    Config explicitGate;
+    error.Truncate();
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","outer-session-gate":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    ASSERT_EQ(ParseConfig(json, explicitGate, error), NS_OK) << error.get();
+    EXPECT_EQ(explicitGate.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+              PreambleMode::DocumentStartOverlap);
+    EXPECT_EQ(explicitGate.mOuterSessionGate, expected);
+    EXPECT_FALSE(explicitGate.mImplicitH3PreambleGate);
+  }
 }
 
 TEST(NaiveFoxConfig, MaxConnectionsIsBoundedAndExplicit)
@@ -743,6 +824,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
   source.mPreamble.mCacheResources = true;
   source.mOuterSessionGate = true;
+  source.mImplicitH3PreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
 
   TunnelConfig constructed(source);
@@ -764,6 +846,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);
     EXPECT_TRUE(copy->mPreamble.mCacheResources);
     EXPECT_TRUE(copy->mOuterSessionGate);
+    EXPECT_TRUE(copy->mImplicitH3PreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
   }
 }

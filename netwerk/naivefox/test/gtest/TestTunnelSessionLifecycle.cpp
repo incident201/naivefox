@@ -91,6 +91,15 @@ TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
   EXPECT_TRUE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
   config.mProtocol = ProxyProtocol::Auto;
   EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+
+  config.mOuterSessionGate = false;
+  config.mImplicitH3PreambleGate = true;
+  config.mProtocol = ProxyProtocol::H2;
+  EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+  config.mProtocol = ProxyProtocol::H3;
+  EXPECT_TRUE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+  config.mProtocol = ProxyProtocol::Auto;
+  EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)

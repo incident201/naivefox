@@ -33,6 +33,23 @@ HEADERS to precede CONNECT HEADERS on the sole QUIC identity; failure rejects
 the mechanism and never causes selective recapture. Response HEADERS and FIN
 ordering remain outcomes rather than admission criteria.
 
+Safe 30-block same-base acceptance artifact `7b5c70011f0fba08` (seed
+`27082730`) compared explicit `off` with `document-start-overlap` using paired
+Firefox A/B controls and inner HTTPS/H2. The document-start policy improved
+packets 1--16 (`0.16459` to `0.13442`), packets 17--32 (`0.76117` to
+`0.65828`), packets 1--32 (`0.26499` to `0.22720`), packets 1--64/128, and the
+250 ms view (`0.14026` to `0.12081`). No whole-flow regression was detected
+(`0.38926` to `0.38660`; paired CI included zero), but equivalence was not
+proved. All 120 participants passed
+the isolated-network mutation and capture-drop policy. This satisfies the
+predeclared product gate, so omitted preamble now enables the mechanism only
+for explicit H3 upstreams; explicit `mode: off` remains the control/opt-out,
+and H2 scheduling remains unchanged.
+Secondary `steady_after_32` and lifecycle point estimates favored `off`; the
+steady paired interval crossed zero and lifecycle did not survive the report's
+Holm correction (`p=0.136`). They remain regression monitors rather than a
+reason to override the predeclared early/250 ms/whole acceptance views.
+
 `tree-native-parser-document-start-overlap` keeps the same request-commit
 barrier and lets the root continue in the background through the lean HTML5
 speculative scanner and one native stylesheet preload. Decrypted admission is

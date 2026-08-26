@@ -276,6 +276,19 @@ done
 [[ $(rg -c "^Outer protocol: $protocol$" "$client_log") -eq 11 ]]
 [[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 11 ]]
 ! rg -q '^Padding negotiated: no$' "$client_log"
+if [[ ${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} != 1 ]]; then
+  if [[ $protocol == h3 ]]; then
+    # Omitted product preamble promotes one cold-route document-start GET for
+    # an explicit H3 upstream. The remaining ten tunnels reuse the ready route
+    # without replaying the implicit preamble.
+    [[ $(rg -c 'preamble document-start-overlap admission=request-committed' \
+      "$client_log") -eq 1 ]]
+    [[ $(rg -c 'preamble document-start-overlap drain=complete' \
+      "$client_log") -eq 1 ]]
+  else
+    ! rg -q 'preamble document-start-overlap' "$client_log"
+  fi
+fi
 ! rg -Fq "$NAIVEFOX_FIXTURE_PASS" "$client_log"
 
 if [[ ${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} == 1 ]]; then

@@ -1495,7 +1495,12 @@ bool TunnelSession::ShouldGateOuterSession(const TunnelConfig& aConfig) {
   // H2 route, releasing that stale H3 callback would recreate the startup
   // race. Keep Auto's existing per-session H3 -> H2 generation semantics
   // until the winning protocol can be propagated to queued attempts.
-  return aConfig.mOuterSessionGate && aConfig.mProtocol != ProxyProtocol::Auto;
+  const bool implicitH3Gate =
+      aConfig.mImplicitH3PreambleGate &&
+      aConfig.mProtocol == ProxyProtocol::H3;
+  const bool explicitGate =
+      aConfig.mOuterSessionGate && aConfig.mProtocol != ProxyProtocol::Auto;
+  return implicitH3Gate || explicitGate;
 }
 
 void TunnelSession::ResetAttemptState() {

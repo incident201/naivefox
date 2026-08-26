@@ -540,8 +540,12 @@ was absent unless H3 frames from the first connection were actually decrypted.
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
-adds one bounded document GET before CONNECT. The tree modes also fetch two
-resources from that browser page; `tree-complete` waits for them, while
+adds one bounded document GET before CONNECT. The harness always emits these
+fields explicitly. Thus `off` remains a true
+control even though a successfully parsed product config which omits
+`preamble` now promotes `document-start-overlap` for explicit H3 upstreams.
+The tree modes also fetch two resources from that browser page;
+`tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
 `tree-resource-committed-overlap-css` is an H3-only, one-resource causal arm.
 `tree-native-parser-document-handoff-overlap-css` keeps the existing native

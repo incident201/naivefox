@@ -78,8 +78,17 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
-- `preamble` is optional and defaults to `off`. `mode` remains the required
-  default when the object is present; optional `h2-mode` and `h3-mode`
+- `preamble` is optional. When it is omitted, an explicit `quic://` upstream
+  uses the promoted H3-only `document-start-overlap` policy at path `/` with a
+  64 KiB safety budget; strict H2 remains `off`. The implicit cold-route gate
+  also applies only to that H3 upstream, so H2 scheduling is unchanged. An
+  explicit `{"preamble":{"mode":"off"}}` is the complete opt-out, and an
+  explicit `outer-session-gate` value remains authoritative: `false` runs the
+  implicit H3 document on every tunnel, while `true` retains the existing
+  global gate semantics. An older H3 gate-only config must now add explicit
+  `mode: off` to keep sending no document GET. The 64 KiB value is a safety cap,
+  not a target response size. `mode` is still
+  required when the preamble object is present; optional `h2-mode` and `h3-mode`
   override it only for that negotiated outer protocol. This allows Auto mode
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
@@ -126,6 +135,13 @@ The supported config is a strict NaiveProxy-compatible subset:
   only after the H2/H3 request stream has accepted and committed the GET. It
   then permits CONNECT while the response continues. Admission and final HTTP
   result are separate events; a normal 2xx root drain remains mandatory.
+  Same-base 30-block acceptance artifact `7b5c70011f0fba08` compared explicit
+  `off` and this mode against paired Firefox A/B controls with inner HTTPS/H2.
+  It improved packets 1--16 (`0.16459` to `0.13442`), packets 17--32
+  (`0.76117` to `0.65828`), packets 1--32 (`0.26499` to `0.22720`), and the
+  250 ms view (`0.14026` to `0.12081`); no whole-flow regression was detected
+  (`0.38926` to `0.38660`, with a paired interval crossing zero). It is
+  therefore the implicit default for explicit H3 upstreams.
   `tree-native-parser-document-start-overlap` preserves that same early
   request-commit admission, then continues the root response through the lean
   HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens
