@@ -569,6 +569,7 @@ class ProxyPreambleOperation::Impl final {
     uint32_t mHttpStatus = 0;
     bool mHeadersReceived = false;
     bool mResponseHeadersReceived = false;
+    bool mRequestCommitted = false;
     bool mDone = false;
   };
 
@@ -589,6 +590,7 @@ class ProxyPreambleOperation::Impl final {
   nsresult mFirstFailure = NS_OK;
   bool mParserInHead = true;
   bool mRootDone = false;
+  bool mRootCompletedSuccessfully = false;
   bool mBarrierFired = false;
   bool mFinishedFired = false;
   bool mCancelled = false;
@@ -1056,13 +1058,21 @@ nsresult ProxyPreambleOperation::Start(
 void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
                                                 nsIRequest* aRequest) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mImpl->mCancelled ||
-      mImpl->mConfig.mMode != PreambleMode::DocumentStartOverlap ||
-      aStreamId != 0 || aStreamId >= mImpl->mStreams.Length() ||
+  if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length() ||
       !SameCOMIdentity(mImpl->mStreams[aStreamId].mRequest, aRequest)) {
     return;
   }
-  FireBarrierCallback();
+  if (mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap &&
+      aStreamId == 0) {
+    FireBarrierCallback();
+    return;
+  }
+  if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeResourceCommittedOverlap &&
+      aStreamId > 0) {
+    mImpl->mStreams[aStreamId].mRequestCommitted = true;
+    MaybeFireBarrier();
+  }
 }
 
 nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
@@ -1344,6 +1354,10 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       stream.mUri = resourceUri;
       stream.mRequest = channel;
       RefPtr<StreamListener> listener = new StreamListener(this, streamId);
+      if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeResourceCommittedOverlap) {
+        MOZ_TRY(channel->SetNotificationCallbacks(listener));
+      }
       nsresult openRv = channel->AsyncOpen(listener);
       if (NS_FAILED(openRv)) {
         mImpl->mStreams.RemoveLastElement();
@@ -1387,8 +1401,10 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   }
   if (aStreamId == 0) {
     mImpl->mRootDone = true;
-    if (!detail::PreambleResourceCompletedSuccessfully(
-            stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus)) {
+    mImpl->mRootCompletedSuccessfully =
+        detail::PreambleResourceCompletedSuccessfully(
+            stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus);
+    if (!mImpl->mRootCompletedSuccessfully) {
       mImpl->mAllStreamsCompletedNormally = false;
     }
   }
@@ -1397,7 +1413,7 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   MaybeFinish();
 }
 
-void ProxyPreambleOperation::FireBarrierCallback() {
+void ProxyPreambleOperation::FireBarrierCallback(bool aTerminalFallback) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mBarrierFired || !mImpl->mBarrierCallback) {
     return;
@@ -1408,8 +1424,13 @@ void ProxyPreambleOperation::FireBarrierCallback() {
       mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams[0].mHttpStatus;
   const uint32_t startedResources =
       mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams.Length() - 1;
+  uint32_t committedResources = 0;
+  for (uint32_t index = 1; index < mImpl->mStreams.Length(); ++index) {
+    committedResources += mImpl->mStreams[index].mRequestCommitted;
+  }
   callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes,
-            startedResources, mImpl->mRootDone});
+            startedResources, committedResources, mImpl->mRootDone,
+            aTerminalFallback});
 }
 
 void ProxyPreambleOperation::MaybeFireBarrier() {
@@ -1424,16 +1445,19 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
   uint32_t assetsWithHeadersNotDone = 0;
   uint32_t assetsWithHeadersOrDone = 0;
   uint32_t assetsDone = 0;
+  uint32_t assetsCommitted = 0;
   for (uint32_t index = 1; index < mImpl->mStreams.Length(); ++index) {
     const auto& candidate = mImpl->mStreams[index];
     assetsWithHeadersNotDone +=
         candidate.mResponseHeadersReceived && !candidate.mDone;
     assetsWithHeadersOrDone += candidate.mHeadersReceived || candidate.mDone;
     assetsDone += candidate.mDone;
+    assetsCommitted += candidate.mRequestCommitted;
   }
   const bool barrierReached = detail::PreambleBarrierReached(
       mImpl->mConfig.mMode, rootResponseAccepted, mImpl->mRootDone, assetCount,
-      assetsWithHeadersNotDone, assetsWithHeadersOrDone, assetsDone);
+      assetsWithHeadersNotDone, assetsWithHeadersOrDone, assetsDone,
+      assetsCommitted, mImpl->mRootCompletedSuccessfully);
   if (barrierReached) {
     FireBarrierCallback();
   }
@@ -1452,7 +1476,7 @@ void ProxyPreambleOperation::MaybeFinish() {
     // waiting for the outer preamble timeout.
     if (detail::PreambleNeedsCompletionFallback(mImpl->mConfig.mMode,
                                                 mImpl->mBarrierFired)) {
-      FireBarrierCallback();
+      FireBarrierCallback(true);
     }
     auto callback = std::move(mImpl->mFinishedCallback);
     if (callback) {

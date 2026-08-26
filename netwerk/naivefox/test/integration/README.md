@@ -488,10 +488,11 @@ Windows host, its VPN, and other WSL processes are untouched. This mode is
 restricted to same-base runs so it cannot unexpectedly block reference
 downloads.
 
-Every sample also starts a route-netlink mutation monitor before either the
-reference browser or the NaiveFox process. Any link, address, or route
-add/delete from that boundary through the end of capture invalidates the
-sample. Stopping uses a drain-and-confirm handshake so an event already queued
+Every sample completes its fixture cold reset and namespace convergence first,
+then starts a route-netlink mutation monitor before either the reference
+browser or the NaiveFox process. Any link, address, or route add/delete from
+that measurement boundary through the end of capture invalidates the sample.
+Stopping uses a drain-and-confirm handshake so an event already queued
 by the kernel cannot be lost at the right boundary. An early monitor exit,
 truncated/error netlink input, missing completion confirmation, or non-empty
 event log fails closed. The private log stores only event type,
@@ -514,13 +515,19 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
 adds one bounded document GET before CONNECT. The tree modes also fetch two
 resources from that browser page; `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
+`tree-resource-committed-overlap-css` is an H3-only, one-resource causal arm.
+It releases CONNECT only after the root has completed and Gecko has emitted
+`NS_NET_STATUS_WAITING_FOR` for the stylesheet request. It therefore proves
+that the resource transaction was committed without conditioning admission on
+response HEADERS, body size, packet number, or elapsed time. A terminal drain
+fallback is reported separately and is invalid for passive admission.
 `document-overlap` uses the identical single document request but releases
 CONNECT after accepted 2xx response HEADERS while the root listener is still
 active. Its normal root drain is mandatory. Root FIN ordering is report-only,
@@ -785,6 +792,18 @@ Packets 17--32 improved only marginally (0.57514 versus 0.58116). This is a
 screening result, but it shows that reproducing only the confirmation boundary
 creates an artificial sequence; any production candidate should instead
 investigate the ordinary Firefox connection-winner/adoption lifecycle.
+
+The H3-only `tree-resource-committed-overlap-css` arm uses the same root and
+64-KiB stylesheet as `tree-complete-css`, but releases CONNECT after Gecko has
+committed the CSS request rather than after its response. Strict decrypted
+artifact `20260826T051112Z-deaf291f` proved one QUIC identity and ClientHello,
+root completion before CSS commit, CSS GET before CONNECT, and CSS response
+after CONNECT, with identical request semantics and content length in the
+control arm. Two-block passive artifact `c1bd74f7b299c8a1` is screening-only:
+the committed arm was closest for packets 17--32 (0.43774) and packets 1--32
+(0.22508), but worse for packets 1--16 (0.16204) and the first 250 ms
+(0.22409). This supports a real scheduling effect without supporting asset-size
+tuning or making the mechanism the default.
 
 Controlled H3 packet-shape screening must run with
 `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`. The private namespace disables loopback

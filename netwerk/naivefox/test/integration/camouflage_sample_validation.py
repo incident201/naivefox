@@ -24,6 +24,20 @@ ROOT_OVERLAP_DRAIN = re.compile(
     r"completed_resources=(?P<completed_resources>\d+) "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+RESOURCE_COMMITTED_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble resource-committed-overlap admission=(?P<admission>\S+) "
+    r"root_done=(?P<root_done>[01]) "
+    r"started_resources=(?P<started_resources>\d+) "
+    r"committed_resources=(?P<committed_resources>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+RESOURCE_COMMITTED_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble resource-committed-overlap drain=complete "
+    r"completed_resources=(?P<completed_resources>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 DOCUMENT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble document-overlap admission=(?P<admission>\S+) "
@@ -93,6 +107,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-resource-committed-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -112,6 +127,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-native-cache-open requires h3")
     if arm == "document-native-channel-open" and protocol != "h3":
         raise ValueError("document-native-channel-open requires h3")
+    if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
+        raise ValueError("tree-resource-committed-overlap-css requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -133,6 +150,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-resource-committed-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -142,6 +160,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-early-overlap",
         "tree-root-overlap",
         "tree-root-overlap-css",
+        "tree-resource-committed-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -213,6 +232,28 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_drains = [ROOT_OVERLAP_DRAIN.fullmatch(line) for line in drain_lines]
     if any(drain is None for drain in parsed_drains):
         raise ValueError("malformed tree-root-overlap drain evidence")
+    resource_commit_admission_lines = [
+        line
+        for line in log_lines
+        if " preamble resource-committed-overlap admission=" in line
+    ]
+    parsed_resource_commit_admissions = [
+        RESOURCE_COMMITTED_ADMISSION.fullmatch(line)
+        for line in resource_commit_admission_lines
+    ]
+    if any(marker is None for marker in parsed_resource_commit_admissions):
+        raise ValueError("malformed resource-committed admission evidence")
+    resource_commit_drain_lines = [
+        line
+        for line in log_lines
+        if " preamble resource-committed-overlap drain=" in line
+    ]
+    parsed_resource_commit_drains = [
+        RESOURCE_COMMITTED_DRAIN.fullmatch(line)
+        for line in resource_commit_drain_lines
+    ]
+    if any(marker is None for marker in parsed_resource_commit_drains):
+        raise ValueError("malformed resource-committed drain evidence")
     established_lines = [line for line in log_lines if " established target=" in line]
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
@@ -471,6 +512,50 @@ def validate_sample(arm, protocol, log_text, feature_document):
     elif parsed_admissions or parsed_drains:
         raise ValueError(f"{arm} arm unexpectedly logged root-overlap lifecycle")
 
+    if arm == "tree-resource-committed-overlap-css":
+        if len(parsed_resource_commit_admissions) != 1:
+            raise ValueError(
+                "resource-committed arm requires one causal admission marker"
+            )
+        if len(parsed_resource_commit_drains) != 1:
+            raise ValueError("resource-committed arm requires one drain marker")
+        admission = parsed_resource_commit_admissions[0]
+        drain = parsed_resource_commit_drains[0]
+        if (
+            admission["admission"] != "request-committed"
+            or admission["root_done"] != "1"
+            or admission["started_resources"] != "1"
+            or admission["committed_resources"] != "1"
+            or admission["protocol"] != "h3"
+            or drain["completed_resources"] != "1"
+            or drain["protocol"] != "h3"
+            or result["connection"] != admission["connection"]
+            or drain["connection"] != admission["connection"]
+        ):
+            raise ValueError("resource-committed causal state is invalid")
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == admission["connection"]
+            and established["protocol"] == "h3"
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "resource-committed arm requires one matching CONNECT marker"
+            )
+        if not (
+            log_lines.index(resource_commit_admission_lines[0])
+            < log_lines.index(result_lines[0])
+            < log_lines.index(resource_commit_drain_lines[0])
+            and log_lines.index(result_lines[0])
+            < log_lines.index(matching_established[0])
+        ):
+            raise ValueError("resource-committed markers have invalid ordering")
+    elif parsed_resource_commit_admissions or parsed_resource_commit_drains:
+        raise ValueError(
+            f"{arm} arm unexpectedly logged resource-committed lifecycle"
+        )
+
     if arm != "off":
         if feature_document.get("protocol") != protocol:
             raise ValueError("feature document protocol does not match sample")
@@ -505,6 +590,7 @@ def main():
             "tree-early-overlap",
             "tree-root-overlap",
             "tree-root-overlap-css",
+            "tree-resource-committed-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

@@ -646,7 +646,8 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
         self->FinishPreambleOnMain(
             aGeneration, aProtocol, authority, aResult.mStatus,
             aResult.mHttpStatus, aResult.mBodyBytes, aResult.mStartedResources,
-            aResult.mRootDone);
+            aResult.mCommittedResources, aResult.mRootDone,
+            aResult.mTerminalFallback);
       },
       [self, aGeneration, aProtocol](ProxyPreambleFinalResult aFinalResult) {
         self->FinishPreambleOperationOnMain(
@@ -702,7 +703,8 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
 void TunnelSession::FinishPreambleOnMain(
     uint64_t aGeneration, ProxyProtocol aProtocol,
     const nsACString& aTargetAuthority, nsresult aStatus, uint32_t aHttpStatus,
-    uint32_t aBodyBytes, uint32_t aStartedResources, bool aRootDone) {
+    uint32_t aBodyBytes, uint32_t aStartedResources,
+    uint32_t aCommittedResources, bool aRootDone, bool aTerminalFallback) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mImpl->mPreambleSequence.IsInFlight(aGeneration, aProtocol) ||
       !mImpl->mPreambleOperation ||
@@ -744,6 +746,16 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone && aStartedResources > 0 ? "started-resources"
                                            : "terminal-fallback",
         aRootDone, aStartedResources, ProtocolName(aProtocol));
+  }
+  if (preambleMode == PreambleMode::TreeResourceCommittedOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble resource-committed-overlap admission=%s "
+        "root_done=%d started_resources=%u committed_resources=%u "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aTerminalFallback ? "terminal-fallback" : "request-committed",
+        aRootDone, aStartedResources, aCommittedResources,
+        ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
@@ -833,6 +845,14 @@ void TunnelSession::FinishPreambleOperationOnMain(
   if (aCompletedNormally && preambleMode == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble root-overlap drain=complete "
+        "completed_resources=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aCompletedSuccessfulResources, ProtocolName(aProtocol));
+  }
+  if (aCompletedNormally &&
+      preambleMode == PreambleMode::TreeResourceCommittedOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble resource-committed-overlap drain=complete "
         "completed_resources=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aCompletedSuccessfulResources, ProtocolName(aProtocol));

@@ -846,6 +846,33 @@ class CamouflageHarnessTests(unittest.TestCase):
                 self.assertTrue(config["preamble"]["cache-resources"])
             else:
                 self.assertNotIn("cache-resources", config["preamble"])
+        committed = CONFIG.build_config(
+            "tree-resource-committed-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            committed["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-resource-committed-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-resource-committed-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1237,6 +1264,35 @@ class CamouflageHarnessTests(unittest.TestCase):
             "completed_resources=1 protocol=h3\n",
             one_connection,
         )
+        SAMPLE.validate_sample(
+            "tree-resource-committed-overlap-css",
+            "h3",
+            "Connection 1 preamble resource-committed-overlap "
+            "admission=request-committed root_done=1 started_resources=1 "
+            "committed_resources=1 protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Connection 1 preamble resource-committed-overlap "
+            "drain=complete completed_resources=1 protocol=h3\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "causal state"):
+            SAMPLE.validate_sample(
+                "tree-resource-committed-overlap-css",
+                "h3",
+                "Connection 1 preamble resource-committed-overlap "
+                "admission=terminal-fallback root_done=1 started_resources=1 "
+                "committed_resources=0 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=12000 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble resource-committed-overlap "
+                "drain=complete completed_resources=1 protocol=h3\n",
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "causal admission state"):
             SAMPLE.validate_sample(
                 "tree-root-overlap-css",
@@ -1960,7 +2016,11 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn("cold_proxy_reset_applies()", runner)
         self.assertIn("[[ $protocol == h3 ]] || return 1", runner)
         self.assertIn(
-            "[[ ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ]]", runner
+            ",$multi_arm_arms_csv, == *,tree-root-overlap-css,*", runner
+        )
+        self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,*",
+            runner,
         )
         self.assertIn("pid does not identify the fixture Caddy binary", runner)
         self.assertIn("found no exact target process identity", runner)

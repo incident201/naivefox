@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -45,7 +45,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -113,6 +113,11 @@ fi
 if [[ -n ${seen_comparison_arms[tree-root-overlap-css]:-} &&
       -z ${seen_comparison_arms[tree-complete-css]:-} ]]; then
   printf 'tree-root-overlap-css comparison requires tree-complete-css\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-resource-committed-overlap-css]:-} &&
+      -z ${seen_comparison_arms[tree-complete-css]:-} ]]; then
+  printf 'tree-resource-committed-overlap-css comparison requires tree-complete-css\n' >&2
   exit 2
 fi
 
@@ -880,6 +885,9 @@ EOF
     [[ $arm == tree-root-overlap-css ]] && expected_resources=1
     wait_for_log "$naivefox_pid" "$log" \
       " preamble root-overlap drain=complete completed_resources=$expected_resources protocol=h3$"
+  elif [[ $arm == tree-resource-committed-overlap-css ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble resource-committed-overlap drain=complete completed_resources=1 protocol=h3$'
   elif [[ $arm == document-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$'
@@ -910,6 +918,7 @@ EOF
         $arm == tree-early-overlap ||
         $arm == tree-root-overlap ||
         $arm == tree-root-overlap-css ||
+        $arm == tree-resource-committed-overlap-css ||
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
@@ -925,6 +934,7 @@ EOF
           $arm == tree-early-overlap ||
           $arm == tree-root-overlap ||
           $arm == tree-root-overlap-css ||
+          $arm == tree-resource-committed-overlap-css ||
           $arm == tree-overlap ]]; then
       ! rg -q ' preamble background drain timed out' "$log"
     fi
@@ -949,6 +959,11 @@ EOF
       established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h3 padding=yes$" "$log" | cut -d: -f1)
       [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
          $result_line -lt $established_line ]]
+    elif [[ $arm == tree-resource-committed-overlap-css ]]; then
+      [[ $(rg -c ' preamble resource-committed-overlap admission=' "$log" || true) -eq 1 ]]
+      [[ $(rg -c ' preamble resource-committed-overlap drain=' "$log" || true) -eq 1 ]]
+      rg -q ' preamble resource-committed-overlap admission=request-committed root_done=1 started_resources=1 committed_resources=1 protocol=h3$' "$log"
+      rg -q ' preamble resource-committed-overlap drain=complete completed_resources=1 protocol=h3$' "$log"
     elif [[ $arm == document-overlap ]]; then
       [[ $(rg -c ' preamble document-overlap admission=' "$log" || true) -eq 1 ]]
       [[ $(rg -c ' preamble document-overlap drain=' "$log" || true) -eq 1 ]]

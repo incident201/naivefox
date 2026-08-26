@@ -751,6 +751,11 @@ def extract(args):
         raise SystemExit("document-native-cache-open requires h3")
     if args.naivefox_arm == "document-native-channel-open" and args.protocol != "h3":
         raise SystemExit("document-native-channel-open requires h3")
+    if (
+        args.naivefox_arm == "tree-resource-committed-overlap-css"
+        and args.protocol != "h3"
+    ):
+        raise SystemExit("tree-resource-committed-overlap-css requires h3")
     features = {}
     extract_handshake(args.pcap, args.protocol, args.server_port, features)
     if args.protocol == "h2":
@@ -915,6 +920,7 @@ def main():
             "tree-early-overlap",
             "tree-root-overlap",
             "tree-root-overlap-css",
+            "tree-resource-committed-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

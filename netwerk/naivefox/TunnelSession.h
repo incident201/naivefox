@@ -164,7 +164,8 @@ class TunnelSession final {
                             const nsACString& aTargetAuthority,
                             nsresult aStatus, uint32_t aHttpStatus,
                             uint32_t aBodyBytes, uint32_t aStartedResources,
-                            bool aRootDone);
+                            uint32_t aCommittedResources, bool aRootDone,
+                            bool aTerminalFallback);
   void FinishPreambleOperationOnMain(uint64_t aGeneration,
                                      ProxyProtocol aProtocol, nsresult aStatus,
                                      uint32_t aHttpStatus, uint32_t aBodyBytes,

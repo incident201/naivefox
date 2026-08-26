@@ -25,6 +25,7 @@ SUPPORTED_ARMS = (
     "tree-early-overlap",
     "tree-root-overlap",
     "tree-root-overlap-css",
+    "tree-resource-committed-overlap-css",
     "tree-warm-css-304",
     "tree-overlap",
 )

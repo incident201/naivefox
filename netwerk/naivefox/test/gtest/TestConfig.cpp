@@ -242,6 +242,8 @@ TEST(NaiveFoxConfig, PreambleModesAndBudgets)
        PreambleMode::TreeRootOverlap, "/camouflage/", 2, 256 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-root-overlap","path":"/camouflage/","max-assets":0}})",
        PreambleMode::TreeRootOverlap, "/camouflage/", 0, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-committed-overlap","path":"/camouflage/","max-assets":1}})",
+       PreambleMode::Off, "/camouflage/", 1, 256 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"path":"/a%20b","max-bytes":393216,"max-assets":6,"mode":"tree"}})",
        PreambleMode::Tree, "/a%20b", 6, 384 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page?scenario=browser_page&completion=0123456789abcdef"}})",
@@ -517,6 +519,9 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-cache-open","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-native-channel-open","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-channel-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-committed-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-committed-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-committed-overlap","path":"/","max-assets":2}})",
   };
   for (const char* json : kInvalid) {
     Config invalid;

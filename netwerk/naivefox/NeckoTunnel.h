@@ -36,7 +36,9 @@ struct ProxyPreambleResult final {
   uint32_t mHttpStatus = 0;
   uint32_t mBodyBytes = 0;
   uint32_t mStartedResources = 0;
+  uint32_t mCommittedResources = 0;
   bool mRootDone = false;
+  bool mTerminalFallback = false;
 
   bool Succeeded() const {
     return NS_SUCCEEDED(mStatus) && mHttpStatus >= 200 && mHttpStatus < 300;
@@ -98,7 +100,9 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
                                       bool aRootDone, uint32_t aAssetCount,
                                       uint32_t aAssetsWithHeadersNotDone,
                                       uint32_t aAssetsWithHeadersOrDone,
-                                      uint32_t aAssetsDone) {
+                                      uint32_t aAssetsDone,
+                                      uint32_t aAssetsCommitted = 0,
+                                      bool aRootCompletedSuccessfully = true) {
   if (aMode == PreambleMode::Off) {
     return false;
   }
@@ -128,6 +132,10 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
   if (aMode == PreambleMode::TreeRootOverlap) {
     return aAssetCount > 0;
   }
+  if (aMode == PreambleMode::TreeResourceCommittedOverlap) {
+    return aRootCompletedSuccessfully && aAssetCount == 1 &&
+           aAssetsCommitted == 1;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -137,7 +145,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::DocumentStartOverlap ||
          aMode == PreambleMode::TreeOverlap ||
          aMode == PreambleMode::TreeEarlyOverlap ||
-         aMode == PreambleMode::TreeRootOverlap;
+         aMode == PreambleMode::TreeRootOverlap ||
+         aMode == PreambleMode::TreeResourceCommittedOverlap;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
@@ -145,7 +154,8 @@ constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
   return (aMode == PreambleMode::DocumentOverlap ||
           aMode == PreambleMode::DocumentStartOverlap ||
           aMode == PreambleMode::TreeEarlyOverlap ||
-          aMode == PreambleMode::TreeRootOverlap) &&
+          aMode == PreambleMode::TreeRootOverlap ||
+          aMode == PreambleMode::TreeResourceCommittedOverlap) &&
          !aBarrierFired;
 }
 
@@ -194,7 +204,7 @@ class ProxyPreambleOperation final {
                            uint32_t aCount);
   void OnRequestCommitted(uint32_t aStreamId, nsIRequest* aRequest);
   void OnStopRequest(uint32_t aStreamId, nsresult aStatus);
-  void FireBarrierCallback();
+  void FireBarrierCallback(bool aTerminalFallback = false);
   void MaybeFireBarrier();
   void MaybeFinish();
 

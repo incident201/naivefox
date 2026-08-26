@@ -584,6 +584,8 @@ class JsonParser final {
         aMode = PreambleMode::TreeEarlyOverlap;
       } else if (mode.EqualsLiteral("tree-root-overlap")) {
         aMode = PreambleMode::TreeRootOverlap;
+      } else if (mode.EqualsLiteral("tree-resource-committed-overlap")) {
+        aMode = PreambleMode::TreeResourceCommittedOverlap;
       } else {
         return Error("unsupported preamble mode");
       }
@@ -712,6 +714,17 @@ class JsonParser final {
           "document-native-channel-open must be selected explicitly with "
           "h3-mode");
     }
+    if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeResourceCommittedOverlap))) {
+      return Error(
+          "tree-resource-committed-overlap must be selected explicitly with "
+          "h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeResourceCommittedOverlap) {
+      return Error("tree-resource-committed-overlap is H3-only");
+    }
     const bool anyActive =
         h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
     const bool anyTree =
@@ -741,6 +754,11 @@ class JsonParser final {
       }
     } else if (!sawMaxAssets) {
       aPreamble.mMaxAssets = 2;
+    }
+    if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&
+        aPreamble.mMaxAssets != 1) {
+      return Error(
+          "tree-resource-committed-overlap requires exactly one asset");
     }
     return NS_OK;
   }

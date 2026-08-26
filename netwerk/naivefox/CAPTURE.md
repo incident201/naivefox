@@ -601,6 +601,17 @@ which queues the document transaction normally but releases its HEADERS only
 after QUIC handshake confirmation. Packet positions remain outcomes, never the
 barrier definition.
 
+Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
+`tree-resource-committed-overlap-css` experiment. It uses the same root and
+64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
+Gecko reports `NS_NET_STATUS_WAITING_FOR` for that stylesheet. The trace proves
+one QUIC identity and ClientHello, root completion before the resource commit,
+CSS GET before CONNECT, CSS response after CONNECT, and identical HTTP
+semantics/content length in the paired control. Two-block passive artifact
+`c1bd74f7b299c8a1` found a descriptive improvement for packets 17--32 and
+1--32, but a regression for packets 1--16 and the first 250 ms. It is a causal
+screen, not evidence for tuning asset volume or selecting a product default.
+
 Future paired captures pass the exact same scenario path and block-scoped wire
 token to the direct reference, the candidate outer preamble, and the inner
 browser. The local completion file is still removed before every participant,
@@ -638,9 +649,11 @@ reuse defect and not something production code may suppress. Use
 `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1` to run the complete localhost experiment
 inside a stable private Linux network namespace. Independently of that mode,
 the harness rejects every sample that observes a link/address/route mutation
-after its sample monitor starts. The monitor is active before NaiveFox startup
-or reference-browser startup, fails closed if its own process or netlink parser
-fails, and drains queued events before confirming the sample boundary closed.
+after its sample monitor starts. Fixture cold reset and namespace convergence
+finish before this measurement boundary; the monitor is then active before
+NaiveFox startup or reference-browser startup, fails closed if its own process
+or netlink parser fails, and drains queued events before confirming the sample
+boundary closed.
 
 H3 packet-shape screening inside the private namespace also disables loopback
 GRO, GSO, TSO, UDP segmentation, and GSO-list aggregation. The harness rejects
@@ -689,7 +702,7 @@ retain descriptive metrics and refit uncertainty, but record
 conclusion remain `INCONCLUSIVE`. Select a candidate with the paired report,
 then preregister it and collect a fresh single-arm confirmation such as
 `--mode research --naivefox-arm root`. Experimental
-`tree-complete`, `tree-early-overlap`, `tree-root-overlap`,
+`tree-complete`, `tree-early-overlap`, `tree-resource-committed-overlap-css`, `tree-root-overlap`,
 `tree-warm-css-304`, and `tree-overlap` single-arm runs remain
 screening-only, and
 the fixed default superblock deliberately excludes them to bound collection
