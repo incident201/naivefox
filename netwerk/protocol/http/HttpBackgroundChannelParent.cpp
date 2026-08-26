@@ -45,6 +45,11 @@ class ContinueAsyncOpenRunnable final : public Runnable {
         ("HttpBackgroundChannelParent::ContinueAsyncOpen [this=%p "
          "channelId=%" PRIu64 "]\n",
          mActor.get(), mChannelId));
+    LOG(
+        ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+         "phase=background-main-dispatch-run background=%p "
+         "channelId=%" PRIu64 "\n",
+         mActor.get(), mChannelId));
     AssertIsInMainProcess();
     MOZ_ASSERT(NS_IsMainThread());
 
@@ -53,6 +58,11 @@ class ContinueAsyncOpenRunnable final : public Runnable {
     MOZ_ASSERT(registrar);
 
     registrar->LinkBackgroundChannel(mChannelId, mActor);
+    LOG(
+        ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+         "phase=background-registrar-link-return background=%p "
+         "channelId=%" PRIu64 "\n",
+         mActor.get(), mChannelId));
     return NS_OK;
   }
 
@@ -82,6 +92,10 @@ nsresult HttpBackgroundChannelParent::Init(const dom::ContentParentId& aCpId,
                                            const uint64_t& aChannelId) {
   LOG(("HttpBackgroundChannelParent::Init [this=%p channelId=%" PRIu64 "]\n",
        this, aChannelId));
+  LOG(
+      ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=background-init-enter "
+       "background=%p channelId=%" PRIu64 "\n",
+       this, aChannelId));
   AssertIsInMainProcess();
   AssertIsOnBackgroundThread();
 
@@ -90,7 +104,13 @@ nsresult HttpBackgroundChannelParent::Init(const dom::ContentParentId& aCpId,
   RefPtr<ContinueAsyncOpenRunnable> runnable =
       new ContinueAsyncOpenRunnable(this, aChannelId);
 
-  return NS_DispatchToMainThread(runnable);
+  nsresult rv = NS_DispatchToMainThread(runnable);
+  LOG(
+      ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+       "phase=background-main-dispatch-return "
+       "background=%p channelId=%" PRIu64 " rv=%" PRIx32 "\n",
+       this, aChannelId, static_cast<uint32_t>(rv)));
+  return rv;
 }
 
 void HttpBackgroundChannelParent::LinkToChannel(

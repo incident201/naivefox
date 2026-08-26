@@ -2612,8 +2612,22 @@ nsresult HttpChannelChild::ContinueAsyncOpen() {
   // target.
   SetEventTarget();
 
-  if (!gNeckoChild->SendPHttpChannelConstructor(
-          this, browserChild, IPC::SerializedLoadContext(this), openArgs)) {
+  bool constructorSent;
+  {
+    IPC::SerializedLoadContext serializedLoadContext(this);
+    LOG(
+        ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=child-openargs-ready "
+         "child=%p channelId=%" PRIu64 " browserId=%" PRIx64
+         " contentWindowId=%" PRIu64 "\n",
+         this, mChannelId, mBrowserId, contentWindowId));
+    constructorSent = gNeckoChild->SendPHttpChannelConstructor(
+        this, browserChild, serializedLoadContext, openArgs);
+  }
+  LOG(
+      ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=child-send-return "
+       "child=%p channelId=%" PRIu64 " sent=%d\n",
+       this, mChannelId, static_cast<int>(constructorSent)));
+  if (!constructorSent) {
     return NS_ERROR_FAILURE;
   }
 

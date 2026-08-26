@@ -193,6 +193,11 @@ void HttpChannelParent::TryInvokeAsyncOpen(nsresult aRv) {
   LOG(("HttpChannelParent::TryInvokeAsyncOpen [this=%p barrier=%u rv=%" PRIx32
        "]\n",
        this, mAsyncOpenBarrier, static_cast<uint32_t>(aRv)));
+  LOG(
+      ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-try-invoke "
+       "parent=%p channelId=%" PRIu64 " barrier=%u rv=%" PRIx32 "\n",
+       this, mChannel ? mChannel->ChannelId() : 0, mAsyncOpenBarrier,
+       static_cast<uint32_t>(aRv)));
   MOZ_ASSERT(NS_IsMainThread());
   AUTO_PROFILER_LABEL("HttpChannelParent::TryInvokeAsyncOpen", NETWORK);
 
@@ -219,6 +224,10 @@ void HttpChannelParent::OnBackgroundParentReady(
     HttpBackgroundChannelParent* aBgParent) {
   LOG(("HttpChannelParent::OnBackgroundParentReady [this=%p bgParent=%p]\n",
        this, aBgParent));
+  LOG(
+      ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-background-ready "
+       "parent=%p background=%p channelId=%" PRIu64 "\n",
+       this, aBgParent, mChannel ? mChannel->ChannelId() : 0));
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!mBgParent);
 
@@ -658,14 +667,25 @@ bool HttpChannelParent::DoAsyncOpen(
   ++mAsyncOpenBarrier;
   RefPtr<HttpChannelParent> self = this;
   nsCOMPtr<nsISerialEventTarget> eventTarget = GetEventTargetForBgParentWait();
-  WaitForBgParent(mChannel->ChannelId())
+  const uint64_t channelId = mChannel->ChannelId();
+  WaitForBgParent(channelId)
       ->Then(
           eventTarget, __func__,
-          [self]() {
+          [self, channelId]() {
+            LOG(
+                ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+                 "phase=parent-wait-resolved "
+                 "parent=%p channelId=%" PRIu64 " status=success\n",
+                 self.get(), channelId));
             self->mRequest.Complete();
             self->TryInvokeAsyncOpen(NS_OK);
           },
-          [self](nsresult aStatus) {
+          [self, channelId](nsresult aStatus) {
+            LOG(
+                ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+                 "phase=parent-wait-resolved "
+                 "parent=%p channelId=%" PRIu64 " status=%" PRIx32 "\n",
+                 self.get(), channelId, static_cast<uint32_t>(aStatus)));
             self->mRequest.Complete();
             self->TryInvokeAsyncOpen(aStatus);
           })
@@ -676,6 +696,10 @@ bool HttpChannelParent::DoAsyncOpen(
 RefPtr<GenericNonExclusivePromise> HttpChannelParent::WaitForBgParent(
     uint64_t aChannelId) {
   LOG(("HttpChannelParent::WaitForBgParent [this=%p]\n", this));
+  LOG(
+      ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-wait-start "
+       "parent=%p channelId=%" PRIu64 "\n",
+       this, aChannelId));
   MOZ_ASSERT(!mBgParent);
 
   if (!mChannel && !mEarlyHintPreloaderId) {
@@ -687,6 +711,10 @@ RefPtr<GenericNonExclusivePromise> HttpChannelParent::WaitForBgParent(
       BackgroundChannelRegistrar::GetOrCreate();
   MOZ_ASSERT(registrar);
   registrar->LinkHttpChannel(aChannelId, this);
+  LOG((
+      "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-registrar-link-return "
+      "parent=%p channelId=%" PRIu64 " ready=%d\n",
+      this, aChannelId, static_cast<int>(!!mBgParent)));
 
   if (mBgParent) {
     return GenericNonExclusivePromise::CreateAndResolve(true, __func__);

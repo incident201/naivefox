@@ -7,6 +7,7 @@
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Components.h"
 #include "mozilla/ContentPrincipal.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/NullPrincipal.h"
 #include "mozilla/ipc/IPCStreamUtils.h"
 #include "mozilla/net/CookieServiceParent.h"
@@ -186,6 +187,14 @@ void NeckoParent::ActorDestroy(ActorDestroyReason aWhy) {
 already_AddRefed<PHttpChannelParent> NeckoParent::AllocPHttpChannelParent(
     PBrowserParent* aBrowser, const SerializedLoadContext& aSerialized,
     const HttpChannelCreationArgs& aOpenArgs) {
+  if (aOpenArgs.type() == HttpChannelCreationArgs::THttpChannelOpenArgs) {
+    const HttpChannelOpenArgs& args = aOpenArgs.get_HttpChannelOpenArgs();
+    MOZ_LOG(gHttpLog, LogLevel::Debug,
+            ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-alloc-enter "
+             "necko=%p channelId=%" PRIu64 " browserId=%" PRIx64 "\n",
+             this, args.channelId(), args.browserId()));
+  }
+
   nsCOMPtr<nsIPrincipal> requestingPrincipal =
       GetRequestingPrincipal(aOpenArgs);
 
@@ -203,6 +212,14 @@ mozilla::ipc::IPCResult NeckoParent::RecvPHttpChannelConstructor(
     PHttpChannelParent* aActor, PBrowserParent* aBrowser,
     const SerializedLoadContext& aSerialized,
     const HttpChannelCreationArgs& aOpenArgs) {
+  if (aOpenArgs.type() == HttpChannelCreationArgs::THttpChannelOpenArgs) {
+    const HttpChannelOpenArgs& args = aOpenArgs.get_HttpChannelOpenArgs();
+    MOZ_LOG(gHttpLog, LogLevel::Debug,
+            ("NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-recv-enter "
+             "actor=%p channelId=%" PRIu64 " browserId=%" PRIx64 "\n",
+             aActor, args.channelId(), args.browserId()));
+  }
+
   HttpChannelParent* p = static_cast<HttpChannelParent*>(aActor);
   if (!p->Init(aOpenArgs)) {
     return IPC_FAIL_NO_REASON(this);
