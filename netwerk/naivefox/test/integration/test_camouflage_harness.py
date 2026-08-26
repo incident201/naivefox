@@ -304,14 +304,11 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         self.assertIn("effective_backend=selenium", runner)
         self.assertIn("--warmup-url", runner)
-        self.assertIn(
-            '"https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/', runner
-        )
+        self.assertIn('"https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/', runner)
         self.assertIn("post-capture process-group SIGTERM", runner)
         self.assertIn("Firefox browser controller required SIGKILL", runner)
         self.assertIn(
-            "document-handshake-confirmed multi-arm screening requires "
-            "--protocol h3",
+            "document-handshake-confirmed multi-arm screening requires --protocol h3",
             runner,
         )
         self.assertIn(
@@ -328,8 +325,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         self.assertIn("packets_17_32", runner)
         self.assertIn(
-            "document-native-channel-open multi-arm screening requires "
-            "--protocol h3",
+            "document-native-channel-open multi-arm screening requires --protocol h3",
             runner,
         )
         self.assertIn(
@@ -1124,6 +1120,34 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertLess(page.index("/camouflage/style.css"), page.index("<img"))
         self.assertLess(page.index("/camouflage/app.js"), page.index("<img"))
 
+    def test_browser_page_navigation_token_reaches_every_asset(self):
+        token = "d" * 32
+        page = TARGET.Handler.camouflage_page(
+            object(), {"scenario": ["browser_page"], "nav": [token]}
+        ).decode()
+        self.assertEqual(page.count(f"nav={token}"), 6)
+        self.assertIn(f"/camouflage/style.css?nav={token}", page)
+        self.assertIn(f"/camouflage/app.js?nav={token}", page)
+        self.assertIn(f"/camouflage/resource?size=65536&nav={token}", page)
+        self.assertIn(f"/camouflage/resource?size=131072&nav={token}", page)
+        self.assertIn(f"/camouflage/resource?size=262144&nav={token}", page)
+        self.assertIn(f"/camouflage/api?nav={token}", page)
+
+    def test_browser_page_rejects_invalid_navigation_token(self):
+        page = TARGET.Handler.camouflage_page(
+            object(), {"scenario": ["browser_page"], "nav": ["../bad"]}
+        )
+        self.assertIsNone(page)
+
+    def test_navigation_token_api_asset_is_a_valid_fixed_svg(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = "/camouflage/api?nav=" + "e" * 32
+        handler.send_svg = mock.Mock()
+        handler.send_bytes = mock.Mock()
+        TARGET.Handler.do_GET(handler)
+        handler.send_svg.assert_called_once_with(TARGET.CAMOUFLAGE_API_IMAGE_SIZE)
+        handler.send_bytes.assert_not_called()
+
     def test_tree_fixture_assets_leave_streams_live_within_budget(self):
         page = TARGET.Handler.camouflage_page(object(), {"scenario": ["browser_page"]})
         self.assertEqual(len(TARGET.CAMOUFLAGE_STYLE_CSS), 64 * 1024)
@@ -1551,8 +1575,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             SAMPLE.validate_sample(
                 "tree-native-parser-retarget-overlap-css",
                 "h3",
-                retarget_log
-                + "Connection 7 preamble native-parser-retarget "
+                retarget_log + "Connection 7 preamble native-parser-retarget "
                 "fallback=main-copy protocol=h3\n",
                 one_connection,
             )
@@ -2305,9 +2328,7 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         ) as stream:
             runner = stream.read()
         self.assertIn("tree-warm-css-304 requires a single-arm H3 run", runner)
-        self.assertIn(
-            "tree-warm-css-304 requires --scenario browser_page", runner
-        )
+        self.assertIn("tree-warm-css-304 requires --scenario browser_page", runner)
         self.assertIn(
             "tree-warm-css-304 cannot share cold superblock references", runner
         )
@@ -2320,15 +2341,13 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn("camouflage_cache_validation.py", runner)
         self.assertIn("temporary_participant_sample_warm_measure_then_deleted", runner)
         self.assertIn("warm_traffic_excluded_measure_only", runner)
-        self.assertIn('$session_id:reference_measure', runner)
-        self.assertIn('$session_id:naivefox_measure', runner)
+        self.assertIn("$session_id:reference_measure", runner)
+        self.assertIn("$session_id:naivefox_measure", runner)
         self.assertIn("reference_cold_measure", runner)
         self.assertIn("naivefox_cold_measure", runner)
         self.assertIn("cold_proxy_reset_applies()", runner)
         self.assertIn("[[ $protocol == h3 ]] || return 1", runner)
-        self.assertIn(
-            ",$multi_arm_arms_csv, == *,tree-root-overlap-css,*", runner
-        )
+        self.assertIn(",$multi_arm_arms_csv, == *,tree-root-overlap-css,*", runner)
         self.assertIn(
             ",$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,*",
             runner,
@@ -2378,14 +2397,19 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         ]
         self.assertIn("client traffic before Initial", origin)
         self.assertIn("foreign UDP flow after Initial", origin)
-        self.assertIn('udp.stream!=$measured_udp_stream', origin)
+        self.assertIn("udp.stream!=$measured_udp_stream", origin)
         self.assertIn("before-origin-trim.pcapng", origin)
-        self.assertIn('frame.number>=$first_initial_frame', origin)
+        self.assertIn("frame.number>=$first_initial_frame", origin)
         self.assertIn("cache_validated_participants -ne $session_counter", runner)
         self.assertIn("network.ssl_tokens_cache_persistence", runner)
         self.assertIn("network.http.http3.enable_0rtt", runner)
         self.assertIn("--max-connections 1", runner)
-        self.assertNotIn('kill -TERM "$pid"', runner[runner.index("stop_pid_clean()") : runner.index("stop_process_group()")])
+        self.assertNotIn(
+            'kill -TERM "$pid"',
+            runner[
+                runner.index("stop_pid_clean()") : runner.index("stop_process_group()")
+            ],
+        )
         self.assertIn("requires its condition-specific Firefox A/B controls", runner)
         self.assertIn("warm NaiveFox lacks successful completion evidence", runner)
 

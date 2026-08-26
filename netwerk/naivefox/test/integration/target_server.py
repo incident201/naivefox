@@ -43,6 +43,7 @@ CAMOUFLAGE_STYLE_SIZE = configured_camouflage_asset_size(
 CAMOUFLAGE_SCRIPT_SIZE = configured_camouflage_asset_size(
     "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE", 128 * 1024
 )
+CAMOUFLAGE_API_IMAGE_SIZE = 4096
 
 
 def sized_source_asset(size, prefix, filler):
@@ -188,6 +189,9 @@ class Handler(BaseHTTPRequestHandler):
         size = min(max(int(query.get("size", [262144])[0]), 1), 16 * 1024 * 1024)
         count = min(max(int(query.get("count", [4])[0]), 1), 16)
         idle_ms = min(max(int(query.get("idle_ms", [5000])[0]), 0), 120000)
+        navigation = query.get("nav", [""])[0]
+        if navigation and not COMPLETION_TOKEN.fullmatch(navigation):
+            return None
         head = (
             "<!doctype html><meta charset=utf-8>"
             "<title>NaiveFox controlled browser workload</title>"
@@ -195,13 +199,15 @@ class Handler(BaseHTTPRequestHandler):
         if scenario == "initial":
             body = '<img src="/camouflage/resource?size=16384">'
         elif scenario == "browser_page":
+            suffix = f"?nav={navigation}" if navigation else ""
+            resource_suffix = f"&nav={navigation}" if navigation else ""
             body = (
-                '<link rel="stylesheet" href="/camouflage/style.css">'
-                '<script src="/camouflage/app.js"></script>'
-                '<img src="/camouflage/resource?size=65536">'
-                '<img src="/camouflage/resource?size=131072">'
-                '<img src="/camouflage/resource?size=262144">'
-                '<img src="/camouflage/api">'
+                f'<link rel="stylesheet" href="/camouflage/style.css{suffix}">'
+                f'<script src="/camouflage/app.js{suffix}"></script>'
+                f'<img src="/camouflage/resource?size=65536{resource_suffix}">'
+                f'<img src="/camouflage/resource?size=131072{resource_suffix}">'
+                f'<img src="/camouflage/resource?size=262144{resource_suffix}">'
+                f'<img src="/camouflage/api{suffix}">'
             )
         elif scenario == "warm_css":
             body = '<link rel="stylesheet" href="/camouflage/style.css">'
@@ -307,9 +313,16 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
         elif parsed.path == "/camouflage/app.js":
             self.send_bytes(200, CAMOUFLAGE_APP_JS, "application/javascript")
         elif parsed.path == "/camouflage/api":
-            self.send_bytes(
-                200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"
-            )
+            navigation = query.get("nav", [""])[0]
+            if navigation:
+                if not COMPLETION_TOKEN.fullmatch(navigation):
+                    self.send_error(400)
+                    return
+                self.send_svg(CAMOUFLAGE_API_IMAGE_SIZE)
+            else:
+                self.send_bytes(
+                    200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"
+                )
         elif parsed.path == "/camouflage/status":
             token = query.get("token", [""])[0]
             with COMPLETIONS_LOCK:

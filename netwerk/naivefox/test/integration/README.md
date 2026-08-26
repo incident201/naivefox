@@ -161,6 +161,22 @@ part of the product gates. Requirements, environment variables, comparison
 semantics, WSL packet handling, and sensitive-data rules are in
 [`../../CAPTURE.md`](../../CAPTURE.md).
 
+`run-firefox-repeat-navigation-diagnostic.sh` is a same-base, reference-only H3
+control for separating first-navigation startup work from the normal Firefox
+resource-discovery lifecycle. It prelaunches one Firefox instance, captures two
+sequential `browser_page` navigations in the same tab and content process, and
+puts a different random navigation token into the root URL and every asset URL.
+The analyzer rejects cache reuse, conditional requests, non-200 resources,
+changed request semantics or response sizes, a second QUIC identity or
+ClientHello, network mutation, and ambiguous lifecycle mappings. Its safe
+summary reports `root response HEADERS -> first CSS GET` and the parent/channel,
+HTML5 parser, child-to-parent IPC, transaction-dispatch, H3 `AddStream`, and wire
+sub-intervals for each navigation. The private capture, key log, browser identity
+and Mozilla logs are deliberately retained under `h3-captures`; the sanitized
+summary is written under the matching `h3-capture-safe` directory. Run it only
+with `NAIVEFOX_CAPTURE_MODE=same-base` and the same
+`NAIVEFOX_CAPTURE_REFERENCE_*` inputs used by the other same-base diagnostics.
+
 Quick capture downloads the current official Nightly binary from the URL in
 `../../tools/firefox-reference-manifest` and compares its observed behavior
 with the same fixture run through NaiveFox. The archive checksum in that

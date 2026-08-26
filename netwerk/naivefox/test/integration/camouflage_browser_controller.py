@@ -110,7 +110,10 @@ class Controller:
             self.args.protocol, self.args.proxy_port, self.args.socks_port
         ).items():
             options.set_preference(name, value)
-        service = Service(log_output=self.args.webdriver_log)
+        service_args = (
+            ["--allow-system-access"] if self.args.navigation_evidence_file else None
+        )
+        service = Service(log_output=self.args.webdriver_log, service_args=service_args)
         self.driver = webdriver.Firefox(options=options, service=service)
         self.driver.set_page_load_timeout(self.args.timeout)
         return "selenium"
@@ -145,6 +148,32 @@ class Controller:
             stdout=self.process_log,
             stderr=subprocess.STDOUT,
         )
+
+    def selenium_identity(self):
+        self.driver.set_context("chrome")
+        try:
+            identity = self.driver.execute_script(
+                """return {
+                  browser_pid: Services.appinfo.processID,
+                  browsing_context_id:
+                    gBrowser.selectedBrowser.browsingContext.id,
+                  content_pid:
+                    gBrowser.selectedBrowser.browsingContext.currentWindowGlobal.osPid
+                };"""
+            )
+        finally:
+            self.driver.set_context("content")
+        identity["webdriver_session_id"] = self.driver.session_id
+        identity["current_window_handle"] = self.driver.current_window_handle
+        identity["window_handles"] = self.driver.window_handles
+        return identity
+
+    def write_navigation_evidence(self, first, second):
+        temporary = self.args.navigation_evidence_file + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as stream:
+            json.dump({"navigation_1": first, "navigation_2": second}, stream)
+            stream.write("\n")
+        os.replace(temporary, self.args.navigation_evidence_file)
 
     def browser_alive(self):
         if self.driver is not None:
@@ -209,6 +238,13 @@ class Controller:
             return
         self.navigate(backend)
         self.wait_for_completion()
+        if self.args.second_url:
+            if backend != "selenium":
+                raise RuntimeError("repeat navigation requires Selenium")
+            first_identity = self.selenium_identity()
+            self.driver.get(self.args.second_url)
+            self.wait_for_completion(self.args.second_completion_file)
+            self.write_navigation_evidence(first_identity, self.selenium_identity())
         with open(self.args.done_file, "w", encoding="utf-8") as stream:
             stream.write("complete\n")
         self.wait_for_file(self.args.stop_file)
@@ -232,6 +268,9 @@ def main():
     parser.add_argument("--socks-port", type=int, default=0)
     parser.add_argument("--url", required=True)
     parser.add_argument("--completion-file", required=True)
+    parser.add_argument("--second-url")
+    parser.add_argument("--second-completion-file")
+    parser.add_argument("--navigation-evidence-file")
     parser.add_argument("--warmup-url")
     parser.add_argument("--warmup-completion-file")
     parser.add_argument("--ready-file", required=True)
@@ -245,6 +284,16 @@ def main():
     args = parser.parse_args()
     if bool(args.warmup_url) != bool(args.warmup_completion_file):
         parser.error("--warmup-url and --warmup-completion-file must be used together")
+    repeat_arguments = (
+        args.second_url,
+        args.second_completion_file,
+        args.navigation_evidence_file,
+    )
+    if any(repeat_arguments) and not all(repeat_arguments):
+        parser.error(
+            "--second-url, --second-completion-file, and "
+            "--navigation-evidence-file must be used together"
+        )
     controller = Controller(args)
     signal.signal(signal.SIGTERM, controller.stop)
     signal.signal(signal.SIGINT, controller.stop)
