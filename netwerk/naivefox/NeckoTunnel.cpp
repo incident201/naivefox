@@ -570,6 +570,7 @@ class ProxyPreambleOperation::Impl final {
     bool mHeadersReceived = false;
     bool mResponseHeadersReceived = false;
     bool mRequestCommitted = false;
+    bool mNativeCacheNewEntry = false;
     bool mDone = false;
   };
 
@@ -923,7 +924,11 @@ nsresult ProxyPreambleOperation::Start(
       !IsValidPreamblePath(aConfig.mPath) || aConfig.mMaxBytes == 0 ||
       aConfig.mMaxBytes > PreambleConfig::kMaximumBytes ||
       aConfig.mMaxAssets > PreambleConfig::kMaximumAssets ||
-      (aConfig.mCacheResources && !PreambleModeUsesResources(aConfig.mMode))) {
+      (aConfig.mCacheResources && !PreambleModeUsesResources(aConfig.mMode)) ||
+      (aConfig.mMode ==
+           PreambleMode::TreeResourceNativeCacheCommittedOverlap &&
+       (aProtocol != ProxyProtocol::H3 || aConfig.mMaxAssets != 1 ||
+        !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
   }
   mImpl->mConfig = aConfig;
@@ -1071,6 +1076,26 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
           PreambleMode::TreeResourceCommittedOverlap &&
       aStreamId > 0) {
     mImpl->mStreams[aStreamId].mRequestCommitted = true;
+    MaybeFireBarrier();
+  }
+  if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeResourceNativeCacheCommittedOverlap &&
+      aStreamId > 0) {
+    nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(aRequest);
+    bool cacheOpenSucceeded = false;
+    if (!internal ||
+        NS_FAILED(internal->GetProxyPreambleNativeResourceCacheOpenSucceeded(
+            &cacheOpenSucceeded)) ||
+        !cacheOpenSucceeded) {
+      if (NS_SUCCEEDED(mImpl->mFirstFailure)) {
+        mImpl->mFirstFailure = NS_ERROR_UNEXPECTED;
+      }
+      mImpl->mAllStreamsCompletedNormally = false;
+      return;
+    }
+    auto& stream = mImpl->mStreams[aStreamId];
+    stream.mNativeCacheNewEntry = true;
+    stream.mRequestCommitted = true;
     MaybeFireBarrier();
   }
 }
@@ -1339,6 +1364,10 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
         loadFlags |= nsIRequest::INHIBIT_CACHING;
       }
       MOZ_TRY(channel->SetLoadFlags(loadFlags));
+      if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+        MOZ_TRY(internal->SetProxyPreambleUseNativeResourceCacheOpen());
+      }
       if (detail::PreambleResourceNeedsLeader(resourceKind, deferredResource,
                                               parserBlockingScript,
                                               discoveredInHead)) {
@@ -1355,7 +1384,9 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       stream.mRequest = channel;
       RefPtr<StreamListener> listener = new StreamListener(this, streamId);
       if (mImpl->mConfig.mMode ==
-          PreambleMode::TreeResourceCommittedOverlap) {
+              PreambleMode::TreeResourceCommittedOverlap ||
+          mImpl->mConfig.mMode ==
+              PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
         MOZ_TRY(channel->SetNotificationCallbacks(listener));
       }
       nsresult openRv = channel->AsyncOpen(listener);
@@ -1425,12 +1456,14 @@ void ProxyPreambleOperation::FireBarrierCallback(bool aTerminalFallback) {
   const uint32_t startedResources =
       mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams.Length() - 1;
   uint32_t committedResources = 0;
+  uint32_t nativeCacheNewResources = 0;
   for (uint32_t index = 1; index < mImpl->mStreams.Length(); ++index) {
     committedResources += mImpl->mStreams[index].mRequestCommitted;
+    nativeCacheNewResources += mImpl->mStreams[index].mNativeCacheNewEntry;
   }
   callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes,
-            startedResources, committedResources, mImpl->mRootDone,
-            aTerminalFallback});
+            startedResources, committedResources, nativeCacheNewResources,
+            mImpl->mRootDone, aTerminalFallback});
 }
 
 void ProxyPreambleOperation::MaybeFireBarrier() {
@@ -1446,6 +1479,7 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
   uint32_t assetsWithHeadersOrDone = 0;
   uint32_t assetsDone = 0;
   uint32_t assetsCommitted = 0;
+  uint32_t nativeCacheNewResources = 0;
   for (uint32_t index = 1; index < mImpl->mStreams.Length(); ++index) {
     const auto& candidate = mImpl->mStreams[index];
     assetsWithHeadersNotDone +=
@@ -1453,11 +1487,13 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
     assetsWithHeadersOrDone += candidate.mHeadersReceived || candidate.mDone;
     assetsDone += candidate.mDone;
     assetsCommitted += candidate.mRequestCommitted;
+    nativeCacheNewResources += candidate.mNativeCacheNewEntry;
   }
   const bool barrierReached = detail::PreambleBarrierReached(
       mImpl->mConfig.mMode, rootResponseAccepted, mImpl->mRootDone, assetCount,
       assetsWithHeadersNotDone, assetsWithHeadersOrDone, assetsDone,
-      assetsCommitted, mImpl->mRootCompletedSuccessfully);
+      assetsCommitted, mImpl->mRootCompletedSuccessfully,
+      nativeCacheNewResources);
   if (barrierReached) {
     FireBarrierCallback();
   }
@@ -1468,6 +1504,15 @@ void ProxyPreambleOperation::MaybeFinish() {
   bool allDone = !mImpl->mStreams.IsEmpty();
   for (const auto& candidate : mImpl->mStreams) {
     allDone &= candidate.mDone;
+  }
+  if (allDone && !mImpl->mBarrierFired &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+    // This mode has a strict causal admission contract. Keep the operation
+    // alive for the ordinary outer preamble timeout rather than converting a
+    // completed-but-invalid resource into a CONNECT barrier or dropping the
+    // operation while the sequence is still in flight.
+    return;
   }
   if (allDone && !mImpl->mFinishedFired) {
     mImpl->mFinishedFired = true;
@@ -1483,8 +1528,16 @@ void ProxyPreambleOperation::MaybeFinish() {
       const uint32_t rootStatus =
           mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams[0].mHttpStatus;
       callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes,
-                mImpl->mCompletedSuccessfulResources, mImpl->mRootDone,
-                mImpl->mAllStreamsCompletedNormally});
+                mImpl->mCompletedSuccessfulResources,
+                [&]() {
+                  uint32_t count = 0;
+                  for (uint32_t index = 1; index < mImpl->mStreams.Length();
+                       ++index) {
+                    count += mImpl->mStreams[index].mNativeCacheNewEntry;
+                  }
+                  return count;
+                }(),
+                mImpl->mRootDone, mImpl->mAllStreamsCompletedNormally});
     }
   }
 }

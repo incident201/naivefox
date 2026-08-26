@@ -38,6 +38,23 @@ RESOURCE_COMMITTED_DRAIN = re.compile(
     r"completed_resources=(?P<completed_resources>\d+) "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+RESOURCE_NATIVE_CACHE_COMMITTED_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble resource-native-cache-committed-overlap "
+    r"admission=(?P<admission>\S+) "
+    r"root_done=(?P<root_done>[01]) "
+    r"started_resources=(?P<started_resources>\d+) "
+    r"committed_resources=(?P<committed_resources>\d+) "
+    r"cache_new=(?P<cache_new>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+RESOURCE_NATIVE_CACHE_COMMITTED_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble resource-native-cache-committed-overlap drain=complete "
+    r"completed_resources=(?P<completed_resources>\d+) "
+    r"cache_new=(?P<cache_new>\d+) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 DOCUMENT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble document-overlap admission=(?P<admission>\S+) "
@@ -108,6 +125,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-root-overlap",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
+        "tree-resource-native-cache-committed-overlap",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -129,6 +147,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-native-channel-open requires h3")
     if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
         raise ValueError("tree-resource-committed-overlap-css requires h3")
+    if (
+        arm == "tree-resource-native-cache-committed-overlap"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-resource-native-cache-committed-overlap requires h3"
+        )
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -151,6 +176,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-root-overlap",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
+        "tree-resource-native-cache-committed-overlap",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -161,6 +187,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-root-overlap",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
+        "tree-resource-native-cache-committed-overlap",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -254,6 +281,28 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ]
     if any(marker is None for marker in parsed_resource_commit_drains):
         raise ValueError("malformed resource-committed drain evidence")
+    resource_native_cache_admission_lines = [
+        line
+        for line in log_lines
+        if " preamble resource-native-cache-committed-overlap admission=" in line
+    ]
+    parsed_resource_native_cache_admissions = [
+        RESOURCE_NATIVE_CACHE_COMMITTED_ADMISSION.fullmatch(line)
+        for line in resource_native_cache_admission_lines
+    ]
+    if any(marker is None for marker in parsed_resource_native_cache_admissions):
+        raise ValueError("malformed native resource cache admission evidence")
+    resource_native_cache_drain_lines = [
+        line
+        for line in log_lines
+        if " preamble resource-native-cache-committed-overlap drain=" in line
+    ]
+    parsed_resource_native_cache_drains = [
+        RESOURCE_NATIVE_CACHE_COMMITTED_DRAIN.fullmatch(line)
+        for line in resource_native_cache_drain_lines
+    ]
+    if any(marker is None for marker in parsed_resource_native_cache_drains):
+        raise ValueError("malformed native resource cache drain evidence")
     established_lines = [line for line in log_lines if " established target=" in line]
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
@@ -556,6 +605,59 @@ def validate_sample(arm, protocol, log_text, feature_document):
             f"{arm} arm unexpectedly logged resource-committed lifecycle"
         )
 
+    if arm == "tree-resource-native-cache-committed-overlap":
+        if len(parsed_resource_native_cache_admissions) != 1:
+            raise ValueError(
+                "native resource cache arm requires one causal admission marker"
+            )
+        if len(parsed_resource_native_cache_drains) != 1:
+            raise ValueError(
+                "native resource cache arm requires one drain marker"
+            )
+        admission = parsed_resource_native_cache_admissions[0]
+        drain = parsed_resource_native_cache_drains[0]
+        if (
+            admission["admission"] != "request-committed"
+            or admission["root_done"] != "1"
+            or admission["started_resources"] != "1"
+            or admission["committed_resources"] != "1"
+            or admission["cache_new"] != "1"
+            or admission["protocol"] != "h3"
+            or drain["completed_resources"] != "1"
+            or drain["cache_new"] != "1"
+            or drain["protocol"] != "h3"
+            or result["connection"] != admission["connection"]
+            or drain["connection"] != admission["connection"]
+        ):
+            raise ValueError("native resource cache causal state is invalid")
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == admission["connection"]
+            and established["protocol"] == "h3"
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "native resource cache arm requires one matching CONNECT marker"
+            )
+        if not (
+            log_lines.index(resource_native_cache_admission_lines[0])
+            < log_lines.index(result_lines[0])
+            < log_lines.index(resource_native_cache_drain_lines[0])
+            and log_lines.index(result_lines[0])
+            < log_lines.index(matching_established[0])
+        ):
+            raise ValueError(
+                "native resource cache markers have invalid ordering"
+            )
+    elif (
+        parsed_resource_native_cache_admissions
+        or parsed_resource_native_cache_drains
+    ):
+        raise ValueError(
+            f"{arm} arm unexpectedly logged native resource cache lifecycle"
+        )
+
     if arm != "off":
         if feature_document.get("protocol") != protocol:
             raise ValueError("feature document protocol does not match sample")
@@ -591,6 +693,7 @@ def main():
             "tree-root-overlap",
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
+            "tree-resource-native-cache-committed-overlap",
             "tree-warm-css-304",
             "tree-overlap",
         ),

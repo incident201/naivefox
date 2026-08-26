@@ -37,6 +37,7 @@ struct ProxyPreambleResult final {
   uint32_t mBodyBytes = 0;
   uint32_t mStartedResources = 0;
   uint32_t mCommittedResources = 0;
+  uint32_t mNativeCacheNewResources = 0;
   bool mRootDone = false;
   bool mTerminalFallback = false;
 
@@ -52,6 +53,7 @@ struct ProxyPreambleFinalResult final {
   uint32_t mHttpStatus = 0;
   uint32_t mBodyBytes = 0;
   uint32_t mCompletedSuccessfulResources = 0;
+  uint32_t mNativeCacheNewResources = 0;
   bool mRootDone = false;
   bool mCompletedNormally = false;
 };
@@ -102,7 +104,8 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
                                       uint32_t aAssetsWithHeadersOrDone,
                                       uint32_t aAssetsDone,
                                       uint32_t aAssetsCommitted = 0,
-                                      bool aRootCompletedSuccessfully = true) {
+                                      bool aRootCompletedSuccessfully = true,
+                                      uint32_t aNativeCacheNewResources = 0) {
   if (aMode == PreambleMode::Off) {
     return false;
   }
@@ -136,6 +139,10 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
     return aRootCompletedSuccessfully && aAssetCount == 1 &&
            aAssetsCommitted == 1;
   }
+  if (aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+    return aRootCompletedSuccessfully && aAssetCount == 1 &&
+           aAssetsCommitted == 1 && aNativeCacheNewResources == 1;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -146,7 +153,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeOverlap ||
          aMode == PreambleMode::TreeEarlyOverlap ||
          aMode == PreambleMode::TreeRootOverlap ||
-         aMode == PreambleMode::TreeResourceCommittedOverlap;
+         aMode == PreambleMode::TreeResourceCommittedOverlap ||
+         aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,

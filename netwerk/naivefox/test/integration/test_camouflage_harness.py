@@ -873,6 +873,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        native_cache_committed = CONFIG.build_config(
+            "tree-resource-native-cache-committed-overlap",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            native_cache_committed["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-resource-native-cache-committed-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-resource-native-cache-committed-overlap",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1278,6 +1306,35 @@ class CamouflageHarnessTests(unittest.TestCase):
             "drain=complete completed_resources=1 protocol=h3\n",
             one_connection,
         )
+        SAMPLE.validate_sample(
+            "tree-resource-native-cache-committed-overlap",
+            "h3",
+            "Connection 1 preamble resource-native-cache-committed-overlap "
+            "admission=request-committed root_done=1 started_resources=1 "
+            "committed_resources=1 cache_new=1 protocol=h3\n"
+            "Connection 1 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 1 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Connection 1 preamble resource-native-cache-committed-overlap "
+            "drain=complete completed_resources=1 cache_new=1 protocol=h3\n",
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "causal state"):
+            SAMPLE.validate_sample(
+                "tree-resource-native-cache-committed-overlap",
+                "h3",
+                "Connection 1 preamble resource-native-cache-committed-overlap "
+                "admission=request-committed root_done=1 started_resources=1 "
+                "committed_resources=1 cache_new=0 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=12000 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble resource-native-cache-committed-overlap "
+                "drain=complete completed_resources=1 cache_new=0 protocol=h3\n",
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "causal state"):
             SAMPLE.validate_sample(
                 "tree-resource-committed-overlap-css",
@@ -1600,6 +1657,11 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertLess(candidate.index(drain), cutoff)
         self.assertLess(cutoff, drain_check)
         self.assertLess(drain_check, capture_stop)
+        self.assertIn(
+            "preamble resource-native-cache-committed-overlap "
+            "drain=complete completed_resources=1 cache_new=1 protocol=$protocol$",
+            candidate,
+        )
         self.assertEqual(candidate[:capture_stop].count("wait_for_log"), 1)
         self.assertIn(
             "did not drain its preamble by the fixed capture cutoff", candidate

@@ -87,7 +87,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   `document-native-cache-open`, `document-native-channel-open`,
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-complete`, `tree-overlap`,
-  `tree-early-overlap`, and `tree-root-overlap`; `root` and `tree` are
+  `tree-early-overlap`, `tree-resource-native-cache-committed-overlap`, and
+  `tree-root-overlap`; `root` and `tree` are
   compatibility aliases. `document-carrier-dispatch`,
   `document-cold-winner-handoff`, `document-native-cache-open`,
   `document-native-channel-open`, and
@@ -163,6 +164,14 @@ The supported config is a strict NaiveProxy-compatible subset:
   reuse, and real-time classifier paths fail closed. Controlled runs use a
   fresh temporary profile; this mode does not introduce a persistent cache
   dependency.
+  `tree-resource-native-cache-committed-overlap` is a screening-only H3 mode
+  that keeps the root cache-inhibited, opens exactly one discovered resource
+  through a normal writable Cache2 entry, and releases CONNECT only after an
+  asynchronous new-entry callback and the resource's real
+  `NS_NET_STATUS_WAITING_FOR` commit. Cache hits, synchronous callbacks,
+  timeouts, and missing entries fail closed. It exists to test native resource
+  scheduling with a fresh temporary profile; it is not a persistent-cache
+  product policy or a recommended default.
   `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
   is accepted only when at least one effective protocol mode is a tree mode.
   It enables Gecko's ordinary HTTP cache path only for discovered resource

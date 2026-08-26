@@ -285,6 +285,17 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] readonly attribute boolean proxyPreambleNativeChannelOpenSucceeded;
 
     /**
+     * For an experimental HTTP/3 proxy preamble resource, require Firefox's
+     * ordinary asynchronous writable cache2 open before the resource network
+     * transaction is dispatched. This does not run the document classifier.
+     * Must be called after setProxyPreamble() and before the channel is opened.
+     */
+    [must_use] void setProxyPreambleUseNativeResourceCacheOpen();
+
+    /** True only after an asynchronous new writable resource cache entry. */
+    [must_use] readonly attribute boolean proxyPreambleNativeResourceCacheOpenSucceeded;
+
+    /**
      * True iff the channel is CONNECT only.
      */
     [must_use] readonly attribute boolean onlyConnect;

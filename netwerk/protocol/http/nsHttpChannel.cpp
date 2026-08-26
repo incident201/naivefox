@@ -1592,7 +1592,8 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
       ((mLoadFlags & nsIRequest::INHIBIT_CACHING) &&
        !mProxyPreambleUseNativeCacheOpen &&
-       !mProxyPreambleUseNativeChannelOpen)) {
+       !mProxyPreambleUseNativeChannelOpen &&
+       !mProxyPreambleUseNativeResourceCacheOpen)) {
     return TriggerNetwork();
   }
   if (mProxyPreambleUseNativeCacheOpen &&
@@ -1609,6 +1610,13 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
          "inhibit_caching=%d expected_mode=normal",
          this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
   }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_resource_cache_open action=open-begin channel=%p "
+         "inhibit_caching=%d expected_mode=normal",
+         this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+  }
 #endif
 
   // open a cache entry for this channel...
@@ -1619,6 +1627,9 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   if (mProxyPreambleUseNativeChannelOpen) {
     mProxyPreambleNativeChannelOpenCallActive = true;
   }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    mProxyPreambleNativeResourceCacheOpenCallActive = true;
+  }
 #endif
   rv = OpenCacheEntry(mURI->SchemeIs("https"));
 #ifdef MOZ_NAIVEFOX
@@ -1627,6 +1638,9 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   }
   if (mProxyPreambleUseNativeChannelOpen) {
     mProxyPreambleNativeChannelOpenCallActive = false;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    mProxyPreambleNativeResourceCacheOpenCallActive = false;
   }
 #endif
 
@@ -1661,6 +1675,25 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
       NAIVEFOX_LIFECYCLE_LOG(
           ("h3.native_channel_open action=callback-pending channel=%p", this));
+    }
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    if (NS_FAILED(rv) || !AwaitingCacheCallbacks() ||
+        (mLoadFlags & nsIRequest::INHIBIT_CACHING)) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.native_resource_cache_open action=open-failed channel=%p "
+             "rv=%08x awaiting_callback=%d inhibit_caching=%d",
+             this, static_cast<uint32_t>(rv), AwaitingCacheCallbacks(),
+             !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+      }
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_resource_cache_open action=callback-pending "
+           "channel=%p",
+           this));
     }
   }
 #endif
@@ -6091,6 +6124,13 @@ nsHttpChannel::OnCacheEntryAvailable(nsICacheEntry* entry, bool aNew,
          "status=%08x",
          this, entry, aNew, static_cast<uint32_t>(status)));
   }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_resource_cache_open action=callback channel=%p entry=%p "
+         "new=%d status=%08x",
+         this, entry, aNew, static_cast<uint32_t>(status)));
+  }
 #endif
 
   // The cache callback arrived (or we're tearing down); the backstop timer is
@@ -6154,6 +6194,16 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
     }
     return NS_ERROR_UNEXPECTED;
   }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      mProxyPreambleNativeResourceCacheOpenCallActive) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_resource_cache_open action=contract-failed channel=%p "
+           "entry=%p new=%d status=%08x reason=synchronous-callback",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
   if (mProxyPreambleUseNativeCacheOpen &&
       (status != NS_ERROR_CACHE_KEY_NOT_FOUND || entry || aNew)) {
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
@@ -6179,6 +6229,19 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
   }
   if (mProxyPreambleUseNativeChannelOpen) {
     mProxyPreambleNativeChannelNewEntry = true;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      (status != NS_OK || !entry || !aNew)) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_resource_cache_open action=contract-failed channel=%p "
+           "entry=%p new=%d status=%08x reason=not-new-writable-entry",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    mProxyPreambleNativeResourceCacheNewEntry = true;
   }
 #endif
 
@@ -6211,6 +6274,13 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
         ("h3.native_channel_open action=trigger-network channel=%p "
          "new_writable_entry=1 classifier_started=%d",
          this, mProxyPreambleNativeChannelClassifierStarted));
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_resource_cache_open action=trigger-network channel=%p "
+         "cache_new=1",
+         this));
   }
 #endif
 
@@ -12966,12 +13036,16 @@ nsresult nsHttpChannel::OnCacheWaitTimeout() {
 
 #ifdef MOZ_NAIVEFOX
   if (mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeChannelOpen) {
+      mProxyPreambleUseNativeChannelOpen ||
+      mProxyPreambleUseNativeResourceCacheOpen) {
     if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
       NAIVEFOX_LIFECYCLE_LOG(
           ("%s action=contract-failed channel=%p reason=cache-wait-timeout",
-           mProxyPreambleUseNativeChannelOpen ? "h3.native_channel_open"
-                                               : "h3.native_cache_open",
+           mProxyPreambleUseNativeChannelOpen
+               ? "h3.native_channel_open"
+               : (mProxyPreambleUseNativeResourceCacheOpen
+                      ? "h3.native_resource_cache_open"
+                      : "h3.native_cache_open"),
            this));
     }
     StoreWaitForCacheEntry(LoadWaitForCacheEntry() & ~WAIT_FOR_CACHE_ENTRY);

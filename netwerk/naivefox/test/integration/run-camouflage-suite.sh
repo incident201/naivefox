@@ -200,7 +200,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -240,6 +240,11 @@ if [[ $naivefox_arm == tree-resource-committed-overlap-css &&
   printf 'tree-resource-committed-overlap-css requires --protocol h3\n' >&2
   exit 2
 fi
+if [[ $naivefox_arm == tree-resource-native-cache-committed-overlap &&
+      $protocol_selection != h3 ]]; then
+  printf 'tree-resource-native-cache-committed-overlap requires --protocol h3\n' >&2
+  exit 2
+fi
 if [[ $experiment_design == multi_arm_superblocks && $naivefox_arm_explicit -eq 1 ]]; then
   printf '%s\n' '--naivefox-arm cannot be combined with a multi-arm design' >&2
   exit 2
@@ -253,7 +258,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -1376,10 +1381,12 @@ cold_proxy_reset_applies() {
   [[ $protocol == h3 ]] || return 1
   if [[ $experiment_design == multi_arm_superblocks ]]; then
     [[ ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ||
-       ,$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,* ]]
+       ,$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,* ||
+       ,$multi_arm_arms_csv, == *,tree-resource-native-cache-committed-overlap,* ]]
   else
     [[ $naivefox_arm == tree-root-overlap-css ||
-       $naivefox_arm == tree-resource-committed-overlap-css ]]
+       $naivefox_arm == tree-resource-committed-overlap-css ||
+       $naivefox_arm == tree-resource-native-cache-committed-overlap ]]
   fi
 }
 
@@ -1578,7 +1585,8 @@ run_naivefox_sample() {
     --output "$naivefox_config" --arm "$arm" \
     --protocol "$protocol" --socks-port "$socks_port" \
     --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --preamble-path "$path"
-  if [[ $arm == document-native-channel-open ]]; then
+  if [[ $arm == document-native-channel-open ||
+        $arm == tree-resource-native-cache-committed-overlap ]]; then
     validate_native_channel_fresh_cache "$naivefox_profile" naivefox
   fi
   env "${sslkeylog_unset[@]}" \
@@ -1603,6 +1611,8 @@ run_naivefox_sample() {
     drain_pattern=" preamble root-overlap drain=complete completed_resources=$expected_resources protocol=$protocol$"
   elif [[ $arm == tree-resource-committed-overlap-css ]]; then
     drain_pattern=" preamble resource-committed-overlap drain=complete completed_resources=1 protocol=$protocol$"
+  elif [[ $arm == tree-resource-native-cache-committed-overlap ]]; then
+    drain_pattern=" preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=$protocol$"
   elif [[ $arm == document-overlap ]]; then
     drain_pattern=" preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
   elif [[ $arm == document-start-overlap ]]; then
@@ -1748,9 +1758,11 @@ if [[ " ${protocols[*]} " == *" h3 "* ]]; then
   if [[ $naivefox_arm == tree-warm-css-304 ]] ||
      [[ $naivefox_arm == tree-root-overlap-css ]] ||
      [[ $naivefox_arm == tree-resource-committed-overlap-css ]] ||
+     [[ $naivefox_arm == tree-resource-native-cache-committed-overlap ]] ||
      [[ $experiment_design == multi_arm_superblocks &&
         ( ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ||
-          ,$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,* ) ]]; then
+          ,$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,* ||
+          ,$multi_arm_arms_csv, == *,tree-resource-native-cache-committed-overlap,* ) ]]; then
     expected_proxy_restart_count=$((samples_per_cohort * members_per_block))
   fi
 fi
@@ -1765,6 +1777,8 @@ if [[ $naivefox_arm == tree-root-overlap-css ]]; then
   cache_condition=cold_css_200_control
 elif [[ $naivefox_arm == tree-resource-committed-overlap-css ]]; then
   cache_condition=cold_css_200_resource_committed
+elif [[ $naivefox_arm == tree-resource-native-cache-committed-overlap ]]; then
+  cache_condition=cold_css_200_native_cache_committed
 elif [[ $naivefox_arm == tree-warm-css-304 ]]; then
   cache_condition=warm_css_304
   expected_cache_participants=$((samples_per_cohort * 3))
@@ -1918,6 +1932,7 @@ else
         $naivefox_arm == tree-root-overlap ||
         $naivefox_arm == tree-root-overlap-css ||
         $naivefox_arm == tree-resource-committed-overlap-css ||
+        $naivefox_arm == tree-resource-native-cache-committed-overlap ||
         $naivefox_arm == tree-warm-css-304 ||
         $naivefox_arm == tree-overlap ]]; then
     single_arm_analysis=screening
@@ -1940,9 +1955,11 @@ if [[ $naivefox_arm == tree-warm-css-304 ]]; then
   fixture_proxy_reset_policy=warm_after_drain_and_symmetric_cold_before_measure
 elif [[ $naivefox_arm == tree-root-overlap-css ]] ||
      [[ $naivefox_arm == tree-resource-committed-overlap-css ]] ||
+     [[ $naivefox_arm == tree-resource-native-cache-committed-overlap ]] ||
      [[ $experiment_design == multi_arm_superblocks &&
         ( ,$multi_arm_arms_csv, == *,tree-root-overlap-css,* ||
-          ,$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,* ) ]]; then
+          ,$multi_arm_arms_csv, == *,tree-resource-committed-overlap-css,* ||
+          ,$multi_arm_arms_csv, == *,tree-resource-native-cache-committed-overlap,* ) ]]; then
   fixture_proxy_reset_policy=cold_before_measure
 fi
 # shellcheck source=/etc/os-release

@@ -1850,6 +1850,53 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 {"4": 11, "8": 22},
             )
 
+    def test_private_response_recovers_tshark_quoted_etag_csv_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            separator = summary.PRIVATE_VALUE_SEPARATOR
+            self.write_csv(
+                directory,
+                "tree-complete-css",
+                "response-header-values",
+                [
+                    "frame.number",
+                    "udp.srcport",
+                    "udp.dstport",
+                    "quic.connection.number",
+                    "quic.stream.stream_id",
+                    "http3.headers.status",
+                    "http3.header.header.name",
+                    "http3.headers.header.value",
+                ],
+                [
+                    {
+                        "frame.number": "21",
+                        "udp.srcport": "4433",
+                        "udp.dstport": "55000",
+                        "quic.connection.number": "0",
+                        "quic.stream.stream_id": "4",
+                        "http3.headers.status": "200",
+                        "http3.header.header.name": separator.join((
+                            ":status",
+                            "etag",
+                            "content-length",
+                        )),
+                        # This is the exact value shape csv.DictReader returns
+                        # after tshark fails to double the ETag's RFC quotes.
+                        "http3.headers.header.value": separator.join((
+                            "200",
+                            'naivefox-style-deadbeef"',
+                            '65536"',
+                        )),
+                    }
+                ],
+            )
+            self.assertEqual(
+                summary.read_response_content_lengths(
+                    Path(directory), "tree-complete-css", "4433"
+                ),
+                {"4": 65536},
+            )
+
     def test_private_response_ignores_ambiguous_non_sized_connect_block(self):
         with tempfile.TemporaryDirectory() as directory:
             separator = summary.PRIVATE_VALUE_SEPARATOR

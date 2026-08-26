@@ -42,6 +42,7 @@ def build_config(
         "tree-root-overlap",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
+        "tree-resource-native-cache-committed-overlap",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -57,6 +58,7 @@ def build_config(
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, "
             "tree-resource-committed-overlap-css, tree-warm-css-304, or "
+            "tree-resource-native-cache-committed-overlap, or "
             "tree-overlap"
         )
     if protocol not in ("h2", "h3"):
@@ -75,6 +77,13 @@ def build_config(
         raise ValueError("document-native-channel-open requires h3")
     if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
         raise ValueError("tree-resource-committed-overlap-css requires h3")
+    if (
+        arm == "tree-resource-native-cache-committed-overlap"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-resource-native-cache-committed-overlap requires h3"
+        )
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -113,6 +122,15 @@ def build_config(
             "path": preamble_path,
             "max-assets": 1,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
+        }
+    elif arm == "tree-resource-native-cache-committed-overlap":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-resource-native-cache-committed-overlap",
+            "path": preamble_path,
+            "max-assets": 1,
+            "max-bytes": TREE_PREAMBLE_MAX_BYTES,
+            "cache-resources": True,
         }
     elif arm in (
         "document-handshake-confirmed",
@@ -221,6 +239,7 @@ def main():
             "tree-root-overlap",
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
+            "tree-resource-native-cache-committed-overlap",
             "tree-warm-css-304",
             "tree-overlap",
         ),

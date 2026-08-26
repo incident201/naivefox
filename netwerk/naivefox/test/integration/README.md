@@ -515,7 +515,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -528,6 +528,12 @@ It releases CONNECT only after the root has completed and Gecko has emitted
 that the resource transaction was committed without conditioning admission on
 response HEADERS, body size, packet number, or elapsed time. A terminal drain
 fallback is reported separately and is invalid for passive admission.
+`tree-resource-native-cache-committed-overlap` keeps the same one-resource
+admission rule but restores the resource channel's ordinary writable Cache2
+open. The root remains cache-inhibited. Admission additionally requires an
+asynchronous callback for a new entry and therefore a fresh temporary profile;
+cache reuse, a synchronous callback, or a timeout invalidates the sample. This
+is a scheduling diagnostic, not a proposal to depend on persistent cache.
 `document-overlap` uses the identical single document request but releases
 CONNECT after accepted 2xx response HEADERS while the root listener is still
 active. Its normal root drain is mandatory. Root FIN ordering is report-only,
@@ -804,6 +810,42 @@ the committed arm was closest for packets 17--32 (0.43774) and packets 1--32
 (0.22508), but worse for packets 1--16 (0.16204) and the first 250 ms
 (0.22409). This supports a real scheduling effect without supporting asset-size
 tuning or making the mechanism the default.
+
+A corrected ten-block same-base screen, safe artifact `324d583facd28300`
+(seed `84625`), confirmed that the committed arm removes the old packet-25/26
+phase boundary rather than merely moving it. Relative to `document-complete`,
+its model-free distance improved on packets 17--32 (`0.34961` versus
+`0.48280`), packets 1--32 (`0.13689` versus `0.18094`), and whole flow
+(`0.35140` versus `0.38407`), but regressed in the first 250 ms (`0.13604`
+versus `0.12857`). Its CSS response also formed an early dense server burst at
+about 7 ms, with roughly 82.7 KiB excess server wire volume in the first
+250 ms. The arm is therefore a useful causal diagnostic but not a default.
+
+`tree-resource-native-cache-committed-overlap` tested whether the stylesheet's
+ordinary asynchronous Cache2 open naturally supplies the missing scheduling
+phase. Strict same-base artifact `20260826T062323Z-e9a146a3` proved one QUIC
+identity and ClientHello, a new writable cache entry, identical root/CSS
+semantics and 65536-byte CSS content length, CSS GET before CONNECT, and CSS
+response completion after CONNECT. The outcome was negative: CSS remained at
+packet 16 and CONNECT at packet 17 / 7.140 ms. A subsequent paired collection
+was rejected fail closed after a sequential native-cache sample timed out
+before admission, so no incomplete statistics were retained. This mode remains
+diagnostic and must not be promoted or expanded as a cache-dependent policy.
+
+Fresh symmetric private lifecycle artifact `20260826T063809Z-a069beb8` also
+closed the Safe Browsing latency hypothesis. The pre-launched reference had
+initialized its URL-classifier service during warm-up; for the measured target
+document `StartInternal` returned `expectCallback=false`, so the channel was
+not suspended and its real transaction was created 0.292 ms after classifier
+start. The admitted NaiveFox `document-native-channel-open` channel did perform
+the genuine local-DB path: `Classify(expectCallback=true) -> Suspend`, clean
+callback after 1.276 ms, `Resume` 0.002 ms later, and transaction dispatch
+0.019 ms after that. H3 connected only later, so classification did not retain
+an already-ready session. Firefox and NaiveFox document GETs were correspondingly
+close (4.882 ms and 5.560 ms). The remaining phase appears after the document:
+Firefox's first resource GET was at 29.277 ms, while a document-only NaiveFox
+arm had already released CONNECT near 7 ms. Further work must target ordinary
+resource discovery/activation rather than extend classifier or cache barriers.
 
 Controlled H3 packet-shape screening must run with
 `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`. The private namespace disables loopback

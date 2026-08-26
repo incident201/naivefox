@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -45,7 +45,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -118,6 +118,11 @@ fi
 if [[ -n ${seen_comparison_arms[tree-resource-committed-overlap-css]:-} &&
       -z ${seen_comparison_arms[tree-complete-css]:-} ]]; then
   printf 'tree-resource-committed-overlap-css comparison requires tree-complete-css\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-resource-native-cache-committed-overlap]:-} &&
+      -z ${seen_comparison_arms[tree-complete-css]:-} ]]; then
+  printf 'tree-resource-native-cache-committed-overlap comparison requires tree-complete-css\n' >&2
   exit 2
 fi
 
@@ -855,7 +860,8 @@ EOF
         $arm == document-carrier-dispatch ||
         $arm == document-cold-winner-handoff ||
         $arm == document-native-cache-open ||
-        $arm == document-native-channel-open ]]; then
+        $arm == document-native-channel-open ||
+        $arm == tree-resource-native-cache-committed-overlap ]]; then
     lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
   fi
   if [[ $private_event_trace -eq 1 &&
@@ -866,7 +872,8 @@ EOF
       "MOZ_LOG_FILE=$lifecycle_log_base"
     )
   fi
-  if [[ $arm == document-native-channel-open ]]; then
+  if [[ $arm == document-native-channel-open ||
+        $arm == tree-resource-native-cache-committed-overlap ]]; then
     validate_native_channel_fresh_cache "$naivefox_profile" naivefox
   fi
   env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
@@ -888,6 +895,9 @@ EOF
   elif [[ $arm == tree-resource-committed-overlap-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble resource-committed-overlap drain=complete completed_resources=1 protocol=h3$'
+  elif [[ $arm == tree-resource-native-cache-committed-overlap ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=h3$'
   elif [[ $arm == document-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h3$'
@@ -919,6 +929,7 @@ EOF
         $arm == tree-root-overlap ||
         $arm == tree-root-overlap-css ||
         $arm == tree-resource-committed-overlap-css ||
+        $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
@@ -935,6 +946,7 @@ EOF
           $arm == tree-root-overlap ||
           $arm == tree-root-overlap-css ||
           $arm == tree-resource-committed-overlap-css ||
+          $arm == tree-resource-native-cache-committed-overlap ||
           $arm == tree-overlap ]]; then
       ! rg -q ' preamble background drain timed out' "$log"
     fi
@@ -964,6 +976,15 @@ EOF
       [[ $(rg -c ' preamble resource-committed-overlap drain=' "$log" || true) -eq 1 ]]
       rg -q ' preamble resource-committed-overlap admission=request-committed root_done=1 started_resources=1 committed_resources=1 protocol=h3$' "$log"
       rg -q ' preamble resource-committed-overlap drain=complete completed_resources=1 protocol=h3$' "$log"
+    elif [[ $arm == tree-resource-native-cache-committed-overlap ]]; then
+      [[ $(rg -c ' preamble resource-native-cache-committed-overlap admission=' "$log" || true) -eq 1 ]]
+      [[ $(rg -c ' preamble resource-native-cache-committed-overlap drain=' "$log" || true) -eq 1 ]]
+      rg -q ' preamble resource-native-cache-committed-overlap admission=request-committed root_done=1 started_resources=1 committed_resources=1 cache_new=1 protocol=h3$' "$log"
+      rg -q ' preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=h3$' "$log"
+      rg -q 'h3.native_resource_cache_open action=callback-pending ' "$lifecycle_log"
+      rg -q 'h3.native_resource_cache_open action=callback .* new=1 status=00000000' "$lifecycle_log"
+      rg -q 'h3.native_resource_cache_open action=trigger-network .* cache_new=1' "$lifecycle_log"
+      ! rg -q 'h3.native_resource_cache_open action=contract-failed' "$lifecycle_log"
     elif [[ $arm == document-overlap ]]; then
       [[ $(rg -c ' preamble document-overlap admission=' "$log" || true) -eq 1 ]]
       [[ $(rg -c ' preamble document-overlap drain=' "$log" || true) -eq 1 ]]

@@ -586,6 +586,9 @@ class JsonParser final {
         aMode = PreambleMode::TreeRootOverlap;
       } else if (mode.EqualsLiteral("tree-resource-committed-overlap")) {
         aMode = PreambleMode::TreeResourceCommittedOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-resource-native-cache-committed-overlap")) {
+        aMode = PreambleMode::TreeResourceNativeCacheCommittedOverlap;
       } else {
         return Error("unsupported preamble mode");
       }
@@ -722,8 +725,17 @@ class JsonParser final {
           "tree-resource-committed-overlap must be selected explicitly with "
           "h3-mode");
     }
-    if (h2Mode == PreambleMode::TreeResourceCommittedOverlap) {
-      return Error("tree-resource-committed-overlap is H3-only");
+    if (h3Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeResourceNativeCacheCommittedOverlap))) {
+      return Error(
+          "tree-resource-native-cache-committed-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeResourceCommittedOverlap ||
+        h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+      return Error("selected resource-committed preamble is H3-only");
     }
     const bool anyActive =
         h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
@@ -759,6 +771,18 @@ class JsonParser final {
         aPreamble.mMaxAssets != 1) {
       return Error(
           "tree-resource-committed-overlap requires exactly one asset");
+    }
+    if (h3Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-resource-native-cache-committed-overlap requires exactly "
+            "one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-resource-native-cache-committed-overlap requires "
+            "cache-resources=true");
+      }
     }
     return NS_OK;
   }

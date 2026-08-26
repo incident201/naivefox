@@ -25,6 +25,7 @@ SUPPORTED_ARMS = (
     "tree-root-overlap",
     "tree-root-overlap-css",
     "tree-resource-committed-overlap-css",
+    "tree-resource-native-cache-committed-overlap",
     "tree-overlap",
 )
 REDACTED_HEADER_NAMES = {
@@ -416,6 +417,7 @@ def read_get_request_semantics(root, cohort, proxy_port):
         "tree-complete-css",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
+        "tree-resource-native-cache-committed-overlap",
     ):
         roles = ("root", "stylesheet")
     elif cohort.startswith("tree-"):
@@ -502,6 +504,21 @@ def read_response_content_lengths(root, cohort, proxy_port):
             selected = [value for name, value in block if name == "content-length"]
             if not selected:
                 continue
+            # tshark's CSV writer does not double RFC-quoted ETag values.  A
+            # quoted ETag can therefore donate its opening quote to the CSV
+            # field delimiter and leave the final quote on the following
+            # Content-Length value.  Admit only that exact, unambiguous shape;
+            # every other non-numeric length remains fail-closed.
+            if len(selected) == 1 and not selected[0].isdigit():
+                etags = [value for name, value in block if name == "etag"]
+                if (
+                    len(etags) == 1
+                    and not etags[0].startswith('"')
+                    and etags[0].endswith('"')
+                    and selected[0].endswith('"')
+                    and selected[0][:-1].isdigit()
+                ):
+                    selected = [selected[0][:-1]]
             require(
                 len(selected) == 1 and selected[0].isdigit(),
                 f"{cohort} response has invalid content-length semantics",
@@ -1442,6 +1459,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "tree-root-overlap",
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
+            "tree-resource-native-cache-committed-overlap",
             "tree-overlap",
         ):
             expected_gets = (
@@ -1451,6 +1469,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-complete-css",
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
+                    "tree-resource-native-cache-committed-overlap",
                 )
                 else 3
                 if arm.startswith("tree-")
@@ -1560,7 +1579,13 @@ def validate(cohorts, connections, client_hellos, arms):
                     for row in response_headers
                     if (row["connection_index"], row["stream_id"]) in asset_streams
                 ]
-                expected_assets = 1 if arm.endswith("-css") else 2
+                expected_assets = (
+                    1
+                    if arm.endswith("-css")
+                    or arm
+                    == "tree-resource-native-cache-committed-overlap"
+                    else 2
+                )
                 require(
                     len(asset_responses) == expected_assets,
                     f"{arm} lacks one or more asset response headers",
@@ -1631,6 +1656,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-root-overlap",
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
+                    "tree-resource-native-cache-committed-overlap",
                 ):
                     root_stream = (
                         ordered_gets[0]["connection_index"],
@@ -1830,6 +1856,12 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         or "tree-complete-css" in arms,
         "tree-resource-committed-overlap-css decrypted validation requires "
         "tree-complete-css",
+    )
+    require(
+        "tree-resource-native-cache-committed-overlap" not in arms
+        or "tree-complete-css" in arms,
+        "tree-resource-native-cache-committed-overlap decrypted validation "
+        "requires tree-complete-css",
     )
     cohorts_to_read = ("reference", *arms)
     cohorts = {}
@@ -2241,6 +2273,25 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             == tree_asset_sizes["tree-resource-committed-overlap-css"],
             "resource-committed CSS asset content-length differs",
         )
+    if {
+        "tree-complete-css",
+        "tree-resource-native-cache-committed-overlap",
+    }.issubset(arms):
+        for role in ("root", "stylesheet"):
+            require(
+                tree_semantics["tree-complete-css"][role]
+                == tree_semantics[
+                    "tree-resource-native-cache-committed-overlap"
+                ][role],
+                f"native-cache-committed {role} GET selected header values/order differ",
+            )
+        require(
+            tree_asset_sizes["tree-complete-css"]
+            == tree_asset_sizes[
+                "tree-resource-native-cache-committed-overlap"
+            ],
+            "native-cache-committed CSS asset content-length differs",
+        )
     fieldnames = [
         "cohort",
         "event_ordinal",
@@ -2327,6 +2378,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
                     "tree-root-overlap",
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
+                    "tree-resource-native-cache-committed-overlap",
                     "tree-overlap",
                 ):
                     ordered_gets = sorted(gets, key=lambda row: row["packet_position"])
@@ -2407,6 +2459,19 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write("tree_resource_committed_asset_sizes_match=yes\n")
             destination.write(
                 "tree_resource_committed_response_order_is_admission=no\n"
+            )
+        if {
+            "tree-complete-css",
+            "tree-resource-native-cache-committed-overlap",
+        }.issubset(arms):
+            destination.write(
+                "tree_resource_native_cache_request_semantics_match=yes\n"
+            )
+            destination.write(
+                "tree_resource_native_cache_asset_sizes_match=yes\n"
+            )
+            destination.write(
+                "tree_resource_native_cache_response_order_is_admission=no\n"
             )
         if {"root", "root-pmtud-control"}.issubset(arms):
             destination.write("root_pmtud_control_request_semantics_match=yes\n")

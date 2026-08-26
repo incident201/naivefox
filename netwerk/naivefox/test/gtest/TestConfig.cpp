@@ -281,12 +281,30 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_FALSE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H2));
   EXPECT_TRUE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H3));
 
+  Config nativeCacheCommitted;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeCacheCommitted, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeCacheCommitted.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_EQ(nativeCacheCommitted.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeResourceNativeCacheCommittedOverlap);
+  EXPECT_EQ(nativeCacheCommitted.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeCacheCommitted.mPreamble.mCacheResources);
+
   static constexpr const char* kInvalid[] = {
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":2,"cache-resources":true}})",
   };
   for (const char* json : kInvalid) {
     Config invalid;

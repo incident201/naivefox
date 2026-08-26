@@ -176,6 +176,15 @@ TEST(NaiveFoxTunnelSessionLifecycle, ResourceCacheFollowsEffectiveTreeMode)
   EXPECT_TRUE(
       detail::PreambleChannelUsesCache(config, ProxyProtocol::H3, true));
 
+  config.mH3Mode =
+      Some(PreambleMode::TreeResourceNativeCacheCommittedOverlap);
+  // The product arm restores the native cache lifecycle only for the
+  // discovered resource; the synthetic root remains cache-inhibited.
+  EXPECT_FALSE(
+      detail::PreambleChannelUsesCache(config, ProxyProtocol::H3, false));
+  EXPECT_TRUE(
+      detail::PreambleChannelUsesCache(config, ProxyProtocol::H3, true));
+
   config.mH3Mode = Some(PreambleMode::Off);
   EXPECT_FALSE(config.CacheResourcesForProtocol(ProxyProtocol::H3));
 }
@@ -266,6 +275,19 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeResourceCommittedOverlap, true, true, 1, 0, 0, 0, 1,
       true));
 
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
+      0, 0, 1, true, 0));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
+      0, 0, 0, true, 1));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
+      0, 0, 1, false, 1));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
+      0, 0, 1, true, 1));
+
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(
       detail::PreambleOverlapsConnect(PreambleMode::DocumentStartOverlap));
@@ -274,6 +296,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::TreeRootOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeResourceCommittedOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -328,6 +352,13 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeResourceCommittedOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeResourceCommittedOverlap, true));
+
+  // This mode is a fail-closed product contract: completing the resource
+  // without its async new-cache-entry admission must not release CONNECT.
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeResourceNativeCacheCommittedOverlap, true));
 
   detail::PreambleSequenceState sequence;
   constexpr uint64_t generation = 17;

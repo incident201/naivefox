@@ -283,10 +283,13 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD SetProxyPreambleUseCarrierDispatch() override;
   NS_IMETHOD SetProxyPreambleUseNativeCacheOpen() override;
   NS_IMETHOD SetProxyPreambleUseNativeChannelOpen() override;
+  NS_IMETHOD SetProxyPreambleUseNativeResourceCacheOpen() override;
   NS_IMETHOD SetProxyPreambleUseColdWinnerHandoff() override;
   NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) override;
   NS_IMETHOD GetProxyPreambleNativeCacheReadOnlyMiss(bool* aValue) override;
   NS_IMETHOD GetProxyPreambleNativeChannelOpenSucceeded(bool* aValue) override;
+  NS_IMETHOD GetProxyPreambleNativeResourceCacheOpenSucceeded(
+      bool* aValue) override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
   NS_IMETHOD SetAllowSpdy(bool aAllowSpdy) override;
   NS_IMETHOD GetAllowHttp3(bool* aAllowHttp3) override;
@@ -920,6 +923,9 @@ class HttpBaseChannel : public nsHashPropertyBag,
   bool mProxyPreambleNativeChannelClassifierStartCallActive{false};
   bool mProxyPreambleNativeChannelClassifierStarted{false};
   bool mProxyPreambleNativeChannelClassifierCompleted{false};
+  bool mProxyPreambleUseNativeResourceCacheOpen{false};
+  bool mProxyPreambleNativeResourceCacheOpenCallActive{false};
+  bool mProxyPreambleNativeResourceCacheNewEntry{false};
 #endif
 
   ClassOfService mClassOfService;
