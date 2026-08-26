@@ -32,6 +32,9 @@ CONFIG = load("camouflage_naivefox_config", "camouflage_naivefox_config.py")
 CACHE = load("camouflage_cache_validation", "camouflage_cache_validation.py")
 CONTROLLER = load("camouflage_browser_controller", "camouflage_browser_controller.py")
 FEATURES = load("camouflage_features", "camouflage_features.py")
+INNER_H2 = load(
+    "camouflage_inner_h2_validation", "camouflage_inner_h2_validation.py"
+)
 SAMPLE = load("camouflage_sample_validation", "camouflage_sample_validation.py")
 SUPERBLOCKS = load("camouflage_superblocks", "camouflage_superblocks.py")
 TARGET = load("target_server", "target_server.py")
@@ -1597,6 +1600,95 @@ class CamouflageHarnessTests(unittest.TestCase):
             TARGET.Handler.send_bytes(response, 200, body, content_type)
             self.assertEqual(response.headers["Content-Length"], str(len(body)))
             self.assertNotIn("Content-Encoding", response.headers)
+
+    def test_inner_h2_access_log_requires_exact_http2_completion(self):
+        token = "0123456789abcdef0123456789abcdef"
+
+        def record(uri, *, proto="HTTP/2.0", method="GET", status=200):
+            return json.dumps(
+                {
+                    "request": {
+                        "host": "localhost:45501",
+                        "method": method,
+                        "proto": proto,
+                        "uri": uri,
+                    },
+                    "status": status,
+                }
+            )
+
+        valid = [
+            record(f"/camouflage/index.html?completion={token}"),
+            record("/camouflage/style.css"),
+            record(
+                f"/camouflage/complete?token={token}",
+                method="POST",
+                status=204,
+            ),
+        ]
+        INNER_H2.validate_records(valid, completion=token, port=45501)
+
+        for invalid, pattern in (
+            (
+                [
+                    record(f"/camouflage/index.html?completion={token}"),
+                    record(
+                        f"/camouflage/complete?token={token}",
+                        proto="HTTP/1.1",
+                        method="POST",
+                        status=204,
+                    ),
+                ],
+                "unexpected protocol",
+            ),
+            (
+                [
+                    record(
+                        f"/camouflage/complete?token={token}",
+                        method="POST",
+                        status=200,
+                    )
+                ],
+                "status is not 204",
+            ),
+            (valid + [valid[-1]], "exactly one"),
+        ):
+            with self.assertRaisesRegex(ValueError, pattern):
+                INNER_H2.validate_records(invalid, completion=token, port=45501)
+
+    def test_inner_h2_fixture_is_opt_in_and_persistent(self):
+        with open(os.path.join(HERE, "Caddyfile"), encoding="utf-8") as stream:
+            proxy_caddyfile = stream.read()
+        with open(
+            os.path.join(HERE, "Caddyfile-inner-h2"), encoding="utf-8"
+        ) as stream:
+            inner_caddyfile = stream.read()
+        with open(os.path.join(HERE, "start.sh"), encoding="utf-8") as stream:
+            fixture_start = stream.read()
+        with open(os.path.join(HERE, "stop.sh"), encoding="utf-8") as stream:
+            fixture_stop = stream.read()
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            suite = stream.read()
+
+        self.assertIn("{$NAIVEFOX_FIXTURE_ALLOWED_PORTS}", proxy_caddyfile)
+        self.assertNotIn("INNER_H2_PORT}", proxy_caddyfile)
+        self.assertIn("protocols h2", inner_caddyfile)
+        self.assertNotIn("protocols h1", inner_caddyfile)
+        self.assertIn("--inner-h2", fixture_start)
+        self.assertIn("inner-h2.pid", fixture_start)
+        self.assertIn("wait_for_h2_origin", fixture_start)
+        self.assertIn("caddy inner-h2 target", fixture_stop)
+        self.assertIn("fixture_start_args+=(--inner-h2)", suite)
+        self.assertIn("camouflage_inner_h2_validation.py", suite)
+        self.assertLess(
+            suite.index("stop_capture", suite.index("run_naivefox_sample()")),
+            suite.index(
+                'validate_inner_h2_request "$completion"',
+                suite.index("run_naivefox_sample()"),
+            ),
+        )
 
     def test_sample_validation_accepts_expected_arm_evidence(self):
         one_connection = {

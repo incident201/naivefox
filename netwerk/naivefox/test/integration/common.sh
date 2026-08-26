@@ -110,6 +110,37 @@ wait_for_h3_proxy() {
   return 1
 }
 
+wait_for_h2_origin() {
+  local pid=$1
+  local port=$2
+  local ca=$3
+  local http_version
+  for ((i = 0; i < 150; i++)); do
+    http_version=$(curl --silent --output /dev/null --connect-timeout 1 \
+      --max-time 2 --http2 --cacert "$ca" --write-out '%{http_version}' \
+      "https://localhost:$port/health" || true)
+    if [[ $http_version == 2 ]]; then
+      if [[ -n $(ss -H -lun "sport = :$port") ]]; then
+        printf 'strict inner HTTP/2 fixture unexpectedly has a UDP listener\n' >&2
+        return 1
+      fi
+      if curl --silent --output /dev/null --connect-timeout 1 --max-time 2 \
+        --http1.1 --cacert "$ca" "https://localhost:$port/health"; then
+        printf 'strict inner HTTP/2 fixture unexpectedly accepted HTTP/1.1\n' >&2
+        return 1
+      fi
+      return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      printf 'Caddy exited before inner HTTP/2 readiness\n' >&2
+      return 1
+    fi
+    sleep 0.1
+  done
+  printf 'timed out waiting for strict inner HTTP/2 listener\n' >&2
+  return 1
+}
+
 sanitize_stream() {
   local user=${1:-}
   local pass=${2:-}

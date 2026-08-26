@@ -31,7 +31,7 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 		forward_proxy {
 			basic_auth {$NAIVEFOX_FIXTURE_USER} {$NAIVEFOX_FIXTURE_PASS}
 			hosts localhost
-			ports {$NAIVEFOX_FIXTURE_HTTP_PORT} {$NAIVEFOX_FIXTURE_HTTPS_PORT}
+			ports {$NAIVEFOX_FIXTURE_ALLOWED_PORTS}
 			acl {
 				allow 127.0.0.1/32
 				deny all

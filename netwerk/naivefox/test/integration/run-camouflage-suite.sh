@@ -73,7 +73,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https] [--scenario NAME] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,...] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,...] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -157,7 +157,12 @@ case $protocol_selection in
     ;;
 esac
 case $inner_transport in
-  http | https) ;;
+  http)
+    inner_scheme=http
+    ;;
+  https | https-h2)
+    inner_scheme=https
+    ;;
   *)
     printf 'unsupported inner transport: %s\n' "$inner_transport" >&2
     exit 2
@@ -804,6 +809,11 @@ restart_fixture_proxy() {
   local target_executable
   local current_target_starttime
   local current_target_executable
+  local inner_h2_pid=
+  local inner_h2_starttime=
+  local inner_h2_executable=
+  local current_inner_h2_starttime=
+  local current_inner_h2_executable=
   local journal_identity
   local journal_size
   local current_journal_identity
@@ -830,6 +840,18 @@ restart_fixture_proxy() {
   if [[ -z $target_starttime || -z $target_executable ]]; then
     printf 'proxy restart found no exact target process identity\n' >&2
     return 1
+  fi
+  if [[ ${NAIVEFOX_FIXTURE_INNER_H2_ENABLED:-0} == 1 ]]; then
+    inner_h2_pid=$(<"$NAIVEFOX_FIXTURE_RUN_DIR/inner-h2.pid")
+    inner_h2_starttime=$(awk '{print $22}' "/proc/$inner_h2_pid/stat" \
+      2>/dev/null || true)
+    inner_h2_executable=$(readlink -f "/proc/$inner_h2_pid/exe" \
+      2>/dev/null || true)
+    if [[ -z $inner_h2_starttime ||
+          $inner_h2_executable != "$expected_executable" ]]; then
+      printf 'proxy restart found no exact persistent inner H2 identity\n' >&2
+      return 1
+    fi
   fi
   journal_identity=absent
   journal_size=0
@@ -912,10 +934,20 @@ restart_fixture_proxy() {
     2>/dev/null || true)
   current_target_executable=$(readlink -f "/proc/$target_pid/exe" \
     2>/dev/null || true)
+  if [[ -n $inner_h2_pid ]]; then
+    current_inner_h2_starttime=$(awk '{print $22}' \
+      "/proc/$inner_h2_pid/stat" 2>/dev/null || true)
+    current_inner_h2_executable=$(readlink -f "/proc/$inner_h2_pid/exe" \
+      2>/dev/null || true)
+  fi
   if [[ $(<"$NAIVEFOX_FIXTURE_RUN_DIR/target.pid") != "$target_pid" ]] ||
      ! kill -0 "$target_pid" 2>/dev/null ||
      [[ $current_target_starttime != "$target_starttime" ]] ||
      [[ $current_target_executable != "$target_executable" ]] ||
+     [[ -n $inner_h2_pid &&
+        ( $(<"$NAIVEFOX_FIXTURE_RUN_DIR/inner-h2.pid") != "$inner_h2_pid" ||
+          $current_inner_h2_starttime != "$inner_h2_starttime" ||
+          $current_inner_h2_executable != "$inner_h2_executable" ) ]] ||
      [[ $current_journal_identity != "$journal_identity" ]] ||
      [[ $current_journal_size != "$journal_size" ]]; then
     printf 'proxy restart changed target or request-journal identity\n' >&2
@@ -992,6 +1024,15 @@ validate_native_channel_fresh_cache() {
       "$participant" >&2
     return 1
   fi
+}
+
+validate_inner_h2_request() {
+  local completion=$1
+  local offset=$2
+  python3 "$INTEGRATION_DIR/camouflage_inner_h2_validation.py" \
+    --access-log "$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG" \
+    --offset "$offset" --completion "$completion" \
+    --port "$NAIVEFOX_FIXTURE_INNER_H2_PORT" --wait-seconds 2
 }
 
 validate_profile_role() {
@@ -1611,9 +1652,12 @@ run_naivefox_sample() {
   local warm_outer_token=
   local warm_trigger_token=
   local cache_journal_start=0
+  local inner_h2_log_start=0
   socks_port=$(choose_port)
   path=$(scenario_path "$scenario" "$completion")
-  if [[ $inner_transport == https ]]; then
+  if [[ $inner_transport == https-h2 ]]; then
+    target_port=$NAIVEFOX_FIXTURE_INNER_H2_PORT
+  elif [[ $inner_transport == https ]]; then
     target_port=$NAIVEFOX_FIXTURE_HTTPS_PORT
   else
     target_port=$NAIVEFOX_FIXTURE_HTTP_PORT
@@ -1631,6 +1675,7 @@ run_naivefox_sample() {
     local warm_socks_port
     local warm_target_port=$target_port
     local warm_dir="$sample_dir/cache-warm"
+    local warm_inner_h2_log_start=0
     warm_socks_port=$(choose_port)
     cache_journal_start=$(stat -c %s \
       "$NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL" 2>/dev/null || printf 0)
@@ -1654,10 +1699,18 @@ run_naivefox_sample() {
       "$NAIVEFOX_BIN" "$warm_config" >"$warm_log" 2>&1 &
     naivefox_pid=$!
     wait_for_cache_log "$naivefox_pid" "$warm_log" '^SOCKS5 listening on '
+    if [[ $inner_transport == https-h2 ]]; then
+      warm_inner_h2_log_start=$(stat -c %s \
+        "$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG")
+    fi
     start_browser_controller "$warm_browser_profile" \
-      "$inner_transport://localhost:$warm_target_port/camouflage/index.html?scenario=initial&completion=$warm_trigger_token" \
+      "$inner_scheme://localhost:$warm_target_port/camouflage/index.html?scenario=initial&completion=$warm_trigger_token" \
       "$warm_trigger_token" "$warm_dir" "$protocol" "$warm_socks_port"
     run_browser_workload "$warm_dir"
+    if [[ $inner_transport == https-h2 ]]; then
+      validate_inner_h2_request "$warm_trigger_token" \
+        "$warm_inner_h2_log_start"
+    fi
     wait_for_cache_log "$naivefox_pid" "$warm_log" \
       ' preamble root-overlap drain=complete completed_resources=1 protocol=h3$'
     wait_for_cache_log "$naivefox_pid" "$warm_log" \
@@ -1698,8 +1751,12 @@ run_naivefox_sample() {
     "$NAIVEFOX_BIN" "$naivefox_config" >"$log" 2>&1 &
   naivefox_pid=$!
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
+  if [[ $inner_transport == https-h2 ]]; then
+    inner_h2_log_start=$(stat -c %s \
+      "$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG")
+  fi
   start_browser_controller "$browser_profile" \
-    "$inner_transport://localhost:$target_port$path" \
+    "$inner_scheme://localhost:$target_port$path" \
     "$completion" "$sample_dir" "$protocol" "$socks_port"
   start_capture "$pcap" "$sample_dir/dumpcap.log"
   run_browser_workload "$sample_dir"
@@ -1732,6 +1789,9 @@ run_naivefox_sample() {
     drain_ready=0
   fi
   stop_capture
+  if [[ $inner_transport == https-h2 ]]; then
+    validate_inner_h2_request "$completion" "$inner_h2_log_start"
+  fi
   if [[ $arm == tree-warm-css-304 ]]; then
     normalize_h3_capture_origin "$pcap"
   fi
@@ -1789,7 +1849,11 @@ else
   members_per_block=3
 fi
 for protocol in "${protocols[@]}"; do
-  "$INTEGRATION_DIR/start.sh" --mode "$protocol"
+  fixture_start_args=(--mode "$protocol")
+  if [[ $inner_transport == https-h2 ]]; then
+    fixture_start_args+=(--inner-h2)
+  fi
+  "$INTEGRATION_DIR/start.sh" "${fixture_start_args[@]}"
   run_dir=$(<"$ACTIVE_RUN_FILE")
   # shellcheck source=/dev/null
   source "$run_dir/fixture.env"
