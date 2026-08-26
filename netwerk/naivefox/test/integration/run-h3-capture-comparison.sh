@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -45,7 +45,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -57,6 +57,14 @@ done
 if [[ -n ${seen_comparison_arms[tree-overlap]:-} &&
       -z ${seen_comparison_arms[tree-complete]:-} ]]; then
   printf 'tree-overlap comparison requires tree-complete\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-native-parser-ipc-rendezvous-overlap-css]:-} &&
+      ( -z ${seen_comparison_arms[tree-complete-css]:-} ||
+        -z ${seen_comparison_arms[tree-native-parser-preload-overlap-css]:-} ||
+        -z ${seen_comparison_arms[tree-native-parser-document-handoff-overlap-css]:-} ||
+        -z ${seen_comparison_arms[tree-native-parser-retarget-overlap-css]:-} ) ]]; then
+  printf 'tree-native-parser-ipc-rendezvous-overlap-css comparison requires tree-complete-css, tree-native-parser-preload-overlap-css, tree-native-parser-document-handoff-overlap-css, and tree-native-parser-retarget-overlap-css\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[tree-native-parser-retarget-overlap-css]:-} &&
@@ -882,7 +890,8 @@ EOF
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
-        $arm == tree-native-parser-retarget-overlap-css ]]; then
+        $arm == tree-native-parser-retarget-overlap-css ||
+        $arm == tree-native-parser-ipc-rendezvous-overlap-css ]]; then
     lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
   fi
   if [[ $private_event_trace -eq 1 &&
@@ -897,7 +906,8 @@ EOF
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
-        $arm == tree-native-parser-retarget-overlap-css ]]; then
+        $arm == tree-native-parser-retarget-overlap-css ||
+        $arm == tree-native-parser-ipc-rendezvous-overlap-css ]]; then
     validate_native_channel_fresh_cache "$naivefox_profile" naivefox
   fi
   env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
@@ -924,7 +934,8 @@ EOF
       ' preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=h3$'
   elif [[ $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
-          $arm == tree-native-parser-retarget-overlap-css ]]; then
+          $arm == tree-native-parser-retarget-overlap-css ||
+          $arm == tree-native-parser-ipc-rendezvous-overlap-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-preload drain=complete completed_resources=1 http=2[0-9][0-9] protocol=h3$'
   elif [[ $arm == document-overlap ]]; then
@@ -962,6 +973,7 @@ EOF
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
+        $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
         $arm == tree-overlap ]]; then
     [[ $preamble_count -eq 1 ]]
     rg -q ' preamble result=success .*http=200 .*protocol=h3$' "$log"
@@ -982,6 +994,7 @@ EOF
           $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
           $arm == tree-native-parser-retarget-overlap-css ||
+          $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
           $arm == tree-overlap ]]; then
       ! rg -q ' preamble background drain timed out' "$log"
     fi
@@ -1022,7 +1035,8 @@ EOF
       ! rg -q 'h3.native_resource_cache_open action=contract-failed' "$lifecycle_log"
     elif [[ $arm == tree-native-parser-preload-overlap-css ||
             $arm == tree-native-parser-document-handoff-overlap-css ||
-            $arm == tree-native-parser-retarget-overlap-css ]]; then
+            $arm == tree-native-parser-retarget-overlap-css ||
+            $arm == tree-native-parser-ipc-rendezvous-overlap-css ]]; then
       [[ $(rg -c ' preamble native-parser-preload parser=' "$log" || true) -eq 1 ]]
       [[ $(rg -c ' preamble native-parser-preload channel=' "$log" || true) -eq 1 ]]
       [[ $(rg -c ' preamble native-parser-preload admission=' "$log" || true) -eq 1 ]]
@@ -1062,7 +1076,8 @@ EOF
       else
         ! rg -q ' preamble native-parser-document-handoff phase=' "$log"
       fi
-      if [[ $arm == tree-native-parser-retarget-overlap-css ]]; then
+      if [[ $arm == tree-native-parser-retarget-overlap-css ||
+            $arm == tree-native-parser-ipc-rendezvous-overlap-css ]]; then
         local phase
         local previous_line=0
         local retarget_connection=
@@ -1094,6 +1109,46 @@ EOF
         ! rg -q 'native-parser-retarget.*(failed|failure|fallback|verified=0)' "$log"
       else
         ! rg -q ' preamble native-parser-retarget phase=' "$log"
+      fi
+      if [[ $arm == tree-native-parser-ipc-rendezvous-overlap-css ]]; then
+        local activation_phase
+        for activation_phase in descriptor-frozen child-open-sent background-dispatched parent-channel-created background-ready-received async-open; do
+          [[ $(rg -c "Native style activation phase=${activation_phase} request=[0-9]+$" "$log" || true) -eq 1 ]]
+        done
+        [[ $(rg -c 'Native style activation phase=activation-released request=[0-9]+ status=0x00000000$' "$log" || true) -eq 1 ]]
+        ! rg -q 'Native style activation phase=(request-failed|request-cancelled|activation-callback-failed)' "$log"
+        local activation_request
+        activation_request=$(sed -nE 's/^.*Native style activation phase=descriptor-frozen request=([0-9]+)$/\1/p' "$log")
+        [[ -n $activation_request ]]
+        for activation_phase in child-open-sent background-dispatched parent-channel-created background-ready-received activation-released async-open; do
+          rg -q "Native style activation phase=${activation_phase} request=${activation_request}( status=0x00000000)?$" "$log"
+        done
+        local registered_line primary_sent_line background_sent_line async_open_line
+        local primary_received_line background_received_line released_line
+        registered_line=$(rg -n -m1 'Native style activation phase=descriptor-frozen ' "$log" | cut -d: -f1)
+        primary_sent_line=$(rg -n -m1 'Native style activation phase=child-open-sent ' "$log" | cut -d: -f1)
+        background_sent_line=$(rg -n -m1 'Native style activation phase=background-dispatched ' "$log" | cut -d: -f1)
+        primary_received_line=$(rg -n -m1 'Native style activation phase=parent-channel-created ' "$log" | cut -d: -f1)
+        background_received_line=$(rg -n -m1 'Native style activation phase=background-ready-received ' "$log" | cut -d: -f1)
+        released_line=$(rg -n -m1 'Native style activation phase=activation-released ' "$log" | cut -d: -f1)
+        async_open_line=$(rg -n -m1 'Native style activation phase=async-open ' "$log" | cut -d: -f1)
+        [[ $registered_line -lt $primary_sent_line &&
+           $primary_sent_line -lt $primary_received_line &&
+           $primary_received_line -lt $released_line &&
+           $registered_line -lt $background_sent_line &&
+           $background_sent_line -lt $background_received_line &&
+           $background_received_line -lt $released_line &&
+           $released_line -lt $async_open_line ]]
+        [[ $(rg -c 'Preamble native-parser-preload lifecycle=stylesheet-channel-created stream=1 activation=ipc-rendezvous protocol=h3$' "$log" || true) -eq 1 ]]
+        [[ $(rg -c 'Preamble native-parser-preload lifecycle=stylesheet-opened stream=1 kind=from-parser referrer=inherited activation=ipc-rendezvous protocol=h3$' "$log" || true) -eq 1 ]]
+        local channel_created_line stylesheet_opened_line
+        channel_created_line=$(rg -n -m1 'Preamble native-parser-preload lifecycle=stylesheet-channel-created .*activation=ipc-rendezvous' "$log" | cut -d: -f1)
+        stylesheet_opened_line=$(rg -n -m1 'Preamble native-parser-preload lifecycle=stylesheet-opened .*activation=ipc-rendezvous' "$log" | cut -d: -f1)
+        [[ $channel_created_line -lt $released_line &&
+           $released_line -lt $stylesheet_opened_line ]]
+      else
+        ! rg -q 'Native style activation phase=(descriptor-frozen|child-open-sent|background-dispatched|parent-channel-created|background-ready-received|activation-released|async-open|request-failed|request-cancelled|activation-callback-failed)' "$log"
+        ! rg -q 'Preamble native-parser-preload lifecycle=stylesheet-(channel-created|opened).*activation=ipc-rendezvous' "$log"
       fi
     elif [[ $arm == document-overlap ]]; then
       [[ $(rg -c ' preamble document-overlap admission=' "$log" || true) -eq 1 ]]

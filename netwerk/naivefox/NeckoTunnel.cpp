@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "AutoFallback.h"
+#include "NativeStylePreloadActivation.h"
 #include "NativeStylePreloadChannel.h"
 #include "ReferrerInfo.h"
 #include "RuntimeLogging.h"
@@ -608,6 +609,7 @@ class ProxyPreambleOperation::Impl final {
   struct Stream final {
     nsCOMPtr<nsIURI> mUri;
     nsCOMPtr<nsIRequest> mRequest;
+    nsCOMPtr<nsIStreamListener> mPendingOpenListener;
     uint32_t mHttpStatus = 0;
     bool mHeadersReceived = false;
     bool mResponseHeadersReceived = false;
@@ -634,6 +636,7 @@ class ProxyPreambleOperation::Impl final {
   // original native-parser control still constructs lazily on that target.
   UniquePtr<nsHtml5SpeculativeScanner> mNativeParserScanner;
   std::atomic<uint64_t> mNativeParserGeneration{1};
+  uint64_t mNativeStyleActivationRequestId = 0;
   uint64_t mConnectionId = 0;
   std::atomic<uint64_t> mNativeParserConsumerGeneration{0};
   nsCString mRootPrePath;
@@ -1005,6 +1008,11 @@ void ProxyPreambleOperation::Cancel(nsresult aStatus) {
     return;
   }
   mImpl->mCancelled = true;
+  if (mImpl->mNativeStyleActivationRequestId) {
+    NativeStylePreloadActivation::Cancel(
+        mImpl->mNativeStyleActivationRequestId);
+    mImpl->mNativeStyleActivationRequestId = 0;
+  }
   mImpl->mNativeParserRetargetArmed.store(false, std::memory_order_release);
   mImpl->mNativeParserRetargetInstalled.store(false, std::memory_order_release);
   mImpl->mNativeParserGeneration.fetch_add(1, std::memory_order_acq_rel);
@@ -1400,7 +1408,7 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
       // confined to subsequent parser -> main speculative-load flushes.
       return NS_OK;
     }
-    if (mImpl->mConfig.mMode == PreambleMode::TreeNativeParserRetargetOverlap) {
+    if (PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode)) {
       nsAutoCString rootPrePath;
       if (!mImpl->mRootReferrerInfo || !mImpl->mHaveRootOriginAttributes ||
           !stream.mUri || NS_FAILED(stream.mUri->GetPrePath(rootPrePath)) ||
@@ -1456,8 +1464,7 @@ void ProxyPreambleOperation::LogNativeParserDocumentHandoffPhase(
 
 void ProxyPreambleOperation::LogNativeParserRetargetPhase(
     const char* aPhase) const {
-  MOZ_ASSERT(mImpl->mConfig.mMode ==
-             PreambleMode::TreeNativeParserRetargetOverlap);
+  MOZ_ASSERT(PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode));
   RuntimeLogEvent(
       "Connection %llu preamble native-parser-retarget phase=%s protocol=h3\n",
       static_cast<unsigned long long>(mImpl->mConnectionId), aPhase);
@@ -1466,8 +1473,7 @@ void ProxyPreambleOperation::LogNativeParserRetargetPhase(
 nsresult ProxyPreambleOperation::InstallNativeParserRetargetDelivery(
     nsIRequest* aRequest) {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mImpl->mConfig.mMode ==
-             PreambleMode::TreeNativeParserRetargetOverlap);
+  MOZ_ASSERT(PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode));
   if (!aRequest || !mImpl->mNativeParserTarget ||
       !mImpl->mNativeParserRootSuspended ||
       mImpl->mNativeParserRetargetArmed.load(std::memory_order_acquire) ||
@@ -1510,7 +1516,7 @@ nsresult ProxyPreambleOperation::InstallNativeParserRetargetDelivery(
 nsresult ProxyPreambleOperation::CheckNativeParserRetargetListener(
     uint32_t aStreamId) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mImpl->mConfig.mMode != PreambleMode::TreeNativeParserRetargetOverlap ||
+  if (!PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode) ||
       aStreamId != 0 ||
       !mImpl->mNativeParserRetargetArmed.load(std::memory_order_acquire) ||
       mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire) ||
@@ -1531,7 +1537,7 @@ ProxyPreambleOperation::DispatchNativeParserReplacementListenerInstall() {
       !mImpl->mNativeParserScanner ||
       mImpl->mNativeParserReplacementInstallQueued ||
       mImpl->mNativeParserConsumerReady.load(std::memory_order_acquire) ||
-      (mImpl->mConfig.mMode == PreambleMode::TreeNativeParserRetargetOverlap &&
+      (PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode) &&
        !mImpl->mNativeParserRetargetInstalled.load(
            std::memory_order_acquire))) {
     return NS_ERROR_UNEXPECTED;
@@ -1724,8 +1730,8 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
             if (!self->mImpl->mNativeParserScanner) {
               parserStatus = NS_ERROR_UNEXPECTED;
             } else {
-              if (self->mImpl->mConfig.mMode ==
-                  PreambleMode::TreeNativeParserRetargetOverlap) {
+              if (PreambleModeUsesRetargetedNativeParser(
+                      self->mImpl->mConfig.mMode)) {
                 self->LogNativeParserRetargetPhase("parser-data-finished");
               }
               parserStatus = self->mImpl->mNativeParserScanner->Finish();
@@ -1839,21 +1845,68 @@ nsresult ProxyPreambleOperation::OpenNativeParserStylesheet(
     return NS_ERROR_DOM_BAD_URI;
   }
 
-  nsCOMPtr<nsIChannel> channel;
-  MOZ_TRY(NewNativeStylePreloadChannel(
-      resourceUri, mImpl->mStreams[0].mUri, css::StylePreloadKind::FromParser,
-      mImpl->mRootOriginAttributes, mImpl->mRootReferrerInfo, mImpl->mLoadGroup,
-      mImpl->mRoute.mProxyInfo, mImpl->mProtocol, getter_AddRefs(channel)));
-
   const uint32_t streamId = mImpl->mStreams.Length();
   MOZ_ASSERT(streamId == 1);
   auto& stream = *mImpl->mStreams.AppendElement();
   stream.mUri = resourceUri;
-  stream.mRequest = channel;
   mImpl->mDiscoveredSpecs.AppendElement(spec);
+
+  if (PreambleModeUsesNativeStyleActivation(mImpl->mConfig.mMode)) {
+    NativeStylePreloadActivationDescriptor activation;
+    activation.mResourceSpec = spec;
+    MOZ_TRY(mImpl->mStreams[0].mUri->GetSpec(activation.mDocumentSpec));
+    mImpl->mRootOriginAttributes.CreateSuffix(
+        activation.mOriginAttributesSuffix);
+    nsCOMPtr<nsIURI> originalReferrer;
+    MOZ_TRY(mImpl->mRootReferrerInfo->GetOriginalReferrer(
+        getter_AddRefs(originalReferrer)));
+    if (originalReferrer) {
+      MOZ_TRY(originalReferrer->GetSpec(activation.mReferrerSpec));
+    }
+    activation.mReferrerPolicy =
+        static_cast<uint8_t>(mImpl->mRootReferrerInfo->ReferrerPolicy());
+    MOZ_TRY(
+        mImpl->mRootReferrerInfo->GetSendReferrer(&activation.mSendReferrer));
+    activation.mPreloadKind =
+        static_cast<uint8_t>(css::StylePreloadKind::FromParser);
+
+    RefPtr self = this;
+    const uint64_t generation =
+        mImpl->mNativeParserGeneration.load(std::memory_order_acquire);
+    nsresult rv = NativeStylePreloadActivation::RegisterAndDispatch(
+        std::move(activation),
+        [self, generation](
+            const NativeStylePreloadActivationDescriptor& aActivation) {
+          return self->CreateNativeParserStylesheetChannel(generation,
+                                                           aActivation);
+        },
+        [self, generation](nsresult aStatus) {
+          return self->ReleaseNativeParserStylesheetChannel(generation,
+                                                            aStatus);
+        },
+        mImpl->mNativeStyleActivationRequestId);
+    if (NS_FAILED(rv)) {
+      mImpl->mDiscoveredSpecs.RemoveLastElement();
+      mImpl->mStreams.RemoveLastElement();
+      return rv;
+    }
+    return NS_OK;
+  }
+
+  nsCOMPtr<nsIChannel> channel;
+  nsresult rv = NewNativeStylePreloadChannel(
+      resourceUri, mImpl->mStreams[0].mUri, css::StylePreloadKind::FromParser,
+      mImpl->mRootOriginAttributes, mImpl->mRootReferrerInfo, mImpl->mLoadGroup,
+      mImpl->mRoute.mProxyInfo, mImpl->mProtocol, getter_AddRefs(channel));
+  if (NS_FAILED(rv)) {
+    mImpl->mDiscoveredSpecs.RemoveLastElement();
+    mImpl->mStreams.RemoveLastElement();
+    return rv;
+  }
+  stream.mRequest = channel;
   RefPtr<StreamListener> listener = new StreamListener(this, streamId);
   MOZ_TRY(channel->SetNotificationCallbacks(listener));
-  nsresult rv = channel->AsyncOpen(listener);
+  rv = channel->AsyncOpen(listener);
   if (NS_FAILED(rv)) {
     mImpl->mDiscoveredSpecs.RemoveLastElement();
     mImpl->mStreams.RemoveLastElement();
@@ -1865,6 +1918,106 @@ nsresult ProxyPreambleOperation::OpenNativeParserStylesheet(
   return NS_OK;
 }
 
+nsresult ProxyPreambleOperation::CreateNativeParserStylesheetChannel(
+    uint64_t aGeneration,
+    const NativeStylePreloadActivationDescriptor& aActivation) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      mImpl->mNativeParserGeneration.load(std::memory_order_acquire) !=
+          aGeneration ||
+      !PreambleModeUsesNativeStyleActivation(mImpl->mConfig.mMode) ||
+      !mImpl->mNativeStyleActivationRequestId ||
+      mImpl->mStreams.Length() != 2 || mImpl->mStreams[1].mRequest ||
+      mImpl->mStreams[1].mPendingOpenListener) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsCOMPtr<nsIURI> resourceUri;
+  nsCOMPtr<nsIURI> documentUri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(resourceUri), aActivation.mResourceSpec));
+  MOZ_TRY(NS_NewURI(getter_AddRefs(documentUri), aActivation.mDocumentSpec));
+  nsAutoCString admittedResourceSpec;
+  nsAutoCString admittedDocumentSpec;
+  MOZ_TRY(mImpl->mStreams[1].mUri->GetSpec(admittedResourceSpec));
+  MOZ_TRY(mImpl->mStreams[0].mUri->GetSpec(admittedDocumentSpec));
+  if (!aActivation.mResourceSpec.Equals(admittedResourceSpec) ||
+      !aActivation.mDocumentSpec.Equals(admittedDocumentSpec) ||
+      aActivation.mPreloadKind !=
+          static_cast<uint8_t>(css::StylePreloadKind::FromParser)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  OriginAttributes originAttributes;
+  if (!originAttributes.PopulateFromSuffix(
+          aActivation.mOriginAttributesSuffix)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  nsAutoCString reconstructedSuffix;
+  originAttributes.CreateSuffix(reconstructedSuffix);
+  if (!reconstructedSuffix.Equals(aActivation.mOriginAttributesSuffix)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  nsCOMPtr<nsIURI> referrerUri;
+  if (!aActivation.mReferrerSpec.IsEmpty()) {
+    MOZ_TRY(NS_NewURI(getter_AddRefs(referrerUri), aActivation.mReferrerSpec));
+  }
+  RefPtr<dom::ReferrerInfo> referrerInfo = new dom::ReferrerInfo(
+      referrerUri,
+      static_cast<dom::ReferrerPolicy>(aActivation.mReferrerPolicy),
+      aActivation.mSendReferrer);
+
+  nsCOMPtr<nsIChannel> channel;
+  MOZ_TRY(NewNativeStylePreloadChannel(
+      resourceUri, documentUri, css::StylePreloadKind::FromParser,
+      originAttributes, referrerInfo, mImpl->mLoadGroup,
+      mImpl->mRoute.mProxyInfo, mImpl->mProtocol, getter_AddRefs(channel)));
+  RefPtr<StreamListener> listener = new StreamListener(this, 1);
+  MOZ_TRY(channel->SetNotificationCallbacks(listener));
+  mImpl->mStreams[1].mRequest = channel;
+  mImpl->mStreams[1].mPendingOpenListener = listener;
+  RuntimeLogEvent(
+      "Preamble native-parser-preload lifecycle=stylesheet-channel-created "
+      "stream=1 activation=ipc-rendezvous protocol=h3\n");
+  return NS_OK;
+}
+
+nsresult ProxyPreambleOperation::ReleaseNativeParserStylesheetChannel(
+    uint64_t aGeneration, nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  mImpl->mNativeStyleActivationRequestId = 0;
+  if (NS_FAILED(aStatus)) {
+    FailNativeParserContract(aStatus, "stylesheet-activation-failed");
+    return aStatus;
+  }
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      mImpl->mNativeParserGeneration.load(std::memory_order_acquire) !=
+          aGeneration ||
+      mImpl->mStreams.Length() != 2 || !mImpl->mStreams[1].mRequest ||
+      !mImpl->mStreams[1].mPendingOpenListener) {
+    FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                             "stylesheet-activation-state-invalid");
+    return NS_ERROR_UNEXPECTED;
+  }
+  nsCOMPtr<nsIChannel> channel = do_QueryInterface(mImpl->mStreams[1].mRequest);
+  nsCOMPtr<nsIStreamListener> listener =
+      mImpl->mStreams[1].mPendingOpenListener.forget();
+  if (!channel || !listener) {
+    FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                             "stylesheet-activation-channel-missing");
+    return NS_ERROR_UNEXPECTED;
+  }
+  nsresult rv = channel->AsyncOpen(listener);
+  if (NS_FAILED(rv)) {
+    FailNativeParserContract(rv, "stylesheet-async-open-failed");
+    return rv;
+  }
+  RuntimeLogEvent(
+      "Preamble native-parser-preload lifecycle=stylesheet-opened stream=1 "
+      "kind=from-parser referrer=inherited activation=ipc-rendezvous "
+      "protocol=h3\n");
+  return NS_OK;
+}
+
 void ProxyPreambleOperation::FailNativeParserContract(nsresult aStatus,
                                                       const char* aReason) {
   MOZ_ASSERT(NS_IsMainThread());
@@ -1872,6 +2025,11 @@ void ProxyPreambleOperation::FailNativeParserContract(nsresult aStatus,
     return;
   }
   mImpl->mNativeParserContractFailed = true;
+  if (mImpl->mNativeStyleActivationRequestId) {
+    NativeStylePreloadActivation::Cancel(
+        mImpl->mNativeStyleActivationRequestId);
+    mImpl->mNativeStyleActivationRequestId = 0;
+  }
   mImpl->mNativeParserRetargetArmed.store(false, std::memory_order_release);
   mImpl->mNativeParserRetargetInstalled.store(false, std::memory_order_release);
   mImpl->mAllStreamsCompletedNormally = false;
@@ -1925,8 +2083,7 @@ nsresult ProxyPreambleOperation::DispatchNativeParserOutputToMain(
 
 nsresult ProxyPreambleOperation::OnRetargetedDataAvailable(
     uint32_t aStreamId, nsIInputStream* aInputStream, uint32_t aCount) {
-  MOZ_ASSERT(mImpl->mConfig.mMode ==
-             PreambleMode::TreeNativeParserRetargetOverlap);
+  MOZ_ASSERT(PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode));
   auto recordFailure = [this](nsresult aStatus) {
     nsresult expected = NS_OK;
     (void)mImpl->mNativeParserRetargetFailure.compare_exchange_strong(
@@ -2014,8 +2171,7 @@ nsresult ProxyPreambleOperation::OnRetargetedDataAvailable(
 
 nsresult ProxyPreambleOperation::OnRetargetedDataFinished(uint32_t aStreamId,
                                                           nsresult aStatus) {
-  MOZ_ASSERT(mImpl->mConfig.mMode ==
-             PreambleMode::TreeNativeParserRetargetOverlap);
+  MOZ_ASSERT(PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode));
   auto recordFailure = [this](nsresult aFailure) {
     nsresult expected = NS_OK;
     (void)mImpl->mNativeParserRetargetFailure.compare_exchange_strong(
@@ -2367,7 +2523,7 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
     mImpl->mFirstFailure = aStatus;
   }
   if (aStreamId == 0) {
-    if (mImpl->mConfig.mMode == PreambleMode::TreeNativeParserRetargetOverlap) {
+    if (PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode)) {
       mImpl->mBodyBytes =
           mImpl->mNativeParserRetargetBodyBytes.load(std::memory_order_acquire);
       const nsresult retargetFailure =
@@ -2393,7 +2549,7 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
       mImpl->mAllStreamsCompletedNormally = false;
     }
     if (PreambleModeUsesNativeParser(mImpl->mConfig.mMode) &&
-        mImpl->mConfig.mMode != PreambleMode::TreeNativeParserRetargetOverlap &&
+        !PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode) &&
         !mImpl->mNativeParserContractFailed) {
       nsresult parserRv = DispatchNativeParserFinish();
       if (NS_FAILED(parserRv)) {
@@ -2478,7 +2634,7 @@ void ProxyPreambleOperation::MaybeFinish() {
        mImpl->mConfig.mMode == PreambleMode::TreeNativeParserPreloadOverlap ||
        mImpl->mConfig.mMode ==
            PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
-       mImpl->mConfig.mMode == PreambleMode::TreeNativeParserRetargetOverlap)) {
+       PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode))) {
     // This mode has a strict causal admission contract. Keep the operation
     // alive for the ordinary outer preamble timeout rather than converting a
     // completed-but-invalid resource into a CONNECT barrier or dropping the

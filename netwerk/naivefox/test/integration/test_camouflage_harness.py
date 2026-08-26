@@ -66,7 +66,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("WaitForStartupCondition", wait_body)
         self.assertIn("NS_NewTimerWithCallback", runtime)
         self.assertIn("InitialNetworkStateAllowsStartup", wait_body)
-        self.assertIn("return WaitForNetworkStartup();", runtime)
+        self.assertIn("MOZ_TRY(WaitForNetworkStartup());", runtime)
         embedded = runner[
             runner.index("NaiveFoxRunEmbedded") : runner.index("NaiveFoxMain")
         ]
@@ -79,7 +79,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         ]
         self.assertLess(
             standalone.index("runtime.Initialize(aArgc"),
-            standalone.index("RunLocalProxyServer(config.mListeners"),
+            standalone.index("RunLocalProxyServer("),
         )
 
     def test_post_start_network_change_still_invalidates_h3(self):
@@ -992,6 +992,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        ipc_rendezvous = CONFIG.build_config(
+            "tree-native-parser-ipc-rendezvous-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            ipc_rendezvous["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-ipc-rendezvous-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-ipc-rendezvous-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1545,6 +1573,74 @@ class CamouflageHarnessTests(unittest.TestCase):
             retarget_log,
             one_connection,
         )
+        activation_lines = (
+            "Native style activation phase=descriptor-frozen request=41\n"
+            "Native style activation phase=child-open-sent request=41\n"
+            "Native style activation phase=background-dispatched request=41\n"
+            "Native style activation phase=background-ready-received request=41\n"
+            "Preamble native-parser-preload "
+            "lifecycle=stylesheet-channel-created stream=1 "
+            "activation=ipc-rendezvous protocol=h3\n"
+            "Native style activation phase=parent-channel-created request=41\n"
+            "Native style activation phase=activation-released request=41 "
+            "status=0x00000000\n"
+            "Preamble native-parser-preload lifecycle=stylesheet-opened "
+            "stream=1 kind=from-parser referrer=inherited "
+            "activation=ipc-rendezvous protocol=h3\n"
+            "Native style activation phase=async-open request=41\n"
+        )
+        discovery_marker = (
+            "Connection 7 preamble native-parser-preload "
+            "parser=html5-speculative-scanner parsers=1 descriptors=1 "
+            "provenance=FromParser internal_type=40 protocol=h3\n"
+        )
+        ipc_rendezvous_log = retarget_lines + native_parser_log.replace(
+            discovery_marker,
+            discovery_marker + activation_lines,
+            1,
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-ipc-rendezvous-overlap-css",
+            "h3",
+            ipc_rendezvous_log,
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "exactly one marker"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-ipc-rendezvous-overlap-css",
+                "h3",
+                ipc_rendezvous_log.replace(
+                    "Native style activation phase=background-ready-received "
+                    "request=41\n",
+                    "",
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "causal ordering"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-ipc-rendezvous-overlap-css",
+                "h3",
+                ipc_rendezvous_log.replace(
+                    "Native style activation phase=background-dispatched "
+                    "request=41\n",
+                    "",
+                ).replace(
+                    "Native style activation phase=background-ready-received "
+                    "request=41\n",
+                    "Native style activation phase=background-ready-received "
+                    "request=41\n"
+                    "Native style activation phase=background-dispatched "
+                    "request=41\n",
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "unexpectedly logged"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-retarget-overlap-css",
+                "h3",
+                ipc_rendezvous_log,
+                one_connection,
+            )
         for old, new, error in (
             ("verified=1", "verified=0", "verification failed"),
             (
@@ -2365,6 +2461,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-ipc-rendezvous-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
             runner,
@@ -2377,6 +2477,11 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn(
             "tree-native-parser-retarget-overlap-css multi-arm screening "
             "requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-ipc-rendezvous-overlap-css multi-arm "
+            "screening requires --protocol h3",
             runner,
         )
         self.assertIn(

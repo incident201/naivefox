@@ -68,7 +68,10 @@ XPIDL_MODULE = "naivefox_compat"
 
 # libpref's parent-process storage uses the small Pref/PrefValue data structs,
 # but not the PContent actor which normally carries them to child processes.
-IPDL_SOURCES += ["PrefsTypes.ipdlh"]
+IPDL_SOURCES += [
+    "PNativeStylePreloadActivation.ipdl",
+    "PrefsTypes.ipdlh",
+]
 
 WEBIDL_FILES += [
     "../../../dom/chrome-webidl/OriginAttributes.webidl",

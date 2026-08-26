@@ -12,6 +12,7 @@ SOURCES += [
     "../LeanDOMBindings.cpp",
     "../MemMapSnapshot.cpp",
     "../NaiveFoxRunner.cpp",
+    "../NativeStylePreloadActivation.cpp",
     "../NativeStylePreloadChannel.cpp",
     "../NeckoTunnel.cpp",
     "../OuterSessionGate.cpp",
@@ -39,6 +40,11 @@ GeneratedFile(
 )
 
 SOURCES += ["!NaiveFoxVersion.cpp"]
+SOURCES += [
+    "!/ipc/ipdl/PNativeStylePreloadActivation.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationParent.cpp",
+]
 
 XPCOM_MANIFESTS += ["components.conf"]
 
@@ -78,6 +84,8 @@ LOCAL_INCLUDES += ["/toolkit/components/url-classifier"]
 LOCAL_INCLUDES += ["/third_party/abseil-cpp"]
 LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]
 LOCAL_INCLUDES += ["/ipc/chromium/src"]
+
+include("/ipc/chromium/chromium-config.mozbuild")
 
 if CONFIG["ENABLE_TESTS"]:
     LOCAL_INCLUDES += ["/testing/gtest/mozilla"]

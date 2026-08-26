@@ -117,6 +117,37 @@ NATIVE_PARSER_RETARGET_PHASES = (
     "first-parser-feed",
     "parser-data-finished",
 )
+NATIVE_STYLE_ACTIVATION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native style activation "
+    r"phase=(?P<phase>descriptor-frozen|child-open-sent|"
+    r"background-dispatched|parent-channel-created|"
+    r"background-ready-received|activation-released|async-open) "
+    r"request=(?P<request>\d+)"
+    r"(?: status=(?P<status>0x[0-9a-fA-F]+))?$"
+)
+NATIVE_STYLE_ACTIVATION_PHASES = {
+    "descriptor-frozen",
+    "child-open-sent",
+    "background-dispatched",
+    "parent-channel-created",
+    "background-ready-received",
+    "activation-released",
+    "async-open",
+}
+NATIVE_STYLE_CHANNEL_CREATED = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-preload "
+    r"lifecycle=stylesheet-channel-created stream=1 "
+    r"activation=ipc-rendezvous protocol=h3$"
+)
+NATIVE_STYLE_OPENED = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-preload "
+    r"lifecycle=stylesheet-opened stream=1 kind=from-parser "
+    r"referrer=inherited activation=ipc-rendezvous protocol=h3$"
+)
+NATIVE_STYLE_BG_READY_SENT = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native style activation "
+    r"phase=bg-ready-sent request=(?P<request>\d+)$"
+)
 DOCUMENT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble document-overlap admission=(?P<admission>\S+) "
@@ -191,6 +222,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
+        "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -230,6 +262,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         )
     if arm == "tree-native-parser-retarget-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-retarget-overlap-css requires h3")
+    if (
+        arm == "tree-native-parser-ipc-rendezvous-overlap-css"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-native-parser-ipc-rendezvous-overlap-css requires h3"
+        )
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -256,6 +295,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
+        "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -270,6 +310,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
+        "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -472,6 +513,39 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ):
         raise ValueError(
             "native parser retarget emitted fallback, failure, or unknown evidence"
+        )
+    native_style_activation_evidence_lines = [
+        line
+        for line in log_lines
+        if "Native style activation phase=" in line and " request=" in line
+        and not NATIVE_STYLE_BG_READY_SENT.fullmatch(line)
+    ]
+    native_style_bg_ready_sent = [
+        NATIVE_STYLE_BG_READY_SENT.fullmatch(line)
+        for line in log_lines
+        if NATIVE_STYLE_BG_READY_SENT.fullmatch(line)
+    ]
+    native_style_channel_created_lines = [
+        line for line in log_lines if NATIVE_STYLE_CHANNEL_CREATED.fullmatch(line)
+    ]
+    native_style_opened_lines = [
+        line for line in log_lines if NATIVE_STYLE_OPENED.fullmatch(line)
+    ]
+    native_style_activation_lines = [
+        line
+        for line in native_style_activation_evidence_lines
+        if NATIVE_STYLE_ACTIVATION.fullmatch(line)
+    ]
+    parsed_native_style_activations = [
+        NATIVE_STYLE_ACTIVATION.fullmatch(line)
+        for line in native_style_activation_lines
+    ]
+    if len(native_style_activation_evidence_lines) != len(
+        native_style_activation_lines
+    ):
+        raise ValueError(
+            "native style activation emitted failure, cancellation, or unknown "
+            "request evidence"
         )
     established_lines = [line for line in log_lines if " established target=" in line]
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
@@ -839,6 +913,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
+        "tree-native-parser-ipc-rendezvous-overlap-css",
     ):
         if any(len(markers) != 1 for markers in native_parser_markers):
             raise ValueError(
@@ -958,7 +1033,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
             f"{arm} arm unexpectedly logged native parser document handoff lifecycle"
         )
 
-    if arm == "tree-native-parser-retarget-overlap-css":
+    if arm in (
+        "tree-native-parser-retarget-overlap-css",
+        "tree-native-parser-ipc-rendezvous-overlap-css",
+    ):
         if len(parsed_native_parser_retargets) != len(
             NATIVE_PARSER_RETARGET_PHASES
         ):
@@ -1025,6 +1103,93 @@ def validate_sample(arm, protocol, log_text, feature_document):
             f"{arm} arm unexpectedly logged native parser retarget lifecycle"
         )
 
+    if arm == "tree-native-parser-ipc-rendezvous-overlap-css":
+        if len(parsed_native_style_activations) != len(
+            NATIVE_STYLE_ACTIVATION_PHASES
+        ):
+            raise ValueError(
+                "native style activation requires exactly one marker for every "
+                "request lifecycle phase"
+            )
+        phases = tuple(
+            marker["phase"] for marker in parsed_native_style_activations
+        )
+        if set(phases) != NATIVE_STYLE_ACTIVATION_PHASES:
+            raise ValueError(
+                "native style activation phases are missing, duplicated, or unknown"
+            )
+        request = parsed_native_style_activations[0]["request"]
+        if any(
+            marker["request"] != request
+            for marker in parsed_native_style_activations
+        ):
+            raise ValueError("native style activation request identity differs")
+        if len(native_style_bg_ready_sent) > 1 or any(
+            marker["request"] != request for marker in native_style_bg_ready_sent
+        ):
+            raise ValueError("native style activation bg-ready identity differs")
+        by_phase = {
+            marker["phase"]: log_lines.index(line)
+            for line, marker in zip(
+                native_style_activation_lines,
+                parsed_native_style_activations,
+            )
+        }
+        if parsed_native_style_activations[phases.index("activation-released")][
+            "status"
+        ] != "0x00000000":
+            raise ValueError("native style activation did not release successfully")
+        if any(
+            marker["status"] is not None
+            for marker in parsed_native_style_activations
+            if marker["phase"] != "activation-released"
+        ):
+            raise ValueError("native style activation status contract is invalid")
+        if not (
+            by_phase["descriptor-frozen"]
+            < by_phase["child-open-sent"]
+            < by_phase["parent-channel-created"]
+            < by_phase["activation-released"]
+            and by_phase["descriptor-frozen"]
+            < by_phase["background-dispatched"]
+            < by_phase["background-ready-received"]
+            < by_phase["activation-released"]
+            and by_phase["activation-released"] < by_phase["async-open"]
+            and log_lines.index(native_parser_discovery_lines[0])
+            < by_phase["descriptor-frozen"]
+        ):
+            raise ValueError(
+                "native style activation rendezvous has invalid causal ordering"
+            )
+        if (
+            len(native_style_channel_created_lines) != 1
+            or len(native_style_opened_lines) != 1
+        ):
+            raise ValueError(
+                "native style activation requires one channel-created and "
+                "stylesheet-opened marker"
+            )
+        if not (
+            log_lines.index(native_style_channel_created_lines[0])
+            < by_phase["activation-released"]
+            < by_phase["async-open"]
+            and by_phase["activation-released"]
+            < log_lines.index(native_style_opened_lines[0])
+            < log_lines.index(native_parser_channel_lines[0])
+        ):
+            raise ValueError(
+                "native style activation channel/open markers have invalid ordering"
+            )
+    elif (
+        parsed_native_style_activations
+        or native_style_bg_ready_sent
+        or native_style_channel_created_lines
+        or native_style_opened_lines
+    ):
+        raise ValueError(
+            f"{arm} arm unexpectedly logged native style activation request lifecycle"
+        )
+
     if arm != "off":
         if feature_document.get("protocol") != protocol:
             raise ValueError("feature document protocol does not match sample")
@@ -1040,6 +1205,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             in (
                 "tree-native-parser-document-handoff-overlap-css",
                 "tree-native-parser-retarget-overlap-css",
+                "tree-native-parser-ipc-rendezvous-overlap-css",
             )
             and feature_document.get("features", {}).get(
                 "tls_client_hello_count"
@@ -1078,6 +1244,7 @@ def main():
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
+            "tree-native-parser-ipc-rendezvous-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

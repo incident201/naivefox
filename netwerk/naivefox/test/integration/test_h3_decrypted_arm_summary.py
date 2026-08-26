@@ -575,6 +575,20 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     ("tree-native-parser-retarget-overlap-css",),
                 )
 
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-native-parser-ipc-rendezvous-overlap-css decrypted "
+                "validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-native-parser-ipc-rendezvous-overlap-css",),
+                )
+
     def test_runner_supports_selectable_document_and_tree_arms(self):
         path = os.path.join(HERE, "run-h3-capture-comparison.sh")
         with open(path, encoding="utf-8") as stream:
@@ -649,6 +663,15 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "tree-native-parser-retarget-overlap-css comparison requires "
             "tree-complete-css, tree-native-parser-preload-overlap-css, and "
             "tree-native-parser-document-handoff-overlap-css",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-ipc-rendezvous-overlap-css comparison "
+            "requires tree-complete-css",
+            runner,
+        )
+        self.assertIn(
+            "Native style activation phase=activation-released",
             runner,
         )
         self.assertIn(
@@ -2313,6 +2336,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 "tree-native-parser-preload-overlap-css",
                 "tree-native-parser-document-handoff-overlap-css",
                 retarget,
+                "tree-native-parser-ipc-rendezvous-overlap-css",
             ):
                 self.make_cohort(
                     directory,
@@ -2325,6 +2349,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 "tree-native-parser-preload-overlap-css",
                 "tree-native-parser-document-handoff-overlap-css",
                 retarget,
+                "tree-native-parser-ipc-rendezvous-overlap-css",
             )
             summary_path = Path(directory) / "summary.txt"
             summary.write_outputs(
@@ -2336,6 +2361,14 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             )
             self.assertIn(
                 "tree_native_parser_retarget_overlap_validated=yes",
+                summary_path.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "tree_native_parser_ipc_rendezvous_request_semantics_match=yes",
+                summary_path.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "tree_native_parser_ipc_rendezvous_overlap_validated=yes",
                 summary_path.read_text(encoding="utf-8"),
             )
 

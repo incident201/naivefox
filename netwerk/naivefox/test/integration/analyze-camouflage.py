@@ -181,6 +181,7 @@ def load_dataset(path):
                 "tree-native-parser-preload-overlap-css",
                 "tree-native-parser-document-handoff-overlap-css",
                 "tree-native-parser-retarget-overlap-css",
+                "tree-native-parser-ipc-rendezvous-overlap-css",
                 "tree-warm-css-304",
                 "tree-overlap",
             }
@@ -222,6 +223,7 @@ def load_dataset(path):
                     "tree-native-parser-preload-overlap-css",
                     "tree-native-parser-document-handoff-overlap-css",
                     "tree-native-parser-retarget-overlap-css",
+                    "tree-native-parser-ipc-rendezvous-overlap-css",
                 )
                 and source["protocol"] != "h3"
             ):

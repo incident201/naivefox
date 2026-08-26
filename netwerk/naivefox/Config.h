@@ -63,6 +63,7 @@ enum class PreambleMode : uint8_t {
   TreeNativeParserPreloadOverlap,
   TreeNativeParserDocumentHandoffOverlap,
   TreeNativeParserRetargetOverlap,
+  TreeNativeParserIpcRendezvousOverlap,
 
   // Compatibility names for the first experimental configuration surface.
   Root = DocumentComplete,
@@ -84,12 +85,29 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
 constexpr bool PreambleModeUsesNativeParser(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
-         aMode == PreambleMode::TreeNativeParserRetargetOverlap;
+         aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
 }
 
 constexpr bool PreambleModeUsesNativeParserHandoff(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
-         aMode == PreambleMode::TreeNativeParserRetargetOverlap;
+         aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+}
+
+constexpr bool PreambleModeUsesRetargetedNativeParser(PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+}
+
+constexpr bool PreambleModeUsesNativeStyleActivation(PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+}
+
+constexpr bool PreambleModeNeedsNativeStyleActivationRuntime(
+    PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
+         PreambleModeUsesNativeStyleActivation(aMode);
 }
 
 struct PreambleConfig final {

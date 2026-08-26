@@ -4,6 +4,8 @@
 
 #include "GeckoRuntime.h"
 
+#include "NativeStylePreloadActivation.h"
+
 #ifdef XP_WIN
 #  include <windows.h>
 #else
@@ -31,8 +33,8 @@
 #include "nsIIOService.h"
 #include "nsINetworkLinkService.h"
 #include "nsIObserverService.h"
-#include "nsISocketTransportService.h"
 #include "nsISimpleEnumerator.h"
+#include "nsISocketTransportService.h"
 #include "nsITimer.h"
 #include "nsLocalFile.h"
 #include "nsNetCID.h"
@@ -93,13 +95,11 @@ nsresult WaitForStartupCondition(const nsACString& aName,
   RefPtr<StartupBarrierState> deadline = new StartupBarrierState();
   nsCOMPtr<nsITimer> timer;
   MOZ_TRY(NS_NewTimerWithCallback(
-      getter_AddRefs(timer),
-      [deadline](nsITimer*) { deadline->Timeout(); },
+      getter_AddRefs(timer), [deadline](nsITimer*) { deadline->Timeout(); },
       kNetworkStartupBarrierTimeoutMs, nsITimer::TYPE_ONE_SHOT, aName));
 
-  const bool processed = SpinEventLoopUntil(aName, [&]() {
-    return aPredicate() || deadline->IsTimedOut();
-  });
+  const bool processed = SpinEventLoopUntil(
+      aName, [&]() { return aPredicate() || deadline->IsTimedOut(); });
   (void)timer->Cancel();
 
   if (!processed) {
@@ -183,9 +183,9 @@ GeckoRuntime::~GeckoRuntime() { Shutdown(); }
 
 nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
                                   const nsACString& aProfilePath,
-                                  ProxyProtocol aProtocol,
-                                  bool aNoPostQuantum,
-                                  bool aEnablePreambleCache2) {
+                                  ProxyProtocol aProtocol, bool aNoPostQuantum,
+                                  bool aEnablePreambleCache2,
+                                  bool aEnableNativeStyleActivation) {
   if (mXPCOMInitialized || aProfilePath.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -216,15 +216,16 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
   MOZ_TRY(NS_NewNativeLocalFile(aProfilePath, getter_AddRefs(profile)));
 
   return InitializeWithLocations(profile, mBinDirectory, mExecutable, aProtocol,
-                                 nullptr, aNoPostQuantum,
-                                 aEnablePreambleCache2);
+                                 nullptr, aNoPostQuantum, aEnablePreambleCache2,
+                                 aEnableNativeStyleActivation);
 }
 
 nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
                                           const nsACString& aRuntimePath,
                                           ProxyProtocol aProtocol,
                                           bool aNoPostQuantum,
-                                          bool aEnablePreambleCache2) {
+                                          bool aEnablePreambleCache2,
+                                          bool aEnableNativeStyleActivation) {
   if (mXPCOMInitialized) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -247,13 +248,13 @@ nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
 #ifdef ANDROID
   nsAutoCString normalizedRuntimePath;
   MOZ_TRY(binDirectory->GetNativePath(normalizedRuntimePath));
-  return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
-                                 &normalizedRuntimePath, aNoPostQuantum,
-                                 aEnablePreambleCache2);
+  return InitializeWithLocations(
+      profile, binDirectory, executable, aProtocol, &normalizedRuntimePath,
+      aNoPostQuantum, aEnablePreambleCache2, aEnableNativeStyleActivation);
 #else
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
-                                 nullptr, aNoPostQuantum,
-                                 aEnablePreambleCache2);
+                                 nullptr, aNoPostQuantum, aEnablePreambleCache2,
+                                 aEnableNativeStyleActivation);
 #endif
 }
 
@@ -305,7 +306,8 @@ nsresult GeckoRuntime::ValidateEmbeddedLocations(
 nsresult GeckoRuntime::InitializeWithLocations(
     nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
     ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath,
-    bool aNoPostQuantum, bool aEnablePreambleCache2) {
+    bool aNoPostQuantum, bool aEnablePreambleCache2,
+    bool aEnableNativeStyleActivation) {
   if (mXPCOMInitialized || !aProfile || !aBinDirectory || !aExecutable) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -374,8 +376,7 @@ nsresult GeckoRuntime::InitializeWithLocations(
     mHadHttp3KyberPref =
         Preferences::HasUserValue("network.http.http3.enable_kyber");
     (void)Preferences::GetBool("security.tls.enable_kyber", &mOldKyberPref);
-    (void)Preferences::GetBool("security.tls.enable_mlkem1024",
-                               &mOldMlkemPref);
+    (void)Preferences::GetBool("security.tls.enable_mlkem1024", &mOldMlkemPref);
     (void)Preferences::GetBool("network.http.http3.enable_kyber",
                                &mOldHttp3KyberPref);
     Preferences::SetBool("security.tls.enable_kyber", false);
@@ -416,7 +417,7 @@ nsresult GeckoRuntime::InitializeWithLocations(
     mHadHttp3ThirdPartyRootsPref =
         Preferences::HasUserValue(kHttp3ThirdPartyRootsPref);
     (void)Preferences::GetBool(kHttp3ThirdPartyRootsPref,
-                                &mOldHttp3ThirdPartyRootsPref);
+                               &mOldHttp3ThirdPartyRootsPref);
     Preferences::SetBool(kHttp3ThirdPartyRootsPref, false);
     mSslCertFileApplied = true;
   }
@@ -425,7 +426,15 @@ nsresult GeckoRuntime::InitializeWithLocations(
   if (!mIOService) {
     return NS_ERROR_FAILURE;
   }
-  return WaitForNetworkStartup();
+  MOZ_TRY(WaitForNetworkStartup());
+  if (aEnableNativeStyleActivation) {
+    MOZ_TRY(NativeStylePreloadActivation::Initialize());
+    mNativeStyleActivationInitialized = true;
+    MOZ_TRY(WaitForStartupCondition(
+        "NaiveFox::NativeStyleActivationWarmup"_ns,
+        []() { return NativeStylePreloadActivation::IsReady(); }));
+  }
+  return NS_OK;
 }
 
 nsresult GeckoRuntime::WaitForNetworkStartup() {
@@ -435,18 +444,17 @@ nsresult GeckoRuntime::WaitForNetworkStartup() {
   nsCOMPtr<nsINetworkLinkService> linkService =
       do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID);
   const auto initialState = net::NetlinkService::GetInitialNetworkState();
-  NAIVEFOX_NETWORK_STARTUP_LOG(
-      ("barrier.wait link_service=%d initial_state=%u", !!linkService,
-       static_cast<unsigned>(initialState)));
+  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.wait link_service=%d initial_state=%u",
+                                !!linkService,
+                                static_cast<unsigned>(initialState)));
   if (!linkService) {
     return NS_ERROR_FAILURE;
   }
 
-  MOZ_TRY(WaitForStartupCondition(
-      "NaiveFox::InitialNetworkState"_ns, []() {
-        return net::InitialNetworkStateIsTerminal(
-            net::NetlinkService::GetInitialNetworkState());
-      }));
+  MOZ_TRY(WaitForStartupCondition("NaiveFox::InitialNetworkState"_ns, []() {
+    return net::InitialNetworkStateIsTerminal(
+        net::NetlinkService::GetInitialNetworkState());
+  }));
   if (!net::InitialNetworkStateAllowsStartup(
           net::NetlinkService::GetInitialNetworkState())) {
     NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-failed"));
@@ -479,8 +487,7 @@ nsresult GeckoRuntime::WaitForNetworkStartup() {
   }
   RefPtr<StartupBarrierState> socketThreadBarrier = new StartupBarrierState();
   MOZ_TRY(socketTarget->Dispatch(NS_NewRunnableFunction(
-      "NaiveFox::NetworkSocketThreadBarrier",
-      [socketThreadBarrier]() {
+      "NaiveFox::NetworkSocketThreadBarrier", [socketThreadBarrier]() {
         // Return to the main thread only after all earlier socket-thread work
         // has run.  The refcounted state remains safe if startup times out.
         (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
@@ -517,6 +524,10 @@ void GeckoRuntime::Shutdown() {
   mTemporaryTrustStore = nullptr;
 
   if (mXPCOMInitialized) {
+    if (mNativeStyleActivationInitialized) {
+      NativeStylePreloadActivation::Shutdown();
+      mNativeStyleActivationInitialized = false;
+    }
     if (mNoPostQuantumApplied) {
       if (mHadKyberPref) {
         Preferences::SetBool("security.tls.enable_kyber", mOldKyberPref);

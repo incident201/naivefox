@@ -531,7 +531,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -557,6 +557,17 @@ in the upstream HTML5 parser fallback; direct `OnDataFinished` is part of the
 later `HttpChannelChild` boundary. Its decrypted comparison requires the
 complete CSS, native-preload, and document-handoff controls; timing and packet
 indices remain outcomes rather than admission criteria.
+`tree-native-parser-ipc-rendezvous-overlap-css` is the H3-only treatment that
+keeps the retarget control's root/parser path and inserts the lean native-style
+activation rendezvous before the existing parent-side channel `AsyncOpen`.
+Admission requires one request identity across request registration, primary
+open, the independent background leg, both receives, and successful release.
+The two receive orders may race, but release must follow both. Failure,
+cancellation, callback failure, missing/duplicate phases, direct fallback, a
+second QUIC connection, or a second outer ClientHello invalidates the sample.
+The arm retains one CSS asset, a fresh profile, and ordinary writable Cache2;
+the existing Cache2 lifecycle begins after rendezvous release and is not
+emulated by another hop.
 It releases CONNECT only after the root has completed and Gecko has emitted
 `NS_NET_STATUS_WAITING_FOR` for the stylesheet request. It therefore proves
 that the resource transaction was committed without conditioning admission on

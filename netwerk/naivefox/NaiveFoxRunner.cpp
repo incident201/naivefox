@@ -102,6 +102,13 @@ bool PreambleNeedsCacheRuntime(const mozilla::naivefox::Config& aConfig) {
              aConfig.mPreamble.ModeForProtocol(protocol));
 }
 
+bool PreambleNeedsNativeStyleActivationRuntime(
+    const mozilla::naivefox::Config& aConfig) {
+  const auto protocol = RuntimeProtocol(aConfig);
+  return mozilla::naivefox::PreambleModeNeedsNativeStyleActivationRuntime(
+      aConfig.mPreamble.ModeForProtocol(protocol));
+}
+
 nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     const mozilla::naivefox::Config& aConfig) {
   nsTArray<mozilla::naivefox::TunnelConfig> tunnelConfigs;
@@ -212,11 +219,11 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
     } else {
       mozilla::naivefox::GeckoRuntime runtime;
       xpcomAttempted = true;
-      rv = runtime.InitializeEmbedded(nsDependentCString(aProfilePath),
-                                      nsDependentCString(aRuntimePath),
-                                      RuntimeProtocol(config),
-                                      config.mNoPostQuantum,
-                                      PreambleNeedsCacheRuntime(config));
+      rv = runtime.InitializeEmbedded(
+          nsDependentCString(aProfilePath), nsDependentCString(aRuntimePath),
+          RuntimeProtocol(config), config.mNoPostQuantum,
+          PreambleNeedsCacheRuntime(config),
+          PreambleNeedsNativeStyleActivationRuntime(config));
       if (NS_SUCCEEDED(rv)) {
         MarkEmbeddedRunning();
         mozilla::naivefox::RuntimeLogEvent(
@@ -276,7 +283,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     mozilla::naivefox::GeckoRuntime runtime;
     rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol,
                             config.mNoPostQuantum,
-                            PreambleNeedsCacheRuntime(config));
+                            PreambleNeedsCacheRuntime(config),
+                            PreambleNeedsNativeStyleActivationRuntime(config));
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started listeners=%u upstreams=%u\n",
@@ -290,9 +298,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
             static_cast<unsigned>(index + 1));
       }
       auto tunnelConfigs = MakeTunnelConfigs(config);
-      rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
-                                                  tunnelConfigs,
-                                                  config.mMaxConnections);
+      rv = mozilla::naivefox::RunLocalProxyServer(
+          config.mListeners, tunnelConfigs, config.mMaxConnections);
     }
     if (NS_FAILED(rv)) {
       std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",

@@ -26,6 +26,8 @@ class nsHtml5StylePreloadDescriptor;
 
 namespace mozilla::naivefox {
 
+struct NativeStylePreloadActivationDescriptor;
+
 // Internal Naive proxy authentication helper. This is not part of the
 // embedded C ABI.
 nsresult BuildProxyAuthorization(const nsACString& aUser,
@@ -152,6 +154,10 @@ constexpr bool PreambleBarrierReached(
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
+  if (aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap) {
+    return aRootCompletedSuccessfully && aNativeParserFinished &&
+           aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -166,7 +172,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
          aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
-         aMode == PreambleMode::TreeNativeParserRetargetOverlap;
+         aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
 }
 
 constexpr bool PreambleRetargetDeliveryVerified(bool aListenerChainAccepted,
@@ -177,8 +184,7 @@ constexpr bool PreambleRetargetDeliveryVerified(bool aListenerChainAccepted,
 
 constexpr bool PreambleUsesRetargetedRootDelivery(PreambleMode aMode,
                                                   uint32_t aStreamId) {
-  return aMode == PreambleMode::TreeNativeParserRetargetOverlap &&
-         aStreamId == 0;
+  return PreambleModeUsesRetargetedNativeParser(aMode) && aStreamId == 0;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
@@ -258,6 +264,11 @@ class ProxyPreambleOperation final {
       nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
   nsresult OpenNativeParserStylesheet(
       nsHtml5StylePreloadDescriptor&& aDescriptor);
+  nsresult CreateNativeParserStylesheetChannel(
+      uint64_t aGeneration,
+      const NativeStylePreloadActivationDescriptor& aActivation);
+  nsresult ReleaseNativeParserStylesheetChannel(uint64_t aGeneration,
+                                                nsresult aStatus);
   void FailNativeParserContract(nsresult aStatus, const char* aReason);
   void FireBarrierCallback(bool aTerminalFallback = false);
   void MaybeFireBarrier();
