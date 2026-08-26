@@ -309,6 +309,20 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserPreload.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserPreload.mPreamble.mCacheResources);
 
+  Config nativeParserDocumentHandoff;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentHandoff, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserDocumentHandoff.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserDocumentHandoffOverlap);
+  EXPECT_EQ(nativeParserDocumentHandoff.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentHandoff.mPreamble.mCacheResources);
+
   static constexpr const char* kInvalid[] = {
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
@@ -323,6 +337,10 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":2,"cache-resources":true}})",
   };
   for (const char* json : kInvalid) {
     Config invalid;

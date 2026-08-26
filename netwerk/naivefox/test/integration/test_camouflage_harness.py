@@ -761,6 +761,16 @@ class CamouflageHarnessTests(unittest.TestCase):
         ) as stream:
             classifier = stream.read()
         with open(
+            os.path.join(SOURCE_ROOT, "caps", "NaiveFoxURIPrincipal.h"),
+            encoding="utf-8",
+        ) as stream:
+            uri_principal_header = stream.read()
+        with open(
+            os.path.join(SOURCE_ROOT, "caps", "NaiveFoxURIPrincipal.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            uri_principal_source = stream.read()
+        with open(
             os.path.join(SOURCE_ROOT, "netwerk", "naivefox", "GeckoRuntime.cpp"),
             encoding="utf-8",
         ) as stream:
@@ -771,11 +781,12 @@ class CamouflageHarnessTests(unittest.TestCase):
         )[1].split("nsScriptSecurityManager::ActivateDomainPolicy", 1)[0]
         self.assertIn("return GetSystemPrincipal(aResult);", channel_principal)
         self.assertNotIn("NaiveFoxClassifierURIPrincipal", security_manager)
-        self.assertIn("class NaiveFoxClassifierURIPrincipal", classifier)
+        self.assertIn("class NaiveFoxURIPrincipal", uri_principal_header)
+        self.assertIn("NaiveFoxURIPrincipal::Create", uri_principal_source)
         classify_region = classifier.split("nsChannelClassifier::StartInternal", 1)[1]
-        self.assertIn("principal = new NaiveFoxClassifierURIPrincipal", classify_region)
+        self.assertIn("principal = NaiveFoxURIPrincipal::Create", classify_region)
         self.assertLess(
-            classify_region.index("principal = new NaiveFoxClassifierURIPrincipal"),
+            classify_region.index("principal = NaiveFoxURIPrincipal::Create"),
             classify_region.index("uriClassifier->Classify(principal"),
         )
         shutdown = runtime.split("void GeckoRuntime::Shutdown()", 1)[1]
@@ -923,6 +934,34 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires h3"):
             CONFIG.build_config(
                 "tree-native-parser-preload-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+        document_handoff = CONFIG.build_config(
+            "tree-native-parser-document-handoff-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            document_handoff["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-document-handoff-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-document-handoff-overlap-css",
                 "h2",
                 1080,
                 4433,
@@ -1140,7 +1179,10 @@ class CamouflageHarnessTests(unittest.TestCase):
     def test_sample_validation_accepts_expected_arm_evidence(self):
         one_connection = {
             "protocol": "h3",
-            "features": {"lifecycle_connection_count": 1.0},
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
         }
         SAMPLE.validate_sample("off", "h3", "", one_connection)
         SAMPLE.validate_sample("gate", "h3", "", one_connection)
@@ -1387,6 +1429,55 @@ class CamouflageHarnessTests(unittest.TestCase):
             native_parser_log,
             one_connection,
         )
+        handoff_phases = "".join(
+            "Connection 7 preamble native-parser-document-handoff "
+            f"phase={phase}"
+            f"{' delivery=main-copy-dispatch' if phase == 'first-parser-feed' else ''} "
+            "protocol=h3\n"
+            for phase in SAMPLE.NATIVE_PARSER_DOCUMENT_HANDOFF_PHASES
+        )
+        document_handoff_log = handoff_phases + native_parser_log
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-handoff-overlap-css",
+            "h3",
+            document_handoff_log,
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "delivery contract"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-handoff-overlap-css",
+                "h3",
+                document_handoff_log.replace(
+                    "delivery=main-copy-dispatch", "delivery=retargeted"
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "missing, duplicated"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-handoff-overlap-css",
+                "h3",
+                document_handoff_log.replace(
+                    "phase=handoff-resume", "phase=consumer-constructed-main"
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            first_feed = (
+                "Connection 7 preamble native-parser-document-handoff "
+                "phase=first-parser-feed delivery=main-copy-dispatch protocol=h3\n"
+            )
+            channel_marker = (
+                "Connection 7 preamble native-parser-preload "
+                "channel=async-open channels=1 protocol=h3\n"
+            )
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-handoff-overlap-css",
+                "h3",
+                document_handoff_log.replace(first_feed, "").replace(
+                    channel_marker, first_feed + channel_marker, 1
+                ),
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "exactly one parser"):
             SAMPLE.validate_sample(
                 "tree-native-parser-preload-overlap-css",
@@ -2169,8 +2260,17 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-document-handoff-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-document-handoff-overlap-css multi-arm "
+            "screening requires --protocol h3",
             runner,
         )
         self.assertIn(

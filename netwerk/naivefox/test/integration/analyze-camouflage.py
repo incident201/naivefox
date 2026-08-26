@@ -179,6 +179,7 @@ def load_dataset(path):
                 "tree-resource-committed-overlap-css",
                 "tree-resource-native-cache-committed-overlap",
                 "tree-native-parser-preload-overlap-css",
+                "tree-native-parser-document-handoff-overlap-css",
                 "tree-warm-css-304",
                 "tree-overlap",
             }
@@ -215,11 +216,15 @@ def load_dataset(path):
                     "tree-resource-native-cache-committed-overlap requires h3"
                 )
             if (
-                arm == "tree-native-parser-preload-overlap-css"
+                arm
+                in (
+                    "tree-native-parser-preload-overlap-css",
+                    "tree-native-parser-document-handoff-overlap-css",
+                )
                 and source["protocol"] != "h3"
             ):
                 raise SystemExit(
-                    "tree-native-parser-preload-overlap-css requires h3"
+                    f"{arm} requires h3"
                 )
             if arm == "reference" and source["label"] == "naivefox":
                 raise SystemExit("NaiveFox row cannot use reference arm metadata")

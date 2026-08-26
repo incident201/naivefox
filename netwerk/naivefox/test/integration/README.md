@@ -515,7 +515,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -523,6 +523,14 @@ adds one bounded document GET before CONNECT. The tree modes also fetch two
 resources from that browser page; `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
 `tree-resource-committed-overlap-css` is an H3-only, one-resource causal arm.
+`tree-native-parser-document-handoff-overlap-css` keeps the existing native
+HTML5 speculative-preload arm as a control and adds the upstream-style
+document-consumer handoff before parser feeding. Its fail-closed admission
+requires each handoff phase exactly once, one physical QUIC connection and
+ClientHello, and the same root/CSS semantics and asset length as both
+`tree-complete-css` and `tree-native-parser-preload-overlap-css`; timing and
+packet indices are outcomes only. The first parser feed is explicitly
+`main-copy-dispatch`; delivery retargeting is not part of this arm.
 It releases CONNECT only after the root has completed and Gecko has emitted
 `NS_NET_STATUS_WAITING_FOR` for the stylesheet request. It therefore proves
 that the resource transaction was committed without conditioning admission on

@@ -657,7 +657,7 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
             aFinalResult.mCompletedSuccessfulResources,
             aFinalResult.mNativeCacheNewResources);
       },
-      mImpl->mConfig.mHostResolverRule, operation);
+      mImpl->mConfig.mHostResolverRule, mImpl->mConnectionId, operation);
   if (NS_FAILED(rv)) {
     MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
     RuntimeLogEvent(
@@ -770,7 +770,7 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone, aStartedResources, aCommittedResources,
         aNativeCacheNewResources, ProtocolName(aProtocol));
   }
-  if (preambleMode == PreambleMode::TreeNativeParserPreloadOverlap &&
+  if (PreambleModeUsesNativeParser(preambleMode) &&
       aProtocol == ProxyProtocol::H3 && succeeded && aRootDone &&
       !aTerminalFallback && aStartedResources == 1 &&
       aCommittedResources == 1) {
@@ -908,7 +908,7 @@ void TunnelSession::FinishPreambleOperationOnMain(
   if (aCompletedNormally && aProtocol == ProxyProtocol::H3 && aRootDone &&
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300 &&
       aCompletedSuccessfulResources == 1 &&
-      preambleMode == PreambleMode::TreeNativeParserPreloadOverlap) {
+      PreambleModeUsesNativeParser(preambleMode)) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-preload "
         "drain=complete completed_resources=%u http=%u protocol=h3\n",
@@ -991,8 +991,8 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
     nsCOMPtr<nsIRequest> openedRequest;
     const bool useAnonymousConnection =
-        mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol) !=
-        PreambleMode::TreeNativeParserPreloadOverlap;
+        !PreambleModeUsesNativeParser(
+            mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
     rv = OpenNeckoTunnel(
         mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
         mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,

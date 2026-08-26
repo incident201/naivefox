@@ -149,6 +149,10 @@ constexpr bool PreambleBarrierReached(PreambleMode aMode,
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
+  if (aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap) {
+    return aRootCompletedSuccessfully && aNativeParserFinished &&
+           aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -161,7 +165,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeRootOverlap ||
          aMode == PreambleMode::TreeResourceCommittedOverlap ||
          aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
-         aMode == PreambleMode::TreeNativeParserPreloadOverlap;
+         aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
+         aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap;
 }
 
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
@@ -202,7 +207,7 @@ class ProxyPreambleOperation final {
       const nsACString&, const nsACString&, const nsACString&,
       const PreambleConfig&, ProxyProtocol, ProxyPreambleCallback&&,
       ProxyPreambleFinishedCallback&&, const Maybe<HostResolverRule>&,
-      RefPtr<ProxyPreambleOperation>&);
+      uint64_t, RefPtr<ProxyPreambleOperation>&);
   class Impl;
 
   ProxyPreambleOperation();
@@ -213,7 +218,8 @@ class ProxyPreambleOperation final {
                  const PreambleConfig& aConfig, ProxyProtocol aProtocol,
                  ProxyPreambleCallback&& aBarrierCallback,
                  ProxyPreambleFinishedCallback&& aFinishedCallback,
-                 const Maybe<HostResolverRule>& aHostResolverRule);
+                 const Maybe<HostResolverRule>& aHostResolverRule,
+                 uint64_t aConnectionId);
   nsresult OnStartRequest(uint32_t aStreamId, nsIRequest* aRequest);
   nsresult OnDataAvailable(uint32_t aStreamId, nsIInputStream* aInputStream,
                            uint32_t aCount);
@@ -221,6 +227,10 @@ class ProxyPreambleOperation final {
   void OnStopRequest(uint32_t aStreamId, nsresult aStatus);
   nsresult DispatchNativeParserChunk(nsCString&& aChunk);
   nsresult DispatchNativeParserFinish();
+  nsresult DispatchNativeParserReplacementListenerInstall();
+  void OnNativeParserReplacementListenerInstalled(uint64_t aGeneration);
+  nsresult ResumeNativeParserDocumentHandoffRoot();
+  void LogNativeParserDocumentHandoffPhase(const char* aPhase) const;
   void OnNativeParserOutput(
       uint64_t aGeneration, uint32_t aSequence, bool aFinished,
       nsresult aStatus,
@@ -241,6 +251,7 @@ nsresult OpenProxyPreambleOperation(
     ProxyProtocol aProtocol, ProxyPreambleCallback&& aBarrierCallback,
     ProxyPreambleFinishedCallback&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule,
+    uint64_t aConnectionId,
     RefPtr<ProxyPreambleOperation>& aOperation);
 
 nsresult OpenProxyPreamble(

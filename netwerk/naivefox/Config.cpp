@@ -591,6 +591,9 @@ class JsonParser final {
         aMode = PreambleMode::TreeResourceNativeCacheCommittedOverlap;
       } else if (mode.EqualsLiteral("tree-native-parser-preload-overlap")) {
         aMode = PreambleMode::TreeNativeParserPreloadOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-handoff-overlap")) {
+        aMode = PreambleMode::TreeNativeParserDocumentHandoffOverlap;
       } else {
         return Error("unsupported preamble mode");
       }
@@ -743,9 +746,17 @@ class JsonParser final {
           "tree-native-parser-preload-overlap must be selected explicitly "
           "with h3-mode");
     }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentHandoffOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentHandoffOverlap))) {
+      return Error(
+          "tree-native-parser-document-handoff-overlap must be selected "
+          "explicitly with h3-mode");
+    }
     if (h2Mode == PreambleMode::TreeResourceCommittedOverlap ||
         h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
-        h2Mode == PreambleMode::TreeNativeParserPreloadOverlap) {
+        PreambleModeUsesNativeParser(h2Mode)) {
       return Error("selected resource-committed preamble is H3-only");
     }
     const bool anyActive =
@@ -803,6 +814,18 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-preload-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentHandoffOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-document-handoff-overlap requires exactly "
+            "one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-handoff-overlap requires "
             "cache-resources=true");
       }
     }

@@ -15,6 +15,7 @@
 
 class nsHtml5Tokenizer;
 class nsHtml5TreeBuilder;
+class nsISerialEventTarget;
 
 /**
  * DOM-free facade over Gecko's generated HTML5 tokenizer/tree builder.
@@ -23,7 +24,8 @@ class nsHtml5TreeBuilder;
  */
 class nsHtml5SpeculativeScanner final {
  public:
-  nsHtml5SpeculativeScanner();
+  explicit nsHtml5SpeculativeScanner(
+      nsISerialEventTarget* aParserEventTarget = nullptr);
   ~nsHtml5SpeculativeScanner();
 
   nsresult Feed(const nsAString& aChunk);

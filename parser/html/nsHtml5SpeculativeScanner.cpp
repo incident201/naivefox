@@ -34,8 +34,19 @@ void EnsureHtml5Statics() {
 }
 }  // namespace
 
-nsHtml5SpeculativeScanner::nsHtml5SpeculativeScanner() {
+nsHtml5SpeculativeScanner::nsHtml5SpeculativeScanner(
+    nsISerialEventTarget* aParserEventTarget) {
   EnsureHtml5Statics();
+#ifdef DEBUG
+  // nsHtml5StreamParser is constructed on main, then explicitly permits atom
+  // table lookups on its parser target. Preserve that thread contract for the
+  // document-handoff arm; target-local callers can retain the default target.
+  if (aParserEventTarget) {
+    mAtomTable.SetPermittedLookupEventTarget(aParserEventTarget);
+  }
+#else
+  (void)aParserEventTarget;
+#endif
   mTreeBuilder = mozilla::MakeUnique<nsHtml5TreeBuilder>(&mStage);
   mTokenizer = mozilla::MakeUnique<nsHtml5Tokenizer>(mTreeBuilder.get(), false);
   mTokenizer->setInterner(&mAtomTable);
