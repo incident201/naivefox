@@ -86,7 +86,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   `document-carrier-dispatch`, `document-cold-winner-handoff`,
   `document-native-cache-open`, `document-native-channel-open`,
   `document-handshake-confirmed`, `document-overlap`,
-  `document-start-overlap`, `tree-complete`, `tree-overlap`,
+  `document-start-overlap`, `tree-native-parser-document-start-overlap`,
+  `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, `tree-resource-native-cache-committed-overlap`, and
   `tree-root-overlap`; `root` and `tree` are
   compatibility aliases. `document-carrier-dispatch`,
@@ -123,6 +124,15 @@ The supported config is a strict NaiveProxy-compatible subset:
   only after the H2/H3 request stream has accepted and committed the GET. It
   then permits CONNECT while the response continues. Admission and final HTTP
   result are separate events; a normal 2xx root drain remains mandatory.
+  `tree-native-parser-document-start-overlap` preserves that same early
+  request-commit admission, then continues the root response through the lean
+  HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens
+  through the native `FromParser` preload path while CONNECT and its tunneled
+  workload are already active. It is H3-only, fail-closed, and does not add a
+  timer, DOM, layout, graphics, JavaScript, or a second process. Screening
+  shows a strong packets-17--32 improvement but a later volume penalty from
+  the additional complete stylesheet, so it remains experimental rather than
+  the default until that tradeoff is resolved.
   `document-carrier-dispatch` uses one request-less Gecko
   `SpeculativeTransaction` to establish the first cold outer H3 session. The
   real document remains pending until the carrier's normal zero-byte

@@ -536,7 +536,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -735,6 +735,13 @@ separate lifecycle evidence. Decrypted H3 admission requires root GET HEADERS
 before CONNECT HEADERS, one QUIC identity, and request/response-size parity
 with both document controls; it never requires response HEADERS or FIN before
 CONNECT.
+`tree-native-parser-document-start-overlap-css` retains that exact early
+admission while the root continues through the lightweight HTML5 speculative
+scanner and opens one native `FromParser` stylesheet in the background. The
+sample validator requires one physical H3 connection, one outer ClientHello,
+one successful parser descriptor/channel/drain, and forbids the older late
+parser barrier. The private decrypted validator additionally proves `root GET
+< CONNECT < CSS GET` and the CSS 200/FIN lifecycle.
 `tree-early-overlap` completes the root first, then releases CONNECT only after
 at least one resource response has begun while leaving that same CSS or JS
 stream unfinished at the callback boundary. Necko can nevertheless serialize

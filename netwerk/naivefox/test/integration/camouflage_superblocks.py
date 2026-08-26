@@ -28,6 +28,7 @@ SUPPORTED_ARMS = (
     "tree-resource-committed-overlap-css",
     "tree-resource-native-cache-committed-overlap",
     "tree-native-parser-preload-overlap-css",
+    "tree-native-parser-document-start-overlap-css",
     "tree-native-parser-document-handoff-overlap-css",
     "tree-native-parser-retarget-overlap-css",
     "tree-native-parser-ipc-rendezvous-overlap-css",

@@ -61,6 +61,7 @@ enum class PreambleMode : uint8_t {
   TreeResourceCommittedOverlap,
   TreeResourceNativeCacheCommittedOverlap,
   TreeNativeParserPreloadOverlap,
+  TreeNativeParserDocumentStartOverlap,
   TreeNativeParserDocumentHandoffOverlap,
   TreeNativeParserRetargetOverlap,
   TreeNativeParserIpcRendezvousOverlap,
@@ -85,8 +86,13 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
          aMode != PreambleMode::DocumentStartOverlap;
 }
 
-constexpr bool PreambleModeUsesNativeParser(PreambleMode aMode) {
+constexpr bool PreambleModeUsesLightweightNativeParser(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
+         aMode == PreambleMode::TreeNativeParserDocumentStartOverlap;
+}
+
+constexpr bool PreambleModeUsesNativeParser(PreambleMode aMode) {
+  return PreambleModeUsesLightweightNativeParser(aMode) ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
          aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
@@ -125,7 +131,8 @@ constexpr bool PreambleModeUsesNativeParserProcess(PreambleMode aMode) {
 }
 
 constexpr bool PreambleModeRequiresFailClosed(PreambleMode aMode) {
-  return PreambleModeUsesNativeParserProcess(aMode);
+  return aMode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
+         PreambleModeUsesNativeParserProcess(aMode);
 }
 
 constexpr bool PreambleModeNeedsNativeStyleActivationRuntime(

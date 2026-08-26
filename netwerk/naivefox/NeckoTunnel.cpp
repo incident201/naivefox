@@ -1272,7 +1272,9 @@ nsresult ProxyPreambleOperation::Start(
     stream.mUri = aUri;
     stream.mRequest = channel;
     RefPtr<StreamListener> listener = new StreamListener(this, aStreamId);
-    if (mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap &&
+    if ((mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
+         mImpl->mConfig.mMode ==
+             PreambleMode::TreeNativeParserDocumentStartOverlap) &&
         aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
       MOZ_TRY(channel->SetNotificationCallbacks(listener));
     }
@@ -1295,7 +1297,9 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
       !SameCOMIdentity(mImpl->mStreams[aStreamId].mRequest, aRequest)) {
     return;
   }
-  if (mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap &&
+  if ((mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
+       mImpl->mConfig.mMode ==
+           PreambleMode::TreeNativeParserDocumentStartOverlap) &&
       aStreamId == 0) {
     FireBarrierCallback();
     return;
@@ -2461,8 +2465,8 @@ nsresult ProxyPreambleOperation::DispatchNativeParserChunk(nsCString&& aChunk) {
             nsTArray<nsHtml5StylePreloadDescriptor> descriptors;
             if (NS_SUCCEEDED(parserStatus)) {
               if (!self->mImpl->mNativeParserScanner &&
-                  self->mImpl->mConfig.mMode ==
-                      PreambleMode::TreeNativeParserPreloadOverlap) {
+                  PreambleModeUsesLightweightNativeParser(
+                      self->mImpl->mConfig.mMode)) {
                 self->mImpl->mNativeParserScanner =
                     MakeUnique<nsHtml5SpeculativeScanner>();
               }
@@ -2543,8 +2547,8 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
             nsresult parserStatus = NS_OK;
             nsTArray<nsHtml5StylePreloadDescriptor> descriptors;
             if (!self->mImpl->mNativeParserScanner &&
-                self->mImpl->mConfig.mMode ==
-                    PreambleMode::TreeNativeParserPreloadOverlap) {
+                PreambleModeUsesLightweightNativeParser(
+                    self->mImpl->mConfig.mMode)) {
               self->mImpl->mNativeParserScanner =
                   MakeUnique<nsHtml5SpeculativeScanner>();
             }
@@ -3606,7 +3610,7 @@ void ProxyPreambleOperation::MaybeFinish() {
   if (allDone && !mImpl->mBarrierFired &&
       (mImpl->mConfig.mMode ==
            PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
-       mImpl->mConfig.mMode == PreambleMode::TreeNativeParserPreloadOverlap ||
+       PreambleModeUsesLightweightNativeParser(mImpl->mConfig.mMode) ||
        mImpl->mConfig.mMode ==
            PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
        PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode))) {

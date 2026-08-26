@@ -86,6 +86,14 @@ NATIVE_PARSER_PRELOAD_DRAIN = re.compile(
     r"completed_resources=(?P<completed_resources>\d+) "
     r"http=(?P<http>\d+) protocol=(?P<protocol>h2|h3)$"
 )
+NATIVE_PARSER_DOCUMENT_START_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-document-start "
+    r"admission=(?P<admission>\S+) "
+    r"request_committed=(?P<request_committed>[01]) "
+    r"root_done=(?P<root_done>[01]) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
 NATIVE_PARSER_DOCUMENT_HANDOFF = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble native-parser-document-handoff phase=(?P<phase>\S+)"
@@ -865,6 +873,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
+        "tree-native-parser-document-start-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -896,6 +905,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-preload-overlap-css requires h3")
+    if (
+        arm == "tree-native-parser-document-start-overlap-css"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-native-parser-document-start-overlap-css requires h3"
+        )
     if arm == "tree-native-parser-document-handoff-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-document-handoff-overlap-css requires h3")
     if arm == "tree-native-parser-retarget-overlap-css" and protocol != "h3":
@@ -932,6 +948,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
+        "tree-native-parser-document-start-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -950,6 +967,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-committed-overlap-css",
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
+        "tree-native-parser-document-start-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1087,6 +1105,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         and " status=0x00000000 " in line
         and line.endswith(" protocol=h3")
     ]
+    native_parser_lightweight_open_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-preload "
+        "lifecycle=stylesheet-opened stream=1 kind=from-parser "
+        "referrer=inherited protocol=h3" in line
+    ]
     native_parser_channel_lines = [
         line for line in log_lines if " preamble native-parser-preload channel=" in line
     ]
@@ -1125,6 +1150,20 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ]
     if any(marker is None for marker in parsed_native_parser_drains):
         raise ValueError("malformed native parser preload drain evidence")
+    native_parser_document_start_admission_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-document-start admission=" in line
+    ]
+    parsed_native_parser_document_start_admissions = [
+        NATIVE_PARSER_DOCUMENT_START_ADMISSION.fullmatch(line)
+        for line in native_parser_document_start_admission_lines
+    ]
+    if any(
+        marker is None
+        for marker in parsed_native_parser_document_start_admissions
+    ):
+        raise ValueError("malformed native parser document-start admission evidence")
     native_parser_document_handoff_lines = [
         line
         for line in log_lines
@@ -1564,7 +1603,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         parsed_native_parser_barriers,
         parsed_native_parser_drains,
     )
-    if arm in (
+    native_parser_complete_before_connect_arms = (
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
@@ -1572,7 +1611,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-root-rendezvous-overlap-css",
         "tree-native-parser-process-overlap-css",
         "tree-native-parser-full-process-overlap-css",
-    ):
+    )
+    if arm in native_parser_complete_before_connect_arms:
         if any(len(markers) != 1 for markers in native_parser_markers):
             raise ValueError(
                 "native parser preload arm requires exactly one parser, "
@@ -1627,8 +1667,73 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "native parser preload lifecycle markers have invalid ordering"
             )
     elif any(native_parser_markers):
+        if arm != "tree-native-parser-document-start-overlap-css":
+            raise ValueError(
+                f"{arm} arm unexpectedly logged native parser preload lifecycle"
+            )
+
+    if arm == "tree-native-parser-document-start-overlap-css":
+        if len(parsed_native_parser_document_start_admissions) != 1:
+            raise ValueError(
+                "native parser document-start arm requires one early admission"
+            )
+        if (
+            parsed_native_parser_discoveries
+            or len(native_parser_descriptor_lines) != 1
+            or parsed_native_parser_channels
+            or len(native_parser_lightweight_open_lines) != 1
+            or len(parsed_native_parser_drains) != 1
+            or parsed_native_parser_admissions
+            or parsed_native_parser_barriers
+        ):
+            raise ValueError(
+                "native parser document-start arm requires one background parser, "
+                "descriptor, channel, and drain without a late parser barrier"
+            )
+        early = parsed_native_parser_document_start_admissions[0]
+        drain = parsed_native_parser_drains[0]
+        connection = early["connection"]
+        if (
+            early["admission"] != "request-committed"
+            or early["request_committed"] != "1"
+            or early["root_done"] != "0"
+            or drain["completed_resources"] != "1"
+            or not 200 <= int(drain["http"]) < 300
+            or drain["connection"] != connection
+            or drain["protocol"] != "h3"
+            or early["protocol"] != "h3"
+            or result["connection"] != connection
+        ):
+            raise ValueError("native parser document-start causal state is invalid")
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == connection
+            and established["protocol"] == "h3"
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "native parser document-start arm requires one matching CONNECT marker"
+            )
+        early_index = log_lines.index(
+            native_parser_document_start_admission_lines[0]
+        )
+        discovery_index = log_lines.index(native_parser_descriptor_lines[0])
+        channel_index = log_lines.index(native_parser_lightweight_open_lines[0])
+        result_index = log_lines.index(result_lines[0])
+        drain_index = log_lines.index(native_parser_drain_lines[0])
+        established_index = log_lines.index(matching_established[0])
+        if not (
+            early_index < established_index
+            and early_index < discovery_index < channel_index < result_index
+            and result_index < drain_index
+        ):
+            raise ValueError(
+                "native parser document-start lifecycle markers have invalid ordering"
+            )
+    elif parsed_native_parser_document_start_admissions:
         raise ValueError(
-            f"{arm} arm unexpectedly logged native parser preload lifecycle"
+            f"{arm} arm unexpectedly logged native parser document-start admission"
         )
 
     if arm == "tree-native-parser-document-handoff-overlap-css":
@@ -2233,6 +2338,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             arm
             in (
                 "tree-native-parser-document-handoff-overlap-css",
+                "tree-native-parser-document-start-overlap-css",
                 "tree-native-parser-retarget-overlap-css",
                 "tree-native-parser-ipc-rendezvous-overlap-css",
                 "tree-native-parser-root-rendezvous-overlap-css",
@@ -2281,6 +2387,7 @@ def main():
             "tree-resource-committed-overlap-css",
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
+            "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",

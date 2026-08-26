@@ -729,6 +729,23 @@ void TunnelSession::FinishPreambleOnMain(
   MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  const bool requestCommittedAdmission =
+      preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
+      aProtocol == ProxyProtocol::H3 && NS_SUCCEEDED(aStatus) &&
+      aHttpStatus == 0 && aBodyBytes == 0 && aStartedResources == 0 &&
+      aCommittedResources == 0 && aNativeCacheNewResources == 0 &&
+      !aRootDone && !aTerminalFallback;
+  const bool succeeded =
+      NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
+  if ((preambleMode ==
+           PreambleMode::TreeNativeParserDocumentStartOverlap &&
+       !requestCommittedAdmission) ||
+      (preambleMode !=
+           PreambleMode::TreeNativeParserDocumentStartOverlap &&
+       PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
+    FailPreambleOnMain(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
+    return;
+  }
   if (detail::PreambleOverlapsConnect(preambleMode) &&
       mImpl->mPreambleOperation) {
     RefPtr self = this;
@@ -741,17 +758,16 @@ void TunnelSession::FinishPreambleOnMain(
     if (timer.isOk()) {
       mImpl->mPreambleDrainTimer = timer.unwrap();
     } else {
+      const nsresult timerStatus = timer.unwrapErr();
       RefPtr operation = std::move(mImpl->mPreambleOperation);
       mImpl->mPreambleOperationGeneration = 0;
       mImpl->mPreambleTargetAuthority.Truncate();
-      operation->Cancel(timer.unwrapErr());
+      operation->Cancel(timerStatus);
+      if (PreambleModeRequiresFailClosed(preambleMode)) {
+        FailPreambleOnMain(timerStatus);
+        return;
+      }
     }
-  }
-  const bool succeeded =
-      NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
-  if (PreambleModeRequiresFailClosed(preambleMode) && !succeeded) {
-    FailPreambleOnMain(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
-    return;
   }
   if (preambleMode == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
@@ -822,6 +838,13 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone ? "terminal-fallback" : "request-committed", !aRootDone,
         aRootDone, ProtocolName(aProtocol));
   }
+  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-document-start "
+        "admission=request-committed request_committed=1 root_done=0 "
+        "protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId));
+  }
   if (preambleMode == PreambleMode::DocumentNativeCacheOpen && succeeded) {
     RuntimeLogEvent(
         "Connection %llu preamble native-cache-open cache=readonly-miss "
@@ -845,7 +868,8 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode != PreambleMode::DocumentStartOverlap) {
+  if (preambleMode != PreambleMode::DocumentStartOverlap &&
+      preambleMode != PreambleMode::TreeNativeParserDocumentStartOverlap) {
     const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
                          : succeeded                      ? "success"
                          : NS_FAILED(aStatus)             ? "network-error"
@@ -877,18 +901,30 @@ void TunnelSession::FinishPreambleOperationOnMain(
   }
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  const bool finalSucceeded =
+      aRootDone && aCompletedNormally && NS_SUCCEEDED(aStatus) &&
+      aHttpStatus >= 200 && aHttpStatus < 300;
+  const bool documentStartParserSucceeded =
+      finalSucceeded && aCompletedSuccessfulResources == 1;
   if (PreambleModeRequiresFailClosed(preambleMode) &&
-      (!aCompletedNormally || NS_FAILED(aStatus))) {
+      ((preambleMode ==
+            PreambleMode::TreeNativeParserDocumentStartOverlap &&
+        !documentStartParserSucceeded) ||
+       (preambleMode !=
+            PreambleMode::TreeNativeParserDocumentStartOverlap &&
+        (!aCompletedNormally || NS_FAILED(aStatus))))) {
     mImpl->mPreambleOperation = nullptr;
     mImpl->mPreambleOperationGeneration = 0;
     mImpl->mPreambleTargetAuthority.Truncate();
     FailPreambleOnMain(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
     return;
   }
-  if (preambleMode == PreambleMode::DocumentStartOverlap) {
-    const bool succeeded = aRootDone && aCompletedNormally &&
-                           NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 &&
-                           aHttpStatus < 300;
+  if (preambleMode == PreambleMode::DocumentStartOverlap ||
+      preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
+    const bool succeeded =
+        preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap
+            ? documentStartParserSucceeded
+            : finalSucceeded;
     const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
                          : succeeded                      ? "success"
                          : NS_FAILED(aStatus)             ? "network-error"

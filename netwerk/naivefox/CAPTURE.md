@@ -33,6 +33,18 @@ HEADERS to precede CONNECT HEADERS on the sole QUIC identity; failure rejects
 the mechanism and never causes selective recapture. Response HEADERS and FIN
 ordering remain outcomes rather than admission criteria.
 
+`tree-native-parser-document-start-overlap` keeps the same request-commit
+barrier and lets the root continue in the background through the lean HTML5
+speculative scanner and one native stylesheet preload. Decrypted admission is
+fail-closed on one QUIC identity and one ClientHello, exact document and CSS
+semantics, and the wire order `root GET < CONNECT < CSS GET < CSS 200/FIN`.
+The mode deliberately does not require any packet position, elapsed time, or
+asset-size-derived overlap. Six-block H2-inside-CONNECT screening improved
+packets 17--32 from `0.62052` to `0.50648` and packets 1--32 from `0.22690` to
+`0.20573`, but worsened the 250 ms and whole-flow views because the completed
+stylesheet remains additional traffic. It is therefore not promoted by that
+screen alone.
+
 ## Modes and policy
 
 The runners support two reference modes:

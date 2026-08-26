@@ -495,6 +495,20 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
+                "tree-native-parser-document-start-overlap-css decrypted "
+                "validation requires document-start-overlap",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-native-parser-document-start-overlap-css",),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
                 "tree-root-overlap decrypted validation requires tree-complete",
             ):
                 summary.write_outputs(
@@ -2285,6 +2299,129 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                         "tree-complete-css",
                         "tree-native-parser-preload-overlap-css",
                     ),
+                )
+
+    def test_native_parser_document_start_requires_css_after_connect(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            complete = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 4, method="CONNECT"),
+                self.event(14, 0.016, "server", 4, status="200"),
+            ]
+            self.make_cohort(directory, "document-complete", complete)
+            self.make_cohort(
+                directory,
+                "document-overlap",
+                complete,
+                fin_frames={"0": 16},
+            )
+            self.make_cohort(
+                directory,
+                "document-start-overlap",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="CONNECT"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(11, 0.013, "server", 4, status="200"),
+                ],
+                fin_frames={"0": 16},
+            )
+            arm = "tree-native-parser-document-start-overlap-css"
+            treatment = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 4, method="CONNECT"),
+                self.event(9, 0.011, "server", 4, status="200"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 8, method="GET"),
+                self.event(14, 0.016, "server", 8, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                arm,
+                treatment,
+                fin_frames={"0": 12, "8": 16},
+            )
+            arms = (
+                "document-complete",
+                "document-overlap",
+                "document-start-overlap",
+                arm,
+            )
+            summary_path = Path(directory) / "summary.txt"
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                summary_path,
+                "4433",
+                arms,
+            )
+            safe_summary = summary_path.read_text(encoding="utf-8")
+            self.assertIn(
+                "tree_native_parser_document_start_root_get_before_connect=yes",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_document_start_css_get_after_connect=yes",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_document_start_late_barrier_required=no",
+                safe_summary,
+            )
+            self.assertIn(
+                f"{arm}_connect_after_all_get_requests=no",
+                safe_summary,
+            )
+
+            reordered = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 8, method="GET"),
+                self.event(9, 0.011, "client", 4, method="CONNECT"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(11, 0.013, "server", 4, status="200"),
+                self.event(14, 0.016, "server", 8, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                arm,
+                reordered,
+                fin_frames={"0": 12, "8": 16},
+            )
+            with self.assertRaisesRegex(
+                ValueError, "root GET < CONNECT < CSS GET"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    summary_path,
+                    "4433",
+                    arms,
+                )
+
+            self.make_cohort(
+                directory,
+                arm,
+                treatment,
+                fin_frames={"0": 12, "8": 13},
+            )
+            with self.assertRaisesRegex(
+                ValueError, "CSS GET < response HEADERS <= CSS FIN"
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    summary_path,
+                    "4433",
+                    arms,
                 )
 
     def test_native_parser_document_handoff_requires_same_wire_contract(self):

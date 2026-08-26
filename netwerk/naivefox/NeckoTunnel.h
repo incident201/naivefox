@@ -114,7 +114,8 @@ constexpr bool PreambleBarrierReached(
   if (aMode == PreambleMode::DocumentOverlap) {
     return aRootResponseAccepted && !aRootDone;
   }
-  if (aMode == PreambleMode::DocumentStartOverlap) {
+  if (aMode == PreambleMode::DocumentStartOverlap ||
+      aMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
     return false;
   }
   if (!aRootDone) {
@@ -182,6 +183,7 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeResourceCommittedOverlap ||
          aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
          aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
+         aMode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
          aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||

@@ -1197,6 +1197,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        native_parser_document_start = CONFIG.build_config(
+            "tree-native-parser-document-start-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            native_parser_document_start["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-document-start-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-document-start-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         document_handoff = CONFIG.build_config(
             "tree-native-parser-document-handoff-overlap-css",
             "h3",
@@ -1946,6 +1974,49 @@ class CamouflageHarnessTests(unittest.TestCase):
             native_parser_log,
             one_connection,
         )
+        native_parser_document_start_log = (
+            "Connection 7 preamble native-parser-document-start "
+            "admission=request-committed request_committed=1 root_done=0 "
+            "protocol=h3\n"
+            "Connection 7 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Preamble native-parser-preload lifecycle=chunk-flushed "
+            "sequence=1 descriptors=1 status=0x00000000 generation=1 "
+            "protocol=h3\n"
+            "Preamble native-parser-preload lifecycle=stylesheet-opened "
+            "stream=1 kind=from-parser referrer=inherited protocol=h3\n"
+            "Connection 7 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 7 preamble native-parser-preload "
+            "drain=complete completed_resources=1 http=200 protocol=h3\n"
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-start-overlap-css",
+            "h3",
+            native_parser_document_start_log,
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "causal state"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-start-overlap-css",
+                "h3",
+                native_parser_document_start_log.replace(
+                    "request_committed=1", "request_committed=0"
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "late parser barrier"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-start-overlap-css",
+                "h3",
+                native_parser_document_start_log.replace(
+                    "Connection 7 preamble result=success",
+                    "Connection 7 preamble native-parser-preload "
+                    "barrier=released protocol=h3\n"
+                    "Connection 7 preamble result=success",
+                ),
+                one_connection,
+            )
         handoff_phases = "".join(
             "Connection 7 preamble native-parser-document-handoff "
             f"phase={phase}"
@@ -3150,6 +3221,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-document-start-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             ",$multi_arm_arms_csv, == *,tree-native-parser-document-handoff-overlap-css,*",
             runner,
         )
@@ -3176,6 +3251,11 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-document-start-overlap-css multi-arm "
+            "screening requires --protocol h3",
             runner,
         )
         self.assertIn(
