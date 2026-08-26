@@ -528,6 +528,26 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
+                "tree-native-parser-document-start-response-stop-css "
+                "decrypted validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    (
+                        "document-complete",
+                        "document-overlap",
+                        "document-start-overlap",
+                        "tree-native-parser-document-start-overlap-css",
+                        "tree-native-parser-document-start-response-stop-css",
+                    ),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
                 "tree-root-overlap decrypted validation requires tree-complete",
             ):
                 summary.write_outputs(
@@ -2595,6 +2615,287 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     arms,
                 )
 
+    def test_native_parser_response_stop_requires_causal_wire_cancellation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(
+                directory,
+                "reference",
+                [
+                    self.event(8, 0.010, "client", 0, method="GET"),
+                    self.event(12, 0.020, "server", 0, status="200"),
+                ],
+            )
+            complete = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 4, method="CONNECT"),
+                self.event(14, 0.016, "server", 4, status="200"),
+            ]
+            self.make_cohort(directory, "document-complete", complete)
+            self.make_cohort(
+                directory,
+                "document-overlap",
+                complete,
+                fin_frames={"0": 16},
+            )
+            self.make_cohort(
+                directory,
+                "document-start-overlap",
+                [
+                    self.event(7, 0.009, "client", 0, method="GET"),
+                    self.event(8, 0.010, "client", 4, method="CONNECT"),
+                    self.event(10, 0.012, "server", 0, status="200"),
+                    self.event(11, 0.013, "server", 4, status="200"),
+                ],
+                fin_frames={"0": 16},
+            )
+            control = "tree-native-parser-document-start-overlap-css"
+            navigation_stop = (
+                "tree-native-parser-document-start-navigation-stop-css"
+            )
+            treatment = "tree-native-parser-document-start-response-stop-css"
+            tree_events = [
+                self.event(7, 0.009, "client", 0, method="GET"),
+                self.event(8, 0.010, "client", 4, method="CONNECT"),
+                self.event(9, 0.011, "server", 4, status="200"),
+                self.event(10, 0.012, "server", 0, status="200"),
+                self.event(13, 0.015, "client", 8, method="GET"),
+                self.event(14, 0.016, "server", 8, status="200"),
+            ]
+            self.make_cohort(
+                directory,
+                control,
+                tree_events,
+                fin_frames={"0": 12, "8": 20},
+            )
+            self.make_cohort(
+                directory,
+                navigation_stop,
+                tree_events,
+                fin_frames={"0": 12, "8": None},
+            )
+            arms = (
+                "document-complete",
+                "document-overlap",
+                "document-start-overlap",
+                control,
+                navigation_stop,
+                treatment,
+            )
+            summary_path = Path(directory) / "summary.txt"
+
+            def write_treatment(lifecycle_extra, css_fin=None):
+                self.make_cohort(
+                    directory,
+                    treatment,
+                    tree_events,
+                    fin_frames={"0": 12, "8": css_fin},
+                    lifecycle_extra=lifecycle_extra,
+                )
+
+            valid_lifecycle = [
+                self.lifecycle_event(
+                    15,
+                    0.017,
+                    "server",
+                    stream=8,
+                    length=4098,
+                    h3_frame_type=0,
+                    h3_frame_length=4096,
+                ),
+                self.lifecycle_event(
+                    16,
+                    0.018,
+                    "server",
+                    stream=4,
+                    length=113,
+                    h3_frame_type=0,
+                    h3_frame_length=111,
+                ),
+                self.lifecycle_event(
+                    17,
+                    0.019,
+                    "client",
+                    stop_stream=8,
+                    stop_error="0x10c",
+                ),
+                self.lifecycle_event(
+                    18,
+                    0.020,
+                    "server",
+                    reset_stream=8,
+                    reset_error="0x10c",
+                    reset_final_size=20000,
+                ),
+            ]
+            write_treatment(valid_lifecycle)
+            summary.write_outputs(
+                Path(directory),
+                Path(directory) / "events.csv",
+                summary_path,
+                "4433",
+                arms,
+            )
+            safe_summary = summary_path.read_text(encoding="utf-8")
+            for key in (
+                "request_semantics_match",
+                "root_response_size_match",
+                "asset_size_match",
+                "server_connect_data_before_stop",
+                "stop_before_reset",
+                "h3_request_cancelled",
+                "partial_css_data",
+            ):
+                self.assertIn(
+                    f"tree_native_parser_response_stop_{key}=yes",
+                    safe_summary,
+                )
+            self.assertIn(
+                "tree_native_parser_response_stop_css_fin_observed=no",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_server_connect_data_packet_position=16",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_stop_sending_packet_position=17",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_reset_stream_packet_position=18",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_reset_stream_final_size=20000",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_css_data_length_before_reset=4096",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_css_content_length=16384",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_server_connect_data_time_ms=18.000",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_stop_sending_time_ms=19.000",
+                safe_summary,
+            )
+            self.assertIn(
+                "tree_native_parser_response_stop_reset_stream_time_ms=20.000",
+                safe_summary,
+            )
+
+            invalid_cases = (
+                (
+                    [
+                        valid_lifecycle[0],
+                        self.lifecycle_event(
+                            16, 0.018, "server", stream=4, length=111
+                        ),
+                        valid_lifecycle[2],
+                        valid_lifecycle[3],
+                    ],
+                    None,
+                    "no positive server CONNECT H3 DATA",
+                ),
+                (
+                    [
+                        valid_lifecycle[0],
+                        self.lifecycle_event(
+                            16,
+                            0.018,
+                            "client",
+                            stop_stream=8,
+                            stop_error="0x10c",
+                        ),
+                        self.lifecycle_event(
+                            16,
+                            0.018,
+                            "server",
+                            stream=4,
+                            length=113,
+                            h3_frame_type=0,
+                            h3_frame_length=111,
+                        ),
+                        valid_lifecycle[3],
+                    ],
+                    None,
+                    "CSS 200 < server CONNECT data < STOP_SENDING < RESET_STREAM",
+                ),
+                (
+                    [
+                        valid_lifecycle[0],
+                        valid_lifecycle[1],
+                        self.lifecycle_event(
+                            17,
+                            0.019,
+                            "client",
+                            stop_stream=8,
+                            stop_error="0x10d",
+                        ),
+                        valid_lifecycle[3],
+                    ],
+                    None,
+                    "H3_REQUEST_CANCELLED",
+                ),
+                (
+                    [
+                        valid_lifecycle[0],
+                        valid_lifecycle[1],
+                        self.lifecycle_event(
+                            17,
+                            0.019,
+                            "server",
+                            stop_stream=8,
+                            stop_error="0x10c",
+                        ),
+                        valid_lifecycle[3],
+                    ],
+                    None,
+                    "cancellation directions are invalid",
+                ),
+                (
+                    [
+                        self.lifecycle_event(
+                            15,
+                            0.017,
+                            "server",
+                            stream=8,
+                            length=16386,
+                            h3_frame_type=0,
+                            h3_frame_length=16384,
+                        ),
+                        valid_lifecycle[1],
+                        valid_lifecycle[2],
+                        valid_lifecycle[3],
+                    ],
+                    None,
+                    "observed CSS DATA body is not partial",
+                ),
+                (
+                    valid_lifecycle,
+                    19,
+                    "CSS stream reached FIN",
+                ),
+            )
+            for lifecycle_extra, css_fin, message in invalid_cases:
+                with self.subTest(message=message):
+                    write_treatment(lifecycle_extra, css_fin=css_fin)
+                    with self.assertRaisesRegex(ValueError, message):
+                        summary.write_outputs(
+                            Path(directory),
+                            Path(directory) / "events.csv",
+                            summary_path,
+                            "4433",
+                            arms,
+                        )
+
     def test_native_parser_document_handoff_requires_same_wire_contract(self):
         with tempfile.TemporaryDirectory() as directory:
             arm = "tree-native-parser-document-handoff-overlap-css"
@@ -2876,7 +3177,14 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def make_cohort(self, directory, cohort, requests, fin_frames=None):
+    def make_cohort(
+        self,
+        directory,
+        cohort,
+        requests,
+        fin_frames=None,
+        lifecycle_extra=(),
+    ):
         fin_frames = fin_frames or {}
         request_fields = [
             "frame.number",
@@ -2923,7 +3231,10 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "quic.ss.stream_id",
             "quic.ss.application_error_code",
             "quic.stream.stream_id",
+            "quic.stream.length",
             "quic.stream.fin",
+            "http3.frame_type",
+            "http3.frame_length",
             "quic.cc.error_code",
             "quic.cc.error_code.app",
         ]
@@ -3102,12 +3413,16 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 "quic.ss.stream_id": "",
                 "quic.ss.application_error_code": "",
                 "quic.stream.stream_id": row["quic.stream.stream_id"],
+                "quic.stream.length": "",
                 "quic.stream.fin": ";".join(
                     "1" for _ in str(row["quic.stream.stream_id"]).split(";")
                 ),
+                "http3.frame_type": "",
+                "http3.frame_length": "",
                 "quic.cc.error_code": "",
                 "quic.cc.error_code.app": "",
             })
+        lifecycle.extend(lifecycle_extra)
         self.write_csv(directory, cohort, "lifecycle", lifecycle_fields, lifecycle)
         self.write_csv(
             directory,
@@ -3181,6 +3496,45 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "quic.stream.stream_id": str(stream),
             "http3.headers.method": method,
             "http3.headers.status": status,
+        }
+
+    @staticmethod
+    def lifecycle_event(
+        frame,
+        time,
+        direction,
+        *,
+        stream="",
+        length="",
+        h3_frame_type="",
+        h3_frame_length="",
+        fin="",
+        stop_stream="",
+        stop_error="",
+        reset_stream="",
+        reset_error="",
+        reset_final_size="",
+    ):
+        client = direction == "client"
+        return {
+            "frame.number": str(frame),
+            "frame.time_relative": str(time),
+            "udp.srcport": "55000" if client else "4433",
+            "udp.dstport": "4433" if client else "55000",
+            "quic.connection.number": "0",
+            "quic.frame_type": "",
+            "quic.rsts.stream_id": str(reset_stream),
+            "quic.rsts.application_error_code": str(reset_error),
+            "quic.rsts.final_size": str(reset_final_size),
+            "quic.ss.stream_id": str(stop_stream),
+            "quic.ss.application_error_code": str(stop_error),
+            "quic.stream.stream_id": str(stream),
+            "quic.stream.length": str(length),
+            "quic.stream.fin": str(fin),
+            "http3.frame_type": str(h3_frame_type),
+            "http3.frame_length": str(h3_frame_length),
+            "quic.cc.error_code": "",
+            "quic.cc.error_code.app": "",
         }
 
     def test_writes_ordered_sanitized_arm_events(self):

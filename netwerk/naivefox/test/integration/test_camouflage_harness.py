@@ -437,6 +437,21 @@ class CamouflageHarnessTests(unittest.TestCase):
             (control, treatment),
         )
 
+    def test_response_stop_superblock_requires_navigation_stop_control(self):
+        document_start = "tree-native-parser-document-start-overlap-css"
+        navigation_stop = (
+            "tree-native-parser-document-start-navigation-stop-css"
+        )
+        response_stop = "tree-native-parser-document-start-response-stop-css"
+        with self.assertRaisesRegex(ValueError, "requires the .* control"):
+            SUPERBLOCKS.validate_arm_sequence((document_start, response_stop))
+        self.assertEqual(
+            SUPERBLOCKS.validate_arm_sequence(
+                (document_start, navigation_stop, response_stop)
+            ),
+            (document_start, navigation_stop, response_stop),
+        )
+
     def test_opt_in_superblock_arms_share_one_control_pair(self):
         arms = (
             "gate",
@@ -1261,6 +1276,34 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires h3"):
             CONFIG.build_config(
                 "tree-native-parser-document-start-navigation-stop-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
+        response_stop = CONFIG.build_config(
+            "tree-native-parser-document-start-response-stop-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            response_stop["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-document-start-response-stop",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-document-start-response-stop-css",
                 "h2",
                 1080,
                 4433,
@@ -2187,6 +2230,149 @@ class CamouflageHarnessTests(unittest.TestCase):
                     + tunnel_active_marker
                     + response_started_marker,
                 ),
+                one_connection,
+            )
+        native_parser_response_stop_log = (
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "admission=request-committed request_committed=1 root_done=0 "
+            "protocol=h3\n"
+            "Connection 7 established target=localhost:443 "
+            "outer=h3 padding=yes\n"
+            "Preamble native-parser-preload lifecycle=chunk-flushed "
+            "sequence=1 descriptors=1 status=0x00000000 generation=1 "
+            "protocol=h3\n"
+            "Preamble native-parser-preload lifecycle=stylesheet-opened "
+            "stream=1 kind=from-parser referrer=inherited protocol=h3\n"
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=stylesheet-committed stream=1 status=waiting-for "
+            "protocol=h3\n"
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=stylesheet-response-started http=200 protocol=h3\n"
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=tunnel-application-active direction=target-to-client "
+            "bytes_positive=1 payload=decoded protocol=h3\n"
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=navigation-stop-issued reason=NS_BINDING_ABORTED "
+            "load_group=scoped protocol=h3\n"
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=stylesheet-onstop status=NS_BINDING_ABORTED expected=1 "
+            "protocol=h3\n"
+            "Connection 7 preamble result=success status=0x00000000 "
+            "http=200 bytes=12000 protocol=h3\n"
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop drain=complete "
+            "root_done=1 css_committed=1 css_aborted=1 css_completed=0 "
+            "http=200 protocol=h3\n"
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-start-response-stop-css",
+            "h3",
+            native_parser_response_stop_log,
+            one_connection,
+        )
+        response_stop_tunnel_active_marker = (
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=tunnel-application-active direction=target-to-client "
+            "bytes_positive=1 payload=decoded protocol=h3\n"
+        )
+        response_stop_response_started_marker = (
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=stylesheet-response-started http=200 protocol=h3\n"
+        )
+        response_stop_issued_marker = (
+            "Connection 7 preamble "
+            "native-parser-document-start-response-stop "
+            "phase=navigation-stop-issued reason=NS_BINDING_ABORTED "
+            "load_group=scoped protocol=h3\n"
+        )
+        natural_response_stop_log = (
+            native_parser_response_stop_log
+            .replace(response_stop_tunnel_active_marker, "")
+            .replace(response_stop_issued_marker, "")
+            .replace(
+                "Connection 7 preamble "
+                "native-parser-document-start-response-stop "
+                "phase=stylesheet-onstop status=NS_BINDING_ABORTED expected=1 "
+                "protocol=h3\n",
+                "",
+            )
+            .replace(
+                "css_aborted=1 css_completed=0",
+                "css_aborted=0 css_completed=1",
+            )
+            .replace(
+                "Connection 7 preamble "
+                "native-parser-document-start-response-stop drain=complete ",
+                "Connection 7 preamble native-parser-preload drain=complete "
+                "completed_resources=1 http=200 protocol=h3\n"
+                "Connection 7 preamble "
+                "native-parser-document-start-response-stop drain=complete ",
+            )
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-start-response-stop-css",
+            "h3",
+            natural_response_stop_log,
+            one_connection,
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-start-response-stop-css",
+            "h3",
+            native_parser_response_stop_log.replace(
+                response_stop_response_started_marker
+                + response_stop_tunnel_active_marker,
+                response_stop_tunnel_active_marker
+                + response_stop_response_started_marker,
+            ),
+            one_connection,
+        )
+        for old, new in (
+            ("direction=target-to-client", "direction=client-to-target"),
+            ("payload=decoded", "payload=encoded"),
+            ("css_completed=0", "css_completed=1"),
+        ):
+            with self.subTest(response_stop_invalid_state=old):
+                with self.assertRaisesRegex(ValueError, "causal state"):
+                    SAMPLE.validate_sample(
+                        "tree-native-parser-document-start-response-stop-css",
+                        "h3",
+                        native_parser_response_stop_log.replace(old, new),
+                        one_connection,
+                    )
+        with self.assertRaisesRegex(ValueError, "either a complete"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-start-response-stop-css",
+                "h3",
+                native_parser_response_stop_log.replace(
+                    response_stop_tunnel_active_marker, ""
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-start-response-stop-css",
+                "h3",
+                native_parser_response_stop_log.replace(
+                    response_stop_tunnel_active_marker
+                    + response_stop_issued_marker,
+                    response_stop_issued_marker
+                    + response_stop_tunnel_active_marker,
+                ),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-start-response-stop-css",
+                "h2",
+                native_parser_response_stop_log,
                 one_connection,
             )
         with self.assertRaisesRegex(ValueError, "late parser barrier"):

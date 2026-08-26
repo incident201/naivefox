@@ -180,6 +180,8 @@ class TunnelSession final {
   void PreambleDrainTimeoutOnMain(uint64_t aGeneration);
   void TunnelApplicationActiveOnMain(uint64_t aGeneration,
                                      ProxyProtocol aProtocol);
+  void TunnelServerApplicationActiveOnMain(uint64_t aGeneration,
+                                           ProxyProtocol aProtocol);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
   void NotifyOuterGateReady();

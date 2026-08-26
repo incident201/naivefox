@@ -88,6 +88,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-native-parser-document-start-overlap`,
   `tree-native-parser-document-start-navigation-stop`,
+  `tree-native-parser-document-start-response-stop`,
   `tree-complete`, `tree-overlap`,
   `tree-early-overlap`, `tree-resource-native-cache-committed-overlap`, and
   `tree-root-overlap`; `root` and `tree` are
@@ -145,6 +146,19 @@ The supported config is a strict NaiveProxy-compatible subset:
   packets 1--32, but remained worse than `document-start-overlap` at 250 ms and
   whole-flow. The mode is therefore a negative product experiment and is not a
   recommended default.
+  `tree-native-parser-document-start-response-stop` moves that cancellation
+  predicate from client-to-target data to the first positive decoded
+  target-to-client tunnel payload. If the stylesheet is still active, the same
+  scoped load group issues a normal `NS_BINDING_ABORTED`; if it has already
+  finished, natural completion is a valid product outcome and the tunnel is
+  never failed. Safe metadata records abort and natural-completion counts
+  separately. A bounded background-drain timeout also leaves the working
+  tunnel intact, but controlled captures reject it as incomplete lifecycle
+  evidence. In six-block same-base H3 screening only one of six samples
+  canceled while five completed naturally. The arm was best at packets 17--32
+  and 1--32, but remained worse than `document-start-overlap` at 250 ms and
+  whole-flow. It therefore remains an experimental negative product result,
+  not a default.
   `document-carrier-dispatch` uses one request-less Gecko
   `SpeculativeTransaction` to establish the first cold outer H3 session. The
   real document remains pending until the carrier's normal zero-byte

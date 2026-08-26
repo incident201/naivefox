@@ -29,6 +29,7 @@ SUPPORTED_ARMS = (
     "tree-native-parser-preload-overlap-css",
     "tree-native-parser-document-start-overlap-css",
     "tree-native-parser-document-start-navigation-stop-css",
+    "tree-native-parser-document-start-response-stop-css",
     "tree-native-parser-document-handoff-overlap-css",
     "tree-native-parser-retarget-overlap-css",
     "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -161,6 +162,34 @@ def direction(row, proxy_port):
     if row["udp.srcport"] == proxy_port:
         return "server"
     raise ValueError("decrypted event is outside the outer proxy flow")
+
+
+def numeric_field(value, context):
+    try:
+        return int(value, 0)
+    except ValueError as error:
+        raise ValueError(f"{context} is not numeric") from error
+
+
+def aligned_numeric_events(row, id_field, value_fields, context):
+    identifiers = split_values(row[id_field])
+    if not identifiers:
+        return []
+    values = [split_values(row[field]) for field in value_fields]
+    require(
+        all(len(items) == len(identifiers) for items in values),
+        f"{context} field cardinality is ambiguous",
+    )
+    return [
+        (
+            numeric_field(identifier, f"{context} stream id"),
+            *(
+                numeric_field(items[index], f"{context} {field}")
+                for field, items in zip(value_fields, values)
+            ),
+        )
+        for index, identifier in enumerate(identifiers)
+    ]
 
 
 def safe_header_name(name):
@@ -430,6 +459,7 @@ def read_get_request_semantics(root, cohort, proxy_port):
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
         "tree-native-parser-document-start-navigation-stop-css",
+        "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1373,6 +1403,176 @@ def summarize_cohort(root, cohort, proxy_port):
     return output, len(connection_indices), len(clienthello_connections)
 
 
+def validate_response_stop_wire_lifecycle(
+    root,
+    cohort,
+    proxy_port,
+    connect_stream,
+    css_stream,
+    css_response_frame,
+    css_content_length,
+):
+    connect_stream = numeric_field(connect_stream, f"{cohort} CONNECT stream id")
+    css_stream = numeric_field(css_stream, f"{cohort} CSS stream id")
+    lifecycle_rows = read_rows(root, cohort, "lifecycle")
+    connect_data = []
+    stop_sending = []
+    reset_stream = []
+    css_server_fins = []
+    css_data_length = 0
+
+    for row in lifecycle_rows:
+        frame = numeric_field(row["frame.number"], f"{cohort} lifecycle frame")
+        event_time_ms = float(row["frame.time_relative"]) * 1000
+        connections = ordered_unique(split_values(row["quic.connection.number"]))
+        require(
+            len(connections) == 1,
+            f"{cohort} lifecycle event connection identity is ambiguous",
+        )
+        connection = connections[0]
+        event_direction = direction(row, proxy_port)
+
+        data_events = []
+        if split_values(row["http3.frame_type"]):
+            stream_ids = split_values(row["quic.stream.stream_id"])
+            frame_types = split_values(row["http3.frame_type"])
+            frame_lengths = split_values(row["http3.frame_length"])
+            require(
+                bool(stream_ids) and len(frame_types) == len(frame_lengths),
+                f"{cohort} H3 DATA field cardinality is ambiguous",
+            )
+            unique_stream_ids = ordered_unique(stream_ids)
+            if len(unique_stream_ids) == 1:
+                stream_ids = unique_stream_ids * len(frame_types)
+            else:
+                require(
+                    len(stream_ids) == len(frame_types),
+                    f"{cohort} H3 DATA stream mapping is ambiguous",
+                )
+            data_events = [
+                (
+                    numeric_field(stream, f"{cohort} H3 DATA stream id"),
+                    numeric_field(frame_type, f"{cohort} H3 frame type"),
+                    numeric_field(frame_length, f"{cohort} H3 frame length"),
+                )
+                for stream, frame_type, frame_length in zip(
+                    stream_ids, frame_types, frame_lengths
+                )
+            ]
+        for stream, frame_type, frame_length in data_events:
+            if (
+                event_direction == "server"
+                and stream == connect_stream
+                and frame_type == 0
+                and frame_length > 0
+            ):
+                connect_data.append((frame, event_time_ms, connection, frame_length))
+            if (
+                event_direction == "server"
+                and stream == css_stream
+                and frame_type == 0
+                and frame_length > 0
+            ):
+                css_data_length += frame_length
+
+        fin_values = [value.lower() for value in split_values(row["quic.stream.fin"])]
+        if fin_values:
+            stream_ids = split_values(row["quic.stream.stream_id"])
+            require(
+                len(stream_ids) == len(fin_values),
+                f"{cohort} stream FIN field cardinality is ambiguous",
+            )
+            for stream, fin in zip(stream_ids, fin_values):
+                require(
+                    fin in {"0", "false", "1", "true"},
+                    f"{cohort} stream FIN value is ambiguous",
+                )
+                if (
+                    event_direction == "server"
+                    and numeric_field(stream, f"{cohort} FIN stream id") == css_stream
+                    and fin in {"1", "true"}
+                ):
+                    css_server_fins.append(frame)
+
+        for stream, error in aligned_numeric_events(
+            row,
+            "quic.ss.stream_id",
+            ("quic.ss.application_error_code",),
+            f"{cohort} STOP_SENDING event",
+        ):
+            if stream == css_stream:
+                stop_sending.append(
+                    (frame, event_time_ms, connection, event_direction, error)
+                )
+
+        for stream, error, final_size in aligned_numeric_events(
+            row,
+            "quic.rsts.stream_id",
+            (
+                "quic.rsts.application_error_code",
+                "quic.rsts.final_size",
+            ),
+            f"{cohort} RESET_STREAM event",
+        ):
+            if stream == css_stream:
+                reset_stream.append(
+                    (
+                        frame,
+                        event_time_ms,
+                        connection,
+                        event_direction,
+                        error,
+                        final_size,
+                    )
+                )
+
+    require(connect_data, f"{cohort} has no positive server CONNECT H3 DATA")
+    require(
+        len(stop_sending) == 1,
+        f"{cohort} must emit exactly one CSS STOP_SENDING",
+    )
+    require(
+        len(reset_stream) == 1,
+        f"{cohort} must receive exactly one CSS RESET_STREAM",
+    )
+    require(not css_server_fins, f"{cohort} CSS stream reached FIN before cancellation")
+
+    first_connect_data = min(connect_data, key=lambda event: event[0])
+    stop = stop_sending[0]
+    reset = reset_stream[0]
+    require(
+        stop[3] == "client" and reset[3] == "server",
+        f"{cohort} CSS cancellation directions are invalid",
+    )
+    require(
+        stop[4] == 0x10C and reset[4] == 0x10C,
+        f"{cohort} CSS cancellation did not use H3_REQUEST_CANCELLED",
+    )
+    require(
+        first_connect_data[2] == stop[2] == reset[2],
+        f"{cohort} response-stop lifecycle used different QUIC identities",
+    )
+    require(
+        css_response_frame < first_connect_data[0] < stop[0] < reset[0],
+        f"{cohort} lacks CSS 200 < server CONNECT data < STOP_SENDING < RESET_STREAM",
+    )
+    require(
+        0 < css_data_length < css_content_length,
+        f"{cohort} observed CSS DATA body is not partial",
+    )
+    return {
+        "server_connect_data_packet_position": first_connect_data[0],
+        "server_connect_data_time_ms": f"{first_connect_data[1]:.3f}",
+        "stop_sending_packet_position": stop[0],
+        "stop_sending_time_ms": f"{stop[1]:.3f}",
+        "reset_stream_packet_position": reset[0],
+        "reset_stream_time_ms": f"{reset[1]:.3f}",
+        "reset_stream_final_size": reset[5],
+        "css_data_length_before_reset": css_data_length,
+        "css_content_length": css_content_length,
+    }
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -1481,6 +1681,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-start-navigation-stop-css",
+            "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1500,6 +1701,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-native-parser-preload-overlap-css",
                     "tree-native-parser-document-start-overlap-css",
                     "tree-native-parser-document-start-navigation-stop-css",
+                    "tree-native-parser-document-start-response-stop-css",
                     "tree-native-parser-document-handoff-overlap-css",
                     "tree-native-parser-retarget-overlap-css",
                     "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1523,6 +1725,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 if arm not in (
                     "tree-native-parser-document-start-overlap-css",
                     "tree-native-parser-document-start-navigation-stop-css",
+                    "tree-native-parser-document-start-response-stop-css",
                 ):
                     require(
                         get["packet_position"] < connects[0]["packet_position"],
@@ -1554,7 +1757,10 @@ def validate(cohorts, connections, client_hellos, arms):
                     for get in gets
                 )
             ]
-            if arm == "tree-native-parser-document-start-navigation-stop-css":
+            if arm in (
+                "tree-native-parser-document-start-navigation-stop-css",
+                "tree-native-parser-document-start-response-stop-css",
+            ):
                 root_get = sorted(
                     gets, key=lambda row: row["packet_position"]
                 )[0]
@@ -1644,6 +1850,7 @@ def validate(cohorts, connections, client_hellos, arms):
                         "tree-native-parser-preload-overlap-css",
                         "tree-native-parser-document-start-overlap-css",
                         "tree-native-parser-document-start-navigation-stop-css",
+                        "tree-native-parser-document-start-response-stop-css",
                         "tree-native-parser-document-handoff-overlap-css",
                         "tree-native-parser-retarget-overlap-css",
                         "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1653,7 +1860,10 @@ def validate(cohorts, connections, client_hellos, arms):
                     )
                     else 2
                 )
-                if arm != "tree-native-parser-document-start-navigation-stop-css":
+                if arm not in (
+                    "tree-native-parser-document-start-navigation-stop-css",
+                    "tree-native-parser-document-start-response-stop-css",
+                ):
                     require(
                         len(asset_responses) == expected_assets,
                         f"{arm} lacks one or more asset response headers",
@@ -1670,6 +1880,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 if arm not in (
                     "tree-native-parser-document-start-overlap-css",
                     "tree-native-parser-document-start-navigation-stop-css",
+                    "tree-native-parser-document-start-response-stop-css",
                 ):
                     require(
                         root_responses
@@ -1727,6 +1938,7 @@ def validate(cohorts, connections, client_hellos, arms):
                 elif arm in (
                     "tree-native-parser-document-start-overlap-css",
                     "tree-native-parser-document-start-navigation-stop-css",
+                    "tree-native-parser-document-start-response-stop-css",
                     "tree-root-overlap",
                     "tree-root-overlap-css",
                     "tree-resource-committed-overlap-css",
@@ -1751,6 +1963,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     if arm not in (
                         "tree-native-parser-document-start-overlap-css",
                         "tree-native-parser-document-start-navigation-stop-css",
+                        "tree-native-parser-document-start-response-stop-css",
                     ):
                         require(
                             root_responses
@@ -2030,6 +2243,13 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         or "tree-native-parser-document-start-overlap-css" in arms,
         "tree-native-parser-document-start-navigation-stop-css decrypted "
         "validation requires tree-native-parser-document-start-overlap-css",
+    )
+    require(
+        "tree-native-parser-document-start-response-stop-css" not in arms
+        or "tree-native-parser-document-start-navigation-stop-css" in arms,
+        "tree-native-parser-document-start-response-stop-css decrypted "
+        "validation requires "
+        "tree-native-parser-document-start-navigation-stop-css",
     )
     require(
         "tree-early-overlap" not in arms or "tree-complete" in arms,
@@ -2439,6 +2659,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
         )
     tree_semantics = {}
     tree_asset_sizes = {}
+    response_stop_wire_outcomes = {}
     for arm in arms:
         if not arm.startswith("tree-"):
             continue
@@ -2511,6 +2732,68 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             root_response_sizes[baseline] == root_response_sizes[treatment],
             "native-parser navigation-stop root response content-length "
             "differs from control",
+        )
+    if {
+        "tree-native-parser-document-start-navigation-stop-css",
+        "tree-native-parser-document-start-response-stop-css",
+    }.issubset(arms):
+        baseline = "tree-native-parser-document-start-navigation-stop-css"
+        treatment = "tree-native-parser-document-start-response-stop-css"
+        for role in ("root", "stylesheet"):
+            require(
+                tree_semantics[baseline][role] == tree_semantics[treatment][role],
+                "native-parser response-stop "
+                f"{role} selected header values/order differ from control",
+            )
+        require(
+            root_response_sizes[baseline] == root_response_sizes[treatment],
+            "native-parser response-stop root response content-length "
+            "differs from control",
+        )
+        require(
+            tree_asset_sizes[baseline] == tree_asset_sizes[treatment],
+            "native-parser response-stop CSS asset content-length differs "
+            "from control",
+        )
+
+        ordered_gets = sorted(
+            (
+                row
+                for row in cohorts[treatment]
+                if row["direction"] == "client" and row["method"] == "GET"
+            ),
+            key=lambda row: row["packet_position"],
+        )
+        connects = [
+            row
+            for row in cohorts[treatment]
+            if row["direction"] == "client" and row["method"] == "CONNECT"
+        ]
+        require(
+            len(ordered_gets) == 2 and len(connects) == 1,
+            f"{treatment} must contain root GET, CSS GET, and one CONNECT",
+        )
+        css_get = ordered_gets[1]
+        css_responses = [
+            row
+            for row in cohorts[treatment]
+            if row["direction"] == "server"
+            and row["status"] == "200"
+            and row["connection_index"] == css_get["connection_index"]
+            and row["stream_id"] == css_get["stream_id"]
+        ]
+        require(
+            len(css_responses) == 1,
+            f"{treatment} must contain exactly one successful CSS response",
+        )
+        response_stop_wire_outcomes = validate_response_stop_wire_lifecycle(
+            root,
+            treatment,
+            proxy_port,
+            connects[0]["stream_id"],
+            css_get["stream_id"],
+            css_responses[0]["packet_position"],
+            tree_asset_sizes[treatment][0],
         )
     if "tree-complete" in arms:
         for arm in preamble_arms:
@@ -3021,6 +3304,49 @@ def write_outputs(root, events_path, summary_path, proxy_port, arms):
             destination.write(
                 "tree_native_parser_navigation_stop_runtime_lifecycle_validated=yes\n"
             )
+        if {
+            "tree-native-parser-document-start-navigation-stop-css",
+            "tree-native-parser-document-start-response-stop-css",
+        }.issubset(arms):
+            destination.write(
+                "tree_native_parser_response_stop_request_semantics_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_root_response_size_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_asset_size_match=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_server_connect_data_before_stop=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_stop_before_reset=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_h3_request_cancelled=yes\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_css_fin_observed=no\n"
+            )
+            destination.write(
+                "tree_native_parser_response_stop_partial_css_data=yes\n"
+            )
+            for key in (
+                "server_connect_data_packet_position",
+                "server_connect_data_time_ms",
+                "stop_sending_packet_position",
+                "stop_sending_time_ms",
+                "reset_stream_packet_position",
+                "reset_stream_time_ms",
+                "reset_stream_final_size",
+                "css_data_length_before_reset",
+                "css_content_length",
+            ):
+                destination.write(
+                    f"tree_native_parser_response_stop_{key}="
+                    f"{response_stop_wire_outcomes[key]}\n"
+                )
         if {
             "tree-complete-css",
             "tree-native-parser-preload-overlap-css",

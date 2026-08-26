@@ -63,6 +63,7 @@ enum class PreambleMode : uint8_t {
   TreeNativeParserPreloadOverlap,
   TreeNativeParserDocumentStartOverlap,
   TreeNativeParserDocumentStartNavigationStop,
+  TreeNativeParserDocumentStartResponseStop,
   TreeNativeParserDocumentHandoffOverlap,
   TreeNativeParserRetargetOverlap,
   TreeNativeParserIpcRendezvousOverlap,
@@ -89,7 +90,13 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
 
 constexpr bool PreambleModeUsesNativeParserDocumentStart(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
-         aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop;
+         aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop ||
+         aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop;
+}
+
+constexpr bool PreambleModeUsesScopedNavigationStop(PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop ||
+         aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop;
 }
 
 constexpr bool PreambleModeUsesLightweightNativeParser(PreambleMode aMode) {
@@ -139,6 +146,11 @@ constexpr bool PreambleModeUsesNativeParserProcess(PreambleMode aMode) {
 constexpr bool PreambleModeRequiresFailClosed(PreambleMode aMode) {
   return PreambleModeUsesNativeParserDocumentStart(aMode) ||
          PreambleModeUsesNativeParserProcess(aMode);
+}
+
+constexpr bool PreambleDrainTimeoutFailsTunnel(PreambleMode aMode) {
+  return PreambleModeRequiresFailClosed(aMode) &&
+         aMode != PreambleMode::TreeNativeParserDocumentStartResponseStop;
 }
 
 constexpr bool PreambleModeNeedsNativeStyleActivationRuntime(

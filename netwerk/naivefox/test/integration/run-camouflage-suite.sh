@@ -205,7 +205,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -265,6 +265,11 @@ if [[ $naivefox_arm == tree-native-parser-document-start-navigation-stop-css &&
   printf 'tree-native-parser-document-start-navigation-stop-css requires --protocol h3\n' >&2
   exit 2
 fi
+if [[ $naivefox_arm == tree-native-parser-document-start-response-stop-css &&
+      $protocol_selection != h3 ]]; then
+  printf 'tree-native-parser-document-start-response-stop-css requires --protocol h3\n' >&2
+  exit 2
+fi
 if [[ $naivefox_arm == tree-native-parser-document-handoff-overlap-css &&
       $protocol_selection != h3 ]]; then
   printf 'tree-native-parser-document-handoff-overlap-css requires --protocol h3\n' >&2
@@ -308,7 +313,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -377,6 +382,16 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   if [[ -n ${seen_multi_arms[tree-native-parser-document-start-navigation-stop-css]:-} &&
         -z ${seen_multi_arms[tree-native-parser-document-start-overlap-css]:-} ]]; then
     printf 'tree-native-parser-document-start-navigation-stop-css multi-arm screening requires tree-native-parser-document-start-overlap-css\n' >&2
+    exit 2
+  fi
+  if [[ -n ${seen_multi_arms[tree-native-parser-document-start-response-stop-css]:-} &&
+        $protocol_selection != h3 ]]; then
+    printf 'tree-native-parser-document-start-response-stop-css multi-arm screening requires --protocol h3\n' >&2
+    exit 2
+  fi
+  if [[ -n ${seen_multi_arms[tree-native-parser-document-start-response-stop-css]:-} &&
+        -z ${seen_multi_arms[tree-native-parser-document-start-navigation-stop-css]:-} ]]; then
+    printf 'tree-native-parser-document-start-response-stop-css multi-arm screening requires tree-native-parser-document-start-navigation-stop-css\n' >&2
     exit 2
   fi
   if [[ -n ${seen_multi_arms[tree-native-parser-document-handoff-overlap-css]:-} &&
@@ -623,6 +638,8 @@ network_monitor_ready=
 network_monitor_done=
 network_mutation_validated_samples=0
 cache_validated_participants=0
+response_stop_aborted_samples=0
+response_stop_natural_completion_samples=0
 controller_backends="$private_dir/controller-backends.txt"
 cache_semantics_records="$private_dir/cache-semantics.txt"
 : >"$cache_semantics_records"
@@ -1529,6 +1546,7 @@ cold_proxy_reset_applies() {
        ,$multi_arm_arms_csv, == *,tree-native-parser-preload-overlap-css,* ||
        ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-overlap-css,* ||
        ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-navigation-stop-css,* ||
+       ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-response-stop-css,* ||
        ,$multi_arm_arms_csv, == *,tree-native-parser-document-handoff-overlap-css,* ||
        ,$multi_arm_arms_csv, == *,tree-native-parser-retarget-overlap-css,* ||
        ,$multi_arm_arms_csv, == *,tree-native-parser-ipc-rendezvous-overlap-css,* ||
@@ -1542,6 +1560,7 @@ cold_proxy_reset_applies() {
        $naivefox_arm == tree-native-parser-preload-overlap-css ||
        $naivefox_arm == tree-native-parser-document-start-overlap-css ||
        $naivefox_arm == tree-native-parser-document-start-navigation-stop-css ||
+       $naivefox_arm == tree-native-parser-document-start-response-stop-css ||
        $naivefox_arm == tree-native-parser-document-handoff-overlap-css ||
        $naivefox_arm == tree-native-parser-retarget-overlap-css ||
        $naivefox_arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -1763,6 +1782,7 @@ run_naivefox_sample() {
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
+        $arm == tree-native-parser-document-start-response-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -1801,6 +1821,13 @@ run_naivefox_sample() {
     drain_pattern=" preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=$protocol$"
   elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
     drain_pattern=" preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h3$"
+  elif [[ $arm == tree-native-parser-document-start-response-stop-css ]]; then
+    # The product contract is deliberately opportunistic. A target response
+    # cancels an in-flight stylesheet, but on a fast path the stylesheet may
+    # have completed before that response arrives. Both terminal states are
+    # healthy and the sample validator checks that their lifecycle evidence is
+    # mutually exclusive.
+    drain_pattern=" preamble native-parser-document-start-response-stop drain=complete root_done=1 css_committed=1 css_aborted=[01] css_completed=[01] http=2[0-9][0-9] protocol=h3$"
   elif [[ $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
@@ -1860,6 +1887,17 @@ run_naivefox_sample() {
   python3 "$INTEGRATION_DIR/camouflage_sample_validation.py" \
     --arm "$arm" --protocol "$protocol" --log "$log" \
     --features "$feature_fragments/$session_id.json"
+  if [[ $arm == tree-native-parser-document-start-response-stop-css ]]; then
+    if rg -q ' native-parser-document-start-response-stop drain=complete root_done=1 css_committed=1 css_aborted=1 css_completed=0 http=2[0-9][0-9] protocol=h3$' "$log"; then
+      response_stop_aborted_samples=$((response_stop_aborted_samples + 1))
+    elif rg -q ' native-parser-document-start-response-stop drain=complete root_done=1 css_committed=1 css_aborted=0 css_completed=1 http=2[0-9][0-9] protocol=h3$' "$log"; then
+      response_stop_natural_completion_samples=$((response_stop_natural_completion_samples + 1))
+    else
+      printf 'NaiveFox response-stop sample %s lacks a valid terminal branch\n' \
+        "$session_id" >&2
+      return 1
+    fi
+  fi
   stop_browser_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
@@ -1979,6 +2017,7 @@ if [[ " ${protocols[*]} " == *" h3 "* ]]; then
      [[ $naivefox_arm == tree-native-parser-preload-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-document-start-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-document-start-navigation-stop-css ]] ||
+     [[ $naivefox_arm == tree-native-parser-document-start-response-stop-css ]] ||
      [[ $naivefox_arm == tree-native-parser-document-handoff-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-retarget-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-ipc-rendezvous-overlap-css ]] ||
@@ -1992,6 +2031,7 @@ if [[ " ${protocols[*]} " == *" h3 "* ]]; then
           ,$multi_arm_arms_csv, == *,tree-native-parser-preload-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-navigation-stop-css,* ||
+          ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-response-stop-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-document-handoff-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-retarget-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-ipc-rendezvous-overlap-css,* ||
@@ -2020,6 +2060,8 @@ elif [[ $naivefox_arm == tree-native-parser-document-start-overlap-css ]]; then
   cache_condition=cold_css_200_native_parser_document_start
 elif [[ $naivefox_arm == tree-native-parser-document-start-navigation-stop-css ]]; then
   cache_condition=cold_css_aborted_native_parser_document_start_navigation_stop
+elif [[ $naivefox_arm == tree-native-parser-document-start-response-stop-css ]]; then
+  cache_condition=cold_css_opportunistic_response_stop_native_parser_document_start
 elif [[ $naivefox_arm == tree-native-parser-document-handoff-overlap-css ]]; then
   cache_condition=cold_css_200_native_parser_document_handoff
 elif [[ $naivefox_arm == tree-native-parser-retarget-overlap-css ]]; then
@@ -2189,6 +2231,7 @@ else
         $naivefox_arm == tree-native-parser-preload-overlap-css ||
         $naivefox_arm == tree-native-parser-document-start-overlap-css ||
         $naivefox_arm == tree-native-parser-document-start-navigation-stop-css ||
+        $naivefox_arm == tree-native-parser-document-start-response-stop-css ||
         $naivefox_arm == tree-native-parser-document-handoff-overlap-css ||
         $naivefox_arm == tree-native-parser-retarget-overlap-css ||
         $naivefox_arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -2221,6 +2264,7 @@ elif [[ $naivefox_arm == tree-root-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-preload-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-document-start-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-document-start-navigation-stop-css ]] ||
+     [[ $naivefox_arm == tree-native-parser-document-start-response-stop-css ]] ||
      [[ $naivefox_arm == tree-native-parser-document-handoff-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-retarget-overlap-css ]] ||
      [[ $naivefox_arm == tree-native-parser-ipc-rendezvous-overlap-css ]] ||
@@ -2234,6 +2278,7 @@ elif [[ $naivefox_arm == tree-root-overlap-css ]] ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-preload-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-navigation-stop-css,* ||
+          ,$multi_arm_arms_csv, == *,tree-native-parser-document-start-response-stop-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-document-handoff-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-retarget-overlap-css,* ||
           ,$multi_arm_arms_csv, == *,tree-native-parser-ipc-rendezvous-overlap-css,* ||
@@ -2304,6 +2349,8 @@ cache_profile_scope=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf tempora
 cache_header_policy=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf gecko_generated_if_none_match || printf not_applicable)
 cache_capture_policy=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf warm_traffic_excluded_measure_only || printf not_applicable)
 cache_validated_participants=$cache_validated_participants
+response_stop_aborted_samples=$response_stop_aborted_samples
+response_stop_natural_completion_samples=$response_stop_natural_completion_samples
 preamble_root_url_parity=reference_and_candidate_outer_exact_path
 browser_controller_backends=$(sort -u "$controller_backends" | paste -sd, -)
 naivefox_browser_proxy_policy=fail_closed_pac_loopback_only

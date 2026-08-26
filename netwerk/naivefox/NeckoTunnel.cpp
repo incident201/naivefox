@@ -700,6 +700,7 @@ class ProxyPreambleOperation::Impl final {
   bool mFinishedFired = false;
   bool mConnectHandoffAdmitted = false;
   bool mTunnelApplicationActive = false;
+  bool mTunnelServerApplicationActive = false;
   bool mNavigationStopStyleResponseStarted = false;
   bool mNavigationStopIssued = false;
   bool mNavigationStopStyleAborted = false;
@@ -1063,8 +1064,7 @@ ProxyPreambleOperation::~ProxyPreambleOperation() {
 
 nsresult ProxyPreambleOperation::NotifyConnectHandoffAdmitted() {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mImpl->mConfig.mMode !=
-      PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+  if (!PreambleModeUsesScopedNavigationStop(mImpl->mConfig.mMode)) {
     return NS_OK;
   }
   if (mImpl->mCancelled || mImpl->mFinishedFired ||
@@ -1097,10 +1097,39 @@ nsresult ProxyPreambleOperation::NotifyTunnelApplicationActive() {
   return MaybeIssueNativeParserNavigationStop();
 }
 
-nsresult ProxyPreambleOperation::MaybeIssueNativeParserNavigationStop() {
+nsresult ProxyPreambleOperation::NotifyTunnelServerApplicationActive() {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mConfig.mMode !=
-      PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+    return NS_OK;
+  }
+  if (mImpl->mCancelled || mImpl->mFinishedFired) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mImpl->mTunnelServerApplicationActive) {
+    return NS_OK;
+  }
+  if (mImpl->mStreams.Length() == 2 &&
+      (mImpl->mStreams[1].mDone || !mImpl->mStreams[1].mRequest)) {
+    // Target activity that arrives after the synthetic stylesheet has already
+    // completed cannot cause a response-scoped stop. Keep that outcome a
+    // clean natural-completion branch instead of logging mixed causal
+    // evidence that the runtime did not act on.
+    return NS_OK;
+  }
+  mImpl->mTunnelServerApplicationActive = true;
+  RuntimeLogEvent(
+      "Connection %llu preamble "
+      "native-parser-document-start-response-stop "
+      "phase=tunnel-application-active direction=target-to-client "
+      "bytes_positive=1 payload=decoded protocol=h3\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId));
+  return MaybeIssueNativeParserNavigationStop();
+}
+
+nsresult ProxyPreambleOperation::MaybeIssueNativeParserNavigationStop() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!PreambleModeUsesScopedNavigationStop(mImpl->mConfig.mMode)) {
     return NS_OK;
   }
   if (mImpl->mNavigationStopIssued) {
@@ -1110,9 +1139,18 @@ nsresult ProxyPreambleOperation::MaybeIssueNativeParserNavigationStop() {
       !detail::PreambleNavigationStopMayIssue(
           mImpl->mConfig.mMode, mImpl->mConnectHandoffAdmitted,
           mImpl->mNavigationStopStyleResponseStarted,
-          mImpl->mTunnelApplicationActive) ||
+          mImpl->mTunnelApplicationActive,
+          mImpl->mTunnelServerApplicationActive) ||
       !mImpl->mRootDone || !mImpl->mRootCompletedSuccessfully ||
       !mImpl->mNativeParserFinished) {
+    return NS_OK;
+  }
+  if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserDocumentStartResponseStop &&
+      (mImpl->mStreams[1].mDone || !mImpl->mStreams[1].mRequest)) {
+    // A slow or silent target may not respond until the synthetic stylesheet
+    // has naturally completed. The response-scoped stop is opportunistic and
+    // must never turn that healthy tunnel into a product failure.
     return NS_OK;
   }
   if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
@@ -1123,10 +1161,14 @@ nsresult ProxyPreambleOperation::MaybeIssueNativeParserNavigationStop() {
   mImpl->mNavigationStopIssued = true;
   RuntimeLogEvent(
       "Connection %llu preamble "
-      "native-parser-document-start-navigation-stop "
+      "%s "
       "phase=navigation-stop-issued reason=NS_BINDING_ABORTED "
       "load_group=scoped protocol=h3\n",
-      static_cast<unsigned long long>(mImpl->mConnectionId));
+      static_cast<unsigned long long>(mImpl->mConnectionId),
+      mImpl->mConfig.mMode ==
+              PreambleMode::TreeNativeParserDocumentStartResponseStop
+          ? "native-parser-document-start-response-stop"
+          : "native-parser-document-start-navigation-stop");
   return mImpl->mLoadGroup->CancelWithReason(
       NS_BINDING_ABORTED, "NaiveFox::ProxyPreambleNavigationStop"_ns);
 }
@@ -1411,22 +1453,24 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
     auto& stream = mImpl->mStreams[aStreamId];
     if (!stream.mRequestCommitted) {
       stream.mRequestCommitted = true;
-      if (mImpl->mConfig.mMode ==
-          PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+      if (PreambleModeUsesScopedNavigationStop(mImpl->mConfig.mMode)) {
         RuntimeLogEvent(
             "Connection %llu preamble "
-            "native-parser-document-start-navigation-stop "
+            "%s "
             "phase=stylesheet-committed stream=1 status=waiting-for "
             "protocol=h3\n",
-            static_cast<unsigned long long>(mImpl->mConnectionId));
+            static_cast<unsigned long long>(mImpl->mConnectionId),
+            mImpl->mConfig.mMode ==
+                    PreambleMode::TreeNativeParserDocumentStartResponseStop
+                ? "native-parser-document-start-response-stop"
+                : "native-parser-document-start-navigation-stop");
       } else {
         RuntimeLogEvent(
             "Preamble native-parser-preload lifecycle=resource-committed "
             "stream=1 status=waiting-for protocol=h3\n");
       }
     }
-    if (mImpl->mConfig.mMode ==
-        PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    if (PreambleModeUsesScopedNavigationStop(mImpl->mConfig.mMode)) {
       nsresult cancelRv = MaybeIssueNativeParserNavigationStop();
       if (NS_FAILED(cancelRv)) {
         FailNativeParserContract(cancelRv, "navigation-stop-cancel-failed");
@@ -1491,8 +1535,7 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
   nsresult rv = channel->GetResponseStatus(&stream.mHttpStatus);
   stream.mResponseHeadersReceived = NS_SUCCEEDED(rv);
   if (aStreamId == 1 &&
-      mImpl->mConfig.mMode ==
-          PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+      PreambleModeUsesScopedNavigationStop(mImpl->mConfig.mMode)) {
     if (!stream.mResponseHeadersReceived || stream.mHttpStatus < 200 ||
         stream.mHttpStatus >= 300) {
       nsresult failure = NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
@@ -1509,9 +1552,13 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
     mImpl->mNavigationStopStyleResponseStarted = true;
     RuntimeLogEvent(
         "Connection %llu preamble "
-        "native-parser-document-start-navigation-stop "
+        "%s "
         "phase=stylesheet-response-started http=%u protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
+        mImpl->mConfig.mMode ==
+                PreambleMode::TreeNativeParserDocumentStartResponseStop
+            ? "native-parser-document-start-response-stop"
+            : "native-parser-document-start-navigation-stop",
         stream.mHttpStatus);
     nsresult stopRv = MaybeIssueNativeParserNavigationStop();
     if (NS_FAILED(stopRv)) {
@@ -3600,15 +3647,20 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
           mImpl->mConfig.mMode, mImpl->mBarrierFired,
           mImpl->mNavigationStopStyleResponseStarted,
           mImpl->mConnectHandoffAdmitted, mImpl->mTunnelApplicationActive,
+          mImpl->mTunnelServerApplicationActive,
           mImpl->mNavigationStopIssued, aStatus);
   if (expectedNavigationStopStyleAbort) {
     mImpl->mNavigationStopStyleAborted = true;
     RuntimeLogEvent(
         "Connection %llu preamble "
-        "native-parser-document-start-navigation-stop "
+        "%s "
         "phase=stylesheet-onstop status=NS_BINDING_ABORTED expected=1 "
         "protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        mImpl->mConfig.mMode ==
+                PreambleMode::TreeNativeParserDocumentStartResponseStop
+            ? "native-parser-document-start-response-stop"
+            : "native-parser-document-start-navigation-stop");
   } else if (NS_FAILED(aStatus)) {
     mImpl->mAllStreamsCompletedNormally = false;
   }

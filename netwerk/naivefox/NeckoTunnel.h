@@ -224,20 +224,32 @@ constexpr bool PreambleResourceCompletedSuccessfully(
 constexpr bool PreambleNavigationStopExpectedStyleAbort(
     PreambleMode aMode, bool aBarrierFired, bool aStyleResponseStarted,
     bool aConnectHandoffAdmitted, bool aTunnelApplicationActive,
+    bool aTunnelServerApplicationActive,
     bool aNavigationStopIssued, nsresult aStopStatus) {
-  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+  const bool requiredActivity =
+      aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop
+          ? aTunnelApplicationActive
+          : aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
+                aTunnelServerApplicationActive;
+  return PreambleModeUsesScopedNavigationStop(aMode) &&
          aBarrierFired && aStyleResponseStarted && aConnectHandoffAdmitted &&
-         aTunnelApplicationActive && aNavigationStopIssued &&
+         requiredActivity && aNavigationStopIssued &&
          aStopStatus == NS_BINDING_ABORTED;
 }
 
 constexpr bool PreambleNavigationStopMayIssue(PreambleMode aMode,
                                               bool aConnectHandoffAdmitted,
                                               bool aStyleResponseStarted,
-                                              bool aTunnelApplicationActive) {
-  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+                                              bool aTunnelApplicationActive,
+                                              bool aTunnelServerApplicationActive) {
+  const bool requiredActivity =
+      aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop
+          ? aTunnelApplicationActive
+          : aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
+                aTunnelServerApplicationActive;
+  return PreambleModeUsesScopedNavigationStop(aMode) &&
          aConnectHandoffAdmitted && aStyleResponseStarted &&
-         aTunnelApplicationActive;
+         requiredActivity;
 }
 
 constexpr bool PreambleNavigationStopCompletedSuccessfully(
@@ -245,11 +257,16 @@ constexpr bool PreambleNavigationStopCompletedSuccessfully(
     nsresult aStatus, uint32_t aHttpStatus,
     uint32_t aCompletedSuccessfulResources, bool aStyleCommitted,
     bool aStyleResponseStarted, bool aStyleAborted) {
-  return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
-         aRootDone && aCompletedNormally && NS_SUCCEEDED(aStatus) &&
-         aHttpStatus >= 200 && aHttpStatus < 300 &&
-         aCompletedSuccessfulResources == 0 && aStyleCommitted &&
-         aStyleResponseStarted && aStyleAborted;
+  if (!PreambleModeUsesScopedNavigationStop(aMode) || !aRootDone ||
+      !aCompletedNormally || NS_FAILED(aStatus) || aHttpStatus < 200 ||
+      aHttpStatus >= 300 || !aStyleCommitted || !aStyleResponseStarted) {
+    return false;
+  }
+  if (aStyleAborted) {
+    return aCompletedSuccessfulResources == 0;
+  }
+  return aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
+         aCompletedSuccessfulResources == 1;
 }
 
 }  // namespace detail
@@ -270,6 +287,7 @@ class ProxyPreambleOperation final {
   void Cancel(nsresult aStatus);
   nsresult NotifyConnectHandoffAdmitted();
   nsresult NotifyTunnelApplicationActive();
+  nsresult NotifyTunnelServerApplicationActive();
 
  private:
   friend nsresult OpenProxyPreambleOperation(

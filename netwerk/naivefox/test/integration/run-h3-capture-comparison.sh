@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -57,7 +57,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -145,6 +145,11 @@ fi
 if [[ -n ${seen_comparison_arms[tree-native-parser-document-start-navigation-stop-css]:-} &&
       -z ${seen_comparison_arms[tree-native-parser-document-start-overlap-css]:-} ]]; then
   printf 'tree-native-parser-document-start-navigation-stop-css comparison requires tree-native-parser-document-start-overlap-css\n' >&2
+  exit 2
+fi
+if [[ -n ${seen_comparison_arms[tree-native-parser-document-start-response-stop-css]:-} &&
+      -z ${seen_comparison_arms[tree-native-parser-document-start-navigation-stop-css]:-} ]]; then
+  printf 'tree-native-parser-document-start-response-stop-css comparison requires tree-native-parser-document-start-navigation-stop-css\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[tree-early-overlap]:-} &&
@@ -934,6 +939,7 @@ EOF
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
+        $arm == tree-native-parser-document-start-response-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -955,6 +961,7 @@ EOF
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
+        $arm == tree-native-parser-document-start-response-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -989,6 +996,9 @@ EOF
   elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h3$'
+  elif [[ $arm == tree-native-parser-document-start-response-stop-css ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble native-parser-document-start-response-stop drain=complete root_done=1 css_committed=1 css_aborted=1 css_completed=0 http=2[0-9][0-9] protocol=h3$'
   elif [[ $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
@@ -1069,6 +1079,7 @@ EOF
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
+        $arm == tree-native-parser-document-start-response-stop-css ||
         $arm == tree-native-parser-document-handoff-overlap-css ||
         $arm == tree-native-parser-retarget-overlap-css ||
         $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -1095,6 +1106,7 @@ EOF
           $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||
           $arm == tree-native-parser-document-start-navigation-stop-css ||
+          $arm == tree-native-parser-document-start-response-stop-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
           $arm == tree-native-parser-retarget-overlap-css ||
           $arm == tree-native-parser-ipc-rendezvous-overlap-css ||
@@ -1178,6 +1190,31 @@ spec.loader.exec_module(module)
 with open(log_path, encoding="utf-8", errors="replace") as stream:
     module.validate_sample(
         "tree-native-parser-document-start-navigation-stop-css",
+        "h3",
+        stream.read(),
+        {
+            "protocol": "h3",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        },
+    )
+PY
+    elif [[ $arm == tree-native-parser-document-start-response-stop-css ]]; then
+      python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" <<'PY'
+import importlib.util
+import sys
+
+module_path, log_path = sys.argv[1:]
+spec = importlib.util.spec_from_file_location(
+    "camouflage_sample_validation", module_path
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+with open(log_path, encoding="utf-8", errors="replace") as stream:
+    module.validate_sample(
+        "tree-native-parser-document-start-response-stop-css",
         "h3",
         stream.read(),
         {
@@ -1663,13 +1700,14 @@ extract_decrypted() {
     -e quic.packet_number -e quic.packet_length >"$prefix-packets.csv"
 
   tshark -r "$pcap" "${decode[@]}" \
-    -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && (quic.rsts.stream_id || quic.ss.stream_id || quic.stream.fin==1 || quic.cc.error_code || quic.cc.error_code.app)" \
+    -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && (http3.frame_type==0 || quic.rsts.stream_id || quic.ss.stream_id || quic.stream.fin==1 || quic.cc.error_code || quic.cc.error_code.app)" \
     "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
     -e udp.srcport -e udp.dstport -e quic.connection.number \
     -e quic.frame_type -e quic.rsts.stream_id \
     -e quic.rsts.application_error_code -e quic.rsts.final_size \
     -e quic.ss.stream_id -e quic.ss.application_error_code \
-    -e quic.stream.stream_id -e quic.stream.fin \
+    -e quic.stream.stream_id -e quic.stream.length -e quic.stream.fin \
+    -e http3.frame_type -e http3.frame_length \
     -e quic.cc.error_code -e quic.cc.error_code.app \
     >"$prefix-lifecycle.csv"
 }
@@ -2104,7 +2142,7 @@ with open(destination, "w", encoding="utf-8") as output:
     output.write(f"client_transport_parameters_equal={'yes' if transport_equal else 'no'}\n")
     output.write(f"h3_settings_equal={'yes' if settings_equal else 'no'}\n")
     output.write("qpack_settings_compared=max_table_capacity,blocked_streams\n")
-    output.write("h3_lifecycle_frames_recorded=RESET_STREAM,STOP_SENDING,STREAM_FIN,CONNECTION_CLOSE\n")
+    output.write("h3_lifecycle_frames_recorded=STREAM_DATA,RESET_STREAM,STOP_SENDING,STREAM_FIN,CONNECTION_CLOSE\n")
     output.write(f"clienthello_canonical_sha256={fingerprint}\n")
     output.write("synthetic_marker_names=none\n")
     output.write("padding_request_header_name=present\n")

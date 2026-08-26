@@ -338,6 +338,20 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_TRUE(
       nativeParserDocumentStartNavigationStop.mPreamble.mCacheResources);
 
+  Config nativeParserDocumentStartResponseStop;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartResponseStop, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserDocumentStartResponseStop.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserDocumentStartResponseStop);
+  EXPECT_EQ(nativeParserDocumentStartResponseStop.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentStartResponseStop.mPreamble.mCacheResources);
+
   Config nativeParserDocumentHandoff;
   error.Truncate();
   ASSERT_EQ(
@@ -444,6 +458,10 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":2,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",

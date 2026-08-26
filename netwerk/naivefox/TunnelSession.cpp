@@ -137,6 +137,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
              nsIAsyncInputStream* aTunnelIn, nsIAsyncOutputStream* aTunnelOut,
              bool aPaddingEnabled,
              std::function<void()>&& aOnUpstreamApplicationActive,
+             std::function<void()>&& aOnDownstreamApplicationActive,
              std::function<void(nsresult)>&& aOnClose)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
@@ -144,6 +145,8 @@ class DuplexPump final : public RefCounted<DuplexPump> {
         mTunnelOut(aTunnelOut),
         mPaddingEnabled(aPaddingEnabled),
         mOnUpstreamApplicationActive(std::move(aOnUpstreamApplicationActive)),
+        mOnDownstreamApplicationActive(
+            std::move(aOnDownstreamApplicationActive)),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start(Span<const uint8_t> aInitialLocalPayload) {
@@ -215,6 +218,16 @@ class DuplexPump final : public RefCounted<DuplexPump> {
     onUpstreamApplicationActive();
   }
 
+  void DownstreamApplicationActive(PumpDirection* aDirection) {
+    if (mClosed || aDirection != mDown.get() ||
+        !mOnDownstreamApplicationActive) {
+      return;
+    }
+    auto onDownstreamApplicationActive =
+        std::move(mOnDownstreamApplicationActive);
+    onDownstreamApplicationActive();
+  }
+
   bool Closed() const { return mClosed; }
   ~DuplexPump() { Close(NS_BASE_STREAM_CLOSED); }
 
@@ -227,6 +240,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
   RefPtr<PumpDirection> mDown;
   bool mPaddingEnabled;
   std::function<void()> mOnUpstreamApplicationActive;
+  std::function<void()> mOnDownstreamApplicationActive;
   std::function<void(nsresult)> mOnClose;
   bool mUpComplete = false;
   bool mClosed = false;
@@ -357,6 +371,7 @@ nsresult PumpDirection::Produce() {
       return NS_ERROR_UNEXPECTED;
     }
   }
+  mOwner->DownstreamApplicationActive(this);
   return Flush();
 }
 
@@ -860,14 +875,17 @@ void TunnelSession::FinishPreambleOnMain(
         "protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId));
   }
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+  if (PreambleModeUsesScopedNavigationStop(preambleMode)) {
     RuntimeLogEvent(
-        "Connection %llu preamble "
-        "native-parser-document-start-navigation-stop "
+      "Connection %llu preamble "
+        "%s "
         "admission=request-committed request_committed=1 root_done=0 "
         "protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        preambleMode ==
+                PreambleMode::TreeNativeParserDocumentStartResponseStop
+            ? "native-parser-document-start-response-stop"
+            : "native-parser-document-start-navigation-stop");
   }
   if (preambleMode == PreambleMode::DocumentNativeCacheOpen && succeeded) {
     RuntimeLogEvent(
@@ -940,8 +958,7 @@ void TunnelSession::FinishPreambleOperationOnMain(
   if (PreambleModeRequiresFailClosed(preambleMode) &&
       ((preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
         !documentStartParserSucceeded) ||
-       (preambleMode ==
-            PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+       (PreambleModeUsesScopedNavigationStop(preambleMode) &&
         !navigationStopSucceeded) ||
        (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
         (!aCompletedNormally || NS_FAILED(aStatus))))) {
@@ -956,8 +973,7 @@ void TunnelSession::FinishPreambleOperationOnMain(
     const bool succeeded =
         preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap
             ? documentStartParserSucceeded
-        : preambleMode ==
-                PreambleMode::TreeNativeParserDocumentStartNavigationStop
+        : PreambleModeUsesScopedNavigationStop(preambleMode)
             ? navigationStopSucceeded
             : finalSucceeded;
     const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
@@ -1015,6 +1031,17 @@ void TunnelSession::FinishPreambleOperationOnMain(
         "protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId), aHttpStatus);
   }
+  if (navigationStopSucceeded &&
+      preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+    RuntimeLogEvent(
+        "Connection %llu preamble "
+        "native-parser-document-start-response-stop "
+        "drain=complete root_done=1 css_committed=1 css_aborted=%d "
+        "css_completed=%d http=%u protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aNavigationStopStyleAborted,
+        aCompletedSuccessfulResources == 1, aHttpStatus);
+  }
   if (aCompletedNormally && preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap drain=complete "
@@ -1051,7 +1078,7 @@ void TunnelSession::PreambleDrainTimeoutOnMain(uint64_t aGeneration) {
   const PreambleMode mode = mImpl->mConfig.mPreamble.ModeForProtocol(
       mImpl->mAttemptProtocol == ProxyProtocol::Auto ? ProxyProtocol::H3
                                                      : mImpl->mAttemptProtocol);
-  if (PreambleModeRequiresFailClosed(mode)) {
+  if (PreambleDrainTimeoutFailsTunnel(mode)) {
     FailPreambleOnMain(NS_ERROR_NET_TIMEOUT);
   }
 }
@@ -1103,6 +1130,23 @@ void TunnelSession::TunnelApplicationActiveOnMain(uint64_t aGeneration,
   }
 }
 
+void TunnelSession::TunnelServerApplicationActiveOnMain(
+    uint64_t aGeneration, ProxyProtocol aProtocol) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire) ||
+      !mImpl->mPreambleOperation ||
+      mImpl->mPreambleOperationGeneration != aGeneration ||
+      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol) !=
+          PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+    return;
+  }
+  nsresult rv =
+      mImpl->mPreambleOperation->NotifyTunnelServerApplicationActive();
+  if (NS_FAILED(rv)) {
+    FailPreambleOnMain(rv);
+  }
+}
+
 void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
                                       ProxyProtocol aProtocol,
                                       const nsACString& aTargetAuthority) {
@@ -1143,8 +1187,8 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
       } else {
         if (mImpl->mPreambleOperation &&
             mImpl->mPreambleOperationGeneration == aGeneration &&
-            mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol) ==
-                PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+            PreambleModeUsesScopedNavigationStop(
+                mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol))) {
           rv = mImpl->mPreambleOperation->NotifyConnectHandoffAdmitted();
           if (NS_FAILED(rv)) {
             FailPreambleOnMain(rv);
@@ -1549,6 +1593,23 @@ nsresult TunnelSession::StartPump() {
   }
   mImpl->mPumpStarted = true;
   RefPtr self = this;
+  std::function<void()> onDownstreamApplicationActive;
+  if (mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol) ==
+      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+    onDownstreamApplicationActive =
+        [self, generation = mImpl->mAttemptGeneration,
+         protocol = mImpl->mAttemptProtocol]() {
+          nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+              "NaiveFox::TunnelServerApplicationActive",
+              [self, generation, protocol]() {
+                self->TunnelServerApplicationActiveOnMain(generation,
+                                                          protocol);
+              }));
+          if (NS_FAILED(rv)) {
+            self->Fail(rv);
+          }
+        };
+  }
   mImpl->mPump = new DuplexPump(
       mImpl->mLocalIn, mImpl->mLocalOut, mImpl->mPendingTunnelIn,
       mImpl->mPendingTunnelOut, mImpl->mPaddingEnabled,
@@ -1563,6 +1624,7 @@ nsresult TunnelSession::StartPump() {
           self->Fail(rv);
         }
       },
+      std::move(onDownstreamApplicationActive),
       [self](nsresult aStatus) { self->Cancel(aStatus); });
   mImpl->mPendingTunnelIn = nullptr;
   mImpl->mPendingTunnelOut = nullptr;

@@ -175,6 +175,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
       PreambleMode::TreeNativeParserDocumentStartOverlap));
   EXPECT_TRUE(PreambleModeRequiresFailClosed(
       PreambleMode::TreeNativeParserDocumentStartNavigationStop));
+  EXPECT_TRUE(PreambleModeRequiresFailClosed(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop));
+  EXPECT_TRUE(PreambleDrainTimeoutFailsTunnel(
+      PreambleMode::TreeNativeParserDocumentStartNavigationStop));
+  EXPECT_FALSE(PreambleDrainTimeoutFailsTunnel(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop));
   EXPECT_TRUE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserRetargetOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
@@ -199,6 +205,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
       PreambleMode::TreeNativeParserDocumentStartOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserDocumentStartNavigationStop, 0));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop, 0));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, ResourceCacheFollowsEffectiveTreeMode)
@@ -281,6 +289,9 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       0, 1, true, 0, true));
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::TreeNativeParserDocumentStartNavigationStop, true, true, 1,
+      0, 0, 0, 1, true, 0, true));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop, true, true, 1,
       0, 0, 0, 1, true, 0, true));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
@@ -407,6 +418,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserDocumentStartNavigationStop));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserRetargetOverlap));
@@ -492,6 +505,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserDocumentStartNavigationStop, true));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserDocumentStartResponseStop, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, true));
@@ -534,30 +551,47 @@ TEST(NaiveFoxTunnelSessionLifecycle, NavigationStopAcceptsOnlyScopedStyleAbort)
 {
   const PreambleMode mode =
       PreambleMode::TreeNativeParserDocumentStartNavigationStop;
-  EXPECT_TRUE(detail::PreambleNavigationStopMayIssue(mode, true, true, true));
-  EXPECT_FALSE(detail::PreambleNavigationStopMayIssue(mode, false, true, true));
-  EXPECT_FALSE(detail::PreambleNavigationStopMayIssue(mode, true, false, true));
-  EXPECT_FALSE(detail::PreambleNavigationStopMayIssue(mode, true, true, false));
+  const PreambleMode responseMode =
+      PreambleMode::TreeNativeParserDocumentStartResponseStop;
+  EXPECT_TRUE(
+      detail::PreambleNavigationStopMayIssue(mode, true, true, true, false));
+  EXPECT_FALSE(
+      detail::PreambleNavigationStopMayIssue(mode, false, true, true, false));
+  EXPECT_FALSE(
+      detail::PreambleNavigationStopMayIssue(mode, true, false, true, false));
+  EXPECT_FALSE(
+      detail::PreambleNavigationStopMayIssue(mode, true, true, false, true));
+  EXPECT_TRUE(detail::PreambleNavigationStopMayIssue(responseMode, true, true,
+                                                     false, true));
+  EXPECT_FALSE(detail::PreambleNavigationStopMayIssue(responseMode, true, true,
+                                                      true, false));
   EXPECT_FALSE(detail::PreambleNavigationStopMayIssue(
-      PreambleMode::TreeNativeParserDocumentStartOverlap, true, true, true));
+      PreambleMode::TreeNativeParserDocumentStartOverlap, true, true, true,
+      true));
 
   EXPECT_TRUE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, true, true, true, true, true, NS_BINDING_ABORTED));
+      mode, true, true, true, true, false, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, false, true, true, true, true, NS_BINDING_ABORTED));
+      mode, false, true, true, true, false, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, true, false, true, true, true, NS_BINDING_ABORTED));
+      mode, true, false, true, true, false, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, true, true, false, true, true, NS_BINDING_ABORTED));
+      mode, true, true, false, true, false, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, true, true, true, false, true, NS_BINDING_ABORTED));
+      mode, true, true, true, false, true, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, true, true, true, true, false, NS_BINDING_ABORTED));
+      mode, true, true, true, true, false, false, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      mode, true, true, true, true, true, NS_ERROR_ABORT));
+      mode, true, true, true, true, false, true, NS_ERROR_ABORT));
+  EXPECT_TRUE(detail::PreambleNavigationStopExpectedStyleAbort(
+      responseMode, true, true, true, false, true, true,
+      NS_BINDING_ABORTED));
+  EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
+      responseMode, true, true, true, true, false, true,
+      NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
       PreambleMode::TreeNativeParserDocumentStartOverlap, true, true, true,
-      true, true, NS_BINDING_ABORTED));
+      true, true, true, NS_BINDING_ABORTED));
 
   EXPECT_TRUE(detail::PreambleNavigationStopCompletedSuccessfully(
       mode, true, true, NS_OK, 200, 0, true, true, true));
@@ -569,6 +603,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, NavigationStopAcceptsOnlyScopedStyleAbort)
       mode, true, true, NS_OK, 200, 0, true, false, true));
   EXPECT_FALSE(detail::PreambleNavigationStopCompletedSuccessfully(
       mode, true, true, NS_OK, 200, 0, true, true, false));
+  EXPECT_TRUE(detail::PreambleNavigationStopCompletedSuccessfully(
+      responseMode, true, true, NS_OK, 200, 0, true, true, true));
+  EXPECT_TRUE(detail::PreambleNavigationStopCompletedSuccessfully(
+      responseMode, true, true, NS_OK, 200, 1, true, true, false));
+  EXPECT_FALSE(detail::PreambleNavigationStopCompletedSuccessfully(
+      responseMode, true, true, NS_OK, 200, 0, true, true, false));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, ResourceDrainRequiresSuccessfulHttp)

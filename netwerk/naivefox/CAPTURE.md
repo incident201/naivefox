@@ -56,6 +56,18 @@ requires `root GET < CONNECT < CSS GET < CSS 200 < cancellation`, one QUIC
 identity, one ClientHello, and the expected aborted stylesheet drain. It never
 uses elapsed time, packet position, or delivered-byte count as a gate.
 
+`tree-native-parser-document-start-response-stop` uses the same scoped load
+group but waits for positive decoded target-to-client tunnel payload instead
+of client-to-target activity. Runtime admission has two mutually exclusive
+valid terminal branches: a causal abort with target activity, stop, expected
+`NS_BINDING_ABORTED`, and no complete CSS drain; or natural completion with a
+normal one-resource drain and no activity/stop/abort markers. Mixed branches
+are rejected. Decrypted abort admission requires positive H3 DATA on the
+CONNECT stream before CSS STOP_SENDING and RESET_STREAM, error `0x10c`, no CSS
+FIN, and positive but partial CSS DATA relative to its declared body length.
+Packet index, time, and QUIC reset final size are outcomes only because the
+reset offset also includes HTTP/3 framing and HEADERS.
+
 The first response-start trace placed the CSS GET at packet 18, CSS 200 at
 packet 22, delivered the server burst through packet 58, and then emitted
 STOP_SENDING/RESET_STREAM; the reset final size was about 51.8 KiB. Safe
@@ -67,6 +79,17 @@ audit confirms the tradeoff is fundamental: a normal FromParser stylesheet
 drains to FIN, while canceling an active H3 load necessarily produces request
 cancel/reset signaling. The arm remains experimental and does not change the
 product default.
+
+Safe six-block response-stop screen `9193f5a55f430bda` (seed `27082707`)
+observed one abort and five natural completions. It improved packets 17--32 to
+`0.57228` and packets 1--32 to `0.19807`, but `document-start-overlap` remained
+better at 250 ms (`0.12532` versus `0.13297`) and whole-flow (`0.38923` versus
+`0.39998`). The reset therefore was not a deterministic every-tunnel marker,
+but the opportunistic policy also failed to remove the late stylesheet volume
+reliably. This does not justify promotion or a 30-block confirmation.
+The product keeps a working tunnel alive if the bounded background drain times
+out, but the controlled harness rejects that third operational outcome because
+it proves neither a causal abort nor a complete natural stylesheet lifecycle.
 
 ## Modes and policy
 
