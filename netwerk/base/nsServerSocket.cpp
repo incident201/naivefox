@@ -186,6 +186,17 @@ void nsServerSocket::OnSocketReady(PRFileDesc* fd, int16_t outFlags) {
   }
   PR_SetFDInheritable(clientFD, false);
 
+  if (mAcceptedSocketNoDelay) {
+    PRSocketOptionData option{};
+    option.option = PR_SockOpt_NoDelay;
+    option.value.no_delay = true;
+    if (PR_SetSocketOption(clientFD, &option) != PR_SUCCESS) {
+      PR_Close(clientFD);
+      mCondition = NS_ERROR_FAILURE;
+      return;
+    }
+  }
+
   NetAddr clientAddr(&prClientAddr);
   // Accept succeeded, create socket transport and notify consumer
   CreateClientTransport(clientFD, clientAddr);
@@ -350,6 +361,22 @@ nsServerSocket::InitSpecialConnection(int32_t aPort, nsServerSocketFlag aFlags,
 NS_IMETHODIMP
 nsServerSocket::InitWithAddress(const PRNetAddr* aAddr, int32_t aBackLog) {
   return InitWithAddressInternal(aAddr, aBackLog);
+}
+
+NS_IMETHODIMP
+nsServerSocket::GetAcceptedSocketNoDelay(bool* aAcceptedSocketNoDelay) {
+  NS_ENSURE_ARG_POINTER(aAcceptedSocketNoDelay);
+  *aAcceptedSocketNoDelay = mAcceptedSocketNoDelay;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsServerSocket::SetAcceptedSocketNoDelay(bool aAcceptedSocketNoDelay) {
+  if (HasListener()) {
+    return NS_ERROR_ALREADY_INITIALIZED;
+  }
+  mAcceptedSocketNoDelay = aAcceptedSocketNoDelay;
+  return NS_OK;
 }
 
 nsresult nsServerSocket::InitWithAddressInternal(const PRNetAddr* aAddr,

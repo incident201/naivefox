@@ -24,6 +24,24 @@ COMPLETION_TOKEN = re.compile(r"^[0-9a-f]{32}$")
 REQUEST_JOURNAL_LOCK = threading.Lock()
 
 
+def require_tcp_nodelay(connection):
+    """Match the low-latency accepted-socket behavior of the Caddy endpoint."""
+    connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    if connection.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY) != 1:
+        raise OSError("fixture accepted socket did not enable TCP_NODELAY")
+
+
+class FixtureHTTPServer(ThreadingHTTPServer):
+    def get_request(self):
+        connection, address = super().get_request()
+        try:
+            require_tcp_nodelay(connection)
+        except Exception:
+            connection.close()
+            raise
+        return connection, address
+
+
 def configured_camouflage_asset_size(name, default):
     raw = os.environ.get(name)
     if raw is None:
@@ -387,8 +405,8 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
 def serve(args):
     Handler.completion_dir = args.completion_dir
     Handler.request_journal = args.request_journal
-    httpd = ThreadingHTTPServer(("127.0.0.1", args.http_port), Handler)
-    httpsd = ThreadingHTTPServer(("127.0.0.1", args.https_port), Handler)
+    httpd = FixtureHTTPServer(("127.0.0.1", args.http_port), Handler)
+    httpsd = FixtureHTTPServer(("127.0.0.1", args.https_port), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(args.cert, args.key)

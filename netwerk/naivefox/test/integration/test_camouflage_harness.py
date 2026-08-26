@@ -128,6 +128,23 @@ def native_parser_full_process_lifecycle_lines():
 
 
 class CamouflageHarnessTests(unittest.TestCase):
+    def test_fixture_accepted_connections_require_tcp_nodelay(self):
+        connection = mock.Mock()
+        connection.getsockopt.return_value = 1
+        TARGET.require_tcp_nodelay(connection)
+        connection.setsockopt.assert_called_once_with(
+            TARGET.socket.IPPROTO_TCP, TARGET.socket.TCP_NODELAY, 1
+        )
+        connection.getsockopt.assert_called_once_with(
+            TARGET.socket.IPPROTO_TCP, TARGET.socket.TCP_NODELAY
+        )
+
+    def test_fixture_tcp_nodelay_verification_fails_closed(self):
+        connection = mock.Mock()
+        connection.getsockopt.return_value = 0
+        with self.assertRaisesRegex(OSError, "did not enable TCP_NODELAY"):
+            TARGET.require_tcp_nodelay(connection)
+
     def test_native_parser_process_validator_accepts_exact_lifecycle(self):
         SAMPLE.validate_native_parser_process(
             native_parser_process_lifecycle_lines(), expected_connection=7

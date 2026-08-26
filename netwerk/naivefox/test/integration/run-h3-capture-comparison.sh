@@ -10,10 +10,18 @@ original_args=("$@")
 comparison_design=legacy
 comparison_arms=()
 private_event_trace=${NAIVEFOX_CAPTURE_PRIVATE_EVENT_TRACE:-0}
+private_three_leg=${NAIVEFOX_CAPTURE_PRIVATE_THREE_LEG:-0}
 case $private_event_trace in
   0|1) ;;
   *)
     printf '%s\n' 'NAIVEFOX_CAPTURE_PRIVATE_EVENT_TRACE must be 0 or 1' >&2
+    exit 2
+    ;;
+esac
+case $private_three_leg in
+  0|1) ;;
+  *)
+    printf '%s\n' 'NAIVEFOX_CAPTURE_PRIVATE_THREE_LEG must be 0 or 1' >&2
     exit 2
     ;;
 esac
@@ -41,6 +49,10 @@ done
 
 if [[ $comparison_design == arms && ${#comparison_arms[@]} -eq 0 ]]; then
   comparison_arms=(off gate root tree-complete tree-overlap)
+fi
+if [[ $private_three_leg -eq 1 && $comparison_design != arms ]]; then
+  printf '%s\n' 'private three-leg capture requires --compare-arms' >&2
+  exit 2
 fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
@@ -477,6 +489,12 @@ export MOZ_CRASHREPORTER_DISABLE=1
 start_capture() {
   local pcap=$1
   local log=$2
+  local extra_filter=${3:-}
+  local capture_filter
+  capture_filter="udp port $NAIVEFOX_FIXTURE_PROXY_PORT or tcp port $NAIVEFOX_FIXTURE_PROXY_PORT"
+  if [[ -n $extra_filter ]]; then
+    capture_filter+=" or $extra_filter"
+  fi
   capture_pcap=$pcap
   capture_log=$log
   capture_stage_raw="$capture_stage_dir/$(basename "${pcap%.pcapng}.raw.pcapng")"
@@ -486,7 +504,7 @@ start_capture() {
   # `any` is the only reliable WSL loopback source here.  stop_capture filters
   # its duplicate cooked receive/transmit views before stateful QUIC decode.
   dumpcap -q -i any \
-    -f "udp port $NAIVEFOX_FIXTURE_PROXY_PORT or tcp port $NAIVEFOX_FIXTURE_PROXY_PORT" \
+    -f "$capture_filter" \
     -a duration:60 -a filesize:65536 -w "$capture_stage_raw" >"$log" 2>&1 &
   capture_pid=$!
   for ((i = 0; i < 100; i++)); do
@@ -835,6 +853,9 @@ run_naivefox_arm() {
   local pcap="$capture_dir/decrypted-$arm.pcapng"
   local log="$capture_dir/decrypted-$arm-naivefox.log"
   local keylog="$capture_dir/decrypted-$arm.keys"
+  local browser_keylog="$capture_dir/decrypted-$arm-browser.keys"
+  local combined_keylog="$capture_dir/decrypted-$arm-combined.keys"
+  local browser_keylog_arg=
   local naivefox_profile="$capture_dir/decrypted-$arm-naivefox-profile"
   local browser_profile="$capture_dir/decrypted-$arm-browser-profile"
   local browser_log="$capture_dir/decrypted-$arm-firefox.log"
@@ -895,7 +916,15 @@ EOF
   : >"$browser_log"
   chmod 0600 "$keylog" "$log" "$browser_log"
   start_network_mutation_monitor "decrypted-$arm"
-  start_capture "$pcap" "$capture_dir/decrypted-$arm-dumpcap.log"
+  local capture_extra_filter=
+  if [[ $private_three_leg -eq 1 ]]; then
+    : >"$browser_keylog"
+    chmod 0600 "$browser_keylog"
+    browser_keylog_arg=$browser_keylog
+    capture_extra_filter="tcp port $socks_port or tcp port $NAIVEFOX_FIXTURE_HTTPS_PORT"
+  fi
+  start_capture "$pcap" "$capture_dir/decrypted-$arm-dumpcap.log" \
+    "$capture_extra_filter"
   local -a lifecycle_env=(-u MOZ_LOG -u MOZ_LOG_FILE)
   if [[ $arm == document-handshake-confirmed ||
         $arm == document-carrier-dispatch ||
@@ -940,7 +969,8 @@ EOF
   wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
   start_browser_controller "$browser_profile" \
     "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT$preamble_path" \
-    "$completion" "decrypted-$arm" "$socks_port"
+    "$completion" "decrypted-$arm" "$socks_port" \
+    "$browser_keylog_arg"
   run_browser_workload "decrypted-$arm"
   if [[ $arm == tree-root-overlap || $arm == tree-root-overlap-css ]]; then
     local expected_resources=2
@@ -974,6 +1004,41 @@ EOF
   stop_browser_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
+  if [[ $private_three_leg -eq 1 ]]; then
+    [[ -s $keylog ]] || {
+      printf 'private three-leg capture has no outer TLS secrets for %s\n' \
+        "$arm" >&2
+      return 1
+    }
+    [[ -s $browser_keylog ]] || {
+      printf 'private three-leg capture has no browser TLS secrets for %s\n' \
+        "$arm" >&2
+      return 1
+    }
+    cat "$keylog" "$browser_keylog" >"$combined_keylog"
+    chmod 0600 "$combined_keylog"
+    tshark -r "$pcap" \
+      -Y "udp.port==$NAIVEFOX_FIXTURE_PROXY_PORT" \
+      -T fields -e frame.number | rg -q . || {
+      printf 'private three-leg capture has no outer UDP leg for %s\n' \
+        "$arm" >&2
+      return 1
+    }
+    tshark -r "$pcap" \
+      -Y "tcp.port==$socks_port && tcp.flags.syn==1" \
+      -T fields -e frame.number | rg -q . || {
+      printf 'private three-leg capture has no SOCKS TCP leg for %s\n' \
+        "$arm" >&2
+      return 1
+    }
+    tshark -r "$pcap" \
+      -Y "tcp.port==$NAIVEFOX_FIXTURE_HTTPS_PORT && tcp.flags.syn==1" \
+      -T fields -e frame.number | rg -q . || {
+      printf 'private three-leg capture has no HTTPS target TCP leg for %s\n' \
+        "$arm" >&2
+      return 1
+    }
+  fi
   local outer_count padding_count preamble_count
   outer_count=$(rg -c '^Outer protocol: h3$' "$log" || true)
   padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)

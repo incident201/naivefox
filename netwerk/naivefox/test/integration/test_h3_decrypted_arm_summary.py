@@ -804,6 +804,30 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         )
         self.assertIn('browser_env+=("SSLKEYLOGFILE=$keylog")', runner)
         self.assertIn('setsid env "${browser_env[@]}"', runner)
+        self.assertIn(
+            "private_three_leg=${NAIVEFOX_CAPTURE_PRIVATE_THREE_LEG:-0}",
+            runner,
+        )
+        self.assertIn(
+            "private three-leg capture requires --compare-arms", runner
+        )
+        self.assertIn(
+            'capture_extra_filter="tcp port $socks_port or tcp port '
+            '$NAIVEFOX_FIXTURE_HTTPS_PORT"',
+            runner,
+        )
+        self.assertIn(
+            'local browser_keylog="$capture_dir/decrypted-$arm-browser.keys"',
+            runner,
+        )
+        self.assertIn('cat "$keylog" "$browser_keylog"', runner)
+        self.assertIn(
+            'tcp.port==$socks_port && tcp.flags.syn==1', runner
+        )
+        self.assertIn(
+            'tcp.port==$NAIVEFOX_FIXTURE_HTTPS_PORT && tcp.flags.syn==1',
+            runner,
+        )
         self.assertIn('run_browser_workload "$pass-reference"', runner)
         self.assertIn('run_browser_workload "decrypted-$arm"', runner)
 

@@ -890,6 +890,11 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
       state->Shutdown();
       return rv;
     }
+    rv = server->SetAcceptedSocketNoDelay(true);
+    if (NS_FAILED(rv)) {
+      state->Shutdown();
+      return rv;
+    }
     RefPtr listener =
         new LocalListener(config, tunnelConfig, socketTarget, state);
     rv = server->AsyncListen(listener);
