@@ -1453,37 +1453,34 @@ run_browser_workload() {
 
 stop_browser_controller() {
   local controller_pid=$browser_controller_pid
-  : >"$browser_stop_file"
-  if ! timeout 10 tail --pid="$controller_pid" -f /dev/null; then
-    local controller_pgid
-    controller_pgid=$(ps -o pgid= -p "$controller_pid" 2>/dev/null |
-      tr -d ' ')
-    if [[ $controller_pgid != "$controller_pid" ]]; then
-      printf 'Firefox browser controller lacks its isolated process group\n' >&2
-      stop_process_group "$controller_pid"
-      return 1
-    fi
-    printf 'WebDriver quit timed out; using post-capture process-group SIGTERM\n' \
-      >&2
-    kill -TERM -- "-$controller_pid" 2>/dev/null || true
-    if ! timeout 5 tail --pid="$controller_pid" -f /dev/null; then
-      printf 'Firefox browser controller required SIGKILL\n' >&2
-      kill -KILL -- "-$controller_pid" 2>/dev/null || true
-      wait "$controller_pid" 2>/dev/null || true
-      return 1
-    fi
-    wait "$controller_pid" 2>/dev/null || true
-    if kill -0 -- "-$controller_pid" 2>/dev/null; then
-      printf 'Firefox browser controller left process-group members\n' >&2
-      kill -KILL -- "-$controller_pid" 2>/dev/null || true
-      return 1
-    fi
-    browser_controller_pid=
-    browser_stop_file=
-    browser_shutdown_file=
-    return 0
+  local controller_pgid
+  controller_pgid=$(ps -o pgid= -p "$controller_pid" 2>/dev/null |
+    tr -d ' ')
+  if [[ $controller_pgid != "$controller_pid" ]]; then
+    printf 'Firefox browser controller lacks its isolated process group\n' >&2
+    stop_process_group "$controller_pid"
+    return 1
   fi
-  wait "$controller_pid"
+
+  # The measured capture and its fail-closed validation are complete before
+  # this function runs. Fresh same-base Firefox profiles consistently wedge
+  # in WebDriver DELETE-session/AsyncShutdown, so make the already-isolated
+  # process-group SIGTERM the normal bounded post-capture teardown.
+  : >"$browser_stop_file"
+  printf 'Using bounded post-capture Firefox process-group SIGTERM\n' >&2
+  kill -TERM -- "-$controller_pid" 2>/dev/null || true
+  if ! timeout 5 tail --pid="$controller_pid" -f /dev/null; then
+    printf 'Firefox browser controller required SIGKILL\n' >&2
+    kill -KILL -- "-$controller_pid" 2>/dev/null || true
+    wait "$controller_pid" 2>/dev/null || true
+    return 1
+  fi
+  wait "$controller_pid" 2>/dev/null || true
+  if kill -0 -- "-$controller_pid" 2>/dev/null; then
+    printf 'Firefox browser controller left process-group members\n' >&2
+    kill -KILL -- "-$controller_pid" 2>/dev/null || true
+    return 1
+  fi
   python3 - "$browser_shutdown_file" <<'PY'
 import json
 import sys

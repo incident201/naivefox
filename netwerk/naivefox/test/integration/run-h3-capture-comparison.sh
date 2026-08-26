@@ -611,44 +611,33 @@ run_browser_workload() {
 
 stop_browser_controller() {
   [[ -n $browser_controller_pid ]] || return 0
-  local controlled_sigterm=0
-  : >"$browser_stop_file"
-  if ! timeout 20 tail --pid="$browser_controller_pid" -f /dev/null; then
-    # A fresh same-base Firefox profile can wedge in browser AsyncShutdown
-    # after WebDriver has already completed the measured workload.  Capture is
-    # stopped before this function is called, so terminate only the isolated
-    # Selenium process group and require it to disappear without SIGKILL.
-    local controller_pgid
-    controller_pgid=$(ps -o pgid= -p "$browser_controller_pid" 2>/dev/null |
-      tr -d ' ')
-    if [[ $controller_pgid != "$browser_controller_pid" ]]; then
-      printf 'controlled Firefox lacks its isolated process group\n' >&2
-      stop_process_group "$browser_controller_pid"
-      browser_controller_pid=
-      browser_stop_file=
-      return 1
-    fi
-    printf 'WebDriver quit timed out; using controlled Firefox process-group SIGTERM\n' \
-      >&2
-    controlled_sigterm=1
-    kill -TERM -- "-$browser_controller_pid" 2>/dev/null || true
-    if ! timeout 5 tail --pid="$browser_controller_pid" -f /dev/null; then
-      printf 'controlled Firefox required SIGKILL after shutdown timeout\n' >&2
-      kill -KILL -- "-$browser_controller_pid" 2>/dev/null || true
-      wait "$browser_controller_pid" 2>/dev/null || true
-      browser_controller_pid=
-      browser_stop_file=
-      return 1
-    fi
-  fi
-  if [[ $controlled_sigterm -eq 1 ]]; then
-    wait "$browser_controller_pid" 2>/dev/null || true
-  elif ! wait "$browser_controller_pid"; then
-    printf 'controlled Firefox browser controller exited unsuccessfully\n' >&2
+  local controller_pgid
+  controller_pgid=$(ps -o pgid= -p "$browser_controller_pid" 2>/dev/null |
+    tr -d ' ')
+  if [[ $controller_pgid != "$browser_controller_pid" ]]; then
+    printf 'controlled Firefox lacks its isolated process group\n' >&2
+    stop_process_group "$browser_controller_pid"
     browser_controller_pid=
     browser_stop_file=
     return 1
   fi
+
+  # Capture and decrypted admission finish before this teardown. Avoid the
+  # deterministic Firefox AsyncShutdown wedge by terminating only the
+  # controller's isolated process group, with a fail-closed bounded wait.
+  : >"$browser_stop_file"
+  printf 'Using bounded post-capture controlled Firefox process-group SIGTERM\n' \
+    >&2
+  kill -TERM -- "-$browser_controller_pid" 2>/dev/null || true
+  if ! timeout 5 tail --pid="$browser_controller_pid" -f /dev/null; then
+    printf 'controlled Firefox required SIGKILL after shutdown timeout\n' >&2
+    kill -KILL -- "-$browser_controller_pid" 2>/dev/null || true
+    wait "$browser_controller_pid" 2>/dev/null || true
+    browser_controller_pid=
+    browser_stop_file=
+    return 1
+  fi
+  wait "$browser_controller_pid" 2>/dev/null || true
   if kill -0 -- "-$browser_controller_pid" 2>/dev/null; then
     printf 'controlled Firefox left processes in its isolated process group\n' >&2
     kill -KILL -- "-$browser_controller_pid" 2>/dev/null || true

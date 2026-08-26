@@ -826,8 +826,14 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             "H3 arm comparison requires a pre-launched Selenium browser", runner
         )
         self.assertIn(
-            "WebDriver quit timed out; using controlled Firefox process-group SIGTERM",
+            "bounded post-capture controlled Firefox process-group SIGTERM",
             runner,
+        )
+        self.assertNotIn(
+            'timeout 20 tail --pid="$browser_controller_pid"', runner
+        )
+        self.assertIn(
+            'timeout 5 tail --pid="$browser_controller_pid"', runner
         )
         self.assertIn('kill -TERM -- "-$browser_controller_pid"', runner)
         self.assertIn('kill -KILL -- "-$browser_controller_pid"', runner)

@@ -576,8 +576,12 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("effective_backend=selenium", runner)
         self.assertIn("--warmup-url", runner)
         self.assertIn('"https://127.0.0.1:$NAIVEFOX_FIXTURE_HTTPS_PORT/', runner)
-        self.assertIn("post-capture process-group SIGTERM", runner)
+        self.assertIn("bounded post-capture Firefox process-group SIGTERM", runner)
+        self.assertNotIn('timeout 10 tail --pid="$controller_pid"', runner)
+        self.assertIn('timeout 5 tail --pid="$controller_pid"', runner)
+        self.assertIn('kill -TERM -- "-$controller_pid"', runner)
         self.assertIn("Firefox browser controller required SIGKILL", runner)
+        self.assertIn("Firefox browser controller left process-group members", runner)
         self.assertIn(
             "document-handshake-confirmed multi-arm screening requires --protocol h3",
             runner,
