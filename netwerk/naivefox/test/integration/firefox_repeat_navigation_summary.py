@@ -32,7 +32,10 @@ def require(condition, message):
 
 def read_csv(path):
     with path.open(newline="", encoding="utf-8") as source:
-        return list(csv.DictReader(source))
+        header = source.readline()
+        source.seek(0)
+        delimiter = "\t" if "\t" in header else ","
+        return list(csv.DictReader(source, delimiter=delimiter))
 
 
 def constrained_header_blocks(
@@ -44,24 +47,30 @@ def constrained_header_blocks(
     expected_direction,
 ):
     constraints = []
+    with path.open(encoding="utf-8") as source:
+        private_separator = (
+            "~" if "\t" in source.readline() else h3.PRIVATE_VALUE_SEPARATOR
+        )
+
+    def values(value):
+        return value.split(private_separator) if value else []
+
     for row in read_csv(path):
         require(
             h3.direction(row, str(proxy_port)) == expected_direction,
             "private header block has the wrong direction",
         )
-        marker_values = h3.private_values(row[marker_column])
-        streams = list(dict.fromkeys(h3.private_values(row["quic.stream.stream_id"])))
-        connections = h3.private_values(row["quic.connection.number"])
-        names = [
-            name.lower() for name in h3.private_values(row["http3.header.header.name"])
-        ]
+        marker_values = values(row[marker_column])
+        streams = list(dict.fromkeys(values(row["quic.stream.stream_id"])))
+        connections = values(row["quic.connection.number"])
+        names = [name.lower() for name in values(row["http3.header.header.name"])]
         require(marker_values, "private header row lacks its block marker")
         require(
             len(streams) >= len(marker_values),
             "private header row has fewer streams than header blocks",
         )
         h3.require_one_connection(connections, len(streams), "repeat navigation")
-        header_values = h3.private_values(row[value_column])
+        header_values = values(row[value_column])
         parsed = h3.split_private_header_blocks(
             names,
             header_values,
@@ -259,6 +268,31 @@ def child_channel_for_uri(lines, uri):
     return candidates[0]
 
 
+def stylesheet_descriptor_for_uri(lines, uri, after, before):
+    candidates = []
+    for index, line in enumerate(lines):
+        if line["time"] < after or line["time"] > before:
+            continue
+        if line["message"] != "css::Loader::LoadSheet(aURL, aObserver) api call":
+            continue
+        if index + 1 >= len(lines):
+            continue
+        uri_line = lines[index + 1]
+        if (
+            uri_line["file"] == line["file"]
+            and uri_line["number"] == line["number"] + 1
+            and uri_line["process"] == line["process"]
+            and uri_line["message"] == f"  Non-document sheet uri: '{uri}'"
+            and 0 <= uri_line["time"] - line["time"] <= 0.001
+        ):
+            candidates.append(line)
+    require(
+        len(candidates) == 1,
+        "parser-discovered stylesheet descriptor lifecycle mapping is ambiguous",
+    )
+    return candidates[0]
+
+
 def parse_navigation_lifecycle(
     parent_lines, child_lines, root_uri, css_uri, root_event, css_event, wire_offset
 ):
@@ -298,13 +332,11 @@ def parse_navigation_lifecycle(
         parser_body["process"].endswith(": HTML5 Parser"),
         "root body was not delivered on the HTML5 Parser thread",
     )
-    descriptor, _ = one_line(
+    descriptor = stylesheet_descriptor_for_uri(
         child_lines,
-        rf"css::Loader::LoadSheet\(aURL, aObserver\) api call uri={re.escape(css_uri)} "
-        r"preloadKind=1 contentPolicyType=40$",
-        "FromParser stylesheet descriptor",
-        after=parser_body["time"],
-        before=css_wire,
+        css_uri,
+        parser_body["time"],
+        css_wire,
     )
     child_open, child_open_match = one_line(
         child_lines,
@@ -316,6 +348,25 @@ def parse_navigation_lifecycle(
     css_child = child_open_match.group(1)
     require(css_child != root_child, "CSS reused the root child channel")
 
+    child_openargs_ready, child_openargs_match = one_line(
+        child_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=child-openargs-ready "
+        rf"child={css_child} channelId=([0-9]+) browserId=[0-9a-f]+ "
+        r"contentWindowId=[0-9]+$",
+        "CSS child open-args readiness",
+        after=child_open["time"],
+        before=css_wire,
+    )
+    channel_id = child_openargs_match.group(1)
+    child_send_return, _ = one_line(
+        child_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=child-send-return "
+        rf"child={css_child} channelId={channel_id} sent=1$",
+        "CSS child constructor send return",
+        after=child_openargs_ready["time"],
+        before=css_wire,
+    )
+
     parent_recv, parent_recv_match = one_line(
         parent_lines,
         rf"HttpChannelParent RecvAsyncOpen \[this=([0-9a-f]+) uri={re.escape(css_uri)},",
@@ -324,12 +375,105 @@ def parse_navigation_lifecycle(
         before=css_wire,
     )
     parent_channel = parent_recv_match.group(1)
+    parent_alloc, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-alloc-enter "
+        rf"necko=[0-9a-f]+ channelId={channel_id} browserId=[0-9a-f]+$",
+        "CSS parent actor allocation",
+        after=child_openargs_ready["time"],
+        before=parent_recv["time"],
+    )
+    parent_recv_enter, parent_recv_enter_match = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-recv-enter "
+        rf"actor=([0-9a-f]+) channelId={channel_id} browserId=[0-9a-f]+$",
+        "CSS parent constructor receive",
+        after=parent_alloc["time"],
+        before=parent_recv["time"],
+    )
+    require(
+        int(parent_recv_enter_match.group(1), 16) - int(parent_channel, 16) == 8,
+        "CSS IPDL actor/object pointer relationship changed",
+    )
+    parent_wait_start, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-wait-start "
+        rf"parent={parent_channel} channelId={channel_id}$",
+        "CSS parent background wait start",
+        after=parent_recv["time"],
+        before=css_wire,
+    )
+    parent_link_return, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+        rf"phase=parent-registrar-link-return parent={parent_channel} "
+        rf"channelId={channel_id} ready=[01]$",
+        "CSS parent registrar link",
+        after=parent_wait_start["time"],
+        before=css_wire,
+    )
+    background_init, background_init_match = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=background-init-enter "
+        rf"background=([0-9a-f]+) channelId={channel_id}$",
+        "CSS background actor initialization",
+        after=child_send_return["time"],
+        before=css_wire,
+    )
+    background = background_init_match.group(1)
+    background_dispatch_run, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+        rf"phase=background-main-dispatch-run background={background} "
+        rf"channelId={channel_id}$",
+        "CSS background main-thread dispatch",
+        after=background_init["time"],
+        before=css_wire,
+    )
+    background_link_return, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC "
+        rf"phase=background-registrar-link-return background={background} "
+        rf"channelId={channel_id}$",
+        "CSS background registrar link",
+        after=background_dispatch_run["time"],
+        before=css_wire,
+    )
+    parent_background_ready, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-background-ready "
+        rf"parent={parent_channel} background={background} "
+        rf"channelId={channel_id}$",
+        "CSS parent background readiness",
+        after=max(parent_wait_start["time"], background_dispatch_run["time"]),
+        before=css_wire,
+    )
+    parent_wait_resolved, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-wait-resolved "
+        rf"parent={parent_channel} channelId={channel_id} status=success$",
+        "CSS parent background wait resolution",
+        after=parent_background_ready["time"],
+        before=css_wire,
+    )
+    parent_try_invoke, _ = one_line(
+        parent_lines,
+        rf"NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-try-invoke "
+        rf"parent={parent_channel} channelId={channel_id} barrier=1 rv=0$",
+        "CSS parent async-open barrier release",
+        after=parent_wait_resolved["time"],
+        before=css_wire,
+    )
     parent_invoke, _ = one_line(
         parent_lines,
         rf"HttpChannelParent::InvokeAsyncOpen \[this={parent_channel} rv=0\]$",
         "CSS parent InvokeAsyncOpen",
         after=parent_recv["time"],
         before=css_wire,
+    )
+    require(
+        parent_try_invoke["time"] <= parent_invoke["time"],
+        "CSS parent invoked before its background barrier release",
     )
     channel_open, channel_open_match = one_line(
         parent_lines,
@@ -346,23 +490,24 @@ def parse_navigation_lifecycle(
         after=channel_open["time"],
         before=css_wire,
     )
-    transaction_created, transaction_match = one_line(
-        parent_lines,
-        r"Creating nsHttpTransaction @([0-9a-f]+)$",
-        "CSS transaction creation",
-        after=dispatch["time"],
-        before=dispatch["time"] + 0.0001,
-    )
-    transaction = transaction_match.group(1)
-    _, interface_match = one_line(
+    transaction_owned, transaction_owned_match = one_line(
         parent_lines,
         rf"nsHttpChannel {channel} created nsHttpTransaction ([0-9a-f]+)$",
         "CSS channel-to-transaction ownership",
-        after=transaction_created["time"],
-        before=transaction_created["time"] + 0.0001,
+        after=dispatch["time"],
+        before=css_wire,
+    )
+    transaction_interface = transaction_owned_match.group(1)
+    transaction = f"{int(transaction_interface, 16) - 0x10:x}"
+    transaction_created, _ = one_line(
+        parent_lines,
+        rf"Creating nsHttpTransaction @{transaction}$",
+        "CSS transaction creation",
+        after=dispatch["time"],
+        before=transaction_owned["time"],
     )
     require(
-        int(interface_match.group(1), 16) - int(transaction, 16) == 0x10,
+        0 <= transaction_owned["time"] - transaction_created["time"] <= 0.0001,
         "CSS transaction interface/base pointer relationship changed",
     )
     socket_new, _ = one_line(
@@ -394,7 +539,15 @@ def parse_navigation_lifecycle(
         parser_body["time"],
         descriptor["time"],
         child_open["time"],
+        child_openargs_ready["time"],
+        # The child send return and parent allocation are concurrent after the
+        # pre-send marker, so their relative order is not required here.
+        parent_alloc["time"],
+        parent_recv_enter["time"],
         parent_recv["time"],
+        parent_wait_start["time"],
+        parent_wait_resolved["time"],
+        parent_try_invoke["time"],
         parent_invoke["time"],
         channel_open["time"],
         dispatch["time"],
@@ -404,6 +557,24 @@ def parse_navigation_lifecycle(
         css_wire,
     )
     require(list(ordered) == sorted(ordered), "CSS lifecycle order is invalid")
+    require(
+        child_openargs_ready["time"] <= child_send_return["time"],
+        "CSS constructor returned before its open args were ready",
+    )
+    require(
+        child_send_return["time"] <= background_init["time"],
+        "CSS background actor started before the primary constructor returned",
+    )
+    require(
+        background_init["time"]
+        <= background_dispatch_run["time"]
+        <= background_link_return["time"],
+        "CSS background actor branch order is invalid",
+    )
+    require(
+        parent_wait_start["time"] <= parent_link_return["time"],
+        "CSS parent registrar returned before its wait began",
+    )
     return {
         "root_headers_to_css_get_ms": (css_wire - root_wire) * 1000,
         "root_suspend_to_resume_ms": (resume["time"] - suspend["time"]) * 1000,
@@ -416,6 +587,54 @@ def parse_navigation_lifecycle(
         * 1000,
         "css_child_async_open_to_parent_recv_ms": (
             parent_recv["time"] - child_open["time"]
+        )
+        * 1000,
+        "css_child_async_open_to_openargs_ready_ms": (
+            child_openargs_ready["time"] - child_open["time"]
+        )
+        * 1000,
+        "css_openargs_ready_to_send_return_ms": (
+            child_send_return["time"] - child_openargs_ready["time"]
+        )
+        * 1000,
+        "css_openargs_ready_to_parent_alloc_ms": (
+            parent_alloc["time"] - child_openargs_ready["time"]
+        )
+        * 1000,
+        "css_send_return_to_parent_alloc_ms": (
+            parent_alloc["time"] - child_send_return["time"]
+        )
+        * 1000,
+        "css_parent_alloc_to_recv_enter_ms": (
+            parent_recv_enter["time"] - parent_alloc["time"]
+        )
+        * 1000,
+        "css_parent_recv_enter_to_do_async_open_ms": (
+            parent_recv["time"] - parent_recv_enter["time"]
+        )
+        * 1000,
+        "css_parent_do_async_open_to_wait_start_ms": (
+            parent_wait_start["time"] - parent_recv["time"]
+        )
+        * 1000,
+        "css_parent_wait_start_to_resolved_ms": (
+            parent_wait_resolved["time"] - parent_wait_start["time"]
+        )
+        * 1000,
+        "css_background_init_to_main_run_ms": (
+            background_dispatch_run["time"] - background_init["time"]
+        )
+        * 1000,
+        "css_background_main_run_to_link_return_ms": (
+            background_link_return["time"] - background_dispatch_run["time"]
+        )
+        * 1000,
+        "css_background_ready_to_wait_resolved_ms": (
+            parent_wait_resolved["time"] - parent_background_ready["time"]
+        )
+        * 1000,
+        "css_wait_resolved_to_invoke_ms": (
+            parent_invoke["time"] - parent_wait_resolved["time"]
         )
         * 1000,
         "css_parent_recv_to_invoke_ms": (parent_invoke["time"] - parent_recv["time"])
@@ -444,6 +663,12 @@ def parse_navigation_lifecycle(
 def analyze(args):
     root = Path(args.root)
     proxy_port = str(args.proxy_port)
+    tokens = (args.nav1, args.nav2, args.completion1, args.completion2)
+    require(
+        all(re.fullmatch(r"[0-9a-f]{32}", token) for token in tokens),
+        "navigation/completion token format is invalid",
+    )
+    require(len(set(tokens)) == len(tokens), "navigation/completion tokens are reused")
     request_rows = read_csv(root / "repeat-requests.csv")
     header_rows = read_csv(root / "repeat-header-names.csv")
     events = h3.read_http3_events(request_rows, header_rows, "repeat", proxy_port)
@@ -517,6 +742,10 @@ def analyze(args):
         require(key not in response_by_stream, "duplicate response HEADERS")
         require(block["value"] == "200", "resource response was not HTTP 200")
         headers = dict(block["headers"])
+        require(
+            not h3.REDACTED_HEADER_NAMES.intersection(headers),
+            "resource response contains auth or cookie semantics",
+        )
         require("content-length" in headers, "resource response lacks Content-Length")
         response_by_stream[key] = response_content_length(block)
     require(

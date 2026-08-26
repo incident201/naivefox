@@ -326,10 +326,10 @@ tshark -r "$capture_dir/repeat.pcapng" "${decode[@]}" \
   "${fields[@]}" -e frame.number -e udp.srcport -e udp.dstport \
   -e quic.connection.number -e quic.stream.stream_id \
   -e http3.header.header.name >"$capture_dir/repeat-header-names.csv"
-semantic_separator=$'\x1f'
+semantic_separator='~'
 tshark -r "$capture_dir/repeat.pcapng" "${decode[@]}" \
   -Y "udp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && http3.headers.method==\"GET\" && http3.header.header.name && !(http3.header.header.name contains \"authorization\") && !(http3.header.header.name contains \"cookie\")" \
-  -T fields -E header=y -E separator=, -E quote=d -E occurrence=a \
+  -T fields -E header=y -E separator=/t -E quote=n -E occurrence=a \
   -E "aggregator=$semantic_separator" \
   -e frame.number -e udp.srcport -e udp.dstport \
   -e quic.connection.number -e quic.stream.stream_id \
@@ -337,7 +337,7 @@ tshark -r "$capture_dir/repeat.pcapng" "${decode[@]}" \
   -e http3.headers.header.value >"$capture_dir/repeat-get-header-values.csv"
 tshark -r "$capture_dir/repeat.pcapng" "${decode[@]}" \
   -Y "udp.srcport==$NAIVEFOX_FIXTURE_PROXY_PORT && http3.headers.status && http3.header.header.name" \
-  -T fields -E header=y -E separator=, -E quote=d -E occurrence=a \
+  -T fields -E header=y -E separator=/t -E quote=n -E occurrence=a \
   -E "aggregator=$semantic_separator" \
   -e frame.number -e udp.srcport -e udp.dstport \
   -e quic.connection.number -e quic.stream.stream_id \

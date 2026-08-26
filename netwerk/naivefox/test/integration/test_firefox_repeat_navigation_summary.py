@@ -40,6 +40,56 @@ class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
                 100.60,
                 f"HttpChannelParent RecvAsyncOpen [this=ccc uri={css_uri}, loadFlags=0]",
             ),
+            self.line(
+                14,
+                100.56,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-alloc-enter necko=999 channelId=42 browserId=3",
+            ),
+            self.line(
+                15,
+                100.57,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-recv-enter actor=cd4 channelId=42 browserId=3",
+            ),
+            self.line(
+                16,
+                100.61,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-wait-start parent=ccc channelId=42",
+            ),
+            self.line(
+                17,
+                100.62,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-registrar-link-return parent=ccc channelId=42 ready=0",
+            ),
+            self.line(
+                18,
+                100.58,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=background-init-enter background=abc channelId=42",
+            ),
+            self.line(
+                19,
+                100.63,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=background-main-dispatch-run background=abc channelId=42",
+            ),
+            self.line(
+                20,
+                100.64,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-background-ready parent=ccc background=abc channelId=42",
+            ),
+            self.line(
+                21,
+                100.65,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=background-registrar-link-return background=abc channelId=42",
+            ),
+            self.line(
+                22,
+                100.66,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-wait-resolved parent=ccc channelId=42 status=success",
+            ),
+            self.line(
+                23,
+                100.67,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=parent-try-invoke parent=ccc channelId=42 barrier=1 rv=0",
+            ),
             self.line(5, 100.70, "HttpChannelParent::InvokeAsyncOpen [this=ccc rv=0]"),
             self.line(6, 100.70005, "nsHttpChannel::AsyncOpen [this=ddd]"),
             self.line(
@@ -80,14 +130,35 @@ class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
             self.line(
                 4,
                 100.40,
-                f"css::Loader::LoadSheet(aURL, aObserver) api call uri={css_uri} preloadKind=1 contentPolicyType=40",
+                "css::Loader::LoadSheet(aURL, aObserver) api call",
                 "Web Content 2",
                 "child.log",
             ),
             self.line(
                 5,
+                100.400002,
+                f"  Non-document sheet uri: '{css_uri}'",
+                "Web Content 2",
+                "child.log",
+            ),
+            self.line(
+                6,
                 100.50,
                 f"HttpChannelChild::AsyncOpen [this=123 uri={css_uri}]",
+                "Web Content 2",
+                "child.log",
+            ),
+            self.line(
+                7,
+                100.51,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=child-openargs-ready child=123 channelId=42 browserId=3 contentWindowId=4",
+                "Web Content 2",
+                "child.log",
+            ),
+            self.line(
+                8,
+                100.52,
+                "NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC phase=child-send-return child=123 channelId=42 sent=1",
                 "Web Content 2",
                 "child.log",
             ),
@@ -105,6 +176,11 @@ class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
         self.assertAlmostEqual(result["root_suspend_to_resume_ms"], 100.0)
         self.assertAlmostEqual(result["parser_body_to_css_descriptor_ms"], 100.0)
         self.assertAlmostEqual(result["css_channel_async_open_to_dispatch_ms"], 99.95)
+        self.assertAlmostEqual(
+            result["css_child_async_open_to_openargs_ready_ms"], 10.0
+        )
+        self.assertAlmostEqual(result["css_openargs_ready_to_parent_alloc_ms"], 50.0)
+        self.assertAlmostEqual(result["css_parent_wait_start_to_resolved_ms"], 50.0)
         self.assertAlmostEqual(result["css_h3_dispatch_to_add_stream_ms"], 100.0)
         self.assertAlmostEqual(result["css_add_stream_to_wire_get_ms"], 100.0)
 
@@ -166,7 +242,7 @@ class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
         )
 
     def test_request_mapper_reserves_fragmented_stream_for_next_frame(self):
-        separator = "\x1f"
+        separator = "~"
         fieldnames = [
             "frame.number",
             "udp.srcport",
@@ -201,9 +277,9 @@ class FirefoxRepeatNavigationSummaryTests(unittest.TestCase):
             ],
         ]
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "requests.csv"
+            path = Path(directory) / "requests.tsv"
             with path.open("w", newline="", encoding="utf-8") as stream:
-                writer = csv.writer(stream)
+                writer = csv.writer(stream, delimiter="\t", quoting=csv.QUOTE_NONE)
                 writer.writerow(fieldnames)
                 writer.writerows(rows)
             mapped = summary.private_header_blocks(
