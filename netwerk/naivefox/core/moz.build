@@ -41,9 +41,13 @@ GeneratedFile(
 
 SOURCES += ["!NaiveFoxVersion.cpp"]
 SOURCES += [
+    "!/ipc/ipdl/NativeStylePreloadActivationTypes.cpp",
     "!/ipc/ipdl/PNativeStylePreloadActivation.cpp",
     "!/ipc/ipdl/PNativeStylePreloadActivationChild.cpp",
     "!/ipc/ipdl/PNativeStylePreloadActivationParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationRequest.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationRequestChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationRequestParent.cpp",
 ]
 
 XPCOM_MANIFESTS += ["components.conf"]

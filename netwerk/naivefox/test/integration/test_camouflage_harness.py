@@ -1020,6 +1020,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        root_rendezvous = CONFIG.build_config(
+            "tree-native-parser-root-rendezvous-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            root_rendezvous["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-root-rendezvous-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-root-rendezvous-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1578,8 +1606,17 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         activation_lines = (
             "Native style activation phase=descriptor-frozen request=41\n"
+            "Native style activation phase=request-primary-actor-created "
+            "request=41\n"
+            "Native style activation phase=request-primary-actor-bound "
+            "request=41\n"
             "Native style activation phase=child-open-sent request=41\n"
             "Native style activation phase=background-dispatched request=41\n"
+            "Native style activation phase=request-background-actor-created "
+            "request=41\n"
+            "Native style activation phase=request-background-actor-bound "
+            "request=41\n"
+            "Native style activation phase=bg-ready-sent request=41\n"
             "Native style activation phase=background-ready-received request=41\n"
             "Preamble native-parser-preload "
             "lifecycle=stylesheet-channel-created stream=1 "
@@ -1592,15 +1629,31 @@ class CamouflageHarnessTests(unittest.TestCase):
             "activation=ipc-rendezvous protocol=h3\n"
             "Native style activation phase=async-open request=41\n"
         )
+        activation_completion_lines = (
+            "Native style activation phase=on-stop request=41 "
+            "status=0x00000000\n"
+            "Native style activation phase=request-primary-actor-delete-sent "
+            "request=41\n"
+            "Native style activation phase=request-background-actor-delete-sent "
+            "request=41\n"
+            "Native style activation phase=request-primary-actor-destroyed "
+            "request=41\n"
+            "Native style activation phase=request-background-actor-destroyed "
+            "request=41\n"
+        )
         descriptor_marker = (
             "Preamble native-parser-preload lifecycle=chunk-flushed "
             "sequence=1 descriptors=1 status=0x00000000 generation=1 "
             "protocol=h3\n"
         )
-        ipc_rendezvous_log = retarget_lines + native_parser_log.replace(
-            descriptor_marker,
-            descriptor_marker + activation_lines,
-            1,
+        ipc_rendezvous_log = (
+            retarget_lines
+            + native_parser_log.replace(
+                descriptor_marker,
+                descriptor_marker + activation_lines,
+                1,
+            )
+            + activation_completion_lines
         )
         SAMPLE.validate_sample(
             "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -1608,6 +1661,173 @@ class CamouflageHarnessTests(unittest.TestCase):
             ipc_rendezvous_log,
             one_connection,
         )
+        root_activation_before_resume = (
+            "Native root replacement activation phase=descriptor-frozen request=51\n"
+            "Native root replacement activation phase=request-primary-actor-created "
+            "request=51\n"
+            "Native root replacement activation phase=begin-sent request=51\n"
+            "Native root replacement activation phase=request-primary-actor-bound "
+            "request=51\n"
+            "Native root replacement activation phase=begin-received request=51\n"
+            "Native root replacement activation phase=connect-parent-sent request=51\n"
+            "Native root replacement activation phase=background-dispatched "
+            "request=51\n"
+            "Native root replacement activation phase=request-background-actor-created "
+            "request=51\n"
+            "Native root replacement activation phase=request-background-actor-bound "
+            "request=51\n"
+            "Native root replacement activation phase=background-ready request=51\n"
+            "Native root replacement activation phase=bg-linked request=51\n"
+            "Native root replacement activation phase=redirect-verification-started "
+            "request=51\n"
+            "Native root replacement activation phase=connect-parent-linked request=51 "
+            "same_channel=1\n"
+            "Native root replacement activation phase=redirect-verification-queued "
+            "request=51\n"
+            "Native root replacement activation phase=redirect-verification-run "
+            "request=51 channel=71 generation=1\n"
+            "Native root replacement activation phase=redirect-verification-callback "
+            "request=51 channel=71 generation=1 status=0x00000000\n"
+            "Native root replacement activation phase=redirect-verification-resolved "
+            "request=51 channel=71 generation=1 status=0x00000000\n"
+            "Native root replacement activation phase=continue-verification request=51\n"
+            "Native root replacement activation phase=ready-to-verify request=51\n"
+            "Native root replacement activation phase=setup-finished request=51\n"
+        )
+        root_activation_release = (
+            "Native root replacement activation phase=forward-sent request=51 "
+            "channel=71 generation=1\n"
+            "Native root replacement activation phase=activation-released request=51 "
+            "status=0x00000000\n"
+        )
+        root_activation_resume = (
+            "Native root replacement activation phase=resume request=51\n"
+        )
+        root_activation_after_resume = (
+            "Native root replacement activation phase=forward-received request=51 "
+            "channel=71 generation=1\n"
+            "Native root replacement activation phase=forward-start request=51\n"
+        )
+        root_activation_completion = (
+            "Native root replacement activation phase=on-stop request=51 "
+            "status=0x00000000 generation=1\n"
+            "Native root replacement activation phase=request-primary-actor-delete-sent "
+            "request=51\n"
+            "Native root replacement activation phase=request-background-actor-delete-sent "
+            "request=51\n"
+            "Native root replacement activation phase=request-primary-actor-destroyed "
+            "request=51\n"
+            "Native root replacement activation phase=request-background-actor-destroyed "
+            "request=51\n"
+        )
+        def root_product_phase(phase, request=51):
+            return (
+                "Connection 7 preamble native-parser-root-replacement "
+                f"phase={phase} channel=71 request={request} "
+                "generation=1 protocol=h3\n"
+            )
+
+        root_activation_before_resume = (
+            root_product_phase("root-response-validated", request=0)
+            + root_product_phase("physical-root-suspended", request=0)
+            + root_activation_before_resume
+        ).replace(
+            "Native root replacement activation phase=descriptor-frozen "
+            "request=51\n",
+            "Native root replacement activation phase=descriptor-frozen "
+            "request=51\n"
+            + root_product_phase("replacement-registered"),
+            1,
+        ).replace(
+            "Native root replacement activation "
+            "phase=connect-parent-linked request=51 same_channel=1\n",
+            root_product_phase("connect-parent-same-root-linked")
+            + root_product_phase("redirect-verifier-run-queued")
+            + "Native root replacement activation "
+            "phase=connect-parent-linked request=51 same_channel=1\n",
+            1,
+        ).replace(
+            "Native root replacement activation "
+            "phase=redirect-verification-callback request=51 channel=71 "
+            "generation=1 status=0x00000000\n",
+            root_product_phase("redirect-verifier-run")
+            + root_product_phase("redirect-verifier-callback-queued")
+            + "Native root replacement activation "
+            "phase=redirect-verification-callback request=51 channel=71 "
+            "generation=1 status=0x00000000\n",
+            1,
+        ).replace(
+            "Native root replacement activation "
+            "phase=continue-verification request=51\n",
+            root_product_phase("redirect-verifier-callback-resolved")
+            + "Native root replacement activation "
+            "phase=continue-verification request=51\n",
+            1,
+        )
+        root_activation_release += (
+            root_product_phase("replacement-listener-published")
+            + root_product_phase("forward-on-start-sent")
+            + root_product_phase("physical-root-resume")
+        )
+        root_activation_after_resume += (
+            root_product_phase("forward-on-start-received")
+            + root_product_phase("consumer-constructed-main")
+        )
+        root_retarget_after_resume = (
+            "Connection 7 preamble native-parser-retarget "
+            "phase=delivery-retargeted target=html5-parser verified=1 "
+            "protocol=h3\n"
+            + root_product_phase("logical-request-retargeted")
+            + "Native root replacement activation phase=forward-data-received "
+            "request=51 bytes=4096\n"
+            "Native root replacement activation phase=forward-data request=51 "
+            "bytes=4096\n"
+            "Native root replacement activation phase=forward-stop-received "
+            "request=51 status=0x00000000\n"
+            "Native root replacement activation phase=forward-stop request=51 "
+            "status=0x00000000\n"
+            "Connection 7 preamble native-parser-retarget "
+            "phase=first-parser-feed delivery=logical-background protocol=h3\n"
+            "Connection 7 preamble native-parser-retarget "
+            "phase=parser-data-finished protocol=h3\n"
+        )
+        root_rendezvous_log = (
+            root_activation_before_resume
+            + root_activation_release
+            + root_activation_resume
+            + root_activation_after_resume
+            + root_retarget_after_resume
+            + native_parser_log.replace(
+                descriptor_marker,
+                descriptor_marker + activation_lines,
+                1,
+            )
+            + root_activation_completion
+            + activation_completion_lines
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-root-rendezvous-overlap-css",
+            "h3",
+            root_rendezvous_log,
+            one_connection,
+        )
+        with self.assertRaisesRegex(ValueError, "same root channel"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-root-rendezvous-overlap-css",
+                "h3",
+                root_rendezvous_log.replace("same_channel=1", "same_channel=0"),
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "registration identity"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-root-rendezvous-overlap-css",
+                "h3",
+                root_rendezvous_log.replace(
+                    "phase=replacement-registered channel=71 request=51",
+                    "phase=replacement-registered channel=71 request=0",
+                ),
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "exactly one marker"):
             SAMPLE.validate_sample(
                 "tree-native-parser-ipc-rendezvous-overlap-css",
@@ -2037,6 +2257,23 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(
             "did not drain its preamble by the fixed capture cutoff", candidate
         )
+
+    def test_h3_actor_teardown_wait_is_naivefox_only(self):
+        with open(
+            os.path.join(HERE, "run-h3-capture-comparison.sh"),
+            encoding="utf-8",
+        ) as stream:
+            runner = stream.read()
+        reference = runner.split("run_reference() {", 1)[1].split(
+            "run_naivefox() {", 1
+        )[0]
+        candidate = runner.split("run_naivefox_arm() {", 1)[1].split(
+            "run_reference", 1
+        )[0]
+        marker = "request-primary-actor-destroyed"
+        self.assertNotIn(marker, reference)
+        self.assertIn(marker, candidate)
+        self.assertLess(candidate.index("stop_capture"), candidate.index(marker))
 
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
         two_connections = {
@@ -2468,6 +2705,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-root-rendezvous-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
             runner,
@@ -2484,6 +2725,11 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         )
         self.assertIn(
             "tree-native-parser-ipc-rendezvous-overlap-css multi-arm "
+            "screening requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-root-rendezvous-overlap-css multi-arm "
             "screening requires --protocol h3",
             runner,
         )

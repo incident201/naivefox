@@ -1,0 +1,37 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+namespace mozilla {
+namespace naivefox {
+
+struct NativeStylePreloadActivationArgs {
+  uint64_t requestId;
+  nsCString resourceSpec;
+  nsCString documentSpec;
+  nsCString referrerSpec;
+  nsCString originAttributesSuffix;
+  uint8_t referrerPolicy;
+  bool sendReferrer;
+  uint8_t preloadKind;
+};
+
+struct NativeRootReplacementActivationArgs {
+  uint64_t requestId;
+  uint64_t channelId;
+  nsCString resourceSpec;
+  nsCString originalSpec;
+  nsCString originAttributesSuffix;
+  nsCString referrerSpec;
+  uint8_t referrerPolicy;
+  bool sendReferrer;
+  uint32_t loadFlags;
+  uint32_t contentPolicyType;
+  uint32_t httpStatus;
+  nsCString contentType;
+  nsCString charset;
+  uint64_t generation;
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

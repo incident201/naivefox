@@ -64,6 +64,7 @@ enum class PreambleMode : uint8_t {
   TreeNativeParserDocumentHandoffOverlap,
   TreeNativeParserRetargetOverlap,
   TreeNativeParserIpcRendezvousOverlap,
+  TreeNativeParserRootRendezvousOverlap,
 
   // Compatibility names for the first experimental configuration surface.
   Root = DocumentComplete,
@@ -86,22 +87,30 @@ constexpr bool PreambleModeUsesNativeParser(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
-         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
+         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
 }
 
 constexpr bool PreambleModeUsesNativeParserHandoff(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
-         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
+         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
 }
 
 constexpr bool PreambleModeUsesRetargetedNativeParser(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
-         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
+         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
 }
 
 constexpr bool PreambleModeUsesNativeStyleActivation(PreambleMode aMode) {
-  return aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+  return aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
+         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
+}
+
+constexpr bool PreambleModeUsesNativeRootReplacement(PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
 }
 
 constexpr bool PreambleModeNeedsNativeStyleActivationRuntime(

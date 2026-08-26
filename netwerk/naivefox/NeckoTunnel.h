@@ -19,6 +19,7 @@
 #include "nscore.h"
 
 class nsIHttpUpgradeListener;
+class nsIHttpChannel;
 class nsIInputStream;
 class nsIRequest;
 class nsIStreamListener;
@@ -27,6 +28,7 @@ class nsHtml5StylePreloadDescriptor;
 namespace mozilla::naivefox {
 
 struct NativeStylePreloadActivationDescriptor;
+struct NativeRootReplacementActivationDescriptor;
 
 // Internal Naive proxy authentication helper. This is not part of the
 // embedded C ABI.
@@ -158,6 +160,10 @@ constexpr bool PreambleBarrierReached(
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
+  if (aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+    return aRootCompletedSuccessfully && aNativeParserFinished &&
+           aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -173,7 +179,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
-         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+         aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
+         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
 }
 
 constexpr bool PreambleRetargetDeliveryVerified(bool aListenerChainAccepted,
@@ -255,7 +262,25 @@ class ProxyPreambleOperation final {
   nsresult ResumeNativeParserDocumentHandoffRoot();
   void LogNativeParserDocumentHandoffPhase(const char* aPhase) const;
   void LogNativeParserRetargetPhase(const char* aPhase) const;
+  void LogNativeParserRootReplacementPhase(const char* aPhase) const;
   nsresult InstallNativeParserRetargetDelivery(nsIRequest* aRequest);
+  nsresult StartNativeParserRootReplacement(nsIRequest* aRequest,
+                                            nsIHttpChannel* aChannel);
+  nsresult LinkNativeParserRootReplacement(
+      uint64_t aGeneration,
+      const NativeRootReplacementActivationDescriptor& aDescriptor);
+  void RunNativeParserRootRedirectVerification(uint64_t aGeneration,
+                                               uint64_t aRequestId);
+  void ResolveNativeParserRootRedirectVerification(uint64_t aGeneration,
+                                                   uint64_t aRequestId);
+  nsresult OnNativeParserRootReplacementReady(uint64_t aGeneration,
+                                              nsresult aStatus);
+  nsresult OnNativeParserRootForwardedStart(uint64_t aGeneration);
+  nsresult OnNativeParserRootData(uint64_t aGeneration, nsCString&& aData);
+  nsresult OnNativeParserRootStop(uint64_t aGeneration, nsresult aStatus);
+  nsresult QueueNativeParserRootBody(nsIInputStream* aInputStream,
+                                     uint32_t aCount);
+  nsresult InstallNativeParserLogicalRetargetDelivery();
   nsresult DispatchNativeParserOutputToMain(
       uint64_t aGeneration, uint32_t aSequence, bool aFinished,
       nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);

@@ -117,22 +117,65 @@ NATIVE_PARSER_RETARGET_PHASES = (
     "first-parser-feed",
     "parser-data-finished",
 )
+NATIVE_PARSER_ROOT_RENDEZVOUS_RETARGET_PHASES = (
+    "delivery-retargeted",
+    "first-parser-feed",
+    "parser-data-finished",
+)
+NATIVE_PARSER_ROOT_REPLACEMENT = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-root-replacement phase=(?P<phase>[a-z-]+) "
+    r"channel=(?P<channel>\d+) request=(?P<request>\d+) "
+    r"generation=(?P<generation>\d+) protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_ROOT_REPLACEMENT_PHASES = (
+    "root-response-validated",
+    "physical-root-suspended",
+    "replacement-registered",
+    "connect-parent-same-root-linked",
+    "redirect-verifier-run-queued",
+    "redirect-verifier-run",
+    "redirect-verifier-callback-queued",
+    "redirect-verifier-callback-resolved",
+    "replacement-listener-published",
+    "forward-on-start-sent",
+    "physical-root-resume",
+    "forward-on-start-received",
+    "consumer-constructed-main",
+    "logical-request-retargeted",
+)
 NATIVE_STYLE_ACTIVATION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Native style activation "
-    r"phase=(?P<phase>descriptor-frozen|child-open-sent|"
-    r"background-dispatched|parent-channel-created|"
-    r"background-ready-received|activation-released|async-open) "
+    r"phase=(?P<phase>descriptor-frozen|request-primary-actor-created|"
+    r"request-primary-actor-bound|child-open-sent|background-dispatched|"
+    r"request-background-actor-created|request-background-actor-bound|"
+    r"bg-ready-sent|parent-channel-created|background-ready-received|"
+    r"activation-released|async-open|on-stop|"
+    r"request-primary-actor-delete-sent|"
+    r"request-background-actor-delete-sent|"
+    r"request-primary-actor-destroyed|"
+    r"request-background-actor-destroyed) "
     r"request=(?P<request>\d+)"
     r"(?: status=(?P<status>0x[0-9a-fA-F]+))?$"
 )
 NATIVE_STYLE_ACTIVATION_PHASES = {
     "descriptor-frozen",
+    "request-primary-actor-created",
+    "request-primary-actor-bound",
     "child-open-sent",
     "background-dispatched",
+    "request-background-actor-created",
+    "request-background-actor-bound",
+    "bg-ready-sent",
     "parent-channel-created",
     "background-ready-received",
     "activation-released",
     "async-open",
+    "on-stop",
+    "request-primary-actor-delete-sent",
+    "request-background-actor-delete-sent",
+    "request-primary-actor-destroyed",
+    "request-background-actor-destroyed",
 }
 NATIVE_STYLE_CHANNEL_CREATED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-preload "
@@ -144,9 +187,38 @@ NATIVE_STYLE_OPENED = re.compile(
     r"lifecycle=stylesheet-opened stream=1 kind=from-parser "
     r"referrer=inherited activation=ipc-rendezvous protocol=h3$"
 )
-NATIVE_STYLE_BG_READY_SENT = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Native style activation "
-    r"phase=bg-ready-sent request=(?P<request>\d+)$"
+NATIVE_ROOT_PLAIN_PHASES = {
+    "descriptor-frozen",
+    "request-primary-actor-created",
+    "request-primary-actor-bound",
+    "begin-sent",
+    "begin-received",
+    "connect-parent-sent",
+    "background-dispatched",
+    "redirect-verification-started",
+    "redirect-verification-queued",
+    "request-background-actor-created",
+    "request-background-actor-bound",
+    "background-ready",
+    "bg-linked",
+    "continue-verification",
+    "background-wait",
+    "ready-to-verify",
+    "setup-finished",
+    "forward-start",
+    "resume",
+    "request-primary-actor-delete-sent",
+    "request-background-actor-delete-sent",
+    "request-primary-actor-destroyed",
+    "request-background-actor-destroyed",
+}
+NATIVE_ROOT_REQUIRED_PLAIN_PHASES = NATIVE_ROOT_PLAIN_PHASES - {
+    "background-wait"
+}
+NATIVE_ROOT_PHASE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native root replacement activation "
+    r"phase=(?P<phase>[a-z-]+) request=(?P<request>\d+)"
+    r"(?P<suffix>.*)$"
 )
 DOCUMENT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
@@ -223,6 +295,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
+        "tree-native-parser-root-rendezvous-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -269,6 +342,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(
             "tree-native-parser-ipc-rendezvous-overlap-css requires h3"
         )
+    if (
+        arm == "tree-native-parser-root-rendezvous-overlap-css"
+        and protocol != "h3"
+    ):
+        raise ValueError(
+            "tree-native-parser-root-rendezvous-overlap-css requires h3"
+        )
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -296,6 +376,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
+        "tree-native-parser-root-rendezvous-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -311,6 +392,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
+        "tree-native-parser-root-rendezvous-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -522,16 +604,23 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(
             "native parser retarget emitted fallback, failure, or unknown evidence"
         )
+    native_parser_root_replacement_evidence_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-root-replacement phase=" in line
+    ]
+    parsed_native_parser_root_replacements = [
+        NATIVE_PARSER_ROOT_REPLACEMENT.fullmatch(line)
+        for line in native_parser_root_replacement_evidence_lines
+    ]
+    if any(marker is None for marker in parsed_native_parser_root_replacements):
+        raise ValueError(
+            "native parser root replacement emitted fallback or unknown evidence"
+        )
     native_style_activation_evidence_lines = [
         line
         for line in log_lines
         if "Native style activation phase=" in line and " request=" in line
-        and not NATIVE_STYLE_BG_READY_SENT.fullmatch(line)
-    ]
-    native_style_bg_ready_sent = [
-        NATIVE_STYLE_BG_READY_SENT.fullmatch(line)
-        for line in log_lines
-        if NATIVE_STYLE_BG_READY_SENT.fullmatch(line)
     ]
     native_style_channel_created_lines = [
         line for line in log_lines if NATIVE_STYLE_CHANNEL_CREATED.fullmatch(line)
@@ -554,6 +643,19 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError(
             "native style activation emitted failure, cancellation, or unknown "
             "request evidence"
+        )
+    native_root_activation_evidence_lines = [
+        line
+        for line in log_lines
+        if "Native root replacement activation phase=" in line
+    ]
+    parsed_native_root_activations = [
+        NATIVE_ROOT_PHASE.fullmatch(line)
+        for line in native_root_activation_evidence_lines
+    ]
+    if any(marker is None for marker in parsed_native_root_activations):
+        raise ValueError(
+            "native root replacement emitted malformed or unknown evidence"
         )
     established_lines = [line for line in log_lines if " established target=" in line]
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
@@ -922,6 +1024,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-document-handoff-overlap-css",
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
+        "tree-native-parser-root-rendezvous-overlap-css",
     ):
         if any(len(markers) != 1 for markers in native_parser_markers):
             raise ValueError(
@@ -1106,12 +1209,396 @@ def validate_sample(arm, protocol, log_text, feature_document):
             raise ValueError(
                 "native parser retarget and preload markers have invalid ordering"
             )
+    elif arm == "tree-native-parser-root-rendezvous-overlap-css":
+        if len(parsed_native_parser_retargets) != len(
+            NATIVE_PARSER_ROOT_RENDEZVOUS_RETARGET_PHASES
+        ):
+            raise ValueError(
+                "native parser root rendezvous retarget requires exactly one "
+                "marker for every lifecycle phase"
+            )
+        phases = tuple(marker["phase"] for marker in parsed_native_parser_retargets)
+        if phases != NATIVE_PARSER_ROOT_RENDEZVOUS_RETARGET_PHASES:
+            raise ValueError(
+                "native parser root rendezvous phases are missing, duplicated, "
+                "unknown, or out of order"
+            )
+        targets = tuple(marker["target"] for marker in parsed_native_parser_retargets)
+        verified = tuple(
+            marker["verified"] for marker in parsed_native_parser_retargets
+        )
+        deliveries = tuple(
+            marker["delivery"] for marker in parsed_native_parser_retargets
+        )
+        if targets != ("html5-parser", None, None):
+            raise ValueError(
+                "native parser root rendezvous retarget target contract is invalid"
+            )
+        if verified != ("1", None, None):
+            raise ValueError(
+                "native parser root rendezvous retarget verification failed"
+            )
+        if deliveries != (None, "logical-background", None):
+            raise ValueError(
+                "native parser root rendezvous delivery contract is invalid"
+            )
+        retarget_connection = parsed_native_parser_retargets[0]["connection"]
+        if any(
+            marker["connection"] != retarget_connection
+            or marker["protocol"] != "h3"
+            for marker in parsed_native_parser_retargets
+        ):
+            raise ValueError(
+                "native parser root rendezvous marker identity is inconsistent"
+            )
+        if retarget_connection != parsed_native_parser_discoveries[0]["connection"]:
+            raise ValueError(
+                "native parser root rendezvous and preload identities differ"
+            )
+        ordered_lines = (
+            *native_parser_retarget_lines,
+            native_parser_discovery_lines[0],
+            native_parser_channel_lines[0],
+            native_parser_admission_lines[0],
+            native_parser_barrier_lines[0],
+            result_lines[0],
+            native_parser_drain_lines[0],
+        )
+        ordered_indices = tuple(log_lines.index(line) for line in ordered_lines)
+        if (
+            tuple(sorted(ordered_indices)) != ordered_indices
+            or len(set(ordered_indices)) != len(ordered_indices)
+        ):
+            raise ValueError(
+                "native parser root rendezvous and preload markers have invalid "
+                "ordering"
+            )
     elif parsed_native_parser_retargets:
         raise ValueError(
             f"{arm} arm unexpectedly logged native parser retarget lifecycle"
         )
 
-    if arm == "tree-native-parser-ipc-rendezvous-overlap-css":
+    if arm == "tree-native-parser-root-rendezvous-overlap-css":
+        if len(parsed_native_parser_root_replacements) != len(
+            NATIVE_PARSER_ROOT_REPLACEMENT_PHASES
+        ):
+            raise ValueError(
+                "native parser root replacement requires exactly one marker "
+                "for every product lifecycle phase"
+            )
+        product_phases = tuple(
+            marker["phase"] for marker in parsed_native_parser_root_replacements
+        )
+        if product_phases != NATIVE_PARSER_ROOT_REPLACEMENT_PHASES:
+            raise ValueError(
+                "native parser root replacement product phases are missing, "
+                "duplicated, unknown, or out of order"
+            )
+        first_product = parsed_native_parser_root_replacements[0]
+        product_connection = first_product["connection"]
+        product_channel = first_product["channel"]
+        product_generation = first_product["generation"]
+        registered_index = NATIVE_PARSER_ROOT_REPLACEMENT_PHASES.index(
+            "replacement-registered"
+        )
+        product_request = parsed_native_parser_root_replacements[
+            registered_index
+        ]["request"]
+        product_identity = (
+            product_connection,
+            product_channel,
+            product_request,
+            product_generation,
+        )
+        if (
+            any(value == "0" for value in product_identity)
+            or any(
+                marker["connection"] != product_connection
+                or marker["channel"] != product_channel
+                or marker["generation"] != product_generation
+                or marker["protocol"] != "h3"
+                for marker in parsed_native_parser_root_replacements
+            )
+            or any(
+                marker["request"] != "0"
+                for marker in parsed_native_parser_root_replacements[
+                    :registered_index
+                ]
+            )
+            or any(
+                marker["request"] != product_request
+                for marker in parsed_native_parser_root_replacements[
+                    registered_index:
+                ]
+            )
+        ):
+            raise ValueError(
+                "native parser root replacement registration identity differs"
+            )
+        if product_identity[0] != parsed_native_parser_discoveries[0]["connection"]:
+            raise ValueError(
+                "native parser root replacement and preload identities differ"
+            )
+        phases = [marker["phase"] for marker in parsed_native_root_activations]
+        allowed_phases = NATIVE_ROOT_PLAIN_PHASES | {
+            "connect-parent-linked",
+            "redirect-verification-run",
+            "redirect-verification-callback",
+            "redirect-verification-resolved",
+            "forward-sent",
+            "forward-received",
+            "forward-data-received",
+            "forward-data",
+            "forward-stop-received",
+            "forward-stop",
+            "activation-released",
+            "on-stop",
+        }
+        if any(phase not in allowed_phases for phase in phases):
+            raise ValueError(
+                "native root replacement emitted failure, cancellation, or "
+                "unknown request evidence"
+            )
+        request = parsed_native_root_activations[0]["request"] if phases else None
+        if not request or any(
+            marker["request"] != request
+            for marker in parsed_native_root_activations
+        ):
+            raise ValueError("native root replacement request identity differs")
+        if request != product_identity[2]:
+            raise ValueError(
+                "native root bridge and product request identities differ"
+            )
+
+        by_phase = {}
+        channel_identity = None
+        for line, marker in zip(
+            native_root_activation_evidence_lines,
+            parsed_native_root_activations,
+        ):
+            phase = marker["phase"]
+            suffix = marker["suffix"]
+            by_phase.setdefault(phase, []).append(log_lines.index(line))
+            identity = None
+            if phase in NATIVE_ROOT_PLAIN_PHASES:
+                if suffix:
+                    raise ValueError(
+                        f"native root replacement {phase} marker is malformed"
+                    )
+            elif phase == "connect-parent-linked":
+                if suffix != " same_channel=1":
+                    raise ValueError(
+                        "native root replacement did not link the same root channel"
+                    )
+            elif phase in (
+                "redirect-verification-run",
+                "forward-sent",
+                "forward-received",
+            ):
+                match = re.fullmatch(
+                    r" channel=(\d+) generation=(\d+)", suffix
+                )
+                if not match:
+                    raise ValueError(
+                        f"native root replacement {phase} marker is malformed"
+                    )
+                identity = match.groups()
+            elif phase in (
+                "redirect-verification-callback",
+                "redirect-verification-resolved",
+            ):
+                match = re.fullmatch(
+                    r" channel=(\d+) generation=(\d+) status=0x00000000",
+                    suffix,
+                )
+                if not match:
+                    raise ValueError(
+                        f"native root replacement {phase} did not complete cleanly"
+                    )
+                identity = match.groups()
+            elif phase in ("forward-data-received", "forward-data"):
+                if not re.fullmatch(r" bytes=\d+", suffix):
+                    raise ValueError(
+                        f"native root replacement {phase} marker is malformed"
+                    )
+            elif phase in ("forward-stop-received", "forward-stop"):
+                if suffix != " status=0x00000000":
+                    raise ValueError(
+                        f"native root replacement {phase} did not complete cleanly"
+                    )
+            elif phase == "activation-released":
+                if suffix != " status=0x00000000":
+                    raise ValueError(
+                        "native root replacement activation did not release cleanly"
+                    )
+            elif phase == "on-stop":
+                match = re.fullmatch(
+                    r" status=0x00000000 generation=(\d+)", suffix
+                )
+                if not match:
+                    raise ValueError(
+                        "native root replacement physical root did not stop cleanly"
+                    )
+                identity = (None, match.group(1))
+            if identity:
+                if identity[0] is not None:
+                    if channel_identity is None:
+                        channel_identity = identity
+                    elif channel_identity != identity:
+                        raise ValueError(
+                            "native root replacement channel/generation identity differs"
+                        )
+                elif channel_identity is None or channel_identity[1] != identity[1]:
+                    raise ValueError(
+                        "native root replacement completion generation differs"
+                    )
+        if channel_identity != (product_identity[1], product_identity[3]):
+            raise ValueError(
+                "native root bridge and product channel/generation differ"
+            )
+
+        for phase in NATIVE_ROOT_REQUIRED_PLAIN_PHASES | {
+            "connect-parent-linked",
+            "redirect-verification-run",
+            "redirect-verification-callback",
+            "redirect-verification-resolved",
+            "forward-sent",
+            "forward-received",
+            "forward-stop-received",
+            "forward-stop",
+            "activation-released",
+            "on-stop",
+        }:
+            count = len(by_phase.get(phase, ()))
+            if (phase == "continue-verification" and count < 1) or (
+                phase != "continue-verification" and count != 1
+            ):
+                raise ValueError(
+                    "native root replacement phases are missing, duplicated, "
+                    "or unknown"
+                )
+        if len(by_phase["continue-verification"]) != (
+            len(by_phase.get("background-wait", ())) + 1
+        ):
+            raise ValueError(
+                "native root replacement background wait/continue contract is invalid"
+            )
+        data_received = by_phase.get("forward-data-received", ())
+        data_delivered = by_phase.get("forward-data", ())
+        if not data_received or len(data_received) != len(data_delivered):
+            raise ValueError(
+                "native root replacement DATA forwarding is missing or unpaired"
+            )
+
+        first = lambda phase: by_phase[phase][0]
+        last = lambda phase: by_phase[phase][-1]
+        product_by_phase = {
+            marker["phase"]: log_lines.index(line)
+            for line, marker in zip(
+                native_parser_root_replacement_evidence_lines,
+                parsed_native_parser_root_replacements,
+            )
+        }
+        if not (
+            first("descriptor-frozen")
+            < first("request-primary-actor-created")
+            < first("request-primary-actor-bound")
+            < first("begin-received")
+            and first("request-primary-actor-created")
+            < first("begin-sent")
+            < first("begin-received")
+            < first("connect-parent-sent")
+            < first("redirect-verification-started")
+            < first("connect-parent-linked")
+            < first("redirect-verification-queued")
+            < first("redirect-verification-run")
+            < first("redirect-verification-callback")
+            < first("redirect-verification-resolved")
+            and first("begin-received")
+            < first("background-dispatched")
+            and first("begin-received")
+            < first("request-background-actor-created")
+            < first("request-background-actor-bound")
+            < first("background-ready")
+            < first("bg-linked")
+            and first("connect-parent-linked") < first("continue-verification")
+            and first("redirect-verification-resolved")
+            < first("continue-verification")
+            and first("bg-linked") < last("continue-verification")
+            < first("ready-to-verify")
+            < first("setup-finished")
+            < first("forward-sent")
+            < first("activation-released")
+            < first("resume")
+            < first("forward-stop-received")
+            < first("forward-stop")
+            < first("on-stop")
+            and first("resume") < first("forward-received")
+            < first("forward-start")
+            < first("forward-data-received")
+            < first("forward-data")
+            and last("forward-data-received") < first("forward-stop-received")
+            and last("forward-data") < first("forward-stop")
+            and first("on-stop")
+            < first("request-primary-actor-delete-sent")
+            < first("request-primary-actor-destroyed")
+            and first("on-stop")
+            < first("request-background-actor-delete-sent")
+            < first("request-background-actor-destroyed")
+        ):
+            raise ValueError(
+                "native root replacement rendezvous has invalid causal ordering"
+            )
+        waits = by_phase.get("background-wait", ())
+        continues = by_phase["continue-verification"]
+        if waits and not (
+            all(continues[index] < wait for index, wait in enumerate(waits))
+            and all(wait < first("background-ready") for wait in waits)
+            and first("background-ready") < continues[-1]
+        ):
+            raise ValueError(
+                "native root replacement background wait has invalid ordering"
+            )
+        retarget_delivery_index = log_lines.index(native_parser_retarget_lines[0])
+        if not (
+            product_by_phase["root-response-validated"]
+            < product_by_phase["physical-root-suspended"]
+            < first("descriptor-frozen")
+            < product_by_phase["replacement-registered"]
+            and first("redirect-verification-started")
+            < product_by_phase["connect-parent-same-root-linked"]
+            < product_by_phase["redirect-verifier-run-queued"]
+            and first("redirect-verification-run")
+            < product_by_phase["redirect-verifier-run"]
+            < product_by_phase["redirect-verifier-callback-queued"]
+            and first("redirect-verification-resolved")
+            < product_by_phase["redirect-verifier-callback-resolved"]
+            and first("setup-finished")
+            < first("forward-sent")
+            < first("activation-released")
+            < product_by_phase["replacement-listener-published"]
+            < product_by_phase["forward-on-start-sent"]
+            < product_by_phase["physical-root-resume"]
+            < first("resume")
+            < first("forward-received")
+            < first("forward-start")
+            < product_by_phase["forward-on-start-received"]
+            < product_by_phase["consumer-constructed-main"]
+            < retarget_delivery_index
+            < product_by_phase["logical-request-retargeted"]
+        ):
+            raise ValueError(
+                "native root replacement product/bridge handoff ordering is invalid"
+            )
+    elif parsed_native_root_activations or parsed_native_parser_root_replacements:
+        raise ValueError(
+            f"{arm} arm unexpectedly logged native root replacement lifecycle"
+        )
+
+    if arm in (
+        "tree-native-parser-ipc-rendezvous-overlap-css",
+        "tree-native-parser-root-rendezvous-overlap-css",
+    ):
         if len(native_parser_descriptor_lines) != 1:
             raise ValueError(
                 "native style activation requires one successful parser "
@@ -1137,10 +1624,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             for marker in parsed_native_style_activations
         ):
             raise ValueError("native style activation request identity differs")
-        if len(native_style_bg_ready_sent) > 1 or any(
-            marker["request"] != request for marker in native_style_bg_ready_sent
-        ):
-            raise ValueError("native style activation bg-ready identity differs")
         by_phase = {
             marker["phase"]: log_lines.index(line)
             for line, marker in zip(
@@ -1148,26 +1631,42 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 parsed_native_style_activations,
             )
         }
-        if parsed_native_style_activations[phases.index("activation-released")][
-            "status"
-        ] != "0x00000000":
-            raise ValueError("native style activation did not release successfully")
+        if any(
+            parsed_native_style_activations[phases.index(phase)]["status"]
+            != "0x00000000"
+            for phase in ("activation-released", "on-stop")
+        ):
+            raise ValueError(
+                "native style activation release or completion failed"
+            )
         if any(
             marker["status"] is not None
             for marker in parsed_native_style_activations
-            if marker["phase"] != "activation-released"
+            if marker["phase"] not in ("activation-released", "on-stop")
         ):
             raise ValueError("native style activation status contract is invalid")
         if not (
             by_phase["descriptor-frozen"]
+            < by_phase["request-primary-actor-created"]
+            < by_phase["request-primary-actor-bound"]
             < by_phase["child-open-sent"]
             < by_phase["parent-channel-created"]
             < by_phase["activation-released"]
             and by_phase["descriptor-frozen"]
             < by_phase["background-dispatched"]
+            < by_phase["request-background-actor-created"]
+            < by_phase["request-background-actor-bound"]
+            < by_phase["bg-ready-sent"]
             < by_phase["background-ready-received"]
             < by_phase["activation-released"]
             and by_phase["activation-released"] < by_phase["async-open"]
+            < by_phase["on-stop"]
+            and by_phase["on-stop"]
+            < by_phase["request-primary-actor-delete-sent"]
+            < by_phase["request-primary-actor-destroyed"]
+            and by_phase["on-stop"]
+            < by_phase["request-background-actor-delete-sent"]
+            < by_phase["request-background-actor-destroyed"]
             and log_lines.index(native_parser_descriptor_lines[0])
             < by_phase["descriptor-frozen"]
         ):
@@ -1195,7 +1694,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
     elif (
         parsed_native_style_activations
-        or native_style_bg_ready_sent
         or native_style_channel_created_lines
         or native_style_opened_lines
     ):
@@ -1219,6 +1717,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "tree-native-parser-document-handoff-overlap-css",
                 "tree-native-parser-retarget-overlap-css",
                 "tree-native-parser-ipc-rendezvous-overlap-css",
+                "tree-native-parser-root-rendezvous-overlap-css",
             )
             and feature_document.get("features", {}).get(
                 "tls_client_hello_count"
@@ -1258,6 +1757,7 @@ def main():
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",
+            "tree-native-parser-root-rendezvous-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

@@ -94,6 +94,43 @@ already_AddRefed<nsISerialEventTarget> NativeParserTarget() {
   return target.forget();
 }
 
+// Lean analogue of the replacement HttpChannelChild request. The physical
+// parent nsHttpChannel remains on the main thread; background-channel DATA is
+// delivered according to this logical request's current ODA target.
+class NativeRootReplacementRequest final : public nsIThreadRetargetableRequest {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSITHREADRETARGETABLEREQUEST
+
+ private:
+  ~NativeRootReplacementRequest() = default;
+
+  nsCOMPtr<nsISerialEventTarget> mDeliveryTarget;
+};
+
+NS_IMPL_ISUPPORTS(NativeRootReplacementRequest, nsIThreadRetargetableRequest)
+
+NS_IMETHODIMP NativeRootReplacementRequest::RetargetDeliveryTo(
+    nsISerialEventTarget* aNewTarget) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!aNewTarget) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  mDeliveryTarget = aNewTarget;
+  return NS_OK;
+}
+
+NS_IMETHODIMP NativeRootReplacementRequest::GetDeliveryTarget(
+    nsISerialEventTarget** aTarget) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!aTarget) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  nsCOMPtr<nsISerialEventTarget> target = mDeliveryTarget;
+  target.forget(aTarget);
+  return NS_OK;
+}
+
 struct ExplicitProxyRoute {
   nsCOMPtr<nsIURI> mProxyUri;
   nsCOMPtr<nsIProxyInfo> mProxyInfo;
@@ -637,6 +674,9 @@ class ProxyPreambleOperation::Impl final {
   UniquePtr<nsHtml5SpeculativeScanner> mNativeParserScanner;
   std::atomic<uint64_t> mNativeParserGeneration{1};
   uint64_t mNativeStyleActivationRequestId = 0;
+  uint64_t mNativeRootReplacementRequestId = 0;
+  uint64_t mNativeRootReplacementChannelId = 0;
+  nsCOMPtr<nsIThreadRetargetableRequest> mNativeRootLogicalRequest;
   uint64_t mConnectionId = 0;
   std::atomic<uint64_t> mNativeParserConsumerGeneration{0};
   nsCString mRootPrePath;
@@ -661,6 +701,8 @@ class ProxyPreambleOperation::Impl final {
   bool mNativeParserDescriptorAccepted = false;
   bool mNativeParserContractFailed = false;
   bool mNativeParserReplacementInstallQueued = false;
+  bool mNativeRootReplacementSetupReady = false;
+  bool mNativeRootForwardedStartReceived = false;
   std::atomic<bool> mNativeParserConsumerReady{false};
   std::atomic<bool> mNativeParserRetargetArmed{false};
   std::atomic<bool> mNativeParserRetargetListenerChainChecked{false};
@@ -769,6 +811,12 @@ NS_IMETHODIMP ProxyPreambleOperation::StreamListener::OnDataFinished(
   // contract if a platform configuration happens to surface OnDataFinished.
   if (!detail::PreambleUsesRetargetedRootDelivery(mOwner->mImpl->mConfig.mMode,
                                                   mStreamId)) {
+    return NS_OK;
+  }
+  if (mOwner->mImpl->mConfig.mMode ==
+      PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+    // The physical parent pump stays on main. Its terminal event is forwarded
+    // through the logical replacement background actor from OnStopRequest.
     return NS_OK;
   }
   return mOwner->OnRetargetedDataFinished(mStreamId, aStatus);
@@ -1013,6 +1061,12 @@ void ProxyPreambleOperation::Cancel(nsresult aStatus) {
         mImpl->mNativeStyleActivationRequestId);
     mImpl->mNativeStyleActivationRequestId = 0;
   }
+  if (mImpl->mNativeRootReplacementRequestId) {
+    NativeStylePreloadActivation::CancelRootReplacement(
+        mImpl->mNativeRootReplacementRequestId);
+    mImpl->mNativeRootReplacementRequestId = 0;
+  }
+  mImpl->mNativeRootLogicalRequest = nullptr;
   mImpl->mNativeParserRetargetArmed.store(false, std::memory_order_release);
   mImpl->mNativeParserRetargetInstalled.store(false, std::memory_order_release);
   mImpl->mNativeParserGeneration.fetch_add(1, std::memory_order_acq_rel);
@@ -1023,6 +1077,10 @@ void ProxyPreambleOperation::Cancel(nsresult aStatus) {
         mImpl->mStreams.IsEmpty() ? nullptr : mImpl->mStreams[0].mRequest;
     mImpl->mNativeParserRootSuspended = false;
     if (root) {
+      if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+        (void)root->Cancel(aStatus);
+      }
       (void)root->Resume();
     }
   }
@@ -1369,6 +1427,16 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
     mImpl->mRootReferrerInfo =
         new mozilla::dom::ReferrerInfo(stream.mUri, policy, true);
     if (mImpl->mConfig.mMode ==
+        PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+      nsresult replacementRv =
+          StartNativeParserRootReplacement(aRequest, channel);
+      if (NS_FAILED(replacementRv)) {
+        FailNativeParserContract(replacementRv,
+                                 "root-replacement-start-failed");
+      }
+      return replacementRv;
+    }
+    if (mImpl->mConfig.mMode ==
         PreambleMode::TreeNativeParserDocumentHandoffOverlap) {
       nsAutoCString rootPrePath;
       if (!mImpl->mRootReferrerInfo || !mImpl->mHaveRootOriginAttributes ||
@@ -1452,6 +1520,352 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
   return rv;
 }
 
+nsresult ProxyPreambleOperation::StartNativeParserRootReplacement(
+    nsIRequest* aRequest, nsIHttpChannel* aChannel) {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mImpl->mConfig.mMode ==
+             PreambleMode::TreeNativeParserRootRendezvousOverlap);
+  if (!aRequest || !aChannel || mImpl->mStreams.IsEmpty() ||
+      mImpl->mNativeRootReplacementRequestId ||
+      mImpl->mNativeParserRootSuspended || mImpl->mNativeParserScanner ||
+      !mImpl->mRootReferrerInfo || !mImpl->mHaveRootOriginAttributes) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsCOMPtr<nsIChannel> rootChannel = do_QueryInterface(aRequest);
+  nsCOMPtr<nsILoadInfo> loadInfo =
+      rootChannel ? rootChannel->LoadInfo() : nullptr;
+  if (!rootChannel || !loadInfo ||
+      loadInfo->GetExternalContentPolicyType() !=
+          ExtContentPolicy::TYPE_DOCUMENT) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  NativeRootReplacementActivationDescriptor descriptor;
+  MOZ_TRY(aChannel->GetChannelId(&descriptor.mChannelId));
+  if (!descriptor.mChannelId) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  MOZ_TRY(mImpl->mStreams[0].mUri->GetSpec(descriptor.mResourceSpec));
+  nsCOMPtr<nsIURI> originalUri;
+  MOZ_TRY(rootChannel->GetOriginalURI(getter_AddRefs(originalUri)));
+  if (!originalUri) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  MOZ_TRY(originalUri->GetSpec(descriptor.mOriginalSpec));
+  mImpl->mRootOriginAttributes.CreateSuffix(descriptor.mOriginAttributesSuffix);
+  nsCOMPtr<nsIURI> originalReferrer;
+  MOZ_TRY(mImpl->mRootReferrerInfo->GetOriginalReferrer(
+      getter_AddRefs(originalReferrer)));
+  if (originalReferrer) {
+    MOZ_TRY(originalReferrer->GetSpec(descriptor.mReferrerSpec));
+  }
+  descriptor.mReferrerPolicy =
+      static_cast<uint8_t>(mImpl->mRootReferrerInfo->ReferrerPolicy());
+  MOZ_TRY(mImpl->mRootReferrerInfo->GetSendReferrer(&descriptor.mSendReferrer));
+  MOZ_TRY(rootChannel->GetLoadFlags(&descriptor.mLoadFlags));
+  descriptor.mContentPolicyType =
+      static_cast<uint32_t>(loadInfo->GetExternalContentPolicyType());
+  descriptor.mHttpStatus = mImpl->mStreams[0].mHttpStatus;
+  MOZ_TRY(rootChannel->GetContentType(descriptor.mContentType));
+  (void)rootChannel->GetContentCharset(descriptor.mCharset);
+  descriptor.mCharset.Trim(" \t\r\n");
+  descriptor.mGeneration =
+      mImpl->mNativeParserGeneration.load(std::memory_order_acquire);
+
+  nsAutoCString rootPrePath;
+  MOZ_TRY(mImpl->mStreams[0].mUri->GetPrePath(rootPrePath));
+  if (!rootPrePath.Equals(mImpl->mRootPrePath) ||
+      !descriptor.mContentType.Equals("text/html"_ns,
+                                      nsCaseInsensitiveCStringComparator) ||
+      (!descriptor.mCharset.IsEmpty() &&
+       !descriptor.mCharset.Equals("utf-8"_ns,
+                                   nsCaseInsensitiveCStringComparator))) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  mImpl->mNativeRootReplacementChannelId = descriptor.mChannelId;
+  LogNativeParserRootReplacementPhase("root-response-validated");
+  MOZ_TRY(aRequest->Suspend());
+  mImpl->mNativeParserRootSuspended = true;
+  LogNativeParserRootReplacementPhase("physical-root-suspended");
+
+  RefPtr self = this;
+  const uint64_t generation = descriptor.mGeneration;
+  nsresult rv = NativeStylePreloadActivation::RegisterRootReplacement(
+      std::move(descriptor),
+      [self, generation](
+          const NativeRootReplacementActivationDescriptor& aDescriptor) {
+        return self->LinkNativeParserRootReplacement(generation, aDescriptor);
+      },
+      [self, generation](nsresult aStatus) {
+        return self->OnNativeParserRootReplacementReady(generation, aStatus);
+      },
+      [self, generation]() {
+        return self->OnNativeParserRootForwardedStart(generation);
+      },
+      [self, generation](nsCString&& aData) {
+        return self->OnNativeParserRootData(generation, std::move(aData));
+      },
+      [self, generation](nsresult aStatus) {
+        return self->OnNativeParserRootStop(generation, aStatus);
+      },
+      mImpl->mNativeRootReplacementRequestId);
+  if (NS_SUCCEEDED(rv)) {
+    LogNativeParserRootReplacementPhase("replacement-registered");
+  }
+  return rv;
+}
+
+nsresult ProxyPreambleOperation::LinkNativeParserRootReplacement(
+    uint64_t aGeneration,
+    const NativeRootReplacementActivationDescriptor& aDescriptor) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      mImpl->mConfig.mMode !=
+          PreambleMode::TreeNativeParserRootRendezvousOverlap ||
+      !mImpl->mNativeParserRootSuspended ||
+      !mImpl->mNativeRootReplacementRequestId ||
+      aGeneration !=
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
+      aDescriptor.mGeneration != aGeneration ||
+      aDescriptor.mChannelId != mImpl->mNativeRootReplacementChannelId ||
+      aDescriptor.mContentPolicyType !=
+          static_cast<uint32_t>(ExtContentPolicy::TYPE_DOCUMENT) ||
+      aDescriptor.mHttpStatus != mImpl->mStreams[0].mHttpStatus ||
+      !aDescriptor.mContentType.Equals("text/html"_ns,
+                                       nsCaseInsensitiveCStringComparator)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsCOMPtr<nsIHttpChannel> root =
+      do_QueryInterface(mImpl->mStreams[0].mRequest);
+  nsCOMPtr<nsIChannel> rootChannel =
+      do_QueryInterface(mImpl->mStreams[0].mRequest);
+  uint64_t actualChannelId = 0;
+  nsAutoCString actualSpec;
+  nsAutoCString actualOriginalSpec;
+  nsAutoCString actualOriginAttributesSuffix;
+  nsAutoCString actualReferrerSpec;
+  nsAutoCString actualCharset;
+  uint32_t actualLoadFlags = 0;
+  nsCOMPtr<nsIURI> actualOriginalUri;
+  nsCOMPtr<nsIURI> actualReferrerUri;
+  mImpl->mRootOriginAttributes.CreateSuffix(actualOriginAttributesSuffix);
+  if (!root || !rootChannel ||
+      NS_FAILED(root->GetChannelId(&actualChannelId)) ||
+      !mImpl->mStreams[0].mUri ||
+      NS_FAILED(mImpl->mStreams[0].mUri->GetSpec(actualSpec)) ||
+      NS_FAILED(
+          rootChannel->GetOriginalURI(getter_AddRefs(actualOriginalUri))) ||
+      !actualOriginalUri ||
+      NS_FAILED(actualOriginalUri->GetSpec(actualOriginalSpec)) ||
+      NS_FAILED(rootChannel->GetLoadFlags(&actualLoadFlags)) ||
+      NS_FAILED(mImpl->mRootReferrerInfo->GetOriginalReferrer(
+          getter_AddRefs(actualReferrerUri))) ||
+      actualChannelId != aDescriptor.mChannelId ||
+      !actualSpec.Equals(aDescriptor.mResourceSpec) ||
+      !actualOriginalSpec.Equals(aDescriptor.mOriginalSpec) ||
+      !actualOriginAttributesSuffix.Equals(
+          aDescriptor.mOriginAttributesSuffix) ||
+      actualLoadFlags != aDescriptor.mLoadFlags ||
+      static_cast<uint8_t>(mImpl->mRootReferrerInfo->ReferrerPolicy()) !=
+          aDescriptor.mReferrerPolicy) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  (void)rootChannel->GetContentCharset(actualCharset);
+  if (actualReferrerUri) {
+    MOZ_TRY(actualReferrerUri->GetSpec(actualReferrerSpec));
+  }
+  bool actualSendReferrer = false;
+  MOZ_TRY(mImpl->mRootReferrerInfo->GetSendReferrer(&actualSendReferrer));
+  actualCharset.Trim(" \t\r\n");
+  if (!actualReferrerSpec.Equals(aDescriptor.mReferrerSpec) ||
+      actualSendReferrer != aDescriptor.mSendReferrer ||
+      !actualCharset.Equals(aDescriptor.mCharset,
+                            nsCaseInsensitiveCStringComparator)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  LogNativeParserRootReplacementPhase("connect-parent-same-root-linked");
+  const uint64_t requestId = mImpl->mNativeRootReplacementRequestId;
+  RefPtr self = this;
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::NativeRootRedirectVerifierRun",
+      [self, aGeneration, requestId] {
+        self->RunNativeParserRootRedirectVerification(aGeneration, requestId);
+      }));
+  if (NS_SUCCEEDED(rv)) {
+    LogNativeParserRootReplacementPhase("redirect-verifier-run-queued");
+  }
+  return rv;
+}
+
+void ProxyPreambleOperation::RunNativeParserRootRedirectVerification(
+    uint64_t aGeneration, uint64_t aRequestId) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      aGeneration !=
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
+      aRequestId != mImpl->mNativeRootReplacementRequestId) {
+    NativeStylePreloadActivation::ResolveRootReplacementRedirectVerification(
+        aRequestId, NS_BINDING_ABORTED);
+    return;
+  }
+  NativeStylePreloadActivation::NotifyRootReplacementRedirectVerificationRun(
+      aRequestId);
+  LogNativeParserRootReplacementPhase("redirect-verifier-run");
+  RefPtr self = this;
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::NativeRootRedirectVerifierCallback",
+      [self, aGeneration, aRequestId] {
+        self->ResolveNativeParserRootRedirectVerification(aGeneration,
+                                                          aRequestId);
+      }));
+  if (NS_FAILED(rv)) {
+    NativeStylePreloadActivation::ResolveRootReplacementRedirectVerification(
+        aRequestId, rv);
+    FailNativeParserContract(rv,
+                             "root-redirect-verifier-callback-dispatch-failed");
+    return;
+  }
+  LogNativeParserRootReplacementPhase("redirect-verifier-callback-queued");
+}
+
+void ProxyPreambleOperation::ResolveNativeParserRootRedirectVerification(
+    uint64_t aGeneration, uint64_t aRequestId) {
+  MOZ_ASSERT(NS_IsMainThread());
+  const bool valid =
+      !mImpl->mCancelled && !mImpl->mNativeParserContractFailed &&
+      aGeneration ==
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) &&
+      aRequestId == mImpl->mNativeRootReplacementRequestId;
+  NativeStylePreloadActivation::ResolveRootReplacementRedirectVerification(
+      aRequestId, valid ? NS_OK : NS_BINDING_ABORTED);
+  if (valid) {
+    LogNativeParserRootReplacementPhase("redirect-verifier-callback-resolved");
+  }
+}
+
+nsresult ProxyPreambleOperation::OnNativeParserRootReplacementReady(
+    uint64_t aGeneration, nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (NS_FAILED(aStatus)) {
+    FailNativeParserContract(aStatus, "root-replacement-setup-failed");
+    return aStatus;
+  }
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      aGeneration !=
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
+      !mImpl->mNativeRootReplacementRequestId ||
+      !mImpl->mNativeParserRootSuspended ||
+      mImpl->mNativeRootReplacementSetupReady) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  mImpl->mNativeRootReplacementSetupReady = true;
+  LogNativeParserRootReplacementPhase("replacement-listener-published");
+  LogNativeParserRootReplacementPhase("forward-on-start-sent");
+  nsresult rv = ResumeNativeParserDocumentHandoffRoot();
+  if (NS_FAILED(rv)) {
+    FailNativeParserContract(rv, "root-resume-failed");
+    return rv;
+  }
+  return NS_OK;
+}
+
+nsresult ProxyPreambleOperation::OnNativeParserRootForwardedStart(
+    uint64_t aGeneration) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      aGeneration !=
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
+      !mImpl->mNativeRootReplacementRequestId ||
+      !mImpl->mNativeRootReplacementSetupReady ||
+      mImpl->mNativeParserRootSuspended ||
+      mImpl->mNativeRootForwardedStartReceived || mImpl->mNativeParserScanner ||
+      mImpl->mNativeParserConsumerReady) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  mImpl->mNativeRootForwardedStartReceived = true;
+  LogNativeParserRootReplacementPhase("forward-on-start-received");
+  mImpl->mNativeParserScanner =
+      MakeUnique<nsHtml5SpeculativeScanner>(mImpl->mNativeParserTarget.get());
+  LogNativeParserRootReplacementPhase("consumer-constructed-main");
+  mImpl->mNativeParserConsumerGeneration = aGeneration;
+  mImpl->mNativeParserConsumerReady = true;
+
+  mImpl->mNativeRootLogicalRequest = new NativeRootReplacementRequest();
+  nsresult rv = InstallNativeParserLogicalRetargetDelivery();
+  if (NS_FAILED(rv)) {
+    FailNativeParserContract(rv, "root-retarget-failed");
+    return rv;
+  }
+  return NS_OK;
+}
+
+nsresult ProxyPreambleOperation::OnNativeParserRootData(uint64_t aGeneration,
+                                                        nsCString&& aData) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      aGeneration !=
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
+      !mImpl->mNativeRootReplacementRequestId ||
+      !mImpl->mNativeRootForwardedStartReceived ||
+      !mImpl->mNativeRootLogicalRequest ||
+      !mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  return DispatchNativeParserChunk(std::move(aData));
+}
+
+nsresult ProxyPreambleOperation::OnNativeParserRootStop(uint64_t aGeneration,
+                                                        nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      aGeneration !=
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire) ||
+      !mImpl->mNativeRootReplacementRequestId ||
+      !mImpl->mNativeRootForwardedStartReceived ||
+      !mImpl->mNativeRootLogicalRequest || NS_FAILED(aStatus)) {
+    return NS_FAILED(aStatus) ? aStatus : NS_ERROR_UNEXPECTED;
+  }
+  return DispatchNativeParserFinish();
+}
+
+nsresult ProxyPreambleOperation::QueueNativeParserRootBody(
+    nsIInputStream* aInputStream, uint32_t aCount) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!aInputStream ||
+      mImpl->mConfig.mMode !=
+          PreambleMode::TreeNativeParserRootRendezvousOverlap ||
+      !mImpl->mNativeRootReplacementRequestId ||
+      aCount >
+          mImpl->mConfig.mMaxBytes - mImpl->mNativeParserRetargetBodyBytes.load(
+                                         std::memory_order_acquire)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  nsCString chunk;
+  if (!chunk.SetLength(aCount, fallible)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+  uint32_t offset = 0;
+  while (offset < aCount) {
+    uint32_t read = 0;
+    nsresult rv = aInputStream->Read(chunk.BeginWriting() + offset,
+                                     aCount - offset, &read);
+    if (NS_FAILED(rv) || !read) {
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    offset += read;
+  }
+  mImpl->mNativeParserRetargetBodyBytes.fetch_add(aCount,
+                                                  std::memory_order_acq_rel);
+  return NativeStylePreloadActivation::ForwardRootReplacementData(
+      mImpl->mNativeRootReplacementRequestId, std::move(chunk));
+}
+
 void ProxyPreambleOperation::LogNativeParserDocumentHandoffPhase(
     const char* aPhase) const {
   MOZ_ASSERT(mImpl->mConfig.mMode ==
@@ -1470,12 +1884,32 @@ void ProxyPreambleOperation::LogNativeParserRetargetPhase(
       static_cast<unsigned long long>(mImpl->mConnectionId), aPhase);
 }
 
+void ProxyPreambleOperation::LogNativeParserRootReplacementPhase(
+    const char* aPhase) const {
+  MOZ_ASSERT(mImpl->mConfig.mMode ==
+             PreambleMode::TreeNativeParserRootRendezvousOverlap);
+  RuntimeLogEvent(
+      "Connection %llu preamble native-parser-root-replacement phase=%s "
+      "channel=%llu request=%llu generation=%llu protocol=h3\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId), aPhase,
+      static_cast<unsigned long long>(mImpl->mNativeRootReplacementChannelId),
+      static_cast<unsigned long long>(mImpl->mNativeRootReplacementRequestId),
+      static_cast<unsigned long long>(
+          mImpl->mNativeParserGeneration.load(std::memory_order_acquire)));
+}
+
 nsresult ProxyPreambleOperation::InstallNativeParserRetargetDelivery(
     nsIRequest* aRequest) {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode));
+  const bool rootReplacementForwarded =
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserRootRendezvousOverlap &&
+      mImpl->mNativeRootReplacementSetupReady &&
+      mImpl->mNativeRootForwardedStartReceived &&
+      !mImpl->mNativeParserRootSuspended;
   if (!aRequest || !mImpl->mNativeParserTarget ||
-      !mImpl->mNativeParserRootSuspended ||
+      (!mImpl->mNativeParserRootSuspended && !rootReplacementForwarded) ||
       mImpl->mNativeParserRetargetArmed.load(std::memory_order_acquire) ||
       mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire)) {
     return NS_ERROR_UNEXPECTED;
@@ -1513,14 +1947,54 @@ nsresult ProxyPreambleOperation::InstallNativeParserRetargetDelivery(
   return NS_OK;
 }
 
+nsresult ProxyPreambleOperation::InstallNativeParserLogicalRetargetDelivery() {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mImpl->mConfig.mMode ==
+             PreambleMode::TreeNativeParserRootRendezvousOverlap);
+  if (!mImpl->mNativeRootLogicalRequest || !mImpl->mNativeParserTarget ||
+      !mImpl->mNativeRootReplacementSetupReady ||
+      !mImpl->mNativeRootForwardedStartReceived ||
+      mImpl->mNativeParserRootSuspended ||
+      mImpl->mNativeParserRetargetArmed.load(std::memory_order_acquire) ||
+      mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  mImpl->mNativeParserRetargetArmed.store(true, std::memory_order_release);
+  MOZ_TRY(mImpl->mNativeRootLogicalRequest->RetargetDeliveryTo(
+      mImpl->mNativeParserTarget));
+  nsCOMPtr<nsISerialEventTarget> deliveryTarget;
+  MOZ_TRY(mImpl->mNativeRootLogicalRequest->GetDeliveryTarget(
+      getter_AddRefs(deliveryTarget)));
+  if (!deliveryTarget ||
+      !SameCOMIdentity(deliveryTarget, mImpl->mNativeParserTarget)) {
+    mImpl->mNativeParserRetargetArmed.store(false, std::memory_order_release);
+    return NS_ERROR_UNEXPECTED;
+  }
+  mImpl->mNativeParserRetargetInstalled.store(true, std::memory_order_release);
+  RuntimeLogEvent(
+      "Connection %llu preamble native-parser-retarget "
+      "phase=delivery-retargeted target=html5-parser verified=1 protocol=h3\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId));
+  LogNativeParserRootReplacementPhase("logical-request-retargeted");
+  return NS_OK;
+}
+
 nsresult ProxyPreambleOperation::CheckNativeParserRetargetListener(
     uint32_t aStreamId) {
   MOZ_ASSERT(NS_IsMainThread());
+  const bool rootReplacementForwarded =
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserRootRendezvousOverlap &&
+      mImpl->mNativeRootReplacementSetupReady &&
+      mImpl->mNativeRootForwardedStartReceived &&
+      !mImpl->mNativeParserRootSuspended;
   if (!PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode) ||
       aStreamId != 0 ||
       !mImpl->mNativeParserRetargetArmed.load(std::memory_order_acquire) ||
       mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire) ||
-      !mImpl->mNativeParserRootSuspended || !mImpl->mNativeParserScanner) {
+      (!mImpl->mNativeParserRootSuspended && !rootReplacementForwarded) ||
+      !mImpl->mNativeParserScanner) {
     return NS_ERROR_NOT_AVAILABLE;
   }
   mImpl->mNativeParserRetargetListenerChainChecked.store(
@@ -1611,6 +2085,9 @@ nsresult ProxyPreambleOperation::ResumeNativeParserDocumentHandoffRoot() {
   if (mImpl->mConfig.mMode ==
       PreambleMode::TreeNativeParserDocumentHandoffOverlap) {
     LogNativeParserDocumentHandoffPhase("handoff-resume");
+  } else if (mImpl->mConfig.mMode ==
+             PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+    LogNativeParserRootReplacementPhase("physical-root-resume");
   } else {
     LogNativeParserRetargetPhase("handoff-resume");
   }
@@ -1626,19 +2103,43 @@ nsresult ProxyPreambleOperation::DispatchNativeParserChunk(nsCString&& aChunk) {
     return NS_ERROR_UNEXPECTED;
   }
 
+  nsCOMPtr<nsISerialEventTarget> deliveryTarget = mImpl->mNativeParserTarget;
+  if (mImpl->mConfig.mMode ==
+      PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+    if (!mImpl->mNativeRootLogicalRequest) {
+      return NS_ERROR_UNEXPECTED;
+    }
+    MOZ_TRY(mImpl->mNativeRootLogicalRequest->GetDeliveryTarget(
+        getter_AddRefs(deliveryTarget)));
+    if (!deliveryTarget) {
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
+
   const uint64_t generation =
       mImpl->mNativeParserGeneration.load(std::memory_order_acquire);
   const uint32_t sequence = ++mImpl->mNativeParserNextSequence;
   const uint32_t bytes = aChunk.Length();
   ++mImpl->mNativeParserPendingMainCallbacks;
   RefPtr self = this;
-  nsresult rv = mImpl->mNativeParserTarget->Dispatch(
+  nsresult rv = deliveryTarget->Dispatch(
       NS_NewRunnableFunction(
           "NaiveFox::NativeParserFeed",
           [self, generation, sequence, chunk = std::move(aChunk)]() mutable {
             if (self->mImpl->mNativeParserGeneration.load(
                     std::memory_order_acquire) != generation) {
               return;
+            }
+
+            if (self->mImpl->mConfig.mMode ==
+                    PreambleMode::TreeNativeParserRootRendezvousOverlap &&
+                !self->mImpl->mNativeParserFirstRetargetFeedLogged.exchange(
+                    true, std::memory_order_acq_rel)) {
+              RuntimeLogEvent(
+                  "Connection %llu preamble native-parser-retarget "
+                  "phase=first-parser-feed delivery=logical-background "
+                  "protocol=h3\n",
+                  static_cast<unsigned long long>(self->mImpl->mConnectionId));
             }
 
             // The controlled document is UTF-8 and its markup is ASCII. Avoid
@@ -1705,13 +2206,26 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
     return NS_ERROR_UNEXPECTED;
   }
 
+  nsCOMPtr<nsISerialEventTarget> deliveryTarget = mImpl->mNativeParserTarget;
+  if (mImpl->mConfig.mMode ==
+      PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+    if (!mImpl->mNativeRootLogicalRequest) {
+      return NS_ERROR_UNEXPECTED;
+    }
+    MOZ_TRY(mImpl->mNativeRootLogicalRequest->GetDeliveryTarget(
+        getter_AddRefs(deliveryTarget)));
+    if (!deliveryTarget) {
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
+
   mImpl->mNativeParserFinishQueued = true;
   const uint64_t generation =
       mImpl->mNativeParserGeneration.load(std::memory_order_acquire);
   const uint32_t sequence = ++mImpl->mNativeParserNextSequence;
   ++mImpl->mNativeParserPendingMainCallbacks;
   RefPtr self = this;
-  nsresult rv = mImpl->mNativeParserTarget->Dispatch(
+  nsresult rv = deliveryTarget->Dispatch(
       NS_NewRunnableFunction(
           "NaiveFox::NativeParserFinish",
           [self, generation, sequence] {
@@ -1812,6 +2326,14 @@ void ProxyPreambleOperation::OnNativeParserOutput(
       return;
     }
     mImpl->mNativeParserFinished = true;
+    if (mImpl->mConfig.mMode ==
+            PreambleMode::TreeNativeParserRootRendezvousOverlap &&
+        mImpl->mNativeRootReplacementRequestId) {
+      NativeStylePreloadActivation::CompleteRootReplacement(
+          mImpl->mNativeRootReplacementRequestId, NS_OK);
+      mImpl->mNativeRootReplacementRequestId = 0;
+      mImpl->mNativeRootLogicalRequest = nullptr;
+    }
   }
   MaybeFireBarrier();
   MaybeFinish();
@@ -1984,7 +2506,6 @@ nsresult ProxyPreambleOperation::CreateNativeParserStylesheetChannel(
 nsresult ProxyPreambleOperation::ReleaseNativeParserStylesheetChannel(
     uint64_t aGeneration, nsresult aStatus) {
   MOZ_ASSERT(NS_IsMainThread());
-  mImpl->mNativeStyleActivationRequestId = 0;
   if (NS_FAILED(aStatus)) {
     FailNativeParserContract(aStatus, "stylesheet-activation-failed");
     return aStatus;
@@ -2030,6 +2551,12 @@ void ProxyPreambleOperation::FailNativeParserContract(nsresult aStatus,
         mImpl->mNativeStyleActivationRequestId);
     mImpl->mNativeStyleActivationRequestId = 0;
   }
+  if (mImpl->mNativeRootReplacementRequestId) {
+    NativeStylePreloadActivation::CancelRootReplacement(
+        mImpl->mNativeRootReplacementRequestId);
+    mImpl->mNativeRootReplacementRequestId = 0;
+  }
+  mImpl->mNativeRootLogicalRequest = nullptr;
   mImpl->mNativeParserRetargetArmed.store(false, std::memory_order_release);
   mImpl->mNativeParserRetargetInstalled.store(false, std::memory_order_release);
   mImpl->mAllStreamsCompletedNormally = false;
@@ -2059,8 +2586,14 @@ void ProxyPreambleOperation::FailNativeParserContract(nsresult aStatus,
     if (root) {
       // A contract failure must not leak this arm's owned suspend count. The
       // failed OnStartRequest/Cancel path remains responsible for termination.
-      (void)root->Resume();
-      (void)root->Cancel(mImpl->mFirstFailure);
+      if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+        (void)root->Cancel(mImpl->mFirstFailure);
+        (void)root->Resume();
+      } else {
+        (void)root->Resume();
+        (void)root->Cancel(mImpl->mFirstFailure);
+      }
     }
   }
 }
@@ -2102,6 +2635,23 @@ nsresult ProxyPreambleOperation::OnRetargetedDataAvailable(
       mImpl->mNativeParserRetargetDataFinished.load(
           std::memory_order_acquire) ||
       !mImpl->mNativeParserScanner) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-retarget "
+        "phase=data-precondition-failed stream=%u input=%d target=%d "
+        "on_target=%d installed=%d consumer=%d generation_match=%d "
+        "finish_queued=%d data_finished=%d scanner=%d protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), aStreamId,
+        aInputStream != nullptr, mImpl->mNativeParserTarget != nullptr,
+        mImpl->mNativeParserTarget &&
+            mImpl->mNativeParserTarget->IsOnCurrentThread(),
+        mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire),
+        mImpl->mNativeParserConsumerReady.load(std::memory_order_acquire),
+        mImpl->mNativeParserConsumerGeneration.load(
+            std::memory_order_acquire) == generation,
+        mImpl->mNativeParserFinishQueued.load(std::memory_order_acquire),
+        mImpl->mNativeParserRetargetDataFinished.load(
+            std::memory_order_acquire),
+        mImpl->mNativeParserScanner != nullptr);
     recordFailure(NS_ERROR_UNEXPECTED);
     return NS_ERROR_UNEXPECTED;
   }
@@ -2195,6 +2745,24 @@ nsresult ProxyPreambleOperation::OnRetargetedDataFinished(uint32_t aStreamId,
           expectedDataFinished, true, std::memory_order_acq_rel) ||
       !mImpl->mNativeParserFinishQueued.compare_exchange_strong(
           expectedFinishQueued, true, std::memory_order_acq_rel)) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-retarget "
+        "phase=finish-precondition-failed stream=%u status=0x%08x "
+        "target=%d on_target=%d installed=%d consumer=%d "
+        "generation_match=%d first_feed=%d scanner=%d "
+        "data_finished_was=%d finish_queued_was=%d protocol=h3\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), aStreamId,
+        static_cast<unsigned>(aStatus), mImpl->mNativeParserTarget != nullptr,
+        mImpl->mNativeParserTarget &&
+            mImpl->mNativeParserTarget->IsOnCurrentThread(),
+        mImpl->mNativeParserRetargetInstalled.load(std::memory_order_acquire),
+        mImpl->mNativeParserConsumerReady.load(std::memory_order_acquire),
+        mImpl->mNativeParserConsumerGeneration.load(
+            std::memory_order_acquire) == generation,
+        mImpl->mNativeParserFirstRetargetFeedLogged.load(
+            std::memory_order_acquire),
+        mImpl->mNativeParserScanner != nullptr, expectedDataFinished,
+        expectedFinishQueued);
     nsresult failure = NS_FAILED(aStatus) ? aStatus : NS_ERROR_UNEXPECTED;
     recordFailure(failure);
     return failure;
@@ -2228,6 +2796,11 @@ nsresult ProxyPreambleOperation::OnRetargetedDataFinished(uint32_t aStreamId,
 nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
                                                  nsIInputStream* aInputStream,
                                                  uint32_t aCount) {
+  if (mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserRootRendezvousOverlap &&
+      aStreamId == 0) {
+    return QueueNativeParserRootBody(aInputStream, aCount);
+  }
   if (detail::PreambleUsesRetargetedRootDelivery(mImpl->mConfig.mMode,
                                                  aStreamId)) {
     return OnRetargetedDataAvailable(aStreamId, aInputStream, aCount);
@@ -2502,6 +3075,26 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length()) {
     return;
   }
+  if (aStreamId == 1 && mImpl->mNativeStyleActivationRequestId) {
+    NativeStylePreloadActivation::CompleteStyle(
+        mImpl->mNativeStyleActivationRequestId, aStatus);
+    mImpl->mNativeStyleActivationRequestId = 0;
+  }
+  if (aStreamId == 0 && mImpl->mNativeRootReplacementRequestId) {
+    if (mImpl->mConfig.mMode ==
+        PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+      nsresult forwardRv =
+          NativeStylePreloadActivation::ForwardRootReplacementStop(
+              mImpl->mNativeRootReplacementRequestId, aStatus);
+      if (NS_FAILED(forwardRv)) {
+        FailNativeParserContract(forwardRv, "root-stop-forward-failed");
+      }
+    } else {
+      NativeStylePreloadActivation::CompleteRootReplacement(
+          mImpl->mNativeRootReplacementRequestId, aStatus);
+      mImpl->mNativeRootReplacementRequestId = 0;
+    }
+  }
   auto& stream = mImpl->mStreams[aStreamId];
   stream.mRequest = nullptr;
   stream.mDone = true;
@@ -2523,7 +3116,9 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
     mImpl->mFirstFailure = aStatus;
   }
   if (aStreamId == 0) {
-    if (PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode)) {
+    if (PreambleModeUsesRetargetedNativeParser(mImpl->mConfig.mMode) &&
+        mImpl->mConfig.mMode !=
+            PreambleMode::TreeNativeParserRootRendezvousOverlap) {
       mImpl->mBodyBytes =
           mImpl->mNativeParserRetargetBodyBytes.load(std::memory_order_acquire);
       const nsresult retargetFailure =

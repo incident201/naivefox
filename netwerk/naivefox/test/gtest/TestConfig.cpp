@@ -350,6 +350,20 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserIpcRendezvous.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserIpcRendezvous.mPreamble.mCacheResources);
 
+  Config nativeParserRootRendezvous;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserRootRendezvous, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserRootRendezvous.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserRootRendezvousOverlap);
+  EXPECT_EQ(nativeParserRootRendezvous.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserRootRendezvous.mPreamble.mCacheResources);
+
   static constexpr const char*
       kInvalid[] =
           {
@@ -378,6 +392,10 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1}})",
               R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1}})",
+              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
           };
   for (const char* json : kInvalid) {
     Config invalid;

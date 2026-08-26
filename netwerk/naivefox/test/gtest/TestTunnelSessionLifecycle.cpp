@@ -169,6 +169,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
       PreambleMode::TreeNativeParserIpcRendezvousOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserIpcRendezvousOverlap, 1));
+  EXPECT_TRUE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap, 0));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap, 1));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
@@ -336,6 +340,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
   EXPECT_TRUE(detail::PreambleBarrierReached(
       PreambleMode::TreeNativeParserIpcRendezvousOverlap, true, true, 1, 0, 0,
       0, 1, true, 0, true));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap, true, true, 1, 0, 0,
+      0, 1, true, 0, false));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap, true, true, 1, 0, 0,
+      0, 1, true, 0, true));
 
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(
@@ -355,6 +365,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserRetargetOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserIpcRendezvousOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -432,6 +444,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeNativeParserIpcRendezvousOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserIpcRendezvousOverlap, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap, true));
 
   EXPECT_TRUE(detail::PreambleRetargetDeliveryVerified(true, true, true));
   EXPECT_FALSE(detail::PreambleRetargetDeliveryVerified(false, true, true));

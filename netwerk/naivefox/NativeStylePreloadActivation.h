@@ -23,9 +23,31 @@ struct NativeStylePreloadActivationDescriptor final {
   uint8_t mPreloadKind = 0;
 };
 
+struct NativeRootReplacementActivationDescriptor final {
+  uint64_t mChannelId = 0;
+  nsCString mResourceSpec;
+  nsCString mOriginalSpec;
+  nsCString mOriginAttributesSuffix;
+  nsCString mReferrerSpec;
+  uint8_t mReferrerPolicy = 0;
+  bool mSendReferrer = true;
+  uint32_t mLoadFlags = 0;
+  uint32_t mContentPolicyType = 0;
+  uint32_t mHttpStatus = 0;
+  nsCString mContentType;
+  nsCString mCharset;
+  uint64_t mGeneration = 0;
+};
+
 using NativeStylePreloadPrimaryCallback =
     std::function<nsresult(const NativeStylePreloadActivationDescriptor&)>;
 using NativeStylePreloadFinalCallback = std::function<nsresult(nsresult)>;
+using NativeRootReplacementPrimaryCallback =
+    std::function<nsresult(const NativeRootReplacementActivationDescriptor&)>;
+using NativeRootReplacementSetupCallback = std::function<nsresult(nsresult)>;
+using NativeRootReplacementForwardedStartCallback = std::function<nsresult()>;
+using NativeRootReplacementDataCallback = std::function<nsresult(nsCString&&)>;
+using NativeRootReplacementStopCallback = std::function<nsresult(nsresult)>;
 
 class NativeStylePreloadActivation final {
  public:
@@ -37,7 +59,25 @@ class NativeStylePreloadActivation final {
       NativeStylePreloadActivationDescriptor&& aDescriptor,
       NativeStylePreloadPrimaryCallback&& aPrimaryCallback,
       NativeStylePreloadFinalCallback&& aFinalCallback, uint64_t& aRequestId);
+  static void CompleteStyle(uint64_t aRequestId, nsresult aStatus);
   static void Cancel(uint64_t aRequestId);
+
+  static nsresult RegisterRootReplacement(
+      NativeRootReplacementActivationDescriptor&& aDescriptor,
+      NativeRootReplacementPrimaryCallback&& aPrimaryCallback,
+      NativeRootReplacementSetupCallback&& aSetupCallback,
+      NativeRootReplacementForwardedStartCallback&& aForwardedStartCallback,
+      NativeRootReplacementDataCallback&& aDataCallback,
+      NativeRootReplacementStopCallback&& aStopCallback, uint64_t& aRequestId);
+  static nsresult ForwardRootReplacementData(uint64_t aRequestId,
+                                             nsCString&& aData);
+  static nsresult ForwardRootReplacementStop(uint64_t aRequestId,
+                                             nsresult aStatus);
+  static void NotifyRootReplacementRedirectVerificationRun(uint64_t aRequestId);
+  static void ResolveRootReplacementRedirectVerification(uint64_t aRequestId,
+                                                         nsresult aStatus);
+  static void CompleteRootReplacement(uint64_t aRequestId, nsresult aStatus);
+  static void CancelRootReplacement(uint64_t aRequestId);
 };
 
 }  // namespace mozilla::naivefox

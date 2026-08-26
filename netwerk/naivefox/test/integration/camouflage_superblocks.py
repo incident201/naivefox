@@ -31,6 +31,7 @@ SUPPORTED_ARMS = (
     "tree-native-parser-document-handoff-overlap-css",
     "tree-native-parser-retarget-overlap-css",
     "tree-native-parser-ipc-rendezvous-overlap-css",
+    "tree-native-parser-root-rendezvous-overlap-css",
     "tree-warm-css-304",
     "tree-overlap",
 )
@@ -93,6 +94,10 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         raise ValueError("document-native-cache-open requires h3 superblocks")
     if protocol != "h3" and "document-native-channel-open" in arms:
         raise ValueError("document-native-channel-open requires h3 superblocks")
+    if protocol != "h3" and any(
+        arm.startswith("tree-native-parser-") for arm in arms
+    ):
+        raise ValueError("native parser arms require h3 superblocks")
     rng = random.Random(f"{seed}:{protocol}:multi-arm-superblocks")
     rows = []
     for index in range(count):

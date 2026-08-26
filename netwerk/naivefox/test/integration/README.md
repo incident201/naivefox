@@ -531,7 +531,7 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
@@ -568,6 +568,20 @@ second QUIC connection, or a second outer ClientHello invalidates the sample.
 The arm retains one CSS asset, a fresh profile, and ordinary writable Cache2;
 the existing Cache2 lifecycle begins after rendezvous release and is not
 emulated by another hop.
+`tree-native-parser-root-rendezvous-overlap-css` is the H3-only root
+replacement treatment. It keeps the same root and CSS requests and the same
+native parser/style semantics, but suspends the already-open physical root
+channel while a request-scoped replacement primary actor links to that exact
+channel, asynchronous redirect verification resolves, and the independent
+request-scoped background actor becomes ready. Only then does it publish the
+replacement consumer, forward the stored `OnStartRequest`, and resume the
+physical root. The existing real `RetargetDeliveryTo` step remains downstream
+of Resume and is not an admission barrier. No second root channel is opened.
+Admission requires the primary/background actor pairs to be created, linked,
+and destroyed for this request; `same_channel=1`; the redirect-verification
+queue/run/callback/resolve phases; verification and setup completion before
+forward/Resume; and the prior retarget, parser, stylesheet, one-QUIC-identity,
+and one-ClientHello contracts. Timing and packet positions remain outcomes.
 It releases CONNECT only after the root has completed and Gecko has emitted
 `NS_NET_STATUS_WAITING_FOR` for the stylesheet request. It therefore proves
 that the resource transaction was committed without conditioning admission on
