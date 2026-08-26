@@ -510,7 +510,7 @@ start_browser_controller() {
   fi
   if [[ $private_event_trace -eq 1 && $socks_port -eq 0 ]]; then
     browser_env+=(
-      "MOZ_LOG=timestamp,nsHttp:5,UDPSocket:5,nsChannelClassifier:5,UrlClassifierDbService:5"
+      "MOZ_LOG=timestamp,nsHttp:5,UDPSocket:5,nsChannelClassifier:5,UrlClassifierDbService:5,nsCSSLoader:5"
       "MOZ_LOG_FILE=$capture_dir/$label-private-event-trace"
     )
   fi
