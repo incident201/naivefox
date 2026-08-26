@@ -414,9 +414,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 "lifecycle_order_valid",
                 "lifecycle_ids_match",
             ):
-                self.assertIn(
-                    f"document_handshake_confirmed_{key}=yes", safe_summary
-                )
+                self.assertIn(f"document_handshake_confirmed_{key}=yes", safe_summary)
             self.assertNotIn("0x111", safe_summary)
             self.assertNotIn("0x222", safe_summary)
 
@@ -549,8 +547,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 ValueError,
-                "requires tree-complete-css and "
-                "tree-native-parser-preload-overlap-css",
+                "requires tree-complete-css and tree-native-parser-preload-overlap-css",
             ):
                 summary.write_outputs(
                     Path(directory),
@@ -603,6 +600,19 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     ("tree-native-parser-root-rendezvous-overlap-css",),
                 )
 
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                ValueError,
+                "tree-native-parser-process-overlap-css decrypted validation requires",
+            ):
+                summary.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    ("tree-native-parser-process-overlap-css",),
+                )
+
     def test_runner_supports_selectable_document_and_tree_arms(self):
         path = os.path.join(HERE, "run-h3-capture-comparison.sh")
         with open(path, encoding="utf-8") as stream:
@@ -646,7 +656,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         )
         self.assertIn('"MOZ_LOG=NaiveFoxLifecycle:5"', runner)
         self.assertIn('"MOZ_LOG_FILE=$lifecycle_log_base"', runner)
-        self.assertIn('quic.frame_type==0x1e', runner)
+        self.assertIn("quic.frame_type==0x1e", runner)
         self.assertIn('>"$prefix-handshake-done.csv"', runner)
         self.assertIn("tree-overlap comparison requires tree-complete", runner)
         self.assertIn(
@@ -687,6 +697,16 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
         self.assertIn(
             "tree-native-parser-root-rendezvous-overlap-css comparison "
             "requires tree-native-parser-ipc-rendezvous-overlap-css",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-process-overlap-css comparison requires "
+            "tree-native-parser-root-rendezvous-overlap-css",
+            runner,
+        )
+        self.assertNotIn(
+            "tree-native-parser-process-overlap-css requires exact "
+            "cross-process admission evidence before capture",
             runner,
         )
         self.assertIn(
@@ -1485,9 +1505,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             self.assertIn(
                 "document_start_overlap_response_size_match=yes", safe_summary
             )
-            self.assertIn(
-                "document_start_overlap_get_before_connect=yes", safe_summary
-            )
+            self.assertIn("document_start_overlap_get_before_connect=yes", safe_summary)
 
     def test_tree_arms_reject_different_selected_header_values(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -2214,9 +2232,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 ],
                 fin_frames={"0": 10, "4": 12},
             )
-            with self.assertRaisesRegex(
-                ValueError, "CSS GET < CONNECT < CSS FIN"
-            ):
+            with self.assertRaisesRegex(ValueError, "CSS GET < CONNECT < CSS FIN"):
                 summary.write_outputs(
                     Path(directory),
                     Path(directory) / "events.csv",
@@ -2308,9 +2324,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 ],
                 fin_frames={"0": 10, "4": 12},
             )
-            with self.assertRaisesRegex(
-                ValueError, "CSS GET < CONNECT < CSS FIN"
-            ):
+            with self.assertRaisesRegex(ValueError, "CSS GET < CONNECT < CSS FIN"):
                 summary.write_outputs(
                     Path(directory),
                     Path(directory) / "events.csv",
@@ -2403,9 +2417,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                 overlap_events,
                 fin_frames={"0": 10, "4": 12},
             )
-            with self.assertRaisesRegex(
-                ValueError, "CSS GET < CONNECT < CSS FIN"
-            ):
+            with self.assertRaisesRegex(ValueError, "CSS GET < CONNECT < CSS FIN"):
                 summary.write_outputs(
                     Path(directory),
                     Path(directory) / "events.csv",
@@ -3026,9 +3038,7 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
                     self.event(14, 0.022, "server", 8, status="200"),
                 ],
             )
-            rows, _, _ = summary.summarize_cohort(
-                Path(directory), "off", "4433"
-            )
+            rows, _, _ = summary.summarize_cohort(Path(directory), "off", "4433")
             requests = {
                 row["method"]: row
                 for row in rows

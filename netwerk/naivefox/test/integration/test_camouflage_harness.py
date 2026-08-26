@@ -37,7 +37,99 @@ SUPERBLOCKS = load("camouflage_superblocks", "camouflage_superblocks.py")
 TARGET = load("target_server", "target_server.py")
 
 
+def native_parser_process_lifecycle_lines():
+    return [
+        "Native activation process phase=child-running parent_pid=100 child_pid=200",
+        "Native activation process phase=hello parent_pid=100 child_pid=200 "
+        "cross_process=1 persistent=1",
+        "Connection 7 preamble native-parser-process "
+        "phase=physical-root-suspended channel=71 generation=5 parent_pid=100 "
+        "protocol=h3",
+        "Connection 7 preamble native-parser-process "
+        "phase=root-registered request=51 generation=5 parent_pid=100 protocol=h3",
+        "Native activation child phase=root-ready request=51 generation=5 pid=200",
+        "Connection 7 preamble native-parser-process "
+        "phase=root-ready-resume request=51 generation=5 parent_pid=100 protocol=h3",
+        "Connection 7 preamble native-parser-process "
+        "phase=root-data request=51 generation=5 sequence=1 bytes=100 "
+        "parent_pid=100 protocol=h3",
+        "Native activation child phase=root-data-accepted request=51 generation=5 "
+        "sequence=1 bytes=100 pid=200 main_thread=1",
+        "Native activation child phase=parser-feed request=51 generation=5 "
+        "sequence=1 bytes=100 descriptors=1 status=0x00000000 pid=200 "
+        "main_thread=0",
+        "Native activation child phase=style-discovered root=51 generation=5 "
+        "style=61 sequence=1 pid=200",
+        "Connection 7 preamble native-parser-process "
+        "phase=style-opened root=51 style=61 sequence=1 parent_pid=100 protocol=h3",
+        "Connection 7 preamble native-parser-process "
+        "phase=root-stop request=51 generation=5 sequence=2 status=0x00000000 "
+        "parent_pid=100 protocol=h3",
+        "Native activation child phase=root-stop-accepted request=51 generation=5 "
+        "sequence=2 status=0x00000000 pid=200 main_thread=1",
+        "Native activation child phase=parser-finish request=51 generation=5 "
+        "sequence=2 bytes=100 descriptors=0 status=0x00000000 pid=200 "
+        "main_thread=0",
+        "Native activation child phase=parser-finished request=51 generation=5 "
+        "sequence=2 bytes=100 styles=1 status=0x00000000 pid=200 main_thread=1",
+        "Connection 7 preamble native-parser-process "
+        "phase=parser-finished request=51 generation=5 sequence=2 bytes=100 "
+        "styles=1 parent_pid=100 protocol=h3",
+        "Native activation child phase=root-actor-destroyed request=51 generation=5 "
+        "finished=1 reason=4 pid=200",
+        "Connection 7 preamble native-parser-process "
+        "phase=style-onstop-complete style=61 status=0x00000000 parent_pid=100 "
+        "protocol=h3",
+        "Native activation child phase=style-complete request=61 root=51 "
+        "generation=5 pid=200 main_thread=1",
+        "Native activation child phase=style-actor-destroyed request=61 root=51 "
+        "generation=5 completed=1 reason=4 pid=200",
+    ]
+
+
 class CamouflageHarnessTests(unittest.TestCase):
+    def test_native_parser_process_validator_accepts_exact_lifecycle(self):
+        SAMPLE.validate_native_parser_process(
+            native_parser_process_lifecycle_lines(), expected_connection=7
+        )
+
+    def test_native_parser_process_validator_rejects_unknown_or_partial_markers(self):
+        lines = native_parser_process_lifecycle_lines()
+        lines.insert(
+            5,
+            "Native activation child phase=unexpected request=51 generation=5 pid=200",
+        )
+        with self.assertRaisesRegex(ValueError, "child marker schema"):
+            SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
+        lines = native_parser_process_lifecycle_lines()
+        lines[6] = lines[6].replace(" parent_pid=100", "")
+        with self.assertRaisesRegex(ValueError, "parent marker schema"):
+            SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
+    def test_native_parser_process_validator_rejects_wrong_identity(self):
+        with self.assertRaisesRegex(ValueError, "connection identity"):
+            SAMPLE.validate_native_parser_process(
+                native_parser_process_lifecycle_lines(), expected_connection=8
+            )
+        lines = native_parser_process_lifecycle_lines()
+        lines[4] = lines[4].replace("pid=200", "pid=201")
+        with self.assertRaisesRegex(ValueError, "child PID changed"):
+            SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
+    def test_native_parser_process_validator_rejects_false_descriptor_evidence(self):
+        lines = native_parser_process_lifecycle_lines()
+        lines[8] = lines[8].replace("descriptors=1", "descriptors=0")
+        with self.assertRaisesRegex(ValueError, "descriptor provenance"):
+            SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
+    def test_native_parser_process_validator_rejects_early_actor_teardown(self):
+        lines = native_parser_process_lifecycle_lines()
+        root_destroyed = lines.pop(16)
+        lines.insert(14, root_destroyed)
+        with self.assertRaisesRegex(ValueError, "root actor teardown ordering"):
+            SAMPLE.validate_native_parser_process(lines, expected_connection=7)
+
     def test_cold_listener_follows_network_and_socket_barriers(self):
         with open(
             os.path.join(SOURCE_ROOT, "netwerk/naivefox/GeckoRuntime.cpp"),
@@ -74,11 +166,12 @@ class CamouflageHarnessTests(unittest.TestCase):
             embedded.index("runtime.InitializeEmbedded("),
             embedded.index("RunLocalProxyServer("),
         )
+        standalone_start = runner.index("const bool configMode")
         standalone = runner[
-            runner.index("const bool configMode") : runner.index("nsCString profile;")
+            standalone_start : runner.index("nsCString profile;", standalone_start)
         ]
         self.assertLess(
-            standalone.index("runtime.Initialize(aArgc"),
+            standalone.index("runtime.Initialize("),
             standalone.index("RunLocalProxyServer("),
         )
 
@@ -212,6 +305,8 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-early-overlap",
             "tree-root-overlap",
             "tree-root-overlap-css",
+            "tree-native-parser-root-rendezvous-overlap-css",
+            "tree-native-parser-process-overlap-css",
             "tree-overlap",
         )
         rows = SUPERBLOCKS.schedule_rows(17, "h3", 2, ["browser_page"], arms=arms)
@@ -275,6 +370,26 @@ class CamouflageHarnessTests(unittest.TestCase):
                 1,
                 ["browser_page"],
                 arms=("root", "document-native-channel-open"),
+            )
+        with self.assertRaisesRegex(ValueError, "native parser arms require h3"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h2",
+                1,
+                ["browser_page"],
+                arms=(
+                    "root",
+                    "tree-native-parser-root-rendezvous-overlap-css",
+                    "tree-native-parser-process-overlap-css",
+                ),
+            )
+        with self.assertRaisesRegex(ValueError, "root-rendezvous-overlap-css control"):
+            SUPERBLOCKS.schedule_rows(
+                17,
+                "h3",
+                1,
+                ["browser_page"],
+                arms=("root", "tree-native-parser-process-overlap-css"),
             )
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
@@ -1048,6 +1163,34 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-user",
                 "fixture-pass",
             )
+        process = CONFIG.build_config(
+            "tree-native-parser-process-overlap-css",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            process["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-process-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-process-overlap-css",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
         alias = CONFIG.build_config(
             "document-complete", "h2", 1080, 4433, "user", "pass"
         )
@@ -1720,6 +1863,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "Native root replacement activation phase=request-background-actor-destroyed "
             "request=51\n"
         )
+
         def root_product_phase(phase, request=51):
             return (
                 "Connection 7 preamble native-parser-root-replacement "
@@ -1728,51 +1872,55 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
 
         root_activation_before_resume = (
-            root_product_phase("root-response-validated", request=0)
-            + root_product_phase("physical-root-suspended", request=0)
-            + root_activation_before_resume
-        ).replace(
-            "Native root replacement activation phase=descriptor-frozen "
-            "request=51\n",
-            "Native root replacement activation phase=descriptor-frozen "
-            "request=51\n"
-            + root_product_phase("replacement-registered"),
-            1,
-        ).replace(
-            "Native root replacement activation "
-            "phase=connect-parent-linked request=51 same_channel=1\n",
-            root_product_phase("connect-parent-same-root-linked")
-            + root_product_phase("redirect-verifier-run-queued")
-            + "Native root replacement activation "
-            "phase=connect-parent-linked request=51 same_channel=1\n",
-            1,
-        ).replace(
-            "Native root replacement activation "
-            "phase=redirect-verification-callback request=51 channel=71 "
-            "generation=1 status=0x00000000\n",
-            root_product_phase("redirect-verifier-run")
-            + root_product_phase("redirect-verifier-callback-queued")
-            + "Native root replacement activation "
-            "phase=redirect-verification-callback request=51 channel=71 "
-            "generation=1 status=0x00000000\n",
-            1,
-        ).replace(
-            "Native root replacement activation "
-            "phase=continue-verification request=51\n",
-            root_product_phase("redirect-verifier-callback-resolved")
-            + "Native root replacement activation "
-            "phase=continue-verification request=51\n",
-            1,
+            (
+                root_product_phase("root-response-validated", request=0)
+                + root_product_phase("physical-root-suspended", request=0)
+                + root_activation_before_resume
+            )
+            .replace(
+                "Native root replacement activation phase=descriptor-frozen "
+                "request=51\n",
+                "Native root replacement activation phase=descriptor-frozen "
+                "request=51\n" + root_product_phase("replacement-registered"),
+                1,
+            )
+            .replace(
+                "Native root replacement activation "
+                "phase=connect-parent-linked request=51 same_channel=1\n",
+                root_product_phase("connect-parent-same-root-linked")
+                + root_product_phase("redirect-verifier-run-queued")
+                + "Native root replacement activation "
+                "phase=connect-parent-linked request=51 same_channel=1\n",
+                1,
+            )
+            .replace(
+                "Native root replacement activation "
+                "phase=redirect-verification-callback request=51 channel=71 "
+                "generation=1 status=0x00000000\n",
+                root_product_phase("redirect-verifier-run")
+                + root_product_phase("redirect-verifier-callback-queued")
+                + "Native root replacement activation "
+                "phase=redirect-verification-callback request=51 channel=71 "
+                "generation=1 status=0x00000000\n",
+                1,
+            )
+            .replace(
+                "Native root replacement activation "
+                "phase=continue-verification request=51\n",
+                root_product_phase("redirect-verifier-callback-resolved")
+                + "Native root replacement activation "
+                "phase=continue-verification request=51\n",
+                1,
+            )
         )
         root_activation_release += (
             root_product_phase("replacement-listener-published")
             + root_product_phase("forward-on-start-sent")
             + root_product_phase("physical-root-resume")
         )
-        root_activation_after_resume += (
-            root_product_phase("forward-on-start-received")
-            + root_product_phase("consumer-constructed-main")
-        )
+        root_activation_after_resume += root_product_phase(
+            "forward-on-start-received"
+        ) + root_product_phase("consumer-constructed-main")
         root_retarget_after_resume = (
             "Connection 7 preamble native-parser-retarget "
             "phase=delivery-retargeted target=html5-parser verified=1 "
@@ -1811,6 +1959,22 @@ class CamouflageHarnessTests(unittest.TestCase):
             root_rendezvous_log,
             one_connection,
         )
+        with self.assertRaisesRegex(
+            ValueError, "unexpectedly logged native parser retarget lifecycle"
+        ):
+            SAMPLE.validate_sample(
+                "tree-native-parser-process-overlap-css",
+                "h3",
+                root_rendezvous_log,
+                one_connection,
+            )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-process-overlap-css",
+                "h2",
+                root_rendezvous_log,
+                one_connection,
+            )
         with self.assertRaisesRegex(ValueError, "same root channel"):
             SAMPLE.validate_sample(
                 "tree-native-parser-root-rendezvous-overlap-css",
@@ -1844,8 +2008,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "tree-native-parser-ipc-rendezvous-overlap-css",
                 "h3",
                 ipc_rendezvous_log.replace(
-                    "Native style activation phase=background-dispatched "
-                    "request=41\n",
+                    "Native style activation phase=background-dispatched request=41\n",
                     "",
                 ).replace(
                     "Native style activation phase=background-ready-received "
@@ -2709,6 +2872,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
+            ",$multi_arm_arms_csv, == *,tree-native-parser-process-overlap-css,*",
+            runner,
+        )
+        self.assertIn(
             "tree-native-parser-preload-overlap-css multi-arm screening "
             "requires --protocol h3",
             runner,
@@ -2733,6 +2900,17 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             "screening requires --protocol h3",
             runner,
         )
+        self.assertIn(
+            "tree-native-parser-process-overlap-css multi-arm screening "
+            "requires --protocol h3",
+            runner,
+        )
+        self.assertIn(
+            "tree-native-parser-process-overlap-css multi-arm screening "
+            "requires the tree-native-parser-root-rendezvous-overlap-css control",
+            runner,
+        )
+        self.assertIn("camouflage_sample_validation.py", runner)
         self.assertIn(
             "native-parser-preload drain=complete completed_resources=1 "
             "http=2[0-9][0-9]",

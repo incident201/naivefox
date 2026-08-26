@@ -14,6 +14,7 @@ SOURCES += [
     "../NaiveFoxRunner.cpp",
     "../NativeStylePreloadActivation.cpp",
     "../NativeStylePreloadChannel.cpp",
+    "../NativeStylePreloadProcessBridge.cpp",
     "../NeckoTunnel.cpp",
     "../OuterSessionGate.cpp",
     "../PaddingNegotiation.cpp",
@@ -51,6 +52,12 @@ SOURCES += [
     "!/ipc/ipdl/PNativeStylePreloadProcess.cpp",
     "!/ipc/ipdl/PNativeStylePreloadProcessChild.cpp",
     "!/ipc/ipdl/PNativeStylePreloadProcessParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessRoot.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessRootChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessRootParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessStyle.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessStyleChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessStyleParent.cpp",
 ]
 
 XPCOM_MANIFESTS += ["components.conf"]

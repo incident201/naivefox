@@ -22,12 +22,12 @@
 #include "CacheObserver.h"
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
-#include "mozilla/ipc/IOThread.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/Utf8.h"
+#include "mozilla/ipc/IOThread.h"
 #include "mozilla/net/UrlClassifierFeatureFactory.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceDefs.h"
@@ -194,7 +194,8 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
                                   const nsACString& aProfilePath,
                                   ProxyProtocol aProtocol, bool aNoPostQuantum,
                                   bool aEnablePreambleCache2,
-                                  bool aEnableNativeStyleActivation) {
+                                  bool aEnableNativeStyleActivation,
+                                  bool aEnableNativeActivationProcess) {
   if (mXPCOMInitialized || aProfilePath.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -226,17 +227,19 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
 
   return InitializeWithLocations(profile, mBinDirectory, mExecutable, aProtocol,
                                  nullptr, aNoPostQuantum, aEnablePreambleCache2,
-                                 aEnableNativeStyleActivation);
+                                 aEnableNativeStyleActivation,
+                                 aEnableNativeActivationProcess);
 }
 
-nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
-                                          const nsACString& aRuntimePath,
-                                          ProxyProtocol aProtocol,
-                                          bool aNoPostQuantum,
-                                          bool aEnablePreambleCache2,
-                                          bool aEnableNativeStyleActivation) {
+nsresult GeckoRuntime::InitializeEmbedded(
+    const nsACString& aProfilePath, const nsACString& aRuntimePath,
+    ProxyProtocol aProtocol, bool aNoPostQuantum, bool aEnablePreambleCache2,
+    bool aEnableNativeStyleActivation, bool aEnableNativeActivationProcess) {
   if (mXPCOMInitialized) {
     return NS_ERROR_INVALID_ARG;
+  }
+  if (aEnableNativeActivationProcess) {
+    return NS_ERROR_NOT_IMPLEMENTED;
   }
   MOZ_TRY(ValidateEmbeddedLocations(aProfilePath, aRuntimePath));
 
@@ -259,11 +262,13 @@ nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
   MOZ_TRY(binDirectory->GetNativePath(normalizedRuntimePath));
   return InitializeWithLocations(
       profile, binDirectory, executable, aProtocol, &normalizedRuntimePath,
-      aNoPostQuantum, aEnablePreambleCache2, aEnableNativeStyleActivation);
+      aNoPostQuantum, aEnablePreambleCache2, aEnableNativeStyleActivation,
+      aEnableNativeActivationProcess);
 #else
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
                                  nullptr, aNoPostQuantum, aEnablePreambleCache2,
-                                 aEnableNativeStyleActivation);
+                                 aEnableNativeStyleActivation,
+                                 aEnableNativeActivationProcess);
 #endif
 }
 
@@ -316,7 +321,7 @@ nsresult GeckoRuntime::InitializeWithLocations(
     nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
     ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath,
     bool aNoPostQuantum, bool aEnablePreambleCache2,
-    bool aEnableNativeStyleActivation) {
+    bool aEnableNativeStyleActivation, bool aEnableNativeActivationProcess) {
   if (mXPCOMInitialized || !aProfile || !aBinDirectory || !aExecutable) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -436,6 +441,13 @@ nsresult GeckoRuntime::InitializeWithLocations(
     return NS_ERROR_FAILURE;
   }
   MOZ_TRY(WaitForNetworkStartup());
+  if (aEnableNativeActivationProcess) {
+    MOZ_TRY(NativeStylePreloadActivation::InitializeProcess());
+    if (!NativeStylePreloadActivation::IsProcessReady()) {
+      return NS_ERROR_FAILURE;
+    }
+    mNativeActivationProcessInitialized = true;
+  }
   if (aEnableNativeStyleActivation) {
     MOZ_TRY(NativeStylePreloadActivation::Initialize());
     mNativeStyleActivationInitialized = true;
@@ -533,6 +545,10 @@ void GeckoRuntime::Shutdown() {
   mTemporaryTrustStore = nullptr;
 
   if (mXPCOMInitialized) {
+    if (mNativeActivationProcessInitialized) {
+      NativeStylePreloadActivation::ShutdownProcess();
+      mNativeActivationProcessInitialized = false;
+    }
     if (mNativeStyleActivationInitialized) {
       NativeStylePreloadActivation::Shutdown();
       mNativeStyleActivationInitialized = false;
@@ -603,8 +619,7 @@ void xpc::ReadOnlyPage::Init() {}
 
 namespace {
 
-std::atomic<GeckoProcessType> sNaiveFoxProcessType{
-    GeckoProcessType_Default};
+std::atomic<GeckoProcessType> sNaiveFoxProcessType{GeckoProcessType_Default};
 std::atomic<bool> sNaiveFoxActivationChildEntered{false};
 
 }  // namespace
@@ -660,9 +675,8 @@ nsISerialEventTarget* XRE_GetAsyncIOEventTarget() {
 
 #  if !defined(ANDROID) && !defined(__ANDROID__)
 extern "C" NAIVEFOX_EXPORT int NaiveFoxActivationChildMain(int aArgc,
-                                                            char* aArgv[]) {
-  return mozilla::naivefox::RunNativeStylePreloadActivationChild(aArgc,
-                                                                 aArgv);
+                                                           char* aArgv[]) {
+  return mozilla::naivefox::RunNativeStylePreloadActivationChild(aArgc, aArgv);
 }
 #  endif
 

@@ -29,6 +29,7 @@ namespace mozilla::naivefox {
 
 struct NativeStylePreloadActivationDescriptor;
 struct NativeRootReplacementActivationDescriptor;
+struct NativeStylePreloadProcessDescriptor;
 
 // Internal Naive proxy authentication helper. This is not part of the
 // embedded C ABI.
@@ -164,6 +165,10 @@ constexpr bool PreambleBarrierReached(
     return aRootCompletedSuccessfully && aNativeParserFinished &&
            aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
   }
+  if (aMode == PreambleMode::TreeNativeParserProcessOverlap) {
+    return aRootCompletedSuccessfully && aNativeParserFinished &&
+           aAssetCount == 1 && aAssetsCommitted == 1 && aAssetsDone == 0;
+  }
   return aMode == PreambleMode::TreeOverlap &&
          aAssetsWithHeadersOrDone == aAssetCount;
 }
@@ -180,7 +185,8 @@ constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
          aMode == PreambleMode::TreeNativeParserDocumentHandoffOverlap ||
          aMode == PreambleMode::TreeNativeParserRetargetOverlap ||
          aMode == PreambleMode::TreeNativeParserIpcRendezvousOverlap ||
-         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap;
+         aMode == PreambleMode::TreeNativeParserRootRendezvousOverlap ||
+         aMode == PreambleMode::TreeNativeParserProcessOverlap;
 }
 
 constexpr bool PreambleRetargetDeliveryVerified(bool aListenerChainAccepted,
@@ -266,6 +272,18 @@ class ProxyPreambleOperation final {
   nsresult InstallNativeParserRetargetDelivery(nsIRequest* aRequest);
   nsresult StartNativeParserRootReplacement(nsIRequest* aRequest,
                                             nsIHttpChannel* aChannel);
+  nsresult StartNativeParserProcessRoot(nsIRequest* aRequest,
+                                        nsIHttpChannel* aChannel);
+  nsresult OnNativeParserProcessRootReady(uint64_t aGeneration);
+  nsresult OnNativeParserProcessStyleDiscovered(
+      uint64_t aGeneration,
+      const NativeStylePreloadProcessDescriptor& aDescriptor);
+  void OnNativeParserProcessRootFinished(uint64_t aGeneration,
+                                         uint32_t aLastSequence,
+                                         uint32_t aBodyBytes,
+                                         uint32_t aStyleCount,
+                                         nsresult aStatus);
+  void OnNativeParserProcessFailed(uint64_t aGeneration, nsresult aStatus);
   nsresult LinkNativeParserRootReplacement(
       uint64_t aGeneration,
       const NativeRootReplacementActivationDescriptor& aDescriptor);
@@ -288,7 +306,8 @@ class ProxyPreambleOperation final {
       uint64_t aGeneration, uint32_t aSequence, bool aFinished,
       nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
   nsresult OpenNativeParserStylesheet(
-      nsHtml5StylePreloadDescriptor&& aDescriptor);
+      nsHtml5StylePreloadDescriptor&& aDescriptor,
+      uint64_t aProcessStyleRequestId = 0);
   nsresult CreateNativeParserStylesheetChannel(
       uint64_t aGeneration,
       const NativeStylePreloadActivationDescriptor& aActivation);

@@ -1,0 +1,35 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PNativeStylePreloadProcess;
+include NativeStylePreloadActivationTypes;
+
+namespace mozilla {
+namespace naivefox {
+
+[ChildProc=any, ChildImpl=virtual, ParentImpl=virtual]
+async protocol PNativeStylePreloadProcessRoot {
+  manager PNativeStylePreloadProcess;
+parent:
+  async Ready(uint64_t requestId, uint64_t generation,
+              uint64_t childPid);
+  async ParserFinished(uint64_t requestId, uint64_t generation,
+                       uint32_t lastSequence, uint32_t bodyBytes,
+                       uint32_t styleCount, nsresult status);
+  async Canceled(uint64_t requestId, uint64_t generation);
+
+child:
+  async Start(NativeRootReplacementActivationArgs args,
+              uint64_t expectedParentPid, uint64_t expectedChildPid,
+              uint32_t maximumBodyBytes);
+  async Data(uint64_t requestId, uint64_t generation,
+             uint32_t sequence, nsCString data);
+  async Stop(uint64_t requestId, uint64_t generation,
+             uint32_t sequence, nsresult status);
+  async Cancel(uint64_t requestId, uint64_t generation, nsresult status);
+  async __delete__();
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

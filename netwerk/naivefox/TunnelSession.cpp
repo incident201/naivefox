@@ -425,6 +425,7 @@ class TunnelSession::Impl final {
   bool mPumpStarted = false;
   bool mFailed = false;
   bool mClosed = false;
+  bool mPreambleFailureDispatched = false;
   std::atomic<bool> mCancelRequested{false};
   std::atomic<bool> mOuterGateRegistered{false};
   std::atomic<bool> mOuterGateReleaseRequested{false};
@@ -665,8 +666,12 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
         "bytes=0 protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         static_cast<unsigned>(rv), ProtocolName(aProtocol));
-    // Preamble failures never enter AutoFallback. Continue exactly once with
-    // CONNECT on the same generation and protocol.
+    if (PreambleModeRequiresFailClosed(preamble.mMode)) {
+      FailPreambleOnMain(rv);
+      return;
+    }
+    // Non-product diagnostic preamble failures never enter AutoFallback.
+    // Continue exactly once with CONNECT on the same generation and protocol.
     OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
     return;
   }
@@ -692,6 +697,10 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
         "bytes=0 protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         static_cast<unsigned>(rv), ProtocolName(aProtocol));
+    if (PreambleModeRequiresFailClosed(preamble.mMode)) {
+      FailPreambleOnMain(rv);
+      return;
+    }
     OpenConnectOnMain(aGeneration, aProtocol, aTargetAuthority);
     return;
   }
@@ -740,6 +749,10 @@ void TunnelSession::FinishPreambleOnMain(
   }
   const bool succeeded =
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
+  if (PreambleModeRequiresFailClosed(preambleMode) && !succeeded) {
+    FailPreambleOnMain(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
+    return;
+  }
   if (preambleMode == PreambleMode::TreeRootOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble root-overlap admission=%s root_done=%d "
@@ -759,8 +772,7 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone, aStartedResources, aCommittedResources,
         ProtocolName(aProtocol));
   }
-  if (preambleMode ==
-      PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+  if (preambleMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble resource-native-cache-committed-overlap "
         "admission=%s root_done=%d started_resources=%u "
@@ -865,6 +877,14 @@ void TunnelSession::FinishPreambleOperationOnMain(
   }
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  if (PreambleModeRequiresFailClosed(preambleMode) &&
+      (!aCompletedNormally || NS_FAILED(aStatus))) {
+    mImpl->mPreambleOperation = nullptr;
+    mImpl->mPreambleOperationGeneration = 0;
+    mImpl->mPreambleTargetAuthority.Truncate();
+    FailPreambleOnMain(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
+    return;
+  }
   if (preambleMode == PreambleMode::DocumentStartOverlap) {
     const bool succeeded = aRootDone && aCompletedNormally &&
                            NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 &&
@@ -896,8 +916,7 @@ void TunnelSession::FinishPreambleOperationOnMain(
         aCompletedSuccessfulResources, ProtocolName(aProtocol));
   }
   if (aCompletedNormally &&
-      preambleMode ==
-          PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+      preambleMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble resource-native-cache-committed-overlap "
         "drain=complete completed_resources=%u cache_new=%u protocol=%s\n",
@@ -948,6 +967,12 @@ void TunnelSession::PreambleDrainTimeoutOnMain(uint64_t aGeneration) {
   operation->Cancel(NS_ERROR_NET_TIMEOUT);
   RuntimeLogEvent("Connection %llu preamble background drain timed out\n",
                   static_cast<unsigned long long>(mImpl->mConnectionId));
+  const PreambleMode mode = mImpl->mConfig.mPreamble.ModeForProtocol(
+      mImpl->mAttemptProtocol == ProxyProtocol::Auto ? ProxyProtocol::H3
+                                                     : mImpl->mAttemptProtocol);
+  if (PreambleModeRequiresFailClosed(mode)) {
+    FailPreambleOnMain(NS_ERROR_NET_TIMEOUT);
+  }
 }
 
 void TunnelSession::PreambleTimeoutOnMain(uint64_t aGeneration,
@@ -971,6 +996,11 @@ void TunnelSession::PreambleTimeoutOnMain(uint64_t aGeneration,
       "bytes=0 protocol=%s\n",
       static_cast<unsigned long long>(mImpl->mConnectionId),
       static_cast<unsigned>(NS_ERROR_NET_TIMEOUT), ProtocolName(aProtocol));
+  if (PreambleModeRequiresFailClosed(
+          mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol))) {
+    FailPreambleOnMain(NS_ERROR_NET_TIMEOUT);
+    return;
+  }
   if (!mImpl->mCancelRequested.load(std::memory_order_acquire)) {
     OpenConnectOnMain(aGeneration, aProtocol, authority);
   }
@@ -990,9 +1020,8 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
     RefPtr<TunnelAttempt> attempt =
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
     nsCOMPtr<nsIRequest> openedRequest;
-    const bool useAnonymousConnection =
-        !PreambleModeUsesNativeParser(
-            mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
+    const bool useAnonymousConnection = !PreambleModeUsesNativeParser(
+        mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
     rv = OpenNeckoTunnel(
         mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
         mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,
@@ -1108,6 +1137,28 @@ NS_IMETHODIMP TunnelAttempt::OnStopRequest(nsIRequest* aRequest,
                              }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
+}
+
+void TunnelSession::FailPreambleOnMain(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mPreambleFailureDispatched) {
+    return;
+  }
+  mImpl->mPreambleFailureDispatched = true;
+  mImpl->mCancelRequested.store(true, std::memory_order_release);
+  CancelRequestOnMain(aStatus);
+  RefPtr self = this;
+  nsresult rv = mImpl->mSocketTarget->Dispatch(
+      NS_NewRunnableFunction("NaiveFox::FailClosedPreamble",
+                             [self, aStatus]() { self->Fail(aStatus); }),
+      NS_DISPATCH_NORMAL);
+  if (NS_FAILED(rv)) {
+    RuntimeLogEvent(
+        "Connection %llu failed to dispatch fail-closed preamble "
+        "status=0x%08x dispatch=0x%08x\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        static_cast<unsigned>(aStatus), static_cast<unsigned>(rv));
+  }
 }
 
 void TunnelSession::CancelRequestOnMain(nsresult aStatus) {

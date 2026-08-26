@@ -31,6 +31,10 @@ class TunnelSessionTestPeer final {
   static bool ShouldGateOuterSession(const TunnelConfig& aConfig) {
     return TunnelSession::ShouldGateOuterSession(aConfig);
   }
+
+  static void FailPreambleOnMain(TunnelSession* aSession, nsresult aStatus) {
+    aSession->FailPreambleOnMain(aStatus);
+  }
 };
 
 namespace {
@@ -161,6 +165,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, ProtocolSpecificPreambleModeSelection)
 
 TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
 {
+  EXPECT_TRUE(PreambleModeRequiresFailClosed(
+      PreambleMode::TreeNativeParserProcessOverlap));
+  EXPECT_FALSE(PreambleModeRequiresFailClosed(
+      PreambleMode::TreeNativeParserRootRendezvousOverlap));
   EXPECT_TRUE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserRetargetOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
@@ -173,6 +181,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, ParserRetargetIsRootDeliveryOnly)
       PreambleMode::TreeNativeParserRootRendezvousOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserRootRendezvousOverlap, 1));
+  EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
+      PreambleMode::TreeNativeParserProcessOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
       PreambleMode::TreeNativeParserDocumentHandoffOverlap, 0));
   EXPECT_FALSE(detail::PreambleUsesRetargetedRootDelivery(
@@ -346,6 +356,12 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
   EXPECT_TRUE(detail::PreambleBarrierReached(
       PreambleMode::TreeNativeParserRootRendezvousOverlap, true, true, 1, 0, 0,
       0, 1, true, 0, true));
+  EXPECT_FALSE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserProcessOverlap, true, true, 1, 0, 0, 0, 1,
+      true, 0, false));
+  EXPECT_TRUE(detail::PreambleBarrierReached(
+      PreambleMode::TreeNativeParserProcessOverlap, true, true, 1, 0, 0, 0, 1,
+      true, 0, true));
 
   EXPECT_TRUE(detail::PreambleOverlapsConnect(PreambleMode::DocumentOverlap));
   EXPECT_TRUE(
@@ -367,6 +383,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserIpcRendezvousOverlap));
   EXPECT_TRUE(detail::PreambleOverlapsConnect(
       PreambleMode::TreeNativeParserRootRendezvousOverlap));
+  EXPECT_TRUE(detail::PreambleOverlapsConnect(
+      PreambleMode::TreeNativeParserProcessOverlap));
   EXPECT_FALSE(detail::PreambleOverlapsConnect(PreambleMode::TreeComplete));
 }
 
@@ -448,6 +466,10 @@ TEST(NaiveFoxTunnelSessionLifecycle, EarlyOverlapTerminalNonAdmissionFallsBack)
       PreambleMode::TreeNativeParserRootRendezvousOverlap, false));
   EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
       PreambleMode::TreeNativeParserRootRendezvousOverlap, true));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserProcessOverlap, false));
+  EXPECT_FALSE(detail::PreambleNeedsCompletionFallback(
+      PreambleMode::TreeNativeParserProcessOverlap, true));
 
   EXPECT_TRUE(detail::PreambleRetargetDeliveryVerified(true, true, true));
   EXPECT_FALSE(detail::PreambleRetargetDeliveryVerified(false, true, true));
@@ -494,16 +516,48 @@ TEST(NaiveFoxTunnelSessionLifecycle, LatePreambleCallbackCannotDoubleOpen)
   EXPECT_FALSE(state.Complete(generation + 1, ProxyProtocol::H2));
 }
 
-RefPtr<TunnelSession> NewSession(nsIEventTarget* aSocketTarget,
-                                 Atomic<uint32_t, Relaxed>& aClosedCount) {
+RefPtr<TunnelSession> NewSession(
+    nsIEventTarget* aSocketTarget, Atomic<uint32_t, Relaxed>& aClosedCount,
+    Atomic<uint32_t, Relaxed>* aFailureCount = nullptr) {
   nsCOMPtr<nsIAsyncInputStream> localIn;
   nsCOMPtr<nsIAsyncOutputStream> localOut;
   NS_NewPipe2(getter_AddRefs(localIn), getter_AddRefs(localOut), true, true);
   TunnelConfig config;
   return new TunnelSession(
       localIn, localOut, config, false, aSocketTarget,
-      [](const nsACString&, bool) {}, [](nsresult) {},
+      [](const nsACString&, bool) {},
+      [aFailureCount](nsresult) {
+        if (aFailureCount) {
+          ++*aFailureCount;
+        }
+      },
       [&aClosedCount](nsresult) { ++aClosedCount; });
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle,
+     FailClosedPreambleDispatchesOneTerminalFailure)
+{
+  nsCOMPtr<nsIThread> socketThread;
+  ASSERT_NS_SUCCEEDED(
+      NS_NewNamedThread("NFPreambleFail", getter_AddRefs(socketThread)));
+  auto shutdownThread = MakeScopeExit([&]() {
+    if (socketThread) {
+      (void)socketThread->Shutdown();
+    }
+  });
+
+  Atomic<uint32_t, Relaxed> closedCount{0};
+  Atomic<uint32_t, Relaxed> failureCount{0};
+  RefPtr<TunnelSession> session =
+      NewSession(socketThread, closedCount, &failureCount);
+  ASSERT_TRUE(session);
+
+  TunnelSessionTestPeer::FailPreambleOnMain(session, NS_ERROR_NET_TIMEOUT);
+  TunnelSessionTestPeer::FailPreambleOnMain(session, NS_ERROR_FAILURE);
+
+  ASSERT_NS_SUCCEEDED(socketThread->Shutdown());
+  shutdownThread.release();
+  EXPECT_EQ(failureCount, 1u);
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, QueuedChannelStopKeepsSessionAlive)

@@ -2,15 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+include protocol PNativeStylePreloadProcessRoot;
+include protocol PNativeStylePreloadProcessStyle;
+include NativeStylePreloadActivationTypes;
+
 namespace mozilla {
 namespace naivefox {
 
 [ChildProc=any, ChildImpl=virtual, ParentImpl=virtual, NeedsOtherPid]
 async protocol PNativeStylePreloadProcess {
+  manages PNativeStylePreloadProcessRoot;
+  manages PNativeStylePreloadProcessStyle;
 parent:
   async Hello(uint64_t childPid, uint64_t observedParentPid);
+  async PNativeStylePreloadProcessStyle(NativeStylePreloadProcessArgs args);
 
 child:
+  async PNativeStylePreloadProcessRoot(uint64_t requestId,
+                                       uint64_t generation);
   async Shutdown();
 };
 

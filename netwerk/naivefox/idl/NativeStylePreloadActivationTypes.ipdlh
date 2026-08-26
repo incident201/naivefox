@@ -33,5 +33,29 @@ struct NativeRootReplacementActivationArgs {
   uint64_t generation;
 };
 
+// Complete, move-safe wire representation of
+// nsHtml5StylePreloadDescriptor.  Keep the parser output separate from the
+// parent-owned channel activation context: the activation child discovers the
+// former, while the network parent remains authoritative for the latter.
+struct NativeHtml5StylePreloadDescriptorArgs {
+  nsString url;
+  nsString charset;
+  nsString crossOrigin;
+  nsString media;
+  nsString referrerPolicy;
+  nsString nonce;
+  nsString integrity;
+  nsString fetchPriority;
+  bool linkPreload;
+};
+
+struct NativeStylePreloadProcessArgs {
+  uint64_t rootRequestId;
+  uint64_t rootGeneration;
+  uint64_t styleRequestId;
+  uint32_t discoverySequence;
+  NativeHtml5StylePreloadDescriptorArgs descriptor;
+};
+
 }  // namespace naivefox
 }  // namespace mozilla

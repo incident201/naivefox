@@ -5,21 +5,25 @@
 #include "NativeStylePreloadActivation.h"
 
 #include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "NativeStylePreloadProcessBridge.h"
 
 #if defined(XP_UNIX)
 #  include <limits.h>
 #  include <unistd.h>
 #endif
 
+#include "RuntimeLogging.h"
 #include "base/at_exit.h"
 #include "base/message_loop.h"
 #include "base/process_util.h"
-#include "RuntimeLogging.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/GeckoArgs.h"
 #include "mozilla/Logging.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/ScopeExit.h"
@@ -30,7 +34,6 @@
 #include "mozilla/ipc/IOThread.h"
 #include "mozilla/ipc/NodeController.h"
 #include "mozilla/ipc/ProtocolUtils.h"
-#include "mozilla/GeckoArgs.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationChild.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationParent.h"
 #include "mozilla/naivefox/PNativeStylePreloadActivationRequestChild.h"
@@ -46,8 +49,8 @@
 #include "nsNetCID.h"
 #include "nsServiceManagerUtils.h"
 #include "nsTHashMap.h"
-#include "nsThreadUtils.h"
 #include "nsThreadManager.h"
+#include "nsThreadUtils.h"
 #include "nsXPCOM.h"
 
 namespace mozilla::naivefox {
@@ -2182,73 +2185,111 @@ namespace {
 
 constexpr uint32_t kActivationProcessAdmissionTimeoutMs = 10000;
 
-class ProcessAdmissionState final {
+class ActivationProcessServiceParent;
+
+class ProcessServiceState final {
  public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ProcessAdmissionState)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ProcessServiceState)
 
-  void LaunchFailed(nsresult aStatus) {
-    MOZ_ASSERT(NS_IsMainThread());
-    if (!mTerminal) {
-      mStatus = aStatus;
-      mTerminal = true;
-    }
-  }
+  struct Route final {
+    uint64_t mGeneration = 0;
+    NativeStylePreloadProcessRootCallbacks mCallbacks;
+    uint32_t mOutstandingStyles = 0;
+    bool mReady = false;
+    bool mFinished = false;
+  };
 
-  void SetLaunched(base::ProcessHandle aProcess) {
-    MOZ_ASSERT(NS_IsMainThread());
-    mProcess = aProcess;
-  }
+  struct StyleOwner final {
+    uint64_t mRequestId = 0;
+    uint64_t mGeneration = 0;
+  };
 
-  void HelloAccepted() {
-    MOZ_ASSERT(NS_IsMainThread());
-    mHelloAccepted = true;
-  }
-
-  void ActorDestroyed(bool aExpected) {
-    MOZ_ASSERT(NS_IsMainThread());
-    if (!mTerminal) {
-      mStatus = aExpected && mHelloAccepted ? NS_OK : NS_ERROR_FAILURE;
-      mTerminal = true;
-    }
-  }
-
-  bool IsTerminal() const {
-    MOZ_ASSERT(NS_IsMainThread());
-    return mTerminal;
-  }
-
-  nsresult Status() const {
-    MOZ_ASSERT(NS_IsMainThread());
-    return mStatus;
-  }
-
-  base::ProcessHandle TakeProcess() {
-    MOZ_ASSERT(NS_IsMainThread());
-    return std::exchange(mProcess, base::kInvalidProcessHandle);
-  }
+  nsresult BeginLaunch();
+  void SetLaunched(base::ProcessHandle aProcess,
+                   RefPtr<ipc::NodeChannel>&& aNodeChannel);
+  void SetActor(ActivationProcessServiceParent* aActor);
+  void LaunchFailed(nsresult aStatus);
+  void HelloAccepted();
+  void ActorDestroyed(bool aExpected);
+  bool IsReady() const;
+  bool HasFailed() const;
+  nsresult Status() const;
+  nsresult StartRoot(NativeRootReplacementActivationDescriptor&& aDescriptor,
+                     uint32_t aMaximumBodyBytes,
+                     NativeStylePreloadProcessRootCallbacks&& aCallbacks,
+                     uint64_t& aRequestId);
+  nsresult SendRootData(uint64_t aRequestId, uint64_t aGeneration,
+                        uint32_t aSequence, nsCString&& aData);
+  nsresult SendRootStop(uint64_t aRequestId, uint64_t aGeneration,
+                        uint32_t aSequence, nsresult aStatus);
+  void CancelRoot(uint64_t aRequestId, uint64_t aGeneration, nsresult aStatus);
+  nsresult CompleteStyle(uint64_t aStyleRequestId, nsresult aStatus);
+  nsresult RootReady(uint64_t aRequestId, uint64_t aGeneration);
+  nsresult StyleDiscovered(const NativeStylePreloadProcessArgs& aArgs);
+  void RouteFailed(uint64_t aRequestId, uint64_t aGeneration, nsresult aStatus);
+  void RootFinished(uint64_t aRequestId, uint64_t aGeneration,
+                    uint32_t aLastSequence, uint32_t aBodyBytes,
+                    uint32_t aStyleCount, nsresult aStatus);
+  void TransportFailed(nsresult aStatus);
+  void BeginShutdown();
+  bool IsShutdownComplete() const;
+  base::ProcessHandle TakeProcess();
 
  private:
-  ~ProcessAdmissionState() = default;
+  ~ProcessServiceState() = default;
 
+  Route* LookupRoute(uint64_t aRequestId, uint64_t aGeneration);
+  void FailAll(nsresult aStatus);
+
+  nsTHashMap<nsUint64HashKey, UniquePtr<Route>> mRoutes;
+  nsTHashMap<nsUint64HashKey, StyleOwner> mStyleOwners;
+  RefPtr<ActivationProcessServiceParent> mActor;
+  RefPtr<ipc::NodeChannel> mNodeChannel;
   base::ProcessHandle mProcess = base::kInvalidProcessHandle;
+  uint64_t mNextRequestId = 1;
   nsresult mStatus = NS_ERROR_FAILURE;
-  bool mHelloAccepted = false;
-  bool mTerminal = false;
+  bool mReady = false;
+  bool mFailed = false;
+  bool mShuttingDown = false;
+  bool mActorDestroyed = false;
 };
 
-class ActivationProcessParent final : public PNativeStylePreloadProcessParent {
- public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ActivationProcessParent, override)
+StaticRefPtr<ProcessServiceState> sProcessServiceState;
 
-  ActivationProcessParent(ProcessAdmissionState* aState,
-                          base::ProcessId aExpectedChildPid,
-                          base::ProcessId aExpectedParentPid)
+class ActivationProcessServiceParent final
+    : public PNativeStylePreloadProcessParent {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ActivationProcessServiceParent,
+                                        override)
+
+  ActivationProcessServiceParent(ProcessServiceState* aState,
+                                 base::ProcessId aExpectedChildPid,
+                                 base::ProcessId aExpectedParentPid)
       : mState(aState),
         mExpectedChildPid(aExpectedChildPid),
         mExpectedParentPid(aExpectedParentPid) {}
 
+  NativeStylePreloadProcessParentBridge* Bridge() const {
+    return mBridge.get();
+  }
+
+  nsresult BeginShutdown() {
+    MOZ_ASSERT(NS_IsMainThread());
+    if (mShutdownSent || !mHelloReceived || !mBridge) {
+      return NS_ERROR_UNEXPECTED;
+    }
+    mShutdownSent = true;
+    return SendShutdown() ? NS_OK : NS_ERROR_FAILURE;
+  }
+
+  already_AddRefed<PNativeStylePreloadProcessStyleParent>
+  AllocPNativeStylePreloadProcessStyleParent(
+      const NativeStylePreloadProcessArgs& aArgs) final {
+    return mBridge ? mBridge->AllocStyle(aArgs) : nullptr;
+  }
+
  private:
-  ~ActivationProcessParent() = default;
+  ~ActivationProcessServiceParent() = default;
 
   IPCResult RecvHello(const uint64_t& aChildPid,
                       const uint64_t& aObservedParentPid) final {
@@ -2258,29 +2299,56 @@ class ActivationProcessParent final : public PNativeStylePreloadProcessParent {
         OtherPid() != mExpectedChildPid) {
       return IPC_FAIL_NO_REASON(this);
     }
+    NativeStylePreloadProcessParentBridge::Callbacks callbacks;
+    callbacks.mRootReady = [state = mState.get()](uint64_t aRequestId,
+                                                  uint64_t aGeneration) {
+      return state->RootReady(aRequestId, aGeneration);
+    };
+    callbacks.mStyleDiscovered =
+        [state = mState.get()](const NativeStylePreloadProcessArgs& aArgs) {
+          return state->StyleDiscovered(aArgs);
+        };
+    callbacks.mRootFinished = [state = mState.get()](
+                                  uint64_t aRequestId, uint64_t aGeneration,
+                                  uint32_t aLastSequence, uint32_t aBodyBytes,
+                                  uint32_t aStyleCount, nsresult aStatus) {
+      state->RootFinished(aRequestId, aGeneration, aLastSequence, aBodyBytes,
+                          aStyleCount, aStatus);
+    };
+    callbacks.mRootFailed = [state = mState.get()](uint64_t aRequestId,
+                                                   uint64_t aGeneration,
+                                                   nsresult aStatus) {
+      state->RouteFailed(aRequestId, aGeneration, aStatus);
+    };
+    callbacks.mTransportFailed = [state = mState.get()](nsresult aStatus) {
+      state->TransportFailed(aStatus);
+    };
+    mBridge = MakeUnique<NativeStylePreloadProcessParentBridge>(
+        this, std::move(callbacks));
     mHelloReceived = true;
     mState->HelloAccepted();
     RuntimeLogEvent(
         "Native activation process phase=hello parent_pid=%llu "
-        "child_pid=%llu cross_process=1\n",
+        "child_pid=%llu cross_process=1 persistent=1\n",
         static_cast<unsigned long long>(mExpectedParentPid),
         static_cast<unsigned long long>(mExpectedChildPid));
-    if (!SendShutdown()) {
-      return IPC_FAIL_NO_REASON(this);
-    }
-    mShutdownSent = true;
     return IPC_OK();
   }
 
   void ActorDestroy(IProtocol::ActorDestroyReason aWhy) final {
     MOZ_ASSERT(NS_IsMainThread());
+    if (mBridge) {
+      mBridge->ProcessActorDestroyed();
+      mBridge = nullptr;
+    }
     mState->ActorDestroyed(mHelloReceived && mShutdownSent &&
                            (aWhy == Deletion || aWhy == NormalShutdown));
   }
 
-  const RefPtr<ProcessAdmissionState> mState;
+  const RefPtr<ProcessServiceState> mState;
   const base::ProcessId mExpectedChildPid;
   const base::ProcessId mExpectedParentPid;
+  UniquePtr<NativeStylePreloadProcessParentBridge> mBridge;
   bool mHelloReceived = false;
   bool mShutdownSent = false;
 };
@@ -2293,7 +2361,18 @@ class ActivationProcessChild final : public PNativeStylePreloadProcessChild {
       : mParentPid(aParentPid), mDone(aDone) {}
 
   bool Start() {
+    mBridge = MakeUnique<NativeStylePreloadProcessChildBridge>(this);
+    if (NS_FAILED(mBridge->Initialize())) {
+      mBridge = nullptr;
+      return false;
+    }
     return SendHello(uint64_t(base::GetCurrentProcId()), uint64_t(mParentPid));
+  }
+
+  already_AddRefed<PNativeStylePreloadProcessRootChild>
+  AllocPNativeStylePreloadProcessRootChild(const uint64_t& aRequestId,
+                                           const uint64_t& aGeneration) final {
+    return mBridge ? mBridge->AllocRoot(aRequestId, aGeneration) : nullptr;
   }
 
  private:
@@ -2305,22 +2384,30 @@ class ActivationProcessChild final : public PNativeStylePreloadProcessChild {
       return IPC_FAIL_NO_REASON(this);
     }
     mShutdownReceived = true;
+    if (mBridge) {
+      mBridge->Shutdown();
+    }
     Close();
     return IPC_OK();
   }
 
   void ActorDestroy(IProtocol::ActorDestroyReason) final {
     MOZ_ASSERT(NS_IsMainThread());
+    if (mBridge) {
+      mBridge->ProcessActorDestroyed();
+      mBridge = nullptr;
+    }
     *mDone = true;
   }
 
   const base::ProcessId mParentPid;
   bool* const mDone;
+  UniquePtr<NativeStylePreloadProcessChildBridge> mBridge;
   bool mShutdownReceived = false;
 };
 
 #if defined(XP_UNIX) && !defined(ANDROID)
-void LaunchActivationProcess(ProcessAdmissionState* aState) {
+void LaunchActivationProcessService(ProcessServiceState* aState) {
   MOZ_ASSERT(ipc::IOThread::Get()->GetEventTarget()->IsOnCurrentThread());
 
   IPC::Channel::ChannelHandle clientHandle;
@@ -2329,7 +2416,7 @@ void LaunchActivationProcess(ProcessAdmissionState* aState) {
   if (!ipc::NodeController::GetSingleton()->InviteChildProcess(
           nullptr, &clientHandle, &initialPort, &rawNodeChannel)) {
     (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "NaiveFox::ActivationProcessInviteFailed",
+        "NaiveFox::ActivationProcessServiceInviteFailed",
         [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
     return;
   }
@@ -2338,7 +2425,7 @@ void LaunchActivationProcess(ProcessAdmissionState* aState) {
   auto* unixHandle = std::get_if<UniqueFileHandle>(&clientHandle);
   if (!unixHandle || !*unixHandle) {
     (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "NaiveFox::ActivationProcessHandleFailed",
+        "NaiveFox::ActivationProcessServiceHandleFailed",
         [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
     return;
   }
@@ -2357,14 +2444,13 @@ void LaunchActivationProcess(ProcessAdmissionState* aState) {
       readlink("/proc/self/exe", executablePath, PATH_MAX);
   if (executableLength <= 0 || executableLength > PATH_MAX) {
     (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "NaiveFox::ActivationProcessExecutableFailed",
+        "NaiveFox::ActivationProcessServiceExecutableFailed",
         [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
     return;
   }
   executablePath[executableLength] = '\0';
 
-  std::vector<std::string> argv{executablePath,
-                                "--naivefox-activation-child"};
+  std::vector<std::string> argv{executablePath, "--naivefox-activation-child"};
   argv.insert(argv.end(), childArgs.mArgs.begin(), childArgs.mArgs.end());
   base::LaunchOptions options;
   geckoargs::AddToFdsToRemap(childArgs, options.fds_to_remap);
@@ -2372,7 +2458,7 @@ void LaunchActivationProcess(ProcessAdmissionState* aState) {
   if (base::LaunchApp(argv, std::move(options), &childProcess).isErr() ||
       childProcess == base::kInvalidProcessHandle) {
     (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "NaiveFox::ActivationProcessLaunchFailed",
+        "NaiveFox::ActivationProcessServiceLaunchFailed",
         [state = RefPtr{aState}]() { state->LaunchFailed(NS_ERROR_FAILURE); }));
     return;
   }
@@ -2382,21 +2468,362 @@ void LaunchActivationProcess(ProcessAdmissionState* aState) {
       ipc::EndpointProcInfo::Current(),
       ipc::EndpointProcInfo{.mPid = childProcess, .mChildID = 1});
   nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
-      "NaiveFox::BindActivationProcessParent",
+      "NaiveFox::BindActivationProcessServiceParent",
       [state = RefPtr{aState}, endpoint = std::move(endpoint), childProcess,
        parentPid, nodeChannel = std::move(nodeChannel)]() mutable {
-        state->SetLaunched(childProcess);
-        RefPtr<ActivationProcessParent> actor =
-            new ActivationProcessParent(state, childProcess, parentPid);
+        state->SetLaunched(childProcess, std::move(nodeChannel));
+        RefPtr actor =
+            new ActivationProcessServiceParent(state, childProcess, parentPid);
+        state->SetActor(actor);
         if (!endpoint.Bind(actor)) {
           state->LaunchFailed(NS_ERROR_FAILURE);
         }
       }));
   if (NS_FAILED(rv)) {
     (void)base::KillProcess(childProcess, 1);
+    int processInfo = 0;
+    (void)base::WaitForProcess(childProcess, base::BlockingWait::Yes,
+                               &processInfo);
+    (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::ActivationProcessServiceBindDispatchFailed",
+        [state = RefPtr{aState}, rv]() { state->LaunchFailed(rv); }));
   }
 }
 #endif
+
+nsresult ProcessServiceState::BeginLaunch() {
+  MOZ_ASSERT(NS_IsMainThread());
+#if !defined(XP_UNIX) || defined(ANDROID)
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
+  if (mProcess != base::kInvalidProcessHandle || mActor || mReady || mFailed ||
+      mShuttingDown) {
+    return NS_ERROR_ALREADY_INITIALIZED;
+  }
+  if (!ipc::IOThread::Get()) {
+    ipc::IOThread::Startup();
+  }
+  return ipc::IOThread::Get()->GetEventTarget()->Dispatch(
+      NS_NewRunnableFunction(
+          "NaiveFox::LaunchActivationProcessService",
+          [self = RefPtr{this}]() { LaunchActivationProcessService(self); }));
+#endif
+}
+
+void ProcessServiceState::SetLaunched(base::ProcessHandle aProcess,
+                                      RefPtr<ipc::NodeChannel>&& aNodeChannel) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mProcess != base::kInvalidProcessHandle || mFailed || mShuttingDown ||
+      aProcess == base::kInvalidProcessHandle || !aNodeChannel) {
+    if (aProcess != base::kInvalidProcessHandle) {
+      (void)base::KillProcess(aProcess, 1);
+      int processInfo = 0;
+      (void)base::WaitForProcess(aProcess, base::BlockingWait::Yes,
+                                 &processInfo);
+    }
+    LaunchFailed(NS_ERROR_FAILURE);
+    return;
+  }
+  mProcess = aProcess;
+  mNodeChannel = std::move(aNodeChannel);
+}
+
+void ProcessServiceState::SetActor(ActivationProcessServiceParent* aActor) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!aActor || mActor || mFailed || mShuttingDown) {
+    LaunchFailed(NS_ERROR_FAILURE);
+    return;
+  }
+  mActor = aActor;
+}
+
+void ProcessServiceState::LaunchFailed(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mFailed || mShuttingDown) {
+    return;
+  }
+  mStatus = NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE;
+  mFailed = true;
+  FailAll(mStatus);
+}
+
+void ProcessServiceState::HelloAccepted() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mReady || mFailed || mShuttingDown || !mActor || !mActor->Bridge()) {
+    LaunchFailed(NS_ERROR_UNEXPECTED);
+    return;
+  }
+  mReady = true;
+  mStatus = NS_OK;
+}
+
+void ProcessServiceState::ActorDestroyed(bool aExpected) {
+  MOZ_ASSERT(NS_IsMainThread());
+  mActorDestroyed = true;
+  mActor = nullptr;
+  mNodeChannel = nullptr;
+  if (!mShuttingDown || !aExpected) {
+    TransportFailed(NS_ERROR_FAILURE);
+  }
+}
+
+bool ProcessServiceState::IsReady() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  return mReady && !mFailed && !mShuttingDown && mActor && mActor->Bridge();
+}
+
+bool ProcessServiceState::HasFailed() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  return mFailed;
+}
+
+nsresult ProcessServiceState::Status() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  return mStatus;
+}
+
+ProcessServiceState::Route* ProcessServiceState::LookupRoute(
+    uint64_t aRequestId, uint64_t aGeneration) {
+  auto* route = mRoutes.Lookup(aRequestId).DataPtrOrNull();
+  return route && *route && (*route)->mGeneration == aGeneration ? route->get()
+                                                                 : nullptr;
+}
+
+nsresult ProcessServiceState::StartRoot(
+    NativeRootReplacementActivationDescriptor&& aDescriptor,
+    uint32_t aMaximumBodyBytes,
+    NativeStylePreloadProcessRootCallbacks&& aCallbacks, uint64_t& aRequestId) {
+  MOZ_ASSERT(NS_IsMainThread());
+  aRequestId = 0;
+  if (!IsReady() || !aDescriptor.mGeneration || !aMaximumBodyBytes ||
+      !aCallbacks.mReady || !aCallbacks.mStyleDiscovered ||
+      !aCallbacks.mFinished || !aCallbacks.mFailed || !mNextRequestId) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  const uint64_t requestId = mNextRequestId++;
+  auto route = MakeUnique<Route>();
+  route->mGeneration = aDescriptor.mGeneration;
+  route->mCallbacks = std::move(aCallbacks);
+  mRoutes.InsertOrUpdate(requestId, std::move(route));
+  NativeRootReplacementActivationArgs args =
+      SerializeRootDescriptor(requestId, aDescriptor);
+  nsresult rv = mActor->Bridge()->StartRoot(
+      std::move(args), uint64_t(base::GetCurrentProcId()),
+      uint64_t(base::GetProcId(mProcess)), aMaximumBodyBytes);
+  if (NS_FAILED(rv)) {
+    mRoutes.Remove(requestId);
+    return rv;
+  }
+  aRequestId = requestId;
+  return NS_OK;
+}
+
+nsresult ProcessServiceState::SendRootData(uint64_t aRequestId,
+                                           uint64_t aGeneration,
+                                           uint32_t aSequence,
+                                           nsCString&& aData) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!IsReady() || !LookupRoute(aRequestId, aGeneration)) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  return mActor->Bridge()->SendRootData(aRequestId, aGeneration, aSequence,
+                                        std::move(aData));
+}
+
+nsresult ProcessServiceState::SendRootStop(uint64_t aRequestId,
+                                           uint64_t aGeneration,
+                                           uint32_t aSequence,
+                                           nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!IsReady() || !LookupRoute(aRequestId, aGeneration)) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  return mActor->Bridge()->SendRootStop(aRequestId, aGeneration, aSequence,
+                                        aStatus);
+}
+
+void ProcessServiceState::CancelRoot(uint64_t aRequestId, uint64_t aGeneration,
+                                     nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  Route* route = LookupRoute(aRequestId, aGeneration);
+  if (!route) {
+    return;
+  }
+  if (IsReady()) {
+    mActor->Bridge()->CancelRoot(aRequestId, aGeneration,
+                                 NS_FAILED(aStatus) ? aStatus : NS_ERROR_ABORT);
+  }
+  nsTArray<uint64_t> styles;
+  for (auto iter = mStyleOwners.Iter(); !iter.Done(); iter.Next()) {
+    if (iter.Data().mRequestId == aRequestId &&
+        iter.Data().mGeneration == aGeneration) {
+      styles.AppendElement(iter.Key());
+    }
+  }
+  for (uint64_t styleId : styles) {
+    if (IsReady()) {
+      (void)mActor->Bridge()->CompleteStyle(
+          styleId, NS_FAILED(aStatus) ? aStatus : NS_ERROR_ABORT);
+    }
+    mStyleOwners.Remove(styleId);
+  }
+  mRoutes.Remove(aRequestId);
+}
+
+nsresult ProcessServiceState::CompleteStyle(uint64_t aStyleRequestId,
+                                            nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  auto* owner = mStyleOwners.Lookup(aStyleRequestId).DataPtrOrNull();
+  if (!IsReady() || !owner) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  nsresult rv = mActor->Bridge()->CompleteStyle(aStyleRequestId, aStatus);
+  if (NS_SUCCEEDED(rv)) {
+    const StyleOwner completedOwner = *owner;
+    mStyleOwners.Remove(aStyleRequestId);
+    Route* route =
+        LookupRoute(completedOwner.mRequestId, completedOwner.mGeneration);
+    if (route) {
+      MOZ_RELEASE_ASSERT(route->mOutstandingStyles);
+      --route->mOutstandingStyles;
+      if (route->mFinished && !route->mOutstandingStyles) {
+        mRoutes.Remove(completedOwner.mRequestId);
+      }
+    }
+  }
+  return rv;
+}
+
+nsresult ProcessServiceState::RootReady(uint64_t aRequestId,
+                                        uint64_t aGeneration) {
+  MOZ_ASSERT(NS_IsMainThread());
+  Route* route = LookupRoute(aRequestId, aGeneration);
+  if (!route || route->mReady) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  route->mReady = true;
+  return route->mCallbacks.mReady();
+}
+
+nsresult ProcessServiceState::StyleDiscovered(
+    const NativeStylePreloadProcessArgs& aArgs) {
+  MOZ_ASSERT(NS_IsMainThread());
+  Route* route = LookupRoute(aArgs.rootRequestId(), aArgs.rootGeneration());
+  if (!route || !route->mReady || !aArgs.styleRequestId() ||
+      mStyleOwners.Contains(aArgs.styleRequestId())) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  NativeStylePreloadProcessDescriptor descriptor;
+  descriptor.mRootRequestId = aArgs.rootRequestId();
+  descriptor.mRootGeneration = aArgs.rootGeneration();
+  descriptor.mStyleRequestId = aArgs.styleRequestId();
+  descriptor.mDiscoverySequence = aArgs.discoverySequence();
+  descriptor.mUrl = aArgs.descriptor().url();
+  descriptor.mCharset = aArgs.descriptor().charset();
+  descriptor.mCrossOrigin = aArgs.descriptor().crossOrigin();
+  descriptor.mMedia = aArgs.descriptor().media();
+  descriptor.mReferrerPolicy = aArgs.descriptor().referrerPolicy();
+  descriptor.mNonce = aArgs.descriptor().nonce();
+  descriptor.mIntegrity = aArgs.descriptor().integrity();
+  descriptor.mFetchPriority = aArgs.descriptor().fetchPriority();
+  descriptor.mLinkPreload = aArgs.descriptor().linkPreload();
+  StyleOwner owner{aArgs.rootRequestId(), aArgs.rootGeneration()};
+  mStyleOwners.InsertOrUpdate(aArgs.styleRequestId(), owner);
+  ++route->mOutstandingStyles;
+  return route->mCallbacks.mStyleDiscovered(descriptor);
+}
+
+void ProcessServiceState::RouteFailed(uint64_t aRequestId, uint64_t aGeneration,
+                                      nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  Route* route = LookupRoute(aRequestId, aGeneration);
+  if (!route) {
+    return;
+  }
+  auto failed = std::move(route->mCallbacks.mFailed);
+  CancelRoot(aRequestId, aGeneration,
+             NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
+  if (failed) {
+    failed(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
+  }
+}
+
+void ProcessServiceState::RootFinished(uint64_t aRequestId,
+                                       uint64_t aGeneration,
+                                       uint32_t aLastSequence,
+                                       uint32_t aBodyBytes,
+                                       uint32_t aStyleCount, nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  Route* route = LookupRoute(aRequestId, aGeneration);
+  if (!route) {
+    TransportFailed(NS_ERROR_UNEXPECTED);
+    return;
+  }
+  if (route->mFinished) {
+    TransportFailed(NS_ERROR_UNEXPECTED);
+    return;
+  }
+  route->mFinished = true;
+  auto finished = std::move(route->mCallbacks.mFinished);
+  finished(aLastSequence, aBodyBytes, aStyleCount, aStatus);
+  route = LookupRoute(aRequestId, aGeneration);
+  if (route && !route->mOutstandingStyles) {
+    mRoutes.Remove(aRequestId);
+  }
+}
+
+void ProcessServiceState::TransportFailed(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mShuttingDown) {
+    return;
+  }
+  mReady = false;
+  mStatus = NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE;
+  mFailed = true;
+  FailAll(mStatus);
+}
+
+void ProcessServiceState::FailAll(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  nsTArray<std::function<void(nsresult)>> callbacks;
+  for (auto iter = mRoutes.Iter(); !iter.Done(); iter.Next()) {
+    if (iter.Data() && iter.Data()->mCallbacks.mFailed) {
+      callbacks.AppendElement(std::move(iter.Data()->mCallbacks.mFailed));
+    }
+  }
+  mRoutes.Clear();
+  mStyleOwners.Clear();
+  for (auto& callback : callbacks) {
+    callback(aStatus);
+  }
+}
+
+void ProcessServiceState::BeginShutdown() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mShuttingDown) {
+    return;
+  }
+  mShuttingDown = true;
+  mReady = false;
+  FailAll(NS_ERROR_ABORT);
+  if (mActor) {
+    if (NS_FAILED(mActor->BeginShutdown())) {
+      mActor->Close();
+    }
+  } else {
+    mActorDestroyed = true;
+  }
+}
+
+bool ProcessServiceState::IsShutdownComplete() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  return mActorDestroyed;
+}
+
+base::ProcessHandle ProcessServiceState::TakeProcess() {
+  MOZ_ASSERT(NS_IsMainThread());
+  return std::exchange(mProcess, base::kInvalidProcessHandle);
+}
 
 }  // namespace
 
@@ -2523,51 +2950,152 @@ void NativeStylePreloadActivation::CancelRootReplacement(uint64_t aRequestId) {
   }
 }
 
-nsresult NativeStylePreloadActivation::RunProcessBootstrapAdmission() {
+static nsresult ShutdownActivationProcessService() {
   MOZ_ASSERT(NS_IsMainThread());
-#if !defined(XP_UNIX) || defined(ANDROID)
-  return NS_ERROR_NOT_IMPLEMENTED;
-#else
-  if (!ipc::IOThread::Get()) {
-    ipc::IOThread::Startup();
+  if (!sProcessServiceState) {
+    return NS_OK;
   }
-  RefPtr<ProcessAdmissionState> state = new ProcessAdmissionState();
-  nsresult rv = ipc::IOThread::Get()->GetEventTarget()->Dispatch(
-      NS_NewRunnableFunction("NaiveFox::LaunchActivationProcess",
-                             [state]() { LaunchActivationProcess(state); }));
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
+  RefPtr<ProcessServiceState> state = sProcessServiceState.forget();
+  state->BeginShutdown();
 
   nsCOMPtr<nsITimer> deadline;
-  MOZ_TRY(NS_NewTimerWithCallback(
-      getter_AddRefs(deadline),
-      [state](nsITimer*) { state->LaunchFailed(NS_ERROR_NET_TIMEOUT); },
-      kActivationProcessAdmissionTimeoutMs, nsITimer::TYPE_ONE_SHOT,
-      "NaiveFox::ActivationProcessAdmissionTimeout"_ns));
-  const bool processed = SpinEventLoopUntil(
-      "NaiveFox::ActivationProcessAdmission"_ns,
-      [&]() { return state->IsTerminal(); });
-  (void)deadline->Cancel();
-  if (!processed) {
-    return NS_ERROR_FAILURE;
+  bool timedOut = false;
+  if (NS_SUCCEEDED(NS_NewTimerWithCallback(
+          getter_AddRefs(deadline), [&timedOut](nsITimer*) { timedOut = true; },
+          kActivationProcessAdmissionTimeoutMs, nsITimer::TYPE_ONE_SHOT,
+          "NaiveFox::ActivationProcessShutdownTimeout"_ns))) {
+    (void)SpinEventLoopUntil("NaiveFox::ActivationProcessShutdown"_ns, [&]() {
+      return state->IsShutdownComplete() || timedOut;
+    });
+    (void)deadline->Cancel();
   }
 
-  const nsresult status = state->Status();
+  bool graceful = state->IsShutdownComplete();
   const base::ProcessHandle childProcess = state->TakeProcess();
   if (childProcess != base::kInvalidProcessHandle) {
-    if (NS_FAILED(status)) {
+    if (!graceful) {
       (void)base::KillProcess(childProcess, 1);
     }
     int processInfo = 0;
     const base::ProcessStatus processStatus = base::WaitForProcess(
         childProcess, base::BlockingWait::Yes, &processInfo);
-    if (NS_SUCCEEDED(status) &&
-        (processStatus != base::ProcessStatus::Exited || processInfo != 0)) {
-      return NS_ERROR_FAILURE;
-    }
+    graceful &=
+        processStatus == base::ProcessStatus::Exited && processInfo == 0;
   }
-  return status;
+  return graceful ? NS_OK : NS_ERROR_FAILURE;
+}
+
+nsresult NativeStylePreloadActivation::InitializeProcess() {
+  MOZ_ASSERT(NS_IsMainThread());
+#if !defined(XP_UNIX) || defined(ANDROID)
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
+  if (sProcessServiceState) {
+    return sProcessServiceState->IsReady() ? NS_OK
+                                           : NS_ERROR_ALREADY_INITIALIZED;
+  }
+  RefPtr<ProcessServiceState> state = new ProcessServiceState();
+  MOZ_TRY(state->BeginLaunch());
+  sProcessServiceState = state;
+
+  nsCOMPtr<nsITimer> deadline;
+  nsresult rv = NS_NewTimerWithCallback(
+      getter_AddRefs(deadline),
+      [state](nsITimer*) { state->LaunchFailed(NS_ERROR_NET_TIMEOUT); },
+      kActivationProcessAdmissionTimeoutMs, nsITimer::TYPE_ONE_SHOT,
+      "NaiveFox::ActivationProcessStartupTimeout"_ns);
+  if (NS_FAILED(rv)) {
+    state->LaunchFailed(rv);
+  }
+  const bool processed = SpinEventLoopUntil(
+      "NaiveFox::ActivationProcessStartup"_ns,
+      [&]() { return state->IsReady() || state->HasFailed(); });
+  if (deadline) {
+    (void)deadline->Cancel();
+  }
+  if (!processed || !state->IsReady()) {
+    const nsresult status = processed ? state->Status() : NS_ERROR_FAILURE;
+    ShutdownProcess();
+    return status;
+  }
+  return NS_OK;
+#endif
+}
+
+bool NativeStylePreloadActivation::IsProcessReady() {
+  MOZ_ASSERT(NS_IsMainThread());
+  return sProcessServiceState && sProcessServiceState->IsReady();
+}
+
+void NativeStylePreloadActivation::ShutdownProcess() {
+  MOZ_ASSERT(NS_IsMainThread());
+  (void)ShutdownActivationProcessService();
+}
+
+nsresult NativeStylePreloadActivation::StartProcessRoot(
+    NativeRootReplacementActivationDescriptor&& aDescriptor,
+    uint32_t aMaximumBodyBytes,
+    NativeStylePreloadProcessRootCallbacks&& aCallbacks, uint64_t& aRequestId) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!sProcessServiceState) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  return sProcessServiceState->StartRoot(std::move(aDescriptor),
+                                         aMaximumBodyBytes,
+                                         std::move(aCallbacks), aRequestId);
+}
+
+nsresult NativeStylePreloadActivation::ForwardProcessRootData(
+    uint64_t aRequestId, uint64_t aGeneration, uint32_t aSequence,
+    nsCString&& aData) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!sProcessServiceState) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  return sProcessServiceState->SendRootData(aRequestId, aGeneration, aSequence,
+                                            std::move(aData));
+}
+
+nsresult NativeStylePreloadActivation::ForwardProcessRootStop(
+    uint64_t aRequestId, uint64_t aGeneration, uint32_t aSequence,
+    nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!sProcessServiceState) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  return sProcessServiceState->SendRootStop(aRequestId, aGeneration, aSequence,
+                                            aStatus);
+}
+
+void NativeStylePreloadActivation::CancelProcessRoot(uint64_t aRequestId,
+                                                     uint64_t aGeneration,
+                                                     nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (sProcessServiceState) {
+    sProcessServiceState->CancelRoot(aRequestId, aGeneration, aStatus);
+  }
+}
+
+nsresult NativeStylePreloadActivation::CompleteProcessStyle(
+    uint64_t aStyleRequestId, nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!sProcessServiceState) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  return sProcessServiceState->CompleteStyle(aStyleRequestId, aStatus);
+}
+
+nsresult NativeStylePreloadActivation::RunProcessBootstrapAdmission() {
+  MOZ_ASSERT(NS_IsMainThread());
+#if !defined(XP_UNIX) || defined(ANDROID)
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
+  MOZ_TRY(InitializeProcess());
+  if (!IsProcessReady()) {
+    ShutdownProcess();
+    return NS_ERROR_FAILURE;
+  }
+  return ShutdownActivationProcessService();
 #endif
 }
 
@@ -2575,14 +3103,21 @@ int RunNativeStylePreloadActivationChild(int aArgc, char* aArgv[]) {
 #if !defined(XP_UNIX) || defined(ANDROID)
   return 2;
 #else
+  nsAutoCString loggingError;
+  if (NS_FAILED(ConfigureRuntimeLogging(RuntimeLogMode::Console, EmptyCString(),
+                                        loggingError))) {
+    std::fprintf(stderr, "NaiveFox activation child logging error: %s\n",
+                 loggingError.get());
+    return 2;
+  }
+  auto runtimeLogging = MakeScopeExit([] { ShutdownRuntimeLogging(); });
   base::AtExitManager atExit;
   MessageLoopForUI mainLoop(MessageLoop::TYPE_MOZILLA_CHILD);
   NS_LogInit();
   auto logging = MakeScopeExit([] { NS_LogTerm(); });
   LogModule::Init(aArgc, aArgv);
 
-  Maybe<UniqueFileHandle> ipcHandle =
-      geckoargs::sIPCHandle.Get(aArgc, aArgv);
+  Maybe<UniqueFileHandle> ipcHandle = geckoargs::sIPCHandle.Get(aArgc, aArgv);
   Maybe<uint64_t> parentPid = geckoargs::sParentPid.Get(aArgc, aArgv);
   Maybe<const char*> channelIdString =
       geckoargs::sInitialChannelID.Get(aArgc, aArgv);
@@ -2606,7 +3141,8 @@ int RunNativeStylePreloadActivationChild(int aArgc, char* aArgv[]) {
   Endpoint<PNativeStylePreloadProcessChild> endpoint(
       ipc::PrivateIPDLInterface{}, ioThread->TakeInitialPort(), channelId,
       ipc::EndpointProcInfo::Current(),
-      ipc::EndpointProcInfo{.mPid = base::ProcessId(*parentPid), .mChildID = 0});
+      ipc::EndpointProcInfo{.mPid = base::ProcessId(*parentPid),
+                            .mChildID = 0});
 
   bool done = false;
   RefPtr<ActivationProcessChild> actor =

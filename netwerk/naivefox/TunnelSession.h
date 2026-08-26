@@ -165,8 +165,8 @@ class TunnelSession final {
                             nsresult aStatus, uint32_t aHttpStatus,
                             uint32_t aBodyBytes, uint32_t aStartedResources,
                             uint32_t aCommittedResources,
-                            uint32_t aNativeCacheNewResources,
-                            bool aRootDone, bool aTerminalFallback);
+                            uint32_t aNativeCacheNewResources, bool aRootDone,
+                            bool aTerminalFallback);
   void FinishPreambleOperationOnMain(uint64_t aGeneration,
                                      ProxyProtocol aProtocol, nsresult aStatus,
                                      uint32_t aHttpStatus, uint32_t aBodyBytes,
@@ -179,6 +179,7 @@ class TunnelSession final {
                          const nsACString& aTargetAuthority);
   void NotifyOuterGateReady();
   void ReleaseOuterGate();
+  void FailPreambleOnMain(nsresult aStatus);
   void CancelRequestOnMain(nsresult aStatus);
   void ClearRequestOnMain(uint64_t aGeneration, nsIRequest* aRequest);
   void ApplyConnectMetadata(uint64_t aGeneration, ProxyProtocol aProtocol,

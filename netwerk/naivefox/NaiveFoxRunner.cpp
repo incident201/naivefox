@@ -11,8 +11,8 @@
 #include "GeckoRuntime.h"
 #include "HttpClient.h"
 #include "NaiveFoxAPI.h"
-#include "NeckoTunnel.h"
 #include "NativeStylePreloadActivation.h"
+#include "NeckoTunnel.h"
 #include "ProfilerControl.h"
 #include "ProxyProtocol.h"
 #include "RuntimeLogging.h"
@@ -89,26 +89,56 @@ const char* ProxyProtocolName(mozilla::naivefox::ProxyProtocol aProtocol) {
 
 mozilla::naivefox::ProxyProtocol RuntimeProtocol(
     const mozilla::naivefox::Config& aConfig) {
+  bool hasAuto = false;
   for (const auto& proxy : aConfig.mProxies) {
     if (proxy.mProtocol == mozilla::naivefox::ProxyProtocol::H3) {
       return mozilla::naivefox::ProxyProtocol::H3;
     }
+    hasAuto |= proxy.mProtocol == mozilla::naivefox::ProxyProtocol::Auto;
   }
-  return mozilla::naivefox::ProxyProtocol::H2;
+  return hasAuto ? mozilla::naivefox::ProxyProtocol::Auto
+                 : mozilla::naivefox::ProxyProtocol::H2;
+}
+
+template <typename Predicate>
+bool AnyEffectivePreambleMode(const mozilla::naivefox::Config& aConfig,
+                              Predicate&& aPredicate) {
+  for (const auto& proxy : aConfig.mProxies) {
+    if (proxy.mProtocol != mozilla::naivefox::ProxyProtocol::H3 &&
+        aPredicate(aConfig.mPreamble.ModeForProtocol(
+            mozilla::naivefox::ProxyProtocol::H2))) {
+      return true;
+    }
+    if (proxy.mProtocol != mozilla::naivefox::ProxyProtocol::H2 &&
+        aPredicate(aConfig.mPreamble.ModeForProtocol(
+            mozilla::naivefox::ProxyProtocol::H3))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool PreambleNeedsCacheRuntime(const mozilla::naivefox::Config& aConfig) {
-  const auto protocol = RuntimeProtocol(aConfig);
   return aConfig.mPreamble.mCacheResources ||
-         mozilla::naivefox::PreambleModeUsesNativeCacheOpen(
-             aConfig.mPreamble.ModeForProtocol(protocol));
+         AnyEffectivePreambleMode(aConfig, [](auto aMode) {
+           return mozilla::naivefox::PreambleModeUsesNativeCacheOpen(aMode);
+         });
 }
 
 bool PreambleNeedsNativeStyleActivationRuntime(
     const mozilla::naivefox::Config& aConfig) {
-  const auto protocol = RuntimeProtocol(aConfig);
-  return mozilla::naivefox::PreambleModeNeedsNativeStyleActivationRuntime(
-      aConfig.mPreamble.ModeForProtocol(protocol));
+  return AnyEffectivePreambleMode(aConfig, [](auto aMode) {
+    return mozilla::naivefox::PreambleModeNeedsNativeStyleActivationRuntime(
+        aMode);
+  });
+}
+
+bool PreambleNeedsNativeActivationProcessRuntime(
+    const mozilla::naivefox::Config& aConfig) {
+  return AnyEffectivePreambleMode(aConfig, [](auto aMode) {
+    return mozilla::naivefox::PreambleModeNeedsNativeActivationProcessRuntime(
+        aMode);
+  });
 }
 
 nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
@@ -225,7 +255,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
           nsDependentCString(aProfilePath), nsDependentCString(aRuntimePath),
           RuntimeProtocol(config), config.mNoPostQuantum,
           PreambleNeedsCacheRuntime(config),
-          PreambleNeedsNativeStyleActivationRuntime(config));
+          PreambleNeedsNativeStyleActivationRuntime(config),
+          PreambleNeedsNativeActivationProcessRuntime(config));
       if (NS_SUCCEEDED(rv)) {
         MarkEmbeddedRunning();
         mozilla::naivefox::RuntimeLogEvent(
@@ -283,10 +314,11 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     const auto runtimeProtocol = RuntimeProtocol(config);
 
     mozilla::naivefox::GeckoRuntime runtime;
-    rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol,
-                            config.mNoPostQuantum,
-                            PreambleNeedsCacheRuntime(config),
-                            PreambleNeedsNativeStyleActivationRuntime(config));
+    rv = runtime.Initialize(
+        aArgc, aArgv, profile.Path(), runtimeProtocol, config.mNoPostQuantum,
+        PreambleNeedsCacheRuntime(config),
+        PreambleNeedsNativeStyleActivationRuntime(config),
+        PreambleNeedsNativeActivationProcessRuntime(config));
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started listeners=%u upstreams=%u\n",

@@ -212,9 +212,7 @@ NATIVE_ROOT_PLAIN_PHASES = {
     "request-primary-actor-destroyed",
     "request-background-actor-destroyed",
 }
-NATIVE_ROOT_REQUIRED_PLAIN_PHASES = NATIVE_ROOT_PLAIN_PHASES - {
-    "background-wait"
-}
+NATIVE_ROOT_REQUIRED_PLAIN_PHASES = NATIVE_ROOT_PLAIN_PHASES - {"background-wait"}
 NATIVE_ROOT_PHASE = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Native root replacement activation "
     r"phase=(?P<phase>[a-z-]+) request=(?P<request>\d+)"
@@ -268,6 +266,432 @@ COLD_WINNER_HANDOFF = re.compile(
     r"protocol=(?P<protocol>h2|h3)$"
 )
 
+PROCESS_HELLO = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native activation process phase=hello "
+    r"parent_pid=(?P<parent>\d+) child_pid=(?P<child>\d+) "
+    r"cross_process=1 persistent=1$"
+)
+PROCESS_CHILD_RUNNING = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native activation process phase=child-running "
+    r"parent_pid=(?P<parent>\d+) child_pid=(?P<child>\d+)$"
+)
+PROCESS_PARENT_PHASE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) preamble "
+    r"native-parser-process phase=(?P<phase>[a-z0-9-]+) (?P<fields>.+) "
+    r"protocol=h3$"
+)
+PROCESS_CHILD_PHASE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Native activation child "
+    r"phase=(?P<phase>[a-z0-9-]+) (?P<fields>.+)$"
+)
+PROCESS_FIELD = re.compile(r"(?P<key>[a-z_]+)=(?P<value>[^ ]+)")
+
+
+def _process_fields(text):
+    fields = {}
+    position = 0
+    for match in PROCESS_FIELD.finditer(text):
+        if match.start() != position:
+            raise ValueError("malformed native parser process fields")
+        key = match["key"]
+        if key in fields:
+            raise ValueError("duplicate native parser process field")
+        fields[key] = match["value"]
+        position = match.end() + 1
+    if not fields or position - 1 != len(text):
+        raise ValueError("malformed native parser process fields")
+    return fields
+
+
+def _single_process_phase(markers, phase, side):
+    selected = [marker for marker in markers if marker["phase"] == phase]
+    if len(selected) != 1:
+        raise ValueError(
+            f"native parser process requires exactly one {side} {phase} marker"
+        )
+    return selected[0]
+
+
+def validate_native_parser_process(log_lines, expected_connection=None):
+    hellos = [
+        (index, match)
+        for index, line in enumerate(log_lines)
+        if (match := PROCESS_HELLO.fullmatch(line)) is not None
+    ]
+    if len(hellos) != 1:
+        raise ValueError("native parser process requires one persistent hello")
+    hello_index, hello = hellos[0]
+    parent_pid = int(hello["parent"])
+    child_pid = int(hello["child"])
+    if not parent_pid or not child_pid or parent_pid == child_pid:
+        raise ValueError("native parser process did not prove distinct PIDs")
+    running = [
+        match
+        for line in log_lines
+        if (match := PROCESS_CHILD_RUNNING.fullmatch(line)) is not None
+    ]
+    if (
+        len(running) != 1
+        or int(running[0]["parent"]) != parent_pid
+        or int(running[0]["child"]) != child_pid
+    ):
+        raise ValueError("native parser process child-running identity differs")
+
+    parent_markers = []
+    child_markers = []
+    for index, line in enumerate(log_lines):
+        parent = PROCESS_PARENT_PHASE.fullmatch(line)
+        if parent:
+            parent_markers.append({
+                "index": index,
+                "connection": int(parent["connection"]),
+                "phase": parent["phase"],
+                "fields": _process_fields(parent["fields"]),
+            })
+        child = PROCESS_CHILD_PHASE.fullmatch(line)
+        if child:
+            child_markers.append({
+                "index": index,
+                "phase": child["phase"],
+                "fields": _process_fields(child["fields"]),
+            })
+
+    parent_fields = {
+        "physical-root-suspended": {"channel", "generation", "parent_pid"},
+        "root-registered": {"request", "generation", "parent_pid"},
+        "root-ready-resume": {"request", "generation", "parent_pid"},
+        "root-data": {
+            "request",
+            "generation",
+            "sequence",
+            "bytes",
+            "parent_pid",
+        },
+        "root-stop": {
+            "request",
+            "generation",
+            "sequence",
+            "status",
+            "parent_pid",
+        },
+        "style-opened": {"root", "style", "sequence", "parent_pid"},
+        "parser-finished": {
+            "request",
+            "generation",
+            "sequence",
+            "bytes",
+            "styles",
+            "parent_pid",
+        },
+        "style-onstop-complete": {"style", "status", "parent_pid"},
+    }
+    child_fields = {
+        "root-ready": {"request", "generation", "pid"},
+        "root-data-accepted": {
+            "request",
+            "generation",
+            "sequence",
+            "bytes",
+            "pid",
+            "main_thread",
+        },
+        "parser-feed": {
+            "request",
+            "generation",
+            "sequence",
+            "bytes",
+            "descriptors",
+            "status",
+            "pid",
+            "main_thread",
+        },
+        "root-stop-accepted": {
+            "request",
+            "generation",
+            "sequence",
+            "status",
+            "pid",
+            "main_thread",
+        },
+        "parser-finish": {
+            "request",
+            "generation",
+            "sequence",
+            "bytes",
+            "descriptors",
+            "status",
+            "pid",
+            "main_thread",
+        },
+        "style-discovered": {"root", "generation", "style", "sequence", "pid"},
+        "parser-finished": {
+            "request",
+            "generation",
+            "sequence",
+            "bytes",
+            "styles",
+            "status",
+            "pid",
+            "main_thread",
+        },
+        "style-complete": {
+            "request",
+            "root",
+            "generation",
+            "pid",
+            "main_thread",
+        },
+        "style-actor-destroyed": {
+            "request",
+            "root",
+            "generation",
+            "completed",
+            "reason",
+            "pid",
+        },
+        "root-actor-destroyed": {
+            "request",
+            "generation",
+            "finished",
+            "reason",
+            "pid",
+        },
+    }
+    for marker in parent_markers:
+        expected = parent_fields.get(marker["phase"])
+        if expected is None or set(marker["fields"]) != expected:
+            raise ValueError("native parser process parent marker schema differs")
+    for marker in child_markers:
+        expected = child_fields.get(marker["phase"])
+        if expected is None or set(marker["fields"]) != expected:
+            raise ValueError("native parser process child marker schema differs")
+
+    parent_single_phases = (
+        "physical-root-suspended",
+        "root-registered",
+        "root-ready-resume",
+        "root-stop",
+        "style-opened",
+        "parser-finished",
+        "style-onstop-complete",
+    )
+    parent_single = {
+        phase: _single_process_phase(parent_markers, phase, "parent")
+        for phase in parent_single_phases
+    }
+    child_single_phases = (
+        "root-ready",
+        "root-stop-accepted",
+        "parser-finish",
+        "style-discovered",
+        "parser-finished",
+        "style-complete",
+        "style-actor-destroyed",
+        "root-actor-destroyed",
+    )
+    child_single = {
+        phase: _single_process_phase(child_markers, phase, "child")
+        for phase in child_single_phases
+    }
+
+    connections = {marker["connection"] for marker in parent_markers}
+    if len(connections) != 1:
+        raise ValueError("native parser process phases span multiple connections")
+    if expected_connection is not None and connections != {expected_connection}:
+        raise ValueError("native parser process connection identity differs")
+    if hello_index >= min(marker["index"] for marker in parent_markers):
+        raise ValueError("native parser process hello followed request lifecycle")
+    for marker in parent_markers:
+        if int(marker["fields"]["parent_pid"]) != parent_pid:
+            raise ValueError("native parser process parent PID changed")
+    for marker in child_markers:
+        if int(marker["fields"]["pid"]) != child_pid:
+            raise ValueError("native parser process child PID changed")
+
+    request = parent_single["root-registered"]["fields"].get("request")
+    generation = parent_single["root-registered"]["fields"].get("generation")
+    style = parent_single["style-opened"]["fields"].get("style")
+    if (
+        not request
+        or not generation
+        or not style
+        or any(int(value) <= 0 for value in (request, generation, style))
+    ):
+        raise ValueError("native parser process identity is incomplete")
+    channel = parent_single["physical-root-suspended"]["fields"]["channel"]
+    if int(channel) <= 0:
+        raise ValueError("native parser process root channel identity is invalid")
+    for marker in (*parent_markers, *child_markers):
+        fields = marker["fields"]
+        if "request" in fields and marker["phase"] not in (
+            "style-complete",
+            "style-actor-destroyed",
+        ):
+            if marker["phase"] in ("style-onstop-complete",):
+                pass
+            elif fields["request"] != request:
+                raise ValueError("native parser process root request ID changed")
+        if "root" in fields and fields["root"] != request:
+            raise ValueError("native parser process style root ID changed")
+        if "generation" in fields and fields["generation"] != generation:
+            raise ValueError("native parser process generation changed")
+    for marker in (
+        parent_single["style-opened"],
+        parent_single["style-onstop-complete"],
+        child_single["style-discovered"],
+        child_single["style-complete"],
+        child_single["style-actor-destroyed"],
+    ):
+        fields = marker["fields"]
+        marker_style = fields.get("style", fields.get("request"))
+        if marker_style != style:
+            raise ValueError("native parser process style request ID changed")
+
+    parent_data = [
+        marker for marker in parent_markers if marker["phase"] == "root-data"
+    ]
+    child_data = [
+        marker for marker in child_markers if marker["phase"] == "root-data-accepted"
+    ]
+    parser_feeds = [
+        marker for marker in child_markers if marker["phase"] == "parser-feed"
+    ]
+    if not parent_data or not (
+        len(parent_data) == len(child_data) == len(parser_feeds)
+    ):
+        raise ValueError("native parser process DATA lifecycle is incomplete")
+    expected_sequences = list(range(1, len(parent_data) + 1))
+    for markers in (parent_data, child_data, parser_feeds):
+        sequences = [int(marker["fields"].get("sequence", "0")) for marker in markers]
+        if sequences != expected_sequences:
+            raise ValueError("native parser process DATA sequence is not contiguous")
+    for parent, accepted, feed in zip(parent_data, child_data, parser_feeds):
+        if not (parent["index"] < accepted["index"] < feed["index"]):
+            raise ValueError("native parser process DATA crossed phases out of order")
+        sizes = {
+            int(marker["fields"].get("bytes", "-1"))
+            for marker in (parent, accepted, feed)
+        }
+        if len(sizes) != 1 or next(iter(sizes)) <= 0:
+            raise ValueError("native parser process DATA byte count changed")
+        if feed["fields"].get("main_thread") != "0":
+            raise ValueError("native parser process parser feed ran on main thread")
+        if feed["fields"].get("status") != "0x00000000":
+            raise ValueError("native parser process parser feed failed")
+
+    main_thread_phases = (
+        child_single["root-stop-accepted"],
+        child_single["parser-finished"],
+        child_single["style-complete"],
+    )
+    if any(marker["fields"]["main_thread"] != "1" for marker in main_thread_phases):
+        raise ValueError("native parser process child main-thread phase moved")
+    if any(marker["fields"]["main_thread"] != "1" for marker in child_data):
+        raise ValueError("native parser process DATA admission moved off main thread")
+
+    stop_sequence = len(parent_data) + 1
+    for marker in (
+        parent_single["root-stop"],
+        child_single["root-stop-accepted"],
+        child_single["parser-finish"],
+        child_single["parser-finished"],
+        parent_single["parser-finished"],
+    ):
+        if int(marker["fields"].get("sequence", "0")) != stop_sequence:
+            raise ValueError("native parser process STOP sequence changed")
+    if child_single["parser-finish"]["fields"].get("main_thread") != "0":
+        raise ValueError("native parser process parser finish ran on main thread")
+    for marker in (
+        parent_single["root-stop"],
+        child_single["root-stop-accepted"],
+        child_single["parser-finish"],
+        child_single["parser-finished"],
+    ):
+        if marker["fields"].get("status") != "0x00000000":
+            raise ValueError("native parser process terminal status is not clean")
+    total_bytes = sum(int(marker["fields"]["bytes"]) for marker in parent_data)
+    for marker in (
+        child_single["parser-finish"],
+        child_single["parser-finished"],
+        parent_single["parser-finished"],
+    ):
+        if int(marker["fields"].get("bytes", "-1")) != total_bytes:
+            raise ValueError("native parser process final byte count changed")
+    if any(
+        marker["fields"].get("styles") != "1"
+        for marker in (
+            child_single["parser-finished"],
+            parent_single["parser-finished"],
+        )
+    ):
+        raise ValueError("native parser process did not discover exactly one style")
+    descriptor_sources = [
+        marker
+        for marker in (*parser_feeds, child_single["parser-finish"])
+        if int(marker["fields"]["descriptors"]) > 0
+    ]
+    if (
+        sum(
+            int(marker["fields"]["descriptors"])
+            for marker in (*parser_feeds, child_single["parser-finish"])
+        )
+        != 1
+        or len(descriptor_sources) != 1
+        or descriptor_sources[0]["index"] >= child_single["style-discovered"]["index"]
+    ):
+        raise ValueError("native parser process descriptor provenance is invalid")
+    if (
+        child_single["style-discovered"]["fields"].get("sequence") != "1"
+        or parent_single["style-opened"]["fields"].get("sequence") != "1"
+    ):
+        raise ValueError("native parser process discovery sequence is invalid")
+    if parent_single["style-onstop-complete"]["fields"]["status"] != "0x00000000":
+        raise ValueError("native parser process style completion failed")
+    if child_single["style-actor-destroyed"]["fields"].get("completed") != "1":
+        raise ValueError("native parser process style actor died before completion")
+    if child_single["root-actor-destroyed"]["fields"].get("finished") != "1":
+        raise ValueError("native parser process root actor died before parser finish")
+
+    ordered = (
+        parent_single["physical-root-suspended"]["index"],
+        parent_single["root-registered"]["index"],
+        child_single["root-ready"]["index"],
+        parent_single["root-ready-resume"]["index"],
+        parent_data[0]["index"],
+        parent_single["root-stop"]["index"],
+        child_single["root-stop-accepted"]["index"],
+        child_single["parser-finish"]["index"],
+        child_single["parser-finished"]["index"],
+        parent_single["parser-finished"]["index"],
+        parent_single["style-onstop-complete"]["index"],
+        child_single["style-complete"]["index"],
+        child_single["style-actor-destroyed"]["index"],
+    )
+    if tuple(sorted(ordered)) != ordered:
+        raise ValueError("native parser process lifecycle ordering is invalid")
+    if not (
+        child_single["style-discovered"]["index"]
+        < parent_single["style-opened"]["index"]
+        < parent_single["parser-finished"]["index"]
+        < parent_single["style-onstop-complete"]["index"]
+    ):
+        raise ValueError("native parser process style lifecycle ordering is invalid")
+    if not (
+        child_single["parser-finished"]["index"]
+        < parent_single["parser-finished"]["index"]
+        < child_single["root-actor-destroyed"]["index"]
+    ):
+        raise ValueError(
+            "native parser process root actor teardown ordering is invalid"
+        )
+    forbidden = (
+        "consumer-constructed-main",
+        "native-parser-retarget phase=",
+        "native-parser-root-replacement phase=",
+    )
+    if any(token in line for token in forbidden for line in log_lines):
+        raise ValueError("native parser process used a forbidden parent parser path")
+
 
 def validate_sample(arm, protocol, log_text, feature_document):
     log_lines = log_text.splitlines()
@@ -296,6 +720,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
+        "tree-native-parser-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -317,38 +742,20 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-native-channel-open requires h3")
     if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
         raise ValueError("tree-resource-committed-overlap-css requires h3")
-    if (
-        arm == "tree-resource-native-cache-committed-overlap"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-resource-native-cache-committed-overlap requires h3"
-        )
+    if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
+        raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-preload-overlap-css requires h3")
-    if (
-        arm == "tree-native-parser-document-handoff-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-document-handoff-overlap-css requires h3"
-        )
+    if arm == "tree-native-parser-document-handoff-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-document-handoff-overlap-css requires h3")
     if arm == "tree-native-parser-retarget-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-retarget-overlap-css requires h3")
-    if (
-        arm == "tree-native-parser-ipc-rendezvous-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-ipc-rendezvous-overlap-css requires h3"
-        )
-    if (
-        arm == "tree-native-parser-root-rendezvous-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-root-rendezvous-overlap-css requires h3"
-        )
+    if arm == "tree-native-parser-ipc-rendezvous-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-ipc-rendezvous-overlap-css requires h3")
+    if arm == "tree-native-parser-root-rendezvous-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-root-rendezvous-overlap-css requires h3")
+    if arm == "tree-native-parser-process-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-process-overlap-css requires h3")
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -377,6 +784,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
+        "tree-native-parser-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -393,6 +801,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
+        "tree-native-parser-process-overlap-css",
         "tree-warm-css-304",
         "tree-overlap",
     )
@@ -481,8 +890,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if " preamble resource-committed-overlap drain=" in line
     ]
     parsed_resource_commit_drains = [
-        RESOURCE_COMMITTED_DRAIN.fullmatch(line)
-        for line in resource_commit_drain_lines
+        RESOURCE_COMMITTED_DRAIN.fullmatch(line) for line in resource_commit_drain_lines
     ]
     if any(marker is None for marker in parsed_resource_commit_drains):
         raise ValueError("malformed resource-committed drain evidence")
@@ -509,9 +917,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(marker is None for marker in parsed_resource_native_cache_drains):
         raise ValueError("malformed native resource cache drain evidence")
     native_parser_discovery_lines = [
-        line
-        for line in log_lines
-        if " preamble native-parser-preload parser=" in line
+        line for line in log_lines if " preamble native-parser-preload parser=" in line
     ]
     parsed_native_parser_discoveries = [
         NATIVE_PARSER_PRELOAD_DISCOVERY.fullmatch(line)
@@ -528,9 +934,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         and line.endswith(" protocol=h3")
     ]
     native_parser_channel_lines = [
-        line
-        for line in log_lines
-        if " preamble native-parser-preload channel=" in line
+        line for line in log_lines if " preamble native-parser-preload channel=" in line
     ]
     parsed_native_parser_channels = [
         NATIVE_PARSER_PRELOAD_CHANNEL.fullmatch(line)
@@ -550,9 +954,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(marker is None for marker in parsed_native_parser_admissions):
         raise ValueError("malformed native parser preload admission evidence")
     native_parser_barrier_lines = [
-        line
-        for line in log_lines
-        if " preamble native-parser-preload barrier=" in line
+        line for line in log_lines if " preamble native-parser-preload barrier=" in line
     ]
     parsed_native_parser_barriers = [
         NATIVE_PARSER_PRELOAD_BARRIER.fullmatch(line)
@@ -561,9 +963,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(marker is None for marker in parsed_native_parser_barriers):
         raise ValueError("malformed native parser preload barrier evidence")
     native_parser_drain_lines = [
-        line
-        for line in log_lines
-        if " preamble native-parser-preload drain=" in line
+        line for line in log_lines if " preamble native-parser-preload drain=" in line
     ]
     parsed_native_parser_drains = [
         NATIVE_PARSER_PRELOAD_DRAIN.fullmatch(line)
@@ -583,9 +983,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(marker is None for marker in parsed_native_parser_document_handoffs):
         raise ValueError("malformed native parser document handoff evidence")
     native_parser_retarget_evidence_lines = [
-        line
-        for line in log_lines
-        if " preamble native-parser-retarget " in line
+        line for line in log_lines if " preamble native-parser-retarget " in line
     ]
     native_parser_retarget_lines = [
         line
@@ -593,14 +991,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if " preamble native-parser-retarget phase=" in line
     ]
     parsed_native_parser_retargets = [
-        NATIVE_PARSER_RETARGET.fullmatch(line)
-        for line in native_parser_retarget_lines
+        NATIVE_PARSER_RETARGET.fullmatch(line) for line in native_parser_retarget_lines
     ]
     if any(marker is None for marker in parsed_native_parser_retargets):
         raise ValueError("malformed native parser retarget evidence")
-    if len(native_parser_retarget_evidence_lines) != len(
-        native_parser_retarget_lines
-    ):
+    if len(native_parser_retarget_evidence_lines) != len(native_parser_retarget_lines):
         raise ValueError(
             "native parser retarget emitted fallback, failure, or unknown evidence"
         )
@@ -664,7 +1059,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
     native_cache_lines = [
         line for line in log_lines if " preamble native-cache-open cache=" in line
     ]
-    parsed_native_cache = [NATIVE_CACHE_OPEN.fullmatch(line) for line in native_cache_lines]
+    parsed_native_cache = [
+        NATIVE_CACHE_OPEN.fullmatch(line) for line in native_cache_lines
+    ]
     if any(marker is None for marker in parsed_native_cache):
         raise ValueError("malformed native cache-open evidence")
     if arm == "document-native-cache-open":
@@ -684,10 +1081,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "document-native-cache-open marker identity differs from CONNECT"
             )
         if not (
-            log_lines.index(native_cache_lines[0]) < log_lines.index(result_lines[0])
+            log_lines.index(native_cache_lines[0])
+            < log_lines.index(result_lines[0])
             < log_lines.index(matching_established[0][0])
         ):
-            raise ValueError("native cache-open lifecycle markers have invalid ordering")
+            raise ValueError(
+                "native cache-open lifecycle markers have invalid ordering"
+            )
     elif parsed_native_cache:
         raise ValueError(f"{arm} arm unexpectedly logged native cache-open lifecycle")
     native_channel_lines = [
@@ -715,7 +1115,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "document-native-channel-open marker identity differs from CONNECT"
             )
         if not (
-            log_lines.index(native_channel_lines[0]) < log_lines.index(result_lines[0])
+            log_lines.index(native_channel_lines[0])
+            < log_lines.index(result_lines[0])
             < log_lines.index(matching_established[0][0])
         ):
             raise ValueError(
@@ -744,11 +1145,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
             and established["protocol"] == protocol
         ]
         if len(matching_established) != 1 or marker["protocol"] != protocol:
-            raise ValueError(
-                "cold winner-handoff marker identity differs from CONNECT"
-            )
+            raise ValueError("cold winner-handoff marker identity differs from CONNECT")
         if not (
-            log_lines.index(cold_winner_lines[0]) < log_lines.index(result_lines[0])
+            log_lines.index(cold_winner_lines[0])
+            < log_lines.index(result_lines[0])
             < log_lines.index(matching_established[0][0])
         ):
             raise ValueError("cold winner-handoff markers have invalid ordering")
@@ -955,9 +1355,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         ):
             raise ValueError("resource-committed markers have invalid ordering")
     elif parsed_resource_commit_admissions or parsed_resource_commit_drains:
-        raise ValueError(
-            f"{arm} arm unexpectedly logged resource-committed lifecycle"
-        )
+        raise ValueError(f"{arm} arm unexpectedly logged resource-committed lifecycle")
 
     if arm == "tree-resource-native-cache-committed-overlap":
         if len(parsed_resource_native_cache_admissions) != 1:
@@ -965,9 +1363,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "native resource cache arm requires one causal admission marker"
             )
         if len(parsed_resource_native_cache_drains) != 1:
-            raise ValueError(
-                "native resource cache arm requires one drain marker"
-            )
+            raise ValueError("native resource cache arm requires one drain marker")
         admission = parsed_resource_native_cache_admissions[0]
         drain = parsed_resource_native_cache_drains[0]
         if (
@@ -1001,13 +1397,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             and log_lines.index(result_lines[0])
             < log_lines.index(matching_established[0])
         ):
-            raise ValueError(
-                "native resource cache markers have invalid ordering"
-            )
-    elif (
-        parsed_resource_native_cache_admissions
-        or parsed_resource_native_cache_drains
-    ):
+            raise ValueError("native resource cache markers have invalid ordering")
+    elif parsed_resource_native_cache_admissions or parsed_resource_native_cache_drains:
         raise ValueError(
             f"{arm} arm unexpectedly logged native resource cache lifecycle"
         )
@@ -1025,6 +1416,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
         "tree-native-parser-root-rendezvous-overlap-css",
+        "tree-native-parser-process-overlap-css",
     ):
         if any(len(markers) != 1 for markers in native_parser_markers):
             raise ValueError(
@@ -1050,8 +1442,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["completed_resources"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection
-                or marker["protocol"] != "h3"
+                marker["connection"] != connection or marker["protocol"] != "h3"
                 for marker in (channel, admission, barrier, drain)
             )
             or result["connection"] != connection
@@ -1110,8 +1501,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
         handoff_connection = parsed_native_parser_document_handoffs[0]["connection"]
         if any(
-            marker["connection"] != handoff_connection
-            or marker["protocol"] != "h3"
+            marker["connection"] != handoff_connection or marker["protocol"] != "h3"
             for marker in parsed_native_parser_document_handoffs
         ):
             raise ValueError(
@@ -1131,10 +1521,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
             native_parser_drain_lines[0],
         )
         ordered_indices = tuple(log_lines.index(line) for line in ordered_lines)
-        if (
-            tuple(sorted(ordered_indices)) != ordered_indices
-            or len(set(ordered_indices)) != len(ordered_indices)
-        ):
+        if tuple(sorted(ordered_indices)) != ordered_indices or len(
+            set(ordered_indices)
+        ) != len(ordered_indices):
             raise ValueError(
                 "native parser document handoff and preload markers have invalid "
                 "ordering"
@@ -1148,9 +1537,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-retarget-overlap-css",
         "tree-native-parser-ipc-rendezvous-overlap-css",
     ):
-        if len(parsed_native_parser_retargets) != len(
-            NATIVE_PARSER_RETARGET_PHASES
-        ):
+        if len(parsed_native_parser_retargets) != len(NATIVE_PARSER_RETARGET_PHASES):
             raise ValueError(
                 "native parser retarget requires exactly one marker for every "
                 "lifecycle phase"
@@ -1185,8 +1572,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             raise ValueError("native parser retarget delivery contract is invalid")
         retarget_connection = parsed_native_parser_retargets[0]["connection"]
         if any(
-            marker["connection"] != retarget_connection
-            or marker["protocol"] != "h3"
+            marker["connection"] != retarget_connection or marker["protocol"] != "h3"
             for marker in parsed_native_parser_retargets
         ):
             raise ValueError("native parser retarget marker identity is inconsistent")
@@ -1202,10 +1588,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
             native_parser_drain_lines[0],
         )
         ordered_indices = tuple(log_lines.index(line) for line in ordered_lines)
-        if (
-            tuple(sorted(ordered_indices)) != ordered_indices
-            or len(set(ordered_indices)) != len(ordered_indices)
-        ):
+        if tuple(sorted(ordered_indices)) != ordered_indices or len(
+            set(ordered_indices)
+        ) != len(ordered_indices):
             raise ValueError(
                 "native parser retarget and preload markers have invalid ordering"
             )
@@ -1244,8 +1629,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
         retarget_connection = parsed_native_parser_retargets[0]["connection"]
         if any(
-            marker["connection"] != retarget_connection
-            or marker["protocol"] != "h3"
+            marker["connection"] != retarget_connection or marker["protocol"] != "h3"
             for marker in parsed_native_parser_retargets
         ):
             raise ValueError(
@@ -1265,10 +1649,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
             native_parser_drain_lines[0],
         )
         ordered_indices = tuple(log_lines.index(line) for line in ordered_lines)
-        if (
-            tuple(sorted(ordered_indices)) != ordered_indices
-            or len(set(ordered_indices)) != len(ordered_indices)
-        ):
+        if tuple(sorted(ordered_indices)) != ordered_indices or len(
+            set(ordered_indices)
+        ) != len(ordered_indices):
             raise ValueError(
                 "native parser root rendezvous and preload markers have invalid "
                 "ordering"
@@ -1301,9 +1684,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         registered_index = NATIVE_PARSER_ROOT_REPLACEMENT_PHASES.index(
             "replacement-registered"
         )
-        product_request = parsed_native_parser_root_replacements[
-            registered_index
-        ]["request"]
+        product_request = parsed_native_parser_root_replacements[registered_index][
+            "request"
+        ]
         product_identity = (
             product_connection,
             product_channel,
@@ -1321,15 +1704,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
             or any(
                 marker["request"] != "0"
-                for marker in parsed_native_parser_root_replacements[
-                    :registered_index
-                ]
+                for marker in parsed_native_parser_root_replacements[:registered_index]
             )
             or any(
                 marker["request"] != product_request
-                for marker in parsed_native_parser_root_replacements[
-                    registered_index:
-                ]
+                for marker in parsed_native_parser_root_replacements[registered_index:]
             )
         ):
             raise ValueError(
@@ -1361,14 +1740,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
         request = parsed_native_root_activations[0]["request"] if phases else None
         if not request or any(
-            marker["request"] != request
-            for marker in parsed_native_root_activations
+            marker["request"] != request for marker in parsed_native_root_activations
         ):
             raise ValueError("native root replacement request identity differs")
         if request != product_identity[2]:
-            raise ValueError(
-                "native root bridge and product request identities differ"
-            )
+            raise ValueError("native root bridge and product request identities differ")
 
         by_phase = {}
         channel_identity = None
@@ -1395,9 +1771,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "forward-sent",
                 "forward-received",
             ):
-                match = re.fullmatch(
-                    r" channel=(\d+) generation=(\d+)", suffix
-                )
+                match = re.fullmatch(r" channel=(\d+) generation=(\d+)", suffix)
                 if not match:
                     raise ValueError(
                         f"native root replacement {phase} marker is malformed"
@@ -1432,9 +1806,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                         "native root replacement activation did not release cleanly"
                     )
             elif phase == "on-stop":
-                match = re.fullmatch(
-                    r" status=0x00000000 generation=(\d+)", suffix
-                )
+                match = re.fullmatch(r" status=0x00000000 generation=(\d+)", suffix)
                 if not match:
                     raise ValueError(
                         "native root replacement physical root did not stop cleanly"
@@ -1453,9 +1825,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                         "native root replacement completion generation differs"
                     )
         if channel_identity != (product_identity[1], product_identity[3]):
-            raise ValueError(
-                "native root bridge and product channel/generation differ"
-            )
+            raise ValueError("native root bridge and product channel/generation differ")
 
         for phase in NATIVE_ROOT_REQUIRED_PLAIN_PHASES | {
             "connect-parent-linked",
@@ -1474,8 +1844,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 phase != "continue-verification" and count != 1
             ):
                 raise ValueError(
-                    "native root replacement phases are missing, duplicated, "
-                    "or unknown"
+                    "native root replacement phases are missing, duplicated, or unknown"
                 )
         if len(by_phase["continue-verification"]) != (
             len(by_phase.get("background-wait", ())) + 1
@@ -1514,17 +1883,16 @@ def validate_sample(arm, protocol, log_text, feature_document):
             < first("redirect-verification-run")
             < first("redirect-verification-callback")
             < first("redirect-verification-resolved")
-            and first("begin-received")
-            < first("background-dispatched")
+            and first("begin-received") < first("background-dispatched")
             and first("begin-received")
             < first("request-background-actor-created")
             < first("request-background-actor-bound")
             < first("background-ready")
             < first("bg-linked")
             and first("connect-parent-linked") < first("continue-verification")
-            and first("redirect-verification-resolved")
-            < first("continue-verification")
-            and first("bg-linked") < last("continue-verification")
+            and first("redirect-verification-resolved") < first("continue-verification")
+            and first("bg-linked")
+            < last("continue-verification")
             < first("ready-to-verify")
             < first("setup-finished")
             < first("forward-sent")
@@ -1533,7 +1901,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             < first("forward-stop-received")
             < first("forward-stop")
             < first("on-stop")
-            and first("resume") < first("forward-received")
+            and first("resume")
+            < first("forward-received")
             < first("forward-start")
             < first("forward-data-received")
             < first("forward-data")
@@ -1604,24 +1973,19 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "native style activation requires one successful parser "
                 "descriptor flush"
             )
-        if len(parsed_native_style_activations) != len(
-            NATIVE_STYLE_ACTIVATION_PHASES
-        ):
+        if len(parsed_native_style_activations) != len(NATIVE_STYLE_ACTIVATION_PHASES):
             raise ValueError(
                 "native style activation requires exactly one marker for every "
                 "request lifecycle phase"
             )
-        phases = tuple(
-            marker["phase"] for marker in parsed_native_style_activations
-        )
+        phases = tuple(marker["phase"] for marker in parsed_native_style_activations)
         if set(phases) != NATIVE_STYLE_ACTIVATION_PHASES:
             raise ValueError(
                 "native style activation phases are missing, duplicated, or unknown"
             )
         request = parsed_native_style_activations[0]["request"]
         if any(
-            marker["request"] != request
-            for marker in parsed_native_style_activations
+            marker["request"] != request for marker in parsed_native_style_activations
         ):
             raise ValueError("native style activation request identity differs")
         by_phase = {
@@ -1636,9 +2000,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             != "0x00000000"
             for phase in ("activation-released", "on-stop")
         ):
-            raise ValueError(
-                "native style activation release or completion failed"
-            )
+            raise ValueError("native style activation release or completion failed")
         if any(
             marker["status"] is not None
             for marker in parsed_native_style_activations
@@ -1659,7 +2021,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             < by_phase["bg-ready-sent"]
             < by_phase["background-ready-received"]
             < by_phase["activation-released"]
-            and by_phase["activation-released"] < by_phase["async-open"]
+            and by_phase["activation-released"]
+            < by_phase["async-open"]
             < by_phase["on-stop"]
             and by_phase["on-stop"]
             < by_phase["request-primary-actor-delete-sent"]
@@ -1718,15 +2081,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "tree-native-parser-retarget-overlap-css",
                 "tree-native-parser-ipc-rendezvous-overlap-css",
                 "tree-native-parser-root-rendezvous-overlap-css",
+                "tree-native-parser-process-overlap-css",
             )
-            and feature_document.get("features", {}).get(
-                "tls_client_hello_count"
-            )
+            and feature_document.get("features", {}).get("tls_client_hello_count")
             != 1.0
         ):
-            raise ValueError(
-                f"{arm} requires exactly one outer ClientHello"
-            )
+            raise ValueError(f"{arm} requires exactly one outer ClientHello")
+    if arm == "tree-native-parser-process-overlap-css":
+        validate_native_parser_process(log_lines, int(result["connection"]))
 
 
 def main():
@@ -1758,6 +2120,7 @@ def main():
             "tree-native-parser-retarget-overlap-css",
             "tree-native-parser-ipc-rendezvous-overlap-css",
             "tree-native-parser-root-rendezvous-overlap-css",
+            "tree-native-parser-process-overlap-css",
             "tree-warm-css-304",
             "tree-overlap",
         ),

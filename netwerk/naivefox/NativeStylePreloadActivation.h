@@ -39,6 +39,30 @@ struct NativeRootReplacementActivationDescriptor final {
   uint64_t mGeneration = 0;
 };
 
+struct NativeStylePreloadProcessDescriptor final {
+  uint64_t mRootRequestId = 0;
+  uint64_t mRootGeneration = 0;
+  uint64_t mStyleRequestId = 0;
+  uint32_t mDiscoverySequence = 0;
+  nsString mUrl;
+  nsString mCharset;
+  nsString mCrossOrigin;
+  nsString mMedia;
+  nsString mReferrerPolicy;
+  nsString mNonce;
+  nsString mIntegrity;
+  nsString mFetchPriority;
+  bool mLinkPreload = false;
+};
+
+struct NativeStylePreloadProcessRootCallbacks final {
+  std::function<nsresult()> mReady;
+  std::function<nsresult(const NativeStylePreloadProcessDescriptor&)>
+      mStyleDiscovered;
+  std::function<void(uint32_t, uint32_t, uint32_t, nsresult)> mFinished;
+  std::function<void(nsresult)> mFailed;
+};
+
 using NativeStylePreloadPrimaryCallback =
     std::function<nsresult(const NativeStylePreloadActivationDescriptor&)>;
 using NativeStylePreloadFinalCallback = std::function<nsresult(nsresult)>;
@@ -78,6 +102,25 @@ class NativeStylePreloadActivation final {
                                                          nsresult aStatus);
   static void CompleteRootReplacement(uint64_t aRequestId, nsresult aStatus);
   static void CancelRootReplacement(uint64_t aRequestId);
+
+  static nsresult InitializeProcess();
+  static bool IsProcessReady();
+  static void ShutdownProcess();
+  static nsresult StartProcessRoot(
+      NativeRootReplacementActivationDescriptor&& aDescriptor,
+      uint32_t aMaximumBodyBytes,
+      NativeStylePreloadProcessRootCallbacks&& aCallbacks,
+      uint64_t& aRequestId);
+  static nsresult ForwardProcessRootData(uint64_t aRequestId,
+                                         uint64_t aGeneration,
+                                         uint32_t aSequence, nsCString&& aData);
+  static nsresult ForwardProcessRootStop(uint64_t aRequestId,
+                                         uint64_t aGeneration,
+                                         uint32_t aSequence, nsresult aStatus);
+  static void CancelProcessRoot(uint64_t aRequestId, uint64_t aGeneration,
+                                nsresult aStatus);
+  static nsresult CompleteProcessStyle(uint64_t aStyleRequestId,
+                                       nsresult aStatus);
 
   static nsresult RunProcessBootstrapAdmission();
 };

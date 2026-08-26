@@ -29,7 +29,8 @@ class GeckoRuntime final {
   nsresult Initialize(int aArgc, char* aArgv[], const nsACString& aProfilePath,
                       ProxyProtocol aProtocol, bool aNoPostQuantum = false,
                       bool aEnablePreambleCache2 = false,
-                      bool aEnableNativeStyleActivation = false);
+                      bool aEnableNativeStyleActivation = false,
+                      bool aEnableNativeActivationProcess = false);
   static nsresult ValidateEmbeddedLocations(const nsACString& aProfilePath,
                                             const nsACString& aRuntimePath);
   nsresult InitializeEmbedded(const nsACString& aProfilePath,
@@ -37,17 +38,16 @@ class GeckoRuntime final {
                               ProxyProtocol aProtocol,
                               bool aNoPostQuantum = false,
                               bool aEnablePreambleCache2 = false,
-                              bool aEnableNativeStyleActivation = false);
+                              bool aEnableNativeStyleActivation = false,
+                              bool aEnableNativeActivationProcess = false);
   nsresult RunEventLoopSmoke();
 
  private:
-  nsresult InitializeWithLocations(nsIFile* aProfile, nsIFile* aBinDirectory,
-                                   nsIFile* aExecutable,
-                                   ProxyProtocol aProtocol,
-                                   const nsACString* aAndroidRuntimePath,
-                                   bool aNoPostQuantum,
-                                   bool aEnablePreambleCache2,
-                                   bool aEnableNativeStyleActivation);
+  nsresult InitializeWithLocations(
+      nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
+      ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath,
+      bool aNoPostQuantum, bool aEnablePreambleCache2,
+      bool aEnableNativeStyleActivation, bool aEnableNativeActivationProcess);
   nsresult WaitForNetworkStartup();
   void Shutdown();
 
@@ -60,6 +60,7 @@ class GeckoRuntime final {
   bool mXPCOMInitialized = false;
   bool mPreambleCache2Initialized = false;
   bool mNativeStyleActivationInitialized = false;
+  bool mNativeActivationProcessInitialized = false;
   bool mNoPostQuantumApplied = false;
   bool mSslCertFileApplied = false;
   bool mHadKyberPref = false;
