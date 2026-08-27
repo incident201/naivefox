@@ -11,8 +11,8 @@
 #include <utility>
 #include <vector>
 
-#include "NativeStylePreloadProcessBridge.h"
 #include "NativeStylePreloadProcessBackground.h"
+#include "NativeStylePreloadProcessBridge.h"
 
 #if defined(XP_UNIX)
 #  include <limits.h>
@@ -2304,7 +2304,7 @@ class ProcessServiceState final {
   nsresult RootReady(uint64_t aRequestId, uint64_t aGeneration);
   nsresult BackgroundRootReady(uint64_t aRequestId, uint64_t aGeneration);
   nsresult BackgroundRootOnStartForwarded(uint64_t aRequestId,
-                                           uint64_t aGeneration);
+                                          uint64_t aGeneration);
   nsresult BackgroundStyleReady(uint64_t aRequestId, uint64_t aGeneration,
                                 uint64_t aStyleRequestId,
                                 uint32_t aDiscoverySequence);
@@ -2325,8 +2325,7 @@ class ProcessServiceState final {
   Route* LookupRoute(uint64_t aRequestId, uint64_t aGeneration);
   void MaybePublishReady();
   void MaybeStartFullRootJoin(uint64_t aRequestId, uint64_t aGeneration);
-  void FinishFullRootVerification(uint64_t aRequestId,
-                                  uint64_t aGeneration);
+  void FinishFullRootVerification(uint64_t aRequestId, uint64_t aGeneration);
   nsresult MaybeReleaseFullStyle(uint64_t aStyleRequestId);
   void MaybeDeliverRootFinished(uint64_t aRequestId, uint64_t aGeneration);
   void FailAll(nsresult aStatus);
@@ -2444,13 +2443,13 @@ class ActivationProcessServiceParent final
         actor->mState->BackgroundHelloAccepted();
       }
     };
-    backgroundCallbacks.mRootReady =
-        [gate = mCallbackGate](uint64_t aRequestId, uint64_t aGeneration) {
-          auto* actor = gate->Actor();
-          return actor ? actor->mState->BackgroundRootReady(aRequestId,
-                                                            aGeneration)
-                       : NS_ERROR_NOT_AVAILABLE;
-        };
+    backgroundCallbacks.mRootReady = [gate = mCallbackGate](
+                                         uint64_t aRequestId,
+                                         uint64_t aGeneration) {
+      auto* actor = gate->Actor();
+      return actor ? actor->mState->BackgroundRootReady(aRequestId, aGeneration)
+                   : NS_ERROR_NOT_AVAILABLE;
+    };
     backgroundCallbacks.mRootOnStartForwarded =
         [gate = mCallbackGate](uint64_t aRequestId, uint64_t aGeneration) {
           auto* actor = gate->Actor();
@@ -2599,27 +2598,26 @@ class ActivationProcessChild final : public PNativeStylePreloadProcessChild {
       auto* actor = gate->Actor();
       return actor && actor->mBridge
                  ? actor->mBridge->ForwardRootOnStart(aRequestId, aGeneration)
-                     : NS_ERROR_NOT_AVAILABLE;
+                 : NS_ERROR_NOT_AVAILABLE;
     };
-    callbacks.mRootData =
-        [gate = mCallbackGate](uint64_t aRequestId, uint64_t aGeneration,
-                               uint32_t aSequence, nsCString&& aData) {
-          auto* actor = gate->Actor();
-          return actor && actor->mBridge
-                     ? actor->mBridge->ForwardRootData(
-                               aRequestId, aGeneration, aSequence,
-                               std::move(aData))
-                         : NS_ERROR_NOT_AVAILABLE;
-        };
-    callbacks.mRootStop =
-        [gate = mCallbackGate](uint64_t aRequestId, uint64_t aGeneration,
-                               uint32_t aSequence, nsresult aStatus) {
-          auto* actor = gate->Actor();
-          return actor && actor->mBridge
-                     ? actor->mBridge->ForwardRootStop(
-                               aRequestId, aGeneration, aSequence, aStatus)
-                         : NS_ERROR_NOT_AVAILABLE;
-        };
+    callbacks.mRootData = [gate = mCallbackGate](
+                              uint64_t aRequestId, uint64_t aGeneration,
+                              uint32_t aSequence, nsCString&& aData) {
+      auto* actor = gate->Actor();
+      return actor && actor->mBridge
+                 ? actor->mBridge->ForwardRootData(aRequestId, aGeneration,
+                                                   aSequence, std::move(aData))
+                 : NS_ERROR_NOT_AVAILABLE;
+    };
+    callbacks.mRootStop = [gate = mCallbackGate](
+                              uint64_t aRequestId, uint64_t aGeneration,
+                              uint32_t aSequence, nsresult aStatus) {
+      auto* actor = gate->Actor();
+      return actor && actor->mBridge
+                 ? actor->mBridge->ForwardRootStop(aRequestId, aGeneration,
+                                                   aSequence, aStatus)
+                 : NS_ERROR_NOT_AVAILABLE;
+    };
     callbacks.mFailed = [gate = mCallbackGate](nsresult) {
       if (auto* actor = gate->Actor(); actor && !actor->mShutdownReceived) {
         actor->Close();
@@ -2786,9 +2784,13 @@ void ProcessServiceState::SetLaunched(base::ProcessHandle aProcess,
       aProcess == base::kInvalidProcessHandle || !aNodeChannel) {
     if (aProcess != base::kInvalidProcessHandle) {
       (void)base::KillProcess(aProcess, 1);
+#if defined(XP_UNIX)
       int processInfo = 0;
       (void)base::WaitForProcess(aProcess, base::BlockingWait::Yes,
                                  &processInfo);
+#else
+      base::CloseProcessHandle(aProcess);
+#endif
     }
     LaunchFailed(NS_ERROR_FAILURE);
     return;
@@ -2922,8 +2924,8 @@ nsresult ProcessServiceState::SendRootData(uint64_t aRequestId,
     return NS_ERROR_NOT_AVAILABLE;
   }
   if (route->mFullProcess) {
-    return mActor->Background()->ForwardRootData(
-        aRequestId, aGeneration, aSequence, std::move(aData));
+    return mActor->Background()->ForwardRootData(aRequestId, aGeneration,
+                                                 aSequence, std::move(aData));
   }
   return mActor->Bridge()->SendRootData(aRequestId, aGeneration, aSequence,
                                         std::move(aData));
@@ -2961,8 +2963,7 @@ void ProcessServiceState::CancelRoot(uint64_t aRequestId, uint64_t aGeneration,
   if (route->mFullProcess && route->mBackgroundRootReady && IsReady() &&
       mActor->Background()) {
     (void)mActor->Background()->CompleteRoot(
-        aRequestId, aGeneration,
-        NS_FAILED(aStatus) ? aStatus : NS_ERROR_ABORT);
+        aRequestId, aGeneration, NS_FAILED(aStatus) ? aStatus : NS_ERROR_ABORT);
     canceled.mRootCompleteSent = true;
   }
   if (route->mFullProcess) {
@@ -3052,7 +3053,7 @@ nsresult ProcessServiceState::RootReady(uint64_t aRequestId,
 }
 
 nsresult ProcessServiceState::BackgroundRootReady(uint64_t aRequestId,
-                                                   uint64_t aGeneration) {
+                                                  uint64_t aGeneration) {
   MOZ_ASSERT(NS_IsMainThread());
   auto* canceled = mCanceledRoutes.Lookup(aRequestId).DataPtrOrNull();
   if (canceled && canceled->mGeneration == aGeneration) {
@@ -3290,8 +3291,7 @@ void ProcessServiceState::BackgroundRootDrained(uint64_t aRequestId,
   }
 }
 
-nsresult ProcessServiceState::MaybeReleaseFullStyle(
-    uint64_t aStyleRequestId) {
+nsresult ProcessServiceState::MaybeReleaseFullStyle(uint64_t aStyleRequestId) {
   MOZ_ASSERT(NS_IsMainThread());
   auto* owner = mStyleOwners.Lookup(aStyleRequestId).DataPtrOrNull();
   if (!owner || !owner->mFullProcess) {
@@ -3615,11 +3615,16 @@ static nsresult ShutdownActivationProcessService() {
     if (!graceful) {
       (void)base::KillProcess(childProcess, 1);
     }
+#if defined(XP_UNIX)
     int processInfo = 0;
     const base::ProcessStatus processStatus = base::WaitForProcess(
         childProcess, base::BlockingWait::Yes, &processInfo);
     graceful &=
         processStatus == base::ProcessStatus::Exited && processInfo == 0;
+#else
+    base::CloseProcessHandle(childProcess);
+    graceful = false;
+#endif
   }
   return graceful ? NS_OK : NS_ERROR_FAILURE;
 }
