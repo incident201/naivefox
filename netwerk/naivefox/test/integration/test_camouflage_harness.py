@@ -302,6 +302,17 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("WaitForStartupCondition", wait_body)
         self.assertIn("NS_NewTimerWithCallback", runtime)
         self.assertIn("InitialNetworkStateAllowsStartup", wait_body)
+        self.assertIn(
+            "terminalState, kAllowUnavailableNetworkMonitor", wait_body
+        )
+        self.assertIn(
+            "#  ifdef ANDROID\n"
+            "constexpr bool kAllowUnavailableNetworkMonitor = true;\n"
+            "#  else\n"
+            "constexpr bool kAllowUnavailableNetworkMonitor = false;",
+            runtime,
+        )
+        self.assertIn("barrier.initial-monitor-unavailable", wait_body)
         self.assertIn("MOZ_TRY(WaitForNetworkStartup());", runtime)
         embedded = runner[
             runner.index("NaiveFoxRunEmbedded") : runner.index("NaiveFoxMain")
