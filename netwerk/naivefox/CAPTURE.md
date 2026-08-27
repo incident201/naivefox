@@ -84,6 +84,24 @@ that the response had already entered the H2/TLS/TCP send path before the
 causal cancel. The H2 stop mode therefore remains diagnostic and is not a
 default candidate.
 
+A server-side H2 padding-phase control then tested whether the existing Naive
+Variant 1 budget could fill part of the nested-handshake gap without adding
+bytes. The opt-in Caddy path moved the same eight independently randomized
+padding records from the first target reads to immediately after the first
+positive client-to-target payload. It used valid zero-payload Variant 1
+records, required no client decoder change, and left unmodified NaiveProxy
+clients on the stock path. Six-block same-base artifact `2c4ef7e9e097254b`
+compared both arms only with ordinary direct Firefox A/B. The shift improved
+packets 1--16 (`0.14803` to `0.13831`) but worsened packets 17--32 (`0.58058`
+to `0.61987`), packets 1--32 (`0.28510` to `0.29356`), and 250 ms (`0.12589`
+to `0.12960`). It also compressed the first-32-packet phase from about 56.5 ms
+to 32.9 ms instead of reproducing Firefox's roughly 53--56 ms phase. The
+server patch and arm were removed. Legacy Variant 1 can contribute at most
+`8 * 255 = 2040` padding bytes per direction; a larger cover protocol would
+therefore add traffic rather than redistribute the existing budget. The
+complete-stylesheet upper bound already shows that such additive early volume
+trades a local 17--32 improvement for a 250 ms/whole-flow penalty.
+
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
 without paying for the complete synthetic stylesheet. CONNECT is not a member
