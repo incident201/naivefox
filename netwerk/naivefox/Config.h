@@ -215,11 +215,10 @@ struct Config final {
   PreambleConfig mPreamble;
   uint32_t mMaxConnections = 0;
   bool mOuterSessionGate = false;
-  // Successfully parsed configs with an explicit H3 upstream and no preamble
-  // field receive the promoted H3-only document-start policy. Its cold-route
-  // gate is deliberately distinct from the user-visible global gate so H2
-  // scheduling remains unchanged.
-  bool mImplicitH3PreambleGate = false;
+  // Successfully parsed configs with an explicit upstream and no preamble
+  // field receive the promoted per-protocol document-start policy. Its
+  // cold-route gate is deliberately distinct from the user-visible gate.
+  bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;

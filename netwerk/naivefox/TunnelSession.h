@@ -97,7 +97,7 @@ struct TunnelConfig final {
         mHostResolverRule(aOther.mHostResolverRule),
         mPreamble(aOther.mPreamble),
         mOuterSessionGate(aOther.mOuterSessionGate),
-        mImplicitH3PreambleGate(aOther.mImplicitH3PreambleGate),
+        mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
             aOther.mDiagnosticFirstSocksTunnelUrgentStart) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
@@ -111,7 +111,7 @@ struct TunnelConfig final {
       mHostResolverRule = aOther.mHostResolverRule;
       mPreamble = aOther.mPreamble;
       mOuterSessionGate = aOther.mOuterSessionGate;
-      mImplicitH3PreambleGate = aOther.mImplicitH3PreambleGate;
+      mImplicitPreambleGate = aOther.mImplicitPreambleGate;
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mExtraHeaders.Clear();
@@ -128,7 +128,7 @@ struct TunnelConfig final {
   nsTArray<ExtraHeader> mExtraHeaders;
   PreambleConfig mPreamble;
   bool mOuterSessionGate = false;
-  bool mImplicitH3PreambleGate = false;
+  bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
 };
 

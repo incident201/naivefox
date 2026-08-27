@@ -42,9 +42,11 @@ packets 1--16 (`0.16459` to `0.13442`), packets 17--32 (`0.76117` to
 (`0.38926` to `0.38660`; paired CI included zero), but equivalence was not
 proved. All 120 participants passed
 the isolated-network mutation and capture-drop policy. This satisfies the
-predeclared product gate, so omitted preamble now enables the mechanism only
-for explicit H3 upstreams; explicit `mode: off` remains the control/opt-out,
-and H2 scheduling remains unchanged.
+predeclared product gate for H3. The final six-block H2 resource-tree screen
+then retained the lower distance for the same compact mechanism in every view
+after packets 1--16. Omitted preamble therefore enables
+`document-start-overlap` for explicit H2 and H3 upstreams; explicit
+`mode: off` remains the control and opt-out.
 Secondary `steady_after_32` and lifecycle point estimates favored `off`; the
 steady paired interval crossed zero and lifecycle did not survive the report's
 Holm correction (`p=0.136`). They remain regression monitors rather than a
@@ -71,6 +73,21 @@ packets 17--32 from `0.45721` to `0.43922` and packets 1--32 from `0.22483` to
 `0.21018`, while worsening 250 ms from `0.13102` to `0.14840` and whole-flow
 from `0.28498` to `0.31852`. The complete stylesheet added about 67 KiB of
 server traffic by 250 ms, so this H2 arm is not a default candidate either.
+
+The final bounded H2 fronting-page experiment extended that mechanism to one
+same-origin stylesheet, classic deferred script, and image, all discovered by
+the lean HTML5 speculative scanner and opened through native Necko preload
+channels after early CONNECT admission. Two fresh decrypted runs proved one
+outer TLS/H2 connection, one ClientHello, normal END_STREAM completion, exact
+same-base request semantics, and `root GET -> CONNECT -> resource GETs`. The
+isolated six-block paired screen is retained as `f244527d965b626e`. Relative to
+`document-start-overlap`, the resource tree was tied for packets 1--16
+(`0.06880` versus `0.06871`) but worse for packets 17--32 (`0.50135` versus
+`0.45276`), packets 1--32 (`0.21964` versus `0.19245`), 250 ms (`0.19285`
+versus `0.18929`), and whole flow (`0.49826` versus `0.48398`). It introduced
+about 47 KiB of additional early server traffic and a new burst rather than
+removing the residual. The tree is therefore rejected as a default;
+`document-start-overlap` is the compact H2 product policy.
 
 H2 `tree-native-parser-document-start-navigation-stop` retains the same
 client-to-target ownership predicate and scoped load-group cancellation.

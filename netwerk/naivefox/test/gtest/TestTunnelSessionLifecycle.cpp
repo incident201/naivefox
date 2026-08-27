@@ -93,12 +93,16 @@ TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
   EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
 
   config.mOuterSessionGate = false;
-  config.mImplicitH3PreambleGate = true;
+  config.mImplicitPreambleGate = true;
   config.mProtocol = ProxyProtocol::H2;
-  EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+  EXPECT_TRUE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
   config.mProtocol = ProxyProtocol::H3;
   EXPECT_TRUE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
   config.mProtocol = ProxyProtocol::Auto;
+  EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
+
+  config.mImplicitPreambleGate = false;
+  config.mProtocol = ProxyProtocol::H2;
   EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
 }
 
@@ -300,8 +304,8 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserDocumentStartNavigationStop, true, true, 1,
       0, 0, 0, 1, true, 0, true));
   EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserDocumentStartResponseStop, true, true, 1,
-      0, 0, 0, 1, true, 0, true));
+      PreambleMode::TreeNativeParserDocumentStartResponseStop, true, true, 1, 0,
+      0, 0, 1, true, 0, true));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(PreambleMode::TreeComplete, true,
                                               true, 2, 0, 2, 1));
@@ -593,11 +597,9 @@ TEST(NaiveFoxTunnelSessionLifecycle, NavigationStopAcceptsOnlyScopedStyleAbort)
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
       mode, true, true, true, true, false, true, NS_ERROR_ABORT));
   EXPECT_TRUE(detail::PreambleNavigationStopExpectedStyleAbort(
-      responseMode, true, true, true, false, true, true,
-      NS_BINDING_ABORTED));
+      responseMode, true, true, true, false, true, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
-      responseMode, true, true, true, true, false, true,
-      NS_BINDING_ABORTED));
+      responseMode, true, true, true, true, false, true, NS_BINDING_ABORTED));
   EXPECT_FALSE(detail::PreambleNavigationStopExpectedStyleAbort(
       PreambleMode::TreeNativeParserDocumentStartOverlap, true, true, true,
       true, true, true, NS_BINDING_ABORTED));

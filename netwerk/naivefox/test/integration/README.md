@@ -209,6 +209,14 @@ gate requires one admission/result/drain/CONNECT-established lifecycle on the
 same NaiveFox connection. Its decrypted gate requires document GET before
 CONNECT, HTTP 2xx, and normal H2 END_STREAM, but does not require END_STREAM to
 fall on either side of CONNECT; request commit is the product admission cause.
+`tree-native-parser-document-start-resource-tree` is the bounded H2-only
+fronting-page treatment. Reference Firefox and the outer NaiveFox preamble use
+the same `fronting_page`, while the browser behind SOCKS independently runs the
+same block-wide `browser_page` workload. Private admission requires exactly one
+root, stylesheet, classic deferred script, and image request in source order on
+one TLS/H2 connection, with matching same-base Firefox request semantics and
+normal END_STREAM completion. The three fixed fixture assets are inputs to a
+normal small page, not packet-size targets.
 The callback used by `tree-early-overlap` can release CONNECT while a resource
 is live yet still lose the wire-level race to that resource's END_STREAM. The
 decrypted check intentionally rejects such a run. Do not keep retrying until
@@ -564,14 +572,15 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
-`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
+`--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-resource-tree|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
 gate without a preamble. `root` is the short alias for `document-complete` and
 adds one bounded document GET before CONNECT. The harness always emits these
 fields explicitly. Thus `off` remains a true
 control even though a successfully parsed product config which omits
-`preamble` now promotes `document-start-overlap` for explicit H3 upstreams.
+`preamble` now promotes `document-start-overlap` for explicit H2 and H3
+upstreams.
 The tree modes also fetch two resources from that browser page;
 `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
@@ -767,6 +776,17 @@ separate lifecycle evidence. Decrypted H3 admission requires root GET HEADERS
 before CONNECT HEADERS, one QUIC identity, and request/response-size parity
 with both document controls; it never requires response HEADERS or FIN before
 CONNECT.
+The final isolated six-block H2/inner-HTTPS screen is retained as safe artifact
+`f244527d965b626e`. Compared with `document-start-overlap`, the bounded resource
+tree was effectively tied for packets 1--16 (`0.06880` versus `0.06871`) but
+worse for packets 17--32 (`0.50135` versus `0.45276`), packets 1--32 (`0.21964`
+versus `0.19245`), the first 250 ms (`0.19285` versus `0.18929`), and whole
+flow (`0.49826` versus `0.48398`). It added about 47 KiB of server traffic in
+the first 250 ms. Six blocks remain screening evidence rather than an
+inferential verdict, but the consistent direction and identified volume/burst
+mechanism reject the resource tree as a product default. The smaller
+`document-start-overlap` lifecycle is therefore the promoted H2 policy; the
+resource tree remains an explicit fail-closed research arm.
 `tree-native-parser-document-start-overlap-css` retains that exact early
 admission while the root continues through the lightweight HTML5 speculative
 scanner and opens one native `FromParser` stylesheet in the background. The

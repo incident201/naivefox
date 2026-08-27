@@ -454,24 +454,30 @@ class JsonParser final {
       return Error("listen addresses do not match multiple proxies");
     }
     if (!sawPreamble) {
+      bool hasExplicitH2Proxy = false;
       bool hasExplicitH3Proxy = false;
       for (const auto& proxy : parsed.mProxies) {
-        if (proxy.mProtocol == ProxyProtocol::H3) {
+        if (proxy.mProtocol == ProxyProtocol::H2) {
+          hasExplicitH2Proxy = true;
+        } else if (proxy.mProtocol == ProxyProtocol::H3) {
           hasExplicitH3Proxy = true;
-          break;
         }
       }
-      if (hasExplicitH3Proxy) {
-        // Promote the same cold H3 document-start lifecycle that passed the
-        // same-base acceptance screen. H2 and Auto remain Off: neither was
-        // part of that causal experiment. Explicit preamble and gate fields
-        // always remain authoritative.
-        parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
+      if (hasExplicitH2Proxy || hasExplicitH3Proxy) {
+        // Promote the same cold document-start lifecycle that passed the
+        // same-base H2 and H3 screens. Explicit preamble and gate fields
+        // remain authoritative.
+        if (hasExplicitH2Proxy) {
+          parsed.mPreamble.mH2Mode = Some(PreambleMode::DocumentStartOverlap);
+        }
+        if (hasExplicitH3Proxy) {
+          parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
+        }
         parsed.mPreamble.mPath.AssignLiteral("/");
         parsed.mPreamble.mMaxAssets = 0;
         parsed.mPreamble.mMaxBytes = PreambleConfig::kDefaultDocumentMaxBytes;
         parsed.mPreamble.mCacheResources = false;
-        parsed.mImplicitH3PreambleGate = !sawOuterSessionGate;
+        parsed.mImplicitPreambleGate = !sawOuterSessionGate;
       }
     }
     aConfig = std::move(parsed);

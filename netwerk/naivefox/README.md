@@ -78,14 +78,15 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
-- `preamble` is optional. When it is omitted, an explicit `quic://` upstream
-  uses the promoted H3-only `document-start-overlap` policy at path `/` with a
-  64 KiB safety budget; strict H2 remains `off`. The implicit cold-route gate
-  also applies only to that H3 upstream, so H2 scheduling is unchanged. An
+- `preamble` is optional. When it is omitted, explicit `https://` and
+  `quic://` upstreams use the promoted `document-start-overlap` policy at path
+  `/` with a 64 KiB safety budget. The implicit cold-route gate applies to the
+  selected H2 or H3 upstream, so one established outer session does not repeat
+  the synthetic document for every tunnel. An
   explicit `{"preamble":{"mode":"off"}}` is the complete opt-out, and an
   explicit `outer-session-gate` value remains authoritative: `false` runs the
-  implicit H3 document on every tunnel, while `true` retains the existing
-  global gate semantics. An older H3 gate-only config must now add explicit
+  implicit protocol-specific document on every tunnel, while `true` retains
+  the existing global gate semantics. An older H3 gate-only config must now add explicit
   `mode: off` to keep sending no document GET. The 64 KiB value is a safety cap,
   not a target response size. `mode` is still
   required when the preamble object is present; optional `h2-mode` and `h3-mode`
@@ -96,6 +97,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   `document-native-cache-open`, `document-native-channel-open`,
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-native-parser-document-start-overlap`,
+  `tree-native-parser-document-start-resource-tree`,
   `tree-native-parser-document-start-navigation-stop`,
   `tree-native-parser-document-start-response-stop`,
   `tree-complete`, `tree-overlap`,
@@ -141,16 +143,33 @@ The supported config is a strict NaiveProxy-compatible subset:
   (`0.76117` to `0.65828`), packets 1--32 (`0.26499` to `0.22720`), and the
   250 ms view (`0.14026` to `0.12081`); no whole-flow regression was detected
   (`0.38926` to `0.38660`, with a paired interval crossing zero). It is
-  therefore the implicit default for explicit H3 upstreams.
+  therefore the implicit default for explicit H2 and H3 upstreams. A final
+  six-block H2 screen against the bounded resource-tree candidate retained the
+  lower distance for this mode in packets 17--32, packets 1--32, 250 ms, and
+  whole-flow views, while packets 1--16 were effectively tied.
   `tree-native-parser-document-start-overlap` preserves that same early
   request-commit admission, then continues the root response through the lean
   HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens
   through the native `FromParser` preload path while CONNECT and its tunneled
-  workload are already active. It is H3-only, fail-closed, and does not add a
+  workload are already active. It is fail-closed and does not add a
   timer, DOM, layout, graphics, JavaScript, or a second process. Screening
   shows a strong packets-17--32 improvement but a later volume penalty from
   the additional complete stylesheet, so it remains experimental rather than
   the default until that tradeoff is resolved.
+  `tree-native-parser-document-start-resource-tree` is the final bounded H2
+  fronting-page experiment. It preserves early document-start admission and
+  then accepts, in source order, one same-origin stylesheet, one classic
+  deferred script, and one image from the lean HTML5 speculative scanner. Each
+  resource uses a native Necko preload channel with upstream referrer, Fetch
+  Metadata, priority, image `Accept`, Cache2, and normal stream completion. The
+  fixture uses a fixed small page (12 KiB CSS, 24 KiB JS, and 8 KiB SVG); these
+  are semantic fixture sizes, not packet-index targets. A fresh decrypted run
+  proved `root GET -> CONNECT -> resource GETs` on one H2 TLS connection with
+  request semantics matching same-base Firefox. The final paired screen still
+  made packets 17--32, packets 1--32, 250 ms, and whole flow worse than
+  `document-start-overlap`: the resource burst moved the residual and added
+  roughly 47 KiB of early server traffic. The mode remains available for
+  controlled research but is rejected as a product default.
   `tree-native-parser-document-start-navigation-stop` tests the corresponding
   upstream cancellation tradeoff. The synthetic root and stylesheet share a
   scoped load group which excludes CONNECT. After CONNECT is admitted, positive

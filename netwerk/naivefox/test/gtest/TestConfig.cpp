@@ -110,35 +110,38 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_EQ(config.mPreamble.mMode, PreambleMode::Off);
   EXPECT_TRUE(config.mPreamble.mPath.EqualsLiteral("/"));
   EXPECT_EQ(config.mPreamble.mMaxAssets, 0U);
-  EXPECT_EQ(config.mPreamble.mMaxBytes, 0U);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(config.mPreamble.mMaxBytes,
+            PreambleConfig::kDefaultDocumentMaxBytes);
   EXPECT_EQ(config.mMaxConnections, 0U);
   EXPECT_FALSE(config.mOuterSessionGate);
-  EXPECT_FALSE(config.mImplicitH3PreambleGate);
+  EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
 }
 
-TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitH3Only)
+TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
 {
   nsAutoCString error;
-  Config implicitH3;
+  Config implicitQuic;
   ASSERT_EQ(
       ParseConfig(
           R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example"})"_ns,
-          implicitH3, error),
+          implicitQuic, error),
       NS_OK)
       << error.get();
-  EXPECT_EQ(implicitH3.mPreamble.mMode, PreambleMode::Off);
-  EXPECT_EQ(implicitH3.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+  EXPECT_EQ(implicitQuic.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_EQ(implicitQuic.mPreamble.ModeForProtocol(ProxyProtocol::H2),
             PreambleMode::Off);
-  EXPECT_EQ(implicitH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+  EXPECT_EQ(implicitQuic.mPreamble.ModeForProtocol(ProxyProtocol::H3),
             PreambleMode::DocumentStartOverlap);
-  EXPECT_TRUE(implicitH3.mPreamble.mPath.EqualsLiteral("/"));
-  EXPECT_EQ(implicitH3.mPreamble.mMaxAssets, 0U);
-  EXPECT_EQ(implicitH3.mPreamble.mMaxBytes,
+  EXPECT_TRUE(implicitQuic.mPreamble.mPath.EqualsLiteral("/"));
+  EXPECT_EQ(implicitQuic.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(implicitQuic.mPreamble.mMaxBytes,
             PreambleConfig::kDefaultDocumentMaxBytes);
-  EXPECT_FALSE(implicitH3.mPreamble.mCacheResources);
-  EXPECT_FALSE(implicitH3.mOuterSessionGate);
-  EXPECT_TRUE(implicitH3.mImplicitH3PreambleGate);
+  EXPECT_FALSE(implicitQuic.mPreamble.mCacheResources);
+  EXPECT_FALSE(implicitQuic.mOuterSessionGate);
+  EXPECT_TRUE(implicitQuic.mImplicitPreambleGate);
 
   Config explicitOff;
   error.Truncate();
@@ -152,7 +155,7 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitH3Only)
             PreambleMode::Off);
   EXPECT_EQ(explicitOff.mPreamble.mMaxBytes, 0U);
   EXPECT_FALSE(explicitOff.mOuterSessionGate);
-  EXPECT_FALSE(explicitOff.mImplicitH3PreambleGate);
+  EXPECT_FALSE(explicitOff.mImplicitPreambleGate);
 
   Config explicitGateOnly;
   error.Truncate();
@@ -165,7 +168,7 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitH3Only)
   EXPECT_EQ(explicitGateOnly.mPreamble.ModeForProtocol(ProxyProtocol::H3),
             PreambleMode::Off);
   EXPECT_TRUE(explicitGateOnly.mOuterSessionGate);
-  EXPECT_FALSE(explicitGateOnly.mImplicitH3PreambleGate);
+  EXPECT_FALSE(explicitGateOnly.mImplicitPreambleGate);
 
   Config mixedProtocols;
   error.Truncate();
@@ -176,24 +179,29 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitH3Only)
       NS_OK)
       << error.get();
   EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H2),
-            PreambleMode::Off);
+            PreambleMode::DocumentStartOverlap);
   EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H3),
             PreambleMode::DocumentStartOverlap);
-  EXPECT_TRUE(mixedProtocols.mImplicitH3PreambleGate);
+  EXPECT_TRUE(mixedProtocols.mImplicitPreambleGate);
 
   for (const auto& [value, expected] :
        {std::pair{"false", false}, std::pair{"true", true}}) {
-    Config explicitGate;
-    error.Truncate();
-    nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","outer-session-gate":)"_ns);
-    json.Append(value);
-    json.Append('}');
-    ASSERT_EQ(ParseConfig(json, explicitGate, error), NS_OK) << error.get();
-    EXPECT_EQ(explicitGate.mPreamble.ModeForProtocol(ProxyProtocol::H3),
-              PreambleMode::DocumentStartOverlap);
-    EXPECT_EQ(explicitGate.mOuterSessionGate, expected);
-    EXPECT_FALSE(explicitGate.mImplicitH3PreambleGate);
+    for (const auto& [proxy, protocol] :
+         {std::pair{"https://proxy.example", ProxyProtocol::H2},
+          std::pair{"quic://proxy.example", ProxyProtocol::H3}}) {
+      Config explicitGate;
+      error.Truncate();
+      nsAutoCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":")"_ns);
+      json.Append(proxy);
+      json.Append(R"(","outer-session-gate":)"_ns);
+      json.Append(value);
+      json.Append('}');
+      ASSERT_EQ(ParseConfig(json, explicitGate, error), NS_OK) << error.get();
+      EXPECT_EQ(explicitGate.mPreamble.ModeForProtocol(protocol),
+                PreambleMode::DocumentStartOverlap);
+      EXPECT_EQ(explicitGate.mOuterSessionGate, expected);
+      EXPECT_FALSE(explicitGate.mImplicitPreambleGate);
+    }
   }
 }
 
@@ -874,7 +882,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
   source.mPreamble.mCacheResources = true;
   source.mOuterSessionGate = true;
-  source.mImplicitH3PreambleGate = true;
+  source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
 
   TunnelConfig constructed(source);
@@ -896,7 +904,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);
     EXPECT_TRUE(copy->mPreamble.mCacheResources);
     EXPECT_TRUE(copy->mOuterSessionGate);
-    EXPECT_TRUE(copy->mImplicitH3PreambleGate);
+    EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
   }
 }
