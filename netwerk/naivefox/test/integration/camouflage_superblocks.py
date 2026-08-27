@@ -132,7 +132,11 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         raise ValueError("document-native-channel-open requires h3 superblocks")
     if protocol != "h3" and any(
         arm.startswith("tree-native-parser-")
-        and arm != "tree-native-parser-document-start-overlap-css"
+        and arm
+        not in (
+            "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-navigation-stop-css",
+        )
         for arm in arms
     ):
         raise ValueError("native parser arms require h3 superblocks")

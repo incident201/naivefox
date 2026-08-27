@@ -1021,13 +1021,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-preload-overlap-css requires h3")
     if (
-        arm == "tree-native-parser-document-start-navigation-stop-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-document-start-navigation-stop-css requires h3"
-        )
-    if (
         arm == "tree-native-parser-document-start-response-stop-css"
         and protocol != "h3"
     ):
@@ -1933,7 +1926,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["completed_resources"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection or marker["protocol"] != "h3"
+                marker["connection"] != connection
+                or marker["protocol"] != protocol
                 for marker in (channel, admission, barrier, drain)
             )
             or result["connection"] != connection
@@ -2092,7 +2086,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["css_aborted"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection or marker["protocol"] != "h3"
+                marker["connection"] != connection
+                or marker["protocol"] != protocol
                 for marker in (
                     stylesheet,
                     tunnel_active,
@@ -2102,7 +2097,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                     drain,
                 )
             )
-            or admission["protocol"] != "h3"
+            or admission["protocol"] != protocol
             or result["connection"] != connection
         ):
             raise ValueError("native parser navigation-stop causal state is invalid")
@@ -2110,7 +2105,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             line
             for line, established in zip(established_lines, parsed_established)
             if established["connection"] == connection
-            and established["protocol"] == "h3"
+            and established["protocol"] == protocol
         ]
         if len(matching_established) != 1:
             raise ValueError(

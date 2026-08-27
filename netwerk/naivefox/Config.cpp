@@ -811,6 +811,14 @@ class JsonParser final {
           "tree-native-parser-document-start-navigation-stop must be "
           "selected explicitly with h3-mode");
     }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartNavigationStop))) {
+      return Error(
+          "tree-native-parser-document-start-navigation-stop must be "
+          "selected explicitly with h2-mode");
+    }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
         (!sawH3Mode ||
          aPreamble.mH3Mode !=
@@ -870,7 +878,9 @@ class JsonParser final {
     if (h2Mode == PreambleMode::TreeResourceCommittedOverlap ||
         h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
         (PreambleModeUsesNativeParser(h2Mode) &&
-         h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap)) {
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap &&
+         h2Mode !=
+             PreambleMode::TreeNativeParserDocumentStartNavigationStop)) {
       return Error("selected resource-committed preamble is H3-only");
     }
     const bool anyActive =
@@ -944,7 +954,8 @@ class JsonParser final {
             "cache-resources=true");
       }
     }
-    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop ||
+        h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
       if (aPreamble.mMaxAssets != 1) {
         return Error(
             "tree-native-parser-document-start-navigation-stop requires "

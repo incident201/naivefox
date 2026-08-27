@@ -102,13 +102,6 @@ def build_config(
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-preload-overlap-css requires h3")
     if (
-        arm == "tree-native-parser-document-start-navigation-stop-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-document-start-navigation-stop-css requires h3"
-        )
-    if (
         arm == "tree-native-parser-document-start-response-stop-css"
         and protocol != "h3"
     ):
@@ -196,7 +189,7 @@ def build_config(
     elif arm == "tree-native-parser-document-start-navigation-stop-css":
         preamble = {
             "mode": "off",
-            "h3-mode": "tree-native-parser-document-start-navigation-stop",
+            f"{protocol}-mode": "tree-native-parser-document-start-navigation-stop",
             "path": preamble_path,
             "max-assets": 1,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,

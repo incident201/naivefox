@@ -1096,8 +1096,9 @@ nsresult ProxyPreambleOperation::NotifyTunnelApplicationActive() {
       "Connection %llu preamble "
       "native-parser-document-start-navigation-stop "
       "phase=tunnel-application-active direction=client-to-target "
-      "bytes_positive=1 protocol=h3\n",
-      static_cast<unsigned long long>(mImpl->mConnectionId));
+      "bytes_positive=1 protocol=%s\n",
+      static_cast<unsigned long long>(mImpl->mConnectionId),
+      ProtocolName(mImpl->mProtocol));
   return MaybeIssueNativeParserNavigationStop();
 }
 
@@ -1167,12 +1168,13 @@ nsresult ProxyPreambleOperation::MaybeIssueNativeParserNavigationStop() {
       "Connection %llu preamble "
       "%s "
       "phase=navigation-stop-issued reason=NS_BINDING_ABORTED "
-      "load_group=scoped protocol=h3\n",
+      "load_group=scoped protocol=%s\n",
       static_cast<unsigned long long>(mImpl->mConnectionId),
       mImpl->mConfig.mMode ==
               PreambleMode::TreeNativeParserDocumentStartResponseStop
           ? "native-parser-document-start-response-stop"
-          : "native-parser-document-start-navigation-stop");
+          : "native-parser-document-start-navigation-stop",
+      ProtocolName(mImpl->mProtocol));
   return mImpl->mLoadGroup->CancelWithReason(
       NS_BINDING_ABORTED, "NaiveFox::ProxyPreambleNavigationStop"_ns);
 }
@@ -1262,8 +1264,10 @@ nsresult ProxyPreambleOperation::Start(
       (PreambleModeUsesNativeParser(aConfig.mMode) &&
        ((aProtocol != ProxyProtocol::H3 &&
          !(aProtocol == ProxyProtocol::H2 &&
-           aConfig.mMode ==
-               PreambleMode::TreeNativeParserDocumentStartOverlap)) ||
+           (aConfig.mMode ==
+                PreambleMode::TreeNativeParserDocumentStartOverlap ||
+            aConfig.mMode ==
+                PreambleMode::TreeNativeParserDocumentStartNavigationStop))) ||
         aConfig.mMaxAssets != 1 || !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -1466,12 +1470,13 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
             "Connection %llu preamble "
             "%s "
             "phase=stylesheet-committed stream=1 status=waiting-for "
-            "protocol=h3\n",
+            "protocol=%s\n",
             static_cast<unsigned long long>(mImpl->mConnectionId),
             mImpl->mConfig.mMode ==
                     PreambleMode::TreeNativeParserDocumentStartResponseStop
                 ? "native-parser-document-start-response-stop"
-                : "native-parser-document-start-navigation-stop");
+                : "native-parser-document-start-navigation-stop",
+            ProtocolName(mImpl->mProtocol));
       } else {
         RuntimeLogEvent(
             "Preamble native-parser-preload lifecycle=resource-committed "
@@ -1562,13 +1567,13 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
     RuntimeLogEvent(
         "Connection %llu preamble "
         "%s "
-        "phase=stylesheet-response-started http=%u protocol=h3\n",
+        "phase=stylesheet-response-started http=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         mImpl->mConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartResponseStop
             ? "native-parser-document-start-response-stop"
             : "native-parser-document-start-navigation-stop",
-        stream.mHttpStatus);
+        stream.mHttpStatus, ProtocolName(mImpl->mProtocol));
     nsresult stopRv = MaybeIssueNativeParserNavigationStop();
     if (NS_FAILED(stopRv)) {
       FailNativeParserContract(stopRv, "navigation-stop-cancel-failed");
@@ -3670,12 +3675,13 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
         "Connection %llu preamble "
         "%s "
         "phase=stylesheet-onstop status=NS_BINDING_ABORTED expected=1 "
-        "protocol=h3\n",
+        "protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         mImpl->mConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartResponseStop
             ? "native-parser-document-start-response-stop"
-            : "native-parser-document-start-navigation-stop");
+            : "native-parser-document-start-navigation-stop",
+        ProtocolName(mImpl->mProtocol));
   } else if (NS_FAILED(aStatus)) {
     mImpl->mAllStreamsCompletedNormally = false;
   }

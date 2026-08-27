@@ -759,7 +759,6 @@ def extract(args):
         args.naivefox_arm
         in (
             "tree-native-parser-preload-overlap-css",
-            "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",
             "tree-native-parser-retarget-overlap-css",

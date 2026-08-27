@@ -1299,15 +1299,25 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "cache-resources": True,
             },
         )
-        with self.assertRaisesRegex(ValueError, "requires h3"):
-            CONFIG.build_config(
-                "tree-native-parser-document-start-navigation-stop-css",
-                "h2",
-                1080,
-                4433,
-                "fixture-user",
-                "fixture-pass",
-            )
+        navigation_stop_h2 = CONFIG.build_config(
+            "tree-native-parser-document-start-navigation-stop-css",
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            navigation_stop_h2["preamble"],
+            {
+                "mode": "off",
+                "h2-mode": "tree-native-parser-document-start-navigation-stop",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
         response_stop = CONFIG.build_config(
             "tree-native-parser-document-start-response-stop-css",
             "h3",
@@ -2199,6 +2209,20 @@ class CamouflageHarnessTests(unittest.TestCase):
             "h3",
             native_parser_navigation_stop_log,
             one_connection,
+        )
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-start-navigation-stop-css",
+            "h2",
+            native_parser_navigation_stop_log.replace(
+                "protocol=h3", "protocol=h2"
+            ).replace("outer=h3", "outer=h2"),
+            {
+                "protocol": "h2",
+                "features": {
+                    "lifecycle_connection_count": 1.0,
+                    "tls_client_hello_count": 1.0,
+                },
+            },
         )
         with self.assertRaisesRegex(ValueError, "causal state"):
             SAMPLE.validate_sample(
@@ -3186,6 +3210,12 @@ class CamouflageHarnessTests(unittest.TestCase):
             summary,
         )
         self.assertIn("root or stylesheet lacks END_STREAM", summary)
+        self.assertIn(
+            "tree-native-parser-document-start-navigation-stop-css", runner
+        )
+        self.assertIn("http2.rst_stream.error", runner)
+        self.assertIn("stylesheet completed instead of being canceled", summary)
+        self.assertIn("lacks one causal H2 CANCEL", summary)
 
     def test_superblock_reuses_wire_completion_token_with_fresh_marker(self):
         with open(

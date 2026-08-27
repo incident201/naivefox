@@ -72,6 +72,18 @@ packets 17--32 from `0.45721` to `0.43922` and packets 1--32 from `0.22483` to
 from `0.28498` to `0.31852`. The complete stylesheet added about 67 KiB of
 server traffic by 250 ms, so this H2 arm is not a default candidate either.
 
+H2 `tree-native-parser-document-start-navigation-stop` retains the same
+client-to-target ownership predicate and scoped load-group cancellation.
+Decrypted admission proves `root GET < CONNECT < CSS GET < CSS 200 <
+RST_STREAM(CANCEL)`, no CSS END_STREAM, and one TCP/TLS/H2 connection. In the
+six-block direct-Firefox screen `2f2b4c49e0b6edb7`, however, packets 17--32
+changed only from `0.48108` to `0.47885`; packets 1--32 improved from `0.23117`
+to `0.21944`, while packets 1--16, 250 ms, and whole-flow all worsened. Server
+bytes by 250 ms were nearly identical for complete and canceled CSS, showing
+that the response had already entered the H2/TLS/TCP send path before the
+causal cancel. The H2 stop mode therefore remains diagnostic and is not a
+default candidate.
+
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
 without paying for the complete synthetic stylesheet. CONNECT is not a member

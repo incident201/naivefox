@@ -12,14 +12,14 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --arm) arm=${2:-}; shift 2 ;;
     --help)
-      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css]\n' "$0"
+      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css]\n' "$0"
       exit 0
       ;;
     *) printf 'unknown H2 comparison argument: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
 case $arm in
-  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap | tree-native-parser-document-start-overlap-css) ;;
+  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css) ;;
   *) printf 'unsupported H2 diagnostic arm: %s\n' "$arm" >&2; exit 2 ;;
 esac
 
@@ -395,6 +395,9 @@ run_candidate() {
   elif [[ $arm == tree-native-parser-document-start-overlap-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-preload drain=complete completed_resources=1 http=2[0-9][0-9] protocol=h2$'
+  elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h2$'
   fi
   sleep 0.25
   stop_capture
@@ -447,12 +450,13 @@ run_candidate() {
     established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h2 padding=yes$" "$log" | cut -d: -f1)
     [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
        $admission_line -lt $established_line ]]
-  elif [[ $arm == tree-native-parser-document-start-overlap-css ]]; then
-    python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" <<'PY'
+  elif [[ $arm == tree-native-parser-document-start-overlap-css ||
+          $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
+    python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" "$arm" <<'PY'
 import importlib.util
 import sys
 
-module_path, log_path = sys.argv[1:]
+module_path, log_path, arm = sys.argv[1:]
 spec = importlib.util.spec_from_file_location(
     "camouflage_sample_validation", module_path
 )
@@ -460,7 +464,7 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 with open(log_path, encoding="utf-8", errors="replace") as stream:
     module.validate_sample(
-        "tree-native-parser-document-start-overlap-css",
+        arm,
         "h2",
         stream.read(),
         {
@@ -539,6 +543,12 @@ extract_cohort() {
     "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
     -e tcp.srcport -e tcp.dstport -e tcp.stream -e http2.type \
     -e http2.streamid -e http2.flags >"$capture_dir/$cohort-frames.csv"
+  tshark -r "$pcap" "${decode[@]}" \
+    -Y "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && http2.type==3" \
+    "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \
+    -e tcp.srcport -e tcp.dstport -e tcp.stream -e http2.type \
+    -e http2.streamid -e http2.rst_stream.error \
+    >"$capture_dir/$cohort-resets.csv"
   tshark -r "$pcap" "${decode[@]}" \
     -Y "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && (http2.headers.method || http2.headers.status)" \
     "${TSHARK_FIELDS[@]}" -e frame.number -e frame.time_relative \

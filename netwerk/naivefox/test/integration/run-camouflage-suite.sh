@@ -297,11 +297,6 @@ if [[ $naivefox_arm == tree-native-parser-preload-overlap-css &&
   printf 'tree-native-parser-preload-overlap-css requires --protocol h3\n' >&2
   exit 2
 fi
-if [[ $naivefox_arm == tree-native-parser-document-start-navigation-stop-css &&
-      $protocol_selection != h3 ]]; then
-  printf 'tree-native-parser-document-start-navigation-stop-css requires --protocol h3\n' >&2
-  exit 2
-fi
 if [[ $naivefox_arm == tree-native-parser-document-start-response-stop-css &&
       $protocol_selection != h3 ]]; then
   printf 'tree-native-parser-document-start-response-stop-css requires --protocol h3\n' >&2
@@ -404,11 +399,6 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   if [[ -n ${seen_multi_arms[tree-native-parser-preload-overlap-css]:-} &&
         $protocol_selection != h3 ]]; then
     printf 'tree-native-parser-preload-overlap-css multi-arm screening requires --protocol h3\n' >&2
-    exit 2
-  fi
-  if [[ -n ${seen_multi_arms[tree-native-parser-document-start-navigation-stop-css]:-} &&
-        $protocol_selection != h3 ]]; then
-    printf 'tree-native-parser-document-start-navigation-stop-css multi-arm screening requires --protocol h3\n' >&2
     exit 2
   fi
   if [[ -n ${seen_multi_arms[tree-native-parser-document-start-navigation-stop-css]:-} &&
@@ -1962,7 +1952,7 @@ run_naivefox_sample() {
   elif [[ $arm == tree-resource-native-cache-committed-overlap ]]; then
     drain_pattern=" preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=$protocol$"
   elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
-    drain_pattern=" preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h3$"
+    drain_pattern=" preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=$protocol$"
   elif [[ $arm == tree-native-parser-document-start-response-stop-css ]]; then
     # The product contract is deliberately opportunistic. A target response
     # cancels an in-flight stylesheet, but on a fast path the stylesheet may

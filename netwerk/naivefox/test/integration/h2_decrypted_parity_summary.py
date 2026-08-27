@@ -22,6 +22,11 @@ SUPPORTED_ARMS = {
     "tree-root-overlap",
     "tree-overlap",
     "tree-native-parser-document-start-overlap-css",
+    "tree-native-parser-document-start-navigation-stop-css",
+}
+PARSER_DOCUMENT_START_ARMS = {
+    "tree-native-parser-document-start-overlap-css",
+    "tree-native-parser-document-start-navigation-stop-css",
 }
 SELECTED_GET_SEMANTIC_HEADERS = {
     ":method",
@@ -112,6 +117,38 @@ def parse_frames(rows, cohort, proxy_port):
                 key = (event_direction, tcp_stream, stream)
                 end_stream[key] = max(frame, end_stream.get(key, frame))
     return end_stream, tcp_streams
+
+
+def parse_resets(rows, cohort, proxy_port):
+    resets = []
+    for row in rows:
+        tcp_stream = row["tcp.stream"]
+        require(tcp_stream, f"{cohort} RST_STREAM lacks TCP identity")
+        types = values(row["http2.type"])
+        streams = values(row["http2.streamid"])
+        errors = values(row["http2.rst_stream.error"])
+        require(
+            types and len(types) == len(streams),
+            f"{cohort} RST_STREAM frame/stream alignment is ambiguous",
+        )
+        reset_streams = [
+            stream for frame_type, stream in zip(types, streams) if frame_type == "3"
+        ]
+        require(
+            len(reset_streams) == len(errors),
+            f"{cohort} RST_STREAM error mapping is ambiguous",
+        )
+        for stream, error in zip(reset_streams, errors):
+            resets.append(
+                {
+                    "frame": int(row["frame.number"]),
+                    "direction": direction(row, proxy_port),
+                    "tcp_stream": tcp_stream,
+                    "stream": stream,
+                    "error": error,
+                }
+            )
+    return resets
 
 
 def parse_headers(rows, cohort, proxy_port):
@@ -272,7 +309,7 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
         0
         if arm == "gate"
         else 2
-        if arm == "tree-native-parser-document-start-overlap-css"
+        if arm in PARSER_DOCUMENT_START_ARMS
         else 3
         if arm.startswith("tree-")
         else 1
@@ -315,12 +352,12 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
             root_record["stream"],
         )
     expected_paths = {root_path, "/camouflage/style.css"}
-    if arm != "tree-native-parser-document-start-overlap-css":
+    if arm not in PARSER_DOCUMENT_START_ARMS:
         expected_paths.add("/camouflage/app.js")
     require(set(by_path) == expected_paths, f"{cohort} tree resource paths differ")
     root_url = f"{root[':scheme']}://{root[':authority']}{root_path}"
     resources = [("/camouflage/style.css", "style")]
-    if arm != "tree-native-parser-document-start-overlap-css":
+    if arm not in PARSER_DOCUMENT_START_ARMS:
         resources.append(("/camouflage/app.js", "script"))
     for path, destination in resources:
         _, resource = by_path[path]
@@ -484,6 +521,7 @@ def validate(
     reference_server_tls,
     arm_server_tls,
     root_request_identity,
+    resets,
 ):
     require(reference_settings == arm_settings, "same-base client H2 SETTINGS differ")
     require(
@@ -543,7 +581,7 @@ def validate(
         0
         if arm == "gate"
         else 2
-        if arm == "tree-native-parser-document-start-overlap-css"
+        if arm in PARSER_DOCUMENT_START_ARMS
         else 3
         if arm.startswith("tree-")
         else 1
@@ -552,7 +590,7 @@ def validate(
         len(gets) == expected_gets,
         f"{arm} must emit exactly {expected_gets} preamble GETs",
     )
-    if arm == "tree-native-parser-document-start-overlap-css":
+    if arm in PARSER_DOCUMENT_START_ARMS:
         root_get = next(
             event
             for event in gets
@@ -701,6 +739,49 @@ def validate(
             all(event["end_stream_frame"] != "" for event in responses),
             f"{arm} root or stylesheet lacks END_STREAM",
         )
+    elif arm == "tree-native-parser-document-start-navigation-stop-css":
+        root_get = next(
+            event
+            for event in gets
+            if (event["frame"], event["tcp_stream"], event["stream"])
+            == root_request_identity
+        )
+        style_get = next(event for event in gets if event is not root_get)
+        root_responses = [
+            event
+            for event in responses
+            if event["tcp_stream"] == root_get["tcp_stream"]
+            and event["stream"] == root_get["stream"]
+        ]
+        style_responses = [
+            event
+            for event in responses
+            if event["tcp_stream"] == style_get["tcp_stream"]
+            and event["stream"] == style_get["stream"]
+        ]
+        require(
+            root_responses
+            and all(event["end_stream_frame"] != "" for event in root_responses),
+            f"{arm} root document lacks END_STREAM",
+        )
+        require(
+            len(style_responses) == 1
+            and style_responses[0]["end_stream_frame"] == "",
+            f"{arm} stylesheet completed instead of being canceled",
+        )
+        style_resets = [
+            reset
+            for reset in resets
+            if reset["direction"] == "client"
+            and reset["tcp_stream"] == style_get["tcp_stream"]
+            and reset["stream"] == style_get["stream"]
+        ]
+        require(
+            len(style_resets) == 1
+            and int(style_resets[0]["error"], 0) == 8
+            and style_responses[0]["frame"] < style_resets[0]["frame"],
+            f"{arm} lacks one causal H2 CANCEL after stylesheet response",
+        )
 
 
 def write_outputs(root, events_path, summary_path, proxy_port, arm):
@@ -735,6 +816,9 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
     candidate_semantics = read_get_request_semantics(
         root, arm, proxy_port, candidate_gets
     )
+    candidate_resets = parse_resets(
+        read_rows(root, arm, "resets"), arm, proxy_port
+    )
     root_request_identity = validate_expected_get_request_semantics(
         arm, candidate_semantics, arm
     )
@@ -766,6 +850,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
         reference_server_tls,
         candidate_server_tls,
         root_request_identity,
+        candidate_resets,
     )
     cohorts = (("reference", reference), (arm, candidate))
     fieldnames = (
@@ -823,7 +908,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
         output.write(f"reference_outer_get_count={len(reference_gets)}\n")
         output.write(f"{arm}_preamble_get_count={len(candidate_gets)}\n")
         output.write(f"{arm}_outer_connect_count={len(candidate_connects)}\n")
-        if arm == "tree-native-parser-document-start-overlap-css":
+        if arm in PARSER_DOCUMENT_START_ARMS:
             output.write(f"{arm}_root_before_first_connect=yes\n")
             output.write(f"{arm}_stylesheet_after_first_connect=yes\n")
         else:
@@ -841,6 +926,15 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
             output.write(
                 "tree-native-parser-document-start-overlap-css_"
                 "root_and_css_end_stream=yes\n"
+            )
+        if arm == "tree-native-parser-document-start-navigation-stop-css":
+            output.write(
+                "tree-native-parser-document-start-navigation-stop-css_"
+                "stylesheet_h2_cancel_after_response=yes\n"
+            )
+            output.write(
+                "tree-native-parser-document-start-navigation-stop-css_"
+                "stylesheet_end_stream=no\n"
             )
         if arm == "tree-root-overlap":
             output.write("tree-root-overlap_wire_overlap_is_admission=no\n")
