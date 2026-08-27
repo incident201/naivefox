@@ -102,6 +102,28 @@ therefore add traffic rather than redistribute the existing budget. The
 complete-stylesheet upper bound already shows that such additive early volume
 trades a local 17--32 improvement for a 250 ms/whole-flow penalty.
 
+The preceding H2 packet-index screens were collected with segmentation
+offloads disabled but the Linux loopback MTU still at its default 65536 bytes.
+Their SYNs advertised MSS 65495, and direct Firefox consequently exposed
+5--8 KiB host-local TCP segments in packets 22--32.  Those results remain
+useful lifecycle/byte-volume diagnostics, but their packet-index distances are
+not physical-wire camouflage evidence and must not select a product default.
+Controlled H2 screening now sets and verifies loopback MTU 1500 before any
+endpoint starts and rejects an outer TCP segment with more than 1460 payload
+bytes.  H2 product decisions require a fresh same-base baseline under this
+policy.
+
+The first fail-closed two-block gate under that policy is safe artifact
+`00de90dccbdb2cec` (seed `2026082701`).  SYN MSS was 1460 for every participant
+and no oversized outer TCP segment was admitted.  By packet 32 direct Firefox
+had about 10.9 KiB of server transport payload rather than the earlier
+55--62 KiB loopback-supersegment result; H2 `off` had about 6.4 KiB.  The main
+remaining shape was temporal: direct Firefox reached packet 32 around
+51--56 ms, while `off` reached it around 11 ms.  A bodyless
+`document-start-overlap` control improved the isolated packets-17--32 distance
+but worsened packets 1--16, packets 1--32, 250 ms, and whole flow.  With only
+two blocks this is localization evidence, not inference or a product default.
+
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
 without paying for the complete synthetic stylesheet. CONNECT is not a member
@@ -827,8 +849,9 @@ NaiveFox startup or reference-browser startup, fails closed if its own process
 or netlink parser fails, and drains queued events before confirming the sample
 boundary closed.
 
-H3 packet-shape screening inside the private namespace also disables loopback
-GRO, GSO, TSO, UDP segmentation, and GSO-list aggregation. The harness rejects
+Packet-shape screening inside the private namespace sets loopback MTU 1500 and
+disables GRO, GSO, TSO, UDP segmentation, and GSO-list aggregation. H2 rejects
+outer TCP payload segments larger than 1460 bytes. H3 rejects
 any proxy UDP frame whose captured UDP length exceeds 1500 bytes. Without this
 step, Linux can expose one host-side UDP GSO superframe as a 13--20 KiB
 "packet" even though it is segmented into ordinary QUIC datagrams before the

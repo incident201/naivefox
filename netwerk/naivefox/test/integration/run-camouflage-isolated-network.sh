@@ -10,8 +10,20 @@ if [[ $# -lt 1 || ${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0} != 1 ||
 fi
 
 ip link set lo up
-# Preserve individual QUIC datagrams for passive packet indices and private
-# HTTP/3 decryption.  This changes only the one-shot namespace loopback device.
+# The default Linux loopback MTU is 65536.  Even with segmentation offloads
+# disabled, that permits host-local TCP segments far larger than an ordinary
+# Ethernet packet and makes HTTP/2 packet indices depend on the fixture's
+# write boundaries.  Give both reference Firefox and NaiveFox the same
+# physical-network-sized MTU before either endpoint starts.
+ip link set lo mtu 1500
+loopback_mtu=$(ip -o link show dev lo | sed -n 's/.* mtu \([0-9][0-9]*\).*/\1/p')
+if [[ $loopback_mtu != 1500 ]]; then
+  printf 'isolated loopback MTU is not 1500: %s\n' "$loopback_mtu" >&2
+  exit 1
+fi
+# Preserve individual TCP segments and QUIC datagrams for passive packet
+# indices and private decryption.  This changes only the one-shot namespace
+# loopback device.
 ethtool -K lo gro off gso off tso off \
   tx-udp-segmentation off tx-gso-list off
 offload_state=$(ethtool -k lo)

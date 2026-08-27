@@ -1427,6 +1427,8 @@ strict_transport_check() {
     local client_hello_count
     local client_syn_count
     local destination
+    local max_tcp_payload
+    local oversized_tcp_segment
     local stream
     local syn
     mapfile -t tcp_streams < <(tshark -r "$pcap" \
@@ -1454,6 +1456,14 @@ strict_transport_check() {
         "$stream" "$client_syn_count" >&2
       return 1
     fi
+    max_tcp_payload=$(tshark -r "$pcap" \
+      -Y "tcp.stream==$stream && tcp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && tcp.flags.syn==1 && tcp.flags.ack==0" \
+      -T fields -e tcp.options.mss_val | sed -n '1p')
+    if [[ ! $max_tcp_payload =~ ^[0-9]+$ || $max_tcp_payload -gt 1460 ]]; then
+      printf 'H2 flow %s has an invalid client MSS for MTU 1500: %s\n' \
+        "$stream" "${max_tcp_payload:-missing}" >&2
+      return 1
+    fi
     client_hello_count=$(tshark -r "$pcap" \
       -d "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT,tls" \
       -Y "tcp.stream==$stream && tcp.dstport==$NAIVEFOX_FIXTURE_PROXY_PORT && tls.handshake.type==1" \
@@ -1461,6 +1471,14 @@ strict_transport_check() {
     if [[ $client_hello_count -ne 1 ]]; then
       printf 'H2 flow %s must contain exactly one visible TLS ClientHello (observed=%s)\n' \
         "$stream" "$client_hello_count" >&2
+      return 1
+    fi
+    oversized_tcp_segment=$(tshark -r "$pcap" \
+      -Y "tcp.stream==$stream && tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT && tcp.len>$max_tcp_payload" \
+      -T fields -e frame.number | sed -n '1p')
+    if [[ -n $oversized_tcp_segment ]]; then
+      printf 'strict H2 sample contains an oversized TCP segment at frame %s\n' \
+        "$oversized_tcp_segment" >&2
       return 1
     fi
   fi
@@ -2279,7 +2297,7 @@ EOF
 fi
 
 if [[ $isolated_network == 1 ]]; then
-  capture_offload_policy=namespace_loopback_gro_gso_tso_udp_gso_disabled
+  capture_offload_policy=namespace_loopback_mtu_1500_gro_gso_tso_udp_gso_disabled
 else
   capture_offload_policy=host_interface_offload_state_unmodified
 fi
