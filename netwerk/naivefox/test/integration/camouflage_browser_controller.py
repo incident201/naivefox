@@ -212,15 +212,16 @@ class Controller:
                 self.driver.quit()
             except Exception:
                 self.shutdown_failed = True
-        if self.process is not None and self.process.poll() is None:
+        if self.process is not None:
             self.shutdown_method = "controlled_sigterm"
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.forced_kill = True
-                self.process.kill()
-                self.process.wait()
+            if self.process.poll() is None:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.forced_kill = True
+                    self.process.kill()
+                    self.process.wait()
         if self.process_log is not None:
             self.process_log.close()
 

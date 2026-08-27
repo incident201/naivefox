@@ -129,6 +129,17 @@ def native_parser_full_process_lifecycle_lines():
 
 
 class CamouflageHarnessTests(unittest.TestCase):
+    def test_commandline_controller_records_group_sigterm_shutdown_race(self):
+        controller = CONTROLLER.Controller(SimpleNamespace())
+        controller.process = mock.Mock()
+        controller.process.poll.return_value = -15
+
+        controller.close()
+
+        self.assertEqual(controller.shutdown_method, "controlled_sigterm")
+        self.assertFalse(controller.forced_kill)
+        controller.process.terminate.assert_not_called()
+
     def test_fixture_accepted_connections_require_tcp_nodelay(self):
         connection = mock.Mock()
         connection.getsockopt.return_value = 1

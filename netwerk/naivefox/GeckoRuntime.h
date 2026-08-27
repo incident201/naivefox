@@ -66,11 +66,11 @@ class GeckoRuntime final {
   bool mHadKyberPref = false;
   bool mHadMlkemPref = false;
   bool mHadHttp3KyberPref = false;
-  bool mHadHttp3ThirdPartyRootsPref = false;
+  bool mHttp3ThirdPartyRootsPrefWasLocked = false;
   bool mOldKyberPref = false;
   bool mOldMlkemPref = false;
   bool mOldHttp3KyberPref = false;
-  bool mOldHttp3ThirdPartyRootsPref = false;
+  bool mOldHttp3ThirdPartyRootsDefault = false;
 };
 
 }  // namespace mozilla::naivefox

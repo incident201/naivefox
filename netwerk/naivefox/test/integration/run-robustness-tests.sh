@@ -103,7 +103,8 @@ start_client() {
 
 wait_for_client_exit() {
   local description=$1
-  if ! timeout 30 tail --pid="$client_pid" -f /dev/null; then
+  local timeout_seconds=${2:-30}
+  if ! timeout "$timeout_seconds" tail --pid="$client_pid" -f /dev/null; then
     printf 'NaiveFox did not exit after %s\n' "$description" >&2
     return 1
   fi
@@ -321,7 +322,12 @@ if wait "$disconnect_curl_pid"; then
   exit 1
 fi
 background_pids=()
-wait_for_client_exit 'the proxy disconnected'
+# A dead TCP peer is observable immediately, while an abruptly killed UDP/QUIC
+# peer is only observable when the negotiated idle timeout expires.  Keep the
+# H3 assertion bounded without racing its normal 45-second timeout boundary.
+disconnect_exit_timeout=30
+[[ $protocol == h3 ]] && disconnect_exit_timeout=60
+wait_for_client_exit 'the proxy disconnected' "$disconnect_exit_timeout"
 assert_no_secret "$client_log"
 
 printf '%s\n' \

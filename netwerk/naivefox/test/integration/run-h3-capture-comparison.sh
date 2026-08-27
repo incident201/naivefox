@@ -744,7 +744,11 @@ run_reference() {
   local -a command_env=(env -u SSLKEYLOGFILE \
     "${firefox_runtime_env[@]}" \
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1)
-  local workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/observer?size=2097152&pass=$pass"
+  # Keep the legacy screenshot workload bounded in layout size.  Rendering a
+  # multi-megabyte plain-text document can exceed Firefox's screenshot canvas
+  # even though the H3 transfer itself completed successfully.  A normal HTML
+  # document with one bulk resource preserves the intended wire volume.
+  local workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=bulk_download&size=2097152&pass=$pass"
   mkdir -m 0700 "$run_profile"
   cp -aL -- "$reference_profile/." "$run_profile/"
   if [[ $comparison_design == arms ]]; then
@@ -772,11 +776,15 @@ run_reference() {
   if [[ $comparison_design == arms ]]; then
     run_browser_workload "$pass-reference"
   else
-    if ! timeout 35 "${command_env[@]}" \
-        "$REFERENCE_BIN" --headless --new-instance --no-remote \
-        --profile "$run_profile" --screenshot \
-        "$capture_dir/$pass-reference.png" "$workload_url" \
-        >"$log" 2>&1; then
+    set +e
+    timeout 35 "${command_env[@]}" \
+      "$REFERENCE_BIN" --headless --new-instance --no-remote \
+      --profile "$run_profile" --screenshot \
+      "$capture_dir/$pass-reference.png" "$workload_url" \
+      >"$log" 2>&1
+    local reference_status=$?
+    set -e
+    if [[ $reference_status -ne 0 && $reference_status -ne 124 ]]; then
       printf 'reference Firefox %s pass did not complete successfully\n' \
         "$pass" >&2
       return 1

@@ -428,11 +428,17 @@ nsresult GeckoRuntime::InitializeWithLocations(
   if (mTemporaryTrustStore->IsConfigured()) {
     constexpr auto kHttp3ThirdPartyRootsPref =
         "network.http.http3.disable_when_third_party_roots_found";
-    mHadHttp3ThirdPartyRootsPref =
-        Preferences::HasUserValue(kHttp3ThirdPartyRootsPref);
-    (void)Preferences::GetBool(kHttp3ThirdPartyRootsPref,
-                               &mOldHttp3ThirdPartyRootsPref);
-    Preferences::SetBool(kHttp3ThirdPartyRootsPref, false);
+    MOZ_TRY(Preferences::GetBool(kHttp3ThirdPartyRootsPref,
+                                 &mOldHttp3ThirdPartyRootsDefault,
+                                 PrefValueKind::Default));
+    mHttp3ThirdPartyRootsPrefWasLocked =
+        Preferences::IsLocked(kHttp3ThirdPartyRootsPref);
+    if (mHttp3ThirdPartyRootsPrefWasLocked) {
+      MOZ_TRY(Preferences::Unlock(kHttp3ThirdPartyRootsPref));
+    }
+    MOZ_TRY(Preferences::SetBool(kHttp3ThirdPartyRootsPref, false,
+                                 PrefValueKind::Default));
+    MOZ_TRY(Preferences::Lock(kHttp3ThirdPartyRootsPref));
     mSslCertFileApplied = true;
   }
 
@@ -575,11 +581,12 @@ void GeckoRuntime::Shutdown() {
     if (mSslCertFileApplied) {
       constexpr auto kHttp3ThirdPartyRootsPref =
           "network.http.http3.disable_when_third_party_roots_found";
-      if (mHadHttp3ThirdPartyRootsPref) {
-        Preferences::SetBool(kHttp3ThirdPartyRootsPref,
-                             mOldHttp3ThirdPartyRootsPref);
-      } else {
-        Preferences::ClearUser(kHttp3ThirdPartyRootsPref);
+      (void)Preferences::Unlock(kHttp3ThirdPartyRootsPref);
+      (void)Preferences::SetBool(kHttp3ThirdPartyRootsPref,
+                                 mOldHttp3ThirdPartyRootsDefault,
+                                 PrefValueKind::Default);
+      if (mHttp3ThirdPartyRootsPrefWasLocked) {
+        (void)Preferences::Lock(kHttp3ThirdPartyRootsPref);
       }
       mSslCertFileApplied = false;
     }
