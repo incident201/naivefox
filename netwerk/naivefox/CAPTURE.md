@@ -533,6 +533,25 @@ passive gate does not mislabel ClientHello advertisement as selection: the
 H2-only listener plus successful workload completion is the keyless ALPN
 contract. Inner HTTPS/H2 uses a distinct port and cannot enter this identity.
 
+`--h2-proxy-floor-superblocks` is a same-base passive causal design fixed to
+the `browser_page` workload. Each randomized block contains direct Firefox A
+and B, the same Firefox using its native authenticated HTTPS-proxy path, and
+NaiveFox `off`. All browsers are Selenium-prelaunched before capture; a shared
+wire completion token is reset locally before every participant, and every
+capture ends at completion plus the same 250 ms tail. The native-proxy and
+NaiveFox participants must also complete the same workload over the dedicated
+inner HTTPS/H2 fixture. The ordinary H2 transport gate rejects any participant
+with more than one outer TCP identity, SYN, or ClientHello.
+
+The safe multi-arm output treats `firefox-proxied` as an analysis-only
+candidate slot. Its distance from direct Firefox estimates the unavoidable
+proxy architecture floor; `off` versus direct Firefox is the total NaiveFox
+gap, and the paired difference between those two distances is the remaining
+product-specific signal. The fixed views are packets 1--16, packets 17--32,
+packets 1--32, the first 250 ms, and the whole flow. The internal `naivefox`
+label for the native Firefox candidate is only a legacy analysis-schema slot,
+not a claim about which executable produced it.
+
 Controlled workloads cover a cold small operation, a browser page with CSS,
 JavaScript, images, and an API response, warm sequential requests, burst and
 concurrent requests, bulk download and upload, bidirectional transfer, and an

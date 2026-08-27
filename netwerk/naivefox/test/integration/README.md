@@ -439,6 +439,22 @@ selection contract; the runner does not confuse ClientHello advertisement
 with negotiated ALPN. The optional inner H2 origin uses a different port and
 is excluded from the outer identity.
 
+Use `--h2-proxy-floor-superblocks` for the fixed same-base `browser_page`
+proxy-floor experiment. Every randomized block contains direct Firefox A/B,
+native-proxied Firefox, and NaiveFox `off`. Each participant uses a fresh
+profile and a Selenium browser that is ready before capture; navigation starts
+after capture readiness, the block shares one wire completion token while its
+local marker is reset before every participant, and all captures stop at
+completion plus 250 ms. Native-proxied Firefox and NaiveFox must independently
+pass the fixture's inner HTTPS/H2 access-log validator. No sample is retried
+because of its observed packet sequence.
+
+The existing multi-arm analysis reports `firefox-proxied` and `off` against
+the common direct Firefox A/B noise floor for packets 1--16, 17--32, 1--32,
+the first 250 ms, and the whole flow. `firefox-proxied` is an analysis-only
+candidate arm; its internal `label=naivefox` value is merely the legacy
+candidate slot required by the feature schema.
+
 The controlled workloads are cold initial, browser-page navigation, warm
 sequential, burst/concurrent streams, bulk download, bulk upload,
 bidirectional, and idle/resume. Features include only passive-visible packet or

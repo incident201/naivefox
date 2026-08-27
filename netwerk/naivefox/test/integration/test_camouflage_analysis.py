@@ -550,6 +550,38 @@ class CamouflageAnalysisTests(unittest.TestCase):
             ["reference", "reference", "document-handshake-confirmed"],
         )
 
+    def test_dataset_accepts_h2_native_firefox_proxy_candidate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "features.csv")
+            fieldnames = [
+                "schema_version",
+                "protocol",
+                "scenario",
+                "label",
+                "session_id",
+                "naivefox_arm",
+                "whole_packet_count",
+            ]
+            with open(path, "w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=fieldnames)
+                writer.writeheader()
+                for label, arm in (
+                    ("firefox_a", "reference"),
+                    ("firefox_b", "reference"),
+                    ("naivefox", "firefox-proxied"),
+                ):
+                    writer.writerow({
+                        "schema_version": 1,
+                        "protocol": "h2",
+                        "scenario": "browser_page",
+                        "label": label,
+                        "session_id": label,
+                        "naivefox_arm": arm,
+                        "whole_packet_count": 1,
+                    })
+            rows, _ = ANALYZE.load_dataset(path)
+        self.assertEqual(rows[-1]["naivefox_arm"], "firefox-proxied")
+
 
 if __name__ == "__main__":
     unittest.main()

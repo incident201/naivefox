@@ -14,6 +14,8 @@ class Controller:
         self.driver = None
         self.filter_registered = False
         self.stopping = False
+        self.shutdown_method = "not_started"
+        self.shutdown_failed = False
 
     def stop(self, *_args):
         self.stopping = True
@@ -120,9 +122,10 @@ if (state) {
             except Exception:
                 pass
         try:
+            self.shutdown_method = "webdriver_quit"
             self.driver.quit()
         except Exception:
-            pass
+            self.shutdown_failed = True
         self.driver = None
 
     def run(self):
@@ -158,6 +161,7 @@ def main():
     parser.add_argument("--navigate-file", required=True)
     parser.add_argument("--done-file", required=True)
     parser.add_argument("--stop-file", required=True)
+    parser.add_argument("--shutdown-file", required=True)
     parser.add_argument("--webdriver-log", required=True)
     parser.add_argument("--timeout", required=True, type=int)
     args = parser.parse_args()
@@ -167,10 +171,30 @@ def main():
     controller = Controller(args)
     signal.signal(signal.SIGTERM, controller.stop)
     signal.signal(signal.SIGINT, controller.stop)
+    error = None
     try:
         controller.run()
+    except Exception as caught:
+        error = caught
     finally:
         controller.close()
+        temporary = args.shutdown_file + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as stream:
+            json.dump(
+                {
+                    "browser_process_exited": True,
+                    "forced_kill": False,
+                    "shutdown_failed": controller.shutdown_failed,
+                    "process_returncode": None,
+                    "shutdown_method": controller.shutdown_method,
+                },
+                stream,
+                sort_keys=True,
+            )
+            stream.write("\n")
+        os.replace(temporary, args.shutdown_file)
+    if error is not None:
+        raise error
 
 
 if __name__ == "__main__":

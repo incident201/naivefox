@@ -427,6 +427,30 @@ class CamouflageHarnessTests(unittest.TestCase):
                 rows, expected_blocks=1, arms=SUPERBLOCKS.DEFAULT_ARMS
             )
 
+    def test_h2_proxy_floor_schedule_has_two_controls_and_two_candidates(self):
+        arms = ("firefox-proxied", "off")
+        rows = SUPERBLOCKS.schedule_rows(
+            17, "h2", 3, ["browser_page"], arms=arms
+        )
+        SUPERBLOCKS.validate_superblocks(rows, expected_blocks=3, arms=arms)
+        for index in range(3):
+            members = rows[index * 4 : (index + 1) * 4]
+            self.assertEqual(
+                {
+                    (member["label"], member["naivefox_arm"])
+                    for member in members
+                },
+                {
+                    ("firefox_a", "reference"),
+                    ("firefox_b", "reference"),
+                    ("naivefox", "firefox-proxied"),
+                    ("naivefox", "off"),
+                },
+            )
+            self.assertEqual(
+                {member["scenario"] for member in members}, {"browser_page"}
+            )
+
     def test_navigation_stop_superblock_requires_document_start_control(self):
         treatment = "tree-native-parser-document-start-navigation-stop-css"
         control = "tree-native-parser-document-start-overlap-css"
@@ -3574,6 +3598,36 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         features = {}
         FEATURES.add_h3_features(features, events)
         self.assertEqual(features["quic_zero_rtt_packet_count"], 1.0)
+
+    def test_h2_proxy_floor_is_fixed_paired_and_fail_closed(self):
+        with open(
+            os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
+        ) as stream:
+            runner = stream.read()
+        self.assertIn("--h2-proxy-floor-superblocks", runner)
+        self.assertIn("multi_arm_arms_csv=firefox-proxied,off", runner)
+        self.assertIn("scenario_override=browser_page", runner)
+        self.assertIn("protocol_selection=h2", runner)
+        self.assertIn("inner_transport=https-h2", runner)
+        self.assertIn("isolated_network=1", runner)
+        self.assertIn("export NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1", runner)
+        self.assertIn("start_proxied_browser_controller()", runner)
+        self.assertIn("proxied_firefox_controller.py", runner)
+        self.assertIn('--shutdown-file "$browser_shutdown_file"', runner)
+        self.assertIn(
+            'rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"',
+            runner,
+        )
+        self.assertIn(
+            'validate_inner_h2_request "$completion" "$inner_h2_log_start"',
+            runner,
+        )
+        self.assertIn("expected_inner_h2_validations=$((samples_per_cohort * 2))", runner)
+        self.assertIn("strict_transport_check \"$protocol\" \"$pcap\"", runner)
+        self.assertIn("capture_cutoff=browser_done_plus_250ms", runner)
+        self.assertIn("proxy_floor_workload=", runner)
+        self.assertIn("proxy_floor_candidate_slot_semantics=", runner)
+        self.assertIn("initial_packets_16,packets_17_32,initial_packets_32", runner)
 
     def test_warm_cache_runner_is_ephemeral_and_fail_closed(self):
         with open(

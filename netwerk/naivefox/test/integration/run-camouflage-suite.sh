@@ -10,11 +10,15 @@ original_args=("$@")
 
 mode=smoke
 protocol_selection=both
+protocol_option_count=0
 inner_transport=https
+inner_transport_option_count=0
 naivefox_arm=off
 naivefox_arm_explicit=0
 naivefox_arm_option_count=0
 experiment_design=single
+proxy_floor_requested=0
+multi_arm_option_count=0
 multi_arm_arms_csv=off,gate,root
 multi_arm_views_csv=all
 scenario_override=
@@ -33,10 +37,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     --protocol)
       protocol_selection=${2:-}
+      protocol_option_count=$((protocol_option_count + 1))
       shift 2
       ;;
     --inner-transport)
       inner_transport=${2:-}
+      inner_transport_option_count=$((inner_transport_option_count + 1))
       shift 2
       ;;
     --naivefox-arm)
@@ -47,17 +53,25 @@ while [[ $# -gt 0 ]]; do
       ;;
     --multi-arm-superblocks)
       experiment_design=multi_arm_superblocks
+      multi_arm_option_count=$((multi_arm_option_count + 1))
       shift
       ;;
     --multi-arm-arms)
       multi_arm_arms_csv=${2:-}
       experiment_design=multi_arm_superblocks
+      multi_arm_option_count=$((multi_arm_option_count + 1))
       shift 2
       ;;
     --multi-arm-views)
       multi_arm_views_csv=${2:-}
       experiment_design=multi_arm_superblocks
+      multi_arm_option_count=$((multi_arm_option_count + 1))
       shift 2
+      ;;
+    --h2-proxy-floor-superblocks)
+      proxy_floor_requested=1
+      experiment_design=h2_proxy_floor_superblocks
+      shift
       ;;
     --scenario)
       scenario_override=${2:-}
@@ -73,7 +87,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,...] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -82,6 +96,34 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ $proxy_floor_requested == 1 ]]; then
+  if [[ $multi_arm_option_count -ne 0 || $naivefox_arm_explicit -eq 1 ]]; then
+    printf '%s\n' '--h2-proxy-floor-superblocks cannot be combined with arm options' >&2
+    exit 2
+  fi
+  if [[ $protocol_option_count -ne 0 && $protocol_selection != h2 ]]; then
+    printf '%s\n' '--h2-proxy-floor-superblocks requires --protocol h2' >&2
+    exit 2
+  fi
+  if [[ $inner_transport_option_count -ne 0 && $inner_transport != https-h2 ]]; then
+    printf '%s\n' '--h2-proxy-floor-superblocks requires --inner-transport https-h2' >&2
+    exit 2
+  fi
+  if [[ $scenario_option_count -ne 0 && $scenario_override != browser_page ]]; then
+    printf '%s\n' '--h2-proxy-floor-superblocks requires --scenario browser_page' >&2
+    exit 2
+  fi
+  protocol_selection=h2
+  inner_transport=https-h2
+  isolated_network=1
+  export NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1
+  scenario_override=browser_page
+  scenarios=(browser_page)
+  multi_arm_arms_csv=firefox-proxied,off
+  multi_arm_arms=(firefox-proxied off)
+  multi_arm_views_csv=initial_packets_16,packets_17_32,initial_packets_32,initial_time_250ms,whole
+fi
 
 case $mode in
   gate)
@@ -497,6 +539,12 @@ if [[ $diagnostic_naivefox_only == 1 ]]; then
     exit 2
   fi
 fi
+if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
+  if [[ $diagnostic_naivefox_only == 1 || $private_h3_keylog == 1 ]]; then
+    printf 'H2 proxy-floor superblocks require passive four-cohort capture\n' >&2
+    exit 2
+  fi
+fi
 if [[ -z $samples_per_cohort ]]; then
   samples_per_cohort=$default_samples
 fi
@@ -546,6 +594,17 @@ if [[ $experiment_design == multi_arm_superblocks &&
     exit 1
   }
 fi
+if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
+  [[ $browser_backend != commandline ]] || {
+    printf 'H2 proxy-floor superblocks require pre-launched Selenium browsers\n' >&2
+    exit 2
+  }
+  browser_backend=selenium
+  "$browser_python" -c 'import selenium' || {
+    printf 'H2 proxy-floor superblocks require Selenium\n' >&2
+    exit 1
+  }
+fi
 dumpcap_path=$(command -v dumpcap)
 dumpcap_caps=$(getcap "$dumpcap_path" 2>/dev/null || true)
 if [[ $EUID -ne 0 ]] &&
@@ -583,6 +642,11 @@ case $capture_mode in
 esac
 if [[ $experiment_design == multi_arm_superblocks && $capture_mode != same-base ]]; then
   printf '%s\n' '--multi-arm-superblocks requires NAIVEFOX_CAPTURE_MODE=same-base' >&2
+  exit 2
+fi
+if [[ $experiment_design == h2_proxy_floor_superblocks &&
+      $capture_mode != same-base ]]; then
+  printf '%s\n' '--h2-proxy-floor-superblocks requires NAIVEFOX_CAPTURE_MODE=same-base' >&2
   exit 2
 fi
 NAIVEFOX_BIN="${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$BIN/naivefox}"
@@ -638,6 +702,7 @@ network_monitor_ready=
 network_monitor_done=
 network_mutation_validated_samples=0
 cache_validated_participants=0
+inner_h2_validated_participants=0
 response_stop_aborted_samples=0
 response_stop_natural_completion_samples=0
 controller_backends="$private_dir/controller-backends.txt"
@@ -1075,6 +1140,7 @@ validate_inner_h2_request() {
     --access-log "$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG" \
     --offset "$offset" --completion "$completion" \
     --port "$NAIVEFOX_FIXTURE_INNER_H2_PORT" --wait-seconds 2
+  inner_h2_validated_participants=$((inner_h2_validated_participants + 1))
 }
 
 validate_profile_role() {
@@ -1534,6 +1600,46 @@ PY
   browser_shutdown_file=
 }
 
+start_proxied_browser_controller() {
+  local profile=$1
+  local url=$2
+  local completion=$3
+  local sample_dir=$4
+  local ready_file="$sample_dir/browser-ready.json"
+  local navigate_file="$sample_dir/browser-navigate"
+  local done_file="$sample_dir/browser-done"
+  browser_stop_file="$sample_dir/browser-stop"
+  browser_shutdown_file="$sample_dir/browser-shutdown.json"
+  rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
+  setsid env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
+    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
+    NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
+    NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
+    "$browser_python" "$INTEGRATION_DIR/proxied_firefox_controller.py" \
+    --binary "$REFERENCE_BIN" --profile "$profile" \
+    --proxy-host localhost --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    --target-host localhost --target-port "$NAIVEFOX_FIXTURE_INNER_H2_PORT" \
+    --url "$url" \
+    --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion" \
+    --ready-file "$ready_file" --navigate-file "$navigate_file" \
+    --done-file "$done_file" --stop-file "$browser_stop_file" \
+    --shutdown-file "$browser_shutdown_file" \
+    --webdriver-log "$sample_dir/webdriver.log" --timeout "$sample_timeout" \
+    >"$sample_dir/controller.log" 2>&1 &
+  browser_controller_pid=$!
+  wait_for_file "$ready_file" "$browser_controller_pid" \
+    'native-proxied Firefox controller' 300
+  python3 - "$ready_file" <<'PY'
+import json
+import sys
+
+record = json.load(open(sys.argv[1], encoding="utf-8"))
+if record != {"backend": "selenium", "proxy_filter": "registered"}:
+    raise SystemExit("native-proxied Firefox controller lacks ready filter evidence")
+PY
+  printf 'selenium\n' >>"$controller_backends"
+}
+
 warm_reference_cache() {
   local profile=$1
   local protocol=$2
@@ -1678,6 +1784,40 @@ run_reference_sample() {
       "$sample_dir" "$cache_journal_start" "$experiment_block"
     validate_no_tls_token_persistence "$profile"
   fi
+}
+
+run_proxied_reference_sample() {
+  local protocol=$1
+  local scenario=$2
+  local session_id=$3
+  local experiment_block=$4
+  local completion=$5
+  local sample_dir="$private_dir/$session_id"
+  local profile="$sample_dir/profile"
+  local pcap="$sample_dir/capture.pcapng"
+  local path
+  local inner_h2_log_start
+  [[ $protocol == h2 && $inner_transport == https-h2 ]] || {
+    printf 'native-proxied Firefox floor requires outer H2 and inner HTTPS/H2\n' >&2
+    return 2
+  }
+  path=$(scenario_path "$scenario" "$completion")
+  mkdir -m 0700 -- "$sample_dir"
+  make_profile "$profile" "$protocol" reference
+  inner_h2_log_start=$(stat -c %s "$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG")
+  start_network_mutation_monitor "$sample_dir"
+  start_proxied_browser_controller "$profile" \
+    "https://localhost:$NAIVEFOX_FIXTURE_INNER_H2_PORT$path" \
+    "$completion" "$sample_dir"
+  start_capture "$pcap" "$sample_dir/dumpcap.log"
+  run_browser_workload "$sample_dir"
+  sleep 0.25
+  stop_capture
+  validate_inner_h2_request "$completion" "$inner_h2_log_start"
+  stop_network_mutation_monitor
+  extract_sample "$protocol" "$scenario" naivefox "$session_id" "$pcap" \
+    "$experiment_block" firefox-proxied
+  stop_browser_controller
 }
 
 run_naivefox_sample() {
@@ -1922,7 +2062,8 @@ run_naivefox_sample() {
 
 scenario_csv=$(IFS=,; printf '%s' "${scenarios[*]}")
 session_counter=0
-if [[ $experiment_design == multi_arm_superblocks ]]; then
+if [[ $experiment_design == multi_arm_superblocks ||
+      $experiment_design == h2_proxy_floor_superblocks ]]; then
   members_per_block=$((2 + ${#multi_arm_arms[@]}))
 elif [[ $diagnostic_naivefox_only == 1 ]]; then
   members_per_block=1
@@ -1975,7 +2116,8 @@ arm = sys.argv[4]
 for index in range(count):
     print("naivefox", arm, scenario, f"{protocol}_d{index:06d}", sep="\t")
 PY
-  elif [[ $experiment_design == multi_arm_superblocks ]]; then
+  elif [[ $experiment_design == multi_arm_superblocks ||
+          $experiment_design == h2_proxy_floor_superblocks ]]; then
     python3 "$INTEGRATION_DIR/camouflage_superblocks.py" schedule \
       --seed "$seed" --protocol "$protocol" --blocks "$samples_per_cohort" \
       --scenarios "$scenario_csv" --arms "$multi_arm_arms_csv" >"$schedule"
@@ -2014,7 +2156,10 @@ PY
       block_completion_tokens[$experiment_block]=$(openssl rand -hex 16)
     fi
     completion=${block_completion_tokens[$experiment_block]}
-    if [[ $label == naivefox ]]; then
+    if [[ $sample_arm == firefox-proxied ]]; then
+      run_proxied_reference_sample "$protocol" "$scenario" "$session_id" \
+        "$experiment_block" "$completion"
+    elif [[ $label == naivefox ]]; then
       run_naivefox_sample "$protocol" "$scenario" "$session_id" \
         "$experiment_block" "$sample_arm" "$completion"
     else
@@ -2028,6 +2173,15 @@ PY
     fixture_caddy_child_pid=
   fi
 done
+
+if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
+  expected_inner_h2_validations=$((samples_per_cohort * 2))
+  if [[ $inner_h2_validated_participants -ne $expected_inner_h2_validations ]]; then
+    printf 'H2 proxy-floor validated %s inner H2 participants, expected %s\n' \
+      "$inner_h2_validated_participants" "$expected_inner_h2_validations" >&2
+    exit 1
+  fi
+fi
 
 expected_proxy_restart_count=0
 if [[ " ${protocols[*]} " == *" h3 "* ]]; then
@@ -2201,7 +2355,8 @@ analyze_dataset() {
   python3 "$INTEGRATION_DIR/analyze-camouflage.py" "${analyzer_args[@]}"
 }
 
-if [[ $experiment_design == multi_arm_superblocks ]]; then
+if [[ $experiment_design == multi_arm_superblocks ||
+      $experiment_design == h2_proxy_floor_superblocks ]]; then
   superblock_features="$safe_dir/features-superblocks.csv"
   python3 "$INTEGRATION_DIR/camouflage_features.py" merge \
     --input-dir "$feature_fragments" --output "$superblock_features" \
@@ -2225,7 +2380,11 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   fi
   python3 "$INTEGRATION_DIR/analyze-camouflage-arms.py" \
     "${arm_analyzer_args[@]}"
-  metadata_naivefox_arm=multi
+  if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
+    metadata_naivefox_arm=proxy_floor
+  else
+    metadata_naivefox_arm=multi
+  fi
   metadata_naivefox_arms=$multi_arm_arms_csv
   metadata_arm_comparison_views=$multi_arm_views_csv
   metadata_arm_specific_analysis=screening_only
@@ -2323,6 +2482,9 @@ refit_bootstrap_iterations=$refit_bootstrap
 permutation_iterations=$permutations
 protocol_selection=$protocol_selection
 inner_transport=$inner_transport
+proxy_floor_workload=$([[ $experiment_design == h2_proxy_floor_superblocks ]] && printf browser_page || printf not_applicable)
+proxy_floor_candidate_slot_semantics=$([[ $experiment_design == h2_proxy_floor_superblocks ]] && printf analysis_schema_only || printf not_applicable)
+proxy_floor_inner_h2_validated_participants=$inner_h2_validated_participants
 outer_h2_alpn_policy=$([[ $protocol_selection == h3 ]] && printf not_applicable || printf h2_only_listener)
 camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE
 camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE

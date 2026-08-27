@@ -8,6 +8,7 @@ import random
 DEFAULT_ARMS = ("off", "gate", "root")
 ARMS = DEFAULT_ARMS
 SUPPORTED_ARMS = (
+    "firefox-proxied",
     "off",
     "gate",
     "root",

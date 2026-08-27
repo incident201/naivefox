@@ -92,6 +92,23 @@ def write_dataset(path, blocks):
 
 
 class CamouflageArmAnalysisTests(unittest.TestCase):
+    def test_proxy_floor_analysis_accepts_native_firefox_candidate_arm(self):
+        blocks = synthetic_blocks(3)
+        for block in blocks:
+            block["arms"] = {
+                "firefox-proxied": block["arms"]["gate"],
+                "off": block["arms"]["off"],
+            }
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "proxy-floor.csv")
+            write_dataset(path, blocks)
+            rows, _ = ARMS_ANALYSIS.load_dataset(path)
+            grouped = ARMS_ANALYSIS.group_superblocks(rows)
+        self.assertEqual(len(grouped), 3)
+        self.assertEqual(
+            set(grouped[0]["arms"]), {"firefox-proxied", "off"}
+        )
+
     def test_paired_distance_ranks_closer_arm_first(self):
         blocks = synthetic_blocks()
         result = ARMS_ANALYSIS.summarize_view(

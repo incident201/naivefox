@@ -927,6 +927,7 @@ def main():
         "--naivefox-arm",
         choices=(
             "reference",
+            "firefox-proxied",
             "off",
             "gate",
             "root",
