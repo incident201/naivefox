@@ -139,6 +139,27 @@ substantially reducing the complete-response penalty; a successor must derive
 availability from real tunnel lifecycle events rather than a selected byte
 count or timer.
 
+Three subsequent two-block fail-closed controls rejected the remaining simple
+H2 server-shaping candidates before any larger run.  In `b4e50d4c5b2f6e01`,
+the stylesheet received a partial body only after the first successful
+target-to-client CONNECT write on the same physical H2 connection.  This
+event-derived release improved packets 17--32 only slightly, left packets
+1--32 effectively unchanged, and retained a whole-flow penalty.  A separate
+randomized 8--32 ms first-flight deferral (`360c141b0530a2b9`) likewise traded
+a small packets-17--32 change for worse packets 1--16, 250 ms, and whole flow;
+the timing range was not tuned further.  Stock `outer-session-gate`
+(`e4a22a686496c9e1`) did not improve packets 17--32 or 1--32, despite better
+250 ms/whole point estimates.  Finally, opt-in randomized fragmentation of
+the existing first eight padded target records (`acfefa8613e22022`) added no
+cover payload and improved both early slices descriptively, but its extra
+H2/TLS framing sharply worsened 250 ms (`0.07142` to `0.15499`) and whole flow
+(`0.26033` to `0.34173`).  All four server experiments were removed; the
+pinned server binary and module source were restored byte-for-byte.  These
+screens do not prove the H2 residual unfixable, but they rule out fixed cover,
+first-event cover, cold-flight delay, gate-only establishment, and early
+record fragmentation as acceptable defaults under the no-tail-regression
+criterion.
+
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
 without paying for the complete synthetic stylesheet. CONNECT is not a member
