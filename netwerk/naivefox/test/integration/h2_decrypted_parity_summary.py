@@ -16,6 +16,7 @@ SUPPORTED_ARMS = {
     "gate",
     "root",
     "document-complete",
+    "document-start-overlap",
     "tree-complete",
     "tree-early-overlap",
     "tree-root-overlap",
@@ -38,6 +39,14 @@ REQUIRED_GET_PSEUDO_HEADERS = {":method", ":scheme", ":authority", ":path"}
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def successful_status(status):
+    try:
+        value = int(status)
+    except (TypeError, ValueError):
+        return False
+    return 200 <= value < 300
 
 
 def values(value):
@@ -484,7 +493,17 @@ def validate(
     require(all(event["frame"] < connect["frame"] for event in gets), f"{arm} preamble GET did not precede CONNECT")
     responses = []
     for get in gets:
-        matches = [event for event in arm_events if event["direction"] == "server" and event["stream"] == get["stream"] and event["status"] == "200"]
+        matches = [
+            event
+            for event in arm_events
+            if event["direction"] == "server"
+            and event["stream"] == get["stream"]
+            and (
+                successful_status(event["status"])
+                if arm == "document-start-overlap"
+                else event["status"] == "200"
+            )
+        ]
         require(matches, f"{arm} preamble GET lacks successful response")
         responses.extend(matches)
     if arm in {"root", "document-complete"}:
@@ -565,6 +584,11 @@ def validate(
         )
         # Asset END_STREAM order relative to CONNECT is report-only. Product
         # admission is established by the causal lifecycle markers.
+    elif arm == "document-start-overlap":
+        require(
+            all(event["end_stream_frame"] != "" for event in responses),
+            "document-start-overlap document lacks END_STREAM",
+        )
 
 
 def write_outputs(root, events_path, summary_path, proxy_port, arm):
@@ -667,6 +691,11 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
             output.write(
                 "tree-root-overlap_wire_overlap_observed="
                 f"{'yes' if root_overlap_observed else 'no'}\n"
+            )
+        if arm == "document-start-overlap":
+            output.write("document-start-overlap_document_end_stream=yes\n")
+            output.write(
+                "document-start-overlap_end_stream_position_is_admission=no\n"
             )
         output.write("header_values_retained=no\n")
         output.write("credential_header_names_redacted=yes\n")

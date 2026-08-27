@@ -7,6 +7,7 @@ source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
 fixture_mode=h2
 inner_h2_enabled=0
+outer_h2_only=0
 while [[ $# -gt 0 ]]; do
   case $1 in
     --mode)
@@ -17,20 +18,34 @@ while [[ $# -gt 0 ]]; do
       inner_h2_enabled=1
       shift
       ;;
+    --outer-h2-only)
+      outer_h2_only=1
+      shift
+      ;;
     *)
-      printf 'usage: %s [--mode h2|h3] [--inner-h2]\n' "$0" >&2
+      printf 'usage: %s [--mode h2|h3] [--inner-h2] [--outer-h2-only]\n' "$0" >&2
       exit 2
       ;;
   esac
 done
 case $fixture_mode in
-  h2) fixture_protocols='h1 h2' ;;
+  h2)
+    if [[ $outer_h2_only == 1 ]]; then
+      fixture_protocols=h2
+    else
+      fixture_protocols='h1 h2'
+    fi
+    ;;
   h3) fixture_protocols=h3 ;;
   *)
     printf 'unsupported fixture mode: %s\n' "$fixture_mode" >&2
     exit 2
     ;;
 esac
+if [[ $outer_h2_only == 1 && $fixture_mode != h2 ]]; then
+  printf '%s\n' '--outer-h2-only requires --mode h2' >&2
+  exit 2
+fi
 
 camouflage_style_size=${NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE:-65536}
 camouflage_script_size=${NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE:-131072}
@@ -189,14 +204,13 @@ if ! "$CADDY_BIN" validate --config "$RUN_DIR/adapted.json" \
   exit 1
 fi
 
-python3 - "$RUN_DIR/adapted.json" "$proxy_port" "$fixture_mode" <<'PY'
+python3 - "$RUN_DIR/adapted.json" "$proxy_port" "$fixture_protocols" <<'PY'
 import json
 import sys
 
 config = json.load(open(sys.argv[1], encoding="utf-8"))
 proxy_port = sys.argv[2]
-mode = sys.argv[3]
-expected_protocols = ["h1", "h2"] if mode == "h2" else ["h3"]
+expected_protocols = sys.argv[3].split()
 servers = config["apps"]["http"]["servers"]
 matches = []
 found_proxy_listener = False
@@ -269,6 +283,7 @@ cat >"$RUN_DIR/fixture.env" <<EOF
 NAIVEFOX_FIXTURE_RUN_DIR=$RUN_DIR
 NAIVEFOX_FIXTURE_MODE=$fixture_mode
 NAIVEFOX_FIXTURE_PROTOCOLS='$fixture_protocols'
+NAIVEFOX_FIXTURE_OUTER_H2_ONLY=$outer_h2_only
 NAIVEFOX_FIXTURE_PROXY_PORT=$proxy_port
 NAIVEFOX_FIXTURE_HTTP_PORT=$http_port
 NAIVEFOX_FIXTURE_HTTPS_PORT=$https_port
@@ -295,6 +310,7 @@ chmod 0600 "$RUN_DIR/fixture.env"
   printf 'run_id=%s\n' "$run_id"
   printf 'fixture_mode=%s\n' "$fixture_mode"
   printf 'proxy_protocols=%s\n' "$fixture_protocols"
+  printf 'outer_h2_only=%s\n' "$outer_h2_only"
   printf 'proxy_listener=127.0.0.1:%s\n' "$proxy_port"
   printf 'proxy_ip_san=%s\n' "${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-}"
   printf 'http_target=127.0.0.1:%s\n' "$http_port"

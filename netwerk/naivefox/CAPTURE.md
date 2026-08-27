@@ -235,6 +235,15 @@ metadata with exact `Priority: u=0, i`, plus same-origin stylesheet/script
 `Referer`, fetch metadata, and `Priority: u=2`; only pass/fail booleans enter
 the safe summary.
 
+The H2 `document-start-overlap` diagnostic additionally requires the causal
+runtime admission, successful result, normal drain, and CONNECT-established
+markers to belong to one NaiveFox connection lifecycle. Decrypted wire
+admission requires the document GET HEADERS before CONNECT, an HTTP 2xx
+document response, and a normal H2 END_STREAM on that document stream. The
+END_STREAM position relative to CONNECT is deliberately report-only: request
+commit, rather than response completion or a selected frame position, releases
+CONNECT in this mode.
+
 `run-h2-connect-priority-comparison.sh` isolates the scheduling cause of the
 first SOCKS tunnel. It uses the same authenticated Caddy listener for an
 ordinary proxied same-base Firefox navigation, NaiveFox default, and the
@@ -517,6 +526,12 @@ of the primary sample.
 `dumpcap` readiness uses its runtime marker rather than pcap header creation.
 Every sample rejects nonzero capture drops, an H2 flow missing its opening
 client SYN and ClientHello, or an H3 flow missing its opening client Initial.
+The passive H2 collector starts the outer Caddy listener in H2-only mode and
+requires exactly one proxy-port TCP identity with exactly one client SYN and
+one visible ClientHello. TLS 1.3 encrypts the server's selected ALPN, so the
+passive gate does not mislabel ClientHello advertisement as selection: the
+H2-only listener plus successful workload completion is the keyless ALPN
+contract. Inner HTTPS/H2 uses a distinct port and cannot enter this identity.
 
 Controlled workloads cover a cold small operation, a browser page with CSS,
 JavaScript, images, and an API response, warm sequential requests, burst and

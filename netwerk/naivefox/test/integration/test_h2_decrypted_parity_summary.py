@@ -171,6 +171,119 @@ class H2DecryptedParitySummaryTests(unittest.TestCase):
             self.assertEqual([row["method"] for row in candidate if row["method"]], ["GET", "CONNECT"])
             self.assertNotIn("localhost", events.read_text(encoding="utf-8"))
 
+    def test_document_start_overlap_requires_2xx_and_end_stream_at_any_position(self):
+        for end_frame in (7, 10):
+            with self.subTest(end_frame=end_frame), tempfile.TemporaryDirectory() as directory:
+                self.make_cohort(directory, "reference")
+                self.make_cohort(
+                    directory, "document-start-overlap", candidate=True
+                )
+                frames_path = Path(directory) / "document-start-overlap-frames.csv"
+                with frames_path.open(newline="", encoding="utf-8") as source:
+                    frames = list(csv.DictReader(source))
+                    frame_fields = frames[0].keys()
+                frames[2]["frame.number"] = str(end_frame)
+                frames[2]["frame.time_relative"] = str(end_frame / 1000)
+                with frames_path.open("w", newline="", encoding="utf-8") as output:
+                    writer = csv.DictWriter(output, fieldnames=frame_fields)
+                    writer.writeheader()
+                    writer.writerows(frames)
+                headers_path = (
+                    Path(directory) / "document-start-overlap-headers.csv"
+                )
+                with headers_path.open(newline="", encoding="utf-8") as source:
+                    headers = list(csv.DictReader(source))
+                    header_fields = headers[0].keys()
+                headers[1]["http2.headers.status"] = "204"
+                with headers_path.open("w", newline="", encoding="utf-8") as output:
+                    writer = csv.DictWriter(output, fieldnames=header_fields)
+                    writer.writeheader()
+                    writer.writerows(headers)
+                events = Path(directory) / "events.csv"
+                report = Path(directory) / "summary.txt"
+                SUMMARY.write_outputs(
+                    Path(directory),
+                    events,
+                    report,
+                    "4433",
+                    "document-start-overlap",
+                )
+                text = report.read_text(encoding="utf-8")
+                self.assertIn(
+                    "document-start-overlap_preamble_before_first_connect=yes",
+                    text,
+                )
+                self.assertIn(
+                    "document-start-overlap_document_end_stream=yes", text
+                )
+                self.assertIn(
+                    "document-start-overlap_end_stream_position_is_admission=no",
+                    text,
+                )
+
+    def test_document_start_overlap_rejects_missing_end_stream_or_non_2xx(self):
+        for mutation, message in (
+            ("missing-end-stream", "document lacks END_STREAM"),
+            ("non-2xx", "preamble GET lacks successful response"),
+        ):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                self.make_cohort(directory, "reference")
+                self.make_cohort(
+                    directory, "document-start-overlap", candidate=True
+                )
+                if mutation == "missing-end-stream":
+                    path = Path(directory) / "document-start-overlap-frames.csv"
+                    with path.open(newline="", encoding="utf-8") as source:
+                        rows = list(csv.DictReader(source))
+                        fields = rows[0].keys()
+                    rows[2]["http2.flags"] = "0"
+                else:
+                    path = Path(directory) / "document-start-overlap-headers.csv"
+                    with path.open(newline="", encoding="utf-8") as source:
+                        rows = list(csv.DictReader(source))
+                        fields = rows[0].keys()
+                    rows[1]["http2.headers.status"] = "304"
+                with path.open("w", newline="", encoding="utf-8") as output:
+                    writer = csv.DictWriter(output, fieldnames=fields)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                with self.assertRaisesRegex(ValueError, message):
+                    SUMMARY.write_outputs(
+                        Path(directory),
+                        Path(directory) / "events.csv",
+                        Path(directory) / "summary.txt",
+                        "4433",
+                        "document-start-overlap",
+                    )
+
+    def test_document_start_overlap_rejects_get_after_connect(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.make_cohort(directory, "reference")
+            self.make_cohort(
+                directory, "document-start-overlap", candidate=True
+            )
+            for suffix in ("headers", "get-header-values"):
+                path = Path(directory) / f"document-start-overlap-{suffix}.csv"
+                with path.open(newline="", encoding="utf-8") as source:
+                    rows = list(csv.DictReader(source))
+                    fields = rows[0].keys()
+                rows[0]["frame.number"] = "10"
+                rows[0]["frame.time_relative"] = "0.010"
+                with path.open("w", newline="", encoding="utf-8") as output:
+                    writer = csv.DictWriter(output, fieldnames=fields)
+                    writer.writeheader()
+                    writer.writerows(rows)
+            with self.assertRaisesRegex(
+                ValueError, "preamble GET did not precede CONNECT"
+            ):
+                SUMMARY.write_outputs(
+                    Path(directory),
+                    Path(directory) / "events.csv",
+                    Path(directory) / "summary.txt",
+                    "4433",
+                    "document-start-overlap",
+                )
+
     def test_second_physical_tcp_connection_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             self.make_cohort(directory, "reference")
@@ -503,6 +616,32 @@ class H2DecryptedParitySummaryTests(unittest.TestCase):
         self.assertIn("capture_source_state_sha256", runner)
         self.assertIn(
             "browser_start_state=cold_after_capture_start_both_cohorts", runner
+        )
+        self.assertIn("document-start-overlap", runner)
+        self.assertIn("--mode h2 --outer-h2-only", runner)
+        self.assertIn(
+            "H2 decrypted fixture is not constrained to the h2-only listener",
+            runner,
+        )
+        self.assertIn(
+            "document-start-overlap admission=request-committed "
+            "request_committed=1 root_done=0 protocol=h2$",
+            runner,
+        )
+        self.assertIn(
+            "preamble result=success .*http=2[0-9][0-9] .*protocol=h2$",
+            runner,
+        )
+        self.assertIn(
+            "document-start-overlap drain=complete root_done=1 "
+            "completed_resources=0 protocol=h2$",
+            runner,
+        )
+        self.assertIn(
+            '$admission_connection == "$result_connection"', runner
+        )
+        self.assertIn(
+            '$admission_connection == "$drain_connection"', runner
         )
 
 

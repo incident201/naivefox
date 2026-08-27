@@ -12,14 +12,14 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --arm) arm=${2:-}; shift 2 ;;
     --help)
-      printf 'usage: %s [--arm gate|root|document-complete|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap]\n' "$0"
+      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap]\n' "$0"
       exit 0
       ;;
     *) printf 'unknown H2 comparison argument: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
 case $arm in
-  gate | root | document-complete | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap) ;;
+  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap) ;;
   *) printf 'unsupported H2 diagnostic arm: %s\n' "$arm" >&2; exit 2 ;;
 esac
 
@@ -83,10 +83,15 @@ rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
   exit 1
 }
 
-"$INTEGRATION_DIR/start.sh" --mode h2
+"$INTEGRATION_DIR/start.sh" --mode h2 --outer-h2-only
 run_dir=$(<"$ACTIVE_RUN_FILE")
 # shellcheck source=/dev/null
 source "$run_dir/fixture.env"
+if [[ $NAIVEFOX_FIXTURE_PROTOCOLS != h2 ||
+      ${NAIVEFOX_FIXTURE_OUTER_H2_ONLY:-0} != 1 ]]; then
+  printf 'H2 decrypted fixture is not constrained to the h2-only listener\n' >&2
+  exit 1
+fi
 
 capture_id="$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 capture_dir="$STATE_ROOT/h2-captures/$capture_id"
@@ -384,6 +389,9 @@ run_candidate() {
   if [[ $arm == tree-root-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble root-overlap drain=complete completed_resources=2 protocol=h2$'
+  elif [[ $arm == document-start-overlap ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=h2$'
   fi
   sleep 0.25
   stop_capture
@@ -415,9 +423,32 @@ run_candidate() {
     established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h2 padding=yes$" "$log" | cut -d: -f1)
     [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
        $result_line -lt $established_line ]]
+  elif [[ $arm == document-start-overlap ]]; then
+    [[ $(rg -c ' preamble document-start-overlap admission=' "$log" || true) -eq 1 ]]
+    [[ $(rg -c ' preamble result=' "$log" || true) -eq 1 ]]
+    [[ $(rg -c ' preamble document-start-overlap drain=' "$log" || true) -eq 1 ]]
+    rg -q ' preamble document-start-overlap admission=request-committed request_committed=1 root_done=0 protocol=h2$' "$log"
+    rg -q ' preamble result=success .*http=2[0-9][0-9] .*protocol=h2$' "$log"
+    rg -q ' preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=h2$' "$log"
+    local admission_connection result_connection drain_connection
+    admission_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble document-start-overlap admission=.*/\2/p' "$log")
+    result_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble result=.*/\2/p' "$log")
+    drain_connection=$(sed -nE 's/^(\[[^]]+\] )?Connection ([0-9]+) preamble document-start-overlap drain=.*/\2/p' "$log")
+    [[ $admission_connection == "$result_connection" &&
+       $admission_connection == "$drain_connection" ]]
+    [[ $(rg -c "Connection $admission_connection established target=.* outer=h2 padding=yes$" "$log" || true) -eq 1 ]]
+    local admission_line result_line drain_line established_line
+    admission_line=$(rg -n -m1 ' preamble document-start-overlap admission=' "$log" | cut -d: -f1)
+    result_line=$(rg -n -m1 ' preamble result=' "$log" | cut -d: -f1)
+    drain_line=$(rg -n -m1 ' preamble document-start-overlap drain=' "$log" | cut -d: -f1)
+    established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h2 padding=yes$" "$log" | cut -d: -f1)
+    [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
+       $admission_line -lt $established_line ]]
   else
     ! rg -q -e ' preamble root-overlap admission=' \
-      -e ' preamble root-overlap drain=' "$log"
+      -e ' preamble root-overlap drain=' \
+      -e ' preamble document-start-overlap admission=' \
+      -e ' preamble document-start-overlap drain=' "$log"
   fi
 }
 

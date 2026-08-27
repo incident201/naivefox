@@ -1790,10 +1790,17 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("protocols h2", inner_caddyfile)
         self.assertNotIn("protocols h1", inner_caddyfile)
         self.assertIn("--inner-h2", fixture_start)
+        self.assertIn("--outer-h2-only", fixture_start)
+        self.assertIn("expected_protocols = sys.argv[3].split()", fixture_start)
         self.assertIn("inner-h2.pid", fixture_start)
         self.assertIn("wait_for_h2_origin", fixture_start)
         self.assertIn("caddy inner-h2 target", fixture_stop)
         self.assertIn("fixture_start_args+=(--inner-h2)", suite)
+        self.assertIn("fixture_start_args+=(--outer-h2-only)", suite)
+        self.assertIn(
+            "H2 camouflage fixture is not constrained to the h2-only listener",
+            suite,
+        )
         self.assertIn("camouflage_inner_h2_validation.py", suite)
         self.assertLess(
             suite.index("stop_capture", suite.index("run_naivefox_sample()")),
@@ -3690,6 +3697,19 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn("found no exact target process identity", runner)
         self.assertIn("enabling HTTP/3 listener", runner)
         self.assertIn("fixture_proxy_restart_count=$proxy_restart_count", runner)
+        strict_transport = runner[
+            runner.index("strict_transport_check() {") : runner.index(
+                "start_browser_controller() {"
+            )
+        ]
+        self.assertIn("${#tcp_streams[@]} -ne 1", strict_transport)
+        self.assertIn("client_syn_count -ne 1", strict_transport)
+        self.assertIn("client_hello_count -ne 1", strict_transport)
+        self.assertIn(
+            "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT", strict_transport
+        )
+        self.assertNotIn("NAIVEFOX_FIXTURE_INNER_H2_PORT", strict_transport)
+        self.assertIn("outer_h2_alpn_policy=", runner)
         self.assertIn("proxy_restart_count -ne $expected_proxy_restart_count", runner)
         self.assertEqual(runner.count('normalize_h3_capture_origin "$pcap"'), 2)
         origin = runner[

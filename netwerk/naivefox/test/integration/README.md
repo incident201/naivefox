@@ -204,6 +204,11 @@ Tree admission privately verifies the document plus same-origin CSS/JS
 `Referer`, `Sec-Fetch-*`, exact document `Priority: u=0, i`, and naturally
 computed resource `Priority: u=2` semantics;
 the safe output contains only boolean results, never those header values.
+`document-start-overlap` is also available in this H2 diagnostic. Its runtime
+gate requires one admission/result/drain/CONNECT-established lifecycle on the
+same NaiveFox connection. Its decrypted gate requires document GET before
+CONNECT, HTTP 2xx, and normal H2 END_STREAM, but does not require END_STREAM to
+fall on either side of CONNECT; request commit is the product admission cause.
 The callback used by `tree-early-overlap` can release CONNECT while a resource
 is live yet still lose the wire-level race to that resource's END_STREAM. The
 decrypted check intentionally rejects such a run. Do not keep retrying until
@@ -426,6 +431,13 @@ the controller watches that file without adding an out-of-band network flow.
 The runner stops and validates `dumpcap` before shutting down the browser or
 NaiveFox, rejects capture drops, and rejects H2/H3 flows whose client SYN or
 Initial was not captured.
+For passive H2 datasets it starts the outer Caddy listener with only `h2`
+enabled and requires exactly one proxy-port TCP identity, one client SYN, and
+one visible ClientHello. Because TLS 1.3 encrypts the server-selected ALPN,
+successful workload completion against that H2-only listener is the keyless
+selection contract; the runner does not confuse ClientHello advertisement
+with negotiated ALPN. The optional inner H2 origin uses a different port and
+is excluded from the outer identity.
 
 The controlled workloads are cold initial, browser-page navigation, warm
 sequential, burst/concurrent streams, bulk download, bulk upload,
