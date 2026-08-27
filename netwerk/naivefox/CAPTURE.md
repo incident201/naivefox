@@ -650,14 +650,24 @@ packets 1--32, the first 250 ms, and the whole flow. The internal `naivefox`
 label for the native Firefox candidate is only a legacy analysis-schema slot,
 not a claim about which executable produced it.
 
-Six-block same-base artifact `bc9ee30b969b6318` measured that floor against
-ordinary direct Firefox, which remains the camouflage target. Native-proxied
-Firefox was only modestly closer than NaiveFox `off`: paired distances were
-`0.1091/0.4823/0.2301/0.1125/0.2706` versus
-`0.1133/0.4909/0.2423/0.1372/0.2992` for packets 1--16, packets 17--32,
-packets 1--32, 250 ms, and whole flow. Thus most H2 residual is shared by a
-full same-base Firefox using CONNECT; that control diagnoses the nested
-transport floor but does not redefine the target as Firefox-behind-proxy.
+Six-block same-base artifact `bc9ee30b969b6318` first measured that floor
+against ordinary direct Firefox, which remains the camouflage target.  It was
+captured before the MTU-1500 policy and is retained only as lifecycle evidence;
+its packet-index distances must not select H2 product behavior.
+
+Fresh fail-closed six-block artifact `8f0c619bcd38385e` (seed `2026082712`)
+repeated the control with loopback MTU 1500, SYN MSS 1460, no oversized outer
+TCP segment, pre-launched same-base browsers, and inner HTTPS/H2.  Native
+Firefox using its ordinary authenticated HTTPS-proxy path remained only
+modestly closer to direct Firefox than NaiveFox `off`: distances were
+`0.05923/0.46731/0.20420/0.10955/0.24196` versus
+`0.06217/0.48243/0.21055/0.11034/0.26441` for packets 1--16, packets 17--32,
+packets 1--32, 250 ms, and whole flow.  The paired native-proxy-minus-NaiveFox
+interval crossed zero in every view.  This screening result does not prove
+equivalence with six blocks, but it localizes most current H2 residual to the
+shared nested `CONNECT + inner TLS/H2` architecture rather than a distinct
+NaiveFox client fingerprint.  The control diagnoses that floor; it does not
+redefine the camouflage target as Firefox behind a proxy.
 
 A server-side response-coalescing candidate was then tested because stock
 `forwardproxy` flushes every target TCP read. The candidate was backward
