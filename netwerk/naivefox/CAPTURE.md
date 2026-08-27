@@ -62,6 +62,16 @@ packets 17--32 from `0.62052` to `0.50648` and packets 1--32 from `0.22690` to
 stylesheet remains additional traffic. It is therefore not promoted by that
 screen alone.
 
+The same mode is available as an explicit H2-only experiment. Decrypted
+same-base admission proves one TCP/TLS/H2 connection, equal semantic TLS and
+SETTINGS, normal document/FromParser request semantics, and the wire order
+`root GET < CONNECT < CSS GET`, followed by successful root and CSS
+END_STREAM. Six-block direct-Firefox screening `fec6d5d295bcecf0` improved
+packets 17--32 from `0.45721` to `0.43922` and packets 1--32 from `0.22483` to
+`0.21018`, while worsening 250 ms from `0.13102` to `0.14840` and whole-flow
+from `0.28498` to `0.31852`. The complete stylesheet added about 67 KiB of
+server traffic by 250 ms, so this H2 arm is not a default candidate either.
+
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
 without paying for the complete synthetic stylesheet. CONNECT is not a member

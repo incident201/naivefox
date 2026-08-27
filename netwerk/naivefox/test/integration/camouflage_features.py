@@ -735,17 +735,11 @@ def validate_features(features):
 def extract(args):
     if args.naivefox_arm == "root-pmtud-control" and args.protocol != "h3":
         raise SystemExit("root-pmtud-control requires h3")
-    if (
-        args.naivefox_arm == "document-handshake-confirmed"
-        and args.protocol != "h3"
-    ):
+    if args.naivefox_arm == "document-handshake-confirmed" and args.protocol != "h3":
         raise SystemExit("document-handshake-confirmed requires h3")
     if args.naivefox_arm == "document-carrier-dispatch" and args.protocol != "h3":
         raise SystemExit("document-carrier-dispatch requires h3")
-    if (
-        args.naivefox_arm == "document-cold-winner-handoff"
-        and args.protocol != "h3"
-    ):
+    if args.naivefox_arm == "document-cold-winner-handoff" and args.protocol != "h3":
         raise SystemExit("document-cold-winner-handoff requires h3")
     if args.naivefox_arm == "document-native-cache-open" and args.protocol != "h3":
         raise SystemExit("document-native-cache-open requires h3")
@@ -760,14 +754,11 @@ def extract(args):
         args.naivefox_arm == "tree-resource-native-cache-committed-overlap"
         and args.protocol != "h3"
     ):
-        raise SystemExit(
-            "tree-resource-native-cache-committed-overlap requires h3"
-        )
+        raise SystemExit("tree-resource-native-cache-committed-overlap requires h3")
     if (
         args.naivefox_arm
         in (
             "tree-native-parser-preload-overlap-css",
-            "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

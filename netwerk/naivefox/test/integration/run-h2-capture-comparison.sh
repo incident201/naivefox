@@ -12,14 +12,14 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --arm) arm=${2:-}; shift 2 ;;
     --help)
-      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap]\n' "$0"
+      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css]\n' "$0"
       exit 0
       ;;
     *) printf 'unknown H2 comparison argument: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
 case $arm in
-  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap) ;;
+  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap | tree-native-parser-document-start-overlap-css) ;;
   *) printf 'unsupported H2 diagnostic arm: %s\n' "$arm" >&2; exit 2 ;;
 esac
 
@@ -392,6 +392,9 @@ run_candidate() {
   elif [[ $arm == document-start-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=h2$'
+  elif [[ $arm == tree-native-parser-document-start-overlap-css ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble native-parser-preload drain=complete completed_resources=1 http=2[0-9][0-9] protocol=h2$'
   fi
   sleep 0.25
   stop_capture
@@ -444,6 +447,31 @@ run_candidate() {
     established_line=$(rg -n -m1 "Connection $admission_connection established target=.* outer=h2 padding=yes$" "$log" | cut -d: -f1)
     [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
        $admission_line -lt $established_line ]]
+  elif [[ $arm == tree-native-parser-document-start-overlap-css ]]; then
+    python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" <<'PY'
+import importlib.util
+import sys
+
+module_path, log_path = sys.argv[1:]
+spec = importlib.util.spec_from_file_location(
+    "camouflage_sample_validation", module_path
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+with open(log_path, encoding="utf-8", errors="replace") as stream:
+    module.validate_sample(
+        "tree-native-parser-document-start-overlap-css",
+        "h2",
+        stream.read(),
+        {
+            "protocol": "h2",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        },
+    )
+PY
   else
     ! rg -q -e ' preamble root-overlap admission=' \
       -e ' preamble root-overlap drain=' \

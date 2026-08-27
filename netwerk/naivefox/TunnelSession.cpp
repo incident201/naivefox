@@ -761,9 +761,13 @@ void TunnelSession::FinishPreambleOnMain(
   MOZ_ALWAYS_TRUE(mImpl->mPreambleSequence.Complete(aGeneration, aProtocol));
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
+  const bool supportsDocumentStartAdmission =
+      aProtocol == ProxyProtocol::H3 ||
+      (aProtocol == ProxyProtocol::H2 &&
+       preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap);
   const bool requestCommittedAdmission =
       PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
-      aProtocol == ProxyProtocol::H3 && NS_SUCCEEDED(aStatus) &&
+      supportsDocumentStartAdmission && NS_SUCCEEDED(aStatus) &&
       aHttpStatus == 0 && aBodyBytes == 0 && aStartedResources == 0 &&
       aCommittedResources == 0 && aNativeCacheNewResources == 0 && !aRootDone &&
       !aTerminalFallback;
@@ -828,29 +832,33 @@ void TunnelSession::FinishPreambleOnMain(
         aRootDone, aStartedResources, aCommittedResources,
         aNativeCacheNewResources, ProtocolName(aProtocol));
   }
-  if (PreambleModeUsesNativeParser(preambleMode) &&
-      aProtocol == ProxyProtocol::H3 && succeeded && aRootDone &&
+  if (PreambleModeUsesNativeParser(preambleMode) && succeeded && aRootDone &&
       !aTerminalFallback && aStartedResources == 1 &&
-      aCommittedResources == 1) {
+      aCommittedResources == 1 &&
+      (aProtocol == ProxyProtocol::H3 ||
+       preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap)) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-preload "
         "parser=html5-speculative-scanner parsers=1 descriptors=1 "
-        "provenance=FromParser internal_type=40 protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
+        "provenance=FromParser internal_type=40 protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-preload "
-        "channel=async-open channels=1 protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
+        "channel=async-open channels=1 protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-preload "
         "admission=request-committed root_done=%d started_resources=%u "
-        "committed_resources=%u protocol=h3\n",
+        "committed_resources=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId), aRootDone,
-        aStartedResources, aCommittedResources);
+        aStartedResources, aCommittedResources, ProtocolName(aProtocol));
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-preload barrier=released "
-        "protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
@@ -872,18 +880,18 @@ void TunnelSession::FinishPreambleOnMain(
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-document-start "
         "admission=request-committed request_committed=1 root_done=0 "
-        "protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
   }
   if (PreambleModeUsesScopedNavigationStop(preambleMode)) {
     RuntimeLogEvent(
-      "Connection %llu preamble "
+        "Connection %llu preamble "
         "%s "
         "admission=request-committed request_committed=1 root_done=0 "
         "protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
-        preambleMode ==
-                PreambleMode::TreeNativeParserDocumentStartResponseStop
+        preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop
             ? "native-parser-document-start-response-stop"
             : "native-parser-document-start-navigation-stop");
   }
@@ -1011,15 +1019,17 @@ void TunnelSession::FinishPreambleOperationOnMain(
         aCompletedSuccessfulResources, aNativeCacheNewResources,
         ProtocolName(aProtocol));
   }
-  if (aCompletedNormally && aProtocol == ProxyProtocol::H3 && aRootDone &&
-      NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300 &&
+  if (aCompletedNormally && aRootDone && NS_SUCCEEDED(aStatus) &&
+      aHttpStatus >= 200 && aHttpStatus < 300 &&
       aCompletedSuccessfulResources == 1 &&
-      PreambleModeUsesNativeParser(preambleMode)) {
+      PreambleModeUsesNativeParser(preambleMode) &&
+      (aProtocol == ProxyProtocol::H3 ||
+       preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap)) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-preload "
-        "drain=complete completed_resources=%u http=%u protocol=h3\n",
+        "drain=complete completed_resources=%u http=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
-        aCompletedSuccessfulResources, aHttpStatus);
+        aCompletedSuccessfulResources, aHttpStatus, ProtocolName(aProtocol));
   }
   if (navigationStopSucceeded &&
       preambleMode ==
@@ -1039,8 +1049,8 @@ void TunnelSession::FinishPreambleOperationOnMain(
         "drain=complete root_done=1 css_committed=1 css_aborted=%d "
         "css_completed=%d http=%u protocol=h3\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
-        aNavigationStopStyleAborted,
-        aCompletedSuccessfulResources == 1, aHttpStatus);
+        aNavigationStopStyleAborted, aCompletedSuccessfulResources == 1,
+        aHttpStatus);
   }
   if (aCompletedNormally && preambleMode == PreambleMode::DocumentOverlap) {
     RuntimeLogEvent(
@@ -1496,8 +1506,7 @@ bool TunnelSession::ShouldGateOuterSession(const TunnelConfig& aConfig) {
   // race. Keep Auto's existing per-session H3 -> H2 generation semantics
   // until the winning protocol can be propagated to queued attempts.
   const bool implicitH3Gate =
-      aConfig.mImplicitH3PreambleGate &&
-      aConfig.mProtocol == ProxyProtocol::H3;
+      aConfig.mImplicitH3PreambleGate && aConfig.mProtocol == ProxyProtocol::H3;
   const bool explicitGate =
       aConfig.mOuterSessionGate && aConfig.mProtocol != ProxyProtocol::Auto;
   return implicitH3Gate || explicitGate;
@@ -1601,19 +1610,18 @@ nsresult TunnelSession::StartPump() {
   std::function<void()> onDownstreamApplicationActive;
   if (mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol) ==
       PreambleMode::TreeNativeParserDocumentStartResponseStop) {
-    onDownstreamApplicationActive =
-        [self, generation = mImpl->mAttemptGeneration,
-         protocol = mImpl->mAttemptProtocol]() {
-          nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
-              "NaiveFox::TunnelServerApplicationActive",
-              [self, generation, protocol]() {
-                self->TunnelServerApplicationActiveOnMain(generation,
-                                                          protocol);
-              }));
-          if (NS_FAILED(rv)) {
-            self->Fail(rv);
-          }
-        };
+    onDownstreamApplicationActive = [self,
+                                     generation = mImpl->mAttemptGeneration,
+                                     protocol = mImpl->mAttemptProtocol]() {
+      nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+          "NaiveFox::TunnelServerApplicationActive",
+          [self, generation, protocol]() {
+            self->TunnelServerApplicationActiveOnMain(generation, protocol);
+          }));
+      if (NS_FAILED(rv)) {
+        self->Fail(rv);
+      }
+    };
   }
   mImpl->mPump = new DuplexPump(
       mImpl->mLocalIn, mImpl->mLocalOut, mImpl->mPendingTunnelIn,

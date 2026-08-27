@@ -466,12 +466,10 @@ class JsonParser final {
         // same-base acceptance screen. H2 and Auto remain Off: neither was
         // part of that causal experiment. Explicit preamble and gate fields
         // always remain authoritative.
-        parsed.mPreamble.mH3Mode =
-            Some(PreambleMode::DocumentStartOverlap);
+        parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
         parsed.mPreamble.mPath.AssignLiteral("/");
         parsed.mPreamble.mMaxAssets = 0;
-        parsed.mPreamble.mMaxBytes =
-            PreambleConfig::kDefaultDocumentMaxBytes;
+        parsed.mPreamble.mMaxBytes = PreambleConfig::kDefaultDocumentMaxBytes;
         parsed.mPreamble.mCacheResources = false;
         parsed.mImplicitH3PreambleGate = !sawOuterSessionGate;
       }
@@ -797,18 +795,23 @@ class JsonParser final {
           "tree-native-parser-document-start-overlap must be selected "
           "explicitly with h3-mode");
     }
-    if (h3Mode ==
-            PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartOverlap))) {
+      return Error(
+          "tree-native-parser-document-start-overlap must be selected "
+          "explicitly with h2-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
         (!sawH3Mode ||
          aPreamble.mH3Mode !=
-             Some(PreambleMode::
-                      TreeNativeParserDocumentStartNavigationStop))) {
+             Some(PreambleMode::TreeNativeParserDocumentStartNavigationStop))) {
       return Error(
           "tree-native-parser-document-start-navigation-stop must be "
           "selected explicitly with h3-mode");
     }
-    if (h3Mode ==
-            PreambleMode::TreeNativeParserDocumentStartResponseStop &&
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
         (!sawH3Mode ||
          aPreamble.mH3Mode !=
              Some(PreambleMode::TreeNativeParserDocumentStartResponseStop))) {
@@ -866,7 +869,8 @@ class JsonParser final {
     }
     if (h2Mode == PreambleMode::TreeResourceCommittedOverlap ||
         h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
-        PreambleModeUsesNativeParser(h2Mode)) {
+        (PreambleModeUsesNativeParser(h2Mode) &&
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap)) {
       return Error("selected resource-committed preamble is H3-only");
     }
     const bool anyActive =
@@ -927,7 +931,8 @@ class JsonParser final {
             "cache-resources=true");
       }
     }
-    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
+        h3Mode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
       if (aPreamble.mMaxAssets != 1) {
         return Error(
             "tree-native-parser-document-start-overlap requires exactly one "
@@ -939,8 +944,7 @@ class JsonParser final {
             "cache-resources=true");
       }
     }
-    if (h3Mode ==
-        PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
       if (aPreamble.mMaxAssets != 1) {
         return Error(
             "tree-native-parser-document-start-navigation-stop requires "

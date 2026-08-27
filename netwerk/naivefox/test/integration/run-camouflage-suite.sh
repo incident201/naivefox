@@ -297,11 +297,6 @@ if [[ $naivefox_arm == tree-native-parser-preload-overlap-css &&
   printf 'tree-native-parser-preload-overlap-css requires --protocol h3\n' >&2
   exit 2
 fi
-if [[ $naivefox_arm == tree-native-parser-document-start-overlap-css &&
-      $protocol_selection != h3 ]]; then
-  printf 'tree-native-parser-document-start-overlap-css requires --protocol h3\n' >&2
-  exit 2
-fi
 if [[ $naivefox_arm == tree-native-parser-document-start-navigation-stop-css &&
       $protocol_selection != h3 ]]; then
   printf 'tree-native-parser-document-start-navigation-stop-css requires --protocol h3\n' >&2
@@ -409,11 +404,6 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   if [[ -n ${seen_multi_arms[tree-native-parser-preload-overlap-css]:-} &&
         $protocol_selection != h3 ]]; then
     printf 'tree-native-parser-preload-overlap-css multi-arm screening requires --protocol h3\n' >&2
-    exit 2
-  fi
-  if [[ -n ${seen_multi_arms[tree-native-parser-document-start-overlap-css]:-} &&
-        $protocol_selection != h3 ]]; then
-    printf 'tree-native-parser-document-start-overlap-css multi-arm screening requires --protocol h3\n' >&2
     exit 2
   fi
   if [[ -n ${seen_multi_arms[tree-native-parser-document-start-navigation-stop-css]:-} &&

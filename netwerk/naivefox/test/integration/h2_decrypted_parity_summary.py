@@ -21,6 +21,7 @@ SUPPORTED_ARMS = {
     "tree-early-overlap",
     "tree-root-overlap",
     "tree-overlap",
+    "tree-native-parser-document-start-overlap-css",
 }
 SELECTED_GET_SEMANTIC_HEADERS = {
     ":method",
@@ -62,9 +63,7 @@ def direction(row, proxy_port):
 
 
 def read_rows(root, cohort, suffix):
-    with (root / f"{cohort}-{suffix}.csv").open(
-        newline="", encoding="utf-8"
-    ) as source:
+    with (root / f"{cohort}-{suffix}.csv").open(newline="", encoding="utf-8") as source:
         return list(csv.DictReader(source))
 
 
@@ -143,25 +142,27 @@ def parse_headers(rows, cohort, proxy_port):
             len(header_streams) == len(blocks),
             f"{cohort} H2 HEADERS block/stream mapping is ambiguous",
         )
-        for stream, semantic, block in zip(
-            header_streams, semantic_values, blocks
-        ):
-            events.append(
-                {
-                    "frame": int(row["frame.number"]),
-                    "time": float(row["frame.time_relative"]),
-                    "direction": direction(row, proxy_port),
-                    "tcp_stream": tcp_stream,
-                    "stream": stream,
-                    "method": semantic if methods else "",
-                    "status": semantic if statuses else "",
-                    "header_order": tuple(dict.fromkeys(block)),
-                    "header_set": frozenset(block),
-                }
-            )
+        for stream, semantic, block in zip(header_streams, semantic_values, blocks):
+            events.append({
+                "frame": int(row["frame.number"]),
+                "time": float(row["frame.time_relative"]),
+                "direction": direction(row, proxy_port),
+                "tcp_stream": tcp_stream,
+                "stream": stream,
+                "method": semantic if methods else "",
+                "status": semantic if statuses else "",
+                "header_order": tuple(dict.fromkeys(block)),
+                "header_set": frozenset(block),
+            })
     require(events, f"{cohort} has no decrypted H2 HEADERS")
     identities = {
-        (event["direction"], event["tcp_stream"], event["stream"], event["method"], event["status"])
+        (
+            event["direction"],
+            event["tcp_stream"],
+            event["stream"],
+            event["method"],
+            event["status"],
+        )
         for event in events
     }
     require(len(identities) == len(events), f"{cohort} has duplicate H2 HEADERS")
@@ -229,7 +230,9 @@ def read_get_request_semantics(root, cohort, proxy_port, public_gets):
                 f"{cohort} private GET block contains auth or cookie semantics",
             )
             require(
-                all(block_names.count(name) == 1 for name in REQUIRED_GET_PSEUDO_HEADERS),
+                all(
+                    block_names.count(name) == 1 for name in REQUIRED_GET_PSEUDO_HEADERS
+                ),
                 f"{cohort} private GET block lacks required pseudo-header semantics",
             )
             selected = tuple(
@@ -243,20 +246,17 @@ def read_get_request_semantics(root, cohort, proxy_port, public_gets):
                 and dict(selected)[":method"] == method,
                 f"{cohort} private GET block has invalid :method semantics",
             )
-            blocks.append(
-                {
-                    "frame": int(row["frame.number"]),
-                    "tcp_stream": tcp_stream,
-                    "stream": stream,
-                    "selected": selected,
-                }
-            )
+            blocks.append({
+                "frame": int(row["frame.number"]),
+                "tcp_stream": tcp_stream,
+                "stream": stream,
+                "selected": selected,
+            })
     private_identities = {
         (block["frame"], block["tcp_stream"], block["stream"]) for block in blocks
     }
     public_identities = {
-        (event["frame"], event["tcp_stream"], event["stream"])
-        for event in public_gets
+        (event["frame"], event["tcp_stream"], event["stream"]) for event in public_gets
     }
     require(
         len(private_identities) == len(blocks)
@@ -268,7 +268,15 @@ def read_get_request_semantics(root, cohort, proxy_port, public_gets):
 
 
 def validate_expected_get_request_semantics(cohort, semantics, arm):
-    expected_count = 0 if arm == "gate" else 3 if arm.startswith("tree-") else 1
+    expected_count = (
+        0
+        if arm == "gate"
+        else 2
+        if arm == "tree-native-parser-document-start-overlap-css"
+        else 3
+        if arm.startswith("tree-")
+        else 1
+    )
     require(
         len(semantics) == expected_count,
         f"{cohort} private GET semantics must contain exactly {expected_count} blocks",
@@ -306,19 +314,15 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
             root_record["tcp_stream"],
             root_record["stream"],
         )
-    require(
-        set(by_path) == {
-            root_path,
-            "/camouflage/style.css",
-            "/camouflage/app.js",
-        },
-        f"{cohort} tree resource paths differ",
-    )
+    expected_paths = {root_path, "/camouflage/style.css"}
+    if arm != "tree-native-parser-document-start-overlap-css":
+        expected_paths.add("/camouflage/app.js")
+    require(set(by_path) == expected_paths, f"{cohort} tree resource paths differ")
     root_url = f"{root[':scheme']}://{root[':authority']}{root_path}"
-    for path, destination in (
-        ("/camouflage/style.css", "style"),
-        ("/camouflage/app.js", "script"),
-    ):
+    resources = [("/camouflage/style.css", "style")]
+    if arm != "tree-native-parser-document-start-overlap-css":
+        resources.append(("/camouflage/app.js", "script"))
+    for path, destination in resources:
         _, resource = by_path[path]
         require(
             resource.get(":method") == "GET"
@@ -340,14 +344,25 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
 
 def settings_signature(rows, cohort, proxy_port):
     require(rows, f"{cohort} has no client H2 SETTINGS")
-    ignored = {"frame.number", "frame.time_relative", "tcp.srcport", "tcp.dstport", "tcp.stream"}
+    ignored = {
+        "frame.number",
+        "frame.time_relative",
+        "tcp.srcport",
+        "tcp.dstport",
+        "tcp.stream",
+    }
     signature = []
     streams = set()
     for row in rows:
-        require(direction(row, proxy_port) == "client", f"{cohort} SETTINGS direction differs")
+        require(
+            direction(row, proxy_port) == "client",
+            f"{cohort} SETTINGS direction differs",
+        )
         require(row["tcp.stream"], f"{cohort} SETTINGS lacks TCP identity")
         streams.add(row["tcp.stream"])
-        signature.append(tuple((name, row[name]) for name in row if name not in ignored))
+        signature.append(
+            tuple((name, row[name]) for name in row if name not in ignored)
+        )
     require(len(streams) == 1, f"{cohort} SETTINGS span multiple TCP connections")
     return tuple(signature)
 
@@ -417,17 +432,39 @@ def summarize_cohort(root, cohort, proxy_port):
     end_stream, frame_connections = parse_frames(frames, cohort, proxy_port)
     events = parse_headers(headers, cohort, proxy_port)
     event_connections = {event["tcp_stream"] for event in events}
-    hello_connections = {row["tcp.stream"] for row in client_hellos if row["tcp.stream"]}
+    hello_connections = {
+        row["tcp.stream"] for row in client_hellos if row["tcp.stream"]
+    }
     syn_connections = {row["tcp.stream"] for row in syns if row["tcp.stream"]}
-    all_connections = frame_connections | event_connections | hello_connections | syn_connections
-    require(len(all_connections) == 1, f"{cohort} must use one physical TCP/H2 connection")
-    require(len(hello_connections) == 1, f"{cohort} must emit one outer ClientHello connection")
-    require(len(syn_connections) == 1, f"{cohort} must emit one outer client SYN connection")
-    require(alpns and all("h2" in values(row["tls.handshake.extensions_alpn_str"]) for row in alpns), f"{cohort} did not negotiate h2 ALPN")
+    all_connections = (
+        frame_connections | event_connections | hello_connections | syn_connections
+    )
+    require(
+        len(all_connections) == 1, f"{cohort} must use one physical TCP/H2 connection"
+    )
+    require(
+        len(hello_connections) == 1,
+        f"{cohort} must emit one outer ClientHello connection",
+    )
+    require(
+        len(syn_connections) == 1, f"{cohort} must emit one outer client SYN connection"
+    )
+    require(
+        alpns
+        and all(
+            "h2" in values(row["tls.handshake.extensions_alpn_str"]) for row in alpns
+        ),
+        f"{cohort} did not negotiate h2 ALPN",
+    )
     connection = next(iter(all_connections))
-    require(all(event["tcp_stream"] == connection for event in events), f"{cohort} H2 events changed TCP connection")
+    require(
+        all(event["tcp_stream"] == connection for event in events),
+        f"{cohort} H2 events changed TCP connection",
+    )
     for event in events:
-        event["end_stream_frame"] = end_stream.get((event["direction"], connection, event["stream"]), "")
+        event["end_stream_frame"] = end_stream.get(
+            (event["direction"], connection, event["stream"]), ""
+        )
     return (
         events,
         settings_signature(settings, cohort, proxy_port),
@@ -457,11 +494,25 @@ def validate(
         reference_server_tls == arm_server_tls,
         "same-base TLS server negotiation differs",
     )
-    reference_requests = [event for event in reference if event["direction"] == "client" and event["method"]]
-    require(any(event["method"] == "GET" for event in reference_requests), "reference has no outer GET")
-    require(not any(event["method"] == "CONNECT" for event in reference_requests), "reference unexpectedly used CONNECT")
+    reference_requests = [
+        event
+        for event in reference
+        if event["direction"] == "client" and event["method"]
+    ]
+    require(
+        any(event["method"] == "GET" for event in reference_requests),
+        "reference has no outer GET",
+    )
+    require(
+        not any(event["method"] == "CONNECT" for event in reference_requests),
+        "reference unexpectedly used CONNECT",
+    )
 
-    requests = [event for event in arm_events if event["direction"] == "client" and event["method"]]
+    requests = [
+        event
+        for event in arm_events
+        if event["direction"] == "client" and event["method"]
+    ]
     connects = [event for event in requests if event["method"] == "CONNECT"]
     require(connects, f"{arm} must emit at least one outer CONNECT")
     require(
@@ -488,9 +539,36 @@ def validate(
         )
 
     gets = [event for event in requests if event["method"] == "GET"]
-    expected_gets = 0 if arm == "gate" else 3 if arm.startswith("tree-") else 1
-    require(len(gets) == expected_gets, f"{arm} must emit exactly {expected_gets} preamble GETs")
-    require(all(event["frame"] < connect["frame"] for event in gets), f"{arm} preamble GET did not precede CONNECT")
+    expected_gets = (
+        0
+        if arm == "gate"
+        else 2
+        if arm == "tree-native-parser-document-start-overlap-css"
+        else 3
+        if arm.startswith("tree-")
+        else 1
+    )
+    require(
+        len(gets) == expected_gets,
+        f"{arm} must emit exactly {expected_gets} preamble GETs",
+    )
+    if arm == "tree-native-parser-document-start-overlap-css":
+        root_get = next(
+            event
+            for event in gets
+            if (event["frame"], event["tcp_stream"], event["stream"])
+            == root_request_identity
+        )
+        style_get = next(event for event in gets if event is not root_get)
+        require(
+            root_get["frame"] < connect["frame"] < style_get["frame"],
+            f"{arm} must emit root GET before CONNECT and CSS GET after CONNECT",
+        )
+    else:
+        require(
+            all(event["frame"] < connect["frame"] for event in gets),
+            f"{arm} preamble GET did not precede CONNECT",
+        )
     responses = []
     for get in gets:
         matches = [
@@ -507,11 +585,32 @@ def validate(
         require(matches, f"{arm} preamble GET lacks successful response")
         responses.extend(matches)
     if arm in {"root", "document-complete"}:
-        require(all(event["end_stream_frame"] != "" and event["end_stream_frame"] < connect["frame"] for event in responses), f"{arm} document did not complete before CONNECT")
+        require(
+            all(
+                event["end_stream_frame"] != ""
+                and event["end_stream_frame"] < connect["frame"]
+                for event in responses
+            ),
+            f"{arm} document did not complete before CONNECT",
+        )
     elif arm == "tree-complete":
-        require(all(event["end_stream_frame"] != "" and event["end_stream_frame"] < connect["frame"] for event in responses), "tree-complete resource did not complete before CONNECT")
+        require(
+            all(
+                event["end_stream_frame"] != ""
+                and event["end_stream_frame"] < connect["frame"]
+                for event in responses
+            ),
+            "tree-complete resource did not complete before CONNECT",
+        )
     elif arm in {"tree-early-overlap", "tree-overlap"}:
-        require(any(event["frame"] < connect["frame"] < event["end_stream_frame"] for event in responses if event["end_stream_frame"] != ""), f"{arm} lacks HEADERS < CONNECT < END_STREAM overlap")
+        require(
+            any(
+                event["frame"] < connect["frame"] < event["end_stream_frame"]
+                for event in responses
+                if event["end_stream_frame"] != ""
+            ),
+            f"{arm} lacks HEADERS < CONNECT < END_STREAM overlap",
+        )
         if arm == "tree-early-overlap":
             require(
                 root_request_identity is not None,
@@ -538,7 +637,15 @@ def validate(
                 if event["tcp_stream"] == root_get["tcp_stream"]
                 and event["stream"] == root_get["stream"]
             ]
-            require(root_responses and all(event["end_stream_frame"] != "" and event["end_stream_frame"] < connect["frame"] for event in root_responses), "tree-early-overlap root did not complete before CONNECT")
+            require(
+                root_responses
+                and all(
+                    event["end_stream_frame"] != ""
+                    and event["end_stream_frame"] < connect["frame"]
+                    for event in root_responses
+                ),
+                "tree-early-overlap root did not complete before CONNECT",
+            )
     elif arm == "tree-root-overlap":
         require(
             root_request_identity is not None,
@@ -588,6 +695,11 @@ def validate(
         require(
             all(event["end_stream_frame"] != "" for event in responses),
             "document-start-overlap document lacks END_STREAM",
+        )
+    elif arm == "tree-native-parser-document-start-overlap-css":
+        require(
+            all(event["end_stream_frame"] != "" for event in responses),
+            f"{arm} root or stylesheet lacks END_STREAM",
         )
 
 
@@ -656,15 +768,46 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
         root_request_identity,
     )
     cohorts = (("reference", reference), (arm, candidate))
-    fieldnames = ("cohort", "ordinal", "direction", "packet_position", "time_from_first_h2_ms", "stream_index", "method", "status", "header_name_order", "header_name_set", "end_stream_packet_position")
+    fieldnames = (
+        "cohort",
+        "ordinal",
+        "direction",
+        "packet_position",
+        "time_from_first_h2_ms",
+        "stream_index",
+        "method",
+        "status",
+        "header_name_order",
+        "header_name_set",
+        "end_stream_packet_position",
+    )
     with events_path.open("w", newline="", encoding="utf-8") as output:
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         for cohort, events in cohorts:
             origin = min(event["time"] for event in events)
-            stream_indices = {stream: index for index, stream in enumerate(sorted({event["stream"] for event in events}, key=int), 1)}
-            for ordinal, event in enumerate(sorted(events, key=lambda item: (item["frame"], int(item["stream"]))), 1):
-                writer.writerow({"cohort": cohort, "ordinal": ordinal, "direction": event["direction"], "packet_position": event["frame"], "time_from_first_h2_ms": f"{(event['time'] - origin) * 1000:.3f}", "stream_index": stream_indices[event["stream"]], "method": event["method"], "status": event["status"], "header_name_order": ";".join(event["header_order"]), "header_name_set": ";".join(sorted(event["header_set"])), "end_stream_packet_position": event["end_stream_frame"]})
+            stream_indices = {
+                stream: index
+                for index, stream in enumerate(
+                    sorted({event["stream"] for event in events}, key=int), 1
+                )
+            }
+            for ordinal, event in enumerate(
+                sorted(events, key=lambda item: (item["frame"], int(item["stream"]))), 1
+            ):
+                writer.writerow({
+                    "cohort": cohort,
+                    "ordinal": ordinal,
+                    "direction": event["direction"],
+                    "packet_position": event["frame"],
+                    "time_from_first_h2_ms": f"{(event['time'] - origin) * 1000:.3f}",
+                    "stream_index": stream_indices[event["stream"]],
+                    "method": event["method"],
+                    "status": event["status"],
+                    "header_name_order": ";".join(event["header_order"]),
+                    "header_name_set": ";".join(sorted(event["header_set"])),
+                    "end_stream_packet_position": event["end_stream_frame"],
+                })
     with summary_path.open("w", encoding="utf-8") as output:
         output.write("capture_scope=same_base_h2_decrypted_outer_sequence\n")
         output.write("inner_transport=https\n")
@@ -680,12 +823,25 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
         output.write(f"reference_outer_get_count={len(reference_gets)}\n")
         output.write(f"{arm}_preamble_get_count={len(candidate_gets)}\n")
         output.write(f"{arm}_outer_connect_count={len(candidate_connects)}\n")
-        output.write(f"{arm}_preamble_before_first_connect=yes\n")
+        if arm == "tree-native-parser-document-start-overlap-css":
+            output.write(f"{arm}_root_before_first_connect=yes\n")
+            output.write(f"{arm}_stylesheet_after_first_connect=yes\n")
+        else:
+            output.write(f"{arm}_preamble_before_first_connect=yes\n")
         output.write(f"{arm}_sequence_validation=passed\n")
         if arm != "gate":
             output.write(f"{arm}_root_document_request_semantics=yes\n")
         if arm.startswith("tree-"):
             output.write(f"{arm}_resource_request_semantics=yes\n")
+        if arm == "tree-native-parser-document-start-overlap-css":
+            output.write(
+                "tree-native-parser-document-start-overlap-css_"
+                "wire_order=root_get_connect_css_get\n"
+            )
+            output.write(
+                "tree-native-parser-document-start-overlap-css_"
+                "root_and_css_end_stream=yes\n"
+            )
         if arm == "tree-root-overlap":
             output.write("tree-root-overlap_wire_overlap_is_admission=no\n")
             output.write(
@@ -694,9 +850,7 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
             )
         if arm == "document-start-overlap":
             output.write("document-start-overlap_document_end_stream=yes\n")
-            output.write(
-                "document-start-overlap_end_stream_position_is_admission=no\n"
-            )
+            output.write("document-start-overlap_end_stream_position_is_admission=no\n")
         output.write("header_values_retained=no\n")
         output.write("credential_header_names_redacted=yes\n")
         output.write("raw_capture_material=deleted_after_success\n")

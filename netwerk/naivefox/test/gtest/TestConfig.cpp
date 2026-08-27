@@ -404,6 +404,23 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserDocumentStart.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserDocumentStart.mPreamble.mCacheResources);
 
+  Config nativeParserDocumentStartH2;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartH2, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserDocumentStartH2.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::TreeNativeParserDocumentStartOverlap);
+  EXPECT_EQ(
+      nativeParserDocumentStartH2.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::Off);
+  EXPECT_EQ(nativeParserDocumentStartH2.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentStartH2.mPreamble.mCacheResources);
+
   Config nativeParserDocumentStartNavigationStop;
   error.Truncate();
   ASSERT_EQ(
@@ -515,59 +532,57 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserFullProcess.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserFullProcess.mPreamble.mCacheResources);
 
-  static constexpr const char*
-      kInvalid[] =
-          {
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1}})",
-              R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
-          };
+  static constexpr const char* kInvalid[] =
+      {
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+      };
   for (const char* json : kInvalid) {
     Config invalid;
     error.Truncate();

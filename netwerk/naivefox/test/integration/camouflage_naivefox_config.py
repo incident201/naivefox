@@ -97,22 +97,10 @@ def build_config(
         raise ValueError("document-native-channel-open requires h3")
     if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
         raise ValueError("tree-resource-committed-overlap-css requires h3")
-    if (
-        arm == "tree-resource-native-cache-committed-overlap"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-resource-native-cache-committed-overlap requires h3"
-        )
+    if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
+        raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-preload-overlap-css requires h3")
-    if (
-        arm == "tree-native-parser-document-start-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-document-start-overlap-css requires h3"
-        )
     if (
         arm == "tree-native-parser-document-start-navigation-stop-css"
         and protocol != "h3"
@@ -127,29 +115,14 @@ def build_config(
         raise ValueError(
             "tree-native-parser-document-start-response-stop-css requires h3"
         )
-    if (
-        arm == "tree-native-parser-document-handoff-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-document-handoff-overlap-css requires h3"
-        )
+    if arm == "tree-native-parser-document-handoff-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-document-handoff-overlap-css requires h3")
     if arm == "tree-native-parser-retarget-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-retarget-overlap-css requires h3")
-    if (
-        arm == "tree-native-parser-ipc-rendezvous-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-ipc-rendezvous-overlap-css requires h3"
-        )
-    if (
-        arm == "tree-native-parser-root-rendezvous-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-root-rendezvous-overlap-css requires h3"
-        )
+    if arm == "tree-native-parser-ipc-rendezvous-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-ipc-rendezvous-overlap-css requires h3")
+    if arm == "tree-native-parser-root-rendezvous-overlap-css" and protocol != "h3":
+        raise ValueError("tree-native-parser-root-rendezvous-overlap-css requires h3")
     if arm == "tree-native-parser-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
@@ -214,7 +187,7 @@ def build_config(
     elif arm == "tree-native-parser-document-start-overlap-css":
         preamble = {
             "mode": "off",
-            "h3-mode": "tree-native-parser-document-start-overlap",
+            f"{protocol}-mode": "tree-native-parser-document-start-overlap",
             "path": preamble_path,
             "max-assets": 1,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,

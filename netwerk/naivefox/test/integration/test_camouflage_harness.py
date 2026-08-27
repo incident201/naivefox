@@ -32,9 +32,7 @@ CONFIG = load("camouflage_naivefox_config", "camouflage_naivefox_config.py")
 CACHE = load("camouflage_cache_validation", "camouflage_cache_validation.py")
 CONTROLLER = load("camouflage_browser_controller", "camouflage_browser_controller.py")
 FEATURES = load("camouflage_features", "camouflage_features.py")
-INNER_H2 = load(
-    "camouflage_inner_h2_validation", "camouflage_inner_h2_validation.py"
-)
+INNER_H2 = load("camouflage_inner_h2_validation", "camouflage_inner_h2_validation.py")
 SAMPLE = load("camouflage_sample_validation", "camouflage_sample_validation.py")
 SUPERBLOCKS = load("camouflage_superblocks", "camouflage_superblocks.py")
 TARGET = load("target_server", "target_server.py")
@@ -232,8 +230,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             ) : source.index("nsresult ProcessServiceState::StyleDiscovered(")
         ]
         style = source[
-            source.index("nsresult ProcessServiceState::MaybeReleaseFullStyle(") :
-            source.index("void ProcessServiceState::RouteFailed(")
+            source.index(
+                "nsresult ProcessServiceState::MaybeReleaseFullStyle("
+            ) : source.index("void ProcessServiceState::RouteFailed(")
         ]
         for body in (root, style):
             self.assertIn("RouteFailed(", body)
@@ -260,9 +259,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             primary = stream.read()
         self.assertEqual(background.count("(mCompleted && cleanDelete)"), 2)
         self.assertEqual(
-            primary.count(
-                "(aWhy != Deletion && aWhy != NormalShutdown)"
-            ),
+            primary.count("(aWhy != Deletion && aWhy != NormalShutdown)"),
             4,
         )
 
@@ -429,17 +426,12 @@ class CamouflageHarnessTests(unittest.TestCase):
 
     def test_h2_proxy_floor_schedule_has_two_controls_and_two_candidates(self):
         arms = ("firefox-proxied", "off")
-        rows = SUPERBLOCKS.schedule_rows(
-            17, "h2", 3, ["browser_page"], arms=arms
-        )
+        rows = SUPERBLOCKS.schedule_rows(17, "h2", 3, ["browser_page"], arms=arms)
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=3, arms=arms)
         for index in range(3):
             members = rows[index * 4 : (index + 1) * 4]
             self.assertEqual(
-                {
-                    (member["label"], member["naivefox_arm"])
-                    for member in members
-                },
+                {(member["label"], member["naivefox_arm"]) for member in members},
                 {
                     ("firefox_a", "reference"),
                     ("firefox_b", "reference"),
@@ -463,16 +455,16 @@ class CamouflageHarnessTests(unittest.TestCase):
 
     def test_response_stop_superblock_requires_navigation_stop_control(self):
         document_start = "tree-native-parser-document-start-overlap-css"
-        navigation_stop = (
-            "tree-native-parser-document-start-navigation-stop-css"
-        )
+        navigation_stop = "tree-native-parser-document-start-navigation-stop-css"
         response_stop = "tree-native-parser-document-start-response-stop-css"
         with self.assertRaisesRegex(ValueError, "requires the .* control"):
             SUPERBLOCKS.validate_arm_sequence((document_start, response_stop))
         self.assertEqual(
-            SUPERBLOCKS.validate_arm_sequence(
-                (document_start, navigation_stop, response_stop)
-            ),
+            SUPERBLOCKS.validate_arm_sequence((
+                document_start,
+                navigation_stop,
+                response_stop,
+            )),
             (document_start, navigation_stop, response_stop),
         )
 
@@ -1269,15 +1261,25 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "cache-resources": True,
             },
         )
-        with self.assertRaisesRegex(ValueError, "requires h3"):
-            CONFIG.build_config(
-                "tree-native-parser-document-start-overlap-css",
-                "h2",
-                1080,
-                4433,
-                "fixture-user",
-                "fixture-pass",
-            )
+        native_parser_document_start_h2 = CONFIG.build_config(
+            "tree-native-parser-document-start-overlap-css",
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(
+            native_parser_document_start_h2["preamble"],
+            {
+                "mode": "off",
+                "h2-mode": "tree-native-parser-document-start-overlap",
+                "path": CONFIG.PREAMBLE_PATH,
+                "max-assets": 1,
+                "max-bytes": CONFIG.TREE_PREAMBLE_MAX_BYTES,
+                "cache-resources": True,
+            },
+        )
         navigation_stop = CONFIG.build_config(
             "tree-native-parser-document-start-navigation-stop-css",
             "h3",
@@ -1742,17 +1744,15 @@ class CamouflageHarnessTests(unittest.TestCase):
         token = "0123456789abcdef0123456789abcdef"
 
         def record(uri, *, proto="HTTP/2.0", method="GET", status=200):
-            return json.dumps(
-                {
-                    "request": {
-                        "host": "localhost:45501",
-                        "method": method,
-                        "proto": proto,
-                        "uri": uri,
-                    },
-                    "status": status,
-                }
-            )
+            return json.dumps({
+                "request": {
+                    "host": "localhost:45501",
+                    "method": method,
+                    "proto": proto,
+                    "uri": uri,
+                },
+                "status": status,
+            })
 
         valid = [
             record(f"/camouflage/index.html?completion={token}"),
@@ -1796,9 +1796,7 @@ class CamouflageHarnessTests(unittest.TestCase):
     def test_inner_h2_fixture_is_opt_in_and_persistent(self):
         with open(os.path.join(HERE, "Caddyfile"), encoding="utf-8") as stream:
             proxy_caddyfile = stream.read()
-        with open(
-            os.path.join(HERE, "Caddyfile-inner-h2"), encoding="utf-8"
-        ) as stream:
+        with open(os.path.join(HERE, "Caddyfile-inner-h2"), encoding="utf-8") as stream:
             inner_caddyfile = stream.read()
         with open(os.path.join(HERE, "start.sh"), encoding="utf-8") as stream:
             fixture_start = stream.read()
@@ -2112,6 +2110,44 @@ class CamouflageHarnessTests(unittest.TestCase):
             native_parser_document_start_log,
             one_connection,
         )
+        SAMPLE.validate_sample(
+            "tree-native-parser-document-start-overlap-css",
+            "h2",
+            native_parser_document_start_log.replace(
+                "protocol=h3", "protocol=h2"
+            ).replace("outer=h3", "outer=h2"),
+            {
+                "protocol": "h2",
+                "features": {
+                    "lifecycle_connection_count": 1.0,
+                    "tls_client_hello_count": 1.0,
+                },
+            },
+        )
+        native_parser_document_start_h2_wrong_protocol = (
+            native_parser_document_start_log
+            .replace("protocol=h3", "protocol=h2")
+            .replace("outer=h3", "outer=h2")
+            .replace(
+                "lifecycle=chunk-flushed sequence=1 descriptors=1 "
+                "status=0x00000000 generation=1 protocol=h2",
+                "lifecycle=chunk-flushed sequence=1 descriptors=1 "
+                "status=0x00000000 generation=1 protocol=h3",
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "wrong outer protocol"):
+            SAMPLE.validate_sample(
+                "tree-native-parser-document-start-overlap-css",
+                "h2",
+                native_parser_document_start_h2_wrong_protocol,
+                {
+                    "protocol": "h2",
+                    "features": {
+                        "lifecycle_connection_count": 1.0,
+                        "tls_client_hello_count": 1.0,
+                    },
+                },
+            )
         with self.assertRaisesRegex(ValueError, "causal state"):
             SAMPLE.validate_sample(
                 "tree-native-parser-document-start-overlap-css",
@@ -2168,9 +2204,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             SAMPLE.validate_sample(
                 "tree-native-parser-document-start-navigation-stop-css",
                 "h3",
-                native_parser_navigation_stop_log.replace(
-                    "expected=1", "expected=0"
-                ),
+                native_parser_navigation_stop_log.replace("expected=1", "expected=0"),
                 one_connection,
             )
         with self.assertRaisesRegex(ValueError, "causal state"):
@@ -2202,9 +2236,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_sample(
             "tree-native-parser-document-start-navigation-stop-css",
             "h3",
-            native_parser_navigation_stop_log.replace(
-                tunnel_active_marker, ""
-            ).replace(
+            native_parser_navigation_stop_log.replace(tunnel_active_marker, "").replace(
                 "Preamble native-parser-preload lifecycle=chunk-flushed",
                 tunnel_active_marker
                 + "Preamble native-parser-preload lifecycle=chunk-flushed",
@@ -2224,9 +2256,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             SAMPLE.validate_sample(
                 "tree-native-parser-document-start-navigation-stop-css",
                 "h3",
-                native_parser_navigation_stop_log.replace(
-                    response_started_marker, ""
-                ),
+                native_parser_navigation_stop_log.replace(response_started_marker, ""),
                 one_connection,
             )
         with self.assertRaisesRegex(ValueError, "causal state"):
@@ -2254,12 +2284,8 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "tree-native-parser-document-start-navigation-stop-css",
                 "h3",
                 native_parser_navigation_stop_log.replace(
-                    tunnel_active_marker
-                    + response_started_marker
-                    + stop_issued_marker,
-                    stop_issued_marker
-                    + tunnel_active_marker
-                    + response_started_marker,
+                    tunnel_active_marker + response_started_marker + stop_issued_marker,
+                    stop_issued_marker + tunnel_active_marker + response_started_marker,
                 ),
                 one_connection,
             )
@@ -2392,10 +2418,8 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "tree-native-parser-document-start-response-stop-css",
                 "h3",
                 native_parser_response_stop_log.replace(
-                    response_stop_tunnel_active_marker
-                    + response_stop_issued_marker,
-                    response_stop_issued_marker
-                    + response_stop_tunnel_active_marker,
+                    response_stop_tunnel_active_marker + response_stop_issued_marker,
+                    response_stop_issued_marker + response_stop_tunnel_active_marker,
                 ),
                 one_connection,
             )
@@ -3142,6 +3166,27 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertNotIn(marker, reference_body)
         self.assertLess(body.index(marker), body.index("stop_capture"))
 
+    def test_h2_native_parser_document_start_has_decrypted_wire_admission(self):
+        with open(
+            os.path.join(HERE, "run-h2-capture-comparison.sh"),
+            encoding="utf-8",
+        ) as stream:
+            runner = stream.read()
+        with open(
+            os.path.join(HERE, "h2_decrypted_parity_summary.py"),
+            encoding="utf-8",
+        ) as stream:
+            summary = stream.read()
+        arm = "tree-native-parser-document-start-overlap-css"
+        self.assertIn(arm, runner)
+        self.assertIn("camouflage_sample_validation.py", runner)
+        self.assertIn(arm, summary)
+        self.assertIn(
+            'root_get["frame"] < connect["frame"] < style_get["frame"]',
+            summary,
+        )
+        self.assertIn("root or stylesheet lacks END_STREAM", summary)
+
     def test_superblock_reuses_wire_completion_token_with_fresh_marker(self):
         with open(
             os.path.join(HERE, "run-camouflage-suite.sh"), encoding="utf-8"
@@ -3211,9 +3256,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "elif [[ $arm == tree-native-parser-root-rendezvous-overlap-css ]]; then",
             runner,
         )
-        self.assertIn(
-            '"$INTEGRATION_DIR/camouflage_sample_validation.py"', runner
-        )
+        self.assertIn('"$INTEGRATION_DIR/camouflage_sample_validation.py"', runner)
         self.assertIn("expected_mode=expected_mode", runner)
 
     def test_sample_validation_rejects_unexpected_preamble_or_connection(self):
@@ -3622,8 +3665,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             'validate_inner_h2_request "$completion" "$inner_h2_log_start"',
             runner,
         )
-        self.assertIn("expected_inner_h2_validations=$((samples_per_cohort * 2))", runner)
-        self.assertIn("strict_transport_check \"$protocol\" \"$pcap\"", runner)
+        self.assertIn(
+            "expected_inner_h2_validations=$((samples_per_cohort * 2))", runner
+        )
+        self.assertIn('strict_transport_check "$protocol" "$pcap"', runner)
         self.assertIn("capture_cutoff=browser_done_plus_250ms", runner)
         self.assertIn("proxy_floor_workload=", runner)
         self.assertIn("proxy_floor_candidate_slot_semantics=", runner)
@@ -3697,11 +3742,6 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             runner,
         )
         self.assertIn(
-            "tree-native-parser-document-start-overlap-css multi-arm "
-            "screening requires --protocol h3",
-            runner,
-        )
-        self.assertIn(
             "tree-native-parser-document-handoff-overlap-css multi-arm "
             "screening requires --protocol h3",
             runner,
@@ -3759,9 +3799,7 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
         self.assertIn("${#tcp_streams[@]} -ne 1", strict_transport)
         self.assertIn("client_syn_count -ne 1", strict_transport)
         self.assertIn("client_hello_count -ne 1", strict_transport)
-        self.assertIn(
-            "tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT", strict_transport
-        )
+        self.assertIn("tcp.port==$NAIVEFOX_FIXTURE_PROXY_PORT", strict_transport)
         self.assertNotIn("NAIVEFOX_FIXTURE_INNER_H2_PORT", strict_transport)
         self.assertIn("outer_h2_alpn_policy=", runner)
         self.assertIn("proxy_restart_count -ne $expected_proxy_restart_count", runner)

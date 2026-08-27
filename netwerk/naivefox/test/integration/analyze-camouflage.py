@@ -198,17 +198,11 @@ def load_dataset(path):
                 raise SystemExit("firefox-proxied analysis requires h2")
             if arm == "root-pmtud-control" and source["protocol"] != "h3":
                 raise SystemExit("root-pmtud-control requires h3")
-            if (
-                arm == "document-handshake-confirmed"
-                and source["protocol"] != "h3"
-            ):
+            if arm == "document-handshake-confirmed" and source["protocol"] != "h3":
                 raise SystemExit("document-handshake-confirmed requires h3")
             if arm == "document-carrier-dispatch" and source["protocol"] != "h3":
                 raise SystemExit("document-carrier-dispatch requires h3")
-            if (
-                arm == "document-cold-winner-handoff"
-                and source["protocol"] != "h3"
-            ):
+            if arm == "document-cold-winner-handoff" and source["protocol"] != "h3":
                 raise SystemExit("document-cold-winner-handoff requires h3")
             if arm == "document-native-cache-open" and source["protocol"] != "h3":
                 raise SystemExit("document-native-cache-open requires h3")
@@ -230,7 +224,6 @@ def load_dataset(path):
                 arm
                 in (
                     "tree-native-parser-preload-overlap-css",
-                    "tree-native-parser-document-start-overlap-css",
                     "tree-native-parser-document-start-navigation-stop-css",
                     "tree-native-parser-document-start-response-stop-css",
                     "tree-native-parser-document-handoff-overlap-css",
@@ -242,9 +235,7 @@ def load_dataset(path):
                 )
                 and source["protocol"] != "h3"
             ):
-                raise SystemExit(
-                    f"{arm} requires h3"
-                )
+                raise SystemExit(f"{arm} requires h3")
             if arm == "reference" and source["label"] == "naivefox":
                 raise SystemExit("NaiveFox row cannot use reference arm metadata")
             if arm in naivefox_arms and source["label"] != "naivefox":
@@ -1187,9 +1178,7 @@ def absolute_inference_status(rows, mode, screening_only=False):
         protocol_rows = [row for row in rows if row["protocol"] == protocol]
         protocol_samples[protocol] = {
             label: len({
-                analysis_group(row)
-                for row in protocol_rows
-                if row["label"] == label
+                analysis_group(row) for row in protocol_rows if row["label"] == label
             })
             for label in COHORT_LABELS
         }
@@ -1206,9 +1195,7 @@ def absolute_inference_status(rows, mode, screening_only=False):
     research_samples_sufficient = bool(protocol_samples) and not research_shortfalls
     reasons = []
     if screening_only:
-        reasons.append(
-            "multi-arm screening analysis cannot emit an absolute verdict"
-        )
+        reasons.append("multi-arm screening analysis cannot emit an absolute verdict")
     if mode != "research":
         reasons.append(f"{mode} mode is non-inferential")
     elif not research_samples_sufficient:
@@ -1221,9 +1208,7 @@ def absolute_inference_status(rows, mode, screening_only=False):
     )
     return {
         "status": (
-            "RESEARCH_VERDICT_ENABLED"
-            if supports_absolute_verdict
-            else "INCONCLUSIVE"
+            "RESEARCH_VERDICT_ENABLED" if supports_absolute_verdict else "INCONCLUSIVE"
         ),
         "supports_absolute_verdict": supports_absolute_verdict,
         "screening_only": bool(screening_only),
@@ -1239,9 +1224,7 @@ def build_report(args, rows, all_feature_names):
     inference = absolute_inference_status(
         rows, args.mode, getattr(args, "screening_only", False)
     )
-    verdict_mode = (
-        "research" if inference["supports_absolute_verdict"] else "standard"
-    )
+    verdict_mode = "research" if inference["supports_absolute_verdict"] else "standard"
     report = {
         "schema_version": SCHEMA_VERSION,
         "mode": args.mode,

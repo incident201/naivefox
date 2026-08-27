@@ -77,6 +77,10 @@ constexpr uint32_t kResponseLimit = 64 * 1024;
 constexpr auto kExpectedMarker = "naivefox-fixture-small"_ns;
 StaticRefPtr<nsIThread> sNativeParserThread;
 
+const char* ProtocolName(ProxyProtocol aProtocol) {
+  return aProtocol == ProxyProtocol::H3 ? "h3" : "h2";
+}
+
 already_AddRefed<nsISerialEventTarget> NativeParserTarget() {
   MOZ_ASSERT(NS_IsMainThread());
   if (AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownNetTeardown)) {
@@ -1256,8 +1260,11 @@ nsresult ProxyPreambleOperation::Start(
        (aProtocol != ProxyProtocol::H3 || aConfig.mMaxAssets != 1 ||
         !aConfig.mCacheResources)) ||
       (PreambleModeUsesNativeParser(aConfig.mMode) &&
-       (aProtocol != ProxyProtocol::H3 || aConfig.mMaxAssets != 1 ||
-        !aConfig.mCacheResources))) {
+       ((aProtocol != ProxyProtocol::H3 &&
+         !(aProtocol == ProxyProtocol::H2 &&
+           aConfig.mMode ==
+               PreambleMode::TreeNativeParserDocumentStartOverlap)) ||
+        aConfig.mMaxAssets != 1 || !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
   }
   mImpl->mConfig = aConfig;
@@ -1279,7 +1286,8 @@ nsresult ProxyPreambleOperation::Start(
     }
     RuntimeLogEvent(
         "Preamble native-parser-preload lifecycle=target-ready generation=1 "
-        "protocol=h3\n");
+        "protocol=%s\n",
+        ProtocolName(aProtocol));
   }
 
   nsAutoCString rootSpec;
@@ -1467,7 +1475,8 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
       } else {
         RuntimeLogEvent(
             "Preamble native-parser-preload lifecycle=resource-committed "
-            "stream=1 status=waiting-for protocol=h3\n");
+            "stream=1 status=waiting-for protocol=%s\n",
+            ProtocolName(mImpl->mProtocol));
       }
     }
     if (PreambleModeUsesScopedNavigationStop(mImpl->mConfig.mMode)) {
@@ -1598,8 +1607,9 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
       mImpl->mHaveRootOriginAttributes = true;
       RuntimeLogEvent(
           "Preamble native-parser-preload lifecycle=root-admitted "
-          "media=text/html charset=%s protocol=h3\n",
-          contentCharset.IsEmpty() ? "absent" : "utf-8");
+          "media=text/html charset=%s protocol=%s\n",
+          contentCharset.IsEmpty() ? "absent" : "utf-8",
+          ProtocolName(mImpl->mProtocol));
     }
     nsAutoCString policyHeader;
     mozilla::dom::ReferrerPolicy policy = mozilla::dom::ReferrerPolicy::_empty;
@@ -2663,8 +2673,9 @@ nsresult ProxyPreambleOperation::DispatchNativeParserChunk(nsCString&& aChunk) {
   }
   RuntimeLogEvent(
       "Preamble native-parser-preload lifecycle=chunk-queued sequence=%u "
-      "bytes=%u generation=%llu protocol=h3\n",
-      sequence, bytes, static_cast<unsigned long long>(generation));
+      "bytes=%u generation=%llu protocol=%s\n",
+      sequence, bytes, static_cast<unsigned long long>(generation),
+      ProtocolName(mImpl->mProtocol));
   return NS_OK;
 }
 
@@ -2749,8 +2760,9 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
   }
   RuntimeLogEvent(
       "Preamble native-parser-preload lifecycle=finish-queued sequence=%u "
-      "generation=%llu protocol=h3\n",
-      sequence, static_cast<unsigned long long>(generation));
+      "generation=%llu protocol=%s\n",
+      sequence, static_cast<unsigned long long>(generation),
+      ProtocolName(mImpl->mProtocol));
   return NS_OK;
 }
 
@@ -2766,11 +2778,12 @@ void ProxyPreambleOperation::OnNativeParserOutput(
   --mImpl->mNativeParserPendingMainCallbacks;
   RuntimeLogEvent(
       "Preamble native-parser-preload lifecycle=%s sequence=%u "
-      "descriptors=%u status=0x%08x generation=%llu protocol=h3\n",
+      "descriptors=%u status=0x%08x generation=%llu protocol=%s\n",
       aFinished ? "parser-finished" : "chunk-flushed", aSequence,
       static_cast<unsigned>(aDescriptors.Length()),
       static_cast<unsigned>(aStatus),
-      static_cast<unsigned long long>(aGeneration));
+      static_cast<unsigned long long>(aGeneration),
+      ProtocolName(mImpl->mProtocol));
 
   if (NS_FAILED(aStatus)) {
     FailNativeParserContract(aStatus,
@@ -2916,7 +2929,8 @@ nsresult ProxyPreambleOperation::OpenNativeParserStylesheet(
   }
   RuntimeLogEvent(
       "Preamble native-parser-preload lifecycle=stylesheet-opened stream=1 "
-      "kind=from-parser referrer=inherited protocol=h3\n");
+      "kind=from-parser referrer=inherited protocol=%s\n",
+      ProtocolName(mImpl->mProtocol));
   return NS_OK;
 }
 
@@ -3055,9 +3069,10 @@ void ProxyPreambleOperation::FailNativeParserContract(nsresult aStatus,
       1;
   RuntimeLogEvent(
       "Preamble native-parser-preload lifecycle=contract-failed reason=%s "
-      "status=0x%08x generation=%llu protocol=h3\n",
+      "status=0x%08x generation=%llu protocol=%s\n",
       aReason, static_cast<unsigned>(mImpl->mFirstFailure),
-      static_cast<unsigned long long>(generation));
+      static_cast<unsigned long long>(generation),
+      ProtocolName(mImpl->mProtocol));
   if (mImpl->mNativeParserTarget) {
     RefPtr self = this;
     (void)mImpl->mNativeParserTarget->Dispatch(
@@ -3647,8 +3662,8 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
           mImpl->mConfig.mMode, mImpl->mBarrierFired,
           mImpl->mNavigationStopStyleResponseStarted,
           mImpl->mConnectHandoffAdmitted, mImpl->mTunnelApplicationActive,
-          mImpl->mTunnelServerApplicationActive,
-          mImpl->mNavigationStopIssued, aStatus);
+          mImpl->mTunnelServerApplicationActive, mImpl->mNavigationStopIssued,
+          aStatus);
   if (expectedNavigationStopStyleAbort) {
     mImpl->mNavigationStopStyleAborted = true;
     RuntimeLogEvent(

@@ -107,9 +107,7 @@ def parse_arms(value):
 
 def infer_arms(rows):
     selected = {
-        row["naivefox_arm"]
-        for row in rows
-        if row.get("naivefox_arm") != REFERENCE_ARM
+        row["naivefox_arm"] for row in rows if row.get("naivefox_arm") != REFERENCE_ARM
     }
     invalid = sorted(selected - set(SUPPORTED_ARMS))
     if invalid:
@@ -133,7 +131,9 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
     if protocol != "h3" and "document-native-channel-open" in arms:
         raise ValueError("document-native-channel-open requires h3 superblocks")
     if protocol != "h3" and any(
-        arm.startswith("tree-native-parser-") for arm in arms
+        arm.startswith("tree-native-parser-")
+        and arm != "tree-native-parser-document-start-overlap-css"
+        for arm in arms
     ):
         raise ValueError("native parser arms require h3 superblocks")
     rng = random.Random(f"{seed}:{protocol}:multi-arm-superblocks")
@@ -148,15 +148,13 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         ]
         rng.shuffle(members)
         for label, arm in members:
-            rows.append(
-                {
-                    "protocol": protocol,
-                    "label": label,
-                    "naivefox_arm": arm,
-                    "scenario": scenario,
-                    "experiment_block": block,
-                }
-            )
+            rows.append({
+                "protocol": protocol,
+                "label": label,
+                "naivefox_arm": arm,
+                "scenario": scenario,
+                "experiment_block": block,
+            })
     return rows
 
 
@@ -169,17 +167,12 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
     if rows and not required.issubset(rows[0]):
         missing = sorted(required - set(rows[0]))
         raise ValueError(f"superblock dataset lacks metadata fields: {missing}")
-    selected_arms = (
-        infer_arms(rows) if arms is None else validate_arm_sequence(arms)
-    )
+    selected_arms = infer_arms(rows) if arms is None else validate_arm_sequence(arms)
     blocks = {}
     for row in rows:
         if row["naivefox_arm"] not in {*SUPPORTED_ARMS, REFERENCE_ARM}:
             raise ValueError(f"invalid arm label: {row['naivefox_arm']}")
-        if (
-            row["naivefox_arm"] == "root-pmtud-control"
-            and row["protocol"] != "h3"
-        ):
+        if row["naivefox_arm"] == "root-pmtud-control" and row["protocol"] != "h3":
             raise ValueError("root-pmtud-control requires h3 superblocks")
         if (
             row["naivefox_arm"] == "document-handshake-confirmed"
@@ -195,9 +188,7 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
             row["naivefox_arm"] == "document-cold-winner-handoff"
             and row["protocol"] != "h3"
         ):
-            raise ValueError(
-                "document-cold-winner-handoff requires h3 superblocks"
-            )
+            raise ValueError("document-cold-winner-handoff requires h3 superblocks")
         if (
             row["naivefox_arm"] == "document-native-cache-open"
             and row["protocol"] != "h3"
@@ -255,9 +246,7 @@ def materialize_arms(input_path, output_dir, expected_blocks=None, arms=None):
             raise ValueError("superblock dataset has no header")
         rows = list(reader)
         fieldnames = list(reader.fieldnames)
-    selected_arms = (
-        infer_arms(rows) if arms is None else validate_arm_sequence(arms)
-    )
+    selected_arms = infer_arms(rows) if arms is None else validate_arm_sequence(arms)
     validate_superblocks(
         rows,
         expected_blocks,

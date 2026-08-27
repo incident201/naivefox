@@ -603,34 +603,65 @@ def validate_native_parser_process(
     else:
         full_fields = {
             "full-root-primary-ready": {
-                "request", "generation", "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "parent_pid",
+                "child_pid",
             },
             "full-root-background-ready": {
-                "request", "generation", "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "parent_pid",
+                "child_pid",
             },
             "full-root-verification-queued": {
-                "request", "generation", "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "parent_pid",
+                "child_pid",
             },
             "full-root-verification-run": {
-                "request", "generation", "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "parent_pid",
+                "child_pid",
             },
             "full-root-onstart-forwarded": {
-                "request", "generation", "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "parent_pid",
+                "child_pid",
             },
             "full-style-primary-ready": {
-                "request", "generation", "style", "sequence",
-                "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "style",
+                "sequence",
+                "parent_pid",
+                "child_pid",
             },
             "full-style-background-ready": {
-                "request", "generation", "style", "sequence",
-                "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "style",
+                "sequence",
+                "parent_pid",
+                "child_pid",
             },
             "full-style-join-released": {
-                "request", "generation", "style", "sequence",
-                "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "style",
+                "sequence",
+                "parent_pid",
+                "child_pid",
             },
             "full-root-background-drained": {
-                "request", "generation", "canceled", "parent_pid", "child_pid"
+                "request",
+                "generation",
+                "canceled",
+                "parent_pid",
+                "child_pid",
             },
         }
         if len(full_markers) != len(full_fields):
@@ -671,10 +702,7 @@ def validate_native_parser_process(
         for phase in child_single_phases
     }
     full_single = (
-        {
-            marker["phase"]: marker
-            for marker in full_markers
-        }
+        {marker["phase"]: marker for marker in full_markers}
         if expected_mode == "full-process"
         else {}
     )
@@ -896,39 +924,32 @@ def validate_native_parser_process(
     if expected_mode == "full-process":
         root_primary = full_single["full-root-primary-ready"]["index"]
         root_background = full_single["full-root-background-ready"]["index"]
-        verification_queued = full_single[
-            "full-root-verification-queued"
-        ]["index"]
+        verification_queued = full_single["full-root-verification-queued"]["index"]
         verification_run = full_single["full-root-verification-run"]["index"]
-        onstart_forwarded = full_single[
-            "full-root-onstart-forwarded"
-        ]["index"]
+        onstart_forwarded = full_single["full-root-onstart-forwarded"]["index"]
         style_primary = full_single["full-style-primary-ready"]["index"]
-        style_background = full_single[
-            "full-style-background-ready"
-        ]["index"]
+        style_background = full_single["full-style-background-ready"]["index"]
         style_released = full_single["full-style-join-released"]["index"]
-        background_drained = full_single[
-            "full-root-background-drained"
-        ]["index"]
+        background_drained = full_single["full-root-background-drained"]["index"]
         if not (
             parent_single["root-registered"]["index"]
             < min(root_primary, root_background)
-            and max(root_primary, root_background) < verification_queued
+            and max(root_primary, root_background)
+            < verification_queued
             < verification_run
             < onstart_forwarded
             < parent_single["root-ready-resume"]["index"]
         ):
             raise ValueError("full native parser root join ordering is invalid")
         if not (
-            max(style_primary, style_background) < style_released
+            max(style_primary, style_background)
+            < style_released
             < parent_single["style-opened"]["index"]
         ):
             raise ValueError("full native parser style join ordering is invalid")
         if not (
             parent_single["parser-finished"]["index"] < background_drained
-            and parent_single["style-onstop-complete"]["index"]
-            < background_drained
+            and parent_single["style-onstop-complete"]["index"] < background_drained
         ):
             raise ValueError(
                 "full native parser background actors did not drain terminally"
@@ -999,13 +1020,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-preload-overlap-css requires h3")
-    if (
-        arm == "tree-native-parser-document-start-overlap-css"
-        and protocol != "h3"
-    ):
-        raise ValueError(
-            "tree-native-parser-document-start-overlap-css requires h3"
-        )
     if (
         arm == "tree-native-parser-document-start-navigation-stop-css"
         and protocol != "h3"
@@ -1215,15 +1229,24 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if "Preamble native-parser-preload lifecycle=chunk-flushed " in line
         and " descriptors=1 " in line
         and " status=0x00000000 " in line
-        and line.endswith(" protocol=h3")
+        and line.endswith(f" protocol={protocol}")
     ]
     native_parser_lightweight_open_lines = [
         line
         for line in log_lines
         if "Preamble native-parser-preload "
         "lifecycle=stylesheet-opened stream=1 kind=from-parser "
-        "referrer=inherited protocol=h3" in line
+        f"referrer=inherited protocol={protocol}" in line
     ]
+    wrong_protocol_native_parser_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-preload " in line
+        and " protocol=" in line
+        and not line.endswith(f" protocol={protocol}")
+    ]
+    if wrong_protocol_native_parser_lines:
+        raise ValueError("native parser lifecycle logged the wrong outer protocol")
     native_parser_channel_lines = [
         line for line in log_lines if " preamble native-parser-preload channel=" in line
     ]
@@ -1271,10 +1294,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         NATIVE_PARSER_DOCUMENT_START_ADMISSION.fullmatch(line)
         for line in native_parser_document_start_admission_lines
     ]
-    if any(
-        marker is None
-        for marker in parsed_native_parser_document_start_admissions
-    ):
+    if any(marker is None for marker in parsed_native_parser_document_start_admissions):
         raise ValueError("malformed native parser document-start admission evidence")
     native_parser_navigation_stop_evidence_lines = [
         line
@@ -1350,18 +1370,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
         [pattern.fullmatch(line) for line in lines]
         for lines, pattern in native_parser_navigation_stop_groups
     )
-    if (
-        sum(len(lines) for lines, _ in native_parser_navigation_stop_groups)
-        != len(native_parser_navigation_stop_evidence_lines)
-        or any(
-            marker is None
-            for markers in parsed_native_parser_navigation_stop_groups
-            for marker in markers
-        )
+    if sum(len(lines) for lines, _ in native_parser_navigation_stop_groups) != len(
+        native_parser_navigation_stop_evidence_lines
+    ) or any(
+        marker is None
+        for markers in parsed_native_parser_navigation_stop_groups
+        for marker in markers
     ):
-        raise ValueError(
-            "malformed or unknown native parser navigation-stop evidence"
-        )
+        raise ValueError("malformed or unknown native parser navigation-stop evidence")
     native_parser_response_stop_evidence_lines = [
         line
         for line in log_lines
@@ -1436,18 +1452,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
         [pattern.fullmatch(line) for line in lines]
         for lines, pattern in native_parser_response_stop_groups
     )
-    if (
-        sum(len(lines) for lines, _ in native_parser_response_stop_groups)
-        != len(native_parser_response_stop_evidence_lines)
-        or any(
-            marker is None
-            for markers in parsed_native_parser_response_stop_groups
-            for marker in markers
-        )
+    if sum(len(lines) for lines, _ in native_parser_response_stop_groups) != len(
+        native_parser_response_stop_evidence_lines
+    ) or any(
+        marker is None
+        for markers in parsed_native_parser_response_stop_groups
+        for marker in markers
     ):
-        raise ValueError(
-            "malformed or unknown native parser response-stop evidence"
-        )
+        raise ValueError("malformed or unknown native parser response-stop evidence")
     native_parser_document_handoff_lines = [
         line
         for line in log_lines
@@ -1988,8 +2000,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["completed_resources"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or drain["connection"] != connection
-            or drain["protocol"] != "h3"
-            or early["protocol"] != "h3"
+            or drain["protocol"] != protocol
+            or early["protocol"] != protocol
             or result["connection"] != connection
         ):
             raise ValueError("native parser document-start causal state is invalid")
@@ -1997,15 +2009,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
             line
             for line, established in zip(established_lines, parsed_established)
             if established["connection"] == connection
-            and established["protocol"] == "h3"
+            and established["protocol"] == protocol
         ]
         if len(matching_established) != 1:
             raise ValueError(
                 "native parser document-start arm requires one matching CONNECT marker"
             )
-        early_index = log_lines.index(
-            native_parser_document_start_admission_lines[0]
-        )
+        early_index = log_lines.index(native_parser_document_start_admission_lines[0])
         discovery_index = log_lines.index(native_parser_descriptor_lines[0])
         channel_index = log_lines.index(native_parser_lightweight_open_lines[0])
         result_index = log_lines.index(result_lines[0])
@@ -2026,8 +2036,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
 
     if arm == "tree-native-parser-document-start-navigation-stop-css":
         if any(
-            len(markers) != 1
-            for markers in parsed_native_parser_navigation_stop_groups
+            len(markers) != 1 for markers in parsed_native_parser_navigation_stop_groups
         ):
             raise ValueError(
                 "native parser navigation-stop arm requires exactly one "
@@ -2083,8 +2092,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["css_aborted"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection
-                or marker["protocol"] != "h3"
+                marker["connection"] != connection or marker["protocol"] != "h3"
                 for marker in (
                     stylesheet,
                     tunnel_active,
@@ -2106,8 +2114,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         ]
         if len(matching_established) != 1:
             raise ValueError(
-                "native parser navigation-stop arm requires one matching "
-                "CONNECT marker"
+                "native parser navigation-stop arm requires one matching CONNECT marker"
             )
         admission_index = log_lines.index(
             native_parser_navigation_stop_admission_lines[0]
@@ -2143,8 +2150,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             < drain_index
         ):
             raise ValueError(
-                "native parser navigation-stop lifecycle markers have invalid "
-                "ordering"
+                "native parser navigation-stop lifecycle markers have invalid ordering"
             )
     elif native_parser_navigation_stop_evidence_lines:
         raise ValueError(
@@ -2178,9 +2184,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 "and abort marker"
             )
         causal_abort = all(len(markers) == 1 for markers in causal_abort_groups)
-        natural_completion = all(
-            len(markers) == 0 for markers in causal_abort_groups
-        )
+        natural_completion = all(len(markers) == 0 for markers in causal_abort_groups)
         if not (causal_abort or natural_completion):
             raise ValueError(
                 "native parser response-stop arm requires either a complete "
@@ -2237,8 +2241,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["css_completed"] != ("0" if causal_abort else "1")
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection
-                or marker["protocol"] != "h3"
+                marker["connection"] != connection or marker["protocol"] != "h3"
                 for marker in identity_markers
             )
             or admission["protocol"] != "h3"
@@ -2272,8 +2275,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         ]
         if len(matching_established) != 1:
             raise ValueError(
-                "native parser response-stop arm requires one matching "
-                "CONNECT marker"
+                "native parser response-stop arm requires one matching CONNECT marker"
             )
         admission_index = log_lines.index(
             native_parser_response_stop_admission_lines[0]
@@ -2301,12 +2303,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             tunnel_active_index = log_lines.index(
                 native_parser_response_stop_tunnel_active_lines[0]
             )
-            stop_index = log_lines.index(
-                native_parser_response_stop_issued_lines[0]
-            )
-            onstop_index = log_lines.index(
-                native_parser_response_stop_onstop_lines[0]
-            )
+            stop_index = log_lines.index(native_parser_response_stop_issued_lines[0])
+            onstop_index = log_lines.index(native_parser_response_stop_onstop_lines[0])
             ordering_valid = (
                 admission_index < established_index < tunnel_active_index
                 and common_order_valid
@@ -2331,8 +2329,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
         if not ordering_valid:
             raise ValueError(
-                "native parser response-stop lifecycle markers have invalid "
-                "ordering"
+                "native parser response-stop lifecycle markers have invalid ordering"
             )
     elif native_parser_response_stop_evidence_lines:
         raise ValueError(
