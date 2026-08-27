@@ -259,13 +259,19 @@ netwerk/system/netlink/NetlinkService.cpp
 Exposes a NaiveFox-only, process-latched boundary after the first complete
 Linux/Android route-check and `CalculateNetworkID()` cycle. The NaiveFox runtime
 then drains already queued main-thread network observers and performs a FIFO
-socket-thread barrier before it publishes local proxy listeners. This prevents
-the first outer H3 connection from racing Gecko's initial
-`VerifyTraffic -> DontReuse` cleanup. It does not suppress, delay, or reinterpret
-any later kernel network event.
+socket-thread barrier before it publishes local proxy listeners. Android
+application sandboxes may deny the route-netlink monitor; only on Android, its
+terminal startup failure follows the native link service's conservative
+unknown-network fallback and still runs both ordered queue barriers. Linux
+continues to require successful initial convergence. This prevents the first
+outer H3 connection from racing Gecko's initial `VerifyTraffic -> DontReuse`
+cleanup and does not suppress, delay, or reinterpret any later kernel network
+event.
 
 Review obligations: the latch remains after the completed calculation rather
-than the earlier `linkStatusKnown`; the main-thread and socket-thread drains
+than the earlier `linkStatusKnown`; Android alone may continue after a terminal
+monitor failure, while pending state, timeouts, missing services, queue failures,
+and Linux monitor failure remain fatal; the main-thread and socket-thread drains
 remain ordered before listener publication; later
 `network:link-status-changed` notifications still execute the normal
 `VerifyTraffic` path; and the isolated cold-start stress retains one physical

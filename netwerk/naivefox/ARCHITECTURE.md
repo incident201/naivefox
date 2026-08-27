@@ -197,6 +197,14 @@ embedded frontend sets `MOZ_ANDROID_LIBDIR` before any `BinaryPath`, Gecko, or
 XPCOM work. No `JNIEnv`, Android `Context`, Java type, or GeckoView lifecycle is
 part of the common initializer.
 
+Android application sandboxes may deny the route-netlink monitor used by
+Gecko's native network-link service. After that monitor reaches a terminal
+failure, the embedded runtime follows the service's existing conservative
+unknown-network policy and continues through the ordered main-thread and
+socket-thread startup barriers. Linux still requires successful initial
+netlink convergence, and a pending state, timeout, missing service, or failed
+queue barrier remains fatal on every platform.
+
 The instance contract is one NaiveFox runtime per process. Multiple listeners
 belong to that one runtime; concurrent starts are rejected. After a successful
 Gecko/XPCOM initialization and shutdown, another embedded start in the same

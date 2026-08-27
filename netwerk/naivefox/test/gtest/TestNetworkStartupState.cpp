@@ -30,9 +30,21 @@ TEST(NaiveFoxNetworkStartupState, FailsClosed) {
   EXPECT_TRUE(InitialNetworkStateIsTerminal(InitialNetworkState::Ready));
   EXPECT_TRUE(InitialNetworkStateIsTerminal(InitialNetworkState::Failed));
 
-  EXPECT_FALSE(InitialNetworkStateAllowsStartup(InitialNetworkState::Pending));
-  EXPECT_TRUE(InitialNetworkStateAllowsStartup(InitialNetworkState::Ready));
-  EXPECT_FALSE(InitialNetworkStateAllowsStartup(InitialNetworkState::Failed));
+  EXPECT_FALSE(InitialNetworkStateAllowsStartup(InitialNetworkState::Pending,
+                                                false));
+  EXPECT_TRUE(
+      InitialNetworkStateAllowsStartup(InitialNetworkState::Ready, false));
+  EXPECT_FALSE(
+      InitialNetworkStateAllowsStartup(InitialNetworkState::Failed, false));
+}
+
+TEST(NaiveFoxNetworkStartupState, AllowsUnavailableAndroidMonitor) {
+  EXPECT_FALSE(InitialNetworkStateAllowsStartup(InitialNetworkState::Pending,
+                                                true));
+  EXPECT_TRUE(
+      InitialNetworkStateAllowsStartup(InitialNetworkState::Ready, true));
+  EXPECT_TRUE(
+      InitialNetworkStateAllowsStartup(InitialNetworkState::Failed, true));
 }
 
 }  // namespace mozilla::net
