@@ -822,23 +822,6 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
   EXPECT_EQ(documentNativeCacheOpen.mPreamble.mMaxAssets, 0U);
   EXPECT_EQ(documentNativeCacheOpen.mPreamble.mMaxBytes, 64U * 1024U);
 
-  Config documentNativeChannelOpen;
-  error.Truncate();
-  ASSERT_EQ(
-      ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-native-channel-open","path":"/camouflage/"}})"_ns,
-          documentNativeChannelOpen, error),
-      NS_OK)
-      << error.get();
-  EXPECT_EQ(
-      documentNativeChannelOpen.mPreamble.ModeForProtocol(ProxyProtocol::H2),
-      PreambleMode::Off);
-  EXPECT_EQ(
-      documentNativeChannelOpen.mPreamble.ModeForProtocol(ProxyProtocol::H3),
-      PreambleMode::DocumentNativeChannelOpen);
-  EXPECT_EQ(documentNativeChannelOpen.mPreamble.mMaxAssets, 0U);
-  EXPECT_EQ(documentNativeChannelOpen.mPreamble.mMaxBytes, 64U * 1024U);
-
   static constexpr const char* kInvalid[] = {
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h2-mode":"root","h2-mode":"off","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h3-mode":"invalid","path":"/"}})",
@@ -857,6 +840,7 @@ TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-cache-open","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-native-channel-open","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-channel-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-native-channel-open","path":"/"}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-committed-overlap","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-committed-overlap","path":"/","max-assets":1}})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-committed-overlap","path":"/","max-assets":2}})",

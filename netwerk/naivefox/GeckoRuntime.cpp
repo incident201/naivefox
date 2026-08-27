@@ -28,7 +28,6 @@
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/Utf8.h"
 #include "mozilla/ipc/IOThread.h"
-#include "mozilla/net/UrlClassifierFeatureFactory.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
@@ -602,10 +601,6 @@ void GeckoRuntime::Shutdown() {
       (void)net::CacheObserver::Shutdown();
       mPreambleCache2Initialized = false;
     }
-    // The full browser invokes this through nsLayoutStatics. The lean runtime
-    // has no layout shutdown path, so explicitly unregister feature preference
-    // callbacks while XPCOM and Preferences are still alive.
-    net::UrlClassifierFeatureFactory::Shutdown();
     (void)NS_ShutdownXPCOM(nullptr);
     mXPCOMInitialized = false;
   }

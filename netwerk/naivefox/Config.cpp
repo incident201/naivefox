@@ -595,7 +595,10 @@ class JsonParser final {
       } else if (mode.EqualsLiteral("document-native-cache-open")) {
         aMode = PreambleMode::DocumentNativeCacheOpen;
       } else if (mode.EqualsLiteral("document-native-channel-open")) {
-        aMode = PreambleMode::DocumentNativeChannelOpen;
+        return Error(
+            "document-native-channel-open was retired because the falsified "
+            "diagnostic pulled the full Safe Browsing protobuf/Abseil graph "
+            "into the lean product");
       } else if (mode.EqualsLiteral("document-handshake-confirmed")) {
         aMode = PreambleMode::DocumentHandshakeConfirmed;
       } else if (mode.EqualsLiteral("document-overlap")) {

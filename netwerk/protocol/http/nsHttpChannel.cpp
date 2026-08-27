@@ -114,7 +114,9 @@
 #include "nsCOMPtr.h"
 #include "nsCORSListenerProxy.h"
 #include "nsCRT.h"
-#include "nsChannelClassifier.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsChannelClassifier.h"
+#endif
 #include "nsCharSeparatedTokenizer.h"
 #include "nsComponentManagerUtils.h"
 #ifndef MOZ_NAIVEFOX
@@ -2044,7 +2046,9 @@ void nsHttpChannel::DoNotifyListenerCleanup() {
 void nsHttpChannel::ReleaseListeners() {
   HttpBaseChannel::ReleaseListeners();
 
+#ifndef MOZ_NAIVEFOX
   mChannelClassifier = nullptr;
+#endif
   mWarningReporter = nullptr;
   mEarlyHintObserver = nullptr;
   mWebTransportSessionEventListener = nullptr;
@@ -8647,6 +8651,7 @@ nsresult nsHttpChannel::AsyncOpenOnTailUnblock() {
   return AsyncOpen(mListener);
 }
 
+#ifndef MOZ_NAIVEFOX
 already_AddRefed<nsChannelClassifier>
 nsHttpChannel::GetOrCreateChannelClassifier() {
   if (!mChannelClassifier) {
@@ -8658,6 +8663,7 @@ nsHttpChannel::GetOrCreateChannelClassifier() {
   RefPtr<nsChannelClassifier> classifier = mChannelClassifier;
   return classifier.forget();
 }
+#endif
 
 nsIHttpChannelInternal::ProxyDNSStrategy
 nsHttpChannel::ComputeProxyDNSStrategy() {
@@ -9086,57 +9092,6 @@ nsresult nsHttpChannel::BeginConnect() {
     LOG(("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]",
          channelClassifier.get(), this));
     channelClassifier->Start();
-  }
-#else
-  if (mProxyPreambleUseNativeChannelOpen) {
-    const bool shouldClassify =
-        NS_ShouldClassifyChannel(this, ClassifyType::SafeBrowsing);
-    const auto policyType = mLoadInfo->GetExternalContentPolicyType();
-    const bool triggeringSystem =
-        mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal();
-    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-      NAIVEFOX_LIFECYCLE_LOG(
-          ("h3.native_channel_open action=classifier-predicate channel=%p "
-           "result=%d type=%u triggering_system=%d bypass=%d "
-           "be_conservative=%d",
-           this, shouldClassify, static_cast<unsigned>(policyType),
-           triggeringSystem,
-           !!(mLoadFlags & nsIChannel::LOAD_BYPASS_URL_CLASSIFIER),
-           LoadBeConservative()));
-    }
-    if (!shouldClassify || policyType != ExtContentPolicy::TYPE_DOCUMENT ||
-        !triggeringSystem) {
-      return NS_ERROR_UNEXPECTED;
-    }
-
-    RefPtr<nsChannelClassifier> channelClassifier =
-        GetOrCreateChannelClassifier();
-    mProxyPreambleNativeChannelClassifierStartCallActive = true;
-    nsresult classifierRv = channelClassifier->StartForNaiveFoxPreamble();
-    mProxyPreambleNativeChannelClassifierStartCallActive = false;
-    if (NS_FAILED(classifierRv) ||
-        mProxyPreambleNativeChannelClassifierCompleted || !mSuspendCount) {
-      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-        NAIVEFOX_LIFECYCLE_LOG(
-            ("h3.native_channel_open action=contract-failed channel=%p "
-             "reason=%s status=%08x",
-             this,
-             NS_FAILED(classifierRv)
-                 ? "classifier-no-async-callback"
-                 : (mProxyPreambleNativeChannelClassifierCompleted
-                        ? "classifier-synchronous-callback"
-                        : "classifier-not-suspended"),
-             static_cast<uint32_t>(classifierRv)));
-      }
-      return NS_FAILED(classifierRv) ? classifierRv : NS_ERROR_UNEXPECTED;
-    }
-    mProxyPreambleNativeChannelClassifierStarted = true;
-    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-      NAIVEFOX_LIFECYCLE_LOG(
-          ("h3.native_channel_open action=classifier-suspended channel=%p "
-           "suspend_count=%u",
-           this, mSuspendCount));
-    }
   }
 #endif
 

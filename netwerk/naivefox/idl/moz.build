@@ -56,7 +56,6 @@ XPIDL_SOURCES += [
     "/netwerk/url-classifier/nsIUrlClassifierFeature.idl",
     "/toolkit/components/asyncshutdown/nsIAsyncShutdown.idl",
     "/toolkit/components/kvstore/nsIKeyValue.idl",
-    "/toolkit/components/urlformatter/nsIURLFormatter.idl",
     "/uriloader/base/nsIWebProgress.idl",
     "/uriloader/base/nsIWebProgressListener.idl",
     "/widget/nsIFormatConverter.idl",

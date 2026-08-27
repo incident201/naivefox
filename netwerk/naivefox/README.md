@@ -94,7 +94,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   to choose a fresh policy on fallback instead of reusing the failed H3
   attempt's policy. Supported modes are `off`, `document-complete`,
   `document-carrier-dispatch`, `document-cold-winner-handoff`,
-  `document-native-cache-open`, `document-native-channel-open`,
+  `document-native-cache-open`,
   `document-handshake-confirmed`, `document-overlap`,
   `document-start-overlap`, `tree-native-parser-document-start-overlap`,
   `tree-native-parser-document-start-resource-tree`,
@@ -105,7 +105,6 @@ The supported config is a strict NaiveProxy-compatible subset:
   `tree-root-overlap`; `root` and `tree` are
   compatibility aliases. `document-carrier-dispatch`,
   `document-cold-winner-handoff`, `document-native-cache-open`,
-  `document-native-channel-open`, and
   `document-handshake-confirmed` are H3-only causal diagnostics and therefore
   must be selected explicitly through `h3-mode`; the resolved H2 mode must
   remain a different supported mode. Active
@@ -225,16 +224,10 @@ The supported config is a strict NaiveProxy-compatible subset:
   preserves `INHIBIT_CACHING`, requires an `OPEN_READONLY` miss before normal
   network dispatch, and never writes the response cache. Synchronous callbacks,
   hits, timeouts, and other cache outcomes fail before the document GET.
-  `document-native-channel-open` is the stricter cold H3 channel-lifecycle
-  diagnostic. It keeps the system triggering principal, but requires Safe
-  Browsing to classify the fixture URI through a non-system URI/codebase
-  principal with matching origin attributes. It also requires a normal
-  writable new cache2 entry and a genuine local-DB asynchronous classifier
-  callback that suspends and resumes the channel. Missing services,
-  `expectCallback=false`, synchronous completion, principal mismatch, cache
-  reuse, and real-time classifier paths fail closed. Controlled runs use a
-  fresh temporary profile; this mode does not introduce a persistent cache
-  dependency.
+  The falsified `document-native-channel-open` diagnostic was retired from
+  product configuration. Its real local Safe Browsing DB path did not improve
+  the passive screen and pulled protobuf plus Abseil into the lean link graph;
+  retaining that browser subsystem would violate the minimal-runtime boundary.
   `tree-resource-native-cache-committed-overlap` is a screening-only H3 mode
   that keeps the root cache-inhibited, opens exactly one discovered resource
   through a normal writable Cache2 entry, and releases CONNECT only after an

@@ -153,7 +153,6 @@ DIRS += [
     "/modules/libpref",
     "/parser/htmlaccel",
     "/parser/html",
-    "/config/external/abseil-cpp",
     "/netwerk/naivefox/idl",
     "/netwerk",
     "/xpcom",
@@ -167,8 +166,6 @@ DIRS += [
     "/security/certverifier",
     "/security/manager",
     "/toolkit/components/glean",
-    "/toolkit/components/protobuf",
-    "/toolkit/components/url-classifier",
     "/toolkit/library",
     "/tools/profiler",
 ]
