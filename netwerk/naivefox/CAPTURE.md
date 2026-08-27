@@ -710,6 +710,19 @@ record alignment as a default H2 mechanism under the no-tail-regression rule:
 the multi-record split is the cause of both its local improvement and its
 later distinguishability.
 
+A final client-side diagnostic reduced only the existing Variant 1 upstream
+padding range from 0--255 to 0--63 bytes, without adding cover traffic or
+changing the stock server. Strict decrypted artifact
+`20260827T111901Z-af8eee26` admitted the H2-only runtime hook and ordinary
+CONNECT lifecycle. Six-block paired artifact `7bd5dd64a07e662f` (seed
+`2026082731`) found a local packets 1--16 improvement (`0.06600 -> 0.05847`),
+but packets 17--32 (`0.55279 -> 0.58610`), packets 1--32
+(`0.23201 -> 0.24500`), 250 ms (`0.06341 -> 0.07417`), and whole flow
+(`0.24158 -> 0.25524`) all moved away from direct Firefox. The diagnostic
+hook was removed without a larger run. Reducing random client padding only
+reorders the early nested-TLS phase; it does not repair the remaining H2
+application-phase shape.
+
 Controlled workloads cover a cold small operation, a browser page with CSS,
 JavaScript, images, and an API response, warm sequential requests, burst and
 concurrent requests, bulk download and upload, bidirectional transfer, and an
