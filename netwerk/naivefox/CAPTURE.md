@@ -683,6 +683,33 @@ retained. This is evidence against server read-boundary batching as a useful
 H2 camouflage mechanism, not evidence that the remaining H2 signal is
 unfixable.
 
+Two request-opt-in TLS-boundary controls then replaced arbitrary target TCP
+read boundaries with semantic inner-TLS boundaries without changing Variant 1
+payload or padding bytes. Full-record alignment split the initial inner server
+flight into seven ordinary padded response records. In 30-block paired
+artifact `e742cfd3a0c19fe9` (seed `2026082717`) this improved packets 17--32
+from `0.54512` to `0.49152` and packets 1--32 from `0.22555` to `0.21010`,
+but worsened whole flow from `0.22023` to `0.23771` (`p=0.0288`). A causal
+flight cutoff stopped alignment when the client sent its next TLS flight, so
+application DATA returned to stock streaming. The authoritative 30-block
+artifact `9ce752e81ecd307b` (seed `2026082723`) reproduced the early benefit
+(`0.53960 -> 0.48008` for packets 17--32 and `0.22238 -> 0.20419` for packets
+1--32) but also the whole-flow regression (`0.22811 -> 0.24725`, `p=0.0063`).
+Safe record sequences show why: the useful initial split itself shifts bulk
+records by roughly seven visible TLS-record ordinals, so ending the policy
+after the flight cannot remove its new fingerprint.
+
+A final cleartext-only control aligned just TLS Handshake records and returned
+to stock streaming at the first CCS or encrypted record. Six-block artifact
+`64e7a03ff341ffe2` (seed `2026082729`) removed the large ordinal shift, but it
+also removed the early benefit: packets 17--32 changed `0.54819 -> 0.55041`
+and packets 1--32 `0.22286 -> 0.22699`. It did not qualify for a larger run.
+The server module source, binary, and temporary client header hook were
+restored byte-for-byte. Together these controls close deterministic inner-TLS
+record alignment as a default H2 mechanism under the no-tail-regression rule:
+the multi-record split is the cause of both its local improvement and its
+later distinguishability.
+
 Controlled workloads cover a cold small operation, a browser page with CSS,
 JavaScript, images, and an API response, warm sequential requests, burst and
 concurrent requests, bulk download and upload, bidirectional transfer, and an
