@@ -738,8 +738,7 @@ class JsonParser final {
     if (h2Mode == PreambleMode::DocumentHandshakeConfirmed ||
         h2Mode == PreambleMode::DocumentCarrierDispatch ||
         h2Mode == PreambleMode::DocumentColdWinnerHandoff ||
-        h2Mode == PreambleMode::DocumentNativeCacheOpen ||
-        h2Mode == PreambleMode::DocumentNativeChannelOpen) {
+        h2Mode == PreambleMode::DocumentNativeCacheOpen) {
       return Error("selected diagnostic preamble is only supported for H3");
     }
     if (h3Mode == PreambleMode::DocumentHandshakeConfirmed &&
@@ -767,13 +766,6 @@ class JsonParser final {
          aPreamble.mH3Mode != Some(PreambleMode::DocumentNativeCacheOpen))) {
       return Error(
           "document-native-cache-open must be selected explicitly with "
-          "h3-mode");
-    }
-    if (h3Mode == PreambleMode::DocumentNativeChannelOpen &&
-        (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(PreambleMode::DocumentNativeChannelOpen))) {
-      return Error(
-          "document-native-channel-open must be selected explicitly with "
           "h3-mode");
     }
     if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&

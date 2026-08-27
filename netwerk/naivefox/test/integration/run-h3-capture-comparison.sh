@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-native-channel-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -57,7 +57,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-native-channel-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -124,11 +124,6 @@ fi
 if [[ -n ${seen_comparison_arms[document-native-cache-open]:-} &&
       -z ${seen_comparison_arms[document-complete]:-} ]]; then
   printf 'document-native-cache-open comparison requires document-complete\n' >&2
-  exit 2
-fi
-if [[ -n ${seen_comparison_arms[document-native-channel-open]:-} &&
-      -z ${seen_comparison_arms[document-complete]:-} ]]; then
-  printf 'document-native-channel-open comparison requires document-complete\n' >&2
   exit 2
 fi
 if [[ -n ${seen_comparison_arms[document-start-overlap]:-} &&
@@ -728,7 +723,7 @@ validate_native_channel_fresh_cache() {
   local profile=$1
   local participant=$2
   if [[ -e $profile/cache2 || -L $profile/cache2 ]]; then
-    printf 'document-native-channel-open %s profile is not cache-cold: cache2 exists\n' \
+    printf 'native preamble %s profile is not cache-cold: cache2 exists\n' \
       "$participant" >&2
     return 1
   fi
@@ -765,9 +760,6 @@ run_reference() {
   : >"$log"
   chmod 0600 "$log"
   if [[ $comparison_design == arms ]]; then
-    if [[ -n ${seen_comparison_arms[document-native-channel-open]:-} ]]; then
-      validate_native_channel_fresh_cache "$run_profile" reference
-    fi
     start_browser_controller "$run_profile" "$workload_url" \
       "$completion" "$pass-reference" 0 "$keylog"
   fi
@@ -942,7 +934,6 @@ EOF
         $arm == document-carrier-dispatch ||
         $arm == document-cold-winner-handoff ||
         $arm == document-native-cache-open ||
-        $arm == document-native-channel-open ||
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
@@ -957,15 +948,13 @@ EOF
     lifecycle_env=("MOZ_LOG=NaiveFoxLifecycle:5" "MOZ_LOG_FILE=$lifecycle_log_base")
   fi
   if [[ $private_event_trace -eq 1 &&
-        ( $arm == document-cold-winner-handoff ||
-          $arm == document-native-channel-open ) ]]; then
+        $arm == document-cold-winner-handoff ]]; then
     lifecycle_env=(
       "MOZ_LOG=timestamp,NaiveFoxLifecycle:5,nsHttp:5,UDPSocket:5,nsChannelClassifier:5,UrlClassifierDbService:5"
       "MOZ_LOG_FILE=$lifecycle_log_base"
     )
   fi
-  if [[ $arm == document-native-channel-open ||
-        $arm == tree-resource-native-cache-committed-overlap ||
+  if [[ $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
@@ -1074,7 +1063,6 @@ EOF
         $arm == document-carrier-dispatch ||
         $arm == document-cold-winner-handoff ||
         $arm == document-native-cache-open ||
-        $arm == document-native-channel-open ||
         $arm == document-handshake-confirmed ||
         $arm == document-overlap ||
         $arm == document-start-overlap ||
@@ -1100,8 +1088,7 @@ EOF
     if [[ $arm == document-handshake-confirmed ||
           $arm == document-carrier-dispatch ||
           $arm == document-cold-winner-handoff ||
-          $arm == document-native-cache-open ||
-          $arm == document-native-channel-open ]]; then
+          $arm == document-native-cache-open ]]; then
       [[ -s $lifecycle_log ]]
     fi
     if [[ $arm == document-overlap ||

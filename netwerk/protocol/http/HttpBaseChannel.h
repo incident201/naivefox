@@ -282,12 +282,10 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD SetProxyPreambleWaitForHandshakeConfirmation() override;
   NS_IMETHOD SetProxyPreambleUseCarrierDispatch() override;
   NS_IMETHOD SetProxyPreambleUseNativeCacheOpen() override;
-  NS_IMETHOD SetProxyPreambleUseNativeChannelOpen() override;
   NS_IMETHOD SetProxyPreambleUseNativeResourceCacheOpen() override;
   NS_IMETHOD SetProxyPreambleUseColdWinnerHandoff() override;
   NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) override;
   NS_IMETHOD GetProxyPreambleNativeCacheReadOnlyMiss(bool* aValue) override;
-  NS_IMETHOD GetProxyPreambleNativeChannelOpenSucceeded(bool* aValue) override;
   NS_IMETHOD GetProxyPreambleNativeResourceCacheOpenSucceeded(
       bool* aValue) override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
@@ -917,12 +915,6 @@ class HttpBaseChannel : public nsHashPropertyBag,
   bool mProxyPreambleUseNativeCacheOpen{false};
   bool mProxyPreambleNativeCacheOpenCallActive{false};
   bool mProxyPreambleNativeCacheReadOnlyMiss{false};
-  bool mProxyPreambleUseNativeChannelOpen{false};
-  bool mProxyPreambleNativeChannelOpenCallActive{false};
-  bool mProxyPreambleNativeChannelNewEntry{false};
-  bool mProxyPreambleNativeChannelClassifierStartCallActive{false};
-  bool mProxyPreambleNativeChannelClassifierStarted{false};
-  bool mProxyPreambleNativeChannelClassifierCompleted{false};
   bool mProxyPreambleUseNativeResourceCacheOpen{false};
   bool mProxyPreambleNativeResourceCacheOpenCallActive{false};
   bool mProxyPreambleNativeResourceCacheNewEntry{false};

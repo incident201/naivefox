@@ -50,7 +50,6 @@ enum class PreambleMode : uint8_t {
   DocumentCarrierDispatch,
   DocumentColdWinnerHandoff,
   DocumentNativeCacheOpen,
-  DocumentNativeChannelOpen,
   DocumentHandshakeConfirmed,
   DocumentOverlap,
   DocumentStartOverlap,
@@ -83,7 +82,6 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
          aMode != PreambleMode::DocumentCarrierDispatch &&
          aMode != PreambleMode::DocumentColdWinnerHandoff &&
          aMode != PreambleMode::DocumentNativeCacheOpen &&
-         aMode != PreambleMode::DocumentNativeChannelOpen &&
          aMode != PreambleMode::DocumentHandshakeConfirmed &&
          aMode != PreambleMode::DocumentOverlap &&
          aMode != PreambleMode::DocumentStartOverlap;
@@ -201,8 +199,7 @@ struct PreambleConfig final {
 };
 
 constexpr bool PreambleModeUsesNativeCacheOpen(PreambleMode aMode) {
-  return aMode == PreambleMode::DocumentNativeCacheOpen ||
-         aMode == PreambleMode::DocumentNativeChannelOpen;
+  return aMode == PreambleMode::DocumentNativeCacheOpen;
 }
 
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };

@@ -15,7 +15,6 @@ SUPPORTED_ARMS = (
     "document-carrier-dispatch",
     "document-cold-winner-handoff",
     "document-native-cache-open",
-    "document-native-channel-open",
     "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",

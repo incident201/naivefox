@@ -34,7 +34,6 @@ def build_config(
         "document-carrier-dispatch",
         "document-cold-winner-handoff",
         "document-native-cache-open",
-        "document-native-channel-open",
         "document-handshake-confirmed",
         "document-overlap",
         "document-start-overlap",
@@ -65,7 +64,6 @@ def build_config(
             "document-complete, document-carrier-dispatch, "
             "document-cold-winner-handoff, "
             "document-native-cache-open, "
-            "document-native-channel-open, "
             "document-handshake-confirmed, "
             "document-overlap, document-start-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
@@ -97,8 +95,6 @@ def build_config(
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
-    if arm == "document-native-channel-open" and protocol != "h3":
-        raise ValueError("document-native-channel-open requires h3")
     if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
         raise ValueError("tree-resource-committed-overlap-css requires h3")
     if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
@@ -280,7 +276,6 @@ def build_config(
         "document-carrier-dispatch",
         "document-cold-winner-handoff",
         "document-native-cache-open",
-        "document-native-channel-open",
     ):
         preamble = {
             "mode": "off",
@@ -372,7 +367,6 @@ def main():
             "document-carrier-dispatch",
             "document-cold-winner-handoff",
             "document-native-cache-open",
-            "document-native-channel-open",
             "document-handshake-confirmed",
             "document-overlap",
             "document-start-overlap",

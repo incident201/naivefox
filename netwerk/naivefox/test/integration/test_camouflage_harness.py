@@ -568,7 +568,6 @@ class CamouflageHarnessTests(unittest.TestCase):
             "root-pmtud-control",
             "document-carrier-dispatch",
             "document-cold-winner-handoff",
-            "document-native-channel-open",
             "document-handshake-confirmed",
             "tree-complete",
             "tree-complete-css",
@@ -634,10 +633,10 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ["browser_page"],
                 arms=("root", "document-native-cache-open"),
             )
-        with self.assertRaisesRegex(ValueError, "requires h3"):
+        with self.assertRaisesRegex(ValueError, "invalid multi-arm labels"):
             SUPERBLOCKS.schedule_rows(
                 17,
-                "h2",
+                "h3",
                 1,
                 ["browser_page"],
                 arms=("root", "document-native-channel-open"),
@@ -723,9 +722,8 @@ class CamouflageHarnessTests(unittest.TestCase):
             runner,
         )
         self.assertIn("packets_17_32", runner)
-        self.assertIn(
-            "document-native-channel-open multi-arm screening requires --protocol h3",
-            runner,
+        self.assertNotIn(
+            "document-native-channel-open multi-arm screening requires", runner
         )
         self.assertIn(
             "if [[ $participant == reference || $participant == naivefox ]]",
@@ -1119,48 +1117,35 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "fixture-pass",
             )
 
-    def test_native_channel_open_arm_is_explicitly_h3_only(self):
-        config = CONFIG.build_config(
-            "document-native-channel-open",
-            "h3",
-            1080,
-            4433,
-            "fixture-user",
-            "fixture-pass",
+    def test_native_channel_open_arm_is_explicitly_retired(self):
+        for protocol in ("h2", "h3"):
+            with self.assertRaisesRegex(ValueError, "config arm must be"):
+                CONFIG.build_config(
+                    "document-native-channel-open",
+                    protocol,
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+        with open(
+            os.path.join(SOURCE_ROOT, "netwerk", "naivefox", "Config.cpp"),
+            encoding="utf-8",
+        ) as stream:
+            source = stream.read()
+        self.assertIn(
+            'mode.EqualsLiteral("document-native-channel-open")', source
         )
-        self.assertEqual(
-            config["preamble"],
-            {
-                "mode": "off",
-                "h3-mode": "document-native-channel-open",
-                "path": CONFIG.PREAMBLE_PATH,
-                "max-bytes": CONFIG.PREAMBLE_MAX_BYTES,
-            },
-        )
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h3"):
-            CONFIG.build_config(
-                "document-native-channel-open",
-                "h2",
-                1080,
-                4433,
-                "fixture-user",
-                "fixture-pass",
-            )
+        self.assertIn("was retired because the falsified", source)
+        self.assertIn("diagnostic pulled the full Safe Browsing", source)
+        self.assertNotIn("DocumentNativeChannelOpen", source)
 
-    def test_native_classifier_principal_and_shutdown_are_lean_private(self):
+    def test_native_resource_uri_principal_is_lean_private(self):
         with open(
             os.path.join(SOURCE_ROOT, "caps", "nsScriptSecurityManagerNaiveFox.cpp"),
             encoding="utf-8",
         ) as stream:
             security_manager = stream.read()
-        with open(
-            os.path.join(
-                SOURCE_ROOT, "netwerk", "url-classifier", "nsChannelClassifier.cpp"
-            ),
-            encoding="utf-8",
-        ) as stream:
-            classifier = stream.read()
         with open(
             os.path.join(SOURCE_ROOT, "caps", "NaiveFoxURIPrincipal.h"),
             encoding="utf-8",
@@ -1172,10 +1157,15 @@ class CamouflageHarnessTests(unittest.TestCase):
         ) as stream:
             uri_principal_source = stream.read()
         with open(
-            os.path.join(SOURCE_ROOT, "netwerk", "naivefox", "GeckoRuntime.cpp"),
+            os.path.join(
+                SOURCE_ROOT,
+                "netwerk",
+                "naivefox",
+                "NativeStylePreloadChannel.cpp",
+            ),
             encoding="utf-8",
         ) as stream:
-            runtime = stream.read()
+            native_style_channel = stream.read()
 
         channel_principal = security_manager.split(
             "nsScriptSecurityManager::GetChannelURIPrincipal", 1
@@ -1184,17 +1174,10 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertNotIn("NaiveFoxClassifierURIPrincipal", security_manager)
         self.assertIn("class NaiveFoxURIPrincipal", uri_principal_header)
         self.assertIn("NaiveFoxURIPrincipal::Create", uri_principal_source)
-        classify_region = classifier.split("nsChannelClassifier::StartInternal", 1)[1]
-        self.assertIn("principal = NaiveFoxURIPrincipal::Create", classify_region)
-        self.assertLess(
-            classify_region.index("principal = NaiveFoxURIPrincipal::Create"),
-            classify_region.index("uriClassifier->Classify(principal"),
+        self.assertGreaterEqual(
+            native_style_channel.count("NaiveFoxURIPrincipal::Create"), 2
         )
-        shutdown = runtime.split("void GeckoRuntime::Shutdown()", 1)[1]
-        self.assertLess(
-            shutdown.index("UrlClassifierFeatureFactory::Shutdown()"),
-            shutdown.index("NS_ShutdownXPCOM(nullptr)"),
-        )
+        self.assertIn("documentPrincipal->IsSystemPrincipal()", native_style_channel)
 
     def test_cold_winner_handoff_arm_is_explicitly_h3_only(self):
         config = CONFIG.build_config(

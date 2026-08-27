@@ -662,7 +662,6 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
       preamble.mMode == PreambleMode::DocumentCarrierDispatch ||
       preamble.mMode == PreambleMode::DocumentColdWinnerHandoff ||
       preamble.mMode == PreambleMode::DocumentNativeCacheOpen ||
-      preamble.mMode == PreambleMode::DocumentNativeChannelOpen ||
       preamble.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       preamble.mMode == PreambleMode::DocumentOverlap ||
       preamble.mMode == PreambleMode::DocumentStartOverlap) {
@@ -911,14 +910,6 @@ void TunnelSession::FinishPreambleOnMain(
   if (preambleMode == PreambleMode::DocumentNativeCacheOpen && succeeded) {
     RuntimeLogEvent(
         "Connection %llu preamble native-cache-open cache=readonly-miss "
-        "protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        ProtocolName(aProtocol));
-  }
-  if (preambleMode == PreambleMode::DocumentNativeChannelOpen && succeeded) {
-    RuntimeLogEvent(
-        "Connection %llu preamble native-channel-open "
-        "cache=new-writable-entry classifier=async-suspend-resume "
         "protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));

@@ -84,10 +84,6 @@ class nsHttpChannel final : public HttpBaseChannel,
  public:
   NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(
       bool* aValue) override;
-#ifdef MOZ_NAIVEFOX
-  void MarkProxyPreambleNativeChannelClassifierComplete(nsresult aStatus,
-                                                         nsresult aResumeRv);
-#endif
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER

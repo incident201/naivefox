@@ -17,7 +17,6 @@ SUPPORTED_ARMS = (
     "document-carrier-dispatch",
     "document-cold-winner-handoff",
     "document-native-cache-open",
-    "document-native-channel-open",
     "document-handshake-confirmed",
     "document-overlap",
     "document-start-overlap",
@@ -145,8 +144,6 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         raise ValueError("document-cold-winner-handoff requires h3 superblocks")
     if protocol != "h3" and "document-native-cache-open" in arms:
         raise ValueError("document-native-cache-open requires h3 superblocks")
-    if protocol != "h3" and "document-native-channel-open" in arms:
-        raise ValueError("document-native-channel-open requires h3 superblocks")
     if protocol != "h3" and any(
         arm.startswith("tree-native-parser-")
         and arm
@@ -220,11 +217,6 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
             and row["protocol"] != "h3"
         ):
             raise ValueError("document-native-cache-open requires h3 superblocks")
-        if (
-            row["naivefox_arm"] == "document-native-channel-open"
-            and row["protocol"] != "h3"
-        ):
-            raise ValueError("document-native-channel-open requires h3 superblocks")
         if (
             row["naivefox_arm"]
             == "tree-native-parser-document-start-resource-tree"

@@ -143,12 +143,6 @@ void nsChannelClassifier::Start() {
   }
 }
 
-#ifdef MOZ_NAIVEFOX
-nsresult nsChannelClassifier::StartForNaiveFoxPreamble() {
-  return StartInternal();
-}
-#endif
-
 nsresult nsChannelClassifier::StartInternal() {
   // Should only be called in the parent process.
   MOZ_ASSERT(XRE_IsParentProcess());
@@ -574,13 +568,7 @@ nsChannelClassifier::OnClassifyComplete(nsresult aErrorCode,
         ("nsChannelClassifier::OnClassifyComplete - resuming channel %p "
          "[this=%p]",
          mChannel.get(), this));
-    nsresult resumeRv = mChannel->Resume();
-#ifdef MOZ_NAIVEFOX
-    if (RefPtr<nsHttpChannel> channel = do_QueryObject(mChannel)) {
-      channel->MarkProxyPreambleNativeChannelClassifierComplete(aErrorCode,
-                                                                 resumeRv);
-    }
-#endif
+    mChannel->Resume();
   }
 
   mChannel = nullptr;

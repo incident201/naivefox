@@ -793,9 +793,8 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             'phase_suffix=" delivery=retargeted-direct protocol=h3"',
             runner,
         )
-        self.assertIn(
-            "document-native-channel-open comparison requires document-complete",
-            runner,
+        self.assertNotIn(
+            "document-native-channel-open comparison requires", runner
         )
         self.assertIn(
             'reference_profile="$capture_dir/reference-profile-template"', runner
@@ -804,9 +803,6 @@ class H3DecryptedArmSummaryTests(unittest.TestCase):
             'local run_profile="$capture_dir/$pass-reference-profile"', runner
         )
         self.assertIn('cp -aL -- "$reference_profile/." "$run_profile/"', runner)
-        self.assertIn(
-            'validate_native_channel_fresh_cache "$run_profile" reference', runner
-        )
         self.assertIn(
             'validate_native_channel_fresh_cache "$naivefox_profile" naivefox',
             runner,
