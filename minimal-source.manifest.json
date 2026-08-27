@@ -3,8 +3,8 @@
     "executable_files": 171,
     "files": 21977
   },
-  "evidence_commit": "45739cae750da54f927015726de75753e294cfe7",
-  "evidence_source_commit": "f5eb9b8bfe817431b124d37bae39481d474fbcb1",
+  "evidence_commit": "3d005bd87721599c99b1ad5c20516243e5961e51",
+  "evidence_source_commit": "5090e39a1d1f2aeaf0900ba76aa2af89122cd509",
   "files": [
     {
       "mode": "0644",
@@ -19019,7 +19019,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/ARCHITECTURE.md",
-      "sha256": "e2f2f61089580944ea745613ac17640c45da10115e1bd9f938e552acfd3bf2fc"
+      "sha256": "0c46216ef91389eafd48a8d834946d4aef186c94b8e3190b6815700f58743fae"
     },
     {
       "mode": "0644",
@@ -19059,7 +19059,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/GeckoRuntime.cpp",
-      "sha256": "546503f340191ae41ce990e89a78f92f1b7bb7166752249f819d2d2d0b1d047b"
+      "sha256": "f582175999b8e03df579e1c612011d4e729f2f3e6e0479f3e163091687d26c8d"
     },
     {
       "mode": "0644",
@@ -19509,7 +19509,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestNetworkStartupState.cpp",
-      "sha256": "48632a63b8ca382545c7ad233ee46d19be3e574eac629a16a91847ee5f46a7dc"
+      "sha256": "0b949f8ce7fda61c4365e7a5331c8c61ff358ab6fe282cd77033fd29a44e611c"
     },
     {
       "mode": "0644",
@@ -19889,7 +19889,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_camouflage_harness.py",
-      "sha256": "e503db121fc4e0b7573d9871fcde0926455d7e1b37bae4f5b18c1ddeea9858fe"
+      "sha256": "b6e1dd9256c8e3a8c5d40a8a31fa4eab637062500e35a7added7ad242d94e081"
     },
     {
       "mode": "0644",
@@ -21614,7 +21614,7 @@
     {
       "mode": "0644",
       "path": "netwerk/system/netlink/NetlinkService.h",
-      "sha256": "66a0a5a16b8d8838119fe22032878f118fe58c969d3831382946db4862b60bcc"
+      "sha256": "078b4384244d06eb28d69fe6fa3c6984af03b44e30ebfefe2ecf721baecc4429"
     },
     {
       "mode": "0644",
@@ -109893,8 +109893,8 @@
     }
   ],
   "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
-  "manifest_sha256": "e7f812410eb59937bf9e301de2e7e0c551f63e07771589a398e3e8f6b74b19be",
+  "manifest_sha256": "245bc718ca07ce600c436ce5dd33139a420ee41aacb27d0cda93ecb0b3a037d0",
   "manifest_version": 2,
-  "minimal_export_commit": "45739cae750da54f927015726de75753e294cfe7",
-  "naivefox_reference_commit": "f5eb9b8bfe817431b124d37bae39481d474fbcb1"
+  "minimal_export_commit": "3d005bd87721599c99b1ad5c20516243e5961e51",
+  "naivefox_reference_commit": "5090e39a1d1f2aeaf0900ba76aa2af89122cd509"
 }

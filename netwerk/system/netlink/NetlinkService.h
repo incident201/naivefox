@@ -51,8 +51,10 @@ constexpr bool InitialNetworkStateIsTerminal(InitialNetworkState aState) {
   return aState != InitialNetworkState::Pending;
 }
 
-constexpr bool InitialNetworkStateAllowsStartup(InitialNetworkState aState) {
-  return aState == InitialNetworkState::Ready;
+constexpr bool InitialNetworkStateAllowsStartup(
+    InitialNetworkState aState, bool aAllowUnavailableMonitor) {
+  return aState == InitialNetworkState::Ready ||
+         (aAllowUnavailableMonitor && aState == InitialNetworkState::Failed);
 }
 #endif
 

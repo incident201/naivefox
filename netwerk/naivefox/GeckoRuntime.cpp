@@ -64,6 +64,14 @@ namespace {
 
 constexpr uint32_t kNetworkStartupBarrierTimeoutMs = 5000;
 
+#if defined(XP_LINUX) || defined(ANDROID)
+#  ifdef ANDROID
+constexpr bool kAllowUnavailableNetworkMonitor = true;
+#  else
+constexpr bool kAllowUnavailableNetworkMonitor = false;
+#  endif
+#endif
+
 class StartupBarrierState final {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(StartupBarrierState)
@@ -481,12 +489,17 @@ nsresult GeckoRuntime::WaitForNetworkStartup() {
     return net::InitialNetworkStateIsTerminal(
         net::NetlinkService::GetInitialNetworkState());
   }));
+  const auto terminalState = net::NetlinkService::GetInitialNetworkState();
   if (!net::InitialNetworkStateAllowsStartup(
-          net::NetlinkService::GetInitialNetworkState())) {
+          terminalState, kAllowUnavailableNetworkMonitor)) {
     NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-failed"));
     return NS_ERROR_FAILURE;
   }
-  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-ready"));
+  if (terminalState == net::InitialNetworkState::Failed) {
+    NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-monitor-unavailable"));
+  } else {
+    NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-ready"));
+  }
 #endif
 
   // The readiness latch is set on the netlink thread after it queued any
