@@ -124,6 +124,21 @@ remaining shape was temporal: direct Firefox reached packet 32 around
 but worsened packets 1--16, packets 1--32, 250 ms, and whole flow.  With only
 two blocks this is localization evidence, not inference or a product default.
 
+A server-backpressure control then kept the ordinary 64-KiB declared
+stylesheet but made only one HTTP/2 maximum-DATA-frame-sized source chunk
+available before Gecko's existing causal navigation stop.  Six-block safe
+artifact `4cf0e735fac6e9fc` (seed `2026082704`) confirmed the mechanism rather
+than a product preset: packets 17--32 improved from `0.59298` for `off` to
+`0.51864`, and packets 1--32 from `0.24220` to `0.22026`.  However packets
+1--16 worsened from `0.08364` to `0.09202`, 250 ms from `0.07451` to
+`0.08283`, and whole flow from `0.23120` to `0.25397`.  The bounded response
+still added about 16 KiB of server traffic by 250 ms.  Therefore a fixed
+one-frame response is not a default candidate.  It establishes only that
+server-side backpressure can preserve the useful early stylesheet phase while
+substantially reducing the complete-response penalty; a successor must derive
+availability from real tunnel lifecycle events rather than a selected byte
+count or timer.
+
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
 without paying for the complete synthetic stylesheet. CONNECT is not a member

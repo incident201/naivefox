@@ -577,7 +577,7 @@ python3 "$INTEGRATION_DIR/h2_decrypted_parity_summary.py" \
 {
   printf 'isolated_network=yes\n'
   printf 'network_mutation_monitor=netlink_route_v1_fail_closed\n'
-  printf 'capture_offload_policy=namespace_loopback_offload_disabled_and_verified\n'
+  printf 'capture_offload_policy=namespace_loopback_mtu_1500_gro_gso_tso_udp_gso_disabled\n'
   printf 'capture_drop_policy=reject_nonzero\n'
   printf 'browser_backend=commandline\n'
   printf 'browser_start_state=cold_after_capture_start_both_cohorts\n'
