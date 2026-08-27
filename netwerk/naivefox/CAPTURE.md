@@ -552,6 +552,29 @@ packets 1--32, the first 250 ms, and the whole flow. The internal `naivefox`
 label for the native Firefox candidate is only a legacy analysis-schema slot,
 not a claim about which executable produced it.
 
+Six-block same-base artifact `bc9ee30b969b6318` measured that floor against
+ordinary direct Firefox, which remains the camouflage target. Native-proxied
+Firefox was only modestly closer than NaiveFox `off`: paired distances were
+`0.1091/0.4823/0.2301/0.1125/0.2706` versus
+`0.1133/0.4909/0.2423/0.1372/0.2992` for packets 1--16, packets 17--32,
+packets 1--32, 250 ms, and whole flow. Thus most H2 residual is shared by a
+full same-base Firefox using CONNECT; that control diagnoses the nested
+transport floor but does not redefine the target as Firefox-behind-proxy.
+
+A server-side response-coalescing candidate was then tested because stock
+`forwardproxy` flushes every target TCP read. The candidate was backward
+compatible and request-opt-in: unmodified NaiveProxy clients retained the
+historical path, while the experiment coalesced adjacent target reads until a
+one-millisecond idle window without adding or removing bytes. Cross-run data
+looked favorable, but the authoritative randomized paired artifact
+`01c1250aa7a7f14a` rejected it. Relative to direct Firefox, packets 17--32
+improved only `0.5279 -> 0.5194`, packets 1--32 regressed
+`0.2432 -> 0.2500`, and the server-byte deficit by packet 32 increased from
+about 49.3 KiB to 50.0 KiB. The patch and experimental arm were therefore not
+retained. This is evidence against server read-boundary batching as a useful
+H2 camouflage mechanism, not evidence that the remaining H2 signal is
+unfixable.
+
 Controlled workloads cover a cold small operation, a browser page with CSS,
 JavaScript, images, and an API response, warm sequential requests, burst and
 concurrent requests, bulk download and upload, bidirectional transfer, and an
