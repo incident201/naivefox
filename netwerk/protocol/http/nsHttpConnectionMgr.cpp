@@ -16,6 +16,8 @@
 
 #include "ConnectionHandle.h"
 #include "HttpConnectionUDP.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "NaiveFoxReuseLog.h"
 #include "NullHttpTransaction.h"
 #include "SpeculativeTransaction.h"
 #include "mozilla/Components.h"
@@ -585,6 +587,15 @@ nsresult nsHttpConnectionMgr::GetSocketThreadTarget(nsIEventTarget** target) {
 
 nsresult nsHttpConnectionMgr::ReclaimConnection(HttpConnectionBase* conn) {
   LOG(("nsHttpConnectionMgr::ReclaimConnection [conn=%p]\n", conn));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("reclaim.enqueue conn=%p ci=%p owner=%p transaction=%p", conn,
+         NaiveFoxConnectionInfoId(conn ? conn->ConnectionInfo() : nullptr),
+         conn ? conn->OwnerEntry() : nullptr,
+         conn ? conn->Transaction() : nullptr));
+  }
+#endif
 
   (void)EnsureSocketThreadTarget();
 
@@ -1385,6 +1396,15 @@ nsresult nsHttpConnectionMgr::MakeNewConnection(
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   if (ent->FindConnToClaim(pendingTransInfo)) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("connect.decision ci=%p entry=%p trans=%p "
+           "new_connection_requested=0 reason=claimed-existing",
+           NaiveFoxConnectionInfoId(ent->mConnInfo), ent,
+           pendingTransInfo->Transaction()));
+    }
+#endif
     return NS_OK;
   }
 
@@ -1399,6 +1419,14 @@ nsresult nsHttpConnectionMgr::MakeNewConnection(
         ("nsHttpConnectionMgr::MakeNewConnection [ci = %s] "
          "Not Available Due to RestrictConnections()\n",
          ent->mConnInfo->HashKey().get()));
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("connect.decision ci=%p entry=%p trans=%p "
+           "new_connection_requested=0 reason=restricted",
+           NaiveFoxConnectionInfoId(ent->mConnInfo), ent, trans));
+    }
+#endif
     return NS_ERROR_NOT_AVAILABLE;
   }
 
@@ -1439,14 +1467,38 @@ nsresult nsHttpConnectionMgr::MakeNewConnection(
   }
 
   if (AtActiveConnectionLimit(ent, trans->Caps())) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("connect.decision ci=%p entry=%p trans=%p "
+           "new_connection_requested=0 reason=active-limit",
+           NaiveFoxConnectionInfoId(ent->mConnInfo), ent, trans));
+    }
+#endif
     return NS_ERROR_NOT_AVAILABLE;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("connect.decision ci=%p entry=%p trans=%p caps=%08x "
+         "new_connection_requested=1 reason=dispatch-requested-new-transport",
+         NaiveFoxConnectionInfoId(ent->mConnInfo), ent, trans, trans->Caps()));
+  }
+#endif
   nsresult rv = ent->CreateDnsAndConnectSocket(
       trans, trans->Caps(), false,
       trans->GetClassOfService().Flags() & nsIClassOfService::UrgentStart, true,
       pendingTransInfo);
   if (NS_FAILED(rv)) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("connect.result ci=%p entry=%p trans=%p requested=1 rv=%08x",
+           NaiveFoxConnectionInfoId(ent->mConnInfo), ent, trans,
+           static_cast<uint32_t>(rv)));
+    }
+#endif
     /* hard failure */
     LOG(
         ("nsHttpConnectionMgr::MakeNewConnection [ci = %s trans = %p] "
@@ -1456,6 +1508,14 @@ nsresult nsHttpConnectionMgr::MakeNewConnection(
     if (rv == NS_ERROR_NOT_AVAILABLE) rv = NS_ERROR_FAILURE;
     return rv;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("connect.result ci=%p entry=%p trans=%p requested=1 rv=00000000",
+         NaiveFoxConnectionInfoId(ent->mConnInfo), ent, trans));
+  }
+#endif
 
   return NS_OK;
 }
@@ -1472,6 +1532,51 @@ nsresult nsHttpConnectionMgr::TryDispatchTransaction(
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   nsHttpTransaction* trans = pendingTransInfo->Transaction();
+
+#ifdef MOZ_NAIVEFOX
+  if (trans->UseH3CarrierDispatch()) {
+    H3CarrierDispatchGate* gate = trans->CarrierDispatchGate();
+    if (!gate) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.carrier_dispatch action=document-gate-error document=%p "
+             "reason=missing-gate",
+             trans));
+      }
+      trans->Close(NS_ERROR_UNEXPECTED);
+      return NS_ERROR_UNEXPECTED;
+    }
+
+    if (!gate->IsComplete()) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.carrier_dispatch action=document-waiting gate=%p "
+             "carrier=%p document=%p carrier_complete=0",
+             gate, reinterpret_cast<void*>(gate->CarrierId()), trans));
+      }
+      return NS_ERROR_NOT_AVAILABLE;
+    }
+
+    if (NS_FAILED(gate->Result())) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.carrier_dispatch action=document-gate-error gate=%p "
+             "carrier=%p document=%p reason=carrier-failed rv=%08x",
+             gate, reinterpret_cast<void*>(gate->CarrierId()), trans,
+             static_cast<uint32_t>(gate->Result())));
+      }
+      trans->Close(gate->Result());
+      return gate->Result();
+    }
+
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=document-normal-dispatch gate=%p "
+           "carrier=%p document=%p carrier_complete=1",
+           gate, reinterpret_cast<void*>(gate->CarrierId()), trans));
+    }
+  }
+#endif
 
   LOG(
       ("nsHttpConnectionMgr::TryDispatchTransaction without conn "
@@ -1945,6 +2050,18 @@ nsresult nsHttpConnectionMgr::ProcessNewTransaction(nsHttpTransaction* trans) {
   nsHttpConnectionInfo* ci = trans->ConnectionInfo();
   MOZ_ASSERT(ci);
   MOZ_ASSERT(!ci->IsHttp3() || !(trans->Caps() & NS_HTTP_DISALLOW_HTTP3));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    const char* requestProxyType = ci->ProxyType();
+    NAIVEFOX_REUSE_LOG(
+        ("request.begin trans=%p ci=%p caps=%08x proxy_type=%s "
+         "proxy_flags=%08x https_proxy=%d connect=%d h3_proxy=%d wildcard=%d",
+         trans, NaiveFoxConnectionInfoId(ci), trans->Caps(),
+         requestProxyType ? requestProxyType : "none", ci->ProxyFlag(),
+         ci->UsingHttpsProxy(), ci->UsingConnect(),
+         ci->IsHttp3ProxyConnection(), ci->IsWildCard()));
+  }
+#endif
 
   bool isWildcard = false;
   ConnectionEntry* ent = GetOrCreateConnectionEntry(
@@ -1999,7 +2116,17 @@ nsresult nsHttpConnectionMgr::ProcessNewTransaction(nsHttpTransaction* trans) {
     bool isHttp3Proxy = ci->IsHttp3ProxyConnection();
     RefPtr<HttpConnectionBase> conn =
         GetH2orH3ActiveConn(ent, isHttp3Proxy, !isHttp3Proxy);
-    if (ci->UsingHttpsProxy() && ci->UsingConnect()) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("request.wildcard trans=%p ci=%p entry=%p candidate=%p "
+           "candidate_found=%d",
+           trans, NaiveFoxConnectionInfoId(ci), ent, conn.get(),
+           conn != nullptr));
+    }
+#endif
+    if (ci->UsingHttpsProxy() && ci->UsingConnect() &&
+        !(trans->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
       LOG(("About to create new tunnel conn from [%p]", conn.get()));
       ConnectionEntry* specificEnt = mCT.GetWeak(ci->HashKey());
 
@@ -2071,6 +2198,20 @@ void nsHttpConnectionMgr::DecrementActiveConnCount(HttpConnectionBase* conn) {
   ConditionallyStopTimeoutTick();
 }
 
+#ifdef MOZ_NAIVEFOX
+void nsHttpConnectionMgr::DecrementProvisionalActiveConnCount() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  MOZ_DIAGNOSTIC_ASSERT(mNumActiveConns > 0);
+  if (mNumActiveConns > 0) {
+    mNumActiveConns--;
+  }
+  // A provisional racing H3 winner has been inserted into the active entry,
+  // but ReportHttp3Connection has deliberately not published it yet.  Roll
+  // back only the generic active count; the H3/SPDY count was never raised.
+  ConditionallyStopTimeoutTick();
+}
+#endif
+
 void nsHttpConnectionMgr::StartedConnect() {
   mNumActiveConns++;
   ActivateTimeoutTick();  // likely disabled by RecvdConnect()
@@ -2124,6 +2265,55 @@ void nsHttpConnectionMgr::DispatchSpdyPendingQ(
       leftovers.AppendElement(pendingTransInfo);
       continue;
     }
+
+#ifdef MOZ_NAIVEFOX
+    nsHttpTransaction* trans = pendingTransInfo->Transaction();
+    if (trans->UseH3CarrierDispatch()) {
+      H3CarrierDispatchGate* gate = trans->CarrierDispatchGate();
+      if (!gate) {
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("h3.carrier_dispatch action=document-gate-error document=%p "
+               "reason=missing-gate path=spdy-pending",
+               trans));
+        }
+        trans->Close(NS_ERROR_UNEXPECTED);
+        continue;
+      }
+      if (!gate->IsComplete()) {
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("h3.carrier_dispatch action=document-waiting gate=%p "
+               "carrier=%p document=%p carrier_complete=0 "
+               "path=spdy-pending",
+               gate, reinterpret_cast<void*>(gate->CarrierId()), trans));
+        }
+        leftovers.AppendElement(pendingTransInfo);
+        continue;
+      }
+      if (NS_FAILED(gate->Result()) || conn != connH3) {
+        nsresult result = NS_FAILED(gate->Result()) ? gate->Result()
+                                                    : NS_ERROR_UNEXPECTED;
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("h3.carrier_dispatch action=document-gate-error gate=%p "
+               "carrier=%p document=%p reason=carrier-or-route-failed "
+               "rv=%08x path=spdy-pending",
+               gate, reinterpret_cast<void*>(gate->CarrierId()), trans,
+               static_cast<uint32_t>(result)));
+        }
+        trans->Close(result);
+        continue;
+      }
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.carrier_dispatch action=document-normal-dispatch gate=%p "
+             "carrier=%p document=%p carrier_complete=1 "
+             "path=spdy-pending",
+             gate, reinterpret_cast<void*>(gate->CarrierId()), trans));
+      }
+    }
+#endif
 
     nsresult rv =
         DispatchTransaction(ent, pendingTransInfo->Transaction(), conn);
@@ -2582,6 +2772,12 @@ void nsHttpConnectionMgr::OnMsgPruneNoTraffic(int32_t, ARefBase*) {
 void nsHttpConnectionMgr::OnMsgVerifyTraffic(int32_t, ARefBase*) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   LOG(("nsHttpConnectionMgr::OnMsgVerifyTraffic\n"));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(("verify-traffic.begin entries=%u pruning=%d",
+                            mCT.Count(), mPruningNoTraffic));
+  }
+#endif
 
   if (mPruningNoTraffic) {
     // Called in the time gap when the timeout to prune notraffic
@@ -2665,6 +2861,14 @@ void nsHttpConnectionMgr::OnMsgReclaimConnection(HttpConnectionBase* conn) {
   //
 
   MOZ_ASSERT(conn);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG((
+        "reclaim.begin conn=%p ci=%p owner=%p transaction=%p h2=%d h3=%d", conn,
+        NaiveFoxConnectionInfoId(conn->ConnectionInfo()), conn->OwnerEntry(),
+        conn->Transaction(), conn->UsingSpdy(), conn->UsingHttp3()));
+  }
+#endif
   ConnectionEntry* ent = conn->ConnectionInfo()
                              ? mCT.GetWeak(conn->ConnectionInfo()->HashKey())
                              : nullptr;
@@ -2680,6 +2884,13 @@ void nsHttpConnectionMgr::OnMsgReclaimConnection(HttpConnectionBase* conn) {
         ("nsHttpConnectionMgr::OnMsgReclaimConnection conn %p "
          "forced new hash entry %s\n",
          conn, conn->ConnectionInfo()->HashKey().get()));
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("reclaim.entry conn=%p ci=%p entry=%p source=created", conn,
+           NaiveFoxConnectionInfoId(conn->ConnectionInfo()), ent));
+    }
+#endif
   }
 
   MOZ_ASSERT(ent);
@@ -2694,20 +2905,38 @@ void nsHttpConnectionMgr::OnMsgReclaimConnection(HttpConnectionBase* conn) {
   // is also holding one that is released at the end of this function.
 
   RefPtr<nsHttpConnection> connTCP = do_QueryObject(conn);
-  if (!connTCP || connTCP->EverUsedSpdy()) {
+  bool everUsedSpdy = connTCP && connTCP->EverUsedSpdy();
+  if (!connTCP || everUsedSpdy) {
     // Spdyand Http3 connections aren't reused in the traditional HTTP way in
     // the idleconns list, they are actively multplexed as active
     // conns. Even when they have 0 transactions on them they are
     // considered active connections. So when one is reclaimed it
     // is really complete and is meant to be shut down and not
     // reused.
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("reclaim.dont_reuse conn=%p entry=%p reason=multiplexed-or-h3 "
+           "tcp=%d ever_spdy=%d",
+           conn, ent, connTCP != nullptr, everUsedSpdy));
+    }
+#endif
     conn->DontReuse();
   }
 
   // a connection that still holds a reference to a transaction was
   // not closed naturally (i.e. it was reset or aborted) and is
   // therefore not something that should be reused.
-  if (conn->Transaction()) {
+  nsAHttpTransaction* activeTransaction = conn->Transaction();
+  if (activeTransaction) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("reclaim.dont_reuse conn=%p entry=%p reason=transaction-present "
+           "transaction=%p",
+           conn, ent, activeTransaction));
+    }
+#endif
     conn->DontReuse();
   }
 
@@ -2719,12 +2948,25 @@ void nsHttpConnectionMgr::OnMsgReclaimConnection(HttpConnectionBase* conn) {
          "OwnerEntry",
          conn));
     RefPtr<ConnectionEntry> entry = conn->OwnerEntry();
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("reclaim.owner_fallback conn=%p primary_entry=%p owner_entry=%p",
+           conn, ent, entry.get()));
+    }
+#endif
     if (entry) {
       entry->RemoveActiveConnection(conn);
     }
   }
 
   MOZ_ASSERT(conn->OwnerEntry() == nullptr);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(("reclaim.removed conn=%p entry=%p owner=%p", conn,
+                            ent, conn->OwnerEntry()));
+  }
+#endif
 
   if (connTCP && connTCP->CanReuse()) {
     LOG(("  adding connection to idle list\n"));
@@ -3596,10 +3838,30 @@ ConnectionEntry* nsHttpConnectionMgr::GetOrCreateConnectionEntry(
   }
   *aIsWildcard = false;
 
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    const char* proxyType = specificCI->ProxyType();
+    NAIVEFOX_REUSE_LOG(
+        ("select.begin ci=%p proxy_type=%s proxy_flags=%08x wildcard=%d "
+         "prohibit=%d no_h2=%d no_h3=%d",
+         NaiveFoxConnectionInfoId(specificCI), proxyType ? proxyType : "none",
+         specificCI->ProxyFlag(), specificCI->IsWildCard(), prohibitWildCard,
+         aNoHttp2, aNoHttp3));
+  }
+#endif
+
   // step 1
   LOG(("GetOrCreateConnectionEntry step 1"));
   ConnectionEntry* specificEnt = mCT.GetWeak(specificCI->HashKey());
   if (specificEnt && specificEnt->AvailableForDispatchNow()) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("select.result route=exact ci=%p entry=%p available=1 "
+           "new_connection_requested=0",
+           NaiveFoxConnectionInfoId(specificCI), specificEnt));
+    }
+#endif
     if (aAvailableForDispatchNow) {
       *aAvailableForDispatchNow = true;
     }
@@ -3631,6 +3893,14 @@ ConnectionEntry* nsHttpConnectionMgr::GetOrCreateConnectionEntry(
         if (aAvailableForDispatchNow) {
           *aAvailableForDispatchNow = true;
         }
+#ifdef MOZ_NAIVEFOX
+        if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+          NAIVEFOX_REUSE_LOG(
+              ("select.result route=anonymous-inverted ci=%p entry=%p "
+               "candidate=%p available=1 new_connection_requested=0",
+               NaiveFoxConnectionInfoId(specificCI), invertedEnt, h2orh3conn));
+        }
+#endif
         return invertedEnt;
       }
     }
@@ -3650,6 +3920,15 @@ ConnectionEntry* nsHttpConnectionMgr::GetOrCreateConnectionEntry(
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     ConnectionEntry* wildCardEnt = mCT.GetWeak(wildCardProxyCI->HashKey());
     if (wildCardEnt && wildCardEnt->AvailableForDispatchNow()) {
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+        NAIVEFOX_REUSE_LOG(
+            ("select.result route=wildcard ci=%p wildcard_ci=%p entry=%p "
+             "available=1 new_connection_requested=0",
+             NaiveFoxConnectionInfoId(specificCI),
+             NaiveFoxConnectionInfoId(wildCardProxyCI), wildCardEnt));
+      }
+#endif
       if (aAvailableForDispatchNow) {
         *aAvailableForDispatchNow = true;
       }
@@ -3665,6 +3944,14 @@ ConnectionEntry* nsHttpConnectionMgr::GetOrCreateConnectionEntry(
     specificEnt = new ConnectionEntry(clone, mPendingQEntries);
     mCT.InsertOrUpdate(clone->HashKey(), RefPtr{specificEnt});
   }
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("select.result route=exact ci=%p entry=%p available=0 "
+         "new_connection_requested=undecided",
+         NaiveFoxConnectionInfoId(specificCI), specificEnt));
+  }
+#endif
   return specificEnt;
 }
 
@@ -3697,6 +3984,16 @@ void nsHttpConnectionMgr::DoSpeculativeConnectionInternal(
     // Do nothing if we are shutting down.
     return;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (aTrans->CarrierDispatchGate() && aFetchHTTPSRR) {
+    // Explicit HTTP/3 proxy routing never needs origin HTTPS RR discovery.
+    // Treat an accidental routing expansion as a failed experiment instead of
+    // cloning away the carrier completion callback.
+    aTrans->Close(NS_ERROR_UNEXPECTED);
+    return;
+  }
+#endif
 
   nsIHttpChannelInternal::ProxyDNSStrategy strategy = GetProxyDNSStrategyHelper(
       aEnt->mConnInfo->ProxyType(), aEnt->mConnInfo->ProxyFlag());
@@ -3732,19 +4029,38 @@ void nsHttpConnectionMgr::DoSpeculativeConnectionInternal(
        !aEnt->IdleConnectionsLength()) &&
       (wantsFirstH3Connection || !(keepAlive && aEnt->RestrictConnections())) &&
       !AtActiveConnectionLimit(aEnt, aTrans->Caps())) {
+#ifdef MOZ_NAIVEFOX
+    if (H3CarrierDispatchGate* gate = aTrans->CarrierDispatchGate();
+        gate && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=carrier-establishment-start gate=%p "
+           "carrier=%p ci=%p",
+           gate, aTrans, aTrans->ConnectionInfo()));
+    }
+#endif
     nsresult rv = aEnt->CreateDnsAndConnectSocket(aTrans, aTrans->Caps(), true,
                                                   false, allow1918, nullptr);
     if (NS_FAILED(rv)) {
       LOG(
           ("DoSpeculativeConnectionInternal Transport socket creation "
            "failure: %" PRIx32 "\n",
-           static_cast<uint32_t>(rv)));
+          static_cast<uint32_t>(rv)));
+#ifdef MOZ_NAIVEFOX
+      if (aTrans->CarrierDispatchGate()) {
+        aTrans->Close(rv);
+      }
+#endif
     }
   } else {
     LOG(
         ("DoSpeculativeConnectionInternal Transport ci=%s "
          "not created due to existing connection count:%d",
-         aEnt->mConnInfo->HashKey().get(), parallelSpeculativeConnectLimit));
+        aEnt->mConnInfo->HashKey().get(), parallelSpeculativeConnectLimit));
+#ifdef MOZ_NAIVEFOX
+    if (aTrans->CarrierDispatchGate()) {
+      aTrans->Close(NS_ERROR_NOT_AVAILABLE);
+    }
+#endif
   }
 }
 
@@ -3884,6 +4200,18 @@ void nsHttpConnectionMgr::MoveToWildCardConnEntry(
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   MOZ_ASSERT(specificCI->UsingHttpsProxy());
 
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    const char* proxyType = specificCI->ProxyType();
+    NAIVEFOX_REUSE_LOG(
+        ("wildcard.begin specific_ci=%p wildcard_ci=%p conn=%p "
+         "proxy_type=%s proxy_flags=%08x",
+         NaiveFoxConnectionInfoId(specificCI),
+         NaiveFoxConnectionInfoId(wildCardCI), proxyConn,
+         proxyType ? proxyType : "none", specificCI->ProxyFlag()));
+  }
+#endif
+
   LOG(
       ("nsHttpConnectionMgr::MakeConnEntryWildCard conn %p has requested to "
        "change CI from %s to %s\n",
@@ -3897,6 +4225,16 @@ void nsHttpConnectionMgr::MoveToWildCardConnEntry(
        ent ? ent->IsHttp3ProxyConnection() : 0));
 
   if (!ent || (!ent->mUsingSpdy && !ent->IsHttp3ProxyConnection())) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG((
+          "wildcard.result specific_ci=%p wildcard_ci=%p conn=%p "
+          "success=0 reason=%s entry=%p",
+          NaiveFoxConnectionInfoId(specificCI),
+          NaiveFoxConnectionInfoId(wildCardCI), proxyConn,
+          ent ? "entry-not-multiplexed-proxy" : "specific-entry-missing", ent));
+    }
+#endif
     return;
   }
 
@@ -3906,6 +4244,15 @@ void nsHttpConnectionMgr::MoveToWildCardConnEntry(
   if (wcEnt == ent) {
     // nothing to do!
     LOG(("nothing to do "));
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("wildcard.result specific_ci=%p wildcard_ci=%p conn=%p "
+           "success=1 reason=already-wildcard entry=%p",
+           NaiveFoxConnectionInfoId(specificCI),
+           NaiveFoxConnectionInfoId(wildCardCI), proxyConn, ent));
+    }
+#endif
     return;
   }
   if (ent->mUsingSpdy) {

@@ -27,6 +27,66 @@ namespace mozilla::naivefox {
 
 class TunnelAttempt;
 
+namespace detail {
+
+constexpr bool ShouldRunPreamble(PreambleMode aMode, bool aColdLeader) {
+  return aMode != PreambleMode::Off && aColdLeader;
+}
+
+// Main-thread-only sequence guard. Keeping the generation transition in this
+// small value type makes cancellation and late callback behavior testable
+// without constructing Necko channels.
+class PreambleSequenceState final {
+ public:
+  bool Begin(uint64_t aGeneration, ProxyProtocol aProtocol) {
+    if (mConnectGeneration == aGeneration ||
+        (mGeneration == aGeneration && mPhase != Phase::Idle)) {
+      return false;
+    }
+    mGeneration = aGeneration;
+    mProtocol = aProtocol;
+    mPhase = Phase::InFlight;
+    return true;
+  }
+
+  bool IsInFlight(uint64_t aGeneration, ProxyProtocol aProtocol) const {
+    return mGeneration == aGeneration && mProtocol == aProtocol &&
+           mPhase == Phase::InFlight;
+  }
+
+  bool Complete(uint64_t aGeneration, ProxyProtocol aProtocol) {
+    if (!IsInFlight(aGeneration, aProtocol)) {
+      return false;
+    }
+    mPhase = Phase::Complete;
+    return true;
+  }
+
+  void Cancel() {
+    if (mPhase == Phase::InFlight) {
+      mPhase = Phase::Complete;
+    }
+  }
+
+  bool TryStartConnect(uint64_t aGeneration) {
+    if (mConnectGeneration == aGeneration) {
+      return false;
+    }
+    mConnectGeneration = aGeneration;
+    return true;
+  }
+
+ private:
+  enum class Phase : uint8_t { Idle, InFlight, Complete };
+
+  uint64_t mGeneration = 0;
+  ProxyProtocol mProtocol = ProxyProtocol::H2;
+  Phase mPhase = Phase::Idle;
+  uint64_t mConnectGeneration = 0;
+};
+
+}  // namespace detail
+
 struct TunnelConfig final {
   TunnelConfig() = default;
   TunnelConfig(const TunnelConfig& aOther)
@@ -34,7 +94,12 @@ struct TunnelConfig final {
         mProxyUser(aOther.mProxyUser),
         mProxyPassword(aOther.mProxyPassword),
         mProtocol(aOther.mProtocol),
-        mHostResolverRule(aOther.mHostResolverRule) {
+        mHostResolverRule(aOther.mHostResolverRule),
+        mPreamble(aOther.mPreamble),
+        mOuterSessionGate(aOther.mOuterSessionGate),
+        mImplicitPreambleGate(aOther.mImplicitPreambleGate),
+        mDiagnosticFirstSocksTunnelUrgentStart(
+            aOther.mDiagnosticFirstSocksTunnelUrgentStart) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -44,6 +109,11 @@ struct TunnelConfig final {
       mProxyPassword = aOther.mProxyPassword;
       mProtocol = aOther.mProtocol;
       mHostResolverRule = aOther.mHostResolverRule;
+      mPreamble = aOther.mPreamble;
+      mOuterSessionGate = aOther.mOuterSessionGate;
+      mImplicitPreambleGate = aOther.mImplicitPreambleGate;
+      mDiagnosticFirstSocksTunnelUrgentStart =
+          aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -56,6 +126,10 @@ struct TunnelConfig final {
   ProxyProtocol mProtocol = ProxyProtocol::H2;
   Maybe<HostResolverRule> mHostResolverRule;
   nsTArray<ExtraHeader> mExtraHeaders;
+  PreambleConfig mPreamble;
+  bool mOuterSessionGate = false;
+  bool mImplicitPreambleGate = false;
+  bool mDiagnosticFirstSocksTunnelUrgentStart = false;
 };
 
 class TunnelSession final {
@@ -67,7 +141,8 @@ class TunnelSession final {
   using ClosedCallback = std::function<void(nsresult)>;
 
   TunnelSession(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
-                const TunnelConfig& aConfig, nsIEventTarget* aSocketTarget,
+                const TunnelConfig& aConfig, bool aConnectUrgentStart,
+                nsIEventTarget* aSocketTarget,
                 EstablishedCallback&& aOnEstablished,
                 FailureCallback&& aOnFailure, ClosedCallback&& aOnClosed);
 
@@ -86,6 +161,35 @@ class TunnelSession final {
   nsresult StartAttempt(ProxyProtocol aProtocol);
   void OpenAttemptOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
+  void BeginPreambleOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
+                           const nsACString& aTargetAuthority);
+  void FinishPreambleOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
+                            const nsACString& aTargetAuthority,
+                            nsresult aStatus, uint32_t aHttpStatus,
+                            uint32_t aBodyBytes, uint32_t aStartedResources,
+                            uint32_t aCommittedResources,
+                            uint32_t aNativeCacheNewResources, bool aRootDone,
+                            bool aTerminalFallback);
+  void FinishPreambleOperationOnMain(uint64_t aGeneration,
+                                     ProxyProtocol aProtocol, nsresult aStatus,
+                                     uint32_t aHttpStatus, uint32_t aBodyBytes,
+                                     bool aRootDone, bool aCompletedNormally,
+                                     uint32_t aCompletedSuccessfulResources,
+                                     uint32_t aNativeCacheNewResources,
+                                     bool aNavigationStopStyleCommitted,
+                                     bool aNavigationStopStyleResponseStarted,
+                                     bool aNavigationStopStyleAborted);
+  void PreambleTimeoutOnMain(uint64_t aGeneration, ProxyProtocol aProtocol);
+  void PreambleDrainTimeoutOnMain(uint64_t aGeneration);
+  void TunnelApplicationActiveOnMain(uint64_t aGeneration,
+                                     ProxyProtocol aProtocol);
+  void TunnelServerApplicationActiveOnMain(uint64_t aGeneration,
+                                           ProxyProtocol aProtocol);
+  void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
+                         const nsACString& aTargetAuthority);
+  void NotifyOuterGateReady();
+  void ReleaseOuterGate();
+  void FailPreambleOnMain(nsresult aStatus);
   void CancelRequestOnMain(nsresult aStatus);
   void ClearRequestOnMain(uint64_t aGeneration, nsIRequest* aRequest);
   void ApplyConnectMetadata(uint64_t aGeneration, ProxyProtocol aProtocol,
@@ -105,6 +209,7 @@ class TunnelSession final {
   void ApplyOpenFailure(uint64_t aGeneration, ProxyProtocol aProtocol,
                         nsresult aStatus);
   bool IsCurrentAttempt(uint64_t aGeneration, ProxyProtocol aProtocol) const;
+  static bool ShouldGateOuterSession(const TunnelConfig& aConfig);
   void ResetAttemptState();
   void MaybeFinishAttempt();
   void TunnelReady();

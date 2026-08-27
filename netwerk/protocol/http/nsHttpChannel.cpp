@@ -14,6 +14,8 @@
 #  include "CookieService.h"
 #endif
 #include "HttpLog.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "SpeculativeTransaction.h"
 #include "HttpTrafficAnalyzer.h"
 #include "LoadContextInfo.h"
 #ifndef MOZ_NAIVEFOX
@@ -67,7 +69,9 @@
 #ifndef MOZ_NAIVEFOX
 #  include "mozilla/dom/ReferrerInfo.h"
 #endif
-#ifndef MOZ_NAIVEFOX
+#ifdef MOZ_NAIVEFOX
+#  include "SecFetch.h"
+#else
 #  include "mozilla/dom/SecFetch.h"
 #  include "mozilla/dom/ServiceWorkerUtils.h"
 #  include "mozilla/dom/WindowGlobalParent.h"
@@ -110,7 +114,9 @@
 #include "nsCOMPtr.h"
 #include "nsCORSListenerProxy.h"
 #include "nsCRT.h"
-#include "nsChannelClassifier.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsChannelClassifier.h"
+#endif
 #include "nsCharSeparatedTokenizer.h"
 #include "nsComponentManagerUtils.h"
 #ifndef MOZ_NAIVEFOX
@@ -144,6 +150,7 @@
 #include "nsIDNSRecord.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsIHttpChannelInternal.h"
+#include "nsInterfaceRequestorAgg.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsINetworkErrorLogging.h"
 #ifndef MOZ_NAIVEFOX
@@ -152,9 +159,9 @@
 #include "nsINetworkLinkService.h"
 #include "nsIOService.h"
 #include "nsIPrincipal.h"
+#include "nsIProgressEventSink.h"
 #include "nsIPrompt.h"
 #include "nsIProtocolProxyService2.h"
-#include "nsIProgressEventSink.h"
 #include "nsIRedirectResultListener.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
@@ -957,9 +964,17 @@ nsresult nsHttpChannel::OnBeforeConnect() {
   // header for *all* navigational requests instead of all requests as
   // defined in the spec, see:
   // https://www.w3.org/TR/upgrade-insecure-requests/#preference
-#ifndef MOZ_NAIVEFOX
   ExtContentPolicyType type = mLoadInfo->GetExternalContentPolicyType();
 
+#ifdef MOZ_NAIVEFOX
+  if (mCaps & NS_HTTP_PROXY_PREAMBLE) {
+    if (type == ExtContentPolicy::TYPE_DOCUMENT) {
+      rv = SetRequestHeader("Upgrade-Insecure-Requests"_ns, "1"_ns, false);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+    SecFetch::AddSecFetchHeader(this);
+  }
+#else
   if (type == ExtContentPolicy::TYPE_DOCUMENT ||
       type == ExtContentPolicy::TYPE_SUBDOCUMENT) {
     rv = SetRequestHeader("Upgrade-Insecure-Requests"_ns, "1"_ns, false);
@@ -1572,13 +1587,86 @@ nsresult nsHttpChannel::ConnectOnTailUnblock() {
   SpeculativeConnect();
 
 #ifdef MOZ_NAIVEFOX
-  // The lean client has no browser cache component graph.  Network channels
-  // are intentionally uncached, so go directly to the transport path.
-  return TriggerNetwork();
+  // Preserve the lean client's direct transport path for every ordinary
+  // channel and cache-inhibited proxy preamble. The native-open diagnostics
+  // restore Firefox's asynchronous cache phase before TriggerNetwork.
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
+      ((mLoadFlags & nsIRequest::INHIBIT_CACHING) &&
+       !mProxyPreambleUseNativeCacheOpen &&
+       !mProxyPreambleUseNativeResourceCacheOpen)) {
+    return TriggerNetwork();
+  }
+  if (mProxyPreambleUseNativeCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_cache_open action=open-begin channel=%p "
+         "inhibit_caching=%d expected_mode=readonly",
+         this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_resource_cache_open action=open-begin channel=%p "
+         "inhibit_caching=%d expected_mode=normal",
+         this, !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+  }
 #endif
 
   // open a cache entry for this channel...
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    mProxyPreambleNativeCacheOpenCallActive = true;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    mProxyPreambleNativeResourceCacheOpenCallActive = true;
+  }
+#endif
   rv = OpenCacheEntry(mURI->SchemeIs("https"));
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    mProxyPreambleNativeCacheOpenCallActive = false;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    mProxyPreambleNativeResourceCacheOpenCallActive = false;
+  }
+#endif
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen) {
+    if (NS_FAILED(rv) || !AwaitingCacheCallbacks()) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.native_cache_open action=open-failed channel=%p rv=%08x "
+             "awaiting_callback=%d",
+             this, static_cast<uint32_t>(rv), AwaitingCacheCallbacks()));
+      }
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=callback-pending channel=%p", this));
+    }
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    if (NS_FAILED(rv) || !AwaitingCacheCallbacks() ||
+        (mLoadFlags & nsIRequest::INHIBIT_CACHING)) {
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.native_resource_cache_open action=open-failed channel=%p "
+             "rv=%08x awaiting_callback=%d inhibit_caching=%d",
+             this, static_cast<uint32_t>(rv), AwaitingCacheCallbacks(),
+             !!(mLoadFlags & nsIRequest::INHIBIT_CACHING)));
+      }
+      return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+    }
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_resource_cache_open action=callback-pending "
+           "channel=%p",
+           this));
+    }
+  }
+#endif
 
   // do not continue if asyncOpenCacheEntry is in progress
   if (AwaitingCacheCallbacks()) {
@@ -1793,6 +1881,19 @@ void nsHttpChannel::SpeculativeConnect() {
   // Before we take the latency hit of dealing with the cache, try and
   // get the TCP (and SSL) handshakes going so they can overlap.
 
+#ifdef MOZ_NAIVEFOX
+  // The cold-winner handoff deliberately starts establishment from
+  // MakeNewConnection(), after the real document has entered the pending
+  // queue.  A channel-level speculative connect would create and publish a
+  // usable H3 proxy session first, so the real transaction would never reach
+  // the single-candidate winner path that owns its exact PendingTransactionInfo.
+  // This also matches the controlled Firefox reference, whose speculative
+  // parallel limit is zero.
+  if (mProxyPreambleUseColdWinnerHandoff) {
+    return;
+  }
+#endif
+
   // don't speculate if we are offline, when doing http upgrade (i.e.
   // websockets bootstrap), or if we can't do keep-alive (because then we
   // couldn't reuse the speculative connection anyhow).
@@ -1805,8 +1906,7 @@ void nsHttpChannel::SpeculativeConnect() {
 #endif
 
   if (gIOService->IsOffline() || mUpgradeProtocolCallback ||
-      !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) ||
-      forceOffline) {
+      !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) || forceOffline) {
     return;
   }
 
@@ -1829,12 +1929,81 @@ void nsHttpChannel::SpeculativeConnect() {
   // it.
   bool httpsRRAllowed = !(mCaps & NS_HTTP_DISALLOW_HTTPS_RR) &&
                         !(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS);
-  (void)gHttpHandler->MaybeSpeculativeConnectWithHTTPSRR(
-      mConnectionInfo, callbacks,
+  uint32_t speculativeCaps =
       mCaps & (NS_HTTP_DISALLOW_SPDY | NS_HTTP_TRR_MODE_MASK |
                NS_HTTP_DISABLE_IPV4 | NS_HTTP_DISABLE_IPV6 |
-               NS_HTTP_DISALLOW_HTTP3 | NS_HTTP_REFRESH_DNS),
-      nsHttpHandler::EchConfigEnabled() && httpsRRAllowed);
+               NS_HTTP_DISALLOW_HTTP3 | NS_HTTP_REFRESH_DNS);
+  bool fetchHTTPSRR = nsHttpHandler::EchConfigEnabled() && httpsRRAllowed;
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseCarrierDispatch) {
+    if (mProxyPreambleCarrierDispatchGate) {
+      return;
+    }
+
+    speculativeCaps |= mConnectionInfo->GetAnonymous()
+                           ? NS_HTTP_LOAD_ANONYMOUS
+                           : 0;
+    speculativeCaps |= NS_HTTP_ERROR_SOFTLY;
+
+    nsCOMPtr<nsIInterfaceRequestor> carrierCallbacks;
+    NS_NewInterfaceRequestorAggregation(callbacks, nullptr,
+                                        getter_AddRefs(carrierCallbacks));
+    if (!carrierCallbacks) {
+      return;
+    }
+
+    RefPtr<H3CarrierDispatchGate> gate = new H3CarrierDispatchGate();
+    RefPtr<nsHttpConnectionInfo> gateConnectionInfo = mConnectionInfo;
+    RefPtr<SpeculativeTransaction> carrier = new SpeculativeTransaction(
+        mConnectionInfo, carrierCallbacks, speculativeCaps,
+        [gate, gateConnectionInfo](nsresult aReason) {
+          MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+          nsresult result = aReason;
+          if (!gate->CarrierReadComplete()) {
+            result = NS_ERROR_UNEXPECTED;
+          } else if (gate->CarrierReadResult() != NS_BASE_STREAM_CLOSED) {
+            result = gate->CarrierReadResult();
+          }
+          gate->Complete(result);
+          if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+            NAIVEFOX_LIFECYCLE_LOG(
+                ("h3.carrier_dispatch action=carrier-complete gate=%p "
+                 "carrier=%p result=%08x carrier_read_complete=%d",
+                 gate.get(), reinterpret_cast<void*>(gate->CarrierId()),
+                 static_cast<uint32_t>(result),
+                 gate->CarrierReadComplete()));
+          }
+          (void)gHttpHandler->ProcessPendingQ(gateConnectionInfo);
+        });
+    gate->SetCarrierId(reinterpret_cast<uintptr_t>(carrier.get()));
+    carrier->SetH3CarrierDispatchGate(gate);
+    // This product-owned carrier is the single establishment transaction for
+    // the marked preamble, not background browser speculation. Keep it usable
+    // when the embedding profile disables general speculative preconnects.
+    carrier->SetParallelSpeculativeConnectLimit(1);
+    mProxyPreambleCarrierDispatchGate = gate;
+
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=carrier-created gate=%p carrier=%p "
+           "ci=%p use_he=0 fetch_https_rr=%d parallel_limit=1",
+           gate.get(), carrier.get(), mConnectionInfo.get(), false));
+    }
+    // Explicit HTTP/3 proxy routing already selects the outer transport. HTTPS
+    // RR is origin routing work and DoSpeculativeConnectionInternal normally
+    // suppresses it for proxies; keep the request-less carrier on that path.
+    nsresult rv = gHttpHandler->MaybeSpeculativeConnectWithHTTPSRR(
+        mConnectionInfo, carrierCallbacks, speculativeCaps, false, carrier);
+    if (NS_FAILED(rv)) {
+      gate->Complete(rv);
+    }
+    return;
+  }
+#endif
+
+  (void)gHttpHandler->MaybeSpeculativeConnectWithHTTPSRR(
+      mConnectionInfo, callbacks, speculativeCaps, fetchHTTPSRR);
 }
 
 void nsHttpChannel::DoNotifyListenerCleanup() {
@@ -2327,10 +2496,10 @@ nsresult nsHttpChannel::InitTransaction() {
   mTransaction->SetIsForWebTransport(!!mWebTransportSessionEventListener);
 
 #ifndef MOZ_NAIVEFOX
-#ifndef MOZ_NAIVEFOX
+#  ifndef MOZ_NAIVEFOX
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-#endif
+#  endif
 
   nsILoadInfo::IPAddressSpace parentAddressSpace =
       nsILoadInfo::IPAddressSpace::Unknown;
@@ -2382,6 +2551,37 @@ nsresult nsHttpChannel::InitTransaction() {
     mTransaction = nullptr;
     return rv;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
+    transaction->SetWaitForH3HandshakeConfirmation(
+        mProxyPreambleWaitForHandshakeConfirmation);
+    transaction->SetUseH3CarrierDispatch(mProxyPreambleUseCarrierDispatch);
+    transaction->SetUseH3ColdWinnerHandoff(
+        mProxyPreambleUseColdWinnerHandoff);
+    transaction->SetH3CarrierDispatchGate(
+        mProxyPreambleCarrierDispatchGate);
+    if (mProxyPreambleUseCarrierDispatch &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.carrier_dispatch action=document-configured gate=%p "
+           "carrier=%p document=%p ci=%p caps=%08x",
+           mProxyPreambleCarrierDispatchGate.get(),
+           reinterpret_cast<void*>(mProxyPreambleCarrierDispatchGate
+                                       ? mProxyPreambleCarrierDispatchGate
+                                             ->CarrierId()
+                                       : 0),
+           transaction, mConnectionInfo.get(), mCaps));
+    }
+    if (mProxyPreambleUseColdWinnerHandoff &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=document-configured document=%p "
+           "ci=%p caps=%08x",
+           transaction, mConnectionInfo.get(), mCaps));
+    }
+  }
+#endif
 
   return rv;
 }
@@ -2437,6 +2637,20 @@ HttpTrafficCategory nsHttpChannel::CreateTrafficCategory() {
   return HttpTrafficAnalyzer::CreateTrafficCategory(
       NS_UsePrivateBrowsing(this), isSystemPrincipal, isThirdParty, cos, tc);
 #endif
+}
+
+NS_IMETHODIMP
+nsHttpChannel::GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) {
+  NS_ENSURE_ARG_POINTER(aValue);
+  *aValue = false;
+#ifdef MOZ_NAIVEFOX
+  if (mTransaction) {
+    if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
+      *aValue = transaction->H3ColdWinnerHandoffSucceeded();
+    }
+  }
+#endif
+  return NS_OK;
 }
 
 void nsHttpChannel::SetCachedContentType() {
@@ -3006,7 +3220,7 @@ nsresult nsHttpChannel::ProcessWAICTHeader() {
 #ifdef MOZ_NAIVEFOX
   return NS_OK;
 #else
-#ifdef NIGHTLY_BUILD
+#  ifdef NIGHTLY_BUILD
   if (!StaticPrefs::security_waict_downgrade_protection_enable()) {
     return NS_OK;
   }
@@ -3066,7 +3280,7 @@ nsresult nsHttpChannel::ProcessWAICTHeader() {
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
-#endif
+#  endif
 
   return NS_OK;
 #endif  // MOZ_NAIVEFOX
@@ -3133,8 +3347,7 @@ void nsHttpChannel::ProcessSSLInformation() {
   }
 
   uint32_t state;
-  if (NS_SUCCEEDED(mSecurityInfo->GetSecurityState(&state)) &&
-      (state & 1U)) {
+  if (NS_SUCCEEDED(mSecurityInfo->GetSecurityState(&state)) && (state & 1U)) {
     // Send weak crypto warnings to the web console
     if (state & 33554432U) {
       nsString consoleErrorTag = u"WeakCipherSuiteWarning"_ns;
@@ -3646,6 +3859,17 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
       break;
     case 401:
     case 407:
+      if (mCaps & NS_HTTP_PROXY_PREAMBLE) {
+        // A proxy preamble is deliberately an unauthenticated, ordinary
+        // origin request. Never reuse cached origin/proxy credentials or
+        // retry it through the authentication machinery.
+        if (mAuthProvider) {
+          (void)mAuthProvider->Disconnect(NS_ERROR_ABORT);
+          mAuthProvider = nullptr;
+        }
+        rv = ProcessNormal();
+        break;
+      }
       if (MOZ_UNLIKELY(httpStatus == 407 && transactionRestarted)) {
         // The transaction has been internally restarted.  We want to
         // authenticate to the proxy again, so reuse either cached credentials
@@ -5836,6 +6060,23 @@ nsHttpChannel::OnCacheEntryAvailable(nsICacheEntry* entry, bool aNew,
        "new=%d status=%" PRIx32 "] for %s",
        this, entry, aNew, static_cast<uint32_t>(status), mSpec.get()));
 
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_cache_open action=callback channel=%p entry=%p new=%d "
+         "status=%08x",
+         this, entry, aNew, static_cast<uint32_t>(status)));
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_resource_cache_open action=callback channel=%p entry=%p "
+         "new=%d status=%08x",
+         this, entry, aNew, static_cast<uint32_t>(status)));
+  }
+#endif
+
   // The cache callback arrived (or we're tearing down); the backstop timer is
   // no longer needed.
   CancelCacheWaitTimer();
@@ -5876,6 +6117,55 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
     return mStatus;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen &&
+      mProxyPreambleNativeCacheOpenCallActive) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=contract-failed channel=%p entry=%p "
+           "new=%d status=%08x reason=synchronous-callback",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      mProxyPreambleNativeResourceCacheOpenCallActive) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_resource_cache_open action=contract-failed channel=%p "
+           "entry=%p new=%d status=%08x reason=synchronous-callback",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeCacheOpen &&
+      (status != NS_ERROR_CACHE_KEY_NOT_FOUND || entry || aNew)) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_cache_open action=contract-failed channel=%p entry=%p "
+           "new=%d status=%08x reason=not-cold-readonly-miss",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeCacheOpen) {
+    mProxyPreambleNativeCacheReadOnlyMiss = true;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      (status != NS_OK || !entry || !aNew)) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.native_resource_cache_open action=contract-failed channel=%p "
+           "entry=%p new=%d status=%08x reason=not-new-writable-entry",
+           this, entry, aNew, static_cast<uint32_t>(status)));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen) {
+    mProxyPreambleNativeResourceCacheNewEntry = true;
+  }
+#endif
+
   rv = OnNormalCacheEntryAvailable(entry, aNew, status);
 
   if (NS_FAILED(rv) && (mLoadFlags & LOAD_ONLY_FROM_CACHE)) {
@@ -5890,6 +6180,23 @@ nsresult nsHttpChannel::OnCacheEntryAvailableInternal(nsICacheEntry* entry,
   if (AwaitingCacheCallbacks()) {
     return NS_OK;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_cache_open action=trigger-network channel=%p "
+         "cold_readonly_miss=1",
+         this));
+  }
+  if (mProxyPreambleUseNativeResourceCacheOpen &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.native_resource_cache_open action=trigger-network channel=%p "
+         "cache_new=1",
+         this));
+  }
+#endif
 
   return TriggerNetwork();
 }
@@ -8434,7 +8741,13 @@ nsresult nsHttpChannel::BeginConnect() {
          scheme.get(), mapping->AlternateHost().get(), mapping->AlternatePort(),
          mapping->HashKey().get()));
 
-    if (!(mLoadFlags & LOAD_ANONYMOUS) && !mPrivateBrowsing) {
+    bool sendAltUsed = !(mLoadFlags & LOAD_ANONYMOUS);
+#ifdef MOZ_NAIVEFOX
+    sendAltUsed =
+        sendAltUsed || ((mCaps & NS_HTTP_PROXY_PREAMBLE) &&
+                        mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal());
+#endif
+    if (sendAltUsed && !mPrivateBrowsing) {
       nsAutoCString altUsedLine(mapping->AlternateHost());
       bool defaultPort =
           mapping->AlternatePort() ==
@@ -8578,10 +8891,12 @@ nsresult nsHttpChannel::BeginConnect() {
 
   // check to see if authorization headers should be included
   // CustomAuthHeader is set in AsyncOpen if we find Authorization header
-  rv = mAuthProvider->AddAuthorizationHeaders(LoadCustomAuthHeader());
-  if (NS_FAILED(rv)) {
-    LOG(("nsHttpChannel %p AddAuthorizationHeaders failed (%08x)", this,
-         static_cast<uint32_t>(rv)));
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE)) {
+    rv = mAuthProvider->AddAuthorizationHeaders(LoadCustomAuthHeader());
+    if (NS_FAILED(rv)) {
+      LOG(("nsHttpChannel %p AddAuthorizationHeaders failed (%08x)", this,
+           static_cast<uint32_t>(rv)));
+    }
   }
 
   // if this somehow fails we can go on without it
@@ -12583,6 +12898,24 @@ nsresult nsHttpChannel::OnCacheWaitTimeout() {
   if (!LoadIsPending() || !AwaitingCacheCallbacks()) {
     return NS_OK;
   }
+
+#ifdef MOZ_NAIVEFOX
+  if (mProxyPreambleUseNativeCacheOpen ||
+      mProxyPreambleUseNativeResourceCacheOpen) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("%s action=contract-failed channel=%p reason=cache-wait-timeout",
+           mProxyPreambleUseNativeResourceCacheOpen
+               ? "h3.native_resource_cache_open"
+               : "h3.native_cache_open",
+           this));
+    }
+    StoreWaitForCacheEntry(LoadWaitForCacheEntry() & ~WAIT_FOR_CACHE_ENTRY);
+    CloseCacheEntry(false);
+    (void)AsyncAbort(NS_ERROR_NET_TIMEOUT);
+    return NS_ERROR_NET_TIMEOUT;
+  }
+#endif
 
   LOG(("  cache entry wait timed out, forcing network [this=%p]", this));
   mCacheWaitTimedOut = true;

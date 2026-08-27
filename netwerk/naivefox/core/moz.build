@@ -12,7 +12,12 @@ SOURCES += [
     "../LeanDOMBindings.cpp",
     "../MemMapSnapshot.cpp",
     "../NaiveFoxRunner.cpp",
+    "../NativeStylePreloadActivation.cpp",
+    "../NativeStylePreloadChannel.cpp",
+    "../NativeStylePreloadProcessBackground.cpp",
+    "../NativeStylePreloadProcessBridge.cpp",
     "../NeckoTunnel.cpp",
+    "../OuterSessionGate.cpp",
     "../PaddingNegotiation.cpp",
     "../RuntimeLogging.cpp",
     "../Socks5Parser.cpp",
@@ -25,6 +30,11 @@ SOURCES += [
     "ProfilerNaiveFoxStub.cpp",
 ]
 
+SOURCES += [
+    "/dom/security/ReferrerInfo.cpp",
+    "/dom/security/SecFetch.cpp",
+]
+
 GeneratedFile(
     "NaiveFoxVersion.cpp",
     script="generate_version_source.py",
@@ -32,10 +42,35 @@ GeneratedFile(
 )
 
 SOURCES += ["!NaiveFoxVersion.cpp"]
+SOURCES += [
+    "!/ipc/ipdl/NativeStylePreloadActivationTypes.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivation.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationRequest.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationRequestChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadActivationRequestParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcess.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessBackground.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessBackgroundChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessBackgroundParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessBackgroundRequest.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessBackgroundRequestChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessBackgroundRequestParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessRoot.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessRootChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessRootParent.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessStyle.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessStyleChild.cpp",
+    "!/ipc/ipdl/PNativeStylePreloadProcessStyleParent.cpp",
+]
 
 XPCOM_MANIFESTS += ["components.conf"]
 
 SOURCES += ["/toolkit/xre/AutoSQLiteLifetime.cpp"]
+SOURCES += ["/toolkit/xre/GeckoArgs.cpp"]
 SOURCES += ["/js/xpconnect/src/XPCString.cpp"]
 SOURCES += ["!/ipc/ipdl/PrefsTypes.cpp"]
 
@@ -46,12 +81,18 @@ EXPORTS.mozilla += ["../StoragePrincipalHelper.h"]
 EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
 EXPORTS += ["../nsContentUtils.h"]
 
+LOCAL_INCLUDES += ["/dom/security"]
+LOCAL_INCLUDES += ["/layout/style"]
 LOCAL_INCLUDES += ["/netwerk/base"]
 LOCAL_INCLUDES += ["/netwerk/naivefox"]
+LOCAL_INCLUDES += ["/netwerk/protocol/http"]
+LOCAL_INCLUDES += ["/netwerk/system/netlink"]
 LOCAL_INCLUDES += ["/security/manager/ssl"]
 LOCAL_INCLUDES += ["/tools/profiler/core"]
 LOCAL_INCLUDES += ["!/ipc/ipdl/_ipdlheaders"]
 LOCAL_INCLUDES += ["/ipc/chromium/src"]
+
+include("/ipc/chromium/chromium-config.mozbuild")
 
 if CONFIG["ENABLE_TESTS"]:
     LOCAL_INCLUDES += ["/testing/gtest/mozilla"]

@@ -238,8 +238,7 @@ bool IsHostOrAddress(const nsACString& aHost) {
 }
 
 bool IsHeaderTokenCharacter(char aValue) {
-  if ((aValue >= '0' && aValue <= '9') ||
-      (aValue >= 'A' && aValue <= 'Z') ||
+  if ((aValue >= '0' && aValue <= '9') || (aValue >= 'A' && aValue <= 'Z') ||
       (aValue >= 'a' && aValue <= 'z')) {
     return true;
   }
@@ -281,6 +280,28 @@ bool IsProtectedProxyConnectHeader(const nsACString& aName) {
          aName.LowerCaseEqualsLiteral("alpn");
 }
 
+bool IsValidPreamblePath(const nsACString& aPath) {
+  if (aPath.IsEmpty() || aPath.Length() > 2048 || aPath.First() != '/' ||
+      (aPath.Length() >= 2 && aPath.CharAt(1) == '/')) {
+    return false;
+  }
+  for (size_t index = 0; index < aPath.Length(); ++index) {
+    const unsigned char value = aPath.CharAt(index);
+    if (value <= 0x20 || value >= 0x7f || value == '#' || value == '\\') {
+      return false;
+    }
+    if (value == '%' &&
+        (aPath.Length() - index < 3 || !IsHex(aPath.CharAt(index + 1)) ||
+         !IsHex(aPath.CharAt(index + 2)))) {
+      return false;
+    }
+    if (value == '%') {
+      index += 2;
+    }
+  }
+  return true;
+}
+
 class JsonParser final {
  public:
   JsonParser(const nsACString& aInput, nsACString& aError)
@@ -307,6 +328,10 @@ class JsonParser final {
     bool sawExtraHeaders = false;
     bool sawNoPostQuantum = false;
     bool sawInsecureConcurrency = false;
+    bool sawMaxConnections = false;
+    bool sawPreamble = false;
+    bool sawOuterSessionGate = false;
+    bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -360,6 +385,38 @@ class JsonParser final {
         sawNoPostQuantum = true;
         MOZ_TRY(ParseBoolean(parsed.mNoPostQuantum,
                              "no-post-quantum must be a boolean"));
+      } else if (key.EqualsLiteral("max-connections")) {
+        if (sawMaxConnections) {
+          return Error("duplicate max-connections field");
+        }
+        sawMaxConnections = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            parsed.mMaxConnections, std::numeric_limits<uint32_t>::max(),
+            "max-connections must be a non-negative integer",
+            "max-connections exceeds the supported range"));
+      } else if (key.EqualsLiteral("preamble")) {
+        if (sawPreamble) {
+          return Error("duplicate preamble field");
+        }
+        sawPreamble = true;
+        MOZ_TRY(ParsePreamble(parsed.mPreamble));
+      } else if (key.EqualsLiteral("outer-session-gate")) {
+        if (sawOuterSessionGate) {
+          return Error("duplicate outer-session-gate field");
+        }
+        sawOuterSessionGate = true;
+        MOZ_TRY(ParseBoolean(parsed.mOuterSessionGate,
+                             "outer-session-gate must be a boolean"));
+      } else if (key.EqualsLiteral(
+                     "diagnostic-first-socks-tunnel-urgent-start")) {
+        if (sawDiagnosticFirstSocksTunnelUrgentStart) {
+          return Error(
+              "duplicate diagnostic-first-socks-tunnel-urgent-start field");
+        }
+        sawDiagnosticFirstSocksTunnelUrgentStart = true;
+        MOZ_TRY(ParseBoolean(
+            parsed.mDiagnosticFirstSocksTunnelUrgentStart,
+            "diagnostic-first-socks-tunnel-urgent-start must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -395,6 +452,33 @@ class JsonParser final {
     if (parsed.mProxies.Length() >= 2 &&
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
       return Error("listen addresses do not match multiple proxies");
+    }
+    if (!sawPreamble) {
+      bool hasExplicitH2Proxy = false;
+      bool hasExplicitH3Proxy = false;
+      for (const auto& proxy : parsed.mProxies) {
+        if (proxy.mProtocol == ProxyProtocol::H2) {
+          hasExplicitH2Proxy = true;
+        } else if (proxy.mProtocol == ProxyProtocol::H3) {
+          hasExplicitH3Proxy = true;
+        }
+      }
+      if (hasExplicitH2Proxy || hasExplicitH3Proxy) {
+        // Promote the same cold document-start lifecycle that passed the
+        // same-base H2 and H3 screens. Explicit preamble and gate fields
+        // remain authoritative.
+        if (hasExplicitH2Proxy) {
+          parsed.mPreamble.mH2Mode = Some(PreambleMode::DocumentStartOverlap);
+        }
+        if (hasExplicitH3Proxy) {
+          parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
+        }
+        parsed.mPreamble.mPath.AssignLiteral("/");
+        parsed.mPreamble.mMaxAssets = 0;
+        parsed.mPreamble.mMaxBytes = PreambleConfig::kDefaultDocumentMaxBytes;
+        parsed.mPreamble.mCacheResources = false;
+        parsed.mImplicitPreambleGate = !sawOuterSessionGate;
+      }
     }
     aConfig = std::move(parsed);
     return NS_OK;
@@ -438,6 +522,551 @@ class JsonParser final {
       return NS_OK;
     }
     return Error(aTypeError);
+  }
+
+  nsresult ParseBoundedUnsignedInteger(uint32_t& aOutput, uint32_t aMaximum,
+                                       const char* aTypeError,
+                                       const char* aRangeError) {
+    const size_t start = mPosition;
+    if (mPosition == mInput.Length() || mInput.CharAt(mPosition) < '0' ||
+        mInput.CharAt(mPosition) > '9') {
+      return Error(aTypeError);
+    }
+    if (mInput.CharAt(mPosition) == '0') {
+      ++mPosition;
+      if (mPosition < mInput.Length() && mInput.CharAt(mPosition) >= '0' &&
+          mInput.CharAt(mPosition) <= '9') {
+        return Error(aTypeError);
+      }
+    } else {
+      while (mPosition < mInput.Length() && mInput.CharAt(mPosition) >= '0' &&
+             mInput.CharAt(mPosition) <= '9') {
+        ++mPosition;
+      }
+    }
+    if (mPosition < mInput.Length() &&
+        !IsWhitespace(mInput.CharAt(mPosition)) &&
+        mInput.CharAt(mPosition) != ',' && mInput.CharAt(mPosition) != '}') {
+      return Error(aTypeError);
+    }
+    uint64_t parsed = 0;
+    for (size_t index = start; index < mPosition; ++index) {
+      const uint64_t digit = mInput.CharAt(index) - '0';
+      if (parsed > (std::numeric_limits<uint64_t>::max() - digit) / 10) {
+        return Error(aRangeError);
+      }
+      parsed = parsed * 10 + digit;
+    }
+    if (parsed > aMaximum) {
+      return Error(aRangeError);
+    }
+    aOutput = static_cast<uint32_t>(parsed);
+    return NS_OK;
+  }
+
+  nsresult ParsePreamble(PreambleConfig& aPreamble) {
+    if (!Consume('{')) {
+      return Error("preamble must be an object");
+    }
+    SkipWhitespace();
+    if (Consume('}')) {
+      return Error("preamble requires a mode field");
+    }
+
+    bool sawMode = false;
+    bool sawH2Mode = false;
+    bool sawH3Mode = false;
+    bool sawPath = false;
+    bool sawMaxAssets = false;
+    bool sawMaxBytes = false;
+    bool sawCacheResources = false;
+    auto parseMode = [&](PreambleMode& aMode) -> nsresult {
+      nsAutoCString mode;
+      MOZ_TRY(ParseString(mode, "preamble mode must be a string"));
+      if (mode.EqualsLiteral("off")) {
+        aMode = PreambleMode::Off;
+      } else if (mode.EqualsLiteral("document-complete") ||
+                 mode.EqualsLiteral("root")) {
+        aMode = PreambleMode::DocumentComplete;
+      } else if (mode.EqualsLiteral("document-carrier-dispatch")) {
+        aMode = PreambleMode::DocumentCarrierDispatch;
+      } else if (mode.EqualsLiteral("document-cold-winner-handoff")) {
+        aMode = PreambleMode::DocumentColdWinnerHandoff;
+      } else if (mode.EqualsLiteral("document-native-cache-open")) {
+        aMode = PreambleMode::DocumentNativeCacheOpen;
+      } else if (mode.EqualsLiteral("document-native-channel-open")) {
+        return Error(
+            "document-native-channel-open was retired because the falsified "
+            "diagnostic pulled the full Safe Browsing protobuf/Abseil graph "
+            "into the lean product");
+      } else if (mode.EqualsLiteral("document-handshake-confirmed")) {
+        aMode = PreambleMode::DocumentHandshakeConfirmed;
+      } else if (mode.EqualsLiteral("document-overlap")) {
+        aMode = PreambleMode::DocumentOverlap;
+      } else if (mode.EqualsLiteral("document-start-overlap")) {
+        aMode = PreambleMode::DocumentStartOverlap;
+      } else if (mode.EqualsLiteral("tree-complete") ||
+                 mode.EqualsLiteral("tree")) {
+        aMode = PreambleMode::TreeComplete;
+      } else if (mode.EqualsLiteral("tree-overlap")) {
+        aMode = PreambleMode::TreeOverlap;
+      } else if (mode.EqualsLiteral("tree-early-overlap")) {
+        aMode = PreambleMode::TreeEarlyOverlap;
+      } else if (mode.EqualsLiteral("tree-root-overlap")) {
+        aMode = PreambleMode::TreeRootOverlap;
+      } else if (mode.EqualsLiteral("tree-resource-committed-overlap")) {
+        aMode = PreambleMode::TreeResourceCommittedOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-resource-native-cache-committed-overlap")) {
+        aMode = PreambleMode::TreeResourceNativeCacheCommittedOverlap;
+      } else if (mode.EqualsLiteral("tree-native-parser-preload-overlap")) {
+        aMode = PreambleMode::TreeNativeParserPreloadOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-start-overlap")) {
+        aMode = PreambleMode::TreeNativeParserDocumentStartOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-start-resource-tree")) {
+        aMode = PreambleMode::TreeNativeParserDocumentStartResourceTree;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-start-navigation-stop")) {
+        aMode = PreambleMode::TreeNativeParserDocumentStartNavigationStop;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-start-response-stop")) {
+        aMode = PreambleMode::TreeNativeParserDocumentStartResponseStop;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-handoff-overlap")) {
+        aMode = PreambleMode::TreeNativeParserDocumentHandoffOverlap;
+      } else if (mode.EqualsLiteral("tree-native-parser-retarget-overlap")) {
+        aMode = PreambleMode::TreeNativeParserRetargetOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-ipc-rendezvous-overlap")) {
+        aMode = PreambleMode::TreeNativeParserIpcRendezvousOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-root-rendezvous-overlap")) {
+        aMode = PreambleMode::TreeNativeParserRootRendezvousOverlap;
+      } else if (mode.EqualsLiteral("tree-native-parser-process-overlap")) {
+        aMode = PreambleMode::TreeNativeParserProcessOverlap;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-full-process-overlap")) {
+        aMode = PreambleMode::TreeNativeParserFullProcessOverlap;
+      } else {
+        return Error("unsupported preamble mode");
+      }
+      return NS_OK;
+    };
+    while (true) {
+      nsAutoCString key;
+      MOZ_TRY(ParseString(key, "preamble field name must be a string"));
+      SkipWhitespace();
+      if (!Consume(':')) {
+        return Error("expected ':' after preamble field name");
+      }
+      SkipWhitespace();
+      if (key.EqualsLiteral("mode")) {
+        if (sawMode) {
+          return Error("duplicate preamble mode field");
+        }
+        sawMode = true;
+        MOZ_TRY(parseMode(aPreamble.mMode));
+      } else if (key.EqualsLiteral("h2-mode") || key.EqualsLiteral("h3-mode")) {
+        bool& sawProtocolMode =
+            key.EqualsLiteral("h2-mode") ? sawH2Mode : sawH3Mode;
+        if (sawProtocolMode) {
+          return Error("duplicate protocol preamble mode field");
+        }
+        sawProtocolMode = true;
+        PreambleMode mode;
+        MOZ_TRY(parseMode(mode));
+        if (key.EqualsLiteral("h2-mode")) {
+          aPreamble.mH2Mode = Some(mode);
+        } else {
+          aPreamble.mH3Mode = Some(mode);
+        }
+      } else if (key.EqualsLiteral("path")) {
+        if (sawPath) {
+          return Error("duplicate preamble path field");
+        }
+        sawPath = true;
+        MOZ_TRY(ParseString(aPreamble.mPath, "preamble path must be a string"));
+        if (!IsValidPreamblePath(aPreamble.mPath)) {
+          return Error("preamble path must be an absolute origin-form path");
+        }
+      } else if (key.EqualsLiteral("max-assets")) {
+        if (sawMaxAssets) {
+          return Error("duplicate preamble max-assets field");
+        }
+        sawMaxAssets = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            aPreamble.mMaxAssets, PreambleConfig::kMaximumAssets,
+            "preamble max-assets must be a non-negative integer",
+            "preamble max-assets exceeds the hard limit"));
+      } else if (key.EqualsLiteral("max-bytes")) {
+        if (sawMaxBytes) {
+          return Error("duplicate preamble max-bytes field");
+        }
+        sawMaxBytes = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            aPreamble.mMaxBytes, PreambleConfig::kMaximumBytes,
+            "preamble max-bytes must be a non-negative integer",
+            "preamble max-bytes exceeds the hard limit"));
+      } else if (key.EqualsLiteral("cache-resources")) {
+        if (sawCacheResources) {
+          return Error("duplicate preamble cache-resources field");
+        }
+        sawCacheResources = true;
+        MOZ_TRY(ParseBoolean(aPreamble.mCacheResources,
+                             "preamble cache-resources must be a boolean"));
+      } else {
+        return Error("unsupported preamble field");
+      }
+
+      SkipWhitespace();
+      if (Consume('}')) {
+        break;
+      }
+      if (!Consume(',')) {
+        return Error("expected ',' or '}' after preamble field");
+      }
+      SkipWhitespace();
+    }
+
+    if (!sawMode) {
+      return Error("preamble requires a mode field");
+    }
+    const PreambleMode h2Mode = aPreamble.ModeForProtocol(ProxyProtocol::H2);
+    const PreambleMode h3Mode = aPreamble.ModeForProtocol(ProxyProtocol::H3);
+    if (h2Mode == PreambleMode::DocumentHandshakeConfirmed ||
+        h2Mode == PreambleMode::DocumentCarrierDispatch ||
+        h2Mode == PreambleMode::DocumentColdWinnerHandoff ||
+        h2Mode == PreambleMode::DocumentNativeCacheOpen) {
+      return Error("selected diagnostic preamble is only supported for H3");
+    }
+    if (h3Mode == PreambleMode::DocumentHandshakeConfirmed &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentHandshakeConfirmed))) {
+      return Error(
+          "document-handshake-confirmed must be selected explicitly with "
+          "h3-mode");
+    }
+    if (h3Mode == PreambleMode::DocumentCarrierDispatch &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentCarrierDispatch))) {
+      return Error(
+          "document-carrier-dispatch must be selected explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::DocumentColdWinnerHandoff &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentColdWinnerHandoff))) {
+      return Error(
+          "document-cold-winner-handoff must be selected explicitly with "
+          "h3-mode");
+    }
+    if (h3Mode == PreambleMode::DocumentNativeCacheOpen &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(PreambleMode::DocumentNativeCacheOpen))) {
+      return Error(
+          "document-native-cache-open must be selected explicitly with "
+          "h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&
+        (!sawH3Mode || aPreamble.mH3Mode !=
+                           Some(PreambleMode::TreeResourceCommittedOverlap))) {
+      return Error(
+          "tree-resource-committed-overlap must be selected explicitly with "
+          "h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeResourceNativeCacheCommittedOverlap))) {
+      return Error(
+          "tree-resource-native-cache-committed-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserPreloadOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserPreloadOverlap))) {
+      return Error(
+          "tree-native-parser-preload-overlap must be selected explicitly "
+          "with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartOverlap))) {
+      return Error(
+          "tree-native-parser-document-start-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartOverlap))) {
+      return Error(
+          "tree-native-parser-document-start-overlap must be selected "
+          "explicitly with h2-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartNavigationStop))) {
+      return Error(
+          "tree-native-parser-document-start-navigation-stop must be "
+          "selected explicitly with h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartNavigationStop))) {
+      return Error(
+          "tree-native-parser-document-start-navigation-stop must be "
+          "selected explicitly with h2-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResponseStop))) {
+      return Error(
+          "tree-native-parser-document-start-response-stop must be "
+          "selected explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentHandoffOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentHandoffOverlap))) {
+      return Error(
+          "tree-native-parser-document-handoff-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserRetargetOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserRetargetOverlap))) {
+      return Error(
+          "tree-native-parser-retarget-overlap must be selected explicitly "
+          "with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserIpcRendezvousOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserIpcRendezvousOverlap))) {
+      return Error(
+          "tree-native-parser-ipc-rendezvous-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserRootRendezvousOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserRootRendezvousOverlap))) {
+      return Error(
+          "tree-native-parser-root-rendezvous-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserProcessOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserProcessOverlap))) {
+      return Error(
+          "tree-native-parser-process-overlap must be selected explicitly "
+          "with h3-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserFullProcessOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserFullProcessOverlap))) {
+      return Error(
+          "tree-native-parser-full-process-overlap must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeResourceCommittedOverlap ||
+        h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
+        (PreambleModeUsesNativeParser(h2Mode) &&
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap &&
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartNavigationStop)) {
+      return Error("selected resource-committed preamble is H3-only");
+    }
+    const bool anyActive =
+        h2Mode != PreambleMode::Off || h3Mode != PreambleMode::Off;
+    const bool anyTree =
+        PreambleModeUsesResources(h2Mode) || PreambleModeUsesResources(h3Mode);
+    if (!anyActive) {
+      if (sawPath || sawMaxAssets || sawMaxBytes || sawCacheResources) {
+        return Error(
+            "disabled preamble must not specify path, budgets, or caching");
+      }
+      return NS_OK;
+    }
+    if (!sawPath) {
+      return Error("active preamble requires an explicit path");
+    }
+    if (!sawMaxBytes) {
+      aPreamble.mMaxBytes = anyTree ? 256 * 1024 : 64 * 1024;
+    }
+    if (aPreamble.mMaxBytes == 0) {
+      return Error("active preamble max-bytes must be positive");
+    }
+    if (!anyTree) {
+      if (sawCacheResources) {
+        return Error("preamble cache-resources requires a tree/resource mode");
+      }
+      if (aPreamble.mMaxAssets != 0) {
+        return Error("document-only preamble max-assets must be zero");
+      }
+    } else if (!sawMaxAssets) {
+      aPreamble.mMaxAssets = 2;
+    }
+    if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&
+        aPreamble.mMaxAssets != 1) {
+      return Error(
+          "tree-resource-committed-overlap requires exactly one asset");
+    }
+    if (h3Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-resource-native-cache-committed-overlap requires exactly "
+            "one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-resource-native-cache-committed-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserPreloadOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-preload-overlap requires exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-preload-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
+        h3Mode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-document-start-overlap requires exactly one "
+            "asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-start-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree ||
+        h3Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree) {
+      if (aPreamble.mMaxAssets != 3) {
+        return Error(
+            "tree-native-parser-document-start-resource-tree requires "
+            "exactly three assets");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-start-resource-tree requires "
+            "cache-resources=true");
+      }
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop ||
+        h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-document-start-navigation-stop requires "
+            "exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-start-navigation-stop requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-document-start-response-stop requires "
+            "exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-start-response-stop requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentHandoffOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-document-handoff-overlap requires exactly "
+            "one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-handoff-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserRetargetOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-retarget-overlap requires exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-retarget-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserIpcRendezvousOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-ipc-rendezvous-overlap requires exactly "
+            "one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-ipc-rendezvous-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserRootRendezvousOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-root-rendezvous-overlap requires exactly "
+            "one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-root-rendezvous-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserProcessOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-process-overlap requires exactly one asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-process-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserFullProcessOverlap) {
+      if (aPreamble.mMaxAssets != 1) {
+        return Error(
+            "tree-native-parser-full-process-overlap requires exactly one "
+            "asset");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-full-process-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    return NS_OK;
   }
 
   nsresult ParsePositiveCompatibilityInteger(const char* aTypeError) {
@@ -512,8 +1141,7 @@ class JsonParser final {
     if (negative) {
       signedValue = -signedValue;
     }
-    if (signedValue <= 0 ||
-        signedValue > std::numeric_limits<int32_t>::max()) {
+    if (signedValue <= 0 || signedValue > std::numeric_limits<int32_t>::max()) {
       return Error(aTypeError);
     }
     return NS_OK;
@@ -654,17 +1282,15 @@ class JsonParser final {
     nsTArray<nsCString> tokens;
     size_t position = 0;
     while (position < aValue.Length()) {
-      while (position < aValue.Length() &&
-             (aValue.CharAt(position) == ' ' ||
-              aValue.CharAt(position) == '\t')) {
+      while (position < aValue.Length() && (aValue.CharAt(position) == ' ' ||
+                                            aValue.CharAt(position) == '\t')) {
         ++position;
       }
       if (position == aValue.Length()) {
         break;
       }
       const size_t start = position;
-      while (position < aValue.Length() &&
-             aValue.CharAt(position) != ' ' &&
+      while (position < aValue.Length() && aValue.CharAt(position) != ' ' &&
              aValue.CharAt(position) != '\t') {
         if (aValue.CharAt(position) == '\r' ||
             aValue.CharAt(position) == '\n') {
@@ -714,14 +1340,12 @@ class JsonParser final {
       }
       size_t valueStart = static_cast<size_t>(colon + 1);
       size_t valueEnd = line.Length();
-      while (valueStart < valueEnd &&
-             (line.CharAt(valueStart) == ' ' ||
-              line.CharAt(valueStart) == '\t')) {
+      while (valueStart < valueEnd && (line.CharAt(valueStart) == ' ' ||
+                                       line.CharAt(valueStart) == '\t')) {
         ++valueStart;
       }
-      while (valueEnd > valueStart &&
-             (line.CharAt(valueEnd - 1) == ' ' ||
-              line.CharAt(valueEnd - 1) == '\t')) {
+      while (valueEnd > valueStart && (line.CharAt(valueEnd - 1) == ' ' ||
+                                       line.CharAt(valueEnd - 1) == '\t')) {
         --valueEnd;
       }
       header.mValue.Assign(Substring(line, valueStart, valueEnd - valueStart));
@@ -856,8 +1480,8 @@ class JsonParser final {
         return Error("listener URI requires username and password");
       }
       MOZ_TRY(PercentDecode(Substring(userInfo, 0, colon), aListener.mUser));
-      MOZ_TRY(PercentDecode(Substring(userInfo, colon + 1),
-                            aListener.mPassword));
+      MOZ_TRY(
+          PercentDecode(Substring(userInfo, colon + 1), aListener.mPassword));
       if (aListener.mUser.IsEmpty() || aListener.mPassword.IsEmpty() ||
           aListener.mUser.Length() > 255 ||
           aListener.mPassword.Length() > 255) {
@@ -987,8 +1611,8 @@ class JsonParser final {
     nsAutoCString host;
     bool ipv6 = false;
     uint16_t port = 443;
-    MOZ_TRY(ParseHostPort(Substring(authority, endpointStart), false, host, ipv6,
-                          port));
+    MOZ_TRY(ParseHostPort(Substring(authority, endpointStart), false, host,
+                          ipv6, port));
     in_addr ipv4Address{};
     if (!ipv6 &&
         ParseNetworkAddress(AF_INET, PromiseFlatCString(host).get(),

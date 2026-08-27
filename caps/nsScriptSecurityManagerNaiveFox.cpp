@@ -11,7 +11,6 @@
 #include "nsIChannel.h"
 #include "nsIDomainPolicy.h"
 #include "nsIURI.h"
-#include "nsJSPrincipals.h"
 #include "nsString.h"
 
 using namespace mozilla;
@@ -220,6 +219,9 @@ nsresult nsScriptSecurityManager::GetChannelResultPrincipalIfNotSandboxed(
 
 NS_IMETHODIMP nsScriptSecurityManager::GetChannelURIPrincipal(
     nsIChannel*, nsIPrincipal** aResult) {
+  // The lean runtime keeps channel security semantics system-owned. The
+  // classifier-only URI principal needed by one diagnostic is private to
+  // nsChannelClassifier and must never escape through this general API.
   return GetSystemPrincipal(aResult);
 }
 

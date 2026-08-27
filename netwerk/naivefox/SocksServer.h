@@ -21,6 +21,23 @@ class nsIEventTarget;
 
 namespace mozilla::naivefox {
 
+namespace detail {
+
+// Selects one fully parsed SOCKS tunnel across all listeners owned by a
+// RunLocalProxyServer invocation. Disabled probes deliberately do not consume
+// the one-shot claim.
+class FirstSocksTunnelUrgentStartSelector final {
+ public:
+  bool Claim(bool aEnabled) {
+    return aEnabled && mClaimed.compareExchange(false, true);
+  }
+
+ private:
+  Atomic<bool, Relaxed> mClaimed{false};
+};
+
+}  // namespace detail
+
 class LocalProxyServerControl final {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(LocalProxyServerControl)

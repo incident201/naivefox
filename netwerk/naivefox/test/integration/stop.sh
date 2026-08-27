@@ -29,7 +29,7 @@ if [[ -f "$RUN_DIR/fixture.env" ]]; then
   fixture_pass=${NAIVEFOX_FIXTURE_PASS:-}
 fi
 
-for name in caddy target; do
+for name in caddy inner-h2 target; do
   pid_file="$RUN_DIR/$name.pid"
   [[ -f "$pid_file" ]] || continue
   pid=$(<"$pid_file")
@@ -47,7 +47,7 @@ done
 
 {
   [[ -f "$RUN_DIR/diagnostics.txt" ]] && cat "$RUN_DIR/diagnostics.txt"
-  for log in caddy target; do
+  for log in caddy inner-h2 target; do
     if [[ -s "$RUN_DIR/$log.log" ]]; then
       printf '\n[%s.log]\n' "$log"
       tail -n 100 "$RUN_DIR/$log.log"
@@ -58,4 +58,3 @@ done
 rm -rf -- "$RUN_DIR"
 rm -f -- "$ACTIVE_RUN_FILE"
 [[ $quiet -eq 1 ]] || printf 'fixture stopped\n'
-

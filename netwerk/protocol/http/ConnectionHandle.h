@@ -27,7 +27,7 @@ class ConnectionHandle : public nsAHttpConnection {
   NS_DECL_NSAHTTPCONNECTION(mConn)
 
   explicit ConnectionHandle(HttpConnectionBase* conn) : mConn(conn) {}
-  void Reset() { mConn = nullptr; }
+  void Reset();
   HttpConnectionBase* Conn() { return mConn.get(); }
 
  private:

@@ -741,7 +741,8 @@ nsresult nsHttpConnection::AddTransaction(nsAHttpTransaction* httpTransaction,
 
   // Let the transaction know that the tunnel is already established and we
   // don't need to setup the tunnel again.
-  if (transCI->UsingConnect()) {
+  if (transCI->UsingConnect() &&
+      !(httpTransaction->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
     MOZ_ASSERT(mProxyConnectResponseHead);
     httpTransaction->OnProxyConnectComplete(mProxyConnectResponseHead);
   }

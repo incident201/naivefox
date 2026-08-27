@@ -5,6 +5,224 @@ NSS/PSM, and Neqo wire machinery without accidental project-specific markers.
 It is diagnostic: a browser GET and padded proxy CONNECT are different
 workloads, so packet timing and volume are not fingerprint-equality targets.
 
+## Size-independent mechanism rule
+
+Fixture asset sizes are diagnostic inputs, not camouflage parameters. A
+candidate must not be selected by searching for a response size which happens
+to improve a packet index, time window, or classifier score. Production code
+may retain bounded byte budgets for safety, but it must derive scheduling,
+headers, priorities, cache behavior, and stream lifecycle from normal Gecko
+causes. Any topology candidate should remain directionally stable across a
+small predeclared range of ordinary fixture sizes before promotion.
+
+`document-overlap` is the size-independent control for document scheduling. It
+admits CONNECT after successful 2xx document response HEADERS while the Necko
+listener is still active, and then requires a normal document drain. Decrypted
+admission requires one QUIC identity, one outer ClientHello, matching
+`document-complete` request semantics and response `Content-Length`, and the
+product lifecycle order `response-headers admission -> CONNECT -> normal
+drain`. Whether server FIN happens before or after CONNECT is report-only: it
+must never trigger sample replacement or fixture-size adjustment.
+
+`document-start-overlap` moves the barrier earlier without using a main-loop
+turn as a proxy for socket progress. The root channel's own
+`NS_NET_STATUS_WAITING_FOR` event proves that Gecko committed the bodyless GET
+to its H2/H3 stream path before CONNECT is admitted. The final response result
+and normal drain are recorded separately. H3 decrypted admission requires GET
+HEADERS to precede CONNECT HEADERS on the sole QUIC identity; failure rejects
+the mechanism and never causes selective recapture. Response HEADERS and FIN
+ordering remain outcomes rather than admission criteria.
+
+Safe 30-block same-base acceptance artifact `7b5c70011f0fba08` (seed
+`27082730`) compared explicit `off` with `document-start-overlap` using paired
+Firefox A/B controls and inner HTTPS/H2. The document-start policy improved
+packets 1--16 (`0.16459` to `0.13442`), packets 17--32 (`0.76117` to
+`0.65828`), packets 1--32 (`0.26499` to `0.22720`), packets 1--64/128, and the
+250 ms view (`0.14026` to `0.12081`). No whole-flow regression was detected
+(`0.38926` to `0.38660`; paired CI included zero), but equivalence was not
+proved. All 120 participants passed
+the isolated-network mutation and capture-drop policy. This satisfies the
+predeclared product gate for H3. The final six-block H2 resource-tree screen
+then retained the lower distance for the same compact mechanism in every view
+after packets 1--16. Omitted preamble therefore enables
+`document-start-overlap` for explicit H2 and H3 upstreams; explicit
+`mode: off` remains the control and opt-out.
+Secondary `steady_after_32` and lifecycle point estimates favored `off`; the
+steady paired interval crossed zero and lifecycle did not survive the report's
+Holm correction (`p=0.136`). They remain regression monitors rather than a
+reason to override the predeclared early/250 ms/whole acceptance views.
+
+`tree-native-parser-document-start-overlap` keeps the same request-commit
+barrier and lets the root continue in the background through the lean HTML5
+speculative scanner and one native stylesheet preload. Decrypted admission is
+fail-closed on one QUIC identity and one ClientHello, exact document and CSS
+semantics, and the wire order `root GET < CONNECT < CSS GET < CSS 200/FIN`.
+The mode deliberately does not require any packet position, elapsed time, or
+asset-size-derived overlap. Six-block H2-inside-CONNECT screening improved
+packets 17--32 from `0.62052` to `0.50648` and packets 1--32 from `0.22690` to
+`0.20573`, but worsened the 250 ms and whole-flow views because the completed
+stylesheet remains additional traffic. It is therefore not promoted by that
+screen alone.
+
+The same mode is available as an explicit H2-only experiment. Decrypted
+same-base admission proves one TCP/TLS/H2 connection, equal semantic TLS and
+SETTINGS, normal document/FromParser request semantics, and the wire order
+`root GET < CONNECT < CSS GET`, followed by successful root and CSS
+END_STREAM. Six-block direct-Firefox screening `fec6d5d295bcecf0` improved
+packets 17--32 from `0.45721` to `0.43922` and packets 1--32 from `0.22483` to
+`0.21018`, while worsening 250 ms from `0.13102` to `0.14840` and whole-flow
+from `0.28498` to `0.31852`. The complete stylesheet added about 67 KiB of
+server traffic by 250 ms, so this H2 arm is not a default candidate either.
+
+The final bounded H2 fronting-page experiment extended that mechanism to one
+same-origin stylesheet, classic deferred script, and image, all discovered by
+the lean HTML5 speculative scanner and opened through native Necko preload
+channels after early CONNECT admission. Two fresh decrypted runs proved one
+outer TLS/H2 connection, one ClientHello, normal END_STREAM completion, exact
+same-base request semantics, and `root GET -> CONNECT -> resource GETs`. The
+isolated six-block paired screen is retained as `f244527d965b626e`. Relative to
+`document-start-overlap`, the resource tree was tied for packets 1--16
+(`0.06880` versus `0.06871`) but worse for packets 17--32 (`0.50135` versus
+`0.45276`), packets 1--32 (`0.21964` versus `0.19245`), 250 ms (`0.19285`
+versus `0.18929`), and whole flow (`0.49826` versus `0.48398`). It introduced
+about 47 KiB of additional early server traffic and a new burst rather than
+removing the residual. The tree is therefore rejected as a default;
+`document-start-overlap` is the compact H2 product policy.
+
+H2 `tree-native-parser-document-start-navigation-stop` retains the same
+client-to-target ownership predicate and scoped load-group cancellation.
+Decrypted admission proves `root GET < CONNECT < CSS GET < CSS 200 <
+RST_STREAM(CANCEL)`, no CSS END_STREAM, and one TCP/TLS/H2 connection. In the
+six-block direct-Firefox screen `2f2b4c49e0b6edb7`, however, packets 17--32
+changed only from `0.48108` to `0.47885`; packets 1--32 improved from `0.23117`
+to `0.21944`, while packets 1--16, 250 ms, and whole-flow all worsened. Server
+bytes by 250 ms were nearly identical for complete and canceled CSS, showing
+that the response had already entered the H2/TLS/TCP send path before the
+causal cancel. The H2 stop mode therefore remains diagnostic and is not a
+default candidate.
+
+A server-side H2 padding-phase control then tested whether the existing Naive
+Variant 1 budget could fill part of the nested-handshake gap without adding
+bytes. The opt-in Caddy path moved the same eight independently randomized
+padding records from the first target reads to immediately after the first
+positive client-to-target payload. It used valid zero-payload Variant 1
+records, required no client decoder change, and left unmodified NaiveProxy
+clients on the stock path. Six-block same-base artifact `2c4ef7e9e097254b`
+compared both arms only with ordinary direct Firefox A/B. The shift improved
+packets 1--16 (`0.14803` to `0.13831`) but worsened packets 17--32 (`0.58058`
+to `0.61987`), packets 1--32 (`0.28510` to `0.29356`), and 250 ms (`0.12589`
+to `0.12960`). It also compressed the first-32-packet phase from about 56.5 ms
+to 32.9 ms instead of reproducing Firefox's roughly 53--56 ms phase. The
+server patch and arm were removed. Legacy Variant 1 can contribute at most
+`8 * 255 = 2040` padding bytes per direction; a larger cover protocol would
+therefore add traffic rather than redistribute the existing budget. The
+complete-stylesheet upper bound already shows that such additive early volume
+trades a local 17--32 improvement for a 250 ms/whole-flow penalty.
+
+The preceding H2 packet-index screens were collected with segmentation
+offloads disabled but the Linux loopback MTU still at its default 65536 bytes.
+Their SYNs advertised MSS 65495, and direct Firefox consequently exposed
+5--8 KiB host-local TCP segments in packets 22--32.  Those results remain
+useful lifecycle/byte-volume diagnostics, but their packet-index distances are
+not physical-wire camouflage evidence and must not select a product default.
+Controlled H2 screening now sets and verifies loopback MTU 1500 before any
+endpoint starts and rejects an outer TCP segment with more than 1460 payload
+bytes.  H2 product decisions require a fresh same-base baseline under this
+policy.
+
+The first fail-closed two-block gate under that policy is safe artifact
+`00de90dccbdb2cec` (seed `2026082701`).  SYN MSS was 1460 for every participant
+and no oversized outer TCP segment was admitted.  By packet 32 direct Firefox
+had about 10.9 KiB of server transport payload rather than the earlier
+55--62 KiB loopback-supersegment result; H2 `off` had about 6.4 KiB.  The main
+remaining shape was temporal: direct Firefox reached packet 32 around
+51--56 ms, while `off` reached it around 11 ms.  A bodyless
+`document-start-overlap` control improved the isolated packets-17--32 distance
+but worsened packets 1--16, packets 1--32, 250 ms, and whole flow.  With only
+two blocks this is localization evidence, not inference or a product default.
+
+A server-backpressure control then kept the ordinary 64-KiB declared
+stylesheet but made only one HTTP/2 maximum-DATA-frame-sized source chunk
+available before Gecko's existing causal navigation stop.  Six-block safe
+artifact `4cf0e735fac6e9fc` (seed `2026082704`) confirmed the mechanism rather
+than a product preset: packets 17--32 improved from `0.59298` for `off` to
+`0.51864`, and packets 1--32 from `0.24220` to `0.22026`.  However packets
+1--16 worsened from `0.08364` to `0.09202`, 250 ms from `0.07451` to
+`0.08283`, and whole flow from `0.23120` to `0.25397`.  The bounded response
+still added about 16 KiB of server traffic by 250 ms.  Therefore a fixed
+one-frame response is not a default candidate.  It establishes only that
+server-side backpressure can preserve the useful early stylesheet phase while
+substantially reducing the complete-response penalty; a successor must derive
+availability from real tunnel lifecycle events rather than a selected byte
+count or timer.
+
+Three subsequent two-block fail-closed controls rejected the remaining simple
+H2 server-shaping candidates before any larger run.  In `b4e50d4c5b2f6e01`,
+the stylesheet received a partial body only after the first successful
+target-to-client CONNECT write on the same physical H2 connection.  This
+event-derived release improved packets 17--32 only slightly, left packets
+1--32 effectively unchanged, and retained a whole-flow penalty.  A separate
+randomized 8--32 ms first-flight deferral (`360c141b0530a2b9`) likewise traded
+a small packets-17--32 change for worse packets 1--16, 250 ms, and whole flow;
+the timing range was not tuned further.  Stock `outer-session-gate`
+(`e4a22a686496c9e1`) did not improve packets 17--32 or 1--32, despite better
+250 ms/whole point estimates.  Finally, opt-in randomized fragmentation of
+the existing first eight padded target records (`acfefa8613e22022`) added no
+cover payload and improved both early slices descriptively, but its extra
+H2/TLS framing sharply worsened 250 ms (`0.07142` to `0.15499`) and whole flow
+(`0.26033` to `0.34173`).  All four server experiments were removed; the
+pinned server binary and module source were restored byte-for-byte.  These
+screens do not prove the H2 residual unfixable, but they rule out fixed cover,
+first-event cover, cold-flight delay, gate-only establishment, and early
+record fragmentation as acceptable defaults under the no-tail-regression
+criterion.
+
+`tree-native-parser-document-start-navigation-stop` tests whether Firefox's
+normal scoped load-group cancellation can retain that early server-heavy phase
+without paying for the complete synthetic stylesheet. CONNECT is not a member
+of the synthetic navigation load group. Cancellation is admitted only after
+the CONNECT handoff, positive client-to-target tunnel application data, and a
+successful stylesheet `OnStartRequest` with 2xx response headers. These two
+asynchronous runtime predicates may arrive in either order. Decrypted admission
+requires `root GET < CONNECT < CSS GET < CSS 200 < cancellation`, one QUIC
+identity, one ClientHello, and the expected aborted stylesheet drain. It never
+uses elapsed time, packet position, or delivered-byte count as a gate.
+
+`tree-native-parser-document-start-response-stop` uses the same scoped load
+group but waits for positive decoded target-to-client tunnel payload instead
+of client-to-target activity. Runtime admission has two mutually exclusive
+valid terminal branches: a causal abort with target activity, stop, expected
+`NS_BINDING_ABORTED`, and no complete CSS drain; or natural completion with a
+normal one-resource drain and no activity/stop/abort markers. Mixed branches
+are rejected. Decrypted abort admission requires positive H3 DATA on the
+CONNECT stream before CSS STOP_SENDING and RESET_STREAM, error `0x10c`, no CSS
+FIN, and positive but partial CSS DATA relative to its declared body length.
+Packet index, time, and QUIC reset final size are outcomes only because the
+reset offset also includes HTTP/3 framing and HEADERS.
+
+The first response-start trace placed the CSS GET at packet 18, CSS 200 at
+packet 22, delivered the server burst through packet 58, and then emitted
+STOP_SENDING/RESET_STREAM; the reset final size was about 51.8 KiB. Safe
+six-block H2-inside-CONNECT screen `125ee98eabf85501` (seed `20260829`) found
+the arm best at packets 1--32 (`0.20573` versus `0.20945` for complete CSS and
+`0.23821` for document-start), but not at packets 17--32, 250 ms, or whole-flow.
+Whole-flow remained `0.41881` versus `0.41220` for document-start. Upstream
+audit confirms the tradeoff is fundamental: a normal FromParser stylesheet
+drains to FIN, while canceling an active H3 load necessarily produces request
+cancel/reset signaling. The arm remains experimental and does not change the
+product default.
+
+Safe six-block response-stop screen `9193f5a55f430bda` (seed `27082707`)
+observed one abort and five natural completions. It improved packets 17--32 to
+`0.57228` and packets 1--32 to `0.19807`, but `document-start-overlap` remained
+better at 250 ms (`0.12532` versus `0.13297`) and whole-flow (`0.38923` versus
+`0.39998`). The reset therefore was not a deterministic every-tunnel marker,
+but the opportunistic policy also failed to remove the late stylesheet volume
+reliably. This does not justify promotion or a 30-block confirmation.
+The product keeps a working tunnel alive if the bounded background drain times
+out, but the controlled harness rejects that third operational outcome because
+it proves neither a causal abort nor a complete natural stylesheet lifecycle.
+
 ## Modes and policy
 
 The runners support two reference modes:
@@ -30,8 +248,10 @@ Run the H2, H3, and passive comparisons from the integration directory:
 
 ```bash
 ./run-capture-comparison.sh
+./run-h2-capture-comparison.sh --arm root
 ./run-h3-capture-comparison.sh
 ./run-observer-comparison.sh
+./run-camouflage-suite.sh --mode smoke --protocol both
 ```
 
 For same-base mode, provide the reference paths required by the runner:
@@ -46,6 +266,31 @@ NAIVEFOX_CAPTURE_REFERENCE_OBJDIR=/path/to/firefox-objdir \
 
 The H3 runner accepts the same selection variables. Keep the Firefox and
 NaiveFox packages and object directories isolated.
+
+Create the ordinary Firefox reference once with the dedicated builder:
+
+```bash
+netwerk/naivefox/tools/build-firefox-same-base.sh --dry-run
+netwerk/naivefox/tools/build-firefox-same-base.sh
+netwerk/naivefox/tools/build-firefox-same-base.sh --verify
+netwerk/naivefox/tools/build-firefox-same-base.sh --reuse
+```
+
+The builder derives the exact merge-base of the current NaiveFox revision and
+`firefox-upstream`, checks it out as a detached pristine worktree, and performs
+one optimized non-PGO browser build with four jobs by default. It runs
+`mach package` and records the source revisions, full mozconfig, mozinfo,
+toolchain and sccache identity, application and ELF build IDs, NSS key-log
+define, and hashes of the package and capture runtime in a private manifest
+below the reference object directory.
+
+The reference is reusable by later NaiveFox revisions that retain the same
+Firefox merge-base. A completed manifest is verified instead of rebuilding;
+an exact prepared manifest may resume an interrupted build. The builder never
+deletes or clobbers an existing worktree or object directory and refuses any
+unrecognized directory. `--reuse` prints the verified paths expected by the
+capture runners. Override the external paths only with `--worktree` and
+`--objdir`; use `--sccache off` when compiler caching is not wanted.
 
 ## Capture prerequisites
 
@@ -88,6 +333,225 @@ For H2, compare:
 - `padding` request/response header names;
 - absence of synthetic `alpn`, `upgrade`, and `connection` request headers.
 
+`run-h2-capture-comparison.sh` is the hardened same-base sequence admission
+for camouflage arms. It always re-executes inside the private capture network,
+starts a route-netlink mutation monitor before each participant, disables and
+verifies namespace-local loopback offloads, rejects dumpcap drops or early
+exit, and requires direct Firefox and NaiveFox to use one physical TCP/H2
+connection. Private key logs drive ALPN, client SETTINGS, and per-stream
+GET/CONNECT/response/END_STREAM reconstruction. Safe output retains only
+header names, relative timing and ordering, stream indices, equality booleans, and build
+identity; header values, endpoint values, credentials, profiles, captures, and
+keys are deleted after success. Both cohorts deliberately use a command-line
+cold Firefox start after capture begins, and that backend/start state is
+recorded so warm Selenium and cold command-line runs cannot be mixed silently.
+For tree arms, private admission also requires native HTTPS document fetch
+metadata with exact `Priority: u=0, i`, plus same-origin stylesheet/script
+`Referer`, fetch metadata, and `Priority: u=2`; only pass/fail booleans enter
+the safe summary.
+
+The H2 `document-start-overlap` diagnostic additionally requires the causal
+runtime admission, successful result, normal drain, and CONNECT-established
+markers to belong to one NaiveFox connection lifecycle. Decrypted wire
+admission requires the document GET HEADERS before CONNECT, an HTTP 2xx
+document response, and a normal H2 END_STREAM on that document stream. The
+END_STREAM position relative to CONNECT is deliberately report-only: request
+commit, rather than response completion or a selected frame position, releases
+CONNECT in this mode.
+
+`run-h2-connect-priority-comparison.sh` isolates the scheduling cause of the
+first SOCKS tunnel. It uses the same authenticated Caddy listener for an
+ordinary proxied same-base Firefox navigation, NaiveFox default, and the
+explicit first-tunnel UrgentStart diagnostic. Firefox receives a private
+exact-target channel filter through a system-access Marionette session; the
+filter carries preemptive proxy authorization in memory, never in a profile or
+command line. The decrypted gate rejects a 407, multiple outer TCP/ClientHello
+identities, TLS/SETTINGS mismatch, or missing/ambiguous scheduling evidence.
+The exact first-CONNECT packet must contain one relevant HEADERS occurrence,
+method, and stream plus one priority-flag/dependency/weight field set; an extra
+coalesced HEADERS or PRIORITY occurrence invalidates admission. Before capture,
+both fresh NaiveFox processes must have no applied marker. After workload,
+default must still have none, while the diagnostic must have exactly one safe
+`Connection 1` H2 applied marker ordered before its first CONNECT-established
+evidence. Only the resulting validation booleans are exported. A valid run
+classifies the mechanism as `native-match`, `wire-null`, or `native-mismatch`;
+the latter two remain successful experiments and delete their private raw
+material normally. Safe evidence records only that verdict,
+Priority-header-presence booleans, scheduling equality, header names/order, and
+source/build hashes. It never feeds a passive classifier.
+The current same-base Caddy H2 control produced `mechanism_verdict=wire-null`:
+default NaiveFox, the UrgentStart diagnostic, and proxied Firefox had equal
+observable scheduling, and none carried a CONNECT `Priority` header. Do not
+promote this diagnostic to a camouflage default or spend passive samples on
+it; it remains available only to test another H2 peer or a future Gecko tunnel
+adapter change.
+
+The preamble callback barrier and observed wire ordering are deliberately
+separate claims. On a fast loopback run, Necko can receive a resource response,
+release `tree-early-overlap`, and still schedule the CONNECT HEADERS after the
+resource END_STREAM. The decrypted validator rejects that trace. Do not
+selectively recapture only passing traces or use this arm for passive causal
+screening until wire-level overlap is deterministic; doing so would condition
+the dataset on the scheduling outcome being measured.
+
+`tree-root-overlap` is a separate production-shaped scheduling arm and does
+not change any older mode. It discovers and opens the same resource channels
+while parsing the root, then admits CONNECT once the root has completed and at
+least one resource channel was successfully started. It does not wait for a
+resource response callback. A safe product marker records only
+`root_done=1`, the non-zero started-resource count, protocol, and admission
+kind; sample validation requires exactly one such marker before passive
+analysis. The controlled fixture requires exactly two started resources. It
+also waits for a separate safe `drain=complete completed_resources=2` marker,
+emitted only after both opened assets received response headers, HTTP 2xx, and
+a successful `OnStopRequest`, while every preamble stream stopped normally. A
+bounded watchdog invalidates the sample and never substitutes for that
+completion. The H3 decrypted
+comparison requires `tree-root-overlap` to be
+selected with `tree-complete` so private request and response-size parity is
+proved in the same run. If the tree contains no successfully started resource, terminal
+operation completion releases CONNECT immediately instead of waiting for the
+preamble timeout.
+
+This is a client scheduling intervention, not a promise that QUIC/H2 frames
+will appear in the same order. Resource response HEADERS or FIN may precede
+CONNECT on a fast path. Decrypted diagnostics report observed overlap, but do
+not use it for admission, retry a failed ordering, or filter passive samples by
+that outcome. They still require a completed root before CONNECT and validate
+the production normal-completion marker for every expected CSS/JS response.
+Observed asset FIN is report-only because a fully consumed known-length H3
+response may use `H3_REQUEST_CANCELLED` instead. In the paired H3
+diagnostic, `tree-complete` and `tree-root-overlap` must retain identical
+root/CSS/JS request semantics and response sizes. H2 uses the same fixed
+fixture/config and validates expected request semantics, but does not claim a
+paired asset-size proof.
+
+Resource-cache experiments use the orthogonal `cache-resources` preamble
+setting. The default is off. When enabled for a tree/resource mode, only CSS,
+JS, and other discovered resource channels enter Gecko's native HTTP cache;
+the root navigation stays cache-inhibited. This is a mechanism diagnostic for
+separating resource topology from cold response-body volume. It is not a
+persistent-profile design: normal NaiveFox temporary-profile startup remains
+valid, and product behavior must not depend on state surviving a process run.
+
+The passive harness exposes that question only as `tree-warm-css-304`. It maps
+to `tree-root-overlap`, selects one CSS resource, and enables
+`cache-resources`. Every reference or NaiveFox participant receives a newly
+created profile which is reused only for its private warm→measure pair and then
+deleted. The measured passive window begins at its publicly observable client
+Initial. The complete pcap is preserved with other private diagnostics when a
+run fails; a server-only tail from the closed warm 5-tuple may precede the
+Initial and is excluded from classifier features. Any client traffic before
+that Initial, or any other endpoint UDP 5-tuple after it (regardless of whether
+its payload decodes as QUIC), invalidates the sample.
+The fixture serves the stable CSS
+with `ETag` and `Cache-Control: no-cache`; admission fails unless Gecko first
+receives an unconditional 200 and later generates `If-None-Match` which earns
+a 304. The NaiveFox inner measurement browser remains fresh and must still
+receive its own cold 200. This arm is H3 gate/smoke diagnostic evidence only:
+it cannot enter a shared superblock or a confirmatory/research run, and it is
+never a proposal for persistent `NAIVEFOX_PROFILE` state. The unchanged
+`tree-root-overlap-css` arm remains the cold control.
+The warm arm disables persistent TLS token storage and H3 0-RTT in both outer
+profiles, rejects any `ssl_tokens_cache*` file, and requires one measured QUIC
+identity, one ClientHello, and no 0-RTT packet. Its network-mutation monitor
+runs continuously from before warm-up through the measured capture cutoff.
+Firefox A/B and NaiveFox receive condition-specific warm controls; a fresh
+`tree-root-overlap-css` run under the same fixture revision and binary build is
+the separate cold dataset. The harness restarts only the local Caddy process
+between the warm and measured phases, on the same origin and port, while the
+target server and its append-only journal remain alive. This deterministically
+removes prior QUIC session state without a quiescence timeout. The cold control
+gets the same Caddy reset immediately before measurement. Cross-dataset
+warm/cold interpretation is therefore
+descriptive causal screening, not paired or confirmatory inference.
+
+The first fully fail-closed one-block same-base H3/inner-HTTPS admission run for
+this diagnostic is retained as safe artifact `d26f91c82a29ceed` (seed `305`,
+NaiveFox binary build ID `b1820e20442018465574f71995c69460`). Firefox A,
+Firefox B, and NaiveFox
+each produced an unconditional warm 200 followed by a measured native Gecko
+conditional request and 304 with identical selected outer request semantics.
+The fresh inner Firefox behind NaiveFox independently received 200. Every
+measured participant had one QUIC identity, one ClientHello, no 0-RTT, no TLS
+token persistence, and no route/address/link mutation. This is admission
+evidence only; one block contains no classifier inference. The predecessor
+private run `da04d2419e6c9715` discovered two delayed server-only datagrams from
+the closed warm 5-tuple before the measured client Initial. The harness now
+preserves that full pcap on failure and defines the passive sample origin at
+the first client Initial, while rejecting any client traffic before it or
+stale flow continuing afterward.
+
+A later ten-block predecessor run was discarded in full when an old Caddy QUIC
+flow continued after a measured client Initial. The deterministic Caddy reset
+above closes that contamination path; the post-reset one-block gate is retained
+as safe artifact `211be50a1f1af4bd` (seed `307`). The accepted ten-block warm
+screen is `4a2b14495599e0a4` (seed `20260825307`), with the matching fresh-profile
+cold control `6343c2cbe6c99bfd` (seed `20260825309`). All 30 participants in each
+dataset passed the cache/transport/network admission invariants.
+
+The result rejects cache persistence as a camouflage mechanism. Firefox versus
+NaiveFox remained perfectly separable in the selected 1--16, 17--32, and 1--32
+packet views in this small non-inferential screen. Removing the cold CSS body
+did not correct the phase boundary: packet 16 still arrived around 8 ms for
+NaiveFox versus roughly 25--28 ms for Firefox. Cold body packets had merely
+made part of packets 22--32 look closer by signed byte size despite arriving
+roughly 127 ms too early. With 304, that accidental byte-shape similarity
+disappeared and the early CONNECT/control phase became more exposed. The 250 ms
+aggregate improved modestly, but Firefox A/B noise also increased and whole-run
+volume differences were essentially unchanged. The useful causal conclusion is
+therefore limited: response-body volume affects the observed 17--32 shape, but
+resource cache state does not repair the underlying topology/scheduling gap.
+No product behavior should depend on warm or persistent cache state.
+
+`tree-complete-css` and `tree-root-overlap-css` are harness-only one-asset
+controls. They map to the unchanged production `tree-complete` and
+`tree-root-overlap` modes with `max-assets=1`, so the parsed root opens only the
+first stylesheet and never the later script. Passive admission requires exact
+`started_resources=1` and `completed_resources=1` lifecycle evidence. The H3
+decrypted diagnostic admits `tree-root-overlap-css` only beside
+`tree-complete-css`; it proves one QUIC identity, identical root/CSS selected
+request semantics and response size, and root FIN before CONNECT. Any observed
+CSS FIN ordering relative to CONNECT remains report-only and is never a
+resampling criterion.
+
+Controlled causal screens may set
+`NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE` and
+`NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE` before starting the fixture. The
+defaults remain 64 KiB and 128 KiB. Both values are bounded and recorded in
+safe metadata. Vary them only as a declared response-profile condition while
+keeping the normal CSS/Script channels and orchestration unchanged; never
+select them from observed packet positions.
+
+`root-pmtud-control` is an H3-only, same-binary harness control. It uses the
+same production `document-complete` configuration and root workload as `root`,
+but only the NaiveFox participant profile explicitly sets
+`network.http.http3.pmtud=true`. Passive screening can therefore compare the
+new default route with the former forced-PMTUD behavior without changing the
+socket, product binary, or preamble semantics. Decrypted admission proves one
+complete root GET with equal selected request semantics and response size; it
+does not claim PMTUD wire equivalence. That conclusion requires the passive
+capture itself.
+
+The dedicated H3 diagnostic gives every NaiveFox arm the same inner HTTPS URL;
+the direct reference uses the same page path and query on the outer fixture.
+It rejects any Firefox nonzero exit or empty screenshot and requires
+successful response headers and `Content-Length` for every preamble GET plus
+an observed root FIN before CONNECT. Application completion at a known response
+length may make upstream Firefox end an H3 fetch with
+`H3_REQUEST_CANCELLED` instead of waiting for the peer FIN, so asset FIN is not
+used as a universal completion predicate. The diagnostic checks every root
+against Firefox navigation semantics and uses
+`tree-complete` as the required root/resource-size control for all two-resource
+overlap modes. `tree-early-overlap` and `tree-overlap` have no existing private
+normal-drain completion marker, so their available decrypted ordering
+predicates must pass directly; a missing predicate is not repaired with a wait
+heuristic or selective resampling. Until exact H3 DATA-byte accounting is
+available, do not use those two arms for a strict whole-volume conclusion: one
+background asset can complete by known `Content-Length` without an observed
+FIN. `tree-root-overlap` has the deterministic all-resource drain marker used
+for that comparison.
+
 For H3, compare:
 
 - QUIC version and negotiated `h3`;
@@ -97,6 +561,37 @@ For H3, compare:
 - multiple CONNECT streams on one QUIC connection;
 - no established TCP fallback at the strict H3 endpoint;
 - padding negotiation and absence of synthetic markers.
+
+Same-base `run-h3-capture-comparison.sh --compare-arms` additionally audits
+document/tree preamble ordering against the browser-page root and resources.
+The experimental `tree-early-overlap` arm is opt-in and must be selected
+together with `tree-complete`.
+Use repeated `--compare-arm` options to restrict the candidate set. Its safe
+event table reports only method/status sequencing, connection/stream indices,
+packet positions, and observable response-header or stream-FIN overlap; raw
+headers, values, captures, and NSS keys remain private. For tree causal
+validation, a transient private GET-only extract compares selected root/CSS/JS
+request values and ordering between complete and overlap. For
+`tree-early-overlap`, a second private-only extract proves that the two asset
+`Content-Length` values also equal `tree-complete`; all values are deleted with
+the private capture directory. The safe summary retains only booleans:
+`tree_request_semantics_match=yes` for complete/overlap equality,
+`tree_early_overlap_request_semantics_match=yes` and
+`tree_early_overlap_asset_sizes_match=yes` for the experimental arm, and
+`tree_expected_request_semantics=yes` after the root has navigation/site-none
+semantics and CSS/JS have same-origin no-cors subresource semantics with
+referers exactly equal to the root URL computed from its private pseudo-header
+values.
+
+The browser-page fixture uses a 64 KiB stylesheet and a 128 KiB script, with
+the root document and both assets remaining below the configured 256 KiB tree
+budget. Direct Firefox, preamble traversal, and the inner browser load all use
+those same URLs and response bodies. This controlled size increase is intended
+to keep ordinary resource streams alive when `tree-overlap` or
+`tree-early-overlap` starts CONNECT on loopback; it is not tuned to reproduce
+any packet sequence. Neither the origin
+nor Caddy applies `Content-Encoding` to these fixture assets: adding gzip or
+zstd would invalidate the intended on-wire stream lifetime.
 
 Do not require equality for connection IDs, random values, GREASE values, or
 TLS extension order. NSS may independently randomize extension order. In quick
@@ -114,6 +609,425 @@ parameters may still be inspected; HTTP/3 headers and 1-RTT plaintext may not.
 Packet counts, lengths, timing, and TCP probes are recorded, not normalized or
 treated as equality requirements. Any established TCP transport or TCP payload
 in a strict-H3 NaiveFox case is a failure.
+
+## Statistical camouflage experiment
+
+`run-camouflage-suite.sh` attacks the project assumption from the point of
+view of a passive traffic classifier. It does not prove indistinguishability.
+It attempts to distinguish ordinary Firefox from NaiveFox using selected
+externally observable features, reports the measured classifier advantage, and
+compares that advantage with an independent Firefox-versus-Firefox baseline.
+
+The collector uses seeded complete blocks for three cohorts: Firefox A,
+Firefox B, and NaiveFox. Each sample gets a fresh, symmetric trusted profile.
+All cohorts run on the same host and network namespace, use the same capture
+interface, endpoint IP and port, certificate, target, Caddy process, and
+controlled Firefox page workload. The NaiveFox browser reaches the target
+through its private SOCKS listener. HTTPS/TLS inside CONNECT is the default
+NaiveFox workload; `--inner-transport http` produces a separate cleartext
+diagnostic dataset. Forced Alt-Svc applies only to direct H3 reference traffic,
+not to the SOCKS browser. The SOCKS browser uses a fail-closed PAC: exact
+loopback destinations use the sample's SOCKS5 port, while every other hostname
+goes to a dead local proxy with no `DIRECT` fallback. This keeps Mozilla
+background requests out of the captured NaiveFox flow. H2 and H3 are separate
+datasets. Strict H3 rejects
+established TCP or TCP payload.
+
+The browser controller remains alive until after the primary capture has
+stopped. After receiving the browser's completion POST, the target writes a
+private completion file which the controller watches without generating a
+second network flow. Browser or NaiveFox process shutdown is therefore not part
+of the primary sample.
+`dumpcap` readiness uses its runtime marker rather than pcap header creation.
+Every sample rejects nonzero capture drops, an H2 flow missing its opening
+client SYN and ClientHello, or an H3 flow missing its opening client Initial.
+The passive H2 collector starts the outer Caddy listener in H2-only mode and
+requires exactly one proxy-port TCP identity with exactly one client SYN and
+one visible ClientHello. TLS 1.3 encrypts the server's selected ALPN, so the
+passive gate does not mislabel ClientHello advertisement as selection: the
+H2-only listener plus successful workload completion is the keyless ALPN
+contract. Inner HTTPS/H2 uses a distinct port and cannot enter this identity.
+
+`--h2-proxy-floor-superblocks` is a same-base passive causal design fixed to
+the `browser_page` workload. Each randomized block contains direct Firefox A
+and B, the same Firefox using its native authenticated HTTPS-proxy path, and
+NaiveFox `off`. All browsers are Selenium-prelaunched before capture; a shared
+wire completion token is reset locally before every participant, and every
+capture ends at completion plus the same 250 ms tail. The native-proxy and
+NaiveFox participants must also complete the same workload over the dedicated
+inner HTTPS/H2 fixture. The ordinary H2 transport gate rejects any participant
+with more than one outer TCP identity, SYN, or ClientHello.
+
+The safe multi-arm output treats `firefox-proxied` as an analysis-only
+candidate slot. Its distance from direct Firefox estimates the unavoidable
+proxy architecture floor; `off` versus direct Firefox is the total NaiveFox
+gap, and the paired difference between those two distances is the remaining
+product-specific signal. The fixed views are packets 1--16, packets 17--32,
+packets 1--32, the first 250 ms, and the whole flow. The internal `naivefox`
+label for the native Firefox candidate is only a legacy analysis-schema slot,
+not a claim about which executable produced it.
+
+Six-block same-base artifact `bc9ee30b969b6318` first measured that floor
+against ordinary direct Firefox, which remains the camouflage target.  It was
+captured before the MTU-1500 policy and is retained only as lifecycle evidence;
+its packet-index distances must not select H2 product behavior.
+
+Fresh fail-closed six-block artifact `8f0c619bcd38385e` (seed `2026082712`)
+repeated the control with loopback MTU 1500, SYN MSS 1460, no oversized outer
+TCP segment, pre-launched same-base browsers, and inner HTTPS/H2.  Native
+Firefox using its ordinary authenticated HTTPS-proxy path remained only
+modestly closer to direct Firefox than NaiveFox `off`: distances were
+`0.05923/0.46731/0.20420/0.10955/0.24196` versus
+`0.06217/0.48243/0.21055/0.11034/0.26441` for packets 1--16, packets 17--32,
+packets 1--32, 250 ms, and whole flow.  The paired native-proxy-minus-NaiveFox
+interval crossed zero in every view.  This screening result does not prove
+equivalence with six blocks, but it localizes most current H2 residual to the
+shared nested `CONNECT + inner TLS/H2` architecture rather than a distinct
+NaiveFox client fingerprint.  The control diagnoses that floor; it does not
+redefine the camouflage target as Firefox behind a proxy.
+
+A server-side response-coalescing candidate was then tested because stock
+`forwardproxy` flushes every target TCP read. The candidate was backward
+compatible and request-opt-in: unmodified NaiveProxy clients retained the
+historical path, while the experiment coalesced adjacent target reads until a
+one-millisecond idle window without adding or removing bytes. Cross-run data
+looked favorable, but the authoritative randomized paired artifact
+`01c1250aa7a7f14a` rejected it. Relative to direct Firefox, packets 17--32
+improved only `0.5279 -> 0.5194`, packets 1--32 regressed
+`0.2432 -> 0.2500`, and the server-byte deficit by packet 32 increased from
+about 49.3 KiB to 50.0 KiB. The patch and experimental arm were therefore not
+retained. This is evidence against server read-boundary batching as a useful
+H2 camouflage mechanism, not evidence that the remaining H2 signal is
+unfixable.
+
+Two request-opt-in TLS-boundary controls then replaced arbitrary target TCP
+read boundaries with semantic inner-TLS boundaries without changing Variant 1
+payload or padding bytes. Full-record alignment split the initial inner server
+flight into seven ordinary padded response records. In 30-block paired
+artifact `e742cfd3a0c19fe9` (seed `2026082717`) this improved packets 17--32
+from `0.54512` to `0.49152` and packets 1--32 from `0.22555` to `0.21010`,
+but worsened whole flow from `0.22023` to `0.23771` (`p=0.0288`). A causal
+flight cutoff stopped alignment when the client sent its next TLS flight, so
+application DATA returned to stock streaming. The authoritative 30-block
+artifact `9ce752e81ecd307b` (seed `2026082723`) reproduced the early benefit
+(`0.53960 -> 0.48008` for packets 17--32 and `0.22238 -> 0.20419` for packets
+1--32) but also the whole-flow regression (`0.22811 -> 0.24725`, `p=0.0063`).
+Safe record sequences show why: the useful initial split itself shifts bulk
+records by roughly seven visible TLS-record ordinals, so ending the policy
+after the flight cannot remove its new fingerprint.
+
+A final cleartext-only control aligned just TLS Handshake records and returned
+to stock streaming at the first CCS or encrypted record. Six-block artifact
+`64e7a03ff341ffe2` (seed `2026082729`) removed the large ordinal shift, but it
+also removed the early benefit: packets 17--32 changed `0.54819 -> 0.55041`
+and packets 1--32 `0.22286 -> 0.22699`. It did not qualify for a larger run.
+The server module source, binary, and temporary client header hook were
+restored byte-for-byte. Together these controls close deterministic inner-TLS
+record alignment as a default H2 mechanism under the no-tail-regression rule:
+the multi-record split is the cause of both its local improvement and its
+later distinguishability.
+
+A final client-side diagnostic reduced only the existing Variant 1 upstream
+padding range from 0--255 to 0--63 bytes, without adding cover traffic or
+changing the stock server. Strict decrypted artifact
+`20260827T111901Z-af8eee26` admitted the H2-only runtime hook and ordinary
+CONNECT lifecycle. Six-block paired artifact `7bd5dd64a07e662f` (seed
+`2026082731`) found a local packets 1--16 improvement (`0.06600 -> 0.05847`),
+but packets 17--32 (`0.55279 -> 0.58610`), packets 1--32
+(`0.23201 -> 0.24500`), 250 ms (`0.06341 -> 0.07417`), and whole flow
+(`0.24158 -> 0.25524`) all moved away from direct Firefox. The diagnostic
+hook was removed without a larger run. Reducing random client padding only
+reorders the early nested-TLS phase; it does not repair the remaining H2
+application-phase shape.
+
+Controlled workloads cover a cold small operation, a browser page with CSS,
+JavaScript, images, and an API response, warm sequential requests, burst and
+concurrent requests, bulk download and upload, bidirectional transfer, and an
+idle-then-resume lifecycle. The runner keeps request counts and byte budgets
+comparable where the protocol roles allow it; payload equality is not assumed.
+
+The safe feature extractor uses only information available on the wire:
+
+- signed direction and normalized IP/TCP-payload or UDP-datagram lengths for
+  the first 128 packets, plus 16/32/64/128-packet aggregates;
+- inter-packet timing, response delay, bursts, idle gaps, direction n-grams and
+  run lengths, and byte/packet windows through two seconds;
+- visible TLS-over-TCP record boundaries and lengths;
+- TCP SYN options, FIN/RST/reconnect behavior, and actual retransmission or
+  out-of-order observations;
+- public TLS ClientHello capability sets with GREASE values normalized;
+- for QUIC, version, Initial sizes and ordering, CID lengths, Retry/version
+  negotiation, public ClientHello and transport parameters, packet phases, and
+  observable TCP probe attempts at the strict-H3 endpoint.
+
+It deliberately excludes labels and harness artifacts, filenames, process
+data, source/destination ports, absolute timestamps, profile paths, credentials,
+queries, decrypted H2/H3 headers and frames, CONNECT authority, plaintext,
+private NSS secrets, and NaiveFox logs. H2/H3 decryption remains available only
+to the separate wire-parity diagnostics.
+
+The analyzer is dependency-free Python. It fits an L2-regularized logistic
+classifier after train-only standardization and feature screening. Splits are
+grouped by experiment block when that metadata is present, otherwise by
+session, and stratified by workload; the two Firefox cohorts form the
+experimental baseline. The primary metric is orientation-fixed ROC AUC with
+NaiveFox, or Firefox B in the baseline, always treated as the positive class.
+AUC is calculated within each outer fold and pair-weighted across folds, so
+uncalibrated scores from different models are never pooled. The report retains
+`D = max(AUC, 1 - AUC)` only as a diagnostic and never uses it for a verdict.
+
+Empty steady or lifecycle phases have explicit observable presence indicators.
+The general diagnostic confidence interval uses a conditional clustered
+bootstrap of held-out groups within their outer folds. Research verdicts do not
+use that fixed-model interval: for both the target comparison and its Firefox
+negative control, the three primary views additionally resample complete
+workload blocks and refit the entire grouped-CV pipeline, including feature
+screening and standardization. The workload/block-stratified permutation test
+also refits that pipeline after reshuffling session labels. Expensive
+permutation refits run only for Firefox-versus-NaiveFox in the three
+predeclared verdict views: initial 32 packets, steady state after 32 packets,
+and lifecycle. Secondary reports explicitly record why refit inference was not
+run.
+The report also includes an outer-fold threshold learned only from training
+data, confusion metrics, standardized coefficient importance, and
+leave-one-workload-out generalization. Whole-flow, initial packet windows,
+initial time windows, steady state, and lifecycle views are reported
+separately. Raw metrics are retained so policy thresholds can be changed
+without recapturing traffic.
+
+Run levels are:
+
+- `gate`: two samples per cohort and protocol; structural collection, analysis,
+  and sanitization only;
+- `smoke`: ten samples per cohort and protocol; end-to-end validation only;
+- `standard`: sixty samples per cohort and protocol; preliminary statistics;
+- `research`: 240 samples per cohort and protocol; the only level that emits a
+  GREEN/YELLOW/RED research classification. This is a hard minimum: the runner
+  and non-screening analyzer reject a smaller research dataset.
+
+Gate and smoke results are always `INCONCLUSIVE`, regardless of their point
+estimate. Research policy currently treats a sufficiently narrow, validated
+refit-bootstrap interval contained within `0.40--0.60`, a healthy Firefox
+negative control whose interval contains chance, and no more than 0.05 excess
+absolute advantage over that control as GREEN. Reverse-oriented, confounded,
+or uncertain evidence is YELLOW. Stable `AUC >= 0.70` is RED only when its
+refit lower bound is at least 0.60 and the full-refit permutation test also has
+`p <= 0.05`. These are project policy thresholds, not a security proof.
+
+Examples:
+
+```bash
+./run-camouflage-self-tests.sh
+./run-camouflage-suite.sh --mode gate --protocol both
+./run-camouflage-suite.sh --mode gate --protocol both --inner-transport http
+./run-camouflage-suite.sh --mode smoke --protocol h2
+./run-camouflage-suite.sh --mode standard --protocol both --seed 20260824
+./run-camouflage-suite.sh --mode research --protocol h3
+```
+
+The same explicit seed reproduces schedule order for HTTPS-primary and
+HTTP-diagnostic runs, but separately collected samples are not statistically
+paired. For arm comparison, `--multi-arm-superblocks` requires same-base mode
+and collects Firefox A, Firefox B, and NaiveFox `off`, `gate`, and `root` once
+per seeded randomized block. The sanitized full dataset records
+`experiment_block` and `naivefox_arm`, then materializes one arm-specific
+dataset per arm using the same two contemporaneous Firefox controls. In that
+mode `--samples-per-cohort` is the number of five-member blocks per protocol;
+it cannot be combined with `--naivefox-arm`.
+
+The default remains that bounded five-member design. A deliberate screening
+run may instead select arms with `--multi-arm-arms`; for the first preamble
+shape screen use
+`gate,root,tree-complete,tree-overlap` (`root` is document-complete). A causal
+follow-up may replace `gate` with the opt-in `tree-early-overlap` control while
+keeping the root, CSS, JavaScript, and asset sizes identical. Add
+`--multi-arm-views initial_packets_16,packets_17_32,initial_packets_32` to
+report both the cumulative early views and the non-overlapping 17--32 packet
+slice. `packets_17_32` contains only passive per-packet (and, for H2,
+per-record) sequence features from those positions; it does not repeat the
+handshake or first-16 aggregates. That creates randomized six-member blocks: the four
+selected modes are all paired against the same Firefox A/B controls. The
+analyzer emits every selected pair and its Holm family contains only the
+protocols and views in that report. This opt-in design is screening-only and
+cannot produce an absolute verdict.
+
+The first isolated same-base H3/inner-HTTPS smoke for
+`root,tree-complete,tree-root-overlap` is retained as safe artifact
+`183164d35decbb0f` (seed `24082420`). It used ten paired blocks and therefore
+supports neither relative nor absolute inference. Descriptively,
+`tree-root-overlap` was closest to the shared Firefox A/B
+controls for packets 17--32 (0.53163 versus 0.56326 for `tree-complete` and
+0.64406 for `root`) and for packets 1--32 (0.20633 versus 0.22243 and
+0.23118). `root` remained closest for packets 1--16 and for the whole-flow
+view. Together with the paired decrypted trace, which observed CONNECT at
+packet 19 while both resource responses were still active, this supports the
+root-complete/start-resources admission mechanism but does not support making
+it the default. The remaining early signal is concentrated around packets 12,
+14, and 17, while the whole-flow penalty remains dominated by tree response
+volume. A follow-up should vary the number of naturally opened resources with
+the same admission rule before adding delays or packet-size targets.
+
+The first ten-block same-base H3/inner-HTTPS screen of
+`document-complete,document-overlap,document-start-overlap` is retained as safe
+artifact `c7ef700ffa3c42ae` (seed `20260825`, revision `2ab204178e4b`). All 50
+participants passed the isolated-network mutation monitor and physical-QUIC
+checks. This is scheduling evidence only: the reference used the measured
+scenario query while the outer preamble still used the shorter fixed document
+path. Relative to the common Firefox A/B envelope, request-committed overlap
+was worse in every selected view: 0.13721 versus 0.08776/0.08299 for packets
+1--16, 0.63527 versus 0.61094/0.61219 for packets 17--32, and 0.23219 versus
+0.20479/0.20280 for packets 1--32. Its new packet-13 client phase opposed the
+Firefox server phase. The two older document modes remained descriptively
+indistinguishable from one another. Consequently none of these modes warrants
+a 30-block confirmation from this run.
+
+A subsequent exact-path decrypted diagnostic mapped the early phase boundary
+for Firefox and `document-complete`. Both used the same full scenario/query
+path and a 494-byte root response. Their packet 9 H3 control/SETTINGS and QPACK
+encoder/decoder stream initialization matched semantically, with no dynamic
+QPACK instructions. NaiveFox then emitted document GET HEADERS in outer packet
+10, before receiving its server post-handshake bundle in packet 11. Firefox
+first received the post-handshake transport work (`HANDSHAKE_DONE`, session
+ticket/token, and ACK), with its navigation GET appearing only later; the exact
+GET index varied across controlled traces while this ordering remained stable.
+Packets 13--18 were consequently different lifecycle phases: Firefox still
+contained PMTUD/ACK/navigation work while NaiveFox had already completed the
+document and opened CONNECT. This rules out a post-document drain fence as the
+primary repair for the earliest split and motivates an H3-only causal control
+which queues the document transaction normally but releases its HEADERS only
+after QUIC handshake confirmation. Packet positions remain outcomes, never the
+barrier definition.
+
+Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
+`tree-resource-committed-overlap-css` experiment. It uses the same root and
+64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
+Gecko reports `NS_NET_STATUS_WAITING_FOR` for that stylesheet. The trace proves
+one QUIC identity and ClientHello, root completion before the resource commit,
+CSS GET before CONNECT, CSS response after CONNECT, and identical HTTP
+semantics/content length in the paired control. Two-block passive artifact
+`c1bd74f7b299c8a1` found a descriptive improvement for packets 17--32 and
+1--32, but a regression for packets 1--16 and the first 250 ms. It is a causal
+screen, not evidence for tuning asset volume or selecting a product default.
+
+Future paired captures pass the exact same scenario path and block-scoped wire
+token to the direct reference, the candidate outer preamble, and the inner
+browser. The local completion file is still removed before every participant,
+so reusing a wire token cannot satisfy the next controller from a stale marker.
+Safe metadata records this token/reset policy, the fixed
+`browser-done + 250 ms` cutoff, and fail-closed preamble-drain admission. This
+removes request-target and root-body differences without tuning a response
+size or copying decrypted fields into the passive classifier.
+
+Each paired view also retains diagnostic-only top passive features and mean
+signed packet-size sequences. The sequence records the Firefox A/B mean
+absolute disagreement (the local noise floor) and each arm's mean delta from
+the matched Firefox midpoint. These aggregates help distinguish a reduced
+13--20 signal from a divergence merely shifted after packet 16. They never
+enter the arm distance, bootstrap, sign-flip tests, or Holm family, and contain
+no decrypted fields, HTTP semantics, stream identifiers, endpoints, or raw
+timestamps.
+
+Tree results collected before the decrypted H3 profile split are invalid.
+Those runs injected `network.http.http3.alt-svc-mapping-for-testing` into the
+NaiveFox process even though its outer H3 route was already explicit. The root
+GET could use the proxy connection while the resource GETs used the newly
+ready test mapping and a second QUIC connection. In particular, private
+capture `20260824T123959Z-725a1454` diagnoses harness contamination; it is not
+product evidence and must not be used in passive or decrypted conclusions.
+The direct same-base Firefox profile still needs the test mapping, while every
+NaiveFox arm profile must omit it.
+
+Controlled same-base screening must also exclude host network mutation as an
+experimental variable. WSL mirrored networking can project host VPN
+route/address churn into Linux, where Gecko correctly emits
+`network:link-status-changed`, runs `VerifyTraffic`, and marks an active H3
+session `DontReuse`. This is real Firefox network-change behavior, not a pool
+reuse defect and not something production code may suppress. Use
+`NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1` to run the complete localhost experiment
+inside a stable private Linux network namespace. Independently of that mode,
+the harness rejects every sample that observes a link/address/route mutation
+after its sample monitor starts. Fixture cold reset and namespace convergence
+finish before this measurement boundary; the monitor is then active before
+NaiveFox startup or reference-browser startup, fails closed if its own process
+or netlink parser fails, and drains queued events before confirming the sample
+boundary closed.
+
+Packet-shape screening inside the private namespace sets loopback MTU 1500 and
+disables GRO, GSO, TSO, UDP segmentation, and GSO-list aggregation. H2 rejects
+outer TCP payload segments larger than 1460 bytes. H3 rejects
+any proxy UDP frame whose captured UDP length exceeds 1500 bytes. Without this
+step, Linux can expose one host-side UDP GSO superframe as a 13--20 KiB
+"packet" even though it is segmented into ordinary QUIC datagrams before the
+wire. Private run `909bdbd9c1d68824` was collected before this invariant was
+added. Its arm rankings and packet-13--20 sequence are offload-contaminated and
+must not be cited as wire-level camouflage evidence.
+
+The first passive multi-arm attempt after that fix, private run
+`5f45fb110cc57517`, exposed the same contamination in a second harness entry
+point and was stopped after two samples. Its shell profile helper had inferred
+"direct H3 reference" from the absence of a SOCKS port, which also describes
+the private profile owned by the NaiveFox process. That entire run, including
+its gate sample, is invalid and must be discarded. Profile creation now
+requires an explicit `reference`, `naivefox`, or `socks-browser` role and
+fails before capture if a NaiveFox/SOCKS profile contains either forced test
+mapping preference or a pre-existing `AlternateServices.bin`. Only the direct
+H3 reference role may contain the mapping.
+
+The default reference is the pinned current-Nightly artifact already used by
+the quick capture diagnostics, so it is a version-drift experiment. For a
+same-base experiment, set `NAIVEFOX_CAPTURE_MODE=same-base` and the three
+`NAIVEFOX_CAPTURE_REFERENCE_*` paths shown above. Same-base is the primary
+stack-parity mode but is never built implicitly or made an ordinary merge
+prerequisite.
+
+Successful single-arm runs leave only `metadata.txt`, `features.csv`,
+`metrics.json`, and `summary.txt` below the sanitized run directory. Multi-arm
+runs instead retain `metadata.txt`, `features-superblocks.csv`,
+`arm-comparison.{json,txt}`, and
+`arms/<arm>/{features.csv,metrics.json,summary.txt}`. The paired arm report is a
+model-free, within-`experiment_block` relative ranking. For every protocol and
+passive feature view it measures bounded featurewise excess outside the common
+Firefox A/B envelope, with feature scales derived only from Firefox control
+disagreement. It reports workload-stratified paired-block bootstrap intervals,
+paired sign-flip tests, and a Holm family-wise correction across eligible
+comparisons. Arm labels are never classifier inputs and no arm-dependent
+feature screening is performed.
+
+Arm-specific classifier reports from a multi-arm run are explicitly
+screening-only, even when 240 blocks were collected in `research` mode. They
+retain descriptive metrics and refit uncertainty, but record
+`supports_absolute_verdict=false`; all classifications and the overall
+conclusion remain `INCONCLUSIVE`. Select a candidate with the paired report,
+then preregister it and collect a fresh single-arm confirmation such as
+`--mode research --naivefox-arm root`. Experimental
+`tree-complete`, `tree-early-overlap`, `tree-resource-committed-overlap-css`, `tree-root-overlap`,
+`tree-warm-css-304`, and `tree-overlap` single-arm runs remain
+screening-only, and
+the fixed default superblock deliberately excludes them to bound collection
+cost. Screening rows must not be reused as
+confirmatory evidence.
+
+This ranking is not an absolute camouflage verdict: the same Firefox A/B rows
+define the envelope, so there is no independent third Firefox null observation.
+Gate and smoke mode, fewer than 30 paired blocks per protocol, or any workload
+with only one block are explicitly insufficient for paired inference. The
+distance also gives equal weight to correlated engineered features and its
+bootstrap intervals are conditional on the observed Firefox-only scales. These
+limitations are recorded in both paired output files rather than left as an
+interpretation convention.
+Metadata includes platform, kernel, architecture, browser/product versions,
+build identifiers, library hashes, capture-tool version, revision, mode, and
+seed, making artifacts suitable for later regression history.
+
+Current limitations are deliberate: localhost timing is useful only relative
+to its Firefox baseline; smoke samples cannot support a camouflage conclusion;
+current-Nightly differences may be version drift; platform fingerprints must
+not be mixed; optional `tc netem`, persistent-profile and long-idle studies,
+cross-version analytics and no-padding A/B remain separate research
+extensions. Multi-arm superblocks provide the screening collection design but
+cannot support an absolute camouflage conclusion; that requires a fresh,
+preregistered single-arm research run. The suite selects explicit runtime
+configuration but never mutates production defaults.
 
 ## Sensitive data handling
 

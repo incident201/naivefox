@@ -115,7 +115,13 @@ CacheStorageService::CacheStorageService() {
   sSelf = this;
   sGlobalEntryTables = new GlobalEntryTables();
 
+#ifndef MOZ_NAIVEFOX
   RegisterStrongMemoryReporter(do_AddRef(this));
+#else
+  // MemoryReportingMinimal consumes and immediately releases strong
+  // reporters.  Registering `this` from its constructor would therefore
+  // destroy the cache service before the component factory can AddRef it.
+#endif
 }
 
 CacheStorageService::~CacheStorageService() {

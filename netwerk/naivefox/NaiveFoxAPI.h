@@ -25,6 +25,12 @@ typedef enum NaiveFoxStatus {
 } NaiveFoxStatus;
 
 NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]);
+#if !defined(ANDROID) && !defined(__ANDROID__)
+// Private executable entry point for the request-activation child. This is
+// exported only so the dependent NaiveFox executable can enter libxul without
+// linking any of Firefox's general child-process host stack.
+NAIVEFOX_EXPORT int NaiveFoxActivationChildMain(int aArgc, char* aArgv[]);
+#endif
 NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
                                         const char* aProfilePath,
                                         const char* aRuntimePath);

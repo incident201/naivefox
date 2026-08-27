@@ -120,6 +120,10 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
 
   static already_AddRefed<nsHttpHandler> GetInstance();
 
+#ifdef MOZ_NAIVEFOX
+  const nsCString& ImageAcceptHeaderValue() const { return mImageAcceptHeader; }
+#endif
+
   [[nodiscard]] nsresult AddAcceptAndDictionaryHeaders(
       nsIURI* aURI, ExtContentPolicyType aType, nsHttpRequestHead* aRequest,
       bool aSecure, nsHttpChannel* aChan, void (*aSuspend)(nsHttpChannel*),
@@ -306,10 +310,10 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
 
   [[nodiscard]] nsresult MaybeSpeculativeConnectWithHTTPSRR(
       nsHttpConnectionInfo* ci, nsIInterfaceRequestor* callbacks, uint32_t caps,
-      bool aFetchHTTPSRR) {
+      bool aFetchHTTPSRR, SpeculativeTransaction* aTrans = nullptr) {
     TickleWifi(callbacks);
     RefPtr<nsHttpConnectionInfo> clone = ci->Clone();
-    return mConnMgr->SpeculativeConnect(clone, callbacks, caps, nullptr,
+    return mConnMgr->SpeculativeConnect(clone, callbacks, caps, aTrans,
                                         aFetchHTTPSRR);
   }
 

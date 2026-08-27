@@ -1,0 +1,25 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PNativeStylePreloadActivationRequest;
+include NativeStylePreloadActivationTypes;
+
+namespace mozilla {
+namespace naivefox {
+
+[ChildProc=any, ChildImpl=virtual, ParentImpl=virtual]
+async protocol PNativeStylePreloadActivation {
+  manages PNativeStylePreloadActivationRequest;
+parent:
+  async Warmup(uint8_t leg);
+  async PNativeStylePreloadActivationRequest(uint64_t requestId,
+                                             uint8_t kind,
+                                             uint8_t leg);
+
+child:
+  async WarmupAck(uint8_t leg);
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

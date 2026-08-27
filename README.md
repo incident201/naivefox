@@ -44,6 +44,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   "host-resolver-rules": "MAP proxy.example 127.0.0.1",
   "extra-headers": "X-NaiveFox-Test: enabled\r\n",
   "no-post-quantum": false,
+  "max-connections": 0,
   "log": ""
 }
 ```
@@ -63,6 +64,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   NaiveProxy/Exclave config compatibility. NaiveFox validates the value and
   ignores it; connection pooling, concurrency, and tunnel lifecycle remain
   controlled by Firefox Necko.
+- `max-connections` is an optional non-negative integer, defaulting to `0`
+  (unbounded). A positive value closes the listeners after that many accepted
+  local connections and exits after those connections drain; a peer that does
+  not complete SOCKS parsing still consumes the bound. It is useful for bounded
+  tests and orderly one-shot diagnostics.
 - Strict H2/H3 modes never silently fall back.
 - Listener hosts must be numeric IPv4/IPv6; `localhost` maps to IPv4 loopback.
   An explicit nonzero port is required.
@@ -72,6 +78,172 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
+- `preamble` is optional. When it is omitted, explicit `https://` and
+  `quic://` upstreams use the promoted `document-start-overlap` policy at path
+  `/` with a 64 KiB safety budget. The implicit cold-route gate applies to the
+  selected H2 or H3 upstream, so one established outer session does not repeat
+  the synthetic document for every tunnel. An
+  explicit `{"preamble":{"mode":"off"}}` is the complete opt-out, and an
+  explicit `outer-session-gate` value remains authoritative: `false` runs the
+  implicit protocol-specific document on every tunnel, while `true` retains
+  the existing global gate semantics. An older H3 gate-only config must now add explicit
+  `mode: off` to keep sending no document GET. The 64 KiB value is a safety cap,
+  not a target response size. `mode` is still
+  required when the preamble object is present; optional `h2-mode` and `h3-mode`
+  override it only for that negotiated outer protocol. This allows Auto mode
+  to choose a fresh policy on fallback instead of reusing the failed H3
+  attempt's policy. Supported modes are `off`, `document-complete`,
+  `document-carrier-dispatch`, `document-cold-winner-handoff`,
+  `document-native-cache-open`,
+  `document-handshake-confirmed`, `document-overlap`,
+  `document-start-overlap`, `tree-native-parser-document-start-overlap`,
+  `tree-native-parser-document-start-resource-tree`,
+  `tree-native-parser-document-start-navigation-stop`,
+  `tree-native-parser-document-start-response-stop`,
+  `tree-complete`, `tree-overlap`,
+  `tree-early-overlap`, `tree-resource-native-cache-committed-overlap`, and
+  `tree-root-overlap`; `root` and `tree` are
+  compatibility aliases. `document-carrier-dispatch`,
+  `document-cold-winner-handoff`, `document-native-cache-open`,
+  `document-handshake-confirmed` are H3-only causal diagnostics and therefore
+  must be selected explicitly through `h3-mode`; the resolved H2 mode must
+  remain a different supported mode. Active
+  modes share one absolute origin-form `path` and bounded `max-bytes` budget.
+  `max-assets` is allowed when at least one effective protocol mode is a tree
+  mode and is ignored by a document-only effective mode. Protocol overrides
+  are explicit policy, not an automatic camouflage verdict. For example, an
+  experimental split policy can keep H2 on a document request while using the
+  two-resource root-overlap mode for H3:
+
+  ```json
+  {
+    "mode": "document-complete",
+    "h3-mode": "tree-root-overlap",
+    "path": "/",
+    "max-assets": 2,
+    "max-bytes": 262144
+  }
+  ```
+  `document-overlap` is an experimental scheduling control: after a successful
+  2xx response HEADERS event it permits CONNECT while the normal document
+  channel continues to completion. It never discovers assets and requires
+  `max-assets=0`. Physical HEADERS/DATA/FIN overlap is deliberately not a
+  success criterion because that would make the policy depend on response size
+  and packetization. The current screening evidence does not make this mode a
+  recommended default.
+  `document-start-overlap` is a stricter request-scheduling experiment. Its
+  root channel exposes the normal per-channel `WAITING_FOR` progress event
+  only after the H2/H3 request stream has accepted and committed the GET. It
+  then permits CONNECT while the response continues. Admission and final HTTP
+  result are separate events; a normal 2xx root drain remains mandatory.
+  Same-base 30-block acceptance artifact `7b5c70011f0fba08` compared explicit
+  `off` and this mode against paired Firefox A/B controls with inner HTTPS/H2.
+  It improved packets 1--16 (`0.16459` to `0.13442`), packets 17--32
+  (`0.76117` to `0.65828`), packets 1--32 (`0.26499` to `0.22720`), and the
+  250 ms view (`0.14026` to `0.12081`); no whole-flow regression was detected
+  (`0.38926` to `0.38660`, with a paired interval crossing zero). It is
+  therefore the implicit default for explicit H2 and H3 upstreams. A final
+  six-block H2 screen against the bounded resource-tree candidate retained the
+  lower distance for this mode in packets 17--32, packets 1--32, 250 ms, and
+  whole-flow views, while packets 1--16 were effectively tied.
+  `tree-native-parser-document-start-overlap` preserves that same early
+  request-commit admission, then continues the root response through the lean
+  HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens
+  through the native `FromParser` preload path while CONNECT and its tunneled
+  workload are already active. It is fail-closed and does not add a
+  timer, DOM, layout, graphics, JavaScript, or a second process. Screening
+  shows a strong packets-17--32 improvement but a later volume penalty from
+  the additional complete stylesheet, so it remains experimental rather than
+  the default until that tradeoff is resolved.
+  `tree-native-parser-document-start-resource-tree` is the final bounded H2
+  fronting-page experiment. It preserves early document-start admission and
+  then accepts, in source order, one same-origin stylesheet, one classic
+  deferred script, and one image from the lean HTML5 speculative scanner. Each
+  resource uses a native Necko preload channel with upstream referrer, Fetch
+  Metadata, priority, image `Accept`, Cache2, and normal stream completion. The
+  fixture uses a fixed small page (12 KiB CSS, 24 KiB JS, and 8 KiB SVG); these
+  are semantic fixture sizes, not packet-index targets. A fresh decrypted run
+  proved `root GET -> CONNECT -> resource GETs` on one H2 TLS connection with
+  request semantics matching same-base Firefox. The final paired screen still
+  made packets 17--32, packets 1--32, 250 ms, and whole flow worse than
+  `document-start-overlap`: the resource burst moved the residual and added
+  roughly 47 KiB of early server traffic. The mode remains available for
+  controlled research but is rejected as a product default.
+  `tree-native-parser-document-start-navigation-stop` tests the corresponding
+  upstream cancellation tradeoff. The synthetic root and stylesheet share a
+  scoped load group which excludes CONNECT. After CONNECT is admitted, positive
+  client-to-target tunnel data is observed, and the stylesheet has received
+  successful 2xx response headers, the scoped synthetic navigation is stopped
+  with the normal `NS_BINDING_ABORTED` load-group path. This preserves a real
+  early stylesheet response burst but necessarily emits H3 request-cancel
+  signaling when the response has not reached FIN. Six-block screening improved
+  packets 1--32, but remained worse than `document-start-overlap` at 250 ms and
+  whole-flow. The mode is therefore a negative product experiment and is not a
+  recommended default.
+  `tree-native-parser-document-start-response-stop` moves that cancellation
+  predicate from client-to-target data to the first positive decoded
+  target-to-client tunnel payload. If the stylesheet is still active, the same
+  scoped load group issues a normal `NS_BINDING_ABORTED`; if it has already
+  finished, natural completion is a valid product outcome and the tunnel is
+  never failed. Safe metadata records abort and natural-completion counts
+  separately. A bounded background-drain timeout also leaves the working
+  tunnel intact, but controlled captures reject it as incomplete lifecycle
+  evidence. In six-block same-base H3 screening only one of six samples
+  canceled while five completed naturally. The arm was best at packets 17--32
+  and 1--32, but remained worse than `document-start-overlap` at 250 ms and
+  whole-flow. It therefore remains an experimental negative product result,
+  not a default.
+  `document-carrier-dispatch` uses one request-less Gecko
+  `SpeculativeTransaction` to establish the first cold outer H3 session. The
+  real document remains pending until the carrier's normal zero-byte
+  `ReadSegments`/`Close` lifecycle completes, then returns through the ordinary
+  connection-manager dispatch onto that same session. The carrier has an
+  explicit one-connection limit so profiles may continue to disable general
+  speculative preconnects.
+  The mode does not enable Happy Eyeballs, use transaction swapping, wait for
+  QUIC confirmation, or change proxy fallback policy. If normal dispatch does
+  not select the carrier-established connection, the transaction fails closed.
+  Same-base screening found this drain fence worse than `document-complete` in
+  every measured view, so it remains a negative diagnostic rather than a
+  recommended default.
+  `document-cold-winner-handoff` is a narrower H3-only reconstruction of the
+  ordinary cold Firefox winner lifecycle. The real document first enters the
+  normal pending queue; one request-less proxy-aware H3 carrier owns
+  establishment while the connection remains `IsRacing`, and the existing
+  asynchronous activation callback dispatches that exact document onto the
+  exact winner before publishing it. It does not start a speculative
+  preconnect, use the Rust address race, enable 0-RTT, wait for confirmation,
+  swap transactions, or change proxy fallback. Every failure is terminal for
+  this single candidate and releases the real transaction without feeding an
+  artificial result into the Rust race machine. Same-base decrypted and
+  passive screening left the first GET at packet 10 and did not improve the
+  overall distance, so this remains a falsified causal diagnostic rather than
+  a default.
+  `document-native-cache-open` is a cold H3-only diagnostic that restores the
+  native asynchronous cache2 phase removed by the lean preamble shortcut. It
+  preserves `INHIBIT_CACHING`, requires an `OPEN_READONLY` miss before normal
+  network dispatch, and never writes the response cache. Synchronous callbacks,
+  hits, timeouts, and other cache outcomes fail before the document GET.
+  The falsified `document-native-channel-open` diagnostic was retired from
+  product configuration. Its real local Safe Browsing DB path did not improve
+  the passive screen and pulled protobuf plus Abseil into the lean link graph;
+  retaining that browser subsystem would violate the minimal-runtime boundary.
+  `tree-resource-native-cache-committed-overlap` is a screening-only H3 mode
+  that keeps the root cache-inhibited, opens exactly one discovered resource
+  through a normal writable Cache2 entry, and releases CONNECT only after an
+  asynchronous new-entry callback and the resource's real
+  `NS_NET_STATUS_WAITING_FOR` commit. Cache hits, synchronous callbacks,
+  timeouts, and missing entries fail closed. It exists to test native resource
+  scheduling with a fresh temporary profile; it is not a persistent-cache
+  product policy or a recommended default.
+  `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
+  is accepted only when at least one effective protocol mode is a tree mode.
+  It enables Gecko's ordinary HTTP cache path only for discovered resource
+  channels; the root document remains cache-inhibited, as do direct requests,
+  CONNECT, and every preamble under the default configuration. The cache lives
+  in the run's selected profile. NaiveFox still creates a temporary profile by
+  default, so this mechanism is useful for controlled repeated loads within a
+  process and does not introduce a persistent-profile product dependency.
 - `no-post-quantum` is a boolean, defaulting to `false`; when true it disables
   Firefox Kyber/ML-KEM TLS and HTTP/3 key shares before connecting.
 - `log` absent disables runtime logging, `""` logs to the console, and a path
@@ -218,6 +390,12 @@ H2 uses Firefox's TLS/TCP connection and `Http2StreamTunnel`. H3 uses a strict
 MASQUE-type proxy route to create a regular classic CONNECT through
 `Http3StreamTunnel`; it does not use CONNECT-UDP or a standalone Neqo client.
 Connection pooling remains owned by Necko in both modes.
+
+NaiveFox's H3 route suppresses only Firefox's automatic PMTUD force for an
+outer H3 proxy connection. The normal `network.http.http3.pmtud` preference
+still applies, so an explicit global enable retains Firefox's existing PMTUD
+behavior. This does not change H3 proxy identity, TLS, pooling, CONNECT, or
+strict fallback behavior.
 
 The target's TLS session belongs to the application using the local proxy.
 NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.

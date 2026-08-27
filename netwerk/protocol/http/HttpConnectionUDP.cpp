@@ -19,6 +19,9 @@
 #include "ConnectionHandle.h"
 #include "Http3Session.h"
 #include "HttpConnectionUDP.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "NaiveFoxReuseLog.h"
+#include "SpeculativeTransaction.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "nsComponentManagerUtils.h"
@@ -189,6 +192,17 @@ HttpConnectionUDP::HttpConnectionUDP() : mHttpHandler(gHttpHandler) {
 
 HttpConnectionUDP::~HttpConnectionUDP() {
   LOG(("Destroying HttpConnectionUDP @%p\n", this));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.destroy ci=%p conn=%p session=%p dont_reuse=%d state=%d "
+         "connection_state=%d in_tunnel=%d proxy_connect_succeeded=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+         mDontReuse, static_cast<int>(mState),
+         static_cast<int>(mConnectionState), mIsInTunnel,
+         mProxyConnectSucceeded));
+  }
+#endif
 
   if (mForceSendTimer) {
     mForceSendTimer->Cancel();
@@ -434,6 +448,15 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
 
   NS_ENSURE_ARG_POINTER(trans);
 
+  if (mState == HttpConnectionState::SETTING_UP_TUNNEL &&
+      (caps & NS_HTTP_PROXY_PREAMBLE) && !mIsInTunnel &&
+      mConnInfo->IsHttp3ProxyConnection()) {
+    // A speculative H3 null transaction can set the outer proxy connection's
+    // state before the ordinary preamble is activated. The preamble targets
+    // the proxy origin itself, so it must not inherit that CONNECT state.
+    ChangeState(HttpConnectionState::REQUEST);
+  }
+
   mErrorBeforeConnect = CheckTunnelIsNeeded(trans);
 
   // Connection failures are Activated() just like regular transacions.
@@ -446,6 +469,25 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
     return mErrorBeforeConnect;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (trans->IsNullTransaction() && mConnInfo->IsHttp3ProxyConnection() &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=carrier-activated connection=%p "
+         "session=%p carrier=%p connected=%d",
+         this, mHttp3Session.get(), trans, mConnected));
+  }
+  if ((caps & NS_HTTP_PROXY_PREAMBLE) && hTrans &&
+      hTrans->UseH3CarrierDispatch() && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    H3CarrierDispatchGate* gate = hTrans->CarrierDispatchGate();
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=document-activated gate=%p carrier=%p "
+         "connection=%p session=%p document=%p connected=%d wildcard=%d",
+         gate, reinterpret_cast<void*>(gate ? gate->CarrierId() : 0), this,
+         mHttp3Session.get(), hTrans, mConnected, mAlreadyWildcard));
+  }
+#endif
+
   // When mIsInTunnel is false, this HttpConnectionUDP represents the *outer*
   // connection to the proxy. If a proxy CONNECT is still in progress,
   // we need to queue the transaction until the outer connection is fully
@@ -454,9 +496,27 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
   // Important: we must not reset the transaction while the outer connection
   // is still connecting. Resetting here could lead to opening another HTTP/3
   // connection.
-  if (IsProxyConnectInProgress() && !mIsInTunnel && hTrans) {
-    if (!mConnected) {
+  if ((IsProxyConnectInProgress() ||
+       ((caps & NS_HTTP_PROXY_PREAMBLE) &&
+        mConnInfo->IsHttp3ProxyConnection() && !mAlreadyWildcard)) &&
+      !mIsInTunnel && hTrans) {
+    bool waitForHandshakeConfirmation = false;
+#ifdef MOZ_NAIVEFOX
+    waitForHandshakeConfirmation = (caps & NS_HTTP_PROXY_PREAMBLE) &&
+                                   hTrans->WaitForH3HandshakeConfirmation() &&
+                                   !mAlreadyWildcard && !mHandshakeConfirmed;
+#endif
+    if (!mConnected || waitForHandshakeConfirmation) {
+      MOZ_ASSERT(!mQueuedHttpConnectTransaction.Contains(hTrans));
       mQueuedHttpConnectTransaction.AppendElement(hTrans);
+#ifdef MOZ_NAIVEFOX
+      if (waitForHandshakeConfirmation && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.preamble_confirm_gate action=wait session=%p ci=%p "
+             "transport_confirmed=0",
+             mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
+      }
+#endif
       (void)ResumeSend();
     } else {
       // Don't call ResetTransaction() directly here.
@@ -521,6 +581,16 @@ void HttpConnectionUDP::OnConnected() {
 
   mConnected = true;
 
+#ifdef MOZ_NAIVEFOX
+  if (mConnInfo->IsHttp3ProxyConnection() &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=connection-connected connection=%p "
+         "session=%p",
+         this, mHttp3Session.get()));
+  }
+#endif
+
   // Deferred LNA check: now that the QUIC handshake has succeeded (and the
   // peer presented a valid certificate for the requested name), check
   // whether any deferred transactions are permitted to reach this address
@@ -555,10 +625,52 @@ void HttpConnectionUDP::OnConnected() {
     return;
   }
 
-  for (const auto& trans : mQueuedHttpConnectTransaction) {
+  nsTArray<RefPtr<nsHttpTransaction>> queued =
+      std::move(mQueuedHttpConnectTransaction);
+  for (const auto& trans : queued) {
+#ifdef MOZ_NAIVEFOX
+    if (trans->WaitForH3HandshakeConfirmation() && !mHandshakeConfirmed) {
+      mQueuedHttpConnectTransaction.AppendElement(trans);
+      continue;
+    }
+#endif
     ResetTransaction(trans);
   }
-  mQueuedHttpConnectTransaction.Clear();
+}
+
+void HttpConnectionUDP::OnHandshakeConfirmed() {
+  LOG(("HttpConnectionUDP::OnHandshakeConfirmed %p", this));
+
+#ifdef MOZ_NAIVEFOX
+  if (mHandshakeConfirmed) {
+    return;
+  }
+  mHandshakeConfirmed = true;
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.transport_confirmation action=observed session=%p ci=%p "
+         "transport_confirmed=1",
+         mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
+  }
+
+  if (mIsInTunnel || mDontReuse || mQueuedHttpConnectTransaction.IsEmpty()) {
+    return;
+  }
+
+  RefPtr<HttpConnectionUDP> self(this);
+  nsTArray<RefPtr<nsHttpTransaction>> queued =
+      std::move(mQueuedHttpConnectTransaction);
+  for (const auto& trans : queued) {
+    if (trans->WaitForH3HandshakeConfirmation() &&
+        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.preamble_confirm_gate action=release session=%p ci=%p "
+           "transport_confirmed=1",
+           mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
+    }
+    ResetTransaction(trans);
+  }
+#endif
 }
 
 already_AddRefed<nsIInputStream> HttpConnectionUDP::CreateProxyConnectStream(
@@ -651,6 +763,16 @@ void HttpConnectionUDP::Close(nsresult reason, bool aIsShutdown) {
        static_cast<uint32_t>(reason)));
 
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.close.begin ci=%p conn=%p session=%p reason=%08x shutdown=%d "
+         "dont_reuse=%d state=%d connection_state=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+         static_cast<uint32_t>(reason), aIsShutdown, mDontReuse,
+         static_cast<int>(mState), static_cast<int>(mConnectionState)));
+  }
+#endif
 
   if (mConnectionState != ConnectionState::CLOSED) {
     RecordConnectionCloseTelemetry(reason);
@@ -688,11 +810,31 @@ void HttpConnectionUDP::Close(nsresult reason, bool aIsShutdown) {
     trans->Close(reason);
   }
   mQueuedConnectUdpTransaction.Clear();
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.close.end ci=%p conn=%p session=%p reason=%08x shutdown=%d "
+         "dont_reuse=%d state=%d connection_state=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+         static_cast<uint32_t>(reason), aIsShutdown, mDontReuse,
+         static_cast<int>(mState), static_cast<int>(mConnectionState)));
+  }
+#endif
 }
 
 void HttpConnectionUDP::DontReuse() {
   LOG(("HttpConnectionUDP::DontReuse %p http3session=%p\n", this,
        mHttp3Session.get()));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.dont_reuse ci=%p conn=%p session=%p was_dont_reuse=%d state=%d "
+         "connection_state=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+         mDontReuse, static_cast<int>(mState),
+         static_cast<int>(mConnectionState)));
+  }
+#endif
   mDontReuse = true;
   if (mHttp3Session) {
     mHttp3Session->DontReuse();
@@ -720,19 +862,61 @@ bool HttpConnectionUDP::JoinConnection(const nsACString& hostname,
 bool HttpConnectionUDP::CanReuse() {
 #ifdef DEBUG
   if (StaticPrefs::network_http_http3_force_cannot_reuse_for_testing()) {
+#  ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("udp.reuse ci=%p conn=%p session=%p reusable=0 "
+           "reason=forced-test-pref",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get()));
+    }
+#  endif
     return false;
   }
 #endif
   if (NS_FAILED(mErrorBeforeConnect)) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("udp.reuse ci=%p conn=%p session=%p reusable=0 "
+           "reason=error-before-connect error=%08x",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+           static_cast<uint32_t>(mErrorBeforeConnect)));
+    }
+#endif
     return false;
   }
   if (mDontReuse) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("udp.reuse ci=%p conn=%p session=%p reusable=0 "
+           "reason=dont-reuse",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get()));
+    }
+#endif
     return false;
   }
 
   if (mHttp3Session) {
-    return mHttp3Session->CanReuse();
+    bool reusable = mHttp3Session->CanReuse();
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+      NAIVEFOX_REUSE_LOG(
+          ("udp.reuse ci=%p conn=%p session=%p reusable=%d "
+           "reason=session-decision",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+           reusable));
+    }
+#endif
+    return reusable;
   }
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    NAIVEFOX_REUSE_LOG(
+        ("udp.reuse ci=%p conn=%p session=null reusable=0 reason=no-session",
+         NaiveFoxConnectionInfoId(mConnInfo), this));
+  }
+#endif
   return false;
 }
 
@@ -1046,8 +1230,20 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
   // and the proxy connect is still in progress.
   bool transInQueue = mQueuedHttpConnectTransaction.Contains(trans) ||
                       mQueuedConnectUdpTransaction.Contains(trans);
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.close_transaction.begin ci=%p conn=%p session=%p trans=%p "
+         "is_session=%d reason=%08x shutdown=%d trans_in_queue=%d "
+         "dont_reuse=%d in_tunnel=%d proxy_connect_succeeded=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(), trans,
+         trans == mHttp3Session, static_cast<uint32_t>(reason), aIsShutdown,
+         transInQueue, mDontReuse, mIsInTunnel, mProxyConnectSucceeded));
+  }
+#endif
   MOZ_ASSERT(trans == mHttp3Session ||
-             (transInQueue && IsProxyConnectInProgress()));
+             (transInQueue && (IsProxyConnectInProgress() ||
+                               (trans->Caps() & NS_HTTP_PROXY_PREAMBLE))));
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   if (NS_SUCCEEDED(reason) || (reason == NS_BASE_STREAM_CLOSED)) {
@@ -1057,6 +1253,16 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
       mHttp3Session->SetCleanShutdown(true);
       mHttp3Session->Close(reason);
     }
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("udp.close_transaction.return ci=%p conn=%p session=%p "
+           "reason=%08x action=%s",
+           NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+           static_cast<uint32_t>(reason),
+           aIsShutdown ? "shutdown-close-session" : "successful-noop"));
+    }
+#endif
     return;
   }
 
@@ -1069,6 +1275,15 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
   }
 
   mDontReuse = true;
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.close_transaction.mutate ci=%p conn=%p session=%p "
+         "reason=%08x dont_reuse=1",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+         static_cast<uint32_t>(reason)));
+  }
+#endif
   if (mHttp3Session) {
     // When proxy connnect failed, we call Http3Session::SetCleanShutdown to
     // force Http3Session to release this UDP connection.
@@ -1078,6 +1293,15 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
     if (!mHttp3Session->IsClosed()) {
       // During closing phase we still keep mHttp3Session session,
       // to resend CLOSE_CONNECTION frames.
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("udp.close_transaction.return ci=%p conn=%p session=%p "
+             "reason=%08x action=session-closing",
+             NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+             static_cast<uint32_t>(reason)));
+      }
+#endif
       return;
     }
   }
@@ -1094,6 +1318,15 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
   // flag the connection as reused here for convenience sake. certainly
   // it might be going away instead ;-)
   mIsReused = true;
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("udp.close_transaction.end ci=%p conn=%p session=%p reason=%08x "
+         "dont_reuse=%d reused=%d",
+         NaiveFoxConnectionInfoId(mConnInfo), this, mHttp3Session.get(),
+         static_cast<uint32_t>(reason), mDontReuse, mIsReused));
+  }
+#endif
 }
 
 void HttpConnectionUDP::OnQuicTimeoutExpired() {

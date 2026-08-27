@@ -75,6 +75,7 @@ class nsServerSocket : public nsASocketHandler, public nsIServerSocket {
   nsCOMPtr<nsIEventTarget> mListenerTarget;
   bool mAttached{false};
   bool mKeepWhenOffline{false};
+  bool mAcceptedSocketNoDelay{false};
 };
 
 }  // namespace net

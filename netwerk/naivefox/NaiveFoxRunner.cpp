@@ -11,6 +11,7 @@
 #include "GeckoRuntime.h"
 #include "HttpClient.h"
 #include "NaiveFoxAPI.h"
+#include "NativeStylePreloadActivation.h"
 #include "NeckoTunnel.h"
 #include "ProfilerControl.h"
 #include "ProxyProtocol.h"
@@ -48,12 +49,13 @@ void PrintUsage(const char* aProgram) {
       "Usage: %s [CONFIG_PATH]\n"
       "       %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
+      "       %s --profile PATH --activation-process-smoke\n"
       "       %s --profile PATH --fetch URL\n"
       "       %s --profile PATH --raw-tunnel-smoke PROXY_URL TARGET "
       "[--protocol h2|h3|auto]\n"
       "       %s --profile PATH --socks-listen 127.0.0.1:PORT "
       "--proxy PROXY_URL [--protocol h2|h3|auto] [--max-connections N]\n",
-      aProgram, aProgram, aProgram, aProgram, aProgram, aProgram);
+      aProgram, aProgram, aProgram, aProgram, aProgram, aProgram, aProgram);
 }
 
 bool ParseProxyProtocol(const char* aValue,
@@ -87,12 +89,56 @@ const char* ProxyProtocolName(mozilla::naivefox::ProxyProtocol aProtocol) {
 
 mozilla::naivefox::ProxyProtocol RuntimeProtocol(
     const mozilla::naivefox::Config& aConfig) {
+  bool hasAuto = false;
   for (const auto& proxy : aConfig.mProxies) {
     if (proxy.mProtocol == mozilla::naivefox::ProxyProtocol::H3) {
       return mozilla::naivefox::ProxyProtocol::H3;
     }
+    hasAuto |= proxy.mProtocol == mozilla::naivefox::ProxyProtocol::Auto;
   }
-  return mozilla::naivefox::ProxyProtocol::H2;
+  return hasAuto ? mozilla::naivefox::ProxyProtocol::Auto
+                 : mozilla::naivefox::ProxyProtocol::H2;
+}
+
+template <typename Predicate>
+bool AnyEffectivePreambleMode(const mozilla::naivefox::Config& aConfig,
+                              Predicate&& aPredicate) {
+  for (const auto& proxy : aConfig.mProxies) {
+    if (proxy.mProtocol != mozilla::naivefox::ProxyProtocol::H3 &&
+        aPredicate(aConfig.mPreamble.ModeForProtocol(
+            mozilla::naivefox::ProxyProtocol::H2))) {
+      return true;
+    }
+    if (proxy.mProtocol != mozilla::naivefox::ProxyProtocol::H2 &&
+        aPredicate(aConfig.mPreamble.ModeForProtocol(
+            mozilla::naivefox::ProxyProtocol::H3))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PreambleNeedsCacheRuntime(const mozilla::naivefox::Config& aConfig) {
+  return aConfig.mPreamble.mCacheResources ||
+         AnyEffectivePreambleMode(aConfig, [](auto aMode) {
+           return mozilla::naivefox::PreambleModeUsesNativeCacheOpen(aMode);
+         });
+}
+
+bool PreambleNeedsNativeStyleActivationRuntime(
+    const mozilla::naivefox::Config& aConfig) {
+  return AnyEffectivePreambleMode(aConfig, [](auto aMode) {
+    return mozilla::naivefox::PreambleModeNeedsNativeStyleActivationRuntime(
+        aMode);
+  });
+}
+
+bool PreambleNeedsNativeActivationProcessRuntime(
+    const mozilla::naivefox::Config& aConfig) {
+  return AnyEffectivePreambleMode(aConfig, [](auto aMode) {
+    return mozilla::naivefox::PreambleModeNeedsNativeActivationProcessRuntime(
+        aMode);
+  });
 }
 
 nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
@@ -106,6 +152,11 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mProtocol = proxy.mProtocol;
     tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
     tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
+    tunnelConfig.mPreamble = aConfig.mPreamble;
+    tunnelConfig.mOuterSessionGate = aConfig.mOuterSessionGate;
+    tunnelConfig.mImplicitPreambleGate = aConfig.mImplicitPreambleGate;
+    tunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart =
+        aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
   }
   return tunnelConfigs;
 }
@@ -201,10 +252,12 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
     } else {
       mozilla::naivefox::GeckoRuntime runtime;
       xpcomAttempted = true;
-      rv = runtime.InitializeEmbedded(nsDependentCString(aProfilePath),
-                                      nsDependentCString(aRuntimePath),
-                                      RuntimeProtocol(config),
-                                      config.mNoPostQuantum);
+      rv = runtime.InitializeEmbedded(
+          nsDependentCString(aProfilePath), nsDependentCString(aRuntimePath),
+          RuntimeProtocol(config), config.mNoPostQuantum,
+          PreambleNeedsCacheRuntime(config),
+          PreambleNeedsNativeStyleActivationRuntime(config),
+          PreambleNeedsNativeActivationProcessRuntime(config));
       if (NS_SUCCEEDED(rv)) {
         MarkEmbeddedRunning();
         mozilla::naivefox::RuntimeLogEvent(
@@ -212,8 +265,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
             static_cast<unsigned>(config.mListeners.Length()),
             static_cast<unsigned>(config.mProxies.Length()));
         auto tunnelConfigs = MakeTunnelConfigs(config);
-        rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
-                                                    tunnelConfigs, 0, control);
+        rv = mozilla::naivefox::RunLocalProxyServer(
+            config.mListeners, tunnelConfigs, config.mMaxConnections, control);
       }
       status =
           NS_SUCCEEDED(rv) ? NAIVEFOX_STATUS_OK : NAIVEFOX_STATUS_RUNTIME_ERROR;
@@ -262,8 +315,11 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     const auto runtimeProtocol = RuntimeProtocol(config);
 
     mozilla::naivefox::GeckoRuntime runtime;
-    rv = runtime.Initialize(aArgc, aArgv, profile.Path(), runtimeProtocol,
-                            config.mNoPostQuantum);
+    rv = runtime.Initialize(
+        aArgc, aArgv, profile.Path(), runtimeProtocol, config.mNoPostQuantum,
+        PreambleNeedsCacheRuntime(config),
+        PreambleNeedsNativeStyleActivationRuntime(config),
+        PreambleNeedsNativeActivationProcessRuntime(config));
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started listeners=%u upstreams=%u\n",
@@ -277,8 +333,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
             static_cast<unsigned>(index + 1));
       }
       auto tunnelConfigs = MakeTunnelConfigs(config);
-      rv = mozilla::naivefox::RunLocalProxyServer(config.mListeners,
-                                                  tunnelConfigs);
+      rv = mozilla::naivefox::RunLocalProxyServer(
+          config.mListeners, tunnelConfigs, config.mMaxConnections);
     }
     if (NS_FAILED(rv)) {
       std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",
@@ -299,6 +355,7 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       mozilla::naivefox::ProxyProtocol::H2;
   uint32_t maxConnections = 0;
   bool runtimeSmoke = false;
+  bool activationProcessSmoke = false;
   bool protocolSpecified = false;
 
   for (int i = 1; i < aArgc; ++i) {
@@ -308,6 +365,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       fetchUrl.Assign(aArgv[++i]);
     } else if (std::strcmp(aArgv[i], "--runtime-smoke") == 0) {
       runtimeSmoke = true;
+    } else if (std::strcmp(aArgv[i], "--activation-process-smoke") == 0) {
+      activationProcessSmoke = true;
     } else if (std::strcmp(aArgv[i], "--raw-tunnel-smoke") == 0 &&
                i + 2 < aArgc) {
       rawProxyUrl.Assign(aArgv[++i]);
@@ -341,7 +400,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     }
   }
 
-  int modes = static_cast<int>(runtimeSmoke) + !fetchUrl.IsEmpty() +
+  int modes = static_cast<int>(runtimeSmoke) +
+              static_cast<int>(activationProcessSmoke) + !fetchUrl.IsEmpty() +
               !rawProxyUrl.IsEmpty() + !socksListen.IsEmpty();
   if (profile.IsEmpty() || modes != 1 ||
       (rawProxyUrl.IsEmpty() != rawTarget.IsEmpty()) ||
@@ -365,6 +425,9 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   if (NS_SUCCEEDED(rv)) {
     if (runtimeSmoke) {
       rv = runtime.RunEventLoopSmoke();
+    } else if (activationProcessSmoke) {
+      rv = mozilla::naivefox::NativeStylePreloadActivation::
+          RunProcessBootstrapAdmission();
     } else if (!fetchUrl.IsEmpty()) {
       rv = mozilla::naivefox::FetchWithNecko(fetchUrl);
     } else if (!rawProxyUrl.IsEmpty()) {

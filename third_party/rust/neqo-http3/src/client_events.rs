@@ -125,6 +125,9 @@ pub enum Http3ClientEvent {
     ResumptionToken(ResumptionToken),
     /// Zero Rtt has been rejected.
     ZeroRttRejected,
+    #[cfg(feature = "naivefox")]
+    /// The QUIC client handshake has reached transport `State::Confirmed`.
+    HandshakeConfirmed,
     /// Client has received a GOAWAY frame
     GoawayReceived,
     /// Connection state change.
@@ -351,6 +354,12 @@ impl Http3ClientEvents {
     /// Add a new `ZeroRttRejected` event.
     pub(crate) fn zero_rtt_rejected(&self) {
         self.insert(Http3ClientEvent::ZeroRttRejected);
+    }
+
+    #[cfg(feature = "naivefox")]
+    /// Report the one-shot transport handshake confirmation milestone.
+    pub(crate) fn handshake_confirmed(&self) {
+        self.insert(Http3ClientEvent::HandshakeConfirmed);
     }
 
     /// Add a new `GoawayReceived` event.

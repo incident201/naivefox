@@ -105,7 +105,8 @@ class nsHttpConnection final : public HttpConnectionBase,
 
   bool NeedSpdyTunnel() {
     return mConnInfo->UsingHttpsProxy() && !mHasTLSTransportLayer &&
-           mConnInfo->UsingConnect();
+           mConnInfo->UsingConnect() &&
+           !(mTransactionCaps & NS_HTTP_PROXY_PREAMBLE);
   }
 
   // A connection is forced into plaintext when it is intended to be used as a

@@ -10,6 +10,9 @@
 #include "ConnectionEntry.h"
 #include "HttpConnectionUDP.h"
 #include "HttpLog.h"
+#ifdef MOZ_NAIVEFOX
+#  include "NaiveFoxLifecycleLog.h"
+#endif
 #include "NSSErrorsService.h"
 #include "NetworkConnectivityService.h"
 #include "PendingTransactionInfo.h"
@@ -22,6 +25,7 @@
 #include "nsIDNSAdditionalInfo.h"
 #include "nsIHttpActivityObserver.h"
 #include "nsQueryObject.h"
+#include "nsProxyInfo.h"
 #include "nsSocketTransport2.h"
 #include "nsSocketTransportService2.h"
 #include "sslerr.h"
@@ -136,12 +140,14 @@ class DefaultHappyEyeballsConnMgrDelegate final
 
 HappyEyeballsConnectionAttempt::HappyEyeballsConnectionAttempt(
     nsHttpConnectionInfo* ci, nsAHttpTransaction* trans, uint32_t caps,
-    bool speculative, bool urgentStart, bool retryWithoutTRR)
+    bool speculative, bool urgentStart, bool retryWithoutTRR,
+    bool singleProxyColdWinnerHandoff)
     : ConnectionAttempt(ci, trans, caps, speculative, urgentStart),
       mEstablisherFactory(new DefaultConnectionEstablisherFactory()),
       mConnMgrDelegate(new DefaultHappyEyeballsConnMgrDelegate()),
       mRetryWithoutTRR(retryWithoutTRR),
-      mZeroRttHandle(new ZeroRttHandle(this)) {
+      mZeroRttHandle(new ZeroRttHandle(this)),
+      mSingleProxyColdWinnerHandoff(singleProxyColdWinnerHandoff) {
   LOG(("HappyEyeballsConnectionAttempt ctor %p retryWithoutTRR=%d", this,
        retryWithoutTRR));
   // mHost is the origin host: the base Happy Eyeballs resolves and falls back
@@ -237,12 +243,289 @@ nsresult HappyEyeballsConnectionAttempt::CreateHappyEyeballs(
 
 nsresult HappyEyeballsConnectionAttempt::Init(ConnectionEntry* ent) {
   mEntry = ent;
+
+  if (mSingleProxyColdWinnerHandoff) {
+    // MakeNewConnection still owns the real pending document at this point.
+    // Do not begin DNS or connection establishment on this stack: the caller
+    // must first insert/claim this ConnectionAttempt and attach it to the
+    // PendingTransactionInfo.  This is the same ownership boundary that keeps
+    // Firefox's HCA winner tied to the exact pending document.
+    Transition(State::Connecting);
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=init-post document=%p attempt=%p "
+           "pending-owned=1",
+           mTransaction.get(), this));
+    }
+#endif
+    nsresult rv = NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+        "HappyEyeballsConnectionAttempt::StartSingleProxyColdWinnerHandoff",
+        [self = RefPtr{this}]() { self->StartSingleProxyColdWinnerHandoff(); }));
+    if (NS_FAILED(rv)) {
+      FailSingleProxyColdWinnerHandoff(rv, "init-dispatch");
+    }
+    return rv;
+  }
+
   nsresult rv = CreateHappyEyeballs(ent);
   if (NS_FAILED(rv)) {
     return rv;
   }
   Transition(State::Connecting);
   return ProcessHappyEyeballsOutput();
+}
+
+void HappyEyeballsConnectionAttempt::StartSingleProxyColdWinnerHandoff() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (IsTerminal()) {
+    return;
+  }
+
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.cold_winner_handoff action=init-run document=%p attempt=%p "
+         "registered=1",
+         mTransaction.get(), this));
+  }
+#endif
+
+  nsresult rv = StartSingleProxyDnsLookup();
+  if (NS_FAILED(rv)) {
+    FailSingleProxyColdWinnerHandoff(rv, "dns-start");
+  }
+}
+
+nsresult HappyEyeballsConnectionAttempt::StartSingleProxyDnsLookup() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (!mSingleProxyColdWinnerHandoff || mSingleProxyDnsRequest ||
+      mSingleProxyUdpAttemptStarted || !mTransaction || !mEntry ||
+      !mConnInfo->UsingProxy() || !mConnInfo->IsHttp3ProxyConnection()) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsCOMPtr<nsProxyInfo> proxyInfo = mConnInfo->ProxyInfo();
+  if (!proxyInfo || proxyInfo->Host().IsEmpty() || proxyInfo->Port() <= 0 ||
+      proxyInfo->Port() > UINT16_MAX) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  nsAutoCString physicalHost(
+      proxyInfo->NaiveFoxPhysicalHost().IsEmpty()
+          ? proxyInfo->Host()
+          : proxyInfo->NaiveFoxPhysicalHost());
+  if (physicalHost.IsEmpty()) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  mSingleProxyPort = static_cast<uint16_t>(proxyInfo->Port());
+
+  nsIDNSService::DNSFlags flags = nsIDNSService::RESOLVE_DEFAULT_FLAGS;
+  if (mCaps & NS_HTTP_REFRESH_DNS) {
+    flags = nsIDNSService::RESOLVE_BYPASS_CACHE;
+  }
+  if (mCaps & NS_HTTP_DISABLE_IPV4) {
+    flags |= nsIDNSService::RESOLVE_DISABLE_IPV4;
+  } else if (mCaps & NS_HTTP_DISABLE_IPV6) {
+    flags |= nsIDNSService::RESOLVE_DISABLE_IPV6;
+  }
+  flags |=
+      nsIDNSService::GetFlagsFromTRRMode(NS_HTTP_TRR_MODE_FROM_FLAGS(mCaps));
+  flags |= nsIDNSService::RESOLVE_IGNORE_SOCKS_DNS |
+           nsIDNSService::RESOLVE_WANT_RECORD_ON_ERROR;
+
+  nsCOMPtr<nsIDNSService> dns = GetOrInitDNSService();
+  if (!dns) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  mFirstDnsLookupStart = TimeStamp::Now();
+  MaybeSendTransportStatus(NS_NET_STATUS_RESOLVING_HOST);
+
+  nsCOMPtr<nsICancelable> request;
+  nsresult rv = dns->AsyncResolveNative(
+      physicalHost, nsIDNSService::RESOLVE_TYPE_DEFAULT, flags, nullptr, this,
+      gSocketTransportService, mConnInfo->GetOriginAttributes(),
+      getter_AddRefs(request));
+  if (NS_FAILED(rv) || !request) {
+    return NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED;
+  }
+  mSingleProxyDnsRequest = request;
+
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.cold_winner_handoff action=dns-start document=%p attempt=%p "
+         "physical-proxy=1 candidates-max=1",
+         mTransaction.get(), this));
+  }
+#endif
+  return NS_OK;
+}
+
+nsresult HappyEyeballsConnectionAttempt::HandleSingleProxyDnsResult(
+    nsIDNSRecord* aRecord, nsresult aStatus) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (IsTerminal() || mSingleProxyUdpAttemptStarted) {
+    return NS_ERROR_ABORT;
+  }
+  mDnsResolutionEnd = TimeStamp::Now();
+
+  nsCOMPtr<nsIDNSAddrRecord> addrRecord = do_QueryInterface(aRecord);
+  if (NS_FAILED(aStatus) || !addrRecord) {
+    return NS_FAILED(aStatus) ? aStatus : NS_ERROR_UNKNOWN_PROXY_HOST;
+  }
+
+  mDnsMetadata.Fill(addrRecord);
+  if (mTransaction && !mTRRInfoForwarded) {
+    mTransaction->SetTRRInfo(mDnsMetadata.mEffectiveTRRMode,
+                             mDnsMetadata.mTrrSkipReason);
+    mTRRInfoForwarded = true;
+  }
+  MaybeSendTransportStatus(NS_NET_STATUS_RESOLVED_HOST);
+
+  // Deliberately consume exactly one DNS candidate.  There is no family race,
+  // backup address, retry, ECH retry, or TCP/proxy fallback in this arm.
+  NetAddr addr;
+  nsresult rv = addrRecord->GetNextAddr(mSingleProxyPort, &addr);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  mAddrFamily = addr.raw.family;
+  mFirstConnectionStart = TimeStamp::Now();
+  mFirstSecureConnectionStart = mFirstConnectionStart;
+  mSingleProxyUdpAttemptStarted = true;
+
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.cold_winner_handoff action=udp-attempt-start document=%p "
+         "attempt=%p candidate=1 candidates-total=1 protocol=h3 proxy-aware=1",
+         mTransaction.get(), this));
+  }
+#endif
+  return EstablishSingleProxyUDPConnection(addr);
+}
+
+nsresult HappyEyeballsConnectionAttempt::EstablishSingleProxyUDPConnection(
+    const NetAddr& aAddr) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  constexpr uint64_t kSingleAttemptId = 1;
+
+  // Keep the original proxy connection-info.  CloneAndAdoptPortAndAlpn(), used
+  // by direct HCA racers, would replace the logical proxy route with a direct
+  // origin route and is therefore specifically wrong here.
+  RefPtr<ConnectionEstablisher> establisher =
+      mEstablisherFactory->Create(ConnectionEstablisherType::UDP, mConnInfo,
+                                  aAddr, mCaps, /* speculative */ false,
+                                  /* allow1918 */ true);
+  if (!establisher) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  establisher->SetDnsMetadata(mDnsMetadata);
+  establisher->SetTransportStatusCallback(
+      [self = RefPtr{this}](nsITransport* aTransport, nsresult aStatus,
+                            int64_t aProgress) {
+        self->MaybeSendTransportStatus(aStatus, aTransport, aProgress);
+      });
+
+  nsCOMPtr<nsIInterfaceRequestor> callbacks;
+  uint64_t browserId = 0;
+  mTransaction->GetSecurityCallbacks(getter_AddRefs(callbacks));
+  browserId = mTransaction->BrowserId();
+  RefPtr<HappyEyeballsTransaction> carrier = new HappyEyeballsTransaction(
+      mConnInfo, callbacks, mCaps, browserId,
+      [self = RefPtr{this}](nsITransport* aTransport, nsresult aStatus,
+                            int64_t aProgress) {
+        self->MaybeSendTransportStatus(aStatus, aTransport, aProgress);
+      },
+      []() {}, []() {}, mZeroRttHandle,
+      /* allowZeroRtt */ false);
+  establisher->SetTransaction(carrier);
+
+  auto callback =
+      [self = RefPtr{this}, establisher, kSingleAttemptId](
+          Result<RefPtr<HttpConnectionBase>, nsresult> aResult) mutable {
+        if (self->IsTerminal()) {
+          establisher->Close(NS_ERROR_ABORT);
+          return;
+        }
+
+        if (aResult.isErr()) {
+          nsresult reason = aResult.unwrapErr();
+          establisher->Close(reason);
+          self->FailSingleProxyColdWinnerHandoff(reason,
+                                                 "connection-result");
+          return;
+        }
+
+        self->mOutputConn = aResult.unwrap();
+        if (!self->mOutputConn || !self->mOutputConn->UsingHttp3() ||
+            !self->mOutputConn->IsRacing()) {
+          if (self->mOutputConn) {
+            self->mOutputConn->SetDontExclude();
+            self->mOutputConn->Close(NS_ERROR_UNEXPECTED);
+          }
+          self->mOutputConn = nullptr;
+          establisher->ClearResultConnection();
+          self->FailSingleProxyColdWinnerHandoff(NS_ERROR_UNEXPECTED,
+                                                 "winner-contract");
+          return;
+        }
+
+        self->mOutputTrans = establisher->Transaction();
+        self->mOutputConnId = kSingleAttemptId;
+        self->mFirstConnectEnd = TimeStamp::Now();
+        establisher->ClearResultConnection();
+        self->mConnectionEstablisherTable.Remove(kSingleAttemptId);
+
+#ifdef MOZ_NAIVEFOX
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("h3.cold_winner_handoff action=winner-ready document=%p "
+               "carrier=%p conn=%p racing=1",
+               self->mTransaction.get(), self->mOutputTrans.get(),
+               self->mOutputConn.get()));
+        }
+#endif
+        self->Transition(State::Succeeded);
+      };
+
+  mConnectionEstablisherTable.InsertOrUpdate(kSingleAttemptId,
+                                              establisher);
+  if (!establisher->Start(std::move(callback))) {
+    // Start() is allowed to invoke its completion callback synchronously.
+    // Only the owner still present in the table may perform the failure
+    // teardown; a callback that already consumed it makes this path a no-op.
+    RefPtr<ConnectionEstablisher> stillOwned =
+        mConnectionEstablisherTable.Get(kSingleAttemptId);
+    if (stillOwned == establisher) {
+      mConnectionEstablisherTable.Remove(kSingleAttemptId);
+      establisher->Close(NS_ERROR_FAILURE);
+      return NS_ERROR_FAILURE;
+    }
+  }
+  return NS_OK;
+}
+
+void HappyEyeballsConnectionAttempt::FailSingleProxyColdWinnerHandoff(
+    nsresult aReason, const char* aStage) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+  if (IsTerminal()) {
+    return;
+  }
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.cold_winner_handoff action=terminal-failure document=%p "
+         "attempt=%p stage=%s rv=%08x",
+         mTransaction.get(), this, aStage, static_cast<uint32_t>(aReason)));
+  }
+#endif
+  TransitionPayload payload;
+  payload.mCloseReason = NS_FAILED(aReason) ? aReason : NS_ERROR_UNEXPECTED;
+  Transition(State::AbortTransaction, std::move(payload));
 }
 
 static Result<NetAddr, nsresult> ToNetAddr(
@@ -1428,6 +1711,90 @@ void HappyEyeballsConnectionAttempt::ProcessUDPConn(
     }
   }
 
+  if (mSingleProxyColdWinnerHandoff) {
+    nsHttpTransaction* real = RealHttpTransaction();
+    RefPtr<PendingTransactionInfo> pendingPreflight =
+        real ? mConnMgrDelegate->FindTransaction(false, entry, real) : nullptr;
+    const bool exactPending =
+        pendingPreflight && real &&
+        pendingPreflight->Transaction() == real && !real->IsDone() &&
+        !real->Connection() && !aTransactionAlreadyOnConn;
+    if (!exactPending) {
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.cold_winner_handoff action=terminal-failure document=%p "
+             "attempt=%p stage=pending-preflight rv=%08x pending=%d exact=%d",
+             mTransaction.get(), this,
+             static_cast<uint32_t>(NS_ERROR_UNEXPECTED), !!pendingPreflight,
+             exactPending));
+      }
+#endif
+      ReleaseRealTransaction(NS_ERROR_UNEXPECTED, entry);
+      aConn->SetIsRacing(false);
+      aConn->SetDontExclude();
+      aConn->Close(NS_ERROR_UNEXPECTED);
+      return;
+    }
+
+    // Mirror HCA's cold ProcessUDPConn contract: the winner is registered as
+    // active while still provisional/racing, then the exact pending document
+    // is removed and dispatched directly onto it.  It is not generally
+    // published until that exact dispatch succeeds.
+    mConnMgrDelegate->InsertIntoActiveConns(entry, aConn);
+    RefPtr<PendingTransactionInfo> pendingTransInfo =
+        mConnMgrDelegate->FindTransaction(true, entry, real);
+    nsresult rv = pendingTransInfo && pendingTransInfo->Transaction() == real
+                      ? mConnMgrDelegate->DispatchTransaction(entry, real,
+                                                              aConn)
+                      : NS_ERROR_UNEXPECTED;
+    if (NS_FAILED(rv)) {
+#ifdef MOZ_NAIVEFOX
+      if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+        NAIVEFOX_LIFECYCLE_LOG(
+            ("h3.cold_winner_handoff action=terminal-failure document=%p "
+             "attempt=%p stage=exact-dispatch rv=%08x pending=%d exact=%d",
+             mTransaction.get(), this, static_cast<uint32_t>(rv),
+             !!pendingTransInfo,
+             pendingTransInfo && pendingTransInfo->Transaction() == real));
+      }
+#endif
+      ReleaseRealTransaction(rv, entry);
+#ifdef MOZ_NAIVEFOX
+      MOZ_ALWAYS_SUCCEEDS(entry->RemoveProvisionalActiveConnection(aConn));
+#else
+      MOZ_CRASH("single-proxy cold winner handoff requires MOZ_NAIVEFOX");
+#endif
+      aConn->SetIsRacing(false);
+      aConn->SetDontExclude();
+      aConn->Close(rv);
+      return;
+    }
+
+    mTransactionAdopted = true;
+#ifdef MOZ_NAIVEFOX
+    real->SetH3ColdWinnerHandoffSucceeded(true);
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=exact-dispatch-complete "
+           "document=%p carrier=%p conn=%p pending-removed=1 dispatched=1 "
+           "racing=1",
+           real, mOutputTrans.get(), aConn));
+    }
+#endif
+    aConn->SetIsRacing(false);
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=winner-publish document=%p conn=%p "
+           "racing=0 exact-dispatch=1",
+           mTransaction.get(), aConn));
+    }
+#endif
+    mConnMgrDelegate->ReportHttp3Connection(aConn, entry);
+    return;
+  }
+
   mConnMgrDelegate->InsertIntoActiveConns(entry, aConn);
 
   if (!aTransactionAlreadyOnConn) {
@@ -1508,7 +1875,9 @@ void HappyEyeballsConnectionAttempt::EnterSucceeded() {
       realTransaction->BootstrapTimings(timings);
     }
   }
-  mOutputTrans = nullptr;
+  if (!mSingleProxyColdWinnerHandoff) {
+    mOutputTrans = nullptr;
+  }
 
   // Fallback for the case where ShouldDisqualify didn't fire. A racer that did
   // 0-RTT advanced the real transaction's request stream; its flags are
@@ -1587,6 +1956,7 @@ void HappyEyeballsConnectionAttempt::EnterSucceeded() {
     ProcessUDPConn(mOutputConn, entry, alreadyOnConn);
   }
 
+  mOutputTrans = nullptr;
   mOutputConn = nullptr;
 
   // Make sure everything is released.
@@ -1596,10 +1966,13 @@ void HappyEyeballsConnectionAttempt::EnterSucceeded() {
 }
 
 double HappyEyeballsConnectionAttempt::Duration(TimeStamp epoch) {
-  if (mFirstConnectionStart.IsNull()) {
+  if (mFirstConnectionStart.IsNull() &&
+      (!mSingleProxyColdWinnerHandoff || mFirstDnsLookupStart.IsNull())) {
     return 0;
   }
-  return (epoch - mFirstConnectionStart).ToMilliseconds();
+  return (epoch - (mFirstConnectionStart.IsNull() ? mFirstDnsLookupStart
+                                                  : mFirstConnectionStart))
+      .ToMilliseconds();
 }
 
 void HappyEyeballsConnectionAttempt::OnTimeout() {
@@ -1699,6 +2072,11 @@ void HappyEyeballsConnectionAttempt::EnterAbortTransaction(
 void HappyEyeballsConnectionAttempt::EnterDone() {
   LOG(("HappyEyeballsConnectionAttempt::EnterDone %p", this));
   MOZ_ASSERT(mState == State::Done);
+
+  if (mSingleProxyDnsRequest) {
+    mSingleProxyDnsRequest->Cancel(NS_ERROR_ABORT);
+    mSingleProxyDnsRequest = nullptr;
+  }
 
   for (auto iter = mDnsRequestTable.Iter(); !iter.Done(); iter.Next()) {
     iter.Data()->Cancel();
@@ -1852,6 +2230,9 @@ void HappyEyeballsConnectionAttempt::Transition(State aNext,
 void HappyEyeballsConnectionAttempt::PrintDiagnostics(nsCString& log) {}
 
 uint32_t HappyEyeballsConnectionAttempt::UnconnectedUDPConnsLength() const {
+  if (mSingleProxyColdWinnerHandoff) {
+    return 1;
+  }
   uint32_t len = 0;
   for (auto iter = mConnectionEstablisherTable.ConstIter(); !iter.Done();
        iter.Next()) {
@@ -1911,6 +2292,24 @@ HappyEyeballsConnectionAttempt::OnLookupComplete(nsICancelable* request,
                                                  nsIDNSRecord* rec,
                                                  nsresult status) {
   LOG(("HappyEyeballsConnectionAttempt::OnLookupComplete"));
+
+  if (mSingleProxyColdWinnerHandoff && request &&
+      request == mSingleProxyDnsRequest) {
+    mSingleProxyDnsRequest = nullptr;
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=dns-complete document=%p "
+           "attempt=%p rv=%08x",
+           mTransaction.get(), this, static_cast<uint32_t>(status)));
+    }
+#endif
+    nsresult rv = HandleSingleProxyDnsResult(rec, status);
+    if (NS_FAILED(rv) && !IsTerminal()) {
+      FailSingleProxyColdWinnerHandoff(rv, "dns-result");
+    }
+    return NS_OK;
+  }
 
   // domainLookupEnd tracks the latest DNS response received before the first
   // connection attempt starts. Later responses are ignored; if no lookup has

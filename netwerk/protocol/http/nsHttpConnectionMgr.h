@@ -215,6 +215,9 @@ class nsHttpConnectionMgr final : public HttpConnectionMgrShell,
   friend class ConnectionEntry;
   void IncrementActiveConnCount();
   void DecrementActiveConnCount(HttpConnectionBase*);
+#ifdef MOZ_NAIVEFOX
+  void DecrementProvisionalActiveConnCount();
+#endif
 
  private:
   friend class ConnectionAttemptPool;

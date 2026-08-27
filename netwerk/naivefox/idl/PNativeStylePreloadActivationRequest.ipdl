@@ -1,0 +1,49 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PNativeStylePreloadActivation;
+include NativeStylePreloadActivationTypes;
+
+namespace mozilla {
+namespace naivefox {
+
+[ChildProc=any, ChildImpl=virtual, ParentImpl=virtual]
+async protocol PNativeStylePreloadActivationRequest {
+  manager PNativeStylePreloadActivation;
+parent:
+  async Bind(uint64_t requestId, uint8_t kind, uint8_t leg);
+  async StyleOpen(NativeStylePreloadActivationArgs args);
+  async StyleBackgroundReady(uint64_t requestId);
+  async ConnectRootReplacement(uint64_t requestId,
+                               uint64_t channelId,
+                               uint64_t generation);
+  async RootReplacementSetupFinished(uint64_t requestId,
+                                     uint64_t channelId,
+                                     uint64_t generation);
+  async RootReplacementBackgroundReady(uint64_t requestId,
+                                       uint64_t channelId,
+                                       uint64_t generation);
+  async __delete__();
+
+child:
+  async Bound(uint64_t requestId, uint8_t kind, uint8_t leg);
+  async BeginRootReplacement(NativeRootReplacementActivationArgs args);
+  async ReadyToVerifyRootReplacement(uint64_t requestId,
+                                     uint64_t channelId,
+                                     uint64_t generation);
+  async ForwardRootOnStart(uint64_t requestId,
+                           uint64_t channelId,
+                           uint64_t generation);
+  async ForwardRootData(uint64_t requestId,
+                        uint64_t channelId,
+                        uint64_t generation,
+                        nsCString data);
+  async ForwardRootStop(uint64_t requestId,
+                        uint64_t channelId,
+                        uint64_t generation,
+                        nsresult status);
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

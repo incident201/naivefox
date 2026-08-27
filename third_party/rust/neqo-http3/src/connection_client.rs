@@ -23,6 +23,8 @@ use neqo_common::{
     qtrace, qwarn,
 };
 use neqo_qpack::Stats as QpackStats;
+#[cfg(feature = "naivefox")]
+use neqo_transport::State;
 use neqo_transport::{
     AppError, Connection, ConnectionEvent, ConnectionId, ConnectionIdGenerator, Output,
     OutputBatch, Stats as TransportStats, StreamId, StreamType, Version, ZeroRttState,
@@ -945,12 +947,18 @@ impl Http3Client {
                     self.events.ech_fallback_authentication_needed(public_name);
                 }
                 ConnectionEvent::StateChange(state) => {
+                    #[cfg(feature = "naivefox")]
+                    let handshake_confirmed = matches!(&state, State::Confirmed);
                     if self
                         .base_handler
                         .handle_state_change(&mut self.conn, &state)?
                     {
                         self.events
                             .connection_state_change(self.base_handler.state().clone());
+                    }
+                    #[cfg(feature = "naivefox")]
+                    if handshake_confirmed {
+                        self.events.handshake_confirmed();
                     }
                 }
                 ConnectionEvent::ZeroRttRejected => {
@@ -1641,6 +1649,26 @@ mod tests {
         let mut server = TestServer::new();
         connect_only_transport_with(&mut client, &mut server);
         (client, server)
+    }
+
+    #[test]
+    #[cfg(feature = "naivefox")]
+    fn transport_handshake_confirmation_is_an_explicit_client_event() {
+        let (mut client, mut server) = connect_only_transport();
+        assert!(
+            !client
+                .events()
+                .any(|event| event == Http3ClientEvent::HandshakeConfirmed)
+        );
+
+        let handshake_done = server.conn.process(None::<Datagram>, now());
+        client.process_input(handshake_done.dgram().unwrap(), now());
+
+        assert!(
+            client
+                .events()
+                .any(|event| event == Http3ClientEvent::HandshakeConfirmed)
+        );
     }
 
     fn send_and_receive_client_settings(client: &mut Http3Client, server: &mut TestServer) {

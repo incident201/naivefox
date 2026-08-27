@@ -1,6 +1,7 @@
 {
 	admin off
 	auto_https disable_redirects
+	grace_period 250ms
 	skip_install_trust
 	servers {
 		protocols {$NAIVEFOX_FIXTURE_PROTOCOLS}
@@ -12,15 +13,31 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 	log
 	tls {$NAIVEFOX_FIXTURE_PROXY_CERT} {$NAIVEFOX_FIXTURE_PROXY_KEY}
 	route {
+		@preambleOriginAuthLeak {
+			path /assets/runtime.js /camouflage*
+			header Authorization *
+		}
+		respond @preambleOriginAuthLeak "preamble must not carry Authorization" 403
+		@preambleProxyAuthLeak {
+			path /assets/runtime.js /camouflage*
+			header Proxy-Authorization *
+		}
+		respond @preambleProxyAuthLeak "preamble must not carry Proxy-Authorization" 403
+		header /assets/runtime.js {
+			Content-Type "application/javascript; charset=utf-8"
+			Cache-Control "public, max-age=3600"
+		}
+		respond /assets/runtime.js `(()=>{"use strict";const e={api:"/api/v1",locale:"en-US"};globalThis.appRuntime=e;})();` 200
 		forward_proxy {
 			basic_auth {$NAIVEFOX_FIXTURE_USER} {$NAIVEFOX_FIXTURE_PASS}
 			hosts localhost
-			ports {$NAIVEFOX_FIXTURE_HTTP_PORT} {$NAIVEFOX_FIXTURE_HTTPS_PORT}
+			ports {$NAIVEFOX_FIXTURE_ALLOWED_PORTS}
 			acl {
 				allow 127.0.0.1/32
 				deny all
 			}
 		}
 		reverse_proxy /observer* 127.0.0.1:{$NAIVEFOX_FIXTURE_HTTP_PORT}
+		reverse_proxy /camouflage* 127.0.0.1:{$NAIVEFOX_FIXTURE_HTTP_PORT}
 	}
 }

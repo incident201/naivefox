@@ -1,0 +1,34 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PNativeStylePreloadProcessBackground;
+
+namespace mozilla {
+namespace naivefox {
+
+[ChildProc=any, ChildImpl=virtual, ParentImpl=virtual]
+async protocol PNativeStylePreloadProcessBackgroundRequest {
+  manager PNativeStylePreloadProcessBackground;
+parent:
+  async Ready(uint8_t kind, uint64_t rootRequestId,
+              uint64_t rootGeneration, uint64_t styleRequestId,
+              uint32_t discoverySequence);
+  async RootOnStartForwarded(uint64_t rootRequestId,
+                             uint64_t rootGeneration);
+  async __delete__();
+
+child:
+  async ForwardRootOnStart(uint64_t rootRequestId,
+                           uint64_t rootGeneration);
+  async ForwardRootData(uint64_t rootRequestId, uint64_t rootGeneration,
+                        uint32_t sequence, nsCString data);
+  async ForwardRootStop(uint64_t rootRequestId, uint64_t rootGeneration,
+                        uint32_t sequence, nsresult status);
+  async Complete(uint8_t kind, uint64_t rootRequestId,
+                 uint64_t rootGeneration, uint64_t styleRequestId,
+                 uint32_t discoverySequence, nsresult status);
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

@@ -89,6 +89,12 @@ SOURCES += [
     "nsHttpChannelAuthProvider.cpp",  # redefines GetAuthType
 ]
 
+if CONFIG["MOZ_NAIVEFOX"]:
+    SOURCES += [
+        "NaiveFoxLifecycleLog.cpp",
+        "NaiveFoxReuseLog.cpp",
+    ]
+
 UNIFIED_SOURCES += [
     "AltDataOutputStreamChild.cpp",
     "AltDataOutputStreamParent.cpp",
@@ -247,6 +253,8 @@ if CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES.remove("OpaqueResponseUtils.cpp")
     UNIFIED_SOURCES.remove("nsHttpNTLMAuth.cpp")
     UNIFIED_SOURCES += ["OpaqueResponseUtilsNaiveFox.cpp"]
+    LOCAL_INCLUDES += ["/dom/security"]
+    LOCAL_INCLUDES += ["/netwerk/naivefox"]
 else:
     IPDL_SOURCES += [
         "HttpChannelParams.ipdlh",

@@ -6,12 +6,52 @@
 #define SpeculativeTransaction_h_
 
 #include "NullHttpTransaction.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Maybe.h"
 
 namespace mozilla {
 namespace net {
 
 class HTTPSRecordResolver;
+
+#ifdef MOZ_NAIVEFOX
+class H3CarrierDispatchGate final {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(H3CarrierDispatchGate)
+
+  void SetCarrierId(uintptr_t aCarrierId) { mCarrierId = aCarrierId; }
+  uintptr_t CarrierId() const { return mCarrierId; }
+
+  void MarkCarrierReadComplete(nsresult aResult) {
+    mCarrierReadResult = static_cast<uint32_t>(aResult);
+    mCarrierReadComplete = true;
+  }
+  bool CarrierReadComplete() const { return mCarrierReadComplete; }
+  nsresult CarrierReadResult() const {
+    uint32_t result = mCarrierReadResult;
+    return static_cast<nsresult>(result);
+  }
+
+  void Complete(nsresult aResult) {
+    mResult = static_cast<uint32_t>(aResult);
+    mComplete = true;
+  }
+  bool IsComplete() const { return mComplete; }
+  nsresult Result() const {
+    uint32_t result = mResult;
+    return static_cast<nsresult>(result);
+  }
+
+ private:
+  ~H3CarrierDispatchGate() = default;
+
+  Atomic<uintptr_t, ReleaseAcquire> mCarrierId{0};
+  Atomic<uint32_t, ReleaseAcquire> mCarrierReadResult{0};
+  Atomic<uint32_t, ReleaseAcquire> mResult{0};
+  Atomic<bool, ReleaseAcquire> mCarrierReadComplete{false};
+  Atomic<bool, ReleaseAcquire> mComplete{false};
+};
+#endif
 
 class SpeculativeTransaction : public NullHttpTransaction {
  public:
@@ -46,6 +86,15 @@ class SpeculativeTransaction : public NullHttpTransaction {
                         uint32_t* aCountRead) override;
   void InvokeCallback() override;
 
+#ifdef MOZ_NAIVEFOX
+  void SetH3CarrierDispatchGate(H3CarrierDispatchGate* aGate) {
+    mH3CarrierDispatchGate = aGate;
+  }
+  H3CarrierDispatchGate* CarrierDispatchGate() const {
+    return mH3CarrierDispatchGate;
+  }
+#endif
+
  protected:
   virtual ~SpeculativeTransaction();
 
@@ -56,6 +105,9 @@ class SpeculativeTransaction : public NullHttpTransaction {
   bool mTriedToWrite = false;
   std::function<void(nsresult)> mCloseCallback;
   RefPtr<HTTPSRecordResolver> mResolver;
+#ifdef MOZ_NAIVEFOX
+  RefPtr<H3CarrierDispatchGate> mH3CarrierDispatchGate;
+#endif
 };
 
 class FallbackTransaction : public SpeculativeTransaction {

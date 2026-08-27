@@ -19,8 +19,10 @@
 #include "mozilla/Base64.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/FunctionTypeTraits.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Logging.h"
 #include "mozilla/ProfilerThreadSleep.h"
+#include "mozilla/ScopeExit.h"
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "nsIThread.h"
 #include "nsPrintfCString.h"
@@ -632,6 +634,42 @@ bool NetlinkService::LinkInfo::UpdateStatus() {
 
 NS_IMPL_ISUPPORTS(NetlinkService, nsIRunnable)
 
+#ifdef MOZ_NAIVEFOX
+mozilla::Atomic<InitialNetworkState, mozilla::ReleaseAcquire>
+    NetlinkService::sInitialNetworkState{InitialNetworkState::Pending};
+LazyLogModule gNaiveFoxNetworkStartupLog("NaiveFoxNetworkStartup");
+
+InitialNetworkState NetlinkService::GetInitialNetworkState() {
+  return sInitialNetworkState;
+}
+
+void NetlinkService::BeginInitialNetworkState() {
+  MOZ_ASSERT(NS_IsMainThread());
+  sInitialNetworkState = InitialNetworkState::Pending;
+  NAIVEFOX_NETWORK_STARTUP_LOG(("initial-state pending"));
+}
+
+bool NetlinkService::FinishInitialNetworkState(InitialNetworkState aState,
+                                               const char* aReason) {
+  MOZ_ASSERT(InitialNetworkStateIsTerminal(aState));
+  const bool changed = sInitialNetworkState.compareExchange(
+      InitialNetworkState::Pending, aState);
+  if (changed) {
+    NAIVEFOX_NETWORK_STARTUP_LOG(
+        ("initial-state %s reason=%s",
+         aState == InitialNetworkState::Ready ? "ready" : "failed", aReason));
+
+    // Wake a main-thread SpinEventLoopUntil immediately.  The timeout timer is
+    // still the final backstop if dispatch itself fails during shutdown.
+    if (!NS_IsMainThread()) {
+      (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+          "NaiveFox::InitialNetworkStateTerminalWake", []() {}));
+    }
+  }
+  return changed;
+}
+#endif
+
 NetlinkService::NetlinkService() : mPid(getpid()) {}
 
 NetlinkService::~NetlinkService() {
@@ -669,6 +707,12 @@ void NetlinkService::OnNetlinkMessage(int aNetlinkSocket) {
 
   ssize_t rc = EINTR_RETRY(recvmsg(aNetlinkSocket, &rtnl_reply, MSG_DONTWAIT));
   if (rc < 0) {
+#ifdef MOZ_NAIVEFOX
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+      FinishInitialNetworkState(InitialNetworkState::Failed,
+                                "recvmsg-error");
+    }
+#endif
     return;
   }
   size_t netlink_bytes = rc;
@@ -692,6 +736,10 @@ void NetlinkService::OnNetlinkMessage(int aNetlinkSocket) {
       if (mOutgoingMessages[0]->SeqId() != nlh->nlmsg_seq) {
         LOG(("Received unexpected seq_id [received=%u, expected=%u]",
              nlh->nlmsg_seq, mOutgoingMessages[0]->SeqId()));
+#ifdef MOZ_NAIVEFOX
+        FinishInitialNetworkState(InitialNetworkState::Failed,
+                                  "unexpected-sequence");
+#endif
         RemovePendingMsg();
         continue;
       }
@@ -709,7 +757,13 @@ void NetlinkService::OnNetlinkMessage(int aNetlinkSocket) {
         LOG(("received NLMSG_ERROR"));
         if (isResponse) {
           if (mOutgoingMessages[0]->MsgType() == NetlinkMsg::kRtMsg) {
+            // A route check can legitimately have no matching route.
             OnRouteCheckResult(nullptr);
+          } else {
+#ifdef MOZ_NAIVEFOX
+            FinishInitialNetworkState(InitialNetworkState::Failed,
+                                      "initial-dump-error-response");
+#endif
           }
           RemovePendingMsg();
         }
@@ -889,7 +943,8 @@ void NetlinkService::OnAddrMessage(struct nlmsghdr* aNlh) {
     // Send network event change regardless of whether the ID has changed or
     // not
     mSendNetworkChangeEvent = true;
-    TriggerNetworkIDCalculation();
+    TriggerNetworkIDCalculation("address", aNlh->nlmsg_type,
+                                aNlh->nlmsg_seq);
   }
 }
 
@@ -913,7 +968,7 @@ void NetlinkService::OnRouteMessage(struct nlmsghdr* aNlh) {
   }
 
   // Adding/removing any unicast route might change network ID
-  TriggerNetworkIDCalculation();
+  TriggerNetworkIDCalculation("route", aNlh->nlmsg_type, aNlh->nlmsg_seq);
 
   if (!route->IsDefault()) {
     // Store only default routes
@@ -1034,7 +1089,8 @@ void NetlinkService::OnNeighborMessage(struct nlmsghdr* aNlh) {
         // routing tables we should recalculate network ID
         for (uint32_t i = 0; i < linkInfo->mDefaultRoutes.Length(); ++i) {
           if (linkInfo->mDefaultRoutes[i]->GatewayEquals(*neigh)) {
-            TriggerNetworkIDCalculation();
+            TriggerNetworkIDCalculation("neighbor-default-route",
+                                        aNlh->nlmsg_type, aNlh->nlmsg_seq);
             break;
           }
         }
@@ -1042,7 +1098,8 @@ void NetlinkService::OnNeighborMessage(struct nlmsghdr* aNlh) {
              mIPv4RouteCheckResult->GatewayEquals(*neigh)) ||
             (mIPv6RouteCheckResult &&
              mIPv6RouteCheckResult->GatewayEquals(*neigh))) {
-          TriggerNetworkIDCalculation();
+          TriggerNetworkIDCalculation("neighbor-route-check",
+                                      aNlh->nlmsg_type, aNlh->nlmsg_seq);
         }
       }
     }
@@ -1134,7 +1191,7 @@ void NetlinkService::RemovePendingMsg() {
       // by the incoming messages.
       mInitialScanFinished = true;
 
-      TriggerNetworkIDCalculation();
+      TriggerNetworkIDCalculation("initial-dump-complete");
 
       // Link status should be known by now.
       RefPtr<NetlinkServiceListener> listener;
@@ -1155,6 +1212,14 @@ void NetlinkService::RemovePendingMsg() {
 
 NS_IMETHODIMP
 NetlinkService::Run() {
+#ifdef MOZ_NAIVEFOX
+  // Every worker exit before the successful convergence boundary is a
+  // terminal startup failure.  After Ready this is deliberately a no-op, so
+  // post-start worker/shutdown behavior is unchanged.
+  auto failUnfinishedStartup = MakeScopeExit([&]() {
+    FinishInitialNetworkState(InitialNetworkState::Failed, "worker-exit");
+  });
+#endif
   int netlinkSocket = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
   if (netlinkSocket < 0) {
     return NS_ERROR_FAILURE;
@@ -1195,6 +1260,9 @@ NetlinkService::Run() {
     if (mOutgoingMessages.Length() && !mOutgoingMessages[0]->IsPending()) {
       if (!mOutgoingMessages[0]->Send(netlinkSocket)) {
         LOG(("Failed to send netlink message"));
+#ifdef MOZ_NAIVEFOX
+        FinishInitialNetworkState(InitialNetworkState::Failed, "send-error");
+#endif
         mOutgoingMessages.RemoveElementAt(0);
         // try to send another message if available before polling
         continue;
@@ -1211,6 +1279,11 @@ NetlinkService::Run() {
         // shutdown, abort the loop!
         LOG(("thread shutdown received, dying...\n"));
         shutdown = true;
+      } else if ((fds[0].revents | fds[1].revents) &
+                 (POLLERR | POLLHUP | POLLNVAL)) {
+        LOG(("netlink poll descriptor error"));
+        rv = NS_ERROR_FAILURE;
+        break;
       } else if (fds[1].revents & POLLIN) {
         LOG(("netlink message received, handling it...\n"));
         OnNetlinkMessage(netlinkSocket);
@@ -1228,6 +1301,15 @@ NetlinkService::Run() {
 
 nsresult NetlinkService::Init(NetlinkServiceListener* aListener) {
   nsresult rv;
+
+#ifdef MOZ_NAIVEFOX
+  BeginInitialNetworkState();
+  auto failUnfinishedStartup = MakeScopeExit([&]() {
+    if (!mThread) {
+      FinishInitialNetworkState(InitialNetworkState::Failed, "init-error");
+    }
+  });
+#endif
 
   // No lock needed: Init() runs before the netlink thread starts.
   MOZ_PUSH_IGNORE_THREAD_SAFETY
@@ -1286,14 +1368,30 @@ nsresult NetlinkService::Shutdown() {
  * network ID calculation (e.g. MAC address of the router might be discovered in
  * the meantime)
  */
-void NetlinkService::TriggerNetworkIDCalculation() {
+void NetlinkService::TriggerNetworkIDCalculation(const char* aSource,
+                                                 uint16_t aNetlinkType,
+                                                 uint32_t aNetlinkSequence) {
   LOG(("NetlinkService::TriggerNetworkIDCalculation"));
+
+#ifdef MOZ_NAIVEFOX
+  const uint64_t trigger = ++mNetworkTriggerSequence;
+  NAIVEFOX_NETWORK_STARTUP_LOG(
+      ("trigger sequence=%" PRIu64 " source=%s netlink_type=%u "
+       "netlink_sequence=%u unsolicited=%d initial_scan_finished=%d "
+       "calculation_pending=%d generation=%" PRIu64,
+       trigger, aSource, aNetlinkType, aNetlinkSequence,
+       aNetlinkSequence == 0 && aNetlinkType != 0, mInitialScanFinished,
+       mRecalculateNetworkId, mNetworkCalculationGeneration));
+#endif
 
   if (mRecalculateNetworkId) {
     return;
   }
 
   mRecalculateNetworkId = true;
+#ifdef MOZ_NAIVEFOX
+  ++mNetworkCalculationGeneration;
+#endif
   mTriggerTime = TimeStamp::Now();
 }
 
@@ -1804,6 +1902,12 @@ void NetlinkService::CalculateNetworkID() {
   MOZ_ASSERT(!NS_IsMainThread(), "Must not be called on the main thread");
   MOZ_ASSERT(mRecalculateNetworkId);
 
+#ifdef MOZ_NAIVEFOX
+  NAIVEFOX_NETWORK_STARTUP_LOG(
+      ("calculate.begin generation=%" PRIu64,
+       mNetworkCalculationGeneration));
+#endif
+
   mRecalculateNetworkId = false;
 
   SHA1Sum sha1;
@@ -1862,6 +1966,7 @@ void NetlinkService::CalculateNetworkID() {
   // change. We've started with an empty ID and we've just calculated the
   // correct ID. The network hasn't really changed.
   static bool initialIDCalculation = true;
+  const bool wasInitialIDCalculation = initialIDCalculation;
 
   RefPtr<NetlinkServiceListener> listener;
   {
@@ -1874,12 +1979,27 @@ void NetlinkService::CalculateNetworkID() {
     mSendNetworkChangeEvent = true;
   }
 
-  if (mSendNetworkChangeEvent && listener) {
+  const bool sentNetworkChangeEvent = mSendNetworkChangeEvent && listener;
+  if (sentNetworkChangeEvent) {
     listener->OnNetworkChanged();
   }
 
   initialIDCalculation = false;
   mSendNetworkChangeEvent = false;
+
+#ifdef MOZ_NAIVEFOX
+  NAIVEFOX_NETWORK_STARTUP_LOG(
+      ("calculate.end generation=%" PRIu64 " initial=%d id_changed=%d "
+       "sent_network_change=%d",
+       mNetworkCalculationGeneration, wasInitialIDCalculation, idChanged,
+       sentNetworkChangeEvent));
+
+  // This is deliberately later than OnLinkStatusKnown(): only now have the
+  // initial IPv4/IPv6 route checks completed and all link-change notifications
+  // caused by the first calculation been queued for the main thread.
+  FinishInitialNetworkState(InitialNetworkState::Ready,
+                            "initial-route-calculation-complete");
+#endif
 }
 
 void NetlinkService::GetNetworkID(nsACString& aNetworkID) {

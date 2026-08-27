@@ -13,6 +13,9 @@
 #include "Http3WebTransportStream.h"
 #include "HttpConnectionUDP.h"
 #include "HttpLog.h"
+#include "NaiveFoxLifecycleLog.h"
+#include "NaiveFoxReuseLog.h"
+#include "SpeculativeTransaction.h"
 #include "QuicSocketControl.h"
 #include "SSLServerCertVerification.h"
 #include "SSLTokensCache.h"
@@ -112,15 +115,16 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
   // When `isOuterConnection` is true, this Http3Session represents the *outer*
   // connection between Firefox and the proxy (e.g., when using CONNECT-UDP).
   //
-  // We track this flag for two main reasons:
-  // 1. To select the correct hostname during TLS negotiation on the outer
-  //    connection.
-  // 2. To explicitly enable Path MTU Discovery (PMTUD) on the outer connection,
-  //    since the outer path’s MTU must be at least as large as the inner one.
+  // We track this flag to select the correct hostname during TLS negotiation
+  // and to identify the outer proxy connection.
   bool isOuterConnection = false;
+  bool forcePmtudForOuterConnection = false;
   if (!aIsTunnel) {
     if (auto* proxyInfo = aConnInfo->ProxyInfo()) {
       isOuterConnection = proxyInfo->IsHttp3Proxy();
+      forcePmtudForOuterConnection =
+          isOuterConnection &&
+          !(proxyInfo->Flags() & nsIProxyInfo::DO_NOT_FORCE_HTTP3_PROXY_PMTUD);
     }
   }
 
@@ -189,7 +193,7 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
         StaticPrefs::network_http_http3_max_stream_data(),
         StaticPrefs::network_http_http3_version_negotiation_enabled(),
         mConnInfo->GetWebTransport(), gHttpHandler->Http3QlogDir(), idleTimeout,
-        fastPto, socket->GetFileDescriptor(), isOuterConnection,
+        fastPto, socket->GetFileDescriptor(), forcePmtudForOuterConnection,
         getter_AddRefs(mHttp3Connection));
   }
   if (NS_FAILED(rv)) {
@@ -259,6 +263,14 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
       if (mHttp3Connection->IsZeroRtt()) {
         LOG(("Can send ZeroRtt data"));
         RefPtr<Http3Session> self(this);
+#ifdef MOZ_NAIVEFOX
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("h3.state session=%p ci=%p from=%d to=%d cause=zero-rtt", this,
+               NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+               static_cast<int>(ZERORTT)));
+        }
+#endif
         mState = ZERORTT;
         udpConn->ChangeConnectionState(ConnectionState::ZERORTT);
         mZeroRttStarted = TimeStamp::Now();
@@ -439,6 +451,18 @@ void Http3Session::Shutdown() {
 
 Http3Session::~Http3Session() {
   LOG3(("Http3Session::~Http3Session %p", this));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG((
+        "h3.destroy session=%p ci=%p connection=%p udp=%p state=%d "
+        "error=%08x socket_error=%08x clean_shutdown=%d closed_by_neqo=%d "
+        "goaway=%d should_close=%d active_streams=%d",
+        this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
+        mUdpConn.get(), static_cast<int>(mState), static_cast<uint32_t>(mError),
+        static_cast<uint32_t>(mSocketError), mCleanShutdown, mIsClosedByNeqo,
+        mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
+  }
+#endif
 #ifndef ANDROID
   EchOutcomeTelemetry();
 #endif
@@ -717,6 +741,15 @@ nsresult Http3Session::ProcessEvents() {
       case Http3Event::Tag::ZeroRttRejected:
         LOG(("Http3Session::ProcessEvents - ZeroRttRejected"));
         if (mState == ZERORTT) {
+#ifdef MOZ_NAIVEFOX
+          if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+            NAIVEFOX_LIFECYCLE_LOG(
+                ("h3.state session=%p ci=%p from=%d to=%d "
+                 "cause=zero-rtt-rejected",
+                 this, NaiveFoxConnectionInfoId(mConnInfo),
+                 static_cast<int>(mState), static_cast<int>(INITIALIZING)));
+          }
+#endif
           mState = INITIALIZING;
           mTransactionCount = 0;
           Finish0Rtt(true);
@@ -745,6 +778,14 @@ nsresult Http3Session::ProcessEvents() {
           break;
         }
         bool was0RTT = mState == ZERORTT;
+#ifdef MOZ_NAIVEFOX
+        if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+          NAIVEFOX_LIFECYCLE_LOG(
+              ("h3.state session=%p ci=%p from=%d to=%d cause=connected", this,
+               NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+               static_cast<int>(CONNECTED)));
+        }
+#endif
         mState = CONNECTED;
         SetSecInfo();
         mSocketControl->HandshakeCompleted();
@@ -768,6 +809,13 @@ nsresult Http3Session::ProcessEvents() {
         // is received call MaybeResumeSend to trigger reads for the
         // zero-rtt-rejected transactions.
         MaybeResumeSend();
+      } break;
+      case Http3Event::Tag::HandshakeConfirmed: {
+        LOG(("Http3Session::ProcessEvents - HandshakeConfirmed"));
+        if (IsClosing()) {
+          break;
+        }
+        mUdpConn->OnHandshakeConfirmed();
       } break;
       case Http3Event::Tag::GoawayReceived:
         LOG(("Http3Session::ProcessEvents - GoawayReceived"));
@@ -1447,7 +1495,8 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
 
   Http3StreamBase* stream = nullptr;
 
-  if (trans && mConnInfo->IsHttp3ProxyConnection() && !mIsInTunnel) {
+  if (trans && mConnInfo->IsHttp3ProxyConnection() && !mIsInTunnel &&
+      !(trans->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
     LOG3(("Http3Session::AddStream new connect-udp stream %p atrans=%p.\n",
           this, aHttpTransaction));
     stream = new Http3ConnectUDPStream(aHttpTransaction, this,
@@ -1466,6 +1515,18 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
   }
 
   mStreamTransactionHash.InsertOrUpdate(aHttpTransaction, RefPtr{stream});
+
+#ifdef MOZ_NAIVEFOX
+  if (trans && trans->UseH3CarrierDispatch() &&
+      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    H3CarrierDispatchGate* gate = trans->CarrierDispatchGate();
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.carrier_dispatch action=document-attached gate=%p carrier=%p "
+         "session=%p document=%p via=add-stream carrier_complete=%d",
+         gate, reinterpret_cast<void*>(gate ? gate->CarrierId() : 0), this,
+         trans, gate && gate->IsComplete()));
+  }
+#endif
 
   if (mState == ZERORTT) {
     if (!stream->Do0RTT()) {
@@ -1561,6 +1622,31 @@ void Http3Session::FinishNegotiation(ExtendedConnectKind aKind, bool aSuccess) {
 bool Http3Session::CanReuse() {
   // TODO: we assume "pooling" is disabled here, so we don't allow this session
   // to be reused. "pooling" will be implemented in bug 1815735.
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_REUSE_LOG_ENABLED()) {
+    bool canSendData = CanSendData();
+    bool reusable = canSendData && !(mGoawayReceived || mShouldClose) &&
+                    !mHasWebTransportSession;
+    const char* reason = "reusable";
+    if (!canSendData) {
+      reason = "cannot-send-data";
+    } else if (mGoawayReceived) {
+      reason = "goaway-received";
+    } else if (mShouldClose) {
+      reason = "should-close";
+    } else if (mHasWebTransportSession) {
+      reason = "webtransport-session";
+    }
+    NAIVEFOX_REUSE_LOG(
+        ("h3.reuse session=%p connection=%p reusable=%d reason=%s state=%d "
+         "can_send_data=%d goaway=%d should_close=%d webtransport=%d "
+         "active_streams=%d",
+         this, mConnection.get(), reusable, reason, static_cast<int>(mState),
+         canSendData, mGoawayReceived, mShouldClose, mHasWebTransportSession,
+         !HasNoActiveStreams()));
+    return reusable;
+  }
+#endif
   return CanSendData() && !(mGoawayReceived || mShouldClose) &&
          !mHasWebTransportSession;
 }
@@ -2152,6 +2238,19 @@ void Http3Session::Close(nsresult aReason) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   LOG(("Http3Session::Close [this=%p]", this));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.close.begin session=%p ci=%p connection=%p udp=%p reason=%08x "
+         "state=%d error=%08x socket_error=%08x clean_shutdown=%d "
+         "closed_by_neqo=%d goaway=%d should_close=%d active_streams=%d",
+         this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
+         mUdpConn.get(), static_cast<uint32_t>(aReason),
+         static_cast<int>(mState), static_cast<uint32_t>(mError),
+         static_cast<uint32_t>(mSocketError), mCleanShutdown, mIsClosedByNeqo,
+         mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
+  }
+#endif
 
   if (NS_FAILED(mError)) {
     CloseInternal(false);
@@ -2176,18 +2275,45 @@ void Http3Session::Close(nsresult aReason) {
     mTimerCallback = nullptr;
     mConnection = nullptr;
     mUdpConn = nullptr;
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.state session=%p ci=%p from=%d to=%d cause=close-release", this,
+           NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+           static_cast<int>(CLOSED)));
+    }
+#endif
     mState = CLOSED;
   }
   if (mConnection) {
     // resume sending to send CLOSE_CONNECTION frame.
     (void)mConnection->ResumeSend();
   }
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.close.end session=%p ci=%p connection=%p udp=%p reason=%08x "
+         "state=%d error=%08x",
+         this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
+         mUdpConn.get(), static_cast<uint32_t>(aReason),
+         static_cast<int>(mState), static_cast<uint32_t>(mError)));
+  }
+#endif
 }
 
 void Http3Session::CloseInternal(bool aCallNeqoClose) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   if (IsClosing()) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.close_internal session=%p ci=%p state=%d ignored=1 "
+           "call_neqo_close=%d",
+           this, NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+           aCallNeqoClose));
+    }
+#endif
     return;
   }
 
@@ -2204,6 +2330,16 @@ void Http3Session::CloseInternal(bool aCallNeqoClose) {
                                     : ZeroRttOutcome::USED_CONN_ERROR);
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.state session=%p ci=%p from=%d to=%d cause=close-internal "
+         "call_neqo_close=%d error=%08x",
+         this, NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+         static_cast<int>(CLOSING), aCallNeqoClose,
+         static_cast<uint32_t>(mError)));
+  }
+#endif
   mState = CLOSING;
   Shutdown();
 
@@ -2448,6 +2584,17 @@ bool Http3Session::IsPersistent() { return true; }
 
 void Http3Session::DontReuse() {
   LOG3(("Http3Session::DontReuse %p\n", this));
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.dont_reuse.begin session=%p ci=%p connection=%p udp=%p "
+         "on_socket_thread=%d state=%d goaway=%d should_close=%d "
+         "active_streams=%d",
+         this, NaiveFoxConnectionInfoId(mConnInfo), mConnection.get(),
+         mUdpConn.get(), OnSocketThread(), static_cast<int>(mState),
+         mGoawayReceived, mShouldClose, !HasNoActiveStreams()));
+  }
+#endif
   if (!OnSocketThread()) {
     LOG3(("Http3Session %p not on socket thread\n", this));
     nsCOMPtr<nsIRunnable> event = NewRunnableMethod(
@@ -2458,14 +2605,38 @@ void Http3Session::DontReuse() {
           event.forget(), nsIRunnablePriority::PRIORITY_MEDIUMHIGH);
     }
     gSocketTransportService->Dispatch(event, NS_DISPATCH_NORMAL);
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.dont_reuse.return session=%p ci=%p action=dispatch-to-socket",
+           this, NaiveFoxConnectionInfoId(mConnInfo)));
+    }
+#endif
     return;
   }
 
   if (mGoawayReceived || IsClosing()) {
+#ifdef MOZ_NAIVEFOX
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.dont_reuse.return session=%p ci=%p action=already-closing "
+           "state=%d goaway=%d",
+           this, NaiveFoxConnectionInfoId(mConnInfo), static_cast<int>(mState),
+           mGoawayReceived));
+    }
+#endif
     return;
   }
 
   mShouldClose = true;
+#ifdef MOZ_NAIVEFOX
+  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.dont_reuse.mutate session=%p ci=%p should_close=1 "
+         "active_streams=%d",
+         this, NaiveFoxConnectionInfoId(mConnInfo), !HasNoActiveStreams()));
+  }
+#endif
   if (HasNoActiveStreams()) {
     // This is a temporary workaround and should be fixed properly in Happy
     // Eyeballs project. We should not exclude this domain if

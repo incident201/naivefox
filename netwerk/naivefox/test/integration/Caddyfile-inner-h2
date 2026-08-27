@@ -1,0 +1,20 @@
+{
+	admin off
+	auto_https disable_redirects
+	grace_period 250ms
+	skip_install_trust
+	servers 127.0.0.1:{$NAIVEFOX_FIXTURE_INNER_H2_PORT} {
+		protocols h2
+	}
+}
+
+https://:{$NAIVEFOX_FIXTURE_INNER_H2_PORT} {
+	bind 127.0.0.1
+	log {
+		output file {$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG}
+		format json
+	}
+	tls {$NAIVEFOX_FIXTURE_TARGET_CERT} {$NAIVEFOX_FIXTURE_TARGET_KEY}
+	respond /health 204
+	reverse_proxy /camouflage* 127.0.0.1:{$NAIVEFOX_FIXTURE_HTTP_PORT}
+}

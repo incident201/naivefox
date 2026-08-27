@@ -151,6 +151,8 @@ DIRS += [
     "/intl",
     "/modules/brotli",
     "/modules/libpref",
+    "/parser/htmlaccel",
+    "/parser/html",
     "/netwerk/naivefox/idl",
     "/netwerk",
     "/xpcom",

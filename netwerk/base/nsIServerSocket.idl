@@ -182,6 +182,13 @@ interface nsIServerSocket : nsISupports
                                  in long aBacklog);
 
     /**
+     * Enable TCP_NODELAY on each accepted TCP connection before its socket
+     * transport is exposed to the listener.  This must be configured before
+     * asyncListen().  It has no effect on the listening socket itself.
+     */
+    attribute boolean acceptedSocketNoDelay;
+
+    /**
      * close
      *
      * This method closes a server socket.  This does not affect already

@@ -1,4 +1,7 @@
 NaiveFoxMain
+#ifndef ANDROID
+NaiveFoxActivationChildMain
+#endif
 NaiveFoxRequestStop
 NaiveFoxRunEmbedded
 NaiveFoxVersion

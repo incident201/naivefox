@@ -1,0 +1,61 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+namespace mozilla {
+namespace naivefox {
+
+struct NativeStylePreloadActivationArgs {
+  uint64_t requestId;
+  nsCString resourceSpec;
+  nsCString documentSpec;
+  nsCString referrerSpec;
+  nsCString originAttributesSuffix;
+  uint8_t referrerPolicy;
+  bool sendReferrer;
+  uint8_t preloadKind;
+};
+
+struct NativeRootReplacementActivationArgs {
+  uint64_t requestId;
+  uint64_t channelId;
+  nsCString resourceSpec;
+  nsCString originalSpec;
+  nsCString originAttributesSuffix;
+  nsCString referrerSpec;
+  uint8_t referrerPolicy;
+  bool sendReferrer;
+  uint32_t loadFlags;
+  uint32_t contentPolicyType;
+  uint32_t httpStatus;
+  nsCString contentType;
+  nsCString charset;
+  uint64_t generation;
+};
+
+// Complete, move-safe wire representation of
+// nsHtml5StylePreloadDescriptor.  Keep the parser output separate from the
+// parent-owned channel activation context: the activation child discovers the
+// former, while the network parent remains authoritative for the latter.
+struct NativeHtml5StylePreloadDescriptorArgs {
+  nsString url;
+  nsString charset;
+  nsString crossOrigin;
+  nsString media;
+  nsString referrerPolicy;
+  nsString nonce;
+  nsString integrity;
+  nsString fetchPriority;
+  bool linkPreload;
+};
+
+struct NativeStylePreloadProcessArgs {
+  uint64_t rootRequestId;
+  uint64_t rootGeneration;
+  uint64_t styleRequestId;
+  uint32_t discoverySequence;
+  NativeHtml5StylePreloadDescriptorArgs descriptor;
+};
+
+}  // namespace naivefox
+}  // namespace mozilla

@@ -15,6 +15,10 @@
 #include "ConnectionEntry.h"
 #include "DnsAndConnectSocket.h"
 #include "HappyEyeballsConnectionAttempt.h"
+#ifdef MOZ_NAIVEFOX
+#  include "NaiveFoxLifecycleLog.h"
+#  include "nsHttpTransaction.h"
+#endif
 #include "nsHttpConnectionMgr.h"
 #include "nsHttpHandler.h"
 
@@ -40,9 +44,43 @@ nsresult ConnectionAttemptPool::StartConnectionEstablishment(
 
   RefPtr<ConnectionAttempt> connAttempt;
   nsHttpConnectionInfo* ci = trans->ConnectionInfo();
-  if (ci->GetHappyEyeballsEnabled() && !ci->DisablesHttp3ProxyFallback()) {
+  bool useColdWinnerHandoff = false;
+#ifdef MOZ_NAIVEFOX
+  nsHttpTransaction* httpTrans = trans->QueryHttpTransaction();
+  const bool requestedColdWinnerHandoff =
+      httpTrans && httpTrans->UseH3ColdWinnerHandoff();
+  useColdWinnerHandoff =
+      requestedColdWinnerHandoff && !speculative && pendingTransInfo &&
+      ci->UsingProxy() &&
+      ci->IsHttp3ProxyConnection();
+  if (requestedColdWinnerHandoff && !useColdWinnerHandoff) {
+    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+      NAIVEFOX_LIFECYCLE_LOG(
+          ("h3.cold_winner_handoff action=terminal-failure document=%p "
+           "entry=%p ci=%p stage=attempt-selection rv=%08x speculative=%d "
+           "pending=%d using-proxy=%d h3-proxy=%d",
+           httpTrans, entry, ci, static_cast<uint32_t>(NS_ERROR_UNEXPECTED),
+           speculative, !!pendingTransInfo, ci->UsingProxy(),
+           ci->IsHttp3ProxyConnection()));
+    }
+    return NS_ERROR_UNEXPECTED;
+  }
+  if (useColdWinnerHandoff && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
+    const bool routeMatchesEntry =
+        ci->HashKey().Equals(entry->mConnInfo->HashKey());
+    NAIVEFOX_LIFECYCLE_LOG(
+        ("h3.cold_winner_handoff action=attempt-selected document=%p "
+         "entry=%p ci=%p speculative=0 pending=1 transport=proxy-h3 "
+         "attempts=1 route-match=%d",
+         httpTrans, entry, ci, routeMatchesEntry));
+  }
+#endif
+  if (useColdWinnerHandoff ||
+      (ci->GetHappyEyeballsEnabled() &&
+       !ci->DisablesHttp3ProxyFallback())) {
     connAttempt = new HappyEyeballsConnectionAttempt(
-        ci, trans, caps, speculative, urgentStart, retryWithoutTRR);
+        ci, trans, caps, speculative, urgentStart, retryWithoutTRR,
+        useColdWinnerHandoff);
   } else {
     connAttempt = new DnsAndConnectSocket(entry->mConnInfo, trans, caps,
                                           speculative, urgentStart);
@@ -65,6 +103,15 @@ nsresult ConnectionAttemptPool::StartConnectionEstablishment(
     if (!claimed) {
       // We should always be able to claim this.
       MOZ_ASSERT(false, "Failed to claim a connAttempt");
+#ifdef MOZ_NAIVEFOX
+      if (useColdWinnerHandoff) {
+        // The attempt was already inserted above.  The narrow winner-handoff
+        // contract is 1:1 with its exact pending document, so it must not stay
+        // alive (or become claimable by another transaction) if that ownership
+        // registration fails.
+        RemoveConnectionAttempt(connAttempt, /* abandon */ true);
+      }
+#endif
       return NS_ERROR_UNEXPECTED;
     }
     pendingTransInfo->RememberConnectionAttempt(connAttempt);

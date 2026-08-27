@@ -4,6 +4,9 @@
 
 #include "GeckoRuntime.h"
 
+#include "NaiveFoxAPI.h"
+#include "NativeStylePreloadActivation.h"
+
 #ifdef XP_WIN
 #  include <windows.h>
 #else
@@ -11,36 +14,109 @@
 #  include <unistd.h>
 #endif
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 
+#include "CacheObserver.h"
 #include "mozIStorageService.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/Utf8.h"
+#include "mozilla/ipc/IOThread.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsIFile.h"
 #include "nsIIOService.h"
+#include "nsINetworkLinkService.h"
 #include "nsIObserverService.h"
 #include "nsISimpleEnumerator.h"
+#include "nsISocketTransportService.h"
+#include "nsITimer.h"
 #include "nsLocalFile.h"
+#include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
+#if defined(XP_LINUX) || defined(ANDROID)
+#  include "NetlinkService.h"
+#endif
 #ifdef MOZ_NAIVEFOX
 #  include "xpcpublic.h"
 #endif
 
 namespace mozilla::naivefox {
 
+#if !defined(ANDROID) && !defined(__ANDROID__)
+// Implemented by the lean activation transport. Keep the exported C entry
+// point below independent from the C++ actor implementation.
+int RunNativeStylePreloadActivationChild(int aArgc, char* aArgv[]);
+#endif
+
 namespace {
+
+constexpr uint32_t kNetworkStartupBarrierTimeoutMs = 5000;
+
+class StartupBarrierState final {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(StartupBarrierState)
+
+  void Complete() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mComplete = true;
+  }
+
+  void Timeout() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mTimedOut = true;
+  }
+
+  bool IsComplete() const {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mComplete;
+  }
+
+  bool IsTimedOut() const {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mTimedOut;
+  }
+
+ private:
+  ~StartupBarrierState() = default;
+
+  bool mComplete = false;
+  bool mTimedOut = false;
+};
+
+template <typename Predicate>
+nsresult WaitForStartupCondition(const nsACString& aName,
+                                 Predicate&& aPredicate) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  RefPtr<StartupBarrierState> deadline = new StartupBarrierState();
+  nsCOMPtr<nsITimer> timer;
+  MOZ_TRY(NS_NewTimerWithCallback(
+      getter_AddRefs(timer), [deadline](nsITimer*) { deadline->Timeout(); },
+      kNetworkStartupBarrierTimeoutMs, nsITimer::TYPE_ONE_SHOT, aName));
+
+  const bool processed = SpinEventLoopUntil(
+      aName, [&]() { return aPredicate() || deadline->IsTimedOut(); });
+  (void)timer->Cancel();
+
+  if (!processed) {
+    return NS_ERROR_FAILURE;
+  }
+  // Prefer a condition that became true on the same event-loop turn as the
+  // deadline.  Otherwise a real timer event makes the wait fail closed.
+  return aPredicate() ? NS_OK : NS_ERROR_NET_TIMEOUT;
+}
 
 class DirectoryProvider final : public nsIDirectoryServiceProvider {
  public:
@@ -115,8 +191,10 @@ GeckoRuntime::~GeckoRuntime() { Shutdown(); }
 
 nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
                                   const nsACString& aProfilePath,
-                                  ProxyProtocol aProtocol,
-                                  bool aNoPostQuantum) {
+                                  ProxyProtocol aProtocol, bool aNoPostQuantum,
+                                  bool aEnablePreambleCache2,
+                                  bool aEnableNativeStyleActivation,
+                                  bool aEnableNativeActivationProcess) {
   if (mXPCOMInitialized || aProfilePath.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -147,15 +225,20 @@ nsresult GeckoRuntime::Initialize(int aArgc, char* aArgv[],
   MOZ_TRY(NS_NewNativeLocalFile(aProfilePath, getter_AddRefs(profile)));
 
   return InitializeWithLocations(profile, mBinDirectory, mExecutable, aProtocol,
-                                 nullptr, aNoPostQuantum);
+                                 nullptr, aNoPostQuantum, aEnablePreambleCache2,
+                                 aEnableNativeStyleActivation,
+                                 aEnableNativeActivationProcess);
 }
 
-nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
-                                          const nsACString& aRuntimePath,
-                                          ProxyProtocol aProtocol,
-                                          bool aNoPostQuantum) {
+nsresult GeckoRuntime::InitializeEmbedded(
+    const nsACString& aProfilePath, const nsACString& aRuntimePath,
+    ProxyProtocol aProtocol, bool aNoPostQuantum, bool aEnablePreambleCache2,
+    bool aEnableNativeStyleActivation, bool aEnableNativeActivationProcess) {
   if (mXPCOMInitialized) {
     return NS_ERROR_INVALID_ARG;
+  }
+  if (aEnableNativeActivationProcess) {
+    return NS_ERROR_NOT_IMPLEMENTED;
   }
   MOZ_TRY(ValidateEmbeddedLocations(aProfilePath, aRuntimePath));
 
@@ -176,11 +259,15 @@ nsresult GeckoRuntime::InitializeEmbedded(const nsACString& aProfilePath,
 #ifdef ANDROID
   nsAutoCString normalizedRuntimePath;
   MOZ_TRY(binDirectory->GetNativePath(normalizedRuntimePath));
-  return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
-                                 &normalizedRuntimePath, aNoPostQuantum);
+  return InitializeWithLocations(
+      profile, binDirectory, executable, aProtocol, &normalizedRuntimePath,
+      aNoPostQuantum, aEnablePreambleCache2, aEnableNativeStyleActivation,
+      aEnableNativeActivationProcess);
 #else
   return InitializeWithLocations(profile, binDirectory, executable, aProtocol,
-                                 nullptr, aNoPostQuantum);
+                                 nullptr, aNoPostQuantum, aEnablePreambleCache2,
+                                 aEnableNativeStyleActivation,
+                                 aEnableNativeActivationProcess);
 #endif
 }
 
@@ -232,7 +319,8 @@ nsresult GeckoRuntime::ValidateEmbeddedLocations(
 nsresult GeckoRuntime::InitializeWithLocations(
     nsIFile* aProfile, nsIFile* aBinDirectory, nsIFile* aExecutable,
     ProxyProtocol aProtocol, const nsACString* aAndroidRuntimePath,
-    bool aNoPostQuantum) {
+    bool aNoPostQuantum, bool aEnablePreambleCache2,
+    bool aEnableNativeStyleActivation, bool aEnableNativeActivationProcess) {
   if (mXPCOMInitialized || !aProfile || !aBinDirectory || !aExecutable) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -301,8 +389,7 @@ nsresult GeckoRuntime::InitializeWithLocations(
     mHadHttp3KyberPref =
         Preferences::HasUserValue("network.http.http3.enable_kyber");
     (void)Preferences::GetBool("security.tls.enable_kyber", &mOldKyberPref);
-    (void)Preferences::GetBool("security.tls.enable_mlkem1024",
-                               &mOldMlkemPref);
+    (void)Preferences::GetBool("security.tls.enable_mlkem1024", &mOldMlkemPref);
     (void)Preferences::GetBool("network.http.http3.enable_kyber",
                                &mOldHttp3KyberPref);
     Preferences::SetBool("security.tls.enable_kyber", false);
@@ -320,6 +407,13 @@ nsresult GeckoRuntime::InitializeWithLocations(
   nsCOMPtr<mozIStorageService> storage =
       do_GetService("@mozilla.org/storage/service;1", &storageRv);
   MOZ_TRY(storageRv);
+  // The minimized runtime does not start Firefox's browser cache graph. Opt in
+  // only for an explicit preamble cache2 experiment, before profile-do-change
+  // so CacheObserver sees the normal profile event.
+  if (aEnablePreambleCache2) {
+    MOZ_TRY(net::CacheObserver::Init());
+    mPreambleCache2Initialized = true;
+  }
   MOZ_TRY(observers->NotifyObservers(nullptr, "profile-do-change", u"startup"));
   net_EnsurePSMInit();
 
@@ -333,16 +427,107 @@ nsresult GeckoRuntime::InitializeWithLocations(
   if (mTemporaryTrustStore->IsConfigured()) {
     constexpr auto kHttp3ThirdPartyRootsPref =
         "network.http.http3.disable_when_third_party_roots_found";
-    mHadHttp3ThirdPartyRootsPref =
-        Preferences::HasUserValue(kHttp3ThirdPartyRootsPref);
-    (void)Preferences::GetBool(kHttp3ThirdPartyRootsPref,
-                                &mOldHttp3ThirdPartyRootsPref);
-    Preferences::SetBool(kHttp3ThirdPartyRootsPref, false);
+    MOZ_TRY(Preferences::GetBool(kHttp3ThirdPartyRootsPref,
+                                 &mOldHttp3ThirdPartyRootsDefault,
+                                 PrefValueKind::Default));
+    mHttp3ThirdPartyRootsPrefWasLocked =
+        Preferences::IsLocked(kHttp3ThirdPartyRootsPref);
+    if (mHttp3ThirdPartyRootsPrefWasLocked) {
+      MOZ_TRY(Preferences::Unlock(kHttp3ThirdPartyRootsPref));
+    }
+    MOZ_TRY(Preferences::SetBool(kHttp3ThirdPartyRootsPref, false,
+                                 PrefValueKind::Default));
+    MOZ_TRY(Preferences::Lock(kHttp3ThirdPartyRootsPref));
     mSslCertFileApplied = true;
   }
 
   mIOService = do_GetIOService();
-  return mIOService ? NS_OK : NS_ERROR_FAILURE;
+  if (!mIOService) {
+    return NS_ERROR_FAILURE;
+  }
+  MOZ_TRY(WaitForNetworkStartup());
+  if (aEnableNativeActivationProcess) {
+    MOZ_TRY(NativeStylePreloadActivation::InitializeProcess());
+    if (!NativeStylePreloadActivation::IsProcessReady()) {
+      return NS_ERROR_FAILURE;
+    }
+    mNativeActivationProcessInitialized = true;
+  }
+  if (aEnableNativeStyleActivation) {
+    MOZ_TRY(NativeStylePreloadActivation::Initialize());
+    mNativeStyleActivationInitialized = true;
+    MOZ_TRY(WaitForStartupCondition(
+        "NaiveFox::NativeStyleActivationWarmup"_ns,
+        []() { return NativeStylePreloadActivation::IsReady(); }));
+  }
+  return NS_OK;
+}
+
+nsresult GeckoRuntime::WaitForNetworkStartup() {
+  MOZ_ASSERT(NS_IsMainThread());
+
+#if defined(XP_LINUX) || defined(ANDROID)
+  nsCOMPtr<nsINetworkLinkService> linkService =
+      do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID);
+  const auto initialState = net::NetlinkService::GetInitialNetworkState();
+  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.wait link_service=%d initial_state=%u",
+                                !!linkService,
+                                static_cast<unsigned>(initialState)));
+  if (!linkService) {
+    return NS_ERROR_FAILURE;
+  }
+
+  MOZ_TRY(WaitForStartupCondition("NaiveFox::InitialNetworkState"_ns, []() {
+    return net::InitialNetworkStateIsTerminal(
+        net::NetlinkService::GetInitialNetworkState());
+  }));
+  if (!net::InitialNetworkStateAllowsStartup(
+          net::NetlinkService::GetInitialNetworkState())) {
+    NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-failed"));
+    return NS_ERROR_FAILURE;
+  }
+  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.initial-ready"));
+#endif
+
+  // The readiness latch is set on the netlink thread after it queued any
+  // initial up/down/changed notifications.  Drain the main-thread queue first
+  // so every observer has posted its connection-manager work.
+  RefPtr<StartupBarrierState> mainThreadBarrier = new StartupBarrierState();
+  MOZ_TRY(NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+      "NaiveFox::NetworkMainThreadBarrier",
+      [mainThreadBarrier]() { mainThreadBarrier->Complete(); })));
+  MOZ_TRY(WaitForStartupCondition(
+      "NaiveFox::NetworkMainThreadBarrier"_ns,
+      [mainThreadBarrier]() { return mainThreadBarrier->IsComplete(); }));
+#if defined(XP_LINUX) || defined(ANDROID)
+  NAIVEFOX_NETWORK_STARTUP_LOG(("barrier.main-drained"));
+#endif
+
+  // nsHttpConnectionMgr posts VerifyTraffic to the socket thread.  This FIFO
+  // barrier reports back to main only after all work caused by the initial
+  // network-state convergence has finished.
+  nsCOMPtr<nsIEventTarget> socketTarget =
+      do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID);
+  if (!socketTarget) {
+    return NS_ERROR_FAILURE;
+  }
+  RefPtr<StartupBarrierState> socketThreadBarrier = new StartupBarrierState();
+  MOZ_TRY(socketTarget->Dispatch(NS_NewRunnableFunction(
+      "NaiveFox::NetworkSocketThreadBarrier", [socketThreadBarrier]() {
+        // Return to the main thread only after all earlier socket-thread work
+        // has run.  The refcounted state remains safe if startup times out.
+        (void)NS_DispatchToMainThread(NS_NewRunnableFunction(
+            "NaiveFox::NetworkSocketThreadBarrierComplete",
+            [socketThreadBarrier]() { socketThreadBarrier->Complete(); }));
+      })));
+  nsresult rv = WaitForStartupCondition(
+      "NaiveFox::NetworkSocketThreadBarrier"_ns,
+      [socketThreadBarrier]() { return socketThreadBarrier->IsComplete(); });
+#if defined(XP_LINUX) || defined(ANDROID)
+  NAIVEFOX_NETWORK_STARTUP_LOG(
+      ("barrier.socket-drained rv=%08x", static_cast<uint32_t>(rv)));
+#endif
+  return rv;
 }
 
 nsresult GeckoRuntime::RunEventLoopSmoke() {
@@ -365,6 +550,14 @@ void GeckoRuntime::Shutdown() {
   mTemporaryTrustStore = nullptr;
 
   if (mXPCOMInitialized) {
+    if (mNativeActivationProcessInitialized) {
+      NativeStylePreloadActivation::ShutdownProcess();
+      mNativeActivationProcessInitialized = false;
+    }
+    if (mNativeStyleActivationInitialized) {
+      NativeStylePreloadActivation::Shutdown();
+      mNativeStyleActivationInitialized = false;
+    }
     if (mNoPostQuantumApplied) {
       if (mHadKyberPref) {
         Preferences::SetBool("security.tls.enable_kyber", mOldKyberPref);
@@ -387,11 +580,12 @@ void GeckoRuntime::Shutdown() {
     if (mSslCertFileApplied) {
       constexpr auto kHttp3ThirdPartyRootsPref =
           "network.http.http3.disable_when_third_party_roots_found";
-      if (mHadHttp3ThirdPartyRootsPref) {
-        Preferences::SetBool(kHttp3ThirdPartyRootsPref,
-                             mOldHttp3ThirdPartyRootsPref);
-      } else {
-        Preferences::ClearUser(kHttp3ThirdPartyRootsPref);
+      (void)Preferences::Unlock(kHttp3ThirdPartyRootsPref);
+      (void)Preferences::SetBool(kHttp3ThirdPartyRootsPref,
+                                 mOldHttp3ThirdPartyRootsDefault,
+                                 PrefValueKind::Default);
+      if (mHttp3ThirdPartyRootsPrefWasLocked) {
+        (void)Preferences::Lock(kHttp3ThirdPartyRootsPref);
       }
       mSslCertFileApplied = false;
     }
@@ -400,6 +594,13 @@ void GeckoRuntime::Shutdown() {
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdown);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownQM);
     AppShutdown::AdvanceShutdownPhase(ShutdownPhase::AppShutdownTelemetry);
+    if (mPreambleCache2Initialized) {
+      // AppShutdown has already delivered profile-before-change, which drains
+      // CacheStorageService and CacheFileIOManager.  Pair our explicit Init
+      // before XPCOM tears down the observer service.
+      (void)net::CacheObserver::Shutdown();
+      mPreambleCache2Initialized = false;
+    }
     (void)NS_ShutdownXPCOM(nullptr);
     mXPCOMInitialized = false;
   }
@@ -418,28 +619,68 @@ constexpr const volatile xpc::ReadOnlyPage xpc::ReadOnlyPage::sInstance;
 
 void xpc::ReadOnlyPage::Init() {}
 
-GeckoProcessType XRE_GetProcessType() { return GeckoProcessType_Default; }
+namespace {
 
-const char* XRE_GetProcessTypeString() { return "default"; }
+std::atomic<GeckoProcessType> sNaiveFoxProcessType{GeckoProcessType_Default};
+std::atomic<bool> sNaiveFoxActivationChildEntered{false};
 
-GeckoChildID XRE_GetChildID() { return 0; }
+}  // namespace
+
+namespace mozilla::naivefox {
+
+bool EnterNativeStylePreloadActivationChildRole() {
+  bool expected = false;
+  if (!sNaiveFoxActivationChildEntered.compare_exchange_strong(
+          expected, true, std::memory_order_acq_rel,
+          std::memory_order_acquire)) {
+    return false;
+  }
+  sNaiveFoxProcessType.store(GeckoProcessType_Utility,
+                             std::memory_order_release);
+  return true;
+}
+
+}  // namespace mozilla::naivefox
+
+GeckoProcessType XRE_GetProcessType() {
+  return sNaiveFoxProcessType.load(std::memory_order_acquire);
+}
+
+const char* XRE_GetProcessTypeString() {
+  return XRE_GetProcessType() == GeckoProcessType_Utility ? "utility"
+                                                          : "default";
+}
+
+GeckoChildID XRE_GetChildID() {
+  return XRE_GetProcessType() == GeckoProcessType_Default ? 0 : 1;
+}
 
 bool XRE_IsE10sParentProcess() { return false; }
 
 #  define GECKO_PROCESS_TYPE(enum_value, enum_name, string_name,               \
                              proc_typename, process_bin_type,                  \
                              procinfo_typename, webidl_typename, allcaps_name) \
-    bool XRE_Is##proc_typename##Process() { return enum_value == 0; }
+    bool XRE_Is##proc_typename##Process() {                                    \
+      return XRE_GetProcessType() == GeckoProcessType_##enum_name;             \
+    }
 #  include "mozilla/GeckoProcessTypes.h"
 #  undef GECKO_PROCESS_TYPE
 
 bool XRE_UseNativeEventProcessing() { return false; }
 
 nsISerialEventTarget* XRE_GetAsyncIOEventTarget() {
-  static nsCOMPtr<nsISerialEventTarget> sTarget =
-      mozilla::GetMainThreadSerialEventTarget();
-  return sTarget;
+  if (mozilla::ipc::IOThread* ioThread = mozilla::ipc::IOThread::Get()) {
+    return ioThread->GetEventTarget();
+  }
+  return mozilla::GetMainThreadSerialEventTarget();
 }
+
+#  if !defined(ANDROID) && !defined(__ANDROID__)
+extern "C" NAIVEFOX_EXPORT int NaiveFoxActivationChildMain(int aArgc,
+                                                           char* aArgv[]) {
+  return mozilla::naivefox::RunNativeStylePreloadActivationChild(aArgc, aArgv);
+}
+#  endif
 
 nsresult XRE_GetFileFromPath(const char* aPath, nsIFile** aResult) {
 #  ifdef XP_WIN

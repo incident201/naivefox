@@ -6,16 +6,24 @@ UNIFIED_SOURCES += [
     "TestAutoFallback.cpp",
     "TestConfig.cpp",
     "TestHeaderPadding.cpp",
+    "TestHtml5SpeculativeScanner.cpp",
     "TestHttpConnectParser.cpp",
     "TestNaivePadding.cpp",
+    "TestNativeStylePreloadProcessLifecycle.cpp",
+    "TestNetworkStartupState.cpp",
+    "TestOuterSessionGate.cpp",
     "TestPaddingNegotiation.cpp",
+    "TestPreambleRequestSemantics.cpp",
     "TestSocks5Parser.cpp",
     "TestTunnelSessionLifecycle.cpp",
 ]
 
 LOCAL_INCLUDES += [
+    "/dom/security",
+    "/layout/style",
     "/netwerk/naivefox",
     "/netwerk/naivefox/codec",
+    "/netwerk/system/netlink",
 ]
 
 FINAL_LIBRARY = "xul" if CONFIG["MOZ_NAIVEFOX"] else "xul-gtest"

@@ -133,6 +133,10 @@ inline bool IsHttp3(SupportedAlpnRank aRank) {
 // without accidentally allowing it for websockets not over http/2
 #define NS_HTTP_ALLOW_SPDY_WITHOUT_KEEPALIVE (1 << 15)
 
+// Send this transaction as an ordinary request on the outer HTTPS proxy
+// session instead of creating a CONNECT tunnel.
+#define NS_HTTP_PROXY_PREAMBLE (1 << 14)
+
 // Only permit CONNECTing to a proxy. A channel with this flag will not send an
 // http request after CONNECT or setup tls. An http upgrade handler MUST be
 // set. An ALPN header is set using the upgrade protocol.

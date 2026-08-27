@@ -121,6 +121,12 @@ restart conversion, and Happy Eyeballs TCP route for that transaction. The
 channel's protocol metadata must report H3; integration tests additionally use
 an H3-only UDP listener with no TCP listener at the proxy port.
 
+A separate route flag suppresses only the automatic PMTUD force normally
+derived from outer-H3-proxy identity. `Http3Session` retains that identity for
+TLS host selection and proxy session behavior, while passing a distinct PMTUD
+input to Neqo. The global `network.http.http3.pmtud` preference remains
+authoritative and can explicitly restore PMTUD on the same binary.
+
 H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
 
 - async callbacks are published before a notification that may re-enter;

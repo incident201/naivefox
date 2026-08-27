@@ -10,6 +10,7 @@
 
 #include "Config.h"
 #include "NeckoTunnel.h"
+#include "TunnelSession.h"
 #include "gtest/gtest.h"
 
 namespace mozilla::naivefox {
@@ -106,6 +107,790 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user"));
   EXPECT_TRUE(config.mProxies[0].mPassword.EqualsLiteral("pass"));
   EXPECT_EQ(config.mLogMode, RuntimeLogMode::Disabled);
+  EXPECT_EQ(config.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_TRUE(config.mPreamble.mPath.EqualsLiteral("/"));
+  EXPECT_EQ(config.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(config.mPreamble.mMaxBytes,
+            PreambleConfig::kDefaultDocumentMaxBytes);
+  EXPECT_EQ(config.mMaxConnections, 0U);
+  EXPECT_FALSE(config.mOuterSessionGate);
+  EXPECT_TRUE(config.mImplicitPreambleGate);
+  EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
+}
+
+TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
+{
+  nsAutoCString error;
+  Config implicitQuic;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example"})"_ns,
+          implicitQuic, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(implicitQuic.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_EQ(implicitQuic.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(implicitQuic.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_TRUE(implicitQuic.mPreamble.mPath.EqualsLiteral("/"));
+  EXPECT_EQ(implicitQuic.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(implicitQuic.mPreamble.mMaxBytes,
+            PreambleConfig::kDefaultDocumentMaxBytes);
+  EXPECT_FALSE(implicitQuic.mPreamble.mCacheResources);
+  EXPECT_FALSE(implicitQuic.mOuterSessionGate);
+  EXPECT_TRUE(implicitQuic.mImplicitPreambleGate);
+
+  Config explicitOff;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","preamble":{"mode":"off"}})"_ns,
+          explicitOff, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(explicitOff.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_EQ(explicitOff.mPreamble.mMaxBytes, 0U);
+  EXPECT_FALSE(explicitOff.mOuterSessionGate);
+  EXPECT_FALSE(explicitOff.mImplicitPreambleGate);
+
+  Config explicitGateOnly;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","preamble":{"mode":"off"},"outer-session-gate":true})"_ns,
+          explicitGateOnly, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(explicitGateOnly.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_TRUE(explicitGateOnly.mOuterSessionGate);
+  EXPECT_FALSE(explicitGateOnly.mImplicitPreambleGate);
+
+  Config mixedProtocols;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://h2.example","quic://h3.example"]})"_ns,
+          mixedProtocols, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_TRUE(mixedProtocols.mImplicitPreambleGate);
+
+  for (const auto& [value, expected] :
+       {std::pair{"false", false}, std::pair{"true", true}}) {
+    for (const auto& [proxy, protocol] :
+         {std::pair{"https://proxy.example", ProxyProtocol::H2},
+          std::pair{"quic://proxy.example", ProxyProtocol::H3}}) {
+      Config explicitGate;
+      error.Truncate();
+      nsAutoCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":")"_ns);
+      json.Append(proxy);
+      json.Append(R"(","outer-session-gate":)"_ns);
+      json.Append(value);
+      json.Append('}');
+      ASSERT_EQ(ParseConfig(json, explicitGate, error), NS_OK) << error.get();
+      EXPECT_EQ(explicitGate.mPreamble.ModeForProtocol(protocol),
+                PreambleMode::DocumentStartOverlap);
+      EXPECT_EQ(explicitGate.mOuterSessionGate, expected);
+      EXPECT_FALSE(explicitGate.mImplicitPreambleGate);
+    }
+  }
+}
+
+TEST(NaiveFoxConfig, MaxConnectionsIsBoundedAndExplicit)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":1})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mMaxConnections, 1U);
+
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":-1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":"1"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":4294967296})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":1,"max-connections":2})",
+  };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, OuterSessionGateBoolean)
+{
+  for (const auto& [value, expected] :
+       {std::pair{"true", true}, std::pair{"false", false}}) {
+    Config config;
+    nsAutoCString error;
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_EQ(config.mOuterSessionGate, expected);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidOuterSessionGate)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":"true"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","outer-session-gate":true,"outer-session-gate":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, DiagnosticFirstSocksTunnelUrgentStartBoolean)
+{
+  for (const auto& [value, expected] :
+       {std::pair{"true", true}, std::pair{"false", false}}) {
+    Config config;
+    nsAutoCString error;
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_EQ(config.mDiagnosticFirstSocksTunnelUrgentStart, expected);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidDiagnosticFirstSocksTunnelUrgentStart)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":"true"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-first-socks-tunnel-urgent-start":true,"diagnostic-first-socks-tunnel-urgent-start":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, PreambleModesAndBudgets)
+{
+  struct Expected {
+    const char* mJson;
+    PreambleMode mMode;
+    const char* mPath;
+    uint32_t mMaxAssets;
+    uint32_t mMaxBytes;
+  };
+  static constexpr Expected kExpected[] = {
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off"}})",
+       PreambleMode::Off, "/", 0, 0},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/"}})",
+       PreambleMode::Root, "/", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/camouflage/index.html"}})",
+       PreambleMode::Tree, "/camouflage/index.html", 2, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/camouflage/"}})",
+       PreambleMode::DocumentComplete, "/camouflage/", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-overlap","path":"/camouflage/"}})",
+       PreambleMode::DocumentOverlap, "/camouflage/", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-start-overlap","path":"/camouflage/"}})",
+       PreambleMode::DocumentStartOverlap, "/camouflage/", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-complete","path":"/camouflage/"}})",
+       PreambleMode::TreeComplete, "/camouflage/", 2, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-overlap","path":"/camouflage/"}})",
+       PreambleMode::TreeOverlap, "/camouflage/", 2, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-early-overlap","path":"/camouflage/"}})",
+       PreambleMode::TreeEarlyOverlap, "/camouflage/", 2, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-early-overlap","path":"/camouflage/","max-assets":0}})",
+       PreambleMode::TreeEarlyOverlap, "/camouflage/", 0, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-root-overlap","path":"/camouflage/"}})",
+       PreambleMode::TreeRootOverlap, "/camouflage/", 2, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-root-overlap","path":"/camouflage/","max-assets":0}})",
+       PreambleMode::TreeRootOverlap, "/camouflage/", 0, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-committed-overlap","path":"/camouflage/","max-assets":1}})",
+       PreambleMode::Off, "/camouflage/", 1, 256 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"path":"/a%20b","max-bytes":393216,"max-assets":6,"mode":"tree"}})",
+       PreambleMode::Tree, "/a%20b", 6, 384 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page?scenario=browser_page&completion=0123456789abcdef"}})",
+       PreambleMode::Root,
+       "/page?scenario=browser_page&completion=0123456789abcdef", 0, 64 * 1024},
+      {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/health","max-assets":0,"max-bytes":1}})",
+       PreambleMode::Root, "/health", 0, 1},
+  };
+
+  for (const auto& expected : kExpected) {
+    Config config;
+    nsAutoCString error;
+    ASSERT_EQ(ParseConfig(nsDependentCString(expected.mJson), config, error),
+              NS_OK)
+        << expected.mJson << ": " << error.get();
+    EXPECT_EQ(config.mPreamble.mMode, expected.mMode);
+    EXPECT_TRUE(config.mPreamble.mPath.Equals(expected.mPath));
+    EXPECT_EQ(config.mPreamble.mMaxAssets, expected.mMaxAssets);
+    EXPECT_EQ(config.mPreamble.mMaxBytes, expected.mMaxBytes);
+    EXPECT_FALSE(config.mPreamble.mCacheResources);
+  }
+}
+
+TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h3-mode":"tree-root-overlap","path":"/camouflage/","cache-resources":true}})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_TRUE(config.mPreamble.mCacheResources);
+  EXPECT_FALSE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H2));
+  EXPECT_TRUE(config.mPreamble.CacheResourcesForProtocol(ProxyProtocol::H3));
+
+  Config nativeCacheCommitted;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeCacheCommitted, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeCacheCommitted.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_EQ(nativeCacheCommitted.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeResourceNativeCacheCommittedOverlap);
+  EXPECT_EQ(nativeCacheCommitted.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeCacheCommitted.mPreamble.mCacheResources);
+
+  Config nativeParserPreload;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserPreload, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserPreload.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_EQ(nativeParserPreload.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserPreloadOverlap);
+  EXPECT_EQ(nativeParserPreload.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserPreload.mPreamble.mCacheResources);
+
+  Config nativeParserDocumentStart;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStart, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserDocumentStart.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserDocumentStartOverlap);
+  EXPECT_EQ(nativeParserDocumentStart.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentStart.mPreamble.mCacheResources);
+
+  Config nativeParserDocumentStartH2;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartH2, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserDocumentStartH2.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::TreeNativeParserDocumentStartOverlap);
+  EXPECT_EQ(
+      nativeParserDocumentStartH2.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::Off);
+  EXPECT_EQ(nativeParserDocumentStartH2.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentStartH2.mPreamble.mCacheResources);
+
+  Config nativeParserResourceTreeH2;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-resource-tree","path":"/camouflage/","max-assets":3,"max-bytes":131072,"cache-resources":true}})"_ns,
+          nativeParserResourceTreeH2, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserResourceTreeH2.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::TreeNativeParserDocumentStartResourceTree);
+  EXPECT_EQ(
+      nativeParserResourceTreeH2.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::Off);
+  EXPECT_EQ(nativeParserResourceTreeH2.mPreamble.mMaxAssets, 3U);
+  EXPECT_EQ(nativeParserResourceTreeH2.mPreamble.mMaxBytes, 131072U);
+  EXPECT_TRUE(nativeParserResourceTreeH2.mPreamble.mCacheResources);
+
+  Config nativeParserDocumentStartNavigationStop;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartNavigationStop, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserDocumentStartNavigationStop.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserDocumentStartNavigationStop);
+  EXPECT_EQ(nativeParserDocumentStartNavigationStop.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(
+      nativeParserDocumentStartNavigationStop.mPreamble.mCacheResources);
+
+  Config nativeParserDocumentStartNavigationStopH2;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-navigation-stop","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartNavigationStopH2, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserDocumentStartNavigationStopH2.mPreamble.ModeForProtocol(
+                ProxyProtocol::H2),
+            PreambleMode::TreeNativeParserDocumentStartNavigationStop);
+  EXPECT_EQ(nativeParserDocumentStartNavigationStopH2.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_EQ(nativeParserDocumentStartNavigationStopH2.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(
+      nativeParserDocumentStartNavigationStopH2.mPreamble.mCacheResources);
+
+  Config nativeParserDocumentStartResponseStop;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentStartResponseStop, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserDocumentStartResponseStop.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserDocumentStartResponseStop);
+  EXPECT_EQ(nativeParserDocumentStartResponseStop.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentStartResponseStop.mPreamble.mCacheResources);
+
+  Config nativeParserDocumentHandoff;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserDocumentHandoff, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserDocumentHandoff.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserDocumentHandoffOverlap);
+  EXPECT_EQ(nativeParserDocumentHandoff.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserDocumentHandoff.mPreamble.mCacheResources);
+
+  Config nativeParserRetarget;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserRetarget, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserRetarget.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserRetargetOverlap);
+  EXPECT_EQ(nativeParserRetarget.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserRetarget.mPreamble.mCacheResources);
+
+  Config nativeParserIpcRendezvous;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserIpcRendezvous, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserIpcRendezvous.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserIpcRendezvousOverlap);
+  EXPECT_EQ(nativeParserIpcRendezvous.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserIpcRendezvous.mPreamble.mCacheResources);
+
+  Config nativeParserRootRendezvous;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserRootRendezvous, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserRootRendezvous.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserRootRendezvousOverlap);
+  EXPECT_EQ(nativeParserRootRendezvous.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserRootRendezvous.mPreamble.mCacheResources);
+
+  Config nativeParserProcess;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserProcess, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserProcess.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserProcessOverlap);
+  EXPECT_EQ(nativeParserProcess.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserProcess.mPreamble.mCacheResources);
+
+  Config nativeParserFullProcess;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/camouflage/","max-assets":1,"cache-resources":true}})"_ns,
+          nativeParserFullProcess, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserFullProcess.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::TreeNativeParserFullProcessOverlap);
+  EXPECT_EQ(nativeParserFullProcess.mPreamble.mMaxAssets, 1U);
+  EXPECT_TRUE(nativeParserFullProcess.mPreamble.mCacheResources);
+
+  static constexpr const char* kInvalid[] =
+      {
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","cache-resources":false}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","cache-resources":false}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","cache-resources":true,"cache-resources":false}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-native-cache-committed-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-preload-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-navigation-stop","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-start-response-stop","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-document-handoff-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-retarget-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-ipc-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-root-rendezvous-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1,"cache-resources":true}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":1}})",
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-native-parser-full-process-overlap","path":"/","max-assets":2,"cache-resources":true}})",
+      };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidPreamble)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"invalid"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree_early_overlap","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":""}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"https://example.com/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"//example.com/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/page#fragment"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/bad\\path"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/bad%2"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/space here"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/caf\u00e9"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","max-bytes":0}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/","max-bytes":0}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-assets":7}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-bytes":393217}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-assets":-1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-assets":1.0}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree","path":"/","max-bytes":"1"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","mode":"tree","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","path":"/","extra":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off"},"preamble":{"mode":"off"}})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, ProtocolSpecificPreambleModes)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h2-mode":"document-complete","h3-mode":"tree-root-overlap","path":"/camouflage/","max-assets":2}})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mPreamble.mMode, PreambleMode::DocumentComplete);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeRootOverlap);
+  EXPECT_EQ(config.mPreamble.mMaxAssets, 2U);
+  EXPECT_EQ(config.mPreamble.mMaxBytes, 256U * 1024U);
+
+  Config h3Only;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-root-overlap","path":"/camouflage/"}})"_ns,
+          h3Only, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(h3Only.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(h3Only.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeRootOverlap);
+  EXPECT_EQ(h3Only.mPreamble.mMaxAssets, 2U);
+  EXPECT_EQ(h3Only.mPreamble.mMaxBytes, 256U * 1024U);
+
+  Config legacy;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","path":"/camouflage/"}})"_ns,
+          legacy, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(legacy.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(legacy.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(legacy.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(legacy.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentOverlap;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h3-mode":"document-overlap","path":"/camouflage/"}})"_ns,
+          documentOverlap, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(documentOverlap.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(documentOverlap.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentOverlap);
+  EXPECT_EQ(documentOverlap.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentOverlap.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentStartOverlap;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h3-mode":"document-start-overlap","path":"/camouflage/"}})"_ns,
+          documentStartOverlap, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(documentStartOverlap.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentComplete);
+  EXPECT_EQ(documentStartOverlap.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(documentStartOverlap.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentStartOverlap.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentHandshakeConfirmed;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-handshake-confirmed","path":"/camouflage/"}})"_ns,
+          documentHandshakeConfirmed, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      documentHandshakeConfirmed.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentHandshakeConfirmed.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentHandshakeConfirmed);
+  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentHandshakeConfirmed.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentCarrierDispatch;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-carrier-dispatch","path":"/camouflage/"}})"_ns,
+          documentCarrierDispatch, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      documentCarrierDispatch.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentCarrierDispatch.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentCarrierDispatch);
+  EXPECT_EQ(documentCarrierDispatch.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentCarrierDispatch.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentColdWinnerHandoff;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-cold-winner-handoff","path":"/camouflage/"}})"_ns,
+          documentColdWinnerHandoff, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      documentColdWinnerHandoff.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentColdWinnerHandoff.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentColdWinnerHandoff);
+  EXPECT_EQ(documentColdWinnerHandoff.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentColdWinnerHandoff.mPreamble.mMaxBytes, 64U * 1024U);
+
+  Config documentNativeCacheOpen;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-native-cache-open","path":"/camouflage/"}})"_ns,
+          documentNativeCacheOpen, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      documentNativeCacheOpen.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::Off);
+  EXPECT_EQ(
+      documentNativeCacheOpen.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::DocumentNativeCacheOpen);
+  EXPECT_EQ(documentNativeCacheOpen.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(documentNativeCacheOpen.mPreamble.mMaxBytes, 64U * 1024U);
+
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h2-mode":"root","h2-mode":"off","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"root","h3-mode":"invalid","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"h3-mode":"tree-root-overlap","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"off","h3-mode":"off","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-complete","h2-mode":"document-complete","h3-mode":"off","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-start-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-handshake-confirmed","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-handshake-confirmed","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-carrier-dispatch","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-carrier-dispatch","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-cold-winner-handoff","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-cold-winner-handoff","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-native-cache-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-cache-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-native-channel-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"document-native-channel-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"document-native-channel-open","path":"/"}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"tree-resource-committed-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-resource-committed-overlap","path":"/","max-assets":1}})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h3-mode":"tree-resource-committed-overlap","path":"/","max-assets":2}})",
+  };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
+{
+  TunnelConfig source;
+  source.mPreamble.mMode = PreambleMode::Tree;
+  source.mPreamble.mH2Mode = Some(PreambleMode::DocumentComplete);
+  source.mPreamble.mH3Mode = Some(PreambleMode::TreeRootOverlap);
+  source.mPreamble.mPath.AssignLiteral("/camouflage/");
+  source.mPreamble.mMaxAssets = 6;
+  source.mPreamble.mMaxBytes = PreambleConfig::kMaximumBytes;
+  source.mPreamble.mCacheResources = true;
+  source.mOuterSessionGate = true;
+  source.mImplicitPreambleGate = true;
+  source.mDiagnosticFirstSocksTunnelUrgentStart = true;
+
+  TunnelConfig constructed(source);
+  TunnelConfig assigned;
+  assigned = source;
+  source.mPreamble.mMode = PreambleMode::Off;
+  source.mPreamble.mPath.AssignLiteral("/");
+  source.mPreamble.mMaxAssets = 0;
+  source.mPreamble.mMaxBytes = 0;
+
+  for (const TunnelConfig* copy : {&constructed, &assigned}) {
+    EXPECT_EQ(copy->mPreamble.mMode, PreambleMode::Tree);
+    EXPECT_EQ(copy->mPreamble.ModeForProtocol(ProxyProtocol::H2),
+              PreambleMode::DocumentComplete);
+    EXPECT_EQ(copy->mPreamble.ModeForProtocol(ProxyProtocol::H3),
+              PreambleMode::TreeRootOverlap);
+    EXPECT_TRUE(copy->mPreamble.mPath.EqualsLiteral("/camouflage/"));
+    EXPECT_EQ(copy->mPreamble.mMaxAssets, 6U);
+    EXPECT_EQ(copy->mPreamble.mMaxBytes, 384U * 1024U);
+    EXPECT_TRUE(copy->mPreamble.mCacheResources);
+    EXPECT_TRUE(copy->mOuterSessionGate);
+    EXPECT_TRUE(copy->mImplicitPreambleGate);
+    EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
+  }
 }
 
 TEST(NaiveFoxConfig, MixedListenersQuicAndConsoleLog)
@@ -173,7 +958,8 @@ TEST(NaiveFoxConfig, OptionalUpstreamCredentials)
       NS_OK)
       << error.get();
   ASSERT_EQ(config.mProxies.Length(), 2U);
-  EXPECT_TRUE(config.mProxies[0].mUrl.EqualsLiteral("https://proxy.example:443"));
+  EXPECT_TRUE(
+      config.mProxies[0].mUrl.EqualsLiteral("https://proxy.example:443"));
   EXPECT_TRUE(config.mProxies[0].mUser.IsEmpty());
   EXPECT_TRUE(config.mProxies[0].mPassword.IsEmpty());
   EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H2);
@@ -388,10 +1174,11 @@ TEST(NaiveFoxConfig, NoPostQuantumBoolean)
 
   Config config;
   nsAutoCString error;
-  ASSERT_EQ(ParseConfig(
-                R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example"})"_ns,
-                config, error),
-            NS_OK)
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example"})"_ns,
+          config, error),
+      NS_OK)
       << error.get();
   EXPECT_FALSE(config.mNoPostQuantum);
 }
@@ -505,13 +1292,11 @@ TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
 
 TEST(NaiveFoxConfig, RejectsOversizedListenerCredentials)
 {
-  nsAutoCString json(
-      R"({"listen":"socks://user:)"_ns);
+  nsAutoCString json(R"({"listen":"socks://user:)"_ns);
   for (size_t index = 0; index < 256; ++index) {
     json.Append('p');
   }
-  json.AppendLiteral(
-      R"(@127.0.0.1:1080","proxy":"https://example.com"})");
+  json.AppendLiteral(R"(@127.0.0.1:1080","proxy":"https://example.com"})");
   Config config;
   nsAutoCString error;
   EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
@@ -573,10 +1358,18 @@ TEST(NaiveFoxConfig, RejectsInvalidExtraHeaders)
   }
 
   static constexpr const char* kProtected[] = {
-      "padding",           "Host",               "Connection",
-      "Proxy-Connection", "Keep-Alive",         "Transfer-Encoding",
-      "TE",                "Trailer",            "Upgrade",
-      "Content-Length",    "Proxy-Authorization", "Proxy-Authenticate",
+      "padding",
+      "Host",
+      "Connection",
+      "Proxy-Connection",
+      "Keep-Alive",
+      "Transfer-Encoding",
+      "TE",
+      "Trailer",
+      "Upgrade",
+      "Content-Length",
+      "Proxy-Authorization",
+      "Proxy-Authenticate",
       "ALPN",
   };
   for (const char* name : kProtected) {
@@ -587,8 +1380,8 @@ TEST(NaiveFoxConfig, RejectsInvalidExtraHeaders)
     Config config;
     nsAutoCString error;
     EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error))) << name;
-    EXPECT_TRUE(error.EqualsLiteral(
-        "extra-headers contains a protected header name"))
+    EXPECT_TRUE(
+        error.EqualsLiteral("extra-headers contains a protected header name"))
         << name << ": " << error.get();
   }
 }

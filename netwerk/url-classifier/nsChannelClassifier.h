@@ -26,7 +26,6 @@ class nsChannelClassifier final : public nsIURIClassifierCallback,
   // Calls nsIURIClassifier.Classify with the principal of the given channel,
   // and cancels the channel on a bad verdict.
   void Start();
-
  private:
   // True if the channel is on the allow list.
   bool mIsAllowListed;

@@ -40,7 +40,18 @@ class nsContentUtils final {
 
   static ExtContentPolicyType InternalContentPolicyTypeToExternal(
       nsContentPolicyType aType) {
-    return static_cast<ExtContentPolicyType>(aType);
+    // Keep the internal stylesheet types distinct for Necko while preserving
+    // the public content-policy identity expected by the native CSS loader.
+    // A parser-discovered stylesheet uses
+    // TYPE_INTERNAL_STYLESHEET_PRELOAD internally, but content policy,
+    // referrer, and request-header consumers must still observe a stylesheet.
+    switch (aType) {
+      case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET:
+      case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD:
+        return ExtContentPolicy::TYPE_STYLESHEET;
+      default:
+        return static_cast<ExtContentPolicyType>(aType);
+    }
   }
   static nsIScriptSecurityManager* GetSecurityManager() {
     static nsCOMPtr<nsIScriptSecurityManager> sSecurityManager =
