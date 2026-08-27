@@ -380,8 +380,12 @@ jobs:
           tar -C "${package_parent}" -cJf \
             "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz" \
             naivefox-linux-x86_64
-          sha256sum "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz" \
-            > "${release_dir}/${RELEASE_TAG}-linux-x86_64.tar.xz.sha256"
+          (
+            cd "${release_dir}"
+            sha256sum "${RELEASE_TAG}-linux-x86_64.tar.xz" \
+              > "${RELEASE_TAG}-linux-x86_64.tar.xz.sha256"
+            sha256sum -c "${RELEASE_TAG}-linux-x86_64.tar.xz.sha256"
+          )
 
       - name: Archive Windows package
         if: matrix.platform == 'windows'
@@ -399,8 +403,12 @@ jobs:
             7z a -tzip "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip" \
               naivefox-windows-x86_64
           )
-          sha256sum "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip" \
-            > "${release_dir}/${RELEASE_TAG}-windows-x86_64.zip.sha256"
+          (
+            cd "${release_dir}"
+            sha256sum "${RELEASE_TAG}-windows-x86_64.zip" \
+              > "${RELEASE_TAG}-windows-x86_64.zip.sha256"
+            sha256sum -c "${RELEASE_TAG}-windows-x86_64.zip.sha256"
+          )
 
       - name: Archive Android package
         if: matrix.platform == 'android'
@@ -416,8 +424,12 @@ jobs:
           tar -C "${package_parent}" -cJf \
             "${release_dir}/${RELEASE_TAG}-android-aarch64.tar.xz" \
             naivefox-android-aarch64
-          sha256sum "${release_dir}/${RELEASE_TAG}-android-aarch64.tar.xz" \
-            > "${release_dir}/${RELEASE_TAG}-android-aarch64.tar.xz.sha256"
+          (
+            cd "${release_dir}"
+            sha256sum "${RELEASE_TAG}-android-aarch64.tar.xz" \
+              > "${RELEASE_TAG}-android-aarch64.tar.xz.sha256"
+            sha256sum -c "${RELEASE_TAG}-android-aarch64.tar.xz.sha256"
+          )
 
       - name: Upload platform archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
