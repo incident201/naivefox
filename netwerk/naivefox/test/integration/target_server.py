@@ -62,6 +62,9 @@ CAMOUFLAGE_SCRIPT_SIZE = configured_camouflage_asset_size(
     "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE", 128 * 1024
 )
 CAMOUFLAGE_API_IMAGE_SIZE = 4096
+FRONTING_STYLE_SIZE = 12 * 1024
+FRONTING_SCRIPT_SIZE = 24 * 1024
+FRONTING_IMAGE_SIZE = 8 * 1024
 
 
 def sized_source_asset(size, prefix, filler):
@@ -87,6 +90,27 @@ CAMOUFLAGE_APP_JS = sized_source_asset(
         b'"controlled";})();\n'
     ),
     b"/* controlled browser application module */\n",
+)
+FRONTING_STYLE_CSS = sized_source_asset(
+    FRONTING_STYLE_SIZE,
+    (
+        b":root{color-scheme:light;background:#f5f7fa;color:#213047}"
+        b"body{margin:0;font:16px/1.5 system-ui,sans-serif}"
+        b"main{max-width:68rem;margin:auto;padding:clamp(2rem,6vw,5rem)}"
+        b".hero{display:grid;grid-template-columns:2fr 1fr;gap:2rem}"
+        b".card{background:white;border-radius:1rem;padding:1.5rem;"
+        b"box-shadow:0 .5rem 2rem #1f35521a}\n"
+    ),
+    b".feature{display:flex;align-items:center;gap:.75rem;margin:.5rem 0}\n",
+)
+FRONTING_APP_JS = sized_source_asset(
+    FRONTING_SCRIPT_SIZE,
+    (
+        b'(()=>{"use strict";const root=document.documentElement;'
+        b'root.dataset.ready="true";for(const card of '
+        b'document.querySelectorAll(".card")){card.dataset.enhanced="true"}})();\n'
+    ),
+    b"/* landing-page component registry */\n",
 )
 CAMOUFLAGE_STYLE_ETAG = (
     '"naivefox-style-' + hashlib.sha256(CAMOUFLAGE_STYLE_CSS).hexdigest() + '"'
@@ -227,6 +251,17 @@ class Handler(BaseHTTPRequestHandler):
                 f'<img src="/camouflage/resource?size=262144{resource_suffix}">'
                 f'<img src="/camouflage/api{suffix}">'
             )
+        elif scenario == "fronting_page":
+            body = (
+                "<head>"
+                '<link rel="stylesheet" href="/camouflage/fronting.css">'
+                '<script defer src="/camouflage/fronting.js"></script>'
+                '</head><body><main class="hero">'
+                '<section class="card"><h1>Network status</h1>'
+                "<p>Service connectivity and documentation.</p></section>"
+                '<img src="/camouflage/fronting.svg" alt="Status overview">'
+                "</main></body>"
+            )
         elif scenario == "warm_css":
             body = '<link rel="stylesheet" href="/camouflage/style.css">'
         elif scenario == "sequential":
@@ -330,6 +365,12 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
             self.send_camouflage_style()
         elif parsed.path == "/camouflage/app.js":
             self.send_bytes(200, CAMOUFLAGE_APP_JS, "application/javascript")
+        elif parsed.path == "/camouflage/fronting.css":
+            self.send_bytes(200, FRONTING_STYLE_CSS, "text/css")
+        elif parsed.path == "/camouflage/fronting.js":
+            self.send_bytes(200, FRONTING_APP_JS, "application/javascript")
+        elif parsed.path == "/camouflage/fronting.svg":
+            self.send_svg(FRONTING_IMAGE_SIZE)
         elif parsed.path == "/camouflage/api":
             navigation = query.get("nav", [""])[0]
             if navigation:

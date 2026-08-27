@@ -421,6 +421,24 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserDocumentStartH2.mPreamble.mMaxAssets, 1U);
   EXPECT_TRUE(nativeParserDocumentStartH2.mPreamble.mCacheResources);
 
+  Config nativeParserResourceTreeH2;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-document-start-resource-tree","path":"/camouflage/","max-assets":3,"max-bytes":131072,"cache-resources":true}})"_ns,
+          nativeParserResourceTreeH2, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(
+      nativeParserResourceTreeH2.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+      PreambleMode::TreeNativeParserDocumentStartResourceTree);
+  EXPECT_EQ(
+      nativeParserResourceTreeH2.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+      PreambleMode::Off);
+  EXPECT_EQ(nativeParserResourceTreeH2.mPreamble.mMaxAssets, 3U);
+  EXPECT_EQ(nativeParserResourceTreeH2.mPreamble.mMaxBytes, 131072U);
+  EXPECT_TRUE(nativeParserResourceTreeH2.mPreamble.mCacheResources);
+
   Config nativeParserDocumentStartNavigationStop;
   error.Truncate();
   ASSERT_EQ(

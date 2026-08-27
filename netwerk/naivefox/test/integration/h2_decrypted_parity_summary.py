@@ -23,16 +23,19 @@ SUPPORTED_ARMS = {
     "tree-overlap",
     "tree-native-parser-document-start-overlap-css",
     "tree-native-parser-document-start-navigation-stop-css",
+    "tree-native-parser-document-start-resource-tree",
 }
 PARSER_DOCUMENT_START_ARMS = {
     "tree-native-parser-document-start-overlap-css",
     "tree-native-parser-document-start-navigation-stop-css",
 }
+RESOURCE_TREE_ARMS = {"tree-native-parser-document-start-resource-tree"}
 SELECTED_GET_SEMANTIC_HEADERS = {
     ":method",
     ":scheme",
     ":authority",
     ":path",
+    "accept",
     "referer",
     "sec-fetch-dest",
     "sec-fetch-mode",
@@ -139,15 +142,13 @@ def parse_resets(rows, cohort, proxy_port):
             f"{cohort} RST_STREAM error mapping is ambiguous",
         )
         for stream, error in zip(reset_streams, errors):
-            resets.append(
-                {
-                    "frame": int(row["frame.number"]),
-                    "direction": direction(row, proxy_port),
-                    "tcp_stream": tcp_stream,
-                    "stream": stream,
-                    "error": error,
-                }
-            )
+            resets.append({
+                "frame": int(row["frame.number"]),
+                "direction": direction(row, proxy_port),
+                "tcp_stream": tcp_stream,
+                "stream": stream,
+                "error": error,
+            })
     return resets
 
 
@@ -308,6 +309,8 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
     expected_count = (
         0
         if arm == "gate"
+        else 4
+        if arm in RESOURCE_TREE_ARMS
         else 2
         if arm in PARSER_DOCUMENT_START_ARMS
         else 3
@@ -332,7 +335,11 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
         path = actual.get(":path", "")
         require(path and path not in by_path, f"{cohort} GET paths are ambiguous")
         by_path[path] = (record, actual)
-    root_path = "/camouflage/index.html"
+    root_path = (
+        "/camouflage/index.html?scenario=fronting_page"
+        if arm in RESOURCE_TREE_ARMS
+        else "/camouflage/index.html"
+    )
     require(root_path in by_path, f"{cohort} lacks root document GET semantics")
     root_record, root = by_path[root_path]
     require(
@@ -352,15 +359,38 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
             root_record["stream"],
         )
     expected_paths = {root_path, "/camouflage/style.css"}
-    if arm not in PARSER_DOCUMENT_START_ARMS:
+    if arm in RESOURCE_TREE_ARMS:
+        expected_paths = {
+            root_path,
+            "/camouflage/fronting.css",
+            "/camouflage/fronting.js",
+            "/camouflage/fronting.svg",
+        }
+    elif arm not in PARSER_DOCUMENT_START_ARMS:
         expected_paths.add("/camouflage/app.js")
     require(set(by_path) == expected_paths, f"{cohort} tree resource paths differ")
     root_url = f"{root[':scheme']}://{root[':authority']}{root_path}"
     resources = [("/camouflage/style.css", "style")]
-    if arm not in PARSER_DOCUMENT_START_ARMS:
+    if arm in RESOURCE_TREE_ARMS:
+        resources = [
+            ("/camouflage/fronting.css", "style"),
+            ("/camouflage/fronting.js", "script"),
+            ("/camouflage/fronting.svg", "image"),
+        ]
+    elif arm not in PARSER_DOCUMENT_START_ARMS:
         resources.append(("/camouflage/app.js", "script"))
     for path, destination in resources:
         _, resource = by_path[path]
+        priority = resource.get("priority")
+        priority_matches = priority == "u=2"
+        if arm in RESOURCE_TREE_ARMS:
+            priority_matches = (
+                priority == "u=2"
+                if destination == "style"
+                else "priority" not in resource
+                if destination == "script"
+                else priority == "u=5, i"
+            )
         require(
             resource.get(":method") == "GET"
             and resource.get(":scheme") == root[":scheme"]
@@ -369,7 +399,7 @@ def validate_expected_get_request_semantics(cohort, semantics, arm):
             and resource.get("sec-fetch-site") == "same-origin"
             and resource.get("sec-fetch-mode") == "no-cors"
             and resource.get("sec-fetch-dest") == destination
-            and resource.get("priority") == "u=2",
+            and priority_matches,
             f"{cohort} {destination} resource request semantics differ",
         )
     return (
@@ -521,7 +551,7 @@ def validate(
     reference_server_tls,
     arm_server_tls,
     root_request_identity,
-    resets,
+    resets=(),
 ):
     require(reference_settings == arm_settings, "same-base client H2 SETTINGS differ")
     require(
@@ -580,6 +610,8 @@ def validate(
     expected_gets = (
         0
         if arm == "gate"
+        else 4
+        if arm in RESOURCE_TREE_ARMS
         else 2
         if arm in PARSER_DOCUMENT_START_ARMS
         else 3
@@ -590,17 +622,19 @@ def validate(
         len(gets) == expected_gets,
         f"{arm} must emit exactly {expected_gets} preamble GETs",
     )
-    if arm in PARSER_DOCUMENT_START_ARMS:
+    if arm in PARSER_DOCUMENT_START_ARMS or arm in RESOURCE_TREE_ARMS:
         root_get = next(
             event
             for event in gets
             if (event["frame"], event["tcp_stream"], event["stream"])
             == root_request_identity
         )
-        style_get = next(event for event in gets if event is not root_get)
+        resource_gets = [event for event in gets if event is not root_get]
         require(
-            root_get["frame"] < connect["frame"] < style_get["frame"],
-            f"{arm} must emit root GET before CONNECT and CSS GET after CONNECT",
+            root_get["frame"]
+            < connect["frame"]
+            < min(event["frame"] for event in resource_gets),
+            f"{arm} must emit root GET before CONNECT and resources after CONNECT",
         )
     else:
         require(
@@ -739,6 +773,11 @@ def validate(
             all(event["end_stream_frame"] != "" for event in responses),
             f"{arm} root or stylesheet lacks END_STREAM",
         )
+    elif arm == "tree-native-parser-document-start-resource-tree":
+        require(
+            all(event["end_stream_frame"] != "" for event in responses),
+            f"{arm} root or resource lacks END_STREAM",
+        )
     elif arm == "tree-native-parser-document-start-navigation-stop-css":
         root_get = next(
             event
@@ -765,8 +804,7 @@ def validate(
             f"{arm} root document lacks END_STREAM",
         )
         require(
-            len(style_responses) == 1
-            and style_responses[0]["end_stream_frame"] == "",
+            len(style_responses) == 1 and style_responses[0]["end_stream_frame"] == "",
             f"{arm} stylesheet completed instead of being canceled",
         )
         style_resets = [
@@ -816,12 +854,31 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
     candidate_semantics = read_get_request_semantics(
         root, arm, proxy_port, candidate_gets
     )
-    candidate_resets = parse_resets(
-        read_rows(root, arm, "resets"), arm, proxy_port
+    candidate_resets = (
+        parse_resets(read_rows(root, arm, "resets"), arm, proxy_port)
+        if arm == "tree-native-parser-document-start-navigation-stop-css"
+        else ()
     )
     root_request_identity = validate_expected_get_request_semantics(
         arm, candidate_semantics, arm
     )
+    if arm in RESOURCE_TREE_ARMS:
+        reference_semantics = read_get_request_semantics(
+            root, "reference", proxy_port, reference_gets
+        )
+        validate_expected_get_request_semantics("reference", reference_semantics, arm)
+        reference_by_path = {
+            dict(record["selected"])[":path"]: tuple(record["selected"])
+            for record in reference_semantics
+        }
+        candidate_by_path = {
+            dict(record["selected"])[":path"]: tuple(record["selected"])
+            for record in candidate_semantics
+        }
+        require(
+            reference_by_path == candidate_by_path,
+            f"{arm} GET request semantics differ from same-base Firefox",
+        )
     root_overlap_observed = None
     if arm == "tree-root-overlap":
         connect_frame = min(event["frame"] for event in candidate_connects)
@@ -908,7 +965,10 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
         output.write(f"reference_outer_get_count={len(reference_gets)}\n")
         output.write(f"{arm}_preamble_get_count={len(candidate_gets)}\n")
         output.write(f"{arm}_outer_connect_count={len(candidate_connects)}\n")
-        if arm in PARSER_DOCUMENT_START_ARMS:
+        if arm in RESOURCE_TREE_ARMS:
+            output.write(f"{arm}_root_before_first_connect=yes\n")
+            output.write(f"{arm}_resources_after_first_connect=yes\n")
+        elif arm in PARSER_DOCUMENT_START_ARMS:
             output.write(f"{arm}_root_before_first_connect=yes\n")
             output.write(f"{arm}_stylesheet_after_first_connect=yes\n")
         else:
@@ -926,6 +986,15 @@ def write_outputs(root, events_path, summary_path, proxy_port, arm):
             output.write(
                 "tree-native-parser-document-start-overlap-css_"
                 "root_and_css_end_stream=yes\n"
+            )
+        if arm == "tree-native-parser-document-start-resource-tree":
+            output.write(
+                "tree-native-parser-document-start-resource-tree_"
+                "wire_order=root_get_connect_resource_gets\n"
+            )
+            output.write(
+                "tree-native-parser-document-start-resource-tree_"
+                "root_and_resources_end_stream=yes\n"
             )
         if arm == "tree-native-parser-document-start-navigation-stop-css":
             output.write(

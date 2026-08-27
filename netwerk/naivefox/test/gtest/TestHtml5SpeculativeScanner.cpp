@@ -5,7 +5,8 @@
 #include "gtest/gtest.h"
 #include "nsHtml5SpeculativeScanner.h"
 
-TEST(Html5SpeculativeScanner, DiscoversStyleWithParserSemantics) {
+TEST(Html5SpeculativeScanner, DiscoversStyleWithParserSemantics)
+{
   nsHtml5SpeculativeScanner scanner;
 
   ASSERT_EQ(NS_OK,
@@ -31,4 +32,33 @@ TEST(Html5SpeculativeScanner, DiscoversStyleWithParserSemantics) {
   EXPECT_EQ(u"i"_ns, style.Integrity());
   EXPECT_EQ(u"high"_ns, style.FetchPriority());
   EXPECT_FALSE(style.IsLinkPreload());
+}
+
+TEST(Html5SpeculativeScanner, PreservesLeanResourceDiscoveryOrder)
+{
+  nsHtml5SpeculativeScanner scanner;
+
+  ASSERT_EQ(
+      NS_OK,
+      scanner.Feed(
+          u"<!doctype html><html><head><link rel=stylesheet href=front.css>"
+          u"<script defer src=front.js></script></head><body>"
+          u"<img src=front.svg></body></html>"_ns));
+  ASSERT_EQ(NS_OK, scanner.Finish());
+
+  nsTArray<nsHtml5LeanPreloadDescriptor> descriptors;
+  scanner.TakeLeanDescriptors(descriptors);
+  ASSERT_EQ(4U, descriptors.Length());
+  EXPECT_EQ(nsHtml5LeanPreloadDescriptor::Kind::DocumentMode,
+            descriptors[0].GetKind());
+  EXPECT_EQ(nsHtml5LeanPreloadDescriptor::Kind::Style,
+            descriptors[1].GetKind());
+  EXPECT_EQ(u"front.css"_ns, descriptors[1].UrlOrSizes());
+  EXPECT_EQ(nsHtml5LeanPreloadDescriptor::Kind::ScriptFromHead,
+            descriptors[2].GetKind());
+  EXPECT_EQ(u"front.js"_ns, descriptors[2].UrlOrSizes());
+  EXPECT_TRUE(descriptors[2].IsDefer());
+  EXPECT_EQ(nsHtml5LeanPreloadDescriptor::Kind::Image,
+            descriptors[3].GetKind());
+  EXPECT_EQ(u"front.svg"_ns, descriptors[3].UrlOrSizes());
 }

@@ -22,9 +22,13 @@ enum class StylePreloadKind : uint8_t;
 namespace mozilla::naivefox {
 
 enum class ProxyProtocol : uint8_t;
+enum class NativeParserResourceKind : uint8_t {
+  Style,
+  Script,
+  Image,
+};
 
-nsContentPolicyType StyleContentPolicyType(
-    css::StylePreloadKind aPreloadKind);
+nsContentPolicyType StyleContentPolicyType(css::StylePreloadKind aPreloadKind);
 
 // Creates, but does not open, the HTTP channel corresponding to an ordinary
 // <link rel=stylesheet> discovered by Gecko's speculative HTML parser.  The
@@ -40,8 +44,17 @@ nsresult NewNativeStylePreloadChannel(
     css::StylePreloadKind aPreloadKind,
     const OriginAttributes& aOriginAttributes,
     nsIReferrerInfo* aResolvedReferrerInfo, nsILoadGroup* aLoadGroup,
-    nsIProxyInfo* aProxyInfo, ProxyProtocol aProtocol,
-    nsIChannel** aResult);
+    nsIProxyInfo* aProxyInfo, ProxyProtocol aProtocol, nsIChannel** aResult);
+
+// Creates the network-only portion of an ordinary parser speculative load.
+// The caller has already applied parser ordering, base/referrer context and
+// the bounded same-origin policy. No CSS/JS/image consumer is constructed;
+// the response is drained by the preamble listener.
+nsresult NewNativeParserResourcePreloadChannel(
+    nsIURI* aResourceURI, nsIURI* aDocumentURI, NativeParserResourceKind aKind,
+    const OriginAttributes& aOriginAttributes,
+    nsIReferrerInfo* aResolvedReferrerInfo, nsILoadGroup* aLoadGroup,
+    nsIProxyInfo* aProxyInfo, ProxyProtocol aProtocol, nsIChannel** aResult);
 
 }  // namespace mozilla::naivefox
 

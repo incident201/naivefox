@@ -23,6 +23,7 @@ EXPORTS += [
     "nsHtml5HtmlAttributes.h",
     "nsHtml5LeanContentCreators.h",
     "nsHtml5LeanParserDependencies.h",
+    "nsHtml5LeanPreloadDescriptor.h",
     "nsHtml5Macros.h",
     "nsHtml5Module.h",
     "nsHtml5NamedCharacters.h",

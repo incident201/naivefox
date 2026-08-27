@@ -344,6 +344,30 @@ DOCUMENT_START_OVERLAP_DRAIN = re.compile(
     r"completed_resources=(?P<completed_resources>\d+) "
     r"protocol=(?P<protocol>h2|h3)$"
 )
+NATIVE_PARSER_RESOURCE_TREE_ADMISSION = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-resource-tree admission=(?P<admission>\S+) "
+    r"request_committed=(?P<request_committed>[01]) "
+    r"root_done=(?P<root_done>[01]) "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_RESOURCE_TREE_OPEN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
+    r"lifecycle=resource-opened stream=(?P<stream>\d+) "
+    r"kind=(?P<kind>style|script|image) referrer=inherited "
+    r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_RESOURCE_TREE_COMMIT = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
+    r"lifecycle=resource-committed stream=(?P<stream>\d+) "
+    r"status=waiting-for protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_RESOURCE_TREE_DRAIN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"preamble native-parser-resource-tree drain=complete "
+    r"completed_resources=(?P<completed_resources>\d+) "
+    r"http=(?P<http>\d+) protocol=(?P<protocol>h2|h3)$"
+)
 ESTABLISHED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"established target=\S+ outer=(?P<protocol>h2|h3) padding=yes$"
@@ -987,6 +1011,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -1039,6 +1064,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
+    if arm == "tree-native-parser-document-start-resource-tree" and protocol != "h2":
+        raise ValueError(
+            "tree-native-parser-document-start-resource-tree requires h2"
+        )
 
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
@@ -1064,6 +1093,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -1085,6 +1115,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -1149,6 +1180,54 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ]
     if any(drain is None for drain in parsed_document_start_drains):
         raise ValueError("malformed document-start-overlap drain evidence")
+
+    native_resource_tree_admission_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-resource-tree admission=" in line
+    ]
+    parsed_native_resource_tree_admissions = [
+        NATIVE_PARSER_RESOURCE_TREE_ADMISSION.fullmatch(line)
+        for line in native_resource_tree_admission_lines
+    ]
+    native_resource_tree_open_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-resource-tree lifecycle=resource-opened " in line
+    ]
+    parsed_native_resource_tree_opens = [
+        NATIVE_PARSER_RESOURCE_TREE_OPEN.fullmatch(line)
+        for line in native_resource_tree_open_lines
+    ]
+    native_resource_tree_commit_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-resource-tree lifecycle=resource-committed " in line
+    ]
+    parsed_native_resource_tree_commits = [
+        NATIVE_PARSER_RESOURCE_TREE_COMMIT.fullmatch(line)
+        for line in native_resource_tree_commit_lines
+    ]
+    native_resource_tree_drain_lines = [
+        line
+        for line in log_lines
+        if " preamble native-parser-resource-tree drain=" in line
+    ]
+    parsed_native_resource_tree_drains = [
+        NATIVE_PARSER_RESOURCE_TREE_DRAIN.fullmatch(line)
+        for line in native_resource_tree_drain_lines
+    ]
+    if any(
+        marker is None
+        for markers in (
+            parsed_native_resource_tree_admissions,
+            parsed_native_resource_tree_opens,
+            parsed_native_resource_tree_commits,
+            parsed_native_resource_tree_drains,
+        )
+        for marker in markers
+    ):
+        raise ValueError("malformed native parser resource-tree evidence")
 
     admission_lines = [
         line for line in log_lines if " preamble root-overlap admission=" in line
@@ -1221,6 +1300,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
         for line in log_lines
         if "Preamble native-parser-preload lifecycle=chunk-flushed " in line
         and " descriptors=1 " in line
+        and " status=0x00000000 " in line
+        and line.endswith(f" protocol={protocol}")
+    ]
+    native_resource_tree_descriptor_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-preload lifecycle=chunk-flushed " in line
+        and " descriptors=4 " in line
         and " status=0x00000000 " in line
         and line.endswith(f" protocol={protocol}")
     ]
@@ -2026,6 +2113,93 @@ def validate_sample(arm, protocol, log_text, feature_document):
     elif parsed_native_parser_document_start_admissions:
         raise ValueError(
             f"{arm} arm unexpectedly logged native parser document-start admission"
+        )
+
+    native_resource_tree_markers = (
+        parsed_native_resource_tree_admissions,
+        parsed_native_resource_tree_opens,
+        parsed_native_resource_tree_commits,
+        parsed_native_resource_tree_drains,
+    )
+    if arm == "tree-native-parser-document-start-resource-tree":
+        if (
+            len(parsed_native_resource_tree_admissions) != 1
+            or len(native_resource_tree_descriptor_lines) != 1
+            or len(parsed_native_resource_tree_opens) != 3
+            or len(parsed_native_resource_tree_commits) != 3
+            or len(parsed_native_resource_tree_drains) != 1
+        ):
+            raise ValueError(
+                "native parser resource-tree arm requires one early admission, "
+                "one four-descriptor parser flush, three opens, three commits, "
+                "and one drain"
+            )
+        admission = parsed_native_resource_tree_admissions[0]
+        drain = parsed_native_resource_tree_drains[0]
+        connection = admission["connection"]
+        expected_resources = {1: "style", 2: "script", 3: "image"}
+        opens = {
+            int(marker["stream"]): marker["kind"]
+            for marker in parsed_native_resource_tree_opens
+        }
+        commits = {
+            int(marker["stream"]) for marker in parsed_native_resource_tree_commits
+        }
+        if (
+            admission["admission"] != "request-committed"
+            or admission["request_committed"] != "1"
+            or admission["root_done"] != "0"
+            or admission["protocol"] != "h2"
+            or opens != expected_resources
+            or commits != set(expected_resources)
+            or any(
+                marker["protocol"] != "h2"
+                for markers in (
+                    parsed_native_resource_tree_opens,
+                    parsed_native_resource_tree_commits,
+                )
+                for marker in markers
+            )
+            or drain["connection"] != connection
+            or drain["completed_resources"] != "3"
+            or drain["protocol"] != "h2"
+            or not 200 <= int(drain["http"]) < 300
+            or result["connection"] != connection
+        ):
+            raise ValueError("native parser resource-tree causal state is invalid")
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == connection
+            and established["protocol"] == "h2"
+        ]
+        if len(matching_established) != 1:
+            raise ValueError(
+                "native parser resource-tree arm requires one matching CONNECT marker"
+            )
+        admission_index = log_lines.index(native_resource_tree_admission_lines[0])
+        established_index = log_lines.index(matching_established[0])
+        descriptor_index = log_lines.index(native_resource_tree_descriptor_lines[0])
+        open_indices = [
+            log_lines.index(line) for line in native_resource_tree_open_lines
+        ]
+        commit_indices = [
+            log_lines.index(line) for line in native_resource_tree_commit_lines
+        ]
+        result_index = log_lines.index(result_lines[0])
+        drain_index = log_lines.index(native_resource_tree_drain_lines[0])
+        if not (
+            admission_index < established_index < descriptor_index
+            and descriptor_index < min(open_indices)
+            and max(open_indices) < min(commit_indices)
+            and max(commit_indices) < result_index < drain_index
+        ):
+            raise ValueError(
+                "native parser resource-tree lifecycle markers have invalid ordering"
+            )
+    elif any(native_resource_tree_markers) or native_resource_tree_descriptor_lines:
+        raise ValueError(
+            f"{arm} arm unexpectedly logged native parser resource-tree lifecycle"
         )
 
     if arm == "tree-native-parser-document-start-navigation-stop-css":
@@ -2934,6 +3108,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             in (
                 "tree-native-parser-document-handoff-overlap-css",
                 "tree-native-parser-document-start-overlap-css",
+                "tree-native-parser-document-start-resource-tree",
                 "tree-native-parser-document-start-navigation-stop-css",
                 "tree-native-parser-document-start-response-stop-css",
                 "tree-native-parser-retarget-overlap-css",
@@ -2985,6 +3160,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-resource-tree",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

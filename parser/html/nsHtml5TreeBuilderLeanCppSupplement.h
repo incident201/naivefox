@@ -52,8 +52,7 @@ nsHtml5TreeBuilder::~nsHtml5TreeBuilder() {
 
 nsIContentHandle* nsHtml5TreeBuilder::AllocateContentHandle() {
   auto handle = mozilla::MakeUnique<uint8_t>(0);
-  nsIContentHandle* opaque =
-      reinterpret_cast<nsIContentHandle*>(handle.get());
+  nsIContentHandle* opaque = reinterpret_cast<nsIContentHandle*>(handle.get());
   mHandles.AppendElement(std::move(handle));
   return opaque;
 }
@@ -64,59 +63,144 @@ nsIContentHandle* nsHtml5TreeBuilder::createElement(
   MOZ_ASSERT(aAttributes);
   MOZ_ASSERT(aName);
 
-  // This is the upstream stylesheet portion of the speculative-load wall.
-  // The generated tree builder still determines whether the token is in a
-  // template/foreign-content context; only DOM allocation is replaced.
+  // This is the network-relevant DOM-free subset of the upstream speculative
+  // load wall. The generated tree builder still determines whether the token
+  // is in a template/foreign-content context; only DOM allocation, script
+  // execution, layout, image decoding, and style processing are replaced.
   if (mGenerateSpeculativeLoads && mode != IN_TEMPLATE &&
-      aNamespace == kNameSpaceID_XHTML && aName == nsGkAtoms::link) {
-    nsHtml5String rel =
-        aAttributes->getValue(nsHtml5AttributeName::ATTR_REL);
-    if (rel && rel.LowerCaseEqualsASCII("stylesheet")) {
-      nsHtml5String url =
-          aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
-      if (url &&
-          !aAttributes->getValue(nsHtml5AttributeName::ATTR_DISABLED)) {
-        nsHtml5String charset =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_CHARSET);
+      aNamespace == kNameSpaceID_XHTML) {
+    if (aName == nsGkAtoms::img) {
+      nsHtml5String loading =
+          aAttributes->getValue(nsHtml5AttributeName::ATTR_LOADING);
+      if (!loading.LowerCaseEqualsASCII("lazy")) {
+        nsHtml5String url =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_SRC);
+        nsHtml5String srcset =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_SRCSET);
         nsHtml5String crossOrigin =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
-        nsHtml5String media =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_MEDIA);
         nsHtml5String referrerPolicy =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_REFERRERPOLICY);
-        nsHtml5String nonce =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_NONCE);
-        nsHtml5String integrity =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_INTEGRITY);
+        nsHtml5String sizes =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_SIZES);
         nsHtml5String fetchPriority =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_FETCHPRIORITY);
-        mSpeculativeLoadQueue.AppendElement()->InitStyle(
-            url, charset, crossOrigin, media, referrerPolicy, nonce, integrity,
-            false, fetchPriority);
+        nsHtml5String type =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_TYPE);
+        mSpeculativeLoadQueue.AppendElement()->InitImage(
+            url, crossOrigin, nullptr, referrerPolicy, srcset, sizes, false,
+            fetchPriority, type);
       }
-    } else if (rel && rel.LowerCaseEqualsASCII("preload")) {
-      nsHtml5String as =
-          aAttributes->getValue(nsHtml5AttributeName::ATTR_AS);
-      nsHtml5String url =
-          aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
-      if (url && as.LowerCaseEqualsASCII("style")) {
+    } else if (aName == nsGkAtoms::script) {
+      nsHtml5String type =
+          aAttributes->getValue(nsHtml5AttributeName::ATTR_TYPE);
+      nsAutoString typeString;
+      type.ToString(typeString);
+      const bool isModule = typeString.LowerCaseEqualsASCII("module");
+      const bool importmap = typeString.LowerCaseEqualsASCII("importmap");
+      const bool nomodule =
+          aAttributes->contains(nsHtml5AttributeName::ATTR_NOMODULE);
+      nsHtml5String url = aAttributes->getValue(nsHtml5AttributeName::ATTR_SRC);
+      if (url && !isModule && !importmap && !nomodule) {
+        const bool async =
+            aAttributes->contains(nsHtml5AttributeName::ATTR_ASYNC);
+        const bool defer =
+            aAttributes->contains(nsHtml5AttributeName::ATTR_DEFER);
         nsHtml5String charset =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_CHARSET);
         nsHtml5String crossOrigin =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
-        nsHtml5String media =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_MEDIA);
-        nsHtml5String referrerPolicy =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_REFERRERPOLICY);
         nsHtml5String nonce =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_NONCE);
-        nsHtml5String integrity =
-            aAttributes->getValue(nsHtml5AttributeName::ATTR_INTEGRITY);
         nsHtml5String fetchPriority =
             aAttributes->getValue(nsHtml5AttributeName::ATTR_FETCHPRIORITY);
-        mSpeculativeLoadQueue.AppendElement()->InitStyle(
-            url, charset, crossOrigin, media, referrerPolicy, nonce, integrity,
-            true, fetchPriority);
+        nsHtml5String integrity =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_INTEGRITY);
+        nsHtml5String referrerPolicy =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_REFERRERPOLICY);
+        mSpeculativeLoadQueue.AppendElement()->InitScript(
+            url, charset, type, crossOrigin, nullptr, nonce, fetchPriority,
+            integrity, referrerPolicy, mode == nsHtml5TreeBuilder::IN_HEAD,
+            async, defer, false);
+      }
+      mCurrentHtmlScriptCannotDocumentWriteOrBlock =
+          isModule || importmap ||
+          aAttributes->contains(nsHtml5AttributeName::ATTR_ASYNC) ||
+          aAttributes->contains(nsHtml5AttributeName::ATTR_DEFER) || nomodule;
+    } else if (aName == nsGkAtoms::base) {
+      nsHtml5String url =
+          aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
+      if (url) {
+        mSpeculativeLoadQueue.AppendElement()->InitBase(url);
+      }
+    } else if (aName == nsGkAtoms::meta) {
+      if (nsHtml5Portability::lowerCaseLiteralEqualsIgnoreAsciiCaseString(
+              "content-security-policy",
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_HTTP_EQUIV))) {
+        nsHtml5String csp =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_CONTENT);
+        if (csp) {
+          mSpeculativeLoadQueue.AppendElement()->InitMetaCSP(csp);
+        }
+      } else if (nsHtml5Portability::
+                     lowerCaseLiteralEqualsIgnoreAsciiCaseString(
+                         "referrer", aAttributes->getValue(
+                                         nsHtml5AttributeName::ATTR_NAME))) {
+        nsHtml5String referrerPolicy =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_CONTENT);
+        if (referrerPolicy) {
+          mSpeculativeLoadQueue.AppendElement()->InitMetaReferrerPolicy(
+              referrerPolicy);
+        }
+      }
+    } else if (aName == nsGkAtoms::link) {
+      nsHtml5String rel = aAttributes->getValue(nsHtml5AttributeName::ATTR_REL);
+      if (rel && rel.LowerCaseEqualsASCII("stylesheet")) {
+        nsHtml5String url =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
+        if (url &&
+            !aAttributes->getValue(nsHtml5AttributeName::ATTR_DISABLED)) {
+          nsHtml5String charset =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_CHARSET);
+          nsHtml5String crossOrigin =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
+          nsHtml5String media =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_MEDIA);
+          nsHtml5String referrerPolicy =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_REFERRERPOLICY);
+          nsHtml5String nonce =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_NONCE);
+          nsHtml5String integrity =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_INTEGRITY);
+          nsHtml5String fetchPriority =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_FETCHPRIORITY);
+          mSpeculativeLoadQueue.AppendElement()->InitStyle(
+              url, charset, crossOrigin, media, referrerPolicy, nonce,
+              integrity, false, fetchPriority);
+        }
+      } else if (rel && rel.LowerCaseEqualsASCII("preload")) {
+        nsHtml5String as = aAttributes->getValue(nsHtml5AttributeName::ATTR_AS);
+        nsHtml5String url =
+            aAttributes->getValue(nsHtml5AttributeName::ATTR_HREF);
+        if (url && as.LowerCaseEqualsASCII("style")) {
+          nsHtml5String charset =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_CHARSET);
+          nsHtml5String crossOrigin =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_CROSSORIGIN);
+          nsHtml5String media =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_MEDIA);
+          nsHtml5String referrerPolicy =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_REFERRERPOLICY);
+          nsHtml5String nonce =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_NONCE);
+          nsHtml5String integrity =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_INTEGRITY);
+          nsHtml5String fetchPriority =
+              aAttributes->getValue(nsHtml5AttributeName::ATTR_FETCHPRIORITY);
+          mSpeculativeLoadQueue.AppendElement()->InitStyle(
+              url, charset, crossOrigin, media, referrerPolicy, nonce,
+              integrity, true, fetchPriority);
+        }
       }
     }
   }
@@ -134,8 +218,7 @@ nsIContentHandle* nsHtml5TreeBuilder::createElement(
 nsIContentHandle* nsHtml5TreeBuilder::createHtmlElementSetAsRoot(
     nsHtml5HtmlAttributes* aAttributes) {
   return createElement(kNameSpaceID_XHTML, nsGkAtoms::html, aAttributes,
-                       nullptr,
-                       nsHtml5ContentCreatorFunction{nullptr});
+                       nullptr, nsHtml5ContentCreatorFunction{nullptr});
 }
 
 nsIContentHandle* nsHtml5TreeBuilder::createAndInsertFosterParentedElement(
@@ -151,15 +234,17 @@ bool nsHtml5TreeBuilder::hasChildren(nsIContentHandle*) { return false; }
 void nsHtml5TreeBuilder::appendElement(nsIContentHandle*, nsIContentHandle*) {}
 void nsHtml5TreeBuilder::appendChildrenToNewParent(nsIContentHandle*,
                                                    nsIContentHandle*) {}
-void nsHtml5TreeBuilder::insertFosterParentedCharacters(
-    char16_t*, int32_t, int32_t, nsIContentHandle*, nsIContentHandle*) {}
+void nsHtml5TreeBuilder::insertFosterParentedCharacters(char16_t*, int32_t,
+                                                        int32_t,
+                                                        nsIContentHandle*,
+                                                        nsIContentHandle*) {}
 void nsHtml5TreeBuilder::insertFosterParentedChild(nsIContentHandle*,
                                                    nsIContentHandle*,
                                                    nsIContentHandle*) {}
-void nsHtml5TreeBuilder::appendCharacters(nsIContentHandle*, char16_t*,
-                                           int32_t, int32_t) {}
+void nsHtml5TreeBuilder::appendCharacters(nsIContentHandle*, char16_t*, int32_t,
+                                          int32_t) {}
 void nsHtml5TreeBuilder::appendComment(nsIContentHandle*, char16_t*, int32_t,
-                                        int32_t) {}
+                                       int32_t) {}
 void nsHtml5TreeBuilder::appendCommentToDocument(char16_t*, int32_t, int32_t) {}
 void nsHtml5TreeBuilder::addAttributesToElement(nsIContentHandle*,
                                                 nsHtml5HtmlAttributes*) {}
@@ -182,8 +267,7 @@ void nsHtml5TreeBuilder::end() {
 }
 
 void nsHtml5TreeBuilder::accumulateCharacters(const char16_t* aBuf,
-                                               int32_t aStart,
-                                               int32_t aLength) {
+                                              int32_t aStart, int32_t aLength) {
   MOZ_RELEASE_ASSERT(EnsureBufferSpace(aLength));
   std::memcpy(charBuffer + charBufferLen, aBuf + aStart,
               sizeof(char16_t) * aLength);
@@ -192,13 +276,12 @@ void nsHtml5TreeBuilder::accumulateCharacters(const char16_t* aBuf,
 
 bool nsHtml5TreeBuilder::EnsureBufferSpace(int32_t aLength) {
   if (!charBuffer) {
-    charBuffer = jArray<char16_t, int32_t>::newJArray(
-        std::max(aLength, 1024));
+    charBuffer = jArray<char16_t, int32_t>::newJArray(std::max(aLength, 1024));
     return !!charBuffer;
   }
   if (charBufferLen + aLength > charBuffer.length) {
-    int32_t newLength = std::max(charBuffer.length << 1,
-                                 charBufferLen + aLength);
+    int32_t newLength =
+        std::max(charBuffer.length << 1, charBufferLen + aLength);
     jArray<char16_t, int32_t> newBuffer =
         jArray<char16_t, int32_t>::newJArray(newLength);
     if (!newBuffer) {
@@ -225,20 +308,21 @@ void nsHtml5TreeBuilder::FlushLoads() {
   }
 }
 
-void nsHtml5TreeBuilder::SetDocumentCharset(
-    NotNull<const Encoding*> aEncoding, nsCharsetSource aCharsetSource,
-    bool aCommitEncodingSpeculation) {
+void nsHtml5TreeBuilder::SetDocumentCharset(NotNull<const Encoding*> aEncoding,
+                                            nsCharsetSource aCharsetSource,
+                                            bool aCommitEncodingSpeculation) {
   mSpeculativeLoadQueue.AppendElement()->InitSetDocumentCharset(
       aEncoding, aCharsetSource, aCommitEncodingSpeculation);
 }
 void nsHtml5TreeBuilder::UpdateCharsetSource(nsCharsetSource) {}
 void nsHtml5TreeBuilder::StreamEnded() { FlushLoads(); }
-void nsHtml5TreeBuilder::NeedsCharsetSwitchTo(NotNull<const Encoding*>,
-                                               int32_t, int32_t) {}
-void nsHtml5TreeBuilder::MaybeComplainAboutCharset(const char*, bool, int32_t) {}
+void nsHtml5TreeBuilder::NeedsCharsetSwitchTo(NotNull<const Encoding*>, int32_t,
+                                              int32_t) {}
+void nsHtml5TreeBuilder::MaybeComplainAboutCharset(const char*, bool, int32_t) {
+}
 void nsHtml5TreeBuilder::TryToEnableEncodingMenu() {}
 void nsHtml5TreeBuilder::AddSnapshotToScript(nsAHtml5TreeBuilderState*,
-                                              int32_t) {}
+                                             int32_t) {}
 void nsHtml5TreeBuilder::DropHandles() { mHandles.Clear(); }
 void nsHtml5TreeBuilder::MarkAsBroken(nsresult aRv) {
   if (NS_SUCCEEDED(mBroken)) {
@@ -271,7 +355,8 @@ nsIContentHandle* nsHtml5TreeBuilder::getFormPointerForContext(
 }
 void nsHtml5TreeBuilder::EnableViewSource(nsHtml5Highlighter*) {}
 
-#define HTML5_LEAN_ERROR_0(aName) void nsHtml5TreeBuilder::aName() {}
+#define HTML5_LEAN_ERROR_0(aName) \
+  void nsHtml5TreeBuilder::aName() {}
 #define HTML5_LEAN_ERROR_1(aName, aType) \
   void nsHtml5TreeBuilder::aName(aType) {}
 #define HTML5_LEAN_ERROR_2(aName, aType1, aType2) \

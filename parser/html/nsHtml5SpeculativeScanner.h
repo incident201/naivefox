@@ -8,6 +8,7 @@
 #include "mozilla/UniquePtr.h"
 #include "nsError.h"
 #include "nsHtml5AtomTable.h"
+#include "nsHtml5LeanPreloadDescriptor.h"
 #include "nsHtml5SpeculativeLoadStage.h"
 #include "nsHtml5StylePreloadDescriptor.h"
 #include "nsStringFwd.h"
@@ -33,6 +34,8 @@ class nsHtml5SpeculativeScanner final {
 
   void TakeStyleDescriptors(
       nsTArray<nsHtml5StylePreloadDescriptor>& aDescriptors);
+  void TakeLeanDescriptors(
+      nsTArray<nsHtml5LeanPreloadDescriptor>& aDescriptors);
 
  private:
   nsHtml5AtomTable mAtomTable;

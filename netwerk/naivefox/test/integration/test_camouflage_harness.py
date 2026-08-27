@@ -468,6 +468,88 @@ class CamouflageHarnessTests(unittest.TestCase):
             (document_start, navigation_stop, response_stop),
         )
 
+    def test_resource_tree_is_h2_browser_page_controlled(self):
+        treatment = "tree-native-parser-document-start-resource-tree"
+        control = "document-start-overlap"
+        with self.assertRaisesRegex(ValueError, "requires the .* control"):
+            SUPERBLOCKS.validate_arm_sequence(("root", treatment))
+        with self.assertRaisesRegex(ValueError, "requires h2"):
+            SUPERBLOCKS.schedule_rows(
+                1, "h3", 1, ["browser_page"], arms=(control, treatment)
+            )
+        with self.assertRaisesRegex(ValueError, "browser_page"):
+            SUPERBLOCKS.schedule_rows(
+                1, "h2", 1, ["initial"], arms=(control, treatment)
+            )
+        rows = SUPERBLOCKS.schedule_rows(
+            1, "h2", 1, ["browser_page"], arms=(control, treatment)
+        )
+        SUPERBLOCKS.validate_superblocks(
+            rows, expected_blocks=1, arms=(control, treatment)
+        )
+
+    def test_resource_tree_config_and_lifecycle_are_fail_closed(self):
+        arm = "tree-native-parser-document-start-resource-tree"
+        config = CONFIG.build_config(
+            arm,
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+            preamble_path="/camouflage/index.html?scenario=fronting_page",
+        )
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h2-mode": arm,
+                "path": "/camouflage/index.html?scenario=fronting_page",
+                "max-assets": 3,
+                "max-bytes": 128 * 1024,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h2"):
+            CONFIG.build_config(
+                arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
+            )
+        lines = [
+            "Connection 7 preamble native-parser-resource-tree "
+            "admission=request-committed request_committed=1 root_done=0 "
+            "protocol=h2",
+            "Connection 7 established target=localhost:443 outer=h2 padding=yes",
+            "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
+            "descriptors=4 status=0x00000000 generation=1 protocol=h2",
+            "Preamble native-parser-resource-tree lifecycle=resource-opened "
+            "stream=1 kind=style referrer=inherited protocol=h2",
+            "Preamble native-parser-resource-tree lifecycle=resource-opened "
+            "stream=2 kind=script referrer=inherited protocol=h2",
+            "Preamble native-parser-resource-tree lifecycle=resource-opened "
+            "stream=3 kind=image referrer=inherited protocol=h2",
+            "Preamble native-parser-resource-tree lifecycle=resource-committed "
+            "stream=1 status=waiting-for protocol=h2",
+            "Preamble native-parser-resource-tree lifecycle=resource-committed "
+            "stream=2 status=waiting-for protocol=h2",
+            "Preamble native-parser-resource-tree lifecycle=resource-committed "
+            "stream=3 status=waiting-for protocol=h2",
+            "Connection 7 preamble result=success status=0x00000000 "
+            "http=200 bytes=99 protocol=h2",
+            "Connection 7 preamble native-parser-resource-tree drain=complete "
+            "completed_resources=3 http=200 protocol=h2",
+        ]
+        features = {
+            "protocol": "h2",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        }
+        SAMPLE.validate_sample(arm, "h2", "\n".join(lines), features)
+        mutated = [line.replace("kind=image", "kind=script") for line in lines]
+        with self.assertRaisesRegex(ValueError, "causal state"):
+            SAMPLE.validate_sample(arm, "h2", "\n".join(mutated), features)
+
     def test_opt_in_superblock_arms_share_one_control_pair(self):
         arms = (
             "gate",
@@ -3212,7 +3294,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("camouflage_sample_validation.py", runner)
         self.assertIn(arm, summary)
         self.assertIn(
-            'root_get["frame"] < connect["frame"] < style_get["frame"]',
+            'root_get["frame"]\n            < connect["frame"]\n'
+            '            < min(event["frame"] for event in resource_gets)',
             summary,
         )
         self.assertIn("root or stylesheet lacks END_STREAM", summary)
@@ -3349,7 +3432,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn('NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER"', sample_runner)
         self.assertIn('NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS"', sample_runner)
         self.assertIn('NAIVEFOX_PROFILE="$naivefox_profile"', sample_runner)
-        self.assertIn('--preamble-path "$path"', sample_runner)
+        self.assertIn('--preamble-path "$preamble_path"', sample_runner)
         self.assertNotIn("--socks-listen", sample_runner)
         self.assertNotIn("--profile", sample_runner)
 

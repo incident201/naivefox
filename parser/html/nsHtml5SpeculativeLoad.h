@@ -23,6 +23,7 @@ inline nsString TrimHtml5Whitespace(nsString aValue) {
 #  include "mozilla/Encoding.h"
 #  include "mozilla/Maybe.h"
 #  include "mozilla/NotNull.h"
+#  include "nsHtml5LeanPreloadDescriptor.h"
 #  include "nsHtml5StylePreloadDescriptor.h"
 #endif
 #ifndef MOZ_NAIVEFOX
@@ -66,6 +67,7 @@ class nsHtml5SpeculativeLoad {
 
 #ifdef MOZ_NAIVEFOX
   mozilla::Maybe<nsHtml5StylePreloadDescriptor> TakeStyleDescriptor() &&;
+  nsHtml5LeanPreloadDescriptor TakeLeanDescriptor() &&;
 #endif
 
   inline void InitBase(nsHtml5String aUrl) {
@@ -92,8 +94,7 @@ class nsHtml5SpeculativeLoad {
     nsString
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
-    mReferrerPolicyOrIntegrity.Assign(
-        HTML5_TRIM_WHITESPACE(referrerPolicy));
+    mReferrerPolicyOrIntegrity.Assign(HTML5_TRIM_WHITESPACE(referrerPolicy));
   }
 
   inline void InitImage(nsHtml5String aUrl, nsHtml5String aCrossOrigin,
@@ -110,8 +111,7 @@ class nsHtml5SpeculativeLoad {
     nsString
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
-    mReferrerPolicyOrIntegrity.Assign(
-        HTML5_TRIM_WHITESPACE(referrerPolicy));
+    mReferrerPolicyOrIntegrity.Assign(HTML5_TRIM_WHITESPACE(referrerPolicy));
     aSrcset.ToString(mCharsetOrSrcset);
     aSizes.ToString(
         mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity);
@@ -132,8 +132,7 @@ class nsHtml5SpeculativeLoad {
     nsString
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
-    mReferrerPolicyOrIntegrity.Assign(
-        HTML5_TRIM_WHITESPACE(referrerPolicy));
+    mReferrerPolicyOrIntegrity.Assign(HTML5_TRIM_WHITESPACE(referrerPolicy));
     aFetchPriority.ToString(mFetchPriority);
     // This can be only triggered by <link rel=preload type=font>
     mIsLinkPreload = true;
@@ -151,8 +150,7 @@ class nsHtml5SpeculativeLoad {
     nsString
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
-    mReferrerPolicyOrIntegrity.Assign(
-        HTML5_TRIM_WHITESPACE(referrerPolicy));
+    mReferrerPolicyOrIntegrity.Assign(HTML5_TRIM_WHITESPACE(referrerPolicy));
     aFetchPriority.ToString(mFetchPriority);
 
     // This method can be only be triggered by <link rel=preload type=fetch>,
@@ -255,8 +253,7 @@ class nsHtml5SpeculativeLoad {
     nsString
         referrerPolicy;  // Not Auto, because using it to hold nsStringBuffer*
     aReferrerPolicy.ToString(referrerPolicy);
-    mReferrerPolicyOrIntegrity.Assign(
-        HTML5_TRIM_WHITESPACE(referrerPolicy));
+    mReferrerPolicyOrIntegrity.Assign(HTML5_TRIM_WHITESPACE(referrerPolicy));
     aNonce.ToString(mNonceOrType);
     aIntegrity.ToString(
         mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity);

@@ -111,3 +111,12 @@ void nsHtml5SpeculativeScanner::TakeStyleDescriptors(
     }
   }
 }
+
+void nsHtml5SpeculativeScanner::TakeLeanDescriptors(
+    nsTArray<nsHtml5LeanPreloadDescriptor>& aDescriptors) {
+  nsTArray<nsHtml5SpeculativeLoad> loads;
+  mStage.MoveSpeculativeLoadsTo(loads);
+  for (auto& load : loads) {
+    aDescriptors.AppendElement(std::move(load).TakeLeanDescriptor());
+  }
+}

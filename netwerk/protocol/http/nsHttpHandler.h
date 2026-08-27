@@ -120,6 +120,10 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
 
   static already_AddRefed<nsHttpHandler> GetInstance();
 
+#ifdef MOZ_NAIVEFOX
+  const nsCString& ImageAcceptHeaderValue() const { return mImageAcceptHeader; }
+#endif
+
   [[nodiscard]] nsresult AddAcceptAndDictionaryHeaders(
       nsIURI* aURI, ExtContentPolicyType aType, nsHttpRequestHead* aRequest,
       bool aSecure, nsHttpChannel* aChan, void (*aSuspend)(nsHttpChannel*),

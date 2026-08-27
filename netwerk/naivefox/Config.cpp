@@ -616,6 +616,9 @@ class JsonParser final {
                      "tree-native-parser-document-start-overlap")) {
         aMode = PreambleMode::TreeNativeParserDocumentStartOverlap;
       } else if (mode.EqualsLiteral(
+                     "tree-native-parser-document-start-resource-tree")) {
+        aMode = PreambleMode::TreeNativeParserDocumentStartResourceTree;
+      } else if (mode.EqualsLiteral(
                      "tree-native-parser-document-start-navigation-stop")) {
         aMode = PreambleMode::TreeNativeParserDocumentStartNavigationStop;
       } else if (mode.EqualsLiteral(
@@ -879,8 +882,8 @@ class JsonParser final {
         h2Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap ||
         (PreambleModeUsesNativeParser(h2Mode) &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap &&
-         h2Mode !=
-             PreambleMode::TreeNativeParserDocumentStartNavigationStop)) {
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+         h2Mode != PreambleMode::TreeNativeParserDocumentStartNavigationStop)) {
       return Error("selected resource-committed preamble is H3-only");
     }
     const bool anyActive =
@@ -951,6 +954,19 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-start-overlap requires "
+            "cache-resources=true");
+      }
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree ||
+        h3Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree) {
+      if (aPreamble.mMaxAssets != 3) {
+        return Error(
+            "tree-native-parser-document-start-resource-tree requires "
+            "exactly three assets");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-document-start-resource-tree requires "
             "cache-resources=true");
       }
     }

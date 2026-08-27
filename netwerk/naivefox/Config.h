@@ -62,6 +62,7 @@ enum class PreambleMode : uint8_t {
   TreeResourceNativeCacheCommittedOverlap,
   TreeNativeParserPreloadOverlap,
   TreeNativeParserDocumentStartOverlap,
+  TreeNativeParserDocumentStartResourceTree,
   TreeNativeParserDocumentStartNavigationStop,
   TreeNativeParserDocumentStartResponseStop,
   TreeNativeParserDocumentHandoffOverlap,
@@ -90,6 +91,7 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
 
 constexpr bool PreambleModeUsesNativeParserDocumentStart(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
+         aMode == PreambleMode::TreeNativeParserDocumentStartResourceTree ||
          aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop ||
          aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop;
 }
@@ -97,6 +99,10 @@ constexpr bool PreambleModeUsesNativeParserDocumentStart(PreambleMode aMode) {
 constexpr bool PreambleModeUsesScopedNavigationStop(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop ||
          aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop;
+}
+
+constexpr bool PreambleModeUsesNativeParserResourceTree(PreambleMode aMode) {
+  return aMode == PreambleMode::TreeNativeParserDocumentStartResourceTree;
 }
 
 constexpr bool PreambleModeUsesLightweightNativeParser(PreambleMode aMode) {

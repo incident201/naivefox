@@ -10,6 +10,8 @@ PREAMBLE_PATH = "/camouflage/index.html"
 PREAMBLE_MAX_BYTES = 64 * 1024
 TREE_PREAMBLE_MAX_BYTES = 256 * 1024
 TREE_PREAMBLE_MAX_ASSETS = 2
+RESOURCE_TREE_PREAMBLE_MAX_BYTES = 128 * 1024
+RESOURCE_TREE_PREAMBLE_MAX_ASSETS = 3
 
 
 def build_config(
@@ -45,6 +47,7 @@ def build_config(
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -71,6 +74,7 @@ def build_config(
             "tree-resource-native-cache-committed-overlap, "
             "tree-native-parser-preload-overlap-css, or "
             "tree-native-parser-document-start-overlap-css, or "
+            "tree-native-parser-document-start-resource-tree, or "
             "tree-native-parser-document-start-navigation-stop-css, or "
             "tree-native-parser-document-start-response-stop-css, or "
             "tree-native-parser-document-handoff-overlap-css, or "
@@ -120,6 +124,10 @@ def build_config(
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
+    if arm == "tree-native-parser-document-start-resource-tree" and protocol != "h2":
+        raise ValueError(
+            "tree-native-parser-document-start-resource-tree requires h2"
+        )
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -184,6 +192,15 @@ def build_config(
             "path": preamble_path,
             "max-assets": 1,
             "max-bytes": TREE_PREAMBLE_MAX_BYTES,
+            "cache-resources": True,
+        }
+    elif arm == "tree-native-parser-document-start-resource-tree":
+        preamble = {
+            "mode": "off",
+            f"{protocol}-mode": "tree-native-parser-document-start-resource-tree",
+            "path": preamble_path,
+            "max-assets": RESOURCE_TREE_PREAMBLE_MAX_ASSETS,
+            "max-bytes": RESOURCE_TREE_PREAMBLE_MAX_BYTES,
             "cache-resources": True,
         }
     elif arm == "tree-native-parser-document-start-navigation-stop-css":
@@ -368,6 +385,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-resource-tree",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

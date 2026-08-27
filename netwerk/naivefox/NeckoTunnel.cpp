@@ -30,6 +30,7 @@
 #include "mozilla/TextUtils.h"
 #include "nsCOMPtr.h"
 #include "nsError.h"
+#include "nsHtml5LeanPreloadDescriptor.h"
 #include "nsHtml5SpeculativeScanner.h"
 #include "nsHtml5StylePreloadDescriptor.h"
 #include "nsIAsyncInputStream.h"
@@ -714,6 +715,9 @@ class ProxyPreambleOperation::Impl final {
   std::atomic<bool> mNativeParserFinishQueued{false};
   bool mNativeParserFinished = false;
   bool mNativeParserDescriptorAccepted = false;
+  uint32_t mNativeParserResourceDescriptorsAccepted = 0;
+  nsCOMPtr<nsIURI> mNativeParserBaseURI;
+  bool mNativeParserBaseSeen = false;
   bool mNativeParserContractFailed = false;
   bool mNativeParserReplacementInstallQueued = false;
   bool mNativeRootReplacementSetupReady = false;
@@ -1267,8 +1271,13 @@ nsresult ProxyPreambleOperation::Start(
            (aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartOverlap ||
             aConfig.mMode ==
+                PreambleMode::TreeNativeParserDocumentStartResourceTree ||
+            aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartNavigationStop))) ||
-        aConfig.mMaxAssets != 1 || !aConfig.mCacheResources))) {
+        aConfig.mMaxAssets !=
+            (PreambleModeUsesNativeParserResourceTree(aConfig.mMode) ? 3U
+                                                                     : 1U) ||
+        !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
   }
   mImpl->mConfig = aConfig;
@@ -1457,6 +1466,21 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
     MaybeFireBarrier();
   }
   if (PreambleModeUsesNativeParser(mImpl->mConfig.mMode)) {
+    if (PreambleModeUsesNativeParserResourceTree(mImpl->mConfig.mMode)) {
+      if (aStreamId == 0 || aStreamId > mImpl->mConfig.mMaxAssets ||
+          mImpl->mStreams.Length() != mImpl->mConfig.mMaxAssets + 1 ||
+          mImpl->mStreams[aStreamId].mDone) {
+        FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                                 "invalid-resource-tree-commit");
+        return;
+      }
+      mImpl->mStreams[aStreamId].mRequestCommitted = true;
+      RuntimeLogEvent(
+          "Preamble native-parser-resource-tree lifecycle=resource-committed "
+          "stream=%u status=waiting-for protocol=%s\n",
+          aStreamId, ProtocolName(mImpl->mProtocol));
+      return;
+    }
     if (aStreamId != 1 || mImpl->mStreams.Length() != 2 ||
         mImpl->mStreams[aStreamId].mDone) {
       FailNativeParserContract(NS_ERROR_UNEXPECTED, "invalid-resource-commit");
@@ -2637,6 +2661,7 @@ nsresult ProxyPreambleOperation::DispatchNativeParserChunk(nsCString&& aChunk) {
                 });
             nsresult parserStatus = ascii ? NS_OK : NS_ERROR_ILLEGAL_INPUT;
             nsTArray<nsHtml5StylePreloadDescriptor> descriptors;
+            nsTArray<nsHtml5LeanPreloadDescriptor> leanDescriptors;
             if (NS_SUCCEEDED(parserStatus)) {
               if (!self->mImpl->mNativeParserScanner &&
                   PreambleModeUsesLightweightNativeParser(
@@ -2651,8 +2676,14 @@ nsresult ProxyPreambleOperation::DispatchNativeParserChunk(nsCString&& aChunk) {
                     NS_ConvertASCIItoUTF16(chunk));
               }
               if (NS_SUCCEEDED(parserStatus)) {
-                self->mImpl->mNativeParserScanner->TakeStyleDescriptors(
-                    descriptors);
+                if (PreambleModeUsesNativeParserResourceTree(
+                        self->mImpl->mConfig.mMode)) {
+                  self->mImpl->mNativeParserScanner->TakeLeanDescriptors(
+                      leanDescriptors);
+                } else {
+                  self->mImpl->mNativeParserScanner->TakeStyleDescriptors(
+                      descriptors);
+                }
               }
             }
             if (self->mImpl->mNativeParserGeneration.load(
@@ -2663,10 +2694,11 @@ nsresult ProxyPreambleOperation::DispatchNativeParserChunk(nsCString&& aChunk) {
             nsCOMPtr<nsIRunnable> completion = NS_NewRunnableFunction(
                 "NaiveFox::NativeParserFeedComplete",
                 [self, generation, sequence, parserStatus,
-                 descriptors = std::move(descriptors)]() mutable {
-                  self->OnNativeParserOutput(generation, sequence, false,
-                                             parserStatus,
-                                             std::move(descriptors));
+                 descriptors = std::move(descriptors),
+                 leanDescriptors = std::move(leanDescriptors)]() mutable {
+                  self->OnNativeParserOutput(
+                      generation, sequence, false, parserStatus,
+                      std::move(descriptors), std::move(leanDescriptors));
                 });
             (void)NS_DispatchToMainThread(
                 CreateRenderBlockingRunnable(completion.forget()));
@@ -2721,6 +2753,7 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
             }
             nsresult parserStatus = NS_OK;
             nsTArray<nsHtml5StylePreloadDescriptor> descriptors;
+            nsTArray<nsHtml5LeanPreloadDescriptor> leanDescriptors;
             if (!self->mImpl->mNativeParserScanner &&
                 PreambleModeUsesLightweightNativeParser(
                     self->mImpl->mConfig.mMode)) {
@@ -2737,8 +2770,14 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
               parserStatus = self->mImpl->mNativeParserScanner->Finish();
             }
             if (NS_SUCCEEDED(parserStatus)) {
-              self->mImpl->mNativeParserScanner->TakeStyleDescriptors(
-                  descriptors);
+              if (PreambleModeUsesNativeParserResourceTree(
+                      self->mImpl->mConfig.mMode)) {
+                self->mImpl->mNativeParserScanner->TakeLeanDescriptors(
+                    leanDescriptors);
+              } else {
+                self->mImpl->mNativeParserScanner->TakeStyleDescriptors(
+                    descriptors);
+              }
             }
             // Destruction must stay on the parser target too.
             self->mImpl->mNativeParserScanner = nullptr;
@@ -2749,10 +2788,11 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
             nsCOMPtr<nsIRunnable> completion = NS_NewRunnableFunction(
                 "NaiveFox::NativeParserFinishComplete",
                 [self, generation, sequence, parserStatus,
-                 descriptors = std::move(descriptors)]() mutable {
-                  self->OnNativeParserOutput(generation, sequence, true,
-                                             parserStatus,
-                                             std::move(descriptors));
+                 descriptors = std::move(descriptors),
+                 leanDescriptors = std::move(leanDescriptors)]() mutable {
+                  self->OnNativeParserOutput(
+                      generation, sequence, true, parserStatus,
+                      std::move(descriptors), std::move(leanDescriptors));
                 });
             (void)NS_DispatchToMainThread(
                 CreateRenderBlockingRunnable(completion.forget()));
@@ -2773,7 +2813,8 @@ nsresult ProxyPreambleOperation::DispatchNativeParserFinish() {
 
 void ProxyPreambleOperation::OnNativeParserOutput(
     uint64_t aGeneration, uint32_t aSequence, bool aFinished, nsresult aStatus,
-    nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors) {
+    nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors,
+    nsTArray<nsHtml5LeanPreloadDescriptor>&& aLeanDescriptors) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mCancelled || mImpl->mNativeParserGeneration.load(
                                std::memory_order_acquire) != aGeneration) {
@@ -2785,7 +2826,7 @@ void ProxyPreambleOperation::OnNativeParserOutput(
       "Preamble native-parser-preload lifecycle=%s sequence=%u "
       "descriptors=%u status=0x%08x generation=%llu protocol=%s\n",
       aFinished ? "parser-finished" : "chunk-flushed", aSequence,
-      static_cast<unsigned>(aDescriptors.Length()),
+      static_cast<unsigned>(aDescriptors.Length() + aLeanDescriptors.Length()),
       static_cast<unsigned>(aStatus),
       static_cast<unsigned long long>(aGeneration),
       ProtocolName(mImpl->mProtocol));
@@ -2795,7 +2836,27 @@ void ProxyPreambleOperation::OnNativeParserOutput(
                              aFinished ? "finish-failed" : "feed-failed");
     return;
   }
-  if (!aDescriptors.IsEmpty()) {
+  const bool resourceTree =
+      PreambleModeUsesNativeParserResourceTree(mImpl->mConfig.mMode);
+  if (resourceTree && !aDescriptors.IsEmpty()) {
+    FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                             "resource-tree-style-output-not-empty");
+    return;
+  }
+  if (!resourceTree && !aLeanDescriptors.IsEmpty()) {
+    FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                             "stylesheet-lean-output-not-empty");
+    return;
+  }
+  if (resourceTree) {
+    for (auto& descriptor : aLeanDescriptors) {
+      nsresult rv = OpenNativeParserResource(std::move(descriptor));
+      if (NS_FAILED(rv)) {
+        FailNativeParserContract(rv, "resource-admission-failed");
+        return;
+      }
+    }
+  } else if (!aDescriptors.IsEmpty()) {
     if (aDescriptors.Length() != 1 || mImpl->mNativeParserDescriptorAccepted) {
       FailNativeParserContract(NS_ERROR_UNEXPECTED, "stylesheet-count-not-one");
       return;
@@ -2808,10 +2869,21 @@ void ProxyPreambleOperation::OnNativeParserOutput(
     mImpl->mNativeParserDescriptorAccepted = true;
   }
   if (aFinished) {
-    if (!mImpl->mNativeParserDescriptorAccepted ||
-        mImpl->mStreams.Length() != 2) {
-      FailNativeParserContract(NS_ERROR_UNEXPECTED, "stylesheet-count-not-one");
-      return;
+    if (resourceTree) {
+      if (mImpl->mNativeParserResourceDescriptorsAccepted !=
+              mImpl->mConfig.mMaxAssets ||
+          mImpl->mStreams.Length() != mImpl->mConfig.mMaxAssets + 1) {
+        FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                                 "resource-count-mismatch");
+        return;
+      }
+    } else {
+      if (!mImpl->mNativeParserDescriptorAccepted ||
+          mImpl->mStreams.Length() != 2) {
+        FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                                 "stylesheet-count-not-one");
+        return;
+      }
     }
     mImpl->mNativeParserFinished = true;
     if (mImpl->mConfig.mMode ==
@@ -2830,6 +2902,145 @@ void ProxyPreambleOperation::OnNativeParserOutput(
   }
   MaybeFireBarrier();
   MaybeFinish();
+}
+
+nsresult ProxyPreambleOperation::OpenNativeParserResource(
+    nsHtml5LeanPreloadDescriptor&& aDescriptor) {
+  MOZ_ASSERT(NS_IsMainThread());
+  using DescriptorKind = nsHtml5LeanPreloadDescriptor::Kind;
+  if (!PreambleModeUsesNativeParserResourceTree(mImpl->mConfig.mMode) ||
+      mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      !mImpl->mRootReferrerInfo || !mImpl->mHaveRootOriginAttributes) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  const DescriptorKind descriptorKind = aDescriptor.GetKind();
+  if (descriptorKind == DescriptorKind::DocumentCharset ||
+      descriptorKind == DescriptorKind::DocumentMode ||
+      descriptorKind == DescriptorKind::CharsetComplaint) {
+    return NS_OK;
+  }
+  if (descriptorKind == DescriptorKind::Base) {
+    if (mImpl->mNativeParserBaseSeen) {
+      return NS_OK;
+    }
+    nsCOMPtr<nsIURI> baseUri;
+    MOZ_TRY(NS_NewURI(getter_AddRefs(baseUri),
+                      NS_ConvertUTF16toUTF8(aDescriptor.UrlOrSizes()), nullptr,
+                      mImpl->mStreams[0].mUri));
+    nsAutoCString prePath;
+    MOZ_TRY(baseUri->GetPrePath(prePath));
+    if (!prePath.Equals(mImpl->mRootPrePath)) {
+      return NS_ERROR_DOM_BAD_URI;
+    }
+    mImpl->mNativeParserBaseURI = baseUri;
+    mImpl->mNativeParserBaseSeen = true;
+    return NS_OK;
+  }
+  // A bounded first product experiment does not guess CSP/referrer or picture
+  // semantics. Their ordered presence is observable and invalidates the arm.
+  if (descriptorKind == DescriptorKind::CSP ||
+      descriptorKind == DescriptorKind::MetaReferrer ||
+      descriptorKind == DescriptorKind::Unsupported) {
+    return NS_ERROR_NOT_IMPLEMENTED;
+  }
+  if (mImpl->mNativeParserResourceDescriptorsAccepted >=
+      mImpl->mConfig.mMaxAssets) {
+    return NS_ERROR_FILE_TOO_BIG;
+  }
+
+  NativeParserResourceKind resourceKind;
+  switch (descriptorKind) {
+    case DescriptorKind::Style:
+      if (aDescriptor.UrlOrSizes().IsEmpty() ||
+          !aDescriptor.CharsetOrSrcset().IsEmpty() ||
+          !aDescriptor.CrossOrigin().IsEmpty() ||
+          !aDescriptor.Media().IsEmpty() ||
+          !aDescriptor.ReferrerPolicyOrIntegrity().IsEmpty() ||
+          !aDescriptor.NonceOrType().IsEmpty() ||
+          !aDescriptor.TypeOrSizesOrIntegrity().IsEmpty() ||
+          !aDescriptor.FetchPriority().IsEmpty() ||
+          aDescriptor.IsLinkPreload()) {
+        return NS_ERROR_NOT_IMPLEMENTED;
+      }
+      resourceKind = NativeParserResourceKind::Style;
+      break;
+    case DescriptorKind::ScriptFromHead:
+      if (aDescriptor.UrlOrSizes().IsEmpty() ||
+          !aDescriptor.CharsetOrSrcset().IsEmpty() ||
+          !aDescriptor.TypeOrSizesOrIntegrity().IsEmpty() ||
+          !aDescriptor.CrossOrigin().IsEmpty() ||
+          !aDescriptor.Media().IsEmpty() ||
+          !aDescriptor.NonceOrType().IsEmpty() ||
+          !aDescriptor.ReferrerPolicyOrIntegrity().IsEmpty() ||
+          !aDescriptor.ScriptReferrerPolicy().IsEmpty() ||
+          !aDescriptor.FetchPriority().IsEmpty() || aDescriptor.IsAsync() ||
+          !aDescriptor.IsDefer() || aDescriptor.IsLinkPreload()) {
+        return NS_ERROR_NOT_IMPLEMENTED;
+      }
+      resourceKind = NativeParserResourceKind::Script;
+      break;
+    case DescriptorKind::Image:
+      if (aDescriptor.UrlOrSizes().IsEmpty() ||
+          !aDescriptor.CharsetOrSrcset().IsEmpty() ||
+          !aDescriptor.TypeOrSizesOrIntegrity().IsEmpty() ||
+          !aDescriptor.CrossOrigin().IsEmpty() ||
+          !aDescriptor.Media().IsEmpty() ||
+          !aDescriptor.NonceOrType().IsEmpty() ||
+          !aDescriptor.ReferrerPolicyOrIntegrity().IsEmpty() ||
+          !aDescriptor.FetchPriority().IsEmpty() ||
+          aDescriptor.IsLinkPreload()) {
+        return NS_ERROR_NOT_IMPLEMENTED;
+      }
+      resourceKind = NativeParserResourceKind::Image;
+      break;
+    default:
+      return NS_ERROR_NOT_IMPLEMENTED;
+  }
+
+  nsCOMPtr<nsIURI> resourceUri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(resourceUri),
+                    NS_ConvertUTF16toUTF8(aDescriptor.UrlOrSizes()), nullptr,
+                    mImpl->mNativeParserBaseURI
+                        ? mImpl->mNativeParserBaseURI.get()
+                        : mImpl->mStreams[0].mUri.get()));
+  nsAutoCString prePath;
+  nsAutoCString spec;
+  MOZ_TRY(resourceUri->GetPrePath(prePath));
+  MOZ_TRY(resourceUri->GetSpec(spec));
+  if (!prePath.Equals(mImpl->mRootPrePath) ||
+      mImpl->mDiscoveredSpecs.Contains(spec)) {
+    return NS_ERROR_DOM_BAD_URI;
+  }
+
+  nsCOMPtr<nsIChannel> channel;
+  MOZ_TRY(NewNativeParserResourcePreloadChannel(
+      resourceUri, mImpl->mStreams[0].mUri, resourceKind,
+      mImpl->mRootOriginAttributes, mImpl->mRootReferrerInfo, mImpl->mLoadGroup,
+      mImpl->mRoute.mProxyInfo, mImpl->mProtocol, getter_AddRefs(channel)));
+  const uint32_t streamId = mImpl->mStreams.Length();
+  auto& stream = *mImpl->mStreams.AppendElement();
+  stream.mUri = resourceUri;
+  stream.mRequest = channel;
+  mImpl->mDiscoveredSpecs.AppendElement(spec);
+  RefPtr<StreamListener> listener = new StreamListener(this, streamId);
+  MOZ_TRY(channel->SetNotificationCallbacks(listener));
+  nsresult rv = channel->AsyncOpen(listener);
+  if (NS_FAILED(rv)) {
+    mImpl->mDiscoveredSpecs.RemoveLastElement();
+    mImpl->mStreams.RemoveLastElement();
+    return rv;
+  }
+  ++mImpl->mNativeParserResourceDescriptorsAccepted;
+  RuntimeLogEvent(
+      "Preamble native-parser-resource-tree lifecycle=resource-opened "
+      "stream=%u kind=%s referrer=inherited protocol=%s\n",
+      streamId,
+      resourceKind == NativeParserResourceKind::Style    ? "style"
+      : resourceKind == NativeParserResourceKind::Script ? "script"
+                                                         : "image",
+      ProtocolName(mImpl->mProtocol));
+  return NS_OK;
 }
 
 nsresult ProxyPreambleOperation::OpenNativeParserStylesheet(
@@ -3106,15 +3317,18 @@ void ProxyPreambleOperation::FailNativeParserContract(nsresult aStatus,
 
 nsresult ProxyPreambleOperation::DispatchNativeParserOutputToMain(
     uint64_t aGeneration, uint32_t aSequence, bool aFinished, nsresult aStatus,
-    nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors) {
+    nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors,
+    nsTArray<nsHtml5LeanPreloadDescriptor>&& aLeanDescriptors) {
   RefPtr self = this;
   nsCOMPtr<nsIRunnable> completion = NS_NewRunnableFunction(
       aFinished ? "NaiveFox::NativeParserRetargetFinishComplete"
                 : "NaiveFox::NativeParserRetargetFeedComplete",
       [self, aGeneration, aSequence, aFinished, aStatus,
-       descriptors = std::move(aDescriptors)]() mutable {
+       descriptors = std::move(aDescriptors),
+       leanDescriptors = std::move(aLeanDescriptors)]() mutable {
         self->OnNativeParserOutput(aGeneration, aSequence, aFinished, aStatus,
-                                   std::move(descriptors));
+                                   std::move(descriptors),
+                                   std::move(leanDescriptors));
       });
   return NS_DispatchToMainThread(
       CreateRenderBlockingRunnable(completion.forget()));
@@ -3213,7 +3427,8 @@ nsresult ProxyPreambleOperation::OnRetargetedDataAvailable(
   const uint32_t sequence = ++mImpl->mNativeParserNextSequence;
   ++mImpl->mNativeParserPendingMainCallbacks;
   nsresult dispatchRv = DispatchNativeParserOutputToMain(
-      generation, sequence, false, parserStatus, std::move(descriptors));
+      generation, sequence, false, parserStatus, std::move(descriptors),
+      nsTArray<nsHtml5LeanPreloadDescriptor>());
   if (NS_FAILED(dispatchRv)) {
     --mImpl->mNativeParserPendingMainCallbacks;
     recordFailure(dispatchRv);
@@ -3287,7 +3502,8 @@ nsresult ProxyPreambleOperation::OnRetargetedDataFinished(uint32_t aStreamId,
   const uint32_t sequence = ++mImpl->mNativeParserNextSequence;
   ++mImpl->mNativeParserPendingMainCallbacks;
   nsresult dispatchRv = DispatchNativeParserOutputToMain(
-      generation, sequence, true, parserStatus, std::move(descriptors));
+      generation, sequence, true, parserStatus, std::move(descriptors),
+      nsTArray<nsHtml5LeanPreloadDescriptor>());
   if (NS_FAILED(dispatchRv)) {
     --mImpl->mNativeParserPendingMainCallbacks;
     recordFailure(dispatchRv);

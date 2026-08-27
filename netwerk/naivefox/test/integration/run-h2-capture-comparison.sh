@@ -12,16 +12,23 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --arm) arm=${2:-}; shift 2 ;;
     --help)
-      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css]\n' "$0"
+      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-resource-tree]\n' "$0"
       exit 0
       ;;
     *) printf 'unknown H2 comparison argument: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
 case $arm in
-  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css) ;;
+  gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-resource-tree) ;;
   *) printf 'unsupported H2 diagnostic arm: %s\n' "$arm" >&2; exit 2 ;;
 esac
+
+reference_scenario=browser_page
+preamble_path=/camouflage/index.html
+if [[ $arm == tree-native-parser-document-start-resource-tree ]]; then
+  reference_scenario=fronting_page
+  preamble_path='/camouflage/index.html?scenario=fronting_page'
+fi
 
 if [[ ${NAIVEFOX_CAPTURE_MODE:-quick} != same-base ]]; then
   printf 'H2 decrypted parity requires NAIVEFOX_CAPTURE_MODE=same-base\n' >&2
@@ -333,7 +340,7 @@ run_reference() {
     "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
     "$REFERENCE_BIN" --headless --new-instance --no-remote \
     --profile "$profile" --screenshot "$capture_dir/reference.png" \
-    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page" \
+    "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=$reference_scenario" \
     >"$log" 2>&1 &
   firefox_pid=$!
   wait "$firefox_pid"
@@ -362,6 +369,7 @@ run_candidate() {
     NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
     python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
       --output "$config" --arm "$arm" --protocol h2 \
+      --preamble-path "$preamble_path" \
       --socks-port "$socks_port" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
   : >"$keys"; : >"$log"; : >"$browser_log"
   chmod 0600 "$keys" "$log" "$browser_log"
@@ -398,6 +406,9 @@ run_candidate() {
   elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h2$'
+  elif [[ $arm == tree-native-parser-document-start-resource-tree ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble native-parser-resource-tree drain=complete completed_resources=3 http=2[0-9][0-9] protocol=h2$'
   fi
   sleep 0.25
   stop_capture
@@ -451,7 +462,8 @@ run_candidate() {
     [[ $admission_line -lt $result_line && $result_line -lt $drain_line &&
        $admission_line -lt $established_line ]]
   elif [[ $arm == tree-native-parser-document-start-overlap-css ||
-          $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
+          $arm == tree-native-parser-document-start-navigation-stop-css ||
+          $arm == tree-native-parser-document-start-resource-tree ]]; then
     python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" "$arm" <<'PY'
 import importlib.util
 import sys

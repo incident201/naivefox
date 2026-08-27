@@ -23,6 +23,7 @@ class nsIHttpChannel;
 class nsIInputStream;
 class nsIRequest;
 class nsIStreamListener;
+class nsHtml5LeanPreloadDescriptor;
 class nsHtml5StylePreloadDescriptor;
 
 namespace mozilla::naivefox {
@@ -224,32 +225,29 @@ constexpr bool PreambleResourceCompletedSuccessfully(
 constexpr bool PreambleNavigationStopExpectedStyleAbort(
     PreambleMode aMode, bool aBarrierFired, bool aStyleResponseStarted,
     bool aConnectHandoffAdmitted, bool aTunnelApplicationActive,
-    bool aTunnelServerApplicationActive,
-    bool aNavigationStopIssued, nsresult aStopStatus) {
+    bool aTunnelServerApplicationActive, bool aNavigationStopIssued,
+    nsresult aStopStatus) {
   const bool requiredActivity =
       aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop
           ? aTunnelApplicationActive
           : aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
                 aTunnelServerApplicationActive;
-  return PreambleModeUsesScopedNavigationStop(aMode) &&
-         aBarrierFired && aStyleResponseStarted && aConnectHandoffAdmitted &&
-         requiredActivity && aNavigationStopIssued &&
-         aStopStatus == NS_BINDING_ABORTED;
+  return PreambleModeUsesScopedNavigationStop(aMode) && aBarrierFired &&
+         aStyleResponseStarted && aConnectHandoffAdmitted && requiredActivity &&
+         aNavigationStopIssued && aStopStatus == NS_BINDING_ABORTED;
 }
 
-constexpr bool PreambleNavigationStopMayIssue(PreambleMode aMode,
-                                              bool aConnectHandoffAdmitted,
-                                              bool aStyleResponseStarted,
-                                              bool aTunnelApplicationActive,
-                                              bool aTunnelServerApplicationActive) {
+constexpr bool PreambleNavigationStopMayIssue(
+    PreambleMode aMode, bool aConnectHandoffAdmitted,
+    bool aStyleResponseStarted, bool aTunnelApplicationActive,
+    bool aTunnelServerApplicationActive) {
   const bool requiredActivity =
       aMode == PreambleMode::TreeNativeParserDocumentStartNavigationStop
           ? aTunnelApplicationActive
           : aMode == PreambleMode::TreeNativeParserDocumentStartResponseStop &&
                 aTunnelServerApplicationActive;
   return PreambleModeUsesScopedNavigationStop(aMode) &&
-         aConnectHandoffAdmitted && aStyleResponseStarted &&
-         requiredActivity;
+         aConnectHandoffAdmitted && aStyleResponseStarted && requiredActivity;
 }
 
 constexpr bool PreambleNavigationStopCompletedSuccessfully(
@@ -358,13 +356,16 @@ class ProxyPreambleOperation final {
   nsresult InstallNativeParserLogicalRetargetDelivery();
   nsresult DispatchNativeParserOutputToMain(
       uint64_t aGeneration, uint32_t aSequence, bool aFinished,
-      nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
+      nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors,
+      nsTArray<nsHtml5LeanPreloadDescriptor>&& aLeanDescriptors);
   void OnNativeParserOutput(
       uint64_t aGeneration, uint32_t aSequence, bool aFinished,
-      nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors);
+      nsresult aStatus, nsTArray<nsHtml5StylePreloadDescriptor>&& aDescriptors,
+      nsTArray<nsHtml5LeanPreloadDescriptor>&& aLeanDescriptors);
   nsresult OpenNativeParserStylesheet(
       nsHtml5StylePreloadDescriptor&& aDescriptor,
       uint64_t aProcessStyleRequestId = 0);
+  nsresult OpenNativeParserResource(nsHtml5LeanPreloadDescriptor&& aDescriptor);
   nsresult CreateNativeParserStylesheetChannel(
       uint64_t aGeneration,
       const NativeStylePreloadActivationDescriptor& aActivation);

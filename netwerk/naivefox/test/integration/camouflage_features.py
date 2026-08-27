@@ -746,6 +746,13 @@ def extract(args):
     if args.naivefox_arm == "document-native-channel-open" and args.protocol != "h3":
         raise SystemExit("document-native-channel-open requires h3")
     if (
+        args.naivefox_arm == "tree-native-parser-document-start-resource-tree"
+        and args.protocol != "h2"
+    ):
+        raise SystemExit(
+            "tree-native-parser-document-start-resource-tree requires h2"
+        )
+    if (
         args.naivefox_arm == "tree-resource-committed-overlap-css"
         and args.protocol != "h3"
     ):
@@ -939,6 +946,7 @@ def main():
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
+            "tree-native-parser-document-start-resource-tree",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

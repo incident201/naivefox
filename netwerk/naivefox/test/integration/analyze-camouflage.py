@@ -181,6 +181,7 @@ def load_dataset(path):
                 "tree-resource-native-cache-committed-overlap",
                 "tree-native-parser-preload-overlap-css",
                 "tree-native-parser-document-start-overlap-css",
+                "tree-native-parser-document-start-resource-tree",
                 "tree-native-parser-document-start-navigation-stop-css",
                 "tree-native-parser-document-start-response-stop-css",
                 "tree-native-parser-document-handoff-overlap-css",
@@ -196,6 +197,13 @@ def load_dataset(path):
                 raise SystemExit("invalid NaiveFox arm metadata")
             if arm == "firefox-proxied" and source["protocol"] != "h2":
                 raise SystemExit("firefox-proxied analysis requires h2")
+            if (
+                arm == "tree-native-parser-document-start-resource-tree"
+                and source["protocol"] != "h2"
+            ):
+                raise SystemExit(
+                    "tree-native-parser-document-start-resource-tree requires h2"
+                )
             if arm == "root-pmtud-control" and source["protocol"] != "h3":
                 raise SystemExit("root-pmtud-control requires h3")
             if arm == "document-handshake-confirmed" and source["protocol"] != "h3":

@@ -30,6 +30,7 @@ SUPPORTED_ARMS = (
     "tree-resource-native-cache-committed-overlap",
     "tree-native-parser-preload-overlap-css",
     "tree-native-parser-document-start-overlap-css",
+    "tree-native-parser-document-start-resource-tree",
     "tree-native-parser-document-start-navigation-stop-css",
     "tree-native-parser-document-start-response-stop-css",
     "tree-native-parser-document-handoff-overlap-css",
@@ -64,6 +65,14 @@ def validate_arm_sequence(arms):
         raise ValueError(f"invalid multi-arm labels: {invalid}")
     if "root" in arms and "document-complete" in arms:
         raise ValueError("root and document-complete are aliases; select only one")
+    if (
+        "tree-native-parser-document-start-resource-tree" in arms
+        and "document-start-overlap" not in arms
+    ):
+        raise ValueError(
+            "tree-native-parser-document-start-resource-tree requires the "
+            "document-start-overlap control"
+        )
     if (
         "tree-native-parser-document-start-navigation-stop-css" in arms
         and "tree-native-parser-document-start-overlap-css" not in arms
@@ -118,6 +127,14 @@ def infer_arms(rows):
 
 def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
     arms = validate_arm_sequence(arms)
+    if (
+        "tree-native-parser-document-start-resource-tree" in arms
+        and set(scenarios) != {"browser_page"}
+    ):
+        raise ValueError(
+            "tree-native-parser-document-start-resource-tree requires "
+            "browser_page superblocks"
+        )
     if protocol != "h3" and "root-pmtud-control" in arms:
         raise ValueError("root-pmtud-control requires h3 superblocks")
     if protocol != "h3" and "document-handshake-confirmed" in arms:
@@ -136,10 +153,15 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         not in (
             "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-start-navigation-stop-css",
+            "tree-native-parser-document-start-resource-tree",
         )
         for arm in arms
     ):
         raise ValueError("native parser arms require h3 superblocks")
+    if protocol != "h2" and "tree-native-parser-document-start-resource-tree" in arms:
+        raise ValueError(
+            "tree-native-parser-document-start-resource-tree requires h2 superblocks"
+        )
     rng = random.Random(f"{seed}:{protocol}:multi-arm-superblocks")
     rows = []
     for index in range(count):
@@ -203,6 +225,15 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
             and row["protocol"] != "h3"
         ):
             raise ValueError("document-native-channel-open requires h3 superblocks")
+        if (
+            row["naivefox_arm"]
+            == "tree-native-parser-document-start-resource-tree"
+            and row["protocol"] != "h2"
+        ):
+            raise ValueError(
+                "tree-native-parser-document-start-resource-tree requires "
+                "h2 superblocks"
+            )
         key = (row["protocol"], row["experiment_block"])
         blocks.setdefault(key, []).append(row)
     if expected_blocks is not None:
@@ -229,6 +260,14 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
         if len(scenarios) != 1:
             raise ValueError(
                 f"superblock {protocol}/{block} spans scenarios: {sorted(scenarios)}"
+            )
+        if (
+            "tree-native-parser-document-start-resource-tree" in selected_arms
+            and scenarios != {"browser_page"}
+        ):
+            raise ValueError(
+                "tree-native-parser-document-start-resource-tree requires "
+                "browser_page superblocks"
             )
 
 

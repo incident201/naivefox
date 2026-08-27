@@ -297,6 +297,39 @@ state, strict fallback policy, or Rust; proxy cloning preserves both strict-H3
 and PMTUD flags; and the focused H3 proxy regression proves the flagged route
 works without claiming wire-level PMTUD behavior that it does not observe.
 
+## NF-UPSTREAM-014: DOM-free HTML speculative resource descriptors
+
+Files:
+
+```text
+parser/html/moz.build
+parser/html/nsHtml5SpeculativeLoad.h
+parser/html/nsHtml5SpeculativeLoad.cpp
+parser/html/nsHtml5SpeculativeScanner.h
+parser/html/nsHtml5SpeculativeScanner.cpp
+parser/html/nsHtml5TreeBuilderLeanCppSupplement.h
+netwerk/protocol/http/nsHttpHandler.h
+```
+
+Exposes an ordered, move-only descriptor stream from Firefox's generated HTML5
+speculative-load machinery without constructing DOM nodes, executing script,
+decoding images, or enabling layout. The lean consumer retains the upstream
+causes for same-origin stylesheet, classic deferred script, and image preload
+channels, including document URI/referrer context and the current pref-derived
+image `Accept` value. Base, CSP, and meta-referrer descriptors remain ordered
+context operations and fail closed when the lean runtime cannot preserve their
+semantics.
+
+Review obligations: the generated-tree supplement remains enabled only for the
+NaiveFox lean scanner; normal Firefox tree building and speculative loading are
+unchanged; unsupported/module/lazy or cross-origin resources cannot silently
+enter the bounded tree; system principal never replaces the URI principal for
+request-context calculations; the image accept accessor stays read-only and
+NaiveFox-only; scanner tests prove source order and attributes; and decrypted
+H2 admission proves one physical TLS connection with a native root request,
+CONNECT, then the exact style/script/image resource set and normal stream
+completion.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

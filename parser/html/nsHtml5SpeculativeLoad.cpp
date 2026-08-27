@@ -35,9 +35,59 @@ nsHtml5SpeculativeLoad::TakeStyleDescriptor() && {
       std::move(mUrlOrSizes), std::move(mCharsetOrSrcset),
       std::move(mCrossOrigin), std::move(mMedia),
       std::move(mReferrerPolicyOrIntegrity), std::move(mNonceOrType),
-      std::move(
-          mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity),
+      std::move(mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity),
       mIsLinkPreload, std::move(mFetchPriority)));
+}
+
+nsHtml5LeanPreloadDescriptor nsHtml5SpeculativeLoad::TakeLeanDescriptor() && {
+  using Kind = nsHtml5LeanPreloadDescriptor::Kind;
+  if (mOpCode == eSpeculativeLoadSetDocumentCharset ||
+      mOpCode == eSpeculativeLoadMaybeComplainAboutCharset) {
+    // These opcodes repurpose the mCharsetOrSrcset union. They affect parser
+    // diagnostics/decoding, not network resource activation, and must not be
+    // read through the inactive nsString member.
+    return nsHtml5LeanPreloadDescriptor(
+        mOpCode == eSpeculativeLoadSetDocumentCharset ? Kind::DocumentCharset
+                                                      : Kind::CharsetComplaint,
+        nsString(), nsString(), nsString(), nsString(), nsString(), nsString(),
+        nsString(), nsString(), nsString(), false, false, false);
+  }
+  Kind kind = Kind::Unsupported;
+  switch (mOpCode) {
+    case eSpeculativeLoadBase:
+      kind = Kind::Base;
+      break;
+    case eSpeculativeLoadCSP:
+      kind = Kind::CSP;
+      break;
+    case eSpeculativeLoadMetaReferrer:
+      kind = Kind::MetaReferrer;
+      break;
+    case eSpeculativeLoadImage:
+      kind = Kind::Image;
+      break;
+    case eSpeculativeLoadScript:
+      kind = Kind::Script;
+      break;
+    case eSpeculativeLoadScriptFromHead:
+      kind = Kind::ScriptFromHead;
+      break;
+    case eSpeculativeLoadStyle:
+      kind = Kind::Style;
+      break;
+    case eSpeculativeLoadSetDocumentMode:
+      kind = Kind::DocumentMode;
+      break;
+    default:
+      break;
+  }
+  mDescriptorTaken = true;
+  return nsHtml5LeanPreloadDescriptor(
+      kind, std::move(mUrlOrSizes), std::move(mCharsetOrSrcset),
+      std::move(mTypeOrCharsetSourceOrDocumentModeOrMetaCSPOrSizesOrIntegrity),
+      std::move(mCrossOrigin), std::move(mMedia), std::move(mNonceOrType),
+      std::move(mReferrerPolicyOrIntegrity), std::move(mScriptReferrerPolicy),
+      std::move(mFetchPriority), mIsAsync, mIsDefer, mIsLinkPreload);
 }
 #endif
 

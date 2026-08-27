@@ -766,6 +766,8 @@ void TunnelSession::FinishPreambleOnMain(
       (aProtocol == ProxyProtocol::H2 &&
        (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap ||
         preambleMode ==
+            PreambleMode::TreeNativeParserDocumentStartResourceTree ||
+        preambleMode ==
             PreambleMode::TreeNativeParserDocumentStartNavigationStop));
   const bool requestCommittedAdmission =
       PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
@@ -886,6 +888,14 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
+  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartResourceTree) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-resource-tree "
+        "admission=request-committed request_committed=1 root_done=0 "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
+  }
   if (PreambleModeUsesScopedNavigationStop(preambleMode)) {
     RuntimeLogEvent(
         "Connection %llu preamble "
@@ -961,6 +971,8 @@ void TunnelSession::FinishPreambleOperationOnMain(
                               aHttpStatus < 300;
   const bool documentStartParserSucceeded =
       finalSucceeded && aCompletedSuccessfulResources == 1;
+  const bool resourceTreeSucceeded =
+      finalSucceeded && aCompletedSuccessfulResources == 3;
   const bool navigationStopSucceeded =
       detail::PreambleNavigationStopCompletedSuccessfully(
           preambleMode, aRootDone, aCompletedNormally, aStatus, aHttpStatus,
@@ -969,6 +981,9 @@ void TunnelSession::FinishPreambleOperationOnMain(
   if (PreambleModeRequiresFailClosed(preambleMode) &&
       ((preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
         !documentStartParserSucceeded) ||
+       (preambleMode ==
+            PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+        !resourceTreeSucceeded) ||
        (PreambleModeUsesScopedNavigationStop(preambleMode) &&
         !navigationStopSucceeded) ||
        (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
@@ -984,6 +999,9 @@ void TunnelSession::FinishPreambleOperationOnMain(
     const bool succeeded =
         preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap
             ? documentStartParserSucceeded
+        : preambleMode ==
+                PreambleMode::TreeNativeParserDocumentStartResourceTree
+            ? resourceTreeSucceeded
         : PreambleModeUsesScopedNavigationStop(preambleMode)
             ? navigationStopSucceeded
             : finalSucceeded;
@@ -1033,6 +1051,14 @@ void TunnelSession::FinishPreambleOperationOnMain(
         "drain=complete completed_resources=%u http=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aCompletedSuccessfulResources, aHttpStatus, ProtocolName(aProtocol));
+  }
+  if (resourceTreeSucceeded &&
+      preambleMode == PreambleMode::TreeNativeParserDocumentStartResourceTree) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-resource-tree "
+        "drain=complete completed_resources=3 http=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), aHttpStatus,
+        ProtocolName(aProtocol));
   }
   if (navigationStopSucceeded &&
       preambleMode ==
