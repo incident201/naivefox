@@ -1086,24 +1086,28 @@ independent seeds.
 | `dcb8ca36bf574d7a` | confirmation only, then 16-ms resource delay | 1 | 0.13137 / 0.21756 / 0.15600 / 0.20159 / 0.39685 |
 | `86c38709c99b66a0` | split delay: 8 ms before root and 8 ms before resources | 1 | 0.17666 / 0.51109 / 0.26344 / 0.24243 / 0.50742 |
 | `fe08089dde0ac15c` | one socket-thread turn after handshake confirmation | 1 | 0.26040 / 0.62362 / 0.34047 / 0.32277 / 0.53048 |
-| `6c1da178f259ec37` | 16-ms dwell, coherently scaled 65536-byte page base | 4 | 0.10039 / 0.33793 / 0.15398 / 0.16820 / 0.41965 |
-| `02da1771dd44e616` | 16-ms dwell, coherently scaled 1048576-byte page base | 4 | 0.08761 / 0.42522 / 0.17234 / 0.16295 / 0.38674 |
+| `6c1da178f259ec37` | confirmation-gated six-resource arm, 65536-byte page base | 4 | 0.10039 / 0.33793 / 0.15398 / 0.16820 / 0.41965 |
+| `02da1771dd44e616` | confirmation-gated six-resource arm, 1048576-byte page base | 4 | 0.08761 / 0.42522 / 0.17234 / 0.16295 / 0.38674 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
 remains an opt-in research mechanism while event-driven or measured-network
 alternatives are evaluated.
 
-The predeclared size matrix rejects the fixed dwell as a general default even
-though it remained better than `document-start-overlap` at both new sizes.
-Moving from the established 262144-byte fixture to 65536 bytes changed the
-candidate packets-17--32 distance from 0.19702 to 0.33793 and whole flow from
-0.35166 to 0.41965. At 1048576 bytes the same values were 0.42522 and 0.38674.
-The first-16 and 250-ms views stayed comparatively low, so the failure is
-localized: 16 ms aligns the root/resource transition with one fixture pacing
-regime rather than reproducing a size-independent Firefox lifecycle. A
-successor must use observable transport progress or ordinary Gecko scheduling,
-not rescale this timer from the chosen object size.
+The first predeclared size matrix exposed a provenance mismatch rather than a
+fixed-dwell robustness result. Safe artifact `f07dc0cb1e282738` used dirty
+revision `3d005bd87721599c99b1ad5c20516243e5961e51` and libxul digest
+`8fe40a8763fa79e11ccf2ba9a0864288aa2c9c25ae515b36410d362211f3d312`.
+The two size artifacts used the later committed binary
+`59ec40bb48fe587f445c924600c3dbf4698ef414e9c5d04cb98e4ec78d5ab6b0`,
+whose six-resource arm waits for handshake confirmation but has no dwell; its
+16-ms setter belongs to the separate `document-handshake-confirmed` mode.
+Therefore the 0.33793/0.41965 and 0.42522/0.38674 pairs are retained as valid
+confirmation-gate measurements, but they neither validate nor reject the
+fixed-dwell candidate. Fixed-dwell size testing must first rebuild an
+explicitly identified arm and record its binary digest. Results from different
+mechanisms must not be compared as a robustness matrix merely because the arm
+label was reused during an uncommitted experiment.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
