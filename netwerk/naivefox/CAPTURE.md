@@ -1110,6 +1110,7 @@ independent seeds.
 | `99b99423b650ff11` | explicit 16-ms dwell, 65536-byte page base | 4 | 0.18995 / 0.13934 / 0.15949 / 0.19980 / 0.37883 |
 | `4f29ad91fa7f29f6` | explicit 16-ms dwell, 1048576-byte page base | 4 | 0.14023 / 0.18591 / 0.13661 / 0.16593 / 0.36313 |
 | `a8977a8f77e3e129` | explicit 16-ms dwell, 20-ms one-way delay and 20 Mbit/s | 4 | 0.19669 / 0.55600 / 0.24601 / 0.16671 / 0.44047 |
+| `54ea85af8f8ade5a` | cancel resource bodies on first tunneled application bytes, 20-ms one-way delay and 20 Mbit/s | 1 | 0.34306 / 0.63746 / 0.37520 / 0.30147 / 0.51192 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1155,6 +1156,19 @@ whole durations remained close (means 541.7 and 547.6 ms), so this is not
 explained by a broken control envelope. The opt-in fixed dwell remains a useful
 laboratory oracle, but a production successor must derive release from actual
 transport progress or native scheduling under the current path conditions.
+
+An event-driven attempt to stop all still-active outer resource requests on
+the first positive client-to-target tunnel application bytes is also rejected.
+One-block shaped diagnostic `54ea85af8f8ade5a` used the same 20-ms one-way,
+20-Mbit/s profile. It regressed packets 17--32 to 0.63746 and whole flow to
+0.51192, while whole server bytes still exceeded the Firefox midpoint by
+724090 bytes. By the time the inner application signal reached the main
+thread, the localhost origin and H3 stack had already queued the large cover
+bodies ahead of `netem`; cancelling their channels could not withdraw those
+datagrams. The result rules out late channel cancellation, not causal
+handoff generally. A viable successor must bound or suspend response-body
+delivery before QUIC accepts the excess bytes, then use observed transport or
+application progress to release or retire that bounded cover.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
