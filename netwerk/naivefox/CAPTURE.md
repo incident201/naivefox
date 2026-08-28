@@ -1115,6 +1115,9 @@ independent seeds.
 | `b269891ca820c21c` | cancel all resources after all request HEADERS are sent, confirmation gate, shaped link | 1 | 0.28176 / 0.49624 / 0.32068 / 0.22380 / 0.55319 |
 | `79bd0652b13f9da6` | cancel all resources on first `RECEIVING_FROM`, confirmation gate, shaped link | 1 | 0.29122 / 0.53469 / 0.32290 / 0.19148 / 0.54446 |
 | `3ac531854f16583d` | preceding response stop plus first post-confirmation transmitted-packet gate, shaped link | 1 | 0.17466 / 0.61024 / 0.27430 / 0.14788 / 0.49282 |
+| `783fb4014bc2c827` | ordinary pre-confirmation root scheduling, shaped link | 1 | 0.22187 / 0.30808 / 0.23385 / 0.20438 / 0.40084 |
+| `9041afc666c4d27a` | ordinary pre-confirmation root scheduling, shaped link | 4 | 0.21975 / 0.41939 / 0.24150 / 0.20281 / 0.37755 |
+| `98ff5b58e8acabbf` | ordinary pre-confirmation root scheduling, unshaped localhost | 4 | 0.13015 / 0.42408 / 0.19173 / 0.18586 / 0.40104 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1196,6 +1199,30 @@ whole flow measured 0.49282. Thus neither a generic next socket turn nor an
 actually transmitted post-confirmation packet reproduces the localhost
 16-ms result on the shaped path. No timer, byte threshold, cancellation, or
 transport-gate code from these diagnostics is retained.
+
+Removing the six-resource arm's handshake-confirmation gate is retained as the
+next production-oriented candidate. Packet-sequence inspection showed that on
+the shaped path direct Firefox sent its navigation request near 46 ms, before
+transport confirmation, while the gated preamble did not send its root request
+until roughly 104 ms. The gate therefore introduced an RTT-dependent phase
+error that the localhost 16-ms dwell had hidden. The replacement uses ordinary
+H3 transaction scheduling; it contains no timer, RTT estimate, packet-count
+barrier, body-size rule, or response cancellation.
+
+The one-block shaped screen `783fb4014bc2c827` measured 0.30808 for packets
+17--32 and 0.40084 whole. Four-block follow-up `9041afc666c4d27a` corrected the
+optimistic early estimate but retained the material advantage: 0.41939
+[`0.38538`, `0.47197`] for packets 17--32 versus control 0.58280, and 0.37755
+[`0.36902`, `0.39015`] whole versus control 0.44734. The 250-ms view paid a
+0.02960 descriptive penalty. Unshaped artifact `98ff5b58e8acabbf` measured
+0.42408 packets 17--32 and 0.40104 whole, so it gives up the fixed dwell's
+fixture-specific localhost advantage while avoiding its shaped-link collapse.
+Both four-block runs identify NaiveFox build ID
+`22e819b8198cdbefef03759293a2b6d1` and libxul digest
+`10233fa0a10e43bb6f993d84d9b5d01205ee1f5597d43dac00876abf9628a284`.
+This candidate is retained because its scheduling rule generalizes across RTT;
+its roughly 0.42 packets-17--32 residual remains the next optimization target,
+not an acceptable endpoint.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and

@@ -1370,13 +1370,6 @@ nsresult ProxyPreambleOperation::Start(
       }
       MOZ_TRY(internal->SetProxyPreambleHandshakeDwell(16));
     }
-    if (mImpl->mProtocol == ProxyProtocol::H3 &&
-        mImpl->mConfig.mMode ==
-            PreambleMode::TreeNativeParserResourceCommittedOverlap &&
-        mImpl->mConfig.mMaxAssets == 6 &&
-        aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
-      MOZ_TRY(internal->SetProxyPreambleHandshakeDwell(16));
-    }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
     // DocumentNativeCacheOpen deliberately keeps INHIBIT_CACHING and performs
