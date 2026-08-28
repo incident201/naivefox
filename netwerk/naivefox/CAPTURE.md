@@ -1142,6 +1142,8 @@ independent seeds.
 | `c276f92a62ecafdd` | open two images next turn and two on first resource body buffer, shaped link | 1 | 0.29429 / 0.44772 / 0.31302 / 0.28711 / 0.45058 |
 | `e26fad3d3d44af3c` | open all six resources together next turn, then admit on first body buffer, shaped link | 1 | 0.22284 / 0.71720 / 0.32656 / 0.24533 / 0.49797 |
 | `dcbd84d7270ad4d2` | admit after first body buffers from two distinct resources, shaped link | 1 | 0.12912 / 0.29712 / 0.17971 / 0.18160 / 0.39582 |
+| `e37b8b45df2c72f7` | cross-process stylesheet rendezvous before resource activation, shaped link | 1 | 0.10459 / 0.23626 / 0.14855 / 0.19669 / 0.36922 |
+| `a0ead86d96ae38c9` | preceding cross-process resource activation, shaped link | 4 | 0.12889 / 0.32005 / 0.16100 / 0.15227 / 0.34415 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1518,6 +1520,34 @@ the retained four-block candidate's 0.29471, but whole flow regressed from
 `5e240d15097355e6bd0a129171d9988f327d167332ff0993b87626281f01b541`.
 The per-stream progress accounting and second-resource lifecycle markers were
 removed; the first valid resource body buffer again admits CONNECT.
+
+A cross-process parser-cadence rendezvous is rejected after replication. This
+experiment mirrored the root response into the existing persistent native
+activation child while the parent lean parser independently discovered all six
+resources. CSS/script channels stayed prepared until the child reported its
+stylesheet descriptor and that URL matched the parent's CSS exactly; images
+then opened on the following main-thread turn. CONNECT retained the first-body
+boundary. Thus the new ordering used actual parser and cross-process IPC work,
+not a timer or resource-size threshold. The first attempt, private failure
+artifact `983af062e23d11a3`, failed closed before the process route started
+because the page mode's parent parser target was rejected by a CSS-only process
+precondition. It timed out and produced no admissible distances; the
+precondition was corrected before measurement.
+
+One-block shaped artifact `e37b8b45df2c72f7` looked promising at packets
+17--32, measuring 0.23626, but whole flow rose to 0.36922 and 250 ms to
+0.19669. The predeclared four-block replication `a0ead86d96ae38c9` did not
+retain that target gain: packets 17--32 measured 0.32005 [`0.26996`,
+`0.37014`], worse than the retained candidate's 0.29471 [`0.25981`,
+`0.32960`]. Whole flow was effectively unchanged at 0.34415 [`0.31509`,
+`0.37297`] versus retained 0.34363 [`0.32339`, `0.36381`]. The replicated
+other views were 0.12889/0.16100/0.15227 for packets 1--16, packets 1--32,
+and 250 ms. Both valid artifacts identify build ID
+`ae852c7c0e6698d875e921452f25b346` and libxul digest
+`6a6d141cb374a0694e2650aef0d03c70bf9891ce16c12ac89788b39d02e40971`.
+The extra process startup, root mirroring, rendezvous state, and generalized
+validator lifecycle were removed; their complexity did not improve either
+replicated target view.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
