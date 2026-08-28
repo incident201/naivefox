@@ -1146,6 +1146,7 @@ independent seeds.
 | `a0ead86d96ae38c9` | preceding cross-process resource activation, shaped link | 4 | 0.12889 / 0.32005 / 0.16100 / 0.15227 / 0.34415 |
 | `cdf15c6b3cc11142` | request one-byte ranges for the four image-cover responses, shaped link | 1 | 0.20619 / 0.47585 / 0.23629 / 0.20118 / 0.42462 |
 | `bfd151c6ae8b307f` | keep CONNECT admission, but delay local SOCKS success until a second resource progresses, shaped link | 1 | 0.12217 / 0.56947 / 0.24059 / 0.21827 / 0.38174 |
+| `6f3abdd953241f36` | promote CONNECT locally from generic `u=4` to default-wire `u=3`, shaped link | 1 | 0.28571 / 0.67590 / 0.35053 / 0.27983 / 0.44583 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1589,6 +1590,19 @@ The secondary preamble callback and SOCKS admission state were removed. This
 result shows that holding the inner browser after CONNECT reorders the target
 window much more destructively than moving CONNECT itself to the same second
 resource boundary.
+
+A moderate H3 CONNECT priority is also rejected. Gecko maps a generic channel
+to urgency 4 and the `Unblocked` class to urgency 3. Because non-incremental
+urgency 3 is the HTTP Priority default, this experiment changed local H3
+scheduling without adding a Priority request field, unlike the earlier
+document-equivalent urgent experiment. One-block shaped artifact
+`6f3abdd953241f36` nevertheless measured 0.67590 for packets 17--32 and
+0.44583 whole; its other views were 0.28571/0.35053/0.27983. The binary
+identified build ID `5dfb91f3521b088e904b9b97976fce6f` and libxul digest
+`6122c5a00c58b7a7e0e8900764bb0bc8a4b323913eb6c33315d9d7132d11ca9b`.
+The `Unblocked` class assignment was removed. Together with the rejected
+urgent CONNECT arm, this rules out simple CONNECT promotion as the next
+default direction.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
