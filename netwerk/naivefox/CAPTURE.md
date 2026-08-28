@@ -1122,6 +1122,7 @@ independent seeds.
 | `3db870baccdd8047` | preceding next-turn image scheduling, shaped link | 4 | 0.14180 / 0.42302 / 0.20045 / 0.19663 / 0.35352 |
 | `69ee3fd2559c47e1` | preceding next-turn image scheduling, unshaped localhost | 4 | 0.11254 / 0.43472 / 0.17955 / 0.17351 / 0.41992 |
 | `f9a240071240a55b` | open images in `2+1+1` successive main-thread turns, shaped link | 1 | 0.19743 / 0.37870 / 0.22054 / 0.20749 / 0.38823 |
+| `f5cfa9eff387313d` | next-turn image scheduling plus exact Firefox application UA token, shaped link | 1 | 0.12563 / 0.62333 / 0.24182 / 0.17464 / 0.39800 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1265,6 +1266,22 @@ four-block confirmation was spent. The binary identified build ID
 `9a1a314167aeaaa2cec3277efa671335c80605a35bf237ae1cbbbe968368c43c`.
 The batching code and its temporary validator relaxation were removed; the
 single next-turn image release remains the working candidate.
+
+Exact User-Agent parity does not repair the remaining phase. Decrypted traces
+showed that every candidate GET used the otherwise native
+`Mozilla/... Gecko/20100101 /156.0a1` string because the lean product has no
+application UA name, while same-base Firefox used the corresponding
+`Firefox/156.0` token. This affects every QPACK/HEADERS block independently of
+RTT and resource size, so it was combined with the retained next-turn image
+schedule. One-block shaped artifact `f5cfa9eff387313d` regressed packets
+17--32 to 0.62333 and whole flow to 0.39800; the earlier isolated UA screen's
+low packets-17--32 value therefore did not compose with the robust scheduler.
+The binary identified build ID `acb2989186801906f1b1936d4fc9c4da` and libxul
+digest `a220cfc201cc62361a82322b8570bf5b5ffae0f96bfc6c7bddf8f9901fb06701`.
+The temporary HTTP-handler override was removed. `Alt-Used` and
+`Sec-Fetch-User` remain untouched as well: the former must come from an actual
+Alt-Svc mapping and the latter from a genuine user navigation, so fabricating
+either would change semantics rather than recover native scheduling.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
