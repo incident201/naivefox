@@ -1151,6 +1151,7 @@ independent seeds.
 | `3ccc3e566c17bf55` | preceding selective third-image Range request, shaped link | 4 | 0.13225 / 0.38692 / 0.17637 / 0.14720 / 0.36567 |
 | `b4404c4a0ed5af8f` | delay image activation by half the measured root request-to-response interval, shaped link | 1 | 0.11576 / 0.43308 / 0.18672 / 0.17680 / 0.37198 |
 | `c3e2674327356bfc` | release all prepared images from the main-thread idle queue, shaped link | 1 | 0.24089 / 0.66662 / 0.30821 / 0.22581 / 0.46435 |
+| `78cbd9ef5ace8048` | open each prepared image after the preceding image request commits, shaped link | 1 | 0.30343 / 0.37128 / 0.30186 / 0.28342 / 0.45118 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1657,6 +1658,22 @@ were also 0.24089/0.30821/0.22581. The binary identified build ID
 The idle dispatch and its temporary exact lifecycle marker were removed.
 Yielding behind normal network callbacks is much coarser than ordinary parser
 cadence and is not suitable as a product scheduling cause.
+
+Sequential image activation at request-commit boundaries is rejected. The
+first prepared image still opened on the ordinary next main-thread turn, but
+each remaining image opened only after the preceding image emitted Necko's
+`WAITING_FOR` request-commit status. This was a causal chain with no timer,
+response-size threshold, body wait, or bandwidth estimate, and the strict
+temporary lifecycle validator required the exact open/commit alternation.
+One-block shaped artifact `78cbd9ef5ace8048` measured 0.37128 for packets
+17--32 and 0.45118 whole; packets 1--16, packets 1--32, and 250 ms also rose
+to 0.30343/0.30186/0.28342. Its binary identified build ID
+`0f7fc9070bdf29f71a3f2819d3aac833` and libxul digest
+`c05045cac8f79043c6776a07ee752c3cf663972e87d8848f49796beb349ea8dd`.
+The request-commit chain and temporary validator ordering were removed. A
+transaction commit is deterministic but too coarse as a parser-cadence proxy:
+serializing all four image submissions harms both the target window and the
+whole-flow view.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
