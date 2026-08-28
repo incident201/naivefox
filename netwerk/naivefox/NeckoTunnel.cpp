@@ -1375,7 +1375,7 @@ nsresult ProxyPreambleOperation::Start(
             PreambleMode::TreeNativeParserResourceCommittedOverlap &&
         mImpl->mConfig.mMaxAssets == 6 &&
         aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
-      MOZ_TRY(internal->SetProxyPreambleWaitForHandshakeConfirmation());
+      MOZ_TRY(internal->SetProxyPreambleHandshakeDwell(16));
     }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));

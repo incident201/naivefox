@@ -1088,6 +1088,8 @@ independent seeds.
 | `fe08089dde0ac15c` | one socket-thread turn after handshake confirmation | 1 | 0.26040 / 0.62362 / 0.34047 / 0.32277 / 0.53048 |
 | `6c1da178f259ec37` | confirmation-gated six-resource arm, 65536-byte page base | 4 | 0.10039 / 0.33793 / 0.15398 / 0.16820 / 0.41965 |
 | `02da1771dd44e616` | confirmation-gated six-resource arm, 1048576-byte page base | 4 | 0.08761 / 0.42522 / 0.17234 / 0.16295 / 0.38674 |
+| `99b99423b650ff11` | explicit 16-ms dwell, 65536-byte page base | 4 | 0.18995 / 0.13934 / 0.15949 / 0.19980 / 0.37883 |
+| `4f29ad91fa7f29f6` | explicit 16-ms dwell, 1048576-byte page base | 4 | 0.14023 / 0.18591 / 0.13661 / 0.16593 / 0.36313 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1108,6 +1110,19 @@ fixed-dwell candidate. Fixed-dwell size testing must first rebuild an
 explicitly identified arm and record its binary digest. Results from different
 mechanisms must not be compared as a robustness matrix merely because the arm
 label was reused during an uncommitted experiment.
+
+The corrected fixed-dwell size screen rebuilt the six-resource arm explicitly
+with `SetProxyPreambleHandshakeDwell(16)`. Both new artifacts identify NaiveFox
+build ID `fa86f083ff437943123733a262ce02ff` and libxul digest
+`eb462bba4c0ffe345bbc5961b5a9d90b70b55ae65b3850dc7ad51715b9c181b7`.
+At a 65536-byte page base, packets 17--32 measured 0.13934 and whole flow
+0.37883; at 1048576 bytes they measured 0.18591 and 0.36313. Both sizes retain
+the main advantage over `document-start-overlap`, whose corresponding values
+were 0.63512/0.45239 and 0.60016/0.45256. The tradeoff is consistent and
+limited but real: candidate packets 1--16 exceeded control by 0.05848 and
+0.05072, while 250 ms exceeded it by 0.01797 and 0.00784. Thus object size
+alone does not invalidate the dwell, but these four-block diagnostics do not
+answer slower-link or RTT robustness and do not promote the timer to default.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
