@@ -1134,6 +1134,8 @@ independent seeds.
 | `8925499c80a97688` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 1 | 0.21060 / 0.41138 / 0.24301 / 0.19447 / 0.42297 |
 | `47adda8f2a4b7783` | preceding first-resource-body-buffer admission, 65536-byte page base, shaped link | 4 | 0.08814 / 0.33185 / 0.14079 / 0.13174 / 0.31845 |
 | `07c422cacf441cd1` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 4 | 0.14312 / 0.39571 / 0.18047 / 0.15179 / 0.36178 |
+| `d62dc8f4ca95d6e1` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 1 | 0.15058 / 0.38089 / 0.19917 / 0.10000 / 0.29532 |
+| `4606cb015d86e68a` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 4 | 0.09429 / 0.42424 / 0.16478 / 0.07301 / 0.31681 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1411,6 +1413,21 @@ not collapse as resource duration grows because admission waits only for the
 first delivered buffer. Together the two four-block size endpoints reject a
 fixed object-size dependency; lower bandwidth and higher RTT remain a separate
 robustness axis.
+
+The slower-link screen retains the causal candidate where the fixed dwell had
+failed. One-block artifact `d62dc8f4ca95d6e1` at 50-ms one-way delay and
+5 Mbit/s measured 0.38089 for packets 17--32 and 0.29532 whole. Four-block
+replication `4606cb015d86e68a` measured 0.42424
+[`0.26067`, `0.58780`] and 0.31681 [`0.28349`, `0.35695`], versus matched
+control 0.73615/0.48809. The wider packets-17--32 interval records real
+slow-path variability, but its upper endpoint remains below 0.6 and the mean
+retains a large improvement. All other views also improve:
+0.09429/0.16478/0.07301 for packets 1--16, packets 1--32, and 250 ms, versus
+control 0.21167/0.29908/0.18354. These runs use the same build ID and libxul
+digest as the default-size, localhost, and size screens. The event-driven
+boundary therefore generalizes across the tested RTT/rate range without
+encoding either value; broader network and server-TTFB coverage remains future
+validation rather than a reason to add a fixed pause.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
