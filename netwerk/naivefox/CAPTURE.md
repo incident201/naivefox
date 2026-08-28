@@ -1076,6 +1076,7 @@ independent seeds.
 | `1e3021030d540730` | sequentially open all resources at parser finish | 1 | 0.25506 / 0.34635 / 0.23902 / 0.24322 / 0.45066 |
 | `dcb8ca36bf574d7a` | confirmation only, then 16-ms resource delay | 1 | 0.13137 / 0.21756 / 0.15600 / 0.20159 / 0.39685 |
 | `86c38709c99b66a0` | split delay: 8 ms before root and 8 ms before resources | 1 | 0.17666 / 0.51109 / 0.26344 / 0.24243 / 0.50742 |
+| `fe08089dde0ac15c` | one socket-thread turn after handshake confirmation | 1 | 0.26040 / 0.62362 / 0.34047 / 0.32277 / 0.53048 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
