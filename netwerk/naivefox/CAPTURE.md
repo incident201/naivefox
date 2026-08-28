@@ -1473,6 +1473,19 @@ CONNECT carries a document but also competes with the outer cover streams, so
 the direct document priority over-promotes it. The new parameter, class flags,
 and priority marker were removed; ordinary CONNECT priority is retained.
 
+A fresh retained-candidate decrypted capture did not pass strict admission and
+must not be treated as wire evidence. Private artifact
+`20260828T220612Z-2af3b849` logged all six request commits, first resource body
+progress on the deferred-script stream, successful CONNECT admission, and a
+normal six-resource drain. The pcap decoder, however, could not assign one
+coalesced response HEADERS occurrence unambiguously to every asset stream, so
+`h3_decrypted_arm_summary.py` failed closed with missing asset response-header
+evidence. Manual private inspection suggests the next hypothesis only: the
+candidate issued CSS/script and all four image GETs in a dense early cluster,
+whereas the direct reference issued its image GETs later in two groups after
+blocking-resource response progress. No result from this failed trace enters
+the passive table or validates a production change.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
