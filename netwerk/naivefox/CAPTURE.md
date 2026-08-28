@@ -1149,6 +1149,7 @@ independent seeds.
 | `6f3abdd953241f36` | promote CONNECT locally from generic `u=4` to default-wire `u=3`, shaped link | 1 | 0.28571 / 0.67590 / 0.35053 / 0.27983 / 0.44583 |
 | `516a52ecdf7325fe` | request a one-byte range only for the largest, third image-cover response, shaped link | 1 | 0.20167 / 0.20686 / 0.21134 / 0.26134 / 0.38629 |
 | `3ccc3e566c17bf55` | preceding selective third-image Range request, shaped link | 4 | 0.13225 / 0.38692 / 0.17637 / 0.14720 / 0.36567 |
+| `b4404c4a0ed5af8f` | delay image activation by half the measured root request-to-response interval, shaped link | 1 | 0.11576 / 0.43308 / 0.18672 / 0.17680 / 0.37198 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1622,6 +1623,26 @@ Server-byte diagnostics remained close to the full-body retained arm, so the
 fixture ignored the range and the single-block movement came only from the
 extra request-header/QPACK shape. The selective header was removed; neither
 wholesale nor one-stream Range requests improve the replicated target views.
+
+Delaying image activation by half the measured root request-to-response
+interval is rejected. This replaced a fixed dwell with a per-connection
+`nsITimedChannel` observation and fell back to ordinary next-turn activation
+when timing was unavailable. Private failure artifact `67ac2a4d35b104a7`
+first exposed that the measured half-flight was 62 ms on the nominal
+20-ms-one-way profile; CSS/script therefore committed before the delayed image
+opens, and the original strict lifecycle validator correctly refused that new
+ordering. A temporary validator accepted only the explicit positive H3 timing
+marker and the exact split order (blocking commits, four image opens, four
+image commits), without weakening count or drain checks. The resulting
+one-block shaped artifact `b4404c4a0ed5af8f` measured 0.43308 for packets
+17--32 and 0.37198 whole, with other views
+0.11576/0.18672/0.17680. Its binary identified build ID
+`269e859d236cac7d6f240bbf54740b79` and libxul digest
+`fd77fac46590b5df6257c0543463c9fc2f5e28cef4d71e9845148c1a05e3c8fd`.
+The timing state and temporary validator branch were removed. The measured
+interval includes connection/queue work and is not an RTT estimator; dividing
+it by another fitted constant would recreate the fixture-specific timing
+problem this experiment was meant to avoid.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
