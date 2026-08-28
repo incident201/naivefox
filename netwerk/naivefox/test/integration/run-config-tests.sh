@@ -13,6 +13,11 @@ case $protocol in
     exit 2
     ;;
 esac
+socks_only=${NAIVEFOX_TEST_SOCKS_ONLY:-0}
+if [[ $socks_only == 1 && $protocol != h2 ]]; then
+  printf 'NAIVEFOX_TEST_SOCKS_ONLY is only supported for h2\n' >&2
+  exit 2
+fi
 
 runtime=${NAIVEFOX_RUNTIME:-$OBJDIR/dist/bin/naivefox}
 external_runtime=false
@@ -77,6 +82,7 @@ CONFIG_PATH=$config_file PROXY_SCHEME=$proxy_scheme \
   SOCKS_PORT=$socks_port HTTP_PORT=$http_port \
   AUTH_SOCKS_PORT=$auth_socks_port LISTEN_USER=$listen_user \
   LISTEN_PASS=$listen_pass \
+  TEST_SOCKS_ONLY=$socks_only \
   TEST_PROTOCOL_SPLIT_PREAMBLE=${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} \
   python3 - <<'PY'
 import json
@@ -109,6 +115,9 @@ config = {
     "no-post-quantum": True,
     "log": "",
 }
+if os.environ["TEST_SOCKS_ONLY"] == "1":
+    config["listen"] = [config["listen"][0]]
+    config["proxy"] = [config["proxy"][0]]
 if os.environ["TEST_PROTOCOL_SPLIT_PREAMBLE"] == "1":
     config["preamble"] = {
         "mode": "document-complete",
@@ -155,8 +164,10 @@ fi
 
 for ((i = 0; i < 150; i++)); do
   if rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log" &&
-    rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log" &&
-    rg -q "^SOCKS5 listening on 0.0.0.0:$auth_socks_port$" "$client_log"; then
+    { [[ $socks_only == 1 ]] || {
+      rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log" &&
+      rg -q "^SOCKS5 listening on 0.0.0.0:$auth_socks_port$" "$client_log"
+    }; }; then
     break
   fi
   kill -0 "$client_pid" 2>/dev/null || {
@@ -166,11 +177,13 @@ for ((i = 0; i < 150; i++)); do
   sleep 0.1
 done
 rg -q "^SOCKS5 listening on 0.0.0.0:$socks_port$" "$client_log"
-rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"
-rg -q "^SOCKS5 listening on 0.0.0.0:$auth_socks_port$" "$client_log"
 ss -Hltn "sport = :$socks_port" | rg -q '0\.0\.0\.0:'
-ss -Hltn "sport = :$http_port" | rg -q '0\.0\.0\.0:'
-ss -Hltn "sport = :$auth_socks_port" | rg -q '0\.0\.0\.0:'
+if [[ $socks_only != 1 ]]; then
+  rg -q "^HTTP CONNECT listening on 0.0.0.0:$http_port$" "$client_log"
+  rg -q "^SOCKS5 listening on 0.0.0.0:$auth_socks_port$" "$client_log"
+  ss -Hltn "sport = :$http_port" | rg -q '0\.0\.0\.0:'
+  ss -Hltn "sport = :$auth_socks_port" | rg -q '0\.0\.0\.0:'
+fi
 
 if [[ -n ${NAIVEFOX_EXPECT_RUNTIME_DIR:-} ]]; then
   expected_runtime=$(realpath -- "$NAIVEFOX_EXPECT_RUNTIME_DIR")
@@ -194,6 +207,41 @@ curl_auth_socks=(
   --proxy-user "$listen_user:$listen_pass"
 )
 expected=naivefox-fixture-small
+
+if [[ $socks_only == 1 ]]; then
+  [[ $(curl "${curl_socks[@]}" --cacert "$NAIVEFOX_FIXTURE_CA" \
+    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/small") == "$expected" ]]
+  for ((i = 0; i < 100; i++)); do
+    if rg -q \
+      'preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h2$' \
+      "$client_log"; then
+      break
+    fi
+    kill -0 "$client_pid" 2>/dev/null || {
+      printf 'NaiveFox exited before the implicit SOCKS preamble drained\n' >&2
+      exit 1
+    }
+    sleep 0.1
+  done
+  [[ $(rg -c '^Outer protocol: h2$' "$client_log") -eq 1 ]]
+  [[ $(rg -c \
+    'preamble document-overlap admission=first-data-buffer-task response_accepted=1 root_done=0 protocol=h2$' \
+    "$client_log") -eq 1 ]]
+  [[ $(rg -c \
+    'preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=h2$' \
+    "$client_log") -eq 1 ]]
+  ! rg -q 'preamble document-overlap admission=first-data-buffer ' "$client_log"
+  ! rg -q 'preamble document-start-overlap admission=' "$client_log"
+  kill "$client_pid"
+  set +e
+  wait "$client_pid"
+  client_status=$?
+  set -e
+  client_pid=
+  [[ $client_status -eq 0 || $client_status -eq 143 ]]
+  printf 'NaiveFox implicit SOCKS-only H2 preamble test passed\n'
+  exit 0
+fi
 
 [[ $(curl "${curl_socks[@]}" \
   "http://localhost:$NAIVEFOX_FIXTURE_HTTP_PORT/small") == "$expected" ]]
@@ -277,13 +325,21 @@ done
 [[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 11 ]]
 ! rg -q '^Padding negotiated: no$' "$client_log"
 if [[ ${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} != 1 ]]; then
-  # Omitted product preamble promotes one cold-route document-start GET for
-  # an explicit H2 or H3 upstream. The remaining ten tunnels reuse the ready
-  # route without replaying the implicit preamble.
-  [[ $(rg -c 'preamble document-start-overlap admission=request-committed' \
-    "$client_log") -eq 1 ]]
-  [[ $(rg -c 'preamble document-start-overlap drain=complete' \
-    "$client_log") -eq 1 ]]
+  # Omitted product preamble uses direct first-buffer admission for mixed
+  # H2 listeners and document-start admission for H3. The remaining ten
+  # tunnels reuse the ready route without replaying the implicit preamble.
+  if [[ $protocol == h2 ]]; then
+    [[ $(rg -c \
+      'preamble document-overlap admission=first-data-buffer response_accepted=1 root_done=0 protocol=h2$' \
+      "$client_log") -eq 1 ]]
+    [[ $(rg -c 'preamble document-overlap drain=complete' \
+      "$client_log") -eq 1 ]]
+  else
+    [[ $(rg -c 'preamble document-start-overlap admission=request-committed' \
+      "$client_log") -eq 1 ]]
+    [[ $(rg -c 'preamble document-start-overlap drain=complete' \
+      "$client_log") -eq 1 ]]
+  fi
 fi
 ! rg -Fq "$NAIVEFOX_FIXTURE_PASS" "$client_log"
 

@@ -44,9 +44,10 @@ proved. All 120 participants passed
 the isolated-network mutation and capture-drop policy. This satisfies the
 predeclared product gate for H3. The final six-block H2 resource-tree screen
 then retained the lower distance for the same compact mechanism in every view
-after packets 1--16. Omitted preamble therefore enables
-`document-start-overlap` for explicit H2 and H3 upstreams; explicit
-`mode: off` remains the control and opt-out.
+after packets 1--16. This initially promoted `document-start-overlap` for
+explicit H2 and H3 upstreams; the later first-buffer H2 evidence below replaces
+the H2 policy while retaining it for H3. Explicit `mode: off` remains the
+control and opt-out.
 Secondary `steady_after_32` and lifecycle point estimates favored `off`; the
 steady paired interval crossed zero and lifecycle did not survive the report's
 Holm correction (`p=0.136`). They remain regression monitors rather than a
@@ -87,7 +88,8 @@ isolated six-block paired screen is retained as `f244527d965b626e`. Relative to
 versus `0.18929`), and whole flow (`0.49826` versus `0.48398`). It introduced
 about 47 KiB of additional early server traffic and a new burst rather than
 removing the residual. The tree is therefore rejected as a default;
-`document-start-overlap` is the compact H2 product policy.
+`document-start-overlap` was kept as the compact H2 control until the later
+first-buffer campaign.
 
 H2 `tree-native-parser-document-start-navigation-stop` retains the same
 client-to-target ownership predicate and scoped load-group cancellation.
@@ -176,6 +178,145 @@ screens do not prove the H2 residual unfixable, but they rule out fixed cover,
 first-event cover, cold-flight delay, gate-only establishment, and early
 record fragmentation as acceptable defaults under the no-tail-regression
 criterion.
+
+A fresh same-base H2/inner-HTTPS-H2 barrier sweep then held the root request,
+response body, MTU 1500 policy, and capture cutoff constant while moving only
+the causal CONNECT admission point. Six-block `document-complete` screen
+`fc337f9614b11061` (seed `2026082803`) improved packets 17--32 from `0.50779`
+to `0.45518`, but worsened packets 1--16, 1--32, 250 ms, and whole flow.
+Successful response-HEADERS admission in `9f502d43d980f6df` (seed
+`2026082809`) improved packets 17--32 from `0.52789` to `0.46752` and packets
+1--32 from `0.20916` to `0.20453`, but worsened packets 1--16 (`0.05244` to
+`0.05673`), 250 ms (`0.09330` to `0.09638`), and whole flow (`0.28526` to
+`0.29516`).
+
+Two response-body-start controls completed the causal scale. Releasing after the complete first
+`OnDataAvailable` buffer in `9225f26bc7c3897b` (seed `2026082806`) improved
+packets 17--32 (`0.60708` to `0.57265`), 250 ms, and whole flow, but worsened
+packets 1--16 and left packets 1--32 slightly worse. Releasing immediately
+after the first successfully read body byte in `063ec521aeb104dd` (seed
+`2026082808`) improved packets 1--16 (`0.10928` to `0.09447`), packets 17--32
+(`0.61839` to `0.56906`), and packets 1--32 (`0.26650` to `0.24909`), but
+worsened 250 ms (`0.11467` to `0.12981`) and whole flow (`0.31970` to
+`0.33364`). All artifacts passed the isolated-network, capture-drop,
+inner-H2, normal-drain, and offload checks. Six blocks remain screening-only,
+but the consistent tradeoff rejects all later document barriers under the
+no-other-view-penalty rule for the original SOCKS ingress.
+
+Changing the local ingress to native HTTP CONNECT exposed a better causal
+boundary without changing the target workload or response sizes. Successful
+response-HEADERS admission first reproduced as a candidate in six-block
+artifacts `e25ca068dd5f6a2f` and `271cc85a33c50ba2`. A bounded response carrier
+that remained open until target payload was observed was then rejected:
+six-block artifact `59cb2995524f019d` worsened packets 17--32 (`0.41397`
+versus `0.37410`), packets 1--32, 250 ms, and whole flow versus the simpler
+HEADERS candidate. Native manual proxy preferences were also rejected in
+two-block artifact `e839b0808bf6d33a`; they introduced a large server-byte
+deficit and raised whole-flow distance to `0.48472` versus `0.29245` for PAC.
+Both temporary mechanisms were removed.
+
+The retained `document-first-buffer-overlap` mode releases only after the
+entire first root-body buffer supplied by Necko has been read successfully.
+This is a size-independent channel event, not a fixed byte threshold. A short
+or failed read does not release CONNECT; a successful 2xx result and normal
+root drain remain required, with bodyless completion using the terminal causal
+fallback. Six-block artifact `306a249a46d33a5c` measured packets 17--32 at
+`0.38953` versus `0.38985` for HEADERS admission and `0.44930` for the SOCKS
+default. It also improved 250 ms (`0.08365` versus `0.09790`/`0.09415`) and
+whole flow (`0.26186` versus `0.28139`/`0.28377`). Independent six-block
+artifact `2b8dd75c4e682940` reproduced every target and cumulative win:
+packets 17--32 were `0.41285` versus `0.43633`/`0.47148`, packets 1--32 were
+`0.22472` versus `0.23290`/`0.24706`, 250 ms was `0.06474` versus
+`0.08738`/`0.08567`, and whole flow was `0.27947` versus
+`0.29050`/`0.29013`.
+
+The first two-block workload check was inconclusive across SOCKS: `initial`
+artifact `531316919b72bf69` retained the large packets-17--32 win (`0.52734`
+versus `0.63849` for document-start), while `bulk_download_256k` artifact
+`c301d169be40ee76` favored document-start at packets 17--32 and whole flow.
+That initially limited the implicit promotion to HTTP-CONNECT-only H2
+listeners. The broader SOCKS campaign below supersedes that provisional
+restriction; these small runs remain screening evidence, not a 30-block
+inference claim.
+
+Two fresh independent six-block SOCKS/browser-page screens used the same
+fail-closed PAC ingress and common same-base Firefox A/B controls. Artifact
+`0e3d5fc56b0e06f5` measured first-buffer at `0.50157` for packets 17--32 and
+`0.28531` for whole flow, versus `0.57141` and `0.30666` for document-start.
+Replication `d98cf5d810045203` again improved packets 17--32 (`0.53648` versus
+`0.58128`) and packets 1--32, while whole flow moved in the other direction
+(`0.25715` versus `0.24842`). Combining the 12 sanitized paired blocks only as
+a diagnostic, not as a predeclared inference test, ranked first-buffer best in
+all five primary views: packets 1--16 `0.06904`, packets 17--32 `0.50936`,
+packets 1--32 `0.22106`, 250 ms `0.07852`, and whole flow `0.25605`, versus
+document-start `0.07038`, `0.56771`, `0.23474`, `0.08193`, and `0.25820`.
+
+Three independently seeded two-block workload controls then addressed the
+earlier bulk ambiguity. On `initial`, artifact `b8f33cd43e0a9722` favored
+first-buffer at packets 17--32 (`0.73471` versus `0.74927`) and whole flow
+(`0.45993` versus `0.47738`). On `bulk_download_256k`, artifact
+`631ac031bb4498aa` favored it in every primary view, including packets 17--32
+(`0.44125` versus `0.54880`) and whole flow (`0.29902` versus `0.32002`). On
+`bidirectional_256k`, artifact `37207e981beba111` again improved packets
+17--32 (`0.54020` versus `0.58278`) and whole flow (`0.35035` versus
+`0.38637`). This repeated SOCKS evidence, together with the two HTTP-CONNECT
+replications, established `document-first-buffer-overlap` as the H2 control.
+The final task-boundary campaign below supersedes it for SOCKS-only listeners;
+HTTP CONNECT and mixed listeners retain direct first-buffer admission. H3
+retains `document-start-overlap`; any explicit preamble or gate value remains
+authoritative.
+
+The selected SOCKS policy then passed a fresh 30-block paired same-base run,
+safe artifact `e1a89392d921b419` (seed `2026082832`). All 120 participants
+passed the fail-closed network-mutation, MTU/offload, capture-drop, inner-H2,
+and normal-drain admission policy. First-buffer ranked lower in all five fixed
+views. Packets 17--32 improved from `0.47100` to `0.42560`; the paired
+difference was `-0.04540`, CI95 `[-0.05907,-0.03310]`, Holm `p=0.0005`.
+Packets 1--16 were `0.06300` versus `0.06409`, packets 1--32 `0.19473` versus
+`0.20371`, 250 ms `0.08576` versus `0.08633`, and whole flow `0.25701` versus
+`0.25735`. None of those four monitors detected a penalty; their
+multiple-comparison-adjusted tests did not establish a difference. The report
+supports this relative default ranking, not absolute Firefox
+indistinguishability.
+
+A native manual-SOCKS-profile control was also tested and removed. Two-block
+artifact `7ffcb29b0724180e` improved whole flow to `0.32764` from `0.33475`
+for document-start but worsened packets 17--32 to `0.52145` from `0.49642`.
+The Firefox profile route is therefore not part of the product or harness.
+
+`document-first-buffer-task-overlap` tests a distinct causal boundary without
+a timer or byte threshold. Its first implementation suspended the root request
+between the complete first body buffer and a next-main-thread-task barrier.
+Lifecycle artifact `b2c6572423dc924e` and browser-page artifacts
+`2bcfc478a6a47a5e`/`2a1d04de4af7389f` proved the mechanism and a strong
+packets-17--32 reduction, but the root backpressure produced an unstable whole
+flow and a bulk-download penalty.
+
+The retained implementation removes `Suspend`/`Resume`. It queues the same
+next-task barrier while allowing the channel to drain; if `OnStopRequest`
+arrives synchronously after the first buffer, only terminal bookkeeping is
+deferred until the queued barrier. Lifecycle artifact `7fa017e5724e7628`
+proves SOCKS5 ingress, `first-data-buffer-task` admission, inner HTTPS/H2,
+normal drain, and isolated/offload checks. Two-block bulk artifact
+`8934faaa21a95889` ranked it best at 250 ms and whole flow. Independent
+six-block browser artifact `e1b352731c553d6d` ranked it best at packets 1--16,
+250 ms, and whole flow while retaining a packets-17--32 improvement versus
+document-start. A fresh 12-block comparison `79e7587b8e64d9ee` then ranked it
+better than direct first-buffer in all five fixed views.
+
+The final 30-block paired SOCKS artifact `2834cb35aa391bb0` (seed
+`2026082838`) admitted all 120 participants and supported paired inference.
+Relative to direct first-buffer, task admission improved packets 17--32 from
+`0.49063` to `0.48016`, packets 1--32 from `0.21280` to `0.21028`, 250 ms from
+`0.08630` to `0.08036`, and whole flow from `0.26133` to `0.25077`. The whole
+paired difference was `-0.01056`, CI95 `[-0.02075,-0.00043]`; it did not
+survive correction across the five overlapping views (Holm `p=0.3095`).
+Packets 1--16 moved from `0.06956` to `0.07328`, with a paired CI crossing
+zero. Under the relaxed acceptance rule this is the better overall tradeoff:
+it further reduces packets 17--32 and whole flow, with no detected early
+penalty. Omitted-preamble SOCKS-only H2 therefore uses task admission;
+HTTP-CONNECT-only and mixed listeners retain direct first-buffer admission,
+and H3 retains document-start. Explicit configuration remains authoritative.
 
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
@@ -897,6 +1038,49 @@ primary repair for the earliest split and motivates an H3-only causal control
 which queues the document transaction normally but releases its HEADERS only
 after QUIC handshake confirmation. Packet positions remain outcomes, never the
 barrier definition.
+
+A six-block same-base H3/SOCKS screen of the bounded post-confirmation dwell
+and six-resource native-parser arm is retained as safe artifact
+`f07dc0cb1e282738` (seed `20260828118`). Descriptively, the candidate measured
+0.13428 for packets 1--16, 0.19702 for packets 17--32, 0.12997 for packets
+1--32, 0.15636 for the first 250 ms, and 0.35166 for the whole-flow view. The
+shared `document-start-overlap` control measured 0.65307 for packets 17--32
+and 0.44082 for the whole flow. This is the strongest controlled fixture result
+so far, but it is not evidence for a product default: the settling interval is
+fixed, the page has one fixed six-resource shape, and the namespace has stable
+localhost latency and bandwidth. A real candidate must retain its advantage
+when object sizes, response pacing, RTT, and available bandwidth vary. Those
+conditions must remain experimental inputs, not values inferred from packet
+indices in this artifact.
+
+The complete follow-up screen is recorded below. Distances are ordered as
+packets 1--16 / packets 17--32 / packets 1--32 / first 250 ms / whole flow.
+One- and two-block rows are diagnostics only; their purpose is to reject ideas
+cheaply and preserve negative results, not compare tiny differences across
+independent seeds.
+
+| Safe artifact | Variant | Blocks | Distances |
+| --- | --- | ---: | --- |
+| `d403f00e1eaa227e` | first 16-ms post-confirmation dwell | 1 | 0.18711 / 0.23813 / 0.16551 / 0.19828 / 0.37031 |
+| `23f0f7cb5a58b9f3` | hold images for stylesheet/script response headers | 1 | 0.22357 / 0.34407 / 0.23429 / 0.21802 / 0.41994 |
+| `472e78a791458b2d` | 15-ms post-confirmation dwell | 1 | 0.16362 / 0.30478 / 0.17779 / 0.20493 / 0.45740 |
+| `dbdf4f41d5460ae8` | 17-ms post-confirmation dwell | 1 | unavailable / 0.47632 / 0.29546 / 0.33291 / 0.50266 |
+| `d747406b98716d1c` | 16-ms dwell plus forced candidate PMTUD | 1 | 0.19568 / 0.24770 / 0.21073 / 0.23474 / 0.43461 |
+| `cdee6e1b67e8d6e0` | image response-tailing class | 1 | 0.17274 / 0.17441 / 0.16196 / 0.18151 / 0.47484 |
+| `2dd5b3b7dde3920a` | release images at parser finish | 1 | 0.21567 / 0.28686 / 0.18901 / 0.22479 / 0.44302 |
+| `7819f87eab73fd56` | preconstruct and synchronously activate all channels | 1 | 0.24242 / 0.26010 / 0.22714 / 0.31901 / 0.44565 |
+| `8acfa2e9bf69fd25` | preconstruct channels; CSS/script then image task | 2 | 0.19958 / 0.21088 / 0.17982 / 0.22551 / 0.39621 |
+| `353ec240b34c1cc1` | preceding two-phase activation with 12-ms dwell | 1 | 0.17917 / 0.48634 / 0.21403 / 0.22754 / 0.46054 |
+| `96e4f0433451f926` | exact Firefox User-Agent override | 1 | 0.20197 / 0.27632 / 0.18694 / 0.24588 / 0.44651 |
+| `54edcd1cb261bd6b` | activate all prepared resources on next main turn | 1 | 0.23997 / 0.17685 / 0.21067 / 0.24860 / 0.43406 |
+| `1e3021030d540730` | sequentially open all resources at parser finish | 1 | 0.25506 / 0.34635 / 0.23902 / 0.24322 / 0.45066 |
+| `dcb8ca36bf574d7a` | confirmation only, then 16-ms resource delay | 1 | 0.13137 / 0.21756 / 0.15600 / 0.20159 / 0.39685 |
+| `86c38709c99b66a0` | split delay: 8 ms before root and 8 ms before resources | 1 | 0.17666 / 0.51109 / 0.26344 / 0.24243 / 0.50742 |
+
+None of the rejected rows improved the early and whole-flow views together.
+They are not timing constants to carry into production. The fixed dwell
+remains an opt-in research mechanism while event-driven or measured-network
+alternatives are evaluated.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and

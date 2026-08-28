@@ -28,6 +28,7 @@ https://:{$NAIVEFOX_FIXTURE_PROXY_PORT} {
 			Cache-Control "public, max-age=3600"
 		}
 		respond /assets/runtime.js `(()=>{"use strict";const e={api:"/api/v1",locale:"en-US"};globalThis.appRuntime=e;})();` 200
+		respond / "naivefox-fixture-preamble-root" 200
 		forward_proxy {
 			basic_auth {$NAIVEFOX_FIXTURE_USER} {$NAIVEFOX_FIXTURE_PASS}
 			hosts localhost

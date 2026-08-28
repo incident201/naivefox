@@ -26,6 +26,7 @@ SUPPORTED_ARMS = (
     "tree-resource-committed-overlap-css",
     "tree-resource-native-cache-committed-overlap",
     "tree-native-parser-preload-overlap-css",
+    "tree-native-parser-resource-committed-page",
     "tree-native-parser-document-start-overlap-css",
     "tree-native-parser-document-start-navigation-stop-css",
     "tree-native-parser-document-start-response-stop-css",
@@ -57,8 +58,10 @@ SELECTED_GET_SEMANTIC_HEADERS = {
 }
 REQUIRED_GET_PSEUDO_HEADERS = {":method", ":scheme", ":authority", ":path"}
 ROOT_PATH_PATTERN = re.compile(
-    r"/camouflage/index\.html\?scenario=browser_page&size=262144&count=4"
-    r"&idle_ms=5000&completion=[0-9a-f]{32}"
+    r"/camouflage/index\.html\?(?:"
+    r"scenario=browser_page&size=262144&count=4&idle_ms=5000"
+    r"|scenario=fronting_page_dense"
+    r")&completion=[0-9a-f]{32}"
 )
 CONFIRMED_LIFECYCLE_PATTERNS = {
     "connected": re.compile(
@@ -450,7 +453,17 @@ def read_get_request_semantics(root, cohort, proxy_port):
                     f"{cohort} private GET stream id is not numeric"
                 ) from error
             blocks.append((int(row["frame.number"]), numeric_stream, selected))
-    if cohort in (
+    if cohort == "tree-native-parser-resource-committed-page":
+        roles = (
+            "root",
+            "stylesheet",
+            "script",
+            "image-1",
+            "image-2",
+            "image-3",
+            "image-api",
+        )
+    elif cohort in (
         "tree-complete-css",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
@@ -589,16 +602,48 @@ def validate_expected_get_request_semantics(cohort, semantics):
             "sec-fetch-dest": "document",
         },
         "stylesheet": {
-            ":path": "/camouflage/style.css",
+            ":path": (
+                "/camouflage/fronting.css"
+                if cohort == "tree-native-parser-resource-committed-page"
+                else "/camouflage/style.css"
+            ),
             "sec-fetch-site": "same-origin",
             "sec-fetch-mode": "no-cors",
             "sec-fetch-dest": "style",
         },
         "script": {
-            ":path": "/camouflage/app.js",
+            ":path": (
+                "/camouflage/fronting.js"
+                if cohort == "tree-native-parser-resource-committed-page"
+                else "/camouflage/app.js"
+            ),
             "sec-fetch-site": "same-origin",
             "sec-fetch-mode": "no-cors",
             "sec-fetch-dest": "script",
+        },
+        "image-1": {
+            ":path": "/camouflage/fronting.svg?item=1",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "no-cors",
+            "sec-fetch-dest": "image",
+        },
+        "image-2": {
+            ":path": "/camouflage/fronting.svg?item=2",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "no-cors",
+            "sec-fetch-dest": "image",
+        },
+        "image-3": {
+            ":path": "/camouflage/fronting.svg?item=3",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "no-cors",
+            "sec-fetch-dest": "image",
+        },
+        "image-api": {
+            ":path": "/camouflage/api?item=4",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "no-cors",
+            "sec-fetch-dest": "image",
         },
     }
     root_values = dict(semantics["root"])
@@ -1678,6 +1723,7 @@ def validate(cohorts, connections, client_hellos, arms):
             "tree-resource-committed-overlap-css",
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
+            "tree-native-parser-resource-committed-page",
             "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
@@ -1690,7 +1736,9 @@ def validate(cohorts, connections, client_hellos, arms):
             "tree-overlap",
         ):
             expected_gets = (
-                2
+                7
+                if arm == "tree-native-parser-resource-committed-page"
+                else 2
                 if arm
                 in (
                     "tree-complete-css",
@@ -1698,6 +1746,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     "tree-resource-committed-overlap-css",
                     "tree-resource-native-cache-committed-overlap",
                     "tree-native-parser-preload-overlap-css",
+                    "tree-native-parser-resource-committed-page",
                     "tree-native-parser-document-start-overlap-css",
                     "tree-native-parser-document-start-navigation-stop-css",
                     "tree-native-parser-document-start-response-stop-css",

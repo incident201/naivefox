@@ -336,6 +336,34 @@ H2 admission proves one physical TLS connection with a native root request,
 CONNECT, then the exact style/script/image resource set and normal stream
 completion.
 
+## NF-UPSTREAM-015: bounded post-confirmation H3 preamble dwell
+
+Files:
+
+```text
+netwerk/protocol/http/nsIHttpChannelInternal.idl
+netwerk/protocol/http/HttpBaseChannel.h
+netwerk/protocol/http/HttpBaseChannel.cpp
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpTransaction.h
+netwerk/protocol/http/HttpConnectionUDP.cpp
+netwerk/test/unit/test_proxy_preamble.js
+```
+
+Adds an opt-in, pre-open interval for a marked HTTP/3 proxy preamble. The
+transaction waits for transport confirmation, then defers activation by a
+strictly bounded settling interval. The existing confirmation-only behavior
+retains its zero-delay release, and unmarked transactions and non-H3 transports
+are unchanged.
+
+Review obligations: the interval remains limited to 1 through 100 milliseconds
+and requires the proxy-preamble flag; mutually exclusive carrier, cold-winner,
+and cache-open modes remain rejected; delayed dispatch retains the exact
+transaction and closes it on dispatch failure; the focused API regression
+proves the range and pre-open contract while the H2 request remains ordinary;
+and H3 integration preserves one physical outer connection and normal stream
+lifecycle.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

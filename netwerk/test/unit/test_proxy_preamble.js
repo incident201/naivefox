@@ -52,7 +52,23 @@ add_task(async function test_proxy_preamble_is_an_ordinary_h2_get() {
       Ci.nsILoadInfo.SEC_COOKIES_OMIT,
   }).QueryInterface(Ci.nsIHttpChannel);
   const internal = channel.QueryInterface(Ci.nsIHttpChannelInternal);
+  Assert.throws(
+    () => internal.setProxyPreambleHandshakeDwell(16),
+    /NS_ERROR_INVALID_ARG/,
+    "the dwell requires a proxy preamble"
+  );
   internal.setProxyPreamble();
+  Assert.throws(
+    () => internal.setProxyPreambleHandshakeDwell(0),
+    /NS_ERROR_INVALID_ARG/,
+    "the dwell must be positive"
+  );
+  Assert.throws(
+    () => internal.setProxyPreambleHandshakeDwell(101),
+    /NS_ERROR_INVALID_ARG/,
+    "the dwell is bounded"
+  );
+  internal.setProxyPreambleHandshakeDwell(16);
 
   let body = "";
   await new Promise((resolve, reject) => {
@@ -123,5 +139,10 @@ add_task(async function test_proxy_preamble_is_an_ordinary_h2_get() {
     () => internal.setProxyPreamble(),
     /NS_ERROR_IN_PROGRESS/,
     "the preamble flag is pre-open only"
+  );
+  Assert.throws(
+    () => internal.setProxyPreambleHandshakeDwell(16),
+    /NS_ERROR_IN_PROGRESS/,
+    "the preamble dwell is pre-open only"
   );
 });

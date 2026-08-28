@@ -668,6 +668,23 @@ void HttpConnectionUDP::OnHandshakeConfirmed() {
            "transport_confirmed=1",
            mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
     }
+    const uint32_t dwellMs = trans->H3HandshakeDwellMs();
+    if (dwellMs) {
+      RefPtr<HttpConnectionUDP> self = this;
+      RefPtr<nsHttpTransaction> transaction = trans;
+      nsresult rv = NS_DelayedDispatchToCurrentThread(
+          NS_NewRunnableFunction(
+              "HttpConnectionUDP::ReleasePreambleAfterBrowserDwell",
+              [self = std::move(self),
+               transaction = std::move(transaction)]() {
+                self->ResetTransaction(transaction);
+              }),
+          dwellMs);
+      if (NS_FAILED(rv)) {
+        trans->Close(rv);
+      }
+      continue;
+    }
     ResetTransaction(trans);
   }
 #endif

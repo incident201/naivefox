@@ -52,7 +52,11 @@ enum class PreambleMode : uint8_t {
   DocumentNativeCacheOpen,
   DocumentHandshakeConfirmed,
   DocumentOverlap,
+  DocumentHeadersTaskOverlap,
+  DocumentFirstBufferOverlap,
+  DocumentFirstBufferTaskOverlap,
   DocumentStartOverlap,
+  DocumentStartTaskOverlap,
   TreeComplete,
   TreeOverlap,
   TreeEarlyOverlap,
@@ -62,6 +66,7 @@ enum class PreambleMode : uint8_t {
   TreeNativeParserPreloadOverlap,
   TreeNativeParserDocumentStartOverlap,
   TreeNativeParserDocumentStartResourceTree,
+  TreeNativeParserResourceCommittedOverlap,
   TreeNativeParserDocumentStartNavigationStop,
   TreeNativeParserDocumentStartResponseStop,
   TreeNativeParserDocumentHandoffOverlap,
@@ -84,7 +89,11 @@ constexpr bool PreambleModeUsesResources(PreambleMode aMode) {
          aMode != PreambleMode::DocumentNativeCacheOpen &&
          aMode != PreambleMode::DocumentHandshakeConfirmed &&
          aMode != PreambleMode::DocumentOverlap &&
-         aMode != PreambleMode::DocumentStartOverlap;
+         aMode != PreambleMode::DocumentHeadersTaskOverlap &&
+         aMode != PreambleMode::DocumentFirstBufferOverlap &&
+         aMode != PreambleMode::DocumentFirstBufferTaskOverlap &&
+         aMode != PreambleMode::DocumentStartOverlap &&
+         aMode != PreambleMode::DocumentStartTaskOverlap;
 }
 
 constexpr bool PreambleModeUsesNativeParserDocumentStart(PreambleMode aMode) {
@@ -100,12 +109,14 @@ constexpr bool PreambleModeUsesScopedNavigationStop(PreambleMode aMode) {
 }
 
 constexpr bool PreambleModeUsesNativeParserResourceTree(PreambleMode aMode) {
-  return aMode == PreambleMode::TreeNativeParserDocumentStartResourceTree;
+  return aMode == PreambleMode::TreeNativeParserDocumentStartResourceTree ||
+         aMode == PreambleMode::TreeNativeParserResourceCommittedOverlap;
 }
 
 constexpr bool PreambleModeUsesLightweightNativeParser(PreambleMode aMode) {
   return aMode == PreambleMode::TreeNativeParserPreloadOverlap ||
-         PreambleModeUsesNativeParserDocumentStart(aMode);
+         PreambleModeUsesNativeParserDocumentStart(aMode) ||
+         PreambleModeUsesNativeParserResourceTree(aMode);
 }
 
 constexpr bool PreambleModeUsesNativeParser(PreambleMode aMode) {
@@ -213,8 +224,8 @@ struct Config final {
   uint32_t mMaxConnections = 0;
   bool mOuterSessionGate = false;
   // Successfully parsed configs with an explicit upstream and no preamble
-  // field receive the promoted per-protocol document-start policy. Its
-  // cold-route gate is deliberately distinct from the user-visible gate.
+  // field receive the promoted per-protocol document policy. Its cold-route
+  // gate is deliberately distinct from the user-visible gate.
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mNoPostQuantum = false;

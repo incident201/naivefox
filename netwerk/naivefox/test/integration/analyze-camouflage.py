@@ -169,18 +169,31 @@ def load_dataset(path):
                 "document-cold-winner-handoff",
                 "document-native-cache-open",
                 "document-handshake-confirmed",
+                "document-first-buffer-overlap",
+                "document-first-buffer-task-overlap",
+                "document-first-buffer-http-connect",
                 "document-overlap",
+                "document-headers-task-overlap",
+                "document-overlap-http-connect",
+                "document-start-http-connect",
                 "document-start-overlap",
+                "document-start-task-overlap",
                 "tree-complete",
                 "tree-complete-css",
+                "tree-complete-resource-tree",
                 "tree-early-overlap",
+                "tree-early-overlap-resource-tree",
                 "tree-root-overlap",
                 "tree-root-overlap-css",
                 "tree-resource-committed-overlap-css",
+                "tree-resource-committed-overlap-tree",
+                "tree-resource-committed-overlap-page",
                 "tree-resource-native-cache-committed-overlap",
                 "tree-native-parser-preload-overlap-css",
                 "tree-native-parser-document-start-overlap-css",
                 "tree-native-parser-document-start-resource-tree",
+                "tree-native-parser-resource-committed-tree",
+                "tree-native-parser-resource-committed-page",
                 "tree-native-parser-document-start-navigation-stop-css",
                 "tree-native-parser-document-start-response-stop-css",
                 "tree-native-parser-document-handoff-overlap-css",
@@ -196,13 +209,6 @@ def load_dataset(path):
                 raise SystemExit("invalid NaiveFox arm metadata")
             if arm == "firefox-proxied" and source["protocol"] != "h2":
                 raise SystemExit("firefox-proxied analysis requires h2")
-            if (
-                arm == "tree-native-parser-document-start-resource-tree"
-                and source["protocol"] != "h2"
-            ):
-                raise SystemExit(
-                    "tree-native-parser-document-start-resource-tree requires h2"
-                )
             if arm == "root-pmtud-control" and source["protocol"] != "h3":
                 raise SystemExit("root-pmtud-control requires h3")
             if arm == "document-handshake-confirmed" and source["protocol"] != "h3":
@@ -214,10 +220,19 @@ def load_dataset(path):
             if arm == "document-native-cache-open" and source["protocol"] != "h3":
                 raise SystemExit("document-native-cache-open requires h3")
             if (
-                arm == "tree-resource-committed-overlap-css"
+                arm
+                in (
+                    "tree-resource-committed-overlap-css",
+                    "tree-resource-committed-overlap-tree",
+                    "tree-resource-committed-overlap-page",
+                    "tree-native-parser-resource-committed-tree",
+                    "tree-native-parser-resource-committed-page",
+                    "tree-complete-resource-tree",
+                    "tree-early-overlap-resource-tree",
+                )
                 and source["protocol"] != "h3"
             ):
-                raise SystemExit("tree-resource-committed-overlap-css requires h3")
+                raise SystemExit(f"{arm} requires h3")
             if (
                 arm == "tree-resource-native-cache-committed-overlap"
                 and source["protocol"] != "h3"

@@ -114,9 +114,17 @@ constexpr bool PreambleBarrierReached(
   if (aMode == PreambleMode::DocumentOverlap) {
     return aRootResponseAccepted && !aRootDone;
   }
-  if (aMode == PreambleMode::DocumentStartOverlap ||
+  if (aMode == PreambleMode::DocumentHeadersTaskOverlap ||
+      aMode == PreambleMode::DocumentFirstBufferOverlap ||
+      aMode == PreambleMode::DocumentFirstBufferTaskOverlap ||
+      aMode == PreambleMode::DocumentStartOverlap ||
+      aMode == PreambleMode::DocumentStartTaskOverlap ||
       PreambleModeUsesNativeParserDocumentStart(aMode)) {
     return false;
+  }
+  if (aMode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+    return (aRootResponseAccepted || aRootDone) && aAssetCount > 0 &&
+           aAssetsCommitted == aAssetCount;
   }
   if (!aRootDone) {
     return false;
@@ -138,8 +146,8 @@ constexpr bool PreambleBarrierReached(
     return aAssetCount > 0;
   }
   if (aMode == PreambleMode::TreeResourceCommittedOverlap) {
-    return aRootCompletedSuccessfully && aAssetCount == 1 &&
-           aAssetsCommitted == 1;
+    return aRootCompletedSuccessfully && aAssetCount > 0 &&
+           aAssetsCommitted == aAssetCount;
   }
   if (aMode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
     return aRootCompletedSuccessfully && aAssetCount == 1 &&
@@ -175,7 +183,11 @@ constexpr bool PreambleBarrierReached(
 
 constexpr bool PreambleOverlapsConnect(PreambleMode aMode) {
   return aMode == PreambleMode::DocumentOverlap ||
+         aMode == PreambleMode::DocumentHeadersTaskOverlap ||
+         aMode == PreambleMode::DocumentFirstBufferOverlap ||
+         aMode == PreambleMode::DocumentFirstBufferTaskOverlap ||
          aMode == PreambleMode::DocumentStartOverlap ||
+         aMode == PreambleMode::DocumentStartTaskOverlap ||
          aMode == PreambleMode::TreeOverlap ||
          aMode == PreambleMode::TreeEarlyOverlap ||
          aMode == PreambleMode::TreeRootOverlap ||
@@ -204,7 +216,11 @@ constexpr bool PreambleUsesRetargetedRootDelivery(PreambleMode aMode,
 constexpr bool PreambleNeedsCompletionFallback(PreambleMode aMode,
                                                bool aBarrierFired) {
   return (aMode == PreambleMode::DocumentOverlap ||
+          aMode == PreambleMode::DocumentHeadersTaskOverlap ||
+          aMode == PreambleMode::DocumentFirstBufferOverlap ||
+          aMode == PreambleMode::DocumentFirstBufferTaskOverlap ||
           aMode == PreambleMode::DocumentStartOverlap ||
+          aMode == PreambleMode::DocumentStartTaskOverlap ||
           aMode == PreambleMode::TreeEarlyOverlap ||
           aMode == PreambleMode::TreeRootOverlap ||
           aMode == PreambleMode::TreeResourceCommittedOverlap) &&
@@ -301,6 +317,7 @@ class ProxyPreambleOperation final {
                  const Maybe<HostResolverRule>& aHostResolverRule,
                  uint64_t aConnectionId);
   nsresult OnStartRequest(uint32_t aStreamId, nsIRequest* aRequest);
+  nsresult DispatchDocumentBarrierTask();
   nsresult OnDataAvailable(uint32_t aStreamId, nsIInputStream* aInputStream,
                            uint32_t aCount);
   nsresult OnRetargetedDataAvailable(uint32_t aStreamId,

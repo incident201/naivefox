@@ -37,10 +37,46 @@ def proxy_pac_url(socks_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
     return f"data:application/x-ns-proxy-autoconfig;base64,{encoded}"
 
 
+def http_proxy_pac_script(http_proxy_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
+    for name, port in (
+        ("HTTP proxy", http_proxy_port),
+        ("dead proxy", dead_proxy_port),
+    ):
+        if not 1 <= port <= 65535:
+            raise ValueError(f"{name} port is outside 1..65535")
+    return f"""function FindProxyForURL(url, host) {{
+  host = host.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" ||
+      host === "::1" || host === "[::1]") {{
+    return "PROXY 127.0.0.1:{http_proxy_port}";
+  }}
+  return "PROXY 127.0.0.1:{dead_proxy_port}";
+}}
+"""
+
+
+def http_proxy_pac_url(http_proxy_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
+    encoded = base64.b64encode(
+        http_proxy_pac_script(http_proxy_port, dead_proxy_port).encode("utf-8")
+    ).decode("ascii")
+    return f"data:application/x-ns-proxy-autoconfig;base64,{encoded}"
+
+
 def proxy_preferences(socks_port):
     return {
         "network.proxy.type": 2,
         "network.proxy.autoconfig_url": proxy_pac_url(socks_port),
+        "network.proxy.autoconfig_url.include_path": False,
+        "network.proxy.no_proxies_on": "",
+        "network.proxy.allow_hijacking_localhost": True,
+        "network.proxy.failover_direct": False,
+    }
+
+
+def http_proxy_preferences(http_proxy_port):
+    return {
+        "network.proxy.type": 2,
+        "network.proxy.autoconfig_url": http_proxy_pac_url(http_proxy_port),
         "network.proxy.autoconfig_url.include_path": False,
         "network.proxy.no_proxies_on": "",
         "network.proxy.allow_hijacking_localhost": True,
@@ -55,8 +91,23 @@ def proxy_user_js(socks_port):
     )
 
 
-def firefox_preferences(protocol, proxy_port, socks_port):
-    direct_h3 = protocol == "h3" and not socks_port
+def http_proxy_user_js(http_proxy_port):
+    return "".join(
+        f"user_pref({json.dumps(name)}, {json.dumps(value)});\n"
+        for name, value in http_proxy_preferences(http_proxy_port).items()
+    )
+
+
+def firefox_preferences(
+    protocol,
+    proxy_port,
+    socks_port,
+    http_proxy_port=0,
+):
+    local_proxy_ports = [socks_port, http_proxy_port]
+    if sum(bool(port) for port in local_proxy_ports) > 1:
+        raise ValueError("local proxy ports are mutually exclusive")
+    direct_h3 = protocol == "h3" and not any(local_proxy_ports)
     preferences = {
         "app.update.enabled": False,
         "browser.shell.checkDefaultBrowser": False,
@@ -77,6 +128,8 @@ def firefox_preferences(protocol, proxy_port, socks_port):
         })
     if socks_port:
         preferences.update(proxy_preferences(socks_port))
+    if http_proxy_port:
+        preferences.update(http_proxy_preferences(http_proxy_port))
     return preferences
 
 
@@ -107,7 +160,10 @@ class Controller:
         options.add_argument("--width=1280")
         options.add_argument("--height=720")
         for name, value in firefox_preferences(
-            self.args.protocol, self.args.proxy_port, self.args.socks_port
+            self.args.protocol,
+            self.args.proxy_port,
+            self.args.socks_port,
+            self.args.http_proxy_port,
         ).items():
             options.set_preference(name, value)
         service_args = (
@@ -272,6 +328,12 @@ def main():
         except (ValueError, TypeError) as error:
             raise SystemExit(f"invalid PAC SOCKS port: {error}") from error
         return
+    if len(sys.argv) == 3 and sys.argv[1] == "--generate-http-pac-user-js":
+        try:
+            print(http_proxy_user_js(int(sys.argv[2])), end="")
+        except (ValueError, TypeError) as error:
+            raise SystemExit(f"invalid PAC HTTP proxy port: {error}") from error
+        return
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True)
     parser.add_argument("--profile", required=True)
@@ -281,6 +343,7 @@ def main():
     parser.add_argument("--protocol", choices=("h2", "h3"), required=True)
     parser.add_argument("--proxy-port", type=int, required=True)
     parser.add_argument("--socks-port", type=int, default=0)
+    parser.add_argument("--http-proxy-port", type=int, default=0)
     parser.add_argument("--url", required=True)
     parser.add_argument("--completion-file", required=True)
     parser.add_argument("--second-url")
@@ -304,6 +367,12 @@ def main():
     parser.add_argument("--timeout", type=int, required=True)
     parser.add_argument("--shutdown-file")
     args = parser.parse_args()
+    local_proxy_ports = (
+        args.socks_port,
+        args.http_proxy_port,
+    )
+    if sum(bool(port) for port in local_proxy_ports) > 1:
+        parser.error("local proxy port options are mutually exclusive")
     if bool(args.warmup_url) != bool(args.warmup_completion_file):
         parser.error("--warmup-url and --warmup-completion-file must be used together")
     if bool(args.second_url) != bool(args.second_completion_file):

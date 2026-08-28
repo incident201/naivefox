@@ -4185,6 +4185,25 @@ HttpBaseChannel::SetProxyPreambleWaitForHandshakeConfirmation() {
 }
 
 NS_IMETHODIMP
+HttpBaseChannel::SetProxyPreambleHandshakeDwell(uint32_t aMilliseconds) {
+  ENSURE_CALLED_BEFORE_CONNECT();
+
+#ifdef MOZ_NAIVEFOX
+  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) || aMilliseconds == 0 ||
+      aMilliseconds > 100 || mProxyPreambleUseCarrierDispatch ||
+      mProxyPreambleUseColdWinnerHandoff || mProxyPreambleUseNativeCacheOpen ||
+      mProxyPreambleUseNativeResourceCacheOpen) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  mProxyPreambleWaitForHandshakeConfirmation = true;
+  mProxyPreambleHandshakeDwellMs = aMilliseconds;
+  return NS_OK;
+#else
+  return NS_ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+NS_IMETHODIMP
 HttpBaseChannel::SetProxyPreambleUseCarrierDispatch() {
   ENSURE_CALLED_BEFORE_CONNECT();
 

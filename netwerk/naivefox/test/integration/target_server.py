@@ -262,6 +262,18 @@ class Handler(BaseHTTPRequestHandler):
                 '<img src="/camouflage/fronting.svg" alt="Status overview">'
                 "</main></body>"
             )
+        elif scenario == "fronting_page_dense":
+            body = (
+                "<head>"
+                '<link rel="stylesheet" href="/camouflage/fronting.css">'
+                '<script defer src="/camouflage/fronting.js"></script>'
+                "</head><body><main class=\"hero\">"
+                '<img src="/camouflage/fronting.svg?item=1" alt="Overview">'
+                '<img src="/camouflage/fronting.svg?item=2" alt="Status">'
+                '<img src="/camouflage/fronting.svg?item=3" alt="Health">'
+                '<img src="/camouflage/api?item=4" alt="Details">'
+                "</main></body>"
+            )
         elif scenario == "warm_css":
             body = '<link rel="stylesheet" href="/camouflage/style.css">'
         elif scenario == "sequential":

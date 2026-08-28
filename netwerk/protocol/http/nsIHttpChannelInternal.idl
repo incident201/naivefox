@@ -243,6 +243,12 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setProxyPreambleWaitForHandshakeConfirmation();
 
     /**
+     * For a marked HTTP/3 proxy preamble, wait for transport confirmation and
+     * defer request activation by the bounded settling interval.
+     */
+    [must_use] void setProxyPreambleHandshakeDwell(in unsigned long milliseconds);
+
+    /**
      * For the experimental first cold HTTP/3 proxy preamble only, establish
      * the session with a request-less carrier, then dispatch this transaction
      * normally after the connected activation callback.

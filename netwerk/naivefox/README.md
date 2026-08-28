@@ -78,24 +78,28 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
-- `preamble` is optional. When it is omitted, explicit `https://` and
-  `quic://` upstreams use the promoted `document-start-overlap` policy at path
-  `/` with a 64 KiB safety budget. The implicit cold-route gate applies to the
-  selected H2 or H3 upstream, so one established outer session does not repeat
-  the synthetic document for every tunnel. An
+- `preamble` is optional. When it is omitted, an explicit H2 upstream behind
+  SOCKS-only listeners uses the promoted `document-first-buffer-task-overlap`
+  policy. HTTP-CONNECT-only and mixed listeners use
+  `document-first-buffer-overlap`; H3 retains `document-start-overlap`. All
+  three policies use path `/` with a 64 KiB safety budget. The implicit
+  cold-route gate applies to the selected H2 or H3 upstream, so one established
+  outer session does not repeat the synthetic document for every tunnel. An
   explicit `{"preamble":{"mode":"off"}}` is the complete opt-out, and an
   explicit `outer-session-gate` value remains authoritative: `false` runs the
   implicit protocol-specific document on every tunnel, while `true` retains
-  the existing global gate semantics. An older H3 gate-only config must now add explicit
-  `mode: off` to keep sending no document GET. The 64 KiB value is a safety cap,
-  not a target response size. `mode` is still
-  required when the preamble object is present; optional `h2-mode` and `h3-mode`
-  override it only for that negotiated outer protocol. This allows Auto mode
-  to choose a fresh policy on fallback instead of reusing the failed H3
-  attempt's policy. Supported modes are `off`, `document-complete`,
+  the existing global gate semantics. An older H3 gate-only config must now
+  add explicit `mode: off` to keep sending no document GET. The 64 KiB value is
+  a safety cap, not a target response size. `mode` is still required when the
+  preamble object is present; optional `h2-mode` and `h3-mode` override it only
+  for that negotiated outer protocol. This allows Auto mode to choose a fresh
+  policy on fallback instead of reusing the failed H3 attempt's policy.
+  Supported modes are `off`, `document-complete`,
   `document-carrier-dispatch`, `document-cold-winner-handoff`,
   `document-native-cache-open`,
   `document-handshake-confirmed`, `document-overlap`,
+  `document-first-buffer-overlap`,
+  `document-first-buffer-task-overlap`,
   `document-start-overlap`, `tree-native-parser-document-start-overlap`,
   `tree-native-parser-document-start-resource-tree`,
   `tree-native-parser-document-start-navigation-stop`,
@@ -131,6 +135,38 @@ The supported config is a strict NaiveProxy-compatible subset:
   success criterion because that would make the policy depend on response size
   and packetization. The current screening evidence does not make this mode a
   recommended default.
+  `document-first-buffer-overlap` admits CONNECT only after the complete first
+  body buffer delivered by Necko has been consumed successfully. The event is
+  a channel-delivery boundary, not a byte count or fixture-size threshold; a
+  short or failed read cannot release CONNECT, and normal 2xx document drain
+  remains mandatory. Two independent six-block H2/inner-H2 screens with an
+  HTTP CONNECT local frontend (`306a249a46d33a5c` and
+  `2b8dd75c4e682940`) reproduced lower packets-17--32, 1--32, 250 ms, and
+  whole-flow distances than both response-HEADERS admission and the former
+  SOCKS default. Two independent six-block SOCKS screens
+  (`0e3d5fc56b0e06f5` and `d98cf5d810045203`) then reproduced the
+  packets-17--32 and 1--32 improvement; their combined diagnostic ranked
+  first-buffer best in every view. Fresh initial, bulk-download, and
+  bidirectional SOCKS controls (`b8f33cd43e0a9722`, `631ac031bb4498aa`, and
+  `37207e981beba111`) each favored first-buffer over document-start at packets
+  17--32 and whole flow. This established direct first-buffer as the H2
+  control and retained policy for HTTP CONNECT and mixed listeners. Fresh
+  30-block paired SOCKS artifact `e1a89392d921b419`
+  then ranked it lower in all five fixed views: packets 17--32 improved from
+  `0.47100` to `0.42560` (paired CI95 `[-0.05907,-0.03310]`, Holm
+  `p=0.0005`), while whole flow was effectively tied at `0.25701` versus
+  `0.25735`. Explicit preamble policy remains authoritative.
+  `document-first-buffer-task-overlap` queues CONNECT admission to the next
+  main-thread task after the first complete body buffer. The root channel is
+  not suspended; if its terminal callback arrives synchronously, only terminal
+  bookkeeping is deferred until the queued barrier, so normal network drain is
+  never backpressured. In fresh 30-block paired SOCKS artifact
+  `2834cb35aa391bb0`, task admission improved packets 17--32 from `0.49063` to
+  `0.48016`, packets 1--32 from `0.21280` to `0.21028`, 250 ms from `0.08630`
+  to `0.08036`, and whole flow from `0.26133` to `0.25077` relative to direct
+  first-buffer. Packets 1--16 moved from `0.06956` to `0.07328`; its CI crossed
+  zero. This promotes task admission for SOCKS-only H2 while leaving the
+  ingress-tested direct policy on HTTP CONNECT and mixed listeners.
   `document-start-overlap` is a stricter request-scheduling experiment. Its
   root channel exposes the normal per-channel `WAITING_FOR` progress event
   only after the H2/H3 request stream has accepted and committed the GET. It
@@ -141,8 +177,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   It improved packets 1--16 (`0.16459` to `0.13442`), packets 17--32
   (`0.76117` to `0.65828`), packets 1--32 (`0.26499` to `0.22720`), and the
   250 ms view (`0.14026` to `0.12081`); no whole-flow regression was detected
-  (`0.38926` to `0.38660`, with a paired interval crossing zero). It is
-  therefore the implicit default for explicit H2 and H3 upstreams. A final
+  (`0.38926` to `0.38660`, with a paired interval crossing zero). It therefore
+  remains the implicit default for H3 configurations. A final
   six-block H2 screen against the bounded resource-tree candidate retained the
   lower distance for this mode in packets 17--32, packets 1--32, 250 ms, and
   whole-flow views, while packets 1--16 were effectively tied.
