@@ -1109,6 +1109,7 @@ independent seeds.
 | `02da1771dd44e616` | confirmation-gated six-resource arm, 1048576-byte page base | 4 | 0.08761 / 0.42522 / 0.17234 / 0.16295 / 0.38674 |
 | `99b99423b650ff11` | explicit 16-ms dwell, 65536-byte page base | 4 | 0.18995 / 0.13934 / 0.15949 / 0.19980 / 0.37883 |
 | `4f29ad91fa7f29f6` | explicit 16-ms dwell, 1048576-byte page base | 4 | 0.14023 / 0.18591 / 0.13661 / 0.16593 / 0.36313 |
+| `a8977a8f77e3e129` | explicit 16-ms dwell, 20-ms one-way delay and 20 Mbit/s | 4 | 0.19669 / 0.55600 / 0.24601 / 0.16671 / 0.44047 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1142,6 +1143,18 @@ limited but real: candidate packets 1--16 exceeded control by 0.05848 and
 0.05072, while 250 ms exceeded it by 0.01797 and 0.00784. Thus object size
 alone does not invalidate the dwell, but these four-block diagnostics do not
 answer slower-link or RTT robustness and do not promote the timer to default.
+
+The predeclared shaped-link run rejects the fixed dwell as a general default.
+Artifact `a8977a8f77e3e129` uses the same identified 16-ms binary at the default
+page size, with a verified 20-ms one-way delay, 20-Mbit/s loopback rate, and
+receive-side timestamps. Packets 17--32 regressed to 0.55600, only slightly
+below the `document-start-overlap` control's 0.60207, and whole flow regressed
+to 0.44047 versus 0.45630. Packets 1--16, 1--32, and 250 ms were effectively
+near the control rather than retaining the localhost advantage. Firefox A/B
+whole durations remained close (means 541.7 and 547.6 ms), so this is not
+explained by a broken control envelope. The opt-in fixed dwell remains a useful
+laboratory oracle, but a production successor must derive release from actual
+transport progress or native scheduling under the current path conditions.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
