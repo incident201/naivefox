@@ -330,6 +330,7 @@ class ProxyPreambleOperation final {
   nsresult MaybeIssueNativeParserNavigationStop();
   nsresult DispatchNativeParserChunk(nsCString&& aChunk);
   nsresult DispatchNativeParserFinish();
+  void ReleaseDeferredNativeParserImages();
   nsresult DispatchNativeParserReplacementListenerInstall();
   void OnNativeParserReplacementListenerInstalled(uint64_t aGeneration);
   nsresult ResumeNativeParserDocumentHandoffRoot();

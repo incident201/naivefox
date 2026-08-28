@@ -571,6 +571,78 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "causal state"):
             SAMPLE.validate_sample(arm, "h2", "\n".join(mutated), features)
 
+    def test_resource_committed_page_requires_deferred_image_opens(self):
+        arm = "tree-native-parser-resource-committed-page"
+        protocol = "h3"
+        lines = [
+            "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
+            "descriptors=7 status=0x00000000 generation=1 protocol=h3",
+            "Preamble native-parser-resource-tree lifecycle=resource-opened "
+            "stream=1 kind=style referrer=inherited protocol=h3",
+            "Preamble native-parser-resource-tree lifecycle=resource-opened "
+            "stream=2 kind=script referrer=inherited protocol=h3",
+        ]
+        for stream in range(3, 7):
+            lines.append(
+                "Preamble native-parser-resource-tree "
+                f"lifecycle=resource-prepared stream={stream} kind=image "
+                "referrer=inherited protocol=h3"
+            )
+        for stream in range(3, 7):
+            lines.append(
+                "Preamble native-parser-resource-tree "
+                f"lifecycle=deferred-resource-opened stream={stream} kind=image "
+                "cause=next-main-turn protocol=h3"
+            )
+        for stream in range(1, 7):
+            lines.append(
+                "Preamble native-parser-resource-tree "
+                f"lifecycle=resource-committed stream={stream} "
+                "status=waiting-for protocol=h3"
+            )
+        lines.extend([
+            "Preamble native-parser-resource-tree "
+            "barrier=first-resource-headers assets=6 committed=6 protocol=h3",
+            "Connection 7 preamble native-parser-resource-tree "
+            "admission=resources-committed request_committed=1 root_done=1 "
+            "protocol=h3",
+            "Connection 7 preamble result=success status=0x00000000 "
+            "http=200 bytes=99 protocol=h3",
+            "Connection 7 established target=localhost:443 outer=h3 padding=yes",
+            "Connection 7 preamble native-parser-resource-tree drain=complete "
+            "completed_resources=6 http=200 protocol=h3",
+        ])
+        features = {
+            "protocol": protocol,
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        }
+        SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
+
+        missing_open = [
+            line
+            for line in lines
+            if "deferred-resource-opened stream=6" not in line
+        ]
+        with self.assertRaisesRegex(ValueError, "configured resource opens"):
+            SAMPLE.validate_sample(
+                arm, protocol, "\n".join(missing_open), features
+            )
+
+        wrong_lifecycle = [
+            line.replace(
+                "lifecycle=resource-prepared stream=3",
+                "lifecycle=resource-opened stream=3",
+            )
+            for line in lines
+        ]
+        with self.assertRaisesRegex(ValueError, "causal state"):
+            SAMPLE.validate_sample(
+                arm, protocol, "\n".join(wrong_lifecycle), features
+            )
+
     def test_opt_in_superblock_arms_share_one_control_pair(self):
         arms = (
             "gate",

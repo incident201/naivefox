@@ -1118,6 +1118,9 @@ independent seeds.
 | `783fb4014bc2c827` | ordinary pre-confirmation root scheduling, shaped link | 1 | 0.22187 / 0.30808 / 0.23385 / 0.20438 / 0.40084 |
 | `9041afc666c4d27a` | ordinary pre-confirmation root scheduling, shaped link | 4 | 0.21975 / 0.41939 / 0.24150 / 0.20281 / 0.37755 |
 | `98ff5b58e8acabbf` | ordinary pre-confirmation root scheduling, unshaped localhost | 4 | 0.13015 / 0.42408 / 0.19173 / 0.18586 / 0.40104 |
+| `52eb19521edabbc2` | prepare four images, open them together on the next main-thread turn, shaped link | 1 | 0.10745 / 0.24945 / 0.15401 / 0.18001 / 0.36747 |
+| `3db870baccdd8047` | preceding next-turn image scheduling, shaped link | 4 | 0.14180 / 0.42302 / 0.20045 / 0.19663 / 0.35352 |
+| `69ee3fd2559c47e1` | preceding next-turn image scheduling, unshaped localhost | 4 | 0.11254 / 0.43472 / 0.17955 / 0.17351 / 0.41992 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1223,6 +1226,27 @@ Both four-block runs identify NaiveFox build ID
 This candidate is retained because its scheduling rule generalizes across RTT;
 its roughly 0.42 packets-17--32 residual remains the next optimization target,
 not an acceptable endpoint.
+
+The next experiment split native parser discovery from image-channel
+activation without using elapsed time or response progress. Stylesheet and
+script channels still open in the parser callback; the four image channels are
+prepared there and opened together by the next ordinary main-thread task. The
+one-block shaped diagnostic `52eb19521edabbc2` was optimistic. Four-block
+artifact `3db870baccdd8047` measured 0.42302 for packets 17--32, statistically
+unchanged from the ordinary-scheduling candidate's 0.41939, but improved
+packets 1--16 from 0.21975 to 0.14180 and whole flow from 0.37755 to 0.35352.
+The same binary on unshaped localhost in `69ee3fd2559c47e1` measured 0.43472
+for packets 17--32 and 0.41992 whole, small descriptive regressions from
+0.42408 and 0.40104. All three artifacts identify NaiveFox build ID
+`7304222bbd34555aef8b8526c6fc70f9` and libxul digest
+`04f77b4941775bb7d3c3a7a093e5e8a9ea1096de6f80e0c4c214e633178731d5`.
+The split is retained as an experimental scheduling primitive because it
+materially reduces shaped whole-flow residual without encoding fixture
+latency, bandwidth, or resource size. It is not promoted to default by these
+screens: packets 17--32 remain unresolved, and the localhost whole-flow cost
+needs to be recovered. Follow-ups should vary the image release batches on
+ordinary event-loop turns and reject any schedule that only moves the shaped
+whole-flow score.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and

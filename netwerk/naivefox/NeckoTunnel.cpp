@@ -705,6 +705,7 @@ class ProxyPreambleOperation::Impl final {
   bool mDocumentBarrierTaskDispatched = false;
   bool mDocumentRootStopDeferred = false;
   nsresult mDocumentRootStopStatus = NS_OK;
+  bool mDeferredImageOpenDispatched = false;
   bool mFinishedFired = false;
   bool mConnectHandoffAdmitted = false;
   bool mTunnelApplicationActive = false;
@@ -3066,22 +3067,79 @@ nsresult ProxyPreambleOperation::OpenNativeParserResource(
   mImpl->mDiscoveredSpecs.AppendElement(spec);
   RefPtr<StreamListener> listener = new StreamListener(this, streamId);
   MOZ_TRY(channel->SetNotificationCallbacks(listener));
-  nsresult rv = channel->AsyncOpen(listener);
-  if (NS_FAILED(rv)) {
-    mImpl->mDiscoveredSpecs.RemoveLastElement();
-    mImpl->mStreams.RemoveLastElement();
-    return rv;
+  const bool deferImageToNextMainTurn =
+      resourceKind == NativeParserResourceKind::Image &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      mImpl->mConfig.mMaxAssets == 6;
+  if (deferImageToNextMainTurn) {
+    stream.mPendingOpenListener = listener;
+    if (!mImpl->mDeferredImageOpenDispatched) {
+      mImpl->mDeferredImageOpenDispatched = true;
+      RefPtr self = this;
+      nsresult dispatchRv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+          "NaiveFox::ReleaseDeferredNativeParserImages",
+          [self] { self->ReleaseDeferredNativeParserImages(); }));
+      if (NS_FAILED(dispatchRv)) {
+        mImpl->mDeferredImageOpenDispatched = false;
+        mImpl->mDiscoveredSpecs.RemoveLastElement();
+        mImpl->mStreams.RemoveLastElement();
+        return dispatchRv;
+      }
+    }
+  } else {
+    nsresult rv = channel->AsyncOpen(listener);
+    if (NS_FAILED(rv)) {
+      mImpl->mDiscoveredSpecs.RemoveLastElement();
+      mImpl->mStreams.RemoveLastElement();
+      return rv;
+    }
   }
   ++mImpl->mNativeParserResourceDescriptorsAccepted;
   RuntimeLogEvent(
-      "Preamble native-parser-resource-tree lifecycle=resource-opened "
+      "Preamble native-parser-resource-tree lifecycle=resource-%s "
       "stream=%u kind=%s referrer=inherited protocol=%s\n",
-      streamId,
+      deferImageToNextMainTurn ? "prepared" : "opened", streamId,
       resourceKind == NativeParserResourceKind::Style    ? "style"
       : resourceKind == NativeParserResourceKind::Script ? "script"
                                                          : "image",
       ProtocolName(mImpl->mProtocol));
   return NS_OK;
+}
+
+void ProxyPreambleOperation::ReleaseDeferredNativeParserImages() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      mImpl->mConfig.mMode !=
+          PreambleMode::TreeNativeParserResourceCommittedOverlap ||
+      mImpl->mConfig.mMaxAssets != 6) {
+    return;
+  }
+  for (uint32_t streamId = 1; streamId < mImpl->mStreams.Length();
+       ++streamId) {
+    auto& stream = mImpl->mStreams[streamId];
+    if (!stream.mPendingOpenListener) {
+      continue;
+    }
+    nsCOMPtr<nsIChannel> channel = do_QueryInterface(stream.mRequest);
+    nsCOMPtr<nsIStreamListener> listener =
+        stream.mPendingOpenListener.forget();
+    if (!channel || !listener) {
+      FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                               "deferred-image-open-invalid");
+      return;
+    }
+    nsresult rv = channel->AsyncOpen(listener);
+    if (NS_FAILED(rv)) {
+      FailNativeParserContract(rv, "deferred-image-open-failed");
+      return;
+    }
+    RuntimeLogEvent(
+        "Preamble native-parser-resource-tree "
+        "lifecycle=deferred-resource-opened stream=%u kind=image "
+        "cause=next-main-turn protocol=%s\n",
+        streamId, ProtocolName(mImpl->mProtocol));
+  }
 }
 
 nsresult ProxyPreambleOperation::OpenNativeParserStylesheet(

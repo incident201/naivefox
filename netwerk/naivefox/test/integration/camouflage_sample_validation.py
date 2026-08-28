@@ -353,9 +353,15 @@ NATIVE_PARSER_RESOURCE_TREE_ADMISSION = re.compile(
 )
 NATIVE_PARSER_RESOURCE_TREE_OPEN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
-    r"lifecycle=resource-opened stream=(?P<stream>\d+) "
+    r"lifecycle=resource-(?P<lifecycle>opened|prepared) "
+    r"stream=(?P<stream>\d+) "
     r"kind=(?P<kind>style|script|image) referrer=inherited "
     r"protocol=(?P<protocol>h2|h3)$"
+)
+NATIVE_PARSER_RESOURCE_TREE_DEFERRED_OPEN = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
+    r"lifecycle=deferred-resource-opened stream=(?P<stream>\d+) "
+    r"kind=image cause=next-main-turn protocol=(?P<protocol>h2|h3)$"
 )
 NATIVE_PARSER_RESOURCE_TREE_COMMIT = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
@@ -1240,11 +1246,25 @@ def validate_sample(arm, protocol, log_text, feature_document):
     native_resource_tree_open_lines = [
         line
         for line in log_lines
-        if "Preamble native-parser-resource-tree lifecycle=resource-opened " in line
+        if (
+            "Preamble native-parser-resource-tree lifecycle=resource-opened " in line
+            or "Preamble native-parser-resource-tree "
+            "lifecycle=resource-prepared " in line
+        )
     ]
     parsed_native_resource_tree_opens = [
         NATIVE_PARSER_RESOURCE_TREE_OPEN.fullmatch(line)
         for line in native_resource_tree_open_lines
+    ]
+    native_resource_tree_deferred_open_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-resource-tree "
+        "lifecycle=deferred-resource-opened " in line
+    ]
+    parsed_native_resource_tree_deferred_opens = [
+        NATIVE_PARSER_RESOURCE_TREE_DEFERRED_OPEN.fullmatch(line)
+        for line in native_resource_tree_deferred_open_lines
     ]
     native_resource_tree_commit_lines = [
         line
@@ -1269,6 +1289,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         for markers in (
             parsed_native_resource_tree_admissions,
             parsed_native_resource_tree_opens,
+            parsed_native_resource_tree_deferred_opens,
             parsed_native_resource_tree_commits,
             parsed_native_resource_tree_drains,
         )
@@ -2239,6 +2260,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     native_resource_tree_markers = (
         parsed_native_resource_tree_admissions,
         parsed_native_resource_tree_opens,
+        parsed_native_resource_tree_deferred_opens,
         parsed_native_resource_tree_commits,
         parsed_native_resource_tree_drains,
     )
@@ -2250,10 +2272,15 @@ def validate_sample(arm, protocol, log_text, feature_document):
         expected_resource_count = (
             6 if arm == "tree-native-parser-resource-committed-page" else 3
         )
+        expected_deferred_count = (
+            4 if arm == "tree-native-parser-resource-committed-page" else 0
+        )
         if (
             len(parsed_native_resource_tree_admissions) != 1
             or len(native_resource_tree_descriptor_lines) != 1
             or len(parsed_native_resource_tree_opens) != expected_resource_count
+            or len(parsed_native_resource_tree_deferred_opens)
+            != expected_deferred_count
             or len(parsed_native_resource_tree_commits) != expected_resource_count
             or len(parsed_native_resource_tree_drains) != 1
             or len(native_resource_tree_headers_barrier_lines)
@@ -2261,8 +2288,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         ):
             raise ValueError(
                 "native parser resource-tree arm requires one early admission, "
-                "one four-descriptor parser flush, three opens, three commits, "
-                "and one drain"
+                "one matching parser flush, the configured resource opens and "
+                "commits, and one drain"
             )
         admission = parsed_native_resource_tree_admissions[0]
         drain = parsed_native_resource_tree_drains[0]
@@ -2275,6 +2302,28 @@ def validate_sample(arm, protocol, log_text, feature_document):
             int(marker["stream"]): marker["kind"]
             for marker in parsed_native_resource_tree_opens
         }
+        open_lifecycles = {
+            int(marker["stream"]): marker["lifecycle"]
+            for marker in parsed_native_resource_tree_opens
+        }
+        expected_open_lifecycles = {
+            index: (
+                "prepared"
+                if arm == "tree-native-parser-resource-committed-page"
+                and kind == "image"
+                else "opened"
+            )
+            for index, kind in expected_resources.items()
+        }
+        deferred_opens = {
+            int(marker["stream"])
+            for marker in parsed_native_resource_tree_deferred_opens
+        }
+        expected_deferred_opens = (
+            {3, 4, 5, 6}
+            if arm == "tree-native-parser-resource-committed-page"
+            else set()
+        )
         commits = {
             int(marker["stream"]) for marker in parsed_native_resource_tree_commits
         }
@@ -2296,11 +2345,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
             )
             or admission["protocol"] != protocol
             or opens != expected_resources
+            or open_lifecycles != expected_open_lifecycles
+            or deferred_opens != expected_deferred_opens
             or commits != set(expected_resources)
             or any(
                 marker["protocol"] != protocol
                 for markers in (
                     parsed_native_resource_tree_opens,
+                    parsed_native_resource_tree_deferred_opens,
                     parsed_native_resource_tree_commits,
                 )
                 for marker in markers
@@ -2327,6 +2379,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
         descriptor_index = log_lines.index(native_resource_tree_descriptor_lines[0])
         open_indices = [
             log_lines.index(line) for line in native_resource_tree_open_lines
+        ]
+        deferred_open_indices = [
+            log_lines.index(line)
+            for line in native_resource_tree_deferred_open_lines
         ]
         commit_indices = [
             log_lines.index(line) for line in native_resource_tree_commit_lines
@@ -2356,7 +2412,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
                     f"protocol={protocol}"
                 )
                 and descriptor_index < min(open_indices)
-                and max(open_indices) < min(commit_indices)
+                and max(open_indices) < min(deferred_open_indices)
+                and max(deferred_open_indices) < min(commit_indices)
                 and max(commit_indices) < headers_barrier_index
                 and headers_barrier_index < admission_index
                 and admission_index < result_index < established_index
