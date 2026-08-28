@@ -1111,6 +1111,10 @@ independent seeds.
 | `4f29ad91fa7f29f6` | explicit 16-ms dwell, 1048576-byte page base | 4 | 0.14023 / 0.18591 / 0.13661 / 0.16593 / 0.36313 |
 | `a8977a8f77e3e129` | explicit 16-ms dwell, 20-ms one-way delay and 20 Mbit/s | 4 | 0.19669 / 0.55600 / 0.24601 / 0.16671 / 0.44047 |
 | `54ea85af8f8ade5a` | cancel resource bodies on first tunneled application bytes, 20-ms one-way delay and 20 Mbit/s | 1 | 0.34306 / 0.63746 / 0.37520 / 0.30147 / 0.51192 |
+| `4f6a2d5f9d5d7f7e` | cancel each resource at response headers, confirmation gate, 20-ms one-way delay and 20 Mbit/s | 1 | 0.15433 / 0.51371 / 0.24360 / 0.18631 / 0.45597 |
+| `b269891ca820c21c` | cancel all resources after all request HEADERS are sent, confirmation gate, shaped link | 1 | 0.28176 / 0.49624 / 0.32068 / 0.22380 / 0.55319 |
+| `79bd0652b13f9da6` | cancel all resources on first `RECEIVING_FROM`, confirmation gate, shaped link | 1 | 0.29122 / 0.53469 / 0.32290 / 0.19148 / 0.54446 |
+| `3ac531854f16583d` | preceding response stop plus first post-confirmation transmitted-packet gate, shaped link | 1 | 0.17466 / 0.61024 / 0.27430 / 0.14788 / 0.49282 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1169,6 +1173,29 @@ datagrams. The result rules out late channel cancellation, not causal
 handoff generally. A viable successor must bound or suspend response-body
 delivery before QUIC accepts the excess bytes, then use observed transport or
 application progress to release or retire that bounded cover.
+
+Three earlier resource-stop boundaries and one transport gate refine that
+negative result. Stopping each channel at `OnStartRequest` in
+`4f6a2d5f9d5d7f7e` was still too late: whole server bytes exceeded the Firefox
+midpoint by 723282 bytes. Stopping all six channels as soon as H3 reported all
+request HEADERS sent in `b269891ca820c21c` reduced the excess over the matched
+`document-start-overlap` arm from roughly 73 KiB to 1231 bytes, but packets
+17--32 remained 0.49624 and whole flow regressed to 0.55319. Delaying that stop
+until the first resource `NS_NET_STATUS_RECEIVING_FROM` in
+`79bd0652b13f9da6` admitted one path-controlled congestion flight, about
+42.8 KiB beyond the control, without improving the phase: packets 17--32 were
+0.53469 and whole flow 0.54446. These are one-block diagnostics, but the large
+volume and phase effects are sufficient to reject the three boundaries.
+
+Artifact `3ac531854f16583d` also replaced the wall-clock dwell with a causal
+transport gate: the root transaction remained queued until Neqo's transmitted
+packet counter proved that one packet had been emitted after handshake
+confirmation. Combined with the first-response stop, this improved packets
+1--16 and 250 ms descriptively, but packets 17--32 regressed to 0.61024 and
+whole flow measured 0.49282. Thus neither a generic next socket turn nor an
+actually transmitted post-confirmation packet reproduces the localhost
+16-ms result on the shaped path. No timer, byte threshold, cancellation, or
+transport-gate code from these diagnostics is retained.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
