@@ -74,22 +74,22 @@ def sized_source_asset(size, prefix, filler):
     return prefix + filler * repetitions + b" " * padding
 
 
+CAMOUFLAGE_STYLE_PREFIX = (
+    b":root{color-scheme:light;background:#f4f6f8;color:#243447}"
+    b"body{margin:0;font-family:system-ui,sans-serif}"
+    b"main{max-width:72rem;margin:auto;padding:2rem}\n"
+)
+CAMOUFLAGE_STYLE_FILLER = b"/* controlled component stylesheet module */\n"
+CAMOUFLAGE_SCRIPT_PREFIX = (
+    b'(()=>{"use strict";document.documentElement.dataset.fixture='
+    b'"controlled";})();\n'
+)
+CAMOUFLAGE_SCRIPT_FILLER = b"/* controlled browser application module */\n"
 CAMOUFLAGE_STYLE_CSS = sized_source_asset(
-    CAMOUFLAGE_STYLE_SIZE,
-    (
-        b":root{color-scheme:light;background:#f4f6f8;color:#243447}"
-        b"body{margin:0;font-family:system-ui,sans-serif}"
-        b"main{max-width:72rem;margin:auto;padding:2rem}\n"
-    ),
-    b"/* controlled component stylesheet module */\n",
+    CAMOUFLAGE_STYLE_SIZE, CAMOUFLAGE_STYLE_PREFIX, CAMOUFLAGE_STYLE_FILLER
 )
 CAMOUFLAGE_APP_JS = sized_source_asset(
-    CAMOUFLAGE_SCRIPT_SIZE,
-    (
-        b'(()=>{"use strict";document.documentElement.dataset.fixture='
-        b'"controlled";})();\n'
-    ),
-    b"/* controlled browser application module */\n",
+    CAMOUFLAGE_SCRIPT_SIZE, CAMOUFLAGE_SCRIPT_PREFIX, CAMOUFLAGE_SCRIPT_FILLER
 )
 FRONTING_STYLE_CSS = sized_source_asset(
     FRONTING_STYLE_SIZE,
@@ -151,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def journal_cache_request(self, status):
+    def journal_cache_request(self, status, etag=CAMOUFLAGE_STYLE_ETAG):
         referer = self.headers.get("Referer", "")
         completion = ""
         if referer:
@@ -159,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
         entry = {
             "accept": self.headers.get("Accept", ""),
             "completion": completion if COMPLETION_TOKEN.fullmatch(completion) else "",
-            "etag": CAMOUFLAGE_STYLE_ETAG,
+            "etag": etag,
             "host": self.headers.get("Host", ""),
             "if_none_match": self.headers.get("If-None-Match", ""),
             "listener": "https"
@@ -186,19 +186,20 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 os.close(descriptor)
 
-    def send_camouflage_style(self):
+    def send_camouflage_style(self, body=CAMOUFLAGE_STYLE_CSS):
+        etag = '"naivefox-style-' + hashlib.sha256(body).hexdigest() + '"'
         if_none_match = self.headers.get("If-None-Match", "")
-        status = 304 if if_none_match.strip() == CAMOUFLAGE_STYLE_ETAG else 200
-        self.journal_cache_request(status)
+        status = 304 if if_none_match.strip() == etag else 200
+        self.journal_cache_request(status, etag)
         self.send_response(status)
-        self.send_header("ETag", CAMOUFLAGE_STYLE_ETAG)
+        self.send_header("ETag", etag)
         self.send_header("Cache-Control", "no-cache")
         if status == 200:
             self.send_header("Content-Type", "text/css")
-            self.send_header("Content-Length", str(len(CAMOUFLAGE_STYLE_CSS)))
+            self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if status == 200:
-            self.wfile.write(CAMOUFLAGE_STYLE_CSS)
+            self.wfile.write(body)
 
     def send_pattern(self, status, size, content_type="application/octet-stream"):
         self.send_response(status)
@@ -241,15 +242,50 @@ class Handler(BaseHTTPRequestHandler):
         if scenario == "initial":
             body = '<img src="/camouflage/resource?size=16384">'
         elif scenario == "browser_page":
-            suffix = f"?nav={navigation}" if navigation else ""
-            resource_suffix = f"&nav={navigation}" if navigation else ""
+            asset_base_values = query.get("asset_base", [])
+            if asset_base_values:
+                asset_base = min(
+                    max(int(asset_base_values[0]), 64 * 1024), 4 * 1024 * 1024
+                )
+                asset_sizes = (
+                    asset_base // 4,
+                    asset_base // 2,
+                    asset_base,
+                    asset_base // 64,
+                )
+
+                def asset_url(path, asset_size):
+                    suffix = f"?size={asset_size}"
+                    if navigation:
+                        suffix += f"&nav={navigation}"
+                    return path + suffix
+
+                style_url = asset_url("/camouflage/style.css", asset_sizes[0])
+                script_url = asset_url("/camouflage/app.js", asset_sizes[1])
+                image_urls = (
+                    asset_url("/camouflage/resource", asset_sizes[0]),
+                    asset_url("/camouflage/resource", asset_sizes[1]),
+                    asset_url("/camouflage/resource", asset_sizes[2]),
+                )
+                api_url = asset_url("/camouflage/api", asset_sizes[3])
+            else:
+                suffix = f"?nav={navigation}" if navigation else ""
+                resource_suffix = f"&nav={navigation}" if navigation else ""
+                style_url = "/camouflage/style.css" + suffix
+                script_url = "/camouflage/app.js" + suffix
+                image_urls = (
+                    "/camouflage/resource?size=65536" + resource_suffix,
+                    "/camouflage/resource?size=131072" + resource_suffix,
+                    "/camouflage/resource?size=262144" + resource_suffix,
+                )
+                api_url = "/camouflage/api" + suffix
             body = (
-                f'<link rel="stylesheet" href="/camouflage/style.css{suffix}">'
-                f'<script src="/camouflage/app.js{suffix}"></script>'
-                f'<img src="/camouflage/resource?size=65536{resource_suffix}">'
-                f'<img src="/camouflage/resource?size=131072{resource_suffix}">'
-                f'<img src="/camouflage/resource?size=262144{resource_suffix}">'
-                f'<img src="/camouflage/api{suffix}">'
+                f'<link rel="stylesheet" href="{style_url}">'
+                f'<script src="{script_url}"></script>'
+                f'<img src="{image_urls[0]}">'
+                f'<img src="{image_urls[1]}">'
+                f'<img src="{image_urls[2]}">'
+                f'<img src="{api_url}">'
             )
         elif scenario == "fronting_page":
             body = (
@@ -374,9 +410,23 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                 (("Referrer-Policy", "strict-origin-when-cross-origin"),),
             )
         elif parsed.path == "/camouflage/style.css":
-            self.send_camouflage_style()
+            if "size" in query:
+                size = min(max(int(query["size"][0]), 1024), 4 * 1024 * 1024)
+                body = sized_source_asset(
+                    size, CAMOUFLAGE_STYLE_PREFIX, CAMOUFLAGE_STYLE_FILLER
+                )
+                self.send_camouflage_style(body)
+            else:
+                self.send_camouflage_style()
         elif parsed.path == "/camouflage/app.js":
-            self.send_bytes(200, CAMOUFLAGE_APP_JS, "application/javascript")
+            if "size" in query:
+                size = min(max(int(query["size"][0]), 1024), 4 * 1024 * 1024)
+                body = sized_source_asset(
+                    size, CAMOUFLAGE_SCRIPT_PREFIX, CAMOUFLAGE_SCRIPT_FILLER
+                )
+                self.send_bytes(200, body, "application/javascript")
+            else:
+                self.send_bytes(200, CAMOUFLAGE_APP_JS, "application/javascript")
         elif parsed.path == "/camouflage/fronting.css":
             self.send_bytes(200, FRONTING_STYLE_CSS, "text/css")
         elif parsed.path == "/camouflage/fronting.js":
@@ -385,11 +435,15 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
             self.send_svg(FRONTING_IMAGE_SIZE)
         elif parsed.path == "/camouflage/api":
             navigation = query.get("nav", [""])[0]
-            if navigation:
-                if not COMPLETION_TOKEN.fullmatch(navigation):
-                    self.send_error(400)
-                    return
-                self.send_svg(CAMOUFLAGE_API_IMAGE_SIZE)
+            if navigation and not COMPLETION_TOKEN.fullmatch(navigation):
+                self.send_error(400)
+                return
+            if navigation or "size" in query:
+                size = min(
+                    max(int(query.get("size", [CAMOUFLAGE_API_IMAGE_SIZE])[0]), 1),
+                    MAX_BODY,
+                )
+                self.send_svg(size)
             else:
                 self.send_bytes(
                     200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"

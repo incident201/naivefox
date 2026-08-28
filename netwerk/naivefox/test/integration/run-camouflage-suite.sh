@@ -23,6 +23,7 @@ multi_arm_arms_csv=off,gate,root
 multi_arm_views_csv=all
 scenario_override=
 scenario_option_count=0
+browser_page_base_size=
 private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
 diagnostic_naivefox_only=${NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY:-0}
 isolated_network=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0}
@@ -78,6 +79,10 @@ while [[ $# -gt 0 ]]; do
       scenario_option_count=$((scenario_option_count + 1))
       shift 2
       ;;
+    --browser-page-base-size)
+      browser_page_base_size=${2:-}
+      shift 2
+      ;;
     --samples-per-cohort)
       samples_per_cohort=${2:-}
       shift 2
@@ -87,7 +92,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -188,6 +193,17 @@ if [[ -n $scenario_override ]]; then
       ;;
   esac
   scenarios=("$scenario_override")
+fi
+if [[ -n $browser_page_base_size ]]; then
+  if [[ $scenario_option_count -ne 1 || $scenario_override != browser_page ]]; then
+    printf '%s\n' '--browser-page-base-size requires --scenario browser_page' >&2
+    exit 2
+  fi
+  if [[ ! $browser_page_base_size =~ ^[0-9]+$ ]] ||
+     ((browser_page_base_size < 65536 || browser_page_base_size > 4194304)); then
+    printf '%s\n' '--browser-page-base-size must be an integer between 65536 and 4194304' >&2
+    exit 2
+  fi
 fi
 case $protocol_selection in
   h2) protocols=(h2) ;;
@@ -1409,9 +1425,15 @@ scenario_path() {
   local scenario=$1
   local completion=$2
   scenario_parameters "$scenario"
-  printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&completion=%s\n' \
-    "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
-    "$completion"
+  if [[ $scenario_kind == browser_page && -n $browser_page_base_size ]]; then
+    printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&asset_base=%s&completion=%s\n' \
+      "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
+      "$browser_page_base_size" "$completion"
+  else
+    printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&completion=%s\n' \
+      "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
+      "$completion"
+  fi
 }
 
 outer_scenario_path() {
@@ -2736,6 +2758,7 @@ proxy_floor_inner_h2_validated_participants=$inner_h2_validated_participants
 outer_h2_alpn_policy=$([[ $protocol_selection == h3 ]] && printf not_applicable || printf h2_only_listener)
 camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE
 camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE
+browser_page_base_size=${browser_page_base_size:-default_262144}
 cache_condition=$cache_condition
 fixture_proxy_reset_policy=$fixture_proxy_reset_policy
 fixture_proxy_restart_count=$proxy_restart_count

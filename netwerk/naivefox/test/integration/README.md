@@ -509,6 +509,14 @@ It is useful for private lifecycle diagnostics such as stressing `sequential`
 connection reuse; the selected scenario is recorded in sanitized metadata and
 does not relax any capture-health or sample-count rule.
 
+For a predeclared resource-size robustness check, combine
+`--scenario browser_page` with `--browser-page-base-size BYTES` (65536 through
+4194304).
+The base scales the six ordinary page assets in the same 1/4, 1/2, 1,
+1/64 profile as the default 262144-byte fixture. Omitting the option preserves
+the established fixture exactly. The selected base is recorded in sanitized
+metadata; it is a diagnostic input and must not be tuned to a packet window.
+
 To diagnose a NaiveFox lifecycle race without collecting flaky direct-Firefox
 reference samples, set `NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY=1`. This
 private mode is restricted to gate/smoke, requires exactly one explicit

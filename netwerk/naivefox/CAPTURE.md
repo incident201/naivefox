@@ -14,6 +14,15 @@ may retain bounded byte budgets for safety, but it must derive scheduling,
 headers, priorities, cache behavior, and stream lifecycle from normal Gecko
 causes. Any topology candidate should remain directionally stable across a
 small predeclared range of ordinary fixture sizes before promotion.
+Use `--scenario browser_page --browser-page-base-size BYTES` to scale all six
+page assets coherently for that check. Omitting it preserves the established
+262144-byte fixture; the sanitized metadata records either the explicit base
+or `default_262144`.
+
+Harness validation `a045653efaa21665` (seed `20260828140`) completed one full
+isolated same-base H3/SOCKS block at a 65536-byte base, including both Firefox
+controls and the two NaiveFox arms. This is a successful end-to-end plumbing
+check only; one block is explicitly insufficient for a residual inference.
 
 `document-overlap` is the size-independent control for document scheduling. It
 admits CONNECT after successful 2xx document response HEADERS while the Necko

@@ -1896,6 +1896,24 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(f"/camouflage/resource?size=262144&nav={token}", page)
         self.assertIn(f"/camouflage/api?nav={token}", page)
 
+    def test_browser_page_base_size_scales_every_asset(self):
+        token = "f" * 32
+        page = TARGET.Handler.camouflage_page(
+            object(),
+            {
+                "scenario": ["browser_page"],
+                "asset_base": ["65536"],
+                "nav": [token],
+            },
+        ).decode()
+        self.assertIn(f"/camouflage/style.css?size=16384&nav={token}", page)
+        self.assertIn(f"/camouflage/app.js?size=32768&nav={token}", page)
+        self.assertIn(f"/camouflage/resource?size=16384&nav={token}", page)
+        self.assertIn(f"/camouflage/resource?size=32768&nav={token}", page)
+        self.assertIn(f"/camouflage/resource?size=65536&nav={token}", page)
+        self.assertIn(f"/camouflage/api?size=1024&nav={token}", page)
+        self.assertEqual(page.count(f"nav={token}"), 6)
+
     def test_browser_page_rejects_invalid_navigation_token(self):
         page = TARGET.Handler.camouflage_page(
             object(), {"scenario": ["browser_page"], "nav": ["../bad"]}
@@ -1910,6 +1928,52 @@ class CamouflageHarnessTests(unittest.TestCase):
         TARGET.Handler.do_GET(handler)
         handler.send_svg.assert_called_once_with(TARGET.CAMOUFLAGE_API_IMAGE_SIZE)
         handler.send_bytes.assert_not_called()
+
+    def test_scaled_browser_assets_serve_the_requested_lengths(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.headers = {}
+        handler.send_camouflage_style = mock.Mock()
+        handler.send_bytes = mock.Mock()
+        handler.send_svg = mock.Mock()
+
+        handler.path = "/camouflage/style.css?size=16384"
+        TARGET.Handler.do_GET(handler)
+        style = handler.send_camouflage_style.call_args.args[0]
+        self.assertEqual(len(style), 16384)
+        self.assertTrue(style.startswith(TARGET.CAMOUFLAGE_STYLE_PREFIX))
+
+        handler.path = "/camouflage/app.js?size=32768"
+        TARGET.Handler.do_GET(handler)
+        script = handler.send_bytes.call_args.args[1]
+        self.assertEqual(len(script), 32768)
+        self.assertTrue(script.startswith(TARGET.CAMOUFLAGE_SCRIPT_PREFIX))
+
+        handler.path = "/camouflage/api?size=1024"
+        TARGET.Handler.do_GET(handler)
+        handler.send_svg.assert_called_once_with(1024)
+
+    def test_browser_page_base_size_cli_is_bounded_and_explicit(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (["--browser-page-base-size", "65536"], "requires --scenario"),
+            (
+                [
+                    "--scenario",
+                    "browser_page",
+                    "--browser-page-base-size",
+                    "65535",
+                ],
+                "between 65536 and 4194304",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
 
     def test_tree_fixture_assets_leave_streams_live_within_budget(self):
         page = TARGET.Handler.camouflage_page(object(), {"scenario": ["browser_page"]})
