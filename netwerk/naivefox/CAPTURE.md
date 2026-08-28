@@ -1140,6 +1140,7 @@ independent seeds.
 | `4a893926cca282f9` | release deferred images and CONNECT on the first resource body buffer, shaped link | 1 | 0.26798 / 0.51989 / 0.32041 / 0.32007 / 0.47166 |
 | `ee1d57bb7b7817f0` | give CONNECT document-equivalent H3 priority `u=0, i`, shaped link | 1 | 0.27480 / 0.62412 / 0.33962 / 0.30322 / 0.43876 |
 | `c276f92a62ecafdd` | open two images next turn and two on first resource body buffer, shaped link | 1 | 0.29429 / 0.44772 / 0.31302 / 0.28711 / 0.45058 |
+| `e26fad3d3d44af3c` | open all six resources together next turn, then admit on first body buffer, shaped link | 1 | 0.22284 / 0.71720 / 0.32656 / 0.24533 / 0.49797 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1488,6 +1489,21 @@ build ID `2150abeda012a918bdb326ffa2ad35d0` and libxul digest
 The partial body-triggered image release and its validator ordering were
 removed. The result also rejects treating the incomplete decrypted trace's
 apparent image grouping as sufficient causal evidence.
+
+Combining all-resource next-turn activation with first-body-buffer CONNECT
+admission is rejected. The stylesheet, deferred script, and four images were
+all prepared during parser output and opened together on one ordinary main
+thread turn; CONNECT still waited for the first valid resource body buffer.
+Although each boundary was event-driven, their composition produced the worst
+recent target result: one-block shaped artifact `e26fad3d3d44af3c` measured
+0.71720 for packets 17--32 and 0.49797 whole, versus the retained candidate's
+replicated 0.29471/0.34363. Packets 1--16, packets 1--32, and 250 ms were also
+0.22284/0.32656/0.24533. The binary identified build ID
+`d0b5461df5032118d8d786feb737dae2` and libxul digest
+`51010bd3f4df3fb69c4d0f4c15b48fbf623d60d9ac6d5e5e80f228770079f2bb`.
+The all-resource deferral and generalized validator markers were removed;
+stylesheet/script activation remains in the parser callback and only images
+use the following main-thread turn.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
