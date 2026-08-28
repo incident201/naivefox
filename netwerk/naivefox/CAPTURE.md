@@ -1139,6 +1139,7 @@ independent seeds.
 | `d25a8910b028a6d5` | release CONNECT after the deferred-script body buffer, shaped link | 1 | 0.22782 / 0.46535 / 0.25761 / 0.22191 / 0.40645 |
 | `4a893926cca282f9` | release deferred images and CONNECT on the first resource body buffer, shaped link | 1 | 0.26798 / 0.51989 / 0.32041 / 0.32007 / 0.47166 |
 | `ee1d57bb7b7817f0` | give CONNECT document-equivalent H3 priority `u=0, i`, shaped link | 1 | 0.27480 / 0.62412 / 0.33962 / 0.30322 / 0.43876 |
+| `c276f92a62ecafdd` | open two images next turn and two on first resource body buffer, shaped link | 1 | 0.29429 / 0.44772 / 0.31302 / 0.28711 / 0.45058 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1472,6 +1473,21 @@ build ID `cc5666f97b91aa87a297258769c0e408` and libxul digest
 CONNECT carries a document but also competes with the outer cover streams, so
 the direct document priority over-promotes it. The new parameter, class flags,
 and priority marker were removed; ordinary CONNECT priority is retained.
+
+Splitting image activation `2+2` across two causal events is rejected. Streams
+3--4 opened on the existing next-main-turn boundary, while streams 5--6 stayed
+prepared until the first valid resource body buffer; only then did they open
+and commit before CONNECT admission. This avoided every timer, byte threshold,
+and complete-resource wait, but one-block shaped artifact
+`c276f92a62ecafdd` measured 0.44772 for packets 17--32 and 0.45058 whole,
+worse than the retained candidate's replicated 0.29471/0.34363. Its packets
+1--16 and first-250-ms distances, 0.29429 and 0.28711, also exceeded the
+matched control's 0.26596 and 0.20538. The experimental binary identified
+build ID `2150abeda012a918bdb326ffa2ad35d0` and libxul digest
+`13eac5dee0318aa619fb9d0a9c54a4a2b07441e1298e0792719cebe9d8a7e15a`.
+The partial body-triggered image release and its validator ordering were
+removed. The result also rejects treating the incomplete decrypted trace's
+apparent image grouping as sufficient causal evidence.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
