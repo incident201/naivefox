@@ -1133,6 +1133,7 @@ independent seeds.
 | `c9643a1e000b3c2c` | preceding first-resource-body-buffer admission, 65536-byte page base, shaped link | 1 | 0.20808 / 0.72418 / 0.32068 / 0.22956 / 0.45906 |
 | `8925499c80a97688` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 1 | 0.21060 / 0.41138 / 0.24301 / 0.19447 / 0.42297 |
 | `47adda8f2a4b7783` | preceding first-resource-body-buffer admission, 65536-byte page base, shaped link | 4 | 0.08814 / 0.33185 / 0.14079 / 0.13174 / 0.31845 |
+| `07c422cacf441cd1` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 4 | 0.14312 / 0.39571 / 0.18047 / 0.15179 / 0.36178 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1398,6 +1399,18 @@ versus 0.17985/0.55323/0.23522/0.16931/0.43635. The earlier 0.72418 one-block
 target was therefore an unstable Firefox-envelope diagnostic, not evidence
 that a small response deterministically releases CONNECT at the wrong phase.
 Large-resource and slower-link replication are still needed.
+
+The large-resource replication also retains the candidate. Four-block
+artifact `07c422cacf441cd1` measured 0.39571 [`0.29175`, `0.49966`] for packets
+17--32 and 0.36178 [`0.33620`, `0.38808`] whole at the 1048576-byte page base.
+All five views again improved over the matched control:
+0.14312/0.39571/0.18047/0.15179/0.36178 versus
+0.20947/0.63845/0.26754/0.16318/0.48312. The target residual is higher than
+the default-size 0.29471/0.34363 and small-size 0.33185/0.31845, but it does
+not collapse as resource duration grows because admission waits only for the
+first delivered buffer. Together the two four-block size endpoints reject a
+fixed object-size dependency; lower bandwidth and higher RTT remain a separate
+robustness axis.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
