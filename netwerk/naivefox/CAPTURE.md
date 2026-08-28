@@ -1132,6 +1132,7 @@ independent seeds.
 | `4e4edd7c53b91735` | preceding first-resource-body-buffer admission, unshaped localhost | 4 | 0.10945 / 0.44214 / 0.18431 / 0.17123 / 0.38250 |
 | `c9643a1e000b3c2c` | preceding first-resource-body-buffer admission, 65536-byte page base, shaped link | 1 | 0.20808 / 0.72418 / 0.32068 / 0.22956 / 0.45906 |
 | `8925499c80a97688` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 1 | 0.21060 / 0.41138 / 0.24301 / 0.19447 / 0.42297 |
+| `47adda8f2a4b7783` | preceding first-resource-body-buffer admission, 65536-byte page base, shaped link | 4 | 0.08814 / 0.33185 / 0.14079 / 0.13174 / 0.31845 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1387,6 +1388,16 @@ residual at 65536 bytes is not acceptable evidence of size robustness, while
 the simultaneous control movement makes a single-block rejection equally
 unsafe. The smaller-size condition is therefore selected for four-block
 replication before changing the mechanism.
+
+That replication rejects the apparent small-resource failure rather than the
+mechanism. Four-block artifact `47adda8f2a4b7783` measured 0.33185
+[`0.23825`, `0.41572`] for packets 17--32 and 0.31845
+[`0.28458`, `0.34555`] whole at the same 65536-byte page base. All five views
+improved over the matched control: 0.08814/0.33185/0.14079/0.13174/0.31845
+versus 0.17985/0.55323/0.23522/0.16931/0.43635. The earlier 0.72418 one-block
+target was therefore an unstable Firefox-envelope diagnostic, not evidence
+that a small response deterministically releases CONNECT at the wrong phase.
+Large-resource and slower-link replication are still needed.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
