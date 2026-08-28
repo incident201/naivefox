@@ -1129,6 +1129,7 @@ independent seeds.
 | `5247083ce674bb8c` | preceding task-deferred admission, shaped link | 4 | 0.18055 / 0.42214 / 0.21098 / 0.16720 / 0.38589 |
 | `e003c4bcdeae430f` | release CONNECT after the first consumed resource body buffer, shaped link | 1 | 0.22977 / 0.35266 / 0.23174 / 0.20103 / 0.38039 |
 | `390cc24ccb6ef8c9` | preceding first-resource-body-buffer admission, shaped link | 4 | 0.11745 / 0.29471 / 0.15293 / 0.16835 / 0.34363 |
+| `4e4edd7c53b91735` | preceding first-resource-body-buffer admission, unshaped localhost | 4 | 0.10945 / 0.44214 / 0.18431 / 0.17123 / 0.38250 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1360,6 +1361,19 @@ residual. Both new artifacts identify NaiveFox build ID
 The mechanism and fail-closed lifecycle validation are retained for
 cross-size and unshaped robustness screens; these gate-sized runs do not yet
 promote it to the product default.
+
+Unshaped localhost artifact `4e4edd7c53b91735` used the identical binary and
+measured 0.44214 [`0.37933`, `0.50496`] for packets 17--32 and 0.38250
+[`0.37084`, `0.39415`] whole. The target packet window is descriptively close
+to the prior next-turn scheduler's localhost 0.43472, while whole flow improves
+materially from 0.41992 and also improves over ordinary scheduling's 0.40104.
+Packets 1--16 were effectively tied with the matched control
+(0.10945 versus 0.10739); the first 250 ms paid a limited 0.01567 descriptive
+cost. The causal body-buffer boundary therefore retains its shaped-link gain
+without repeating the previous scheduler's localhost whole-flow regression.
+Resource-size and slower-link screens remain required because the first body
+callback depends on actual server and path progress even though it contains no
+fixed time or byte threshold.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
