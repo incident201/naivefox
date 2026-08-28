@@ -1147,6 +1147,8 @@ independent seeds.
 | `cdf15c6b3cc11142` | request one-byte ranges for the four image-cover responses, shaped link | 1 | 0.20619 / 0.47585 / 0.23629 / 0.20118 / 0.42462 |
 | `bfd151c6ae8b307f` | keep CONNECT admission, but delay local SOCKS success until a second resource progresses, shaped link | 1 | 0.12217 / 0.56947 / 0.24059 / 0.21827 / 0.38174 |
 | `6f3abdd953241f36` | promote CONNECT locally from generic `u=4` to default-wire `u=3`, shaped link | 1 | 0.28571 / 0.67590 / 0.35053 / 0.27983 / 0.44583 |
+| `516a52ecdf7325fe` | request a one-byte range only for the largest, third image-cover response, shaped link | 1 | 0.20167 / 0.20686 / 0.21134 / 0.26134 / 0.38629 |
+| `3ccc3e566c17bf55` | preceding selective third-image Range request, shaped link | 4 | 0.13225 / 0.38692 / 0.17637 / 0.14720 / 0.36567 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1603,6 +1605,23 @@ identified build ID `5dfb91f3521b088e904b9b97976fce6f` and libxul digest
 The `Unblocked` class assignment was removed. Together with the rejected
 urgent CONNECT arm, this rules out simple CONNECT promotion as the next
 default direction.
+
+Selectively reducing only the largest, third image cover is rejected after
+replication. This kept the first two image bodies and final API image intact,
+while requesting `Range: bytes=0-0` only on stream 5; an origin ignoring Range
+still returned its full representation. One-block shaped artifact
+`516a52ecdf7325fe` initially looked promising at 0.20686 for packets 17--32,
+with 0.38629 whole. The predeclared four-block artifact
+`3ccc3e566c17bf55` did not reproduce it: packets 17--32 measured 0.38692
+[`0.32087`, `0.45108`] and whole flow 0.36567 [`0.32993`, `0.39984`], both
+worse than retained 0.29471/0.34363. Its other views were
+0.13225/0.17637/0.14720. Both artifacts identify build ID
+`faf694cd8abf0bee3cd5a2881496842e` and libxul digest
+`4c332156e983765b277039439ddf57b4b498b871f90bb3b3cf0e3008b7c9c96d`.
+Server-byte diagnostics remained close to the full-body retained arm, so the
+fixture ignored the range and the single-block movement came only from the
+extra request-header/QPACK shape. The selective header was removed; neither
+wholesale nor one-stream Range requests improve the replicated target views.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
