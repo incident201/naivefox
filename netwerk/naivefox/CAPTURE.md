@@ -1145,6 +1145,7 @@ independent seeds.
 | `e37b8b45df2c72f7` | cross-process stylesheet rendezvous before resource activation, shaped link | 1 | 0.10459 / 0.23626 / 0.14855 / 0.19669 / 0.36922 |
 | `a0ead86d96ae38c9` | preceding cross-process resource activation, shaped link | 4 | 0.12889 / 0.32005 / 0.16100 / 0.15227 / 0.34415 |
 | `cdf15c6b3cc11142` | request one-byte ranges for the four image-cover responses, shaped link | 1 | 0.20619 / 0.47585 / 0.23629 / 0.20118 / 0.42462 |
+| `bfd151c6ae8b307f` | keep CONNECT admission, but delay local SOCKS success until a second resource progresses, shaped link | 1 | 0.12217 / 0.56947 / 0.24059 / 0.21827 / 0.38174 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1571,6 +1572,23 @@ resource-size-dependent completion rule, one-block shaped artifact
 The HEAD/Range mutations and their validator markers were removed. The result
 shows that retained whole-flow behavior depends on the natural multiplexed
 cover-body shape, not merely eliminating duplicated bytes.
+
+Separating outer CONNECT readiness from local SOCKS success is rejected. The
+retained first resource body buffer still opened CONNECT, so the natural root,
+six cover requests, and CONNECT transaction were unchanged. `TunnelReady`
+instead waited until a second distinct successful cover response had made
+body progress; a normally completed empty response also counted, avoiding a
+fixed byte minimum and preserving reachability for zero-length resources. This
+causal gate follows network pacing instead of wall-clock time, but one-block
+shaped artifact `bfd151c6ae8b307f` regressed packets 17--32 to 0.56947. Whole
+flow was 0.38174 and the remaining views were
+0.12217/0.24059/0.21827. The binary identified build ID
+`09690181c93c9a2530add74f51d1cc01` and libxul digest
+`d11ecf6711f0577cb58b269155b35e3f5a26d728f966eaf2a847791485328024`.
+The secondary preamble callback and SOCKS admission state were removed. This
+result shows that holding the inner browser after CONNECT reorders the target
+window much more destructively than moving CONNECT itself to the same second
+resource boundary.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
