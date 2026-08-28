@@ -1121,6 +1121,7 @@ independent seeds.
 | `52eb19521edabbc2` | prepare four images, open them together on the next main-thread turn, shaped link | 1 | 0.10745 / 0.24945 / 0.15401 / 0.18001 / 0.36747 |
 | `3db870baccdd8047` | preceding next-turn image scheduling, shaped link | 4 | 0.14180 / 0.42302 / 0.20045 / 0.19663 / 0.35352 |
 | `69ee3fd2559c47e1` | preceding next-turn image scheduling, unshaped localhost | 4 | 0.11254 / 0.43472 / 0.17955 / 0.17351 / 0.41992 |
+| `f9a240071240a55b` | open images in `2+1+1` successive main-thread turns, shaped link | 1 | 0.19743 / 0.37870 / 0.22054 / 0.20749 / 0.38823 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1247,6 +1248,23 @@ screens: packets 17--32 remain unresolved, and the localhost whole-flow cost
 needs to be recovered. Follow-ups should vary the image release batches on
 ordinary event-loop turns and reject any schedule that only moves the shaped
 whole-flow score.
+
+The first such follow-up is rejected. It opened two images on the first
+deferred main-thread turn and one image on each of the next two turns, matching
+the `2+1+1` grouping seen in one decrypted Firefox trace without adding a
+timer. The first attempted capture, private failure artifact
+`8e5e218c073f4b6f`, stopped after its first candidate because the validator
+incorrectly required every deferred image open to precede even stylesheet and
+script `WAITING_FOR` callbacks. The log proved the intended `2+1+1` execution;
+the validator was temporarily corrected to require causal ordering per stream,
+and the capture was rerun. Safe one-block artifact `f9a240071240a55b`
+measured 0.37870 for packets 17--32 and 0.38823 whole. This did not improve
+both target views over the one-turn diagnostic's 0.24945/0.36747, so no
+four-block confirmation was spent. The binary identified build ID
+`7477b35b421bf7f30eaa264106fa625c` and libxul digest
+`9a1a314167aeaaa2cec3277efa671335c80605a35bf237ae1cbbbe968368c43c`.
+The batching code and its temporary validator relaxation were removed; the
+single next-turn image release remains the working candidate.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
