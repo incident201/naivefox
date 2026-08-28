@@ -19,6 +19,25 @@ page assets coherently for that check. Omitting it preserves the established
 262144-byte fixture; the sanitized metadata records either the explicit base
 or `default_262144`.
 
+Use `--network-one-way-delay-ms N` and `--network-rate-mbit N` only inside the
+one-shot isolated namespace to test RTT and bandwidth robustness. The verified
+loopback `netem` profile applies symmetrically to every participant. Shaped
+captures use the receive copy so packet timestamps occur after netem rather
+than at the pre-qdisc transmit tap; metadata records the profile and capture
+copy policy.
+
+The first 20-ms/20-Mbit plumbing smoke, `e97a1bae045f29d8` (seed
+`20260828145`), successfully shaped and analyzed all four participants but
+exposed that profile fields were written only for NaiveFox-only diagnostics.
+It is retained as a failed metadata-validation attempt, not candidate evidence.
+After fixing the ordinary metadata path, `162df2d1d421aa23` (seed
+`20260828146`) again completed one H3/SOCKS block and records
+`network_profile_active=1`, one-way delay 20 ms, rate 20 Mbit/s, one applied
+protocol, and `capture_copy_policy=receive_after_netem`. Firefox packets 1--16
+spanned about 148 ms and whole flows about 530--548 ms, confirming that the
+stored receive-side timestamps include the emulated link. One block remains a
+plumbing check, not a candidate comparison.
+
 Harness validation `a045653efaa21665` (seed `20260828140`) completed one full
 isolated same-base H3/SOCKS block at a 65536-byte base, including both Firefox
 controls and the two NaiveFox arms. This is a successful end-to-end plumbing

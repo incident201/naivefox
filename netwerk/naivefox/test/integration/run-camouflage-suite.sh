@@ -24,6 +24,8 @@ multi_arm_views_csv=all
 scenario_override=
 scenario_option_count=0
 browser_page_base_size=
+network_one_way_delay_ms=0
+network_rate_mbit=0
 private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
 diagnostic_naivefox_only=${NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY:-0}
 isolated_network=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0}
@@ -83,6 +85,14 @@ while [[ $# -gt 0 ]]; do
       browser_page_base_size=${2:-}
       shift 2
       ;;
+    --network-one-way-delay-ms)
+      network_one_way_delay_ms=${2:-}
+      shift 2
+      ;;
+    --network-rate-mbit)
+      network_rate_mbit=${2:-}
+      shift 2
+      ;;
     --samples-per-cohort)
       samples_per_cohort=${2:-}
       shift 2
@@ -92,7 +102,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -202,6 +212,24 @@ if [[ -n $browser_page_base_size ]]; then
   if [[ ! $browser_page_base_size =~ ^[0-9]+$ ]] ||
      ((browser_page_base_size < 65536 || browser_page_base_size > 4194304)); then
     printf '%s\n' '--browser-page-base-size must be an integer between 65536 and 4194304' >&2
+    exit 2
+  fi
+fi
+if [[ ! $network_one_way_delay_ms =~ ^[0-9]+$ ]] ||
+   ((network_one_way_delay_ms > 1000)); then
+  printf '%s\n' '--network-one-way-delay-ms must be an integer between 0 and 1000' >&2
+  exit 2
+fi
+if [[ ! $network_rate_mbit =~ ^[0-9]+$ ]] ||
+   ((network_rate_mbit > 10000)); then
+  printf '%s\n' '--network-rate-mbit must be an integer between 0 and 10000' >&2
+  exit 2
+fi
+network_profile_active=0
+if ((network_one_way_delay_ms > 0 || network_rate_mbit > 0)); then
+  network_profile_active=1
+  if [[ $isolated_network != 1 ]]; then
+    printf '%s\n' 'network shaping requires NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1' >&2
     exit 2
   fi
 fi
@@ -768,7 +796,11 @@ if [[ $isolated_network == 1 && $isolated_network_entered == 0 ]]; then
     printf 'isolated-network capture requires same-base mode\n' >&2
     exit 2
   fi
-  for tool in unshare ip ethtool; do
+  isolation_tools=(unshare ip ethtool)
+  if [[ $network_profile_active == 1 ]]; then
+    isolation_tools+=(tc)
+  fi
+  for tool in "${isolation_tools[@]}"; do
     command -v "$tool" >/dev/null 2>&1 || {
       printf 'isolated-network capture requires %s\n' "$tool" >&2
       exit 1
@@ -815,6 +847,45 @@ proxy_restart_records="$private_dir/proxy-restarts.txt"
 proxy_restart_count=0
 fixture_caddy_child_pid=
 success=0
+network_profile_applied_protocols=0
+
+apply_network_profile() {
+  [[ $network_profile_active == 1 ]] || return 0
+  if [[ $isolated_network_entered != 1 ]]; then
+    printf 'refusing network shaping outside the one-shot namespace\n' >&2
+    return 1
+  fi
+  local arguments=(qdisc replace dev lo root handle 1: netem)
+  if ((network_one_way_delay_ms > 0)); then
+    arguments+=(delay "${network_one_way_delay_ms}ms")
+  fi
+  if ((network_rate_mbit > 0)); then
+    arguments+=(rate "${network_rate_mbit}mbit")
+  fi
+  arguments+=(limit 10000)
+  tc "${arguments[@]}"
+  local qdisc
+  qdisc=$(tc qdisc show dev lo)
+  rg -q '^qdisc netem 1: root ' <<<"$qdisc" || {
+    printf 'isolated loopback netem profile was not installed\n' >&2
+    return 1
+  }
+  if ((network_one_way_delay_ms > 0)); then
+    rg -q " delay ${network_one_way_delay_ms}(?:\\.0+)?ms(?: |$)" <<<"$qdisc" || {
+      printf 'isolated loopback delay does not match requested profile: %s\n' \
+        "$qdisc" >&2
+      return 1
+    }
+  fi
+  if ((network_rate_mbit > 0)); then
+    rg -qi " rate ${network_rate_mbit}Mbit(?: |$)" <<<"$qdisc" || {
+      printf 'isolated loopback rate does not match requested profile: %s\n' \
+        "$qdisc" >&2
+      return 1
+    }
+  fi
+  network_profile_applied_protocols=$((network_profile_applied_protocols + 1))
+}
 
 stop_pid() {
   local pid=${1:-}
@@ -942,9 +1013,15 @@ stop_capture() {
     status=1
   fi
   if [[ -n $capture_stage_pcap && -s $capture_stage_pcap ]]; then
-    if [[ -n $(tshark -r "$capture_stage_pcap" -Y 'sll.pkttype==4' \
+    local copy_filter='sll.pkttype==4'
+    if [[ $network_profile_active == 1 ]]; then
+      # The transmit copy is tapped before loopback netem. Use the receive copy
+      # so timestamps reflect the emulated propagation and serialization.
+      copy_filter='sll.pkttype==0'
+    fi
+    if [[ -n $(tshark -r "$capture_stage_pcap" -Y "$copy_filter" \
       -T fields -e frame.number 2>/dev/null | sed -n '1p') ]]; then
-      tshark -r "$capture_stage_pcap" -Y 'sll.pkttype==4' -w "$capture_pcap" \
+      tshark -r "$capture_stage_pcap" -Y "$copy_filter" -w "$capture_pcap" \
         >/dev/null 2>&1
       rm -f -- "$capture_stage_pcap"
     else
@@ -2282,6 +2359,7 @@ for protocol in "${protocols[@]}"; do
   run_dir=$(<"$ACTIVE_RUN_FILE")
   # shellcheck source=/dev/null
   source "$run_dir/fixture.env"
+  apply_network_profile
   if [[ $protocol == h2 &&
         ( $NAIVEFOX_FIXTURE_PROTOCOLS != h2 ||
           ${NAIVEFOX_FIXTURE_OUTER_H2_ONLY:-0} != 1 ) ]]; then
@@ -2546,6 +2624,11 @@ isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link
 network_mutation_monitor=netlink_route_v1_fail_closed
 network_mutation_validated_samples=$network_mutation_validated_samples
+network_profile_active=$network_profile_active
+network_one_way_delay_ms=$network_one_way_delay_ms
+network_rate_mbit=$network_rate_mbit
+network_profile_applied_protocols=$network_profile_applied_protocols
+capture_copy_policy=$([[ $network_profile_active == 1 ]] && printf receive_after_netem || printf transmit)
 capture_offload_policy=$capture_offload_policy
 h3_udp_superframe_policy=reject_udp_length_gt_1500
 EOF
@@ -2768,6 +2851,11 @@ isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link
 network_mutation_monitor=netlink_route_v1_fail_closed
 network_mutation_validated_samples=$network_mutation_validated_samples
+network_profile_active=$network_profile_active
+network_one_way_delay_ms=$network_one_way_delay_ms
+network_rate_mbit=$network_rate_mbit
+network_profile_applied_protocols=$network_profile_applied_protocols
+capture_copy_policy=$([[ $network_profile_active == 1 ]] && printf receive_after_netem || printf transmit)
 capture_offload_policy=$capture_offload_policy
 h3_udp_superframe_policy=reject_udp_length_gt_1500
 experiment_design=$experiment_design

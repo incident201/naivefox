@@ -517,6 +517,15 @@ The base scales the six ordinary page assets in the same 1/4, 1/2, 1,
 the established fixture exactly. The selected base is recorded in sanitized
 metadata; it is a diagnostic input and must not be tuned to a packet window.
 
+For an isolated link-robustness check, add `--network-one-way-delay-ms N`,
+`--network-rate-mbit N`, or both. Network shaping is rejected unless
+`NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`; after the fixture is ready, the runner
+installs and verifies one loopback `netem` qdisc before any participant runs.
+The same profile applies to both Firefox controls and every NaiveFox arm. A
+shaped capture keeps the receive-side cooked-packet copy because its timestamp
+is after netem; the usual transmit copy is tapped before shaping. Requested
+values, application count, and copy policy are recorded in sanitized metadata.
+
 To diagnose a NaiveFox lifecycle race without collecting flaky direct-Firefox
 reference samples, set `NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY=1`. This
 private mode is restricted to gate/smoke, requires exactly one explicit

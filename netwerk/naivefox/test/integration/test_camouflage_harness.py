@@ -1975,6 +1975,31 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn(message, result.stderr)
 
+    def test_network_profile_is_isolated_recorded_and_uses_receive_copy(self):
+        runner_path = os.path.join(HERE, "run-camouflage-suite.sh")
+        with open(runner_path, encoding="utf-8") as stream:
+            runner = stream.read()
+        self.assertIn("--network-one-way-delay-ms", runner)
+        self.assertIn("--network-rate-mbit", runner)
+        self.assertIn("refusing network shaping outside", runner)
+        self.assertIn("qdisc replace dev lo root handle 1: netem", runner)
+        self.assertGreaterEqual(runner.count("network_profile_applied_protocols="), 3)
+        self.assertGreaterEqual(runner.count("capture_copy_policy="), 2)
+        self.assertIn("copy_filter='sll.pkttype==0'", runner)
+        self.assertLess(
+            runner.index('source "$run_dir/fixture.env"'),
+            runner.index("apply_network_profile", runner.index("for protocol in")),
+        )
+
+        result = subprocess.run(
+            ["bash", runner_path, "--network-one-way-delay-ms", "20"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("requires NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1", result.stderr)
+
     def test_tree_fixture_assets_leave_streams_live_within_budget(self):
         page = TARGET.Handler.camouflage_page(object(), {"scenario": ["browser_page"]})
         self.assertEqual(len(TARGET.CAMOUFLAGE_STYLE_CSS), 64 * 1024)
