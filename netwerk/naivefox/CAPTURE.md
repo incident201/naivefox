@@ -1130,6 +1130,8 @@ independent seeds.
 | `e003c4bcdeae430f` | release CONNECT after the first consumed resource body buffer, shaped link | 1 | 0.22977 / 0.35266 / 0.23174 / 0.20103 / 0.38039 |
 | `390cc24ccb6ef8c9` | preceding first-resource-body-buffer admission, shaped link | 4 | 0.11745 / 0.29471 / 0.15293 / 0.16835 / 0.34363 |
 | `4e4edd7c53b91735` | preceding first-resource-body-buffer admission, unshaped localhost | 4 | 0.10945 / 0.44214 / 0.18431 / 0.17123 / 0.38250 |
+| `c9643a1e000b3c2c` | preceding first-resource-body-buffer admission, 65536-byte page base, shaped link | 1 | 0.20808 / 0.72418 / 0.32068 / 0.22956 / 0.45906 |
+| `8925499c80a97688` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 1 | 0.21060 / 0.41138 / 0.24301 / 0.19447 / 0.42297 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1374,6 +1376,17 @@ without repeating the previous scheduler's localhost whole-flow regression.
 Resource-size and slower-link screens remain required because the first body
 callback depends on actual server and path progress even though it contains no
 fixed time or byte threshold.
+
+The first one-block size screens are mixed and remain diagnostic. At a
+65536-byte page base, artifact `c9643a1e000b3c2c` measured 0.72418 for packets
+17--32 and 0.45906 whole; at 1048576 bytes, artifact `8925499c80a97688`
+measured 0.41138 and 0.42297. In both cases the candidate still improved all
+five views over its matched `document-start-overlap` control, whose target
+pairs were respectively 0.88117/0.58286 and 0.58080/0.53749. The high absolute
+residual at 65536 bytes is not acceptable evidence of size robustness, while
+the simultaneous control movement makes a single-block rejection equally
+unsafe. The smaller-size condition is therefore selected for four-block
+replication before changing the mechanism.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
