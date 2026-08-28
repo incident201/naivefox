@@ -1150,6 +1150,7 @@ independent seeds.
 | `516a52ecdf7325fe` | request a one-byte range only for the largest, third image-cover response, shaped link | 1 | 0.20167 / 0.20686 / 0.21134 / 0.26134 / 0.38629 |
 | `3ccc3e566c17bf55` | preceding selective third-image Range request, shaped link | 4 | 0.13225 / 0.38692 / 0.17637 / 0.14720 / 0.36567 |
 | `b4404c4a0ed5af8f` | delay image activation by half the measured root request-to-response interval, shaped link | 1 | 0.11576 / 0.43308 / 0.18672 / 0.17680 / 0.37198 |
+| `c3e2674327356bfc` | release all prepared images from the main-thread idle queue, shaped link | 1 | 0.24089 / 0.66662 / 0.30821 / 0.22581 / 0.46435 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1643,6 +1644,19 @@ The timing state and temporary validator branch were removed. The measured
 interval includes connection/queue work and is not an RTT estimator; dividing
 it by another fitted constant would recreate the fixture-specific timing
 problem this experiment was meant to avoid.
+
+Main-thread idle-queue image activation is rejected. All four images remained
+prepared together, but their release runnable used Gecko's
+`EventQueuePriority::Idle` instead of an ordinary next-turn dispatch. This
+introduced no timer, byte threshold, or resource completion dependency, yet
+one-block shaped artifact `c3e2674327356bfc` regressed packets 17--32 to
+0.66662 and whole flow to 0.46435. Packets 1--16, packets 1--32, and 250 ms
+were also 0.24089/0.30821/0.22581. The binary identified build ID
+`628395e375ae5a29ee6179e4e11c555e` and libxul digest
+`cc8dc4c497fcdf48ff6ec2a7b23e6bafd0352e13b5060d06ceebf763adf381fb`.
+The idle dispatch and its temporary exact lifecycle marker were removed.
+Yielding behind normal network callbacks is much coarser than ordinary parser
+cadence and is not suitable as a product scheduling cause.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
