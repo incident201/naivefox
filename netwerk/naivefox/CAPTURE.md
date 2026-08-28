@@ -1153,6 +1153,7 @@ independent seeds.
 | `c3e2674327356bfc` | release all prepared images from the main-thread idle queue, shaped link | 1 | 0.24089 / 0.66662 / 0.30821 / 0.22581 / 0.46435 |
 | `78cbd9ef5ace8048` | open each prepared image after the preceding image request commits, shaped link | 1 | 0.30343 / 0.37128 / 0.30186 / 0.28342 / 0.45118 |
 | `ef003b01f019fe12` | open three images next turn and the final image on the following main-thread turn, shaped link | 1 | 0.30779 / 0.58293 / 0.35812 / 0.31232 / 0.44871 |
+| `d1c08c6718fa278f` | admit CONNECT after the first successful image response HEADERS, shaped link | 1 | 0.11972 / 0.38830 / 0.17140 / 0.18762 / 0.38223 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1689,6 +1690,20 @@ were 0.30779/0.35812/0.31232. The binary identified build ID
 The second dispatch and temporary validator marker were removed. Together
 with the `2+1+1`, idle-queue, and request-commit results, this shows that even
 a one-image event-loop split is too coarse for the desired H3 burst shape.
+
+CONNECT admission after the first successful image response HEADERS is
+rejected. The gate still required all six request commits, then used the first
+2xx image response start as a causal, body-size-independent boundary. The
+temporary validator required that exact image-header observation between all
+commits and CONNECT admission. One-block shaped artifact
+`d1c08c6718fa278f` kept packets 1--16 low at 0.11972, but packets 17--32 rose
+to 0.38830 and whole flow was 0.38223; the remaining views were
+0.17140/0.18762. The binary identified build ID
+`17baed0a323625250d73534cc06beb36` and libxul digest
+`f71697b265a4486de74890ee7c3d41b0b49a1dcbbeaf05ea9fa33f27b5eb0cd2`.
+The image-header state and temporary validator marker were removed. Moving
+admission from first body progress to a specific response class does not
+improve the target window.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
