@@ -1123,6 +1123,7 @@ independent seeds.
 | `69ee3fd2559c47e1` | preceding next-turn image scheduling, unshaped localhost | 4 | 0.11254 / 0.43472 / 0.17955 / 0.17351 / 0.41992 |
 | `f9a240071240a55b` | open images in `2+1+1` successive main-thread turns, shaped link | 1 | 0.19743 / 0.37870 / 0.22054 / 0.20749 / 0.38823 |
 | `f5cfa9eff387313d` | next-turn image scheduling plus exact Firefox application UA token, shaped link | 1 | 0.12563 / 0.62333 / 0.24182 / 0.17464 / 0.39800 |
+| `906de419f0b1605d` | release CONNECT after stylesheet and deferred-script response HEADERS, shaped link | 1 | 0.09888 / 0.53957 / 0.19785 / 0.19506 / 0.37942 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1282,6 +1283,20 @@ The temporary HTTP-handler override was removed. `Alt-Used` and
 `Sec-Fetch-User` remain untouched as well: the former must come from an actual
 Alt-Svc mapping and the latter from a genuine user navigation, so fabricating
 either would change semantics rather than recover native scheduling.
+
+Waiting for both blocking-resource response HEADERS is also rejected. The
+causal rationale came from the decrypted reference, where image requests
+followed the stylesheet and deferred-script response HEADERS. The candidate
+kept the existing next-turn image activation but delayed CONNECT admission
+until both stream 1 and stream 2 had a successful response start. This uses no
+body progress or fixed delay, but one-block shaped artifact
+`906de419f0b1605d` regressed packets 17--32 to 0.53957 and whole flow to
+0.37942. The binary identified build ID `064783d96e998ba682750149381d4d92`
+and libxul digest
+`79c52c4ab62be2e8033694b8d241fd5b394410133aa69fc8c3c9317e2da3afc8`.
+Additional response waiting therefore moves CONNECT in the wrong direction on
+the shaped path and would impose an avoidable slow-server penalty. The
+blocking-HEADERS condition and its temporary lifecycle label were removed.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
