@@ -1152,6 +1152,7 @@ independent seeds.
 | `b4404c4a0ed5af8f` | delay image activation by half the measured root request-to-response interval, shaped link | 1 | 0.11576 / 0.43308 / 0.18672 / 0.17680 / 0.37198 |
 | `c3e2674327356bfc` | release all prepared images from the main-thread idle queue, shaped link | 1 | 0.24089 / 0.66662 / 0.30821 / 0.22581 / 0.46435 |
 | `78cbd9ef5ace8048` | open each prepared image after the preceding image request commits, shaped link | 1 | 0.30343 / 0.37128 / 0.30186 / 0.28342 / 0.45118 |
+| `ef003b01f019fe12` | open three images next turn and the final image on the following main-thread turn, shaped link | 1 | 0.30779 / 0.58293 / 0.35812 / 0.31232 / 0.44871 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1674,6 +1675,20 @@ The request-commit chain and temporary validator ordering were removed. A
 transaction commit is deterministic but too coarse as a parser-cadence proxy:
 serializing all four image submissions harms both the target window and the
 whole-flow view.
+
+Opening three images on the ordinary next turn and the final image on one
+following main-thread turn is rejected. This approximated separate image-load
+tasks without a timer or network/body dependency, while keeping the split much
+smaller than the earlier `2+1+1` experiment. The strict temporary validator
+required exactly streams 3--5 with `next-main-turn` cause and stream 6 with
+`following-main-turn` cause. One-block shaped artifact `ef003b01f019fe12`
+regressed packets 17--32 to 0.58293 and whole flow to 0.44871; its other views
+were 0.30779/0.35812/0.31232. The binary identified build ID
+`832d32cad6dad72e455ff6244008e97f` and libxul digest
+`deb6c282de08da7094482573a9f1c3a01247517e7616b26a9340602ecc29fa35`.
+The second dispatch and temporary validator marker were removed. Together
+with the `2+1+1`, idle-queue, and request-commit results, this shows that even
+a one-image event-loop split is too coarse for the desired H3 burst shape.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
