@@ -1137,6 +1137,7 @@ independent seeds.
 | `d62dc8f4ca95d6e1` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 1 | 0.15058 / 0.38089 / 0.19917 / 0.10000 / 0.29532 |
 | `4606cb015d86e68a` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 4 | 0.09429 / 0.42424 / 0.16478 / 0.07301 / 0.31681 |
 | `d25a8910b028a6d5` | release CONNECT after the deferred-script body buffer, shaped link | 1 | 0.22782 / 0.46535 / 0.25761 / 0.22191 / 0.40645 |
+| `4a893926cca282f9` | release deferred images and CONNECT on the first resource body buffer, shaped link | 1 | 0.26798 / 0.51989 / 0.32041 / 0.32007 / 0.47166 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1441,6 +1442,21 @@ replicated 0.29471/0.34363. The binary identified build ID
 `536b1ee21f409a357bbec3b3cd20ec83a85da4995146ebf5e3069671f557425a`.
 The stream-specific condition and lifecycle labels were removed; admission
 again follows whichever valid resource delivers body data first.
+
+Using that same first body event to open the four prepared images is also
+rejected. This attempted to reproduce the decrypted Firefox ordering in which
+image GETs followed blocking-resource response progress, while retaining real
+channels and avoiding a time or size constant. Instead one-block shaped
+artifact `4a893926cca282f9` regressed packets 17--32 to 0.51989 and whole flow
+to 0.47166; packets 1--16, 1--32, and 250 ms also rose to
+0.26798/0.32041/0.32007. Its matched control measured 0.64491/0.52655 for the
+two target views, so the arm still differed from the baseline control but was
+clearly worse than retained first-body admission with next-turn images. The
+binary identified build ID `bf1fbfed66c17fe744a7d4c0266e8669` and libxul
+digest
+`a338ef2b94b96c24b16994aa3097c608555289d07d46f33a0170c28886e84a32`.
+The body-triggered image release and validator ordering were removed; image
+activation again occurs on its independent ordinary main-thread turn.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
