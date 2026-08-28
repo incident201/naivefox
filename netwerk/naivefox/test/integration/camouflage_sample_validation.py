@@ -1387,12 +1387,29 @@ def validate_sample(arm, protocol, log_text, feature_document):
         and " status=0x00000000 " in line
         and line.endswith(f" protocol={protocol}")
     ]
-    native_resource_tree_headers_barrier_lines = [
+    native_resource_tree_body_barrier_lines = [
         line
         for line in log_lines
         if "Preamble native-parser-resource-tree "
-        "barrier=first-resource-headers " in line
+        "barrier=first-resource-body-buffer " in line
     ]
+    native_resource_tree_first_body_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-resource-tree "
+        "lifecycle=first-resource-body-buffer-consumed " in line
+    ]
+    parsed_native_resource_tree_first_bodies = [
+        re.fullmatch(
+            r"Preamble native-parser-resource-tree "
+            r"lifecycle=first-resource-body-buffer-consumed "
+            r"stream=(?P<stream>[1-6]) protocol=(?P<protocol>h2|h3)",
+            line,
+        )
+        for line in native_resource_tree_first_body_lines
+    ]
+    if any(marker is None for marker in parsed_native_resource_tree_first_bodies):
+        raise ValueError("malformed native resource-tree first-body evidence")
     native_parser_lightweight_open_lines = [
         line
         for line in log_lines
@@ -2262,6 +2279,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         parsed_native_resource_tree_opens,
         parsed_native_resource_tree_deferred_opens,
         parsed_native_resource_tree_commits,
+        parsed_native_resource_tree_first_bodies,
         parsed_native_resource_tree_drains,
     )
     if arm in (
@@ -2283,7 +2301,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
             != expected_deferred_count
             or len(parsed_native_resource_tree_commits) != expected_resource_count
             or len(parsed_native_resource_tree_drains) != 1
-            or len(native_resource_tree_headers_barrier_lines)
+            or len(parsed_native_resource_tree_first_bodies)
+            != (1 if arm == "tree-native-parser-resource-committed-page" else 0)
+            or len(native_resource_tree_body_barrier_lines)
             != (1 if arm == "tree-native-parser-resource-committed-page" else 0)
         ):
             raise ValueError(
@@ -2402,20 +2422,25 @@ def validate_sample(arm, protocol, log_text, feature_document):
             and result_index < established_index < drain_index
         )
         if arm == "tree-native-parser-resource-committed-page":
-            headers_barrier_index = log_lines.index(
-                native_resource_tree_headers_barrier_lines[0]
+            first_body = parsed_native_resource_tree_first_bodies[0]
+            first_body_index = log_lines.index(
+                native_resource_tree_first_body_lines[0]
+            )
+            body_barrier_index = log_lines.index(
+                native_resource_tree_body_barrier_lines[0]
             )
             resource_committed_order = (
-                native_resource_tree_headers_barrier_lines[0].endswith(
+                first_body["protocol"] == protocol
+                and native_resource_tree_body_barrier_lines[0].endswith(
                     "Preamble native-parser-resource-tree "
-                    "barrier=first-resource-headers assets=6 committed=6 "
+                    "barrier=first-resource-body-buffer assets=6 committed=6 "
                     f"protocol={protocol}"
                 )
                 and descriptor_index < min(open_indices)
                 and max(open_indices) < min(deferred_open_indices)
                 and max(deferred_open_indices) < min(commit_indices)
-                and max(commit_indices) < headers_barrier_index
-                and headers_barrier_index < admission_index
+                and max(commit_indices) < first_body_index < body_barrier_index
+                and body_barrier_index < admission_index
                 and admission_index < result_index < established_index
                 and result_index < drain_index
             )

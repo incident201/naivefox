@@ -602,7 +602,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
         lines.extend([
             "Preamble native-parser-resource-tree "
-            "barrier=first-resource-headers assets=6 committed=6 protocol=h3",
+            "lifecycle=first-resource-body-buffer-consumed stream=1 protocol=h3",
+            "Preamble native-parser-resource-tree "
+            "barrier=first-resource-body-buffer assets=6 committed=6 protocol=h3",
             "Connection 7 preamble native-parser-resource-tree "
             "admission=resources-committed request_committed=1 root_done=1 "
             "protocol=h3",

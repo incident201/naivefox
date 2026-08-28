@@ -703,6 +703,7 @@ class ProxyPreambleOperation::Impl final {
   bool mRootCompletedSuccessfully = false;
   bool mBarrierFired = false;
   bool mDocumentBarrierTaskDispatched = false;
+  bool mFirstResourceBodyBufferConsumed = false;
   bool mDocumentRootStopDeferred = false;
   nsresult mDocumentRootStopStatus = NS_OK;
   bool mDeferredImageOpenDispatched = false;
@@ -3660,6 +3661,26 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
     mImpl->mBodyBytes += read;
   }
 
+  if (aStreamId > 0 &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      mImpl->mConfig.mMaxAssets == 6 &&
+      !mImpl->mFirstResourceBodyBufferConsumed &&
+      mImpl->mStreams[aStreamId].mResponseHeadersReceived &&
+      mImpl->mStreams[aStreamId].mHttpStatus >= 200 &&
+      mImpl->mStreams[aStreamId].mHttpStatus < 300 &&
+      !mImpl->mStreams[aStreamId].mDone) {
+    // This is actual response progress, not a byte threshold: the complete
+    // first Necko-delivered resource buffer must be consumed successfully.
+    mImpl->mFirstResourceBodyBufferConsumed = true;
+    RuntimeLogEvent(
+        "Preamble native-parser-resource-tree "
+        "lifecycle=first-resource-body-buffer-consumed stream=%u "
+        "protocol=%s\n",
+        aStreamId, ProtocolName(mImpl->mProtocol));
+    MaybeFireBarrier();
+  }
+
   if (aStreamId == 0 &&
       (mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferOverlap ||
        mImpl->mConfig.mMode ==
@@ -4166,12 +4187,12 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
     if (mImpl->mConfig.mMode ==
             PreambleMode::TreeNativeParserResourceCommittedOverlap &&
         mImpl->mConfig.mMaxAssets == 6) {
-      if (assetsWithHeadersNotDone == 0) {
+      if (!mImpl->mFirstResourceBodyBufferConsumed) {
         return;
       }
       RuntimeLogEvent(
           "Preamble native-parser-resource-tree "
-          "barrier=first-resource-headers assets=6 committed=6 "
+          "barrier=first-resource-body-buffer assets=6 committed=6 "
           "protocol=%s\n",
           ProtocolName(mImpl->mProtocol));
       FireBarrierCallback();

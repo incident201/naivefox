@@ -1127,6 +1127,8 @@ independent seeds.
 | `e0780953cbebd8a4` | release CONNECT as soon as all six request transactions commit, shaped link | 1 | 0.22115 / 0.69741 / 0.32680 / 0.22386 / 0.47965 |
 | `9c0b28cfd8163df8` | defer first-resource-HEADERS CONNECT admission by one main-thread task, shaped link | 1 | 0.10124 / 0.25761 / 0.15044 / 0.17865 / 0.36383 |
 | `5247083ce674bb8c` | preceding task-deferred admission, shaped link | 4 | 0.18055 / 0.42214 / 0.21098 / 0.16720 / 0.38589 |
+| `e003c4bcdeae430f` | release CONNECT after the first consumed resource body buffer, shaped link | 1 | 0.22977 / 0.35266 / 0.23174 / 0.20103 / 0.38039 |
+| `390cc24ccb6ef8c9` | preceding first-resource-body-buffer admission, shaped link | 4 | 0.11745 / 0.29471 / 0.15293 / 0.16835 / 0.34363 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1332,6 +1334,32 @@ digest
 The task deferral, temporary lifecycle label, and validator allowance were
 removed. The result also demonstrates why single-block improvements are used
 only to decide whether a replication is worth collecting.
+
+Waiting for the first successfully consumed resource body buffer is retained
+as the stronger causal candidate. All six request transactions must still be
+committed first, and the barrier is armed only after `OnDataAvailable` has
+consumed one complete positive resource buffer. The rule has no elapsed-time
+constant, byte threshold, packet count, response-size assumption, or wait for
+the complete resource. It follows actual response progress, while failures,
+short reads, empty responses, and response HEADERS without body data do not
+release CONNECT.
+
+One-block shaped artifact `e003c4bcdeae430f` measured 0.35266 for packets
+17--32 and 0.38039 whole. Four-block replication `390cc24ccb6ef8c9` improved
+all five requested views: 0.11745 [`0.07902`, `0.15589`] for packets 1--16,
+0.29471 [`0.25981`, `0.32960`] for packets 17--32, 0.15293
+[`0.11978`, `0.18609`] for packets 1--32, 0.16835
+[`0.13830`, `0.19840`] for the first 250 ms, and 0.34363
+[`0.32339`, `0.36381`] whole. Its matched control measured
+0.19749/0.54571/0.24224/0.17254/0.43664. Relative to the retained next-turn
+image scheduler's earlier four-block 0.42302/0.35352, the new boundary reduces
+the target packets-17--32 residual materially and also lowers whole-flow
+residual. Both new artifacts identify NaiveFox build ID
+`89a4a90ceb64afd12b532dbe7ee67913` and libxul digest
+`eb4ed5f1dd05c40d1ab17a4419f5ca238ef620854149b501ff0a40bc4b32dcb4`.
+The mechanism and fail-closed lifecycle validation are retained for
+cross-size and unshaped robustness screens; these gate-sized runs do not yet
+promote it to the product default.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
