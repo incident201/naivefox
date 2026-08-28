@@ -1401,7 +1401,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
     ]
     parsed_native_resource_tree_first_bodies = [
         re.fullmatch(
-            r"Preamble native-parser-resource-tree "
+            r"(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
             r"lifecycle=first-resource-body-buffer-consumed "
             r"stream=(?P<stream>[1-6]) protocol=(?P<protocol>h2|h3)",
             line,

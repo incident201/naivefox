@@ -622,6 +622,22 @@ class CamouflageHarnessTests(unittest.TestCase):
             },
         }
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
+        prefixed_lines = [
+            f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
+        ]
+        SAMPLE.validate_sample(
+            arm, protocol, "\n".join(prefixed_lines), features
+        )
+
+        missing_first_body = [
+            line
+            for line in lines
+            if "lifecycle=first-resource-body-buffer-consumed" not in line
+        ]
+        with self.assertRaisesRegex(ValueError, "configured resource opens"):
+            SAMPLE.validate_sample(
+                arm, protocol, "\n".join(missing_first_body), features
+            )
 
         missing_open = [
             line
