@@ -1141,6 +1141,7 @@ independent seeds.
 | `ee1d57bb7b7817f0` | give CONNECT document-equivalent H3 priority `u=0, i`, shaped link | 1 | 0.27480 / 0.62412 / 0.33962 / 0.30322 / 0.43876 |
 | `c276f92a62ecafdd` | open two images next turn and two on first resource body buffer, shaped link | 1 | 0.29429 / 0.44772 / 0.31302 / 0.28711 / 0.45058 |
 | `e26fad3d3d44af3c` | open all six resources together next turn, then admit on first body buffer, shaped link | 1 | 0.22284 / 0.71720 / 0.32656 / 0.24533 / 0.49797 |
+| `dcbd84d7270ad4d2` | admit after first body buffers from two distinct resources, shaped link | 1 | 0.12912 / 0.29712 / 0.17971 / 0.18160 / 0.39582 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1504,6 +1505,19 @@ replicated 0.29471/0.34363. Packets 1--16, packets 1--32, and 250 ms were also
 The all-resource deferral and generalized validator markers were removed;
 stylesheet/script activation remains in the parser callback and only images
 use the following main-thread turn.
+
+Waiting for first body buffers from two distinct resources is rejected. The
+boundary counted at most one successfully consumed buffer per response, so it
+did not depend on elapsed time, buffer length, or full resource completion and
+remained reachable for both small and large resources. One-block shaped
+artifact `dcbd84d7270ad4d2` measured 0.29712 for packets 17--32, effectively
+the retained four-block candidate's 0.29471, but whole flow regressed from
+0.34363 to 0.39582. Its other views were
+0.12912/0.17971/0.18160. The binary identified build ID
+`1086f63b07794dd90ff8f74b69d36489` and libxul digest
+`5e240d15097355e6bd0a129171d9988f327d167332ff0993b87626281f01b541`.
+The per-stream progress accounting and second-resource lifecycle markers were
+removed; the first valid resource body buffer again admits CONNECT.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
