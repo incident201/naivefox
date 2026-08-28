@@ -1144,6 +1144,7 @@ independent seeds.
 | `dcbd84d7270ad4d2` | admit after first body buffers from two distinct resources, shaped link | 1 | 0.12912 / 0.29712 / 0.17971 / 0.18160 / 0.39582 |
 | `e37b8b45df2c72f7` | cross-process stylesheet rendezvous before resource activation, shaped link | 1 | 0.10459 / 0.23626 / 0.14855 / 0.19669 / 0.36922 |
 | `a0ead86d96ae38c9` | preceding cross-process resource activation, shaped link | 4 | 0.12889 / 0.32005 / 0.16100 / 0.15227 / 0.34415 |
+| `cdf15c6b3cc11142` | request one-byte ranges for the four image-cover responses, shaped link | 1 | 0.20619 / 0.47585 / 0.23629 / 0.20118 / 0.42462 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1548,6 +1549,28 @@ and 250 ms. Both valid artifacts identify build ID
 The extra process startup, root mirroring, rendezvous state, and generalized
 validator lifecycle were removed; their complexity did not improve either
 replicated target view.
+
+Removing duplicated image-cover bodies is rejected in both tested forms. A
+first attempt changed the four image requests to standard `HEAD` while leaving
+CSS/script as `GET`, so first-body admission remained reachable. Private
+failure artifact `4a11c4f36f4af40c` showed all six transactions committed and
+CONNECT succeeded, but the H3 HEAD streams never delivered the terminal Necko
+callbacks required for a normal six-resource drain before the fixed cutoff.
+The harness therefore failed closed and published no distances; weakening the
+drain contract to accept those hanging channels was not considered.
+
+The follow-up retained `GET` and requested `Range: bytes=0-0`, which completed
+normally and would fall back to full bodies on an origin that ignored Range.
+Despite removing almost all image response payload without a timer or a
+resource-size-dependent completion rule, one-block shaped artifact
+`cdf15c6b3cc11142` regressed packets 17--32 to 0.47585 and whole flow to
+0.42462. Packets 1--16, packets 1--32, and 250 ms also rose to
+0.20619/0.23629/0.20118. The binary identified build ID
+`a485895d17c1e5964fdbd488362870c3` and libxul digest
+`944e7468380d2be8bac89df91da8ee0a3d7b07adc0f082ff30415a091d19a21a`.
+The HEAD/Range mutations and their validator markers were removed. The result
+shows that retained whole-flow behavior depends on the natural multiplexed
+cover-body shape, not merely eliminating duplicated bytes.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
