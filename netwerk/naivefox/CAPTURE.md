@@ -1138,6 +1138,7 @@ independent seeds.
 | `4606cb015d86e68a` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 4 | 0.09429 / 0.42424 / 0.16478 / 0.07301 / 0.31681 |
 | `d25a8910b028a6d5` | release CONNECT after the deferred-script body buffer, shaped link | 1 | 0.22782 / 0.46535 / 0.25761 / 0.22191 / 0.40645 |
 | `4a893926cca282f9` | release deferred images and CONNECT on the first resource body buffer, shaped link | 1 | 0.26798 / 0.51989 / 0.32041 / 0.32007 / 0.47166 |
+| `ee1d57bb7b7817f0` | give CONNECT document-equivalent H3 priority `u=0, i`, shaped link | 1 | 0.27480 / 0.62412 / 0.33962 / 0.30322 / 0.43876 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1457,6 +1458,20 @@ digest
 `a338ef2b94b96c24b16994aa3097c608555289d07d46f33a0170c28886e84a32`.
 The body-triggered image release and validator ordering were removed; image
 activation again occurs on its independent ordinary main-thread turn.
+
+Giving the tunneled CONNECT document-equivalent H3 priority is rejected.
+Upstream Gecko maps an ordinary `TYPE_OTHER` transaction to urgency 4, while
+the direct Firefox navigation in the decrypted trace carried `priority: u=0,
+i`. The experiment combined `UrgentStart`, `PRIORITY_HIGHEST`, and incremental
+delivery only for the exact six-resource H3 body-buffer arm, producing that
+same priority value without a timer. One-block shaped artifact
+`ee1d57bb7b7817f0` regressed packets 17--32 to 0.62412 and whole flow to
+0.43876; the other views rose to 0.27480/0.33962/0.30322. The binary identified
+build ID `cc5666f97b91aa87a297258769c0e408` and libxul digest
+`e84a1d875957baf7234fe4e3329d1d11b988523c6e9baa83789c21cfc13df45e`.
+CONNECT carries a document but also competes with the outer cover streams, so
+the direct document priority over-promotes it. The new parameter, class flags,
+and priority marker were removed; ordinary CONNECT priority is retained.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
