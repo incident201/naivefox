@@ -1125,6 +1125,8 @@ independent seeds.
 | `f5cfa9eff387313d` | next-turn image scheduling plus exact Firefox application UA token, shaped link | 1 | 0.12563 / 0.62333 / 0.24182 / 0.17464 / 0.39800 |
 | `906de419f0b1605d` | release CONNECT after stylesheet and deferred-script response HEADERS, shaped link | 1 | 0.09888 / 0.53957 / 0.19785 / 0.19506 / 0.37942 |
 | `e0780953cbebd8a4` | release CONNECT as soon as all six request transactions commit, shaped link | 1 | 0.22115 / 0.69741 / 0.32680 / 0.22386 / 0.47965 |
+| `9c0b28cfd8163df8` | defer first-resource-HEADERS CONNECT admission by one main-thread task, shaped link | 1 | 0.10124 / 0.25761 / 0.15044 / 0.17865 / 0.36383 |
+| `5247083ce674bb8c` | preceding task-deferred admission, shaped link | 4 | 0.18055 / 0.42214 / 0.21098 / 0.16720 / 0.38589 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1313,6 +1315,23 @@ boundary at the first resource response HEADERS: moving CONNECT by a whole
 network event in either direction is harmful. The all-request-committed label
 and release were removed; later work should vary task scheduling at the first
 HEADERS boundary rather than add another network wait.
+
+Deferring that first-HEADERS boundary by one ordinary main-thread task did not
+survive replication. One-block shaped artifact `9c0b28cfd8163df8` looked
+promising at 0.25761 for packets 17--32 and 0.36383 whole, so it was expanded
+to the predeclared four-block screen. Artifact `5247083ce674bb8c` measured
+0.42214 [`0.37848`, `0.45709`] for packets 17--32 and 0.38589
+[`0.36954`, `0.40224`] whole, versus 0.59751 and 0.46798 for its matched
+control. Relative to the retained next-turn image scheduler's four-block
+0.42302/0.35352, the task handoff did not change the target packet window and
+regressed whole flow; packets 1--16 also regressed from 0.14180 to 0.18055.
+Only the first-250-ms view improved, from 0.19663 to 0.16720. Both artifacts
+identify NaiveFox build ID `a354ee4827c7cb896758774641abf777` and libxul
+digest
+`ab98ac290569de1224f862ffc8c5a688c24b6ba544bbb8806b01eb3eb3a235d5`.
+The task deferral, temporary lifecycle label, and validator allowance were
+removed. The result also demonstrates why single-block improvements are used
+only to decide whether a replication is worth collecting.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
