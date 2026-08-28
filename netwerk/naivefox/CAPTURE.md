@@ -1136,6 +1136,7 @@ independent seeds.
 | `07c422cacf441cd1` | preceding first-resource-body-buffer admission, 1048576-byte page base, shaped link | 4 | 0.14312 / 0.39571 / 0.18047 / 0.15179 / 0.36178 |
 | `d62dc8f4ca95d6e1` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 1 | 0.15058 / 0.38089 / 0.19917 / 0.10000 / 0.29532 |
 | `4606cb015d86e68a` | preceding first-resource-body-buffer admission, 50-ms one-way delay and 5 Mbit/s | 4 | 0.09429 / 0.42424 / 0.16478 / 0.07301 / 0.31681 |
+| `d25a8910b028a6d5` | release CONNECT after the deferred-script body buffer, shaped link | 1 | 0.22782 / 0.46535 / 0.25761 / 0.22191 / 0.40645 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1428,6 +1429,18 @@ digest as the default-size, localhost, and size screens. The event-driven
 boundary therefore generalizes across the tested RTT/rate range without
 encoding either value; broader network and server-TTFB coverage remains future
 validation rather than a reason to add a fixed pause.
+
+Selecting the deferred script's first body buffer instead of the first ready
+resource is rejected. The semantic stream-2 rule avoided a timer and byte
+threshold, but one-block shaped artifact `d25a8910b028a6d5` regressed packets
+17--32 to 0.46535 and whole flow to 0.40645; the first 250 ms also regressed to
+0.22191, above its matched control's 0.20256. This is worse in both target
+views than the first-ready-resource candidate's one-block 0.35266/0.38039 and
+replicated 0.29471/0.34363. The binary identified build ID
+`28ab359279fe717eeb2c33df8d60556e` and libxul digest
+`536b1ee21f409a357bbec3b3cd20ec83a85da4995146ebf5e3069671f557425a`.
+The stream-specific condition and lifecycle labels were removed; admission
+again follows whichever valid resource delivers body data first.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
