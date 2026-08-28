@@ -1086,11 +1086,24 @@ independent seeds.
 | `dcb8ca36bf574d7a` | confirmation only, then 16-ms resource delay | 1 | 0.13137 / 0.21756 / 0.15600 / 0.20159 / 0.39685 |
 | `86c38709c99b66a0` | split delay: 8 ms before root and 8 ms before resources | 1 | 0.17666 / 0.51109 / 0.26344 / 0.24243 / 0.50742 |
 | `fe08089dde0ac15c` | one socket-thread turn after handshake confirmation | 1 | 0.26040 / 0.62362 / 0.34047 / 0.32277 / 0.53048 |
+| `6c1da178f259ec37` | 16-ms dwell, coherently scaled 65536-byte page base | 4 | 0.10039 / 0.33793 / 0.15398 / 0.16820 / 0.41965 |
+| `02da1771dd44e616` | 16-ms dwell, coherently scaled 1048576-byte page base | 4 | 0.08761 / 0.42522 / 0.17234 / 0.16295 / 0.38674 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
 remains an opt-in research mechanism while event-driven or measured-network
 alternatives are evaluated.
+
+The predeclared size matrix rejects the fixed dwell as a general default even
+though it remained better than `document-start-overlap` at both new sizes.
+Moving from the established 262144-byte fixture to 65536 bytes changed the
+candidate packets-17--32 distance from 0.19702 to 0.33793 and whole flow from
+0.35166 to 0.41965. At 1048576 bytes the same values were 0.42522 and 0.38674.
+The first-16 and 250-ms views stayed comparatively low, so the failure is
+localized: 16 ms aligns the root/resource transition with one fixture pacing
+regime rather than reproducing a size-independent Firefox lifecycle. A
+successor must use observable transport progress or ordinary Gecko scheduling,
+not rescale this timer from the chosen object size.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
