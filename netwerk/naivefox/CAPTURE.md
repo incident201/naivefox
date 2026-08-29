@@ -2143,6 +2143,42 @@ responses damaged the early packet shape. The binary identified build ID
 The four-resource allowance, selection cap, and temporary harness expectations
 were removed; this result does not justify testing still smaller topologies.
 
+Applying the retained six-resource native-parser topology to the HTTP CONNECT
+listener is a promising H3 follow-up, but is not yet an implicit-default
+change. The experimental arm keeps the exact
+`tree-native-parser-resource-committed-overlap` product mode, dense page,
+six cached resources, 384-KiB budget, next-main-turn image activation, and
+first-complete-resource-body admission used by the SOCKS candidate; only the
+local ingress changes from SOCKS5 to HTTP CONNECT. It therefore introduces no
+fixed pause, packet-index rule, response-size threshold, or measured-link
+parameter.
+
+One-block isolated gate `22509d99648b3070` (seed `2026082961`) first measured
+the current `document-start-http-connect` control at
+0.21680/0.73137/0.32695/0.24582/0.52378 and the tree treatment at
+0.17979/0.60120/0.27555/0.29096/0.47956. Because a single QUIC ordering can be
+misleading, six fresh randomized same-base blocks were collected next.
+Artifact `695873adeb4f7f4b` (seed `2026082962`) measured the control at
+0.09215/0.54761/0.18906/0.15156/0.43277 and the tree treatment at
+0.08777/0.35793/0.15090/0.15903/0.41305. Thus packets 17--32 improved by
+0.18968 and whole by 0.01971 while packets 1--16 and 1--32 also improved; the
+first 250 ms regressed slightly by 0.00747. Every one of the six paired blocks
+favored the treatment on packets 17--32 and whole (descriptive exact sign-flip
+`p=0.03125` for each), but six gate blocks remain below the 30-block paired
+inference minimum and cannot support an absolute verdict. Size and shaped-link
+robustness must be checked before promotion or replacement of the canonical
+four-row matrix.
+
+Several bring-up attempts produced no candidate result and must not be
+reinterpreted as measurements. A clean research objdir initially tried to
+download the pinned Go/Caddy fixture toolchain after entering the isolated
+namespace, where public DNS is deliberately unavailable; fixture dependencies
+are now prepared before namespace entry. Subsequent partial collections found
+that the newly added HTTP alias was missing independently from the superblock,
+feature-extractor, and lifecycle-validator CLI registries. Those collections
+stopped fail-closed before analysis. The registries and a cross-registry parser
+test were fixed before either successful artifact above was collected.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
