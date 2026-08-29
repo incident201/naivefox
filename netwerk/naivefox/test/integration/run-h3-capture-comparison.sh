@@ -1005,7 +1005,7 @@ EOF
       ' preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=h3$'
   elif [[ $arm == tree-native-parser-resource-committed-page ]]; then
     wait_for_log "$naivefox_pid" "$log" \
-      ' preamble native-parser-resource-tree drain=complete completed_resources=4 http=2[0-9][0-9] protocol=h3$'
+      ' preamble native-parser-resource-tree drain=complete completed_resources=6 http=2[0-9][0-9] protocol=h3$'
   elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h3$'

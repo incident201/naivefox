@@ -1149,6 +1149,7 @@ independent seeds.
 | `bfd151c6ae8b307f` | keep CONNECT admission, but delay local SOCKS success until a second resource progresses, shaped link | 1 | 0.12217 / 0.56947 / 0.24059 / 0.21827 / 0.38174 |
 | `6f3abdd953241f36` | promote CONNECT locally from generic `u=4` to default-wire `u=3`, shaped link | 1 | 0.28571 / 0.67590 / 0.35053 / 0.27983 / 0.44583 |
 | `6f32c2baf9c1115f` | stop still-active resource bodies on first positive target response, shaped link | 1 | 0.18774 / 0.43453 / 0.25554 / 0.27522 / 0.35880 |
+| `11363e69e10c73f7` | cap retained first-body topology at four resources, shaped link | 1 | 0.29180 / 0.56690 / 0.32295 / 0.28668 / 0.49588 |
 | `516a52ecdf7325fe` | request a one-byte range only for the largest, third image-cover response, shaped link | 1 | 0.20167 / 0.20686 / 0.21134 / 0.26134 / 0.38629 |
 | `3ccc3e566c17bf55` | preceding selective third-image Range request, shaped link | 4 | 0.13225 / 0.38692 / 0.17637 / 0.14720 / 0.36567 |
 | `b4404c4a0ed5af8f` | delay image activation by half the measured root request-to-response interval, shaped link | 1 | 0.11576 / 0.43308 / 0.18672 / 0.17680 / 0.37198 |
@@ -2059,6 +2060,33 @@ and repeat the already rejected response-cancellation family; waiting for the
 real target response is robust but too late to affect this workload. The stop
 state, callback, and validator grammar were removed rather than retained as
 unproductive product complexity.
+
+Reducing the retained topology from six selected resources to four is also
+rejected. The experimental cap kept the stylesheet, deferred script, and first
+two images as ordinary native `GET` channels, retained next-main-turn image
+activation and first-resource-body-buffer admission, and required all four
+selected responses to complete normally. Later ordinary resource descriptors
+were ignored only after the cap; unsupported CSP/referrer/parser events still
+failed closed. Thus the experiment used a bounded topology count rather than a
+response byte, elapsed-time, RTT, or bandwidth threshold.
+
+The first private attempt, `4532515217d376a2`, published no distances. Its log
+proved two blocking opens, two prepared images, and first body progress, but
+the older exact-six parser contract rejected the fifth ordinary descriptor as
+`NS_ERROR_FILE_TOO_BIG` and the operation timed out. The cap was corrected to
+select the first four from the parser's complete seven-descriptor output while
+preserving exact selected-channel validation. The successful one-block shaped
+artifact `11363e69e10c73f7` (seed `2026082937`) then measured
+0.29180/0.56690/0.32295/0.28668/0.49588. Packets 17--32 and whole flow regress
+substantially from the retained six-resource replication's 0.29471/0.34363.
+Whole server wire-byte excess over the matched Firefox midpoint fell only from
+about 720.8 KiB to 712.5 KiB, so the omitted final two resources were not the
+dominant whole-flow duplication, while their missing multiplexed requests and
+responses damaged the early packet shape. The binary identified build ID
+`37f71f6fdd3b042e747ad79090e0041e` and libxul digest
+`f37c49d94fecc13f6f768e1ad5269f9bf9877f921a9b5221e0cfb8809d26e4bf`.
+The four-resource allowance, selection cap, and temporary harness expectations
+were removed; this result does not justify testing still smaller topologies.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and

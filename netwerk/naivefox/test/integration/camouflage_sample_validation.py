@@ -1046,15 +1046,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
-    if (
-        arm
-        in (
-            "document-first-buffer-http-connect",
-            "document-overlap-http-connect",
-            "document-start-http-connect",
-        )
-        and protocol != "h2"
-    ):
+    if arm in (
+        "document-first-buffer-http-connect",
+        "document-overlap-http-connect",
+        "document-start-http-connect",
+    ) and protocol != "h2":
         raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
@@ -1068,19 +1064,15 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-native-cache-open requires h3")
     if arm == "document-native-channel-open" and protocol != "h3":
         raise ValueError("document-native-channel-open requires h3")
-    if (
-        arm
-        in (
-            "tree-resource-committed-overlap-css",
-            "tree-resource-committed-overlap-tree",
-            "tree-resource-committed-overlap-page",
-            "tree-native-parser-resource-committed-tree",
-            "tree-native-parser-resource-committed-page",
-            "tree-complete-resource-tree",
-            "tree-early-overlap-resource-tree",
-        )
-        and protocol != "h3"
-    ):
+    if arm in (
+        "tree-resource-committed-overlap-css",
+        "tree-resource-committed-overlap-tree",
+        "tree-resource-committed-overlap-page",
+        "tree-native-parser-resource-committed-tree",
+        "tree-native-parser-resource-committed-page",
+        "tree-complete-resource-tree",
+        "tree-early-overlap-resource-tree",
+    ) and protocol != "h3":
         raise ValueError(f"{arm} requires h3")
     if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
@@ -1256,8 +1248,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         for line in log_lines
         if (
             "Preamble native-parser-resource-tree lifecycle=resource-opened " in line
-            or "Preamble native-parser-resource-tree lifecycle=resource-prepared "
-            in line
+            or "Preamble native-parser-resource-tree "
+            "lifecycle=resource-prepared " in line
         )
     ]
     parsed_native_resource_tree_opens = [
@@ -1977,13 +1969,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
             1 if arm == "tree-resource-committed-overlap-page" else 0
         )
         if len(resource_commit_task_barrier_lines) != expected_task_barriers:
-            raise ValueError("resource-committed arm has invalid task-barrier evidence")
-        if (
-            resource_commit_task_barrier_lines
-            and not resource_commit_task_barrier_lines[0].endswith(
-                "Preamble resource-committed-overlap barrier=task-dispatched "
-                f"assets=6 protocol={protocol}"
+            raise ValueError(
+                "resource-committed arm has invalid task-barrier evidence"
             )
+        if resource_commit_task_barrier_lines and not resource_commit_task_barrier_lines[
+            0
+        ].endswith(
+            "Preamble resource-committed-overlap barrier=task-dispatched "
+            f"assets=6 protocol={protocol}"
         ):
             raise ValueError("resource-committed task-barrier identity is invalid")
         if len(parsed_admissions) != 1:
@@ -2179,7 +2172,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["completed_resources"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection or marker["protocol"] != protocol
+                marker["connection"] != connection
+                or marker["protocol"] != protocol
                 for marker in (channel, admission, barrier, drain)
             )
             or result["connection"] != connection
@@ -2294,10 +2288,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-resource-committed-page",
     ):
         expected_resource_count = (
-            4 if arm == "tree-native-parser-resource-committed-page" else 3
+            6 if arm == "tree-native-parser-resource-committed-page" else 3
         )
         expected_deferred_count = (
-            2 if arm == "tree-native-parser-resource-committed-page" else 0
+            4 if arm == "tree-native-parser-resource-committed-page" else 0
         )
         if (
             len(parsed_native_resource_tree_admissions) != 1
@@ -2321,9 +2315,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         drain = parsed_native_resource_tree_drains[0]
         connection = admission["connection"]
         expected_resources = {1: "style", 2: "script"}
-        expected_resources.update({
-            index: "image" for index in range(3, expected_resource_count + 1)
-        })
+        expected_resources.update(
+            {index: "image" for index in range(3, expected_resource_count + 1)}
+        )
         opens = {
             int(marker["stream"]): marker["kind"]
             for marker in parsed_native_resource_tree_opens
@@ -2346,7 +2340,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
             for marker in parsed_native_resource_tree_deferred_opens
         }
         expected_deferred_opens = (
-            {3, 4} if arm == "tree-native-parser-resource-committed-page" else set()
+            {3, 4, 5, 6}
+            if arm == "tree-native-parser-resource-committed-page"
+            else set()
         )
         commits = {
             int(marker["stream"]) for marker in parsed_native_resource_tree_commits
@@ -2405,7 +2401,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             log_lines.index(line) for line in native_resource_tree_open_lines
         ]
         deferred_open_indices = [
-            log_lines.index(line) for line in native_resource_tree_deferred_open_lines
+            log_lines.index(line)
+            for line in native_resource_tree_deferred_open_lines
         ]
         commit_indices = [
             log_lines.index(line) for line in native_resource_tree_commit_lines
@@ -2427,7 +2424,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if arm == "tree-native-parser-resource-committed-page":
             first_body = parsed_native_resource_tree_first_bodies[0]
             first_body_stream = int(first_body["stream"])
-            first_body_index = log_lines.index(native_resource_tree_first_body_lines[0])
+            first_body_index = log_lines.index(
+                native_resource_tree_first_body_lines[0]
+            )
             body_barrier_index = log_lines.index(
                 native_resource_tree_body_barrier_lines[0]
             )
@@ -2438,13 +2437,15 @@ def validate_sample(arm, protocol, log_text, feature_document):
                     parsed_native_resource_tree_opens,
                 )
             }
-            open_index_by_stream.update({
-                int(marker["stream"]): log_lines.index(line)
-                for line, marker in zip(
-                    native_resource_tree_deferred_open_lines,
-                    parsed_native_resource_tree_deferred_opens,
-                )
-            })
+            open_index_by_stream.update(
+                {
+                    int(marker["stream"]): log_lines.index(line)
+                    for line, marker in zip(
+                        native_resource_tree_deferred_open_lines,
+                        parsed_native_resource_tree_deferred_opens,
+                    )
+                }
+            )
             commit_index_by_stream = {
                 int(marker["stream"]): log_lines.index(line)
                 for line, marker in zip(
@@ -2457,18 +2458,18 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 and first_body_stream in expected_resources
                 and native_resource_tree_body_barrier_lines[0].endswith(
                     "Preamble native-parser-resource-tree "
-                    f"barrier=first-resource-body-buffer "
-                    f"assets={expected_resource_count} "
-                    f"committed={expected_resource_count} "
+                    "barrier=first-resource-body-buffer assets=6 committed=6 "
                     f"protocol={protocol}"
                 )
                 and descriptor_index < min(open_indices)
                 and max(open_indices) < min(deferred_open_indices)
                 and all(
-                    open_index_by_stream[stream] < commit_index_by_stream[stream]
+                    open_index_by_stream[stream]
+                    < commit_index_by_stream[stream]
                     for stream in expected_resources
                 )
-                and commit_index_by_stream[first_body_stream] < first_body_index
+                and commit_index_by_stream[first_body_stream]
+                < first_body_index
                 and max(commit_indices) < body_barrier_index
                 and first_body_index < body_barrier_index
                 and body_barrier_index < admission_index
@@ -2546,7 +2547,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["css_aborted"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection or marker["protocol"] != protocol
+                marker["connection"] != connection
+                or marker["protocol"] != protocol
                 for marker in (
                     stylesheet,
                     tunnel_active,
