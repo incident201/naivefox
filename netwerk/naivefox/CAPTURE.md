@@ -3277,6 +3277,86 @@ started. Future preflight must treat root/resource-response reuse, including
 renaming a real resource as the downstream lane, as this rejected hybrid
 rather than retrying its component mechanisms.
 
+### H2 pre-launched reference lifecycle audit
+
+The next investigation began with the mandatory exact and causal history gate,
+not a product implementation. The cold command-line H2 control above measured
+a 135-ms startup-heavy request gap and was not the Selenium cohort used by the
+current matrix. Conversely, commits `0f80b315388f`, `d5d41e52bfbd`, and
+`bbc166eea5e9` built a repeated-navigation decomposition only for H3. The
+parser-process, activation-process, and full-process arms had already moved
+real parser/channel work across process boundaries and all lost to the retained
+H3 candidate; the larger full-tree IPC form and its two-wave follow-up were
+also rejected. Thus reproducing that process topology for H2 would repeat a
+closed causal family. What remained unmeasured was the actual pre-launched H2
+reference lifecycle.
+
+Commit `f97476fdbac1` added only a Selenium backend to the existing decrypted
+H2 runner; command-line behavior and every product/Caddy path remained
+unchanged. Clean isolated artifact
+`20260829T233038Z-27a63bf9` then used a browser which was ready before capture
+and navigated only after capture began. The direct root GET was packet 16,
+response HEADERS packet 19 at 0.985 ms, and terminal root DATA packet 20. CSS
+and script GETs did not appear until packets 22--23 at 27.627/27.736 ms; later
+resource GETs followed at 29.201--29.916 ms. The matching NaiveFox root began
+at packet 15, while its first CONNECT request/response appeared at packets
+22--23 only 1.099/1.284 ms after that root request. This closes the earlier
+cohort mismatch: the roughly 27-ms native phase is neither cold browser launch,
+target RTT, nor a large root body, and a fixed pause would still worsen the
+observed early server-byte deficit.
+
+Four reference-only H2 lifecycle collections then enabled ordinary
+`nsHttp`/`nsCSSLoader` logging without changing or rebuilding Firefox. The
+runner was intentionally stopped after the reference cohort by supplying a
+non-starting candidate, so it correctly retained private diagnostics and
+published no passive candidate distances. The final clean-worktree artifact is
+`20260829T235802Z-3f09871c`; earlier private replications
+`20260829T234644Z-11c2fd2a`, `20260829T234910Z-bcda1188`, and
+`20260829T234939Z-a31fc615` had an unrelated temporary repeat-analyzer/docs
+edit in the worktree and are used only to check lifecycle stability. Every
+reference capture completed in the isolated namespace with an empty network
+mutation log.
+
+The clean sample measured 31.667 ms from direct root response HEADERS to the
+CSS GET. Its exhaustive coarse decomposition was 0.775 ms to root suspension,
+4.095 ms in the ordinary classifier suspend/resume phase, 2.960 ms to parser
+body delivery, 0.201 ms to stylesheet discovery, 0.168 ms to child
+`AsyncOpen`, 14.996 ms to parent `RecvAsyncOpen`, 3.198 ms to parent
+`InvokeAsyncOpen`, 4.974 ms through parent channel open/transaction dispatch,
+and only 0.300 ms from socket-thread dispatch through
+`Http2Session::AddStream` to the wire. Across all four diagnostics the total
+was 33.029/27.869/30.380/31.667 ms. The dominant child-to-parent interval was
+remarkably stable at 14.055--14.996 ms; parent channel dispatch was
+2.766--5.160 ms. After H2 `AddStream`, the GET reached the wire in only
+0.136--0.235 ms.
+
+An attempted run of the older H3 repeat-navigation tool also failed closed and
+must not be promoted to safe evidence. Private artifact
+`20260829T233458Z-bab07379` contained the eight requested tokenized trees plus
+one Firefox-generated `/favicon.ico` GET, while the analyzer requires exactly
+seven GETs per navigation. Its pristine same-base reference also lacks the
+product-branch-only fine-grained `NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC`
+markers. A read-only coarse decomposition was possible, but no analyzer or
+fixture relaxation was retained merely to rescue this side diagnostic.
+
+The H2 result identifies the missing native interval but does not justify
+copying its implementation into NaiveFox. The earlier real multi-process
+screens already show that process startup, parser IPC, and native-channel
+rendezvous add their own stable traffic and scheduling without improving both
+target views. The new audit therefore strengthens their rejection: H2 encoder,
+socket dispatch, and wire emission are not the bottleneck, and future work must
+not rename full-process reconstruction as an H2 IPC, PBackground, or channel
+bootstrap experiment.
+
+The same preflight rejected two other no-code variants. Negotiating a smaller
+TLS record-size limit would add a ClientHello marker while reproducing the
+already rejected record-fragmentation/ordinal family. Adding more directional
+H2 lanes would quantitatively repeat the rejected paired-stream tunnel: Gecko's
+12-MiB initial H2 receive window already exceeds the complete canonical flow,
+so extra lanes cannot aggregate flow-control capacity and would only add
+HEADERS, pairing, and reordering. Neither proposal reached product, Caddy,
+harness, build, or passive-screen code.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
