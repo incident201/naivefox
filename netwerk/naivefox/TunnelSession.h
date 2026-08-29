@@ -99,7 +99,9 @@ struct TunnelConfig final {
         mOuterSessionGate(aOther.mOuterSessionGate),
         mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
-            aOther.mDiagnosticFirstSocksTunnelUrgentStart) {
+            aOther.mDiagnosticFirstSocksTunnelUrgentStart),
+        mDiagnosticOptimisticLocalReply(
+            aOther.mDiagnosticOptimisticLocalReply) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -114,6 +116,7 @@ struct TunnelConfig final {
       mImplicitPreambleGate = aOther.mImplicitPreambleGate;
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
+      mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -130,6 +133,7 @@ struct TunnelConfig final {
   bool mOuterSessionGate = false;
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
+  bool mDiagnosticOptimisticLocalReply = false;
 };
 
 class TunnelSession final {

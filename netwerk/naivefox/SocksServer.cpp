@@ -101,6 +101,7 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult WaitForOutput();
   nsresult QueueReply(Span<const uint8_t> aBytes, bool aCloseAfter);
   nsresult FlushReplies();
+  nsresult StartPumpIfReady();
   nsresult BeginTunnel(const nsACString& aAuthority,
                        Span<const uint8_t> aInitialPayload);
   void TunnelEstablished(const nsACString& aOuterProtocol,
@@ -125,6 +126,8 @@ class SocksConnection final : public nsIInputStreamCallback,
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
   bool mFailureQueued = false;
+  bool mOptimisticReplyQueued = false;
+  bool mOptimisticReplyFlushedBeforeOuter = false;
   bool mInputTerminal = false;
   bool mClosed = false;
 };
@@ -181,13 +184,30 @@ nsresult SocksConnection::FlushReplies() {
   }
   mReplyLength = 0;
   mReplyOffset = 0;
+  if (mOptimisticReplyQueued && !mEstablished &&
+      !mOptimisticReplyFlushedBeforeOuter) {
+    mOptimisticReplyFlushedBeforeOuter = true;
+    RuntimeLogEvent(
+        "Local optimistic reply phase=reply-flushed-before-outer "
+        "listener=socks\n");
+  }
   if (mCloseAfterWrite) {
     Close(NS_OK);
-  } else if (mEstablished && mSession && !mPumpStarted) {
-    mPumpStarted = true;
-    return mSession->StartPump();
+    return NS_OK;
   }
-  return NS_OK;
+  return StartPumpIfReady();
+}
+
+nsresult SocksConnection::StartPumpIfReady() {
+  if (!mEstablished || !mSession || mPumpStarted || mReplyLength != 0) {
+    return NS_OK;
+  }
+  mPumpStarted = true;
+  if (mOptimisticReplyQueued) {
+    RuntimeLogEvent(
+        "Local optimistic reply phase=pump-started listener=socks\n");
+  }
+  return mSession->StartPump();
 }
 
 nsresult SocksConnection::BeginTunnel(const nsACString& aAuthority,
@@ -204,6 +224,16 @@ nsresult SocksConnection::BeginTunnel(const nsACString& aAuthority,
       },
       [self](nsresult aStatus) { self->TunnelFailed(aStatus); },
       [self](nsresult aStatus) { self->Close(aStatus); });
+  if (mTunnelConfig.mDiagnosticOptimisticLocalReply) {
+    mOptimisticReplyQueued = true;
+    RuntimeLogEvent("Local optimistic reply phase=queued listener=socks\n");
+    nsTArray<uint8_t> reply;
+    Socks5Parser::MakeReply(0x00, reply);
+    nsresult rv = QueueReply(Span(reply), false);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+  }
   return mSession->Start(aAuthority, aInitialPayload);
 }
 
@@ -213,6 +243,15 @@ void SocksConnection::TunnelEstablished(const nsACString& aOuterProtocol,
     return;
   }
   mEstablished = true;
+  if (mOptimisticReplyQueued) {
+    RuntimeLogEvent(
+        "Local optimistic reply phase=outer-established listener=socks\n");
+    nsresult rv = StartPumpIfReady();
+    if (NS_FAILED(rv)) {
+      Close(rv);
+    }
+    return;
+  }
   nsTArray<uint8_t> reply;
   Socks5Parser::MakeReply(0x00, reply);
   nsresult rv = QueueReply(Span(reply), false);
@@ -223,6 +262,12 @@ void SocksConnection::TunnelEstablished(const nsACString& aOuterProtocol,
 
 void SocksConnection::TunnelFailed(nsresult aStatus) {
   if (mClosed || mFailureQueued) {
+    return;
+  }
+  if (mOptimisticReplyQueued) {
+    RuntimeLogEvent(
+        "Local optimistic reply phase=outer-failed listener=socks\n");
+    Close(aStatus);
     return;
   }
   mFailureQueued = true;
@@ -265,8 +310,7 @@ NS_IMETHODIMP SocksConnection::OnInputStreamReady(
       nsTArray<uint8_t> reply;
       Socks5Parser::MakeMethodSelection(true, reply);
       rv = QueueReply(Span(reply), false);
-    } else if (event ==
-               Socks5Parser::Event::SendUsernamePasswordSelection) {
+    } else if (event == Socks5Parser::Event::SendUsernamePasswordSelection) {
       nsTArray<uint8_t> reply;
       Socks5Parser::MakeUsernamePasswordMethodSelection(reply);
       rv = QueueReply(Span(reply), false);
@@ -370,6 +414,7 @@ class HttpConnectConnection final : public nsIInputStreamCallback,
   nsresult WaitForOutput();
   nsresult QueueResponse(const nsACString& aResponse, bool aCloseAfter);
   nsresult FlushResponse();
+  nsresult StartPumpIfReady();
   nsresult BeginTunnel(const nsACString& aAuthority,
                        Span<const uint8_t> aInitialPayload);
   void TunnelEstablished(const nsACString& aOuterProtocol,
@@ -392,6 +437,8 @@ class HttpConnectConnection final : public nsIInputStreamCallback,
   bool mPumpStarted = false;
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
+  bool mOptimisticReplyQueued = false;
+  bool mOptimisticReplyFlushedBeforeOuter = false;
   bool mInputTerminal = false;
   bool mClosed = false;
 };
@@ -440,13 +487,30 @@ nsresult HttpConnectConnection::FlushResponse() {
   }
   mResponse.Truncate();
   mResponseOffset = 0;
+  if (mOptimisticReplyQueued && !mEstablished &&
+      !mOptimisticReplyFlushedBeforeOuter) {
+    mOptimisticReplyFlushedBeforeOuter = true;
+    RuntimeLogEvent(
+        "Local optimistic reply phase=reply-flushed-before-outer "
+        "listener=http-connect\n");
+  }
   if (mCloseAfterWrite) {
     Close(NS_OK);
-  } else if (mEstablished && mSession && !mPumpStarted) {
-    mPumpStarted = true;
-    return mSession->StartPump();
+    return NS_OK;
   }
-  return NS_OK;
+  return StartPumpIfReady();
+}
+
+nsresult HttpConnectConnection::StartPumpIfReady() {
+  if (!mEstablished || !mSession || mPumpStarted || !mResponse.IsEmpty()) {
+    return NS_OK;
+  }
+  mPumpStarted = true;
+  if (mOptimisticReplyQueued) {
+    RuntimeLogEvent(
+        "Local optimistic reply phase=pump-started listener=http-connect\n");
+  }
+  return mSession->StartPump();
 }
 
 nsresult HttpConnectConnection::BeginTunnel(
@@ -459,6 +523,16 @@ nsresult HttpConnectConnection::BeginTunnel(
       },
       [self](nsresult aStatus) { self->TunnelFailed(aStatus); },
       [self](nsresult aStatus) { self->Close(aStatus); });
+  if (mTunnelConfig.mDiagnosticOptimisticLocalReply) {
+    mOptimisticReplyQueued = true;
+    RuntimeLogEvent(
+        "Local optimistic reply phase=queued listener=http-connect\n");
+    nsresult rv =
+        QueueResponse("HTTP/1.1 200 Connection Established\r\n\r\n"_ns, false);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+  }
   return mSession->Start(aAuthority, aInitialPayload);
 }
 
@@ -468,6 +542,16 @@ void HttpConnectConnection::TunnelEstablished(const nsACString& aOuterProtocol,
     return;
   }
   mEstablished = true;
+  if (mOptimisticReplyQueued) {
+    RuntimeLogEvent(
+        "Local optimistic reply phase=outer-established "
+        "listener=http-connect\n");
+    nsresult rv = StartPumpIfReady();
+    if (NS_FAILED(rv)) {
+      Close(rv);
+    }
+    return;
+  }
   nsresult rv =
       QueueResponse("HTTP/1.1 200 Connection Established\r\n\r\n"_ns, false);
   if (NS_FAILED(rv)) {
@@ -477,6 +561,12 @@ void HttpConnectConnection::TunnelEstablished(const nsACString& aOuterProtocol,
 
 void HttpConnectConnection::TunnelFailed(nsresult aStatus) {
   if (mClosed) {
+    return;
+  }
+  if (mOptimisticReplyQueued) {
+    RuntimeLogEvent(
+        "Local optimistic reply phase=outer-failed listener=http-connect\n");
+    Close(aStatus);
     return;
   }
   nsresult rv = QueueResponse(
@@ -780,7 +870,7 @@ NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
         [state,
          enabled = mTunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart]() {
           return state->ClaimFirstSocksTunnelUrgentStart(enabled);
-    };
+        };
     RefPtr connection = new SocksConnection(
         localIn, localOut, mTunnelConfig, mListener.mUser, mListener.mPassword,
         mSocketTarget, std::move(claimUrgentStart), std::move(onClose));

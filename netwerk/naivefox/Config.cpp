@@ -332,6 +332,7 @@ class JsonParser final {
     bool sawPreamble = false;
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
+    bool sawDiagnosticOptimisticLocalReply = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -417,6 +418,14 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticFirstSocksTunnelUrgentStart,
             "diagnostic-first-socks-tunnel-urgent-start must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-optimistic-local-reply")) {
+        if (sawDiagnosticOptimisticLocalReply) {
+          return Error("duplicate diagnostic-optimistic-local-reply field");
+        }
+        sawDiagnosticOptimisticLocalReply = true;
+        MOZ_TRY(ParseBoolean(
+            parsed.mDiagnosticOptimisticLocalReply,
+            "diagnostic-optimistic-local-reply must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -478,14 +487,14 @@ class JsonParser final {
         // six-resource native-parser policy.  Explicit preamble and gate
         // fields remain authoritative.
         if (hasExplicitH2Proxy) {
-          parsed.mPreamble.mH2Mode = Some(
-              hasOnlySocksListeners
-                  ? PreambleMode::DocumentFirstBufferTaskOverlap
-                  : PreambleMode::DocumentFirstBufferOverlap);
+          parsed.mPreamble.mH2Mode =
+              Some(hasOnlySocksListeners
+                       ? PreambleMode::DocumentFirstBufferTaskOverlap
+                       : PreambleMode::DocumentFirstBufferOverlap);
         }
         if (hasExplicitH3Proxy) {
-          parsed.mPreamble.mH3Mode = Some(
-              PreambleMode::TreeNativeParserResourceCommittedOverlap);
+          parsed.mPreamble.mH3Mode =
+              Some(PreambleMode::TreeNativeParserResourceCommittedOverlap);
         }
         parsed.mPreamble.mPath.AssignLiteral("/");
         const bool usesH3ResourceDefault = hasExplicitH3Proxy;
@@ -837,27 +846,24 @@ class JsonParser final {
     }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserDocumentStartResourceTree))) {
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResourceTree))) {
       return Error(
           "tree-native-parser-document-start-resource-tree must be selected "
           "explicitly with h3-mode");
     }
     if (h2Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
         (!sawH2Mode ||
-         aPreamble.mH2Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserDocumentStartResourceTree))) {
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResourceTree))) {
       return Error(
           "tree-native-parser-document-start-resource-tree must be selected "
           "explicitly with h2-mode");
     }
     if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserResourceCommittedOverlap))) {
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserResourceCommittedOverlap))) {
       return Error(
           "tree-native-parser-resource-committed-overlap must be selected "
           "explicitly with h3-mode");
@@ -1023,7 +1029,7 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-start-resource-tree requires "
-          "cache-resources=true");
+            "cache-resources=true");
       }
     }
     if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {

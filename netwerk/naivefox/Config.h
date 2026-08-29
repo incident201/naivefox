@@ -228,6 +228,7 @@ struct Config final {
   // gate is deliberately distinct from the user-visible gate.
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
+  bool mDiagnosticOptimisticLocalReply = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;

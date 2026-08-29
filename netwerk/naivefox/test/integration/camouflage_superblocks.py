@@ -20,8 +20,10 @@ SUPPORTED_ARMS = (
     "document-handshake-confirmed",
     "document-first-buffer-overlap",
     "document-first-buffer-task-overlap",
+    "document-first-buffer-task-optimistic",
     "document-first-buffer-task-http-connect",
     "document-first-buffer-http-connect",
+    "document-first-buffer-http-connect-optimistic",
     "document-overlap",
     "document-headers-task-overlap",
     "document-headers-task-http-connect",
@@ -191,25 +193,20 @@ def infer_arms(rows):
 
 def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
     arms = validate_arm_sequence(arms)
-    if (
-        any(
-            arm in arms
-            for arm in (
-                "tree-native-parser-document-start-resource-tree",
-                "tree-resource-committed-overlap-tree",
-                "tree-native-parser-resource-committed-tree",
-                "tree-complete-resource-tree",
-                "tree-early-overlap-resource-tree",
-                "tree-resource-committed-overlap-page",
-                "tree-native-parser-resource-committed-page",
-                "tree-native-parser-resource-committed-page-http-connect",
-            )
+    if any(
+        arm in arms
+        for arm in (
+            "tree-native-parser-document-start-resource-tree",
+            "tree-resource-committed-overlap-tree",
+            "tree-native-parser-resource-committed-tree",
+            "tree-complete-resource-tree",
+            "tree-early-overlap-resource-tree",
+            "tree-resource-committed-overlap-page",
+            "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
         )
-        and set(scenarios) != {"browser_page"}
-    ):
-        raise ValueError(
-            "resource-tree arms require browser_page superblocks"
-        )
+    ) and set(scenarios) != {"browser_page"}:
+        raise ValueError("resource-tree arms require browser_page superblocks")
     if protocol != "h3" and "root-pmtud-control" in arms:
         raise ValueError("root-pmtud-control requires h3 superblocks")
     if protocol != "h3" and "document-handshake-confirmed" in arms:
@@ -221,13 +218,9 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
     if protocol != "h3" and "document-native-cache-open" in arms:
         raise ValueError("document-native-cache-open requires h3 superblocks")
     if protocol != "h3" and "tree-resource-committed-overlap-tree" in arms:
-        raise ValueError(
-            "tree-resource-committed-overlap-tree requires h3 superblocks"
-        )
+        raise ValueError("tree-resource-committed-overlap-tree requires h3 superblocks")
     if protocol != "h3" and "tree-resource-committed-overlap-page" in arms:
-        raise ValueError(
-            "tree-resource-committed-overlap-page requires h3 superblocks"
-        )
+        raise ValueError("tree-resource-committed-overlap-page requires h3 superblocks")
     if protocol != "h3" and "tree-native-parser-resource-committed-tree" in arms:
         raise ValueError(
             "tree-native-parser-resource-committed-tree requires h3 superblocks"
@@ -340,25 +333,20 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
             raise ValueError(
                 f"superblock {protocol}/{block} spans scenarios: {sorted(scenarios)}"
             )
-        if (
-            any(
-                arm in selected_arms
-                for arm in (
-                    "tree-native-parser-document-start-resource-tree",
-                    "tree-resource-committed-overlap-tree",
-                    "tree-native-parser-resource-committed-tree",
-                    "tree-complete-resource-tree",
-                    "tree-early-overlap-resource-tree",
-                    "tree-resource-committed-overlap-page",
-                    "tree-native-parser-resource-committed-page",
-                    "tree-native-parser-resource-committed-page-http-connect",
-                )
+        if any(
+            arm in selected_arms
+            for arm in (
+                "tree-native-parser-document-start-resource-tree",
+                "tree-resource-committed-overlap-tree",
+                "tree-native-parser-resource-committed-tree",
+                "tree-complete-resource-tree",
+                "tree-early-overlap-resource-tree",
+                "tree-resource-committed-overlap-page",
+                "tree-native-parser-resource-committed-page",
+                "tree-native-parser-resource-committed-page-http-connect",
             )
-            and scenarios != {"browser_page"}
-        ):
-            raise ValueError(
-                "resource-tree arms require browser_page superblocks"
-            )
+        ) and scenarios != {"browser_page"}:
+            raise ValueError("resource-tree arms require browser_page superblocks")
 
 
 def write_csv(path, fieldnames, rows):

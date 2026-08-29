@@ -118,6 +118,7 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_FALSE(config.mOuterSessionGate);
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
+  EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
@@ -130,9 +131,8 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
           implicitHttpConnect, error),
       NS_OK)
       << error.get();
-  EXPECT_EQ(
-      implicitHttpConnect.mPreamble.ModeForProtocol(ProxyProtocol::H2),
-      PreambleMode::DocumentFirstBufferOverlap);
+  EXPECT_EQ(implicitHttpConnect.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentFirstBufferOverlap);
   EXPECT_TRUE(implicitHttpConnect.mImplicitPreambleGate);
 
   Config implicitHttpConnectH3;
@@ -143,9 +143,8 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
           implicitHttpConnectH3, error),
       NS_OK)
       << error.get();
-  EXPECT_EQ(
-      implicitHttpConnectH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
-      PreambleMode::TreeNativeParserResourceCommittedOverlap);
+  EXPECT_EQ(implicitHttpConnectH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserResourceCommittedOverlap);
   EXPECT_TRUE(implicitHttpConnectH3.mPreamble.mPath.EqualsLiteral("/"));
   EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxAssets, 6U);
   EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxBytes,
@@ -174,8 +173,7 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
   EXPECT_EQ(implicitMixedH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
             PreambleMode::TreeNativeParserResourceCommittedOverlap);
   EXPECT_EQ(implicitMixedH3.mPreamble.mMaxAssets, 6U);
-  EXPECT_EQ(implicitMixedH3.mPreamble.mMaxBytes,
-            PreambleConfig::kMaximumBytes);
+  EXPECT_EQ(implicitMixedH3.mPreamble.mMaxBytes, PreambleConfig::kMaximumBytes);
   EXPECT_TRUE(implicitMixedH3.mPreamble.mCacheResources);
 
   Config implicitQuic;
@@ -238,8 +236,7 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
   EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H3),
             PreambleMode::TreeNativeParserResourceCommittedOverlap);
   EXPECT_EQ(mixedProtocols.mPreamble.mMaxAssets, 6U);
-  EXPECT_EQ(mixedProtocols.mPreamble.mMaxBytes,
-            PreambleConfig::kMaximumBytes);
+  EXPECT_EQ(mixedProtocols.mPreamble.mMaxBytes, PreambleConfig::kMaximumBytes);
   EXPECT_TRUE(mixedProtocols.mPreamble.mCacheResources);
   EXPECT_TRUE(mixedProtocols.mImplicitPreambleGate);
 
@@ -256,11 +253,10 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
       json.Append(value);
       json.Append('}');
       ASSERT_EQ(ParseConfig(json, explicitGate, error), NS_OK) << error.get();
-      EXPECT_EQ(
-          explicitGate.mPreamble.ModeForProtocol(protocol),
-          protocol == ProxyProtocol::H2
-              ? PreambleMode::DocumentFirstBufferTaskOverlap
-              : PreambleMode::TreeNativeParserResourceCommittedOverlap);
+      EXPECT_EQ(explicitGate.mPreamble.ModeForProtocol(protocol),
+                protocol == ProxyProtocol::H2
+                    ? PreambleMode::DocumentFirstBufferTaskOverlap
+                    : PreambleMode::TreeNativeParserResourceCommittedOverlap);
       EXPECT_EQ(explicitGate.mOuterSessionGate, expected);
       EXPECT_FALSE(explicitGate.mImplicitPreambleGate);
     }
@@ -359,6 +355,38 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticFirstSocksTunnelUrgentStart)
   }
 }
 
+TEST(NaiveFoxConfig, DiagnosticOptimisticLocalReplyBoolean)
+{
+  for (const auto& [value, expected] :
+       {std::pair{"true", true}, std::pair{"false", false}}) {
+    Config config;
+    nsAutoCString error;
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":)"_ns);
+    json.Append(value);
+    json.Append('}');
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_EQ(config.mDiagnosticOptimisticLocalReply, expected);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":null})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":"true"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-optimistic-local-reply":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
 TEST(NaiveFoxConfig, PreambleModesAndBudgets)
 {
   struct Expected {
@@ -380,8 +408,7 @@ TEST(NaiveFoxConfig, PreambleModesAndBudgets)
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-overlap","path":"/camouflage/"}})",
        PreambleMode::DocumentOverlap, "/camouflage/", 0, 64 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-first-buffer-overlap","path":"/camouflage/"}})",
-       PreambleMode::DocumentFirstBufferOverlap, "/camouflage/", 0,
-       64 * 1024},
+       PreambleMode::DocumentFirstBufferOverlap, "/camouflage/", 0, 64 * 1024},
       {R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"document-first-buffer-task-overlap","path":"/camouflage/"}})",
        PreambleMode::DocumentFirstBufferTaskOverlap, "/camouflage/", 0,
        64 * 1024},
@@ -956,6 +983,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mOuterSessionGate = true;
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
+  source.mDiagnosticOptimisticLocalReply = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -978,6 +1006,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mOuterSessionGate);
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
+    EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
   }
 }
 

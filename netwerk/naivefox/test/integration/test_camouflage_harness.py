@@ -302,9 +302,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("WaitForStartupCondition", wait_body)
         self.assertIn("NS_NewTimerWithCallback", runtime)
         self.assertIn("InitialNetworkStateAllowsStartup", wait_body)
-        self.assertIn(
-            "terminalState, kAllowUnavailableNetworkMonitor", wait_body
-        )
+        self.assertIn("terminalState, kAllowUnavailableNetworkMonitor", wait_body)
         self.assertIn(
             "#  ifdef ANDROID\n"
             "constexpr bool kAllowUnavailableNetworkMonitor = true;\n"
@@ -663,9 +661,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         prefixed_lines = [
             f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
         ]
-        SAMPLE.validate_sample(
-            arm, protocol, "\n".join(prefixed_lines), features
-        )
+        SAMPLE.validate_sample(arm, protocol, "\n".join(prefixed_lines), features)
 
         body_before_later_commits = list(lines)
         first_body = body_before_later_commits.pop(17)
@@ -693,14 +689,10 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
 
         missing_open = [
-            line
-            for line in lines
-            if "deferred-resource-opened stream=6" not in line
+            line for line in lines if "deferred-resource-opened stream=6" not in line
         ]
         with self.assertRaisesRegex(ValueError, "configured resource opens"):
-            SAMPLE.validate_sample(
-                arm, protocol, "\n".join(missing_open), features
-            )
+            SAMPLE.validate_sample(arm, protocol, "\n".join(missing_open), features)
 
         wrong_lifecycle = [
             line.replace(
@@ -710,9 +702,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             for line in lines
         ]
         with self.assertRaisesRegex(ValueError, "causal state"):
-            SAMPLE.validate_sample(
-                arm, protocol, "\n".join(wrong_lifecycle), features
-            )
+            SAMPLE.validate_sample(arm, protocol, "\n".join(wrong_lifecycle), features)
 
     def test_opt_in_superblock_arms_share_one_control_pair(self):
         arms = (
@@ -1250,6 +1240,46 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
             self.assertTrue(config["outer-session-gate"])
 
+    def test_optimistic_local_reply_arms_are_explicit_and_listener_specific(self):
+        cases = {
+            "document-first-buffer-task-optimistic": (
+                "socks://127.0.0.1:1080",
+                "document-first-buffer-task-overlap",
+            ),
+            "document-first-buffer-http-connect-optimistic": (
+                "http://127.0.0.1:1080",
+                "document-first-buffer-overlap",
+            ),
+        }
+        for arm, (listener, mode) in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+                self.assertEqual(config["listen"], listener)
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertTrue(config["diagnostic-optimistic-local-reply"])
+        for arm in (
+            "document-first-buffer-task-overlap",
+            "document-first-buffer-http-connect",
+        ):
+            self.assertNotIn(
+                "diagnostic-optimistic-local-reply",
+                CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                ),
+            )
+
     def test_http_connect_task_barriers_map_to_product_modes(self):
         cases = {
             "document-start-task-http-connect": "document-start-task-overlap",
@@ -1316,6 +1346,79 @@ class CamouflageHarnessTests(unittest.TestCase):
             with self.subTest(arm=arm):
                 SAMPLE.validate_sample(arm, "h3", log_text, features)
 
+    def test_optimistic_local_reply_lifecycle_is_fail_closed(self):
+        features = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        cases = {
+            "document-first-buffer-task-optimistic": (
+                "socks",
+                "first-data-buffer-task",
+            ),
+            "document-first-buffer-http-connect-optimistic": (
+                "http-connect",
+                "first-data-buffer",
+            ),
+        }
+        for arm, (listener, admission) in cases.items():
+            with self.subTest(arm=arm):
+                markers = "".join(
+                    f"Local optimistic reply phase={phase} listener={listener}\n"
+                    for phase in (
+                        "queued",
+                        "reply-flushed-before-outer",
+                        "outer-established",
+                        "pump-started",
+                    )
+                )
+                lifecycle = (
+                    "Connection 1 preamble document-overlap "
+                    f"admission={admission} response_accepted=1 "
+                    "root_done=0 protocol=h2\n"
+                    "Connection 1 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
+                    "Connection 1 preamble result=success status=0x00000000 "
+                    "http=200 bytes=512 protocol=h2\n"
+                    "Connection 1 preamble document-overlap drain=complete "
+                    "root_done=1 completed_resources=0 protocol=h2\n"
+                )
+                SAMPLE.validate_sample(arm, "h2", markers + lifecycle, features)
+                with self.assertRaisesRegex(ValueError, "incomplete or unordered"):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        markers.replace(
+                            "Local optimistic reply "
+                            "phase=reply-flushed-before-outer "
+                            f"listener={listener}\n",
+                            "",
+                        )
+                        + lifecycle,
+                        features,
+                    )
+                with self.assertRaisesRegex(ValueError, "listener identity"):
+                    wrong_listener = "http-connect" if listener == "socks" else "socks"
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        markers.replace(
+                            f"listener={listener}", f"listener={wrong_listener}"
+                        )
+                        + lifecycle,
+                        features,
+                    )
+        with self.assertRaisesRegex(ValueError, "unexpectedly logged optimistic"):
+            SAMPLE.validate_sample(
+                "document-first-buffer-task-overlap",
+                "h2",
+                "Local optimistic reply phase=queued listener=socks\n"
+                "Connection 1 preamble document-overlap "
+                "admission=first-data-buffer-task response_accepted=1 "
+                "root_done=0 protocol=h2\n",
+                features,
+            )
+
     def test_socks_ingress_combines_with_first_buffer_admission(self):
         config = CONFIG.build_config(
             "document-first-buffer-overlap",
@@ -1326,9 +1429,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-pass",
         )
         self.assertEqual(config["listen"], "socks://127.0.0.1:1080")
-        self.assertEqual(
-            config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(config["outer-session-gate"])
         h3_config = CONFIG.build_config(
             "document-first-buffer-overlap",
@@ -1338,9 +1439,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-user",
             "fixture-pass",
         )
-        self.assertEqual(
-            h3_config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(h3_config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(h3_config["proxy"].startswith("quic://"))
 
     def test_socks_first_buffer_task_arm_uses_explicit_task_mode(self):
@@ -1495,9 +1594,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             encoding="utf-8",
         ) as stream:
             source = stream.read()
-        self.assertIn(
-            'mode.EqualsLiteral("document-native-channel-open")', source
-        )
+        self.assertIn('mode.EqualsLiteral("document-native-channel-open")', source)
         self.assertIn("was retired because the falsified", source)
         self.assertIn("diagnostic pulled the full Safe Browsing", source)
         self.assertNotIn("DocumentNativeChannelOpen", source)
@@ -2166,14 +2263,16 @@ class CamouflageHarnessTests(unittest.TestCase):
 
     def test_browser_page_rejects_unknown_early_hints_mode(self):
         self.assertIsNone(
-            TARGET.browser_page_early_hint_links(
-                {"scenario": ["browser_page"], "early_hints": ["invalid"]}
-            )
+            TARGET.browser_page_early_hint_links({
+                "scenario": ["browser_page"],
+                "early_hints": ["invalid"],
+            })
         )
         self.assertIsNone(
-            TARGET.browser_page_early_hint_links(
-                {"scenario": ["initial"], "early_hints": ["css"]}
-            )
+            TARGET.browser_page_early_hint_links({
+                "scenario": ["initial"],
+                "early_hints": ["css"],
+            })
         )
 
     def test_outer_early_hints_cli_is_bounded_and_h2_browser_only(self):
@@ -2293,8 +2392,7 @@ class CamouflageHarnessTests(unittest.TestCase):
     def test_browser_page_adds_final_preloads_to_final_response(self):
         handler = object.__new__(TARGET.Handler)
         handler.path = (
-            "/camouflage/index.html?scenario=browser_page"
-            "&final_preloads=blocking"
+            "/camouflage/index.html?scenario=browser_page&final_preloads=blocking"
         )
         handler.headers = {}
         handler.send_bytes = mock.Mock()
@@ -2531,7 +2629,9 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("validate_outer_resource_fixture", suite)
         self.assertIn("outer_resource_profile_preflight=", suite)
         self.assertLess(
-            suite.index("validate_outer_resource_fixture", suite.index("for protocol in")),
+            suite.index(
+                "validate_outer_resource_fixture", suite.index("for protocol in")
+            ),
             suite.index("apply_network_profile", suite.index("for protocol in")),
         )
 
@@ -4089,9 +4189,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             summary,
         )
         self.assertIn("root or stylesheet lacks END_STREAM", summary)
-        self.assertIn(
-            "tree-native-parser-document-start-navigation-stop-css", runner
-        )
+        self.assertIn("tree-native-parser-document-start-navigation-stop-css", runner)
         self.assertIn("http2.rst_stream.error", runner)
         self.assertIn("stylesheet completed instead of being canceled", summary)
         self.assertIn("lacks one causal H2 CANCEL", summary)
@@ -4188,12 +4286,10 @@ class CamouflageHarnessTests(unittest.TestCase):
             "features": {"lifecycle_connection_count": 1.0},
         }
         padding_yes = (
-            "Connection 1 established target=localhost:443 "
-            "outer=h2 padding=yes\n"
+            "Connection 1 established target=localhost:443 outer=h2 padding=yes\n"
         )
         padding_no = (
-            "Connection 1 established target=localhost:443 "
-            "outer=h2 padding=no\n"
+            "Connection 1 established target=localhost:443 outer=h2 padding=no\n"
         )
         SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
         with self.assertRaisesRegex(ValueError, "differs from expected"):
@@ -4317,8 +4413,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("case $participant in", runner)
         self.assertIn('make_profile "$profile" "$protocol" reference', runner)
         self.assertIn('make_profile "$naivefox_profile" "$protocol" naivefox', runner)
-        self.assertIn('local browser_participant=socks-browser', runner)
-        self.assertIn('browser_participant=http-browser', runner)
+        self.assertIn("local browser_participant=socks-browser", runner)
+        self.assertIn("browser_participant=http-browser", runner)
         self.assertIn(
             'make_profile "$browser_profile" "$protocol" "$browser_participant"',
             runner,

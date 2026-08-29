@@ -39,8 +39,10 @@ def build_config(
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
         "document-headers-task-http-connect",
@@ -85,8 +87,10 @@ def build_config(
             "document-native-cache-open, "
             "document-handshake-confirmed, document-first-buffer-overlap, "
             "document-first-buffer-task-overlap, "
+            "document-first-buffer-task-optimistic, "
             "document-first-buffer-task-http-connect, "
             "document-first-buffer-http-connect, "
+            "document-first-buffer-http-connect-optimistic, "
             "document-overlap, document-headers-task-overlap, "
             "document-headers-task-http-connect, "
             "document-overlap-http-connect, "
@@ -124,16 +128,20 @@ def build_config(
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
-    if arm in (
-        "tree-resource-committed-overlap-css",
-        "tree-resource-committed-overlap-tree",
-        "tree-resource-committed-overlap-page",
-        "tree-native-parser-resource-committed-tree",
-        "tree-native-parser-resource-committed-page",
-        "tree-native-parser-resource-committed-page-http-connect",
-        "tree-complete-resource-tree",
-        "tree-early-overlap-resource-tree",
-    ) and protocol != "h3":
+    if (
+        arm
+        in (
+            "tree-resource-committed-overlap-css",
+            "tree-resource-committed-overlap-tree",
+            "tree-resource-committed-overlap-page",
+            "tree-native-parser-resource-committed-tree",
+            "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
+            "tree-complete-resource-tree",
+            "tree-early-overlap-resource-tree",
+        )
+        and protocol != "h3"
+    ):
         raise ValueError(f"{arm} requires h3")
     if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
@@ -360,8 +368,10 @@ def build_config(
         "document-complete",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
         "document-headers-task-http-connect",
@@ -377,6 +387,7 @@ def build_config(
                 if arm
                 in (
                     "document-first-buffer-task-overlap",
+                    "document-first-buffer-task-optimistic",
                     "document-first-buffer-task-http-connect",
                 )
                 else "document-first-buffer-overlap"
@@ -384,6 +395,7 @@ def build_config(
                 in (
                     "document-first-buffer-overlap",
                     "document-first-buffer-http-connect",
+                    "document-first-buffer-http-connect-optimistic",
                 )
                 else "document-overlap"
                 if arm
@@ -468,6 +480,7 @@ def build_config(
             if arm
             in (
                 "document-first-buffer-http-connect",
+                "document-first-buffer-http-connect-optimistic",
                 "document-first-buffer-task-http-connect",
                 "document-headers-task-http-connect",
                 "document-overlap-http-connect",
@@ -485,6 +498,11 @@ def build_config(
     }
     if diagnostic_first_socks_tunnel_urgent_start:
         config["diagnostic-first-socks-tunnel-urgent-start"] = True
+    if arm in (
+        "document-first-buffer-task-optimistic",
+        "document-first-buffer-http-connect-optimistic",
+    ):
+        config["diagnostic-optimistic-local-reply"] = True
     if max_connections:
         config["max-connections"] = max_connections
     return config
@@ -516,8 +534,10 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",
             "document-headers-task-http-connect",

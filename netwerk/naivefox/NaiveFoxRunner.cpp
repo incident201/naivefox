@@ -157,6 +157,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mImplicitPreambleGate = aConfig.mImplicitPreambleGate;
     tunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart =
         aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
+    tunnelConfig.mDiagnosticOptimisticLocalReply =
+        aConfig.mDiagnosticOptimisticLocalReply;
   }
   return tunnelConfigs;
 }
