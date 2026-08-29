@@ -477,10 +477,10 @@ class JsonParser final {
         // admission; H3 retains document-start.  Explicit preamble and gate
         // fields remain authoritative.
         if (hasExplicitH2Proxy) {
-          parsed.mPreamble.mH2Mode = Some(
-              hasOnlySocksListeners
-                  ? PreambleMode::DocumentFirstBufferTaskOverlap
-                  : PreambleMode::DocumentFirstBufferOverlap);
+          parsed.mPreamble.mH2Mode =
+              Some(hasOnlySocksListeners
+                       ? PreambleMode::DocumentFirstBufferTaskOverlap
+                       : PreambleMode::DocumentFirstBufferOverlap);
         }
         if (hasExplicitH3Proxy) {
           parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
@@ -832,27 +832,24 @@ class JsonParser final {
     }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserDocumentStartResourceTree))) {
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResourceTree))) {
       return Error(
           "tree-native-parser-document-start-resource-tree must be selected "
           "explicitly with h3-mode");
     }
     if (h2Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
         (!sawH2Mode ||
-         aPreamble.mH2Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserDocumentStartResourceTree))) {
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResourceTree))) {
       return Error(
           "tree-native-parser-document-start-resource-tree must be selected "
           "explicitly with h2-mode");
     }
     if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserResourceCommittedOverlap))) {
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserResourceCommittedOverlap))) {
       return Error(
           "tree-native-parser-resource-committed-overlap must be selected "
           "explicitly with h3-mode");
@@ -1018,14 +1015,15 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-start-resource-tree requires "
-          "cache-resources=true");
+            "cache-resources=true");
       }
     }
     if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
-      if (aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 6) {
+      if (aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 4 &&
+          aPreamble.mMaxAssets != 6) {
         return Error(
             "tree-native-parser-resource-committed-overlap requires exactly "
-            "three or six assets");
+            "three, four, or six assets");
       }
       if (!aPreamble.mCacheResources) {
         return Error(

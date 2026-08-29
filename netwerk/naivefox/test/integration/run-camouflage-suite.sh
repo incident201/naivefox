@@ -2248,7 +2248,7 @@ run_naivefox_sample() {
           $arm == tree-native-parser-resource-committed-tree ||
           $arm == tree-native-parser-resource-committed-page ]]; then
     local expected_resources=3
-    [[ $arm == tree-native-parser-resource-committed-page ]] && expected_resources=6
+    [[ $arm == tree-native-parser-resource-committed-page ]] && expected_resources=4
     drain_pattern=" preamble native-parser-resource-tree drain=complete completed_resources=$expected_resources http=2[0-9][0-9] protocol=$protocol$"
   elif [[ $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||

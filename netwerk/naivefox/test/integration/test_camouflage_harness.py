@@ -302,9 +302,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("WaitForStartupCondition", wait_body)
         self.assertIn("NS_NewTimerWithCallback", runtime)
         self.assertIn("InitialNetworkStateAllowsStartup", wait_body)
-        self.assertIn(
-            "terminalState, kAllowUnavailableNetworkMonitor", wait_body
-        )
+        self.assertIn("terminalState, kAllowUnavailableNetworkMonitor", wait_body)
         self.assertIn(
             "#  ifdef ANDROID\n"
             "constexpr bool kAllowUnavailableNetworkMonitor = true;\n"
@@ -576,25 +574,25 @@ class CamouflageHarnessTests(unittest.TestCase):
         protocol = "h3"
         lines = [
             "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
-            "descriptors=7 status=0x00000000 generation=1 protocol=h3",
+            "descriptors=5 status=0x00000000 generation=1 protocol=h3",
             "Preamble native-parser-resource-tree lifecycle=resource-opened "
             "stream=1 kind=style referrer=inherited protocol=h3",
             "Preamble native-parser-resource-tree lifecycle=resource-opened "
             "stream=2 kind=script referrer=inherited protocol=h3",
         ]
-        for stream in range(3, 7):
+        for stream in range(3, 5):
             lines.append(
                 "Preamble native-parser-resource-tree "
                 f"lifecycle=resource-prepared stream={stream} kind=image "
                 "referrer=inherited protocol=h3"
             )
-        for stream in range(3, 7):
+        for stream in range(3, 5):
             lines.append(
                 "Preamble native-parser-resource-tree "
                 f"lifecycle=deferred-resource-opened stream={stream} kind=image "
                 "cause=next-main-turn protocol=h3"
             )
-        for stream in range(1, 7):
+        for stream in range(1, 5):
             lines.append(
                 "Preamble native-parser-resource-tree "
                 f"lifecycle=resource-committed stream={stream} "
@@ -604,7 +602,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "Preamble native-parser-resource-tree "
             "lifecycle=first-resource-body-buffer-consumed stream=1 protocol=h3",
             "Preamble native-parser-resource-tree "
-            "barrier=first-resource-body-buffer assets=6 committed=6 protocol=h3",
+            "barrier=first-resource-body-buffer assets=4 committed=4 protocol=h3",
             "Connection 7 preamble native-parser-resource-tree "
             "admission=resources-committed request_committed=1 root_done=1 "
             "protocol=h3",
@@ -612,7 +610,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=99 protocol=h3",
             "Connection 7 established target=localhost:443 outer=h3 padding=yes",
             "Connection 7 preamble native-parser-resource-tree drain=complete "
-            "completed_resources=6 http=200 protocol=h3",
+            "completed_resources=4 http=200 protocol=h3",
         ])
         features = {
             "protocol": protocol,
@@ -625,20 +623,18 @@ class CamouflageHarnessTests(unittest.TestCase):
         prefixed_lines = [
             f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
         ]
-        SAMPLE.validate_sample(
-            arm, protocol, "\n".join(prefixed_lines), features
-        )
+        SAMPLE.validate_sample(arm, protocol, "\n".join(prefixed_lines), features)
 
         body_before_later_commits = list(lines)
-        first_body = body_before_later_commits.pop(17)
-        body_before_later_commits.insert(13, first_body)
+        first_body = body_before_later_commits.pop(11)
+        body_before_later_commits.insert(9, first_body)
         SAMPLE.validate_sample(
             arm, protocol, "\n".join(body_before_later_commits), features
         )
 
         body_before_own_commit = list(lines)
-        first_body = body_before_own_commit.pop(17)
-        body_before_own_commit.insert(11, first_body)
+        first_body = body_before_own_commit.pop(11)
+        body_before_own_commit.insert(7, first_body)
         with self.assertRaisesRegex(ValueError, "invalid ordering"):
             SAMPLE.validate_sample(
                 arm, protocol, "\n".join(body_before_own_commit), features
@@ -655,14 +651,10 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
 
         missing_open = [
-            line
-            for line in lines
-            if "deferred-resource-opened stream=6" not in line
+            line for line in lines if "deferred-resource-opened stream=4" not in line
         ]
         with self.assertRaisesRegex(ValueError, "configured resource opens"):
-            SAMPLE.validate_sample(
-                arm, protocol, "\n".join(missing_open), features
-            )
+            SAMPLE.validate_sample(arm, protocol, "\n".join(missing_open), features)
 
         wrong_lifecycle = [
             line.replace(
@@ -672,9 +664,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             for line in lines
         ]
         with self.assertRaisesRegex(ValueError, "causal state"):
-            SAMPLE.validate_sample(
-                arm, protocol, "\n".join(wrong_lifecycle), features
-            )
+            SAMPLE.validate_sample(arm, protocol, "\n".join(wrong_lifecycle), features)
 
     def test_opt_in_superblock_arms_share_one_control_pair(self):
         arms = (
@@ -1177,9 +1167,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-pass",
         )
         self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(
-            config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(config["outer-session-gate"])
         with self.assertRaisesRegex(ValueError, "requires h2"):
             CONFIG.build_config(
@@ -1201,9 +1189,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-pass",
         )
         self.assertEqual(config["listen"], "socks://127.0.0.1:1080")
-        self.assertEqual(
-            config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(config["outer-session-gate"])
         h3_config = CONFIG.build_config(
             "document-first-buffer-overlap",
@@ -1213,9 +1199,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-user",
             "fixture-pass",
         )
-        self.assertEqual(
-            h3_config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(h3_config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(h3_config["proxy"].startswith("quic://"))
 
     def test_socks_first_buffer_task_arm_uses_explicit_task_mode(self):
@@ -1370,9 +1354,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             encoding="utf-8",
         ) as stream:
             source = stream.read()
-        self.assertIn(
-            'mode.EqualsLiteral("document-native-channel-open")', source
-        )
+        self.assertIn('mode.EqualsLiteral("document-native-channel-open")', source)
         self.assertIn("was retired because the falsified", source)
         self.assertIn("diagnostic pulled the full Safe Browsing", source)
         self.assertNotIn("DocumentNativeChannelOpen", source)
@@ -3716,9 +3698,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             summary,
         )
         self.assertIn("root or stylesheet lacks END_STREAM", summary)
-        self.assertIn(
-            "tree-native-parser-document-start-navigation-stop-css", runner
-        )
+        self.assertIn("tree-native-parser-document-start-navigation-stop-css", runner)
         self.assertIn("http2.rst_stream.error", runner)
         self.assertIn("stylesheet completed instead of being canceled", summary)
         self.assertIn("lacks one causal H2 CANCEL", summary)
@@ -3915,8 +3895,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("case $participant in", runner)
         self.assertIn('make_profile "$profile" "$protocol" reference', runner)
         self.assertIn('make_profile "$naivefox_profile" "$protocol" naivefox', runner)
-        self.assertIn('local browser_participant=socks-browser', runner)
-        self.assertIn('browser_participant=http-browser', runner)
+        self.assertIn("local browser_participant=socks-browser", runner)
+        self.assertIn("browser_participant=http-browser", runner)
         self.assertIn(
             'make_profile "$browser_profile" "$protocol" "$browser_participant"',
             runner,

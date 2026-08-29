@@ -13,7 +13,7 @@ TREE_PREAMBLE_MAX_ASSETS = 2
 RESOURCE_TREE_PREAMBLE_MAX_BYTES = 128 * 1024
 RESOURCE_TREE_PREAMBLE_MAX_ASSETS = 3
 PAGE_PREAMBLE_MAX_BYTES = 384 * 1024
-PAGE_PREAMBLE_MAX_ASSETS = 6
+PAGE_PREAMBLE_MAX_ASSETS = 4
 
 
 def build_config(
@@ -106,11 +106,15 @@ def build_config(
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
-    if arm in (
-        "document-first-buffer-http-connect",
-        "document-overlap-http-connect",
-        "document-start-http-connect",
-    ) and protocol != "h2":
+    if (
+        arm
+        in (
+            "document-first-buffer-http-connect",
+            "document-overlap-http-connect",
+            "document-start-http-connect",
+        )
+        and protocol != "h2"
+    ):
         raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
@@ -122,15 +126,19 @@ def build_config(
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
-    if arm in (
-        "tree-resource-committed-overlap-css",
-        "tree-resource-committed-overlap-tree",
-        "tree-resource-committed-overlap-page",
-        "tree-native-parser-resource-committed-tree",
-        "tree-native-parser-resource-committed-page",
-        "tree-complete-resource-tree",
-        "tree-early-overlap-resource-tree",
-    ) and protocol != "h3":
+    if (
+        arm
+        in (
+            "tree-resource-committed-overlap-css",
+            "tree-resource-committed-overlap-tree",
+            "tree-resource-committed-overlap-page",
+            "tree-native-parser-resource-committed-tree",
+            "tree-native-parser-resource-committed-page",
+            "tree-complete-resource-tree",
+            "tree-early-overlap-resource-tree",
+        )
+        and protocol != "h3"
+    ):
         raise ValueError(f"{arm} requires h3")
     if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
