@@ -474,8 +474,9 @@ class JsonParser final {
         // SOCKS-only H2 uses the next-task first-buffer boundary that improved
         // both packets 17--32 and whole flow in the final paired campaign.
         // HTTP CONNECT and mixed listeners retain direct first-buffer
-        // admission; H3 retains document-start.  Explicit preamble and gate
-        // fields remain authoritative.
+        // admission for H2 and document-start admission for H3.  SOCKS-only
+        // H3 uses the retained six-resource native-parser policy.  Explicit
+        // preamble and gate fields remain authoritative.
         if (hasExplicitH2Proxy) {
           parsed.mPreamble.mH2Mode = Some(
               hasOnlySocksListeners
@@ -483,12 +484,19 @@ class JsonParser final {
                   : PreambleMode::DocumentFirstBufferOverlap);
         }
         if (hasExplicitH3Proxy) {
-          parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
+          parsed.mPreamble.mH3Mode = Some(
+              hasOnlySocksListeners
+                  ? PreambleMode::TreeNativeParserResourceCommittedOverlap
+                  : PreambleMode::DocumentStartOverlap);
         }
         parsed.mPreamble.mPath.AssignLiteral("/");
-        parsed.mPreamble.mMaxAssets = 0;
-        parsed.mPreamble.mMaxBytes = PreambleConfig::kDefaultDocumentMaxBytes;
-        parsed.mPreamble.mCacheResources = false;
+        const bool usesH3ResourceDefault =
+            hasExplicitH3Proxy && hasOnlySocksListeners;
+        parsed.mPreamble.mMaxAssets = usesH3ResourceDefault ? 6 : 0;
+        parsed.mPreamble.mMaxBytes =
+            usesH3ResourceDefault ? PreambleConfig::kMaximumBytes
+                                  : PreambleConfig::kDefaultDocumentMaxBytes;
+        parsed.mPreamble.mCacheResources = usesH3ResourceDefault;
         parsed.mImplicitPreambleGate = !sawOuterSessionGate;
       }
     }

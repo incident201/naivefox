@@ -146,6 +146,10 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
   EXPECT_EQ(
       implicitHttpConnectH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
       PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxBytes,
+            PreambleConfig::kDefaultDocumentMaxBytes);
+  EXPECT_FALSE(implicitHttpConnectH3.mPreamble.mCacheResources);
 
   Config implicitMixedH2;
   error.Truncate();
@@ -170,12 +174,11 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
   EXPECT_EQ(implicitQuic.mPreamble.ModeForProtocol(ProxyProtocol::H2),
             PreambleMode::Off);
   EXPECT_EQ(implicitQuic.mPreamble.ModeForProtocol(ProxyProtocol::H3),
-            PreambleMode::DocumentStartOverlap);
+            PreambleMode::TreeNativeParserResourceCommittedOverlap);
   EXPECT_TRUE(implicitQuic.mPreamble.mPath.EqualsLiteral("/"));
-  EXPECT_EQ(implicitQuic.mPreamble.mMaxAssets, 0U);
-  EXPECT_EQ(implicitQuic.mPreamble.mMaxBytes,
-            PreambleConfig::kDefaultDocumentMaxBytes);
-  EXPECT_FALSE(implicitQuic.mPreamble.mCacheResources);
+  EXPECT_EQ(implicitQuic.mPreamble.mMaxAssets, 6U);
+  EXPECT_EQ(implicitQuic.mPreamble.mMaxBytes, PreambleConfig::kMaximumBytes);
+  EXPECT_TRUE(implicitQuic.mPreamble.mCacheResources);
   EXPECT_FALSE(implicitQuic.mOuterSessionGate);
   EXPECT_TRUE(implicitQuic.mImplicitPreambleGate);
 
@@ -218,6 +221,10 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
             PreambleMode::DocumentFirstBufferOverlap);
   EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H3),
             PreambleMode::DocumentStartOverlap);
+  EXPECT_EQ(mixedProtocols.mPreamble.mMaxAssets, 0U);
+  EXPECT_EQ(mixedProtocols.mPreamble.mMaxBytes,
+            PreambleConfig::kDefaultDocumentMaxBytes);
+  EXPECT_FALSE(mixedProtocols.mPreamble.mCacheResources);
   EXPECT_TRUE(mixedProtocols.mImplicitPreambleGate);
 
   for (const auto& [value, expected] :
@@ -237,7 +244,7 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
           explicitGate.mPreamble.ModeForProtocol(protocol),
           protocol == ProxyProtocol::H2
               ? PreambleMode::DocumentFirstBufferTaskOverlap
-              : PreambleMode::DocumentStartOverlap);
+              : PreambleMode::TreeNativeParserResourceCommittedOverlap);
       EXPECT_EQ(explicitGate.mOuterSessionGate, expected);
       EXPECT_FALSE(explicitGate.mImplicitPreambleGate);
     }
