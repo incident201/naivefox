@@ -17,7 +17,10 @@ small predeclared range of ordinary fixture sizes before promotion.
 Use `--scenario browser_page --browser-page-base-size BYTES` to scale all six
 page assets coherently for that check. Omitting it preserves the established
 262144-byte fixture; the sanitized metadata records either the explicit base
-or `default_262144`.
+or `default_262144`. For a dense H3 fronting-page arm, this option scales the
+inner tunneled `browser_page`; the outer Caddy page remains the fixed profile
+documented in [`FRONTING-PAGE.md`](FRONTING-PAGE.md). It is therefore not an
+outer fronting-resource size sweep.
 
 Use `--network-one-way-delay-ms N` and `--network-rate-mbit N` only inside the
 one-shot isolated namespace to test RTT and bandwidth robustness. The verified
@@ -1135,7 +1138,9 @@ when object sizes, response pacing, RTT, and available bandwidth vary. Those
 conditions must remain experimental inputs, not values inferred from packet
 indices in this artifact.
 
-The complete follow-up screen is recorded below. Distances are ordered as
+The complete follow-up screen is recorded below. Every `page base` label in
+this table refers to the inner tunneled browser workload; the six outer
+fronting resources retained their fixed fixture sizes. Distances are ordered as
 packets 1--16 / packets 17--32 / packets 1--32 / first 250 ms / whole flow.
 One- and two-block rows are diagnostics only; their purpose is to reject ideas
 cheaply and preserve negative results, not compare tiny differences across
@@ -1245,14 +1250,16 @@ The corrected fixed-dwell size screen rebuilt the six-resource arm explicitly
 with `SetProxyPreambleHandshakeDwell(16)`. Both new artifacts identify NaiveFox
 build ID `fa86f083ff437943123733a262ce02ff` and libxul digest
 `eb462bba4c0ffe345bbc5961b5a9d90b70b55ae65b3850dc7ad51715b9c181b7`.
-At a 65536-byte page base, packets 17--32 measured 0.13934 and whole flow
-0.37883; at 1048576 bytes they measured 0.18591 and 0.36313. Both sizes retain
+At a 65536-byte inner-workload page base, packets 17--32 measured 0.13934 and
+whole flow 0.37883; at 1048576 bytes they measured 0.18591 and 0.36313. Both
+sizes retain
 the main advantage over `document-start-overlap`, whose corresponding values
 were 0.63512/0.45239 and 0.60016/0.45256. The tradeoff is consistent and
 limited but real: candidate packets 1--16 exceeded control by 0.05848 and
-0.05072, while 250 ms exceeded it by 0.01797 and 0.00784. Thus object size
-alone does not invalidate the dwell, but these four-block diagnostics do not
-answer slower-link or RTT robustness and do not promote the timer to default.
+0.05072, while 250 ms exceeded it by 0.01797 and 0.00784. Thus inner-workload
+size alone does not invalidate the dwell, but these four-block diagnostics do
+not vary the outer resource bodies, answer slower-link or RTT robustness, or
+promote the timer to default.
 
 The predeclared shaped-link run rejects the fixed dwell as a general default.
 Artifact `a8977a8f77e3e129` uses the same identified 16-ms binary at the default
@@ -1449,8 +1456,8 @@ residual. Both new artifacts identify NaiveFox build ID
 `89a4a90ceb64afd12b532dbe7ee67913` and libxul digest
 `eb4ed5f1dd05c40d1ab17a4419f5ca238ef620854149b501ff0a40bc4b32dcb4`.
 The mechanism and fail-closed lifecycle validation are retained for
-cross-size and unshaped robustness screens; these gate-sized runs do not yet
-promote it to the product default.
+inner-workload-size and unshaped robustness screens; these gate-sized runs do
+not vary the outer resources or yet promote it to the product default.
 
 Unshaped localhost artifact `4e4edd7c53b91735` used the identical binary and
 measured 0.44214 [`0.37933`, `0.50496`] for packets 17--32 and 0.38250
@@ -1461,13 +1468,14 @@ Packets 1--16 were effectively tied with the matched control
 (0.10945 versus 0.10739); the first 250 ms paid a limited 0.01567 descriptive
 cost. The causal body-buffer boundary therefore retains its shaped-link gain
 without repeating the previous scheduler's localhost whole-flow regression.
-Resource-size and slower-link screens remain required because the first body
-callback depends on actual server and path progress even though it contains no
-fixed time or byte threshold.
+Outer-resource-size and slower-link screens remain required because the first
+body callback depends on actual server and path progress even though it
+contains no fixed time or byte threshold.
 
-The first one-block size screens are mixed and remain diagnostic. At a
-65536-byte page base, artifact `c9643a1e000b3c2c` measured 0.72418 for packets
-17--32 and 0.45906 whole; at 1048576 bytes, artifact `8925499c80a97688`
+The first one-block inner-workload size screens are mixed and remain
+diagnostic. At a 65536-byte page base, artifact `c9643a1e000b3c2c` measured
+0.72418 for packets 17--32 and 0.45906 whole; at 1048576 bytes, artifact
+`8925499c80a97688`
 measured 0.41138 and 0.42297. In both cases the candidate still improved all
 five views over its matched `document-start-overlap` control, whose target
 pairs were respectively 0.88117/0.58286 and 0.58080/0.53749. The high absolute
@@ -1476,27 +1484,28 @@ the simultaneous control movement makes a single-block rejection equally
 unsafe. The smaller-size condition is therefore selected for four-block
 replication before changing the mechanism.
 
-That replication rejects the apparent small-resource failure rather than the
-mechanism. Four-block artifact `47adda8f2a4b7783` measured 0.33185
+That replication rejects the apparent small-inner-workload failure rather
+than the mechanism. Four-block artifact `47adda8f2a4b7783` measured 0.33185
 [`0.23825`, `0.41572`] for packets 17--32 and 0.31845
 [`0.28458`, `0.34555`] whole at the same 65536-byte page base. All five views
 improved over the matched control: 0.08814/0.33185/0.14079/0.13174/0.31845
 versus 0.17985/0.55323/0.23522/0.16931/0.43635. The earlier 0.72418 one-block
 target was therefore an unstable Firefox-envelope diagnostic, not evidence
-that a small response deterministically releases CONNECT at the wrong phase.
-Large-resource and slower-link replication are still needed.
+that a smaller tunneled workload deterministically releases CONNECT at the
+wrong phase. Outer-resource and slower-link replication are still needed.
 
-The large-resource replication also retains the candidate. Four-block
+The large inner-workload replication also retains the candidate. Four-block
 artifact `07c422cacf441cd1` measured 0.39571 [`0.29175`, `0.49966`] for packets
 17--32 and 0.36178 [`0.33620`, `0.38808`] whole at the 1048576-byte page base.
 All five views again improved over the matched control:
 0.14312/0.39571/0.18047/0.15179/0.36178 versus
 0.20947/0.63845/0.26754/0.16318/0.48312. The target residual is higher than
 the default-size 0.29471/0.34363 and small-size 0.33185/0.31845, but it does
-not collapse as resource duration grows because admission waits only for the
-first delivered buffer. Together the two four-block size endpoints reject a
-fixed object-size dependency; lower bandwidth and higher RTT remain a separate
-robustness axis.
+not collapse as the inner workload duration grows. The historical claim that
+this validated first-resource-body admission against outer resource duration
+was too broad: those outer bodies did not change. Together the two four-block
+endpoints reject only a fixed inner-workload-size explanation; outer resource
+sizes and lower bandwidth or higher RTT remain separate robustness axes.
 
 The slower-link screen retains the causal candidate where the fixed dwell had
 failed. One-block artifact `d62dc8f4ca95d6e1` at 50-ms one-way delay and
@@ -2205,27 +2214,28 @@ barriers and their task variants are retained as explicit harness aliases so
 the negative family is reproducible, but they are not product-default
 candidates and should not be repeated without a new mechanism hypothesis.
 
-The HTTP tree treatment also passed the predeclared size and slower-link
-directional screens. All runs kept the same product policy and budgets; only
-the fixture input or namespace link profile changed:
+The HTTP tree treatment also passed the predeclared inner-workload-size and
+slower-link directional screens. All runs kept the same product policy and
+budgets; only the inner fixture input or namespace link profile changed:
 
 | Safe artifact | Condition | Blocks | Start control | HTTP tree treatment |
 | --- | --- | ---: | --- | --- |
-| `2608e4200af64969` | 65536-byte page base, unshaped | 2 | 0.14352 / 0.58915 / 0.24531 / 0.18110 / 0.46113 | 0.12884 / 0.45060 / 0.19795 / 0.20407 / 0.44064 |
-| `8d81953d90610c34` | 1048576-byte page base, unshaped | 2 | 0.18880 / 0.59725 / 0.25579 / 0.20983 / 0.44874 | 0.17881 / 0.44431 / 0.22058 / 0.22831 / 0.43562 |
-| `ef1c22cb0e387413` | default page, 20-ms one-way and 20 Mbit/s | 2 | 0.16877 / 0.59901 / 0.24823 / 0.13968 / 0.42727 | 0.09124 / 0.33052 / 0.14420 / 0.11115 / 0.30928 |
+| `2608e4200af64969` | 65536-byte inner-workload base, unshaped | 2 | 0.14352 / 0.58915 / 0.24531 / 0.18110 / 0.46113 | 0.12884 / 0.45060 / 0.19795 / 0.20407 / 0.44064 |
+| `8d81953d90610c34` | 1048576-byte inner-workload base, unshaped | 2 | 0.18880 / 0.59725 / 0.25579 / 0.20983 / 0.44874 | 0.17881 / 0.44431 / 0.22058 / 0.22831 / 0.43562 |
+| `ef1c22cb0e387413` | default inner workload, 20-ms one-way and 20 Mbit/s | 2 | 0.16877 / 0.59901 / 0.24823 / 0.13968 / 0.42727 | 0.09124 / 0.33052 / 0.14420 / 0.11115 / 0.30928 |
 
-Packets 17--32, packets 1--32, and whole improved at both one-quarter and
-four-times the default page base. The unshaped 250-ms view regressed by 0.023
-and 0.018 respectively, while the shaped profile improved every retained view,
-including 250 ms by 0.029. Safe shaped metadata confirms receive-side capture
-after netem, the exact 20-ms/20-Mbit profile, eight successful proxy resets,
-and zero dropped or offload-oversized captures. These two-block gates are not
-inferential, but together with the six- and four-block default-size screens
-they reject a fixed-size or localhost-speed explanation and make the existing
-six-resource mode a viable H3 HTTP implicit-default candidate. These screening
-rows were not spliced into the dashboard; promotion required a fresh product
-build and canonical four-row campaign.
+Packets 17--32, packets 1--32, and whole improved at both inner-workload bases.
+The unshaped 250-ms view regressed by 0.023 and 0.018 respectively, while the
+shaped profile improved every retained view, including 250 ms by 0.029. Safe
+shaped metadata confirms receive-side capture after netem, the exact
+20-ms/20-Mbit profile, eight successful proxy resets, and zero dropped or
+offload-oversized captures. These two-block gates are not inferential.
+Together with the six- and four-block default-size screens they reject a
+tunneled-workload-size or localhost-speed explanation, but they do not vary
+the outer fronting resources. The existing six-resource mode was still a
+viable H3 HTTP implicit-default candidate, while an outer-resource size matrix
+remains open. These screening rows were not spliced into the dashboard;
+promotion required a fresh product build and canonical four-row campaign.
 
 That promotion was completed at revision `aa4bd846af3a`. Omitted-preamble H3
 now selects the same exact six-resource tree policy for SOCKS5, HTTP CONNECT,

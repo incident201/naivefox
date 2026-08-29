@@ -85,7 +85,10 @@ The supported config is a strict NaiveProxy-compatible subset:
   listener layout uses the promoted
   `tree-native-parser-resource-committed-overlap` policy with path `/`, exactly
   six parser-discovered resources, ordinary resource caching, and a 384 KiB
-  aggregate safety budget. The
+  aggregate safety budget. The exact H2/H3 origin requirements, supported HTML
+  topology, measured fixture sizes, and unvalidated variations are maintained
+  in [`FRONTING-PAGE.md`](FRONTING-PAGE.md). A change to that contract is not
+  complete until that document and the canonical matrix are updated. The
   canonical H2/H3 by SOCKS5/HTTP-CONNECT residual matrix is maintained in
   [Current implicit-default matrix](CAPTURE.md#current-implicit-default-matrix);
   all four rows must be regenerated together whenever the implicit policy or
@@ -205,13 +208,15 @@ The supported config is a strict NaiveProxy-compatible subset:
   request or response fails. Four-block shaped artifact `390cc24ccb6ef8c9`
   measured `0.11745/0.29471/0.15293/0.16835/0.34363` for packets 1--16,
   packets 17--32, packets 1--32, 250 ms, and whole flow. Separate four-block
-  runs retained the improvement with 64 KiB and 1 MiB page bases and at 50 ms
-  one-way delay with 5 Mbit/s bandwidth. Unshaped localhost retained the
-  whole-flow gain. HTTP CONNECT screens then reproduced the gain in six and
-  four default-size blocks, at 64 KiB and 1 MiB page bases, and with 20 ms
-  one-way delay at 20 Mbit/s. These robustness checks promote the event-driven
-  mode for all H3 listener layouts; explicit preamble configuration remains
-  authoritative.
+  runs retained the improvement while the inner tunneled workload used 64 KiB
+  and 1 MiB page bases and at 50 ms one-way delay with 5 Mbit/s bandwidth.
+  Unshaped localhost retained the whole-flow gain. HTTP CONNECT screens then
+  reproduced the gain in six and four default-size blocks, with those same
+  inner-workload bases, and with 20 ms one-way delay at 20 Mbit/s. The outer
+  Caddy fronting resources remained at their fixed documented sizes in those
+  screens; an outer-resource size matrix is still required. The available
+  robustness checks promote the event-driven mode for all H3 listener layouts;
+  explicit preamble configuration remains authoritative.
   `tree-native-parser-document-start-overlap` preserves that same early
   request-commit admission, then continues the root response through the lean
   HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens

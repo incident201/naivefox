@@ -511,13 +511,17 @@ It is useful for private lifecycle diagnostics such as stressing `sequential`
 connection reuse; the selected scenario is recorded in sanitized metadata and
 does not relax any capture-health or sample-count rule.
 
-For a predeclared resource-size robustness check, combine
+For a predeclared inner browser-workload resource-size robustness check, combine
 `--scenario browser_page` with `--browser-page-base-size BYTES` (65536 through
 4194304).
 The base scales the six ordinary page assets in the same 1/4, 1/2, 1,
 1/64 profile as the default 262144-byte fixture. Omitting the option preserves
 the established fixture exactly. The selected base is recorded in sanitized
 metadata; it is a diagnostic input and must not be tuned to a packet window.
+When a dense fronting-page arm replaces the outer scenario, this option still
+scales the inner tunneled workload only. The fixed outer origin profile and
+its open size-validation gap are documented in
+[`../../FRONTING-PAGE.md`](../../FRONTING-PAGE.md).
 
 For an isolated link-robustness check, add `--network-one-way-delay-ms N`,
 `--network-rate-mbit N`, or both. Network shaping is rejected unless
@@ -884,7 +888,9 @@ routine run. `tree-native-parser-resource-committed-page-http-connect` is the
 H3-only ingress-control alias for the six-resource page arm. It preserves the
 same preamble mode, path, cache policy, limits, and lifecycle validation while
 selecting the local HTTP CONNECT listener; a multi-arm run must include the
-matched `document-start-http-connect` control.
+matched `document-start-http-connect` control. The operator-facing exact HTML
+and response contract is maintained in
+[`../../FRONTING-PAGE.md`](../../FRONTING-PAGE.md).
 
 The HTTP CONNECT ingress can also be combined with the existing causal
 document barriers on either H2 or H3. `document-overlap-http-connect` waits

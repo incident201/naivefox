@@ -90,7 +90,11 @@ four images accepted by the lean parser, within the documented aggregate
 budget. Strict H3 fails closed when that contract is not met; it does not
 silently fall back to a document-only request or to H2. Operators using a
 different fronting page must select an explicit compatible `preamble` policy,
-including `document-start-overlap`, or explicitly disable the preamble.
+including `document-start-overlap`, or explicitly disable the preamble. The
+canonical tag/attribute constraints, response limits, measured resource sizes,
+and remaining size-validation gap are in
+[`FRONTING-PAGE.md`](FRONTING-PAGE.md); they must be updated whenever this
+implicit contract changes.
 
 ## Product scope
 
