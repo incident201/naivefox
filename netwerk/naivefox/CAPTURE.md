@@ -29,6 +29,23 @@ captures use the receive copy so packet timestamps occur after netem rather
 than at the pre-qdisc transmit tap; metadata records the profile and capture
 copy policy.
 
+## Experiment-history preflight
+
+Before implementing a new candidate, search this file, `README.md`,
+`FRONTING-PAGE.md`, and the integration harness for both the proposed name
+and causal synonyms. Then search Git history with message grep and pickaxe
+(`git log --grep`, `-S`, and `-G`) at the intended code boundary. Compare
+the causal mechanism rather than only arm names: a renamed timer, task hop,
+response gate, parser/process topology, cache condition, framing rule, or
+server read policy is still a duplicate if it waits on or changes the same
+event.
+
+If a causal analog already has an admitted artifact, do not reimplement or
+rebuild it. Cite the existing commit/artifact in the research notes and move
+to another hypothesis. A new screen proceeds only after this preflight finds
+no prior analog; its successful or failed result is then added here so the
+same search closes the loop for later work.
+
 ## Predeclared outer-resource size campaign
 
 The first actual outer-resource matrix is fixed before collection. It uses the
@@ -2457,6 +2474,54 @@ Because the record boundary is driven by actual read calls, it is not a fixed
 timer or response-byte cutoff, but it can still vary with chunking and link
 conditions; size/link matrices would have been required after a strong result.
 They were deliberately not spent on these rejected screens.
+
+A compatible server-side queued-burst read was also rejected. The fork kept
+the ordinary eight-record padding format, performed the normal blocking target
+read, and then appended only bytes already readable from the target TCP socket
+with `MSG_DONTWAIT`. It therefore added no timer, future-data wait, response
+size threshold, or client compatibility change. One-block artifact
+`7e680bed35085449` nevertheless measured SOCKS at
+`0.70503/0.43634` and HTTP at `0.74554/0.36086`. Coalescing an already
+queued target burst made the early packet order much less Firefox-like and did
+not repair whole flow. The stock Caddy binary was restored.
+
+Combining complete no-padding with alternative client admission boundaries
+did not rescue that incompatible family. In HTTP artifact
+`e857415d5ad9effe`, direct first-buffer admission measured
+`0.36749/0.29565`, while response HEADERS plus one task measured
+`0.37989/0.32720`; direct admission won both retained views. In SOCKS
+artifact `077729c45551dcca`, direct and next-task first-buffer admission
+measured `0.62721/0.46215` and `0.62055/0.43814`. Both were much worse
+than the earlier no-padding point estimate and the canonical whole result.
+The screens show that a task or HEADERS boundary does not make removal of the
+framing phase robust. Padding and all temporary admission changes were
+restored.
+
+The next site-side experiment used HTTP `103 Early Hints` with same-origin
+`Link: rel=preload` fields before the ordinary final `browser_page`
+response. History preflight found no prior NaiveFox experiment at this causal
+boundary: earlier native `FromParser` preload arms discovered resources only
+after root body bytes arrived. The diagnostic flag changes only the outer
+reference/preamble path; the tunneled inner workload remains the canonical
+page. Stock Caddy and the normal H2 framing/default policies were retained.
+
+| Early Hint set | Safe artifact | SOCKS 17--32 / whole | HTTP 17--32 / whole |
+| --- | --- | ---: | ---: |
+| stylesheet only | `567f47778b70c4d9` | 0.64002 / 0.27867 | 0.65291 / 0.29663 |
+| stylesheet plus blocking script | `f589490d0ab2c0f9` | 0.34743 / 0.37827 | 0.36667 / 0.37973 |
+| all six page resources | `e98062104b89ccbe` | 0.40660 / 0.36125 | 0.40563 / 0.34438 |
+
+These are one-block isolated-namespace screens with seed `2026082971`, not
+paired inference. The two blocking-resource hints produced the interesting
+early direction, approximately 19% below the canonical SOCKS packets-17--32
+row and 14% below HTTP, but whole regressed by approximately 37% and 46%.
+Hinting every resource retained only a small early gain and still regressed
+whole materially; stylesheet-only hints regressed packets 17--32 outright.
+Requiring a special `103` response from the fronting site is therefore not a
+default contract, and no replication or size/link matrix was spent on it. The
+gate/smoke-only H2 switch
+`--outer-early-hints css|blocking|all` remains only to reproduce this rejected
+causal family.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
