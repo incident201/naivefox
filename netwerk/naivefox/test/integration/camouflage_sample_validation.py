@@ -386,6 +386,12 @@ ESTABLISHED = re.compile(
     r"established target=\S+ outer=(?P<protocol>h2|h3) "
     r"padding=(?P<padding>yes|no)$"
 )
+HEADER_PADDING_PROFILE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"diagnostic-header-padding negotiated=1 protocol=(?P<protocol>h2) "
+    r"request-bytes=(?P<request_bytes>2|96) "
+    r"response-bytes=(?P<response_bytes>2|96)$"
+)
 NATIVE_CACHE_OPEN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble native-cache-open cache=readonly-miss "
@@ -1016,9 +1022,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-header-padding-2",
+        "document-first-buffer-task-header-padding-96",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-header-padding-2",
+        "document-first-buffer-http-connect-header-padding-96",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -1070,6 +1080,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
+    header_padding_profiles = {
+        "document-first-buffer-task-header-padding-2": "2",
+        "document-first-buffer-task-header-padding-96": "96",
+        "document-first-buffer-http-connect-header-padding-2": "2",
+        "document-first-buffer-http-connect-header-padding-96": "96",
+    }
+    if arm in header_padding_profiles and protocol != "h2":
+        raise ValueError(f"{arm} requires h2")
     if arm == "document-native-channel-open" and protocol != "h3":
         raise ValueError("document-native-channel-open requires h3")
     if (
@@ -1111,10 +1129,22 @@ def validate_sample(arm, protocol, log_text, feature_document):
     requested_arm = arm
     arm = {
         "document-first-buffer-http-connect": "document-first-buffer-overlap",
+        "document-first-buffer-http-connect-header-padding-2": (
+            "document-first-buffer-overlap"
+        ),
+        "document-first-buffer-http-connect-header-padding-96": (
+            "document-first-buffer-overlap"
+        ),
         "document-first-buffer-http-connect-optimistic": (
             "document-first-buffer-overlap"
         ),
         "document-first-buffer-task-http-connect": (
+            "document-first-buffer-task-overlap"
+        ),
+        "document-first-buffer-task-header-padding-2": (
+            "document-first-buffer-task-overlap"
+        ),
+        "document-first-buffer-task-header-padding-96": (
             "document-first-buffer-task-overlap"
         ),
         "document-first-buffer-task-optimistic": ("document-first-buffer-task-overlap"),
@@ -1790,6 +1820,37 @@ def validate_sample(arm, protocol, log_text, feature_document):
         established["padding"] != expected_padding for established in parsed_established
     ):
         raise ValueError("CONNECT-established padding condition differs from expected")
+    header_padding_lines = [
+        line for line in log_lines if " diagnostic-header-padding " in line
+    ]
+    parsed_header_padding = [
+        HEADER_PADDING_PROFILE.fullmatch(line) for line in header_padding_lines
+    ]
+    if any(marker is None for marker in parsed_header_padding):
+        raise ValueError("malformed header padding profile evidence")
+    if requested_arm in header_padding_profiles:
+        if len(parsed_header_padding) != 1:
+            raise ValueError("header padding profile arm requires one negotiation marker")
+        marker = parsed_header_padding[0]
+        expected_bytes = header_padding_profiles[requested_arm]
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == marker["connection"]
+            and established["protocol"] == marker["protocol"] == protocol
+        ]
+        if (
+            marker["request_bytes"] != expected_bytes
+            or marker["response_bytes"] != expected_bytes
+            or len(matching_established) != 1
+            or not (
+                log_lines.index(matching_established[0])
+                < log_lines.index(header_padding_lines[0])
+            )
+        ):
+            raise ValueError("header padding negotiation identity or profile differs")
+    elif parsed_header_padding:
+        raise ValueError(f"{requested_arm} arm unexpectedly used header padding profile")
     native_cache_lines = [
         line for line in log_lines if " preamble native-cache-open cache=" in line
     ]
@@ -3496,9 +3557,13 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-header-padding-2",
+            "document-first-buffer-task-header-padding-96",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-header-padding-2",
+            "document-first-buffer-http-connect-header-padding-96",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",

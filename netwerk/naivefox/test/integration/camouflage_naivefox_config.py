@@ -14,6 +14,12 @@ RESOURCE_TREE_PREAMBLE_MAX_BYTES = 128 * 1024
 RESOURCE_TREE_PREAMBLE_MAX_ASSETS = 3
 PAGE_PREAMBLE_MAX_BYTES = 384 * 1024
 PAGE_PREAMBLE_MAX_ASSETS = 6
+HEADER_PADDING_PROFILES = {
+    "document-first-buffer-task-header-padding-2": 2,
+    "document-first-buffer-task-header-padding-96": 96,
+    "document-first-buffer-http-connect-header-padding-2": 2,
+    "document-first-buffer-http-connect-header-padding-96": 96,
+}
 
 
 def build_config(
@@ -39,6 +45,7 @@ def build_config(
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        *HEADER_PADDING_PROFILES,
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
@@ -87,9 +94,11 @@ def build_config(
             "document-native-cache-open, "
             "document-handshake-confirmed, document-first-buffer-overlap, "
             "document-first-buffer-task-overlap, "
+            "document-first-buffer-task-header-padding-2/96, "
             "document-first-buffer-task-optimistic, "
             "document-first-buffer-task-http-connect, "
             "document-first-buffer-http-connect, "
+            "document-first-buffer-http-connect-header-padding-2/96, "
             "document-first-buffer-http-connect-optimistic, "
             "document-overlap, document-headers-task-overlap, "
             "document-headers-task-http-connect, "
@@ -128,6 +137,8 @@ def build_config(
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
+    if arm in HEADER_PADDING_PROFILES and protocol != "h2":
+        raise ValueError(f"{arm} requires h2")
     if (
         arm
         in (
@@ -366,6 +377,7 @@ def build_config(
         "document-complete",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        *HEADER_PADDING_PROFILES,
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
@@ -385,6 +397,8 @@ def build_config(
                 if arm
                 in (
                     "document-first-buffer-task-overlap",
+                    "document-first-buffer-task-header-padding-2",
+                    "document-first-buffer-task-header-padding-96",
                     "document-first-buffer-task-optimistic",
                     "document-first-buffer-task-http-connect",
                 )
@@ -393,6 +407,8 @@ def build_config(
                 in (
                     "document-first-buffer-overlap",
                     "document-first-buffer-http-connect",
+                    "document-first-buffer-http-connect-header-padding-2",
+                    "document-first-buffer-http-connect-header-padding-96",
                     "document-first-buffer-http-connect-optimistic",
                 )
                 else "document-overlap"
@@ -478,6 +494,8 @@ def build_config(
             if arm
             in (
                 "document-first-buffer-http-connect",
+                "document-first-buffer-http-connect-header-padding-2",
+                "document-first-buffer-http-connect-header-padding-96",
                 "document-first-buffer-http-connect-optimistic",
                 "document-first-buffer-task-http-connect",
                 "document-headers-task-http-connect",
@@ -501,6 +519,8 @@ def build_config(
         "document-first-buffer-http-connect-optimistic",
     ):
         config["diagnostic-optimistic-local-reply"] = True
+    if arm in HEADER_PADDING_PROFILES:
+        config["diagnostic-header-padding-bytes"] = HEADER_PADDING_PROFILES[arm]
     if max_connections:
         config["max-connections"] = max_connections
     return config
@@ -532,6 +552,7 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            *HEADER_PADDING_PROFILES,
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",

@@ -1331,6 +1331,42 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ),
             )
 
+    def test_header_padding_profiles_are_explicit_h2_only_and_listener_specific(self):
+        cases = {
+            "document-first-buffer-task-header-padding-2": (
+                "socks://127.0.0.1:1080",
+                "document-first-buffer-task-overlap",
+                2,
+            ),
+            "document-first-buffer-task-header-padding-96": (
+                "socks://127.0.0.1:1080",
+                "document-first-buffer-task-overlap",
+                96,
+            ),
+            "document-first-buffer-http-connect-header-padding-2": (
+                "http://127.0.0.1:1080",
+                "document-first-buffer-overlap",
+                2,
+            ),
+            "document-first-buffer-http-connect-header-padding-96": (
+                "http://127.0.0.1:1080",
+                "document-first-buffer-overlap",
+                96,
+            ),
+        }
+        for arm, (listener, mode, bytes_) in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm, "h2", 1080, 4433, "fixture-user", "fixture-pass"
+                )
+                self.assertEqual(config["listen"], listener)
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertEqual(config["diagnostic-header-padding-bytes"], bytes_)
+                with self.assertRaisesRegex(ValueError, "requires h2"):
+                    CONFIG.build_config(
+                        arm, "h3", 1080, 4433, "fixture-user", "fixture-pass"
+                    )
+
     def test_http_connect_task_barriers_map_to_product_modes(self):
         cases = {
             "document-start-task-http-connect": "document-start-task-overlap",
@@ -1467,6 +1503,75 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "Connection 1 preamble document-overlap "
                 "admission=first-data-buffer-task response_accepted=1 "
                 "root_done=0 protocol=h2\n",
+                features,
+            )
+
+    def test_header_padding_profile_lifecycle_is_fail_closed(self):
+        features = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        cases = {
+            "document-first-buffer-task-header-padding-2": (
+                "first-data-buffer-task",
+                "2",
+            ),
+            "document-first-buffer-task-header-padding-96": (
+                "first-data-buffer-task",
+                "96",
+            ),
+            "document-first-buffer-http-connect-header-padding-2": (
+                "first-data-buffer",
+                "2",
+            ),
+            "document-first-buffer-http-connect-header-padding-96": (
+                "first-data-buffer",
+                "96",
+            ),
+        }
+        for arm, (admission, bytes_) in cases.items():
+            with self.subTest(arm=arm):
+                prefix = (
+                    "Connection 1 preamble document-overlap "
+                    f"admission={admission} response_accepted=1 "
+                    "root_done=0 protocol=h2\n"
+                    "Connection 1 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
+                )
+                marker = (
+                    "Connection 1 diagnostic-header-padding negotiated=1 "
+                    f"protocol=h2 request-bytes={bytes_} response-bytes={bytes_}\n"
+                )
+                suffix = (
+                    "Connection 1 preamble result=success status=0x00000000 "
+                    "http=200 bytes=512 protocol=h2\n"
+                    "Connection 1 preamble document-overlap drain=complete "
+                    "root_done=1 completed_resources=0 protocol=h2\n"
+                )
+                SAMPLE.validate_sample(arm, "h2", prefix + marker + suffix, features)
+                with self.assertRaisesRegex(ValueError, "one negotiation marker"):
+                    SAMPLE.validate_sample(arm, "h2", prefix + suffix, features)
+                other = "96" if bytes_ == "2" else "2"
+                with self.assertRaisesRegex(ValueError, "identity or profile"):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        prefix
+                        + marker.replace(
+                            f"response-bytes={bytes_}", f"response-bytes={other}"
+                        )
+                        + suffix,
+                        features,
+                    )
+                with self.assertRaisesRegex(ValueError, "identity or profile"):
+                    SAMPLE.validate_sample(
+                        arm, "h2", marker + prefix + suffix, features
+                    )
+        with self.assertRaisesRegex(ValueError, "unexpectedly used"):
+            SAMPLE.validate_sample(
+                "document-first-buffer-task-overlap",
+                "h2",
+                prefix + marker + suffix,
                 features,
             )
 
