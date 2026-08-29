@@ -17,12 +17,19 @@ namespace mozilla::naivefox {
 
 inline constexpr size_t kHeaderPaddingMinLength = 16;
 inline constexpr size_t kHeaderPaddingMaxLength = 32;
+inline constexpr uint32_t kDiagnosticHeaderPaddingShortLength = 2;
+inline constexpr uint32_t kDiagnosticHeaderPaddingLongLength = 96;
 
 using HeaderPaddingRandom = FunctionRef<Maybe<uint64_t>()>;
 
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding,
                                              HeaderPaddingRandom aRandom);
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding);
+[[nodiscard]] nsresult GenerateDiagnosticHeaderPadding(
+    nsACString& aPadding, uint32_t aLength, HeaderPaddingRandom aRandom);
+[[nodiscard]] nsresult GenerateDiagnosticHeaderPadding(nsACString& aPadding,
+                                                       uint32_t aLength);
+uint32_t DetectDiagnosticHeaderPaddingLength(const nsACString& aPadding);
 
 }  // namespace mozilla::naivefox
 

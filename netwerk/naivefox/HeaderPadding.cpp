@@ -61,4 +61,43 @@ nsresult GenerateHeaderPadding(nsACString& aPadding) {
   return GenerateHeaderPadding(aPadding, SystemRandomUint64);
 }
 
+nsresult GenerateDiagnosticHeaderPadding(nsACString& aPadding, uint32_t aLength,
+                                         HeaderPaddingRandom aRandom) {
+  if (aLength == kDiagnosticHeaderPaddingShortLength) {
+    aPadding.AssignLiteral("~5");
+    return NS_OK;
+  }
+  if (aLength != kDiagnosticHeaderPaddingLongLength) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  nsAutoCString padding;
+  MOZ_TRY(GenerateHeaderPadding(padding, aRandom));
+  const size_t generatedLength = padding.Length();
+  padding.SetLength(aLength);
+  char* output = padding.BeginWriting();
+  std::fill(output + generatedLength, output + aLength, '~');
+  output[0] = '~';
+  output[1] = '6';
+  aPadding = std::move(padding);
+  return NS_OK;
+}
+
+nsresult GenerateDiagnosticHeaderPadding(nsACString& aPadding,
+                                         uint32_t aLength) {
+  return GenerateDiagnosticHeaderPadding(aPadding, aLength, SystemRandomUint64);
+}
+
+uint32_t DetectDiagnosticHeaderPaddingLength(const nsACString& aPadding) {
+  if (aPadding.Length() == kDiagnosticHeaderPaddingShortLength &&
+      aPadding.EqualsLiteral("~5")) {
+    return kDiagnosticHeaderPaddingShortLength;
+  }
+  if (aPadding.Length() == kDiagnosticHeaderPaddingLongLength &&
+      aPadding[0] == '~' && aPadding[1] == '6') {
+    return kDiagnosticHeaderPaddingLongLength;
+  }
+  return 0;
+}
+
 }  // namespace mozilla::naivefox

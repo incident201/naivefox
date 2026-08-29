@@ -119,6 +119,7 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
+  EXPECT_EQ(config.mDiagnosticHeaderPaddingBytes, 0U);
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
@@ -377,6 +378,40 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":1})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":"true"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-optimistic-local-reply":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, DiagnosticHeaderPaddingBytesH2Only)
+{
+  for (uint32_t bytes : {2U, 96U}) {
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-header-padding-bytes":)"_ns);
+    json.AppendInt(bytes);
+    json.Append('}');
+    Config config;
+    nsAutoCString error;
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_EQ(config.mDiagnosticHeaderPaddingBytes, bytes);
+  }
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidDiagnosticHeaderPaddingBytes)
+{
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-header-padding-bytes":0})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-header-padding-bytes":3})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-header-padding-bytes":97})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-header-padding-bytes":"2"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-header-padding-bytes":2,"diagnostic-header-padding-bytes":96})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-header-padding-bytes":2})",
+      R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://proxy.example","quic://proxy.example"],"diagnostic-header-padding-bytes":96})",
   };
   for (const char* json : kInvalid) {
     Config config;
@@ -1002,6 +1037,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
   source.mDiagnosticOptimisticLocalReply = true;
+  source.mDiagnosticHeaderPaddingBytes = 96;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1025,6 +1061,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
+    EXPECT_EQ(copy->mDiagnosticHeaderPaddingBytes, 96U);
   }
 }
 

@@ -333,6 +333,7 @@ class JsonParser final {
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
     bool sawDiagnosticOptimisticLocalReply = false;
+    bool sawDiagnosticHeaderPaddingBytes = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -426,6 +427,19 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticOptimisticLocalReply,
             "diagnostic-optimistic-local-reply must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-header-padding-bytes")) {
+        if (sawDiagnosticHeaderPaddingBytes) {
+          return Error("duplicate diagnostic-header-padding-bytes field");
+        }
+        sawDiagnosticHeaderPaddingBytes = true;
+        MOZ_TRY(ParseBoundedUnsignedInteger(
+            parsed.mDiagnosticHeaderPaddingBytes, 96,
+            "diagnostic-header-padding-bytes must be a non-negative integer",
+            "diagnostic-header-padding-bytes exceeds the supported range"));
+        if (parsed.mDiagnosticHeaderPaddingBytes != 2 &&
+            parsed.mDiagnosticHeaderPaddingBytes != 96) {
+          return Error("diagnostic-header-padding-bytes must be 2 or 96");
+        }
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -457,6 +471,15 @@ class JsonParser final {
     }
     if (!sawProxy) {
       return Error("config requires a proxy field");
+    }
+    if (parsed.mDiagnosticHeaderPaddingBytes != 0) {
+      for (const auto& proxy : parsed.mProxies) {
+        if (proxy.mProtocol != ProxyProtocol::H2) {
+          return Error(
+              "diagnostic-header-padding-bytes requires explicit H2 "
+              "proxies");
+        }
+      }
     }
     if (parsed.mProxies.Length() >= 2 &&
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
