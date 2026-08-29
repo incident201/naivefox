@@ -26,6 +26,7 @@ scenario_option_count=0
 browser_page_base_size=
 outer_resource_unit_size=
 outer_early_hints=none
+outer_final_preloads=none
 network_one_way_delay_ms=0
 network_rate_mbit=0
 private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
@@ -96,6 +97,10 @@ while [[ $# -gt 0 ]]; do
       outer_early_hints=${2:-}
       shift 2
       ;;
+    --outer-final-preloads)
+      outer_final_preloads=${2:-}
+      shift 2
+      ;;
     --network-one-way-delay-ms)
       network_one_way_delay_ms=${2:-}
       shift 2
@@ -113,7 +118,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--outer-resource-unit-size BYTES] [--outer-early-hints none|css|blocking|all] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--outer-resource-unit-size BYTES] [--outer-early-hints none|css|blocking|all] [--outer-final-preloads none|css|blocking|all] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -264,6 +269,29 @@ case $outer_early_hints in
     exit 2
     ;;
 esac
+case $outer_final_preloads in
+  none) ;;
+  css | blocking | all)
+    if [[ $protocol_selection != h2 ||
+          $scenario_option_count -ne 1 ||
+          $scenario_override != browser_page ]]; then
+      printf '%s\n' '--outer-final-preloads requires --protocol h2 --scenario browser_page' >&2
+      exit 2
+    fi
+    if [[ $mode != gate && $mode != smoke ]]; then
+      printf '%s\n' '--outer-final-preloads is restricted to gate/smoke research diagnostics' >&2
+      exit 2
+    fi
+    ;;
+  *)
+    printf '%s\n' '--outer-final-preloads must be none, css, blocking, or all' >&2
+    exit 2
+    ;;
+esac
+if [[ $outer_early_hints != none && $outer_final_preloads != none ]]; then
+  printf '%s\n' '--outer-early-hints and --outer-final-preloads are mutually exclusive' >&2
+  exit 2
+fi
 if [[ ! $network_one_way_delay_ms =~ ^[0-9]+$ ]] ||
    ((network_one_way_delay_ms > 1000)); then
   printf '%s\n' '--network-one-way-delay-ms must be an integer between 0 and 1000' >&2
@@ -1666,6 +1694,8 @@ outer_scenario_path() {
   path=$(scenario_path "$scenario" "$completion")
   if [[ $outer_early_hints != none ]]; then
     printf '%s&early_hints=%s\n' "$path" "$outer_early_hints"
+  elif [[ $outer_final_preloads != none ]]; then
+    printf '%s&final_preloads=%s\n' "$path" "$outer_final_preloads"
   else
     printf '%s\n' "$path"
   fi
@@ -3016,6 +3046,7 @@ browser_page_base_size=${browser_page_base_size:-default_262144}
 outer_resource_profile=$outer_resource_profile
 outer_resource_unit_size=${outer_resource_unit_size:-not_applicable}
 outer_early_hints=$outer_early_hints
+outer_final_preloads=$outer_final_preloads
 outer_style_body_bytes=$outer_style_body_bytes
 outer_script_body_bytes=$outer_script_body_bytes
 outer_image_body_bytes=$outer_image_body_bytes

@@ -213,8 +213,8 @@ def browser_page_asset_urls(query):
     return style_url, script_url, image_urls, api_url
 
 
-def browser_page_early_hint_links(query):
-    mode = query.get("early_hints", ["none"])[0]
+def browser_page_preload_links(query, parameter):
+    mode = query.get(parameter, ["none"])[0]
     if mode == "none":
         return ()
     if (
@@ -234,6 +234,14 @@ def browser_page_early_hint_links(query):
         f"<{url}>; rel=preload; as={destination}"
         for url, destination in resources[:limit]
     )
+
+
+def browser_page_early_hint_links(query):
+    return browser_page_preload_links(query, "early_hints")
+
+
+def browser_page_final_preload_links(query):
+    return browser_page_preload_links(query, "final_preloads")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -472,7 +480,8 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                 self.send_error(400)
                 return
             hints = browser_page_early_hint_links(query)
-            if hints is None:
+            final_preloads = browser_page_final_preload_links(query)
+            if hints is None or final_preloads is None:
                 self.send_error(400)
                 return
             if hints:
@@ -481,11 +490,15 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                     self.send_header("Link", link)
                 self.end_headers()
                 self.wfile.flush()
+            response_headers = [
+                ("Referrer-Policy", "strict-origin-when-cross-origin"),
+                *(("Link", link) for link in final_preloads),
+            ]
             self.send_bytes(
                 200,
                 body,
                 "text/html; charset=utf-8",
-                (("Referrer-Policy", "strict-origin-when-cross-origin"),),
+                response_headers,
             )
         elif parsed.path == "/camouflage/style.css":
             if "size" in query:
