@@ -523,6 +523,15 @@ scales the inner tunneled workload only. The fixed outer origin profile and
 its open size-validation gap are documented in
 [`../../FRONTING-PAGE.md`](../../FRONTING-PAGE.md).
 
+Use `--outer-resource-unit-size BYTES` only with a dense H3 fronting-page arm
+to scale the actual outer resources independently of the inner workload. The
+accepted unit is 1024 through 22000 bytes. CSS, JavaScript, and each of four
+valid SVG image bodies then use `3/6/2/2/2/2` units respectively, so their
+aggregate excluding the small root is exactly 17 units and remains below the
+384-KiB product budget. Omitting the option preserves the historical measured
+fixture exactly, including its 34-byte JSON fourth image response. Sanitized
+metadata records the selected profile, each body size, and the aggregate.
+
 For an isolated link-robustness check, add `--network-one-way-delay-ms N`,
 `--network-rate-mbit N`, or both. Network shaping is rejected unless
 `NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1`; after the fixture is ready, the runner

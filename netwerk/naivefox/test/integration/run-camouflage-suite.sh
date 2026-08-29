@@ -24,6 +24,7 @@ multi_arm_views_csv=all
 scenario_override=
 scenario_option_count=0
 browser_page_base_size=
+outer_resource_unit_size=
 network_one_way_delay_ms=0
 network_rate_mbit=0
 private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
@@ -85,6 +86,10 @@ while [[ $# -gt 0 ]]; do
       browser_page_base_size=${2:-}
       shift 2
       ;;
+    --outer-resource-unit-size)
+      outer_resource_unit_size=${2:-}
+      shift 2
+      ;;
     --network-one-way-delay-ms)
       network_one_way_delay_ms=${2:-}
       shift 2
@@ -102,7 +107,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--outer-resource-unit-size BYTES] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -214,6 +219,13 @@ if [[ -n $browser_page_base_size ]]; then
     printf '%s\n' '--browser-page-base-size must be an integer between 65536 and 4194304' >&2
     exit 2
   fi
+fi
+if [[ -n $outer_resource_unit_size ]] &&
+   { [[ ! $outer_resource_unit_size =~ ^[0-9]+$ ]] ||
+     ((outer_resource_unit_size < 1024 || outer_resource_unit_size > 22000)); };
+then
+  printf '%s\n' '--outer-resource-unit-size must be an integer between 1024 and 22000' >&2
+  exit 2
 fi
 if [[ ! $network_one_way_delay_ms =~ ^[0-9]+$ ]] ||
    ((network_one_way_delay_ms > 1000)); then
@@ -633,6 +645,41 @@ if [[ $naivefox_arm == tree-resource-committed-overlap-page ||
   if [[ $inner_transport != https-h2 ]]; then
     printf 'tree-resource-committed-overlap-page requires --inner-transport https-h2\n' >&2
     exit 2
+  fi
+fi
+if [[ -n $outer_resource_unit_size && $dense_resource_tree_experiment != 1 ]]; then
+  printf '%s\n' '--outer-resource-unit-size requires a dense H3 fronting-page arm' >&2
+  exit 2
+fi
+if [[ -n $outer_resource_unit_size ]]; then
+  export NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE=$outer_resource_unit_size
+else
+  unset NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE
+fi
+outer_resource_profile=not_applicable
+outer_style_body_bytes=0
+outer_script_body_bytes=0
+outer_image_body_bytes=0
+outer_fourth_body_bytes=0
+outer_resource_body_bytes_excluding_root=0
+if [[ $dense_resource_tree_experiment == 1 ]]; then
+  if [[ -n $outer_resource_unit_size ]]; then
+    outer_resource_profile=coherent_valid_images
+    outer_style_body_bytes=$((3 * outer_resource_unit_size))
+    outer_script_body_bytes=$((6 * outer_resource_unit_size))
+    outer_image_body_bytes=$((2 * outer_resource_unit_size))
+    outer_fourth_body_bytes=$outer_image_body_bytes
+    outer_resource_body_bytes_excluding_root=$((17 * outer_resource_unit_size))
+  else
+    outer_resource_profile=exact_current_json_fourth
+    outer_style_body_bytes=$((12 * 1024))
+    outer_script_body_bytes=$((24 * 1024))
+    outer_image_body_bytes=$((8 * 1024))
+    outer_fourth_body_bytes=34
+    outer_resource_body_bytes_excluding_root=$((
+      outer_style_body_bytes + outer_script_body_bytes +
+      3 * outer_image_body_bytes + outer_fourth_body_bytes
+    ))
   fi
 fi
 if [[ $naivefox_arm == tree-warm-css-304 ]]; then
@@ -2874,6 +2921,13 @@ outer_h2_alpn_policy=$([[ $protocol_selection == h3 ]] && printf not_applicable 
 camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE
 camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE
 browser_page_base_size=${browser_page_base_size:-default_262144}
+outer_resource_profile=$outer_resource_profile
+outer_resource_unit_size=${outer_resource_unit_size:-not_applicable}
+outer_style_body_bytes=$outer_style_body_bytes
+outer_script_body_bytes=$outer_script_body_bytes
+outer_image_body_bytes=$outer_image_body_bytes
+outer_fourth_body_bytes=$outer_fourth_body_bytes
+outer_resource_body_bytes_excluding_root=$outer_resource_body_bytes_excluding_root
 cache_condition=$cache_condition
 fixture_proxy_reset_policy=$fixture_proxy_reset_policy
 fixture_proxy_restart_count=$proxy_restart_count

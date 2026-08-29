@@ -113,4 +113,7 @@ its resource sizes fixed.
 Consequently, the closest known measured deployment profile is the topology
 and approximate sizes above. A coherent outer-resource size matrix, including
 a small valid fourth image and shaped/unshaped links, remains required before
-the acceptable size range can be widened in this contract.
+the acceptable size range can be widened in this contract. The integration
+harness exposes this input independently as `--outer-resource-unit-size`: CSS,
+JavaScript, and four valid SVG bodies use `3/6/2/2/2/2` units while the root and
+inner tunneled workload remain fixed.

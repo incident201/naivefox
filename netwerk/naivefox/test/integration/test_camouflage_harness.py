@@ -2205,6 +2205,75 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn(message, result.stderr)
 
+    def test_outer_resource_profiles_are_coherent_and_bounded(self):
+        self.assertEqual(
+            TARGET.fronting_resource_profile(None),
+            (12 * 1024, 24 * 1024, 8 * 1024, 34, False),
+        )
+        for unit in (1024, 4096, 16384, 22000):
+            style, script, image, fourth, fourth_is_svg = (
+                TARGET.fronting_resource_profile(unit)
+            )
+            self.assertEqual(
+                (style, script, image, fourth),
+                (3 * unit, 6 * unit, 2 * unit, 2 * unit),
+            )
+            self.assertTrue(fourth_is_svg)
+            self.assertLess(17 * unit + 1024, 384 * 1024)
+        for invalid in (1023, 22001):
+            with self.assertRaises(ValueError):
+                TARGET.fronting_resource_profile(invalid)
+
+    def test_scaled_outer_fourth_image_is_a_valid_svg(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = "/camouflage/api?item=4"
+        handler.send_svg = mock.Mock()
+        handler.send_bytes = mock.Mock()
+        with mock.patch.object(
+            TARGET, "FRONTING_FOURTH_IMAGE_IS_SVG", True
+        ), mock.patch.object(TARGET, "FRONTING_FOURTH_IMAGE_SIZE", 8192):
+            TARGET.Handler.do_GET(handler)
+        handler.send_svg.assert_called_once_with(8192)
+        handler.send_bytes.assert_not_called()
+
+    def test_exact_outer_fourth_response_remains_the_measured_json(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = "/camouflage/api?item=4"
+        handler.send_svg = mock.Mock()
+        handler.send_bytes = mock.Mock()
+        with mock.patch.object(TARGET, "FRONTING_FOURTH_IMAGE_IS_SVG", False):
+            TARGET.Handler.do_GET(handler)
+        handler.send_svg.assert_not_called()
+        self.assertEqual(handler.send_bytes.call_args.args[0], 200)
+        self.assertEqual(len(handler.send_bytes.call_args.args[1]), 34)
+        self.assertEqual(handler.send_bytes.call_args.args[2], "application/json")
+
+    def test_outer_resource_unit_cli_is_bounded_and_dense_only(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (
+                ["--outer-resource-unit-size", "1023"],
+                "between 1024 and 22000",
+            ),
+            (
+                [
+                    "--scenario",
+                    "browser_page",
+                    "--outer-resource-unit-size",
+                    "4096",
+                ],
+                "requires a dense H3 fronting-page arm",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
     def test_network_profile_is_isolated_recorded_and_uses_receive_copy(self):
         runner_path = os.path.join(HERE, "run-camouflage-suite.sh")
         with open(runner_path, encoding="utf-8") as stream:
@@ -2284,6 +2353,11 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
         self.assertIn(
             "camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE",
+            suite,
+        )
+        self.assertIn("outer_resource_profile=$outer_resource_profile", suite)
+        self.assertIn(
+            "outer_resource_body_bytes_excluding_root=",
             suite,
         )
 

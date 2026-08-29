@@ -29,6 +29,34 @@ captures use the receive copy so packet timestamps occur after netem rather
 than at the pre-qdisc transmit tap; metadata records the profile and capture
 copy policy.
 
+## Predeclared outer-resource size campaign
+
+The first actual outer-resource matrix is fixed before collection. It uses the
+same promoted product binary and one H3 same-base superblock containing
+Firefox A/B, SOCKS5 `document-start-overlap`, SOCKS5 six-resource tree, HTTP
+CONNECT `document-start-overlap`, and HTTP CONNECT six-resource tree. The
+inner `browser_page` remains at its default 262144-byte base. Every run uses a
+fresh-profile, unshaped isolated WSL namespace unless a shaped row explicitly
+says otherwise, seed `2026082971`, four complete blocks, and the five dashboard
+views. These rows are descriptive screens below the 30-block inference floor.
+
+The fixed profiles are:
+
+| Profile | CSS | JavaScript | Images | Resource bytes excluding root | Purpose |
+| --- | ---: | ---: | ---: | ---: | --- |
+| exact current | 12 KiB | 24 KiB | 8 KiB x3 plus 34-byte JSON | 61,474 | Reproduce the currently measured fixture |
+| coherent small, unit 1024 | 3 KiB | 6 KiB | 2 KiB x4 valid SVG | 17 KiB | Small-resource endpoint |
+| coherent nominal, unit 4096 | 12 KiB | 24 KiB | 8 KiB x4 valid SVG | 68 KiB | Isolate replacement of the fourth response |
+| coherent large, unit 16384 | 48 KiB | 96 KiB | 32 KiB x4 valid SVG | 272 KiB | Four-times nominal endpoint below the 384-KiB cap |
+
+Comparisons among the three coherent rows isolate body-size scaling at fixed
+topology, URLs, MIME types, inner workload, and product policy. Exact current
+versus coherent nominal separately exposes the historical fourth-response
+shape change and must not be described as a pure size comparison. A secondary
+endpoint screen uses only coherent small and coherent large at 20-ms one-way
+delay and 20 Mbit/s, seed `2026082972`, and four blocks. No default promotion
+or acceptable-size guarantee will be inferred from these screening runs.
+
 ## Current implicit-default matrix
 
 This is the canonical current-default residual dashboard. Lower is closer to

@@ -55,6 +55,38 @@ def configured_camouflage_asset_size(name, default):
     return size
 
 
+def configured_fronting_resource_unit_size():
+    raw = os.environ.get("NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE")
+    if raw in (None, ""):
+        return None
+    try:
+        size = int(raw)
+    except ValueError as exc:
+        raise ValueError(
+            "NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE must be an integer"
+        ) from exc
+    if not 1024 <= size <= 22000:
+        raise ValueError(
+            "NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE must be between "
+            "1024 and 22000 bytes"
+        )
+    return size
+
+
+def fronting_resource_profile(unit_size):
+    if unit_size is None:
+        return (12 * 1024, 24 * 1024, 8 * 1024, 34, False)
+    if not 1024 <= unit_size <= 22000:
+        raise ValueError("fronting resource unit must be between 1024 and 22000")
+    return (
+        3 * unit_size,
+        6 * unit_size,
+        2 * unit_size,
+        2 * unit_size,
+        True,
+    )
+
+
 CAMOUFLAGE_STYLE_SIZE = configured_camouflage_asset_size(
     "NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE", 64 * 1024
 )
@@ -62,9 +94,14 @@ CAMOUFLAGE_SCRIPT_SIZE = configured_camouflage_asset_size(
     "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE", 128 * 1024
 )
 CAMOUFLAGE_API_IMAGE_SIZE = 4096
-FRONTING_STYLE_SIZE = 12 * 1024
-FRONTING_SCRIPT_SIZE = 24 * 1024
-FRONTING_IMAGE_SIZE = 8 * 1024
+FRONTING_RESOURCE_UNIT_SIZE = configured_fronting_resource_unit_size()
+(
+    FRONTING_STYLE_SIZE,
+    FRONTING_SCRIPT_SIZE,
+    FRONTING_IMAGE_SIZE,
+    FRONTING_FOURTH_IMAGE_SIZE,
+    FRONTING_FOURTH_IMAGE_IS_SVG,
+) = fronting_resource_profile(FRONTING_RESOURCE_UNIT_SIZE)
 
 
 def sized_source_asset(size, prefix, filler):
@@ -444,6 +481,8 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                     MAX_BODY,
                 )
                 self.send_svg(size)
+            elif query.get("item") == ["4"] and FRONTING_FOURTH_IMAGE_IS_SVG:
+                self.send_svg(FRONTING_FOURTH_IMAGE_SIZE)
             else:
                 self.send_bytes(
                     200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"
