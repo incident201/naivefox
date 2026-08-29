@@ -418,15 +418,17 @@ Caddy, certificate, IP, port, namespace, and interface.
 
 All cohorts use the selected reference Firefox to execute the controlled page.
 The NaiveFox cohort configures that browser to use the sample's private SOCKS
-listener. Its target uses HTTPS inside CONNECT by default; the fixture CA is
-trusted only by the isolated test profile. `--inner-transport http` selects a
-separate cleartext diagnostic dataset. Forced Alt-Svc applies only to the
-direct H3 reference browser; the SOCKS browser leaves origin H3 disabled while
-NaiveFox independently owns the selected outer H2 or H3 transport. A
-fail-closed PAC sends exact loopback destinations to the sample's SOCKS5
-listener and every other hostname to a dead local proxy. It has no `DIRECT`
-fallback, so Mozilla background traffic cannot contaminate the captured outer
-flow. A Selenium controller is preferred for H2 when available. Same-base H3
+or HTTP CONNECT listener. Its target uses HTTPS inside CONNECT by default; the
+fixture CA is trusted only by the isolated test profile. `--inner-transport
+http` selects a separate cleartext diagnostic dataset. Forced Alt-Svc applies
+only to the direct H3 reference browser; the proxied browser leaves origin H3
+disabled while NaiveFox independently owns the selected outer H2 or H3
+transport. A fail-closed PAC sends only the exact loopback workload authority
+to the sample listener and every non-loopback hostname to a dead local proxy.
+Other loopback ports remain direct so Selenium's local remote-control channel
+cannot create a pre-capture NaiveFox flow; the isolated namespace prevents
+those local control connections from escaping to the host network. A Selenium
+controller is preferred for H2 when available. Same-base H3
 multi-arm screening requires Selenium and launches Firefox before capture;
 the command-line backend is rejected because its readiness marker precedes
 Firefox process startup. Direct H3 reference participants first complete an

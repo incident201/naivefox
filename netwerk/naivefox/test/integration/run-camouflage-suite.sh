@@ -1380,6 +1380,7 @@ make_profile() {
   local participant=$3
   local socks_port=${4:-}
   local arm=${5:-}
+  local target_port=${6:-}
   local direct_h3=false
   local enable_h3=false
   case $participant in
@@ -1445,11 +1446,13 @@ EOF
   if [[ $participant == socks-browser ]]; then
     "$browser_python" \
       "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-      --generate-pac-user-js "$socks_port" >>"$destination/user.js"
+      --generate-pac-user-js "$socks_port" "$target_port" \
+      >>"$destination/user.js"
   elif [[ $participant == http-browser ]]; then
     "$browser_python" \
       "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-      --generate-http-pac-user-js "$socks_port" >>"$destination/user.js"
+      --generate-http-pac-user-js "$socks_port" "$target_port" \
+      >>"$destination/user.js"
   fi
   if [[ $protocol == h3 && $participant != socks-browser &&
         $participant != http-browser ]]; then
@@ -2115,7 +2118,7 @@ run_naivefox_sample() {
   mkdir -m 0700 -- "$sample_dir"
   make_profile "$naivefox_profile" "$protocol" naivefox "" "$arm"
   make_profile "$browser_profile" "$protocol" "$browser_participant" \
-    "$socks_port"
+    "$socks_port" "" "$target_port"
   if [[ $private_h3_keylog == 1 && $protocol == h3 ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
@@ -2134,7 +2137,7 @@ run_naivefox_sample() {
     warm_trigger_token=$(openssl rand -hex 16)
     mkdir -m 0700 -- "$warm_dir"
     make_profile "$warm_browser_profile" "$protocol" socks-browser \
-      "$warm_socks_port"
+      "$warm_socks_port" "" "$warm_target_port"
     NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
       NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
     python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \

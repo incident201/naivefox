@@ -8,64 +8,99 @@ import signal
 import subprocess
 import sys
 import time
+import urllib.parse
 
 DEAD_LOCAL_PROXY_PORT = 9
 
 
-def proxy_pac_script(socks_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
+def proxy_pac_script(
+    socks_port,
+    target_port,
+    dead_proxy_port=DEAD_LOCAL_PROXY_PORT,
+):
     for name, port in (
         ("SOCKS", socks_port),
+        ("target", target_port),
         ("dead proxy", dead_proxy_port),
     ):
         if not 1 <= port <= 65535:
             raise ValueError(f"{name} port is outside 1..65535")
     return f"""function FindProxyForURL(url, host) {{
   host = host.toLowerCase();
+  var authority = url.toLowerCase().split("/")[2];
   if (host === "localhost" || host === "127.0.0.1" ||
       host === "::1" || host === "[::1]") {{
-    return "SOCKS5 127.0.0.1:{socks_port}";
+    if (authority === "localhost:{target_port}" ||
+        authority === "127.0.0.1:{target_port}" ||
+        authority === "[::1]:{target_port}") {{
+      return "SOCKS5 127.0.0.1:{socks_port}";
+    }}
+    return "DIRECT";
   }}
   return "PROXY 127.0.0.1:{dead_proxy_port}";
 }}
 """
 
 
-def proxy_pac_url(socks_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
+def proxy_pac_url(
+    socks_port,
+    target_port,
+    dead_proxy_port=DEAD_LOCAL_PROXY_PORT,
+):
     encoded = base64.b64encode(
-        proxy_pac_script(socks_port, dead_proxy_port).encode("utf-8")
+        proxy_pac_script(socks_port, target_port, dead_proxy_port).encode("utf-8")
     ).decode("ascii")
     return f"data:application/x-ns-proxy-autoconfig;base64,{encoded}"
 
 
-def http_proxy_pac_script(http_proxy_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
+def http_proxy_pac_script(
+    http_proxy_port,
+    target_port,
+    dead_proxy_port=DEAD_LOCAL_PROXY_PORT,
+):
     for name, port in (
         ("HTTP proxy", http_proxy_port),
+        ("target", target_port),
         ("dead proxy", dead_proxy_port),
     ):
         if not 1 <= port <= 65535:
             raise ValueError(f"{name} port is outside 1..65535")
     return f"""function FindProxyForURL(url, host) {{
   host = host.toLowerCase();
+  var authority = url.toLowerCase().split("/")[2];
   if (host === "localhost" || host === "127.0.0.1" ||
       host === "::1" || host === "[::1]") {{
-    return "PROXY 127.0.0.1:{http_proxy_port}";
+    if (authority === "localhost:{target_port}" ||
+        authority === "127.0.0.1:{target_port}" ||
+        authority === "[::1]:{target_port}") {{
+      return "PROXY 127.0.0.1:{http_proxy_port}";
+    }}
+    return "DIRECT";
   }}
   return "PROXY 127.0.0.1:{dead_proxy_port}";
 }}
 """
 
 
-def http_proxy_pac_url(http_proxy_port, dead_proxy_port=DEAD_LOCAL_PROXY_PORT):
+def http_proxy_pac_url(
+    http_proxy_port,
+    target_port,
+    dead_proxy_port=DEAD_LOCAL_PROXY_PORT,
+):
     encoded = base64.b64encode(
-        http_proxy_pac_script(http_proxy_port, dead_proxy_port).encode("utf-8")
+        http_proxy_pac_script(
+            http_proxy_port,
+            target_port,
+            dead_proxy_port,
+        ).encode("utf-8")
     ).decode("ascii")
     return f"data:application/x-ns-proxy-autoconfig;base64,{encoded}"
 
 
-def proxy_preferences(socks_port):
+def proxy_preferences(socks_port, target_port):
     return {
         "network.proxy.type": 2,
-        "network.proxy.autoconfig_url": proxy_pac_url(socks_port),
+        "network.proxy.autoconfig_url": proxy_pac_url(socks_port, target_port),
         "network.proxy.autoconfig_url.include_path": False,
         "network.proxy.no_proxies_on": "",
         "network.proxy.allow_hijacking_localhost": True,
@@ -73,10 +108,13 @@ def proxy_preferences(socks_port):
     }
 
 
-def http_proxy_preferences(http_proxy_port):
+def http_proxy_preferences(http_proxy_port, target_port):
     return {
         "network.proxy.type": 2,
-        "network.proxy.autoconfig_url": http_proxy_pac_url(http_proxy_port),
+        "network.proxy.autoconfig_url": http_proxy_pac_url(
+            http_proxy_port,
+            target_port,
+        ),
         "network.proxy.autoconfig_url.include_path": False,
         "network.proxy.no_proxies_on": "",
         "network.proxy.allow_hijacking_localhost": True,
@@ -84,17 +122,20 @@ def http_proxy_preferences(http_proxy_port):
     }
 
 
-def proxy_user_js(socks_port):
+def proxy_user_js(socks_port, target_port):
     return "".join(
         f"user_pref({json.dumps(name)}, {json.dumps(value)});\n"
-        for name, value in proxy_preferences(socks_port).items()
+        for name, value in proxy_preferences(socks_port, target_port).items()
     )
 
 
-def http_proxy_user_js(http_proxy_port):
+def http_proxy_user_js(http_proxy_port, target_port):
     return "".join(
         f"user_pref({json.dumps(name)}, {json.dumps(value)});\n"
-        for name, value in http_proxy_preferences(http_proxy_port).items()
+        for name, value in http_proxy_preferences(
+            http_proxy_port,
+            target_port,
+        ).items()
     )
 
 
@@ -103,10 +144,13 @@ def firefox_preferences(
     proxy_port,
     socks_port,
     http_proxy_port=0,
+    target_port=0,
 ):
     local_proxy_ports = [socks_port, http_proxy_port]
     if sum(bool(port) for port in local_proxy_ports) > 1:
         raise ValueError("local proxy ports are mutually exclusive")
+    if any(local_proxy_ports) and not 1 <= target_port <= 65535:
+        raise ValueError("target port is outside 1..65535")
     direct_h3 = protocol == "h3" and not any(local_proxy_ports)
     preferences = {
         "app.update.enabled": False,
@@ -127,9 +171,9 @@ def firefox_preferences(
             "network.http.http3.force-use-alt-svc-mapping-for-testing": True,
         })
     if socks_port:
-        preferences.update(proxy_preferences(socks_port))
+        preferences.update(proxy_preferences(socks_port, target_port))
     if http_proxy_port:
-        preferences.update(http_proxy_preferences(http_proxy_port))
+        preferences.update(http_proxy_preferences(http_proxy_port, target_port))
     return preferences
 
 
@@ -164,6 +208,7 @@ class Controller:
             self.args.proxy_port,
             self.args.socks_port,
             self.args.http_proxy_port,
+            urllib.parse.urlsplit(self.args.url).port or 0,
         ).items():
             options.set_preference(name, value)
         service_args = (
@@ -322,17 +367,17 @@ class Controller:
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == "--generate-pac-user-js":
+    if len(sys.argv) == 4 and sys.argv[1] == "--generate-pac-user-js":
         try:
-            print(proxy_user_js(int(sys.argv[2])), end="")
+            print(proxy_user_js(int(sys.argv[2]), int(sys.argv[3])), end="")
         except (ValueError, TypeError) as error:
-            raise SystemExit(f"invalid PAC SOCKS port: {error}") from error
+            raise SystemExit(f"invalid PAC port: {error}") from error
         return
-    if len(sys.argv) == 3 and sys.argv[1] == "--generate-http-pac-user-js":
+    if len(sys.argv) == 4 and sys.argv[1] == "--generate-http-pac-user-js":
         try:
-            print(http_proxy_user_js(int(sys.argv[2])), end="")
+            print(http_proxy_user_js(int(sys.argv[2]), int(sys.argv[3])), end="")
         except (ValueError, TypeError) as error:
-            raise SystemExit(f"invalid PAC HTTP proxy port: {error}") from error
+            raise SystemExit(f"invalid PAC port: {error}") from error
         return
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True)

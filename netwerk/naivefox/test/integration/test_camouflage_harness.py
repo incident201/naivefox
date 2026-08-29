@@ -3881,7 +3881,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
 
     def test_socks_browser_uses_fail_closed_pac_without_outer_h3_mapping(self):
-        preferences = CONTROLLER.firefox_preferences("h3", 4433, 1080)
+        preferences = CONTROLLER.firefox_preferences("h3", 4433, 1080, 0, 8443)
         self.assertFalse(preferences["network.http.http3.enable"])
         self.assertNotIn("network.http.http3.alt-svc-mapping-for-testing", preferences)
         self.assertEqual(preferences["network.proxy.type"], 2)
@@ -3891,22 +3891,23 @@ class CamouflageHarnessTests(unittest.TestCase):
         pac_url = preferences["network.proxy.autoconfig_url"]
         self.assertTrue(pac_url.startswith(prefix))
         pac = base64.b64decode(pac_url.removeprefix(prefix)).decode()
-        self.assertEqual(pac, CONTROLLER.proxy_pac_script(1080))
+        self.assertEqual(pac, CONTROLLER.proxy_pac_script(1080, 8443))
 
     def test_http_proxy_browser_uses_native_connect_path_and_fail_closed_pac(self):
-        preferences = CONTROLLER.firefox_preferences("h2", 4433, 0, 1080)
+        preferences = CONTROLLER.firefox_preferences("h2", 4433, 0, 1080, 8443)
         self.assertFalse(preferences["network.http.http3.enable"])
         self.assertEqual(preferences["network.proxy.type"], 2)
         self.assertFalse(preferences["network.proxy.failover_direct"])
         prefix = "data:application/x-ns-proxy-autoconfig;base64,"
         pac_url = preferences["network.proxy.autoconfig_url"]
         pac = base64.b64decode(pac_url.removeprefix(prefix)).decode()
-        self.assertEqual(pac, CONTROLLER.http_proxy_pac_script(1080))
+        self.assertEqual(pac, CONTROLLER.http_proxy_pac_script(1080, 8443))
         self.assertIn('return "PROXY 127.0.0.1:1080"', pac)
         self.assertNotIn("SOCKS", pac)
-        self.assertNotIn("DIRECT", pac)
+        self.assertIn('authority === "localhost:8443"', pac)
+        self.assertIn('return "DIRECT"', pac)
         with self.assertRaisesRegex(ValueError, "mutually exclusive"):
-            CONTROLLER.firefox_preferences("h2", 4433, 1080, 1081)
+            CONTROLLER.firefox_preferences("h2", 4433, 1080, 1081, 8443)
 
     def test_suite_profile_roles_keep_test_alt_svc_out_of_naivefox(self):
         path = os.path.join(HERE, "run-camouflage-suite.sh")
@@ -3967,7 +3968,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 f"make_profile {shlex.quote(reference)} h3 reference",
                 f"make_profile {shlex.quote(naivefox)} h3 naivefox",
                 f"make_profile {shlex.quote(pmtud_control)} h3 naivefox '' root-pmtud-control",
-                f"make_profile {shlex.quote(socks)} h3 socks-browser 1080",
+                f"make_profile {shlex.quote(socks)} h3 socks-browser 1080 '' 8443",
             ))
             subprocess.run(["bash"], input=script, text=True, check=True)
 
@@ -3993,23 +3994,28 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertNotIn(pmtud_pref, socks_prefs)
             self.assertIn(pmtud_pref, pmtud_control_prefs)
 
-    def test_proxy_pac_sends_only_loopback_hosts_to_sample_socks(self):
-        pac = CONTROLLER.proxy_pac_script(1080)
+    def test_proxy_pac_sends_only_target_loopback_port_to_sample_socks(self):
+        pac = CONTROLLER.proxy_pac_script(1080, 8443)
         for host in ("localhost", "127.0.0.1", "::1", "[::1]"):
             self.assertIn(f'host === "{host}"', pac)
         self.assertIn('return "SOCKS5 127.0.0.1:1080"', pac)
+        self.assertIn('authority === "localhost:8443"', pac)
+        self.assertIn('return "DIRECT"', pac)
         self.assertIn(
             f'return "PROXY 127.0.0.1:{CONTROLLER.DEAD_LOCAL_PROXY_PORT}"',
             pac,
         )
-        self.assertNotIn("DIRECT", pac)
 
     def test_proxy_pac_rejects_invalid_ports(self):
         for port in (0, 65536):
             with self.assertRaisesRegex(ValueError, "outside 1..65535"):
-                CONTROLLER.proxy_pac_script(port)
+                CONTROLLER.proxy_pac_script(port, 8443)
             with self.assertRaisesRegex(ValueError, "outside 1..65535"):
-                CONTROLLER.http_proxy_pac_script(port)
+                CONTROLLER.http_proxy_pac_script(port, 8443)
+            with self.assertRaisesRegex(ValueError, "outside 1..65535"):
+                CONTROLLER.proxy_pac_script(1080, port)
+            with self.assertRaisesRegex(ValueError, "outside 1..65535"):
+                CONTROLLER.http_proxy_pac_script(1080, port)
 
     def test_commandline_profile_generator_uses_same_pac_preferences(self):
         result = subprocess.run(
@@ -4018,12 +4024,13 @@ class CamouflageHarnessTests(unittest.TestCase):
                 os.path.join(HERE, "camouflage_browser_controller.py"),
                 "--generate-pac-user-js",
                 "1080",
+                "8443",
             ],
             check=True,
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.stdout, CONTROLLER.proxy_user_js(1080))
+        self.assertEqual(result.stdout, CONTROLLER.proxy_user_js(1080, 8443))
         self.assertIn('user_pref("network.proxy.type", 2);', result.stdout)
         self.assertIn('user_pref("network.proxy.autoconfig_url", "data:', result.stdout)
         self.assertIn(
@@ -4038,12 +4045,16 @@ class CamouflageHarnessTests(unittest.TestCase):
                 os.path.join(HERE, "camouflage_browser_controller.py"),
                 "--generate-http-pac-user-js",
                 "1080",
+                "8443",
             ],
             check=True,
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.stdout, CONTROLLER.http_proxy_user_js(1080))
+        self.assertEqual(
+            result.stdout,
+            CONTROLLER.http_proxy_user_js(1080, 8443),
+        )
         self.assertIn('user_pref("network.proxy.type", 2);', result.stdout)
         self.assertIn('user_pref("network.proxy.autoconfig_url", "data:', result.stdout)
         self.assertNotIn("SOCKS5", result.stdout)
