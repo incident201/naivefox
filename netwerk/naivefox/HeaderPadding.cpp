@@ -61,4 +61,36 @@ nsresult GenerateHeaderPadding(nsACString& aPadding) {
   return GenerateHeaderPadding(aPadding, SystemRandomUint64);
 }
 
+nsresult GenerateDiagnosticH2GetCarrierPadding(nsACString& aPadding,
+                                               HeaderPaddingRandom aRandom) {
+  nsCString padding;
+  MOZ_TRY(GenerateHeaderPadding(padding, aRandom));
+  padding.SetCharAt('~', 0);
+  padding.SetCharAt('8', 1);
+  aPadding = std::move(padding);
+  return NS_OK;
+}
+
+nsresult GenerateDiagnosticH2GetCarrierPadding(nsACString& aPadding) {
+  return GenerateDiagnosticH2GetCarrierPadding(aPadding, SystemRandomUint64);
+}
+
+bool IsDiagnosticH2GetCarrierPadding(const nsACString& aPadding) {
+  return aPadding.Length() >= kHeaderPaddingMinLength &&
+         aPadding.Length() <= kHeaderPaddingMaxLength &&
+         aPadding.CharAt(0) == '~' && aPadding.CharAt(1) == '8';
+}
+
+bool DiagnosticH2GetCarrierEchoMatches(
+    const nsACString& aRequestPadding,
+    const Maybe<bool>& aResponseHeaderPresent,
+    const nsACString& aResponsePadding) {
+  return IsDiagnosticH2GetCarrierPadding(aRequestPadding) &&
+         aResponseHeaderPresent.valueOr(false) &&
+         aResponsePadding.Length() >= kResponseHeaderPaddingMinLength &&
+         aResponsePadding.Length() <= kResponseHeaderPaddingMaxLength &&
+         Substring(aResponsePadding, 0, kHeaderPaddingMinLength)
+             .Equals(Substring(aRequestPadding, 0, kHeaderPaddingMinLength));
+}
+
 }  // namespace mozilla::naivefox

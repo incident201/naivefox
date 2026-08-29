@@ -333,6 +333,7 @@ class JsonParser final {
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
     bool sawDiagnosticOptimisticLocalReply = false;
+    bool sawDiagnosticH2GetCarrier = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -426,6 +427,13 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticOptimisticLocalReply,
             "diagnostic-optimistic-local-reply must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-h2-get-carrier")) {
+        if (sawDiagnosticH2GetCarrier) {
+          return Error("duplicate diagnostic-h2-get-carrier field");
+        }
+        sawDiagnosticH2GetCarrier = true;
+        MOZ_TRY(ParseBoolean(parsed.mDiagnosticH2GetCarrier,
+                             "diagnostic-h2-get-carrier must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -461,6 +469,14 @@ class JsonParser final {
     if (parsed.mProxies.Length() >= 2 &&
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
       return Error("listen addresses do not match multiple proxies");
+    }
+    if (parsed.mDiagnosticH2GetCarrier) {
+      for (const auto& proxy : parsed.mProxies) {
+        if (proxy.mProtocol != ProxyProtocol::H2) {
+          return Error(
+              "diagnostic-h2-get-carrier requires explicit h2 proxies");
+        }
+      }
     }
     if (!sawPreamble) {
       bool hasExplicitH2Proxy = false;
