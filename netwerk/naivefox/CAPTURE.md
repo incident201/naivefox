@@ -1156,6 +1156,7 @@ independent seeds.
 | `d1c08c6718fa278f` | admit CONNECT after the first successful image response HEADERS, shaped link | 1 | 0.11972 / 0.38830 / 0.17140 / 0.18762 / 0.38223 |
 | `e386025177b9432c` | make only the first preamble-owned H3 CONNECT stream incremental at generic urgency, shaped link | 1 | 0.12355 / 0.42295 / 0.17830 / 0.16060 / 0.35493 |
 | `f9c4c26050a2988a` | bound H3 duplex-pump reads to Gecko's 4096-byte default segment, shaped link | 1 | 0.23503 / 0.36697 / 0.25550 / 0.24040 / 0.41194 |
+| `3500eb894d951e57` | demote only the first preamble-owned H3 CONNECT from generic `u=4` to `u=5`, shaped link | 1 | 0.25290 / 0.49920 / 0.28958 / 0.22799 / 0.47932 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1735,6 +1736,25 @@ with other views 0.23503/0.25550/0.24040. Its binary identified build ID
 The pump quantum and diagnostic marker were removed. Sequential small writes
 remain eligible for aggregation inside Neqo, so matching the ordinary read
 size does not reproduce ordinary multi-stream packetization.
+
+Demoting the first preamble-owned H3 CONNECT by one scheduler step is
+rejected. The experiment left the stream non-incremental and changed only its
+generic Gecko priority from `u=4` to `u=5`, so the already-committed cover
+transactions could win H3 scheduling without any timer, RTT, throughput, or
+resource-size constant. A strict temporary marker required exactly one such
+CONNECT on the owning preamble generation and rejected the priority on every
+later SOCKS connection. The first private capture
+`7c50b7798ccafd5c` failed closed because the initial validator assumed that
+the marker logged before the synchronously delivered preamble result; the
+actual `AsyncOpen` callback logged the result before the call returned. After
+correcting that diagnostic ordering, one-block shaped artifact
+`3500eb894d951e57` measured 0.49920 for packets 17--32 and 0.47932 whole, with
+other views 0.25290/0.28958/0.22799. Its binary identified build ID
+`187868e93104742a431cd46725894c6c` and libxul digest
+`bb8627aac5326cc30ae838e4c09aaf3a2d0c3c5748c09a5261cf712d6a1e3312`.
+The priority flag and exact validator marker were removed. Both one-step
+promotion and one-step demotion of CONNECT now regress the target window, so
+further urgency-only tuning is not a useful direction.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
