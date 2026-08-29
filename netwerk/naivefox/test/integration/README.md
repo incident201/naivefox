@@ -598,8 +598,8 @@ gate without a preamble. `root` is the short alias for `document-complete` and
 adds one bounded document GET before CONNECT. The harness always emits these
 fields explicitly. Thus `off` remains a true
 control even though a successfully parsed product config which omits
-`preamble` now promotes `document-start-overlap` for explicit H2 and H3
-upstreams.
+`preamble` now selects the documented protocol- and listener-specific implicit
+default. The harness never depends on that omission during arm screening.
 The tree modes also fetch two resources from that browser page;
 `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.

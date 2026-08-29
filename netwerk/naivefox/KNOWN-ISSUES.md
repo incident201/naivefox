@@ -83,7 +83,8 @@ Normal JSON config deliberately has no Auto scheme: `https://` is strict H2 and
 
 ## Implicit H3 fronting page has an exact resource contract
 
-The promoted SOCKS-only H3 preamble expects the configured origin root to
+The promoted implicit H3 preamble on SOCKS5, HTTP CONNECT, or mixed listeners
+expects the configured origin root to
 contain exactly one same-origin stylesheet, one classic deferred script, and
 four images accepted by the lean parser, within the documented aggregate
 budget. Strict H3 fails closed when that contract is not met; it does not

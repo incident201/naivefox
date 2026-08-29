@@ -325,9 +325,9 @@ done
 [[ $(rg -c '^Padding negotiated: yes$' "$client_log") -eq 11 ]]
 ! rg -q '^Padding negotiated: no$' "$client_log"
 if [[ ${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} != 1 ]]; then
-  # Omitted product preamble uses direct first-buffer admission for mixed
-  # H2 listeners and document-start admission for H3. The remaining ten
-  # tunnels reuse the ready route without replaying the implicit preamble.
+  # Omitted product preamble uses direct first-buffer admission for mixed H2
+  # listeners and the exact six-resource parser policy for H3. The remaining
+  # ten tunnels reuse the ready route without replaying the implicit preamble.
   if [[ $protocol == h2 ]]; then
     [[ $(rg -c \
       'preamble document-overlap admission=first-data-buffer response_accepted=1 root_done=0 protocol=h2$' \
@@ -335,10 +335,16 @@ if [[ ${NAIVEFOX_TEST_PROTOCOL_SPLIT_PREAMBLE:-0} != 1 ]]; then
     [[ $(rg -c 'preamble document-overlap drain=complete' \
       "$client_log") -eq 1 ]]
   else
-    [[ $(rg -c 'preamble document-start-overlap admission=request-committed' \
+    [[ $(rg -c \
+      'preamble native-parser-resource-tree admission=resources-committed request_committed=1 root_done=1 protocol=h3$' \
       "$client_log") -eq 1 ]]
-    [[ $(rg -c 'preamble document-start-overlap drain=complete' \
+    [[ $(rg -c \
+      'Preamble native-parser-resource-tree barrier=first-resource-body-buffer assets=6 committed=6 protocol=h3$' \
       "$client_log") -eq 1 ]]
+    [[ $(rg -c \
+      'preamble native-parser-resource-tree drain=complete completed_resources=6 http=200 protocol=h3$' \
+      "$client_log") -eq 1 ]]
+    ! rg -q 'preamble document-start-overlap admission=' "$client_log"
   fi
 fi
 ! rg -Fq "$NAIVEFOX_FIXTURE_PASS" "$client_log"

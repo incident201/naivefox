@@ -145,11 +145,12 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
       << error.get();
   EXPECT_EQ(
       implicitHttpConnectH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
-      PreambleMode::DocumentStartOverlap);
-  EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxAssets, 0U);
+      PreambleMode::TreeNativeParserResourceCommittedOverlap);
+  EXPECT_TRUE(implicitHttpConnectH3.mPreamble.mPath.EqualsLiteral("/"));
+  EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxAssets, 6U);
   EXPECT_EQ(implicitHttpConnectH3.mPreamble.mMaxBytes,
-            PreambleConfig::kDefaultDocumentMaxBytes);
-  EXPECT_FALSE(implicitHttpConnectH3.mPreamble.mCacheResources);
+            PreambleConfig::kMaximumBytes);
+  EXPECT_TRUE(implicitHttpConnectH3.mPreamble.mCacheResources);
 
   Config implicitMixedH2;
   error.Truncate();
@@ -161,6 +162,21 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
       << error.get();
   EXPECT_EQ(implicitMixedH2.mPreamble.ModeForProtocol(ProxyProtocol::H2),
             PreambleMode::DocumentFirstBufferOverlap);
+
+  Config implicitMixedH3;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":"quic://proxy.example"})"_ns,
+          implicitMixedH3, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(implicitMixedH3.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserResourceCommittedOverlap);
+  EXPECT_EQ(implicitMixedH3.mPreamble.mMaxAssets, 6U);
+  EXPECT_EQ(implicitMixedH3.mPreamble.mMaxBytes,
+            PreambleConfig::kMaximumBytes);
+  EXPECT_TRUE(implicitMixedH3.mPreamble.mCacheResources);
 
   Config implicitQuic;
   error.Truncate();
@@ -220,11 +236,11 @@ TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
   EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H2),
             PreambleMode::DocumentFirstBufferOverlap);
   EXPECT_EQ(mixedProtocols.mPreamble.ModeForProtocol(ProxyProtocol::H3),
-            PreambleMode::DocumentStartOverlap);
-  EXPECT_EQ(mixedProtocols.mPreamble.mMaxAssets, 0U);
+            PreambleMode::TreeNativeParserResourceCommittedOverlap);
+  EXPECT_EQ(mixedProtocols.mPreamble.mMaxAssets, 6U);
   EXPECT_EQ(mixedProtocols.mPreamble.mMaxBytes,
-            PreambleConfig::kDefaultDocumentMaxBytes);
-  EXPECT_FALSE(mixedProtocols.mPreamble.mCacheResources);
+            PreambleConfig::kMaximumBytes);
+  EXPECT_TRUE(mixedProtocols.mPreamble.mCacheResources);
   EXPECT_TRUE(mixedProtocols.mImplicitPreambleGate);
 
   for (const auto& [value, expected] :

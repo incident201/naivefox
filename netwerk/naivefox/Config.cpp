@@ -474,9 +474,9 @@ class JsonParser final {
         // SOCKS-only H2 uses the next-task first-buffer boundary that improved
         // both packets 17--32 and whole flow in the final paired campaign.
         // HTTP CONNECT and mixed listeners retain direct first-buffer
-        // admission for H2 and document-start admission for H3.  SOCKS-only
-        // H3 uses the retained six-resource native-parser policy.  Explicit
-        // preamble and gate fields remain authoritative.
+        // admission for H2.  Every H3 listener layout uses the retained
+        // six-resource native-parser policy.  Explicit preamble and gate
+        // fields remain authoritative.
         if (hasExplicitH2Proxy) {
           parsed.mPreamble.mH2Mode = Some(
               hasOnlySocksListeners
@@ -485,13 +485,10 @@ class JsonParser final {
         }
         if (hasExplicitH3Proxy) {
           parsed.mPreamble.mH3Mode = Some(
-              hasOnlySocksListeners
-                  ? PreambleMode::TreeNativeParserResourceCommittedOverlap
-                  : PreambleMode::DocumentStartOverlap);
+              PreambleMode::TreeNativeParserResourceCommittedOverlap);
         }
         parsed.mPreamble.mPath.AssignLiteral("/");
-        const bool usesH3ResourceDefault =
-            hasExplicitH3Proxy && hasOnlySocksListeners;
+        const bool usesH3ResourceDefault = hasExplicitH3Proxy;
         parsed.mPreamble.mMaxAssets = usesH3ResourceDefault ? 6 : 0;
         parsed.mPreamble.mMaxBytes =
             usesH3ResourceDefault ? PreambleConfig::kMaximumBytes
