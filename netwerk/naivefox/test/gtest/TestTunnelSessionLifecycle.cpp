@@ -25,7 +25,8 @@ namespace mozilla::naivefox {
 class TunnelSessionTestPeer final {
  public:
   static void ApplyChannelStop(TunnelSession* aSession) {
-    aSession->ApplyChannelStop(0, ProxyProtocol::H2, NS_OK);
+    aSession->ApplyChannelStop(0, ProxyProtocol::H2,
+                               DirectionalConnectLane::Upstream, NS_OK);
   }
 
   static bool ShouldGateOuterSession(const TunnelConfig& aConfig) {
@@ -370,11 +371,11 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserResourceCommittedOverlap, false, false, 3,
       0, 0, 0, 3));
   EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3,
-      0, 0, 0, 2));
+      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3, 0,
+      0, 0, 2));
   EXPECT_TRUE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3,
-      0, 0, 0, 3));
+      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3, 0,
+      0, 0, 3));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,

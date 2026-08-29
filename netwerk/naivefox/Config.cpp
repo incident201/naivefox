@@ -333,6 +333,7 @@ class JsonParser final {
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
     bool sawDiagnosticOptimisticLocalReply = false;
+    bool sawDiagnosticDirectionalConnect = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -426,6 +427,14 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticOptimisticLocalReply,
             "diagnostic-optimistic-local-reply must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-directional-connect")) {
+        if (sawDiagnosticDirectionalConnect) {
+          return Error("duplicate diagnostic-directional-connect field");
+        }
+        sawDiagnosticDirectionalConnect = true;
+        MOZ_TRY(
+            ParseBoolean(parsed.mDiagnosticDirectionalConnect,
+                         "diagnostic-directional-connect must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -461,6 +470,14 @@ class JsonParser final {
     if (parsed.mProxies.Length() >= 2 &&
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
       return Error("listen addresses do not match multiple proxies");
+    }
+    if (parsed.mDiagnosticDirectionalConnect) {
+      for (const auto& proxy : parsed.mProxies) {
+        if (proxy.mProtocol != ProxyProtocol::H2) {
+          return Error(
+              "diagnostic-directional-connect requires explicit H2 proxies");
+        }
+      }
     }
     if (!sawPreamble) {
       bool hasExplicitH2Proxy = false;

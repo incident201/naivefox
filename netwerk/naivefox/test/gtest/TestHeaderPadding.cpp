@@ -105,4 +105,73 @@ TEST(NaiveFoxHeaderPadding, PreservesOutputOnRandomFailure)
   EXPECT_EQ(padding, "unchanged");
 }
 
+TEST(NaiveFoxHeaderPadding, ExactDirectionalConnectVector)
+{
+  const uint64_t values[] = {0x0cba9876543210, 0, 16};
+  size_t next = 0;
+  auto random = [&]() { return Some(values[next++]); };
+
+  nsCString upstream;
+  nsCString downstream;
+  nsCString token;
+  ASSERT_EQ(GenerateDirectionalConnectHeaderPadding(upstream, downstream, token,
+                                                    random),
+            NS_OK);
+  EXPECT_EQ(token, "!#$()+<>?@[]^");
+  EXPECT_EQ(upstream, "~7!!#$()+<>?@[]^");
+  EXPECT_EQ(downstream, "~7#!#$()+<>?@[]^~~~~~~~~~~~~~~~~");
+  EXPECT_EQ(next, std::size(values));
+  EXPECT_TRUE(MatchesDirectionalConnectHeaderPadding(
+      upstream, DirectionalConnectLane::Upstream, token));
+  EXPECT_TRUE(MatchesDirectionalConnectHeaderPadding(
+      downstream, DirectionalConnectLane::Downstream, token));
+}
+
+TEST(NaiveFoxHeaderPadding, DirectionalConnectMatcherRejectsNearMisses)
+{
+  const nsCString token("!#$()+<>?@[]^");
+  EXPECT_FALSE(MatchesDirectionalConnectHeaderPadding(
+      "~7!!#$()+<>?@[]"_ns, DirectionalConnectLane::Upstream, token));
+  EXPECT_FALSE(MatchesDirectionalConnectHeaderPadding(
+      "!7!!#$()+<>?@[]^"_ns, DirectionalConnectLane::Upstream, token));
+  EXPECT_FALSE(MatchesDirectionalConnectHeaderPadding(
+      "~7#!#$()+<>?@[]^"_ns, DirectionalConnectLane::Upstream, token));
+  EXPECT_FALSE(MatchesDirectionalConnectHeaderPadding(
+      "~7!!#$()+<>?@[]^"_ns, DirectionalConnectLane::Upstream,
+      "!#$()+<>?@[]}"_ns));
+  EXPECT_FALSE(MatchesDirectionalConnectHeaderPadding(
+      "~7!!#$()+<>?@[]^"_ns, DirectionalConnectLane::Upstream, "short"_ns));
+}
+
+TEST(NaiveFoxHeaderPadding, DirectionalConnectPreservesOutputsOnRandomFailure)
+{
+  nsCString upstream("upstream");
+  nsCString downstream("downstream");
+  nsCString token("token");
+  size_t call = 0;
+  auto failLength = [&]() -> Maybe<uint64_t> {
+    return call++ == 0 ? Some(uint64_t{0}) : Nothing();
+  };
+  EXPECT_EQ(GenerateDirectionalConnectHeaderPadding(upstream, downstream, token,
+                                                    failLength),
+            NS_ERROR_FAILURE);
+  EXPECT_EQ(upstream, "upstream");
+  EXPECT_EQ(downstream, "downstream");
+  EXPECT_EQ(token, "token");
+
+  call = 0;
+  auto failSecondLength = [&]() -> Maybe<uint64_t> {
+    if (call++ < 2) {
+      return Some(uint64_t{0});
+    }
+    return Nothing();
+  };
+  EXPECT_EQ(GenerateDirectionalConnectHeaderPadding(upstream, downstream, token,
+                                                    failSecondLength),
+            NS_ERROR_FAILURE);
+  EXPECT_EQ(upstream, "upstream");
+  EXPECT_EQ(downstream, "downstream");
+  EXPECT_EQ(token, "token");
+}
+
 }  // namespace mozilla::naivefox

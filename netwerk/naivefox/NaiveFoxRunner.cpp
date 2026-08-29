@@ -159,6 +159,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
         aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
     tunnelConfig.mDiagnosticOptimisticLocalReply =
         aConfig.mDiagnosticOptimisticLocalReply;
+    tunnelConfig.mDiagnosticDirectionalConnect =
+        aConfig.mDiagnosticDirectionalConnect;
   }
   return tunnelConfigs;
 }
