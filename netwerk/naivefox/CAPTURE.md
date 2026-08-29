@@ -36,23 +36,27 @@ the listed product policy and budgets.
 
 | Outer | Local ingress | Effective omitted-preamble policy | Safe artifact | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| H2 | SOCKS5 | `document-first-buffer-task-overlap` | `928f04b3ed5438f9` | 0.08477 | 0.41427 | 0.20445 | 0.09085 | 0.25202 |
-| H2 | HTTP CONNECT | `document-first-buffer-overlap` (`document-first-buffer-http-connect`) | `928f04b3ed5438f9` | 0.07979 | 0.39456 | 0.19401 | 0.08209 | 0.25309 |
-| H3 | SOCKS5 | `tree-native-parser-resource-committed-overlap`, six cached resources, 384 KiB | `88c03d0288557c3b` | 0.08109 | 0.36026 | 0.13928 | 0.14736 | 0.39905 |
-| H3 | HTTP CONNECT | `document-start-overlap`, 64 KiB (`document-start-http-connect`) | `88c03d0288557c3b` | 0.10896 | 0.55108 | 0.19621 | 0.14730 | 0.40795 |
+| H2 | SOCKS5 | `document-first-buffer-task-overlap` | `e026109117dd8141` | 0.08824 | 0.42884 | 0.19744 | 0.09826 | 0.27527 |
+| H2 | HTTP CONNECT | `document-first-buffer-overlap` (`document-first-buffer-http-connect`) | `e026109117dd8141` | 0.08222 | 0.42859 | 0.19466 | 0.09400 | 0.25955 |
+| H3 | SOCKS5 | `tree-native-parser-resource-committed-overlap`, six cached resources, 384 KiB | `8bc66f8738d559b2` | 0.07392 | 0.39623 | 0.13837 | 0.15011 | 0.39149 |
+| H3 | HTTP CONNECT | `tree-native-parser-resource-committed-overlap`, six cached resources, 384 KiB (`tree-native-parser-resource-committed-page-http-connect`) | `8bc66f8738d559b2` | 0.06375 | 0.40952 | 0.13753 | 0.14458 | 0.39012 |
 
-Both artifacts use seed `2026082950`, ten complete same-base smoke blocks,
+Both artifacts use seed `2026082968`, ten complete same-base smoke blocks,
 the 262144-byte `browser_page`, inner HTTPS/H2, Selenium, an unshaped isolated
 WSL namespace, loopback MTU 1500, disabled offloads, and fresh Firefox profiles.
 The reference browser was installed from the canonical upstream base as a CI
 artifact; no full Firefox build was performed. H2 contains Firefox A/B and the
-two defaults (40 participants). H3 additionally contains the required
-`document-start-overlap` causal control (50 participants). All capture-drop,
+two defaults (40 participants). H3 contains Firefox A/B, both defaults, and the
+required SOCKS5 and HTTP-CONNECT `document-start-overlap` causal controls (60
+participants). All capture-drop,
 network-mutation, transport-origin, inner-H2, and preamble-drain checks passed.
 Ten smoke blocks provide a uniform descriptive dashboard; they are below the
 30-block minimum and do not make a new paired-inference or absolute
 indistinguishability claim. Bootstrap intervals and diagnostics remain in each
-safe artifact's `arm-comparison.txt`.
+safe artifact's `arm-comparison.txt`. Both identify source revision
+`aa4bd846af3a76170aee845ce7f2a356f6c768ee`, NaiveFox build ID
+`929cd10f5dc1a5a286ba4d09ccc0c9c0`, and libxul digest
+`9df4dfb2b2b45475931a0155a8e336f5a8dcc1bb377e1d724eaa33785db7e39c`.
 
 This table is the single source of current residual numbers. A change to an
 implicit default, published runtime, fixture, capture policy, or residual view
@@ -2144,8 +2148,8 @@ The four-resource allowance, selection cap, and temporary harness expectations
 were removed; this result does not justify testing still smaller topologies.
 
 Applying the retained six-resource native-parser topology to the HTTP CONNECT
-listener is a promising H3 follow-up, but is not yet an implicit-default
-change. The experimental arm keeps the exact
+listener was first screened without changing the implicit default. The
+experimental arm kept the exact
 `tree-native-parser-resource-committed-overlap` product mode, dense page,
 six cached resources, 384-KiB budget, next-main-turn image activation, and
 first-complete-resource-body admission used by the SOCKS candidate; only the
@@ -2219,9 +2223,47 @@ after netem, the exact 20-ms/20-Mbit profile, eight successful proxy resets,
 and zero dropped or offload-oversized captures. These two-block gates are not
 inferential, but together with the six- and four-block default-size screens
 they reject a fixed-size or localhost-speed explanation and make the existing
-six-resource mode a viable H3 HTTP implicit-default candidate. Promotion still
-requires an incrementally built product and a fresh canonical four-row matrix;
-these screening rows must not be spliced into that dashboard.
+six-resource mode a viable H3 HTTP implicit-default candidate. These screening
+rows were not spliced into the dashboard; promotion required a fresh product
+build and canonical four-row campaign.
+
+That promotion was completed at revision `aa4bd846af3a`. Omitted-preamble H3
+now selects the same exact six-resource tree policy for SOCKS5, HTTP CONNECT,
+and mixed listeners; explicit preamble fields remain authoritative. The lean
+release product was rebuilt incrementally without a clobber or a Firefox
+build, and the staged package passed the complete runtime verifier. Product
+gtests passed 114/114 across 17 suites. The first staged verifier attempt is
+retained as a failed integration-fixture check: its root still returned the
+old text-only response, so the newly exact tree default correctly failed
+closed rather than silently admitting CONNECT. Rewriting that test root to
+the existing dense camouflage page restored the same documented stylesheet,
+deferred-script, and four-image contract; both H2 and H3 SOCKS/HTTP config
+tests and the full staged verifier then passed.
+
+The fresh canonical artifacts `e026109117dd8141` (H2) and
+`8bc66f8738d559b2` (H3), both seed `2026082968`, regenerated all four dashboard
+rows together. The H3 superblock retained both historical request-commit
+controls so the mechanism remained visible:
+
+| H3 arm in the canonical superblock | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SOCKS5 `document-start-overlap` control | 0.09075 | 0.58376 | 0.18757 | 0.13718 | 0.41942 |
+| SOCKS5 six-resource tree default | 0.07392 | 0.39623 | 0.13837 | 0.15011 | 0.39149 |
+| HTTP CONNECT `document-start-overlap` control | 0.08747 | 0.58210 | 0.18384 | 0.13771 | 0.39665 |
+| HTTP CONNECT six-resource tree default | 0.06375 | 0.40952 | 0.13753 | 0.14458 | 0.39012 |
+
+For HTTP CONNECT, the tree lowers packets 17--32 by 0.17258 and whole by
+0.00653 relative to its contemporaneous control. Relative to the preceding
+published HTTP default row, packets 17--32 fall from 0.55108 to 0.40952
+(25.7%), packets 1--32 from 0.19621 to 0.13753, and whole from 0.40795 to
+0.39012; packets 1--16 and 250 ms also improve in that cross-campaign
+dashboard comparison. Within the new matched block, the tree trades a small
+0.00687 increase in the 250-ms distance for the large non-overlapping packet
+gain. All 60 H3 participants passed capture-drop, network-mutation, QUIC
+origin, inner-H2, exact resource-commit, and normal-drain validation. Ten
+smoke blocks remain descriptive and below the 30-block inference minimum, so
+this promotes a robust default rather than claiming absolute
+indistinguishability.
 
 Several bring-up attempts produced no candidate result and must not be
 reinterpreted as measurements. A clean research objdir initially tried to
