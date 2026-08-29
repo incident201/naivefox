@@ -880,12 +880,18 @@ are opt-in screening diagnostics even in `research` mode. They are not added to
 the large default superblock: its five-member `off`/`gate`/`root` design keeps
 collection cost bounded and remains screening-only. `--multi-arm-arms` can opt
 a deliberate screening run into a different arm list without increasing every
-routine run.
+routine run. `tree-native-parser-resource-committed-page-http-connect` is the
+H3-only ingress-control alias for the six-resource page arm. It preserves the
+same preamble mode, path, cache policy, limits, and lifecycle validation while
+selecting the local HTTP CONNECT listener; a multi-arm run must include the
+matched `document-start-http-connect` control.
 
 Profiles have explicit participant roles. Direct H3 Firefox alone receives
 the local test Alt-Svc mapping; the NaiveFox process profile enables the real
 H3 stack without that mapping, and the workload browser uses only its
-fail-closed SOCKS PAC. The runner validates those generated profiles before
+exact-authority SOCKS or HTTP proxy PAC. Non-loopback traffic remains
+fail-closed and namespace-local browser control ports remain direct. The runner
+validates those generated profiles before
 capture and rejects inherited `AlternateServices.bin` state. Private run
 `5f45fb110cc57517` predated this role separation and stopped after exposing a
 second resumed QUIC route; all of its samples are invalid harness evidence.

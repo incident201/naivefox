@@ -573,6 +573,7 @@ class CamouflageHarnessTests(unittest.TestCase):
 
     def test_resource_committed_page_requires_deferred_image_opens(self):
         arm = "tree-native-parser-resource-committed-page"
+        http_arm = "tree-native-parser-resource-committed-page-http-connect"
         protocol = "h3"
         lines = [
             "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
@@ -622,6 +623,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             },
         }
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
+        SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
         prefixed_lines = [
             f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
         ]
@@ -1149,6 +1151,38 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertEqual(h3_config["preamble"]["mode"], "document-start-overlap")
         self.assertEqual(urlsplit(h3_config["proxy"]).scheme, "quic")
         self.assertTrue(h3_config["outer-session-gate"])
+
+    def test_http_connect_ingress_combines_with_h3_resource_page(self):
+        config = CONFIG.build_config(
+            "tree-native-parser-resource-committed-page-http-connect",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(urlsplit(config["proxy"]).scheme, "quic")
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-resource-committed-overlap",
+                "path": "/camouflage/index.html",
+                "max-assets": 6,
+                "max-bytes": 384 * 1024,
+                "cache-resources": True,
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "requires h3"):
+            CONFIG.build_config(
+                "tree-native-parser-resource-committed-page-http-connect",
+                "h2",
+                1080,
+                4433,
+                "fixture-user",
+                "fixture-pass",
+            )
 
     def test_http_connect_ingress_combines_with_response_header_admission(self):
         config = CONFIG.build_config(

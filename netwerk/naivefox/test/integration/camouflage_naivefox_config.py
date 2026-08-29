@@ -62,6 +62,7 @@ def build_config(
         "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-resource-committed-tree",
         "tree-native-parser-resource-committed-page",
+        "tree-native-parser-resource-committed-page-http-connect",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -94,6 +95,7 @@ def build_config(
             "tree-native-parser-preload-overlap-css, or "
             "tree-native-parser-document-start-overlap-css, or "
             "tree-native-parser-document-start-resource-tree, or "
+            "tree-native-parser-resource-committed-page-http-connect, or "
             "tree-native-parser-document-start-navigation-stop-css, or "
             "tree-native-parser-document-start-response-stop-css, or "
             "tree-native-parser-document-handoff-overlap-css, or "
@@ -127,6 +129,7 @@ def build_config(
         "tree-resource-committed-overlap-page",
         "tree-native-parser-resource-committed-tree",
         "tree-native-parser-resource-committed-page",
+        "tree-native-parser-resource-committed-page-http-connect",
         "tree-complete-resource-tree",
         "tree-early-overlap-resource-tree",
     ) and protocol != "h3":
@@ -210,7 +213,10 @@ def build_config(
             "max-bytes": RESOURCE_TREE_PREAMBLE_MAX_BYTES,
             "cache-resources": True,
         }
-    elif arm == "tree-native-parser-resource-committed-page":
+    elif arm in (
+        "tree-native-parser-resource-committed-page",
+        "tree-native-parser-resource-committed-page-http-connect",
+    ):
         preamble = {
             "mode": "off",
             "h3-mode": "tree-native-parser-resource-committed-overlap",
@@ -448,6 +454,7 @@ def build_config(
                 "document-first-buffer-http-connect",
                 "document-overlap-http-connect",
                 "document-start-http-connect",
+                "tree-native-parser-resource-committed-page-http-connect",
             )
             else f"socks://127.0.0.1:{socks_port}"
         ),
@@ -513,6 +520,7 @@ def main():
             "tree-native-parser-document-start-resource-tree",
             "tree-native-parser-resource-committed-tree",
             "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

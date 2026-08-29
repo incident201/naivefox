@@ -1031,6 +1031,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-resource-committed-tree",
         "tree-native-parser-resource-committed-page",
+        "tree-native-parser-resource-committed-page-http-connect",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -1069,6 +1070,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-resource-committed-overlap-page",
         "tree-native-parser-resource-committed-tree",
         "tree-native-parser-resource-committed-page",
+        "tree-native-parser-resource-committed-page-http-connect",
         "tree-complete-resource-tree",
         "tree-early-overlap-resource-tree",
     ) and protocol != "h3":
@@ -1096,6 +1098,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
+    if arm == "tree-native-parser-resource-committed-page-http-connect":
+        arm = "tree-native-parser-resource-committed-page"
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
