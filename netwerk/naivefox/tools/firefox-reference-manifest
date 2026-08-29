@@ -2,4 +2,4 @@ mode=nightly
 product=Firefox
 version=Mozilla Firefox 156.0a1
 url=https://download-installer.cdn.mozilla.net/pub/firefox/nightly/latest-mozilla-central/firefox-156.0a1.en-US.linux-x86_64.tar.xz
-archive_sha256=875b72793cf03f33a7ac4e3329329937a17d335381c2f4997a27f688143b71d0
+archive_sha256=d4919fa00401e3c1200a2c14797eb2d341f928711ba6c93dbc299d19e8915fc7
