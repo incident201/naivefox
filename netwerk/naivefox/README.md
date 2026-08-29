@@ -87,6 +87,10 @@ The supported config is a strict NaiveProxy-compatible subset:
   six parser-discovered resources, ordinary resource caching, and a 384 KiB
   aggregate safety budget. HTTP-CONNECT-only and mixed H3 listeners retain
   `document-start-overlap` with path `/` and a 64 KiB document budget. The
+  canonical H2/H3 by SOCKS5/HTTP-CONNECT residual matrix is maintained in
+  [Current implicit-default matrix](CAPTURE.md#current-implicit-default-matrix);
+  all four rows must be regenerated together whenever the implicit policy or
+  its measurement contract changes. The
   implicit cold-route gate applies to the selected H2 or H3 upstream, so one
   established outer session does not repeat the synthetic page for every
   tunnel. An

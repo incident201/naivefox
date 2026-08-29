@@ -26,6 +26,55 @@ captures use the receive copy so packet timestamps occur after netem rather
 than at the pre-qdisc transmit tap; metadata records the profile and capture
 copy policy.
 
+## Current implicit-default matrix
+
+This is the canonical current-default residual dashboard. Lower is closer to
+the same Firefox A/B controls in the same randomized block. The columns are
+packets 1--16, packets 17--32, packets 1--32, the first 250 ms, and the whole
+flow. Harness-only arm names in parentheses select the listener while keeping
+the listed product policy and budgets.
+
+| Outer | Local ingress | Effective omitted-preamble policy | Safe artifact | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| H2 | SOCKS5 | `document-first-buffer-task-overlap` | `928f04b3ed5438f9` | 0.08477 | 0.41427 | 0.20445 | 0.09085 | 0.25202 |
+| H2 | HTTP CONNECT | `document-first-buffer-overlap` (`document-first-buffer-http-connect`) | `928f04b3ed5438f9` | 0.07979 | 0.39456 | 0.19401 | 0.08209 | 0.25309 |
+| H3 | SOCKS5 | `tree-native-parser-resource-committed-overlap`, six cached resources, 384 KiB | `88c03d0288557c3b` | 0.08109 | 0.36026 | 0.13928 | 0.14736 | 0.39905 |
+| H3 | HTTP CONNECT | `document-start-overlap`, 64 KiB (`document-start-http-connect`) | `88c03d0288557c3b` | 0.10896 | 0.55108 | 0.19621 | 0.14730 | 0.40795 |
+
+Both artifacts use seed `2026082950`, ten complete same-base smoke blocks,
+the 262144-byte `browser_page`, inner HTTPS/H2, Selenium, an unshaped isolated
+WSL namespace, loopback MTU 1500, disabled offloads, and fresh Firefox profiles.
+The reference browser was installed from the canonical upstream base as a CI
+artifact; no full Firefox build was performed. H2 contains Firefox A/B and the
+two defaults (40 participants). H3 additionally contains the required
+`document-start-overlap` causal control (50 participants). All capture-drop,
+network-mutation, transport-origin, inner-H2, and preamble-drain checks passed.
+Ten smoke blocks provide a uniform descriptive dashboard; they are below the
+30-block minimum and do not make a new paired-inference or absolute
+indistinguishability claim. Bootstrap intervals and diagnostics remain in each
+safe artifact's `arm-comparison.txt`.
+
+This table is the single source of current residual numbers. A change to an
+implicit default, published runtime, fixture, capture policy, or residual view
+is incomplete until all four rows are rerun together under one declared
+measurement contract and this table is updated in the same logical change.
+Never splice a row from a different seed, reference, network profile, or
+workload into the current matrix; prior results remain in the chronological
+evidence below and in Git history.
+
+The campaign also retained its failed attempts. Two quick-reference H3 gates
+failed in direct Firefox with `connectionFailure` before NaiveFox ran, so they
+produced no candidate data and were rejected. The exact same-base reference
+was then installed without building Firefox. Three initial same-base H3 gates
+were rejected because the HTTP PAC proxied Selenium's local remote-control
+port, creating the sole outer QUIC identity before capture and therefore
+failing the client-Initial origin check. A 100-ms capture-readiness delay did
+not change that result and was removed. Restricting the PAC to the exact
+workload authority, keeping other namespace-local control ports direct, and
+keeping every non-loopback host fail-closed fixed the cause. One-block H2
+artifact `e8e45098f22f8a09` and H3 artifact `96c46e62fc03a3c7` then passed
+before the ten-block runs above.
+
 The first 20-ms/20-Mbit plumbing smoke, `e97a1bae045f29d8` (seed
 `20260828145`), successfully shaped and analyzed all four participants but
 exposed that profile fields were written only for NaiveFox-only diagnostics.
