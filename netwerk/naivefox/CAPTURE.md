@@ -2006,6 +2006,24 @@ channel semantics already match Firefox's normal priorities: stylesheet
 incremental delivery. Arbitrary urgency tuning is therefore not a justified
 follow-up. The wave counter and temporary validator grammar were removed.
 
+Preconstructing the dense page's CSS and script channels before opening either
+one is rejected in combination with the retained first-body CONNECT barrier.
+The tree callback created all six channel objects without `AsyncOpen`; after
+the script descriptor existed, one ordinary main-thread task opened CSS and
+script back-to-back, and the existing next-turn task then opened all four
+images. This is event-order based rather than a timer, resource-size threshold,
+or response wait, and was intended to let Necko coalesce the two blocking H3
+requests as the direct Firefox trace does. The lifecycle validator proved that
+all channels were prepared first, both blocking opens preceded the image opens,
+every request committed, and the first complete resource body still preceded
+CONNECT. Nevertheless, shaped one-block artifact `1fb93ac539c0cff8` measured
+0.21981/0.34961/0.25818/0.28214/0.46133. Both packets 17--32 and whole regress
+against the retained replicated 0.29471/0.34363, so the mechanism is not a
+candidate for size/slow-link replication. The measured binary identified build
+ID `37f71f6fdd3b042e747ad79090e0041e` and libxul digest
+`024d7d4c9a4c8184a73e0a28236bcf888e04e97f2f9e02a6c31c600ca5ae53d7`.
+The preconstruction state and its temporary validator grammar were removed.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
