@@ -1917,18 +1917,33 @@ request-commit, and terminal-drain validation, so the rejection is numerical
 rather than a lifecycle failure. The full-tree IPC and wave scheduler are
 removed rather than retained as dormant product complexity.
 
-A fresh retained-candidate decrypted capture did not pass strict admission and
-must not be treated as wire evidence. Private artifact
+A retained-candidate decrypted capture initially did not pass strict admission
+and must not be treated as wire evidence. Private artifact
 `20260828T220612Z-2af3b849` logged all six request commits, first resource body
 progress on the deferred-script stream, successful CONNECT admission, and a
-normal six-resource drain. The pcap decoder, however, could not assign one
-coalesced response HEADERS occurrence unambiguously to every asset stream, so
-`h3_decrypted_arm_summary.py` failed closed with missing asset response-header
-evidence. Manual private inspection suggests the next hypothesis only: the
-candidate issued CSS/script and all four image GETs in a dense early cluster,
-whereas the direct reference issued its image GETs later in two groups after
-blocking-resource response progress. No result from this failed trace enters
-the passive table or validates a production change.
+normal six-resource drain. A fresh reproduction,
+`20260829T021624Z-605b5eb7`, exposed the actual harness defect: the generic tree
+validator still expected exactly two asset responses for the dense page arm,
+so it rejected all six correctly decoded responses with the same missing-header
+message. Revision `bcf08666f1b7` gives this arm its explicit six-response
+contract and adds a regression test; neither failed private trace enters the
+passive table or validates a production change.
+
+The corrected strict run passed as sanitized decrypted artifact
+`20260829T021917Z-03764004`. It proves one QUIC identity and ClientHello, seven
+ordered GETs, all six asset response HEADERS, one normal resource drain, and
+CONNECT after every cover GET but before the final two response HEADERS. The
+wire sequence identifies the remaining scheduling gap without exposing header
+values: the candidate issued CSS/script 5.600/5.707 ms after its first H3 event
+and all four image GETs by 6.062 ms. Direct Firefox issued CSS/script together
+at 24.970 ms and its image group at 27.721--28.774 ms. Candidate CONNECT then
+appeared at 7.567 ms; later CONNECT streams belong to additional inner-browser
+connections and do not invalidate the first tunnel. The binary identified
+build ID `b8dcfa8525b93374ed9e0c34cb5e344b` and libxul digest
+`f2f2ab2cc9b0395be9b109fcf052e5108db3657b0b8593a985e0d79e2e70bb34`.
+This rejects body-callback granularity as the explanation and motivates
+separating early outer CONNECT establishment from the retained body-progress
+gate for local SOCKS success, rather than fitting the observed millisecond gap.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
