@@ -197,9 +197,14 @@ H2 sequence check. It uses the isolated namespace and mutation monitor,
 requires healthy loss-free capture, verifies one TCP/H2 connection, `h2` ALPN,
 equal client SETTINGS, padding, and per-stream preamble GET/CONNECT ordering,
 then exports only a sanitized event sequence with relative timing and a
-summary. Both reference and
-inner Firefox use an explicitly recorded cold command-line start after capture
-begins; the diagnostic never silently mixes that cohort with warm Selenium.
+summary. Its default keeps both reference and inner Firefox on an explicitly
+recorded cold command-line start after capture begins. Select
+`--browser-backend selenium` to pre-launch both browsers, wait for controller
+readiness before capture, and navigate only after capture starts. The selected
+startup cohort is recorded in safe metadata and the runner never silently
+mixes the two contracts. The pre-launched option is restricted to the
+`browser_page` reference; the fixed `fronting_page` resource-tree comparison
+continues to use the command-line cohort.
 Tree admission privately verifies the document plus same-origin CSS/JS
 `Referer`, `Sec-Fetch-*`, exact document `Priority: u=0, i`, and naturally
 computed resource `Priority: u=2` semantics;

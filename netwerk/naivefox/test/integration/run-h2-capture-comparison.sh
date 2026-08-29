@@ -8,11 +8,13 @@ init_paths
 original_args=("$@")
 
 arm=root
+browser_backend=commandline
 while [[ $# -gt 0 ]]; do
   case $1 in
     --arm) arm=${2:-}; shift 2 ;;
+    --browser-backend) browser_backend=${2:-}; shift 2 ;;
     --help)
-      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-resource-tree]\n' "$0"
+      printf 'usage: %s [--arm gate|root|document-complete|document-start-overlap|tree-complete|tree-early-overlap|tree-root-overlap|tree-overlap|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-resource-tree] [--browser-backend commandline|selenium]\n' "$0"
       exit 0
       ;;
     *) printf 'unknown H2 comparison argument: %s\n' "$1" >&2; exit 2 ;;
@@ -22,6 +24,15 @@ case $arm in
   gate | root | document-complete | document-start-overlap | tree-complete | tree-early-overlap | tree-root-overlap | tree-overlap | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-resource-tree) ;;
   *) printf 'unsupported H2 diagnostic arm: %s\n' "$arm" >&2; exit 2 ;;
 esac
+case $browser_backend in
+  commandline | selenium) ;;
+  *) printf 'unsupported H2 browser backend: %s\n' "$browser_backend" >&2; exit 2 ;;
+esac
+if [[ $browser_backend == selenium &&
+      $arm == tree-native-parser-document-start-resource-tree ]]; then
+  printf 'pre-launched H2 Selenium diagnostic requires browser_page\n' >&2
+  exit 2
+fi
 
 reference_scenario=browser_page
 preamble_path=/camouflage/index.html
@@ -76,6 +87,17 @@ REFERENCE_OBJDIR=${NAIVEFOX_CAPTURE_REFERENCE_OBJDIR:-}
 REFERENCE_LIBDIR=${NAIVEFOX_CAPTURE_REFERENCE_LIBDIR:-$(dirname "$REFERENCE_BIN")}
 NAIVEFOX_BIN=${NAIVEFOX_CAPTURE_NAIVEFOX_BIN:-$OBJDIR/dist/bin/naivefox}
 NAIVEFOX_LIBDIR=${NAIVEFOX_CAPTURE_NAIVEFOX_LIBDIR:-$OBJDIR/dist/bin}
+browser_python=${NAIVEFOX_CAMOUFLAGE_PYTHON:-}
+if [[ -z $browser_python && -x "$OBJDIR/camouflage-venv/bin/python" ]]; then
+  browser_python="$OBJDIR/camouflage-venv/bin/python"
+fi
+browser_python=${browser_python:-$(command -v python3)}
+if [[ $browser_backend == selenium ]]; then
+  "$browser_python" -c 'import selenium' || {
+    printf 'pre-launched H2 diagnostic requires Selenium\n' >&2
+    exit 1
+  }
+fi
 for artifact in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
                 "$REFERENCE_LIBDIR/libxul.so" "$NAIVEFOX_BIN" \
                 "$NAIVEFOX_LIBDIR/libssl3.so" "$NAIVEFOX_LIBDIR/libxul.so"; do
@@ -117,6 +139,8 @@ network_monitor_ready=
 network_monitor_done=
 firefox_pid=
 naivefox_pid=
+controller_pid=
+controller_stop=
 success=0
 
 source_worktree_dirty() {
@@ -255,6 +279,7 @@ cleanup() {
   local status=$?
   stop_capture || status=1
   stop_network_monitor || status=1
+  stop_controller || status=1
   stop_pid "$firefox_pid"
   stop_pid "$naivefox_pid"
   "$INTEGRATION_DIR/stop.sh" --quiet || true
@@ -293,6 +318,35 @@ wait_for_log() {
     sleep 0.1
   done
   return 1
+}
+
+wait_for_marker() {
+  local path=$1 pid=$2 description=$3
+  for ((i = 0; i < 400; i++)); do
+    [[ -s $path ]] && return 0
+    kill -0 "$pid" 2>/dev/null || {
+      printf '%s exited before readiness\n' "$description" >&2
+      return 1
+    }
+    sleep 0.1
+  done
+  printf 'timed out waiting for %s\n' "$description" >&2
+  return 1
+}
+
+stop_controller() {
+  [[ -n $controller_pid ]] || return 0
+  [[ -z $controller_stop ]] || : >"$controller_stop"
+  if ! timeout 20 tail --pid="$controller_pid" -f /dev/null; then
+    printf 'H2 Firefox controller did not stop cleanly\n' >&2
+    stop_pid "$controller_pid"
+    controller_pid=
+    controller_stop=
+    return 1
+  fi
+  wait "$controller_pid"
+  controller_pid=
+  controller_stop=
 }
 
 make_profile() {
@@ -334,6 +388,42 @@ run_reference() {
   local log="$capture_dir/reference-firefox.log"
   make_profile "$profile" reference
   : >"$keys"; : >"$log"; chmod 0600 "$keys" "$log"
+  if [[ $browser_backend == selenium ]]; then
+    local token ready navigate done
+    token=$(openssl rand -hex 16)
+    ready="$capture_dir/reference-ready.json"
+    navigate="$capture_dir/reference-navigate"
+    done="$capture_dir/reference-done"
+    controller_stop="$capture_dir/reference-stop"
+    : >"$capture_dir/reference-webdriver.log"
+    : >"$capture_dir/reference-controller.log"
+    chmod 0600 "$capture_dir/reference-webdriver.log" \
+      "$capture_dir/reference-controller.log"
+    env "SSLKEYLOGFILE=$keys" "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" \
+      "${firefox_runtime_env[@]}" MOZ_HEADLESS=1 \
+      "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+      --binary "$REFERENCE_BIN" --profile "$profile" --backend selenium \
+      --protocol h2 --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+      --url "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=$reference_scenario&completion=$token" \
+      --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$token" \
+      --ready-file "$ready" --navigate-file "$navigate" --done-file "$done" \
+      --stop-file "$controller_stop" --browser-log "$log" \
+      --webdriver-log "$capture_dir/reference-webdriver.log" --timeout 35 \
+      >"$capture_dir/reference-controller.log" 2>&1 &
+    controller_pid=$!
+    wait_for_marker "$ready" "$controller_pid" \
+      'direct H2 Firefox controller'
+    start_network_monitor reference
+    start_capture "$pcap" "$capture_dir/reference-dumpcap.log"
+    : >"$navigate"
+    wait_for_marker "$done" "$controller_pid" \
+      'direct H2 Firefox navigation'
+    sleep 0.25
+    stop_capture
+    stop_network_monitor
+    stop_controller
+    return
+  fi
   start_network_monitor reference
   start_capture "$pcap" "$capture_dir/reference-dumpcap.log"
   set +e
@@ -374,27 +464,65 @@ run_candidate() {
       --socks-port "$socks_port" --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT"
   : >"$keys"; : >"$log"; : >"$browser_log"
   chmod 0600 "$keys" "$log" "$browser_log"
-  start_network_monitor "$arm"
-  start_capture "$pcap" "$capture_dir/$arm-dumpcap.log"
-  env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
-    "SSLKEYLOGFILE=$keys" "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
-    NAIVEFOX_PROFILE="$profile" "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
-  naivefox_pid=$!
-  wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
-  set +e
-  timeout 35 env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
-    "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
-    "$REFERENCE_BIN" --headless --new-instance --no-remote \
-    --profile "$browser_profile" --screenshot "$capture_dir/$arm.png" \
-    "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&arm=$arm" \
-    >"$browser_log" 2>&1 &
-  firefox_pid=$!
-  wait "$firefox_pid"
-  local browser_status=$?
-  firefox_pid=
-  set -e
-  [[ $browser_status -eq 0 || $browser_status -eq 124 ]] || \
-    printf 'inner Firefox status=%s; evaluating H2 evidence\n' "$browser_status" >&2
+  if [[ $browser_backend == selenium ]]; then
+    local token ready navigate done
+    token=$(openssl rand -hex 16)
+    ready="$capture_dir/$arm-ready.json"
+    navigate="$capture_dir/$arm-navigate"
+    done="$capture_dir/$arm-done"
+    controller_stop="$capture_dir/$arm-stop"
+    : >"$capture_dir/$arm-webdriver.log"
+    : >"$capture_dir/$arm-controller.log"
+    chmod 0600 "$capture_dir/$arm-webdriver.log" \
+      "$capture_dir/$arm-controller.log"
+    env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+      "SSLKEYLOGFILE=$keys" "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
+      NAIVEFOX_PROFILE="$profile" "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
+    naivefox_pid=$!
+    wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
+    env -u SSLKEYLOGFILE "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" \
+      "${firefox_runtime_env[@]}" MOZ_HEADLESS=1 \
+      "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
+      --binary "$REFERENCE_BIN" --profile "$browser_profile" \
+      --backend selenium --protocol h2 \
+      --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" --socks-port "$socks_port" \
+      --url "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&arm=$arm&completion=$token" \
+      --completion-file "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$token" \
+      --ready-file "$ready" --navigate-file "$navigate" --done-file "$done" \
+      --stop-file "$controller_stop" --browser-log "$browser_log" \
+      --webdriver-log "$capture_dir/$arm-webdriver.log" --timeout 35 \
+      >"$capture_dir/$arm-controller.log" 2>&1 &
+    controller_pid=$!
+    wait_for_marker "$ready" "$controller_pid" \
+      'SOCKS H2 Firefox controller'
+    start_network_monitor "$arm"
+    start_capture "$pcap" "$capture_dir/$arm-dumpcap.log"
+    : >"$navigate"
+    wait_for_marker "$done" "$controller_pid" \
+      'SOCKS H2 Firefox navigation'
+  else
+    start_network_monitor "$arm"
+    start_capture "$pcap" "$capture_dir/$arm-dumpcap.log"
+    env -u NAIVEFOX_PROXY_USER -u NAIVEFOX_PROXY_PASS \
+      "SSLKEYLOGFILE=$keys" "LD_LIBRARY_PATH=$NAIVEFOX_LIBDIR" \
+      NAIVEFOX_PROFILE="$profile" "$NAIVEFOX_BIN" "$config" >"$log" 2>&1 &
+    naivefox_pid=$!
+    wait_for_log "$naivefox_pid" "$log" '^SOCKS5 listening on '
+    set +e
+    timeout 35 env -u SSLKEYLOGFILE "${firefox_runtime_env[@]}" \
+      "LD_LIBRARY_PATH=$REFERENCE_LIBDIR" MOZ_HEADLESS=1 \
+      "$REFERENCE_BIN" --headless --new-instance --no-remote \
+      --profile "$browser_profile" --screenshot "$capture_dir/$arm.png" \
+      "https://localhost:$NAIVEFOX_FIXTURE_HTTPS_PORT/camouflage/index.html?scenario=browser_page&arm=$arm" \
+      >"$browser_log" 2>&1 &
+    firefox_pid=$!
+    wait "$firefox_pid"
+    local browser_status=$?
+    firefox_pid=
+    set -e
+    [[ $browser_status -eq 0 || $browser_status -eq 124 ]] || \
+      printf 'inner Firefox status=%s; evaluating H2 evidence\n' "$browser_status" >&2
+  fi
   if [[ $arm == tree-root-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble root-overlap drain=complete completed_resources=2 protocol=h2$'
@@ -414,6 +542,7 @@ run_candidate() {
   sleep 0.25
   stop_capture
   stop_network_monitor
+  stop_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
   rg -q '^Outer protocol: h2$' "$log"
@@ -592,8 +721,12 @@ python3 "$INTEGRATION_DIR/h2_decrypted_parity_summary.py" \
   printf 'network_mutation_monitor=netlink_route_v1_fail_closed\n'
   printf 'capture_offload_policy=namespace_loopback_mtu_1500_gro_gso_tso_udp_gso_disabled\n'
   printf 'capture_drop_policy=reject_nonzero\n'
-  printf 'browser_backend=commandline\n'
-  printf 'browser_start_state=cold_after_capture_start_both_cohorts\n'
+  printf 'browser_backend=%s\n' "$browser_backend"
+  if [[ $browser_backend == selenium ]]; then
+    printf 'browser_start_state=ready_before_capture_navigation_after_capture\n'
+  else
+    printf 'browser_start_state=cold_after_capture_start_both_cohorts\n'
+  fi
   printf 'capture_revision=%s\n' "$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
   printf 'capture_worktree_dirty=%s\n' "$(source_worktree_dirty)"
   printf 'capture_source_state_sha256=%s\n' "$(source_state_sha256)"
