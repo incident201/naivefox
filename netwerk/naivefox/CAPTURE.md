@@ -55,7 +55,10 @@ versus coherent nominal separately exposes the historical fourth-response
 shape change and must not be described as a pure size comparison. A secondary
 endpoint screen uses only coherent small and coherent large at 20-ms one-way
 delay and 20 Mbit/s, seed `2026082972`, and four blocks. No default promotion
-or acceptable-size guarantee will be inferred from these screening runs.
+or acceptable-size guarantee will be inferred from these screening runs. Each
+fixture first passes a live byte-count and MIME preflight outside the capture;
+declared sizes alone are not accepted as evidence that the intended profile
+was served.
 
 ## Current implicit-default matrix
 

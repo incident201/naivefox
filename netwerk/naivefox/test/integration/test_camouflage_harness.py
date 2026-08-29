@@ -2360,6 +2360,12 @@ class CamouflageHarnessTests(unittest.TestCase):
             "outer_resource_body_bytes_excluding_root=",
             suite,
         )
+        self.assertIn("validate_outer_resource_fixture", suite)
+        self.assertIn("outer_resource_profile_preflight=", suite)
+        self.assertLess(
+            suite.index("validate_outer_resource_fixture", suite.index("for protocol in")),
+            suite.index("apply_network_profile", suite.index("for protocol in")),
+        )
 
         class ResponseRecorder:
             def __init__(self):

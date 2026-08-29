@@ -531,6 +531,10 @@ aggregate excluding the small root is exactly 17 units and remains below the
 384-KiB product budget. Omitting the option preserves the historical measured
 fixture exactly, including its 34-byte JSON fourth image response. Sanitized
 metadata records the selected profile, each body size, and the aggregate.
+Before network shaping or capture begins, the runner downloads all six bodies
+from the isolated target and fails closed unless their actual byte counts and
+MIME types match that metadata; the number of validated protocol fixtures is
+also recorded.
 
 For an isolated link-robustness check, add `--network-one-way-delay-ms N`,
 `--network-rate-mbit N`, or both. Network shaping is rejected unless

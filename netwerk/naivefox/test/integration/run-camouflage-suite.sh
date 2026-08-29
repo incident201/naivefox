@@ -662,6 +662,8 @@ outer_script_body_bytes=0
 outer_image_body_bytes=0
 outer_fourth_body_bytes=0
 outer_resource_body_bytes_excluding_root=0
+outer_resource_profile_preflight=not_applicable
+outer_resource_profile_validated_protocols=0
 if [[ $dense_resource_tree_experiment == 1 ]]; then
   if [[ -n $outer_resource_unit_size ]]; then
     outer_resource_profile=coherent_valid_images
@@ -938,6 +940,52 @@ apply_network_profile() {
     }
   fi
   network_profile_applied_protocols=$((network_profile_applied_protocols + 1))
+}
+
+validate_outer_resource_fixture() {
+  [[ $dense_resource_tree_experiment == 1 ]] || return 0
+  local base="http://127.0.0.1:$NAIVEFOX_FIXTURE_HTTP_PORT"
+  local path
+  local expected_size
+  local expected_type
+  local status
+  local actual_size
+  local actual_type
+  local -a checks=(
+    "/camouflage/fronting.css|$outer_style_body_bytes|text/css"
+    "/camouflage/fronting.js|$outer_script_body_bytes|application/javascript"
+    "/camouflage/fronting.svg?item=1|$outer_image_body_bytes|image/svg+xml"
+    "/camouflage/fronting.svg?item=2|$outer_image_body_bytes|image/svg+xml"
+    "/camouflage/fronting.svg?item=3|$outer_image_body_bytes|image/svg+xml"
+  )
+  if [[ $outer_resource_profile == coherent_valid_images ]]; then
+    checks+=(
+      "/camouflage/api?item=4|$outer_fourth_body_bytes|image/svg+xml"
+    )
+  else
+    checks+=(
+      "/camouflage/api?item=4|$outer_fourth_body_bytes|application/json"
+    )
+  fi
+  for check in "${checks[@]}"; do
+    IFS='|' read -r path expected_size expected_type <<<"$check"
+    IFS=$'\t' read -r status actual_size actual_type < <(
+      curl --silent --show-error --fail --output /dev/null \
+        --write-out '%{http_code}\t%{size_download}\t%{content_type}\n' \
+        "$base$path"
+    )
+    if [[ $status != 200 || $actual_size != "$expected_size" ||
+          $actual_type != "$expected_type" ]]; then
+      printf 'outer resource preflight mismatch for %s: expected 200/%s/%s, got %s/%s/%s\n' \
+        "$path" "$expected_size" "$expected_type" \
+        "$status" "$actual_size" "$actual_type" >&2
+      return 1
+    fi
+  done
+  outer_resource_profile_preflight=passed
+  outer_resource_profile_validated_protocols=$((
+    outer_resource_profile_validated_protocols + 1
+  ))
 }
 
 stop_pid() {
@@ -2429,6 +2477,7 @@ for protocol in "${protocols[@]}"; do
   run_dir=$(<"$ACTIVE_RUN_FILE")
   # shellcheck source=/dev/null
   source "$run_dir/fixture.env"
+  validate_outer_resource_fixture
   apply_network_profile
   if [[ $protocol == h2 &&
         ( $NAIVEFOX_FIXTURE_PROTOCOLS != h2 ||
@@ -2928,6 +2977,8 @@ outer_script_body_bytes=$outer_script_body_bytes
 outer_image_body_bytes=$outer_image_body_bytes
 outer_fourth_body_bytes=$outer_fourth_body_bytes
 outer_resource_body_bytes_excluding_root=$outer_resource_body_bytes_excluding_root
+outer_resource_profile_preflight=$outer_resource_profile_preflight
+outer_resource_profile_validated_protocols=$outer_resource_profile_validated_protocols
 cache_condition=$cache_condition
 fixture_proxy_reset_policy=$fixture_proxy_reset_policy
 fixture_proxy_restart_count=$proxy_restart_count
