@@ -3250,6 +3250,33 @@ fail-closed exact-target PAC scope. The complete harness then passed 122/122
 tests before the successful audit above. This is harness provenance, not a
 candidate residual measurement.
 
+A proposed asymmetric reuse of the outer root response was also rejected by
+the mandatory causal-history preflight without implementation. The suggested
+shape would keep the ordinary root `GET` response open as the
+target-to-client lane and use a separately paired `CONNECT` only for
+client-to-target bytes. Although that exact arm name had not appeared before,
+all of its wire-changing causes are already bracketed by admitted failures:
+the paired two-stream tunnel improved the SOCKS focus/Whole views by only
+11.7%/6.4% in `a9ffaf1c49a77777`; the ordinary-GET carrier was neutral for
+SOCKS and traded a 17.2% HTTP focus gain for a 14.2% Whole regression in
+`9a73f27ea029dcd5`; the retained-open bounded response carrier worsened every
+reported HTTP view in `59cb2995524f019d`; and CSS/JS resource interleaving
+collapsed to -6.5%/-2.7% for SOCKS and -2.9%/+0.7% for HTTP in four-block
+replication `7a9df73a476bf808`.
+
+The decrypted direct-H2 audit above also contradicts the proposed causal
+model: Firefox completed its small root DATA stream before issuing the later
+resource-request wave. Keeping that root response alive for tunneled target
+bytes would therefore invent a stable half-duplex carrier rather than copy a
+native Firefox stream lifecycle. It would additionally require a new
+cross-channel backpressure, half-close, and pairing layer in both client and
+Caddy while combining two changes that individually fell below the 20%
+compatibility-break threshold. There is no untested causal premise here which
+justifies that cost, so no product, server, harness, build, or capture work was
+started. Future preflight must treat root/resource-response reuse, including
+renaming a real resource as the downstream lane, as this rejected hybrid
+rather than retrying its component mechanisms.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
