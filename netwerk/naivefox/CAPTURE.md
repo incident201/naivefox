@@ -1946,6 +1946,19 @@ This rejects body-callback granularity as the explanation and motivates
 separating early outer CONNECT establishment from the retained body-progress
 gate for local SOCKS success, rather than fitting the observed millisecond gap.
 
+Private event-trace diagnostic `20260829T031759Z-3c779253` intentionally added
+verbose `nsHttp` logging to the retained six-resource candidate and published
+no passive distances. The extra logging changed callback interleaving enough
+that the first valid stylesheet body buffer was consumed after its own request
+commit but before the four image commits; the product correctly waited for all
+six commits before firing its barrier, while the harness incorrectly required
+every commit before that first body marker. Validation now expresses the real
+causal contract per stream: each resource opens before its own commit, the
+body-producing stream commits before its body callback, and both the body event
+and all six commits precede the barrier. A regression test accepts this valid
+interleaving and still rejects body progress before the producing request
+commits. The temporary verbose-trace arm selection was removed.
+
 That separation is rejected after a one-block shaped screen. All six cover
 transactions first had to commit, which opened the outer CONNECT stream; the
 SOCKS success callback and tunnel pump remained explicitly blocked until the

@@ -2423,14 +2423,39 @@ def validate_sample(arm, protocol, log_text, feature_document):
         )
         if arm == "tree-native-parser-resource-committed-page":
             first_body = parsed_native_resource_tree_first_bodies[0]
+            first_body_stream = int(first_body["stream"])
             first_body_index = log_lines.index(
                 native_resource_tree_first_body_lines[0]
             )
             body_barrier_index = log_lines.index(
                 native_resource_tree_body_barrier_lines[0]
             )
+            open_index_by_stream = {
+                int(marker["stream"]): log_lines.index(line)
+                for line, marker in zip(
+                    native_resource_tree_open_lines,
+                    parsed_native_resource_tree_opens,
+                )
+            }
+            open_index_by_stream.update(
+                {
+                    int(marker["stream"]): log_lines.index(line)
+                    for line, marker in zip(
+                        native_resource_tree_deferred_open_lines,
+                        parsed_native_resource_tree_deferred_opens,
+                    )
+                }
+            )
+            commit_index_by_stream = {
+                int(marker["stream"]): log_lines.index(line)
+                for line, marker in zip(
+                    native_resource_tree_commit_lines,
+                    parsed_native_resource_tree_commits,
+                )
+            }
             resource_committed_order = (
                 first_body["protocol"] == protocol
+                and first_body_stream in expected_resources
                 and native_resource_tree_body_barrier_lines[0].endswith(
                     "Preamble native-parser-resource-tree "
                     "barrier=first-resource-body-buffer assets=6 committed=6 "
@@ -2438,8 +2463,15 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 )
                 and descriptor_index < min(open_indices)
                 and max(open_indices) < min(deferred_open_indices)
-                and max(deferred_open_indices) < min(commit_indices)
-                and max(commit_indices) < first_body_index < body_barrier_index
+                and all(
+                    open_index_by_stream[stream]
+                    < commit_index_by_stream[stream]
+                    for stream in expected_resources
+                )
+                and commit_index_by_stream[first_body_stream]
+                < first_body_index
+                and max(commit_indices) < body_barrier_index
+                and first_body_index < body_barrier_index
                 and body_barrier_index < admission_index
                 and admission_index < result_index < established_index
                 and result_index < drain_index

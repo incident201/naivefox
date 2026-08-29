@@ -629,6 +629,21 @@ class CamouflageHarnessTests(unittest.TestCase):
             arm, protocol, "\n".join(prefixed_lines), features
         )
 
+        body_before_later_commits = list(lines)
+        first_body = body_before_later_commits.pop(17)
+        body_before_later_commits.insert(13, first_body)
+        SAMPLE.validate_sample(
+            arm, protocol, "\n".join(body_before_later_commits), features
+        )
+
+        body_before_own_commit = list(lines)
+        first_body = body_before_own_commit.pop(17)
+        body_before_own_commit.insert(11, first_body)
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            SAMPLE.validate_sample(
+                arm, protocol, "\n".join(body_before_own_commit), features
+            )
+
         missing_first_body = [
             line
             for line in lines
