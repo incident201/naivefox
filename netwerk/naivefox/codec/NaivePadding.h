@@ -14,6 +14,7 @@
 namespace mozilla::net::naivefox {
 
 inline constexpr size_t kNaivePaddedRecordCount = 8;
+inline constexpr size_t kNaiveDelayedPaddedRecordCount = 16;
 inline constexpr size_t kNaiveMaxPayloadLength = 65535;
 inline constexpr size_t kNaiveMaxPaddingLength = 255;
 inline constexpr size_t kNaiveMaxRecordLength =
@@ -23,6 +24,11 @@ enum class PaddingCodecStatus : uint8_t {
   Ok,
   RandomFailure,
   TruncatedRecord,
+};
+
+enum class NaivePaddingMode : uint8_t {
+  Legacy,
+  Delayed,
 };
 
 struct PaddingCodecResult {
@@ -44,7 +50,9 @@ class SystemPaddingLengthGenerator final : public PaddingLengthGenerator {
 
 class NaivePaddingEncoder final {
  public:
-  explicit NaivePaddingEncoder(PaddingLengthGenerator& aGenerator);
+  explicit NaivePaddingEncoder(
+      PaddingLengthGenerator& aGenerator,
+      NaivePaddingMode aMode = NaivePaddingMode::Legacy);
 
   PaddingCodecResult Encode(Span<const uint8_t> aInput, Span<uint8_t> aOutput);
 
@@ -54,6 +62,7 @@ class NaivePaddingEncoder final {
 
  private:
   PaddingLengthGenerator& mGenerator;
+  const NaivePaddingMode mMode;
   std::array<uint8_t, kNaiveMaxRecordLength> mPending{};
   size_t mPendingOffset = 0;
   size_t mPendingLength = 0;
@@ -63,6 +72,10 @@ class NaivePaddingEncoder final {
 
 class NaivePaddingDecoder final {
  public:
+  explicit NaivePaddingDecoder(
+      NaivePaddingMode aMode = NaivePaddingMode::Legacy)
+      : mMode(aMode) {}
+
   PaddingCodecResult Decode(Span<const uint8_t> aInput, Span<uint8_t> aOutput);
   PaddingCodecStatus Finish();
 
@@ -75,6 +88,7 @@ class NaivePaddingDecoder final {
 
   void CompleteRecord();
 
+  const NaivePaddingMode mMode;
   std::array<uint8_t, 3> mHeader{};
   size_t mHeaderLength = 0;
   size_t mPayloadRemaining = 0;

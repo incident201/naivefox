@@ -19,4 +19,14 @@ nsresult NegotiatePayloadPadding(int32_t aConnectCode,
   return NS_OK;
 }
 
+nsresult NegotiateDelayedPaddingPhase(bool aRequested, bool aAccepted,
+                                      bool aPaddingEnabled, bool& aEnabled) {
+  aEnabled = false;
+  if (aRequested != aAccepted || (aRequested && !aPaddingEnabled)) {
+    return NS_ERROR_FAILURE;
+  }
+  aEnabled = aRequested;
+  return NS_OK;
+}
+
 }  // namespace mozilla::naivefox

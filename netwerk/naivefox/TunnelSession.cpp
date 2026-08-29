@@ -88,6 +88,7 @@ nsCString MakeOuterGateKey(const TunnelConfig& aConfig,
 
 using net::naivefox::NaivePaddingDecoder;
 using net::naivefox::NaivePaddingEncoder;
+using net::naivefox::NaivePaddingMode;
 using net::naivefox::PaddingCodecStatus;
 using net::naivefox::SystemPaddingLengthGenerator;
 
@@ -101,7 +102,8 @@ class PumpDirection final : public nsIInputStreamCallback,
   NS_DECL_NSIOUTPUTSTREAMCALLBACK
 
   PumpDirection(DuplexPump* aOwner, nsIAsyncInputStream* aInput,
-                nsIAsyncOutputStream* aOutput, bool aEncode, bool aDecode);
+                nsIAsyncOutputStream* aOutput, bool aEncode, bool aDecode,
+                NaivePaddingMode aPaddingMode);
 
   nsresult Start(Span<const uint8_t> aInitial = {});
   void Cancel();
@@ -135,7 +137,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
 
   DuplexPump(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
              nsIAsyncInputStream* aTunnelIn, nsIAsyncOutputStream* aTunnelOut,
-             bool aPaddingEnabled,
+             bool aPaddingEnabled, NaivePaddingMode aPaddingMode,
              std::function<void()>&& aOnUpstreamApplicationActive,
              std::function<void()>&& aOnDownstreamApplicationActive,
              std::function<void(nsresult)>&& aOnClose)
@@ -144,15 +146,17 @@ class DuplexPump final : public RefCounted<DuplexPump> {
         mTunnelIn(aTunnelIn),
         mTunnelOut(aTunnelOut),
         mPaddingEnabled(aPaddingEnabled),
+        mPaddingMode(aPaddingMode),
         mOnUpstreamApplicationActive(std::move(aOnUpstreamApplicationActive)),
         mOnDownstreamApplicationActive(
             std::move(aOnDownstreamApplicationActive)),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start(Span<const uint8_t> aInitialLocalPayload) {
-    mUp = new PumpDirection(this, mLocalIn, mTunnelOut, mPaddingEnabled, false);
-    mDown =
-        new PumpDirection(this, mTunnelIn, mLocalOut, false, mPaddingEnabled);
+    mUp = new PumpDirection(this, mLocalIn, mTunnelOut, mPaddingEnabled, false,
+                            mPaddingMode);
+    mDown = new PumpDirection(this, mTunnelIn, mLocalOut, false,
+                              mPaddingEnabled, mPaddingMode);
     RefPtr<PumpDirection> down = mDown;
     nsresult rv = down->Start();
     if (NS_FAILED(rv)) {
@@ -239,6 +243,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
   RefPtr<PumpDirection> mUp;
   RefPtr<PumpDirection> mDown;
   bool mPaddingEnabled;
+  NaivePaddingMode mPaddingMode;
   std::function<void()> mOnUpstreamApplicationActive;
   std::function<void()> mOnDownstreamApplicationActive;
   std::function<void(nsresult)> mOnClose;
@@ -248,13 +253,13 @@ class DuplexPump final : public RefCounted<DuplexPump> {
 
 PumpDirection::PumpDirection(DuplexPump* aOwner, nsIAsyncInputStream* aInput,
                              nsIAsyncOutputStream* aOutput, bool aEncode,
-                             bool aDecode)
+                             bool aDecode, NaivePaddingMode aPaddingMode)
     : mOwner(aOwner), mInput(aInput), mOutput(aOutput) {
   if (aEncode) {
-    mEncoder.emplace(mPaddingGenerator);
+    mEncoder.emplace(mPaddingGenerator, aPaddingMode);
   }
   if (aDecode) {
-    mDecoder.emplace();
+    mDecoder.emplace(aPaddingMode);
   }
 }
 
@@ -443,8 +448,10 @@ class TunnelSession::Impl final {
   bool mConnectCodeKnown = false;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
+  bool mDelayedPaddingPhaseAccepted = false;
   nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
+  NaivePaddingMode mPaddingMode = NaivePaddingMode::Legacy;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
   nsCOMPtr<nsIAsyncOutputStream> mPendingTunnelOut;
   bool mUpgradeFailed = false;
@@ -788,8 +795,7 @@ void TunnelSession::FinishPreambleOnMain(
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
   if ((PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        !requestCommittedAdmission) ||
-      (preambleMode ==
-           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
        !resourceTreeCommittedAdmission) ||
       (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
@@ -887,15 +893,14 @@ void TunnelSession::FinishPreambleOnMain(
       admission = "response-headers-task";
     } else if (preambleMode == PreambleMode::DocumentFirstBufferOverlap) {
       admission = "first-data-buffer";
-    } else if (preambleMode ==
-               PreambleMode::DocumentFirstBufferTaskOverlap) {
+    } else if (preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
       admission = "first-data-buffer-task";
     }
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
         "response_accepted=%d root_done=%d protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        admission, !aRootDone, aRootDone, ProtocolName(aProtocol));
+        static_cast<unsigned long long>(mImpl->mConnectionId), admission,
+        !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentStartOverlap ||
       preambleMode == PreambleMode::DocumentStartTaskOverlap) {
@@ -904,9 +909,9 @@ void TunnelSession::FinishPreambleOnMain(
         "request_committed=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aRootDone ? "terminal-fallback"
-                  : preambleMode == PreambleMode::DocumentStartTaskOverlap
-                        ? "request-committed-task"
-                        : "request-committed",
+        : preambleMode == PreambleMode::DocumentStartTaskOverlap
+            ? "request-committed-task"
+            : "request-committed",
         !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
@@ -925,8 +930,7 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+  if (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
         "admission=resources-committed request_committed=1 root_done=%d "
@@ -1234,6 +1238,12 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
   }
   nsAutoCString padding;
   nsresult rv = GenerateHeaderPadding(padding);
+  const bool requestDelayedPaddingPhase =
+      mImpl->mConfig.mDiagnosticDelayedPaddingPhase &&
+      aProtocol == ProxyProtocol::H2;
+  if (NS_SUCCEEDED(rv) && requestDelayedPaddingPhase) {
+    rv = SetDelayedPaddingPhaseMarker(padding);
+  }
   if (NS_SUCCEEDED(rv)) {
     RefPtr<TunnelAttempt> attempt =
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
@@ -1298,6 +1308,7 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
   bool connectCodeKnown = false;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
+  bool delayedPaddingPhaseAccepted = false;
   nsAutoCString outerProtocol;
   nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aRequest);
   if (proxied && http) {
@@ -1312,6 +1323,7 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
           proxied->GetHttpProxyResponseHeader("padding"_ns, padding);
       if (NS_SUCCEEDED(headerRv)) {
         paddingHeaderPresent = Some(true);
+        delayedPaddingPhaseAccepted = HasDelayedPaddingPhaseMarker(padding);
       } else if (headerRv == NS_ERROR_NOT_AVAILABLE) {
         paddingHeaderPresent = Some(false);
       } else {
@@ -1326,10 +1338,12 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
       NS_NewRunnableFunction(
           "NaiveFox::TunnelConnectMetadata",
           [owner, generation, protocol, rv, connectCodeKnown, connectCode,
-           paddingHeaderPresent, outerProtocol = std::move(outerProtocol)]() {
-            owner->ApplyConnectMetadata(generation, protocol, rv,
-                                        connectCodeKnown, connectCode,
-                                        paddingHeaderPresent, outerProtocol);
+           paddingHeaderPresent, delayedPaddingPhaseAccepted,
+           outerProtocol = std::move(outerProtocol)]() {
+            owner->ApplyConnectMetadata(
+                generation, protocol, rv, connectCodeKnown, connectCode,
+                paddingHeaderPresent, delayedPaddingPhaseAccepted,
+                outerProtocol);
           }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
@@ -1508,7 +1522,7 @@ void TunnelSession::ApplyTransport(uint64_t aGeneration,
 void TunnelSession::ApplyConnectMetadata(
     uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
     bool aConnectCodeKnown, int32_t aConnectCode,
-    const Maybe<bool>& aPaddingHeaderPresent,
+    const Maybe<bool>& aPaddingHeaderPresent, bool aDelayedPaddingPhaseAccepted,
     const nsACString& aOuterProtocol) {
   if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mMetadataReady) {
     return;
@@ -1518,6 +1532,7 @@ void TunnelSession::ApplyConnectMetadata(
   mImpl->mConnectCodeKnown = aConnectCodeKnown;
   mImpl->mConnectCode = aConnectCode;
   mImpl->mPaddingHeaderPresent = aPaddingHeaderPresent;
+  mImpl->mDelayedPaddingPhaseAccepted = aDelayedPaddingPhaseAccepted;
   mImpl->mOuterProtocol = aOuterProtocol;
   MaybeFinishAttempt();
 }
@@ -1595,8 +1610,10 @@ void TunnelSession::ResetAttemptState() {
   mImpl->mConnectCodeKnown = false;
   mImpl->mConnectCode = -1;
   mImpl->mPaddingHeaderPresent.reset();
+  mImpl->mDelayedPaddingPhaseAccepted = false;
   mImpl->mOuterProtocol.Truncate();
   mImpl->mPaddingEnabled = false;
+  mImpl->mPaddingMode = NaivePaddingMode::Legacy;
   mImpl->mPendingTunnelIn = nullptr;
   mImpl->mPendingTunnelOut = nullptr;
   mImpl->mUpgradeFailed = false;
@@ -1633,15 +1650,24 @@ void TunnelSession::MaybeFinishAttempt() {
                                 mImpl->mOuterProtocol.EqualsLiteral("h2")) ||
                                (mImpl->mAttemptProtocol == ProxyProtocol::H3 &&
                                 mImpl->mOuterProtocol.EqualsLiteral("h3"));
+  const bool delayedPaddingPhaseRequested =
+      mImpl->mConfig.mDiagnosticDelayedPaddingPhase &&
+      mImpl->mAttemptProtocol == ProxyProtocol::H2;
+  bool delayedPaddingPhaseEnabled = false;
   if (NS_FAILED(mImpl->mMetadataStatus) || NS_FAILED(mImpl->mChannelStatus) ||
       !mImpl->mConnectCodeKnown || !protocolMatches ||
       NS_FAILED(NegotiatePayloadPadding(mImpl->mConnectCode,
                                         mImpl->mPaddingHeaderPresent,
-                                        mImpl->mPaddingEnabled))) {
+                                        mImpl->mPaddingEnabled)) ||
+      NS_FAILED(NegotiateDelayedPaddingPhase(
+          delayedPaddingPhaseRequested, mImpl->mDelayedPaddingPhaseAccepted,
+          mImpl->mPaddingEnabled, delayedPaddingPhaseEnabled))) {
     Fail(NS_FAILED(mImpl->mChannelStatus) ? mImpl->mChannelStatus
                                           : NS_ERROR_FAILURE);
     return;
   }
+  mImpl->mPaddingMode = delayedPaddingPhaseEnabled ? NaivePaddingMode::Delayed
+                                                   : NaivePaddingMode::Legacy;
   if (!mImpl->mTransportReady) {
     if (mImpl->mUpgradeFailed) {
       Fail(NS_ERROR_FAILURE);
@@ -1663,6 +1689,13 @@ void TunnelSession::TunnelReady() {
                   mImpl->mPaddingEnabled ? "yes" : "no");
   RuntimeLog("Outer protocol: %s\n", mImpl->mOuterProtocol.get());
   RuntimeLog("Padding negotiated: %s\n", mImpl->mPaddingEnabled ? "yes" : "no");
+  if (mImpl->mPaddingMode == NaivePaddingMode::Delayed) {
+    RuntimeLogEvent(
+        "Connection %llu diagnostic-delayed-padding-phase negotiated=1 "
+        "protocol=%s framed-records=16 random-records=9-16\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(mImpl->mAttemptProtocol));
+  }
   if (mImpl->mOnEstablished) {
     mImpl->mOnEstablished(mImpl->mOuterProtocol, mImpl->mPaddingEnabled);
   }
@@ -1678,8 +1711,7 @@ nsresult TunnelSession::StartPump() {
   std::function<void()> onDownstreamApplicationActive;
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,
                                      protocol = mImpl->mAttemptProtocol]() {
@@ -1695,7 +1727,7 @@ nsresult TunnelSession::StartPump() {
   }
   mImpl->mPump = new DuplexPump(
       mImpl->mLocalIn, mImpl->mLocalOut, mImpl->mPendingTunnelIn,
-      mImpl->mPendingTunnelOut, mImpl->mPaddingEnabled,
+      mImpl->mPendingTunnelOut, mImpl->mPaddingEnabled, mImpl->mPaddingMode,
       [self, generation = mImpl->mAttemptGeneration,
        protocol = mImpl->mAttemptProtocol]() {
         nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(

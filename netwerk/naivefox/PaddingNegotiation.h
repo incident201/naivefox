@@ -13,6 +13,8 @@ namespace mozilla::naivefox {
 nsresult NegotiatePayloadPadding(int32_t aConnectCode,
                                  const Maybe<bool>& aResponseHeaderPresent,
                                  bool& aEnabled);
+nsresult NegotiateDelayedPaddingPhase(bool aRequested, bool aAccepted,
+                                      bool aPaddingEnabled, bool& aEnabled);
 
 }  // namespace mozilla::naivefox
 

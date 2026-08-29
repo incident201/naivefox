@@ -63,8 +63,9 @@ void Append(std::vector<uint8_t>& aDestination, Span<const uint8_t> aSource) {
 
 std::vector<uint8_t> EncodeChunks(
     const std::vector<std::vector<uint8_t>>& aChunks,
-    PaddingLengthGenerator& aGenerator, size_t aOutputCapacity = 70123) {
-  NaivePaddingEncoder encoder(aGenerator);
+    PaddingLengthGenerator& aGenerator, size_t aOutputCapacity = 70123,
+    NaivePaddingMode aMode = NaivePaddingMode::Legacy) {
+  NaivePaddingEncoder encoder(aGenerator, aMode);
   std::vector<uint8_t> wire;
   std::vector<uint8_t> output(aOutputCapacity);
 
@@ -264,6 +265,43 @@ TEST(NaivePaddingEncoder, RandomFailureDoesNotConsumeInput)
   EXPECT_EQ(encoder.PaddedRecordCount(), 0U);
 }
 
+TEST(NaivePaddingEncoder, DelayedModeShiftsRandomBudgetToRecordsNineThrough16)
+{
+  SequenceGenerator generator({11, 12, 13, 14, 15, 16, 17, 18});
+  NaivePaddingEncoder encoder(generator, NaivePaddingMode::Delayed);
+  std::array<uint8_t, 512> output{};
+
+  for (size_t record = 0; record < kNaiveDelayedPaddedRecordCount + 1;
+       ++record) {
+    const std::array<uint8_t, 1> input{static_cast<uint8_t>(record)};
+    auto result = encoder.Encode(Span(input), Span(output));
+    ASSERT_EQ(result.status, PaddingCodecStatus::Ok);
+    ASSERT_EQ(result.inputConsumed, 1U);
+    if (record < kNaiveDelayedPaddedRecordCount) {
+      const uint8_t expectedPadding =
+          record < kNaivePaddedRecordCount
+              ? 0
+              : static_cast<uint8_t>(11 + record - kNaivePaddedRecordCount);
+      EXPECT_EQ(output[0], 0U) << "record=" << record;
+      EXPECT_EQ(output[1], 1U) << "record=" << record;
+      EXPECT_EQ(output[2], expectedPadding) << "record=" << record;
+      EXPECT_EQ(output[3], record) << "record=" << record;
+      EXPECT_EQ(result.outputProduced, 4U + expectedPadding)
+          << "record=" << record;
+    } else {
+      EXPECT_EQ(result.outputProduced, 1U);
+      EXPECT_EQ(output[0], record);
+    }
+    EXPECT_EQ(generator.Calls(),
+              record < kNaivePaddedRecordCount
+                  ? 0U
+                  : std::min(record - kNaivePaddedRecordCount + 1,
+                             kNaivePaddedRecordCount));
+  }
+  EXPECT_EQ(encoder.PaddedRecordCount(), kNaiveDelayedPaddedRecordCount);
+  EXPECT_EQ(generator.Calls(), kNaivePaddedRecordCount);
+}
+
 TEST(NaivePaddingDecoder, AcceptsZeroLengthRecords)
 {
   std::vector<uint8_t> wire(kNaivePaddedRecordCount * 3, 0);
@@ -366,6 +404,26 @@ TEST(NaivePaddingDecoder, EighthRecordAndRawTailShareInput)
   EXPECT_EQ(result.outputProduced, kNaivePaddedRecordCount + 4);
   EXPECT_TRUE(std::equal(expected.begin(), expected.end(), output.begin()));
   EXPECT_EQ(decoder.PaddedRecordCount(), kNaivePaddedRecordCount);
+}
+
+TEST(NaivePaddingCodec, DelayedModeRoundTripAndRawTail)
+{
+  std::vector<std::vector<uint8_t>> chunks;
+  for (size_t index = 0; index < kNaiveDelayedPaddedRecordCount; ++index) {
+    chunks.emplace_back(index + 1, static_cast<uint8_t>(index + 31));
+  }
+  chunks.push_back({0xf0, 0xf1, 0xf2, 0xf3});
+  SequenceGenerator generator({0, 1, 2, 3, 4, 5, 6, 7});
+  auto wire = EncodeChunks(chunks, generator, 70123, NaivePaddingMode::Delayed);
+  NaivePaddingDecoder decoder(NaivePaddingMode::Delayed);
+  std::vector<uint8_t> decoded;
+
+  ASSERT_TRUE(FeedDecoder(decoder, Span(wire), 7, decoded));
+
+  EXPECT_EQ(decoded, Concatenate(chunks));
+  EXPECT_EQ(decoder.PaddedRecordCount(), kNaiveDelayedPaddedRecordCount);
+  EXPECT_EQ(decoder.Finish(), PaddingCodecStatus::Ok);
+  EXPECT_EQ(generator.Calls(), kNaivePaddedRecordCount);
 }
 
 TEST(NaivePaddingDecoder, CleanAndTruncatedEof)
