@@ -31,6 +31,7 @@ private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
 diagnostic_naivefox_only=${NAIVEFOX_CAPTURE_DIAGNOSTIC_NAIVEFOX_ONLY:-0}
 isolated_network=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0}
 isolated_network_entered=${NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED:-0}
+expected_padding=${NAIVEFOX_CAPTURE_EXPECT_PADDING:-yes}
 samples_per_cohort=
 seed=
 while [[ $# -gt 0 ]]; do
@@ -116,6 +117,18 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case $expected_padding in
+  yes | no) ;;
+  *)
+    printf 'NAIVEFOX_CAPTURE_EXPECT_PADDING must be yes or no\n' >&2
+    exit 2
+    ;;
+esac
+if [[ $expected_padding == no && $mode != gate && $mode != smoke ]]; then
+  printf 'no-padding capture is restricted to gate/smoke research diagnostics\n' >&2
+  exit 2
+fi
 
 if [[ $proxy_floor_requested == 1 ]]; then
   if [[ $multi_arm_option_count -ne 0 || $naivefox_arm_explicit -eq 1 ]]; then
@@ -2423,7 +2436,7 @@ run_naivefox_sample() {
       'Native root replacement activation phase=request-background-actor-destroyed request=[0-9]+$'
   fi
   outer_count=$(rg -c "^Outer protocol: $protocol$" "$log" || true)
-  padding_count=$(rg -c '^Padding negotiated: yes$' "$log" || true)
+  padding_count=$(rg -c "^Padding negotiated: $expected_padding$" "$log" || true)
   if [[ $outer_count -eq 0 || $padding_count -ne $outer_count ]]; then
     printf 'NaiveFox sample %s has incomplete protocol/padding evidence\n' \
       "$session_id" >&2
@@ -2980,6 +2993,7 @@ outer_resource_body_bytes_excluding_root=$outer_resource_body_bytes_excluding_ro
 outer_resource_profile_preflight=$outer_resource_profile_preflight
 outer_resource_profile_validated_protocols=$outer_resource_profile_validated_protocols
 cache_condition=$cache_condition
+payload_padding_expected=$expected_padding
 fixture_proxy_reset_policy=$fixture_proxy_reset_policy
 fixture_proxy_restart_count=$proxy_restart_count
 fixture_proxy_expected_restart_count=$expected_proxy_restart_count

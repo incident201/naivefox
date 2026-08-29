@@ -4014,6 +4014,34 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "one physical outer connection"):
             SAMPLE.validate_sample("gate", "h2", "", two_connections)
 
+    def test_sample_validation_requires_explicit_padding_condition(self):
+        one_connection = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        padding_yes = (
+            "Connection 1 established target=localhost:443 "
+            "outer=h2 padding=yes\n"
+        )
+        padding_no = (
+            "Connection 1 established target=localhost:443 "
+            "outer=h2 padding=no\n"
+        )
+        SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
+        with self.assertRaisesRegex(ValueError, "differs from expected"):
+            SAMPLE.validate_sample("gate", "h2", padding_no, one_connection)
+        with mock.patch.dict(
+            os.environ, {"NAIVEFOX_CAPTURE_EXPECT_PADDING": "no"}, clear=False
+        ):
+            SAMPLE.validate_sample("gate", "h2", padding_no, one_connection)
+            with self.assertRaisesRegex(ValueError, "differs from expected"):
+                SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
+        with mock.patch.dict(
+            os.environ, {"NAIVEFOX_CAPTURE_EXPECT_PADDING": "maybe"}, clear=False
+        ):
+            with self.assertRaisesRegex(ValueError, "unsupported expected padding"):
+                SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
+
     def test_root_sample_requires_exactly_one_successful_preamble(self):
         one_connection = {
             "protocol": "h2",

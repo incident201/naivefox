@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import re
 
 PREAMBLE_RESULT = re.compile(
@@ -376,7 +377,8 @@ NATIVE_PARSER_RESOURCE_TREE_DRAIN = re.compile(
 )
 ESTABLISHED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
-    r"established target=\S+ outer=(?P<protocol>h2|h3) padding=yes$"
+    r"established target=\S+ outer=(?P<protocol>h2|h3) "
+    r"padding=(?P<padding>yes|no)$"
 )
 NATIVE_CACHE_OPEN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
@@ -1736,6 +1738,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
+    expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
+    if expected_padding not in ("yes", "no"):
+        raise ValueError("unsupported expected padding condition")
+    if any(
+        established["padding"] != expected_padding
+        for established in parsed_established
+    ):
+        raise ValueError("CONNECT-established padding condition differs from expected")
     native_cache_lines = [
         line for line in log_lines if " preamble native-cache-open cache=" in line
     ]
