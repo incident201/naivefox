@@ -302,8 +302,7 @@ if [[ $naivefox_arm == root-pmtud-control && $protocol_selection != h3 ]]; then
   exit 2
 fi
 if [[ ( $naivefox_arm == document-first-buffer-http-connect ||
-        $naivefox_arm == document-overlap-http-connect ||
-        $naivefox_arm == document-start-http-connect ) &&
+        $naivefox_arm == document-overlap-http-connect ) &&
       $protocol_selection != h2 ]]; then
   printf '%s requires --protocol h2\n' "$naivefox_arm" >&2
   exit 2

@@ -1123,8 +1123,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertTrue(config["outer-session-gate"])
         self.assertEqual(config["preamble"], {"mode": "off"})
 
-    def test_http_connect_ingress_uses_same_document_start_outer_mode(self):
-        config = CONFIG.build_config(
+    def test_http_connect_ingress_uses_document_start_for_h2_and_h3(self):
+        h2_config = CONFIG.build_config(
             "document-start-http-connect",
             "h2",
             1080,
@@ -1132,18 +1132,23 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-user",
             "fixture-pass",
         )
-        self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(config["preamble"]["mode"], "document-start-overlap")
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h2"):
-            CONFIG.build_config(
-                "document-start-http-connect",
-                "h3",
-                1080,
-                4433,
-                "fixture-user",
-                "fixture-pass",
-            )
+        self.assertEqual(h2_config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(h2_config["preamble"]["mode"], "document-start-overlap")
+        self.assertEqual(urlsplit(h2_config["proxy"]).scheme, "https")
+        self.assertTrue(h2_config["outer-session-gate"])
+
+        h3_config = CONFIG.build_config(
+            "document-start-http-connect",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(h3_config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(h3_config["preamble"]["mode"], "document-start-overlap")
+        self.assertEqual(urlsplit(h3_config["proxy"]).scheme, "quic")
+        self.assertTrue(h3_config["outer-session-gate"])
 
     def test_http_connect_ingress_combines_with_response_header_admission(self):
         config = CONFIG.build_config(

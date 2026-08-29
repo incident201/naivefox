@@ -109,7 +109,6 @@ def build_config(
     if arm in (
         "document-first-buffer-http-connect",
         "document-overlap-http-connect",
-        "document-start-http-connect",
     ) and protocol != "h2":
         raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
