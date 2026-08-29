@@ -71,7 +71,7 @@ invalid_status=$(curl "${proxy_options[@]}" --proxy-user 'invalid:invalid' \
   "http://127.0.0.1:$NAIVEFOX_FIXTURE_HTTP_PORT/small")
 [[ $invalid_status == 407 ]]
 denied_status=$(curl "${proxy_options[@]}" "${auth_options[@]}" \
-  --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:1/")
+  --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:1/denied")
 [[ $denied_status == 403 ]]
 
 openssl s_client -connect "127.0.0.1:$NAIVEFOX_FIXTURE_PROXY_PORT" \
