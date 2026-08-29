@@ -229,7 +229,6 @@ struct Config final {
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mDiagnosticOptimisticLocalReply = false;
-  bool mDiagnosticDelayedPaddingPhase = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;

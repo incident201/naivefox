@@ -105,24 +105,4 @@ TEST(NaiveFoxHeaderPadding, PreservesOutputOnRandomFailure)
   EXPECT_EQ(padding, "unchanged");
 }
 
-TEST(NaiveFoxHeaderPadding, DelayedPhaseMarkerIsExplicitAndUnambiguous)
-{
-  const uint64_t values[] = {16, 0xfedcba9876543210};
-  size_t next = 0;
-  auto random = [&]() { return Some(values[next++]); };
-  nsCString padding;
-  ASSERT_EQ(GenerateHeaderPadding(padding, random), NS_OK);
-  const auto originalLength = padding.Length();
-  EXPECT_FALSE(HasDelayedPaddingPhaseMarker(padding));
-
-  ASSERT_EQ(SetDelayedPaddingPhaseMarker(padding), NS_OK);
-  EXPECT_EQ(padding.Length(), originalLength);
-  EXPECT_TRUE(HasDelayedPaddingPhaseMarker(padding));
-
-  nsCString tooShort("x");
-  EXPECT_EQ(SetDelayedPaddingPhaseMarker(tooShort), NS_ERROR_INVALID_ARG);
-  EXPECT_EQ(tooShort, "x");
-  EXPECT_FALSE(HasDelayedPaddingPhaseMarker(tooShort));
-}
-
 }  // namespace mozilla::naivefox

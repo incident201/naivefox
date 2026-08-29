@@ -159,8 +159,6 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
         aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
     tunnelConfig.mDiagnosticOptimisticLocalReply =
         aConfig.mDiagnosticOptimisticLocalReply;
-    tunnelConfig.mDiagnosticDelayedPaddingPhase =
-        aConfig.mDiagnosticDelayedPaddingPhase;
   }
   return tunnelConfigs;
 }

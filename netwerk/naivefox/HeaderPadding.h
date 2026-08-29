@@ -23,8 +23,6 @@ using HeaderPaddingRandom = FunctionRef<Maybe<uint64_t>()>;
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding,
                                              HeaderPaddingRandom aRandom);
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding);
-[[nodiscard]] nsresult SetDelayedPaddingPhaseMarker(nsACString& aPadding);
-bool HasDelayedPaddingPhaseMarker(const nsACString& aPadding);
 
 }  // namespace mozilla::naivefox
 

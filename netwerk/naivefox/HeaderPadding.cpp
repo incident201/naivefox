@@ -61,18 +61,4 @@ nsresult GenerateHeaderPadding(nsACString& aPadding) {
   return GenerateHeaderPadding(aPadding, SystemRandomUint64);
 }
 
-nsresult SetDelayedPaddingPhaseMarker(nsACString& aPadding) {
-  if (aPadding.Length() < 2) {
-    return NS_ERROR_INVALID_ARG;
-  }
-  char* output = aPadding.BeginWriting();
-  output[0] = '~';
-  output[1] = '2';
-  return NS_OK;
-}
-
-bool HasDelayedPaddingPhaseMarker(const nsACString& aPadding) {
-  return aPadding.Length() >= 2 && aPadding[0] == '~' && aPadding[1] == '2';
-}
-
 }  // namespace mozilla::naivefox

@@ -119,7 +119,6 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
-  EXPECT_FALSE(config.mDiagnosticDelayedPaddingPhase);
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
@@ -378,40 +377,6 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":1})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":"true"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-optimistic-local-reply":false})",
-  };
-  for (const char* json : kInvalid) {
-    Config config;
-    nsAutoCString error;
-    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
-        << json;
-    EXPECT_FALSE(error.IsEmpty()) << json;
-  }
-}
-
-TEST(NaiveFoxConfig, DiagnosticDelayedPaddingPhaseBoolean)
-{
-  for (const auto& [value, expected] :
-       {std::pair{"true", true}, std::pair{"false", false}}) {
-    Config config;
-    nsAutoCString error;
-    nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-delayed-padding-phase":)"_ns);
-    json.Append(value);
-    json.Append('}');
-    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
-    EXPECT_EQ(config.mDiagnosticDelayedPaddingPhase, expected);
-  }
-}
-
-TEST(NaiveFoxConfig, RejectsInvalidDiagnosticDelayedPaddingPhase)
-{
-  static constexpr const char* kInvalid[] = {
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-delayed-padding-phase":null})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-delayed-padding-phase":1})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-delayed-padding-phase":"true"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-delayed-padding-phase":true,"diagnostic-delayed-padding-phase":false})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-delayed-padding-phase":true})",
-      R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://h2.example","quic://h3.example"],"diagnostic-delayed-padding-phase":true})",
   };
   for (const char* json : kInvalid) {
     Config config;
@@ -1037,7 +1002,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
   source.mDiagnosticOptimisticLocalReply = true;
-  source.mDiagnosticDelayedPaddingPhase = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1061,7 +1025,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
-    EXPECT_TRUE(copy->mDiagnosticDelayedPaddingPhase);
   }
 }
 

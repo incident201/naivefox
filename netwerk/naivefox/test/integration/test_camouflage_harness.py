@@ -659,7 +659,9 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
         SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
         h2_lines = [
-            line.replace("protocol=h3", "protocol=h2").replace("outer=h3", "outer=h2")
+            line.replace("protocol=h3", "protocol=h2").replace(
+                "outer=h3", "outer=h2"
+            )
             for line in lines
         ]
         h2_features = {
@@ -834,7 +836,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-native-parser-resource-committed-page",
             "tree-native-parser-resource-committed-page-http-connect",
         )
-        rows = SUPERBLOCKS.schedule_rows(29, "h2", 1, ["browser_page"], arms=arms)
+        rows = SUPERBLOCKS.schedule_rows(
+            29, "h2", 1, ["browser_page"], arms=arms
+        )
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
@@ -1327,40 +1331,6 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ),
             )
 
-    def test_delayed_padding_arms_are_explicit_h2_only_and_listener_specific(self):
-        cases = {
-            "document-first-buffer-task-delayed-padding": (
-                "socks://127.0.0.1:1080",
-                "document-first-buffer-task-overlap",
-            ),
-            "document-first-buffer-http-connect-delayed-padding": (
-                "http://127.0.0.1:1080",
-                "document-first-buffer-overlap",
-            ),
-        }
-        for arm, (listener, mode) in cases.items():
-            with self.subTest(arm=arm):
-                config = CONFIG.build_config(
-                    arm,
-                    "h2",
-                    1080,
-                    4433,
-                    "fixture-user",
-                    "fixture-pass",
-                )
-                self.assertEqual(config["listen"], listener)
-                self.assertEqual(config["preamble"]["mode"], mode)
-                self.assertTrue(config["diagnostic-delayed-padding-phase"])
-                with self.assertRaisesRegex(ValueError, "requires h2"):
-                    CONFIG.build_config(
-                        arm,
-                        "h3",
-                        1080,
-                        4433,
-                        "fixture-user",
-                        "fixture-pass",
-                    )
-
     def test_http_connect_task_barriers_map_to_product_modes(self):
         cases = {
             "document-start-task-http-connect": "document-start-task-overlap",
@@ -1497,50 +1467,6 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "Connection 1 preamble document-overlap "
                 "admission=first-data-buffer-task response_accepted=1 "
                 "root_done=0 protocol=h2\n",
-                features,
-            )
-
-    def test_delayed_padding_lifecycle_is_fail_closed(self):
-        features = {
-            "protocol": "h2",
-            "features": {"lifecycle_connection_count": 1.0},
-        }
-        cases = {
-            "document-first-buffer-task-delayed-padding": ("first-data-buffer-task"),
-            "document-first-buffer-http-connect-delayed-padding": ("first-data-buffer"),
-        }
-        for arm, admission in cases.items():
-            with self.subTest(arm=arm):
-                prefix = (
-                    "Connection 1 preamble document-overlap "
-                    f"admission={admission} response_accepted=1 "
-                    "root_done=0 protocol=h2\n"
-                    "Connection 1 established target=localhost:443 "
-                    "outer=h2 padding=yes\n"
-                )
-                marker = (
-                    "Connection 1 diagnostic-delayed-padding-phase "
-                    "negotiated=1 protocol=h2 framed-records=16 "
-                    "random-records=9-16\n"
-                )
-                suffix = (
-                    "Connection 1 preamble result=success status=0x00000000 "
-                    "http=200 bytes=512 protocol=h2\n"
-                    "Connection 1 preamble document-overlap drain=complete "
-                    "root_done=1 completed_resources=0 protocol=h2\n"
-                )
-                SAMPLE.validate_sample(arm, "h2", prefix + marker + suffix, features)
-                with self.assertRaisesRegex(ValueError, "one negotiation marker"):
-                    SAMPLE.validate_sample(arm, "h2", prefix + suffix, features)
-                with self.assertRaisesRegex(ValueError, "identity or order"):
-                    SAMPLE.validate_sample(
-                        arm, "h2", marker + prefix + suffix, features
-                    )
-        with self.assertRaisesRegex(ValueError, "unexpectedly used delayed padding"):
-            SAMPLE.validate_sample(
-                "document-first-buffer-task-overlap",
-                "h2",
-                prefix + marker + suffix,
                 features,
             )
 

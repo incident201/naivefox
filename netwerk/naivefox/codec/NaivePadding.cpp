@@ -20,9 +20,8 @@ bool SystemPaddingLengthGenerator::Generate(uint8_t& aLength) {
   return true;
 }
 
-NaivePaddingEncoder::NaivePaddingEncoder(PaddingLengthGenerator& aGenerator,
-                                         NaivePaddingMode aMode)
-    : mGenerator(aGenerator), mMode(aMode) {}
+NaivePaddingEncoder::NaivePaddingEncoder(PaddingLengthGenerator& aGenerator)
+    : mGenerator(aGenerator) {}
 
 size_t NaivePaddingEncoder::BufferedByteCount() const {
   return mPendingLength - mPendingOffset;
@@ -56,15 +55,9 @@ PaddingCodecResult NaivePaddingEncoder::Encode(Span<const uint8_t> aInput,
       return result;
     }
 
-    const size_t paddedRecordLimit = mMode == NaivePaddingMode::Delayed
-                                         ? kNaiveDelayedPaddedRecordCount
-                                         : kNaivePaddedRecordCount;
-    if (mPaddedRecordCount < paddedRecordLimit) {
+    if (mPaddedRecordCount < kNaivePaddedRecordCount) {
       uint8_t paddingLength = 0;
-      const bool generatePadding =
-          mMode == NaivePaddingMode::Legacy ||
-          mPaddedRecordCount >= kNaivePaddedRecordCount;
-      if (generatePadding && !mGenerator.Generate(paddingLength)) {
+      if (!mGenerator.Generate(paddingLength)) {
         mStatus = PaddingCodecStatus::RandomFailure;
         result.status = mStatus;
         return result;
@@ -101,10 +94,8 @@ void NaivePaddingDecoder::CompleteRecord() {
   mHeaderLength = 0;
   mPayloadRemaining = 0;
   mPaddingRemaining = 0;
-  const size_t paddedRecordLimit = mMode == NaivePaddingMode::Delayed
-                                       ? kNaiveDelayedPaddedRecordCount
-                                       : kNaivePaddedRecordCount;
-  mState = mPaddedRecordCount == paddedRecordLimit ? State::Raw : State::Header;
+  mState = mPaddedRecordCount == kNaivePaddedRecordCount ? State::Raw
+                                                         : State::Header;
 }
 
 PaddingCodecResult NaivePaddingDecoder::Decode(Span<const uint8_t> aInput,
