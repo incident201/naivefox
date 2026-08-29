@@ -25,6 +25,10 @@ nsHttpRequestHead::nsHttpRequestHead(const nsHttpRequestHead& aRequestHead) {
 
   mHeaders = other.mHeaders;
   mProxyConnectHeaders = other.mProxyConnectHeaders;
+#ifdef MOZ_NAIVEFOX
+  mNaiveFoxProxyConnectEarlyData.AppendElements(
+      other.mNaiveFoxProxyConnectEarlyData);
+#endif
   mMethod = other.mMethod;
   mVersion = other.mVersion;
   mRequestURI = other.mRequestURI;
@@ -42,6 +46,10 @@ nsHttpRequestHead::nsHttpRequestHead(nsHttpRequestHead&& aRequestHead) {
 
   mHeaders = std::move(other.mHeaders);
   mProxyConnectHeaders = std::move(other.mProxyConnectHeaders);
+#ifdef MOZ_NAIVEFOX
+  mNaiveFoxProxyConnectEarlyData =
+      std::move(other.mNaiveFoxProxyConnectEarlyData);
+#endif
   mMethod = std::move(other.mMethod);
   mVersion = std::move(other.mVersion);
   mRequestURI = std::move(other.mRequestURI);
@@ -62,6 +70,11 @@ nsHttpRequestHead& nsHttpRequestHead::operator=(
 
   mHeaders = other.mHeaders;
   mProxyConnectHeaders = other.mProxyConnectHeaders;
+#ifdef MOZ_NAIVEFOX
+  mNaiveFoxProxyConnectEarlyData.Clear();
+  mNaiveFoxProxyConnectEarlyData.AppendElements(
+      other.mNaiveFoxProxyConnectEarlyData);
+#endif
   mMethod = other.mMethod;
   mVersion = other.mVersion;
   mRequestURI = other.mRequestURI;
@@ -145,6 +158,28 @@ nsresult nsHttpRequestHead::CopyProxyConnectHeadersTo(
   }
   return NS_OK;
 }
+
+#ifdef MOZ_NAIVEFOX
+nsresult nsHttpRequestHead::SetNaiveFoxProxyConnectEarlyData(
+    mozilla::Span<const uint8_t> aData) {
+  RecursiveMutexAutoLock mon(mRecursiveMutex);
+  mNaiveFoxProxyConnectEarlyData.Clear();
+  if (aData.IsEmpty() || aData.Length() > 64 * 1024) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  return mNaiveFoxProxyConnectEarlyData.AppendElements(aData.Elements(),
+                                                       aData.Length(), fallible)
+             ? NS_OK
+             : NS_ERROR_OUT_OF_MEMORY;
+}
+
+void nsHttpRequestHead::CopyNaiveFoxProxyConnectEarlyData(
+    nsTArray<uint8_t>& aData) const {
+  RecursiveMutexAutoLock mon(mRecursiveMutex);
+  aData.Clear();
+  aData.AppendElements(mNaiveFoxProxyConnectEarlyData);
+}
+#endif
 
 void nsHttpRequestHead::Method(nsACString& aMethod) const {
   RecursiveMutexAutoLock mon(mRecursiveMutex);

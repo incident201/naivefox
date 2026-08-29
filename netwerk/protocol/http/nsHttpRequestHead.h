@@ -6,9 +6,11 @@
 #define nsHttpRequestHead_h_
 
 #include "mozilla/RecursiveMutex.h"
+#include "mozilla/Span.h"
 #include "nsHttp.h"
 #include "nsHttpHeaderArray.h"
 #include "nsString.h"
+#include "nsTArray.h"
 
 class nsIHttpHeaderVisitor;
 
@@ -89,6 +91,11 @@ class nsHttpRequestHead {
                                                const nsACString& v);
   [[nodiscard]] nsresult CopyProxyConnectHeadersTo(
       nsHttpRequestHead& aTarget) const;
+#ifdef MOZ_NAIVEFOX
+  [[nodiscard]] nsresult SetNaiveFoxProxyConnectEarlyData(
+      mozilla::Span<const uint8_t> aData);
+  void CopyNaiveFoxProxyConnectEarlyData(nsTArray<uint8_t>& aData) const;
+#endif
   [[nodiscard]] nsresult SetEmptyHeader(const nsACString& h);
   [[nodiscard]] nsresult GetHeader(const nsHttpAtom& h, nsACString& v) const;
 
@@ -138,6 +145,10 @@ class nsHttpRequestHead {
   // All members must be copy-constructable and assignable
   nsHttpHeaderArray mHeaders MOZ_GUARDED_BY(mRecursiveMutex);
   nsHttpHeaderArray mProxyConnectHeaders MOZ_GUARDED_BY(mRecursiveMutex);
+#ifdef MOZ_NAIVEFOX
+  nsTArray<uint8_t> mNaiveFoxProxyConnectEarlyData
+      MOZ_GUARDED_BY(mRecursiveMutex);
+#endif
   nsCString mMethod MOZ_GUARDED_BY(mRecursiveMutex){"GET"_ns};
   HttpVersion mVersion MOZ_GUARDED_BY(mRecursiveMutex){HttpVersion::v1_1};
 

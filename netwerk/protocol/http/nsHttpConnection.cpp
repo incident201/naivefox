@@ -2730,6 +2730,31 @@ nsresult nsHttpConnection::SetupProxyConnectStream() {
   if (NS_FAILED(rv)) {
     return rv;
   }
+#ifdef MOZ_NAIVEFOX
+  nsTArray<uint8_t> earlyData;
+  mTransaction->RequestHead()->CopyNaiveFoxProxyConnectEarlyData(earlyData);
+  if (!earlyData.IsEmpty()) {
+    nsAutoCString expectedLength;
+    expectedLength.AppendInt(earlyData.Length());
+    nsAutoCString declaredLength;
+    nsHttpAtom earlyDataHeader =
+        nsHttp::ResolveAtom("x-naivefox-early-data"_ns);
+    if (!earlyDataHeader ||
+        NS_FAILED(request.GetHeader(earlyDataHeader, declaredLength)) ||
+        !declaredLength.Equals(expectedLength)) {
+      return NS_ERROR_ILLEGAL_VALUE;
+    }
+    nsTArray<uint8_t> connectBytes;
+    if (!connectBytes.AppendElements(
+            reinterpret_cast<const uint8_t*>(buf.BeginReading()), buf.Length(),
+            fallible) ||
+        !connectBytes.AppendElements(earlyData, fallible)) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
+    return NS_NewByteInputStream(getter_AddRefs(mProxyConnectStream),
+                                 std::move(connectBytes));
+  }
+#endif
   rv = NS_NewCStringInputStream(getter_AddRefs(mProxyConnectStream),
                                 std::move(buf));
   return rv;
