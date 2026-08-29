@@ -2201,6 +2201,28 @@ barriers and their task variants are retained as explicit harness aliases so
 the negative family is reproducible, but they are not product-default
 candidates and should not be repeated without a new mechanism hypothesis.
 
+The HTTP tree treatment also passed the predeclared size and slower-link
+directional screens. All runs kept the same product policy and budgets; only
+the fixture input or namespace link profile changed:
+
+| Safe artifact | Condition | Blocks | Start control | HTTP tree treatment |
+| --- | --- | ---: | --- | --- |
+| `2608e4200af64969` | 65536-byte page base, unshaped | 2 | 0.14352 / 0.58915 / 0.24531 / 0.18110 / 0.46113 | 0.12884 / 0.45060 / 0.19795 / 0.20407 / 0.44064 |
+| `8d81953d90610c34` | 1048576-byte page base, unshaped | 2 | 0.18880 / 0.59725 / 0.25579 / 0.20983 / 0.44874 | 0.17881 / 0.44431 / 0.22058 / 0.22831 / 0.43562 |
+| `ef1c22cb0e387413` | default page, 20-ms one-way and 20 Mbit/s | 2 | 0.16877 / 0.59901 / 0.24823 / 0.13968 / 0.42727 | 0.09124 / 0.33052 / 0.14420 / 0.11115 / 0.30928 |
+
+Packets 17--32, packets 1--32, and whole improved at both one-quarter and
+four-times the default page base. The unshaped 250-ms view regressed by 0.023
+and 0.018 respectively, while the shaped profile improved every retained view,
+including 250 ms by 0.029. Safe shaped metadata confirms receive-side capture
+after netem, the exact 20-ms/20-Mbit profile, eight successful proxy resets,
+and zero dropped or offload-oversized captures. These two-block gates are not
+inferential, but together with the six- and four-block default-size screens
+they reject a fixed-size or localhost-speed explanation and make the existing
+six-resource mode a viable H3 HTTP implicit-default candidate. Promotion still
+requires an incrementally built product and a fresh canonical four-row matrix;
+these screening rows must not be spliced into that dashboard.
+
 Several bring-up attempts produced no candidate result and must not be
 reinterpreted as measurements. A clean research objdir initially tried to
 download the pinned Go/Caddy fixture toolchain after entering the isolated
