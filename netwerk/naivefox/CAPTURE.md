@@ -2938,6 +2938,87 @@ can affect the wire. Future research must treat two-stream direction splitting,
 raising the per-server cap solely to support it, and first-inner/target-byte
 cover cancellation as tested causal families, not rename and retry them.
 
+### H2 ordinary-method carrier follow-up
+
+The next H2 candidate also passed the mandatory causal-history preflight before
+implementation. The full multi-process reconstruction had already changed
+Firefox process/parser topology without changing the classic bidirectional
+CONNECT carrier and did not help. The strict H2 priority experiment had already
+reported `mechanism_verdict=wire-null`; WebSocket extended CONNECT, two-stream
+direction splitting, CONNECT header-size endpoints, and HPACK reuse were
+separate previously tested causes. Searches through this document, the harness,
+the full git history, and pickaxe history for `HTTPUpgrade`, `SetConnectOnly`,
+ordinary GET/POST tunnel methods, and `Http2StreamTunnel` found no experiment
+which kept the raw Necko duplex stream but replaced classic H2 CONNECT with an
+ordinary H2 request. That method-carrier cause was therefore new; process
+topology, priority, cache/classifier, and directional framing were not retried.
+
+Commits `24abb804708a` and `b8a3bebf5236` implemented and admitted an explicit
+H2-only `diagnostic-h2-get-carrier` screen. Request padding retained the stock
+16--32-byte distribution but reserved the impossible-in-stock `~8` prefix.
+Only a valid marked H2 request used ordinary `GET`; all other traffic remained
+classic CONNECT. The forwardproxy fork accepted only that bounded marker,
+returned the stock 30--61-byte response-padding distribution while echoing the
+first 16 marker bytes, and then used the unchanged Variant-1 duplex stream.
+The client required H2 plus the exact marker echo before admitting the tunnel.
+There was no timer, resource-size threshold, link estimate, target-body
+condition, or future-byte wait. The server retained the stock forwardproxy
+Fast Open order (`200` before target dial), so slow-origin behavior was not
+silently replaced by an extra target-dial barrier.
+
+The fork was based on `github.com/klzgrad/forwardproxy` commit
+`d62c80d3dd2c`. Its final modified `forwardproxy.go` digest was
+`642f8d3ca7b4822c82322e351c8402f9dfb193a2518977efda4c6886b2027fdc`,
+the focused Go-test digest was
+`55f856b826c7ec81376a60c22eab1f0659534f5750a4d81c242c2a6ce4ad1b0e`,
+and `go test ./...` passed. The private Caddy 2.11.2 binary digest was
+`954e0c3c9ff5c87cc54666a3b9f74935cd2a5d8ea4835f4fe7db2f75ab5f80c2`;
+the preserved stock binary remained
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 103/103 focused C++ gtests, 124/124 complete harness tests,
+and incremental test/product builds without a clobber.
+
+One failed private lifecycle smoke, `87f8b5dd8029eb50` (seed `2026082934`),
+must not be treated as a candidate measurement or repeated as the nominal
+configuration. It proved a valid marked H2 GET reached forwardproxy, but an
+over-specific server guard required path `/`. The fixture's ordinary
+`rewrite / /camouflage/index.html?scenario=fronting_page_dense` runs before
+forwardproxy, so the guard rejected a correctly negotiated request before any
+target dial. Removing that path guard made negotiation independent of the
+fronting-site route and resource set. An isolated manual SOCKS/TLS duplex probe
+then succeeded, followed by strict one-sample SOCKS artifact
+`0b0ffa018502ae33` (seed `2026082935`) and HTTP-listener artifact
+`8765f4f771bfca1e` (seed `2026082936`). Each admitted one physical H2 session,
+one exact marker echo, a completed preamble, and a working inner HTTPS/H2
+request.
+
+The randomized same-base one-block screen `9a73f27ea029dcd5` (seed
+`2026082937`) used the canonical 262144-byte browser page, inner HTTPS/H2,
+Firefox A/B, an isolated network namespace, and only packets 17--32 plus Whole:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.49978 | 0.44192 | control |
+| SOCKS ordinary-GET carrier | 0.50532 | 0.42741 | +1.1% / -3.3% |
+| HTTP current `document-first-buffer-http-connect` | 0.49030 | 0.39485 | control |
+| HTTP ordinary-GET carrier | 0.40576 | 0.45081 | -17.2% / +14.2% |
+
+SOCKS was effectively neutral in the focus window. HTTP improved packets
+17--32 by only 17.2%, below the required 20% threshold for a mutually breaking
+client/Caddy change, while making Whole 14.2% worse. No replication,
+resource-size matrix, constrained-link matrix, or full default matrix was
+spent on this weak trade. Commits `e5522f840f78` and `52c456d88c98` retired the
+harness and client experiment respectively. After retirement, 121/121 harness
+tests, 100/100 C++ gtests, and both incremental test/product builds passed.
+Production defaults and the documented fronting-site requirements are
+unchanged; the active fixture is stock Caddy.
+
+Future preflight must treat replacing H2 CONNECT with an ordinary GET or POST,
+or merely moving the same negotiation marker between headers, as this rejected
+method-carrier causal family. A new proposal needs a distinct mechanism which
+explains both the 17--32 signal and Whole rather than renaming this wire-method
+substitution.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
