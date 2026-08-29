@@ -1945,6 +1945,24 @@ This rejects body-callback granularity as the explanation and motivates
 separating early outer CONNECT establishment from the retained body-progress
 gate for local SOCKS success, rather than fitting the observed millisecond gap.
 
+That separation is rejected after a one-block shaped screen. All six cover
+transactions first had to commit, which opened the outer CONNECT stream; the
+SOCKS success callback and tunnel pump remained explicitly blocked until the
+complete first valid resource body buffer was consumed. Thus target connection
+establishment could overlap cover responses, but no browser application bytes
+could enter H3 early. The two gates were event-driven and retained the same
+body-size, RTT, and bandwidth independence as the working candidate. Artifact
+`5b393915a38fb0e4` nevertheless measured
+0.22035/0.35901/0.22541/0.20450/0.39240. Packets 17--32 and whole do not improve
+the retained candidate's replicated 0.29471/0.34363, while both cumulative
+early views regress materially. The binary identified build ID
+`7f2eef53c6845ab4849be9b19bfa0b51` and libxul digest
+`97dd9e85108aac94812534e607c3c279cb1cb429d5974bab2d20ca8626251a6a`.
+Strict lifecycle validation proved the intended outer-ready/local-wait order,
+so the result rejects the extra early CONNECT scheduling work rather than an
+accidental release of tunneled DATA. The secondary callback, wait state, and
+temporary validator markers were removed.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
