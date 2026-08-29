@@ -1845,6 +1845,24 @@ front-loaded. The measured binary identified build ID
 The descriptor transport is useful diagnostic scaffolding, but immediate
 publication of every discovered image is not a candidate default.
 
+Releasing all four prepared images only after the parser-blocking script's
+successful native `OnStop` is also rejected as a candidate default. This was a
+causal response gate: slower transport or a larger script naturally postponed
+the image wave, while no elapsed-time, RTT, packet, or byte threshold was
+consulted. The validator accepted either ordering between final preamble drain
+and target establishment so that small resources cannot invalidate a healthy
+sample, but required script actor completion before the exact four image opens.
+One-block shaped artifact `576d37b44e6dbb09` improved the eager full-process
+result to 0.21196/0.33680/0.22121/0.19824/0.44306. Packets 17--32 were still
+worse than the retained page candidate's four-block 0.29471 and whole remained
+well above its 0.34363. Diagnostic signed packet sizes showed the four image
+responses becoming another dense flight around packets 23--24 instead of the
+two later direct-reference groups. The measured binary identified build ID
+`4f6cbbaf6282135c2c7c87a4d7745688` and libxul digest
+`04e91ec7013735bb76cea355159585262cb9219638ff02cae0c457b72daee21f`.
+Script completion is a useful adaptive boundary, but one four-image wave is
+still too coarse.
+
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
 `20260828T220612Z-2af3b849` logged all six request commits, first resource body
