@@ -81,7 +81,7 @@ shape and has not been admitted as equivalent to the current fixture. Native
 resource caching is enabled, but the canonical captures use fresh cold
 profiles and do not rely on a warm cache hit.
 
-## Profile behind the current measurements
+## Profile behind the canonical default matrix
 
 The canonical Caddy fixture rewrites `/` to its dense fronting page. Its outer
 resource bodies are:
@@ -99,8 +99,9 @@ aggregate is about 60.4 KiB. The fourth fixture URL is intentionally recorded
 as measurement provenance: it currently returns a tiny JSON body through an
 `<img>` descriptor. That is not a recommendation to deploy an invalid image.
 Replacing it with a small valid image is reasonable for a real fronting site,
-but its passive result must be measured before it is claimed equivalent to the
-dashboard.
+and the coherent size campaign below did measure that shape. Its result was
+mixed rather than equivalent to the historical dashboard, so the canonical
+ten-block matrix continues to describe the historical response exactly.
 
 The event-driven policy contains no configured resource size, fixed pause,
 RTT, bandwidth, or packet-index threshold. It should remain functionally safe
@@ -110,10 +111,49 @@ scaled the **inner tunneled browser workload**, not these outer Caddy
 resources. Slower-link screens did exercise the outer profile above, but kept
 its resource sizes fixed.
 
-Consequently, the closest known measured deployment profile is the topology
-and approximate sizes above. A coherent outer-resource size matrix, including
-a small valid fourth image and shaped/unshaped links, remains required before
-the acceptable size range can be widened in this contract. The integration
-harness exposes this input independently as `--outer-resource-unit-size`: CSS,
-JavaScript, and four valid SVG bodies use `3/6/2/2/2/2` units while the root and
-inner tunneled workload remain fixed.
+The integration harness exposes the outer input independently as
+`--outer-resource-unit-size`: CSS, JavaScript, and four valid SVG bodies use
+`3/6/2/2/2/2` units while the root and inner tunneled workload remain fixed.
+
+## Measured coherent size envelope
+
+The 2026-08-29 coherent campaign kept the exact topology, URLs, MIME types,
+inner workload, product binary, and policy fixed while scaling only the six
+outer bodies. It successfully exercised 17, 68, and 272 KiB excluding the
+small root on an unshaped isolated WSL link, plus the 17- and 272-KiB endpoints
+at 20-ms one-way delay and 20 Mbit/s. Every run completed all 24 participants
+with 24/24 cold proxy resets and network checks, and a live preflight verified
+the served byte counts and MIME types. The table gives packets 17--32 / whole
+point estimates; the
+complete five-view table and safe artifact IDs are in
+[`CAPTURE.md`](CAPTURE.md#predeclared-outer-resource-size-campaign).
+
+| Link | Outer bodies excluding root | H3 SOCKS5 default | H3 HTTP CONNECT default |
+| --- | ---: | ---: | ---: |
+| unshaped | 17 KiB | 0.50255 / 0.50407 | 0.50641 / 0.50456 |
+| unshaped | 68 KiB | 0.46957 / 0.42231 | 0.49428 / 0.42534 |
+| unshaped | 272 KiB | 0.37350 / 0.37166 | 0.38149 / 0.35411 |
+| 20-ms one-way, 20 Mbit/s | 17 KiB | 0.24379 / 0.40498 | 0.31374 / 0.40292 |
+| 20-ms one-way, 20 Mbit/s | 272 KiB | 0.23608 / 0.30535 | 0.25181 / 0.30231 |
+
+These four-block screens establish functional coverage over 17--272 KiB, not
+passive equivalence. On the unshaped link every default view improved
+monotonically as the bodies grew. On the shaped link, 272 KiB still improved
+whole by about 0.10 and HTTP CONNECT packets 17--32 by about 0.062, but worsened
+the 250-ms view by about 0.037 for SOCKS5 and 0.028 for HTTP CONNECT. Resource
+size therefore materially affects the observed residual, and there is no
+single size proven optimal independently of RTT, bandwidth, and observation
+window. Links slower than 20 Mbit/s, one-way delays above 20 ms, compression,
+and aggregates between or beyond the tested endpoints remain unmeasured.
+
+For a neutral placeholder deployment, use the coherent nominal profile as the
+conservative baseline: 12-KiB CSS, 24-KiB JavaScript, and four valid 8-KiB
+images, 68 KiB excluding the small root. It is closest to the historical
+fixture while using valid image responses. A real site whose natural six
+resources total up to about 272 KiB remains inside the measured envelope and
+showed better whole-flow point estimates; do not add artificial padding or
+inflate resources merely to reproduce this laboratory result. The 17-KiB
+profile also functioned correctly but had the worst unshaped whole result.
+Always keep root plus resources comfortably below the hard 384-KiB aggregate
+limit and preserve the exact six-resource topology and response requirements
+above.

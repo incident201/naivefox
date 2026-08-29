@@ -60,6 +60,64 @@ fixture first passes a live byte-count and MIME preflight outside the capture;
 declared sizes alone are not accepted as evidence that the intended profile
 was served.
 
+The campaign completed on 2026-08-29. All six runs used the promoted product
+binary (`naivefox_binary_build_id=929cd10f5dc1a5a286ba4d09ccc0c9c0`,
+libxul SHA-256
+`9df4dfb2b2b45475931a0155a8e336f5a8dcc1bb377e1d724eaa33785db7e39c`),
+inner HTTPS/H2, the default 262144-byte inner workload, cold profiles, and 24
+successful proxy resets and network-mutation checks. Every coherent-profile
+artifact records a passed live size/MIME preflight. Values below are ordered
+as packets 1--16 / packets 17--32 / packets 1--32 / first 250 ms / whole.
+
+| Link | Outer profile | Safe artifact | SOCKS5 six-resource default | HTTP CONNECT six-resource default |
+| --- | --- | --- | --- | --- |
+| unshaped | exact current, 61,474 B | `27cd617551df09e1` | 0.11371 / 0.48209 / 0.18401 / 0.15601 / 0.42831 | 0.10430 / 0.48934 / 0.18104 / 0.16029 / 0.43444 |
+| unshaped | coherent 17 KiB | `797c93e5e5de5b77` | 0.13154 / 0.50255 / 0.19260 / 0.17128 / 0.50407 | 0.12961 / 0.50641 / 0.19508 / 0.18269 / 0.50456 |
+| unshaped | coherent 68 KiB | `6cd4be128b6cdaef` | 0.10774 / 0.46957 / 0.18568 / 0.16721 / 0.42231 | 0.10576 / 0.49428 / 0.19396 / 0.16441 / 0.42534 |
+| unshaped | coherent 272 KiB | `7eeda921f5be8f0e` | 0.08663 / 0.37350 / 0.15555 / 0.14808 / 0.37166 | 0.08330 / 0.38149 / 0.14741 / 0.12599 / 0.35411 |
+| 20-ms one-way, 20 Mbit/s | coherent 17 KiB | `6a9ff85817ad6a41` | 0.09260 / 0.24379 / 0.12282 / 0.07891 / 0.40498 | 0.09482 / 0.31374 / 0.13610 / 0.08995 / 0.40292 |
+| 20-ms one-way, 20 Mbit/s | coherent 272 KiB | `1a6aeb8439779ae7` | 0.10323 / 0.23608 / 0.13335 / 0.11601 / 0.30535 | 0.09898 / 0.25181 / 0.13569 / 0.11801 / 0.30231 |
+
+The unshaped coherent series is monotonic in every displayed default view:
+larger outer bodies produced lower residuals. From 17 to 272 KiB, SOCKS5
+changed by -0.04491 / -0.12905 / -0.03705 / -0.02320 / -0.13241 and HTTP
+CONNECT by -0.04631 / -0.12492 / -0.04767 / -0.05670 / -0.15045. Under the
+shaped link, the same endpoint comparison is mixed: SOCKS5 changed by
++0.01063 / -0.00771 / +0.01053 / +0.03710 / -0.09963 and HTTP CONNECT by
++0.00416 / -0.06193 / -0.00041 / +0.02806 / -0.10061. Thus a larger natural
+page strongly improved whole-flow point estimates and improved HTTP CONNECT
+packets 17--32 in both link conditions, but it did not dominate the small
+page in the shaped 250-ms view.
+
+The corresponding document-start causal controls support a scheduling effect
+rather than only dilution by more outer bytes. Their packets 17--32 / whole
+values were: exact current SOCKS5 0.61855 / 0.46008 and HTTP CONNECT 0.63062 /
+0.43776; coherent 17 KiB unshaped 0.54084 / 0.51579 and 0.55695 / 0.49752;
+coherent 68 KiB unshaped 0.64363 / 0.46323 and 0.65259 / 0.43256; coherent
+272 KiB unshaped 0.56182 / 0.41738 and 0.57931 / 0.37375; coherent 17 KiB
+shaped 0.52894 / 0.46855 and 0.51583 / 0.45591; coherent 272 KiB shaped
+0.48775 / 0.40952 and 0.46932 / 0.39760. The six-resource defaults were lower
+than their listener-matched controls in packets 17--32 for every row and in
+whole for every row except the four-block unshaped 17-KiB HTTP point estimate
+(0.50456 versus 0.49752).
+
+This is evidence that outer resource size materially affects passive residuals,
+not permission to tune a production site to one fixture. Four blocks are
+descriptive, their bootstrap intervals remain broad, and the four-block exact
+repeat does not reproduce the canonical ten-block point estimates exactly.
+The coherent 17--272-KiB range is now functionally exercised, including both
+endpoints on a slower link, but it is not an equivalence interval or a new
+default measurement matrix. The canonical four-row table below remains
+unchanged. The exact-current and coherent-nominal comparison is mixed and also
+changes the fourth response from tiny JSON to a valid SVG, so it is not used
+as a size effect.
+
+Two one-block plumbing artifacts preceded the matrix. `1f49e855f3652c2c`
+successfully exercised the coherent 68-KiB fixture before the live preflight
+was added. `15c737ffa606b880` then exercised coherent 17 KiB with the new
+preflight and passed. Neither is candidate evidence and neither is substituted
+for a complete four-block row.
+
 ## Current implicit-default matrix
 
 This is the canonical current-default residual dashboard. Lower is closer to

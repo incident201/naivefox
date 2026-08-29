@@ -520,7 +520,7 @@ the established fixture exactly. The selected base is recorded in sanitized
 metadata; it is a diagnostic input and must not be tuned to a packet window.
 When a dense fronting-page arm replaces the outer scenario, this option still
 scales the inner tunneled workload only. The fixed outer origin profile and
-its open size-validation gap are documented in
+the completed independent outer-size campaign are documented in
 [`../../FRONTING-PAGE.md`](../../FRONTING-PAGE.md).
 
 Use `--outer-resource-unit-size BYTES` only with a dense H3 fronting-page arm
@@ -534,7 +534,13 @@ metadata records the selected profile, each body size, and the aggregate.
 Before network shaping or capture begins, the runner downloads all six bodies
 from the isolated target and fails closed unless their actual byte counts and
 MIME types match that metadata; the number of validated protocol fixtures is
-also recorded.
+also recorded. The predeclared 17/68/272-KiB unshaped screen and shaped
+17/272-KiB endpoint screen, including safe artifact IDs and all five default
+views, are recorded in
+[`../../CAPTURE.md`](../../CAPTURE.md#predeclared-outer-resource-size-campaign).
+Those four-block results are descriptive robustness evidence, not an
+acceptable-size equivalence claim or a reason to tune fixture bytes after
+observing a packet window.
 
 For an isolated link-robustness check, add `--network-one-way-delay-ms N`,
 `--network-rate-mbit N`, or both. Network shaping is rejected unless
