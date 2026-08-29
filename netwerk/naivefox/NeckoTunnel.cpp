@@ -1262,6 +1262,10 @@ nsresult ProxyPreambleOperation::Start(
     ProxyPreambleFinishedCallback&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule, uint64_t aConnectionId) {
   MOZ_ASSERT(NS_IsMainThread());
+  const uint32_t expectedH2NativeParserResourceCount =
+      aConfig.mMode == PreambleMode::TreeNativeParserResourceCommittedOverlap
+          ? 6U
+          : 3U;
   if (!aBarrierCallback || aConfig.mMode == PreambleMode::Off ||
       !IsValidPreamblePath(aConfig.mPath) || aConfig.mMaxBytes == 0 ||
       aConfig.mMaxBytes > PreambleConfig::kMaximumBytes ||
@@ -1278,9 +1282,14 @@ nsresult ProxyPreambleOperation::Start(
             aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartResourceTree ||
             aConfig.mMode ==
+                PreambleMode::TreeNativeParserResourceCommittedOverlap ||
+            aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartNavigationStop))) ||
         (PreambleModeUsesNativeParserResourceTree(aConfig.mMode)
-             ? (aConfig.mMaxAssets != 3U && aConfig.mMaxAssets != 6U)
+             ? (aProtocol == ProxyProtocol::H2
+                    ? aConfig.mMaxAssets !=
+                          expectedH2NativeParserResourceCount
+                    : (aConfig.mMaxAssets != 3U && aConfig.mMaxAssets != 6U))
              : aConfig.mMaxAssets != 1U) ||
         !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
