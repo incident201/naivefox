@@ -52,14 +52,7 @@ fi
 
 build_id="caddy=$CADDY_VERSION xcaddy=$XCADDY_VERSION module=$FORWARDPROXY_MODULE@$FORWARDPROXY_VERSION=$FORWARDPROXY_REPLACEMENT@$FORWARDPROXY_COMMIT go=$GO_VERSION"
 caddy_marker="$TOOLS_DIR/bin/caddy.build-id"
-custom_caddy_sha256=stock
-if [[ -n ${NAIVEFOX_CAPTURE_CADDY_BIN:-} ]]; then
-  [[ -x "$CADDY_BIN" ]] || {
-    printf 'custom Caddy is not executable: %s\n' "$CADDY_BIN" >&2
-    exit 1
-  }
-  custom_caddy_sha256=$(sha256sum "$CADDY_BIN" | cut -d' ' -f1)
-elif [[ ! -x "$CADDY_BIN" || ! -f "$caddy_marker" || $(<"$caddy_marker") != "$build_id" ]]; then
+if [[ ! -x "$CADDY_BIN" || ! -f "$caddy_marker" || $(<"$caddy_marker") != "$build_id" ]]; then
   caddy_tmp="$TOOLS_DIR/bin/caddy.tmp.$$"
   trap 'rm -f -- "$caddy_tmp"' EXIT
   PATH="$(dirname "$GO_BIN"):$PATH" "$XCADDY_BIN" build "$CADDY_VERSION" --output "$caddy_tmp" \
@@ -82,7 +75,6 @@ fi
 
 {
   printf 'fixture_build=%s\n' "$build_id"
-  printf 'custom_caddy_sha256=%s\n' "$custom_caddy_sha256"
   printf 'go=%s\n' "$("$GO_BIN" version)"
   printf 'xcaddy=%s\n' "$("$XCADDY_BIN" version)"
   printf 'caddy=%s\n' "$("$CADDY_BIN" version)"
