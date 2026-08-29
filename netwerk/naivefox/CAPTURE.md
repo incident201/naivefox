@@ -2523,6 +2523,32 @@ gate/smoke-only H2 switch
 `--outer-early-hints css|blocking|all` remains only to reproduce this rejected
 causal family.
 
+A separate history preflight found no experiment which put the same preload
+links on the ordinary final `200` response. This boundary is later than
+`103` but earlier than discovering the URLs in the HTML body. The
+gate/smoke-only `--outer-final-preloads` switch again changes only the outer
+reference and preamble path; it is mutually exclusive with Early Hints and
+does not alter the inner tunneled workload or product binary.
+
+The first one-block blocking-pair screen `aade9604cf410007` looked balanced:
+SOCKS and HTTP packets 17--32 were `0.39982/0.38275`, with whole
+`0.26172/0.26969`. A stylesheet-only control was then clearly rejected in
+`1deeda6981aeba33`: it measured `0.68566/0.35983` for SOCKS and
+`0.63957/0.39122` for HTTP. This non-monotonic result made a fresh
+replication mandatory rather than treating the first ordering as a tuning
+point.
+
+Four-block artifact `ea162ea7be104577` (seed `2026082974`) did not
+reproduce a common blocking-pair win. SOCKS measured `0.43769/0.24862` and
+HTTP `0.41999/0.27334`. Relative to the canonical rows, that is roughly a 2%
+packets-17--32 regression and 9.7% whole improvement for SOCKS, but a 2%
+packets-17--32 improvement and 5.3% whole regression for HTTP. A special
+final-response `Link` contract therefore transfers residual between
+listeners rather than reducing both targets. It is not a fronting-site
+requirement or default; the all-resource variant and size/link matrix were not
+spent after this replicated rejection. The bounded harness switch remains for
+reproduction.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
