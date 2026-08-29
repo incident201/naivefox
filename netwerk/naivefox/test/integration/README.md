@@ -886,6 +886,17 @@ same preamble mode, path, cache policy, limits, and lifecycle validation while
 selecting the local HTTP CONNECT listener; a multi-arm run must include the
 matched `document-start-http-connect` control.
 
+The HTTP CONNECT ingress can also be combined with the existing causal
+document barriers on either H2 or H3. `document-overlap-http-connect` waits
+for accepted response HEADERS, while `document-first-buffer-http-connect`
+waits for the first complete body buffer. The
+`document-start-task-http-connect`, `document-headers-task-http-connect`, and
+`document-first-buffer-task-http-connect` aliases preserve the corresponding
+product modes but add exactly one ordinary main-thread turn after their native
+Necko event. These are listener-selection aliases only: they do not add a
+timer, byte threshold, packet-index condition, or new production mode. They
+remain opt-in screening arms and do not alter implicit defaults.
+
 Profiles have explicit participant roles. Direct H3 Firefox alone receives
 the local test Alt-Svc mapping; the NaiveFox process profile enables the real
 H3 stack without that mapping, and the workload browser uses only its

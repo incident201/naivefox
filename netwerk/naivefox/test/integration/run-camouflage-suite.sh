@@ -291,7 +291,7 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-first-buffer-overlap | document-first-buffer-task-overlap | document-first-buffer-http-connect | document-overlap | document-headers-task-overlap | document-overlap-http-connect | document-start-http-connect | document-start-overlap | document-start-task-overlap | tree-complete | tree-complete-css | tree-complete-resource-tree | tree-early-overlap | tree-early-overlap-resource-tree | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-committed-overlap-tree | tree-resource-committed-overlap-page | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-resource-tree | tree-native-parser-resource-committed-tree | tree-native-parser-resource-committed-page | tree-native-parser-resource-committed-page-http-connect | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+  off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-first-buffer-overlap | document-first-buffer-task-overlap | document-first-buffer-task-http-connect | document-first-buffer-http-connect | document-overlap | document-headers-task-overlap | document-headers-task-http-connect | document-overlap-http-connect | document-start-http-connect | document-start-overlap | document-start-task-overlap | document-start-task-http-connect | tree-complete | tree-complete-css | tree-complete-resource-tree | tree-early-overlap | tree-early-overlap-resource-tree | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-committed-overlap-tree | tree-resource-committed-overlap-page | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-resource-tree | tree-native-parser-resource-committed-tree | tree-native-parser-resource-committed-page | tree-native-parser-resource-committed-page-http-connect | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
@@ -299,12 +299,6 @@ case $naivefox_arm in
 esac
 if [[ $naivefox_arm == root-pmtud-control && $protocol_selection != h3 ]]; then
   printf 'root-pmtud-control requires --protocol h3\n' >&2
-  exit 2
-fi
-if [[ ( $naivefox_arm == document-first-buffer-http-connect ||
-        $naivefox_arm == document-overlap-http-connect ) &&
-      $protocol_selection != h2 ]]; then
-  printf '%s requires --protocol h2\n' "$naivefox_arm" >&2
   exit 2
 fi
 if [[ $naivefox_arm == document-handshake-confirmed &&
@@ -405,7 +399,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-first-buffer-overlap | document-first-buffer-task-overlap | document-first-buffer-http-connect | document-overlap | document-headers-task-overlap | document-overlap-http-connect | document-start-http-connect | document-start-overlap | document-start-task-overlap | tree-complete | tree-complete-css | tree-complete-resource-tree | tree-early-overlap | tree-early-overlap-resource-tree | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-committed-overlap-tree | tree-resource-committed-overlap-page | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-resource-tree | tree-native-parser-resource-committed-tree | tree-native-parser-resource-committed-page | tree-native-parser-resource-committed-page-http-connect | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
+      off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-first-buffer-overlap | document-first-buffer-task-overlap | document-first-buffer-task-http-connect | document-first-buffer-http-connect | document-overlap | document-headers-task-overlap | document-headers-task-http-connect | document-overlap-http-connect | document-start-http-connect | document-start-overlap | document-start-task-overlap | document-start-task-http-connect | tree-complete | tree-complete-css | tree-complete-resource-tree | tree-early-overlap | tree-early-overlap-resource-tree | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-committed-overlap-tree | tree-resource-committed-overlap-page | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-resource-tree | tree-native-parser-resource-committed-tree | tree-native-parser-resource-committed-page | tree-native-parser-resource-committed-page-http-connect | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
         exit 2
@@ -2114,8 +2108,11 @@ run_naivefox_sample() {
   socks_port=$(choose_port)
   browser_socks_port=$socks_port
   if [[ $arm == document-first-buffer-http-connect ||
+        $arm == document-first-buffer-task-http-connect ||
+        $arm == document-headers-task-http-connect ||
         $arm == document-overlap-http-connect ||
         $arm == document-start-http-connect ||
+        $arm == document-start-task-http-connect ||
         $arm == tree-native-parser-resource-committed-page-http-connect ]]; then
     browser_participant=http-browser
     browser_socks_port=0
@@ -2284,14 +2281,17 @@ run_naivefox_sample() {
     drain_pattern=" preamble native-parser-preload drain=complete completed_resources=1 http=2[0-9][0-9] protocol=$protocol$"
   elif [[ $arm == document-overlap ||
           $arm == document-headers-task-overlap ||
+          $arm == document-headers-task-http-connect ||
           $arm == document-overlap-http-connect ||
           $arm == document-first-buffer-overlap ||
           $arm == document-first-buffer-task-overlap ||
+          $arm == document-first-buffer-task-http-connect ||
           $arm == document-first-buffer-http-connect ]]; then
     drain_pattern=" preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
   elif [[ $arm == document-start-http-connect ||
           $arm == document-start-overlap ||
-          $arm == document-start-task-overlap ]]; then
+          $arm == document-start-task-overlap ||
+          $arm == document-start-task-http-connect ]]; then
     drain_pattern=" preamble document-start-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
   fi
   sleep 0.25
@@ -2734,9 +2734,11 @@ else
   if [[ $naivefox_arm == tree-complete ||
         $naivefox_arm == document-first-buffer-overlap ||
         $naivefox_arm == document-first-buffer-task-overlap ||
+        $naivefox_arm == document-first-buffer-task-http-connect ||
         $naivefox_arm == document-first-buffer-http-connect ||
         $naivefox_arm == document-overlap ||
         $naivefox_arm == document-headers-task-overlap ||
+        $naivefox_arm == document-headers-task-http-connect ||
         $naivefox_arm == document-overlap-http-connect ||
         $naivefox_arm == document-carrier-dispatch ||
         $naivefox_arm == document-cold-winner-handoff ||
@@ -2745,6 +2747,7 @@ else
         $naivefox_arm == document-start-http-connect ||
         $naivefox_arm == document-start-overlap ||
         $naivefox_arm == document-start-task-overlap ||
+        $naivefox_arm == document-start-task-http-connect ||
         $naivefox_arm == root-pmtud-control ||
         $naivefox_arm == tree-complete-css ||
         $naivefox_arm == tree-early-overlap ||

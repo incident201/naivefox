@@ -1008,13 +1008,16 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
         "document-overlap",
         "document-headers-task-overlap",
+        "document-headers-task-http-connect",
         "document-overlap-http-connect",
         "document-start-http-connect",
         "document-start-overlap",
         "document-start-task-overlap",
+        "document-start-task-http-connect",
         "tree-complete",
         "tree-complete-css",
         "tree-complete-resource-tree",
@@ -1047,11 +1050,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
-    if arm in (
-        "document-first-buffer-http-connect",
-        "document-overlap-http-connect",
-    ) and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -1098,8 +1096,19 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
-    if arm == "tree-native-parser-resource-committed-page-http-connect":
-        arm = "tree-native-parser-resource-committed-page"
+    arm = {
+        "document-first-buffer-http-connect": "document-first-buffer-overlap",
+        "document-first-buffer-task-http-connect": (
+            "document-first-buffer-task-overlap"
+        ),
+        "document-headers-task-http-connect": "document-headers-task-overlap",
+        "document-overlap-http-connect": "document-overlap",
+        "document-start-http-connect": "document-start-overlap",
+        "document-start-task-http-connect": "document-start-task-overlap",
+        "tree-native-parser-resource-committed-page-http-connect": (
+            "tree-native-parser-resource-committed-page"
+        ),
+    }.get(arm, arm)
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
@@ -3443,13 +3452,16 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
             "document-overlap",
             "document-headers-task-overlap",
+            "document-headers-task-http-connect",
             "document-overlap-http-connect",
             "document-start-http-connect",
             "document-start-overlap",
             "document-start-task-overlap",
+            "document-start-task-http-connect",
             "tree-complete",
             "tree-complete-css",
             "tree-complete-resource-tree",

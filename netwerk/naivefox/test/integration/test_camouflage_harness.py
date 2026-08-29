@@ -1221,50 +1221,100 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
 
     def test_http_connect_ingress_combines_with_response_header_admission(self):
-        config = CONFIG.build_config(
-            "document-overlap-http-connect",
-            "h2",
-            1080,
-            4433,
-            "fixture-user",
-            "fixture-pass",
-        )
-        self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(config["preamble"]["mode"], "document-overlap")
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h2"):
-            CONFIG.build_config(
+        for protocol in ("h2", "h3"):
+            config = CONFIG.build_config(
                 "document-overlap-http-connect",
-                "h3",
+                protocol,
                 1080,
                 4433,
                 "fixture-user",
                 "fixture-pass",
             )
+            self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+            self.assertEqual(config["preamble"]["mode"], "document-overlap")
+            self.assertTrue(config["outer-session-gate"])
 
     def test_http_connect_ingress_combines_with_first_buffer_admission(self):
-        config = CONFIG.build_config(
-            "document-first-buffer-http-connect",
-            "h2",
-            1080,
-            4433,
-            "fixture-user",
-            "fixture-pass",
-        )
-        self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(
-            config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h2"):
-            CONFIG.build_config(
+        for protocol in ("h2", "h3"):
+            config = CONFIG.build_config(
                 "document-first-buffer-http-connect",
-                "h3",
+                protocol,
                 1080,
                 4433,
                 "fixture-user",
                 "fixture-pass",
             )
+            self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+            self.assertEqual(
+                config["preamble"]["mode"], "document-first-buffer-overlap"
+            )
+            self.assertTrue(config["outer-session-gate"])
+
+    def test_http_connect_task_barriers_map_to_product_modes(self):
+        cases = {
+            "document-start-task-http-connect": "document-start-task-overlap",
+            "document-headers-task-http-connect": "document-headers-task-overlap",
+            "document-first-buffer-task-http-connect": (
+                "document-first-buffer-task-overlap"
+            ),
+        }
+        for arm, mode in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm,
+                    "h3",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+                self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertTrue(config["proxy"].startswith("quic://"))
+
+    def test_http_connect_task_aliases_reuse_causal_validation(self):
+        features = {
+            "protocol": "h3",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        samples = {
+            "document-start-task-http-connect": (
+                "Connection 1 preamble document-start-overlap "
+                "admission=request-committed-task request_committed=1 "
+                "root_done=0 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=512 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble document-start-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+            ),
+            "document-headers-task-http-connect": (
+                "Connection 1 preamble document-overlap "
+                "admission=response-headers-task response_accepted=1 "
+                "root_done=0 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=0 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble document-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+            ),
+            "document-first-buffer-task-http-connect": (
+                "Connection 1 preamble document-overlap "
+                "admission=first-data-buffer-task response_accepted=1 "
+                "root_done=0 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=512 protocol=h3\n"
+                "Connection 1 preamble document-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+            ),
+        }
+        for arm, log_text in samples.items():
+            with self.subTest(arm=arm):
+                SAMPLE.validate_sample(arm, "h3", log_text, features)
 
     def test_socks_ingress_combines_with_first_buffer_admission(self):
         config = CONFIG.build_config(

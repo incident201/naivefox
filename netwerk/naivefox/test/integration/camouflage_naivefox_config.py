@@ -39,13 +39,16 @@ def build_config(
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
         "document-overlap",
         "document-headers-task-overlap",
+        "document-headers-task-http-connect",
         "document-overlap-http-connect",
         "document-start-http-connect",
         "document-start-overlap",
         "document-start-task-overlap",
+        "document-start-task-http-connect",
         "tree-complete",
         "tree-complete-css",
         "tree-complete-resource-tree",
@@ -82,11 +85,14 @@ def build_config(
             "document-native-cache-open, "
             "document-handshake-confirmed, document-first-buffer-overlap, "
             "document-first-buffer-task-overlap, "
+            "document-first-buffer-task-http-connect, "
             "document-first-buffer-http-connect, "
             "document-overlap, document-headers-task-overlap, "
+            "document-headers-task-http-connect, "
             "document-overlap-http-connect, "
             "document-start-http-connect, "
             "document-start-overlap, document-start-task-overlap, "
+            "document-start-task-http-connect, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, "
             "tree-resource-committed-overlap-css, "
@@ -108,11 +114,6 @@ def build_config(
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
-    if arm in (
-        "document-first-buffer-http-connect",
-        "document-overlap-http-connect",
-    ) and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -359,18 +360,25 @@ def build_config(
         "document-complete",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
         "document-overlap",
         "document-headers-task-overlap",
+        "document-headers-task-http-connect",
         "document-overlap-http-connect",
         "document-start-http-connect",
         "document-start-overlap",
         "document-start-task-overlap",
+        "document-start-task-http-connect",
     ):
         preamble = {
             "mode": (
                 "document-first-buffer-task-overlap"
-                if arm == "document-first-buffer-task-overlap"
+                if arm
+                in (
+                    "document-first-buffer-task-overlap",
+                    "document-first-buffer-task-http-connect",
+                )
                 else "document-first-buffer-overlap"
                 if arm
                 in (
@@ -384,7 +392,11 @@ def build_config(
                     "document-overlap-http-connect",
                 )
                 else "document-headers-task-overlap"
-                if arm == "document-headers-task-overlap"
+                if arm
+                in (
+                    "document-headers-task-overlap",
+                    "document-headers-task-http-connect",
+                )
                 else "document-start-overlap"
                 if arm
                 in (
@@ -392,7 +404,11 @@ def build_config(
                     "document-start-overlap",
                 )
                 else "document-start-task-overlap"
-                if arm == "document-start-task-overlap"
+                if arm
+                in (
+                    "document-start-task-overlap",
+                    "document-start-task-http-connect",
+                )
                 else "document-complete"
             ),
             "path": preamble_path,
@@ -452,8 +468,11 @@ def build_config(
             if arm
             in (
                 "document-first-buffer-http-connect",
+                "document-first-buffer-task-http-connect",
+                "document-headers-task-http-connect",
                 "document-overlap-http-connect",
                 "document-start-http-connect",
+                "document-start-task-http-connect",
                 "tree-native-parser-resource-committed-page-http-connect",
             )
             else f"socks://127.0.0.1:{socks_port}"
@@ -497,13 +516,16 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
             "document-overlap",
             "document-headers-task-overlap",
+            "document-headers-task-http-connect",
             "document-overlap-http-connect",
             "document-start-http-connect",
             "document-start-overlap",
             "document-start-task-overlap",
+            "document-start-task-http-connect",
             "tree-complete",
             "tree-complete-css",
             "tree-complete-resource-tree",
