@@ -18,11 +18,6 @@ OPTIMISTIC_LOCAL_REPLY = re.compile(
     r"pump-started|outer-failed) "
     r"listener=(?P<listener>socks|http-connect)$"
 )
-H2_GET_CARRIER = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
-    r"diagnostic-h2-get-carrier applied=1 method=GET "
-    r"negotiation=exact-marker-echo protocol=h2$"
-)
 ROOT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble root-overlap admission=(?P<admission>\S+) "
@@ -1021,11 +1016,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
-        "document-first-buffer-task-get-carrier",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
-        "document-first-buffer-get-carrier-http-connect",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -1067,12 +1060,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
-    get_carrier_arms = {
-        "document-first-buffer-task-get-carrier",
-        "document-first-buffer-get-carrier-http-connect",
-    }
-    if arm in get_carrier_arms and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -1123,12 +1110,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
     requested_arm = arm
     arm = {
-        "document-first-buffer-task-get-carrier": (
-            "document-first-buffer-task-overlap"
-        ),
-        "document-first-buffer-get-carrier-http-connect": (
-            "document-first-buffer-overlap"
-        ),
         "document-first-buffer-http-connect": "document-first-buffer-overlap",
         "document-first-buffer-http-connect-optimistic": (
             "document-first-buffer-overlap"
@@ -1145,23 +1126,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             "tree-native-parser-resource-committed-page"
         ),
     }.get(arm, arm)
-    get_carrier_lines = [
-        line for line in log_lines if "diagnostic-h2-get-carrier" in line
-    ]
-    parsed_get_carrier = [
-        H2_GET_CARRIER.fullmatch(line) for line in get_carrier_lines
-    ]
-    if any(marker is None for marker in parsed_get_carrier):
-        raise ValueError("malformed H2 GET carrier evidence")
-    if requested_arm in get_carrier_arms:
-        if len(parsed_get_carrier) != 1:
-            raise ValueError(
-                "H2 GET carrier arm requires exactly one negotiation marker"
-            )
-    elif parsed_get_carrier:
-        raise ValueError(
-            f"{requested_arm} arm unexpectedly logged H2 GET carrier evidence"
-        )
     optimistic_lines = [
         line for line in log_lines if "Local optimistic reply phase=" in line
     ]
@@ -1819,13 +1783,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
-    if requested_arm in get_carrier_arms and (
-        len(parsed_established) != 1
-        or parsed_established[0]["connection"]
-        != parsed_get_carrier[0]["connection"]
-        or parsed_established[0]["protocol"] != "h2"
-    ):
-        raise ValueError("H2 GET carrier marker identity differs from tunnel")
     expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
     if expected_padding not in ("yes", "no"):
         raise ValueError("unsupported expected padding condition")
@@ -3539,11 +3496,9 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
-            "document-first-buffer-task-get-carrier",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
-            "document-first-buffer-get-carrier-http-connect",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",
