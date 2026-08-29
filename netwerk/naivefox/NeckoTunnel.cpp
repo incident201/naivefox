@@ -11,7 +11,6 @@
 #include <utility>
 
 #include "AutoFallback.h"
-#include "HttpBaseChannel.h"
 #include "NativeStylePreloadActivation.h"
 #include "NativeStylePreloadChannel.h"
 #include "ReferrerInfo.h"
@@ -64,10 +63,10 @@
 #include "nsITimer.h"
 #include "nsITransportSecurityInfo.h"
 #include "nsIURI.h"
+#include "nsIUploadChannel2.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsProxyInfo.h"
-#include "nsQueryObject.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
 #include "nsStringStream.h"
@@ -4457,12 +4456,23 @@ nsresult OpenNeckoTunnel(
     MOZ_TRY(internal->SetProxyConnectHeader("padding"_ns, aConnectPadding));
   }
   if (!aEarlyData.IsEmpty()) {
-    RefPtr<net::HttpBaseChannel> baseChannel = do_QueryObject(channel);
-    if (!baseChannel) {
+    nsCOMPtr<nsIUploadChannel2> uploadChannel = do_QueryInterface(channel);
+    if (!uploadChannel) {
       return NS_ERROR_NO_INTERFACE;
     }
-    MOZ_TRY(baseChannel->GetRequestHead()->SetNaiveFoxProxyConnectEarlyData(
-        aEarlyData));
+    nsTArray<uint8_t> uploadBytes;
+    uploadBytes.AppendElements(aEarlyData);
+    nsCOMPtr<nsIInputStream> uploadStream;
+    MOZ_TRY(NS_NewByteInputStream(getter_AddRefs(uploadStream),
+                                  std::move(uploadBytes)));
+    nsAutoCString noContentType;
+    noContentType.SetIsVoid(true);
+    MOZ_TRY(uploadChannel->ExplicitSetUploadStream(
+        uploadStream, noContentType, aEarlyData.Length(), "POST"_ns));
+    // The synthetic target request remains a GET. Http2StreamTunnel emits the
+    // actual CONNECT pseudo-headers and deliberately keeps its send side open
+    // after this finite upload has been consumed.
+    MOZ_TRY(httpChannel->SetRequestMethod("GET"_ns));
     nsAutoCString earlyDataBytes;
     earlyDataBytes.AppendInt(aEarlyData.Length());
     MOZ_TRY(internal->SetProxyConnectHeader("x-naivefox-early-data"_ns,
