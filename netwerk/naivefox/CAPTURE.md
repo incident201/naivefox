@@ -1157,6 +1157,7 @@ independent seeds.
 | `e386025177b9432c` | make only the first preamble-owned H3 CONNECT stream incremental at generic urgency, shaped link | 1 | 0.12355 / 0.42295 / 0.17830 / 0.16060 / 0.35493 |
 | `f9c4c26050a2988a` | bound H3 duplex-pump reads to Gecko's 4096-byte default segment, shaped link | 1 | 0.23503 / 0.36697 / 0.25550 / 0.24040 / 0.41194 |
 | `3500eb894d951e57` | demote only the first preamble-owned H3 CONNECT from generic `u=4` to `u=5`, shaped link | 1 | 0.25290 / 0.49920 / 0.28958 / 0.22799 / 0.47932 |
+| `7770ec81beea4b8a` | release prepared images after CSS and script request commits, shaped link | 1 | 0.28935 / 0.39986 / 0.29283 / 0.29333 / 0.42113 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1755,6 +1756,24 @@ other views 0.25290/0.28958/0.22799. Its binary identified build ID
 The priority flag and exact validator marker were removed. Both one-step
 promotion and one-step demotion of CONNECT now regress the target window, so
 further urgency-only tuning is not a useful direction.
+
+Holding the four prepared image channels until both blocking requests reach
+`NS_NET_STATUS_WAITING_FOR` is rejected. Decrypted packet inspection motivated
+the experiment: direct Firefox's packets 17--32 contained the stylesheet and
+deferred-script GETs followed by stylesheet response data, while the retained
+candidate had already placed its four image GETs in that window. The new gate
+depended only on CSS/script request commitment, then opened all images on the
+next ordinary main-thread task; it did not wait for a response, body bytes,
+elapsed time, RTT, or bandwidth. The strict temporary validator required both
+blocking commits before the task and all four image commits afterwards.
+One-block shaped artifact `7770ec81beea4b8a` nevertheless measured 0.39986
+for packets 17--32 and 0.42113 whole, with other views
+0.28935/0.29283/0.29333. Its binary identified build ID
+`6163349c5fa7afdb18ac1a857435cb79` and libxul digest
+`179fb8677622398e29caf982acc7f4fafb4731afa3c10f4921e9d2021f778661`.
+Moving the image HEADERS out of the target window alone left mismatched ACK
+and response-flight positions and worsened the 250-ms view. The request gate,
+task, and temporary lifecycle validation were removed.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
