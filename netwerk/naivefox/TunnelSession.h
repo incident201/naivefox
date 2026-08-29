@@ -8,7 +8,6 @@
 #include <functional>
 
 #include "Config.h"
-#include "HeaderPadding.h"
 #include "ProxyProtocol.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
@@ -32,15 +31,6 @@ namespace detail {
 
 constexpr bool ShouldRunPreamble(PreambleMode aMode, bool aColdLeader) {
   return aMode != PreambleMode::Off && aColdLeader;
-}
-
-inline bool ShouldStageDirectionalDownstream(
-    DirectionalConnectLane aLane, nsresult aStatus, bool aConnectCodeKnown,
-    int32_t aConnectCode, bool aDirectionalHeaderAccepted,
-    const nsACString& aOuterProtocol) {
-  return aLane == DirectionalConnectLane::Upstream && NS_SUCCEEDED(aStatus) &&
-         aConnectCodeKnown && aConnectCode >= 200 && aConnectCode < 300 &&
-         aDirectionalHeaderAccepted && aOuterProtocol.EqualsLiteral("h2");
 }
 
 // Main-thread-only sequence guard. Keeping the generation transition in this
@@ -110,8 +100,8 @@ struct TunnelConfig final {
         mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
             aOther.mDiagnosticFirstSocksTunnelUrgentStart),
-        mDiagnosticOptimisticLocalReply(aOther.mDiagnosticOptimisticLocalReply),
-        mDiagnosticDirectionalConnect(aOther.mDiagnosticDirectionalConnect) {
+        mDiagnosticOptimisticLocalReply(
+            aOther.mDiagnosticOptimisticLocalReply) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -127,7 +117,6 @@ struct TunnelConfig final {
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
-      mDiagnosticDirectionalConnect = aOther.mDiagnosticDirectionalConnect;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -145,7 +134,6 @@ struct TunnelConfig final {
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mDiagnosticOptimisticLocalReply = false;
-  bool mDiagnosticDirectionalConnect = false;
 };
 
 class TunnelSession final {
@@ -203,30 +191,25 @@ class TunnelSession final {
                                            ProxyProtocol aProtocol);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
-  void OpenDirectionalDownstreamOnMain(uint64_t aGeneration,
-                                       ProxyProtocol aProtocol);
   void NotifyOuterGateReady();
   void ReleaseOuterGate();
   void FailPreambleOnMain(nsresult aStatus);
   void CancelRequestOnMain(nsresult aStatus);
   void ClearRequestOnMain(uint64_t aGeneration, nsIRequest* aRequest);
   void ApplyConnectMetadata(uint64_t aGeneration, ProxyProtocol aProtocol,
-                            DirectionalConnectLane aLane, nsresult aStatus,
-                            bool aConnectCodeKnown, int32_t aConnectCode,
+                            nsresult aStatus, bool aConnectCodeKnown,
+                            int32_t aConnectCode,
                             const Maybe<bool>& aPaddingHeaderPresent,
-                            bool aDirectionalHeaderAccepted,
                             const nsACString& aOuterProtocol);
   void ApplyChannelStop(uint64_t aGeneration, ProxyProtocol aProtocol,
-                        DirectionalConnectLane aLane, nsresult aStatus);
+                        nsresult aStatus);
   void ApplyTransport(uint64_t aGeneration, ProxyProtocol aProtocol,
-                      DirectionalConnectLane aLane,
                       nsISocketTransport* aTransport,
                       nsIAsyncInputStream* aSocketIn,
                       nsIAsyncOutputStream* aSocketOut);
   void ApplyUpgradeFailure(uint64_t aGeneration, ProxyProtocol aProtocol,
-                           DirectionalConnectLane aLane, nsresult aStatus);
-  void ApplyEstablishmentTimeout(uint64_t aGeneration, ProxyProtocol aProtocol,
-                                 DirectionalConnectLane aLane);
+                           nsresult aStatus);
+  void ApplyEstablishmentTimeout(uint64_t aGeneration, ProxyProtocol aProtocol);
   void ApplyOpenFailure(uint64_t aGeneration, ProxyProtocol aProtocol,
                         nsresult aStatus);
   bool IsCurrentAttempt(uint64_t aGeneration, ProxyProtocol aProtocol) const;

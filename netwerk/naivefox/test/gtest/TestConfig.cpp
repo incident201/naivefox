@@ -119,7 +119,6 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
-  EXPECT_FALSE(config.mDiagnosticDirectionalConnect);
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
@@ -378,46 +377,6 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":1})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":"true"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-optimistic-local-reply":false})",
-  };
-  for (const char* json : kInvalid) {
-    Config config;
-    nsAutoCString error;
-    EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
-        << json;
-    EXPECT_FALSE(error.IsEmpty()) << json;
-  }
-}
-
-TEST(NaiveFoxConfig, DiagnosticDirectionalConnectIsH2Only)
-{
-  for (const auto& [value, expected] :
-       {std::pair{"true", true}, std::pair{"false", false}}) {
-    Config config;
-    nsAutoCString error;
-    nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-directional-connect":)"_ns);
-    json.Append(value);
-    json.Append('}');
-    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
-    EXPECT_EQ(config.mDiagnosticDirectionalConnect, expected);
-  }
-
-  Config h3;
-  nsAutoCString error;
-  EXPECT_TRUE(NS_FAILED(ParseConfig(
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-directional-connect":true})"_ns,
-      h3, error)));
-  EXPECT_EQ(error,
-            "diagnostic-directional-connect requires explicit H2 proxies");
-}
-
-TEST(NaiveFoxConfig, RejectsInvalidDiagnosticDirectionalConnect)
-{
-  static constexpr const char* kInvalid[] = {
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-directional-connect":null})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-directional-connect":1})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-directional-connect":"true"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-directional-connect":true,"diagnostic-directional-connect":false})",
   };
   for (const char* json : kInvalid) {
     Config config;
@@ -1043,7 +1002,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
   source.mDiagnosticOptimisticLocalReply = true;
-  source.mDiagnosticDirectionalConnect = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1067,7 +1025,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
-    EXPECT_TRUE(copy->mDiagnosticDirectionalConnect);
   }
 }
 

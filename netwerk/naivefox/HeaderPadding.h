@@ -17,24 +17,12 @@ namespace mozilla::naivefox {
 
 inline constexpr size_t kHeaderPaddingMinLength = 16;
 inline constexpr size_t kHeaderPaddingMaxLength = 32;
-inline constexpr size_t kDirectionalConnectTokenLength = 13;
-
-enum class DirectionalConnectLane : uint8_t { Upstream, Downstream };
 
 using HeaderPaddingRandom = FunctionRef<Maybe<uint64_t>()>;
 
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding,
                                              HeaderPaddingRandom aRandom);
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding);
-[[nodiscard]] nsresult GenerateDirectionalConnectHeaderPadding(
-    nsACString& aUpstreamPadding, nsACString& aDownstreamPadding,
-    nsACString& aToken, HeaderPaddingRandom aRandom);
-[[nodiscard]] nsresult GenerateDirectionalConnectHeaderPadding(
-    nsACString& aUpstreamPadding, nsACString& aDownstreamPadding,
-    nsACString& aToken);
-bool MatchesDirectionalConnectHeaderPadding(
-    const nsACString& aPadding, DirectionalConnectLane aExpectedLane,
-    const nsACString& aExpectedToken);
 
 }  // namespace mozilla::naivefox
 

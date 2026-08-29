@@ -18,12 +18,6 @@ OPTIMISTIC_LOCAL_REPLY = re.compile(
     r"pump-started|outer-failed) "
     r"listener=(?P<listener>socks|http-connect)$"
 )
-DIRECTIONAL_CONNECT = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
-    r"diagnostic-directional-connect negotiated=1 protocol=h2 "
-    r"streams=2 opening=staged-after-upstream-response "
-    r"upstream=primary downstream=secondary$"
-)
 ROOT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble root-overlap admission=(?P<admission>\S+) "
@@ -1022,11 +1016,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
-        "document-first-buffer-task-directional-connect",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
-        "document-first-buffer-directional-http-connect",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -1068,12 +1060,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
-    directional_arms = {
-        "document-first-buffer-task-directional-connect",
-        "document-first-buffer-directional-http-connect",
-    }
-    if arm in directional_arms and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -1124,12 +1110,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
     requested_arm = arm
     arm = {
-        "document-first-buffer-task-directional-connect": (
-            "document-first-buffer-task-overlap"
-        ),
-        "document-first-buffer-directional-http-connect": (
-            "document-first-buffer-overlap"
-        ),
         "document-first-buffer-http-connect": "document-first-buffer-overlap",
         "document-first-buffer-http-connect-optimistic": (
             "document-first-buffer-overlap"
@@ -1146,21 +1126,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             "tree-native-parser-resource-committed-page"
         ),
     }.get(arm, arm)
-    directional_lines = [
-        line for line in log_lines if "diagnostic-directional-connect" in line
-    ]
-    parsed_directional = [
-        DIRECTIONAL_CONNECT.fullmatch(line) for line in directional_lines
-    ]
-    if any(marker is None for marker in parsed_directional):
-        raise ValueError("malformed directional CONNECT evidence")
-    if requested_arm in directional_arms:
-        if not parsed_directional:
-            raise ValueError("directional CONNECT arm requires negotiation evidence")
-    elif parsed_directional:
-        raise ValueError(
-            f"{requested_arm} arm unexpectedly logged directional CONNECT evidence"
-        )
     optimistic_lines = [
         line for line in log_lines if "Local optimistic reply phase=" in line
     ]
@@ -1818,35 +1783,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
-    if requested_arm in directional_arms:
-        directional_connections = [
-            marker["connection"] for marker in parsed_directional
-        ]
-        established_connections = [
-            marker["connection"] for marker in parsed_established
-        ]
-        if (
-            not established_connections
-            or len(set(directional_connections)) != len(directional_connections)
-            or len(set(established_connections)) != len(established_connections)
-            or set(directional_connections) != set(established_connections)
-            or any(marker["protocol"] != "h2" for marker in parsed_established)
-        ):
-            raise ValueError(
-                "directional CONNECT markers do not match established CONNECTs"
-            )
-        directional_by_connection = {
-            marker["connection"]: line
-            for line, marker in zip(directional_lines, parsed_directional)
-        }
-        if any(
-            log_lines.index(line)
-            >= log_lines.index(directional_by_connection[marker["connection"]])
-            for line, marker in zip(established_lines, parsed_established)
-        ):
-            raise ValueError(
-                "directional CONNECT marker precedes CONNECT establishment"
-            )
     expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
     if expected_padding not in ("yes", "no"):
         raise ValueError("unsupported expected padding condition")
@@ -3560,11 +3496,9 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
-            "document-first-buffer-task-directional-connect",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
-            "document-first-buffer-directional-http-connect",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",

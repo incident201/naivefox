@@ -24,7 +24,7 @@ init_paths() {
   OBJDIR=$(topobjdir)
   STATE_ROOT="$OBJDIR/naivefox-fixture"
   TOOLS_DIR="$STATE_ROOT/tools"
-  CADDY_BIN="${NAIVEFOX_CAPTURE_CADDY_BIN:-$TOOLS_DIR/bin/caddy}"
+  CADDY_BIN="$TOOLS_DIR/bin/caddy"
   ACTIVE_RUN_FILE="$STATE_ROOT/active-run"
   mkdir -p "$TOOLS_DIR/bin" "$STATE_ROOT/runs"
 }

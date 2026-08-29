@@ -402,22 +402,7 @@ NS_IMETHODIMP PumpDirection::OnOutputStreamReady(
 
 class TunnelSession::Impl final {
  public:
-  struct LaneState final {
-    bool mTransportReady = false;
-    bool mMetadataReady = false;
-    nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
-    bool mChannelStopped = false;
-    nsresult mChannelStatus = NS_ERROR_NOT_INITIALIZED;
-    bool mConnectCodeKnown = false;
-    int32_t mConnectCode = -1;
-    Maybe<bool> mPaddingHeaderPresent;
-    bool mDirectionalHeaderAccepted = false;
-    nsCString mOuterProtocol;
-    nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
-    nsCOMPtr<nsIAsyncOutputStream> mPendingTunnelOut;
-    bool mUpgradeFailed = false;
-    bool mEstablishmentTimedOut = false;
-  };
+  enum class ActiveRequestKind : uint8_t { None, Tunnel };
 
   Impl(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
        const TunnelConfig& aConfig, bool aConnectUrgentStart,
@@ -450,11 +435,20 @@ class TunnelSession::Impl final {
   uint64_t mAttemptGeneration = 0;
   bool mFallbackUsed = false;
   bool mConnectUrgentStartLogged = false;
-  std::array<LaneState, 2> mLanes;
-  nsCString mDirectionalConnectToken;
-  nsCString mDirectionalDownstreamPadding;
-  bool mDirectionalDownstreamOpenRequested = false;
+  bool mTransportReady = false;
+  bool mMetadataReady = false;
+  nsresult mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
+  bool mChannelStopped = false;
+  nsresult mChannelStatus = NS_ERROR_NOT_INITIALIZED;
+  bool mConnectCodeKnown = false;
+  int32_t mConnectCode = -1;
+  Maybe<bool> mPaddingHeaderPresent;
+  nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
+  nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
+  nsCOMPtr<nsIAsyncOutputStream> mPendingTunnelOut;
+  bool mUpgradeFailed = false;
+  bool mEstablishmentTimedOut = false;
   bool mStarted = false;
   bool mReady = false;
   bool mPumpStarted = false;
@@ -465,26 +459,15 @@ class TunnelSession::Impl final {
   std::atomic<bool> mOuterGateRegistered{false};
   std::atomic<bool> mOuterGateReleaseRequested{false};
   nsCString mOuterGateKey;
-  std::array<nsCOMPtr<nsIRequest>, 2> mActiveRequests;
-  std::array<uint64_t, 2> mActiveRequestGenerations{};
+  nsCOMPtr<nsIRequest> mActiveRequest;
+  uint64_t mActiveRequestGeneration = 0;
+  ActiveRequestKind mActiveRequestKind = ActiveRequestKind::None;
   nsCOMPtr<nsITimer> mPreambleTimer;
   nsCOMPtr<nsITimer> mPreambleDrainTimer;
   RefPtr<ProxyPreambleOperation> mPreambleOperation;
   uint64_t mPreambleOperationGeneration = 0;
   nsCString mPreambleTargetAuthority;
   detail::PreambleSequenceState mPreambleSequence;
-
-  static constexpr size_t LaneIndex(DirectionalConnectLane aLane) {
-    return aLane == DirectionalConnectLane::Upstream ? 0 : 1;
-  }
-
-  LaneState& State(DirectionalConnectLane aLane) {
-    return mLanes[LaneIndex(aLane)];
-  }
-
-  const LaneState& State(DirectionalConnectLane aLane) const {
-    return mLanes[LaneIndex(aLane)];
-  }
 };
 
 class TunnelAttempt final : public nsIHttpUpgradeListener,
@@ -496,15 +479,11 @@ class TunnelAttempt final : public nsIHttpUpgradeListener,
   NS_DECL_NSISTREAMLISTENER
 
   TunnelAttempt(TunnelSession* aOwner, nsIEventTarget* aSocketTarget,
-                uint64_t aGeneration, ProxyProtocol aProtocol,
-                DirectionalConnectLane aLane,
-                const nsACString& aDirectionalConnectToken)
+                uint64_t aGeneration, ProxyProtocol aProtocol)
       : mOwner(aOwner),
         mSocketTarget(aSocketTarget),
         mGeneration(aGeneration),
-        mProtocol(aProtocol),
-        mLane(aLane),
-        mDirectionalConnectToken(aDirectionalConnectToken) {}
+        mProtocol(aProtocol) {}
 
   nsresult ArmEstablishmentTimeout(nsIRequest* aRequest);
 
@@ -516,8 +495,6 @@ class TunnelAttempt final : public nsIHttpUpgradeListener,
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   const uint64_t mGeneration;
   const ProxyProtocol mProtocol;
-  const DirectionalConnectLane mLane;
-  const nsCString mDirectionalConnectToken;
   nsCOMPtr<nsITimer> mEstablishmentTimer;
 };
 
@@ -536,12 +513,11 @@ nsresult TunnelAttempt::ArmEstablishmentTimeout(nsIRequest* aRequest) {
         RefPtr owner = self->mOwner;
         const uint64_t generation = self->mGeneration;
         const ProxyProtocol protocol = self->mProtocol;
-        const DirectionalConnectLane lane = self->mLane;
         (void)self->mSocketTarget->Dispatch(
             NS_NewRunnableFunction("NaiveFox::AutoH3EstablishmentTimedOut",
-                                   [owner, generation, protocol, lane]() {
+                                   [owner, generation, protocol]() {
                                      owner->ApplyEstablishmentTimeout(
-                                         generation, protocol, lane);
+                                         generation, protocol);
                                    }),
             NS_DISPATCH_NORMAL);
         (void)request->Cancel(NS_ERROR_NET_TIMEOUT);
@@ -577,9 +553,7 @@ TunnelSession::~TunnelSession() {
 
 nsresult TunnelSession::Start(const nsACString& aTargetAuthority,
                               Span<const uint8_t> aInitialPayload) {
-  if (mImpl->mStarted || mImpl->mClosed || aTargetAuthority.IsEmpty() ||
-      (mImpl->mConfig.mDiagnosticDirectionalConnect &&
-       mImpl->mConfig.mProtocol != ProxyProtocol::H2)) {
+  if (mImpl->mStarted || mImpl->mClosed || aTargetAuthority.IsEmpty()) {
     return NS_ERROR_INVALID_ARG;
   }
   mImpl->mStarted = true;
@@ -814,7 +788,8 @@ void TunnelSession::FinishPreambleOnMain(
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
   if ((PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        !requestCommittedAdmission) ||
-      (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      (preambleMode ==
+           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
        !resourceTreeCommittedAdmission) ||
       (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
@@ -912,14 +887,15 @@ void TunnelSession::FinishPreambleOnMain(
       admission = "response-headers-task";
     } else if (preambleMode == PreambleMode::DocumentFirstBufferOverlap) {
       admission = "first-data-buffer";
-    } else if (preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
+    } else if (preambleMode ==
+               PreambleMode::DocumentFirstBufferTaskOverlap) {
       admission = "first-data-buffer-task";
     }
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
         "response_accepted=%d root_done=%d protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId), admission,
-        !aRootDone, aRootDone, ProtocolName(aProtocol));
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        admission, !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentStartOverlap ||
       preambleMode == PreambleMode::DocumentStartTaskOverlap) {
@@ -928,9 +904,9 @@ void TunnelSession::FinishPreambleOnMain(
         "request_committed=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aRootDone ? "terminal-fallback"
-        : preambleMode == PreambleMode::DocumentStartTaskOverlap
-            ? "request-committed-task"
-            : "request-committed",
+                  : preambleMode == PreambleMode::DocumentStartTaskOverlap
+                        ? "request-committed-task"
+                        : "request-committed",
         !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
@@ -949,7 +925,8 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+  if (preambleMode ==
+      PreambleMode::TreeNativeParserResourceCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
         "admission=resources-committed request_committed=1 root_done=%d "
@@ -1255,47 +1232,20 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
       !mImpl->mPreambleSequence.TryStartConnect(aGeneration)) {
     return;
   }
-  const bool directionalConnect =
-      mImpl->mConfig.mDiagnosticDirectionalConnect &&
-      aProtocol == ProxyProtocol::H2;
-  nsAutoCString upstreamPadding;
-  nsAutoCString downstreamPadding;
-  nsAutoCString directionalConnectToken;
-  nsresult rv = directionalConnect ? GenerateDirectionalConnectHeaderPadding(
-                                         upstreamPadding, downstreamPadding,
-                                         directionalConnectToken)
-                                   : GenerateHeaderPadding(upstreamPadding);
-  RefPtr<TunnelAttempt> upstreamAttempt;
+  nsAutoCString padding;
+  nsresult rv = GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
+    RefPtr<TunnelAttempt> attempt =
+        new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
+    nsCOMPtr<nsIRequest> openedRequest;
     const bool useAnonymousConnection = !PreambleModeUsesNativeParser(
         mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
-    auto openLane = [&](DirectionalConnectLane aLane,
-                        const nsACString& aPadding,
-                        RefPtr<TunnelAttempt>& aAttempt) -> nsresult {
-      aAttempt = new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration,
-                                   aProtocol, aLane, directionalConnectToken);
-      nsCOMPtr<nsIRequest> openedRequest;
-      nsresult laneRv = OpenNeckoTunnel(
-          mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
-          mImpl->mConfig.mProxyPassword, aAttempt, aAttempt, aPadding,
-          aProtocol, mImpl->mConfig.mHostResolverRule,
-          mImpl->mConfig.mExtraHeaders, mImpl->mConnectUrgentStart,
-          useAnonymousConnection, getter_AddRefs(openedRequest));
-      if (NS_FAILED(laneRv)) {
-        return laneRv;
-      }
-      const size_t laneIndex = Impl::LaneIndex(aLane);
-      mImpl->mActiveRequests[laneIndex] = openedRequest;
-      mImpl->mActiveRequestGenerations[laneIndex] = aGeneration;
-      return NS_OK;
-    };
-
-    if (directionalConnect) {
-      mImpl->mDirectionalConnectToken = directionalConnectToken;
-      mImpl->mDirectionalDownstreamPadding = downstreamPadding;
-    }
-    rv = openLane(DirectionalConnectLane::Upstream, upstreamPadding,
-                  upstreamAttempt);
+    rv = OpenNeckoTunnel(
+        mImpl->mConfig.mProxyUrl, aTargetAuthority, mImpl->mConfig.mProxyUser,
+        mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,
+        mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
+        mImpl->mConnectUrgentStart, useAnonymousConnection,
+        getter_AddRefs(openedRequest));
     if (NS_SUCCEEDED(rv)) {
       if (mImpl->mConnectUrgentStart && !mImpl->mConnectUrgentStartLogged) {
         mImpl->mConnectUrgentStartLogged = true;
@@ -1306,6 +1256,9 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
             StaticPrefs::dom_document_priority_incremental(),
             ProtocolName(aProtocol));
       }
+      mImpl->mActiveRequest = openedRequest;
+      mImpl->mActiveRequestGeneration = aGeneration;
+      mImpl->mActiveRequestKind = Impl::ActiveRequestKind::Tunnel;
       if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
         CancelRequestOnMain(NS_ERROR_ABORT);
       } else {
@@ -1321,13 +1274,9 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
         }
         if (mImpl->mConfig.mProtocol == ProxyProtocol::Auto &&
             aProtocol == ProxyProtocol::H3) {
-          rv = upstreamAttempt->ArmEstablishmentTimeout(
-              mImpl->mActiveRequests[Impl::LaneIndex(
-                  DirectionalConnectLane::Upstream)]);
+          rv = attempt->ArmEstablishmentTimeout(openedRequest);
         }
       }
-    } else {
-      CancelRequestOnMain(rv);
     }
   }
   if (NS_FAILED(rv)) {
@@ -1342,59 +1291,13 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
   }
 }
 
-void TunnelSession::OpenDirectionalDownstreamOnMain(
-    uint64_t aGeneration, ProxyProtocol aProtocol) {
-  MOZ_ASSERT(NS_IsMainThread());
-  if (mImpl->mCancelRequested.load(std::memory_order_acquire) ||
-      aGeneration != mImpl->mAttemptGeneration ||
-      aProtocol != mImpl->mAttemptProtocol ||
-      !mImpl->mConfig.mDiagnosticDirectionalConnect ||
-      aProtocol != ProxyProtocol::H2 ||
-      mImpl->mDirectionalDownstreamOpenRequested ||
-      mImpl->mDirectionalConnectToken.IsEmpty() ||
-      mImpl->mDirectionalDownstreamPadding.IsEmpty()) {
-    return;
-  }
-  mImpl->mDirectionalDownstreamOpenRequested = true;
-  RefPtr attempt = new TunnelAttempt(
-      this, mImpl->mSocketTarget, aGeneration, aProtocol,
-      DirectionalConnectLane::Downstream, mImpl->mDirectionalConnectToken);
-  nsCOMPtr<nsIRequest> openedRequest;
-  const bool useAnonymousConnection = !PreambleModeUsesNativeParser(
-      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
-  nsresult rv = OpenNeckoTunnel(
-      mImpl->mConfig.mProxyUrl, mImpl->mTargetAuthority,
-      mImpl->mConfig.mProxyUser, mImpl->mConfig.mProxyPassword, attempt, attempt,
-      mImpl->mDirectionalDownstreamPadding, aProtocol,
-      mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
-      mImpl->mConnectUrgentStart, useAnonymousConnection,
-      getter_AddRefs(openedRequest));
-  if (NS_SUCCEEDED(rv)) {
-    const size_t laneIndex =
-        Impl::LaneIndex(DirectionalConnectLane::Downstream);
-    mImpl->mActiveRequests[laneIndex] = openedRequest;
-    mImpl->mActiveRequestGenerations[laneIndex] = aGeneration;
-    return;
-  }
-  RefPtr self = this;
-  (void)mImpl->mSocketTarget->Dispatch(
-      NS_NewRunnableFunction("NaiveFox::DirectionalDownstreamOpenFailure",
-                             [self, aGeneration, aProtocol, rv]() {
-                               self->ApplyOpenFailure(aGeneration, aProtocol,
-                                                      rv);
-                             }),
-      NS_DISPATCH_NORMAL);
-}
-
 NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
-  MOZ_ASSERT(NS_IsMainThread());
   CancelEstablishmentTimeout();
   nsCOMPtr<nsIProxiedChannel> proxied = do_QueryInterface(aRequest);
   int32_t connectCode = -1;
   bool connectCodeKnown = false;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
-  bool directionalHeaderAccepted = false;
   nsAutoCString outerProtocol;
   nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aRequest);
   if (proxied && http) {
@@ -1409,10 +1312,6 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
           proxied->GetHttpProxyResponseHeader("padding"_ns, padding);
       if (NS_SUCCEEDED(headerRv)) {
         paddingHeaderPresent = Some(true);
-        if (!mDirectionalConnectToken.IsEmpty()) {
-          directionalHeaderAccepted = MatchesDirectionalConnectHeaderPadding(
-              padding, mLane, mDirectionalConnectToken);
-        }
       } else if (headerRv == NS_ERROR_NOT_AVAILABLE) {
         paddingHeaderPresent = Some(false);
       } else {
@@ -1423,25 +1322,16 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
   RefPtr owner = mOwner;
   const uint64_t generation = mGeneration;
   const ProxyProtocol protocol = mProtocol;
-  const DirectionalConnectLane lane = mLane;
-  const bool stageDirectionalDownstream =
-      detail::ShouldStageDirectionalDownstream(
-          lane, rv, connectCodeKnown, connectCode, directionalHeaderAccepted,
-          outerProtocol);
   (void)mSocketTarget->Dispatch(
       NS_NewRunnableFunction(
           "NaiveFox::TunnelConnectMetadata",
-          [owner, generation, protocol, lane, rv, connectCodeKnown, connectCode,
-           paddingHeaderPresent, directionalHeaderAccepted,
-           outerProtocol = std::move(outerProtocol)]() {
-            owner->ApplyConnectMetadata(
-                generation, protocol, lane, rv, connectCodeKnown, connectCode,
-                paddingHeaderPresent, directionalHeaderAccepted, outerProtocol);
+          [owner, generation, protocol, rv, connectCodeKnown, connectCode,
+           paddingHeaderPresent, outerProtocol = std::move(outerProtocol)]() {
+            owner->ApplyConnectMetadata(generation, protocol, rv,
+                                        connectCodeKnown, connectCode,
+                                        paddingHeaderPresent, outerProtocol);
           }),
       NS_DISPATCH_NORMAL);
-  if (stageDirectionalDownstream) {
-    owner->OpenDirectionalDownstreamOnMain(mGeneration, mProtocol);
-  }
   return NS_OK;
 }
 
@@ -1469,12 +1359,11 @@ NS_IMETHODIMP TunnelAttempt::OnStopRequest(nsIRequest* aRequest,
   owner->ClearRequestOnMain(mGeneration, aRequest);
   const uint64_t generation = mGeneration;
   const ProxyProtocol protocol = mProtocol;
-  const DirectionalConnectLane lane = mLane;
   (void)mSocketTarget->Dispatch(
       NS_NewRunnableFunction("NaiveFox::TunnelChannelStop",
-                             [owner, generation, protocol, lane, aStatus]() {
+                             [owner, generation, protocol, aStatus]() {
                                owner->ApplyChannelStop(generation, protocol,
-                                                       lane, aStatus);
+                                                       aStatus);
                              }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
@@ -1519,28 +1408,22 @@ void TunnelSession::CancelRequestOnMain(nsresult aStatus) {
     mImpl->mPreambleTargetAuthority.Truncate();
     operation->Cancel(aStatus);
   }
-  for (size_t laneIndex = 0; laneIndex < mImpl->mActiveRequests.size();
-       ++laneIndex) {
-    if (mImpl->mActiveRequests[laneIndex]) {
-      nsCOMPtr<nsIRequest> request =
-          std::move(mImpl->mActiveRequests[laneIndex]);
-      mImpl->mActiveRequestGenerations[laneIndex] = 0;
-      (void)request->Cancel(aStatus);
-    }
+  if (mImpl->mActiveRequest) {
+    nsCOMPtr<nsIRequest> request = std::move(mImpl->mActiveRequest);
+    mImpl->mActiveRequestGeneration = 0;
+    mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
+    (void)request->Cancel(aStatus);
   }
 }
 
 void TunnelSession::ClearRequestOnMain(uint64_t aGeneration,
                                        nsIRequest* aRequest) {
   MOZ_ASSERT(NS_IsMainThread());
-  for (size_t laneIndex = 0; laneIndex < mImpl->mActiveRequests.size();
-       ++laneIndex) {
-    if (mImpl->mActiveRequestGenerations[laneIndex] == aGeneration &&
-        mImpl->mActiveRequests[laneIndex] == aRequest) {
-      mImpl->mActiveRequests[laneIndex] = nullptr;
-      mImpl->mActiveRequestGenerations[laneIndex] = 0;
-      return;
-    }
+  if (mImpl->mActiveRequestGeneration == aGeneration &&
+      mImpl->mActiveRequest == aRequest) {
+    mImpl->mActiveRequest = nullptr;
+    mImpl->mActiveRequestGeneration = 0;
+    mImpl->mActiveRequestKind = Impl::ActiveRequestKind::None;
   }
 }
 
@@ -1553,14 +1436,13 @@ NS_IMETHODIMP TunnelAttempt::OnTransportAvailable(
   nsCOMPtr<nsIAsyncOutputStream> socketOut = aSocketOut;
   const uint64_t generation = mGeneration;
   const ProxyProtocol protocol = mProtocol;
-  const DirectionalConnectLane lane = mLane;
   nsresult rv = mSocketTarget->Dispatch(
       NS_NewRunnableFunction(
           "NaiveFox::TunnelTransport",
-          [owner, generation, protocol, lane, transport = std::move(transport),
+          [owner, generation, protocol, transport = std::move(transport),
            socketIn = std::move(socketIn), socketOut = std::move(socketOut)]() {
-            owner->ApplyTransport(generation, protocol, lane, transport,
-                                  socketIn, socketOut);
+            owner->ApplyTransport(generation, protocol, transport, socketIn,
+                                  socketOut);
           }),
       NS_DISPATCH_NORMAL);
   if (NS_FAILED(rv)) {
@@ -1574,12 +1456,11 @@ NS_IMETHODIMP TunnelAttempt::OnUpgradeFailed(nsresult aErrorCode) {
   RefPtr owner = mOwner;
   const uint64_t generation = mGeneration;
   const ProxyProtocol protocol = mProtocol;
-  const DirectionalConnectLane lane = mLane;
   return mSocketTarget->Dispatch(
       NS_NewRunnableFunction("NaiveFox::TunnelFailure",
-                             [owner, generation, protocol, lane, aErrorCode]() {
+                             [owner, generation, protocol, aErrorCode]() {
                                owner->ApplyUpgradeFailure(generation, protocol,
-                                                          lane, aErrorCode);
+                                                          aErrorCode);
                              }),
       NS_DISPATCH_NORMAL);
 }
@@ -1591,7 +1472,6 @@ NS_IMETHODIMP TunnelAttempt::OnWebSocketConnectionAvailable(
 
 void TunnelSession::ApplyTransport(uint64_t aGeneration,
                                    ProxyProtocol aProtocol,
-                                   DirectionalConnectLane aLane,
                                    nsISocketTransport* aTransport,
                                    nsIAsyncInputStream* aSocketIn,
                                    nsIAsyncOutputStream* aSocketOut) {
@@ -1619,69 +1499,56 @@ void TunnelSession::ApplyTransport(uint64_t aGeneration,
       return;
     }
   }
-  Impl::LaneState& lane = mImpl->State(aLane);
-  if (lane.mTransportReady) {
-    (void)aSocketIn->CloseWithStatus(NS_ERROR_ABORT);
-    (void)aSocketOut->CloseWithStatus(NS_ERROR_ABORT);
-    Fail(NS_ERROR_UNEXPECTED);
-    return;
-  }
-  lane.mPendingTunnelIn = aSocketIn;
-  lane.mPendingTunnelOut = aSocketOut;
-  lane.mTransportReady = true;
+  mImpl->mPendingTunnelIn = aSocketIn;
+  mImpl->mPendingTunnelOut = aSocketOut;
+  mImpl->mTransportReady = true;
   MaybeFinishAttempt();
 }
 
 void TunnelSession::ApplyConnectMetadata(
-    uint64_t aGeneration, ProxyProtocol aProtocol, DirectionalConnectLane aLane,
-    nsresult aStatus, bool aConnectCodeKnown, int32_t aConnectCode,
-    const Maybe<bool>& aPaddingHeaderPresent, bool aDirectionalHeaderAccepted,
+    uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
+    bool aConnectCodeKnown, int32_t aConnectCode,
+    const Maybe<bool>& aPaddingHeaderPresent,
     const nsACString& aOuterProtocol) {
-  Impl::LaneState& lane = mImpl->State(aLane);
-  if (!IsCurrentAttempt(aGeneration, aProtocol) || lane.mMetadataReady) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mMetadataReady) {
     return;
   }
-  lane.mMetadataReady = true;
-  lane.mMetadataStatus = aStatus;
-  lane.mConnectCodeKnown = aConnectCodeKnown;
-  lane.mConnectCode = aConnectCode;
-  lane.mPaddingHeaderPresent = aPaddingHeaderPresent;
-  lane.mDirectionalHeaderAccepted = aDirectionalHeaderAccepted;
-  lane.mOuterProtocol = aOuterProtocol;
+  mImpl->mMetadataReady = true;
+  mImpl->mMetadataStatus = aStatus;
+  mImpl->mConnectCodeKnown = aConnectCodeKnown;
+  mImpl->mConnectCode = aConnectCode;
+  mImpl->mPaddingHeaderPresent = aPaddingHeaderPresent;
+  mImpl->mOuterProtocol = aOuterProtocol;
   MaybeFinishAttempt();
 }
 
 void TunnelSession::ApplyChannelStop(uint64_t aGeneration,
                                      ProxyProtocol aProtocol,
-                                     DirectionalConnectLane aLane,
                                      nsresult aStatus) {
-  Impl::LaneState& lane = mImpl->State(aLane);
-  if (!IsCurrentAttempt(aGeneration, aProtocol) || lane.mChannelStopped) {
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mChannelStopped) {
     return;
   }
-  lane.mChannelStopped = true;
-  lane.mChannelStatus = aStatus;
+  mImpl->mChannelStopped = true;
+  mImpl->mChannelStatus = aStatus;
   MaybeFinishAttempt();
 }
 
 void TunnelSession::ApplyUpgradeFailure(uint64_t aGeneration,
                                         ProxyProtocol aProtocol,
-                                        DirectionalConnectLane aLane,
                                         nsresult aStatus) {
   if (!IsCurrentAttempt(aGeneration, aProtocol)) {
     return;
   }
-  mImpl->State(aLane).mUpgradeFailed = true;
+  mImpl->mUpgradeFailed = true;
   MaybeFinishAttempt();
 }
 
 void TunnelSession::ApplyEstablishmentTimeout(uint64_t aGeneration,
-                                              ProxyProtocol aProtocol,
-                                              DirectionalConnectLane aLane) {
+                                              ProxyProtocol aProtocol) {
   if (!IsCurrentAttempt(aGeneration, aProtocol)) {
     return;
   }
-  mImpl->State(aLane).mEstablishmentTimedOut = true;
+  mImpl->mEstablishmentTimedOut = true;
   MaybeFinishAttempt();
 }
 
@@ -1714,93 +1581,72 @@ bool TunnelSession::ShouldGateOuterSession(const TunnelConfig& aConfig) {
 }
 
 void TunnelSession::ResetAttemptState() {
-  for (Impl::LaneState& lane : mImpl->mLanes) {
-    if (lane.mPendingTunnelIn) {
-      (void)lane.mPendingTunnelIn->CloseWithStatus(NS_ERROR_ABORT);
-    }
-    if (lane.mPendingTunnelOut) {
-      (void)lane.mPendingTunnelOut->CloseWithStatus(NS_ERROR_ABORT);
-    }
-    lane = Impl::LaneState{};
+  if (mImpl->mPendingTunnelIn) {
+    (void)mImpl->mPendingTunnelIn->CloseWithStatus(NS_ERROR_ABORT);
   }
-  mImpl->mDirectionalConnectToken.Truncate();
-  mImpl->mDirectionalDownstreamPadding.Truncate();
-  mImpl->mDirectionalDownstreamOpenRequested = false;
+  if (mImpl->mPendingTunnelOut) {
+    (void)mImpl->mPendingTunnelOut->CloseWithStatus(NS_ERROR_ABORT);
+  }
+  mImpl->mTransportReady = false;
+  mImpl->mMetadataReady = false;
+  mImpl->mMetadataStatus = NS_ERROR_NOT_INITIALIZED;
+  mImpl->mChannelStopped = false;
+  mImpl->mChannelStatus = NS_ERROR_NOT_INITIALIZED;
+  mImpl->mConnectCodeKnown = false;
+  mImpl->mConnectCode = -1;
+  mImpl->mPaddingHeaderPresent.reset();
+  mImpl->mOuterProtocol.Truncate();
   mImpl->mPaddingEnabled = false;
+  mImpl->mPendingTunnelIn = nullptr;
+  mImpl->mPendingTunnelOut = nullptr;
+  mImpl->mUpgradeFailed = false;
+  mImpl->mEstablishmentTimedOut = false;
 }
 
 void TunnelSession::MaybeFinishAttempt() {
-  Impl::LaneState& upstream = mImpl->State(DirectionalConnectLane::Upstream);
-  const bool directionalConnect =
-      mImpl->mConfig.mDiagnosticDirectionalConnect &&
-      mImpl->mAttemptProtocol == ProxyProtocol::H2;
-  if (!upstream.mChannelStopped ||
-      (!upstream.mMetadataReady && !upstream.mEstablishmentTimedOut) ||
+  if (!mImpl->mChannelStopped ||
+      (!mImpl->mMetadataReady && !mImpl->mEstablishmentTimedOut) ||
       mImpl->mReady || mImpl->mClosed || mImpl->mFailed) {
     return;
   }
-
-  if (!directionalConnect) {
-    const AutoFallbackState fallbackState{
-        mImpl->mConfig.mProtocol,
-        mImpl->mAttemptProtocol,
-        mImpl->mFallbackUsed,
-        mImpl->mClosed,
-        upstream.mChannelStopped,
-        NS_FAILED(upstream.mChannelStatus),
-        upstream.mEstablishmentTimedOut,
-        upstream.mConnectCodeKnown,
-        upstream.mConnectCode,
-        upstream.mTransportReady,
-    };
-    if (ShouldRetryH2FromH3(fallbackState)) {
-      mImpl->mFallbackUsed = true;
-      nsresult rv = StartAttempt(ProxyProtocol::H2);
-      if (NS_FAILED(rv)) {
-        Fail(rv);
-      }
-      return;
+  const AutoFallbackState fallbackState{
+      mImpl->mConfig.mProtocol,      mImpl->mAttemptProtocol,
+      mImpl->mFallbackUsed,          mImpl->mClosed,
+      mImpl->mChannelStopped,        NS_FAILED(mImpl->mChannelStatus),
+      mImpl->mEstablishmentTimedOut, mImpl->mConnectCodeKnown,
+      mImpl->mConnectCode,           mImpl->mTransportReady,
+  };
+  if (ShouldRetryH2FromH3(fallbackState)) {
+    mImpl->mFallbackUsed = true;
+    nsresult rv = StartAttempt(ProxyProtocol::H2);
+    if (NS_FAILED(rv)) {
+      Fail(rv);
     }
-  }
-
-  if (!upstream.mMetadataReady) {
-    Fail(NS_FAILED(upstream.mChannelStatus) ? upstream.mChannelStatus
-                                            : NS_ERROR_FAILURE);
     return;
   }
-
-  const size_t requiredLanes = directionalConnect ? 2 : 1;
-  for (size_t laneIndex = 0; laneIndex < requiredLanes; ++laneIndex) {
-    Impl::LaneState& lane = mImpl->mLanes[laneIndex];
-    if (!lane.mChannelStopped || !lane.mMetadataReady) {
-      return;
-    }
-    const bool protocolMatches =
-        (mImpl->mAttemptProtocol == ProxyProtocol::H2 &&
-         lane.mOuterProtocol.EqualsLiteral("h2")) ||
-        (mImpl->mAttemptProtocol == ProxyProtocol::H3 &&
-         lane.mOuterProtocol.EqualsLiteral("h3"));
-    bool lanePaddingEnabled = false;
-    if (NS_FAILED(lane.mMetadataStatus) || NS_FAILED(lane.mChannelStatus) ||
-        !lane.mConnectCodeKnown || !protocolMatches ||
-        NS_FAILED(NegotiatePayloadPadding(lane.mConnectCode,
-                                          lane.mPaddingHeaderPresent,
-                                          lanePaddingEnabled)) ||
-        (directionalConnect &&
-         (!lanePaddingEnabled || !lane.mDirectionalHeaderAccepted))) {
-      Fail(NS_FAILED(lane.mChannelStatus) ? lane.mChannelStatus
+  if (!mImpl->mMetadataReady) {
+    Fail(NS_FAILED(mImpl->mChannelStatus) ? mImpl->mChannelStatus
                                           : NS_ERROR_FAILURE);
-      return;
+    return;
+  }
+  const bool protocolMatches = (mImpl->mAttemptProtocol == ProxyProtocol::H2 &&
+                                mImpl->mOuterProtocol.EqualsLiteral("h2")) ||
+                               (mImpl->mAttemptProtocol == ProxyProtocol::H3 &&
+                                mImpl->mOuterProtocol.EqualsLiteral("h3"));
+  if (NS_FAILED(mImpl->mMetadataStatus) || NS_FAILED(mImpl->mChannelStatus) ||
+      !mImpl->mConnectCodeKnown || !protocolMatches ||
+      NS_FAILED(NegotiatePayloadPadding(mImpl->mConnectCode,
+                                        mImpl->mPaddingHeaderPresent,
+                                        mImpl->mPaddingEnabled))) {
+    Fail(NS_FAILED(mImpl->mChannelStatus) ? mImpl->mChannelStatus
+                                          : NS_ERROR_FAILURE);
+    return;
+  }
+  if (!mImpl->mTransportReady) {
+    if (mImpl->mUpgradeFailed) {
+      Fail(NS_ERROR_FAILURE);
     }
-    if (!lane.mTransportReady) {
-      if (lane.mUpgradeFailed) {
-        Fail(NS_ERROR_FAILURE);
-      }
-      return;
-    }
-    mImpl->mPaddingEnabled = laneIndex == 0
-                                 ? lanePaddingEnabled
-                                 : mImpl->mPaddingEnabled && lanePaddingEnabled;
+    return;
   }
   TunnelReady();
 }
@@ -1811,38 +1657,20 @@ void TunnelSession::TunnelReady() {
   }
   mImpl->mReady = true;
   NotifyOuterGateReady();
-  const nsACString& outerProtocol =
-      mImpl->State(DirectionalConnectLane::Upstream).mOuterProtocol;
   RuntimeLogEvent("Connection %llu established target=%s outer=%s padding=%s\n",
                   static_cast<unsigned long long>(mImpl->mConnectionId),
-                  mImpl->mTargetAuthority.get(),
-                  PromiseFlatCString(outerProtocol).get(),
+                  mImpl->mTargetAuthority.get(), mImpl->mOuterProtocol.get(),
                   mImpl->mPaddingEnabled ? "yes" : "no");
-  if (mImpl->mConfig.mDiagnosticDirectionalConnect) {
-    RuntimeLogEvent(
-        "Connection %llu diagnostic-directional-connect negotiated=1 "
-        "protocol=h2 streams=2 opening=staged-after-upstream-response "
-        "upstream=primary downstream=secondary\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId));
-  }
-  RuntimeLog("Outer protocol: %s\n", PromiseFlatCString(outerProtocol).get());
+  RuntimeLog("Outer protocol: %s\n", mImpl->mOuterProtocol.get());
   RuntimeLog("Padding negotiated: %s\n", mImpl->mPaddingEnabled ? "yes" : "no");
   if (mImpl->mOnEstablished) {
-    mImpl->mOnEstablished(outerProtocol, mImpl->mPaddingEnabled);
+    mImpl->mOnEstablished(mImpl->mOuterProtocol, mImpl->mPaddingEnabled);
   }
 }
 
 nsresult TunnelSession::StartPump() {
-  Impl::LaneState& upstream = mImpl->State(DirectionalConnectLane::Upstream);
-  Impl::LaneState& downstream =
-      mImpl->State(DirectionalConnectLane::Downstream);
-  const bool directionalConnect = mImpl->mConfig.mDiagnosticDirectionalConnect;
-  nsCOMPtr<nsIAsyncInputStream> tunnelIn = directionalConnect
-                                               ? downstream.mPendingTunnelIn
-                                               : upstream.mPendingTunnelIn;
-  nsCOMPtr<nsIAsyncOutputStream> tunnelOut = upstream.mPendingTunnelOut;
   if (!mImpl->mReady || mImpl->mPumpStarted || mImpl->mClosed ||
-      mImpl->mFailed || !tunnelIn || !tunnelOut) {
+      mImpl->mFailed || !mImpl->mPendingTunnelIn || !mImpl->mPendingTunnelOut) {
     return NS_ERROR_NOT_AVAILABLE;
   }
   mImpl->mPumpStarted = true;
@@ -1850,7 +1678,8 @@ nsresult TunnelSession::StartPump() {
   std::function<void()> onDownstreamApplicationActive;
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
-  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+  if (preambleMode ==
+      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,
                                      protocol = mImpl->mAttemptProtocol]() {
@@ -1865,8 +1694,8 @@ nsresult TunnelSession::StartPump() {
     };
   }
   mImpl->mPump = new DuplexPump(
-      mImpl->mLocalIn, mImpl->mLocalOut, tunnelIn, tunnelOut,
-      mImpl->mPaddingEnabled,
+      mImpl->mLocalIn, mImpl->mLocalOut, mImpl->mPendingTunnelIn,
+      mImpl->mPendingTunnelOut, mImpl->mPaddingEnabled,
       [self, generation = mImpl->mAttemptGeneration,
        protocol = mImpl->mAttemptProtocol]() {
         nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
@@ -1880,12 +1709,8 @@ nsresult TunnelSession::StartPump() {
       },
       std::move(onDownstreamApplicationActive),
       [self](nsresult aStatus) { self->Cancel(aStatus); });
-  if (directionalConnect) {
-    downstream.mPendingTunnelIn = nullptr;
-  } else {
-    upstream.mPendingTunnelIn = nullptr;
-  }
-  upstream.mPendingTunnelOut = nullptr;
+  mImpl->mPendingTunnelIn = nullptr;
+  mImpl->mPendingTunnelOut = nullptr;
   nsTArray<uint8_t> initialPayload = std::move(mImpl->mInitialPayload);
   return mImpl->mPump->Start(Span(initialPayload));
 }
@@ -1905,15 +1730,13 @@ void TunnelSession::Fail(nsresult aStatus) {
                   static_cast<unsigned long long>(mImpl->mConnectionId),
                   mImpl->mTargetAuthority.get(),
                   static_cast<unsigned>(aStatus));
-  for (Impl::LaneState& lane : mImpl->mLanes) {
-    if (lane.mPendingTunnelIn) {
-      (void)lane.mPendingTunnelIn->CloseWithStatus(aStatus);
-      lane.mPendingTunnelIn = nullptr;
-    }
-    if (lane.mPendingTunnelOut) {
-      (void)lane.mPendingTunnelOut->CloseWithStatus(aStatus);
-      lane.mPendingTunnelOut = nullptr;
-    }
+  if (mImpl->mPendingTunnelIn) {
+    (void)mImpl->mPendingTunnelIn->CloseWithStatus(aStatus);
+    mImpl->mPendingTunnelIn = nullptr;
+  }
+  if (mImpl->mPendingTunnelOut) {
+    (void)mImpl->mPendingTunnelOut->CloseWithStatus(aStatus);
+    mImpl->mPendingTunnelOut = nullptr;
   }
   mImpl->mOnEstablished = nullptr;
   mImpl->mOnClosed = nullptr;
@@ -1943,15 +1766,13 @@ void TunnelSession::CancelInternal(nsresult aStatus, bool aCancelRequest) {
                   static_cast<unsigned>(aStatus));
   (void)mImpl->mLocalIn->CloseWithStatus(aStatus);
   (void)mImpl->mLocalOut->CloseWithStatus(aStatus);
-  for (Impl::LaneState& lane : mImpl->mLanes) {
-    if (lane.mPendingTunnelIn) {
-      (void)lane.mPendingTunnelIn->CloseWithStatus(aStatus);
-      lane.mPendingTunnelIn = nullptr;
-    }
-    if (lane.mPendingTunnelOut) {
-      (void)lane.mPendingTunnelOut->CloseWithStatus(aStatus);
-      lane.mPendingTunnelOut = nullptr;
-    }
+  if (mImpl->mPendingTunnelIn) {
+    (void)mImpl->mPendingTunnelIn->CloseWithStatus(aStatus);
+    mImpl->mPendingTunnelIn = nullptr;
+  }
+  if (mImpl->mPendingTunnelOut) {
+    (void)mImpl->mPendingTunnelOut->CloseWithStatus(aStatus);
+    mImpl->mPendingTunnelOut = nullptr;
   }
   if (mImpl->mPump) {
     mImpl->mPump->Close(aStatus);

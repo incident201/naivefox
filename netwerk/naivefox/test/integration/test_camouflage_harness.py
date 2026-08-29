@@ -842,24 +842,6 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
-    def test_h2_directional_connect_arms_are_schedulable(self):
-        for arms in (
-            (
-                "document-first-buffer-task-overlap",
-                "document-first-buffer-task-directional-connect",
-            ),
-            (
-                "document-first-buffer-http-connect",
-                "document-first-buffer-directional-http-connect",
-            ),
-        ):
-            with self.subTest(arms=arms):
-                rows = SUPERBLOCKS.schedule_rows(
-                    31, "h2", 1, ["browser_page"], arms=arms
-                )
-                SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
-                self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
-
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
             SUPERBLOCKS.parse_arms("gate,root,document-complete")
@@ -880,17 +862,6 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn('for arm in "${multi_arm_arms[@]}"; do', runner)
         self.assertIn("analyzer_args+=(--screening-only)", runner)
         self.assertIn("metadata_arm_specific_analysis=screening_only", runner)
-        self.assertIn(
-            "document-first-buffer-task-directional-connect", runner
-        )
-        self.assertIn(
-            "document-first-buffer-directional-http-connect", runner
-        )
-        self.assertIn("NAIVEFOX_CAPTURE_CADDY_BIN must be an absolute", runner)
-        self.assertIn("fixture_caddy_sha256=", runner)
-        with open(os.path.join(HERE, "common.sh"), encoding="utf-8") as stream:
-            common = stream.read()
-        self.assertIn("NAIVEFOX_CAPTURE_CADDY_BIN", common)
         self.assertIn('--views "$multi_arm_views_csv"', runner)
         self.assertIn(
             "H3 multi-arm screening requires a pre-launched Selenium browser",
@@ -1360,55 +1331,6 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ),
             )
 
-    def test_directional_connect_arms_are_h2_only_and_listener_specific(self):
-        cases = {
-            "document-first-buffer-task-directional-connect": (
-                "socks://127.0.0.1:1080",
-                "document-first-buffer-task-overlap",
-            ),
-            "document-first-buffer-directional-http-connect": (
-                "http://127.0.0.1:1080",
-                "document-first-buffer-overlap",
-            ),
-        }
-        for arm, (listener, mode) in cases.items():
-            with self.subTest(arm=arm):
-                config = CONFIG.build_config(
-                    arm,
-                    "h2",
-                    1080,
-                    4433,
-                    "fixture-user",
-                    "fixture-pass",
-                )
-                self.assertEqual(config["listen"], listener)
-                self.assertEqual(config["preamble"]["mode"], mode)
-                self.assertIs(config["diagnostic-directional-connect"], True)
-                with self.assertRaisesRegex(ValueError, "requires h2"):
-                    CONFIG.build_config(
-                        arm,
-                        "h3",
-                        1080,
-                        4433,
-                        "fixture-user",
-                        "fixture-pass",
-                    )
-        for arm in (
-            "document-first-buffer-task-overlap",
-            "document-first-buffer-http-connect",
-        ):
-            self.assertNotIn(
-                "diagnostic-directional-connect",
-                CONFIG.build_config(
-                    arm,
-                    "h2",
-                    1080,
-                    4433,
-                    "fixture-user",
-                    "fixture-pass",
-                ),
-            )
-
     def test_http_connect_task_barriers_map_to_product_modes(self):
         cases = {
             "document-start-task-http-connect": "document-start-task-overlap",
@@ -1545,99 +1467,6 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "Connection 1 preamble document-overlap "
                 "admission=first-data-buffer-task response_accepted=1 "
                 "root_done=0 protocol=h2\n",
-                features,
-            )
-
-    def test_directional_connect_lifecycle_is_fail_closed(self):
-        features = {
-            "protocol": "h2",
-            "features": {"lifecycle_connection_count": 1.0},
-        }
-        cases = {
-            "document-first-buffer-task-directional-connect": (
-                "first-data-buffer-task"
-            ),
-            "document-first-buffer-directional-http-connect": (
-                "first-data-buffer"
-            ),
-        }
-        for arm, admission in cases.items():
-            with self.subTest(arm=arm):
-                lifecycle = (
-                    "Connection 1 preamble document-overlap "
-                    f"admission={admission} response_accepted=1 "
-                    "root_done=0 protocol=h2\n"
-                    "Connection 1 established target=localhost:443 "
-                    "outer=h2 padding=yes\n"
-                    "Connection 1 diagnostic-directional-connect negotiated=1 "
-                    "protocol=h2 streams=2 "
-                    "opening=staged-after-upstream-response upstream=primary "
-                    "downstream=secondary\n"
-                    "Connection 1 preamble result=success status=0x00000000 "
-                    "http=200 bytes=512 protocol=h2\n"
-                    "Connection 1 preamble document-overlap drain=complete "
-                    "root_done=1 completed_resources=0 protocol=h2\n"
-                    "Connection 2 established target=localhost:443 "
-                    "outer=h2 padding=yes\n"
-                    "Connection 2 diagnostic-directional-connect negotiated=1 "
-                    "protocol=h2 streams=2 "
-                    "opening=staged-after-upstream-response upstream=primary "
-                    "downstream=secondary\n"
-                )
-                SAMPLE.validate_sample(arm, "h2", lifecycle, features)
-                with self.assertRaisesRegex(
-                    ValueError, "requires negotiation evidence"
-                ):
-                    SAMPLE.validate_sample(
-                        arm,
-                        "h2",
-                        "\n".join(
-                            line
-                            for line in lifecycle.splitlines()
-                            if "diagnostic-directional-connect" not in line
-                        ),
-                        features,
-                    )
-                with self.assertRaisesRegex(
-                    ValueError, "do not match established CONNECTs"
-                ):
-                    SAMPLE.validate_sample(
-                        arm,
-                        "h2",
-                        lifecycle.replace(
-                            "Connection 2 diagnostic-directional-connect "
-                            "negotiated=1 protocol=h2 streams=2 "
-                            "opening=staged-after-upstream-response "
-                            "upstream=primary downstream=secondary\n",
-                            "",
-                        ),
-                        features,
-                    )
-                with self.assertRaisesRegex(ValueError, "precedes"):
-                    second_established = (
-                        "Connection 2 established target=localhost:443 "
-                        "outer=h2 padding=yes\n"
-                    )
-                    second_marker = (
-                        "Connection 2 diagnostic-directional-connect "
-                        "negotiated=1 protocol=h2 streams=2 "
-                        "opening=staged-after-upstream-response "
-                        "upstream=primary downstream=secondary\n"
-                    )
-                    SAMPLE.validate_sample(
-                        arm,
-                        "h2",
-                        lifecycle.replace(
-                            second_established + second_marker,
-                            second_marker + second_established,
-                        ),
-                        features,
-                    )
-        with self.assertRaisesRegex(ValueError, "unexpectedly logged directional"):
-            SAMPLE.validate_sample(
-                "document-first-buffer-task-overlap",
-                "h2",
-                lifecycle,
                 features,
             )
 
@@ -4665,7 +4494,6 @@ class CamouflageHarnessTests(unittest.TestCase):
             reference = os.path.join(temporary, "reference")
             naivefox = os.path.join(temporary, "naivefox")
             pmtud_control = os.path.join(temporary, "pmtud-control")
-            directional = os.path.join(temporary, "directional")
             socks = os.path.join(temporary, "socks")
             variables = {
                 "browser_python": sys.executable,
@@ -4683,10 +4511,6 @@ class CamouflageHarnessTests(unittest.TestCase):
                 f"make_profile {shlex.quote(reference)} h3 reference",
                 f"make_profile {shlex.quote(naivefox)} h3 naivefox",
                 f"make_profile {shlex.quote(pmtud_control)} h3 naivefox '' root-pmtud-control",
-                (
-                    f"make_profile {shlex.quote(directional)} h2 naivefox '' "
-                    "document-first-buffer-task-directional-connect"
-                ),
                 f"make_profile {shlex.quote(socks)} h3 socks-browser 1080 '' 8443",
             ))
             subprocess.run(["bash"], input=script, text=True, check=True)
@@ -4699,10 +4523,6 @@ class CamouflageHarnessTests(unittest.TestCase):
                 os.path.join(pmtud_control, "user.js"), encoding="utf-8"
             ) as stream:
                 pmtud_control_prefs = stream.read()
-            with open(
-                os.path.join(directional, "user.js"), encoding="utf-8"
-            ) as stream:
-                directional_prefs = stream.read()
             with open(os.path.join(socks, "user.js"), encoding="utf-8") as stream:
                 socks_prefs = stream.read()
             mapping_pref = "network.http.http3.alt-svc-mapping-for-testing"
@@ -4716,14 +4536,6 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertNotIn(pmtud_pref, naivefox_prefs)
             self.assertNotIn(pmtud_pref, socks_prefs)
             self.assertIn(pmtud_pref, pmtud_control_prefs)
-            connection_cap_pref = (
-                'user_pref("network.http.max-persistent-connections-per-server", 12);'
-            )
-            self.assertNotIn(connection_cap_pref, reference_prefs)
-            self.assertNotIn(connection_cap_pref, naivefox_prefs)
-            self.assertNotIn(connection_cap_pref, pmtud_control_prefs)
-            self.assertNotIn(connection_cap_pref, socks_prefs)
-            self.assertIn(connection_cap_pref, directional_prefs)
 
     def test_proxy_pac_sends_only_target_loopback_port_to_sample_socks(self):
         pac = CONTROLLER.proxy_pac_script(1080, 8443)

@@ -25,8 +25,7 @@ namespace mozilla::naivefox {
 class TunnelSessionTestPeer final {
  public:
   static void ApplyChannelStop(TunnelSession* aSession) {
-    aSession->ApplyChannelStop(0, ProxyProtocol::H2,
-                               DirectionalConnectLane::Upstream, NS_OK);
+    aSession->ApplyChannelStop(0, ProxyProtocol::H2, NS_OK);
   }
 
   static bool ShouldGateOuterSession(const TunnelConfig& aConfig) {
@@ -105,26 +104,6 @@ TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
   config.mImplicitPreambleGate = false;
   config.mProtocol = ProxyProtocol::H2;
   EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
-}
-
-TEST(NaiveFoxTunnelSessionLifecycle,
-     DirectionalDownstreamRequiresValidatedUpstreamResponse)
-{
-  EXPECT_TRUE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Upstream, NS_OK, true, 200, true, "h2"_ns));
-  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Downstream, NS_OK, true, 200, true, "h2"_ns));
-  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Upstream, NS_ERROR_FAILURE, true, 200, true,
-      "h2"_ns));
-  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Upstream, NS_OK, false, 200, true, "h2"_ns));
-  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Upstream, NS_OK, true, 407, true, "h2"_ns));
-  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Upstream, NS_OK, true, 200, false, "h2"_ns));
-  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
-      DirectionalConnectLane::Upstream, NS_OK, true, 200, true, "h3"_ns));
 }
 
 TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
@@ -391,11 +370,11 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserResourceCommittedOverlap, false, false, 3,
       0, 0, 0, 3));
   EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3, 0,
-      0, 0, 2));
+      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3,
+      0, 0, 0, 2));
   EXPECT_TRUE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3, 0,
-      0, 0, 3));
+      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3,
+      0, 0, 0, 3));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,
