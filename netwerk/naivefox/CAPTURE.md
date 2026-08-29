@@ -568,6 +568,18 @@ it proves neither a causal abort nor a complete natural stylesheet lifecycle.
 
 ## Modes and policy
 
+Every proposed experiment has a mandatory history gate before implementation.
+Search this document and the other NaiveFox Markdown, the product and capture
+harness, and the complete Git history (including pickaxe/regex searches for
+removed implementations). The search must cover both the proposed name and
+the causal wire/lifecycle mechanism: renaming an earlier delay, boundary,
+carrier, padding, scheduling, cache/classifier, process-topology, or
+multiplexing experiment does not make it new. Record either the specific
+difference which makes the mechanism new or the earlier evidence which rejects
+it before writing product, Caddy, or harness code. If the same causal variable
+was already tested, do not implement it again unless new evidence identifies a
+materially different condition and the preflight records that distinction.
+
 The runners support two reference modes:
 
 - `quick` (default) downloads the current official Firefox Nightly artifact
@@ -3115,6 +3127,102 @@ Caddy, harness, build, or passive matrix change was spent. Future preflight
 must not infer multiple logical tunnels merely from the old directional
 experiment's diagnostic slot bound; it must first measure the actual workload
 being proposed for multiplexing.
+
+A proposed bodyless/`HEAD` companion-resource variant was also rejected at
+this gate without implementation. The exact method label was new, but its
+causal event was not: the earlier interleaved blocking-resource experiments
+already exercised `stylesheet and script request commits -> CONNECT`, and the
+related H3 `HEAD`/Range family showed that replacing ordinary resource bodies
+can alter terminal channel behavior without creating a new admission event.
+Changing GET volume to a bodyless response would tune the fixture resource
+shape while leaving the controlling two-commit boundary intact. No product,
+fixture, harness, build, or capture work was spent on this causally equivalent
+proposal.
+
+### H2 DATA-frame padding follow-up
+
+The next incompatible client/server candidate passed the mandatory exact and
+causal-history search before code was written. Prior experiments had varied
+Variant-1 application-record padding, initial record count, directionality,
+CONNECT header padding, TLS-flight alignment, batching, and H2 priority.
+Searches of the Markdown, harness, complete Git history, and pickaxe/regex
+history for H2 PADDED flags and padded-DATA writer paths found no experiment
+which placed padding in the outer H2 DATA frames themselves. This was therefore
+a distinct framing-layer cause rather than another application-record count or
+amount endpoint.
+
+Commits `5dcc4e3cb25f` and `e7c825c10367` implemented and admitted an explicit
+H2-only diagnostic. A reserved request-padding marker negotiated the candidate
+and had to be echoed by the response; the client rejected a protocol mismatch,
+missing echo, or observed/requested diagnostic mismatch. Request-side
+Variant-1 framing remained stock. On the response side, the first eight
+Variant-1 records remained decodable but used zero application padding, while
+up to the first eight Caddy handler writes used standards-compliant H2 DATA
+padding. Pad Length was random in `0..255`, padding octets were zero, and both
+frame-size and flow-control accounting included the pad-length field and pad
+octets. There was no pause, resource-size threshold, fronting-page condition,
+bandwidth/RTT estimate, or wait for future target bytes; unmarked clients kept
+the stock path.
+
+The first server build exposed an implementation path which must not be
+repeated. Patching Go's bundled `net/http/h2_bundle.go` produced private Caddy
+binary digest
+`a342d1abd21569473dc5516254220cbf88e62d437fc4b974861cdda1dac132ca`,
+and its unit tests passed, but Caddy 2.11.2 actually used
+`golang.org/x/net/http2`. Private lifecycle artifact `c55165adc9ced6d8`
+therefore negotiated the marker on five established tunnels but contained no
+PADDED DATA frames and published no passive distances. The first validator
+also passed decrypted PDML bytes to the XML parser as a pathname; wrapping the
+bytes in an in-memory stream fixed that diagnostic error. Neither failure is a
+candidate measurement.
+
+The corrected fork patched the pinned `golang.org/x/net` v0.51.0 writer and
+scheduler, added marker, zero-padding, split-frame, and flow-control tests, and
+passed `go test ./http2`; the pinned forwardproxy fork passed `go test ./...`.
+The resulting Caddy 2.11.2 binary digest was
+`6d3ba1829b4f2d3ad87bbc3e21d7810e804bf2447e852fb36a51da3491283c31`.
+Incremental product/test builds required no clobber, 103/103 focused C++ gtests
+passed, and 129/129 harness plus validator tests passed. Strict isolated
+lifecycle artifacts `f6e7e40aba138a05` (SOCKS) and `0236019a82b63c4c`
+(HTTP listener) each admitted the expected marker and padded-frame sample,
+proved that padding occurred only on server-to-client DATA of marked CONNECT
+streams, and deleted the private key log/capture after retaining safe counts.
+
+The randomized one-block same-base screen `06350ee8cab9df76` (seed
+`2026083053`) used the canonical 262144-byte inner page, inner HTTPS/H2,
+Firefox A/B, both current listener defaults, an isolated WSL network namespace,
+and only packets 17--32 plus Whole:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.45765 | 0.31613 | control |
+| SOCKS H2 DATA padding | 0.45872 | 0.29880 | +0.2% / -5.5% |
+| HTTP current `document-first-buffer-http-connect` | 0.45128 | 0.40461 | control |
+| HTTP H2 DATA padding | 0.39976 | 0.29954 | -11.4% / -26.0% |
+
+The isolated wire validator admitted both candidate samples. SOCKS was
+effectively neutral in the focus window. The HTTP point estimate was promising
+for Whole but below the 20% breaking-change rule for packets 17--32, so it
+required a focused replication instead of a full matrix.
+
+Fresh four-block HTTP-only artifact `b0454b18ae89a387` (seed `2026083054`)
+reversed both directions. The current HTTP default measured
+`0.46318 [0.42335, 0.50301]` for packets 17--32 and
+`0.26826 [0.23575, 0.30440]` for Whole. DATA padding measured
+`0.49186 [0.44626, 0.53385]` and `0.28606 [0.25119, 0.33062]`, regressions of
+6.2% and 6.6%. All four candidate samples passed decrypted wire admission and
+all 16 participants passed the isolated-network mutation gate. Four smoke
+blocks remain descriptive rather than paired inference, but they directly
+reject the one-block promotion signal.
+
+The jointly incompatible Caddy/client mechanism therefore fails replication,
+does not meet the at-least-20% default threshold, and must not be tuned through
+nearby DATA-padding counts or lengths as though those were new causal ideas.
+No resource-size, constrained-link, cross-platform, or full default matrix was
+spent after this rejection. The product and harness diagnostics are retired;
+the production defaults and documented fronting-site requirements remain
+unchanged. The named custom Caddy and forks remain only as inactive private
+scratch material for reproducing this negative result.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
