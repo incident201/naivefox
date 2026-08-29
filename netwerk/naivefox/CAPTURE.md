@@ -2619,6 +2619,40 @@ lifecycle complexity while merely moving outer CONNECT by approximately the
 existing sub-millisecond gap. No product code, build, passive capture, or
 matrix was spent on this rejected premise.
 
+The next H2 preflight revisited the retained six-resource native-parser policy
+without repeating the old H2 resource-tree experiment. Commit `1589da63dcdc`
+had used three resources and admitted CONNECT at document request commit, so
+its observable order was root GET, CONNECT, then resource GETs. The exact
+six-resource policy instead opens the stylesheet and blocking script
+immediately, defers four image opens to the next main-thread turn, and admits
+CONNECT only after all six requests commit and the first complete successful
+resource body buffer is consumed. History and documentation searches found
+that exact contract only in H3 runs.
+
+The first one-block attempt stopped fail-closed in private artifact
+`a433dcc2d6f252a8` and published no distances. Configuration and harness
+validation accepted the explicit H2 mode, but a second runtime whitelist in
+`ProxyPreambleOperation::Start` returned `NS_ERROR_INVALID_ARG` before opening
+the root. The whitelist was corrected without changing scheduling: H2 accepts
+this mode only with exactly six resources, while H3 retains its three- or
+six-resource contract. The same seed then completed all eight participants in
+safe artifact `4266ee23a358db8b`:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.58908 | 0.52290 | control |
+| SOCKS six-resource candidate | 0.54909 | 0.51022 | -6.8% / -2.4% |
+| HTTP current `document-first-buffer-http-connect` | 0.49645 | 0.51241 | control |
+| HTTP six-resource candidate | 0.65647 | 0.53841 | +32.2% / +5.1% |
+
+This was an isolated, unshaped, same-base H2/inner-HTTPS block with seed
+`2026082921`, the canonical 262144-byte page, stock Caddy, Firefox A/B, and
+the required listener-specific `document-start` causal controls. One block is
+not inference, but the SOCKS movement is far below the threshold for a costly
+replication and HTTP CONNECT moves strongly in the wrong direction. No
+default, site contract, resource-size matrix, or link-profile matrix followed.
+The explicit arms remain only for reproduction of this rejected mechanism.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
