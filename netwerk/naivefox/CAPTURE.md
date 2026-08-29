@@ -1154,6 +1154,7 @@ independent seeds.
 | `78cbd9ef5ace8048` | open each prepared image after the preceding image request commits, shaped link | 1 | 0.30343 / 0.37128 / 0.30186 / 0.28342 / 0.45118 |
 | `ef003b01f019fe12` | open three images next turn and the final image on the following main-thread turn, shaped link | 1 | 0.30779 / 0.58293 / 0.35812 / 0.31232 / 0.44871 |
 | `d1c08c6718fa278f` | admit CONNECT after the first successful image response HEADERS, shaped link | 1 | 0.11972 / 0.38830 / 0.17140 / 0.18762 / 0.38223 |
+| `e386025177b9432c` | make only the first preamble-owned H3 CONNECT stream incremental at generic urgency, shaped link | 1 | 0.12355 / 0.42295 / 0.17830 / 0.16060 / 0.35493 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1704,6 +1705,22 @@ to 0.38830 and whole flow was 0.38223; the remaining views were
 The image-header state and temporary validator marker were removed. Moving
 admission from first body progress to a specific response class does not
 improve the target window.
+
+An incremental H3 CONNECT at unchanged generic urgency is rejected. The first
+preamble-owned tunnel set Gecko's incremental class-of-service bit without
+promoting urgency; this produced the standard `u=4, i` Priority signal and
+allowed Neqo's incremental scheduling, while later SOCKS connections retained
+their normal behavior. The first private run `0e250cd494490c3f` failed closed:
+the implementation initially applied the bit to a second non-preamble SOCKS
+connection too, and the exact validator rejected two markers. After scoping it
+to the preamble operation generation, one-block shaped artifact
+`e386025177b9432c` measured 0.42295 for packets 17--32 and 0.35493 whole; the
+other views were 0.12355/0.17830/0.16060. Its binary identified build ID
+`006056bd843c9e546c26872cab533982` and libxul digest
+`a3233c9126b1adb1941c0b25665faf7385a6adce331e6d688d631c07d54685f9`.
+The CONNECT API flag, generation scope, and exact marker were removed. Whole
+flow remained close to retained, but DATA interleaving and the additional
+Priority signal worsened the target packet sequence substantially.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
