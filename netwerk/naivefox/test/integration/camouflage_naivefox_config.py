@@ -135,8 +135,6 @@ def build_config(
             "tree-resource-committed-overlap-tree",
             "tree-resource-committed-overlap-page",
             "tree-native-parser-resource-committed-tree",
-            "tree-native-parser-resource-committed-page",
-            "tree-native-parser-resource-committed-page-http-connect",
             "tree-complete-resource-tree",
             "tree-early-overlap-resource-tree",
         )
@@ -228,7 +226,7 @@ def build_config(
     ):
         preamble = {
             "mode": "off",
-            "h3-mode": "tree-native-parser-resource-committed-overlap",
+            f"{protocol}-mode": "tree-native-parser-resource-committed-overlap",
             "path": preamble_path,
             "max-assets": PAGE_PREAMBLE_MAX_ASSETS,
             "max-bytes": PAGE_PREAMBLE_MAX_BYTES,

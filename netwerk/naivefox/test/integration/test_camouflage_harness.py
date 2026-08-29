@@ -658,6 +658,21 @@ class CamouflageHarnessTests(unittest.TestCase):
         }
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
         SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
+        h2_lines = [
+            line.replace("protocol=h3", "protocol=h2").replace(
+                "outer=h3", "outer=h2"
+            )
+            for line in lines
+        ]
+        h2_features = {
+            "protocol": "h2",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        }
+        SAMPLE.validate_sample(arm, "h2", "\n".join(h2_lines), h2_features)
+        SAMPLE.validate_sample(http_arm, "h2", "\n".join(h2_lines), h2_features)
         prefixed_lines = [
             f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
         ]
@@ -813,6 +828,19 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ["browser_page"],
                 arms=("root", "tree-native-parser-full-process-overlap-css"),
             )
+
+    def test_h2_resource_committed_page_arms_are_schedulable(self):
+        arms = (
+            "document-start-overlap",
+            "document-start-http-connect",
+            "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
+        )
+        rows = SUPERBLOCKS.schedule_rows(
+            29, "h2", 1, ["browser_page"], arms=arms
+        )
+        SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
+        self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
@@ -1200,15 +1228,38 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "cache-resources": True,
             },
         )
-        with self.assertRaisesRegex(ValueError, "requires h3"):
-            CONFIG.build_config(
-                "tree-native-parser-resource-committed-page-http-connect",
-                "h2",
-                1080,
-                4433,
-                "fixture-user",
-                "fixture-pass",
-            )
+        h2_config = CONFIG.build_config(
+            "tree-native-parser-resource-committed-page-http-connect",
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(h2_config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(urlsplit(h2_config["proxy"]).scheme, "https")
+        self.assertEqual(
+            h2_config["preamble"],
+            {
+                "mode": "off",
+                "h2-mode": "tree-native-parser-resource-committed-overlap",
+                "path": "/camouflage/index.html",
+                "max-assets": 6,
+                "max-bytes": 384 * 1024,
+                "cache-resources": True,
+            },
+        )
+
+        h2_socks_config = CONFIG.build_config(
+            "tree-native-parser-resource-committed-page",
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(h2_socks_config["listen"], "socks://127.0.0.1:1080")
+        self.assertEqual(h2_socks_config["preamble"], h2_config["preamble"])
 
     def test_http_connect_ingress_combines_with_response_header_admission(self):
         for protocol in ("h2", "h3"):
@@ -2528,7 +2579,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                     "--outer-resource-unit-size",
                     "4096",
                 ],
-                "requires a dense H3 fronting-page arm",
+                "requires a dense fronting-page arm",
             ),
         ):
             result = subprocess.run(

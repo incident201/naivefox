@@ -407,12 +407,6 @@ if [[ ( $naivefox_arm == tree-resource-committed-overlap-css ||
   printf '%s requires --protocol h3\n' "$naivefox_arm" >&2
   exit 2
 fi
-if [[ ( $naivefox_arm == tree-native-parser-resource-committed-page ||
-        $naivefox_arm == tree-native-parser-resource-committed-page-http-connect ) &&
-      $protocol_selection != h3 ]]; then
-  printf 'tree-native-parser-resource-committed-page requires --protocol h3\n' >&2
-  exit 2
-fi
 if [[ ( $naivefox_arm == tree-complete-resource-tree ||
         $naivefox_arm == tree-early-overlap-resource-tree ) &&
       $protocol_selection != h3 ]]; then
@@ -534,19 +528,9 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
     printf 'tree-native-parser-resource-committed-page multi-arm screening requires document-start-overlap\n' >&2
     exit 2
   fi
-  if [[ -n ${seen_multi_arms[tree-native-parser-resource-committed-page]:-} &&
-        $protocol_selection != h3 ]]; then
-    printf 'tree-native-parser-resource-committed-page multi-arm screening requires --protocol h3\n' >&2
-    exit 2
-  fi
   if [[ -n ${seen_multi_arms[tree-native-parser-resource-committed-page-http-connect]:-} &&
         -z ${seen_multi_arms[document-start-http-connect]:-} ]]; then
     printf 'tree-native-parser-resource-committed-page-http-connect multi-arm screening requires document-start-http-connect\n' >&2
-    exit 2
-  fi
-  if [[ -n ${seen_multi_arms[tree-native-parser-resource-committed-page-http-connect]:-} &&
-        $protocol_selection != h3 ]]; then
-    printf 'tree-native-parser-resource-committed-page-http-connect multi-arm screening requires --protocol h3\n' >&2
     exit 2
   fi
   for resource_tree_arm in tree-complete-resource-tree tree-early-overlap-resource-tree; do
@@ -715,7 +699,7 @@ if [[ $naivefox_arm == tree-resource-committed-overlap-page ||
   fi
 fi
 if [[ -n $outer_resource_unit_size && $dense_resource_tree_experiment != 1 ]]; then
-  printf '%s\n' '--outer-resource-unit-size requires a dense H3 fronting-page arm' >&2
+  printf '%s\n' '--outer-resource-unit-size requires a dense fronting-page arm' >&2
   exit 2
 fi
 if [[ -n $outer_resource_unit_size ]]; then

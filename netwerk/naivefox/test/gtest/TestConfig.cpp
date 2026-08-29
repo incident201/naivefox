@@ -561,6 +561,24 @@ TEST(NaiveFoxConfig, PreambleResourceCacheIsExplicitAndTreeOnly)
   EXPECT_EQ(nativeParserResourceCommittedTreeH3.mPreamble.mMaxBytes, 131072U);
   EXPECT_TRUE(nativeParserResourceCommittedTreeH3.mPreamble.mCacheResources);
 
+  Config nativeParserResourceCommittedPageH2;
+  error.Truncate();
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","preamble":{"mode":"off","h2-mode":"tree-native-parser-resource-committed-overlap","path":"/camouflage/","max-assets":6,"max-bytes":393216,"cache-resources":true}})"_ns,
+          nativeParserResourceCommittedPageH2, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(nativeParserResourceCommittedPageH2.mPreamble.ModeForProtocol(
+                ProxyProtocol::H2),
+            PreambleMode::TreeNativeParserResourceCommittedOverlap);
+  EXPECT_EQ(nativeParserResourceCommittedPageH2.mPreamble.ModeForProtocol(
+                ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_EQ(nativeParserResourceCommittedPageH2.mPreamble.mMaxAssets, 6U);
+  EXPECT_EQ(nativeParserResourceCommittedPageH2.mPreamble.mMaxBytes, 393216U);
+  EXPECT_TRUE(nativeParserResourceCommittedPageH2.mPreamble.mCacheResources);
+
   Config nativeParserDocumentStartNavigationStop;
   error.Truncate();
   ASSERT_EQ(

@@ -1079,8 +1079,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             "tree-resource-committed-overlap-tree",
             "tree-resource-committed-overlap-page",
             "tree-native-parser-resource-committed-tree",
-            "tree-native-parser-resource-committed-page",
-            "tree-native-parser-resource-committed-page-http-connect",
             "tree-complete-resource-tree",
             "tree-early-overlap-resource-tree",
         )

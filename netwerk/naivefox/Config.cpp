@@ -868,6 +868,14 @@ class JsonParser final {
           "tree-native-parser-resource-committed-overlap must be selected "
           "explicitly with h3-mode");
     }
+    if (h2Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserResourceCommittedOverlap))) {
+      return Error(
+          "tree-native-parser-resource-committed-overlap must be selected "
+          "explicitly with h2-mode");
+    }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
         (!sawH3Mode ||
          aPreamble.mH3Mode !=
@@ -945,6 +953,7 @@ class JsonParser final {
         (PreambleModeUsesNativeParser(h2Mode) &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+         h2Mode != PreambleMode::TreeNativeParserResourceCommittedOverlap &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartNavigationStop)) {
       return Error("selected resource-committed preamble is H3-only");
     }
@@ -1032,11 +1041,15 @@ class JsonParser final {
             "cache-resources=true");
       }
     }
-    if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
-      if (aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 6) {
+    if (h2Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap ||
+        h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+      if ((h2Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+           aPreamble.mMaxAssets != 6) ||
+          (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+           aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 6)) {
         return Error(
-            "tree-native-parser-resource-committed-overlap requires exactly "
-            "three or six assets");
+            "tree-native-parser-resource-committed-overlap requires six H2 "
+            "assets or three/six H3 assets");
       }
       if (!aPreamble.mCacheResources) {
         return Error(

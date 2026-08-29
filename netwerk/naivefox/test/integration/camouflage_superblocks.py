@@ -225,10 +225,6 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
         raise ValueError(
             "tree-native-parser-resource-committed-tree requires h3 superblocks"
         )
-    if protocol != "h3" and "tree-native-parser-resource-committed-page" in arms:
-        raise ValueError(
-            "tree-native-parser-resource-committed-page requires h3 superblocks"
-        )
     if protocol != "h3" and any(
         arm in arms
         for arm in (
@@ -244,6 +240,8 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
             "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-resource-tree",
+            "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
         )
         for arm in arms
     ):
