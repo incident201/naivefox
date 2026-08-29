@@ -1122,6 +1122,7 @@ independent seeds.
 | `3db870baccdd8047` | preceding next-turn image scheduling, shaped link | 4 | 0.14180 / 0.42302 / 0.20045 / 0.19663 / 0.35352 |
 | `69ee3fd2559c47e1` | preceding next-turn image scheduling, unshaped localhost | 4 | 0.11254 / 0.43472 / 0.17955 / 0.17351 / 0.41992 |
 | `f9a240071240a55b` | open images in `2+1+1` successive main-thread turns, shaped link | 1 | 0.19743 / 0.37870 / 0.22054 / 0.20749 / 0.38823 |
+| `752d40ac53187d45` | open images in `2+2` successive main-thread turns with retained first-body admission, shaped link | 1 | 0.24093 / 0.31250 / 0.23199 / 0.20919 / 0.44428 |
 | `f5cfa9eff387313d` | next-turn image scheduling plus exact Firefox application UA token, shaped link | 1 | 0.12563 / 0.62333 / 0.24182 / 0.17464 / 0.39800 |
 | `906de419f0b1605d` | release CONNECT after stylesheet and deferred-script response HEADERS, shaped link | 1 | 0.09888 / 0.53957 / 0.19785 / 0.19506 / 0.37942 |
 | `e0780953cbebd8a4` | release CONNECT as soon as all six request transactions commit, shaped link | 1 | 0.22115 / 0.69741 / 0.32680 / 0.22386 / 0.47965 |
@@ -1985,6 +1986,25 @@ the first CSS body buffer before the deferred-image gate; the validator was
 corrected and its dedicated regression stayed green before the successful
 rerun. No result from that failed artifact is used. The response-header gate
 and temporary lifecycle grammar were removed.
+
+Splitting the retained next-turn image activation into two event-loop waves is
+also rejected. Streams 3--4 opened on the first ordinary main-thread task and
+streams 5--6 on the immediately following task; CONNECT still required all six
+commits and the first complete valid resource body buffer. Unlike the rejected
+response-header gate, this adds no network wait and cannot accumulate an RTT
+when resources or the connection are slow. One-block shaped artifact
+`752d40ac53187d45` measured
+0.24093/0.31250/0.23199/0.20919/0.44428. The p17--32 result does not improve
+the retained replicated 0.29471 and whole regresses by about 0.10, indicating
+that yielding between `AsyncOpen` calls does not usefully separate the later H3
+DATA scheduling. The binary identified build ID
+`97176048457701e28771d4601a4264f5` and libxul digest
+`6f41be3b1a9feed091237b7742527d938e90392795f8b07049df388f14bade52`.
+Upstream inspection with `searchfox-cli` also confirmed that the retained
+channel semantics already match Firefox's normal priorities: stylesheet
+`Leader`, deferred script `Unblocked`, and images `PRIORITY_LOW` with
+incremental delivery. Arbitrary urgency tuning is therefore not a justified
+follow-up. The wave counter and temporary validator grammar were removed.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
