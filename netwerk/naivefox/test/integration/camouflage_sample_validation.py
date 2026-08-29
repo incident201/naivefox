@@ -1385,7 +1385,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         and line.endswith(f" protocol={protocol}")
     ]
     native_resource_tree_descriptor_count = (
-        5 if arm == "tree-native-parser-resource-committed-page" else 4
+        7 if arm == "tree-native-parser-resource-committed-page" else 4
     )
     native_resource_tree_descriptor_lines = [
         line

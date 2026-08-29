@@ -2995,6 +2995,9 @@ nsresult ProxyPreambleOperation::OpenNativeParserResource(
   }
   if (mImpl->mNativeParserResourceDescriptorsAccepted >=
       mImpl->mConfig.mMaxAssets) {
+    if (UsesNativeParserFirstBodyBarrier(mImpl->mConfig)) {
+      return NS_OK;
+    }
     return NS_ERROR_FILE_TOO_BIG;
   }
 

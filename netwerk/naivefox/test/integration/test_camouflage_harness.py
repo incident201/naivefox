@@ -574,7 +574,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         protocol = "h3"
         lines = [
             "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
-            "descriptors=5 status=0x00000000 generation=1 protocol=h3",
+            "descriptors=7 status=0x00000000 generation=1 protocol=h3",
             "Preamble native-parser-resource-tree lifecycle=resource-opened "
             "stream=1 kind=style referrer=inherited protocol=h3",
             "Preamble native-parser-resource-tree lifecycle=resource-opened "
