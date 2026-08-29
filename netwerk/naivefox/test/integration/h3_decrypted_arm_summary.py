@@ -1622,6 +1622,26 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def expected_tree_asset_count(arm):
+    if arm == "tree-native-parser-resource-committed-page":
+        return 6
+    if arm.endswith("-css") or arm in (
+        "tree-resource-native-cache-committed-overlap",
+        "tree-native-parser-preload-overlap-css",
+        "tree-native-parser-document-start-overlap-css",
+        "tree-native-parser-document-start-navigation-stop-css",
+        "tree-native-parser-document-start-response-stop-css",
+        "tree-native-parser-document-handoff-overlap-css",
+        "tree-native-parser-retarget-overlap-css",
+        "tree-native-parser-ipc-rendezvous-overlap-css",
+        "tree-native-parser-root-rendezvous-overlap-css",
+        "tree-native-parser-process-overlap-css",
+        "tree-native-parser-full-process-overlap-css",
+    ):
+        return 1
+    return 2
+
+
 def validate(cohorts, connections, client_hellos, arms):
     require(
         connections["reference"] == 1,
@@ -1889,25 +1909,7 @@ def validate(cohorts, connections, client_hellos, arms):
                     for row in response_headers
                     if (row["connection_index"], row["stream_id"]) in asset_streams
                 ]
-                expected_assets = (
-                    1
-                    if arm.endswith("-css")
-                    or arm
-                    in (
-                        "tree-resource-native-cache-committed-overlap",
-                        "tree-native-parser-preload-overlap-css",
-                        "tree-native-parser-document-start-overlap-css",
-                        "tree-native-parser-document-start-navigation-stop-css",
-                        "tree-native-parser-document-start-response-stop-css",
-                        "tree-native-parser-document-handoff-overlap-css",
-                        "tree-native-parser-retarget-overlap-css",
-                        "tree-native-parser-ipc-rendezvous-overlap-css",
-                        "tree-native-parser-root-rendezvous-overlap-css",
-                        "tree-native-parser-process-overlap-css",
-                        "tree-native-parser-full-process-overlap-css",
-                    )
-                    else 2
-                )
+                expected_assets = expected_tree_asset_count(arm)
                 if arm not in (
                     "tree-native-parser-document-start-navigation-stop-css",
                     "tree-native-parser-document-start-response-stop-css",
