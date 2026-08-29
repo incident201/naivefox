@@ -3466,6 +3466,7 @@ def main():
             "tree-native-parser-document-start-resource-tree",
             "tree-native-parser-resource-committed-tree",
             "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

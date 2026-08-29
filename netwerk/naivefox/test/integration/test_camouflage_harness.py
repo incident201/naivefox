@@ -523,16 +523,25 @@ class CamouflageHarnessTests(unittest.TestCase):
             rows, expected_blocks=1, arms=(control, treatment)
         )
 
-    def test_feature_extractor_accepts_every_superblock_arm(self):
-        path = os.path.join(HERE, "camouflage_features.py")
-        result = subprocess.run(
-            [sys.executable, path, "extract", "--help"],
-            check=True,
-            capture_output=True,
-            text=True,
+    def test_pipeline_parsers_accept_every_superblock_arm(self):
+        parsers = (
+            ("camouflage_features.py", ("extract", "--help"), set()),
+            (
+                "camouflage_sample_validation.py",
+                ("--help",),
+                {"firefox-proxied"},
+            ),
         )
-        for arm in SUPERBLOCKS.SUPPORTED_ARMS:
-            self.assertIn(arm, result.stdout)
+        for filename, arguments, excluded in parsers:
+            with self.subTest(filename=filename):
+                result = subprocess.run(
+                    [sys.executable, os.path.join(HERE, filename), *arguments],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                for arm in set(SUPERBLOCKS.SUPPORTED_ARMS) - excluded:
+                    self.assertIn(arm, result.stdout)
 
     def test_resource_tree_config_and_lifecycle_are_fail_closed(self):
         arm = "tree-native-parser-document-start-resource-tree"
