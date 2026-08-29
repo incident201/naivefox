@@ -53,6 +53,10 @@ idea new when the changed code still controls the same causal event. Record a
 rejected premise here even when timing evidence makes implementation and
 capture unnecessary.
 
+Do not begin a product edit, fixture fork, or harness arm until that exact and
+causal-history search is complete. This is a per-idea gate, not a one-time
+review for an extended research session.
+
 ## Predeclared outer-resource size campaign
 
 The first actual outer-resource matrix is fixed before collection. It uses the
@@ -3018,6 +3022,75 @@ or merely moving the same negotiation marker between headers, as this rejected
 method-carrier causal family. A new proposal needs a distinct mechanism which
 explains both the 17--32 signal and Whole rather than renaming this wire-method
 substitution.
+
+### H2 early CONNECT request-DATA follow-up
+
+The next H2 idea passed the mandatory exact and causal-history preflight before
+implementation. Prior work had tried optimistic local listener admission,
+ordinary GET/POST carriers, two directional CONNECT streams, payload framing
+and padding variants, CONNECT header sizes, H2 priority, parser/process
+topology, classifier/cache changes, and fixed or event-driven response gates.
+None put bytes which were already buffered from the inner TLS ClientHello into
+DATA on the same classic H2 CONNECT request before the proxy response. That
+wire-ordering mechanism was therefore distinct; it did not wait for a future
+resource, fixed delay, target response, bandwidth estimate, or page size.
+
+Commits `87c158b74f2f`, `1cc1c6edafdb`, and `51354215991e` implemented the
+explicit H2-only client and two listener-specific harness arms. The first
+implementation exposed an important false path which must not be repeated:
+attaching the 1,822 buffered bytes through the original channel upload stream
+produced zero request-body bytes at the server and a 45-second timeout. H2
+CONNECT does not serialize that upload stream; `nsHttpConnection` constructs a
+separate `mProxyConnectStream`. The corrected diagnostic stored a bounded
+payload in the private request head and appended it directly after that
+CONNECT stream's headers, which Necko then encoded as request DATA before the
+`200`. The normal CONNECT path stayed unchanged, and the client required an
+H2-only exact length echo before accepting the experimental tunnel.
+
+The matching forwardproxy fork read exactly the declared 1--65,536 bytes after
+the stock-time `200`, copied them to the dialed target, and then continued with
+the unchanged Variant-1 decoder. It rejected duplicate, malformed, short, and
+H3-marked requests; unmarked requests retained the stock behavior. Its pinned
+`go test ./...` passed. The final `forwardproxy.go` digest was
+`1ef5885d5ed1d9d9645ece4d6df4a4d45d4eb1f33522738f2792b8d19cf597fb`,
+the focused Go-test digest was
+`5671cc976a8c9fb8c97f23ea149b17256c630b9089eb03b05cd9b77e046e6ef8`,
+and the private Caddy 2.11.2 digest was
+`429d56eb01bb4cf81b781b3b0df7b94601edb7b8530d5e3bc9c3bfa3f456b533`.
+The preserved stock Caddy digest remained
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+
+Incremental product and test builds passed without a clobber, as did the three
+new request-head boundary tests, the existing NaiveFox focused gtests, and
+124/124 complete harness tests. Clean isolated lifecycle artifacts
+`4a4d42ffd0fcf2f2` (SOCKS, seed `2026082945`) and
+`e750bcf796a4b2cb` (HTTP listener, seed `2026082946`) proved real pre-response
+DATA delivery, exact echo negotiation, one physical H2 session, and a working
+inner HTTPS/H2 request.
+
+The randomized same-base one-block screen `797aa31a0b8d8e73` (seed
+`2026082947`) used the canonical 262144-byte browser page, inner HTTPS/H2, an
+isolated WSL network namespace, Firefox A/B, both current defaults, and both
+early-DATA arms. Only the requested packets 17--32 and Whole views were
+collected:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.64087 | 0.38297 | control |
+| SOCKS early CONNECT DATA | 0.62021 | 0.38350 | -3.2% / +0.1% |
+| HTTP current `document-first-buffer-http-connect` | 0.56351 | 0.34759 | control |
+| HTTP early CONNECT DATA | 0.53051 | 0.40755 | -5.9% / +17.3% |
+
+The focus-window changes were weak, and HTTP Whole regressed substantially.
+The mutually incompatible client/Caddy mechanism is far below the required
+20% improvement and does not improve both targets, so no replication,
+resource-size matrix, constrained-link matrix, or full default matrix was
+spent. The diagnostic client, harness, and fixture fork were retired; active
+defaults and fronting-site requirements remain unchanged. Future preflight
+must treat both attaching buffered bytes to the original request upload and
+injecting them into the actual H2 proxy CONNECT stream as the tested and
+rejected pre-response request-DATA causal family, rather than retrying either
+form under a new early-data, Fast Open, or zero-RTT name.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
