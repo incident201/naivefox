@@ -1456,6 +1456,26 @@ boundary therefore generalizes across the tested RTT/rate range without
 encoding either value; broader network and server-TTFB coverage remains future
 validation rather than a reason to add a fixed pause.
 
+Releasing CONNECT after only the first successfully consumed resource byte is
+rejected after replication. This moved the barrier inside the first positive
+`OnDataAvailable` callback: one byte was read successfully, CONNECT was
+admitted, and only then was the rest of that callback drained. It therefore
+tested whether the Necko callback size itself caused the remaining target
+distance, without adding a timer, waiting for a complete response, or requiring
+a server-dependent body size. One-block shaped artifact `d21d819300a31433`
+measured 0.24021/0.46981/0.29011/0.24730/0.47484. Four-block replication
+`178f43ceda873438` measured 0.16215 [`0.12115`, `0.18980`] for packets 1--16,
+0.30412 [`0.24145`, `0.33866`] for packets 17--32, 0.17515 [`0.13674`,
+`0.20065`] for packets 1--32, 0.15015 [`0.13084`, `0.16092`] for the first
+250 ms, and 0.34798 [`0.32732`, `0.36864`] whole. The target pair does not
+improve the retained complete-buffer candidate's replicated 0.29471/0.34363,
+while packets 1--16 and 1--32 regress from 0.11745/0.15293. Both artifacts
+identify NaiveFox build ID `3464761a0c1b92b78d8459f1f1232e16` and libxul
+digest
+`3c7df4963e6efe05b7a883485db9c89707704b46bfa75d2c84fcbb9d96902560`.
+The byte-level state and lifecycle labels were removed; admission again
+follows successful consumption of the complete first Necko resource buffer.
+
 Selecting the deferred script's first body buffer instead of the first ready
 resource is rejected. The semantic stream-2 rule avoided a timer and byte
 threshold, but one-block shaped artifact `d25a8910b028a6d5` regressed packets
