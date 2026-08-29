@@ -3084,7 +3084,8 @@ nsresult ProxyPreambleOperation::OpenNativeParserResource(
       mImpl->mConfig.mMaxAssets == 6;
   if (deferImageToNextMainTurn) {
     stream.mPendingOpenListener = listener;
-    if (!mImpl->mDeferredImageOpenDispatched) {
+    if (mImpl->mProtocol != ProxyProtocol::H2 &&
+        !mImpl->mDeferredImageOpenDispatched) {
       mImpl->mDeferredImageOpenDispatched = true;
       RefPtr self = this;
       nsresult dispatchRv = NS_DispatchToMainThread(NS_NewRunnableFunction(
@@ -3146,9 +3147,13 @@ void ProxyPreambleOperation::ReleaseDeferredNativeParserImages() {
     }
     RuntimeLogEvent(
         "Preamble native-parser-resource-tree "
-        "lifecycle=deferred-resource-opened stream=%u kind=image "
-        "cause=next-main-turn protocol=%s\n",
-        streamId, ProtocolName(mImpl->mProtocol));
+        "lifecycle=deferred-resource-opened stream=%u kind=image cause=%s "
+        "protocol=%s\n",
+        streamId,
+        mImpl->mProtocol == ProxyProtocol::H2
+            ? "blocking-requests-committed-next-main-turn"
+            : "next-main-turn",
+        ProtocolName(mImpl->mProtocol));
   }
 }
 
@@ -3673,6 +3678,7 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
   if (aStreamId > 0 &&
       mImpl->mConfig.mMode ==
           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      mImpl->mProtocol == ProxyProtocol::H3 &&
       mImpl->mConfig.mMaxAssets == 6 &&
       !mImpl->mFirstResourceBodyBufferConsumed &&
       mImpl->mStreams[aStreamId].mResponseHeadersReceived &&
@@ -4186,6 +4192,45 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
     assetsDone += candidate.mDone;
     assetsCommitted += candidate.mRequestCommitted;
     nativeCacheNewResources += candidate.mNativeCacheNewEntry;
+  }
+  const bool h2BlockingRequestsCommitted =
+      mImpl->mProtocol == ProxyProtocol::H2 &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      mImpl->mConfig.mMaxAssets == 6 && mImpl->mRootDone &&
+      mImpl->mRootCompletedSuccessfully && mImpl->mNativeParserFinished &&
+      assetCount == 6 && assetsCommitted == 2;
+  if (h2BlockingRequestsCommitted) {
+    if (mImpl->mDeferredImageOpenDispatched) {
+      FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                               "h2-images-dispatched-before-barrier");
+      return;
+    }
+    for (uint32_t index = 3; index <= 6; ++index) {
+      const auto& image = mImpl->mStreams[index];
+      if (!image.mPendingOpenListener || image.mRequestCommitted ||
+          image.mDone) {
+        FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                                 "h2-image-not-pending-at-barrier");
+        return;
+      }
+    }
+    mImpl->mDeferredImageOpenDispatched = true;
+    RefPtr self = this;
+    nsresult dispatchRv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "NaiveFox::ReleaseDeferredNativeParserImagesAfterBlockingCommit",
+        [self] { self->ReleaseDeferredNativeParserImages(); }));
+    if (NS_FAILED(dispatchRv)) {
+      mImpl->mDeferredImageOpenDispatched = false;
+      FailNativeParserContract(dispatchRv, "h2-image-release-dispatch-failed");
+      return;
+    }
+    RuntimeLogEvent(
+        "Preamble native-parser-resource-tree "
+        "barrier=blocking-requests-committed assets=6 committed=2 "
+        "protocol=h2\n");
+    FireBarrierCallback();
+    return;
   }
   const bool barrierReached = detail::PreambleBarrierReached(
       mImpl->mConfig.mMode, rootResponseAccepted, mImpl->mRootDone, assetCount,

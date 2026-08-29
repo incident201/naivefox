@@ -368,7 +368,9 @@ NATIVE_PARSER_RESOURCE_TREE_OPEN = re.compile(
 NATIVE_PARSER_RESOURCE_TREE_DEFERRED_OPEN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
     r"lifecycle=deferred-resource-opened stream=(?P<stream>\d+) "
-    r"kind=image cause=next-main-turn protocol=(?P<protocol>h2|h3)$"
+    r"kind=image "
+    r"cause=(?P<cause>next-main-turn|blocking-requests-committed-next-main-turn) "
+    r"protocol=(?P<protocol>h2|h3)$"
 )
 NATIVE_PARSER_RESOURCE_TREE_COMMIT = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
@@ -1452,6 +1454,12 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if "Preamble native-parser-resource-tree "
         "barrier=first-resource-body-buffer " in line
     ]
+    native_resource_tree_blocking_barrier_lines = [
+        line
+        for line in log_lines
+        if "Preamble native-parser-resource-tree "
+        "barrier=blocking-requests-committed " in line
+    ]
     native_resource_tree_first_body_lines = [
         line
         for line in log_lines
@@ -2345,6 +2353,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         parsed_native_resource_tree_commits,
         parsed_native_resource_tree_first_bodies,
         parsed_native_resource_tree_drains,
+        native_resource_tree_body_barrier_lines,
+        native_resource_tree_blocking_barrier_lines,
     )
     if arm in (
         "tree-native-parser-document-start-resource-tree",
@@ -2357,6 +2367,14 @@ def validate_sample(arm, protocol, log_text, feature_document):
         expected_deferred_count = (
             4 if arm == "tree-native-parser-resource-committed-page" else 0
         )
+        h2_blocking_commit_page = (
+            arm == "tree-native-parser-resource-committed-page" and protocol == "h2"
+        )
+        expected_first_body_count = (
+            0
+            if h2_blocking_commit_page
+            else (1 if arm == "tree-native-parser-resource-committed-page" else 0)
+        )
         if (
             len(parsed_native_resource_tree_admissions) != 1
             or len(native_resource_tree_descriptor_lines) != 1
@@ -2366,9 +2384,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or len(parsed_native_resource_tree_commits) != expected_resource_count
             or len(parsed_native_resource_tree_drains) != 1
             or len(parsed_native_resource_tree_first_bodies)
-            != (1 if arm == "tree-native-parser-resource-committed-page" else 0)
-            or len(native_resource_tree_body_barrier_lines)
-            != (1 if arm == "tree-native-parser-resource-committed-page" else 0)
+            != expected_first_body_count
+            or len(native_resource_tree_body_barrier_lines) != expected_first_body_count
+            or len(native_resource_tree_blocking_barrier_lines)
+            != (1 if h2_blocking_commit_page else 0)
         ):
             raise ValueError(
                 "native parser resource-tree arm requires one early admission, "
@@ -2403,22 +2422,38 @@ def validate_sample(arm, protocol, log_text, feature_document):
             int(marker["stream"])
             for marker in parsed_native_resource_tree_deferred_opens
         }
+        deferred_open_causes = {
+            int(marker["stream"]): marker["cause"]
+            for marker in parsed_native_resource_tree_deferred_opens
+        }
         expected_deferred_opens = (
             {3, 4, 5, 6}
             if arm == "tree-native-parser-resource-committed-page"
             else set()
         )
+        expected_deferred_cause = (
+            "blocking-requests-committed-next-main-turn"
+            if h2_blocking_commit_page
+            else "next-main-turn"
+        )
+        expected_deferred_causes = {
+            stream: expected_deferred_cause for stream in expected_deferred_opens
+        }
         commits = {
             int(marker["stream"]) for marker in parsed_native_resource_tree_commits
         }
         expected_admission = (
-            "resources-committed"
-            if arm
-            in (
-                "tree-native-parser-resource-committed-tree",
-                "tree-native-parser-resource-committed-page",
+            "blocking-resources-committed"
+            if h2_blocking_commit_page
+            else (
+                "resources-committed"
+                if arm
+                in (
+                    "tree-native-parser-resource-committed-tree",
+                    "tree-native-parser-resource-committed-page",
+                )
+                else "request-committed"
             )
-            else "request-committed"
         )
         if (
             admission["admission"] != expected_admission
@@ -2427,10 +2462,12 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 arm == "tree-native-parser-document-start-resource-tree"
                 and admission["root_done"] != "0"
             )
+            or (h2_blocking_commit_page and admission["root_done"] != "1")
             or admission["protocol"] != protocol
             or opens != expected_resources
             or open_lifecycles != expected_open_lifecycles
             or deferred_opens != expected_deferred_opens
+            or deferred_open_causes != expected_deferred_causes
             or commits != set(expected_resources)
             or any(
                 marker["protocol"] != protocol
@@ -2485,12 +2522,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             and result_index < established_index < drain_index
         )
         if arm == "tree-native-parser-resource-committed-page":
-            first_body = parsed_native_resource_tree_first_bodies[0]
-            first_body_stream = int(first_body["stream"])
-            first_body_index = log_lines.index(native_resource_tree_first_body_lines[0])
-            body_barrier_index = log_lines.index(
-                native_resource_tree_body_barrier_lines[0]
-            )
             open_index_by_stream = {
                 int(marker["stream"]): log_lines.index(line)
                 for line, marker in zip(
@@ -2498,13 +2529,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
                     parsed_native_resource_tree_opens,
                 )
             }
-            open_index_by_stream.update({
+            deferred_open_index_by_stream = {
                 int(marker["stream"]): log_lines.index(line)
                 for line, marker in zip(
                     native_resource_tree_deferred_open_lines,
                     parsed_native_resource_tree_deferred_opens,
                 )
-            })
+            }
             commit_index_by_stream = {
                 int(marker["stream"]): log_lines.index(line)
                 for line, marker in zip(
@@ -2512,27 +2543,67 @@ def validate_sample(arm, protocol, log_text, feature_document):
                     parsed_native_resource_tree_commits,
                 )
             }
-            resource_committed_order = (
-                first_body["protocol"] == protocol
-                and first_body_stream in expected_resources
-                and native_resource_tree_body_barrier_lines[0].endswith(
-                    "Preamble native-parser-resource-tree "
-                    "barrier=first-resource-body-buffer assets=6 committed=6 "
-                    f"protocol={protocol}"
+            if h2_blocking_commit_page:
+                blocking_barrier_index = log_lines.index(
+                    native_resource_tree_blocking_barrier_lines[0]
                 )
-                and descriptor_index < min(open_indices)
-                and max(open_indices) < min(deferred_open_indices)
-                and all(
-                    open_index_by_stream[stream] < commit_index_by_stream[stream]
-                    for stream in expected_resources
+                resource_committed_order = (
+                    native_resource_tree_blocking_barrier_lines[0].endswith(
+                        "Preamble native-parser-resource-tree "
+                        "barrier=blocking-requests-committed assets=6 committed=2 "
+                        "protocol=h2"
+                    )
+                    and descriptor_index < min(open_indices)
+                    and max(open_indices)
+                    < min(commit_index_by_stream[1], commit_index_by_stream[2])
+                    and max(commit_index_by_stream[1], commit_index_by_stream[2])
+                    < blocking_barrier_index
+                    and blocking_barrier_index < admission_index < result_index
+                    and result_index < min(deferred_open_indices)
+                    and all(
+                        open_index_by_stream[stream]
+                        < deferred_open_index_by_stream[stream]
+                        < commit_index_by_stream[stream]
+                        for stream in expected_deferred_opens
+                    )
+                    and result_index < established_index < drain_index
+                    and max(commit_indices) < drain_index
                 )
-                and commit_index_by_stream[first_body_stream] < first_body_index
-                and max(commit_indices) < body_barrier_index
-                and first_body_index < body_barrier_index
-                and body_barrier_index < admission_index
-                and admission_index < result_index < established_index
-                and result_index < drain_index
-            )
+            else:
+                first_body = parsed_native_resource_tree_first_bodies[0]
+                first_body_stream = int(first_body["stream"])
+                first_body_index = log_lines.index(
+                    native_resource_tree_first_body_lines[0]
+                )
+                body_barrier_index = log_lines.index(
+                    native_resource_tree_body_barrier_lines[0]
+                )
+                resource_committed_order = (
+                    first_body["protocol"] == protocol
+                    and first_body_stream in expected_resources
+                    and native_resource_tree_body_barrier_lines[0].endswith(
+                        "Preamble native-parser-resource-tree "
+                        "barrier=first-resource-body-buffer assets=6 committed=6 "
+                        f"protocol={protocol}"
+                    )
+                    and descriptor_index < min(open_indices)
+                    and max(open_indices) < min(deferred_open_indices)
+                    and all(
+                        (
+                            deferred_open_index_by_stream.get(
+                                stream, open_index_by_stream[stream]
+                            )
+                            < commit_index_by_stream[stream]
+                        )
+                        for stream in expected_resources
+                    )
+                    and commit_index_by_stream[first_body_stream] < first_body_index
+                    and max(commit_indices) < body_barrier_index
+                    and first_body_index < body_barrier_index
+                    and body_barrier_index < admission_index
+                    and admission_index < result_index < established_index
+                    and result_index < drain_index
+                )
         if not (
             document_start_order
             if arm == "tree-native-parser-document-start-resource-tree"
