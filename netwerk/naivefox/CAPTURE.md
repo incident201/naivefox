@@ -3092,6 +3092,30 @@ injecting them into the actual H2 proxy CONNECT stream as the tested and
 rejected pre-response request-DATA causal family, rather than retrying either
 form under a new early-data, Fast Open, or zero-RTT name.
 
+### H2 single-CONNECT multiplexing premise check
+
+Before implementing another incompatible transport, the mandatory history
+gate searched the documentation, harness, full Git history, and pickaxe diffs
+for shared tunnels, substreams, demultiplexing, and multiple local transports
+inside one outer CONNECT. No prior NaiveFox experiment had implemented that
+custom multiplexing layer; the two-stream directional experiment did the
+opposite and split one logical tunnel across two CONNECT streams. A new
+implementation was nevertheless rejected because its required premise was
+false for the focus workload.
+
+Clean isolated lifecycle-only artifacts `74cf25555a2a36a7` (SOCKS, seed
+`2026082948`) and `80c8273acbc4565f` (HTTP listener, seed `2026082949`) each
+ran the current H2 default with the canonical browser page and inner HTTPS/H2.
+The fixture access lifecycle contained exactly one outer CONNECT in each run.
+Consequently there were no repeated CONNECT headers or Variant-1 startup
+phases for an application substream multiplexer to eliminate. Adding a custom
+flow-control, target-routing, and demultiplexing protocol would only replace
+the already single tunnel, not collapse several tunnels into one. No product,
+Caddy, harness, build, or passive matrix change was spent. Future preflight
+must not infer multiple logical tunnels merely from the old directional
+experiment's diagnostic slot bound; it must first measure the actual workload
+being proposed for multiplexing.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
