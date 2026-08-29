@@ -368,13 +368,33 @@ if [[ $private_h3_keylog == 1 && $mode != gate && $mode != smoke ]]; then
   exit 2
 fi
 case $naivefox_arm in
-  document-first-buffer-task-optimistic | document-first-buffer-http-connect-optimistic) ;;
+  document-first-buffer-task-optimistic | document-first-buffer-http-connect-optimistic | document-first-buffer-task-h2-data-frame-padding | document-first-buffer-http-connect-h2-data-frame-padding) ;;
   off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-first-buffer-overlap | document-first-buffer-task-overlap | document-first-buffer-task-http-connect | document-first-buffer-http-connect | document-overlap | document-headers-task-overlap | document-headers-task-http-connect | document-overlap-http-connect | document-start-http-connect | document-start-overlap | document-start-task-overlap | document-start-task-http-connect | tree-complete | tree-complete-css | tree-complete-resource-tree | tree-early-overlap | tree-early-overlap-resource-tree | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-committed-overlap-tree | tree-resource-committed-overlap-page | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-resource-tree | tree-native-parser-resource-committed-tree | tree-native-parser-resource-committed-page | tree-native-parser-resource-committed-page-http-connect | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
   *)
     printf 'unsupported NaiveFox arm: %s\n' "$naivefox_arm" >&2
     exit 2
     ;;
 esac
+if [[ ( $naivefox_arm == document-first-buffer-task-h2-data-frame-padding ||
+        $naivefox_arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+      $protocol_selection != h2 ]]; then
+  printf '%s requires --protocol h2\n' "$naivefox_arm" >&2
+  exit 2
+fi
+if [[ ( $naivefox_arm == document-first-buffer-task-h2-data-frame-padding ||
+        $naivefox_arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+      -z ${NAIVEFOX_CAPTURE_CADDY_BIN:-} ]]; then
+  printf '%s requires an explicit NAIVEFOX_CAPTURE_CADDY_BIN\n' \
+    "$naivefox_arm" >&2
+  exit 2
+fi
+if [[ ( $naivefox_arm == document-first-buffer-task-h2-data-frame-padding ||
+        $naivefox_arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+      $mode != gate && $mode != smoke ]]; then
+  printf '%s is restricted to diagnostic gate/smoke runs\n' \
+    "$naivefox_arm" >&2
+  exit 2
+fi
 if [[ $naivefox_arm == root-pmtud-control && $protocol_selection != h3 ]]; then
   printf 'root-pmtud-control requires --protocol h3\n' >&2
   exit 2
@@ -471,7 +491,7 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
   declare -A seen_multi_arms=()
   for arm in "${multi_arm_arms[@]}"; do
     case $arm in
-      document-first-buffer-task-optimistic | document-first-buffer-http-connect-optimistic) ;;
+      document-first-buffer-task-optimistic | document-first-buffer-http-connect-optimistic | document-first-buffer-task-h2-data-frame-padding | document-first-buffer-http-connect-h2-data-frame-padding) ;;
       off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-first-buffer-overlap | document-first-buffer-task-overlap | document-first-buffer-task-http-connect | document-first-buffer-http-connect | document-overlap | document-headers-task-overlap | document-headers-task-http-connect | document-overlap-http-connect | document-start-http-connect | document-start-overlap | document-start-task-overlap | document-start-task-http-connect | tree-complete | tree-complete-css | tree-complete-resource-tree | tree-early-overlap | tree-early-overlap-resource-tree | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-committed-overlap-tree | tree-resource-committed-overlap-page | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-resource-tree | tree-native-parser-resource-committed-tree | tree-native-parser-resource-committed-page | tree-native-parser-resource-committed-page-http-connect | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-warm-css-304 | tree-overlap) ;;
       *)
         printf 'unsupported multi-arm NaiveFox arm: %s\n' "$arm" >&2
@@ -483,6 +503,26 @@ if [[ $experiment_design == multi_arm_superblocks ]]; then
       exit 2
     fi
     seen_multi_arms[$arm]=1
+    if [[ ( $arm == document-first-buffer-task-h2-data-frame-padding ||
+            $arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+          $protocol_selection != h2 ]]; then
+      printf '%s multi-arm screening requires --protocol h2\n' "$arm" >&2
+      exit 2
+    fi
+    if [[ ( $arm == document-first-buffer-task-h2-data-frame-padding ||
+            $arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+          -z ${NAIVEFOX_CAPTURE_CADDY_BIN:-} ]]; then
+      printf '%s multi-arm screening requires an explicit NAIVEFOX_CAPTURE_CADDY_BIN\n' \
+        "$arm" >&2
+      exit 2
+    fi
+    if [[ ( $arm == document-first-buffer-task-h2-data-frame-padding ||
+            $arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+          $mode != gate && $mode != smoke ]]; then
+      printf '%s multi-arm screening is restricted to diagnostic gate/smoke runs\n' \
+        "$arm" >&2
+      exit 2
+    fi
   done
   if [[ -n ${seen_multi_arms[tree-warm-css-304]:-} ]]; then
     printf 'tree-warm-css-304 cannot share cold superblock references\n' >&2
@@ -799,6 +839,12 @@ if [[ ! $seed =~ ^[0-9]+$ ]]; then
   printf 'seed must be a non-negative integer\n' >&2
   exit 2
 fi
+if [[ -n ${NAIVEFOX_CAPTURE_CADDY_BIN:-} &&
+      ( $NAIVEFOX_CAPTURE_CADDY_BIN != /* ||
+        ! -x $NAIVEFOX_CAPTURE_CADDY_BIN ) ]]; then
+  printf 'NAIVEFOX_CAPTURE_CADDY_BIN must be an absolute executable path\n' >&2
+  exit 2
+fi
 
 for tool in dumpcap tshark curl getcap openssl python3 readelf rg setsid sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || {
@@ -943,6 +989,7 @@ network_monitor_done=
 network_mutation_validated_samples=0
 cache_validated_participants=0
 inner_h2_validated_participants=0
+h2_data_frame_padding_validated_samples=0
 response_stop_aborted_samples=0
 response_stop_natural_completion_samples=0
 controller_backends="$private_dir/controller-backends.txt"
@@ -2262,6 +2309,7 @@ run_naivefox_sample() {
   socks_port=$(choose_port)
   browser_socks_port=$socks_port
   if [[ $arm == document-first-buffer-http-connect ||
+        $arm == document-first-buffer-http-connect-h2-data-frame-padding ||
         $arm == document-first-buffer-http-connect-optimistic ||
         $arm == document-first-buffer-task-http-connect ||
         $arm == document-headers-task-http-connect ||
@@ -2287,7 +2335,14 @@ run_naivefox_sample() {
   make_profile "$naivefox_profile" "$protocol" naivefox "" "$arm"
   make_profile "$browser_profile" "$protocol" "$browser_participant" \
     "$socks_port" "" "$target_port"
-  if [[ $private_h3_keylog == 1 && $protocol == h3 ]]; then
+  if [[ ( $arm == document-first-buffer-task-h2-data-frame-padding ||
+          $arm == document-first-buffer-http-connect-h2-data-frame-padding ) &&
+        $protocol == h2 ]]; then
+    : >"$keylog"
+    chmod 0600 "$keylog"
+    sslkeylog_unset=()
+    sslkeylog_assignment=("SSLKEYLOGFILE=$keylog")
+  elif [[ $private_h3_keylog == 1 && $protocol == h3 ]]; then
     : >"$keylog"
     chmod 0600 "$keylog"
     sslkeylog_unset=()
@@ -2440,9 +2495,11 @@ run_naivefox_sample() {
           $arm == document-overlap-http-connect ||
           $arm == document-first-buffer-overlap ||
           $arm == document-first-buffer-task-overlap ||
+          $arm == document-first-buffer-task-h2-data-frame-padding ||
           $arm == document-first-buffer-task-optimistic ||
           $arm == document-first-buffer-task-http-connect ||
           $arm == document-first-buffer-http-connect ||
+          $arm == document-first-buffer-http-connect-h2-data-frame-padding ||
           $arm == document-first-buffer-http-connect-optimistic ]]; then
     drain_pattern=" preamble document-overlap drain=complete root_done=1 completed_resources=0 protocol=$protocol$"
   elif [[ $arm == document-start-http-connect ||
@@ -2456,6 +2513,16 @@ run_naivefox_sample() {
     drain_ready=0
   fi
   stop_capture
+  if [[ $arm == document-first-buffer-task-h2-data-frame-padding ||
+        $arm == document-first-buffer-http-connect-h2-data-frame-padding ]]; then
+    python3 "$INTEGRATION_DIR/h2_data_frame_padding_validation.py" \
+      --pcap "$pcap" --keylog "$keylog" \
+      --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" >>"$log"
+    h2_data_frame_padding_validated_samples=$((
+      h2_data_frame_padding_validated_samples + 1
+    ))
+    rm -f -- "$keylog"
+  fi
   if [[ $inner_transport == https-h2 ]]; then
     validate_inner_h2_request "$completion" "$inner_h2_log_start"
   fi
@@ -2808,6 +2875,8 @@ isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link
 network_mutation_monitor=netlink_route_v1_fail_closed
 network_mutation_validated_samples=$network_mutation_validated_samples
+fixture_caddy_sha256=$(sha256sum "$CADDY_BIN" | cut -d' ' -f1)
+h2_data_frame_padding_validated_samples=$h2_data_frame_padding_validated_samples
 network_profile_active=$network_profile_active
 network_one_way_delay_ms=$network_one_way_delay_ms
 network_rate_mbit=$network_rate_mbit
@@ -2892,9 +2961,11 @@ else
   if [[ $naivefox_arm == tree-complete ||
         $naivefox_arm == document-first-buffer-overlap ||
         $naivefox_arm == document-first-buffer-task-overlap ||
+        $naivefox_arm == document-first-buffer-task-h2-data-frame-padding ||
         $naivefox_arm == document-first-buffer-task-optimistic ||
         $naivefox_arm == document-first-buffer-task-http-connect ||
         $naivefox_arm == document-first-buffer-http-connect ||
+        $naivefox_arm == document-first-buffer-http-connect-h2-data-frame-padding ||
         $naivefox_arm == document-first-buffer-http-connect-optimistic ||
         $naivefox_arm == document-overlap ||
         $naivefox_arm == document-headers-task-overlap ||
@@ -3050,6 +3121,8 @@ payload_padding_expected=$expected_padding
 fixture_proxy_reset_policy=$fixture_proxy_reset_policy
 fixture_proxy_restart_count=$proxy_restart_count
 fixture_proxy_expected_restart_count=$expected_proxy_restart_count
+fixture_caddy_sha256=$(sha256sum "$CADDY_BIN" | cut -d' ' -f1)
+h2_data_frame_padding_validated_samples=$h2_data_frame_padding_validated_samples
 private_h3_keylog=$private_h3_keylog
 isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link
