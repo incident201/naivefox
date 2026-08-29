@@ -355,7 +355,8 @@ user_pref("network.http.http3.enable", false);
 EOF
   if [[ $socks_port -ne 0 ]]; then
     "$browser_python" "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-      --generate-pac-user-js "$socks_port" >>"$destination/user.js"
+      --generate-pac-user-js "$socks_port" \
+      "$NAIVEFOX_FIXTURE_HTTPS_PORT" >>"$destination/user.js"
   fi
   chmod 0600 "$destination/user.js"
 }

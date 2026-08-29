@@ -4602,6 +4602,24 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn('user_pref("network.proxy.autoconfig_url", "data:', result.stdout)
         self.assertNotIn("SOCKS5", result.stdout)
 
+    def test_dedicated_capture_pac_generators_scope_the_exact_target(self):
+        expected = (
+            '--generate-pac-user-js "$socks_port" '
+            '"$NAIVEFOX_FIXTURE_HTTPS_PORT"'
+        )
+        for filename in (
+            "run-h2-capture-comparison.sh",
+            "run-h2-connect-priority-comparison.sh",
+            "run-h3-capture-comparison.sh",
+        ):
+            with self.subTest(filename=filename):
+                with open(os.path.join(HERE, filename), encoding="utf-8") as stream:
+                    flattened = " ".join(
+                        line.strip().removesuffix("\\").strip()
+                        for line in stream.read().splitlines()
+                    )
+                    self.assertIn(expected, flattened)
+
     def test_dumpcap_clean_shutdown_is_accepted(self):
         CAPTURE.validate_dumpcap_log(
             """Capturing on 'any'

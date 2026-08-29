@@ -309,7 +309,8 @@ user_pref("network.http.http3.enable", false);
 EOF
   if [[ $role == socks-browser ]]; then
     python3 "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-      --generate-pac-user-js "$socks_port" >>"$destination/user.js"
+      --generate-pac-user-js "$socks_port" \
+      "$NAIVEFOX_FIXTURE_HTTPS_PORT" >>"$destination/user.js"
     cat >>"$destination/user.js" <<'EOF'
 user_pref("network.prefetch-next", false);
 user_pref("network.http.speculative-parallel-limit", 0);
