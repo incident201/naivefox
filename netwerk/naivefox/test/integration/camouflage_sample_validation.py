@@ -1155,10 +1155,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(marker is None for marker in parsed_directional):
         raise ValueError("malformed directional CONNECT evidence")
     if requested_arm in directional_arms:
-        if len(parsed_directional) != 1:
-            raise ValueError(
-                "directional CONNECT arm requires exactly one negotiation marker"
-            )
+        if not parsed_directional:
+            raise ValueError("directional CONNECT arm requires negotiation evidence")
     elif parsed_directional:
         raise ValueError(
             f"{requested_arm} arm unexpectedly logged directional CONNECT evidence"
@@ -1820,13 +1818,35 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
-    if requested_arm in directional_arms and (
-        len(parsed_established) != 1
-        or parsed_established[0]["connection"]
-        != parsed_directional[0]["connection"]
-        or parsed_established[0]["protocol"] != "h2"
-    ):
-        raise ValueError("directional CONNECT marker identity differs from CONNECT")
+    if requested_arm in directional_arms:
+        directional_connections = [
+            marker["connection"] for marker in parsed_directional
+        ]
+        established_connections = [
+            marker["connection"] for marker in parsed_established
+        ]
+        if (
+            not established_connections
+            or len(set(directional_connections)) != len(directional_connections)
+            or len(set(established_connections)) != len(established_connections)
+            or set(directional_connections) != set(established_connections)
+            or any(marker["protocol"] != "h2" for marker in parsed_established)
+        ):
+            raise ValueError(
+                "directional CONNECT markers do not match established CONNECTs"
+            )
+        directional_by_connection = {
+            marker["connection"]: line
+            for line, marker in zip(directional_lines, parsed_directional)
+        }
+        if any(
+            log_lines.index(line)
+            >= log_lines.index(directional_by_connection[marker["connection"]])
+            for line, marker in zip(established_lines, parsed_established)
+        ):
+            raise ValueError(
+                "directional CONNECT marker precedes CONNECT establishment"
+            )
     expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
     if expected_padding not in ("yes", "no"):
         raise ValueError("unsupported expected padding condition")

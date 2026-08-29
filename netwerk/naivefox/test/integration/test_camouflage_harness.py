@@ -1567,30 +1567,69 @@ class CamouflageHarnessTests(unittest.TestCase):
                     "Connection 1 preamble document-overlap "
                     f"admission={admission} response_accepted=1 "
                     "root_done=0 protocol=h2\n"
+                    "Connection 1 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
                     "Connection 1 diagnostic-directional-connect negotiated=1 "
                     "protocol=h2 streams=2 "
                     "opening=staged-after-upstream-response upstream=primary "
                     "downstream=secondary\n"
-                    "Connection 1 established target=localhost:443 "
-                    "outer=h2 padding=yes\n"
                     "Connection 1 preamble result=success status=0x00000000 "
                     "http=200 bytes=512 protocol=h2\n"
                     "Connection 1 preamble document-overlap drain=complete "
                     "root_done=1 completed_resources=0 protocol=h2\n"
+                    "Connection 2 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
+                    "Connection 2 diagnostic-directional-connect negotiated=1 "
+                    "protocol=h2 streams=2 "
+                    "opening=staged-after-upstream-response upstream=primary "
+                    "downstream=secondary\n"
                 )
                 SAMPLE.validate_sample(arm, "h2", lifecycle, features)
                 with self.assertRaisesRegex(
-                    ValueError, "requires exactly one negotiation marker"
+                    ValueError, "requires negotiation evidence"
+                ):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        "\n".join(
+                            line
+                            for line in lifecycle.splitlines()
+                            if "diagnostic-directional-connect" not in line
+                        ),
+                        features,
+                    )
+                with self.assertRaisesRegex(
+                    ValueError, "do not match established CONNECTs"
                 ):
                     SAMPLE.validate_sample(
                         arm,
                         "h2",
                         lifecycle.replace(
-                            "Connection 1 diagnostic-directional-connect "
+                            "Connection 2 diagnostic-directional-connect "
                             "negotiated=1 protocol=h2 streams=2 "
                             "opening=staged-after-upstream-response "
                             "upstream=primary downstream=secondary\n",
                             "",
+                        ),
+                        features,
+                    )
+                with self.assertRaisesRegex(ValueError, "precedes"):
+                    second_established = (
+                        "Connection 2 established target=localhost:443 "
+                        "outer=h2 padding=yes\n"
+                    )
+                    second_marker = (
+                        "Connection 2 diagnostic-directional-connect "
+                        "negotiated=1 protocol=h2 streams=2 "
+                        "opening=staged-after-upstream-response "
+                        "upstream=primary downstream=secondary\n"
+                    )
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        lifecycle.replace(
+                            second_established + second_marker,
+                            second_marker + second_established,
                         ),
                         features,
                     )
@@ -4626,6 +4665,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             reference = os.path.join(temporary, "reference")
             naivefox = os.path.join(temporary, "naivefox")
             pmtud_control = os.path.join(temporary, "pmtud-control")
+            directional = os.path.join(temporary, "directional")
             socks = os.path.join(temporary, "socks")
             variables = {
                 "browser_python": sys.executable,
@@ -4643,6 +4683,10 @@ class CamouflageHarnessTests(unittest.TestCase):
                 f"make_profile {shlex.quote(reference)} h3 reference",
                 f"make_profile {shlex.quote(naivefox)} h3 naivefox",
                 f"make_profile {shlex.quote(pmtud_control)} h3 naivefox '' root-pmtud-control",
+                (
+                    f"make_profile {shlex.quote(directional)} h2 naivefox '' "
+                    "document-first-buffer-task-directional-connect"
+                ),
                 f"make_profile {shlex.quote(socks)} h3 socks-browser 1080 '' 8443",
             ))
             subprocess.run(["bash"], input=script, text=True, check=True)
@@ -4655,6 +4699,10 @@ class CamouflageHarnessTests(unittest.TestCase):
                 os.path.join(pmtud_control, "user.js"), encoding="utf-8"
             ) as stream:
                 pmtud_control_prefs = stream.read()
+            with open(
+                os.path.join(directional, "user.js"), encoding="utf-8"
+            ) as stream:
+                directional_prefs = stream.read()
             with open(os.path.join(socks, "user.js"), encoding="utf-8") as stream:
                 socks_prefs = stream.read()
             mapping_pref = "network.http.http3.alt-svc-mapping-for-testing"
@@ -4668,6 +4716,14 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertNotIn(pmtud_pref, naivefox_prefs)
             self.assertNotIn(pmtud_pref, socks_prefs)
             self.assertIn(pmtud_pref, pmtud_control_prefs)
+            connection_cap_pref = (
+                'user_pref("network.http.max-persistent-connections-per-server", 12);'
+            )
+            self.assertNotIn(connection_cap_pref, reference_prefs)
+            self.assertNotIn(connection_cap_pref, naivefox_prefs)
+            self.assertNotIn(connection_cap_pref, pmtud_control_prefs)
+            self.assertNotIn(connection_cap_pref, socks_prefs)
+            self.assertIn(connection_cap_pref, directional_prefs)
 
     def test_proxy_pac_sends_only_target_loopback_port_to_sample_socks(self):
         pac = CONTROLLER.proxy_pac_script(1080, 8443)

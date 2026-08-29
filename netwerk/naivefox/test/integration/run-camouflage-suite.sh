@@ -1500,6 +1500,7 @@ validate_profile_role() {
   local mapping_pref='network.http.http3.alt-svc-mapping-for-testing'
   local force_pref='network.http.http3.force-use-alt-svc-mapping-for-testing'
   local pmtud_pref='network.http.http3.pmtud'
+  local max_server_connections_pref='network.http.max-persistent-connections-per-server'
   local expect_test_mapping=false
   [[ $participant == reference && $protocol == h3 ]] && expect_test_mapping=true
 
@@ -1540,6 +1541,24 @@ validate_profile_role() {
        \( -name user.js -o -name prefs.js \) \
        -exec rg -q -F "$pmtud_pref" {} +; then
     printf '%s profile unexpectedly overrides the global H3 PMTUD preference\n' \
+      "$participant" >&2
+    return 1
+  fi
+
+  if [[ $participant == naivefox &&
+        ( $arm == document-first-buffer-task-directional-connect ||
+          $arm == document-first-buffer-directional-http-connect ) ]]; then
+    rg -q -F \
+      'user_pref("network.http.max-persistent-connections-per-server", 12);' \
+      "$destination/user.js" || {
+        printf 'directional CONNECT profile lacks its structural tunnel cap\n' \
+          >&2
+        return 1
+      }
+  elif find "$destination" -maxdepth 1 -type f \
+       \( -name user.js -o -name prefs.js \) \
+       -exec rg -q -F "$max_server_connections_pref" {} +; then
+    printf '%s profile unexpectedly overrides the per-server connection cap\n' \
       "$participant" >&2
     return 1
   fi
@@ -1634,6 +1653,13 @@ EOF
   if [[ $participant == naivefox && $arm == root-pmtud-control ]]; then
     cat >>"$destination/user.js" <<'EOF'
 user_pref("network.http.http3.pmtud", true);
+EOF
+  fi
+  if [[ $participant == naivefox &&
+        ( $arm == document-first-buffer-task-directional-connect ||
+          $arm == document-first-buffer-directional-http-connect ) ]]; then
+    cat >>"$destination/user.js" <<'EOF'
+user_pref("network.http.max-persistent-connections-per-server", 12);
 EOF
   fi
   if [[ $direct_h3 == true ]]; then
