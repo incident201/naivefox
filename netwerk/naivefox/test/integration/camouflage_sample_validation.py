@@ -18,6 +18,11 @@ OPTIMISTIC_LOCAL_REPLY = re.compile(
     r"pump-started|outer-failed) "
     r"listener=(?P<listener>socks|http-connect)$"
 )
+H2_EARLY_CONNECT_DATA = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"diagnostic-h2-early-data captured-bytes=(?P<bytes>\d+) "
+    r"echo-accepted=(?P<accepted>[01]) protocol=h2$"
+)
 ROOT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble root-overlap admission=(?P<admission>\S+) "
@@ -1016,9 +1021,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-early-data",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-early-data",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -1108,13 +1115,25 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
+    early_data_arms = {
+        "document-first-buffer-task-early-data": "socks",
+        "document-first-buffer-http-connect-early-data": "http-connect",
+    }
+    if arm in early_data_arms and protocol != "h2":
+        raise ValueError(f"{arm} requires h2")
     requested_arm = arm
     arm = {
         "document-first-buffer-http-connect": "document-first-buffer-overlap",
+        "document-first-buffer-http-connect-early-data": (
+            "document-first-buffer-overlap"
+        ),
         "document-first-buffer-http-connect-optimistic": (
             "document-first-buffer-overlap"
         ),
         "document-first-buffer-task-http-connect": (
+            "document-first-buffer-task-overlap"
+        ),
+        "document-first-buffer-task-early-data": (
             "document-first-buffer-task-overlap"
         ),
         "document-first-buffer-task-optimistic": ("document-first-buffer-task-overlap"),
@@ -1135,7 +1154,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
     if any(marker is None for marker in parsed_optimistic):
         raise ValueError("malformed optimistic local reply evidence")
     optimistic_arms = {
+        "document-first-buffer-task-early-data": "socks",
         "document-first-buffer-task-optimistic": "socks",
+        "document-first-buffer-http-connect-early-data": "http-connect",
         "document-first-buffer-http-connect-optimistic": "http-connect",
     }
     if requested_arm in optimistic_arms:
@@ -1156,6 +1177,31 @@ def validate_sample(arm, protocol, log_text, feature_document):
             raise ValueError("optimistic local reply listener identity differs")
     elif parsed_optimistic:
         raise ValueError(f"{requested_arm} arm unexpectedly logged optimistic reply")
+    early_data_lines = [
+        line for line in log_lines if "diagnostic-h2-early-data" in line
+    ]
+    parsed_early_data = [
+        H2_EARLY_CONNECT_DATA.fullmatch(line) for line in early_data_lines
+    ]
+    if any(marker is None for marker in parsed_early_data):
+        raise ValueError("malformed H2 early CONNECT data evidence")
+    if requested_arm in early_data_arms:
+        if not parsed_early_data:
+            raise ValueError("H2 early CONNECT data arm requires negotiation evidence")
+        if any(
+            int(marker["bytes"]) < 1
+            or int(marker["bytes"]) > 64 * 1024
+            or marker["accepted"] != "1"
+            for marker in parsed_early_data
+        ):
+            raise ValueError("H2 early CONNECT data was empty, oversized, or unaccepted")
+        connections = [marker["connection"] for marker in parsed_early_data]
+        if len(set(connections)) != len(connections):
+            raise ValueError("duplicate H2 early CONNECT data connection marker")
+    elif parsed_early_data:
+        raise ValueError(
+            f"{requested_arm} arm unexpectedly logged H2 early CONNECT data"
+        )
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
@@ -1783,6 +1829,28 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
+    if requested_arm in early_data_arms:
+        if len(parsed_early_data) != len(parsed_established):
+            raise ValueError(
+                "H2 early CONNECT data marker count differs from established tunnels"
+            )
+        for marker_line, marker in zip(early_data_lines, parsed_early_data):
+            matching_established = [
+                (line, established)
+                for line, established in zip(established_lines, parsed_established)
+                if established["connection"] == marker["connection"]
+                and established["protocol"] == "h2"
+            ]
+            if len(matching_established) != 1:
+                raise ValueError(
+                    "H2 early CONNECT data identity differs from established tunnel"
+                )
+            if log_lines.index(matching_established[0][0]) > log_lines.index(
+                marker_line
+            ):
+                raise ValueError(
+                    "H2 early CONNECT data marker preceded tunnel establishment"
+                )
     expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
     if expected_padding not in ("yes", "no"):
         raise ValueError("unsupported expected padding condition")
@@ -3496,9 +3564,11 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-early-data",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-early-data",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",

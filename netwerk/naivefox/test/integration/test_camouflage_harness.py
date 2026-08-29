@@ -842,6 +842,19 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
+    def test_h2_early_data_arms_are_schedulable(self):
+        arms = (
+            "document-first-buffer-task-overlap",
+            "document-first-buffer-task-early-data",
+            "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-early-data",
+        )
+        rows = SUPERBLOCKS.schedule_rows(
+            31, "h2", 1, ["browser_page"], arms=arms
+        )
+        SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
+        self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
+
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
             SUPERBLOCKS.parse_arms("gate,root,document-complete")
@@ -862,6 +875,13 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn('for arm in "${multi_arm_arms[@]}"; do', runner)
         self.assertIn("analyzer_args+=(--screening-only)", runner)
         self.assertIn("metadata_arm_specific_analysis=screening_only", runner)
+        self.assertIn("document-first-buffer-task-early-data", runner)
+        self.assertIn("document-first-buffer-http-connect-early-data", runner)
+        self.assertIn("NAIVEFOX_CAPTURE_CADDY_BIN must be an absolute", runner)
+        common_path = os.path.join(HERE, "common.sh")
+        with open(common_path, encoding="utf-8") as stream:
+            common = stream.read()
+        self.assertIn("NAIVEFOX_CAPTURE_CADDY_BIN", common)
         self.assertIn('--views "$multi_arm_views_csv"', runner)
         self.assertIn(
             "H3 multi-arm screening requires a pre-launched Selenium browser",
@@ -1331,6 +1351,41 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ),
             )
 
+    def test_h2_early_data_arms_are_explicit_and_listener_specific(self):
+        cases = {
+            "document-first-buffer-task-early-data": (
+                "socks://127.0.0.1:1080",
+                "document-first-buffer-task-overlap",
+            ),
+            "document-first-buffer-http-connect-early-data": (
+                "http://127.0.0.1:1080",
+                "document-first-buffer-overlap",
+            ),
+        }
+        for arm, (listener, mode) in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+                self.assertEqual(config["listen"], listener)
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertIs(config["diagnostic-optimistic-local-reply"], True)
+                self.assertIs(config["diagnostic-h2-early-data"], True)
+                with self.assertRaisesRegex(ValueError, "requires h2"):
+                    CONFIG.build_config(
+                        arm,
+                        "h3",
+                        1080,
+                        4433,
+                        "fixture-user",
+                        "fixture-pass",
+                    )
+
     def test_http_connect_task_barriers_map_to_product_modes(self):
         cases = {
             "document-start-task-http-connect": "document-start-task-overlap",
@@ -1469,6 +1524,62 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "root_done=0 protocol=h2\n",
                 features,
             )
+
+    def test_h2_early_data_lifecycle_is_fail_closed(self):
+        features = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        cases = {
+            "document-first-buffer-task-early-data": (
+                "socks",
+                "first-data-buffer-task",
+            ),
+            "document-first-buffer-http-connect-early-data": (
+                "http-connect",
+                "first-data-buffer",
+            ),
+        }
+        for arm, (listener, admission) in cases.items():
+            with self.subTest(arm=arm):
+                lifecycle = (
+                    f"Local optimistic reply phase=queued listener={listener}\n"
+                    f"Local optimistic reply phase=reply-flushed-before-outer listener={listener}\n"
+                    "Connection 1 preamble document-overlap "
+                    f"admission={admission} response_accepted=1 "
+                    "root_done=0 protocol=h2\n"
+                    "Connection 1 preamble result=success status=0x00000000 "
+                    "http=200 bytes=512 protocol=h2\n"
+                    "Connection 1 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
+                    "Connection 1 diagnostic-h2-early-data captured-bytes=517 "
+                    "echo-accepted=1 protocol=h2\n"
+                    f"Local optimistic reply phase=outer-established listener={listener}\n"
+                    f"Local optimistic reply phase=pump-started listener={listener}\n"
+                    "Connection 1 preamble document-overlap drain=complete "
+                    "root_done=1 completed_resources=0 protocol=h2\n"
+                )
+                SAMPLE.validate_sample(arm, "h2", lifecycle, features)
+                with self.assertRaisesRegex(ValueError, "requires negotiation evidence"):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        lifecycle.replace(
+                            "Connection 1 diagnostic-h2-early-data "
+                            "captured-bytes=517 echo-accepted=1 protocol=h2\n",
+                            "",
+                        ),
+                        features,
+                    )
+                with self.assertRaisesRegex(
+                    ValueError, "empty, oversized, or unaccepted"
+                ):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        lifecycle.replace("captured-bytes=517", "captured-bytes=0"),
+                        features,
+                    )
 
     def test_socks_ingress_combines_with_first_buffer_admission(self):
         config = CONFIG.build_config(
