@@ -2783,6 +2783,78 @@ retirement. The active fixture was restored byte-for-byte to the stock Caddy
 digest above. Future padding work must treat delayed random budget as tested
 and rejected rather than retrying it under another record-count or phase name.
 
+The next idea pass applied the experiment-history gate before touching code.
+Two superficially new proposals were rejected at that stage. First, sharing or
+echoing one constant CONNECT `Padding` value so HPACK could reuse it has no
+causal opportunity in the canonical browser-page workload: one
+`TunnelSession` opens one CONNECT on its outer H2 session. Necko's H2 encoder
+does index an ordinary non-sensitive `Padding` field, but there is no second
+CONNECT header block on which that dynamic-table entry could save bytes. The
+strict negotiation validator used by the preceding smoke also required exactly
+one marker for that session and would have rejected a second one. Therefore
+header-value reuse could not change the measured wire and was not implemented.
+
+Second, replacing forwardproxy's per-target-read response flushes with ordinary
+Go buffering is causally the already closed response-coalescing family, not a
+new transport idea. Safe artifact `01c1250aa7a7f14a` had already tested a 1-ms
+idle batch and found only a small packets-17--32 movement while 1--32 and the
+server-byte deficit worsened. The later semantic full-TLS-record and flight
+cutoffs in artifacts `e742cfd3a0c19fe9` and `9ce752e81ecd307b` improved an
+early slice but significantly worsened Whole; cleartext-handshake-only artifact
+`64e7a03ff341ffe2` removed the apparent benefit. The no-code preflight therefore
+prevented another implementation of the same read-boundary batching mechanism.
+
+The genuinely untried branch was the size of the single CONNECT `Padding`
+header itself. History and pickaxe searches found payload-padding ranges,
+record-count changes, server zero/max padding, and the delayed budget above,
+but no experiment that changed the request/response header-value endpoints
+while leaving the payload codec intact. Commits `adf9d49a91d0` and
+`6efd6724218e` added four explicit H2-only diagnostic arms for SOCKS and HTTP
+CONNECT. A `~5` request selected an exact two-byte value in both directions; a
+`~6` prefix on an exact 96-byte request selected exact 96-byte values. These
+markers cannot be emitted by the stock 16--32-byte client generator. An arm
+failed closed unless the response had the same exact profile, protocol, and
+connection identity. The ordinary eight randomized payload records in each
+direction and the raw stream after them were unchanged; there was no timer,
+resource-size dependency, link estimate, or future-byte wait.
+
+The matching private forwardproxy fork selected a profile per CONNECT while
+preserving the stock 30--61-byte response generator for every unmarked request.
+Pinned `go test ./...` passed, including marker near misses. The custom Caddy
+digest was
+`4dcd4ad6a59791510e08910898d4f22c42d4bf8f50d7ce7deab197d061f1266b`;
+the preserved and restored stock digest was
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 105/105 NaiveFox C++ gtests, 123/123 complete harness tests,
+and incremental test/product builds without a clobber. Isolated single-arm
+smoke artifact `ca9910ed900dc422` (seed `2026082926`) proved real 2/2-byte
+negotiation through the strict runtime validator.
+
+The one-block same-base screen `2ac627c3521ec666` (seed `2026082927`) used the
+canonical 262144-byte browser page, inner HTTPS/H2, Firefox A/B, and all six
+current/profile listener arms in one randomized eight-participant block:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.55473 | 0.34608 | control |
+| SOCKS two-byte header | 0.48077 | 0.35099 | -13.3% / +1.4% |
+| SOCKS 96-byte header | 0.58148 | 0.34886 | +4.8% / +0.8% |
+| HTTP current `document-first-buffer-http-connect` | 0.59045 | 0.35839 | control |
+| HTTP two-byte header | 0.58654 | 0.34527 | -0.7% / -3.7% |
+| HTTP 96-byte header | 0.61926 | 0.32556 | +4.9% / -9.2% |
+
+The best focus movement, SOCKS with two-byte headers, was only 13.3% and made
+Whole slightly worse. The best Whole movement, HTTP with 96-byte headers, was
+9.2% and made packets 17--32 worse. Neither endpoint approached the required
+20% compatibility-break threshold or improved both target views, so no
+replication, resource-size matrix, or constrained-link matrix followed.
+Commit `c67adfa9ccc9` retired the diagnostic client and harness; 100/100 C++
+gtests, 121/121 harness tests, and an incremental product build passed after
+retirement. The active fixture is again byte-for-byte stock. Future work must
+treat CONNECT header-size endpoints, HPACK reuse without a second CONNECT, and
+server read-boundary batching as examined rather than recycling them under new
+names.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
