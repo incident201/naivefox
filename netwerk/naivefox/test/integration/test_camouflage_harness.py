@@ -507,6 +507,22 @@ class CamouflageHarnessTests(unittest.TestCase):
                 rows, expected_blocks=1, arms=(control, treatment)
             )
 
+    def test_http_connect_resource_tree_requires_matching_control(self):
+        treatment = "tree-native-parser-resource-committed-page-http-connect"
+        control = "document-start-http-connect"
+        with self.assertRaisesRegex(ValueError, "requires the .* control"):
+            SUPERBLOCKS.validate_arm_sequence(("root", treatment))
+        with self.assertRaisesRegex(ValueError, "browser_page"):
+            SUPERBLOCKS.schedule_rows(
+                1, "h3", 1, ["initial"], arms=(control, treatment)
+            )
+        rows = SUPERBLOCKS.schedule_rows(
+            1, "h3", 1, ["browser_page"], arms=(control, treatment)
+        )
+        SUPERBLOCKS.validate_superblocks(
+            rows, expected_blocks=1, arms=(control, treatment)
+        )
+
     def test_resource_tree_config_and_lifecycle_are_fail_closed(self):
         arm = "tree-native-parser-document-start-resource-tree"
         config = CONFIG.build_config(

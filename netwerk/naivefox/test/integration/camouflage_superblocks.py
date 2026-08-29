@@ -43,6 +43,7 @@ SUPPORTED_ARMS = (
     "tree-native-parser-document-start-resource-tree",
     "tree-native-parser-resource-committed-tree",
     "tree-native-parser-resource-committed-page",
+    "tree-native-parser-resource-committed-page-http-connect",
     "tree-native-parser-document-start-navigation-stop-css",
     "tree-native-parser-document-start-response-stop-css",
     "tree-native-parser-document-handoff-overlap-css",
@@ -117,6 +118,14 @@ def validate_arm_sequence(arms):
             "tree-native-parser-resource-committed-page requires the "
             "document-start-overlap control"
         )
+    if (
+        "tree-native-parser-resource-committed-page-http-connect" in arms
+        and "document-start-http-connect" not in arms
+    ):
+        raise ValueError(
+            "tree-native-parser-resource-committed-page-http-connect requires "
+            "the document-start-http-connect control"
+        )
     for resource_tree_arm in (
         "tree-complete-resource-tree",
         "tree-early-overlap-resource-tree",
@@ -190,6 +199,7 @@ def schedule_rows(seed, protocol, count, scenarios, arms=DEFAULT_ARMS):
                 "tree-early-overlap-resource-tree",
                 "tree-resource-committed-overlap-page",
                 "tree-native-parser-resource-committed-page",
+                "tree-native-parser-resource-committed-page-http-connect",
             )
         )
         and set(scenarios) != {"browser_page"}
@@ -338,6 +348,7 @@ def validate_superblocks(rows, expected_blocks=None, require_dataset=False, arms
                     "tree-early-overlap-resource-tree",
                     "tree-resource-committed-overlap-page",
                     "tree-native-parser-resource-committed-page",
+                    "tree-native-parser-resource-committed-page-http-connect",
                 )
             )
             and scenarios != {"browser_page"}
