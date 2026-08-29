@@ -81,10 +81,15 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `preamble` is optional. When it is omitted, an explicit H2 upstream behind
   SOCKS-only listeners uses the promoted `document-first-buffer-task-overlap`
   policy. HTTP-CONNECT-only and mixed listeners use
-  `document-first-buffer-overlap`; H3 retains `document-start-overlap`. All
-  three policies use path `/` with a 64 KiB safety budget. The implicit
-  cold-route gate applies to the selected H2 or H3 upstream, so one established
-  outer session does not repeat the synthetic document for every tunnel. An
+  `document-first-buffer-overlap`. An explicit H3 upstream behind SOCKS-only
+  listeners uses the promoted
+  `tree-native-parser-resource-committed-overlap` policy with path `/`, exactly
+  six parser-discovered resources, ordinary resource caching, and a 384 KiB
+  aggregate safety budget. HTTP-CONNECT-only and mixed H3 listeners retain
+  `document-start-overlap` with path `/` and a 64 KiB document budget. The
+  implicit cold-route gate applies to the selected H2 or H3 upstream, so one
+  established outer session does not repeat the synthetic page for every
+  tunnel. An
   explicit `{"preamble":{"mode":"off"}}` is the complete opt-out, and an
   explicit `outer-session-gate` value remains authoritative: `false` runs the
   implicit protocol-specific document on every tunnel, while `true` retains
@@ -102,6 +107,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   `document-first-buffer-task-overlap`,
   `document-start-overlap`, `tree-native-parser-document-start-overlap`,
   `tree-native-parser-document-start-resource-tree`,
+  `tree-native-parser-resource-committed-overlap`,
   `tree-native-parser-document-start-navigation-stop`,
   `tree-native-parser-document-start-response-stop`,
   `tree-complete`, `tree-overlap`,
@@ -177,11 +183,27 @@ The supported config is a strict NaiveProxy-compatible subset:
   It improved packets 1--16 (`0.16459` to `0.13442`), packets 17--32
   (`0.76117` to `0.65828`), packets 1--32 (`0.26499` to `0.22720`), and the
   250 ms view (`0.14026` to `0.12081`); no whole-flow regression was detected
-  (`0.38926` to `0.38660`, with a paired interval crossing zero). It therefore
-  remains the implicit default for H3 configurations. A final
+  (`0.38926` to `0.38660`, with a paired interval crossing zero). It remains
+  the H3 policy for HTTP CONNECT and mixed listeners. A final
   six-block H2 screen against the bounded resource-tree candidate retained the
   lower distance for this mode in packets 17--32, packets 1--32, 250 ms, and
   whole-flow views, while packets 1--16 were effectively tied.
+  `tree-native-parser-resource-committed-overlap` is the promoted SOCKS-only
+  H3 policy. Its lean parser accepts exactly one same-origin stylesheet, one
+  classic deferred script, and four images. CSS and script open from the
+  parser callback; the four prepared images open together on the next ordinary
+  main-thread turn. CONNECT is admitted only after all six native H3 resource
+  transactions have committed and one complete valid resource body buffer has
+  been consumed. This boundary contains no fixed pause, byte threshold, packet
+  count, resource-size target, RTT, or bandwidth value. It fails closed if the
+  page does not meet the exact bounded resource contract or any required
+  request or response fails. Four-block shaped artifact `390cc24ccb6ef8c9`
+  measured `0.11745/0.29471/0.15293/0.16835/0.34363` for packets 1--16,
+  packets 17--32, packets 1--32, 250 ms, and whole flow. Separate four-block
+  runs retained the improvement with 64 KiB and 1 MiB page bases and at 50 ms
+  one-way delay with 5 Mbit/s bandwidth. Unshaped localhost retained the
+  whole-flow gain. These robustness checks promote the event-driven mode for
+  SOCKS-only H3; explicit preamble configuration remains authoritative.
   `tree-native-parser-document-start-overlap` preserves that same early
   request-commit admission, then continues the root response through the lean
   HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens
@@ -272,12 +294,14 @@ The supported config is a strict NaiveProxy-compatible subset:
   timeouts, and missing entries fail closed. It exists to test native resource
   scheduling with a fresh temporary profile; it is not a persistent-cache
   product policy or a recommended default.
-  `cache-resources` is an opt-in diagnostic boolean, defaulting to `false`, and
-  is accepted only when at least one effective protocol mode is a tree mode.
+  `cache-resources` is an explicit-config diagnostic boolean, defaulting to
+  `false`, and is accepted only when at least one effective protocol mode is a
+  tree mode. The promoted implicit SOCKS-only H3 policy enables it for its six
+  resource channels.
   It enables Gecko's ordinary HTTP cache path only for discovered resource
   channels; the root document remains cache-inhibited, as do direct requests,
-  CONNECT, and every preamble under the default configuration. The cache lives
-  in the run's selected profile. NaiveFox still creates a temporary profile by
+  CONNECT, and document-only preambles. The cache lives in the run's selected
+  profile. NaiveFox still creates a temporary profile by
   default, so this mechanism is useful for controlled repeated loads within a
   process and does not introduce a persistent-profile product dependency.
 - `no-post-quantum` is a boolean, defaulting to `false`; when true it disables

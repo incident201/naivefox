@@ -344,7 +344,8 @@ zero. Under the relaxed acceptance rule this is the better overall tradeoff:
 it further reduces packets 17--32 and whole flow, with no detected early
 penalty. Omitted-preamble SOCKS-only H2 therefore uses task admission;
 HTTP-CONNECT-only and mixed listeners retain direct first-buffer admission,
-and H3 retains document-start. Explicit configuration remains authoritative.
+while the later H3 campaign determines its protocol-specific default below.
+Explicit configuration remains authoritative.
 
 `tree-native-parser-document-start-navigation-stop` tests whether Firefox's
 normal scoped load-group cancellation can retain that early server-heavy phase
@@ -1457,7 +1458,12 @@ control 0.21167/0.29908/0.18354. These runs use the same build ID and libxul
 digest as the default-size, localhost, and size screens. The event-driven
 boundary therefore generalizes across the tested RTT/rate range without
 encoding either value; broader network and server-TTFB coverage remains future
-validation rather than a reason to add a fixed pause.
+validation rather than a reason to add a fixed pause. Together with the
+default-size, unshaped, and two replicated size endpoints, this completes the
+predeclared robustness matrix and promotes the retained six-resource mode as
+the implicit SOCKS-only H3 default. HTTP CONNECT and mixed listeners retain
+the ingress-safe `document-start-overlap` control, and explicit preamble
+configuration remains authoritative.
 
 Releasing CONNECT after only the first successfully consumed resource byte is
 rejected after replication. This moved the barrier inside the first positive

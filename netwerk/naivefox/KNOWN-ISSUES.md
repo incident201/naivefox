@@ -81,6 +81,16 @@ pre-CONNECT H3 establishment failure.
 Normal JSON config deliberately has no Auto scheme: `https://` is strict H2 and
 `quic://` is strict H3.
 
+## Implicit H3 fronting page has an exact resource contract
+
+The promoted SOCKS-only H3 preamble expects the configured origin root to
+contain exactly one same-origin stylesheet, one classic deferred script, and
+four images accepted by the lean parser, within the documented aggregate
+budget. Strict H3 fails closed when that contract is not met; it does not
+silently fall back to a document-only request or to H2. Operators using a
+different fronting page must select an explicit compatible `preamble` policy,
+including `document-start-overlap`, or explicitly disable the preamble.
+
 ## Product scope
 
 - SOCKS BIND and UDP ASSOCIATE are not implemented.
