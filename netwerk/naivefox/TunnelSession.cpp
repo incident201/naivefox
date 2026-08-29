@@ -443,7 +443,6 @@ class TunnelSession::Impl final {
   bool mConnectCodeKnown = false;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
-  uint32_t mDiagnosticHeaderPaddingResponseBytes = 0;
   nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
@@ -1234,15 +1233,7 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
     return;
   }
   nsAutoCString padding;
-  nsresult rv = NS_OK;
-  if (mImpl->mConfig.mDiagnosticHeaderPaddingBytes != 0) {
-    rv = aProtocol == ProxyProtocol::H2
-             ? GenerateDiagnosticHeaderPadding(
-                   padding, mImpl->mConfig.mDiagnosticHeaderPaddingBytes)
-             : NS_ERROR_INVALID_ARG;
-  } else {
-    rv = GenerateHeaderPadding(padding);
-  }
+  nsresult rv = GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
     RefPtr<TunnelAttempt> attempt =
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
@@ -1307,7 +1298,6 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
   bool connectCodeKnown = false;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
-  uint32_t diagnosticHeaderPaddingResponseBytes = 0;
   nsAutoCString outerProtocol;
   nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aRequest);
   if (proxied && http) {
@@ -1322,8 +1312,6 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
           proxied->GetHttpProxyResponseHeader("padding"_ns, padding);
       if (NS_SUCCEEDED(headerRv)) {
         paddingHeaderPresent = Some(true);
-        diagnosticHeaderPaddingResponseBytes =
-            DetectDiagnosticHeaderPaddingLength(padding);
       } else if (headerRv == NS_ERROR_NOT_AVAILABLE) {
         paddingHeaderPresent = Some(false);
       } else {
@@ -1338,12 +1326,10 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
       NS_NewRunnableFunction(
           "NaiveFox::TunnelConnectMetadata",
           [owner, generation, protocol, rv, connectCodeKnown, connectCode,
-           paddingHeaderPresent, diagnosticHeaderPaddingResponseBytes,
-           outerProtocol = std::move(outerProtocol)]() {
-            owner->ApplyConnectMetadata(
-                generation, protocol, rv, connectCodeKnown, connectCode,
-                paddingHeaderPresent, diagnosticHeaderPaddingResponseBytes,
-                outerProtocol);
+           paddingHeaderPresent, outerProtocol = std::move(outerProtocol)]() {
+            owner->ApplyConnectMetadata(generation, protocol, rv,
+                                        connectCodeKnown, connectCode,
+                                        paddingHeaderPresent, outerProtocol);
           }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
@@ -1523,7 +1509,6 @@ void TunnelSession::ApplyConnectMetadata(
     uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
     bool aConnectCodeKnown, int32_t aConnectCode,
     const Maybe<bool>& aPaddingHeaderPresent,
-    uint32_t aDiagnosticHeaderPaddingResponseBytes,
     const nsACString& aOuterProtocol) {
   if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mMetadataReady) {
     return;
@@ -1533,8 +1518,6 @@ void TunnelSession::ApplyConnectMetadata(
   mImpl->mConnectCodeKnown = aConnectCodeKnown;
   mImpl->mConnectCode = aConnectCode;
   mImpl->mPaddingHeaderPresent = aPaddingHeaderPresent;
-  mImpl->mDiagnosticHeaderPaddingResponseBytes =
-      aDiagnosticHeaderPaddingResponseBytes;
   mImpl->mOuterProtocol = aOuterProtocol;
   MaybeFinishAttempt();
 }
@@ -1612,7 +1595,6 @@ void TunnelSession::ResetAttemptState() {
   mImpl->mConnectCodeKnown = false;
   mImpl->mConnectCode = -1;
   mImpl->mPaddingHeaderPresent.reset();
-  mImpl->mDiagnosticHeaderPaddingResponseBytes = 0;
   mImpl->mOuterProtocol.Truncate();
   mImpl->mPaddingEnabled = false;
   mImpl->mPendingTunnelIn = nullptr;
@@ -1651,16 +1633,8 @@ void TunnelSession::MaybeFinishAttempt() {
                                 mImpl->mOuterProtocol.EqualsLiteral("h2")) ||
                                (mImpl->mAttemptProtocol == ProxyProtocol::H3 &&
                                 mImpl->mOuterProtocol.EqualsLiteral("h3"));
-  const uint32_t requestedHeaderPaddingBytes =
-      mImpl->mConfig.mDiagnosticHeaderPaddingBytes;
-  const bool diagnosticHeaderPaddingMatches =
-      requestedHeaderPaddingBytes == 0 ||
-      (mImpl->mAttemptProtocol == ProxyProtocol::H2 &&
-       mImpl->mDiagnosticHeaderPaddingResponseBytes ==
-           requestedHeaderPaddingBytes);
   if (NS_FAILED(mImpl->mMetadataStatus) || NS_FAILED(mImpl->mChannelStatus) ||
       !mImpl->mConnectCodeKnown || !protocolMatches ||
-      !diagnosticHeaderPaddingMatches ||
       NS_FAILED(NegotiatePayloadPadding(mImpl->mConnectCode,
                                         mImpl->mPaddingHeaderPresent,
                                         mImpl->mPaddingEnabled))) {
@@ -1689,15 +1663,6 @@ void TunnelSession::TunnelReady() {
                   mImpl->mPaddingEnabled ? "yes" : "no");
   RuntimeLog("Outer protocol: %s\n", mImpl->mOuterProtocol.get());
   RuntimeLog("Padding negotiated: %s\n", mImpl->mPaddingEnabled ? "yes" : "no");
-  if (mImpl->mConfig.mDiagnosticHeaderPaddingBytes != 0) {
-    RuntimeLogEvent(
-        "Connection %llu diagnostic-header-padding negotiated=1 protocol=%s "
-        "request-bytes=%u response-bytes=%u\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        ProtocolName(mImpl->mAttemptProtocol),
-        mImpl->mConfig.mDiagnosticHeaderPaddingBytes,
-        mImpl->mDiagnosticHeaderPaddingResponseBytes);
-  }
   if (mImpl->mOnEstablished) {
     mImpl->mOnEstablished(mImpl->mOuterProtocol, mImpl->mPaddingEnabled);
   }
