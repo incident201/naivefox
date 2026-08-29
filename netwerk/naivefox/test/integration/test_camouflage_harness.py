@@ -659,51 +659,11 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
         SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
         h2_lines = [
-            "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
-            "descriptors=7 status=0x00000000 generation=1 protocol=h2",
-            "Preamble native-parser-resource-tree lifecycle=resource-opened "
-            "stream=1 kind=style referrer=inherited protocol=h2",
-            "Preamble native-parser-resource-tree lifecycle=resource-opened "
-            "stream=2 kind=script referrer=inherited protocol=h2",
+            line.replace("protocol=h3", "protocol=h2").replace(
+                "outer=h3", "outer=h2"
+            )
+            for line in lines
         ]
-        for stream in range(3, 7):
-            h2_lines.append(
-                "Preamble native-parser-resource-tree "
-                f"lifecycle=resource-prepared stream={stream} kind=image "
-                "referrer=inherited protocol=h2"
-            )
-        for stream in range(1, 3):
-            h2_lines.append(
-                "Preamble native-parser-resource-tree "
-                f"lifecycle=resource-committed stream={stream} "
-                "status=waiting-for protocol=h2"
-            )
-        h2_lines.extend([
-            "Preamble native-parser-resource-tree "
-            "barrier=blocking-requests-committed assets=6 committed=2 protocol=h2",
-            "Connection 7 preamble native-parser-resource-tree "
-            "admission=blocking-resources-committed request_committed=1 "
-            "root_done=1 protocol=h2",
-            "Connection 7 preamble result=success status=0x00000000 "
-            "http=200 bytes=99 protocol=h2",
-        ])
-        for stream in range(3, 7):
-            h2_lines.append(
-                "Preamble native-parser-resource-tree "
-                f"lifecycle=deferred-resource-opened stream={stream} kind=image "
-                "cause=blocking-requests-committed-next-main-turn protocol=h2"
-            )
-        for stream in range(3, 7):
-            h2_lines.append(
-                "Preamble native-parser-resource-tree "
-                f"lifecycle=resource-committed stream={stream} "
-                "status=waiting-for protocol=h2"
-            )
-        h2_lines.extend([
-            "Connection 7 established target=localhost:443 outer=h2 padding=yes",
-            "Connection 7 preamble native-parser-resource-tree drain=complete "
-            "completed_resources=6 http=200 protocol=h2",
-        ])
         h2_features = {
             "protocol": "h2",
             "features": {
@@ -713,26 +673,6 @@ class CamouflageHarnessTests(unittest.TestCase):
         }
         SAMPLE.validate_sample(arm, "h2", "\n".join(h2_lines), h2_features)
         SAMPLE.validate_sample(http_arm, "h2", "\n".join(h2_lines), h2_features)
-        h2_missing_barrier = [
-            line
-            for line in h2_lines
-            if "barrier=blocking-requests-committed" not in line
-        ]
-        with self.assertRaisesRegex(ValueError, "configured resource opens"):
-            SAMPLE.validate_sample(
-                arm, "h2", "\n".join(h2_missing_barrier), h2_features
-            )
-        h2_wrong_deferred_cause = [
-            line.replace(
-                "cause=blocking-requests-committed-next-main-turn",
-                "cause=next-main-turn",
-            )
-            for line in h2_lines
-        ]
-        with self.assertRaisesRegex(ValueError, "causal state"):
-            SAMPLE.validate_sample(
-                arm, "h2", "\n".join(h2_wrong_deferred_cause), h2_features
-            )
         prefixed_lines = [
             f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
         ]
@@ -896,7 +836,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-native-parser-resource-committed-page",
             "tree-native-parser-resource-committed-page-http-connect",
         )
-        rows = SUPERBLOCKS.schedule_rows(29, "h2", 1, ["browser_page"], arms=arms)
+        rows = SUPERBLOCKS.schedule_rows(
+            29, "h2", 1, ["browser_page"], arms=arms
+        )
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 

@@ -782,11 +782,7 @@ void TunnelSession::FinishPreambleOnMain(
       preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300 &&
       aStartedResources == mImpl->mConfig.mPreamble.mMaxAssets &&
-      aCommittedResources ==
-          (aProtocol == ProxyProtocol::H2
-               ? 2U
-               : mImpl->mConfig.mPreamble.mMaxAssets) &&
-      (aProtocol != ProxyProtocol::H2 || aRootDone) &&
+      aCommittedResources == mImpl->mConfig.mPreamble.mMaxAssets &&
       aNativeCacheNewResources == 0 && !aTerminalFallback;
   const bool succeeded =
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
@@ -933,11 +929,9 @@ void TunnelSession::FinishPreambleOnMain(
       PreambleMode::TreeNativeParserResourceCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
-        "admission=%s request_committed=1 root_done=%d protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        aProtocol == ProxyProtocol::H2 ? "blocking-resources-committed"
-                                       : "resources-committed",
-        aRootDone,
+        "admission=resources-committed request_committed=1 root_done=%d "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), aRootDone,
         ProtocolName(aProtocol));
   }
   if (PreambleModeUsesScopedNavigationStop(preambleMode)) {
