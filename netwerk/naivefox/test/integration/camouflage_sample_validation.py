@@ -386,6 +386,11 @@ ESTABLISHED = re.compile(
     r"established target=\S+ outer=(?P<protocol>h2|h3) "
     r"padding=(?P<padding>yes|no)$"
 )
+DELAYED_PADDING_PHASE = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
+    r"diagnostic-delayed-padding-phase negotiated=1 protocol=(?P<protocol>h2) "
+    r"framed-records=16 random-records=9-16$"
+)
 NATIVE_CACHE_OPEN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble native-cache-open cache=readonly-miss "
@@ -1016,9 +1021,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-delayed-padding",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-delayed-padding",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -1070,6 +1077,15 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
+    if (
+        arm
+        in (
+            "document-first-buffer-task-delayed-padding",
+            "document-first-buffer-http-connect-delayed-padding",
+        )
+        and protocol != "h2"
+    ):
+        raise ValueError(f"{arm} requires h2")
     if arm == "document-native-channel-open" and protocol != "h3":
         raise ValueError("document-native-channel-open requires h3")
     if (
@@ -1111,10 +1127,16 @@ def validate_sample(arm, protocol, log_text, feature_document):
     requested_arm = arm
     arm = {
         "document-first-buffer-http-connect": "document-first-buffer-overlap",
+        "document-first-buffer-http-connect-delayed-padding": (
+            "document-first-buffer-overlap"
+        ),
         "document-first-buffer-http-connect-optimistic": (
             "document-first-buffer-overlap"
         ),
         "document-first-buffer-task-http-connect": (
+            "document-first-buffer-task-overlap"
+        ),
+        "document-first-buffer-task-delayed-padding": (
             "document-first-buffer-task-overlap"
         ),
         "document-first-buffer-task-optimistic": ("document-first-buffer-task-overlap"),
@@ -1790,6 +1812,35 @@ def validate_sample(arm, protocol, log_text, feature_document):
         established["padding"] != expected_padding for established in parsed_established
     ):
         raise ValueError("CONNECT-established padding condition differs from expected")
+    delayed_padding_lines = [
+        line for line in log_lines if " diagnostic-delayed-padding-phase " in line
+    ]
+    parsed_delayed_padding = [
+        DELAYED_PADDING_PHASE.fullmatch(line) for line in delayed_padding_lines
+    ]
+    if any(marker is None for marker in parsed_delayed_padding):
+        raise ValueError("malformed delayed padding phase evidence")
+    delayed_padding_arms = {
+        "document-first-buffer-task-delayed-padding",
+        "document-first-buffer-http-connect-delayed-padding",
+    }
+    if requested_arm in delayed_padding_arms:
+        if len(parsed_delayed_padding) != 1:
+            raise ValueError("delayed padding arm requires one negotiation marker")
+        marker = parsed_delayed_padding[0]
+        matching_established = [
+            line
+            for line, established in zip(established_lines, parsed_established)
+            if established["connection"] == marker["connection"]
+            and established["protocol"] == marker["protocol"] == protocol
+        ]
+        if len(matching_established) != 1 or not (
+            log_lines.index(matching_established[0])
+            < log_lines.index(delayed_padding_lines[0])
+        ):
+            raise ValueError("delayed padding negotiation identity or order differs")
+    elif parsed_delayed_padding:
+        raise ValueError(f"{requested_arm} arm unexpectedly used delayed padding")
     native_cache_lines = [
         line for line in log_lines if " preamble native-cache-open cache=" in line
     ]
@@ -1953,7 +2004,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if arm in (
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-delayed-padding",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-delayed-padding",
         ):
             valid_order = valid_order and admission_index < established_index
         else:
@@ -3496,9 +3549,11 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-delayed-padding",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-delayed-padding",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",

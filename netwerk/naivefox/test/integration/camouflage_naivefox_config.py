@@ -39,9 +39,11 @@ def build_config(
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-delayed-padding",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-delayed-padding",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -87,9 +89,11 @@ def build_config(
             "document-native-cache-open, "
             "document-handshake-confirmed, document-first-buffer-overlap, "
             "document-first-buffer-task-overlap, "
+            "document-first-buffer-task-delayed-padding, "
             "document-first-buffer-task-optimistic, "
             "document-first-buffer-task-http-connect, "
             "document-first-buffer-http-connect, "
+            "document-first-buffer-http-connect-delayed-padding, "
             "document-first-buffer-http-connect-optimistic, "
             "document-overlap, document-headers-task-overlap, "
             "document-headers-task-http-connect, "
@@ -128,6 +132,15 @@ def build_config(
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
+    if (
+        arm
+        in (
+            "document-first-buffer-task-delayed-padding",
+            "document-first-buffer-http-connect-delayed-padding",
+        )
+        and protocol != "h2"
+    ):
+        raise ValueError(f"{arm} requires h2")
     if (
         arm
         in (
@@ -366,9 +379,11 @@ def build_config(
         "document-complete",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-delayed-padding",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-delayed-padding",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -385,6 +400,7 @@ def build_config(
                 if arm
                 in (
                     "document-first-buffer-task-overlap",
+                    "document-first-buffer-task-delayed-padding",
                     "document-first-buffer-task-optimistic",
                     "document-first-buffer-task-http-connect",
                 )
@@ -393,6 +409,7 @@ def build_config(
                 in (
                     "document-first-buffer-overlap",
                     "document-first-buffer-http-connect",
+                    "document-first-buffer-http-connect-delayed-padding",
                     "document-first-buffer-http-connect-optimistic",
                 )
                 else "document-overlap"
@@ -478,6 +495,7 @@ def build_config(
             if arm
             in (
                 "document-first-buffer-http-connect",
+                "document-first-buffer-http-connect-delayed-padding",
                 "document-first-buffer-http-connect-optimistic",
                 "document-first-buffer-task-http-connect",
                 "document-headers-task-http-connect",
@@ -501,6 +519,11 @@ def build_config(
         "document-first-buffer-http-connect-optimistic",
     ):
         config["diagnostic-optimistic-local-reply"] = True
+    if arm in (
+        "document-first-buffer-task-delayed-padding",
+        "document-first-buffer-http-connect-delayed-padding",
+    ):
+        config["diagnostic-delayed-padding-phase"] = True
     if max_connections:
         config["max-connections"] = max_connections
     return config
@@ -532,9 +555,11 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-delayed-padding",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-delayed-padding",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",
