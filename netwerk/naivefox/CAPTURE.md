@@ -2600,6 +2600,25 @@ special handling solely to make an unmeasured incompatible shaping mechanism
 work was not justified. The fixture was restored byte-for-byte to stock Caddy
 digest `444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
 
+A later preflight found no previous experiment with the ordering `outer
+preamble ready -> local proxy success -> first inner browser bytes -> outer
+CONNECT`. This looked like a possible timer-free source of the natural pause
+seen in direct Firefox: in fresh artifact `2402ddf719abded2`, direct packet 22
+followed packet 21 after 29--36 ms, while the corresponding NaiveFox gap was
+about 0.28 ms. Before changing the cross-thread tunnel lifecycle, a scratch
+loopback HTTP proxy measured the necessary premise directly with the same-base
+reference Firefox. It accepted only `timing.invalid:443`, disabled Nagle on the
+accepted socket, flushed a normal local `200`, and timestamped the first inner
+TLS bytes without logging the CONNECT authority or payload.
+
+Three independent headless launches delivered the same 1827-byte first inner
+TLS flight after `0.555`, `0.770`, and `0.869` ms. Thus Firefox contributes
+less than 1 ms of natural work at this boundary on the isolated local setup,
+not the missing tens of milliseconds. Interposing an inner-byte gate would add
+lifecycle complexity while merely moving outer CONNECT by approximately the
+existing sub-millisecond gap. No product code, build, passive capture, or
+matrix was spent on this rejected premise.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
