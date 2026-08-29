@@ -234,12 +234,7 @@ nsresult SocksConnection::BeginTunnel(const nsACString& aAuthority,
       return rv;
     }
   }
-  nsresult rv = mSession->Start(aAuthority, aInitialPayload);
-  if (NS_SUCCEEDED(rv) && mTunnelConfig.mDiagnosticH2EarlyData &&
-      mSession->EarlyConnectReadLimit() != 0) {
-    rv = WaitForInput();
-  }
-  return rv;
+  return mSession->Start(aAuthority, aInitialPayload);
 }
 
 void SocksConnection::TunnelEstablished(const nsACString& aOuterProtocol,
@@ -286,38 +281,10 @@ void SocksConnection::TunnelFailed(nsresult aStatus) {
 
 NS_IMETHODIMP SocksConnection::OnInputStreamReady(
     nsIAsyncInputStream* aStream) {
-  if (mClosed || mInputTerminal) {
+  if (mClosed || mOpening || mInputTerminal) {
     return NS_OK;
   }
   std::array<uint8_t, 4096> buffer;
-  if (mOpening) {
-    if (!mSession) {
-      return NS_OK;
-    }
-    const uint32_t limit = mSession->EarlyConnectReadLimit();
-    if (limit == 0) {
-      return NS_OK;
-    }
-    uint32_t read = 0;
-    nsresult rv =
-        aStream->Read(reinterpret_cast<char*>(buffer.data()),
-                      std::min<uint32_t>(buffer.size(), limit), &read);
-    if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
-      rv = WaitForInput();
-    } else if (NS_FAILED(rv) || read == 0) {
-      Close(NS_FAILED(rv) ? rv : NS_BASE_STREAM_CLOSED);
-      return NS_OK;
-    } else {
-      rv = mSession->BufferEarlyConnectData(Span(buffer.data(), read));
-      if (NS_SUCCEEDED(rv) && mSession->EarlyConnectReadLimit() != 0) {
-        rv = WaitForInput();
-      }
-    }
-    if (NS_FAILED(rv)) {
-      Close(rv);
-    }
-    return NS_OK;
-  }
   uint32_t read = 0;
   nsresult rv = aStream->Read(reinterpret_cast<char*>(buffer.data()),
                               buffer.size(), &read);
@@ -566,12 +533,7 @@ nsresult HttpConnectConnection::BeginTunnel(
       return rv;
     }
   }
-  nsresult rv = mSession->Start(aAuthority, aInitialPayload);
-  if (NS_SUCCEEDED(rv) && mTunnelConfig.mDiagnosticH2EarlyData &&
-      mSession->EarlyConnectReadLimit() != 0) {
-    rv = WaitForInput();
-  }
-  return rv;
+  return mSession->Start(aAuthority, aInitialPayload);
 }
 
 void HttpConnectConnection::TunnelEstablished(const nsACString& aOuterProtocol,
@@ -641,38 +603,10 @@ void HttpConnectConnection::Reject(HttpConnectParser::Event aEvent) {
 
 NS_IMETHODIMP HttpConnectConnection::OnInputStreamReady(
     nsIAsyncInputStream* aStream) {
-  if (mClosed || mInputTerminal) {
+  if (mClosed || mOpening || mInputTerminal) {
     return NS_OK;
   }
   std::array<uint8_t, 4096> buffer;
-  if (mOpening) {
-    if (!mSession) {
-      return NS_OK;
-    }
-    const uint32_t limit = mSession->EarlyConnectReadLimit();
-    if (limit == 0) {
-      return NS_OK;
-    }
-    uint32_t read = 0;
-    nsresult rv =
-        aStream->Read(reinterpret_cast<char*>(buffer.data()),
-                      std::min<uint32_t>(buffer.size(), limit), &read);
-    if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
-      rv = WaitForInput();
-    } else if (NS_FAILED(rv) || read == 0) {
-      Close(NS_FAILED(rv) ? rv : NS_BASE_STREAM_CLOSED);
-      return NS_OK;
-    } else {
-      rv = mSession->BufferEarlyConnectData(Span(buffer.data(), read));
-      if (NS_SUCCEEDED(rv) && mSession->EarlyConnectReadLimit() != 0) {
-        rv = WaitForInput();
-      }
-    }
-    if (NS_FAILED(rv)) {
-      Close(rv);
-    }
-    return NS_OK;
-  }
   uint32_t read = 0;
   nsresult rv = aStream->Read(reinterpret_cast<char*>(buffer.data()),
                               buffer.size(), &read);

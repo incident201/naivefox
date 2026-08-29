@@ -119,7 +119,6 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
-  EXPECT_FALSE(config.mDiagnosticH2EarlyData);
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
@@ -383,36 +382,6 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
     Config config;
     nsAutoCString error;
     EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
-        << json;
-    EXPECT_FALSE(error.IsEmpty()) << json;
-  }
-}
-
-TEST(NaiveFoxConfig, DiagnosticH2EarlyDataRequiresOptimisticExplicitH2)
-{
-  Config config;
-  nsAutoCString error;
-  ASSERT_EQ(
-      ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-h2-early-data":true})"_ns,
-          config, error),
-      NS_OK)
-      << error.get();
-  EXPECT_TRUE(config.mDiagnosticOptimisticLocalReply);
-  EXPECT_TRUE(config.mDiagnosticH2EarlyData);
-
-  static constexpr const char* kInvalid[] = {
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-early-data":true})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-h2-early-data":true})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-h2-early-data":null})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-h2-early-data":1})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-optimistic-local-reply":true,"diagnostic-h2-early-data":true,"diagnostic-h2-early-data":false})",
-  };
-  for (const char* json : kInvalid) {
-    Config invalid;
-    error.Truncate();
-    EXPECT_TRUE(
-        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
         << json;
     EXPECT_FALSE(error.IsEmpty()) << json;
   }
@@ -1033,7 +1002,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
   source.mDiagnosticOptimisticLocalReply = true;
-  source.mDiagnosticH2EarlyData = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1057,7 +1025,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
-    EXPECT_TRUE(copy->mDiagnosticH2EarlyData);
   }
 }
 

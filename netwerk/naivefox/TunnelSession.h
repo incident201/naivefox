@@ -6,7 +6,6 @@
 #define netwerk_naivefox_TunnelSession_h
 
 #include <functional>
-#include <utility>
 
 #include "Config.h"
 #include "ProxyProtocol.h"
@@ -16,7 +15,6 @@
 #include "mozilla/UniquePtr.h"
 #include "nsISupportsImpl.h"
 #include "nsString.h"
-#include "nsTArray.h"
 #include "nscore.h"
 
 class nsIAsyncInputStream;
@@ -87,53 +85,6 @@ class PreambleSequenceState final {
   uint64_t mConnectGeneration = 0;
 };
 
-inline constexpr size_t kEarlyConnectDataLimit = 64 * 1024;
-
-// Socket-thread-only buffer for bytes that the local client has already
-// produced while the outer preamble is in flight. Taking the buffer is an
-// instantaneous boundary: no timer, future-byte wait, or workload-size
-// heuristic participates in CONNECT admission.
-class EarlyConnectDataBuffer final {
- public:
-  bool Start(Span<const uint8_t> aInitial) {
-    if (mActive || !mBytes.IsEmpty() ||
-        aInitial.Length() > kEarlyConnectDataLimit) {
-      return false;
-    }
-    mActive = true;
-    mBytes.AppendElements(aInitial);
-    return true;
-  }
-
-  uint32_t ReadLimit() const {
-    return mActive
-               ? static_cast<uint32_t>(kEarlyConnectDataLimit - mBytes.Length())
-               : 0;
-  }
-
-  bool Append(Span<const uint8_t> aBytes) {
-    if (!mActive || aBytes.Length() > ReadLimit()) {
-      return false;
-    }
-    mBytes.AppendElements(aBytes);
-    return true;
-  }
-
-  nsTArray<uint8_t> Take() {
-    mActive = false;
-    return std::move(mBytes);
-  }
-
-  void Cancel() {
-    mActive = false;
-    mBytes.Clear();
-  }
-
- private:
-  nsTArray<uint8_t> mBytes;
-  bool mActive = false;
-};
-
 }  // namespace detail
 
 struct TunnelConfig final {
@@ -149,8 +100,8 @@ struct TunnelConfig final {
         mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
             aOther.mDiagnosticFirstSocksTunnelUrgentStart),
-        mDiagnosticOptimisticLocalReply(aOther.mDiagnosticOptimisticLocalReply),
-        mDiagnosticH2EarlyData(aOther.mDiagnosticH2EarlyData) {
+        mDiagnosticOptimisticLocalReply(
+            aOther.mDiagnosticOptimisticLocalReply) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -166,7 +117,6 @@ struct TunnelConfig final {
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
-      mDiagnosticH2EarlyData = aOther.mDiagnosticH2EarlyData;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -184,7 +134,6 @@ struct TunnelConfig final {
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mDiagnosticOptimisticLocalReply = false;
-  bool mDiagnosticH2EarlyData = false;
 };
 
 class TunnelSession final {
@@ -204,8 +153,6 @@ class TunnelSession final {
   nsresult Start(const nsACString& aTargetAuthority,
                  Span<const uint8_t> aInitialPayload = {});
   nsresult StartPump();
-  uint32_t EarlyConnectReadLimit() const;
-  nsresult BufferEarlyConnectData(Span<const uint8_t> aData);
   void Cancel(nsresult aStatus);
 
  private:
@@ -244,12 +191,6 @@ class TunnelSession final {
                                            ProxyProtocol aProtocol);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
-  void PrepareEarlyConnectOnSocket(uint64_t aGeneration,
-                                   ProxyProtocol aProtocol,
-                                   const nsACString& aTargetAuthority);
-  void OpenPreparedConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
-                                 const nsACString& aTargetAuthority,
-                                 nsTArray<uint8_t>&& aEarlyData);
   void NotifyOuterGateReady();
   void ReleaseOuterGate();
   void FailPreambleOnMain(nsresult aStatus);
@@ -259,7 +200,6 @@ class TunnelSession final {
                             nsresult aStatus, bool aConnectCodeKnown,
                             int32_t aConnectCode,
                             const Maybe<bool>& aPaddingHeaderPresent,
-                            bool aEarlyDataAccepted,
                             const nsACString& aOuterProtocol);
   void ApplyChannelStop(uint64_t aGeneration, ProxyProtocol aProtocol,
                         nsresult aStatus);
