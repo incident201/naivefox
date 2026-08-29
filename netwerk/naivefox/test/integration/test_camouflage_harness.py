@@ -842,6 +842,24 @@ class CamouflageHarnessTests(unittest.TestCase):
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
+    def test_h2_get_carrier_arms_are_schedulable(self):
+        for arms in (
+            (
+                "document-first-buffer-task-overlap",
+                "document-first-buffer-task-get-carrier",
+            ),
+            (
+                "document-first-buffer-http-connect",
+                "document-first-buffer-get-carrier-http-connect",
+            ),
+        ):
+            with self.subTest(arms=arms):
+                rows = SUPERBLOCKS.schedule_rows(
+                    31, "h2", 1, ["browser_page"], arms=arms
+                )
+                SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
+                self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
+
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
             SUPERBLOCKS.parse_arms("gate,root,document-complete")
@@ -862,6 +880,13 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn('for arm in "${multi_arm_arms[@]}"; do', runner)
         self.assertIn("analyzer_args+=(--screening-only)", runner)
         self.assertIn("metadata_arm_specific_analysis=screening_only", runner)
+        self.assertIn("document-first-buffer-task-get-carrier", runner)
+        self.assertIn("document-first-buffer-get-carrier-http-connect", runner)
+        self.assertIn("NAIVEFOX_CAPTURE_CADDY_BIN must be an absolute", runner)
+        self.assertIn("fixture_caddy_sha256=", runner)
+        with open(os.path.join(HERE, "common.sh"), encoding="utf-8") as stream:
+            common = stream.read()
+        self.assertIn("NAIVEFOX_CAPTURE_CADDY_BIN", common)
         self.assertIn('--views "$multi_arm_views_csv"', runner)
         self.assertIn(
             "H3 multi-arm screening requires a pre-launched Selenium browser",
@@ -1331,6 +1356,55 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ),
             )
 
+    def test_get_carrier_arms_are_h2_only_and_listener_specific(self):
+        cases = {
+            "document-first-buffer-task-get-carrier": (
+                "socks://127.0.0.1:1080",
+                "document-first-buffer-task-overlap",
+            ),
+            "document-first-buffer-get-carrier-http-connect": (
+                "http://127.0.0.1:1080",
+                "document-first-buffer-overlap",
+            ),
+        }
+        for arm, (listener, mode) in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+                self.assertEqual(config["listen"], listener)
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertIs(config["diagnostic-h2-get-carrier"], True)
+                with self.assertRaisesRegex(ValueError, "requires h2"):
+                    CONFIG.build_config(
+                        arm,
+                        "h3",
+                        1080,
+                        4433,
+                        "fixture-user",
+                        "fixture-pass",
+                    )
+        for arm in (
+            "document-first-buffer-task-overlap",
+            "document-first-buffer-http-connect",
+        ):
+            self.assertNotIn(
+                "diagnostic-h2-get-carrier",
+                CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                ),
+            )
+
     def test_http_connect_task_barriers_map_to_product_modes(self):
         cases = {
             "document-start-task-http-connect": "document-start-task-overlap",
@@ -1467,6 +1541,51 @@ class CamouflageHarnessTests(unittest.TestCase):
                 "Connection 1 preamble document-overlap "
                 "admission=first-data-buffer-task response_accepted=1 "
                 "root_done=0 protocol=h2\n",
+                features,
+            )
+
+    def test_get_carrier_lifecycle_is_fail_closed(self):
+        features = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        cases = {
+            "document-first-buffer-task-get-carrier": "first-data-buffer-task",
+            "document-first-buffer-get-carrier-http-connect": "first-data-buffer",
+        }
+        marker = (
+            "Connection 1 diagnostic-h2-get-carrier applied=1 method=GET "
+            "negotiation=exact-marker-echo protocol=h2\n"
+        )
+        for arm, admission in cases.items():
+            with self.subTest(arm=arm):
+                lifecycle = (
+                    "Connection 1 preamble document-overlap "
+                    f"admission={admission} response_accepted=1 "
+                    "root_done=0 protocol=h2\n"
+                    + marker
+                    + "Connection 1 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
+                    "Connection 1 preamble result=success status=0x00000000 "
+                    "http=200 bytes=512 protocol=h2\n"
+                    "Connection 1 preamble document-overlap drain=complete "
+                    "root_done=1 completed_resources=0 protocol=h2\n"
+                )
+                SAMPLE.validate_sample(arm, "h2", lifecycle, features)
+                with self.assertRaisesRegex(
+                    ValueError, "requires exactly one negotiation marker"
+                ):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        lifecycle.replace(marker, ""),
+                        features,
+                    )
+        with self.assertRaisesRegex(ValueError, "unexpectedly logged H2 GET"):
+            SAMPLE.validate_sample(
+                "document-first-buffer-task-overlap",
+                "h2",
+                marker,
                 features,
             )
 

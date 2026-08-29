@@ -39,9 +39,11 @@ def build_config(
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-get-carrier",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-get-carrier-http-connect",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -87,9 +89,11 @@ def build_config(
             "document-native-cache-open, "
             "document-handshake-confirmed, document-first-buffer-overlap, "
             "document-first-buffer-task-overlap, "
+            "document-first-buffer-task-get-carrier, "
             "document-first-buffer-task-optimistic, "
             "document-first-buffer-task-http-connect, "
             "document-first-buffer-http-connect, "
+            "document-first-buffer-get-carrier-http-connect, "
             "document-first-buffer-http-connect-optimistic, "
             "document-overlap, document-headers-task-overlap, "
             "document-headers-task-http-connect, "
@@ -118,6 +122,15 @@ def build_config(
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
+    if (
+        arm
+        in (
+            "document-first-buffer-task-get-carrier",
+            "document-first-buffer-get-carrier-http-connect",
+        )
+        and protocol != "h2"
+    ):
+        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -366,9 +379,11 @@ def build_config(
         "document-complete",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-get-carrier",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-get-carrier-http-connect",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -385,6 +400,7 @@ def build_config(
                 if arm
                 in (
                     "document-first-buffer-task-overlap",
+                    "document-first-buffer-task-get-carrier",
                     "document-first-buffer-task-optimistic",
                     "document-first-buffer-task-http-connect",
                 )
@@ -393,6 +409,7 @@ def build_config(
                 in (
                     "document-first-buffer-overlap",
                     "document-first-buffer-http-connect",
+                    "document-first-buffer-get-carrier-http-connect",
                     "document-first-buffer-http-connect-optimistic",
                 )
                 else "document-overlap"
@@ -478,6 +495,7 @@ def build_config(
             if arm
             in (
                 "document-first-buffer-http-connect",
+                "document-first-buffer-get-carrier-http-connect",
                 "document-first-buffer-http-connect-optimistic",
                 "document-first-buffer-task-http-connect",
                 "document-headers-task-http-connect",
@@ -501,6 +519,11 @@ def build_config(
         "document-first-buffer-http-connect-optimistic",
     ):
         config["diagnostic-optimistic-local-reply"] = True
+    if arm in (
+        "document-first-buffer-task-get-carrier",
+        "document-first-buffer-get-carrier-http-connect",
+    ):
+        config["diagnostic-h2-get-carrier"] = True
     if max_connections:
         config["max-connections"] = max_connections
     return config
@@ -532,9 +555,11 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-get-carrier",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-get-carrier-http-connect",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",
