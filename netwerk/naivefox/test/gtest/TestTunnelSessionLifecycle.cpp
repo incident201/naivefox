@@ -79,6 +79,36 @@ TEST(NaiveFoxSocksServer, ConcurrentUrgentStartClaimSelectsExactlyOneTunnel)
   EXPECT_FALSE(selector.Claim(true));
 }
 
+TEST(NaiveFoxTunnelSessionLifecycle, EarlyConnectDataUsesInstantTakeBoundary)
+{
+  detail::EarlyConnectDataBuffer buffer;
+  const uint8_t initial[] = {1, 2};
+  const uint8_t later[] = {3, 4, 5};
+  ASSERT_TRUE(buffer.Start(Span(initial)));
+  EXPECT_EQ(buffer.ReadLimit(), detail::kEarlyConnectDataLimit - 2);
+  ASSERT_TRUE(buffer.Append(Span(later)));
+
+  nsTArray<uint8_t> taken = buffer.Take();
+  ASSERT_EQ(taken.Length(), 5U);
+  for (size_t index = 0; index < taken.Length(); ++index) {
+    EXPECT_EQ(taken[index], index + 1);
+  }
+  EXPECT_EQ(buffer.ReadLimit(), 0U);
+  EXPECT_FALSE(buffer.Append(Span(later)));
+}
+
+TEST(NaiveFoxTunnelSessionLifecycle, EarlyConnectDataIsStrictlyBounded)
+{
+  detail::EarlyConnectDataBuffer buffer;
+  ASSERT_TRUE(buffer.Start({}));
+  nsTArray<uint8_t> maximum;
+  maximum.SetLength(detail::kEarlyConnectDataLimit);
+  ASSERT_TRUE(buffer.Append(Span(maximum)));
+  EXPECT_EQ(buffer.ReadLimit(), 0U);
+  const uint8_t extra = 1;
+  EXPECT_FALSE(buffer.Append(Span(&extra, 1)));
+}
+
 TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
 {
   TunnelConfig config;
@@ -370,11 +400,11 @@ TEST(NaiveFoxTunnelSessionLifecycle, PreambleModesUseDistinctBarriers)
       PreambleMode::TreeNativeParserResourceCommittedOverlap, false, false, 3,
       0, 0, 0, 3));
   EXPECT_FALSE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3,
-      0, 0, 0, 2));
+      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3, 0,
+      0, 0, 2));
   EXPECT_TRUE(detail::PreambleBarrierReached(
-      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3,
-      0, 0, 0, 3));
+      PreambleMode::TreeNativeParserResourceCommittedOverlap, true, false, 3, 0,
+      0, 0, 3));
 
   EXPECT_FALSE(detail::PreambleBarrierReached(
       PreambleMode::TreeResourceNativeCacheCommittedOverlap, true, true, 1, 0,

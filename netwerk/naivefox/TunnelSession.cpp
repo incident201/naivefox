@@ -430,6 +430,8 @@ class TunnelSession::Impl final {
   ClosedCallback mOnClosed;
   nsCString mTargetAuthority;
   nsTArray<uint8_t> mInitialPayload;
+  detail::EarlyConnectDataBuffer mEarlyConnectData;
+  uint32_t mEarlyConnectBytes = 0;
   RefPtr<DuplexPump> mPump;
   ProxyProtocol mAttemptProtocol = ProxyProtocol::H2;
   uint64_t mAttemptGeneration = 0;
@@ -443,6 +445,7 @@ class TunnelSession::Impl final {
   bool mConnectCodeKnown = false;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
+  bool mEarlyDataAccepted = false;
   nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
@@ -479,11 +482,13 @@ class TunnelAttempt final : public nsIHttpUpgradeListener,
   NS_DECL_NSISTREAMLISTENER
 
   TunnelAttempt(TunnelSession* aOwner, nsIEventTarget* aSocketTarget,
-                uint64_t aGeneration, ProxyProtocol aProtocol)
+                uint64_t aGeneration, ProxyProtocol aProtocol,
+                uint32_t aExpectedEarlyDataBytes)
       : mOwner(aOwner),
         mSocketTarget(aSocketTarget),
         mGeneration(aGeneration),
-        mProtocol(aProtocol) {}
+        mProtocol(aProtocol),
+        mExpectedEarlyDataBytes(aExpectedEarlyDataBytes) {}
 
   nsresult ArmEstablishmentTimeout(nsIRequest* aRequest);
 
@@ -495,6 +500,7 @@ class TunnelAttempt final : public nsIHttpUpgradeListener,
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   const uint64_t mGeneration;
   const ProxyProtocol mProtocol;
+  const uint32_t mExpectedEarlyDataBytes;
   nsCOMPtr<nsITimer> mEstablishmentTimer;
 };
 
@@ -558,7 +564,13 @@ nsresult TunnelSession::Start(const nsACString& aTargetAuthority,
   }
   mImpl->mStarted = true;
   mImpl->mTargetAuthority = aTargetAuthority;
-  mImpl->mInitialPayload.AppendElements(aInitialPayload);
+  if (mImpl->mConfig.mDiagnosticH2EarlyData) {
+    if (!mImpl->mEarlyConnectData.Start(aInitialPayload)) {
+      return NS_ERROR_FILE_TOO_BIG;
+    }
+  } else {
+    mImpl->mInitialPayload.AppendElements(aInitialPayload);
+  }
   const ProxyProtocol firstProtocol =
       mImpl->mConfig.mProtocol == ProxyProtocol::Auto
           ? ProxyProtocol::H3
@@ -567,6 +579,17 @@ nsresult TunnelSession::Start(const nsACString& aTargetAuthority,
                   static_cast<unsigned long long>(mImpl->mConnectionId),
                   mImpl->mTargetAuthority.get(), ProtocolName(firstProtocol));
   return StartAttempt(firstProtocol);
+}
+
+uint32_t TunnelSession::EarlyConnectReadLimit() const {
+  MOZ_ASSERT(mImpl->mSocketTarget->IsOnCurrentThread());
+  return mImpl->mEarlyConnectData.ReadLimit();
+}
+
+nsresult TunnelSession::BufferEarlyConnectData(Span<const uint8_t> aData) {
+  MOZ_ASSERT(mImpl->mSocketTarget->IsOnCurrentThread());
+  return mImpl->mEarlyConnectData.Append(aData) ? NS_OK
+                                                : NS_ERROR_NOT_AVAILABLE;
 }
 
 nsresult TunnelSession::StartAttempt(ProxyProtocol aProtocol) {
@@ -788,8 +811,7 @@ void TunnelSession::FinishPreambleOnMain(
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
   if ((PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        !requestCommittedAdmission) ||
-      (preambleMode ==
-           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
        !resourceTreeCommittedAdmission) ||
       (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
@@ -887,15 +909,14 @@ void TunnelSession::FinishPreambleOnMain(
       admission = "response-headers-task";
     } else if (preambleMode == PreambleMode::DocumentFirstBufferOverlap) {
       admission = "first-data-buffer";
-    } else if (preambleMode ==
-               PreambleMode::DocumentFirstBufferTaskOverlap) {
+    } else if (preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
       admission = "first-data-buffer-task";
     }
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
         "response_accepted=%d root_done=%d protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        admission, !aRootDone, aRootDone, ProtocolName(aProtocol));
+        static_cast<unsigned long long>(mImpl->mConnectionId), admission,
+        !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentStartOverlap ||
       preambleMode == PreambleMode::DocumentStartTaskOverlap) {
@@ -904,9 +925,9 @@ void TunnelSession::FinishPreambleOnMain(
         "request_committed=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aRootDone ? "terminal-fallback"
-                  : preambleMode == PreambleMode::DocumentStartTaskOverlap
-                        ? "request-committed-task"
-                        : "request-committed",
+        : preambleMode == PreambleMode::DocumentStartTaskOverlap
+            ? "request-committed-task"
+            : "request-committed",
         !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
@@ -925,8 +946,7 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+  if (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
         "admission=resources-committed request_committed=1 root_done=%d "
@@ -1232,11 +1252,64 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
       !mImpl->mPreambleSequence.TryStartConnect(aGeneration)) {
     return;
   }
+  if (mImpl->mConfig.mDiagnosticH2EarlyData) {
+    RefPtr self = this;
+    nsCString authority(aTargetAuthority);
+    nsresult rv = mImpl->mSocketTarget->Dispatch(
+        NS_NewRunnableFunction(
+            "NaiveFox::PrepareEarlyConnect",
+            [self, aGeneration, aProtocol, authority = std::move(authority)]() {
+              self->PrepareEarlyConnectOnSocket(aGeneration, aProtocol,
+                                                authority);
+            }),
+        NS_DISPATCH_NORMAL);
+    if (NS_FAILED(rv)) {
+      FailPreambleOnMain(rv);
+    }
+    return;
+  }
+  OpenPreparedConnectOnMain(aGeneration, aProtocol, aTargetAuthority, {});
+}
+
+void TunnelSession::PrepareEarlyConnectOnSocket(
+    uint64_t aGeneration, ProxyProtocol aProtocol,
+    const nsACString& aTargetAuthority) {
+  MOZ_ASSERT(mImpl->mSocketTarget->IsOnCurrentThread());
+  if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mClosed ||
+      mImpl->mFailed ||
+      mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    return;
+  }
+  (void)mImpl->mLocalIn->AsyncWait(nullptr, 0, 0, nullptr);
+  nsTArray<uint8_t> earlyData = mImpl->mEarlyConnectData.Take();
+  mImpl->mEarlyConnectBytes = earlyData.Length();
+  RefPtr self = this;
+  nsCString authority(aTargetAuthority);
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::OpenPreparedConnect",
+      [self, aGeneration, aProtocol, authority = std::move(authority),
+       earlyData = std::move(earlyData)]() mutable {
+        self->OpenPreparedConnectOnMain(aGeneration, aProtocol, authority,
+                                        std::move(earlyData));
+      }));
+  if (NS_FAILED(rv)) {
+    Fail(rv);
+  }
+}
+
+void TunnelSession::OpenPreparedConnectOnMain(
+    uint64_t aGeneration, ProxyProtocol aProtocol,
+    const nsACString& aTargetAuthority, nsTArray<uint8_t>&& aEarlyData) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire)) {
+    return;
+  }
   nsAutoCString padding;
   nsresult rv = GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
     RefPtr<TunnelAttempt> attempt =
-        new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
+        new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol,
+                          aEarlyData.Length());
     nsCOMPtr<nsIRequest> openedRequest;
     const bool useAnonymousConnection = !PreambleModeUsesNativeParser(
         mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
@@ -1245,7 +1318,7 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
         mImpl->mConfig.mProxyPassword, attempt, attempt, padding, aProtocol,
         mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
         mImpl->mConnectUrgentStart, useAnonymousConnection,
-        getter_AddRefs(openedRequest));
+        getter_AddRefs(openedRequest), Span(aEarlyData));
     if (NS_SUCCEEDED(rv)) {
       if (mImpl->mConnectUrgentStart && !mImpl->mConnectUrgentStartLogged) {
         mImpl->mConnectUrgentStartLogged = true;
@@ -1298,6 +1371,7 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
   bool connectCodeKnown = false;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
+  bool earlyDataAccepted = mExpectedEarlyDataBytes == 0;
   nsAutoCString outerProtocol;
   nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aRequest);
   if (proxied && http) {
@@ -1318,6 +1392,19 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
         rv = headerRv;
       }
     }
+    if (NS_SUCCEEDED(rv) && mExpectedEarlyDataBytes != 0) {
+      nsAutoCString echoedEarlyDataBytes;
+      nsAutoCString expectedEarlyDataBytes;
+      expectedEarlyDataBytes.AppendInt(mExpectedEarlyDataBytes);
+      nsresult headerRv = proxied->GetHttpProxyResponseHeader(
+          "x-naivefox-early-data"_ns, echoedEarlyDataBytes);
+      if (NS_SUCCEEDED(headerRv) &&
+          echoedEarlyDataBytes.Equals(expectedEarlyDataBytes)) {
+        earlyDataAccepted = true;
+      } else {
+        rv = NS_ERROR_FAILURE;
+      }
+    }
   }
   RefPtr owner = mOwner;
   const uint64_t generation = mGeneration;
@@ -1326,10 +1413,11 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
       NS_NewRunnableFunction(
           "NaiveFox::TunnelConnectMetadata",
           [owner, generation, protocol, rv, connectCodeKnown, connectCode,
-           paddingHeaderPresent, outerProtocol = std::move(outerProtocol)]() {
-            owner->ApplyConnectMetadata(generation, protocol, rv,
-                                        connectCodeKnown, connectCode,
-                                        paddingHeaderPresent, outerProtocol);
+           paddingHeaderPresent, earlyDataAccepted,
+           outerProtocol = std::move(outerProtocol)]() {
+            owner->ApplyConnectMetadata(
+                generation, protocol, rv, connectCodeKnown, connectCode,
+                paddingHeaderPresent, earlyDataAccepted, outerProtocol);
           }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
@@ -1508,7 +1596,7 @@ void TunnelSession::ApplyTransport(uint64_t aGeneration,
 void TunnelSession::ApplyConnectMetadata(
     uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
     bool aConnectCodeKnown, int32_t aConnectCode,
-    const Maybe<bool>& aPaddingHeaderPresent,
+    const Maybe<bool>& aPaddingHeaderPresent, bool aEarlyDataAccepted,
     const nsACString& aOuterProtocol) {
   if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mMetadataReady) {
     return;
@@ -1518,6 +1606,7 @@ void TunnelSession::ApplyConnectMetadata(
   mImpl->mConnectCodeKnown = aConnectCodeKnown;
   mImpl->mConnectCode = aConnectCode;
   mImpl->mPaddingHeaderPresent = aPaddingHeaderPresent;
+  mImpl->mEarlyDataAccepted = aEarlyDataAccepted;
   mImpl->mOuterProtocol = aOuterProtocol;
   MaybeFinishAttempt();
 }
@@ -1595,6 +1684,7 @@ void TunnelSession::ResetAttemptState() {
   mImpl->mConnectCodeKnown = false;
   mImpl->mConnectCode = -1;
   mImpl->mPaddingHeaderPresent.reset();
+  mImpl->mEarlyDataAccepted = false;
   mImpl->mOuterProtocol.Truncate();
   mImpl->mPaddingEnabled = false;
   mImpl->mPendingTunnelIn = nullptr;
@@ -1633,8 +1723,11 @@ void TunnelSession::MaybeFinishAttempt() {
                                 mImpl->mOuterProtocol.EqualsLiteral("h2")) ||
                                (mImpl->mAttemptProtocol == ProxyProtocol::H3 &&
                                 mImpl->mOuterProtocol.EqualsLiteral("h3"));
+  const bool earlyDataMatches = !mImpl->mConfig.mDiagnosticH2EarlyData ||
+                                mImpl->mEarlyConnectBytes == 0 ||
+                                mImpl->mEarlyDataAccepted;
   if (NS_FAILED(mImpl->mMetadataStatus) || NS_FAILED(mImpl->mChannelStatus) ||
-      !mImpl->mConnectCodeKnown || !protocolMatches ||
+      !mImpl->mConnectCodeKnown || !protocolMatches || !earlyDataMatches ||
       NS_FAILED(NegotiatePayloadPadding(mImpl->mConnectCode,
                                         mImpl->mPaddingHeaderPresent,
                                         mImpl->mPaddingEnabled))) {
@@ -1663,6 +1756,13 @@ void TunnelSession::TunnelReady() {
                   mImpl->mPaddingEnabled ? "yes" : "no");
   RuntimeLog("Outer protocol: %s\n", mImpl->mOuterProtocol.get());
   RuntimeLog("Padding negotiated: %s\n", mImpl->mPaddingEnabled ? "yes" : "no");
+  if (mImpl->mConfig.mDiagnosticH2EarlyData) {
+    RuntimeLogEvent(
+        "Connection %llu diagnostic-h2-early-data captured-bytes=%u "
+        "echo-accepted=%d protocol=h2\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        mImpl->mEarlyConnectBytes, mImpl->mEarlyDataAccepted);
+  }
   if (mImpl->mOnEstablished) {
     mImpl->mOnEstablished(mImpl->mOuterProtocol, mImpl->mPaddingEnabled);
   }
@@ -1678,8 +1778,7 @@ nsresult TunnelSession::StartPump() {
   std::function<void()> onDownstreamApplicationActive;
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,
                                      protocol = mImpl->mAttemptProtocol]() {
@@ -1720,6 +1819,7 @@ void TunnelSession::Fail(nsresult aStatus) {
     return;
   }
   mImpl->mFailed = true;
+  mImpl->mEarlyConnectData.Cancel();
   mImpl->mCancelRequested.store(true, std::memory_order_release);
   ReleaseOuterGate();
   RefPtr self = this;
@@ -1753,6 +1853,7 @@ void TunnelSession::CancelInternal(nsresult aStatus, bool aCancelRequest) {
     return;
   }
   mImpl->mClosed = true;
+  mImpl->mEarlyConnectData.Cancel();
   mImpl->mCancelRequested.store(true, std::memory_order_release);
   ReleaseOuterGate();
   if (aCancelRequest) {

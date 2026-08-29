@@ -11,6 +11,7 @@
 #include "ProxyProtocol.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/Span.h"
 #include "mozilla/UniquePtr.h"
 #include "nsError.h"
 #include "nsISupportsImpl.h"
@@ -417,7 +418,7 @@ nsresult OpenNeckoTunnel(
     const Maybe<HostResolverRule>& aHostResolverRule = {},
     const nsTArray<ExtraHeader>& aExtraHeaders = {},
     bool aConnectUrgentStart = false, bool aUseAnonymousConnection = true,
-    nsIRequest** aOpenedRequest = nullptr);
+    nsIRequest** aOpenedRequest = nullptr, Span<const uint8_t> aEarlyData = {});
 
 nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aTargetAuthority,
