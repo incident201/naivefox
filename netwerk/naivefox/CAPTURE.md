@@ -1158,6 +1158,7 @@ independent seeds.
 | `f9c4c26050a2988a` | bound H3 duplex-pump reads to Gecko's 4096-byte default segment, shaped link | 1 | 0.23503 / 0.36697 / 0.25550 / 0.24040 / 0.41194 |
 | `3500eb894d951e57` | demote only the first preamble-owned H3 CONNECT from generic `u=4` to `u=5`, shaped link | 1 | 0.25290 / 0.49920 / 0.28958 / 0.22799 / 0.47932 |
 | `7770ec81beea4b8a` | release prepared images after CSS and script request commits, shaped link | 1 | 0.28935 / 0.39986 / 0.29283 / 0.29333 / 0.42113 |
+| `c3d1643c1f966245` | enable standard PLPMTUD on the page-mode H3 proxy route, shaped link | 1 | 0.31425 / 0.55231 / 0.35320 / 0.29369 / 0.52470 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1774,6 +1775,22 @@ for packets 17--32 and 0.42113 whole, with other views
 Moving the image HEADERS out of the target window alone left mismatched ACK
 and response-flight positions and worsened the 250-ms view. The request gate,
 task, and temporary lifecycle validation were removed.
+
+Forcing standard PLPMTUD on the page-mode outer H3 route is rejected.
+Decrypted inspection showed that direct Firefox's server-side response flight
+had advanced from 1280-byte QUIC packets to larger path-validated datagrams by
+packet 18, while the retained preamble's dense response flight stayed at 1280
+until roughly packet 92. The experiment removed the route's PMTUD opt-out for
+both preamble and CONNECT, keeping one proxy identity and asking Neqo's normal
+PLPMTUD algorithm to discover the actual path; it did not prescribe an MTU,
+packet size, delay, resource size, or bandwidth. One-block shaped artifact
+`c3d1643c1f966245` regressed packets 17--32 to 0.55231 and whole flow to
+0.52470, with other views 0.31425/0.35320/0.29369. Its binary identified build
+ID `7bbd9e285252c729dad1a826d134cd8e` and libxul digest
+`36384253d67b6738ff033c195b2b9e5bf3369f96651aff2f02ab9fd2944c74fe`.
+The additional probe and ACK transitions outweighed any later DATA-size
+alignment. The route flag and exact validator marker were removed; production
+must not force path probing merely to reproduce this fixture's packet size.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
