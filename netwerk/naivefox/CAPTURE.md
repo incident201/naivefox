@@ -1160,6 +1160,9 @@ independent seeds.
 | `7770ec81beea4b8a` | release prepared images after CSS and script request commits, shaped link | 1 | 0.28935 / 0.39986 / 0.29283 / 0.29333 / 0.42113 |
 | `c3d1643c1f966245` | enable standard PLPMTUD on the page-mode H3 proxy route, shaped link | 1 | 0.31425 / 0.55231 / 0.35320 / 0.29369 / 0.52470 |
 | `5720930db5b46be2` | open the prepared script one main-thread turn after CSS, then images on the following task, shaped link | 1 | 0.12781 / 0.38475 / 0.19378 / 0.19891 / 0.35858 |
+| `a6de9bd760c43a2e` | root-rendezvous native parser, one CSS control, shaped link | 1 | 0.20613 / 0.46121 / 0.25115 / 0.21464 / 0.48865 |
+| `a6de9bd760c43a2e` | separate activation-process native parser, one CSS control, shaped link | 1 | 0.09027 / 0.47334 / 0.18639 / 0.16738 / 0.44881 |
+| `a6de9bd760c43a2e` | full-process native parser rendezvous, one CSS control, shaped link | 1 | 0.20120 / 0.45172 / 0.24339 / 0.20945 / 0.49445 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1806,6 +1809,22 @@ ID `9482377fbe41a310f96d94869eaccb8a` and libxul digest
 The extra script task and its lifecycle marker were removed. A single
 event-loop split is therefore insufficient to reproduce native parser/resource
 scheduling and is not retained.
+
+The existing separate-process native-parser paths were screened before trying
+to generalize their IPC protocol from one stylesheet to the full six-resource
+tree. In shaped paired artifact `a6de9bd760c43a2e`, the root-rendezvous,
+activation-process, and full-process arms respectively measured packets 17--32
+at 0.46121, 0.47334, and 0.45172, with whole-flow distances 0.48865, 0.44881,
+and 0.49445. All three used the real streamed HTML body, native speculative
+parser output, and event/IPC rendezvous rather than a time delay, but all were
+materially worse than the retained six-resource candidate's replicated
+0.29471/0.34363. The measured binary identified build ID
+`9482377fbe41a310f96d94869eaccb8a` and libxul digest
+`1694ba3b3513757d37cc2fb0c7f33e1426b8b048a7d45b0756c3c5d3f8bb8df6`;
+the earlier deferred-script branch in that binary is scoped to the
+resource-committed page mode and was inactive for these three controls. The
+process boundary by itself therefore does not supply useful browser-like H3
+pacing, so the larger full-tree IPC generalization was not implemented.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
