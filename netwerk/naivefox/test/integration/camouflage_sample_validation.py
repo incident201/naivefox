@@ -21,7 +21,8 @@ OPTIMISTIC_LOCAL_REPLY = re.compile(
 DIRECTIONAL_CONNECT = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"diagnostic-directional-connect negotiated=1 protocol=h2 "
-    r"streams=2 upstream=primary downstream=secondary$"
+    r"streams=2 opening=staged-after-upstream-response "
+    r"upstream=primary downstream=secondary$"
 )
 ROOT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "

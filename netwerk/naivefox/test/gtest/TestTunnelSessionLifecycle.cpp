@@ -107,6 +107,26 @@ TEST(NaiveFoxTunnelSessionLifecycle, OuterGatePreservesAutoFallbackSemantics)
   EXPECT_FALSE(TunnelSessionTestPeer::ShouldGateOuterSession(config));
 }
 
+TEST(NaiveFoxTunnelSessionLifecycle,
+     DirectionalDownstreamRequiresValidatedUpstreamResponse)
+{
+  EXPECT_TRUE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Upstream, NS_OK, true, 200, true, "h2"_ns));
+  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Downstream, NS_OK, true, 200, true, "h2"_ns));
+  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Upstream, NS_ERROR_FAILURE, true, 200, true,
+      "h2"_ns));
+  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Upstream, NS_OK, false, 200, true, "h2"_ns));
+  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Upstream, NS_OK, true, 407, true, "h2"_ns));
+  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Upstream, NS_OK, true, 200, false, "h2"_ns));
+  EXPECT_FALSE(detail::ShouldStageDirectionalDownstream(
+      DirectionalConnectLane::Upstream, NS_OK, true, 200, true, "h3"_ns));
+}
+
 TEST(NaiveFoxTunnelSessionLifecycle, OnlyColdLeaderRunsConfiguredPreamble)
 {
   EXPECT_FALSE(detail::ShouldRunPreamble(PreambleMode::Off, true));

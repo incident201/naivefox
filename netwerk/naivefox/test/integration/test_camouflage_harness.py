@@ -1568,7 +1568,8 @@ class CamouflageHarnessTests(unittest.TestCase):
                     f"admission={admission} response_accepted=1 "
                     "root_done=0 protocol=h2\n"
                     "Connection 1 diagnostic-directional-connect negotiated=1 "
-                    "protocol=h2 streams=2 upstream=primary "
+                    "protocol=h2 streams=2 "
+                    "opening=staged-after-upstream-response upstream=primary "
                     "downstream=secondary\n"
                     "Connection 1 established target=localhost:443 "
                     "outer=h2 padding=yes\n"
@@ -1587,6 +1588,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                         lifecycle.replace(
                             "Connection 1 diagnostic-directional-connect "
                             "negotiated=1 protocol=h2 streams=2 "
+                            "opening=staged-after-upstream-response "
                             "upstream=primary downstream=secondary\n",
                             "",
                         ),

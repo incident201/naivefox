@@ -34,6 +34,15 @@ constexpr bool ShouldRunPreamble(PreambleMode aMode, bool aColdLeader) {
   return aMode != PreambleMode::Off && aColdLeader;
 }
 
+inline bool ShouldStageDirectionalDownstream(
+    DirectionalConnectLane aLane, nsresult aStatus, bool aConnectCodeKnown,
+    int32_t aConnectCode, bool aDirectionalHeaderAccepted,
+    const nsACString& aOuterProtocol) {
+  return aLane == DirectionalConnectLane::Upstream && NS_SUCCEEDED(aStatus) &&
+         aConnectCodeKnown && aConnectCode >= 200 && aConnectCode < 300 &&
+         aDirectionalHeaderAccepted && aOuterProtocol.EqualsLiteral("h2");
+}
+
 // Main-thread-only sequence guard. Keeping the generation transition in this
 // small value type makes cancellation and late callback behavior testable
 // without constructing Necko channels.
@@ -194,6 +203,8 @@ class TunnelSession final {
                                            ProxyProtocol aProtocol);
   void OpenConnectOnMain(uint64_t aGeneration, ProxyProtocol aProtocol,
                          const nsACString& aTargetAuthority);
+  void OpenDirectionalDownstreamOnMain(uint64_t aGeneration,
+                                       ProxyProtocol aProtocol);
   void NotifyOuterGateReady();
   void ReleaseOuterGate();
   void FailPreambleOnMain(nsresult aStatus);

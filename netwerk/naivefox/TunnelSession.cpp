@@ -452,6 +452,8 @@ class TunnelSession::Impl final {
   bool mConnectUrgentStartLogged = false;
   std::array<LaneState, 2> mLanes;
   nsCString mDirectionalConnectToken;
+  nsCString mDirectionalDownstreamPadding;
+  bool mDirectionalDownstreamOpenRequested = false;
   bool mPaddingEnabled = false;
   bool mStarted = false;
   bool mReady = false;
@@ -1288,15 +1290,13 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
       return NS_OK;
     };
 
+    if (directionalConnect) {
+      mImpl->mDirectionalConnectToken = directionalConnectToken;
+      mImpl->mDirectionalDownstreamPadding = downstreamPadding;
+    }
     rv = openLane(DirectionalConnectLane::Upstream, upstreamPadding,
                   upstreamAttempt);
-    if (NS_SUCCEEDED(rv) && directionalConnect) {
-      RefPtr<TunnelAttempt> downstreamAttempt;
-      rv = openLane(DirectionalConnectLane::Downstream, downstreamPadding,
-                    downstreamAttempt);
-    }
     if (NS_SUCCEEDED(rv)) {
-      mImpl->mDirectionalConnectToken = directionalConnectToken;
       if (mImpl->mConnectUrgentStart && !mImpl->mConnectUrgentStartLogged) {
         mImpl->mConnectUrgentStartLogged = true;
         RuntimeLogEvent(
@@ -1342,7 +1342,52 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
   }
 }
 
+void TunnelSession::OpenDirectionalDownstreamOnMain(
+    uint64_t aGeneration, ProxyProtocol aProtocol) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelRequested.load(std::memory_order_acquire) ||
+      aGeneration != mImpl->mAttemptGeneration ||
+      aProtocol != mImpl->mAttemptProtocol ||
+      !mImpl->mConfig.mDiagnosticDirectionalConnect ||
+      aProtocol != ProxyProtocol::H2 ||
+      mImpl->mDirectionalDownstreamOpenRequested ||
+      mImpl->mDirectionalConnectToken.IsEmpty() ||
+      mImpl->mDirectionalDownstreamPadding.IsEmpty()) {
+    return;
+  }
+  mImpl->mDirectionalDownstreamOpenRequested = true;
+  RefPtr attempt = new TunnelAttempt(
+      this, mImpl->mSocketTarget, aGeneration, aProtocol,
+      DirectionalConnectLane::Downstream, mImpl->mDirectionalConnectToken);
+  nsCOMPtr<nsIRequest> openedRequest;
+  const bool useAnonymousConnection = !PreambleModeUsesNativeParser(
+      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol));
+  nsresult rv = OpenNeckoTunnel(
+      mImpl->mConfig.mProxyUrl, mImpl->mTargetAuthority,
+      mImpl->mConfig.mProxyUser, mImpl->mConfig.mProxyPassword, attempt, attempt,
+      mImpl->mDirectionalDownstreamPadding, aProtocol,
+      mImpl->mConfig.mHostResolverRule, mImpl->mConfig.mExtraHeaders,
+      mImpl->mConnectUrgentStart, useAnonymousConnection,
+      getter_AddRefs(openedRequest));
+  if (NS_SUCCEEDED(rv)) {
+    const size_t laneIndex =
+        Impl::LaneIndex(DirectionalConnectLane::Downstream);
+    mImpl->mActiveRequests[laneIndex] = openedRequest;
+    mImpl->mActiveRequestGenerations[laneIndex] = aGeneration;
+    return;
+  }
+  RefPtr self = this;
+  (void)mImpl->mSocketTarget->Dispatch(
+      NS_NewRunnableFunction("NaiveFox::DirectionalDownstreamOpenFailure",
+                             [self, aGeneration, aProtocol, rv]() {
+                               self->ApplyOpenFailure(aGeneration, aProtocol,
+                                                      rv);
+                             }),
+      NS_DISPATCH_NORMAL);
+}
+
 NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
+  MOZ_ASSERT(NS_IsMainThread());
   CancelEstablishmentTimeout();
   nsCOMPtr<nsIProxiedChannel> proxied = do_QueryInterface(aRequest);
   int32_t connectCode = -1;
@@ -1379,6 +1424,10 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
   const uint64_t generation = mGeneration;
   const ProxyProtocol protocol = mProtocol;
   const DirectionalConnectLane lane = mLane;
+  const bool stageDirectionalDownstream =
+      detail::ShouldStageDirectionalDownstream(
+          lane, rv, connectCodeKnown, connectCode, directionalHeaderAccepted,
+          outerProtocol);
   (void)mSocketTarget->Dispatch(
       NS_NewRunnableFunction(
           "NaiveFox::TunnelConnectMetadata",
@@ -1390,6 +1439,9 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
                 paddingHeaderPresent, directionalHeaderAccepted, outerProtocol);
           }),
       NS_DISPATCH_NORMAL);
+  if (stageDirectionalDownstream) {
+    owner->OpenDirectionalDownstreamOnMain(mGeneration, mProtocol);
+  }
   return NS_OK;
 }
 
@@ -1672,6 +1724,8 @@ void TunnelSession::ResetAttemptState() {
     lane = Impl::LaneState{};
   }
   mImpl->mDirectionalConnectToken.Truncate();
+  mImpl->mDirectionalDownstreamPadding.Truncate();
+  mImpl->mDirectionalDownstreamOpenRequested = false;
   mImpl->mPaddingEnabled = false;
 }
 
@@ -1767,7 +1821,8 @@ void TunnelSession::TunnelReady() {
   if (mImpl->mConfig.mDiagnosticDirectionalConnect) {
     RuntimeLogEvent(
         "Connection %llu diagnostic-directional-connect negotiated=1 "
-        "protocol=h2 streams=2 upstream=primary downstream=secondary\n",
+        "protocol=h2 streams=2 opening=staged-after-upstream-response "
+        "upstream=primary downstream=secondary\n",
         static_cast<unsigned long long>(mImpl->mConnectionId));
   }
   RuntimeLog("Outer protocol: %s\n", PromiseFlatCString(outerProtocol).get());
