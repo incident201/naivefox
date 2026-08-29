@@ -1863,6 +1863,23 @@ two later direct-reference groups. The measured binary identified build ID
 Script completion is a useful adaptive boundary, but one four-image wave is
 still too coarse.
 
+Splitting the images into two causal waves is rejected after direct paired
+replication. The first two prepared images opened after successful script
+`OnStop`; the second two opened only after both first-wave channels received
+successful response headers. Thus body sizes could not accelerate the second
+wave, while slower RTT or server response naturally delayed it, and no timer,
+packet index, byte count, or fixture-specific resource length was used. In the
+four-block shaped artifact `07829ee5bb0b5ad3`, this arm measured
+0.13976/0.43070/0.18764/0.14583/0.39706. The retained page arm in the same
+randomized superblocks measured 0.13185/0.37573/0.16462/0.13457/0.35488 and
+ranked closer in every view. The two-wave binary identified build ID
+`43873d9f2e5168673d6b87baa5a98ec0` and libxul digest
+`a564f1152f5da8e7b221dd37c7dcc9dea3f5b351bdf0d29c2048bdc44814d8e5`.
+All four samples passed strict process identity, descriptor-order, two-wave,
+request-commit, and terminal-drain validation, so the rejection is numerical
+rather than a lifecycle failure. The full-tree IPC and wave scheduler are
+removed rather than retained as dormant product complexity.
+
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
 `20260828T220612Z-2af3b849` logged all six request commits, first resource body
