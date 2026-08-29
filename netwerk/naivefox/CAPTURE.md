@@ -2580,6 +2580,26 @@ An irreversible early success is not justified by that replicated tradeoff,
 so production semantics and both H2 defaults remain unchanged. The opt-in
 arms remain only to reproduce the rejected mechanism.
 
+An informational response on the CONNECT stream itself was rejected before
+passive measurement. History preflight found only the later site-page `103`
+experiment above; no earlier server fork inserted `1xx` before the proxy's
+final `200 CONNECT`. A private forwardproxy fork therefore flushed an empty
+standards-defined `103 Early Hints` and then followed the ordinary fast-open
+path, including its random `Padding` header and final `200`. This added no
+timer, target-byte threshold, or dependency on the fronting page resources.
+
+The fork's own tests immediately proved that legacy Go CONNECT clients treat
+the first `103` as final and fail, so the mechanism was already known to be
+compatibility-breaking. Firefox's general HTTP transaction parser can consume
+multiple informational responses, but private fail-closed capture
+`c62a7a440da14346` exposed a narrower tunnel handoff problem: NaiveFox logged
+the first CONNECT HEADERS as established with `padding=no`, then the inner
+browser navigation never completed before its 45-second cutoff. No passive
+distances were published and the sample was not retried. Adding client-side
+special handling solely to make an unmeasured incompatible shaping mechanism
+work was not justified. The fixture was restored byte-for-byte to stock Caddy
+digest `444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
