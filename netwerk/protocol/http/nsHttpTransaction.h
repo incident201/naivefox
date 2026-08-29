@@ -102,6 +102,10 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   bool WaitForH3HandshakeConfirmation() const {
     return mWaitForH3HandshakeConfirmation;
   }
+  void SetH3HandshakeDwellMs(uint32_t aValue) {
+    mH3HandshakeDwellMs = aValue;
+  }
+  uint32_t H3HandshakeDwellMs() const { return mH3HandshakeDwellMs; }
   void SetUseH3CarrierDispatch(bool aValue) { mUseH3CarrierDispatch = aValue; }
   bool UseH3CarrierDispatch() const { return mUseH3CarrierDispatch; }
   void SetUseH3ColdWinnerHandoff(bool aValue) {
@@ -540,6 +544,7 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   Atomic<bool, Relaxed> mIsHttp3Used{false};
 #ifdef MOZ_NAIVEFOX
   Atomic<bool, ReleaseAcquire> mWaitForH3HandshakeConfirmation{false};
+  Atomic<uint32_t, ReleaseAcquire> mH3HandshakeDwellMs{0};
   Atomic<bool, ReleaseAcquire> mUseH3CarrierDispatch{false};
   Atomic<bool, ReleaseAcquire> mUseH3ColdWinnerHandoff{false};
   Atomic<bool, ReleaseAcquire> mH3ColdWinnerHandoffSucceeded{false};

@@ -3,8 +3,8 @@
     "executable_files": 171,
     "files": 21977
   },
-  "evidence_commit": "3d005bd87721599c99b1ad5c20516243e5961e51",
-  "evidence_source_commit": "5090e39a1d1f2aeaf0900ba76aa2af89122cd509",
+  "evidence_commit": "68bcab021195676ee19aa6e58bec16f77ca996d0",
+  "evidence_source_commit": "545087bba6a15333a3dd34b91e85b607d6a79727",
   "files": [
     {
       "mode": "0644",
@@ -49,7 +49,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "9f5025933744a9d74a26be40108529ec806ec6b7dc85a458ab79268fd6d025c8"
+      "sha256": "4a2afa459b987021347c4a2d67cc24c8ab486f14ee8dea69046b04bb1fb1f148"
     },
     {
       "mode": "0644",
@@ -19034,7 +19034,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/CAPTURE.md",
-      "sha256": "050dc8ba6b0e37cc5b3cd201edd0b8cb1ab2fdc8e57676904b41c8ce0af29352"
+      "sha256": "e78609f0bd37bd7c92be47963b1204ee200a41a75d5fb547c984007fb938d0da"
     },
     {
       "mode": "0644",
@@ -19044,12 +19044,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/Config.cpp",
-      "sha256": "a67c767b7fb4f2538119c191a8ce1a6ff77c2afac9235b7f4ca877f3202a4432"
+      "sha256": "440c47f636b3b57366629d72e43c3328045b25633efc07858db1b7d5269555ec"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/Config.h",
-      "sha256": "92879b6995908c500d89a74a954889892b34821cce9b2d19c1a4d96c663ea48d"
+      "sha256": "39ff9d186959b6088c86da5684280d86d7a1b74b06332327f3cb877a95ec24fa"
     },
     {
       "mode": "0644",
@@ -19099,7 +19099,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/KNOWN-ISSUES.md",
-      "sha256": "81a24e3492a39915d0cd177246d17ef2d0ef92625e2561e2a6c687ba31516194"
+      "sha256": "9884f696d98f51312122794713442a077db8baed9635e95439ec098e7381926c"
     },
     {
       "mode": "0644",
@@ -19194,12 +19194,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NeckoTunnel.cpp",
-      "sha256": "fe0114143d3092d1c7b63b85dd760c2cf2e7ebd7ed247f27f45a0c8d8ccbb34b"
+      "sha256": "03cbac86e01154b82fe1a7b732fdc3e3854a139449cc0b79b2082e4f225e71b6"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NeckoTunnel.h",
-      "sha256": "ae0b995ce718a07edc4fe00a9228bce1fe872ec5f8b41cfec350c6ab0b5e2fa8"
+      "sha256": "2c372d25ad8a8a4f2a98257484ccc87dab13dc833424c7cf5d4f5386cfe9582a"
     },
     {
       "mode": "0644",
@@ -19234,7 +19234,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "40521ad24c4e59d0bd237bf04731340752154763804c3f4eb9304c16755c6fbe"
+      "sha256": "beb3ac638c93718b23307b476a80df597401ec2f32b252cba694653bea5ea80c"
     },
     {
       "mode": "0644",
@@ -19309,7 +19309,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/TunnelSession.cpp",
-      "sha256": "62820986681036d75b5fb8ad72a27497f755511a2af6c6c3812d4879ec5ebd96"
+      "sha256": "e5943d809537fae611218e260f94e6e372d58780482b56fe2187a171978dd420"
     },
     {
       "mode": "0644",
@@ -19479,7 +19479,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestConfig.cpp",
-      "sha256": "561ce074eb30db3e4f35e3b01cf7444bb1f78013e7bceec08549247b0bfc58f2"
+      "sha256": "ba0e613baea3ecb65e15ee45c6993f69f8958d48ceaeebc40ea16834967b87bd"
     },
     {
       "mode": "0644",
@@ -19534,7 +19534,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestTunnelSessionLifecycle.cpp",
-      "sha256": "178029158037335e52b546def76f0be78227b01ca2bb981afbd4ab3ee8c143d9"
+      "sha256": "87036e19dd3203b74d6d552c8f170d02eae9fb5592fd0c6634a961a1aed06a78"
     },
     {
       "mode": "0644",
@@ -19544,7 +19544,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/Caddyfile",
-      "sha256": "0df10844579daae674f9592b278e60a17e783e4f7b9a5f24110d0c5287b69ec5"
+      "sha256": "3ca4a76750fead4b08688ff6d4601cb332e4a63375a303516d667562c94c41ef"
     },
     {
       "mode": "0644",
@@ -19554,7 +19554,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/README.md",
-      "sha256": "504e71240328ec012cbebc22a8809c545196aa0be719679dcc3f5bccdb1b496b"
+      "sha256": "d640c220a85da31917c442c7ca87119f5efc6735a18edd15dac884d8b96d9162"
     },
     {
       "mode": "0644",
@@ -19564,7 +19564,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/analyze-camouflage.py",
-      "sha256": "c91f22adf2ba9f490a4499b9c215d6a679de5137c11b3debc8f8773899111c2b"
+      "sha256": "769744eb904172639b5ece61e524e87d978abb930600f39c47448936d890498a"
     },
     {
       "mode": "0755",
@@ -19584,7 +19584,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/camouflage_browser_controller.py",
-      "sha256": "968162afa0e28f3443100dbe57c6bd7627edb056932ac1d6bb51398424f05d3a"
+      "sha256": "61b0ededd47007f845600e222cb094771af19ef6a6ce63782b226ac086261923"
     },
     {
       "mode": "0644",
@@ -19599,7 +19599,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/camouflage_features.py",
-      "sha256": "0eb3ff7875b83deee50d68ab1cbd421be042e9287b446a79d2279cd875993a9c"
+      "sha256": "28e3a3da2c28dcd889cf384f67571acbb8dc7bb1d5f256efd1ca61fc784eebc0"
     },
     {
       "mode": "0644",
@@ -19609,17 +19609,17 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/camouflage_naivefox_config.py",
-      "sha256": "c573fd56413ea089e8dd5ba0118f343f02e7a41a027495be20e67d5c66c22817"
+      "sha256": "3ed3a384d530dcafa594a7f496721a1f69b91751ce52ad5a90e9d9a5f9f3b6b2"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/camouflage_sample_validation.py",
-      "sha256": "998d343613f8f0a5cd89081038ae4e22d9adcfc4883aa19ad7cff1d1e4aa87aa"
+      "sha256": "2539148b1491ebdf4c60d35732b306d05eb19dfea9ac81b13c6af3f3a3ce500e"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/camouflage_superblocks.py",
-      "sha256": "672e21dbfc754ab23d202bdad504c3e9494dbaeeda9468e0a4d7c923f473dc83"
+      "sha256": "476f892dffe8d567e70b9dcd6c93c8eeff1b6a5a49910bc345713a1d12eed20f"
     },
     {
       "mode": "0755",
@@ -19644,7 +19644,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/h3_decrypted_arm_summary.py",
-      "sha256": "6811fd63462408f3614ee2e02dbdfd6a6621a2e55169554ce93476cb55023ca9"
+      "sha256": "3754505e2606949b01f4808a7bcb024f2e49de3c85bb161426e9c17d003a0b23"
     },
     {
       "mode": "0644",
@@ -19684,7 +19684,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-camouflage-suite.sh",
-      "sha256": "c558d55519545ab16a8489716853479c6a3a4776b868e1a7b154d8707060cae2"
+      "sha256": "83b5f29b60a02247bb3a8010f8bb5d49e013b1103b7bd0c1238e940fe59fe180"
     },
     {
       "mode": "0755",
@@ -19699,12 +19699,12 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-config-tests.sh",
-      "sha256": "602a0007c94459f4cfd24c7af4b70e7e1a1b22098502e328082a420cc10dc979"
+      "sha256": "c56d7a6a9117345538e958da33fe1b0c75061109af01222de469192a099b5d39"
     },
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-control-tests.sh",
-      "sha256": "02cca10a104d01b82a8928cca20540d4ca3e7cb5ce7d085a1de630506d326789"
+      "sha256": "abc2d26fcaefe0e4e414ed72b3c9e5a006512551cd7d6f9cd3cecbc9f3f6bf4f"
     },
     {
       "mode": "0755",
@@ -19734,7 +19734,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-h3-capture-comparison.sh",
-      "sha256": "a5cfddc526524edd3d88f6ce0c67871aeffa6b7f817d3c4e67918a2a8583bb1b"
+      "sha256": "3474d2e370e729a1c517a19f10c93d98830de8effd7309ffe3d50f927d8cd8eb"
     },
     {
       "mode": "0755",
@@ -19869,7 +19869,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/target_server.py",
-      "sha256": "952ba7457e5538336058a0022880a5f3c34a5a6f07149ba9160d17995752f5e4"
+      "sha256": "73eb0b266f505ade42347d5a450092516125bf666d7fb9c277712ae124980a05"
     },
     {
       "mode": "0755",
@@ -19889,7 +19889,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_camouflage_harness.py",
-      "sha256": "b6e1dd9256c8e3a8c5d40a8a31fa4eab637062500e35a7added7ad242d94e081"
+      "sha256": "79d9337ea847fd591bab2986ec68a04a85596c68bf310c6d6375bad11858c6ae"
     },
     {
       "mode": "0644",
@@ -19909,7 +19909,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_h3_decrypted_arm_summary.py",
-      "sha256": "e2d7004555350495e34d442704d895c73ba89f769ec238dec5f6aeda09a19891"
+      "sha256": "9745e92d25f8a71e4b00faf2219c418a3a9b3339d62d015f130f61ad19765e8b"
     },
     {
       "mode": "0644",
@@ -19959,7 +19959,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/tools/firefox-reference-manifest",
-      "sha256": "64980a506a103cb89b4e82e34b3e7c4a8e421db67aedd255326d049c49a83b41"
+      "sha256": "0646f04475e7fe531e9ac1956e1b5b8e2bc2817ffbb334071317b805c2952614"
     },
     {
       "mode": "0755",
@@ -20479,12 +20479,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpBaseChannel.cpp",
-      "sha256": "925deab9483c02b25236da35c59f138cbf46da851db98cc3dab65cbd534b4be4"
+      "sha256": "ceeb23aa7227264fe0c49f956322e4c418f1fe7814e774369c27da616d41b7da"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpBaseChannel.h",
-      "sha256": "db3a057677060c4466c0cd340dd2448d472f15acd7bfae6c1fa1b5b258a7e90f"
+      "sha256": "613c0370e5054486d588e893a0556ea0d7cc03ef96bb8054af7e168b54b65ff1"
     },
     {
       "mode": "0644",
@@ -20524,7 +20524,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpConnectionUDP.cpp",
-      "sha256": "b34bb862ea21ff3930678e5a701c03a3d50e7b7878b0cfa5aa81fdfaa786352a"
+      "sha256": "edfa7b2056c9c0f75705b3473c93fd77696e9ca1cb0f4abeb92d0210dcbb63e7"
     },
     {
       "mode": "0644",
@@ -20959,7 +20959,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpChannel.cpp",
-      "sha256": "90123469125a32f6abc859d77a8d58c502caaa8c33af13e0a5d804de7f939fce"
+      "sha256": "ba4471c931158759bcde44e1761b528b812bdfb6d6b31f4f15e630c081a79ad9"
     },
     {
       "mode": "0644",
@@ -21079,7 +21079,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpTransaction.h",
-      "sha256": "6116be309fe28b3dee5805c681170b09207743d9ed60caa66a9cf127145c10f5"
+      "sha256": "af9f92ec97ed3e9127268a603ccefd248c1e4bdac78ce0d936c5b26ba965aa3c"
     },
     {
       "mode": "0644",
@@ -21159,7 +21159,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsIHttpChannelInternal.idl",
-      "sha256": "dc8dcf89a239589d11f6a5473ab7feb69745f38e3e81f4cf3f8fa4aee507f1a3"
+      "sha256": "67e175636f70418f7e9f4f6519efaa15123c0c53512c056fd5d2febe5457da71"
     },
     {
       "mode": "0644",
@@ -109893,8 +109893,8 @@
     }
   ],
   "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
-  "manifest_sha256": "245bc718ca07ce600c436ce5dd33139a420ee41aacb27d0cda93ecb0b3a037d0",
+  "manifest_sha256": "9111669258edc1267fa81e38304de6366e86156ca06313149fa31783855012f6",
   "manifest_version": 2,
-  "minimal_export_commit": "3d005bd87721599c99b1ad5c20516243e5961e51",
-  "naivefox_reference_commit": "5090e39a1d1f2aeaf0900ba76aa2af89122cd509"
+  "minimal_export_commit": "68bcab021195676ee19aa6e58bec16f77ca996d0",
+  "naivefox_reference_commit": "545087bba6a15333a3dd34b91e85b607d6a79727"
 }

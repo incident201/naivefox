@@ -2556,6 +2556,7 @@ nsresult nsHttpChannel::InitTransaction() {
   if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
     transaction->SetWaitForH3HandshakeConfirmation(
         mProxyPreambleWaitForHandshakeConfirmation);
+    transaction->SetH3HandshakeDwellMs(mProxyPreambleHandshakeDwellMs);
     transaction->SetUseH3CarrierDispatch(mProxyPreambleUseCarrierDispatch);
     transaction->SetUseH3ColdWinnerHandoff(
         mProxyPreambleUseColdWinnerHandoff);

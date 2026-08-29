@@ -664,7 +664,11 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
       preamble.mMode == PreambleMode::DocumentNativeCacheOpen ||
       preamble.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       preamble.mMode == PreambleMode::DocumentOverlap ||
-      preamble.mMode == PreambleMode::DocumentStartOverlap) {
+      preamble.mMode == PreambleMode::DocumentHeadersTaskOverlap ||
+      preamble.mMode == PreambleMode::DocumentFirstBufferOverlap ||
+      preamble.mMode == PreambleMode::DocumentFirstBufferTaskOverlap ||
+      preamble.mMode == PreambleMode::DocumentStartOverlap ||
+      preamble.mMode == PreambleMode::DocumentStartTaskOverlap) {
     preamble.mMaxAssets = 0;
   }
   nsresult rv = OpenProxyPreambleOperation(
@@ -774,10 +778,19 @@ void TunnelSession::FinishPreambleOnMain(
       aHttpStatus == 0 && aBodyBytes == 0 && aStartedResources == 0 &&
       aCommittedResources == 0 && aNativeCacheNewResources == 0 && !aRootDone &&
       !aTerminalFallback;
+  const bool resourceTreeCommittedAdmission =
+      preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300 &&
+      aStartedResources == mImpl->mConfig.mPreamble.mMaxAssets &&
+      aCommittedResources == mImpl->mConfig.mPreamble.mMaxAssets &&
+      aNativeCacheNewResources == 0 && !aTerminalFallback;
   const bool succeeded =
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
   if ((PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        !requestCommittedAdmission) ||
+      (preambleMode ==
+           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+       !resourceTreeCommittedAdmission) ||
       (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
     FailPreambleOnMain(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
@@ -863,21 +876,38 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode == PreambleMode::DocumentOverlap) {
+  if (preambleMode == PreambleMode::DocumentOverlap ||
+      preambleMode == PreambleMode::DocumentHeadersTaskOverlap ||
+      preambleMode == PreambleMode::DocumentFirstBufferOverlap ||
+      preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
+    const char* admission = "response-headers";
+    if (aRootDone) {
+      admission = "terminal-fallback";
+    } else if (preambleMode == PreambleMode::DocumentHeadersTaskOverlap) {
+      admission = "response-headers-task";
+    } else if (preambleMode == PreambleMode::DocumentFirstBufferOverlap) {
+      admission = "first-data-buffer";
+    } else if (preambleMode ==
+               PreambleMode::DocumentFirstBufferTaskOverlap) {
+      admission = "first-data-buffer-task";
+    }
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
         "response_accepted=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
-        aRootDone ? "terminal-fallback" : "response-headers", !aRootDone,
-        aRootDone, ProtocolName(aProtocol));
+        admission, !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
-  if (preambleMode == PreambleMode::DocumentStartOverlap) {
+  if (preambleMode == PreambleMode::DocumentStartOverlap ||
+      preambleMode == PreambleMode::DocumentStartTaskOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble document-start-overlap admission=%s "
         "request_committed=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
-        aRootDone ? "terminal-fallback" : "request-committed", !aRootDone,
-        aRootDone, ProtocolName(aProtocol));
+        aRootDone ? "terminal-fallback"
+                  : preambleMode == PreambleMode::DocumentStartTaskOverlap
+                        ? "request-committed-task"
+                        : "request-committed",
+        !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
     RuntimeLogEvent(
@@ -893,6 +923,15 @@ void TunnelSession::FinishPreambleOnMain(
         "admission=request-committed request_committed=1 root_done=0 "
         "protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(aProtocol));
+  }
+  if (preambleMode ==
+      PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+    RuntimeLogEvent(
+        "Connection %llu preamble native-parser-resource-tree "
+        "admission=resources-committed request_committed=1 root_done=%d "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId), aRootDone,
         ProtocolName(aProtocol));
   }
   if (PreambleModeUsesScopedNavigationStop(preambleMode)) {
@@ -923,6 +962,7 @@ void TunnelSession::FinishPreambleOnMain(
         ProtocolName(aProtocol));
   }
   if (preambleMode != PreambleMode::DocumentStartOverlap &&
+      preambleMode != PreambleMode::DocumentStartTaskOverlap &&
       !PreambleModeUsesNativeParserDocumentStart(preambleMode)) {
     const char* result = aStatus == NS_ERROR_FILE_TOO_BIG ? "oversize"
                          : succeeded                      ? "success"
@@ -963,7 +1003,8 @@ void TunnelSession::FinishPreambleOperationOnMain(
   const bool documentStartParserSucceeded =
       finalSucceeded && aCompletedSuccessfulResources == 1;
   const bool resourceTreeSucceeded =
-      finalSucceeded && aCompletedSuccessfulResources == 3;
+      finalSucceeded &&
+      aCompletedSuccessfulResources == mImpl->mConfig.mPreamble.mMaxAssets;
   const bool navigationStopSucceeded =
       detail::PreambleNavigationStopCompletedSuccessfully(
           preambleMode, aRootDone, aCompletedNormally, aStatus, aHttpStatus,
@@ -972,8 +1013,7 @@ void TunnelSession::FinishPreambleOperationOnMain(
   if (PreambleModeRequiresFailClosed(preambleMode) &&
       ((preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap &&
         !documentStartParserSucceeded) ||
-       (preambleMode ==
-            PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+       (PreambleModeUsesNativeParserResourceTree(preambleMode) &&
         !resourceTreeSucceeded) ||
        (PreambleModeUsesScopedNavigationStop(preambleMode) &&
         !navigationStopSucceeded) ||
@@ -986,6 +1026,7 @@ void TunnelSession::FinishPreambleOperationOnMain(
     return;
   }
   if (preambleMode == PreambleMode::DocumentStartOverlap ||
+      preambleMode == PreambleMode::DocumentStartTaskOverlap ||
       PreambleModeUsesNativeParserDocumentStart(preambleMode)) {
     const bool succeeded =
         preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap
@@ -1044,12 +1085,12 @@ void TunnelSession::FinishPreambleOperationOnMain(
         aCompletedSuccessfulResources, aHttpStatus, ProtocolName(aProtocol));
   }
   if (resourceTreeSucceeded &&
-      preambleMode == PreambleMode::TreeNativeParserDocumentStartResourceTree) {
+      PreambleModeUsesNativeParserResourceTree(preambleMode)) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
-        "drain=complete completed_resources=3 http=%u protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId), aHttpStatus,
-        ProtocolName(aProtocol));
+        "drain=complete completed_resources=%u http=%u protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        aCompletedSuccessfulResources, aHttpStatus, ProtocolName(aProtocol));
   }
   if (navigationStopSucceeded &&
       preambleMode ==
@@ -1073,7 +1114,11 @@ void TunnelSession::FinishPreambleOperationOnMain(
         aNavigationStopStyleAborted, aCompletedSuccessfulResources == 1,
         aHttpStatus);
   }
-  if (aCompletedNormally && preambleMode == PreambleMode::DocumentOverlap) {
+  if (aCompletedNormally &&
+      (preambleMode == PreambleMode::DocumentOverlap ||
+       preambleMode == PreambleMode::DocumentHeadersTaskOverlap ||
+       preambleMode == PreambleMode::DocumentFirstBufferOverlap ||
+       preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap)) {
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap drain=complete "
         "root_done=1 completed_resources=%u protocol=%s\n",
@@ -1081,7 +1126,8 @@ void TunnelSession::FinishPreambleOperationOnMain(
         aCompletedSuccessfulResources, ProtocolName(aProtocol));
   }
   if (aRootDone && aCompletedNormally &&
-      preambleMode == PreambleMode::DocumentStartOverlap) {
+      (preambleMode == PreambleMode::DocumentStartOverlap ||
+       preambleMode == PreambleMode::DocumentStartTaskOverlap)) {
     RuntimeLogEvent(
         "Connection %llu preamble document-start-overlap drain=complete "
         "root_done=1 completed_resources=%u protocol=%s\n",
@@ -1630,7 +1676,9 @@ nsresult TunnelSession::StartPump() {
   mImpl->mPumpStarted = true;
   RefPtr self = this;
   std::function<void()> onDownstreamApplicationActive;
-  if (mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol) ==
+  const PreambleMode preambleMode =
+      mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
+  if (preambleMode ==
       PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,

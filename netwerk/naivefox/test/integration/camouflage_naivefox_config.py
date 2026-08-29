@@ -12,6 +12,8 @@ TREE_PREAMBLE_MAX_BYTES = 256 * 1024
 TREE_PREAMBLE_MAX_ASSETS = 2
 RESOURCE_TREE_PREAMBLE_MAX_BYTES = 128 * 1024
 RESOURCE_TREE_PREAMBLE_MAX_ASSETS = 3
+PAGE_PREAMBLE_MAX_BYTES = 384 * 1024
+PAGE_PREAMBLE_MAX_ASSETS = 6
 
 
 def build_config(
@@ -35,18 +37,31 @@ def build_config(
         "document-cold-winner-handoff",
         "document-native-cache-open",
         "document-handshake-confirmed",
+        "document-first-buffer-overlap",
+        "document-first-buffer-task-overlap",
+        "document-first-buffer-http-connect",
         "document-overlap",
+        "document-headers-task-overlap",
+        "document-overlap-http-connect",
+        "document-start-http-connect",
         "document-start-overlap",
+        "document-start-task-overlap",
         "tree-complete",
         "tree-complete-css",
+        "tree-complete-resource-tree",
         "tree-early-overlap",
+        "tree-early-overlap-resource-tree",
         "tree-root-overlap",
         "tree-root-overlap-css",
         "tree-resource-committed-overlap-css",
+        "tree-resource-committed-overlap-tree",
+        "tree-resource-committed-overlap-page",
         "tree-resource-native-cache-committed-overlap",
         "tree-native-parser-preload-overlap-css",
         "tree-native-parser-document-start-overlap-css",
         "tree-native-parser-document-start-resource-tree",
+        "tree-native-parser-resource-committed-tree",
+        "tree-native-parser-resource-committed-page",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -64,11 +79,17 @@ def build_config(
             "document-complete, document-carrier-dispatch, "
             "document-cold-winner-handoff, "
             "document-native-cache-open, "
-            "document-handshake-confirmed, "
-            "document-overlap, document-start-overlap, "
+            "document-handshake-confirmed, document-first-buffer-overlap, "
+            "document-first-buffer-task-overlap, "
+            "document-first-buffer-http-connect, "
+            "document-overlap, document-headers-task-overlap, "
+            "document-overlap-http-connect, "
+            "document-start-http-connect, "
+            "document-start-overlap, document-start-task-overlap, "
             "tree-complete, tree-complete-css, tree-early-overlap, "
             "tree-root-overlap, tree-root-overlap-css, "
-            "tree-resource-committed-overlap-css, tree-warm-css-304, or "
+            "tree-resource-committed-overlap-css, "
+            "tree-resource-committed-overlap-tree, tree-warm-css-304, or "
             "tree-resource-native-cache-committed-overlap, "
             "tree-native-parser-preload-overlap-css, or "
             "tree-native-parser-document-start-overlap-css, or "
@@ -85,6 +106,12 @@ def build_config(
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
+    if arm in (
+        "document-first-buffer-http-connect",
+        "document-overlap-http-connect",
+        "document-start-http-connect",
+    ) and protocol != "h2":
+        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -95,8 +122,16 @@ def build_config(
         raise ValueError("document-cold-winner-handoff requires h3")
     if arm == "document-native-cache-open" and protocol != "h3":
         raise ValueError("document-native-cache-open requires h3")
-    if arm == "tree-resource-committed-overlap-css" and protocol != "h3":
-        raise ValueError("tree-resource-committed-overlap-css requires h3")
+    if arm in (
+        "tree-resource-committed-overlap-css",
+        "tree-resource-committed-overlap-tree",
+        "tree-resource-committed-overlap-page",
+        "tree-native-parser-resource-committed-tree",
+        "tree-native-parser-resource-committed-page",
+        "tree-complete-resource-tree",
+        "tree-early-overlap-resource-tree",
+    ) and protocol != "h3":
+        raise ValueError(f"{arm} requires h3")
     if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
     if arm == "tree-native-parser-preload-overlap-css" and protocol != "h3":
@@ -120,10 +155,6 @@ def build_config(
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
-    if arm == "tree-native-parser-document-start-resource-tree" and protocol != "h2":
-        raise ValueError(
-            "tree-native-parser-document-start-resource-tree requires h2"
-        )
     for name, port in (("SOCKS", socks_port), ("proxy", proxy_port)):
         if (
             not isinstance(port, int)
@@ -155,7 +186,41 @@ def build_config(
     user = quote(proxy_user, safe="")
     password = quote(proxy_pass, safe="")
     preamble = {"mode": "off"}
-    if arm == "tree-resource-committed-overlap-css":
+    if arm == "tree-resource-committed-overlap-tree":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-resource-committed-overlap",
+            "path": preamble_path,
+            "max-assets": RESOURCE_TREE_PREAMBLE_MAX_ASSETS,
+            "max-bytes": RESOURCE_TREE_PREAMBLE_MAX_BYTES,
+        }
+    elif arm == "tree-resource-committed-overlap-page":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-resource-committed-overlap",
+            "path": preamble_path,
+            "max-assets": PAGE_PREAMBLE_MAX_ASSETS,
+            "max-bytes": PAGE_PREAMBLE_MAX_BYTES,
+        }
+    elif arm == "tree-native-parser-resource-committed-tree":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-native-parser-resource-committed-overlap",
+            "path": preamble_path,
+            "max-assets": RESOURCE_TREE_PREAMBLE_MAX_ASSETS,
+            "max-bytes": RESOURCE_TREE_PREAMBLE_MAX_BYTES,
+            "cache-resources": True,
+        }
+    elif arm == "tree-native-parser-resource-committed-page":
+        preamble = {
+            "mode": "off",
+            "h3-mode": "tree-native-parser-resource-committed-overlap",
+            "path": preamble_path,
+            "max-assets": PAGE_PREAMBLE_MAX_ASSETS,
+            "max-bytes": PAGE_PREAMBLE_MAX_BYTES,
+            "cache-resources": True,
+        }
+    elif arm == "tree-resource-committed-overlap-css":
         preamble = {
             "mode": "off",
             "h3-mode": "tree-resource-committed-overlap",
@@ -287,13 +352,42 @@ def build_config(
         "root",
         "root-pmtud-control",
         "document-complete",
+        "document-first-buffer-overlap",
+        "document-first-buffer-task-overlap",
+        "document-first-buffer-http-connect",
         "document-overlap",
+        "document-headers-task-overlap",
+        "document-overlap-http-connect",
+        "document-start-http-connect",
         "document-start-overlap",
+        "document-start-task-overlap",
     ):
         preamble = {
             "mode": (
-                arm
-                if arm in ("document-overlap", "document-start-overlap")
+                "document-first-buffer-task-overlap"
+                if arm == "document-first-buffer-task-overlap"
+                else "document-first-buffer-overlap"
+                if arm
+                in (
+                    "document-first-buffer-overlap",
+                    "document-first-buffer-http-connect",
+                )
+                else "document-overlap"
+                if arm
+                in (
+                    "document-overlap",
+                    "document-overlap-http-connect",
+                )
+                else "document-headers-task-overlap"
+                if arm == "document-headers-task-overlap"
+                else "document-start-overlap"
+                if arm
+                in (
+                    "document-start-http-connect",
+                    "document-start-overlap",
+                )
+                else "document-start-task-overlap"
+                if arm == "document-start-task-overlap"
                 else "document-complete"
             ),
             "path": preamble_path,
@@ -302,7 +396,9 @@ def build_config(
     elif arm in (
         "tree-complete",
         "tree-complete-css",
+        "tree-complete-resource-tree",
         "tree-early-overlap",
+        "tree-early-overlap-resource-tree",
         "tree-root-overlap",
         "tree-root-overlap-css",
         "tree-warm-css-304",
@@ -311,12 +407,20 @@ def build_config(
         preamble = {
             "mode": {
                 "tree-complete-css": "tree-complete",
+                "tree-complete-resource-tree": "tree-complete",
+                "tree-early-overlap-resource-tree": "tree-early-overlap",
                 "tree-root-overlap-css": "tree-root-overlap",
                 "tree-warm-css-304": "tree-root-overlap",
             }.get(arm, arm),
             "path": preamble_path,
             "max-assets": (
-                1
+                RESOURCE_TREE_PREAMBLE_MAX_ASSETS
+                if arm
+                in (
+                    "tree-complete-resource-tree",
+                    "tree-early-overlap-resource-tree",
+                )
+                else 1
                 if arm
                 in (
                     "tree-complete-css",
@@ -325,12 +429,29 @@ def build_config(
                 )
                 else TREE_PREAMBLE_MAX_ASSETS
             ),
-            "max-bytes": TREE_PREAMBLE_MAX_BYTES,
+            "max-bytes": (
+                RESOURCE_TREE_PREAMBLE_MAX_BYTES
+                if arm
+                in (
+                    "tree-complete-resource-tree",
+                    "tree-early-overlap-resource-tree",
+                )
+                else TREE_PREAMBLE_MAX_BYTES
+            ),
         }
         if arm == "tree-warm-css-304":
             preamble["cache-resources"] = True
     config = {
-        "listen": f"socks://127.0.0.1:{socks_port}",
+        "listen": (
+            f"http://127.0.0.1:{socks_port}"
+            if arm
+            in (
+                "document-first-buffer-http-connect",
+                "document-overlap-http-connect",
+                "document-start-http-connect",
+            )
+            else f"socks://127.0.0.1:{socks_port}"
+        ),
         "proxy": f"{scheme}://{user}:{password}@localhost:{proxy_port}",
         "host-resolver-rules": "MAP localhost 127.0.0.1",
         "outer-session-gate": arm != "off",
@@ -368,18 +489,31 @@ def main():
             "document-cold-winner-handoff",
             "document-native-cache-open",
             "document-handshake-confirmed",
+            "document-first-buffer-overlap",
+            "document-first-buffer-task-overlap",
+            "document-first-buffer-http-connect",
             "document-overlap",
+            "document-headers-task-overlap",
+            "document-overlap-http-connect",
+            "document-start-http-connect",
             "document-start-overlap",
+            "document-start-task-overlap",
             "tree-complete",
             "tree-complete-css",
+            "tree-complete-resource-tree",
             "tree-early-overlap",
+            "tree-early-overlap-resource-tree",
             "tree-root-overlap",
             "tree-root-overlap-css",
             "tree-resource-committed-overlap-css",
+            "tree-resource-committed-overlap-tree",
+            "tree-resource-committed-overlap-page",
             "tree-resource-native-cache-committed-overlap",
             "tree-native-parser-preload-overlap-css",
             "tree-native-parser-document-start-overlap-css",
             "tree-native-parser-document-start-resource-tree",
+            "tree-native-parser-resource-committed-tree",
+            "tree-native-parser-resource-committed-page",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

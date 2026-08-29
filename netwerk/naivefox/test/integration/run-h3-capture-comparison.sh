@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
+      printf 'usage: %s [--compare-arms] [--compare-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-root-overlap|tree-root-overlap-css|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-resource-committed-page|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-overlap ...]\n' "$0"
       exit 0
       ;;
     *)
@@ -57,7 +57,7 @@ fi
 declare -A seen_comparison_arms=()
 for arm in "${comparison_arms[@]}"; do
   case $arm in
-    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
+    off | gate | root | root-pmtud-control | document-complete | document-carrier-dispatch | document-cold-winner-handoff | document-native-cache-open | document-handshake-confirmed | document-overlap | document-start-overlap | tree-complete | tree-complete-css | tree-early-overlap | tree-root-overlap | tree-root-overlap-css | tree-resource-committed-overlap-css | tree-resource-native-cache-committed-overlap | tree-native-parser-preload-overlap-css | tree-native-parser-resource-committed-page | tree-native-parser-document-start-overlap-css | tree-native-parser-document-start-navigation-stop-css | tree-native-parser-document-start-response-stop-css | tree-native-parser-document-handoff-overlap-css | tree-native-parser-retarget-overlap-css | tree-native-parser-ipc-rendezvous-overlap-css | tree-native-parser-root-rendezvous-overlap-css | tree-native-parser-process-overlap-css | tree-native-parser-full-process-overlap-css | tree-overlap) ;;
     *) printf 'unsupported comparison arm: %s\n' "$arm" >&2; exit 2 ;;
   esac
   if [[ -n ${seen_comparison_arms[$arm]:-} ]]; then
@@ -66,6 +66,11 @@ for arm in "${comparison_arms[@]}"; do
   fi
   seen_comparison_arms[$arm]=1
 done
+if [[ -n ${seen_comparison_arms[tree-native-parser-resource-committed-page]:-} &&
+      ${#comparison_arms[@]} -ne 1 ]]; then
+  printf 'tree-native-parser-resource-committed-page decrypted comparison uses its dense-page reference and must run alone\n' >&2
+  exit 2
+fi
 if [[ -n ${seen_comparison_arms[tree-overlap]:-} &&
       -z ${seen_comparison_arms[tree-complete]:-} ]]; then
   printf 'tree-overlap comparison requires tree-complete\n' >&2
@@ -749,6 +754,9 @@ run_reference() {
   if [[ $comparison_design == arms ]]; then
     completion=$comparison_completion
     workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=browser_page&size=262144&count=4&idle_ms=5000&completion=$completion"
+    if [[ -n ${seen_comparison_arms[tree-native-parser-resource-committed-page]:-} ]]; then
+      workload_url="https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT/camouflage/index.html?scenario=fronting_page_dense&completion=$completion"
+    fi
   fi
   if [[ $pass == decrypted ]]; then
     : >"$keylog"
@@ -868,6 +876,9 @@ run_naivefox_arm() {
   local completion=$comparison_completion
   local preamble_path="/camouflage/index.html?scenario=browser_page"
   preamble_path+="&size=262144&count=4&idle_ms=5000&completion=$completion"
+  if [[ $arm == tree-native-parser-resource-committed-page ]]; then
+    preamble_path="/camouflage/index.html?scenario=fronting_page_dense&completion=$completion"
+  fi
   local config="$capture_dir/decrypted-$arm-config.json"
   local socks_port
   socks_port=$(python3 -c \
@@ -936,6 +947,7 @@ EOF
         $arm == document-native-cache-open ||
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
+        $arm == tree-native-parser-resource-committed-page ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
         $arm == tree-native-parser-document-start-response-stop-css ||
@@ -956,6 +968,7 @@ EOF
   fi
   if [[ $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
+        $arm == tree-native-parser-resource-committed-page ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
         $arm == tree-native-parser-document-start-response-stop-css ||
@@ -990,6 +1003,9 @@ EOF
   elif [[ $arm == tree-resource-native-cache-committed-overlap ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble resource-native-cache-committed-overlap drain=complete completed_resources=1 cache_new=1 protocol=h3$'
+  elif [[ $arm == tree-native-parser-resource-committed-page ]]; then
+    wait_for_log "$naivefox_pid" "$log" \
+      ' preamble native-parser-resource-tree drain=complete completed_resources=6 http=2[0-9][0-9] protocol=h3$'
   elif [[ $arm == tree-native-parser-document-start-navigation-stop-css ]]; then
     wait_for_log "$naivefox_pid" "$log" \
       ' preamble native-parser-document-start-navigation-stop drain=complete root_done=1 css_committed=1 css_aborted=1 http=2[0-9][0-9] protocol=h3$'
@@ -1073,6 +1089,7 @@ EOF
         $arm == tree-resource-committed-overlap-css ||
         $arm == tree-resource-native-cache-committed-overlap ||
         $arm == tree-native-parser-preload-overlap-css ||
+        $arm == tree-native-parser-resource-committed-page ||
         $arm == tree-native-parser-document-start-overlap-css ||
         $arm == tree-native-parser-document-start-navigation-stop-css ||
         $arm == tree-native-parser-document-start-response-stop-css ||
@@ -1099,6 +1116,7 @@ EOF
           $arm == tree-resource-committed-overlap-css ||
           $arm == tree-resource-native-cache-committed-overlap ||
           $arm == tree-native-parser-preload-overlap-css ||
+          $arm == tree-native-parser-resource-committed-page ||
           $arm == tree-native-parser-document-start-overlap-css ||
           $arm == tree-native-parser-document-start-navigation-stop-css ||
           $arm == tree-native-parser-document-start-response-stop-css ||
@@ -1146,6 +1164,31 @@ EOF
       rg -q 'h3.native_resource_cache_open action=callback .* new=1 status=00000000' "$lifecycle_log"
       rg -q 'h3.native_resource_cache_open action=trigger-network .* cache_new=1' "$lifecycle_log"
       ! rg -q 'h3.native_resource_cache_open action=contract-failed' "$lifecycle_log"
+    elif [[ $arm == tree-native-parser-resource-committed-page ]]; then
+      python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" <<'PY'
+import importlib.util
+import sys
+
+module_path, log_path = sys.argv[1:]
+spec = importlib.util.spec_from_file_location(
+    "camouflage_sample_validation", module_path
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+with open(log_path, encoding="utf-8", errors="replace") as stream:
+    module.validate_sample(
+        "tree-native-parser-resource-committed-page",
+        "h3",
+        stream.read(),
+        {
+            "protocol": "h3",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        },
+    )
+PY
     elif [[ $arm == tree-native-parser-document-start-overlap-css ]]; then
       python3 - "$INTEGRATION_DIR/camouflage_sample_validation.py" "$log" <<'PY'
 import importlib.util

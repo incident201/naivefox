@@ -702,6 +702,11 @@ class ProxyPreambleOperation::Impl final {
   bool mRootDone = false;
   bool mRootCompletedSuccessfully = false;
   bool mBarrierFired = false;
+  bool mDocumentBarrierTaskDispatched = false;
+  bool mFirstResourceBodyBufferConsumed = false;
+  bool mDocumentRootStopDeferred = false;
+  nsresult mDocumentRootStopStatus = NS_OK;
+  bool mDeferredImageOpenDispatched = false;
   bool mFinishedFired = false;
   bool mConnectHandoffAdmitted = false;
   bool mTunnelApplicationActive = false;
@@ -1109,7 +1114,7 @@ nsresult ProxyPreambleOperation::NotifyTunnelApplicationActive() {
 nsresult ProxyPreambleOperation::NotifyTunnelServerApplicationActive() {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mConfig.mMode !=
-      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+          PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     return NS_OK;
   }
   if (mImpl->mCancelled || mImpl->mFinishedFired) {
@@ -1274,9 +1279,9 @@ nsresult ProxyPreambleOperation::Start(
                 PreambleMode::TreeNativeParserDocumentStartResourceTree ||
             aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartNavigationStop))) ||
-        aConfig.mMaxAssets !=
-            (PreambleModeUsesNativeParserResourceTree(aConfig.mMode) ? 3U
-                                                                     : 1U) ||
+        (PreambleModeUsesNativeParserResourceTree(aConfig.mMode)
+             ? (aConfig.mMaxAssets != 3U && aConfig.mMaxAssets != 6U)
+             : aConfig.mMaxAssets != 1U) ||
         !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -1365,7 +1370,7 @@ nsresult ProxyPreambleOperation::Start(
           aContentPolicyType != nsIContentPolicy::TYPE_DOCUMENT) {
         return NS_ERROR_INVALID_ARG;
       }
-      MOZ_TRY(internal->SetProxyPreambleWaitForHandshakeConfirmation());
+      MOZ_TRY(internal->SetProxyPreambleHandshakeDwell(16));
     }
     MOZ_TRY(internal->SetDocumentURI(aUri));
     MOZ_TRY(channel->SetLoadGroup(mImpl->mLoadGroup));
@@ -1403,6 +1408,7 @@ nsresult ProxyPreambleOperation::Start(
     stream.mRequest = channel;
     RefPtr<StreamListener> listener = new StreamListener(this, aStreamId);
     if ((mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
+         mImpl->mConfig.mMode == PreambleMode::DocumentStartTaskOverlap ||
          PreambleModeUsesNativeParserDocumentStart(mImpl->mConfig.mMode)) &&
         aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
       MOZ_TRY(channel->SetNotificationCallbacks(listener));
@@ -1424,6 +1430,14 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length() ||
       !SameCOMIdentity(mImpl->mStreams[aStreamId].mRequest, aRequest)) {
+    return;
+  }
+  if (mImpl->mConfig.mMode == PreambleMode::DocumentStartTaskOverlap &&
+      aStreamId == 0) {
+    nsresult dispatchRv = DispatchDocumentBarrierTask();
+    if (NS_FAILED(dispatchRv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
+      mImpl->mFirstFailure = dispatchRv;
+    }
     return;
   }
   if ((mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
@@ -1471,6 +1485,12 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
           "Preamble native-parser-resource-tree lifecycle=resource-committed "
           "stream=%u status=waiting-for protocol=%s\n",
           aStreamId, ProtocolName(mImpl->mProtocol));
+      if (mImpl->mConfig.mMode ==
+              PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+          mImpl->mNativeParserResourceDescriptorsAccepted ==
+              mImpl->mConfig.mMaxAssets) {
+        MaybeFireBarrier();
+      }
       return;
     }
     if (aStreamId != 1 || mImpl->mStreams.Length() != 2 ||
@@ -1509,6 +1529,39 @@ void ProxyPreambleOperation::OnRequestCommitted(uint32_t aStreamId,
     }
     MaybeFireBarrier();
   }
+}
+
+nsresult ProxyPreambleOperation::DispatchDocumentBarrierTask() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mDocumentBarrierTaskDispatched || mImpl->mBarrierFired) {
+    return NS_OK;
+  }
+  mImpl->mDocumentBarrierTaskDispatched = true;
+  if (mImpl->mConfig.mMaxAssets == 6) {
+    if (mImpl->mConfig.mMode ==
+        PreambleMode::TreeResourceCommittedOverlap) {
+      RuntimeLogEvent(
+          "Preamble resource-committed-overlap barrier=task-dispatched "
+          "assets=6 protocol=%s\n",
+          ProtocolName(mImpl->mProtocol));
+    }
+  }
+  RefPtr self = this;
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "NaiveFox::DocumentBarrierTask", [self]() {
+        if (!self->mImpl->mCancelled) {
+          self->FireBarrierCallback();
+        }
+        if (self->mImpl->mDocumentRootStopDeferred) {
+          const nsresult stopStatus = self->mImpl->mDocumentRootStopStatus;
+          self->mImpl->mDocumentRootStopDeferred = false;
+          self->OnStopRequest(0, stopStatus);
+        }
+      }));
+  if (NS_FAILED(rv)) {
+    mImpl->mDocumentBarrierTaskDispatched = false;
+  }
+  return rv;
 }
 
 nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
@@ -1729,6 +1782,16 @@ nsresult ProxyPreambleOperation::OnStartRequest(uint32_t aStreamId,
       }
       return NS_OK;
     }
+  }
+  if (aStreamId == 0 &&
+      mImpl->mConfig.mMode == PreambleMode::DocumentHeadersTaskOverlap &&
+      stream.mResponseHeadersReceived && stream.mHttpStatus >= 200 &&
+      stream.mHttpStatus < 300) {
+    nsresult dispatchRv = DispatchDocumentBarrierTask();
+    if (NS_FAILED(dispatchRv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
+      mImpl->mFirstFailure = dispatchRv;
+    }
+    return dispatchRv;
   }
   MaybeFireBarrier();
   return rv;
@@ -3005,22 +3068,79 @@ nsresult ProxyPreambleOperation::OpenNativeParserResource(
   mImpl->mDiscoveredSpecs.AppendElement(spec);
   RefPtr<StreamListener> listener = new StreamListener(this, streamId);
   MOZ_TRY(channel->SetNotificationCallbacks(listener));
-  nsresult rv = channel->AsyncOpen(listener);
-  if (NS_FAILED(rv)) {
-    mImpl->mDiscoveredSpecs.RemoveLastElement();
-    mImpl->mStreams.RemoveLastElement();
-    return rv;
+  const bool deferImageToNextMainTurn =
+      resourceKind == NativeParserResourceKind::Image &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      mImpl->mConfig.mMaxAssets == 6;
+  if (deferImageToNextMainTurn) {
+    stream.mPendingOpenListener = listener;
+    if (!mImpl->mDeferredImageOpenDispatched) {
+      mImpl->mDeferredImageOpenDispatched = true;
+      RefPtr self = this;
+      nsresult dispatchRv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+          "NaiveFox::ReleaseDeferredNativeParserImages",
+          [self] { self->ReleaseDeferredNativeParserImages(); }));
+      if (NS_FAILED(dispatchRv)) {
+        mImpl->mDeferredImageOpenDispatched = false;
+        mImpl->mDiscoveredSpecs.RemoveLastElement();
+        mImpl->mStreams.RemoveLastElement();
+        return dispatchRv;
+      }
+    }
+  } else {
+    nsresult rv = channel->AsyncOpen(listener);
+    if (NS_FAILED(rv)) {
+      mImpl->mDiscoveredSpecs.RemoveLastElement();
+      mImpl->mStreams.RemoveLastElement();
+      return rv;
+    }
   }
   ++mImpl->mNativeParserResourceDescriptorsAccepted;
   RuntimeLogEvent(
-      "Preamble native-parser-resource-tree lifecycle=resource-opened "
+      "Preamble native-parser-resource-tree lifecycle=resource-%s "
       "stream=%u kind=%s referrer=inherited protocol=%s\n",
-      streamId,
+      deferImageToNextMainTurn ? "prepared" : "opened", streamId,
       resourceKind == NativeParserResourceKind::Style    ? "style"
       : resourceKind == NativeParserResourceKind::Script ? "script"
                                                          : "image",
       ProtocolName(mImpl->mProtocol));
   return NS_OK;
+}
+
+void ProxyPreambleOperation::ReleaseDeferredNativeParserImages() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mCancelled || mImpl->mNativeParserContractFailed ||
+      mImpl->mConfig.mMode !=
+          PreambleMode::TreeNativeParserResourceCommittedOverlap ||
+      mImpl->mConfig.mMaxAssets != 6) {
+    return;
+  }
+  for (uint32_t streamId = 1; streamId < mImpl->mStreams.Length();
+       ++streamId) {
+    auto& stream = mImpl->mStreams[streamId];
+    if (!stream.mPendingOpenListener) {
+      continue;
+    }
+    nsCOMPtr<nsIChannel> channel = do_QueryInterface(stream.mRequest);
+    nsCOMPtr<nsIStreamListener> listener =
+        stream.mPendingOpenListener.forget();
+    if (!channel || !listener) {
+      FailNativeParserContract(NS_ERROR_UNEXPECTED,
+                               "deferred-image-open-invalid");
+      return;
+    }
+    nsresult rv = channel->AsyncOpen(listener);
+    if (NS_FAILED(rv)) {
+      FailNativeParserContract(rv, "deferred-image-open-failed");
+      return;
+    }
+    RuntimeLogEvent(
+        "Preamble native-parser-resource-tree "
+        "lifecycle=deferred-resource-opened stream=%u kind=image "
+        "cause=next-main-turn protocol=%s\n",
+        streamId, ProtocolName(mImpl->mProtocol));
+  }
 }
 
 nsresult ProxyPreambleOperation::OpenNativeParserStylesheet(
@@ -3541,6 +3661,53 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
     mImpl->mBodyBytes += read;
   }
 
+  if (aStreamId > 0 &&
+      mImpl->mConfig.mMode ==
+          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      mImpl->mConfig.mMaxAssets == 6 &&
+      !mImpl->mFirstResourceBodyBufferConsumed &&
+      mImpl->mStreams[aStreamId].mResponseHeadersReceived &&
+      mImpl->mStreams[aStreamId].mHttpStatus >= 200 &&
+      mImpl->mStreams[aStreamId].mHttpStatus < 300 &&
+      !mImpl->mStreams[aStreamId].mDone) {
+    // This is actual response progress, not a byte threshold: the complete
+    // first Necko-delivered resource buffer must be consumed successfully.
+    mImpl->mFirstResourceBodyBufferConsumed = true;
+    RuntimeLogEvent(
+        "Preamble native-parser-resource-tree "
+        "lifecycle=first-resource-body-buffer-consumed stream=%u "
+        "protocol=%s\n",
+        aStreamId, ProtocolName(mImpl->mProtocol));
+    MaybeFireBarrier();
+  }
+
+  if (aStreamId == 0 &&
+      (mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferOverlap ||
+       mImpl->mConfig.mMode ==
+           PreambleMode::DocumentFirstBufferTaskOverlap) &&
+      !mImpl->mBarrierFired &&
+      mImpl->mStreams[0].mResponseHeadersReceived &&
+      mImpl->mStreams[0].mHttpStatus >= 200 &&
+      mImpl->mStreams[0].mHttpStatus < 300 && !mImpl->mStreams[0].mDone) {
+    // Admit only after the complete first Necko-delivered body buffer was
+    // consumed successfully.  This is a channel event, not a byte threshold:
+    // a short read or failed buffer never releases CONNECT.
+    if (mImpl->mConfig.mMode ==
+        PreambleMode::DocumentFirstBufferTaskOverlap) {
+      if (!mImpl->mDocumentBarrierTaskDispatched) {
+        nsresult dispatchRv = DispatchDocumentBarrierTask();
+        if (NS_FAILED(dispatchRv)) {
+          if (NS_SUCCEEDED(mImpl->mFirstFailure)) {
+            mImpl->mFirstFailure = dispatchRv;
+          }
+          return dispatchRv;
+        }
+      }
+    } else {
+      FireBarrierCallback();
+    }
+  }
+
   if (aStreamId == 0 && PreambleModeUsesNativeParser(mImpl->mConfig.mMode)) {
     if (mImpl->mNativeParserContractFailed) {
       return NS_ERROR_UNEXPECTED;
@@ -3583,7 +3750,11 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
       mImpl->mConfig.mMode == PreambleMode::DocumentNativeCacheOpen ||
       mImpl->mConfig.mMode == PreambleMode::DocumentHandshakeConfirmed ||
       mImpl->mConfig.mMode == PreambleMode::DocumentOverlap ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentHeadersTaskOverlap ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferOverlap ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferTaskOverlap ||
       mImpl->mConfig.mMode == PreambleMode::DocumentStartOverlap ||
+      mImpl->mConfig.mMode == PreambleMode::DocumentStartTaskOverlap ||
       mImpl->mStreams.Length() - 1 >= mImpl->mConfig.mMaxAssets) {
     return NS_OK;
   }
@@ -3777,6 +3948,22 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   if (mImpl->mCancelled || aStreamId >= mImpl->mStreams.Length()) {
     return;
   }
+  if (aStreamId == 0 &&
+      (mImpl->mConfig.mMode == PreambleMode::DocumentHeadersTaskOverlap ||
+       mImpl->mConfig.mMode ==
+           PreambleMode::DocumentFirstBufferTaskOverlap ||
+       mImpl->mConfig.mMode == PreambleMode::DocumentStartTaskOverlap) &&
+      mImpl->mDocumentBarrierTaskDispatched && !mImpl->mBarrierFired &&
+      !mImpl->mDocumentRootStopDeferred) {
+    // Some channel implementations deliver the terminal callback
+    // synchronously after the successful response event that queued the
+    // barrier. Keep the channel itself running, but defer terminal bookkeeping
+    // until that task. This preserves the boundary without imposing
+    // Suspend/Resume backpressure on the root response.
+    mImpl->mDocumentRootStopDeferred = true;
+    mImpl->mDocumentRootStopStatus = aStatus;
+    return;
+  }
   if (aStreamId == 1 && mImpl->mNativeStyleActivationRequestId) {
     NativeStylePreloadActivation::CompleteStyle(
         mImpl->mNativeStyleActivationRequestId, aStatus);
@@ -3967,6 +4154,9 @@ void ProxyPreambleOperation::FireBarrierCallback(bool aTerminalFallback) {
 
 void ProxyPreambleOperation::MaybeFireBarrier() {
   MOZ_ASSERT(NS_IsMainThread());
+  if (mImpl->mBarrierFired) {
+    return;
+  }
   const uint32_t assetCount =
       mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams.Length() - 1;
   const bool rootResponseAccepted =
@@ -3994,6 +4184,31 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
       assetsCommitted, mImpl->mRootCompletedSuccessfully,
       nativeCacheNewResources, mImpl->mNativeParserFinished);
   if (barrierReached) {
+    if (mImpl->mConfig.mMode ==
+            PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+        mImpl->mConfig.mMaxAssets == 6) {
+      if (!mImpl->mFirstResourceBodyBufferConsumed) {
+        return;
+      }
+      RuntimeLogEvent(
+          "Preamble native-parser-resource-tree "
+          "barrier=first-resource-body-buffer assets=6 committed=6 "
+          "protocol=%s\n",
+          ProtocolName(mImpl->mProtocol));
+      FireBarrierCallback();
+      return;
+    }
+    if (mImpl->mConfig.mMode ==
+            PreambleMode::TreeResourceCommittedOverlap &&
+        mImpl->mConfig.mMaxAssets == 6) {
+      if (!mImpl->mDocumentBarrierTaskDispatched) {
+        nsresult dispatchRv = DispatchDocumentBarrierTask();
+        if (NS_FAILED(dispatchRv) && NS_SUCCEEDED(mImpl->mFirstFailure)) {
+          mImpl->mFirstFailure = dispatchRv;
+        }
+      }
+      return;
+    }
     FireBarrierCallback();
   }
 }

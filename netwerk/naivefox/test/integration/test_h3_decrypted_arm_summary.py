@@ -18,6 +18,16 @@ PRIVATE_SEMANTIC_MARKER = "private-tree-authority.invalid"
 
 
 class H3DecryptedArmSummaryTests(unittest.TestCase):
+    def test_dense_resource_page_requires_six_asset_responses(self):
+        self.assertEqual(
+            summary.expected_tree_asset_count(
+                "tree-native-parser-resource-committed-page"
+            ),
+            6,
+        )
+        self.assertEqual(summary.expected_tree_asset_count("tree-overlap"), 2)
+        self.assertEqual(summary.expected_tree_asset_count("tree-complete-css"), 1)
+
     def test_cold_winner_lifecycle_requires_exact_single_proxy_handoff(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / (

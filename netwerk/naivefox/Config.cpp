@@ -456,6 +456,13 @@ class JsonParser final {
     if (!sawPreamble) {
       bool hasExplicitH2Proxy = false;
       bool hasExplicitH3Proxy = false;
+      bool hasOnlySocksListeners = true;
+      for (const auto& listener : parsed.mListeners) {
+        if (listener.mType != ListenerType::Socks5) {
+          hasOnlySocksListeners = false;
+          break;
+        }
+      }
       for (const auto& proxy : parsed.mProxies) {
         if (proxy.mProtocol == ProxyProtocol::H2) {
           hasExplicitH2Proxy = true;
@@ -464,19 +471,32 @@ class JsonParser final {
         }
       }
       if (hasExplicitH2Proxy || hasExplicitH3Proxy) {
-        // Promote the same cold document-start lifecycle that passed the
-        // same-base H2 and H3 screens. Explicit preamble and gate fields
-        // remain authoritative.
+        // SOCKS-only H2 uses the next-task first-buffer boundary that improved
+        // both packets 17--32 and whole flow in the final paired campaign.
+        // HTTP CONNECT and mixed listeners retain direct first-buffer
+        // admission for H2 and document-start admission for H3.  SOCKS-only
+        // H3 uses the retained six-resource native-parser policy.  Explicit
+        // preamble and gate fields remain authoritative.
         if (hasExplicitH2Proxy) {
-          parsed.mPreamble.mH2Mode = Some(PreambleMode::DocumentStartOverlap);
+          parsed.mPreamble.mH2Mode = Some(
+              hasOnlySocksListeners
+                  ? PreambleMode::DocumentFirstBufferTaskOverlap
+                  : PreambleMode::DocumentFirstBufferOverlap);
         }
         if (hasExplicitH3Proxy) {
-          parsed.mPreamble.mH3Mode = Some(PreambleMode::DocumentStartOverlap);
+          parsed.mPreamble.mH3Mode = Some(
+              hasOnlySocksListeners
+                  ? PreambleMode::TreeNativeParserResourceCommittedOverlap
+                  : PreambleMode::DocumentStartOverlap);
         }
         parsed.mPreamble.mPath.AssignLiteral("/");
-        parsed.mPreamble.mMaxAssets = 0;
-        parsed.mPreamble.mMaxBytes = PreambleConfig::kDefaultDocumentMaxBytes;
-        parsed.mPreamble.mCacheResources = false;
+        const bool usesH3ResourceDefault =
+            hasExplicitH3Proxy && hasOnlySocksListeners;
+        parsed.mPreamble.mMaxAssets = usesH3ResourceDefault ? 6 : 0;
+        parsed.mPreamble.mMaxBytes =
+            usesH3ResourceDefault ? PreambleConfig::kMaximumBytes
+                                  : PreambleConfig::kDefaultDocumentMaxBytes;
+        parsed.mPreamble.mCacheResources = usesH3ResourceDefault;
         parsed.mImplicitPreambleGate = !sawOuterSessionGate;
       }
     }
@@ -603,8 +623,16 @@ class JsonParser final {
         aMode = PreambleMode::DocumentHandshakeConfirmed;
       } else if (mode.EqualsLiteral("document-overlap")) {
         aMode = PreambleMode::DocumentOverlap;
+      } else if (mode.EqualsLiteral("document-headers-task-overlap")) {
+        aMode = PreambleMode::DocumentHeadersTaskOverlap;
+      } else if (mode.EqualsLiteral("document-first-buffer-overlap")) {
+        aMode = PreambleMode::DocumentFirstBufferOverlap;
+      } else if (mode.EqualsLiteral("document-first-buffer-task-overlap")) {
+        aMode = PreambleMode::DocumentFirstBufferTaskOverlap;
       } else if (mode.EqualsLiteral("document-start-overlap")) {
         aMode = PreambleMode::DocumentStartOverlap;
+      } else if (mode.EqualsLiteral("document-start-task-overlap")) {
+        aMode = PreambleMode::DocumentStartTaskOverlap;
       } else if (mode.EqualsLiteral("tree-complete") ||
                  mode.EqualsLiteral("tree")) {
         aMode = PreambleMode::TreeComplete;
@@ -627,6 +655,9 @@ class JsonParser final {
       } else if (mode.EqualsLiteral(
                      "tree-native-parser-document-start-resource-tree")) {
         aMode = PreambleMode::TreeNativeParserDocumentStartResourceTree;
+      } else if (mode.EqualsLiteral(
+                     "tree-native-parser-resource-committed-overlap")) {
+        aMode = PreambleMode::TreeNativeParserResourceCommittedOverlap;
       } else if (mode.EqualsLiteral(
                      "tree-native-parser-document-start-navigation-stop")) {
         aMode = PreambleMode::TreeNativeParserDocumentStartNavigationStop;
@@ -807,6 +838,33 @@ class JsonParser final {
           "tree-native-parser-document-start-overlap must be selected "
           "explicitly with h2-mode");
     }
+    if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(
+                                  PreambleMode::
+                                      TreeNativeParserDocumentStartResourceTree))) {
+      return Error(
+          "tree-native-parser-document-start-resource-tree must be selected "
+          "explicitly with h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode != Some(
+                                  PreambleMode::
+                                      TreeNativeParserDocumentStartResourceTree))) {
+      return Error(
+          "tree-native-parser-document-start-resource-tree must be selected "
+          "explicitly with h2-mode");
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+        (!sawH3Mode ||
+         aPreamble.mH3Mode != Some(
+                                  PreambleMode::
+                                      TreeNativeParserResourceCommittedOverlap))) {
+      return Error(
+          "tree-native-parser-resource-committed-overlap must be selected "
+          "explicitly with h3-mode");
+    }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
         (!sawH3Mode ||
          aPreamble.mH3Mode !=
@@ -918,9 +976,9 @@ class JsonParser final {
       aPreamble.mMaxAssets = 2;
     }
     if (h3Mode == PreambleMode::TreeResourceCommittedOverlap &&
-        aPreamble.mMaxAssets != 1) {
+        (aPreamble.mMaxAssets == 0 || aPreamble.mMaxAssets > 6)) {
       return Error(
-          "tree-resource-committed-overlap requires exactly one asset");
+          "tree-resource-committed-overlap requires one to six assets");
     }
     if (h3Mode == PreambleMode::TreeResourceNativeCacheCommittedOverlap) {
       if (aPreamble.mMaxAssets != 1) {
@@ -968,6 +1026,18 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-start-resource-tree requires "
+          "cache-resources=true");
+      }
+    }
+    if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+      if (aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 6) {
+        return Error(
+            "tree-native-parser-resource-committed-overlap requires exactly "
+            "three or six assets");
+      }
+      if (!aPreamble.mCacheResources) {
+        return Error(
+            "tree-native-parser-resource-committed-overlap requires "
             "cache-resources=true");
       }
     }
