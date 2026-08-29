@@ -523,6 +523,17 @@ class CamouflageHarnessTests(unittest.TestCase):
             rows, expected_blocks=1, arms=(control, treatment)
         )
 
+    def test_feature_extractor_accepts_every_superblock_arm(self):
+        path = os.path.join(HERE, "camouflage_features.py")
+        result = subprocess.run(
+            [sys.executable, path, "extract", "--help"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for arm in SUPERBLOCKS.SUPPORTED_ARMS:
+            self.assertIn(arm, result.stdout)
+
     def test_resource_tree_config_and_lifecycle_are_fail_closed(self):
         arm = "tree-native-parser-document-start-resource-tree"
         config = CONFIG.build_config(
