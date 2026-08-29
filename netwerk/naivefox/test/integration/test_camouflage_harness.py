@@ -2144,6 +2144,94 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(f"/camouflage/api?size=1024&nav={token}", page)
         self.assertEqual(page.count(f"nav={token}"), 6)
 
+    def test_browser_page_early_hints_match_document_urls(self):
+        for mode, expected_count in (("css", 1), ("blocking", 2), ("all", 6)):
+            query = {"scenario": ["browser_page"], "early_hints": [mode]}
+            page = TARGET.Handler.camouflage_page(object(), query).decode()
+            links = TARGET.browser_page_early_hint_links(query)
+            self.assertEqual(len(links), expected_count)
+            for link in links:
+                url = link.split(">", 1)[0][1:]
+                self.assertIn(url, page)
+
+    def test_browser_page_rejects_unknown_early_hints_mode(self):
+        self.assertIsNone(
+            TARGET.browser_page_early_hint_links(
+                {"scenario": ["browser_page"], "early_hints": ["invalid"]}
+            )
+        )
+        self.assertIsNone(
+            TARGET.browser_page_early_hint_links(
+                {"scenario": ["initial"], "early_hints": ["css"]}
+            )
+        )
+
+    def test_outer_early_hints_cli_is_bounded_and_h2_browser_only(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-early-hints",
+                    "invalid",
+                ],
+                "must be none, css, blocking, or all",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h3",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-early-hints",
+                    "css",
+                ],
+                "requires --protocol h2 --scenario browser_page",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "initial",
+                    "--outer-early-hints",
+                    "css",
+                ],
+                "requires --protocol h2 --scenario browser_page",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
+    def test_browser_page_emits_early_hints_before_final_response(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = (
+            "/camouflage/index.html?scenario=browser_page&early_hints=blocking"
+        )
+        handler.headers = {}
+        handler.send_response_only = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.wfile = mock.Mock()
+        handler.send_bytes = mock.Mock()
+
+        TARGET.Handler.do_GET(handler)
+
+        handler.send_response_only.assert_called_once_with(103)
+        self.assertEqual(handler.send_header.call_count, 2)
+        handler.end_headers.assert_called_once_with()
+        handler.wfile.flush.assert_called_once_with()
+        handler.send_bytes.assert_called_once()
+
     def test_browser_page_rejects_invalid_navigation_token(self):
         page = TARGET.Handler.camouflage_page(
             object(), {"scenario": ["browser_page"], "nav": ["../bad"]}
