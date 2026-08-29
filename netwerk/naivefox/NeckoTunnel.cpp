@@ -658,7 +658,6 @@ class ProxyPreambleOperation::Impl final {
     bool mResponseHeadersReceived = false;
     bool mRequestCommitted = false;
     bool mNativeCacheNewEntry = false;
-    bool mTargetResponseStopSelected = false;
     uint64_t mNativeProcessStyleRequestId = 0;
     bool mDone = false;
   };
@@ -738,7 +737,6 @@ class ProxyPreambleOperation::Impl final {
   bool mNativeParserRootSuspended = false;
   bool mNativeParserFirstFeedLogged = false;
   uint32_t mCompletedSuccessfulResources = 0;
-  uint32_t mTargetResponseStoppedResources = 0;
 };
 
 class ProxyPreambleOperation::StreamListener final
@@ -1115,14 +1113,8 @@ nsresult ProxyPreambleOperation::NotifyTunnelApplicationActive() {
 
 nsresult ProxyPreambleOperation::NotifyTunnelServerApplicationActive() {
   MOZ_ASSERT(NS_IsMainThread());
-  const bool responseStopStyle =
-      mImpl->mConfig.mMode ==
-      PreambleMode::TreeNativeParserDocumentStartResponseStop;
-  const bool responseStopPage =
-      mImpl->mConfig.mMode ==
-          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
-      mImpl->mConfig.mMaxAssets == 6;
-  if (!responseStopStyle && !responseStopPage) {
+  if (mImpl->mConfig.mMode !=
+          PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     return NS_OK;
   }
   if (mImpl->mCancelled || mImpl->mFinishedFired) {
@@ -1131,7 +1123,7 @@ nsresult ProxyPreambleOperation::NotifyTunnelServerApplicationActive() {
   if (mImpl->mTunnelServerApplicationActive) {
     return NS_OK;
   }
-  if (responseStopStyle && mImpl->mStreams.Length() == 2 &&
+  if (mImpl->mStreams.Length() == 2 &&
       (mImpl->mStreams[1].mDone || !mImpl->mStreams[1].mRequest)) {
     // Target activity that arrives after the synthetic stylesheet has already
     // completed cannot cause a response-scoped stop. Keep that outcome a
@@ -1140,40 +1132,6 @@ nsresult ProxyPreambleOperation::NotifyTunnelServerApplicationActive() {
     return NS_OK;
   }
   mImpl->mTunnelServerApplicationActive = true;
-  if (responseStopPage) {
-    uint32_t selected = 0;
-    for (uint32_t streamId = 1; streamId < mImpl->mStreams.Length();
-         ++streamId) {
-      auto& stream = mImpl->mStreams[streamId];
-      if (stream.mDone || !stream.mRequest ||
-          !stream.mResponseHeadersReceived || stream.mHttpStatus < 200 ||
-          stream.mHttpStatus >= 300) {
-        continue;
-      }
-      stream.mTargetResponseStopSelected = true;
-      ++selected;
-    }
-    if (!selected) {
-      mImpl->mTunnelServerApplicationActive = false;
-      return NS_OK;
-    }
-    RuntimeLogEvent(
-        "Connection %llu preamble native-parser-resource-tree "
-        "phase=target-response-stop-selected active_resources=%u "
-        "direction=target-to-client bytes_positive=1 protocol=h3\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId), selected);
-    for (uint32_t streamId = 1; streamId < mImpl->mStreams.Length();
-         ++streamId) {
-      auto& stream = mImpl->mStreams[streamId];
-      if (stream.mTargetResponseStopSelected && stream.mRequest) {
-        nsresult rv = stream.mRequest->Cancel(NS_BINDING_ABORTED);
-        if (NS_FAILED(rv)) {
-          return rv;
-        }
-      }
-    }
-    return NS_OK;
-  }
   RuntimeLogEvent(
       "Connection %llu preamble "
       "native-parser-document-start-response-stop "
@@ -4093,13 +4051,6 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
           mImpl->mConnectHandoffAdmitted, mImpl->mTunnelApplicationActive,
           mImpl->mTunnelServerApplicationActive, mImpl->mNavigationStopIssued,
           aStatus);
-  const bool expectedTargetResponseStopAbort =
-      aStreamId > 0 &&
-      mImpl->mConfig.mMode ==
-          PreambleMode::TreeNativeParserResourceCommittedOverlap &&
-      mImpl->mConfig.mMaxAssets == 6 &&
-      mImpl->mTunnelServerApplicationActive &&
-      stream.mTargetResponseStopSelected && aStatus == NS_BINDING_ABORTED;
   if (expectedNavigationStopStyleAbort) {
     mImpl->mNavigationStopStyleAborted = true;
     RuntimeLogEvent(
@@ -4113,19 +4064,11 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
             ? "native-parser-document-start-response-stop"
             : "native-parser-document-start-navigation-stop",
         ProtocolName(mImpl->mProtocol));
-  } else if (expectedTargetResponseStopAbort) {
-    ++mImpl->mTargetResponseStoppedResources;
-    RuntimeLogEvent(
-        "Preamble native-parser-resource-tree "
-        "lifecycle=target-response-stopped stream=%u "
-        "status=NS_BINDING_ABORTED expected=1 protocol=h3\n",
-        aStreamId);
   } else if (NS_FAILED(aStatus)) {
     mImpl->mAllStreamsCompletedNormally = false;
   }
   if (aStreamId > 0) {
-    if (!expectedNavigationStopStyleAbort &&
-        !expectedTargetResponseStopAbort) {
+    if (!expectedNavigationStopStyleAbort) {
       const bool resourceSucceeded =
           detail::PreambleResourceCompletedSuccessfully(
               stream.mResponseHeadersReceived, stream.mHttpStatus, aStatus);
@@ -4309,7 +4252,6 @@ void ProxyPreambleOperation::MaybeFinish() {
           mImpl->mStreams.IsEmpty() ? 0 : mImpl->mStreams[0].mHttpStatus;
       callback({mImpl->mFirstFailure, rootStatus, mImpl->mBodyBytes,
                 mImpl->mCompletedSuccessfulResources,
-                mImpl->mTargetResponseStoppedResources,
                 [&]() {
                   uint32_t count = 0;
                   for (uint32_t index = 1; index < mImpl->mStreams.Length();

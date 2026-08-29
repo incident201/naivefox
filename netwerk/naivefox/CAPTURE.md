@@ -1148,6 +1148,7 @@ independent seeds.
 | `cdf15c6b3cc11142` | request one-byte ranges for the four image-cover responses, shaped link | 1 | 0.20619 / 0.47585 / 0.23629 / 0.20118 / 0.42462 |
 | `bfd151c6ae8b307f` | keep CONNECT admission, but delay local SOCKS success until a second resource progresses, shaped link | 1 | 0.12217 / 0.56947 / 0.24059 / 0.21827 / 0.38174 |
 | `6f3abdd953241f36` | promote CONNECT locally from generic `u=4` to default-wire `u=3`, shaped link | 1 | 0.28571 / 0.67590 / 0.35053 / 0.27983 / 0.44583 |
+| `6f32c2baf9c1115f` | stop still-active resource bodies on first positive target response, shaped link | 1 | 0.18774 / 0.43453 / 0.25554 / 0.27522 / 0.35880 |
 | `516a52ecdf7325fe` | request a one-byte range only for the largest, third image-cover response, shaped link | 1 | 0.20167 / 0.20686 / 0.21134 / 0.26134 / 0.38629 |
 | `3ccc3e566c17bf55` | preceding selective third-image Range request, shaped link | 4 | 0.13225 / 0.38692 / 0.17637 / 0.14720 / 0.36567 |
 | `b4404c4a0ed5af8f` | delay image activation by half the measured root request-to-response interval, shaped link | 1 | 0.11576 / 0.43308 / 0.18672 / 0.17680 / 0.37198 |
@@ -2036,6 +2037,28 @@ candidate for size/slow-link replication. The measured binary identified build
 ID `37f71f6fdd3b042e747ad79090e0041e` and libxul digest
 `024d7d4c9a4c8184a73e0a28236bcf888e04e97f2f9e02a6c31c600ca5ae53d7`.
 The preconstruction state and its temporary validator grammar were removed.
+
+Stopping only cover responses that were still active at the first positive
+target-to-client application payload is a safe no-op on the default shaped
+profile, not a whole-flow improvement. The causal rule deliberately avoided a
+timer: it selected only resource channels that already had successful 2xx
+response HEADERS and were still running, never pending or unopened requests.
+Small or fast resources could finish normally, while a slow or silent target
+could not terminate cover traffic prematurely. One-block shaped artifact
+`6f32c2baf9c1115f` (seed `2026082935`) measured
+0.18774/0.43453/0.25554/0.27522/0.35880. Its sanitized terminal counters report
+one natural-completion sample, zero aborting samples, and zero stopped
+resources: all six cover bodies had completed before the target response. The
+whole-flow diagnostic consequently still reports about 724 KiB more server
+wire bytes than the matched Firefox midpoint, and packets 17--32 do not improve
+the retained candidate's replicated 0.29471. The binary identified build ID
+`37f71f6fdd3b042e747ad79090e0041e` and libxul digest
+`febfafdc94318190f98dd1f2a09164b43e5b32988f8839a7a6073f382c7152f4`.
+Moving this stop earlier would again make it depend on client request timing
+and repeat the already rejected response-cancellation family; waiting for the
+real target response is robust but too late to affect this workload. The stop
+state, callback, and validator grammar were removed rather than retained as
+unproductive product complexity.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and

@@ -688,7 +688,6 @@ void TunnelSession::BeginPreambleOnMain(uint64_t aGeneration,
             aFinalResult.mHttpStatus, aFinalResult.mBodyBytes,
             aFinalResult.mRootDone, aFinalResult.mCompletedNormally,
             aFinalResult.mCompletedSuccessfulResources,
-            aFinalResult.mTargetResponseStoppedResources,
             aFinalResult.mNativeCacheNewResources,
             aFinalResult.mNavigationStopStyleCommitted,
             aFinalResult.mNavigationStopStyleResponseStarted,
@@ -985,7 +984,6 @@ void TunnelSession::FinishPreambleOperationOnMain(
     uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
     uint32_t aHttpStatus, uint32_t aBodyBytes, bool aRootDone,
     bool aCompletedNormally, uint32_t aCompletedSuccessfulResources,
-    uint32_t aTargetResponseStoppedResources,
     uint32_t aNativeCacheNewResources, bool aNavigationStopStyleCommitted,
     bool aNavigationStopStyleResponseStarted,
     bool aNavigationStopStyleAborted) {
@@ -1004,14 +1002,9 @@ void TunnelSession::FinishPreambleOperationOnMain(
                               aHttpStatus < 300;
   const bool documentStartParserSucceeded =
       finalSucceeded && aCompletedSuccessfulResources == 1;
-  const bool targetResponseStoppedPage =
-      preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
-      mImpl->mConfig.mPreamble.mMaxAssets == 6;
   const bool resourceTreeSucceeded =
       finalSucceeded &&
-      aCompletedSuccessfulResources + aTargetResponseStoppedResources ==
-          mImpl->mConfig.mPreamble.mMaxAssets &&
-      (!aTargetResponseStoppedResources || targetResponseStoppedPage);
+      aCompletedSuccessfulResources == mImpl->mConfig.mPreamble.mMaxAssets;
   const bool navigationStopSucceeded =
       detail::PreambleNavigationStopCompletedSuccessfully(
           preambleMode, aRootDone, aCompletedNormally, aStatus, aHttpStatus,
@@ -1095,12 +1088,9 @@ void TunnelSession::FinishPreambleOperationOnMain(
       PreambleModeUsesNativeParserResourceTree(preambleMode)) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
-        "drain=complete completed_resources=%u aborted_resources=%u "
-        "terminated_resources=%u http=%u protocol=%s\n",
+        "drain=complete completed_resources=%u http=%u protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
-        aCompletedSuccessfulResources, aTargetResponseStoppedResources,
-        aCompletedSuccessfulResources + aTargetResponseStoppedResources,
-        aHttpStatus, ProtocolName(aProtocol));
+        aCompletedSuccessfulResources, aHttpStatus, ProtocolName(aProtocol));
   }
   if (navigationStopSucceeded &&
       preambleMode ==
@@ -1220,16 +1210,11 @@ void TunnelSession::TunnelApplicationActiveOnMain(uint64_t aGeneration,
 void TunnelSession::TunnelServerApplicationActiveOnMain(
     uint64_t aGeneration, ProxyProtocol aProtocol) {
   MOZ_ASSERT(NS_IsMainThread());
-  const PreambleMode preambleMode =
-      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol);
   if (mImpl->mCancelRequested.load(std::memory_order_acquire) ||
       !mImpl->mPreambleOperation ||
       mImpl->mPreambleOperationGeneration != aGeneration ||
-      (preambleMode !=
-           PreambleMode::TreeNativeParserDocumentStartResponseStop &&
-       (preambleMode !=
-            PreambleMode::TreeNativeParserResourceCommittedOverlap ||
-        mImpl->mConfig.mPreamble.mMaxAssets != 6))) {
+      mImpl->mConfig.mPreamble.ModeForProtocol(aProtocol) !=
+          PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     return;
   }
   nsresult rv =
@@ -1694,10 +1679,7 @@ nsresult TunnelSession::StartPump() {
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
   if (preambleMode ==
-          PreambleMode::TreeNativeParserDocumentStartResponseStop ||
-      (preambleMode ==
-           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
-       mImpl->mConfig.mPreamble.mMaxAssets == 6)) {
+      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,
                                      protocol = mImpl->mAttemptProtocol]() {

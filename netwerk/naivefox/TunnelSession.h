@@ -175,7 +175,6 @@ class TunnelSession final {
                                      uint32_t aHttpStatus, uint32_t aBodyBytes,
                                      bool aRootDone, bool aCompletedNormally,
                                      uint32_t aCompletedSuccessfulResources,
-                                     uint32_t aTargetResponseStoppedResources,
                                      uint32_t aNativeCacheNewResources,
                                      bool aNavigationStopStyleCommitted,
                                      bool aNavigationStopStyleResponseStarted,

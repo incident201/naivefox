@@ -60,7 +60,6 @@ struct ProxyPreambleFinalResult final {
   uint32_t mHttpStatus = 0;
   uint32_t mBodyBytes = 0;
   uint32_t mCompletedSuccessfulResources = 0;
-  uint32_t mTargetResponseStoppedResources = 0;
   uint32_t mNativeCacheNewResources = 0;
   bool mRootDone = false;
   bool mCompletedNormally = false;

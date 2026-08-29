@@ -839,9 +839,6 @@ cache_validated_participants=0
 inner_h2_validated_participants=0
 response_stop_aborted_samples=0
 response_stop_natural_completion_samples=0
-target_response_stop_aborted_samples=0
-target_response_stop_natural_completion_samples=0
-target_response_stopped_resources=0
 controller_backends="$private_dir/controller-backends.txt"
 cache_semantics_records="$private_dir/cache-semantics.txt"
 : >"$cache_semantics_records"
@@ -2252,11 +2249,7 @@ run_naivefox_sample() {
           $arm == tree-native-parser-resource-committed-page ]]; then
     local expected_resources=3
     [[ $arm == tree-native-parser-resource-committed-page ]] && expected_resources=6
-    if [[ $arm == tree-native-parser-resource-committed-page ]]; then
-      drain_pattern=" preamble native-parser-resource-tree drain=complete completed_resources=[0-6] aborted_resources=[0-6] terminated_resources=6 http=2[0-9][0-9] protocol=$protocol$"
-    else
-      drain_pattern=" preamble native-parser-resource-tree drain=complete completed_resources=$expected_resources aborted_resources=0 terminated_resources=$expected_resources http=2[0-9][0-9] protocol=$protocol$"
-    fi
+    drain_pattern=" preamble native-parser-resource-tree drain=complete completed_resources=$expected_resources http=2[0-9][0-9] protocol=$protocol$"
   elif [[ $arm == tree-native-parser-preload-overlap-css ||
           $arm == tree-native-parser-document-start-overlap-css ||
           $arm == tree-native-parser-document-handoff-overlap-css ||
@@ -2332,23 +2325,6 @@ run_naivefox_sample() {
       printf 'NaiveFox response-stop sample %s lacks a valid terminal branch\n' \
         "$session_id" >&2
       return 1
-    fi
-  fi
-  if [[ $arm == tree-native-parser-resource-committed-page ]]; then
-    local stopped_resources
-    stopped_resources=$(sed -n \
-      's/.* preamble native-parser-resource-tree drain=complete completed_resources=[0-6] aborted_resources=\([0-6]\) terminated_resources=6 http=2[0-9][0-9] protocol=h3$/\1/p' \
-      "$log" | tail -n 1)
-    if [[ -z $stopped_resources ]]; then
-      printf 'NaiveFox target-response-stop sample %s lacks a valid terminal count\n' \
-        "$session_id" >&2
-      return 1
-    fi
-    target_response_stopped_resources=$((target_response_stopped_resources + stopped_resources))
-    if ((stopped_resources > 0)); then
-      target_response_stop_aborted_samples=$((target_response_stop_aborted_samples + 1))
-    else
-      target_response_stop_natural_completion_samples=$((target_response_stop_natural_completion_samples + 1))
     fi
   fi
   stop_browser_controller
@@ -2918,9 +2894,6 @@ cache_capture_policy=$([[ $naivefox_arm == tree-warm-css-304 ]] && printf warm_t
 cache_validated_participants=$cache_validated_participants
 response_stop_aborted_samples=$response_stop_aborted_samples
 response_stop_natural_completion_samples=$response_stop_natural_completion_samples
-target_response_stop_aborted_samples=$target_response_stop_aborted_samples
-target_response_stop_natural_completion_samples=$target_response_stop_natural_completion_samples
-target_response_stopped_resources=$target_response_stopped_resources
 preamble_root_url_parity=$preamble_root_url_parity
 browser_controller_backends=$(sort -u "$controller_backends" | paste -sd, -)
 naivefox_browser_proxy_policy=fail_closed_pac_loopback_only

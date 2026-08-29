@@ -372,20 +372,7 @@ NATIVE_PARSER_RESOURCE_TREE_DRAIN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble native-parser-resource-tree drain=complete "
     r"completed_resources=(?P<completed_resources>\d+) "
-    r"(?:aborted_resources=(?P<aborted_resources>\d+) "
-    r"terminated_resources=(?P<terminated_resources>\d+) )?"
     r"http=(?P<http>\d+) protocol=(?P<protocol>h2|h3)$"
-)
-NATIVE_PARSER_RESOURCE_TREE_TARGET_STOP_SELECTED = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
-    r"preamble native-parser-resource-tree "
-    r"phase=target-response-stop-selected active_resources=(?P<active>\d+) "
-    r"direction=target-to-client bytes_positive=1 protocol=h3$"
-)
-NATIVE_PARSER_RESOURCE_TREE_TARGET_STOPPED = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Preamble native-parser-resource-tree "
-    r"lifecycle=target-response-stopped stream=(?P<stream>[1-6]) "
-    r"status=NS_BINDING_ABORTED expected=1 protocol=h3$"
 )
 ESTABLISHED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
@@ -1297,26 +1284,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         NATIVE_PARSER_RESOURCE_TREE_DRAIN.fullmatch(line)
         for line in native_resource_tree_drain_lines
     ]
-    native_resource_tree_target_stop_selected_lines = [
-        line
-        for line in log_lines
-        if " preamble native-parser-resource-tree "
-        "phase=target-response-stop-selected " in line
-    ]
-    parsed_native_resource_tree_target_stop_selected = [
-        NATIVE_PARSER_RESOURCE_TREE_TARGET_STOP_SELECTED.fullmatch(line)
-        for line in native_resource_tree_target_stop_selected_lines
-    ]
-    native_resource_tree_target_stopped_lines = [
-        line
-        for line in log_lines
-        if "Preamble native-parser-resource-tree "
-        "lifecycle=target-response-stopped " in line
-    ]
-    parsed_native_resource_tree_target_stopped = [
-        NATIVE_PARSER_RESOURCE_TREE_TARGET_STOPPED.fullmatch(line)
-        for line in native_resource_tree_target_stopped_lines
-    ]
     if any(
         marker is None
         for markers in (
@@ -1325,8 +1292,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             parsed_native_resource_tree_deferred_opens,
             parsed_native_resource_tree_commits,
             parsed_native_resource_tree_drains,
-            parsed_native_resource_tree_target_stop_selected,
-            parsed_native_resource_tree_target_stopped,
         )
         for marker in markers
     ):
@@ -2413,10 +2378,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 for marker in markers
             )
             or drain["connection"] != connection
-            or (
-                arm != "tree-native-parser-resource-committed-page"
-                and int(drain["completed_resources"]) != expected_resource_count
-            )
+            or int(drain["completed_resources"]) != expected_resource_count
             or drain["protocol"] != protocol
             or not 200 <= int(drain["http"]) < 300
             or result["connection"] != connection
@@ -2460,43 +2422,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             and result_index < established_index < drain_index
         )
         if arm == "tree-native-parser-resource-committed-page":
-            completed_resources = int(drain["completed_resources"])
-            aborted_resources = (
-                int(drain["aborted_resources"])
-                if drain["aborted_resources"] is not None
-                else -1
-            )
-            terminated_resources = (
-                int(drain["terminated_resources"])
-                if drain["terminated_resources"] is not None
-                else -1
-            )
-            stopped_streams = {
-                int(marker["stream"])
-                for marker in parsed_native_resource_tree_target_stopped
-            }
-            target_stop_valid = (
-                completed_resources + aborted_resources == 6
-                and terminated_resources == 6
-                and len(stopped_streams) == aborted_resources
-                and len(parsed_native_resource_tree_target_stopped)
-                == aborted_resources
-            )
-            if aborted_resources:
-                target_stop_valid = (
-                    target_stop_valid
-                    and len(parsed_native_resource_tree_target_stop_selected) == 1
-                    and parsed_native_resource_tree_target_stop_selected[0]["connection"]
-                    == connection
-                    and int(parsed_native_resource_tree_target_stop_selected[0]["active"])
-                    == aborted_resources
-                )
-            else:
-                target_stop_valid = (
-                    target_stop_valid
-                    and not parsed_native_resource_tree_target_stop_selected
-                    and not parsed_native_resource_tree_target_stopped
-                )
             first_body = parsed_native_resource_tree_first_bodies[0]
             first_body_stream = int(first_body["stream"])
             first_body_index = log_lines.index(
@@ -2529,8 +2454,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 )
             }
             resource_committed_order = (
-                target_stop_valid
-                and first_body["protocol"] == protocol
+                first_body["protocol"] == protocol
                 and first_body_stream in expected_resources
                 and native_resource_tree_body_barrier_lines[0].endswith(
                     "Preamble native-parser-resource-tree "
@@ -2552,20 +2476,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 and admission_index < result_index < established_index
                 and result_index < drain_index
             )
-            if aborted_resources:
-                target_stop_selected_index = log_lines.index(
-                    native_resource_tree_target_stop_selected_lines[0]
-                )
-                target_stopped_indices = [
-                    log_lines.index(line)
-                    for line in native_resource_tree_target_stopped_lines
-                ]
-                resource_committed_order = (
-                    resource_committed_order
-                    and established_index < target_stop_selected_index
-                    and target_stop_selected_index < min(target_stopped_indices)
-                    and max(target_stopped_indices) < drain_index
-                )
         if not (
             document_start_order
             if arm == "tree-native-parser-document-start-resource-tree"
