@@ -2374,6 +2374,90 @@ feature-extractor, and lifecycle-validator CLI registries. Those collections
 stopped fail-closed before analysis. The registries and a cross-registry parser
 test were fixed before either successful artifact above was collected.
 
+### H2 server and payload-framing follow-up
+
+A later H2 campaign kept the canonical browser-page workload, inner HTTPS/H2,
+same-base Firefox controls, MTU 1500, offload rejection, and isolated Linux
+network namespace, but screened changes to the document boundary and the
+Caddy/forwardproxy tunnel. Only packets 17--32 and whole were retained during
+these one- and two-block screens. They are mechanism diagnostics, not new
+dashboard rows or paired inference. The canonical H2 defaults and their
+published rows remain unchanged.
+
+The first HTTP-listener screen revisited next-main-thread-task admission after
+the non-suspending implementation had been completed. One-block artifact
+`0c0770517e13dc9c` ranked response-HEADERS plus one task best: packets 17--32
+and whole were `0.58977/0.34708`, versus `0.66674/0.40737` for direct
+first-buffer, `0.60401/0.39263` for first-buffer plus one task, and
+`0.65518/0.36600` for request-commit plus one task. The focused two-block
+replication `477043458740c175` did not reproduce the early result: direct
+first-buffer measured `0.48415/0.33816`, while HEADERS plus one task measured
+`0.51567/0.28978`. The large whole improvement is interesting, but the
+packets-17--32 direction is unstable. No default or extended run followed.
+
+Server-only candidates were then built from isolated forwardproxy source
+forks and installed only into the private fixture. Establishing the target TCP
+connection before returning `200 CONNECT` is causal and timer-free, but
+one-block artifact `d93ef627d2851497` was a clear rejection: SOCKS and HTTP
+measured `0.76902/0.41583` and `0.76899/0.37055`. Keeping the ordinary eight
+framed response records while forcing their server padding lengths to zero
+also failed in `556cd86759536f2f`: SOCKS measured `0.62161/0.31906` and HTTP
+`0.64853/0.30986`. Thus neither target-readiness ordering nor the random
+server padding bytes themselves explain the useful no-padding early shape.
+
+Earlier server framing diagnostics are retained here with the same caveat. A
+self-compensating TLS-flight alignment first deadlocked because it withheld a
+final write while waiting for a future target read; private artifact
+`7fa83b2ca397dc2` published no metrics. The corrected form repaid alignment
+debt only from bytes already queued on the target socket. One-block artifact
+`40509fc9a437ded0` measured SOCKS at `0.51330/0.31894`, but HTTP at
+`0.52996/0.31830`; the HTTP whole regression rejected a shared mechanism.
+Forcing the first eight server padding lengths to 255 was worse in
+`a348380e48c8c17e`: SOCKS was `0.53812/0.35133` and HTTP
+`0.64055/0.34906`. These forks were not installed as product dependencies.
+
+Complete H2 payload-padding removal was admitted only under the explicit
+fail-closed `NAIVEFOX_CAPTURE_EXPECT_PADDING=no` diagnostic condition. It is
+otherwise rejected by the harness, and it remains restricted to gate/smoke
+runs. Artifact `96e8e7354ee5ea05` produced the largest early change in this
+family: SOCKS measured `0.41146/0.33675` and HTTP `0.37249/0.31880`. The HTTP
+whole regression prevents promotion. The result nevertheless localized much
+of the packets-17--32 residual to the historical eight-record payload-framing
+phase rather than to a fixed Caddy resource size or delay.
+
+Because a jointly changed client and server was explicitly allowed for
+research, two incompatible directional variants decomposed that phase. Raw
+client-to-server with ordinary padded server-to-client records measured
+`0.37641/0.38446` for SOCKS and `0.46791/0.41060` for HTTP in
+`02d82188c376ca39`. The inverse measured `0.47376/0.40367` and
+`0.40755/0.34275` in `e98d177eb118ac30`. Both improved at least one early
+point estimate but made the flow directionally asymmetric and substantially
+worsened whole. Directional framing is therefore rejected.
+
+A final incompatible symmetric sweep shortened the framed phase while keeping
+the normal random padding distribution in both directions:
+
+| Initial framed records per direction | Safe artifact | SOCKS 17--32 / whole | HTTP 17--32 / whole |
+| ---: | --- | ---: | ---: |
+| 2 | `130419efd9b6390a` | 0.52067 / 0.41692 | 0.45217 / 0.35922 |
+| 4 | `a8e8a4e61187fe7d` | 0.45298 / 0.34698 | 0.47416 / 0.30469 |
+| 6 | `4401f010fe86411a` | 0.48939 / 0.29574 | 0.48971 / 0.26763 |
+| 6, fresh two-block replication | `4a16e9903f386398` | 0.42907 / 0.26369 | 0.41778 / 0.30528 |
+
+The six-record replication is the most balanced result, but relative to the
+canonical H2 rows it changes packets 17--32 by approximately 0% for SOCKS and
+2.5% for HTTP, improves SOCKS whole by about 4%, and worsens HTTP whole by
+about 18%. This is far below the product rule for an incompatible Caddy/client
+wire change: compatibility may be broken for a default only when a replicated
+candidate gives at least a 20% material improvement and does not introduce an
+unacceptable counter-regression. No candidate in this campaign meets that
+bar. The client record count, product source, incremental object directory,
+and fixture Caddy were restored to the canonical eight-record/stock state.
+Because the record boundary is driven by actual read calls, it is not a fixed
+timer or response-byte cutoff, but it can still vary with chunking and link
+conditions; size/link matrices would have been required after a strong result.
+They were deliberately not spent on these rejected screens.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
