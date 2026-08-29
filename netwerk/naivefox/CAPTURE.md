@@ -1159,6 +1159,7 @@ independent seeds.
 | `3500eb894d951e57` | demote only the first preamble-owned H3 CONNECT from generic `u=4` to `u=5`, shaped link | 1 | 0.25290 / 0.49920 / 0.28958 / 0.22799 / 0.47932 |
 | `7770ec81beea4b8a` | release prepared images after CSS and script request commits, shaped link | 1 | 0.28935 / 0.39986 / 0.29283 / 0.29333 / 0.42113 |
 | `c3d1643c1f966245` | enable standard PLPMTUD on the page-mode H3 proxy route, shaped link | 1 | 0.31425 / 0.55231 / 0.35320 / 0.29369 / 0.52470 |
+| `5720930db5b46be2` | open the prepared script one main-thread turn after CSS, then images on the following task, shaped link | 1 | 0.12781 / 0.38475 / 0.19378 / 0.19891 / 0.35858 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1791,6 +1792,20 @@ ID `7bbd9e285252c729dad1a826d134cd8e` and libxul digest
 The additional probe and ACK transitions outweighed any later DATA-size
 alignment. The route flag and exact validator marker were removed; production
 must not force path probing merely to reproduce this fixture's packet size.
+
+Deferring only the prepared script by one main-thread turn is rejected. The
+stylesheet opened immediately, the script opened from the first queued task,
+and the four already prepared images opened from the existing following task.
+This introduced no timer, response gate, packet counter, resource-size check,
+or link-rate dependency. One-block shaped artifact `5720930db5b46be2`
+measured 0.12781/0.38475/0.19378/0.19891/0.35858: the whole-flow result stayed
+near the retained candidate, but packets 17--32 were materially worse than the
+retained four-block replication's 0.29471. The measured binary identified build
+ID `9482377fbe41a310f96d94869eaccb8a` and libxul digest
+`1694ba3b3513757d37cc2fb0c7f33e1426b8b048a7d45b0756c3c5d3f8bb8df6`.
+The extra script task and its lifecycle marker were removed. A single
+event-loop split is therefore insufficient to reproduce native parser/resource
+scheduling and is not retained.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
