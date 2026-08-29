@@ -1963,6 +1963,29 @@ so the result rejects the extra early CONNECT scheduling work rather than an
 accidental release of tunneled DATA. The secondary callback, wait state, and
 temporary validator markers were removed.
 
+Holding all four image requests until both stylesheet and deferred-script
+response HEADERS is rejected after a one-block shaped screen. This boundary
+was causal rather than timed: both blocking channels had to report successful
+2xx headers, then one ordinary main-thread turn released the prepared images.
+It therefore adapted to origin latency and resource delivery instead of using
+a byte count, resource size, packet position, or fitted delay. That adaptation
+was also the defect: under 20 ms one-way delay and 20 Mbit/s shaping the first
+resource body arrived roughly 86 ms after the dense parser flush and the
+second blocking response did not admit images until roughly 126 ms. Sanitized
+artifact `92847815c44749d0` measured
+0.18382/0.47777/0.27143/0.26629/0.49262. Packets 17--32 and whole are both
+materially worse than the retained candidate's replicated 0.29471/0.34363,
+so further replication would only spend samples on a mechanism already unsafe
+for slower real connections. The measured binary identified build ID
+`56ba4685c920014f3ac5f9429e7d95f4` and libxul digest
+`51163a7c0807c1403cebabe253c55d24f5e6600b2b671ed930ad2f7179f53eac`.
+The first collection attempt, private artifact `785da5e357ffbc05`, completed
+the intended lifecycle but was rejected because its new valid ordering placed
+the first CSS body buffer before the deferred-image gate; the validator was
+corrected and its dedicated regression stayed green before the successful
+rerun. No result from that failed artifact is used. The response-header gate
+and temporary lifecycle grammar were removed.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
