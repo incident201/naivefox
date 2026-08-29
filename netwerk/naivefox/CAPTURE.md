@@ -1476,6 +1476,23 @@ digest
 The byte-level state and lifecycle labels were removed; admission again
 follows successful consumption of the complete first Necko resource buffer.
 
+Releasing after the first successful bounded input-stream read is also
+rejected. The resource drain loop requested at most its existing 4096-byte
+scratch capacity, accepted any positive short read, logged the actual returned
+length, and admitted CONNECT before draining the rest of the callback. Thus it
+tested an intermediate input-stream boundary without requiring a 4096-byte
+body or waiting for resource completion. One-block shaped artifact
+`5e675ae5652db1fb` measured 0.16059/0.43240/0.21810/0.17386/0.38263. Neither
+packets 17--32 nor whole improves the retained complete-buffer candidate's
+replicated 0.29471/0.34363, and the early packet views are also higher. The
+binary identified build ID `7d0dc259cb8d106445836d2d7df4e24e` and libxul
+digest
+`d8be3d8949b82fbcd612715d26a481f3b0a9a69de0621424cb74a3fd2bcd88e3`.
+The read-level state, byte diagnostic, and validator markers were removed.
+Together with the replicated byte-level result, this rejects callback-drain
+granularity as the next optimization axis; the complete first buffer remains
+the simpler and slightly stronger boundary.
+
 Selecting the deferred script's first body buffer instead of the first ready
 resource is rejected. The semantic stream-2 rule avoided a timer and byte
 threshold, but one-block shaped artifact `d25a8910b028a6d5` regressed packets
