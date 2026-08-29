@@ -46,6 +46,13 @@ to another hypothesis. A new screen proceeds only after this preflight finds
 no prior analog; its successful or failed result is then added here so the
 same search closes the loop for later work.
 
+This preflight is mandatory for every implementation attempt, including a
+follow-on variation of the most recently tested experiment. A different arm
+name, protocol branch, task boundary, or number of resources does not make an
+idea new when the changed code still controls the same causal event. Record a
+rejected premise here even when timing evidence makes implementation and
+capture unnecessary.
+
 ## Predeclared outer-resource size campaign
 
 The first actual outer-resource matrix is fixed before collection. It uses the
@@ -2652,6 +2659,73 @@ not inference, but the SOCKS movement is far below the threshold for a costly
 replication and HTTP CONNECT moves strongly in the wrong direction. No
 default, site contract, resource-size matrix, or link-profile matrix followed.
 The explicit arms remain only for reproduction of this rejected mechanism.
+
+Before the next H2 implementation, a proposed cancellation of the active
+outer root at the first target response was rejected without implementation.
+The history search found the H3 response-stop/cancellation family, including
+commit `6f32c2baf9c1115f`, where the cover resources had already completed and
+the stop was a no-op. More importantly, preserved H2 default lifecycle logs
+showed that its document-only root was 620 bytes and drained within about
+0.1 ms of first-buffer admission; outer CONNECT was established roughly
+0.65 ms later. A target-response callback therefore occurs after the only H2
+cover stream has already ended and cannot change the packet sequence. No code,
+build, or passive matrix was spent on that causally ineffective variant.
+
+A distinct ordering then passed the mandatory history preflight. Old H2
+three-resource work admitted CONNECT before resource opens, while the H2
+six-resource screen above waited for all six request commits plus a successful
+resource body buffer. The related H3 image-deferral experiment also admitted
+CONNECT only after the deferred image commits and body progress. No prior arm
+used the ordering `exact root parsed -> CSS and blocking script committed ->
+CONNECT -> four image opens on the next main-thread turn`.
+
+Commit `38fc853f9ccb` implemented that ordering only in the explicit H2
+six-resource diagnostic arm. It used no timer, RTT estimate, response-size
+threshold, or target-body event: the exact root had to finish successfully,
+the native parser had to accept the fixed page contract, and request-commit
+events for streams 1 and 2 released CONNECT. Streams 3--6 remained prepared
+until a queued main-thread task after the admission callback. H3 and every
+production default were unchanged. The strict synthetic lifecycle validator
+covered both listener aliases and rejected a missing commit barrier or wrong
+deferred-open cause; the implementation passed 121/121 harness tests, 57/57
+focused C++ gtests, and an incremental product build.
+
+The isolated same-base one-block screen used seed `2026082922`, the canonical
+262144-byte inner page, the fixed stock-Caddy outer profile, Firefox A/B, both
+current defaults, and both required document-start controls. Safe artifact
+`a2ea4b3dcde8c23a` was directionally strong:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.67644 | 0.50223 | control |
+| SOCKS CSS/JS-commit candidate | 0.41428 | 0.48613 | -38.8% / -3.2% |
+| HTTP current `document-first-buffer-http-connect` | 0.63848 | 0.49068 | control |
+| HTTP CSS/JS-commit candidate | 0.55869 | 0.48713 | -12.5% / -0.7% |
+
+Because the SOCKS movement crossed the strong-screen threshold, the candidate
+received a focused four-block replication rather than a size, link-profile,
+or full default matrix. The harness retained both listener-specific
+document-start controls, so each of the four isolated blocks contained eight
+participants. Safe artifact `7a9df73a476bf808`, seed `2026082923`, did not
+reproduce the first block's magnitude:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.45379 | 0.43380 | control |
+| SOCKS CSS/JS-commit candidate | 0.42451 | 0.42214 | -6.5% / -2.7% |
+| HTTP current `document-first-buffer-http-connect` | 0.42051 | 0.42717 | control |
+| HTTP CSS/JS-commit candidate | 0.40848 | 0.43004 | -2.9% / +0.7% |
+
+Four gate blocks remain below the 30-block inference floor. The conditional
+paired bootstrap difference for SOCKS 17--32 favored the candidate by 0.02928
+with interval `[0.00493, 0.04591]`, but its exact four-block sign-flip
+`p=0.25`; the SOCKS Whole interval crossed zero. Both HTTP intervals crossed
+zero, and its mean Whole direction was slightly worse. This is too small and
+unstable to justify replacing the more general H2 defaults with an exact-page
+policy. No promotion or robustness matrix followed. Commit `1c05e11d6a3f`
+retired the experimental runtime/validator changes and restored the prior
+explicit six-resource behavior; the two safe artifacts and these notes retain
+the complete result for future preflight searches.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
