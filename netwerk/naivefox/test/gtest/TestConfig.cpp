@@ -387,35 +387,6 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
   }
 }
 
-TEST(NaiveFoxConfig, DiagnosticH2GetCarrierIsExplicitAndH2Only)
-{
-  Config config;
-  nsAutoCString error;
-  ASSERT_EQ(
-      ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-get-carrier":true})"_ns,
-          config, error),
-      NS_OK)
-      << error.get();
-  EXPECT_TRUE(config.mDiagnosticH2GetCarrier);
-
-  static constexpr const char* kRejected[] = {
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-h2-get-carrier":true})",
-      R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:1081"],"proxy":["https://proxy.example","quic://proxy.example"],"diagnostic-h2-get-carrier":true})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-get-carrier":null})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-get-carrier":1})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-get-carrier":true,"diagnostic-h2-get-carrier":false})",
-  };
-  for (const char* json : kRejected) {
-    Config rejected;
-    error.Truncate();
-    EXPECT_TRUE(
-        NS_FAILED(ParseConfig(nsDependentCString(json), rejected, error)))
-        << json;
-    EXPECT_FALSE(error.IsEmpty()) << json;
-  }
-}
-
 TEST(NaiveFoxConfig, PreambleModesAndBudgets)
 {
   struct Expected {

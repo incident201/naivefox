@@ -105,43 +105,4 @@ TEST(NaiveFoxHeaderPadding, PreservesOutputOnRandomFailure)
   EXPECT_EQ(padding, "unchanged");
 }
 
-TEST(NaiveFoxHeaderPadding, DiagnosticH2GetCarrierMarkerIsExactAndBounded)
-{
-  const uint64_t values[] = {0, 0xfedcba9876543210};
-  size_t next = 0;
-  auto random = [&]() { return Some(values[next++]); };
-
-  nsCString padding;
-  ASSERT_EQ(GenerateDiagnosticH2GetCarrierPadding(padding, random), NS_OK);
-  EXPECT_EQ(padding, "~8$()+<>?@[]^`{}");
-  EXPECT_TRUE(IsDiagnosticH2GetCarrierPadding(padding));
-  EXPECT_EQ(next, std::size(values));
-
-  EXPECT_FALSE(IsDiagnosticH2GetCarrierPadding("!8$()+<>?@[]^`{}"_ns));
-  EXPECT_FALSE(IsDiagnosticH2GetCarrierPadding("~7$()+<>?@[]^`{}"_ns));
-  EXPECT_FALSE(IsDiagnosticH2GetCarrierPadding("~8"_ns));
-
-  nsCString response(padding);
-  while (response.Length() < kResponseHeaderPaddingMinLength) {
-    response.Append('~');
-  }
-  EXPECT_TRUE(
-      DiagnosticH2GetCarrierEchoMatches(padding, Some(true), response));
-  EXPECT_FALSE(
-      DiagnosticH2GetCarrierEchoMatches(padding, Some(false), response));
-  EXPECT_FALSE(DiagnosticH2GetCarrierEchoMatches(padding, Some(true), padding));
-  response.SetCharAt('!', 2);
-  EXPECT_FALSE(
-      DiagnosticH2GetCarrierEchoMatches(padding, Some(true), response));
-}
-
-TEST(NaiveFoxHeaderPadding, DiagnosticH2GetCarrierPreservesOutputOnFailure)
-{
-  nsCString padding("unchanged");
-  auto fail = []() -> Maybe<uint64_t> { return Nothing(); };
-  EXPECT_EQ(GenerateDiagnosticH2GetCarrierPadding(padding, fail),
-            NS_ERROR_FAILURE);
-  EXPECT_EQ(padding, "unchanged");
-}
-
 }  // namespace mozilla::naivefox

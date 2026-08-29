@@ -330,27 +330,9 @@ nsresult Http2StreamTunnel::GenerateHeaders(nsCString& aCompressedData,
 
   mRequestBodyLenRemaining = 0x0fffffffffffffffULL;
 
-  bool diagnosticGetCarrier = false;
-#ifdef MOZ_NAIVEFOX
-  // An explicit NaiveFox diagnostic replaces only the encrypted H2 request
-  // pseudo-headers. The stream remains the ordinary raw duplex tunnel owned by
-  // Necko. A normal padding value cannot contain the ASCII digit in this
-  // reserved prefix, so stock CONNECT traffic never enters this branch.
-  diagnosticGetCarrier =
-      mFlatHttpRequestHeaders.Find("\r\npadding: ~8"_ns) != kNotFound;
-#endif
-
-  nsAutoCString method(diagnosticGetCarrier ? "GET"_ns : "CONNECT"_ns);
-  nsAutoCString path;
-  nsAutoCString scheme;
-  if (diagnosticGetCarrier) {
-    path.AssignLiteral("/");
-    scheme.AssignLiteral("https");
-  }
-
   nsresult rv = session->Compressor()->EncodeHeaderBlock(
-      mFlatHttpRequestHeaders, method, path, authorityHeader, scheme,
-      EmptyCString(), !diagnosticGetCarrier, aCompressedData, true);
+      mFlatHttpRequestHeaders, "CONNECT"_ns, EmptyCString(), authorityHeader,
+      EmptyCString(), EmptyCString(), true, aCompressedData, true);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
