@@ -2169,6 +2169,38 @@ inference minimum and cannot support an absolute verdict. Size and shaped-link
 robustness must be checked before promotion or replacement of the canonical
 four-row matrix.
 
+A deliberately broad HTTP CONNECT document-barrier family does not beat that
+tree mechanism. One isolated randomized block `062396842874c530` (seed
+`2026082963`) compared request commit, response HEADERS, first complete body
+buffer, an additional ordinary main-thread turn after each of those events,
+and the tree treatment. In arm order, the five-view distances were:
+
+| H3 HTTP CONNECT screening arm | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `document-start-http-connect` | 0.20480 | 0.79587 | 0.32684 | 0.21093 | 0.51381 |
+| `document-start-task-http-connect` | 0.20089 | 0.79061 | 0.32202 | 0.21640 | 0.50653 |
+| `document-overlap-http-connect` | 0.19888 | 0.74201 | 0.31147 | 0.20236 | 0.50199 |
+| `document-headers-task-http-connect` | 0.20232 | 0.73568 | 0.31820 | 0.20387 | 0.51003 |
+| `document-first-buffer-http-connect` | 0.20153 | 0.73336 | 0.31345 | 0.20661 | 0.50500 |
+| `document-first-buffer-task-http-connect` | 0.20663 | 0.74508 | 0.31869 | 0.20485 | 0.50277 |
+| six-resource tree over HTTP CONNECT | 0.19516 | 0.66853 | 0.28654 | 0.20601 | 0.48066 |
+
+The extra main-thread turn had no useful directional effect at any of the
+three document boundaries. Response HEADERS and first body progress improved
+packets 17--32 relative to request commit in that block, but remained well
+behind the tree. A fresh four-block screen retained only the simplest
+response-HEADERS variant, the current start control, and tree. Sanitized
+artifact `b24fe9b411e9cca4` (seed `2026082964`) measured start at
+0.11398/0.52914/0.19860/0.16573/0.43794, response HEADERS at
+0.09509/0.46146/0.18541/0.17115/0.43099, and tree at
+0.09779/0.35342/0.15104/0.16612/0.41673. The response-HEADERS barrier is a real
+improvement over the current H3 HTTP default, but tree wins packets 17--32,
+1--32, and whole while essentially tying start in the 250-ms view. These gate
+screens remain descriptive and below the 30-block minimum. The late document
+barriers and their task variants are retained as explicit harness aliases so
+the negative family is reproducible, but they are not product-default
+candidates and should not be repeated without a new mechanism hypothesis.
+
 Several bring-up attempts produced no candidate result and must not be
 reinterpreted as measurements. A clean research objdir initially tried to
 download the pinned Go/Caddy fixture toolchain after entering the isolated
