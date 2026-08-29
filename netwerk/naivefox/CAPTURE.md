@@ -2855,6 +2855,89 @@ treat CONNECT header-size endpoints, HPACK reuse without a second CONNECT, and
 server read-boundary batching as examined rather than recycling them under new
 names.
 
+The next candidate passed the mandatory causal-history preflight before code
+was written. The earlier full multi-process reconstruction changed where
+Firefox subsystems ran but retained one bidirectional CONNECT stream and did
+not help. Likewise, CAPTURE's earlier "directional framing" changed Variant-1
+record boundaries inside one stream. Neither experiment split the two
+transport directions across independently scheduled H2 streams. Existing
+captures with several CONNECT stream IDs represented several independent
+browser tunnels, not two lanes paired to one logical tunnel. A two-stream
+directional tunnel was therefore new rather than another process-topology or
+payload-framing retry.
+
+Commits `ca672f0faa73`, `27dd6854d0a7`, `86d89858439d`, and
+`db3d8dda57fc` implemented and admitted the explicit H2-only
+`diagnostic-directional-connect` screen. Each logical tunnel used two classic
+CONNECT requests with a shared random token and complementary fail-closed
+markers: the first request body carried only local-to-target bytes, while the
+second response body carried only target-to-local bytes. The server paired the
+lanes, made exactly one target dial, and rejected duplicates, mismatched
+targets, and incomplete pairs. Variant-1 framing remained unchanged exactly
+once in each direction. The downstream lane was opened only after a valid
+upstream H2 `200` with an echoed marker. There was no timer, page-resource
+condition, link estimate, target-body threshold, or future-byte wait.
+
+The pinned forwardproxy fork was based on
+`github.com/klzgrad/forwardproxy` commit `d62c80d3dd2c`; its modified
+`forwardproxy.go` digest was
+`19477a1885d7c7500f09fcf483484c7f857b244bd0d672cce45065e4d1b17535`,
+and `go test ./...` passed. The private Caddy 2.11.2 binary digest was
+`335ee7df79a8a975abdc365e0c06c3f7bac2b051e403e46c162a5056258729b2`;
+the preserved stock binary remained
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 106/106 focused C++ gtests, 124/124 complete harness tests,
+and incremental test/product builds without a clobber.
+
+Three failed private lifecycle smokes were diagnostically useful and must not
+be repeated as nominal candidate captures. Seed `2026082928` opened 58 outer
+TCP flows because both lanes were released together. Staging the downstream
+lane reduced this to 29 flows at seed `2026082929`, but did not restore H2
+multiplexing. A private Necko pool log at seed `2026082930` still observed 31
+flows and exposed the cause: each H2 CONNECT stream becomes a virtual
+`nsHttpConnection`, and `UsingConnect()` applies
+`network.http.max-persistent-connections-per-server`, whose default limit is
+six. Five upstream CONNECTs released by the outer-session gate plus the first
+downstream CONNECT consumed all six slots; later lanes started new H2 winners
+and a `DontReuse`/TLS-race cascade. This was not host-network churn.
+
+The diagnostic profile was therefore given the structural bound of 12 slots,
+two lanes for each of the six browser connections; every non-directional arm
+rejected that override. Seed `2026082931` then used one physical outer TCP
+connection and paired all six logical tunnels, but exposed an overly narrow
+validator which expected one marker for the entire session. After the
+validator required one ordered, unique pair per established logical CONNECT,
+isolated smoke artifact `668436d850d86dfd` (seed `2026082932`) passed with
+one ClientHello, one outer TCP flow, and all six pairs.
+
+The randomized same-base one-block SOCKS screen `a9ffaf1c49a77777` (seed
+`2026082933`) used the canonical 262144-byte browser page, inner HTTPS/H2,
+Firefox A/B, and only the two requested target views:
+
+| H2 SOCKS arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| current `document-first-buffer-task-overlap` | 0.73616 | 0.35785 | control |
+| two-stream directional candidate | 0.65013 | 0.33508 | -11.7% / -6.4% |
+
+Both views moved in the desired direction, but the gains were far below the
+at-least-20% requirement for making the client and Caddy mutually incompatible.
+No HTTP-listener screen, replication, resource-size matrix, or constrained-link
+matrix was spent on it. Commit `bfcef096f398` retired the client and harness
+experiment; the affected files exactly match their pre-experiment state.
+After retirement, 100/100 C++ gtests, 121/121 harness tests, and incremental
+test/product builds passed. Production defaults are unchanged and the active
+fixture remains stock Caddy.
+
+A related proposal to stop cover traffic on the first inner or target bytes
+was also rejected by the same preflight rather than reimplemented. Artifact
+`54ea85af8f8ade5a` had already made cancellation on first tunneled application
+bytes strongly worse on a shaped link. H3 commit `08c70e5382e9` tried the
+target-response form and `983b1705709e` retired it as ineffective; the retained
+H2 lifecycle evidence also shows its small root finishes before such a callback
+can affect the wire. Future research must treat two-stream direction splitting,
+raising the per-server cap solely to support it, and first-inner/target-byte
+cover cancellation as tested causal families, not rename and retry them.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
