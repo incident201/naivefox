@@ -3224,6 +3224,32 @@ the production defaults and documented fronting-site requirements remain
 unchanged. The named custom Caddy and forks remain only as inactive private
 scratch material for reproducing this negative result.
 
+A follow-on connection-control proposal was rejected by the history gate and
+a read-only decrypted audit rather than implemented. Injecting H2 PINGs,
+no-op repeated SETTINGS, or extra WINDOW_UPDATE frames would be distinct from
+DATA padding, but it first needed evidence that direct Firefox naturally used
+such control traffic in the target phase. Safe lifecycle artifact
+`20260829T230030Z-bf81d6e9` used one isolated same-base H2 connection per
+cohort and confirmed equal client SETTINGS. Direct Firefox emitted only the
+initial SETTINGS/WINDOW_UPDATE exchange and acknowledgements, then ordinary
+GET/HEADERS/DATA until its late connection shutdown; it emitted no PING and no
+repeated SETTINGS in the resource-start phase. Its first six resource GETs
+began about 135 ms after the first H2 request in this cold command-line trace,
+whereas the diagnostic document-start arm emitted its first CONNECT after
+0.444 ms. Synthetic control frames would add a new stable marker without
+reproducing the browser parser/resource cause of that gap, so no product,
+Caddy, or passive-screen code was written.
+
+The first attempt to collect that audit, private artifact
+`20260829T225655Z-05bd71e8`, stopped after the reference cohort and published
+no comparison. Commit `5efc697fe10b` had made the PAC generator require both
+the local listener and exact workload target ports, while three dedicated
+decrypted runners still passed only the listener port. Commit `11af5b11b318`
+updated those callers, added a cross-runner regression test, and restored the
+fail-closed exact-target PAC scope. The complete harness then passed 122/122
+tests before the successful audit above. This is harness provenance, not a
+candidate residual measurement.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
