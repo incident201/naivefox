@@ -1155,6 +1155,7 @@ independent seeds.
 | `ef003b01f019fe12` | open three images next turn and the final image on the following main-thread turn, shaped link | 1 | 0.30779 / 0.58293 / 0.35812 / 0.31232 / 0.44871 |
 | `d1c08c6718fa278f` | admit CONNECT after the first successful image response HEADERS, shaped link | 1 | 0.11972 / 0.38830 / 0.17140 / 0.18762 / 0.38223 |
 | `e386025177b9432c` | make only the first preamble-owned H3 CONNECT stream incremental at generic urgency, shaped link | 1 | 0.12355 / 0.42295 / 0.17830 / 0.16060 / 0.35493 |
+| `f9c4c26050a2988a` | bound H3 duplex-pump reads to Gecko's 4096-byte default segment, shaped link | 1 | 0.23503 / 0.36697 / 0.25550 / 0.24040 / 0.41194 |
 
 None of the rejected rows improved the early and whole-flow views together.
 They are not timing constants to carry into production. The fixed dwell
@@ -1721,6 +1722,19 @@ other views were 0.12355/0.17830/0.16060. Its binary identified build ID
 The CONNECT API flag, generation scope, and exact marker were removed. Whole
 flow remained close to retained, but DATA interleaving and the additional
 Priority signal worsened the target packet sequence substantially.
+
+Bounding H3 duplex-pump reads to Gecko's default 4096-byte network segment is
+rejected. Ordinary H3 transactions ask for that quantum, whereas the product
+pump historically reads up to 64 KiB; the experiment applied the upstream
+runtime segment value symmetrically in both tunnel directions without timers,
+Priority changes, or resource-size assumptions. One-block shaped artifact
+`f9c4c26050a2988a` measured 0.36697 for packets 17--32 and 0.41194 whole,
+with other views 0.23503/0.25550/0.24040. Its binary identified build ID
+`c7d69296800b54f9e5f0d1b36fe5965b` and libxul digest
+`658ac4fb91a913157197094b681c6df40d325779c7f9d36e35066f8cdb27e9d8`.
+The pump quantum and diagnostic marker were removed. Sequential small writes
+remain eligible for aggregation inside Neqo, so matching the ordinary read
+size does not reproduce ordinary multi-stream packetization.
 
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
