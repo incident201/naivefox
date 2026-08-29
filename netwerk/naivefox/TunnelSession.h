@@ -100,8 +100,8 @@ struct TunnelConfig final {
         mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
             aOther.mDiagnosticFirstSocksTunnelUrgentStart),
-        mDiagnosticOptimisticLocalReply(aOther.mDiagnosticOptimisticLocalReply),
-        mDiagnosticH2DataFramePadding(aOther.mDiagnosticH2DataFramePadding) {
+        mDiagnosticOptimisticLocalReply(
+            aOther.mDiagnosticOptimisticLocalReply) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -117,7 +117,6 @@ struct TunnelConfig final {
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
-      mDiagnosticH2DataFramePadding = aOther.mDiagnosticH2DataFramePadding;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -135,7 +134,6 @@ struct TunnelConfig final {
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mDiagnosticOptimisticLocalReply = false;
-  bool mDiagnosticH2DataFramePadding = false;
 };
 
 class TunnelSession final {
@@ -202,7 +200,6 @@ class TunnelSession final {
                             nsresult aStatus, bool aConnectCodeKnown,
                             int32_t aConnectCode,
                             const Maybe<bool>& aPaddingHeaderPresent,
-                            bool aH2DataFramePaddingMarkerPresent,
                             const nsACString& aOuterProtocol);
   void ApplyChannelStop(uint64_t aGeneration, ProxyProtocol aProtocol,
                         nsresult aStatus);
