@@ -14,10 +14,6 @@ RESOURCE_TREE_PREAMBLE_MAX_BYTES = 128 * 1024
 RESOURCE_TREE_PREAMBLE_MAX_ASSETS = 3
 PAGE_PREAMBLE_MAX_BYTES = 384 * 1024
 PAGE_PREAMBLE_MAX_ASSETS = 6
-H2_DATA_FRAME_PADDING_ARMS = (
-    "document-first-buffer-task-h2-data-frame-padding",
-    "document-first-buffer-http-connect-h2-data-frame-padding",
-)
 
 
 def build_config(
@@ -43,7 +39,6 @@ def build_config(
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
-        *H2_DATA_FRAME_PADDING_ARMS,
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
@@ -92,7 +87,6 @@ def build_config(
             "document-native-cache-open, "
             "document-handshake-confirmed, document-first-buffer-overlap, "
             "document-first-buffer-task-overlap, "
-            "document-first-buffer-task/http-connect-h2-data-frame-padding, "
             "document-first-buffer-task-optimistic, "
             "document-first-buffer-task-http-connect, "
             "document-first-buffer-http-connect, "
@@ -124,8 +118,6 @@ def build_config(
         )
     if protocol not in ("h2", "h3"):
         raise ValueError("protocol must be h2 or h3")
-    if arm in H2_DATA_FRAME_PADDING_ARMS and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -374,7 +366,6 @@ def build_config(
         "document-complete",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
-        *H2_DATA_FRAME_PADDING_ARMS,
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
@@ -394,7 +385,6 @@ def build_config(
                 if arm
                 in (
                     "document-first-buffer-task-overlap",
-                    "document-first-buffer-task-h2-data-frame-padding",
                     "document-first-buffer-task-optimistic",
                     "document-first-buffer-task-http-connect",
                 )
@@ -403,7 +393,6 @@ def build_config(
                 in (
                     "document-first-buffer-overlap",
                     "document-first-buffer-http-connect",
-                    "document-first-buffer-http-connect-h2-data-frame-padding",
                     "document-first-buffer-http-connect-optimistic",
                 )
                 else "document-overlap"
@@ -489,7 +478,6 @@ def build_config(
             if arm
             in (
                 "document-first-buffer-http-connect",
-                "document-first-buffer-http-connect-h2-data-frame-padding",
                 "document-first-buffer-http-connect-optimistic",
                 "document-first-buffer-task-http-connect",
                 "document-headers-task-http-connect",
@@ -513,8 +501,6 @@ def build_config(
         "document-first-buffer-http-connect-optimistic",
     ):
         config["diagnostic-optimistic-local-reply"] = True
-    if arm in H2_DATA_FRAME_PADDING_ARMS:
-        config["diagnostic-h2-data-frame-padding"] = True
     if max_connections:
         config["max-connections"] = max_connections
     return config
@@ -546,7 +532,6 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
-            *H2_DATA_FRAME_PADDING_ARMS,
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",

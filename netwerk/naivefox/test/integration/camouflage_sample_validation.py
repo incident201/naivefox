@@ -18,10 +18,6 @@ OPTIMISTIC_LOCAL_REPLY = re.compile(
     r"pump-started|outer-failed) "
     r"listener=(?P<listener>socks|http-connect)$"
 )
-H2_DATA_FRAME_PADDING = re.compile(
-    r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
-    r"diagnostic-h2-data-frame-padding negotiated=1 protocol=h2$"
-)
 ROOT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
     r"preamble root-overlap admission=(?P<admission>\S+) "
@@ -1020,11 +1016,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
-        "document-first-buffer-task-h2-data-frame-padding",
         "document-first-buffer-task-optimistic",
         "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
-        "document-first-buffer-http-connect-h2-data-frame-padding",
         "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
@@ -1114,25 +1108,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
-    data_frame_padding_arms = {
-        "document-first-buffer-task-h2-data-frame-padding": "socks",
-        "document-first-buffer-http-connect-h2-data-frame-padding": "http-connect",
-    }
-    if arm in data_frame_padding_arms and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     requested_arm = arm
     arm = {
         "document-first-buffer-http-connect": "document-first-buffer-overlap",
-        "document-first-buffer-http-connect-h2-data-frame-padding": (
-            "document-first-buffer-overlap"
-        ),
         "document-first-buffer-http-connect-optimistic": (
             "document-first-buffer-overlap"
         ),
         "document-first-buffer-task-http-connect": (
-            "document-first-buffer-task-overlap"
-        ),
-        "document-first-buffer-task-h2-data-frame-padding": (
             "document-first-buffer-task-overlap"
         ),
         "document-first-buffer-task-optimistic": ("document-first-buffer-task-overlap"),
@@ -1174,24 +1156,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
             raise ValueError("optimistic local reply listener identity differs")
     elif parsed_optimistic:
         raise ValueError(f"{requested_arm} arm unexpectedly logged optimistic reply")
-    data_frame_padding_lines = [
-        line for line in log_lines if "diagnostic-h2-data-frame-padding" in line
-    ]
-    parsed_data_frame_padding = [
-        H2_DATA_FRAME_PADDING.fullmatch(line) for line in data_frame_padding_lines
-    ]
-    if any(marker is None for marker in parsed_data_frame_padding):
-        raise ValueError("malformed H2 DATA frame padding evidence")
-    if requested_arm in data_frame_padding_arms:
-        if not parsed_data_frame_padding:
-            raise ValueError("H2 DATA frame padding arm requires negotiation evidence")
-        connections = [marker["connection"] for marker in parsed_data_frame_padding]
-        if len(set(connections)) != len(connections):
-            raise ValueError("duplicate H2 DATA frame padding connection marker")
-    elif parsed_data_frame_padding:
-        raise ValueError(
-            f"{requested_arm} arm unexpectedly logged H2 DATA frame padding"
-        )
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
@@ -1819,30 +1783,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
-    if requested_arm in data_frame_padding_arms:
-        if len(parsed_data_frame_padding) != len(parsed_established):
-            raise ValueError(
-                "H2 DATA frame padding marker count differs from established tunnels"
-            )
-        for marker_line, marker in zip(
-            data_frame_padding_lines, parsed_data_frame_padding
-        ):
-            matching_established = [
-                (line, established)
-                for line, established in zip(established_lines, parsed_established)
-                if established["connection"] == marker["connection"]
-                and established["protocol"] == "h2"
-            ]
-            if len(matching_established) != 1:
-                raise ValueError(
-                    "H2 DATA frame padding identity differs from established tunnel"
-                )
-            if log_lines.index(matching_established[0][0]) > log_lines.index(
-                marker_line
-            ):
-                raise ValueError(
-                    "H2 DATA frame padding marker preceded tunnel establishment"
-                )
     expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
     if expected_padding not in ("yes", "no"):
         raise ValueError("unsupported expected padding condition")
@@ -3556,11 +3496,9 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
-            "document-first-buffer-task-h2-data-frame-padding",
             "document-first-buffer-task-optimistic",
             "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
-            "document-first-buffer-http-connect-h2-data-frame-padding",
             "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",
