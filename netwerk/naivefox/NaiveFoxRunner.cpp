@@ -159,6 +159,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
         aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
     tunnelConfig.mDiagnosticOptimisticLocalReply =
         aConfig.mDiagnosticOptimisticLocalReply;
+    tunnelConfig.mDiagnosticH2DataFramePadding =
+        aConfig.mDiagnosticH2DataFramePadding;
   }
   return tunnelConfigs;
 }

@@ -105,4 +105,46 @@ TEST(NaiveFoxHeaderPadding, PreservesOutputOnRandomFailure)
   EXPECT_EQ(padding, "unchanged");
 }
 
+TEST(NaiveFoxHeaderPadding, H2DataFrameMarkerIsDistinctAndBounded)
+{
+  const uint64_t values[] = {0, 0xfedcba9876543210};
+  size_t next = 0;
+  auto random = [&]() { return Some(values[next++]); };
+  nsCString padding;
+  ASSERT_EQ(GenerateH2DataFramePaddingMarker(padding, random), NS_OK);
+  EXPECT_EQ(next, std::size(values));
+  EXPECT_GE(padding.Length(), kHeaderPaddingMinLength);
+  EXPECT_LE(padding.Length(), kHeaderPaddingMaxLength);
+  EXPECT_TRUE(Substring(padding, 0, 2).EqualsLiteral("~9"));
+  EXPECT_TRUE(IsH2DataFramePaddingMarker(padding));
+
+  EXPECT_FALSE(IsH2DataFramePaddingMarker("~9"_ns));
+  nsCString longestResponseMarker;
+  longestResponseMarker.SetLength(kProxyResponseHeaderPaddingMaxLength);
+  std::fill(
+      longestResponseMarker.BeginWriting(),
+      longestResponseMarker.BeginWriting() + longestResponseMarker.Length(),
+      '~');
+  longestResponseMarker.SetCharAt('9', 1);
+  EXPECT_TRUE(IsH2DataFramePaddingMarker(longestResponseMarker));
+  nsCString oversized;
+  oversized.SetLength(kProxyResponseHeaderPaddingMaxLength + 1);
+  std::fill(oversized.BeginWriting(),
+            oversized.BeginWriting() + oversized.Length(), '~');
+  oversized.SetCharAt('9', 1);
+  EXPECT_FALSE(IsH2DataFramePaddingMarker(oversized));
+}
+
+TEST(NaiveFoxHeaderPadding, OrdinaryPaddingCannotSignalH2DataFramePadding)
+{
+  for (uint64_t lengthBits = 0; lengthBits < 17; ++lengthBits) {
+    const uint64_t values[] = {lengthBits, 0};
+    size_t next = 0;
+    auto random = [&]() { return Some(values[next++]); };
+    nsCString padding;
+    ASSERT_EQ(GenerateHeaderPadding(padding, random), NS_OK);
+    EXPECT_FALSE(IsH2DataFramePaddingMarker(padding));
+  }
+}
+
 }  // namespace mozilla::naivefox

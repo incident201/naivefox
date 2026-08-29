@@ -443,6 +443,7 @@ class TunnelSession::Impl final {
   bool mConnectCodeKnown = false;
   int32_t mConnectCode = -1;
   Maybe<bool> mPaddingHeaderPresent;
+  bool mH2DataFramePaddingMarkerPresent = false;
   nsCString mOuterProtocol;
   bool mPaddingEnabled = false;
   nsCOMPtr<nsIAsyncInputStream> mPendingTunnelIn;
@@ -788,8 +789,7 @@ void TunnelSession::FinishPreambleOnMain(
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
   if ((PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        !requestCommittedAdmission) ||
-      (preambleMode ==
-           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
        !resourceTreeCommittedAdmission) ||
       (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
@@ -887,15 +887,14 @@ void TunnelSession::FinishPreambleOnMain(
       admission = "response-headers-task";
     } else if (preambleMode == PreambleMode::DocumentFirstBufferOverlap) {
       admission = "first-data-buffer";
-    } else if (preambleMode ==
-               PreambleMode::DocumentFirstBufferTaskOverlap) {
+    } else if (preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
       admission = "first-data-buffer-task";
     }
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
         "response_accepted=%d root_done=%d protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        admission, !aRootDone, aRootDone, ProtocolName(aProtocol));
+        static_cast<unsigned long long>(mImpl->mConnectionId), admission,
+        !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentStartOverlap ||
       preambleMode == PreambleMode::DocumentStartTaskOverlap) {
@@ -904,9 +903,9 @@ void TunnelSession::FinishPreambleOnMain(
         "request_committed=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aRootDone ? "terminal-fallback"
-                  : preambleMode == PreambleMode::DocumentStartTaskOverlap
-                        ? "request-committed-task"
-                        : "request-committed",
+        : preambleMode == PreambleMode::DocumentStartTaskOverlap
+            ? "request-committed-task"
+            : "request-committed",
         !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
@@ -925,8 +924,7 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+  if (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
         "admission=resources-committed request_committed=1 root_done=%d "
@@ -1233,7 +1231,9 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
     return;
   }
   nsAutoCString padding;
-  nsresult rv = GenerateHeaderPadding(padding);
+  nsresult rv = mImpl->mConfig.mDiagnosticH2DataFramePadding
+                    ? GenerateH2DataFramePaddingMarker(padding)
+                    : GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
     RefPtr<TunnelAttempt> attempt =
         new TunnelAttempt(this, mImpl->mSocketTarget, aGeneration, aProtocol);
@@ -1298,6 +1298,7 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
   bool connectCodeKnown = false;
   nsresult rv = NS_ERROR_UNEXPECTED;
   Maybe<bool> paddingHeaderPresent;
+  bool h2DataFramePaddingMarkerPresent = false;
   nsAutoCString outerProtocol;
   nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(aRequest);
   if (proxied && http) {
@@ -1312,6 +1313,7 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
           proxied->GetHttpProxyResponseHeader("padding"_ns, padding);
       if (NS_SUCCEEDED(headerRv)) {
         paddingHeaderPresent = Some(true);
+        h2DataFramePaddingMarkerPresent = IsH2DataFramePaddingMarker(padding);
       } else if (headerRv == NS_ERROR_NOT_AVAILABLE) {
         paddingHeaderPresent = Some(false);
       } else {
@@ -1326,10 +1328,12 @@ NS_IMETHODIMP TunnelAttempt::OnStartRequest(nsIRequest* aRequest) {
       NS_NewRunnableFunction(
           "NaiveFox::TunnelConnectMetadata",
           [owner, generation, protocol, rv, connectCodeKnown, connectCode,
-           paddingHeaderPresent, outerProtocol = std::move(outerProtocol)]() {
-            owner->ApplyConnectMetadata(generation, protocol, rv,
-                                        connectCodeKnown, connectCode,
-                                        paddingHeaderPresent, outerProtocol);
+           paddingHeaderPresent, h2DataFramePaddingMarkerPresent,
+           outerProtocol = std::move(outerProtocol)]() {
+            owner->ApplyConnectMetadata(
+                generation, protocol, rv, connectCodeKnown, connectCode,
+                paddingHeaderPresent, h2DataFramePaddingMarkerPresent,
+                outerProtocol);
           }),
       NS_DISPATCH_NORMAL);
   return NS_OK;
@@ -1509,7 +1513,7 @@ void TunnelSession::ApplyConnectMetadata(
     uint64_t aGeneration, ProxyProtocol aProtocol, nsresult aStatus,
     bool aConnectCodeKnown, int32_t aConnectCode,
     const Maybe<bool>& aPaddingHeaderPresent,
-    const nsACString& aOuterProtocol) {
+    bool aH2DataFramePaddingMarkerPresent, const nsACString& aOuterProtocol) {
   if (!IsCurrentAttempt(aGeneration, aProtocol) || mImpl->mMetadataReady) {
     return;
   }
@@ -1518,6 +1522,7 @@ void TunnelSession::ApplyConnectMetadata(
   mImpl->mConnectCodeKnown = aConnectCodeKnown;
   mImpl->mConnectCode = aConnectCode;
   mImpl->mPaddingHeaderPresent = aPaddingHeaderPresent;
+  mImpl->mH2DataFramePaddingMarkerPresent = aH2DataFramePaddingMarkerPresent;
   mImpl->mOuterProtocol = aOuterProtocol;
   MaybeFinishAttempt();
 }
@@ -1595,6 +1600,7 @@ void TunnelSession::ResetAttemptState() {
   mImpl->mConnectCodeKnown = false;
   mImpl->mConnectCode = -1;
   mImpl->mPaddingHeaderPresent.reset();
+  mImpl->mH2DataFramePaddingMarkerPresent = false;
   mImpl->mOuterProtocol.Truncate();
   mImpl->mPaddingEnabled = false;
   mImpl->mPendingTunnelIn = nullptr;
@@ -1633,8 +1639,12 @@ void TunnelSession::MaybeFinishAttempt() {
                                 mImpl->mOuterProtocol.EqualsLiteral("h2")) ||
                                (mImpl->mAttemptProtocol == ProxyProtocol::H3 &&
                                 mImpl->mOuterProtocol.EqualsLiteral("h3"));
+  const bool dataFramePaddingMarkerMatches =
+      mImpl->mConfig.mDiagnosticH2DataFramePadding ==
+      mImpl->mH2DataFramePaddingMarkerPresent;
   if (NS_FAILED(mImpl->mMetadataStatus) || NS_FAILED(mImpl->mChannelStatus) ||
       !mImpl->mConnectCodeKnown || !protocolMatches ||
+      !dataFramePaddingMarkerMatches ||
       NS_FAILED(NegotiatePayloadPadding(mImpl->mConnectCode,
                                         mImpl->mPaddingHeaderPresent,
                                         mImpl->mPaddingEnabled))) {
@@ -1663,6 +1673,13 @@ void TunnelSession::TunnelReady() {
                   mImpl->mPaddingEnabled ? "yes" : "no");
   RuntimeLog("Outer protocol: %s\n", mImpl->mOuterProtocol.get());
   RuntimeLog("Padding negotiated: %s\n", mImpl->mPaddingEnabled ? "yes" : "no");
+  if (mImpl->mConfig.mDiagnosticH2DataFramePadding) {
+    RuntimeLogEvent(
+        "Connection %llu diagnostic-h2-data-frame-padding negotiated=1 "
+        "protocol=%s\n",
+        static_cast<unsigned long long>(mImpl->mConnectionId),
+        ProtocolName(mImpl->mAttemptProtocol));
+  }
   if (mImpl->mOnEstablished) {
     mImpl->mOnEstablished(mImpl->mOuterProtocol, mImpl->mPaddingEnabled);
   }
@@ -1678,8 +1695,7 @@ nsresult TunnelSession::StartPump() {
   std::function<void()> onDownstreamApplicationActive;
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,
                                      protocol = mImpl->mAttemptProtocol]() {

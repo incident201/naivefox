@@ -119,6 +119,7 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
+  EXPECT_FALSE(config.mDiagnosticH2DataFramePadding);
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)
@@ -382,6 +383,33 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
     Config config;
     nsAutoCString error;
     EXPECT_TRUE(NS_FAILED(ParseConfig(nsDependentCString(json), config, error)))
+        << json;
+    EXPECT_FALSE(error.IsEmpty()) << json;
+  }
+}
+
+TEST(NaiveFoxConfig, DiagnosticH2DataFramePaddingIsH2Only)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-data-frame-padding":true})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_TRUE(config.mDiagnosticH2DataFramePadding);
+
+  static constexpr const char* kInvalid[] = {
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-h2-data-frame-padding":true})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-data-frame-padding":1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-data-frame-padding":true,"diagnostic-h2-data-frame-padding":false})",
+  };
+  for (const char* json : kInvalid) {
+    Config invalid;
+    error.Truncate();
+    EXPECT_TRUE(
+        NS_FAILED(ParseConfig(nsDependentCString(json), invalid, error)))
         << json;
     EXPECT_FALSE(error.IsEmpty()) << json;
   }
@@ -1002,6 +1030,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
   source.mDiagnosticOptimisticLocalReply = true;
+  source.mDiagnosticH2DataFramePadding = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1025,6 +1054,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
+    EXPECT_TRUE(copy->mDiagnosticH2DataFramePadding);
   }
 }
 

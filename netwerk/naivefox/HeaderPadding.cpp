@@ -61,4 +61,24 @@ nsresult GenerateHeaderPadding(nsACString& aPadding) {
   return GenerateHeaderPadding(aPadding, SystemRandomUint64);
 }
 
+nsresult GenerateH2DataFramePaddingMarker(nsACString& aPadding,
+                                          HeaderPaddingRandom aRandom) {
+  nsAutoCString padding;
+  MOZ_TRY(GenerateHeaderPadding(padding, aRandom));
+  padding.SetCharAt('~', 0);
+  padding.SetCharAt('9', 1);
+  aPadding = std::move(padding);
+  return NS_OK;
+}
+
+nsresult GenerateH2DataFramePaddingMarker(nsACString& aPadding) {
+  return GenerateH2DataFramePaddingMarker(aPadding, SystemRandomUint64);
+}
+
+bool IsH2DataFramePaddingMarker(const nsACString& aPadding) {
+  return aPadding.Length() >= kHeaderPaddingMinLength &&
+         aPadding.Length() <= kProxyResponseHeaderPaddingMaxLength &&
+         aPadding[0] == '~' && aPadding[1] == '9';
+}
+
 }  // namespace mozilla::naivefox

@@ -17,12 +17,17 @@ namespace mozilla::naivefox {
 
 inline constexpr size_t kHeaderPaddingMinLength = 16;
 inline constexpr size_t kHeaderPaddingMaxLength = 32;
+inline constexpr size_t kProxyResponseHeaderPaddingMaxLength = 61;
 
 using HeaderPaddingRandom = FunctionRef<Maybe<uint64_t>()>;
 
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding,
                                              HeaderPaddingRandom aRandom);
 [[nodiscard]] nsresult GenerateHeaderPadding(nsACString& aPadding);
+[[nodiscard]] nsresult GenerateH2DataFramePaddingMarker(
+    nsACString& aPadding, HeaderPaddingRandom aRandom);
+[[nodiscard]] nsresult GenerateH2DataFramePaddingMarker(nsACString& aPadding);
+bool IsH2DataFramePaddingMarker(const nsACString& aPadding);
 
 }  // namespace mozilla::naivefox
 
