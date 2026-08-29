@@ -2727,6 +2727,62 @@ retired the experimental runtime/validator changes and restored the prior
 explicit six-resource behavior; the two safe artifacts and these notes retain
 the complete result for future preflight searches.
 
+The next incompatible padding experiment also passed the mandatory exact and
+causal history preflight before implementation. Searches across this document,
+commit messages, pickaxe diffs for the eight-record codec constant, and the
+old forwardproxy forks found complete no-padding, client padding ranges,
+two/four/six framed records, first-eight zero or maximum server padding,
+directional framing, and an early server padding-only phase. None kept eight
+random padding lengths per direction while moving that same random budget from
+records 1--8 to records 9--16. This distinction was recorded before code so a
+superficially new name could not repeat an old mechanism.
+
+Commits `1680114ac61f` and `c6629c50c443` implemented the explicit H2-only
+`diagnostic-delayed-padding-phase` client, codec, and two listener-specific
+harness arms. Records 1--8 were still framed but used zero padding; records
+9--16 used the ordinary eight independently random 0--255 padding lengths;
+the stream was raw afterwards. Thus the random byte budget was preserved and
+only 24 bytes of additional record headers were introduced per direction.
+There was no timer, future-byte wait, RTT estimate, page-resource dependency,
+or response-size threshold. A `~2` prefix which the normal header-padding
+generator cannot emit negotiated the mode in both CONNECT directions. A
+diagnostic client failed closed if the server did not echo it, and a normal
+client rejected an unexpected delayed marker before starting its duplex pump.
+
+The matching forwardproxy fork selected legacy or delayed framing separately
+for every CONNECT request, so current and candidate arms shared one Caddy
+process without changing their respective wire contracts. Its own `go test
+./...` passed. The private Caddy digest was
+`0456d1d3b515ee4966a86eb6073c8c8baf5e4f25dd287aad971597cfd4e5d327`;
+the preserved stock digest was
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 67/67 focused C++ gtests, including all fail-closed
+negotiation combinations and fragmented codec round trips, 123/123 complete
+harness tests, and an incremental product build. Isolated single-arm smoke
+artifact `6af887ff30cebc6b` (seed `2026082924`) then proved the real negotiated
+path and strict runtime marker before comparative collection.
+
+The one-block same-base screen `3b0d17fb60e70fca` (seed `2026082925`) used
+the canonical 262144-byte browser page, inner HTTPS/H2, Firefox A/B, and both
+current and delayed listener arms in one randomized six-participant block:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.59685 | 0.30333 | control |
+| SOCKS delayed-padding candidate | 0.61947 | 0.28784 | +3.8% / -5.1% |
+| HTTP current `document-first-buffer-http-connect` | 0.60158 | 0.29358 | control |
+| HTTP delayed-padding candidate | 0.62224 | 0.28766 | +3.4% / -2.0% |
+
+Moving the random budget later therefore worsened the primary packets-17--32
+slice for both listeners and improved Whole only slightly. It is nowhere near
+the at-least-20% rule required to justify a client/Caddy compatibility break,
+so no replication, resource-size matrix, or constrained-link matrix was
+spent. Commit `7823a21c5b01` retired the client and harness diagnostics;
+121/121 harness tests and a second incremental product build passed after the
+retirement. The active fixture was restored byte-for-byte to the stock Caddy
+digest above. Future padding work must treat delayed random budget as tested
+and rejected rather than retrying it under another record-count or phase name.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
