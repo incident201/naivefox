@@ -2549,6 +2549,37 @@ requirement or default; the all-resource variant and size/link matrix were not
 spent after this replicated rejection. The bounded harness switch remains for
 reproduction.
 
+Optimistically acknowledging the local proxy request before the outer CONNECT
+completed is rejected after a focused replication. History preflight separated
+this boundary from the earlier `bfd151c6ae8b307f` and `5b393915a38fb0e4`
+experiments: those held local SOCKS success later than outer readiness, while
+this diagnostic deliberately let Firefox construct and queue its inner TLS
+ClientHello earlier. The duplex pump still remained closed until Necko reported
+the real outer tunnel established. Strict markers required the local SOCKS
+success or HTTP `200` to flush before outer establishment and required pump
+startup afterwards; an upstream failure closed the already acknowledged local
+connection because the success could no longer be retracted.
+
+One-block artifact `5d118ec9a43a1d3d` initially made HTTP CONNECT look
+interesting. Its default and optimistic arms measured `0.58627/0.37557` and
+`0.45023/0.38087` for packets 17--32/whole: a 23.2% early improvement with a
+1.4% whole regression. The same block rejected the SOCKS form outright:
+default and optimistic measured `0.55083/0.28560` and
+`0.57846/0.31942`. A fresh four-block HTTP-only replication was therefore
+collected instead of spending a full listener/protocol or resource-size
+matrix.
+
+Artifact `2402ddf719abded2` did not retain the large HTTP change. Default and
+optimistic HTTP CONNECT measured `0.51647/0.23874` and
+`0.48820/0.26799`: packets 17--32 improved only 5.5%, while whole regressed
+12.3%. All participants ran in the isolated namespace and passed the strict
+local-reply, outer-establishment, pump, inner-H2, and single-outer-connection
+contracts. The diagnostic product identified libxul digest
+`08ce2a8de1e7b61544f2d9f4d4d4572cf2336e395c6f11c369e1020694f53dea`.
+An irreversible early success is not justified by that replicated tradeoff,
+so production semantics and both H2 defaults remain unchanged. The opt-in
+arms remain only to reproduce the rejected mechanism.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
