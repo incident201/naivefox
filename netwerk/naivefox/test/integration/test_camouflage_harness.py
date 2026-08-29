@@ -612,7 +612,8 @@ class CamouflageHarnessTests(unittest.TestCase):
             "http=200 bytes=99 protocol=h3",
             "Connection 7 established target=localhost:443 outer=h3 padding=yes",
             "Connection 7 preamble native-parser-resource-tree drain=complete "
-            "completed_resources=6 http=200 protocol=h3",
+            "completed_resources=6 aborted_resources=0 "
+            "terminated_resources=6 http=200 protocol=h3",
         ])
         features = {
             "protocol": protocol,
@@ -628,6 +629,33 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_sample(
             arm, protocol, "\n".join(prefixed_lines), features
         )
+
+        aborted_lines = list(lines[:-1])
+        aborted_lines.extend([
+            "Connection 7 preamble native-parser-resource-tree "
+            "phase=target-response-stop-selected active_resources=2 "
+            "direction=target-to-client bytes_positive=1 protocol=h3",
+            "Preamble native-parser-resource-tree "
+            "lifecycle=target-response-stopped stream=1 "
+            "status=NS_BINDING_ABORTED expected=1 protocol=h3",
+            "Preamble native-parser-resource-tree "
+            "lifecycle=target-response-stopped stream=2 "
+            "status=NS_BINDING_ABORTED expected=1 protocol=h3",
+            "Connection 7 preamble native-parser-resource-tree drain=complete "
+            "completed_resources=4 aborted_resources=2 "
+            "terminated_resources=6 http=200 protocol=h3",
+        ])
+        SAMPLE.validate_sample(
+            arm, protocol, "\n".join(aborted_lines), features
+        )
+        wrong_abort_count = [
+            line.replace("active_resources=2", "active_resources=3")
+            for line in aborted_lines
+        ]
+        with self.assertRaisesRegex(ValueError, "invalid ordering"):
+            SAMPLE.validate_sample(
+                arm, protocol, "\n".join(wrong_abort_count), features
+            )
 
         body_before_later_commits = list(lines)
         first_body = body_before_later_commits.pop(17)
