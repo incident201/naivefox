@@ -1826,6 +1826,25 @@ resource-committed page mode and was inactive for these three controls. The
 process boundary by itself therefore does not supply useful browser-like H3
 pacing, so the larger full-tree IPC generalization was not implemented.
 
+Publishing the complete six-resource lean-parser descriptor stream through the
+full activation process is rejected in its all-at-once form. This follow-up
+filtered non-network document-context descriptors in the child, transferred
+the CSS, parser-blocking script, and four image descriptors with their native
+fields over IPDL, opened each native parent channel as its paired process event
+arrived, and admitted CONNECT only after the parser finished and all six
+requests committed. It introduced no timer, RTT, packet-count, response-size,
+or bandwidth dependency, and the strict validator proved six distinct ordered
+descriptor identities and clean process/channel completion. One-block shaped
+artifact `9448a2a3eb7ce638` nevertheless measured
+0.24504/0.67761/0.31918/0.24062/0.47613. The full tree improved the 250-ms view
+relative to the two process controls in that block, but its packets 17--32
+distance was worst and whole remained high because all resource requests were
+front-loaded. The measured binary identified build ID
+`d80db43f07d97bdd93a9bc1e7a882b79` and libxul digest
+`77724d918db91ab7b1ac849f350ef3105b86c1c9f8f0c4f3e40066dc13886fa2`.
+The descriptor transport is useful diagnostic scaffolding, but immediate
+publication of every discovered image is not a candidate default.
+
 A fresh retained-candidate decrypted capture did not pass strict admission and
 must not be treated as wire evidence. Private artifact
 `20260828T220612Z-2af3b849` logged all six request commits, first resource body
