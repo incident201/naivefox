@@ -7,6 +7,16 @@ import collect
 
 
 class CollectionTests(unittest.TestCase):
+    def test_new_inner_origin_is_tls_h2_and_explicitly_allowed(self):
+        proxy={"handler":"forward_proxy","allowed_ports":[80,443],"acl":["unchanged"]}
+        campaign=SimpleNamespace(base_config={"apps":{"http":{"servers":{"outer":{"routes":[{"handle":[proxy]}]}}}}})
+        collect.attach_corpus_origin(campaign)
+        self.assertIn(campaign.target_port,proxy["allowed_ports"])
+        self.assertEqual(proxy["acl"],["unchanged"])
+        server=campaign.base_config["apps"]["http"]["servers"]["corpus-origin"]
+        self.assertEqual(server["protocols"],["h2"])
+        self.assertEqual(server["tls_connection_policies"],[{}])
+
     def manifest(self):
         return {"pages":[{"id":f"f{family}-{variant}","family":f"f{family}","variant":variant,"partition":family//6} for family in range(24) for variant in range(4)]}
 
@@ -20,7 +30,7 @@ class CollectionTests(unittest.TestCase):
         for page in manifest["pages"]:
             roles=[row["role"] for row in a if row["page"]==page["id"] and row["role"]!="fronting-browser"]
             self.assertEqual(set(roles),set(collect.ROLES))
-        self.assertEqual(len(collect.schedule(manifest,123,True,["f0-0"])),4)
+        self.assertEqual(len(collect.schedule(manifest,123,True,["f0-0"])),5)
 
     def test_diversity_cannot_silently_change_ordinary_capture_modes(self):
         campaign=collect.carrier.Campaign(Path("/unused"),"h2")

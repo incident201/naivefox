@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import random
 import shutil
+import socket
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -20,6 +21,23 @@ sys.path.insert(0,str(CARRIER))
 spec=importlib.util.spec_from_file_location("carrier_runner",CARRIER/"run.py")
 carrier=importlib.util.module_from_spec(spec);spec.loader.exec_module(carrier)
 ROLES=("firefox_a","firefox_b","classic","no_connect")
+
+
+def attach_corpus_origin(campaign):
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1",0))
+        campaign.target_port=listener.getsockname()[1]
+    campaign.base_config["apps"]["http"]["servers"]["corpus-origin"]={
+        "listen":[f"127.0.0.1:{campaign.target_port}"],"protocols":["h2"],
+        "tls_connection_policies":[{}],"automatic_https":{"disable":True},"routes":[]}
+    def allow_port(value):
+        if isinstance(value,dict):
+            if value.get("handler")=="forward_proxy" and value.get("allowed_ports"):
+                value["allowed_ports"]=sorted(set(value["allowed_ports"])|{campaign.target_port})
+            for child in value.values():allow_port(child)
+        elif isinstance(value,list):
+            for child in value:allow_port(child)
+    allow_port(campaign.base_config)
 
 
 def schedule(manifest,seed,pilot=False,pilot_pages=None):
@@ -36,6 +54,8 @@ def schedule(manifest,seed,pilot=False,pilot_pages=None):
     if not pilot:
         extra=[{"page":manifest["pages"][0]["id"],"family":"fronting-control","variant":i%2,"partition":i//2,"role":"fronting-browser"} for i in range(8)]
         for value in extra:cases.insert(rng.randrange(len(cases)+1),value)
+    else:
+        cases.append({"page":pages[0]["id"],"family":"fronting-control","variant":0,"partition":0,"role":"fronting-browser"})
     return cases
 
 
@@ -71,6 +91,7 @@ def collect(args):
     completed=0
     try:
         campaign.start()
+        attach_corpus_origin(campaign)
         for index,case in enumerate(plan):
             origin.reset()
             name=f"private-{index:04d}"

@@ -89,7 +89,7 @@ views separately (p1--16, p17--32, p1--32, 250 ms, whole). Do not tune the
 transport or corpus after inspecting held-out performance.
 
 Primary model: the existing regularized logistic learner, fixed feature budget
-and training parameters. Report classic-versus-Firefox and No-Connect-versus-
+of 64, L2 coefficient 0.1 and 200 optimizer iterations. Report classic-versus-Firefox and No-Connect-versus-
 Firefox, oriented AUC without test-set sign reversal, calibration-selected
 operating points (target 5% and 10% browser false positives), achieved test FPR,
 TPR and balanced accuracy. Include Firefox-A-versus-B as a collection/null
@@ -113,9 +113,25 @@ indistinguishability from this benchmark.
 
 Default selection and explicit-legacy regression checks passed. The corpus has
 96 pages/24 families and 1,257 generated assets (about 36 MB including the
-licensed system font). The collector is in unscored pilot validation; no
-diversity score has been measured yet. The main schedule has 392 samples per
+licensed system font). The unscored H2 pilot passed the simple page and all
+twelve complex-page observations; H3 passed all seventeen observations including
+the genuine fronting-browser control. Ten corpus/collector/analysis tests pass,
+including a test-only feature perturbation that cannot change the fitted model
+or calibration threshold. No diversity score has been measured yet.
+The frozen main schedule uses seed 202608362 for H2 and 202608363 for H3,
+with 392 samples per
 protocol (96 of each primary role plus eight genuine fronting-browser controls).
 The stopped optimization campaign's existing numerical
 matrix remains in `APPLICATION-CARRIER-STATUS.md` and is not overwritten by a
 new, differently defined benchmark.
+
+The first one-page pilot admitted direct Firefox but failed the classic role:
+the existing fixture's inner H2 server was a separate Caddy process, so editing
+only the outer server configuration did not route the inner page to the corpus.
+This is invalid infrastructure evidence, not classifier/transport performance.
+The collector now creates its own H2 corpus-origin listener in the same Caddy
+configuration, with the same fixture trust and a distinct port. The failed
+pilot remains marked incomplete and is never included in main analysis.
+The follow-up also exposed the fixture's explicit CONNECT port allowlist;
+the new loopback origin port is now added to that list without changing auth
+or IP ACLs. Both setup failures remain unscored pilot records.
