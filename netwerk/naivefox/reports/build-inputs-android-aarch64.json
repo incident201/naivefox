@@ -7386,7 +7386,7 @@
     "make:active-assembly-include": 2,
     "make:active-assembly-source": 9,
     "make:active-jar-manifest": 3,
-    "make:active-jar-source": 11,
+    "make:active-jar-source": 12,
     "make:active-python-action": 15,
     "make:active-source-fragment-input": 36,
     "make:core-build-infrastructure": 15,
@@ -10585,10 +10585,10 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "e46f07ae32fef66efe010e885e486a118b637741361daa93c2fc4ce85a2f5bac",
+  "collector_sha256": "abdd3662bad26b9e356882f47a48861d2d7dec8623761b31584312be10b494c5",
   "counts": {
     "directory_contracts": 36,
-    "files": 17039
+    "files": 17040
   },
   "depfile_count": 1064,
   "directory_contracts": [
@@ -14046,6 +14046,7 @@
     "netwerk/ipc/SocketProcessParent.h",
     "netwerk/ipc/moz.build",
     "netwerk/locales/en-US/necko.properties",
+    "netwerk/locales/en-US/netwerk/necko.ftl",
     "netwerk/locales/jar.mn",
     "netwerk/locales/moz.build",
     "netwerk/metrics.yaml",
@@ -27688,7 +27689,7 @@
   "install_manifests_sha256": "6bb4ebab1c057e7c35b2119945b4f8d437231972fc7c2ce3f485608970ac5c82",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "69d4665c2b95be12ac6ba7e976069ff72d28e984a4ede2df50a4729a18052c31",
-  "naivefox_reference_commit": "529bbfd90a265e7e6d2de6010b2a7c5255020d26",
+  "naivefox_reference_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "7e2ff40729785d0c398cc066e10486deb055c1a9e126182ef71d85faa42aaf41",
     "config_status_deps.in": "a4d8df4b3acce6713b8fec747db6b5a811b4c2d63ab144eadc460cc4c13f4042"
@@ -27696,7 +27697,7 @@
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "529bbfd90a265e7e6d2de6010b2a7c5255020d26",
+  "source_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],

@@ -7685,7 +7685,7 @@
     "cargo:target-manifest-parse-entry": 382,
     "cargo:vendor-checksum-index": 621,
     "make:active-jar-manifest": 3,
-    "make:active-jar-source": 11,
+    "make:active-jar-source": 12,
     "make:active-python-action": 15,
     "make:active-source-fragment-input": 36,
     "make:core-build-infrastructure": 15,
@@ -10884,10 +10884,10 @@
       "version": "1.0.20"
     }
   ],
-  "collector_sha256": "e46f07ae32fef66efe010e885e486a118b637741361daa93c2fc4ce85a2f5bac",
+  "collector_sha256": "abdd3662bad26b9e356882f47a48861d2d7dec8623761b31584312be10b494c5",
   "counts": {
     "directory_contracts": 35,
-    "files": 17340
+    "files": 17341
   },
   "depfile_count": 1112,
   "directory_contracts": [
@@ -14330,6 +14330,7 @@
     "netwerk/ipc/SocketProcessParent.h",
     "netwerk/ipc/moz.build",
     "netwerk/locales/en-US/necko.properties",
+    "netwerk/locales/en-US/netwerk/necko.ftl",
     "netwerk/locales/jar.mn",
     "netwerk/locales/moz.build",
     "netwerk/metrics.yaml",
@@ -28287,7 +28288,7 @@
   "install_manifests_sha256": "50bcec6842c5125ce91e01b23077419bed4767cbcdf374b44f37184700374d04",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b",
-  "naivefox_reference_commit": "529bbfd90a265e7e6d2de6010b2a7c5255020d26",
+  "naivefox_reference_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "dc027c930a69af4b35e8317d1efd6d5c8f24c5788316ea6000b679fae98d54f5",
     "config_status_deps.in": "5e66cf6214a724da871bfdfcd4698819e68cc37d499631c1a1c622a4e57c5ec9"
@@ -28295,7 +28296,7 @@
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "529bbfd90a265e7e6d2de6010b2a7c5255020d26",
+  "source_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
