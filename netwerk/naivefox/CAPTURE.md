@@ -3402,6 +3402,41 @@ No larger run, product build, Caddy change, or default promotion was started.
 The 64-KiB limit remains a functional safety bound, not a residual-equivalence
 claim, and future work must not retry root padding as an H2 timing fix.
 
+### H2 server stream-concurrency premise check
+
+The next server-side proposal was stopped by the mandatory exact and causal
+history gate before implementation. Full-history and current-tree searches
+found prior measurement of `SETTINGS_MAX_CONCURRENT_STREAMS`, the rejected
+two-directional-CONNECT experiment's client connection-slot override, and the
+rejected synthetic SETTINGS/PING family, but no experiment which lowered the
+Caddy H2 server's advertised stream limit. The mechanism was therefore
+syntactically new: unlike a no-op SETTINGS marker, it would serialize native
+resource admission.
+
+The measured lifecycle makes the only potentially effective endpoint unsafe.
+In safe decrypted artifact `20260829T233038Z-27a63bf9`, direct Firefox opened
+the stylesheet and script as streams 2 and 3 at 27.627/27.736 ms; their server
+responses were already present at packets 25 and 29. The next request began at
+packet 26, but its response did not begin until packet 227. Consequently a
+limit of two cannot remove either of the two resource responses already inside
+packets 17--32. A limit of one could, but the first long-lived proxy CONNECT
+would then permanently consume the only stream after the root completed. A
+second target connection or origin could not share that H2 connection, while
+a direct site would fetch its blocking stylesheet and script serially. Older
+diagnostic evidence also observed up to six ordinary browser target
+connections, confirming that this is a real lifecycle rather than a
+theoretical edge case.
+
+Caddy 2.11.2 does not expose this field in its Caddyfile or JSON server model;
+the stock `x/net/http2` default is 250 and the only relevant knob is the
+internal `http2.Server.MaxConcurrentStreams`. A private Caddy fork would thus
+be required merely to test an endpoint which either misses the focus window
+(`2` or more) or creates an unbounded multi-origin/page-load regression (`1`).
+No Caddy fork, harness arm, build, or passive capture was created. Future
+preflight must not retry a static low H2 stream limit as a safe site-independent
+fix; any genuinely new concurrency proposal must preserve multiple
+long-lived CONNECT streams and ordinary parallel page loading by construction.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
