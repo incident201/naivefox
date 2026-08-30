@@ -119,8 +119,8 @@ Admission failures retained before this pass:
 - Navigation can briefly return no script state; the driver handles that
   transition instead of treating it as a transport exception.
 
-No measured residual result yet. Full-browser process/memory cost and idle
-behavior remain unqualified; this is an experimental upper-bound prototype.
+At this initial admission stage, no residual result was available yet.
+Full-browser process/memory cost and idle behavior remained unqualified.
 
 The first randomized two-superblock screen (`h2-screen2`) stopped in block 2:
 the append arm delivered only 548,910 downstream target bytes before its
@@ -254,3 +254,69 @@ is an explicit application-scheduler axis. None is claimed as an untested
 general finite-exchange idea; the distinct premise remains fixed-capacity
 application traffic replacing filler. Functional capacity failures will be
 recorded before any residual scoring. Start with H2/SOCKS only, not full matrices.
+
+The first cost sweep freezes these discrete profiles before functional runs:
+
+| Profile | Rounds | Media capacity | Downstream placement | Animation wait |
+| --- | ---: | ---: | --- | --- |
+| v1 control | 16 | 128 KiB | separate GET | every round |
+| duplex-v1 | 16 | 128 KiB | POST response | every round |
+| compact | 16 | 64 KiB | separate GET | every round |
+| compact-sync | 16 | 64 KiB | POST response | every round |
+| compact-sync20 | 20 | 64 KiB | POST response | every round |
+| compact-fast20 | 20 | 64 KiB | POST response | every fourth round |
+
+All retain two 24-KiB interactive rounds at each end and fixed 4-KiB uploads.
+No queue occupancy changes slots, capacities or cadence. Network promises
+already yield through actual HTTP/IPC completion; the fast profile only stops
+requiring a rendered frame after every network operation. A static app-profile
+object is embedded in the fixed-size script body for normal visitors and
+carrier workers alike. Useful-work completion is mandatory; failed profiles
+are not sent to residual scoring or silently extended until they pass.
+
+First functional sweep (`cost-sweep1`, one attempt/profile): v1 and duplex-v1
+completed; duplex used 23 rather than 39 requests but the same body budget.
+Uniform 64-KiB `compact` and `compact-sync` exhausted their 16 slots at
+648,829 and 510,528 delivered bytes and failed. `compact-sync20` completed with
+1,146,880 downstream bytes but about 453 ms completion, worse than v1.
+`compact-fast20` failed at only 379,664 bytes: turning slots faster spent them
+before useful data was available. These are admission observations, not paired
+performance estimates; the first v1 startup overlapped build finalization and
+is not used as a speed baseline. No residual matrix is run for failed profiles.
+
+Next preregistered profiles `staged` / `staged-fast` have 18 slots: four 8-KiB,
+two 32-KiB, ten 64-KiB, two 8-KiB. Total down capacity is 770,048 bytes, with
+the same 4-KiB uplink per round. They retain separate POST/GET transactions;
+the fast variant waits for animation only every second round. This moves
+capacity from poorly utilized startup/tail slots into the middle, without
+using queue occupancy or proxy packet indices to choose slot size.
+
+`staged` completed one admission with 665,866 useful / 102,690 filler bytes,
+but completion slowed to about 431 ms. `staged-fast` delivered only 608,740
+bytes before exhausting the same job and failed. The following `staged-fast20`
+trial explicitly adds two 64-KiB middle slots before the two brief tail slots:
+20 rounds, 901,120 downstream bytes, animation every second round. This is a
+declared capacity/speed tradeoff following a recorded failure, not a retry of
+the original insufficient profile. Fixed profiles remain workload-limited;
+none establishes a production scheduler for arbitrary resource sizes.
+
+`staged-fast20` passed H2/SOCKS admission (278.840 ms useful completion),
+four simultaneous mixed-listener hash-checked downloads, and all eight samples
+of the two-block lean H2 screen `staged-fast20-screen`, seed 202608307.
+The screen uses two Firefox controls, default SOCKS and replacement SOCKS only.
+Mean useful completion was 290.602 ms against default 95.823 ms. Mean outer
+wire bytes were 1,146,260.5 against 722,667: +58.62%, versus v1's approximately
++168%. Relative to the earlier v1 H2 replication, total bytes fell about 41%;
+this cross-campaign accounting is not a paired latency improvement. Effective
+page rate remains 67.03% below the contemporary default.
+
+| H2 SOCKS, compact screen | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Default | 0.07550 | 0.53341 | 0.22463 | 0.18242 | 0.34928 |
+| staged-fast20 replacement | 0.03574 | 0.25208 | 0.10079 | 0.09142 | 0.16205 |
+
+The screening point gains are 52.74% (17--32) and 53.60% (Whole), with much
+less filler. Status remains `INSUFFICIENT_FOR_INFERENCE`. The reference profile
+changed with the application, so these absolute residuals cannot rank v1 and
+staged across different screens. This profile is a cost candidate, not a
+default, universal workload budget or established speed improvement.

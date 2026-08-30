@@ -31,6 +31,13 @@ OLD = Path("/home/zubastik/naivefox-refresh-20260830.fJHfmY")
 FIREFOX = OLD / "reference/firefox/firefox"
 PACKAGE = OLD / "full-linux/package/allocator-fixed"
 TRANSPORT = Path("/home/zubastik/naivefox-transport")
+PROFILES = {
+    "v1": (16, 131072), "duplex-v1": (16, 131072),
+    "compact": (16, 65536), "compact-sync": (16, 65536),
+    "compact-sync20": (20, 65536), "compact-fast20": (20, 65536),
+    "staged": (18, 65536), "staged-fast": (18, 65536),
+    "staged-fast20": (20, 65536),
+}
 
 
 def wait_for(predicate, timeout=20):
@@ -139,12 +146,14 @@ class Campaign:
         with (self.root / "fixture-stop.log").open("w") as log:
             subprocess.run([str(INTEGRATION / "stop.sh"), "--quiet"], env=self.env, stdout=log, stderr=subprocess.STDOUT)
 
-    def sample(self, name, kind="socks", mode="replace", rounds=16, capture=False, probe=False):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1"):
+        rounds = rounds or PROFILES[app_profile][0]
         directory = self.root / name
         directory.mkdir(mode=0o700)
         key, token = secrets.token_hex(32), secrets.token_hex(32)
         config = json.loads(json.dumps(self.base_config))
         handler = {"handler":"naivefox_transport", "key":key,
+                   "profile":app_profile,
                    "append_mode":mode=="append",
                    "allowed_targets":[f"localhost:{self.target_port}"],
                    "stats_path":str(directory / "server-stats.json")}
@@ -161,7 +170,7 @@ class Campaign:
         def launch(args, logname, env=None):
             log = (directory / logname).open("w"); files.append(log)
             return subprocess.Popen([str(v) for v in args], stdout=log, stderr=subprocess.STDOUT, env=env)
-        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds}
+        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile}
         try:
             caddy = launch([self.root.parent / "bin/caddy","run","--config",directory / "caddy.json"], "caddy.log",
                            dict(os.environ, XDG_DATA_HOME=str(directory / "xdg-data"), XDG_CONFIG_HOME=str(directory / "xdg-config")))
@@ -291,8 +300,8 @@ class Campaign:
             write_json(directory / "result.json",result)
         return result
 
-    def screen(self, count, seed):
-        arms=("application-default-socks","application-default-http","application-replace-socks","application-replace-http","application-append-socks")
+    def screen(self, count, seed, app_profile="v1", lean=False):
+        arms=("application-default-socks","application-replace-socks") if lean else ("application-default-socks","application-default-http","application-replace-socks","application-replace-http","application-append-socks")
         schedule=superblocks.schedule_rows(seed,self.protocol,count,["browser_page"],arms)
         write_json(self.root / "schedule.json",schedule)
         feature_dir=self.root / "features";feature_dir.mkdir()
@@ -301,7 +310,7 @@ class Campaign:
             mode="reference" if arm=="reference" else arm.split("-")[1]
             kind="http" if arm.endswith("-http") else "socks"
             name=f"sample-{index:03d}"
-            result=self.sample(name,kind,mode,16,True)
+            result=self.sample(name,kind,mode,0,True,app_profile=app_profile)
             summary={k:v for k,v in result.items() if k not in ("server-stats","bridge-stats","inner_http_statuses")}
             print(json.dumps(summary,sort_keys=True),flush=True)
             if not result["admitted"]:raise RuntimeError("screen stopped at failed admission")
@@ -309,7 +318,11 @@ class Campaign:
             if mode=="default" and self.protocol=="h3":
                 required=["GET /","GET /assets/site.css","GET /assets/app.js",*[f"GET /assets/image-{i}.svg" for i in range(1,5)]]
                 if any(stats["requests"].get(path)!=1 for path in required):raise RuntimeError("default H3 six-resource admission")
-            if mode!="default" and (stats["connect"]!=0 or stats["download_bytes"] < 1671168 or stats["rejected"]!=0):
+            count_rounds,down=PROFILES[app_profile]
+            expected_down=4*24576+(count_rounds-4)*down
+            if app_profile.startswith("staged"):expected_down=770048
+            if app_profile=="staged-fast20":expected_down=901120
+            if mode!="default" and (stats["connect"]!=0 or stats["download_bytes"] < expected_down or stats["rejected"]!=0):
                 raise RuntimeError("HTTP graph admission")
             destination=feature_dir / (name+".json")
             features.extract(SimpleNamespace(pcap=str(self.root / name / "outer.pcapng"),protocol=self.protocol,server_port=self.port,
@@ -337,7 +350,10 @@ def main():
     parser.add_argument("--protocol",choices=["h2","h3"],default="h2")
     parser.add_argument("--mode",choices=["reference","replace","append","default"],default="replace")
     parser.add_argument("--kind",choices=["socks","http"],default="socks")
-    parser.add_argument("--rounds",type=int,default=16)
+    parser.add_argument("--rounds",type=int,default=0)
+    parser.add_argument("--app-profile",choices=PROFILES,default="v1")
+    parser.add_argument("--screen-lean",action="store_true")
+    parser.add_argument("--sweep",action="store_true")
     parser.add_argument("--capture",action="store_true")
     parser.add_argument("--probe",action="store_true")
     parser.add_argument("--screen",type=int,default=0)
@@ -356,10 +372,15 @@ def main():
     campaign=Campaign(args.root,args.protocol)
     try:
         campaign.start()
-        if args.screen:
-            campaign.screen(args.screen,args.seed)
+        if args.sweep:
+            for variant in PROFILES:
+                result=campaign.sample("functional-"+variant,app_profile=variant)
+                print(json.dumps(result,sort_keys=True),flush=True)
             return 0
-        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe)
+        if args.screen:
+            campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean)
+            return 0
+        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile)
         print(json.dumps(result,sort_keys=True),flush=True)
         return 0 if result["admitted"] else 1
     finally:campaign.close()
