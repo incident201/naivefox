@@ -784,7 +784,7 @@ exactly three credit-handoff opportunities; only the candidate promoted them.
 Curl single download means 121.482 -> 70.818 ms (-41.71% time); parallel
 94.159 -> 99.459 ms (+5.63%); slow upload 319.018 -> 320.051 ms (+0.32%);
 small wake 22.049 -> 19.661 ms. Wire 6,690,704 -> 6,714,406 bytes (+0.35%).
-The two control opportunities and two candidate interventions support the
+The two control runs and two candidate interventions support the
 proposed cause for the single-stream gap; they do not establish every stall's
 cause or guarantee a universal gain. Extend to two H3 pairs (202608323) and one
 H2 10-Mbit/s pair (202608324) with identical binaries.
@@ -793,3 +793,53 @@ The runner now records explicit pair control/candidate/seed metadata and admits
 non-v1 profile controls. Older campaigns retain their historical implicit v1
 comparison. Incomplete or mislabeled pairs still fail closed; snapshots retain
 the new comparison metadata.
+
+Two H3 pairs (`continuous-bulk-ready-h3-pairs`, 202608323) passed. Single
+download 107.912 -> 83.350 ms (-22.76%); parallel 98.632 -> 98.208 ms;
+slow upload 319.903 -> 319.539 ms; small wake 19.214 -> 21.963 ms (+2.749 ms).
+Wire 6,597,118 -> 6,685,747.5 bytes (+1.34%). Candidate single-download samples
+100.329/66.371 ms show meaningful variability; do not present the mean as a
+stable bound. One outer QUIC connection and no outer TCP were retained.
+
+The shared 10-Mbit/s H2 pair (`continuous-bulk-ready-h2-10mbit-pair`, 202608324)
+passed but did not improve speed: single 1266.567 -> 1311.304 ms (+3.53%);
+parallel 2041.584 -> 2040.741 ms; slow upload 1127.760 -> 1145.743 ms;
+small wake 65.292 -> 59.565 ms. Wire 6,632,979 -> 6,758,096 bytes (+1.89%).
+The credit fix helps the unshaped single-stream implementation limit; it does
+not solve the shaped-link penalty of committing/buffering large responses.
+Keep both positive and negative evidence; proceed to the separate delivery
+barrier experiment without promoting this profile.
+
+Frozen matching `d02b4e1` evidence is `continuous-bulk-ready-evidence`, manifest
+SHA-256 `c3249f082727260538fb2bb82a9b9e24e0b190664f660d9704aaaafd32813b23`.
+
+## Frame-granular delivery preregistration
+
+The next history preflight re-read finite read-through (`c75be29167da`,
+`f124f1891c32`, `d587a084d5ff`), the staged-prefix experiment (`f804f175862d`)
+and active IPC stage measurements above. Existing streaming waits for the
+entire *used prefix*. If most of a 256-KiB cell is useful, that still holds the
+first target bytes until nearly the whole response arrives. The distinct
+premise is releasing complete logical frames while the remainder of useful
+data, not just filler, is still arriving. It does not change outer capacities,
+snapshot timing, request concurrency or target reads.
+
+Implement a separate opt-in bulk-frames profile on the bounded-credit variant.
+Only 256-KiB responses use incremental delivery. Retain a bounded decoder,
+strict cell/frame sequence and length checks, full HTTP-body drain before the
+next transaction, and explicit local IPC finalization only after valid EOF.
+A malformed later frame or truncated filler closes the whole session; earlier
+delivered bytes cannot be rolled back. Validate arbitrary splits, early data,
+replay, cancellation, sink backpressure and decoder memory bounds first.
+Extra local IPC can cost CPU/fast-link throughput; measure it rather than
+assuming streaming is free. Compare directly against bulk-ready on the shaped
+link that exposed the buffering problem, then unshaped H2/H3 if admitted.
+
+Admission passed 24 JavaScript tests, 14 focused Python tests and all four Go
+race packages. The incremental mode sends complete frames supplied by each
+browser read with an awaited local sink; it introduces no batching timer or
+queue-size-fitted read. Both JavaScript and bridge validate the prefix; the
+bridge refuses mixed whole-cell/partial commands until finalization. Numeric
+final-state counters distinguish frame deliveries with still-unread useful
+bytes from the older filler-only early-prefix metric. Next: two randomized
+10-Mbit/s H2 pairs against bulk-ready, seed 202608325.

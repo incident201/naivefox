@@ -63,6 +63,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         stats["upload_bytes"] += 4 * 4096
         runner.validate_http_graph(stats, "continuous-bulk", "replace")
         runner.validate_http_graph(stats, "continuous-bulk-ready", "replace")
+        runner.validate_http_graph(stats, "continuous-bulk-frames", "replace")
         for change in ("budget", "post", "legacy"):
             invalid = copy.deepcopy(stats)
             if change == "budget": invalid["download_bytes"] += 1
@@ -109,6 +110,7 @@ class CarrierAdmissionTests(unittest.TestCase):
 
         down["continuous-bulk"] = 901120
         down["continuous-bulk-ready"] = 901120
+        down["continuous-bulk-frames"] = 901120
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)

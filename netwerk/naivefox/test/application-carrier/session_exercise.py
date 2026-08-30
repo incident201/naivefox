@@ -16,7 +16,7 @@ from camouflage_capture_health import validate_dumpcap_log
 def state(worker):
     if worker is None:
         return {"phase": "native-control", "alive": True, "error": None, "dynamic": 0, "idle": 0, "wake": 0}
-    value = worker.execute_script("return {phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,error:window.__NFC_ERROR__,dynamic:window.__NFC_DYNAMIC_ROUNDS__,idle:window.__NFC_IDLE_POLLS__,wake:window.__NFC_IDLE_WAKE_POSTS__}")
+    value = worker.execute_script("return {phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,error:window.__NFC_ERROR__,dynamic:window.__NFC_DYNAMIC_ROUNDS__,idle:window.__NFC_IDLE_POLLS__,wake:window.__NFC_IDLE_WAKE_POSTS__,frame_parts:window.__NFC_FRAME_PARTS__||0,early_frame_parts:window.__NFC_EARLY_FRAME_PARTS__||0,frame_bytes_pending:window.__NFC_FRAME_BYTES_PENDING__||0}")
     if not value or value["error"] or not value["alive"]:
         raise RuntimeError("continuous worker stopped during session exercise")
     return value

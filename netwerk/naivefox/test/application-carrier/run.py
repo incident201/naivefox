@@ -46,6 +46,7 @@ PROFILES = {
     "continuous-sync2": (20, 65536),
     "continuous-bulk": (20, 65536),
     "continuous-bulk-ready": (20, 65536),
+    "continuous-bulk-frames": (20, 65536),
 }
 
 
