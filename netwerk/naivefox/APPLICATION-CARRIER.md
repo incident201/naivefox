@@ -1101,3 +1101,44 @@ old default and reject unsupported configured windows. First deterministic
 credit/budget/overflow tests, then two H2 pairs against bulk-duplex with the
 8-MiB workload (seed 202608337), to exercise the diagnosed sustained stage.
 No residual or cross-protocol expansion unless the result warrants it.
+
+First screen `continuous-bulk-window512-h2-8m-pairs`: all functional/wire gates
+passed; 348.168 -> 336.276 ms single, 94.926 -> 87.301 ms parallel,
+327.755 -> 337.547 ms slow upload, 33.001 -> 24.474 ms small wake;
+wire 15,136,366.5 -> 15,157,253 bytes (+0.14%). Single samples span
+297.486--375.066 ms, far beyond the 3.42% mean difference. A path-limited
+all-ref Git history scan overlapped the final part and was stopped; these
+timings are exploratory, not clean promotion evidence. Retain this run,
+then repeat two pairs without a history scan/build/CPU benchmark in parallel
+(`continuous-bulk-window512-h2-8m-clean-pairs`, seed 202608338).
+
+Clean repeat passed: single 333.239 -> 290.052 ms (-12.96%), parallel
+90.987 -> 85.117 ms (-6.45%), slow upload 326.313 -> 332.505 ms (+1.90%),
+small wake 24.556 -> 23.953 ms. Wire 15,127,962.5 -> 15,188,476 bytes
+(+0.40%). Single samples: control 345.358/321.119; candidate 286.882/293.221.
+Useful sustained gain, not a universal ceiling or cross-protocol win. The
+window remains an opt-in memory tradeoff. Snapshot `continuous-window512-evidence`,
+server `9d5dc12`, manifest SHA-256
+`97ec5bfc5f785d9bf848d662f5a8e63571645163093017fc4eb3966eac8a9aed`.
+
+## Filler-generation CPU ablation preregistration
+
+History preflight searched the journal and all-ref encoding/filler records;
+the server cell encoder still has only its original implementation from
+`63452c1`. It allocates random bytes for the entire fixed cell and then overwrites
+the useful prefix, including all target data. Test generating randomness only
+for the filler suffix after computing/validating `used`. Length, frame codec,
+useful bytes and fresh cryptographic filler remain unchanged; no reused padding,
+compression, weaker RNG or traffic-dependent outer capacity. First benchmark
+the isolated encoder with empty, half-full and nearly-full 256-KiB cells, with
+both paths in the same binary. Do not run this alongside network timings.
+Only add a transport profile if saved CPU is large enough to be worth a screen.
+
+The three-repeat Go microbenchmark (Ryzen 7 6800H, Go 1.25.12,
+`encoder-filler-bench.txt`) retains one 262-KiB allocation per encoded cell.
+Empty 256-KiB cell median 430.9 -> 435.0 microseconds (no useful gain);
+128-KiB useful payload 431.6 -> 241.0 microseconds; 240-KiB useful
+payload 425.6 -> 69.2 microseconds. The near-full saving is ~0.356 ms/cell,
+not a claim of 84% end-to-end speedup. Add `continuous-bulk-filler` derived
+from bulk-duplex (original 256-KiB window), enabling only suffix generation
+at bridge/server encoders. Compare two H2 8-MiB pairs, seed 202608339.
