@@ -2,9 +2,11 @@
 
 This is the frozen result of the previous optimization campaign. Subsequently,
 `continuous-bulk-pipeline` became the default only for the new experimental
-transport. The additional [browser-diversity benchmark](BROWSER-DIVERSITY.md)
-has a different comparison population and does not replace the values below.
-Native defaults, minimal export and release state are unchanged.
+transport. The subsequent synthetic browser-diversity benchmark was discarded:
+its code, dataset and generated results were removed at the user's request.
+No further capture campaign or replacement benchmark is in progress. The values
+below remain historical measurements, not a classification verdict. Native
+defaults, minimal export and release state are unchanged.
 
 Selected measured speed profile: `continuous-bulk-pipeline`. The native product
 defaults and stock-Caddy compatibility remain unchanged. The experimental profile

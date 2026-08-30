@@ -4,8 +4,9 @@
 H2/H3 x SOCKS/HTTP matrix, native-relative cold/warm costs, site requirements
 and cleanup state are in [APPLICATION-CARRIER-STATUS.md](APPLICATION-CARRIER-STATUS.md).
 `continuous-bulk-pipeline` is now the default for the new experimental transport.
-The additional [browser-diversity benchmark](BROWSER-DIVERSITY.md) does not
-replace these measurements or change native defaults. No export/publication is in progress.
+The subsequent synthetic diversity benchmark was discarded; no capture campaign
+or replacement benchmark is in progress. Native defaults are unchanged, and no
+export/publication is in progress.
 
 This campaign is confined to an experimental branch and a separate Caddy
 module repository. It does not change product defaults, the published matrix,

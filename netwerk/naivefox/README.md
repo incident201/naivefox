@@ -16,8 +16,8 @@ The server is an unmodified Naive-compatible Caddy build. NaiveFox does not
 ship another HTTP/TLS stack and does not synthesize a Firefox fingerprint.
 
 This document describes the native product. The separate experimental No
-Connect transport defaults to `continuous-bulk-pipeline`; its additional
-evaluation is described in [BROWSER-DIVERSITY.md](BROWSER-DIVERSITY.md).
+Connect transport defaults to `continuous-bulk-pipeline`; its stopped campaign
+is described in [APPLICATION-CARRIER-STATUS.md](APPLICATION-CARRIER-STATUS.md).
 
 ## Running the desktop product
 
