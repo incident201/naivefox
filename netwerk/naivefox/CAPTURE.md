@@ -3189,7 +3189,7 @@ proved that padding occurred only on server-to-client DATA of marked CONNECT
 streams, and deleted the private key log/capture after retaining safe counts.
 
 The randomized one-block same-base screen `06350ee8cab9df76` (seed
-`2026083053`) used the canonical 262144-byte inner page, inner HTTPS/H2,
+`2026083053`) used the canonical 262144-byte inner page, inner HTTPS/H1.1,
 Firefox A/B, both current listener defaults, an isolated WSL network namespace,
 and only packets 17--32 plus Whole:
 
@@ -3206,7 +3206,7 @@ for Whole but below the 20% breaking-change rule for packets 17--32, so it
 required a focused replication instead of a full matrix.
 
 Fresh four-block HTTP-only artifact `b0454b18ae89a387` (seed `2026083054`)
-reversed both directions. The current HTTP default measured
+also used inner HTTPS/H1.1 and reversed both directions. The current HTTP default measured
 `0.46318 [0.42335, 0.50301]` for packets 17--32 and
 `0.26826 [0.23575, 0.30440]` for Whole. DATA padding measured
 `0.49186 [0.44626, 0.53385]` and `0.28606 [0.25119, 0.33062]`, regressions of
@@ -3508,6 +3508,39 @@ stylesheets, scripts, ordinary images, completions, or further API attempts.
 No request is removed from the passive capture and no fixture response is
 changed to make the diagnostic pass. Private log slices are retained on error
 so future admission failures can be investigated without another capture.
+
+Clean-worktree artifact `8c774dd53fa31ff7` completed the predeclared four-member
+block. All participants passed the unchanged capture-drop, offload,
+network-mutation, protocol, and drain gates; both proxy workloads passed inner
+H2 validation, and all four request timelines passed. Product and stock Caddy
+were not rebuilt. The coarse server intervals were:
+
+| Participant | Outer root to CONNECT | CONNECT to inner root | Workload root to CSS | Workload root to script | Outer root to workload completion |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Firefox A | n/a | n/a | 29.113 ms | 29.137 ms | 53.937 ms |
+| Firefox B | n/a | n/a | 28.934 ms | 28.933 ms | 53.921 ms |
+| Current H2 SOCKS | 1.538 ms | 5.660 ms | 54.826 ms | 54.820 ms | 90.154 ms |
+| Current H2 HTTP CONNECT | 1.145 ms | 4.964 ms | 58.963 ms | 58.967 ms | 93.319 ms |
+
+All root handlers completed in 0.498--0.860 ms. The direct resource wave
+arrived at Caddy about 29--33 ms after root; the tunneled waves did not reach
+the inner Caddy until about 62--66 ms after the outer root. Both proxy
+workloads had two canonical API image requests, whereas each direct Firefox
+control had one; every participant also made one empty favicon request. These
+events are preserved, not filtered from the passive sample. Descriptive
+17--32/Whole distances were `0.65340/0.42868` for SOCKS and
+`0.52648/0.40525` for HTTP, with first-50-ms server-wire deficits of
+679,622/680,339 bytes. One block is not a new default dashboard or inference.
+
+The new localization is the extra roughly 26--30 ms between the tunneled
+document request and its resource wave, beyond the direct browser's ordinary
+29-ms phase. It is not explained by the roughly 5-ms CONNECT-to-inner-root
+setup or by slow fixture root handlers. Access logs do not show when the
+browser receives or parses the body, however, so this does not yet assign the
+extra interval to NaiveFox, Caddy, or Firefox's proxy/channel path. The next
+low-cost diagnostic must trace those already-existing browser events before
+changing another outer admission gate. Production defaults and fronting-site
+requirements remain unchanged.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
