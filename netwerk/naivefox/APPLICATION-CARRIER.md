@@ -1142,3 +1142,34 @@ payload 425.6 -> 69.2 microseconds. The near-full saving is ~0.356 ms/cell,
 not a claim of 84% end-to-end speedup. Add `continuous-bulk-filler` derived
 from bulk-duplex (original 256-KiB window), enabling only suffix generation
 at bridge/server encoders. Compare two H2 8-MiB pairs, seed 202608339.
+
+`continuous-bulk-filler-h2-8m-pairs` passed functional/wire gates but **failed
+speed**: single 271.891 -> 658.450 ms (+142.17%); parallel 86.964 -> 82.229 ms;
+slow upload 345.357 -> 314.515 ms; small wake 21.305 -> 22.500 ms.
+Wire 15,153,306.5 -> 15,394,648 bytes (+1.59%). Controls used 48/52 interactive
+GETs and 41 bulk POSTs; both candidates used 132 interactive GETs and 38 bulk
+POSTs. Faster encoding changes the moment `Pressure()` observes the producer;
+extra short leases are consistent with a transient-queue state-hint problem,
+not proof that random bytes are intrinsically necessary. Both bad runs remain
+in evidence. No CPU-only default change. Snapshot `continuous-filler-evidence`,
+server `7abf753`, manifest SHA-256
+`02e2bf9ca8d5710837295cd129613ac72ed838ee7f53d77b419e4661beb2d103`.
+
+## Progress-qualified handoff preregistration
+
+Before the proposed two-transaction overlap test, directly test the timing
+dependence exposed above. History preflight reviewed `d02b4e1` and the earlier
+credit-handoff screen: the old predicate requires at least 32 KiB already
+queued. The new independent `continuous-bulk-progress` derives from filler
+(not the 512-KiB window or deferred ACK). After a bulk response containing at
+least 128 KiB useful data, a still-readable logical stream permits one more
+download hint even if the instantaneous queue is empty. A response below
+that useful threshold cannot renew the promotion; observed EOF/reset cannot
+justify it. Actual byte credit still controls transmission. No timer, wait
+for full buffers, guessed delivery credit or larger cell.
+
+This spends at most one extra empty 256-KiB probe after such productive progress,
+with possible tail overhead; do not call it free. Add separate promotion
+counters and deterministic empty/stalled/EOF tests. Compare two H2 8-MiB pairs
+against the failed filler control (seed 202608340), then compare to the strong
+original bulk-duplex before claiming a net improvement.
