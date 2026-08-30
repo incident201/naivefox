@@ -257,9 +257,11 @@ class ProfileDirectory final {
 };
 
 nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
-                     nsACString& aError);
+                     nsACString& aError,
+                     const Maybe<TransportMode>& aTransportOverride = Nothing());
 nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
-                        nsACString& aError);
+                        nsACString& aError,
+                        const Maybe<TransportMode>& aTransportOverride = Nothing());
 nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
                                  nsACString& aError);
 

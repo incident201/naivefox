@@ -307,7 +307,8 @@ class JsonParser final {
   JsonParser(const nsACString& aInput, nsACString& aError)
       : mInput(aInput), mError(aError) {}
 
-  nsresult Parse(Config& aConfig) {
+  nsresult Parse(Config& aConfig,
+                 const Maybe<TransportMode>& aTransportOverride) {
     if (!mozilla::IsUtf8(Span(mInput.BeginReading(), mInput.Length()))) {
       return Error("config must be valid UTF-8");
     }
@@ -496,6 +497,9 @@ class JsonParser final {
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
       return Error("listen addresses do not match multiple proxies");
     }
+    if (aTransportOverride) {
+      parsed.mTransport = *aTransportOverride;
+    }
     if (parsed.mTransport == TransportMode::NoConnect) {
       if (!sawNoConnectKey) {
         return Error("no-connect transport requires no-connect-key");
@@ -516,7 +520,11 @@ class JsonParser final {
             "headers, gate, or diagnostic options");
       }
     } else if (sawNoConnectKey) {
-      return Error("no-connect-key requires no-connect transport");
+      if (aTransportOverride == Some(TransportMode::Classic)) {
+        parsed.mNoConnectKey.Truncate();
+      } else {
+        return Error("no-connect-key requires no-connect transport");
+      }
     }
     if (!sawPreamble && parsed.mTransport == TransportMode::Classic) {
       bool hasExplicitH2Proxy = false;
@@ -1784,16 +1792,18 @@ class JsonParser final {
 }  // namespace
 
 nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
-                     nsACString& aError) {
+                     nsACString& aError,
+                     const Maybe<TransportMode>& aTransportOverride) {
   aError.Truncate();
   if (aJson.Length() > kMaximumConfigSize) {
     return Fail(aError, "config is too large", NS_ERROR_FILE_TOO_BIG);
   }
-  return JsonParser(aJson, aError).Parse(aConfig);
+  return JsonParser(aJson, aError).Parse(aConfig, aTransportOverride);
 }
 
 nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
-                        nsACString& aError) {
+                        nsACString& aError,
+                        const Maybe<TransportMode>& aTransportOverride) {
   std::unique_ptr<FILE, decltype(&std::fclose)> file(
       std::fopen(PromiseFlatCString(aPath).get(), "rb"), &std::fclose);
   if (!file) {
@@ -1818,7 +1828,7 @@ nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
                     static_cast<size_t>(length)) {
     return Fail(aError, "cannot read config file", NS_ERROR_FAILURE);
   }
-  return ParseConfig(json, aConfig, aError);
+  return ParseConfig(json, aConfig, aError, aTransportOverride);
 }
 
 ProfileDirectory::~ProfileDirectory() {

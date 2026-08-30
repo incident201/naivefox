@@ -179,6 +179,97 @@ TEST(NaiveFoxConfig, TransportOptionsAreOrderIndependent)
   EXPECT_TRUE(config.mImplicitPreambleGate);
 }
 
+TEST(NaiveFoxConfig, TransportOverridePrecedesValidationAndDefaults)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","transport":"classic","no-connect-key":"0123456789abcdef0123456789abcdef"})"_ns,
+          config, error, Some(TransportMode::NoConnect)),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnect);
+  EXPECT_EQ(config.mNoConnectKey.Length(), 32U);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_FALSE(config.mImplicitPreambleGate);
+
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef"})"_ns,
+          config, error, Some(TransportMode::Classic)),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::Classic);
+  EXPECT_TRUE(config.mNoConnectKey.IsEmpty());
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::TreeNativeParserResourceCommittedOverlap);
+  EXPECT_TRUE(config.mImplicitPreambleGate);
+}
+
+TEST(NaiveFoxConfig, TransportOverrideWorksWithoutJsonSelection)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","no-connect-key":"0123456789abcdef0123456789abcdef"})"_ns,
+          config, error, Some(TransportMode::NoConnect)),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnect);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_FALSE(config.mImplicitPreambleGate);
+
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","transport":"no-connect"})"_ns,
+          config, error, Some(TransportMode::Classic)),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::Classic);
+  EXPECT_TRUE(config.mNoConnectKey.IsEmpty());
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::DocumentFirstBufferTaskOverlap);
+}
+
+TEST(NaiveFoxConfig, TransportOverrideRetainsStrictFieldValidation)
+{
+  for (const char* fields : {
+           R"("transport":"invalid")",
+           R"("transport":"classic","transport":"classic")",
+           R"("no-connect-key":false)",
+           R"("no-connect-key":"too-short")",
+       }) {
+    for (TransportMode transport : {TransportMode::Classic,
+                                    TransportMode::NoConnect}) {
+      nsAutoCString json(
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example",)"_ns);
+      json.Append(fields);
+      json.Append('}');
+      Config config;
+      nsAutoCString error;
+      EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error, Some(transport))));
+    }
+  }
+  for (const char* fields : {
+           R"("proxy":"https://proxy.example")",
+           R"("proxy":"https://user:password@proxy.example","no-connect-key":"0123456789abcdef0123456789abcdef")",
+           R"("proxy":"https://proxy.example","no-connect-key":"0123456789abcdef0123456789abcdef","outer-session-gate":true)",
+           R"("proxy":"https://proxy.example","no-connect-key":"0123456789abcdef0123456789abcdef","preamble":{"mode":"document-complete","path":"/"})",
+       }) {
+    nsAutoCString json(R"({"listen":"socks://127.0.0.1:1080",)"_ns);
+    json.Append(fields);
+    json.Append('}');
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error,
+                                      Some(TransportMode::NoConnect))));
+  }
+}
+
 TEST(NaiveFoxConfig, RejectsInvalidTransportConfiguration)
 {
   const char* fields[] = {

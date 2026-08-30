@@ -22,11 +22,20 @@ Its registered Caddy module is `http.handlers.naivefox_transport`.
 ```
 
 Launch this private file with `./naivefox /absolute/path/to/config.json`.
+To override the JSON selection, use
+`./naivefox /absolute/path/to/config.json --transport no-connect` or
+`./naivefox --transport=classic /absolute/path/to/config.json`. The option may
+precede or follow the path; omission of the path reads `./config.json`.
 Replace the example key with a cryptographically random secret shared with the
 module. `no-connect-key` accepts 32 through 1024 printable ASCII bytes and is
-required exactly when `transport` is `no-connect`; it is never a URL parameter
-or log field. JSON values do not expand environment variables. Protect the
-config file as a credential.
+required when the effective transport is `no-connect`; it is never a CLI
+argument, URL parameter or log field. An explicit `--transport classic`
+discards a retained key, so changing modes does not require deleting it from
+the file. Without an override, JSON classic plus a key is still rejected.
+Selection precedes validation and implicit preamble defaults; malformed fields
+and incompatible mode options are not bypassed. JSON values do not expand
+environment variables. Protect the config file as a credential. Diagnostic CLI
+modes cannot be combined with `--transport`.
 
 No-connect rejects upstream URI userinfo, extra CONNECT headers, active classic
 preambles, enabled outer-session gates and classic diagnostic options. Explicit
@@ -104,6 +113,15 @@ connection failure remains the local client's responsibility.
 Use the existing warm minimized product object directories. New source files
 may regenerate the incremental product backend; they do not justify a cold
 Firefox build or another object directory. See [MINIMAL.md](MINIMAL.md).
+
+Check CLI syntax, JSON precedence and mode validation without starting the
+network runtime:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-transport-cli-tests.py \
+  --binary /absolute/path/to/warm-obj-naivefox-linux/dist/bin/naivefox \
+  --work-dir /absolute/path/to/warm-obj-naivefox-linux/no-connect/cli
+```
 
 Acceptance covers both transports against one Caddy process, H2 and H3, and
 SOCKS5 and HTTP CONNECT listeners. No-connect additionally needs authentication

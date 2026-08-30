@@ -27,7 +27,17 @@ reads `./config.json`; one positional argument selects another config:
 ```bash
 ./naivefox
 ./naivefox /absolute/path/to/config.json
+./naivefox /absolute/path/to/config.json --transport no-connect
+./naivefox --transport=classic /absolute/path/to/config.json
 ```
+
+`--transport classic|no-connect` overrides the JSON `transport` field. It may
+precede or follow the optional config path; without a path, it uses
+`./config.json`. The `--transport=value` form is also accepted. A no-connect
+key must remain in the private config, never on the command line. An explicit
+classic override discards a retained no-connect key. Selection occurs before
+mode validation and implicit preamble defaults; incompatible options still
+fail. Diagnostic CLI modes cannot be combined with this config-mode override.
 
 The staged Windows package provides `run-naivefox.cmd` beside its runtime and
 accepts the same optional config path.
@@ -55,8 +65,9 @@ The supported config is a strict NaiveProxy-compatible subset:
 
 - `transport` is `"classic"` by default or `"no-connect"` for the optional
   application transport. This is independent of H2/H3 selection in `proxy`.
-  `no-connect-key` is required only for `no-connect` and contains 32 through
-  1024 printable ASCII bytes shared with the server; keep it in a private config.
+  `no-connect-key` is required for the effective `no-connect` selection and
+  contains 32 through 1024 printable ASCII bytes shared with the server; keep it
+  in a private config.
   Upstream URI credentials, active classic preambles, extra CONNECT headers,
   enabled outer-session gates and classic diagnostic options are rejected in
   this mode. Local SOCKS authentication remains available.
