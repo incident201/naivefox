@@ -165,6 +165,21 @@ class CarrierAdmissionTests(unittest.TestCase):
                     runner.Campaign(Path("/unused"), "h2").shape_outer(10)
                 command.assert_not_called()
 
+    def test_shaper_drop_gate_and_explicit_delay(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            campaign = runner.Campaign(Path(temporary), "h2")
+            campaign.port = 12345
+            with mock.patch.dict(runner.os.environ, {"NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED": "1"}):
+                with mock.patch.object(runner.subprocess,"run") as command, mock.patch.object(runner.subprocess,"check_output",return_value="netem"):
+                    campaign.shape_outer(50,20)
+                netem=command.call_args_list[1].args[0]
+                self.assertIn("50mbit",netem);self.assertIn("20ms",netem)
+            for rows, valid in (([{"kind":"netem","drops":0}],True),([{ "kind":"netem","drops":1}],False),([{ "kind":"noqueue","drops":0}],False)):
+                with mock.patch.object(runner.subprocess,"check_output",return_value=json.dumps(rows)):
+                    if valid:self.assertEqual(campaign.check_shaping()["drops"],0)
+                    else:
+                        with self.assertRaises(RuntimeError):campaign.check_shaping()
+
     def test_shaping_filters_only_outer_port(self):
         for protocol, number in (("h2", "6"), ("h3", "17")):
             with tempfile.TemporaryDirectory() as temporary:

@@ -229,6 +229,7 @@ class Campaign:
         self.fixture = None
         self.base_config = None
         self.outer_rate_mbit = 0
+        self.outer_delay_ms = 0
 
     def start(self):
         binaries = {}
@@ -271,19 +272,28 @@ class Campaign:
         with (self.root / "fixture-stop.log").open("w") as log:
             subprocess.run([str(INTEGRATION / "stop.sh"), "--quiet"], env=self.env, stdout=log, stderr=subprocess.STDOUT)
 
-    def shape_outer(self, rate):
+    def shape_outer(self, rate, delay=0):
         if not os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED"):
             raise RuntimeError("refusing shaping outside isolated namespace")
         commands = [
             ["tc", "qdisc", "add", "dev", "lo", "root", "handle", "1:", "prio", "bands", "3", "priomap", *(["0"] * 16)],
-            ["tc", "qdisc", "add", "dev", "lo", "parent", "1:3", "handle", "30:", "netem", "rate", f"{rate}mbit", "limit", "10000"],
+            ["tc", "qdisc", "add", "dev", "lo", "parent", "1:3", "handle", "30:", "netem", *(["rate", f"{rate}mbit"] if rate else []), *(["delay", f"{delay}ms"] if delay else []), "limit", "10000"],
         ]
         for priority, direction in enumerate(("sport", "dport"), 10):
             commands.append(["tc", "filter", "add", "dev", "lo", "protocol", "ip", "parent", "1:", "prio", str(priority), "u32", "match", "ip", "protocol", "6" if self.protocol == "h2" else "17", "0xff", "match", "ip", direction, str(self.port), "0xffff", "flowid", "1:3"])
         for command in commands:
             subprocess.run(command, check=True, capture_output=True)
         self.outer_rate_mbit = rate
-        write_json(self.root / "outer-shaping.json", {"rate_mbit": rate, "scope": "outer-port-only-both-directions", "qdisc": subprocess.check_output(["tc", "qdisc", "show", "dev", "lo"], text=True)})
+        self.outer_delay_ms = delay
+        write_json(self.root / "outer-shaping.json", {"rate_mbit": rate, "one_way_delay_ms": delay, "scope": "outer-port-only-both-directions-shared-rate", "qdisc": subprocess.check_output(["tc", "qdisc", "show", "dev", "lo"], text=True)})
+
+    def check_shaping(self):
+        rows = json.loads(subprocess.check_output(["tc", "-j", "-s", "qdisc", "show", "dev", "lo"], text=True))
+        value = {"qdiscs": rows, "drops": sum(row.get("drops", 0) for row in rows)}
+        write_json(self.root / "outer-shaping-final.json", value)
+        if not any(row.get("kind") == "netem" for row in rows) or value["drops"]:
+            raise RuntimeError("shaper missing or dropped packets")
+        return value
 
     def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False):
         probe = probe or session_probe
@@ -311,7 +321,7 @@ class Campaign:
         def launch(args, logname, env=None):
             log = (directory / logname).open("w"); files.append(log)
             return subprocess.Popen([str(v) for v in args], stdout=log, stderr=subprocess.STDOUT, env=env)
-        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile,"outer_rate_mbit":self.outer_rate_mbit,"outer_port":self.port}
+        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile,"outer_rate_mbit":self.outer_rate_mbit,"outer_delay_ms":self.outer_delay_ms,"outer_port":self.port}
         journal = self.fixture / "inner-h2-access.jsonl"
         journal_offset = journal.stat().st_size if journal.exists() else 0
         try:
@@ -441,6 +451,8 @@ class Campaign:
                     events,_=(features.packet_events_h2 if self.protocol=="h2" else features.packet_events_h3)(str(Path(stage.name) / "outer.pcapng"),self.port)
                     if not events or any(event["wire_size"]>1500 for event in events):
                         raise RuntimeError("session wire packet admission")
+                    if outer_flow_count(events) != 1:
+                        raise RuntimeError("session outer connection identity")
                     if self.protocol=="h3" and features.packet_events_h2(str(Path(stage.name) / "outer.pcapng"),self.port)[0]:
                         raise RuntimeError("TCP traffic in strict H3 session capture")
                     result["session_wire"]={"bytes":sum(event["wire_size"] for event in events),"packets":len(events),"client_bytes":sum(event["wire_size"] for event in events if event["direction"]>0),"server_bytes":sum(event["wire_size"] for event in events if event["direction"]<0),"outer_flows":outer_flow_count(events)}
@@ -457,6 +469,8 @@ class Campaign:
                 raise RuntimeError("completion outside fixed capture window")
             if worker and app_profile=="staged-commit20" and not result.get("action_done"):
                 raise RuntimeError("terminal confirmation incomplete")
+            if self.outer_rate_mbit or self.outer_delay_ms:
+                result["shaper_drops"] = self.check_shaping()["drops"]
             result["admitted"]=True
         except Exception as error:
             with (directory / "private-error.log").open("w") as failure_log:traceback.print_exc(file=failure_log)
@@ -536,6 +550,7 @@ def main():
     parser.add_argument("--sweep",action="store_true")
     parser.add_argument("--timing-pair",type=int,default=0)
     parser.add_argument("--outer-rate-mbit",type=int,default=0)
+    parser.add_argument("--outer-delay-ms",type=int,default=0)
     parser.add_argument("--capture",action="store_true")
     parser.add_argument("--probe",action="store_true")
     parser.add_argument("--session-probe",action="store_true")
@@ -566,9 +581,9 @@ def main():
         parser.error("idle wire measurement currently requires the continuous worker")
     if continuous(args.app_profile) and (args.mode=="append" or (args.screen and not args.screen_lean)):
         parser.error("continuous append ablation is not qualified; use lean screens")
-    if args.outer_rate_mbit < 0 or args.outer_rate_mbit > 1000 or args.timing_pair < 0:
+    if args.outer_rate_mbit < 0 or args.outer_rate_mbit > 1000 or not 0 <= args.outer_delay_ms <= 200 or args.timing_pair < 0:
         parser.error("invalid timing/rate bounds")
-    if args.outer_rate_mbit and (args.capture or args.screen):
+    if (args.outer_rate_mbit or args.outer_delay_ms) and (args.capture or args.screen):
         parser.error("shaped links are functional timing only; no transmit-copy residual scoring")
     if os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK")!="1" or not os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED"):
         raise SystemExit("isolated fixture namespace required")
@@ -583,8 +598,8 @@ def main():
     campaign=Campaign(args.root,args.protocol)
     try:
         campaign.start()
-        if args.outer_rate_mbit:
-            campaign.shape_outer(args.outer_rate_mbit)
+        if args.outer_rate_mbit or args.outer_delay_ms:
+            campaign.shape_outer(args.outer_rate_mbit,args.outer_delay_ms)
         if args.session_pairs:
             rng=random.Random(args.seed)
             schedule=[]

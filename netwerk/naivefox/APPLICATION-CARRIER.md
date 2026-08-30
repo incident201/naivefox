@@ -885,3 +885,25 @@ strict graph accounting precede performance. A positive result must retain
 traffic and small-request behavior before H3/slow-link follow-up. This is a
 selective composition of known mechanisms, not a newly invented carrier or
 evidence that fewer HTTP requests alone guarantee better residuals.
+
+Server `39f24a1` passed 25 JavaScript tests and all four Go race packages;
+the focused Python admission suite passed. Both H2 pairs passed with no outer
+CONNECT, one TCP connection and exact fixed bodies. Curl means: single
+79.187 -> 57.847 ms (-26.95%); parallel 94.199 -> 81.714 ms (-13.25%);
+slow upload 320.236 -> 320.147 ms; small wake 19.322 -> 20.687 ms (+1.365 ms).
+Wire 6,870,202.5 -> 6,751,285.5 bytes (-1.73% versus bulk-ready). This earns
+two H3 pairs (202608328), then one 10-Mbit/s H2 pair (202608329). If functional
+admission holds, measure a separate H2 pair with 20-ms one-way outer delay and
+a shared 50-Mbit/s ceiling (202608330) to expose serial-turnaround sensitivity.
+These are targeted mechanism checks, not a full platform/resource matrix.
+
+The runner now supports explicit one-way outer-port delay, still leaving local
+IPC and targets unshaped, and refuses residual scoring on any shaped link.
+It also checks and retains netem drop counters for every shaped sample. Review
+found those counters had only been saved by the old finite timing-pair path,
+not continuous session pairs; do not retroactively claim their absence for
+the earlier continuous rate-only trials. Those retain byte-exact completion,
+capture-drop and namespace checks, but lack that separate shaper-drop proof.
+The new session gate also requires one outer flow rather than only reporting
+the count. Fifteen focused Python tests cover delay construction and missing/
+dropping-shaper rejection.
