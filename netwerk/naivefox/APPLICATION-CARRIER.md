@@ -1,5 +1,10 @@
 # Application-capacity transport experiment
 
+**Campaign stopped.** The selected measured speed profile and complete fresh
+H2/H3 x SOCKS/HTTP matrix, native-relative cold/warm costs, site requirements
+and cleanup state are in [APPLICATION-CARRIER-STATUS.md](APPLICATION-CARRIER-STATUS.md).
+No further optimization, export or publication is in progress.
+
 This campaign is confined to an experimental branch and a separate Caddy
 module repository. It does not change product defaults, the published matrix,
 the stock-server contract, or the deferred export/publication state.
@@ -10,7 +15,7 @@ recording wire/memory cost, but do not reject a strong speed candidate merely
 for a few percent additional bytes. This does not waive functional, residual,
 bounded-resource or real-link checks, and is not permission for unbounded cover.
 
-The latest qualified lifecycle baseline is `continuous-v1`: startup followed
+The historical qualified lifecycle baseline was `continuous-v1`: startup followed
 by ongoing interactive/download/upload/mixed states and economical idle. See
 [continuous lifecycle](#continuous-lifecycle-preregistration) for its current
 cost and residual evidence, and [active-speed diagnosis](#active-speed-diagnosis)
@@ -1383,3 +1388,16 @@ Final qualification uses four superblocks per protocol, two fresh Firefox
 references and all four native/replacement listener arms: H2 seed 202608353,
 H3 seed 202608354. Same two-second canonical page capture and unchanged
 native defaults, not a claim that warm 1-MiB cost equals cold-page cost.
+
+Also measure the selected profile's original mixed-session/native cost with
+two pairs per protocol (H2 seed 202608355, H3 seed 202608356). This is final
+qualification, not another optimization: cold-page startup penalties and warm
+session penalties must not be merged into a single misleading percentage.
+
+Both four-block cold matrices admitted every sample. The first H3 warm/native
+run (`final-pipeline-native-h3`, seed 202608356) stopped at the first native
+sample: all payload checks passed, but dumpcap reported 47 dropped packets
+out of 3,976 received. Its wire cost is invalid and no paired estimate is
+reported. Retain the failed result. Increase only dumpcap's capture buffer to
+32 MiB and repeat the two H3 pairs at seed 202608357; do not relax any drop
+gate or change the transport/network profile.

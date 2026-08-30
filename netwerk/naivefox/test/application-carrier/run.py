@@ -432,7 +432,7 @@ class Campaign:
                 monitor=launch([sys.executable,INTEGRATION / "monitor-network-mutations.py","--ready",directory / "network-ready","--events",directory / "network-events","--done",directory / "network-done"],"network.log")
                 wait_for(lambda:(directory / "network-ready").exists() or monitor.poll() is not None)
                 if monitor.poll() is not None:raise RuntimeError("network monitor startup")
-                cap=launch(["dumpcap","-q","-i","any","-f",f"port {self.port}","-a","duration:120","-a","filesize:131072","-w",Path(stage.name) / "outer.pcapng"],"dumpcap.log")
+                cap=launch(["dumpcap","-q","-B","32","-i","any","-f",f"port {self.port}","-a","duration:120","-a","filesize:131072","-w",Path(stage.name) / "outer.pcapng"],"dumpcap.log")
                 wait_for(lambda:"File:" in (directory / "dumpcap.log").read_text() or cap.poll() is not None)
                 if cap.poll() is not None:raise RuntimeError("capture startup")
             start=time.monotonic()
