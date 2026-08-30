@@ -475,7 +475,7 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                 )[: min(remaining, 65536)]
                 self.wfile.write(data)
                 remaining -= len(data)
-        elif parsed.path == "/delay":
+        elif parsed.path in ("/delay", "/camouflage/delay"):
             delay_ms = min(max(int(query.get("ms", [250])[0]), 0), 10000)
             time.sleep(delay_ms / 1000)
             self.send_bytes(200, SMALL_BODY, "text/plain")
@@ -581,11 +581,11 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
             self.wfile.flush()
             write_completion(self.completion_dir, token)
             return
-        if parsed.path not in ("/upload", "/slow-upload", "/camouflage/upload"):
+        if parsed.path not in ("/upload", "/slow-upload", "/camouflage/upload", "/camouflage/slow-upload"):
             self.send_error(404)
             return
         delay_ms = 0
-        if parsed.path == "/slow-upload":
+        if parsed.path in ("/slow-upload", "/camouflage/slow-upload"):
             query = parse_qs(parsed.query)
             delay_ms = min(max(int(query.get("ms", [1])[0]), 0), 100)
         try:

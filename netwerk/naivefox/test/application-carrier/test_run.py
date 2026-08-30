@@ -1,5 +1,8 @@
 import copy
+import hashlib
 import importlib.util
+import io
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,12 +14,51 @@ spec.loader.exec_module(runner)
 
 
 class CarrierAdmissionTests(unittest.TestCase):
+    def test_coalesced_quic_ids_are_not_extra_connections(self):
+        self.assertEqual(runner.outer_flow_count([{"flow": "0"}, {"flow": "0,0"}]), 1)
+
+    def test_continuous_budget_includes_active_leases_and_idle(self):
+        stats = self.stats()
+        stats.update({"requests": runner.profile_requests("continuous-v1"), "write_errors": 0,
+                      "cell_capacities": {"8192": 6, "32768": 2, "65536": 12},
+                      "idle_started": 1, "idle_completed": 0, "idle_cancelled": 1})
+        stats["requests"]["GET /api/events/idle"] = 1
+        runner.validate_http_graph(stats, "continuous-v1", "reference")
+        stats["requests"]["GET /api/data/download"] = 4
+        stats["requests"]["POST /api/sync"] += 4
+        stats["cell_capacities"]["65536"] += 4
+        stats["download_bytes"] += 4 * 65536
+        stats["upload_bytes"] += 4 * 4096
+        runner.validate_http_graph(stats, "continuous-v1", "replace")
+        stats["download_bytes"] += 1
+        with self.assertRaises(RuntimeError):
+            runner.validate_http_graph(stats, "continuous-v1", "replace")
+
+    def test_strict_h2_fixture_aliases(self):
+        target_spec = importlib.util.spec_from_file_location("carrier_target", runner.INTEGRATION / "target_server.py")
+        target = importlib.util.module_from_spec(target_spec)
+        target_spec.loader.exec_module(target)
+        handler = object.__new__(target.Handler)
+        received = []
+        handler.send_bytes = lambda *value: received.append(value)
+        handler.send_error = lambda *value: self.fail("alias rejected")
+        handler.path = "/camouflage/delay?ms=0"
+        with mock.patch.object(target.time, "sleep"):
+            handler.do_GET()
+        self.assertEqual(received[-1][1], target.SMALL_BODY)
+        payload = b"carrier alias upload"
+        handler.path = "/camouflage/slow-upload?ms=0"
+        handler.rfile = io.BytesIO(payload)
+        handler.headers = {"Content-Length": str(len(payload))}
+        handler.do_POST()
+        self.assertEqual(json.loads(received[-1][1]), {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
+
     def test_frozen_budgets(self):
         down = {"v1": 1671168, "duplex-v1": 1671168, "compact": 884736,
                 "compact-sync": 884736, "compact-sync20": 1146880,
                 "compact-fast20": 1146880, "staged": 770048,
                 "staged-fast": 770048, "staged-fast20": 901120,
-                "staged-stream20": 901120, "staged-commit20": 905216}
+                "staged-stream20": 901120, "staged-commit20": 905216, "continuous-v1": 901120}
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)

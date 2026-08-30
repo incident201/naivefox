@@ -419,3 +419,84 @@ Thus merely waiting for the late marker does not repair the finite lifecycle.
 Final checks for this block passed 160 capture/analysis tests, five focused
 carrier harness tests, eleven JavaScript tests and all four Go race-test
 packages in the isolated namespace. No minimized/full Firefox rebuild was needed.
+
+## Continuous lifecycle preregistration
+
+At the user's request, the next implementation is `continuous-v1`. History
+preflight checked all-ref carrier/finite/idle polling, wake, state and budget
+commit records and the retained finite-tail failures. The old finite adapters
+already replenished data-driven windows; merely keeping them alive is not the
+new premise. Here useful bytes still replace filler in fixed application-state
+capacities, with bounded multiplexing and no outer CONNECT.
+
+Keep `staged-fast20`'s initial application job as a matched starting point, then
+continue indefinitely. Interactive, download, upload and mixed activity grant
+four-transaction leases with fixed capacities within a lease: 4/8 KiB up/down,
+4/64 KiB, 128/8 KiB and 128/64 KiB, respectively. Coarse queue pressure selects
+state only at lease boundaries. After the initial job, display painting no
+longer blocks network turnover. This does not promise identical total traffic
+for empty and loaded sessions: state transitions intentionally reflect activity.
+
+Idle uses one ordinary GET `/api/events/idle`, a fixed 512-byte response held
+for at most 30 seconds, ending sooner on server work. A local IPC notification
+wakes a pending idle poll with a normal fixed 4-KiB POST; it must not wait for
+the timeout. No outer WebSocket, background rapid polling, unbounded response,
+or hard-coded delay before useful transfer is added. At rest the carrier-body
+budget is 512 bytes per 30 seconds (61,440 bytes/hour), excluding HTTP/TLS/IP
+overhead; actual idle wire cost must be measured rather than equated to this
+body-only bound. This bounded long poll is a normal application request, not
+a replacement long-lived raw tunnel. Session expiry and cancellation must
+account for the in-flight poll.
+
+Admission must cover late server bytes, wake after an idle interval, sequential
+and concurrent local connections, larger downloads and uploads, per-stream
+credits, cancellation and bounded state. The initial app-complete marker no
+longer terminates transport. A fixed-window residual capture may end with one
+valid idle poll pending; completed active exchanges must retain exact capacity
+accounting. Normal Firefox controls execute the same initial application and
+idle behavior, without replaying a candidate's observed state trace. First
+qualify liveness and idle cost, then short paired residual/timing measurements.
+
+The first continuous H3 canonical admission completed, then remained alive in
+idle; twelve dynamic slots were needed after the initial job. Those extra
+327,680 response bytes are real cost, not hidden behind the initial marker.
+The H2 four-connection hash probe passed. The first extended H2 session admitted
+a 1-MiB download after idle but stopped on the delayed-response digest: the
+strict inner H2 fixture only reverse-proxies `/camouflage*`, so `/delay`
+returned an empty response instead of exercising target delay. Add explicit
+`/camouflage/delay` and `/camouflage/slow-upload` aliases to the existing fixture
+handlers; do not interpret that invalid route test as transport success/failure.
+
+Corrected extended sessions passed on H2 and H3: initial four mixed-listener
+downloads, a 1-MiB download after idle, a genuinely delayed 1.5-second server
+response while the application was idle, a hash-checked 1-MiB slow upload,
+four concurrent 512-KiB downloads, then another small connection. Twelve
+logical streams reused each running browser transport. All bytes matched;
+active cells retained their declared capacities, and one idle poll cancelled
+normally when the worker shut down.
+
+H3 additionally stayed idle for 65.256 seconds: 2,649 outer IP-level bytes in
+15 packets, with two new application poll starts and no active state changes.
+That short observation extrapolates to about 146 kB/hour (not a measured hour
+or a universal link-independent bound). A fresh 4-KiB download then completed
+in about 29 ms, without waiting for the 30-second idle timeout. Artifact:
+`continuous-h3-session-idle`. H2 artifact: `continuous-h2-session2`.
+
+Next comparisons freeze this implementation: two randomized fixed-work session
+pairs per protocol (seeds 202608312/202608313), then lean two-block canonical
+residual screens (202608314/202608315). The session control is the unchanged
+native client with both local listener types. Identical curl workloads compare
+warmed-session download/upload timing, with complete-session wire accounting;
+these are not browser-page completion metrics. A single H2 pair at outer
+10 Mbit/s (202608316) checks whether the cost/rate result changes when the link,
+rather than loopback processing, is limiting. This is not a full size/link matrix.
+
+The first two H2 session pairs completed with exact bodies and single outer
+connections. Mean total wire grew from 4,968,428 to 6,558,423 bytes (+32.00%).
+However, 1-MiB download time grew from 20.813 to 143.474 ms (85.49% lower
+effective rate), and four parallel 512-KiB downloads from 31.837 to 255.127 ms
+(87.52% lower aggregate effective rate). The intentionally slow 1-MiB upload
+grew from 304.755 to 343.731 ms; its 11.34% rate loss is not an unrestricted
+upload-throughput result because the target deliberately pauses per read.
+The protocol is live and economical at rest, but active transport throughput
+is not solved. `session_costs.py` reproduces these paired-session calculations.

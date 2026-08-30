@@ -27,6 +27,7 @@ from camouflage_browser_controller import firefox_preferences
 from camouflage_capture_health import validate_dumpcap_log
 import camouflage_features as features
 import camouflage_superblocks as superblocks
+import session_exercise
 
 OLD = Path("/home/zubastik/naivefox-refresh-20260830.fJHfmY")
 FIREFOX = OLD / "reference/firefox/firefox"
@@ -40,13 +41,14 @@ PROFILES = {
     "staged-fast20": (20, 65536),
     "staged-stream20": (20, 65536),
     "staged-commit20": (20, 65536),
+    "continuous-v1": (20, 65536),
 }
 
 
 def profile_budget(name):
     rounds, media = PROFILES[name]
     down = 4 * 24576 + (rounds - 4) * media
-    if name.startswith("staged"):
+    if name.startswith("staged") or name == "continuous-v1":
         down = 770048 + (rounds - 18) * 65536
     duplex = name.startswith("duplex") or name.startswith("compact-sync") or name == "compact-fast20"
     cells = rounds + (name == "staged-commit20")
@@ -65,7 +67,7 @@ def profile_requests(name):
         requests[upload] = requests.get(upload, 0) + 1
         if not duplex:
             capacity = media if middle else 24576
-            if name.startswith("staged"):
+            if name.startswith("staged") or name == "continuous-v1":
                 capacity = 8192 if index < 4 or index >= rounds - 2 else 32768 if index < 6 else media
             path = {8192: "/api/events/brief", 32768: "/api/events/state", 24576: "/api/events"}.get(capacity, f"/media/chunk/{index}")
             requests["GET " + path] = requests.get("GET " + path, 0) + 1
@@ -74,8 +76,38 @@ def profile_requests(name):
     return requests
 
 
+def outer_flow_count(events):
+    return len({value for event in events for value in features.split_values(event["flow"])})
+
+
 def validate_http_graph(stats, name, mode):
     if mode == "default":
+        return
+    if name == "continuous-v1":
+        initial = profile_requests(name)
+        actual = stats["requests"]
+        dynamic = {"POST /api/sync", "POST /api/upload/chunk", "GET /api/events/idle", *("GET /api/data/" + state for state in ("interactive", "download", "upload", "mixed"))}
+        if stats["connect"] or stats["rejected"] or stats["write_errors"]:
+            raise RuntimeError("continuous transport errors")
+        if any(actual.get(path, 0) < count for path, count in initial.items()) or any(path not in initial and path not in dynamic for path in actual):
+            raise RuntimeError("continuous HTTP surface")
+        if any(actual.get(path) != count for path, count in initial.items() if path != "POST /api/sync"):
+            raise RuntimeError("continuous bootstrap multiplicity")
+        if any(actual.get("GET /api/data/" + state, 0) % 4 for state in ("interactive", "download", "upload", "mixed")):
+            raise RuntimeError("incomplete continuous activity lease")
+        capacities = stats["cell_capacities"]
+        expected = {"8192": 6 + actual.get("GET /api/data/interactive", 0) + actual.get("GET /api/data/upload", 0),
+                    "32768": 2, "65536": 12 + actual.get("GET /api/data/download", 0) + actual.get("GET /api/data/mixed", 0)}
+        if stats["idle_completed"]:
+            expected["512"] = stats["idle_completed"]
+        if capacities != expected or stats["download_bytes"] != sum(int(capacity) * count for capacity, count in capacities.items()):
+            raise RuntimeError("continuous fixed response capacities")
+        if stats["upload_bytes"] != actual.get("POST /api/sync", 0) * 4096 + actual.get("POST /api/upload/chunk", 0) * 131072:
+            raise RuntimeError("continuous fixed upload capacities")
+        if stats["idle_started"] != stats["idle_completed"] + stats["idle_cancelled"] or stats["idle_cancelled"] > 1:
+            raise RuntimeError("continuous idle ownership")
+        if mode == "reference" and (stats["opens"] or stats["download_useful"] or stats["upload_useful"]):
+            raise RuntimeError("empty continuous visitor")
         return
     rounds, down, up, requests = profile_budget(name)
     if stats["connect"] or stats["rejected"] or sum(stats["requests"].values()) != requests or stats["requests"] != profile_requests(name):
@@ -222,7 +254,9 @@ class Campaign:
         self.outer_rate_mbit = rate
         write_json(self.root / "outer-shaping.json", {"rate_mbit": rate, "scope": "outer-port-only-both-directions", "qdisc": subprocess.check_output(["tc", "qdisc", "show", "dev", "lo"], text=True)})
 
-    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1"):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False):
+        probe = probe or session_probe
+        capturing = capture or session_wire
         rounds = rounds or PROFILES[app_profile][0]
         directory = self.root / name
         directory.mkdir(mode=0o700)
@@ -242,11 +276,11 @@ class Campaign:
         worker = inner = None
         probes = []
         files = []
-        stage = tempfile.TemporaryDirectory(prefix="naivefox-carrier-capture-") if capture else None
+        stage = tempfile.TemporaryDirectory(prefix="naivefox-carrier-capture-") if capturing else None
         def launch(args, logname, env=None):
             log = (directory / logname).open("w"); files.append(log)
             return subprocess.Popen([str(v) for v in args], stdout=log, stderr=subprocess.STDOUT, env=env)
-        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile,"outer_rate_mbit":self.outer_rate_mbit}
+        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile,"outer_rate_mbit":self.outer_rate_mbit,"outer_port":self.port}
         journal = self.fixture / "inner-h2-access.jsonl"
         journal_offset = journal.stat().st_size if journal.exists() else 0
         try:
@@ -265,14 +299,22 @@ class Campaign:
                         with (native_profile / "user.js").open("a") as prefs:
                             prefs.write('user_pref("network.http.http3.enable", true);\nuser_pref("network.http.http3.disable_when_third_party_roots_found", false);\n')
                     proxy = ("quic" if self.protocol=="h3" else "https") + "://" + self.values["NAIVEFOX_FIXTURE_USER"] + ":" + self.values["NAIVEFOX_FIXTURE_PASS"] + f"@localhost:{self.port}"
-                    write_json(directory / "naive.json",{"listen":f"{kind}://127.0.0.1:{local_port}","proxy":proxy,"host-resolver-rules":"MAP localhost 127.0.0.1","log":""})
+                    listeners = f"{kind}://127.0.0.1:{local_port}"
+                    if probe:
+                        http_port = local_port
+                        while http_port == local_port:
+                            with socket.socket() as listener:
+                                listener.bind(("127.0.0.1", 0));http_port=listener.getsockname()[1]
+                        ready={"socks":f"127.0.0.1:{local_port}","http":f"127.0.0.1:{http_port}"}
+                        listeners=[scheme+"://"+address for scheme,address in ready.items()]
+                    write_json(directory / "naive.json",{"listen":listeners,"proxy":proxy,"host-resolver-rules":"MAP localhost 127.0.0.1","log":""})
                     naive = launch([PACKAGE / "naivefox",directory / "naive.json"],"naive.log",dict(os.environ,NAIVEFOX_PROFILE=str(native_profile)))
                     wait_for(lambda: naive.poll() is not None or subprocess.check_output(["ss","-H","-ltn",f"sport = :{local_port}"],text=True).strip())
                     if naive.poll() is not None: raise RuntimeError("naive startup")
                 else:
                     write_json(directory / "bridge.json",{"key":key,"token":token,"origin":f"https://localhost:{self.port}",
                                "certificate":str(self.fixture / "pki/target.crt"),"private_key":str(self.fixture / "pki/target.key"),
-                               "ready":str(directory / "bridge-ready.json"),"stats":str(directory / "bridge-stats.json"),"append":mode=="append"})
+                               "ready":str(directory / "bridge-ready.json"),"stats":str(directory / "bridge-stats.json"),"append":mode=="append","continuous":app_profile=="continuous-v1"})
                     bridge = launch([self.root.parent / "bin/bridge","--config",directory / "bridge.json"],"bridge.log")
                     wait_for(lambda:(directory / "bridge-ready.json").exists() or bridge.poll() is not None)
                     if bridge.poll() is not None: raise RuntimeError("bridge startup")
@@ -293,14 +335,14 @@ class Campaign:
                 fragment["bridge"]=f"wss://127.0.0.1:{ready['websocket'].split(':')[1]}/bridge?token={token}"
             outer=f"https://localhost:{self.port}/#"+urllib.parse.urlencode(fragment)
             if probe:
-                if reference or control or capture:raise RuntimeError("probe is separate functional admission")
+                if reference or capture:raise RuntimeError("probe is separate functional admission")
                 expected=subprocess.check_output(["curl","--silent","--show-error","--fail","--noproxy","*",f"http://127.0.0.1:{self.values['NAIVEFOX_FIXTURE_HTTP_PORT']}/camouflage/resource?size=98304"])
                 expected_digest=hashlib.sha256(expected).hexdigest()
-            if capture:
+            if capturing:
                 monitor=launch([sys.executable,INTEGRATION / "monitor-network-mutations.py","--ready",directory / "network-ready","--events",directory / "network-events","--done",directory / "network-done"],"network.log")
                 wait_for(lambda:(directory / "network-ready").exists() or monitor.poll() is not None)
                 if monitor.poll() is not None:raise RuntimeError("network monitor startup")
-                cap=launch(["dumpcap","-q","-i","any","-f",f"port {self.port}","-a","duration:20","-a","filesize:131072","-w",Path(stage.name) / "outer.pcapng"],"dumpcap.log")
+                cap=launch(["dumpcap","-q","-i","any","-f",f"port {self.port}","-a","duration:120","-a","filesize:131072","-w",Path(stage.name) / "outer.pcapng"],"dumpcap.log")
                 wait_for(lambda:"File:" in (directory / "dumpcap.log").read_text() or cap.poll() is not None)
                 if cap.poll() is not None:raise RuntimeError("capture startup")
             start=time.monotonic()
@@ -316,7 +358,7 @@ class Campaign:
             target_done=reference
             while time.monotonic()-start<(2 if capture else 15):
                 if worker:
-                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0,action:!!window.__NFC_ACTION_DONE__}")
+                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0,action:!!window.__NFC_ACTION_DONE__,phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,dynamic:window.__NFC_DYNAMIC_ROUNDS__||0,idle:window.__NFC_IDLE_POLLS__||0,wake:window.__NFC_IDLE_WAKE_POSTS__||0}")
                     if not isinstance(state,dict):time.sleep(.01);continue
                     if state["error"]:raise RuntimeError("SPA admission: "+state["error"])
                     app_done=state["done"]
@@ -324,11 +366,12 @@ class Campaign:
                     result["early_prefix_cells"]=state["early"]
                     result["filler_pending_at_delivery"]=state["early_filler"]
                     result["action_done"]=state["action"]
+                    result["application_state"]={key:state.get(key) for key in ("phase","alive","dynamic","idle","wake")}
                 target_done=all(p.poll()==0 for p in probes) if probe else reference or (self.fixture / "completions" / completion).exists()
                 if not reference and target_done and "target_done_ms" not in result:result["target_done_ms"]=round((time.monotonic()-start)*1000,3)
                 if app_done and (not control or target_done) and "app_done_ms" not in result:
                     result["app_done_ms"]=round((time.monotonic()-start)*1000,3)
-                if app_done and target_done:
+                if app_done and target_done and (app_profile!="continuous-v1" or control or state.get("phase")=="idle"):
                     break
                 time.sleep(.01)
             result["app_done"]=app_done;result["target_done"]=target_done
@@ -337,6 +380,12 @@ class Campaign:
                     raise RuntimeError("byte-exact proxy probe digest")
                 result["byte_exact_concurrent_probes"]=4
                 result["probe_body_bytes_each"]=len(expected)
+            if session_probe and app_done and target_done:
+                def launch_job(args, log):
+                    process = launch(args, log)
+                    probes.append(process)
+                    return process
+                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds)
             if journal.exists():
                 with journal.open() as source:
                     source.seek(journal_offset)
@@ -346,17 +395,30 @@ class Campaign:
                 uri=inner.execute_script("return document.documentURI")
                 result["inner_state"]=inner.execute_script("return document.readyState")
                 result["inner_error_code"]=urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query).get("e",[""])[0]
-            if capture:
-                remaining=2-(time.monotonic()-start)
+            if capturing:
+                remaining=2-(time.monotonic()-start) if capture else 0
                 if remaining>0:time.sleep(remaining)
                 if cap.poll() is None:cap.send_signal(signal.SIGINT);cap.wait(timeout=10)
                 validate_dumpcap_log((directory / "dumpcap.log").read_text())
-                result["capture_window_seconds"]=2
+                result["capture_window_seconds"]=2 if capture else round(time.monotonic()-start,3)
+                result["capture_purpose"]="residual-fixed-window" if capture else "fixed-work-session-wire-cost"
                 stop(monitor)
                 if monitor.returncode!=0 or not (directory / "network-done").exists() or (directory / "network-events").stat().st_size:
                     raise RuntimeError("capture network mutation")
                 result["network_mutation_check"]="passed"
+                if session_wire:
+                    events,_=(features.packet_events_h2 if self.protocol=="h2" else features.packet_events_h3)(str(Path(stage.name) / "outer.pcapng"),self.port)
+                    if not events or any(event["wire_size"]>1500 for event in events):
+                        raise RuntimeError("session wire packet admission")
+                    if self.protocol=="h3" and features.packet_events_h2(str(Path(stage.name) / "outer.pcapng"),self.port)[0]:
+                        raise RuntimeError("TCP traffic in strict H3 session capture")
+                    result["session_wire"]={"bytes":sum(event["wire_size"] for event in events),"packets":len(events),"client_bytes":sum(event["wire_size"] for event in events if event["direction"]>0),"server_bytes":sum(event["wire_size"] for event in events if event["direction"]<0),"outer_flows":outer_flow_count(events)}
             if worker:result["worker_memory"]=process_memory(worker.capabilities["moz:processID"])
+            if worker and app_profile=="continuous-v1":
+                final=worker.execute_script("return {phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,error:window.__NFC_ERROR__,dynamic:window.__NFC_DYNAMIC_ROUNDS__,idle:window.__NFC_IDLE_POLLS__,wake:window.__NFC_IDLE_WAKE_POSTS__}")
+                result["application_state"]=final
+                if final["error"] or not final["alive"] or final["phase"]!="idle":
+                    raise RuntimeError("continuous application did not reach live idle")
             if bridge:result["bridge_memory"]=process_memory(bridge.pid)
             if naive:result["native_memory"]=process_memory(naive.pid)
             if not app_done or not target_done:raise RuntimeError("workload outside application capacity phase")
@@ -384,6 +446,11 @@ class Campaign:
             for source in ("server-stats","bridge-stats"):
                 path=directory / (source+".json")
                 if path.exists():result[source]=json.loads(path.read_text())
+            if result.get("admitted") and rounds == PROFILES[app_profile][0]:
+                try:
+                    validate_http_graph(result["server-stats"],app_profile,mode)
+                except RuntimeError as error:
+                    result["admitted"]=False;result["failure"]=str(error)
             write_json(directory / "result.json",result)
         return result
 
@@ -440,9 +507,25 @@ def main():
     parser.add_argument("--outer-rate-mbit",type=int,default=0)
     parser.add_argument("--capture",action="store_true")
     parser.add_argument("--probe",action="store_true")
+    parser.add_argument("--session-probe",action="store_true")
+    parser.add_argument("--session-pairs",type=int,default=0)
+    parser.add_argument("--session-wire",action="store_true")
+    parser.add_argument("--idle-seconds",type=int,default=0)
     parser.add_argument("--screen",type=int,default=0)
     parser.add_argument("--seed",type=int,default=202608301)
     args=parser.parse_args()
+    if args.session_pairs < 0 or args.session_pairs > 8 or (args.session_pairs and (args.app_profile!="continuous-v1" or args.screen or args.capture or args.idle_seconds)):
+        parser.error("session pairs require the continuous profile, no residual/idle capture, and at most eight pairs")
+    if args.session_wire and (not args.session_probe or args.idle_seconds):
+        parser.error("whole-session wire accounting requires a session probe without long-idle measurement")
+    if args.session_probe and (args.app_profile!="continuous-v1" or args.mode not in ("replace","default") or args.capture or args.screen):
+        parser.error("session probes require the continuous profile or its native control without a residual screen")
+    if args.idle_seconds < 0 or args.idle_seconds > 120 or (args.idle_seconds and not args.session_probe):
+        parser.error("idle duration requires a session probe and must be at most 120 seconds")
+    if args.idle_seconds and args.mode!="replace":
+        parser.error("idle wire measurement currently requires the continuous worker")
+    if args.app_profile=="continuous-v1" and (args.mode=="append" or (args.screen and not args.screen_lean)):
+        parser.error("continuous append ablation is not qualified; use lean screens")
     if args.outer_rate_mbit < 0 or args.outer_rate_mbit > 1000 or args.timing_pair < 0:
         parser.error("invalid timing/rate bounds")
     if args.outer_rate_mbit and (args.capture or args.screen):
@@ -462,6 +545,20 @@ def main():
         campaign.start()
         if args.outer_rate_mbit:
             campaign.shape_outer(args.outer_rate_mbit)
+        if args.session_pairs:
+            rng=random.Random(args.seed)
+            schedule=[]
+            for block in range(args.session_pairs):
+                modes=["default","replace"]
+                rng.shuffle(modes)
+                schedule.extend({"block":block,"mode":value} for value in modes)
+            write_json(args.root / "session-schedule.json",schedule)
+            for index,row in enumerate(schedule):
+                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=args.app_profile,session_probe=True,session_wire=True)
+                print(json.dumps({key:value for key,value in result.items() if key not in ("server-stats","bridge-stats","inner_http_statuses")},sort_keys=True),flush=True)
+                if not result["admitted"]:
+                    return 1
+            return 0
         if args.timing_pair:
             rng=random.Random(args.seed)
             schedule=[]
@@ -485,7 +582,7 @@ def main():
         if args.screen:
             campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean)
             return 0
-        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile)
+        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire)
         print(json.dumps(result,sort_keys=True),flush=True)
         return 0 if result["admitted"] else 1
     finally:campaign.close()
