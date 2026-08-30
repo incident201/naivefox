@@ -37,6 +37,39 @@ inside `--objdir`. Per-run configs, certificates and logs remain private;
 not passing evidence. Server build instructions and the maintained protocol
 boundary are linked from [NO-CONNECT.md](../../NO-CONNECT.md).
 
+Run the separate fail-closed HTTP-envelope gate with the same arguments:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-adversarial-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy
+```
+
+It rejects mismatched profiles, appended/oversized cells, wrong capacities,
+truncated filler, invalid sequence/reserved fields, redirects, HTTP authentication
+prompts and cross-protocol fallback. The corrupt responses come from isolated
+Caddy test routes; production server code is not modified. `--case` narrows a
+run to one or more named cases, and `--protocol` selects H2 or H3. Each refusal
+must reach a local connection failure without an outer CONNECT, redirect follow,
+authentication retry or target open after rejected bootstrap.
+
+The Windows adapter runs the same transfer and rejection matrix with the actual
+staged Windows executable and Windows local clients:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-windows \
+  --runtime /absolute/path/to/staged/naivefox.exe \
+  --caddy /absolute/path/to/combined-linux-caddy \
+  --windows-python '/mnt/c/absolute/path/to/python.exe'
+```
+
+Run the adapter as root in WSL. It creates its own isolated network namespace,
+uses a loopback relay for the private Caddy/target fixture, and owns the Windows
+client process through a kill-on-close Job Object. All fixture state remains
+below the supplied object directory; no existing network-namespace wrapper is
+needed. `--protocol h2` or `--protocol h3` narrows an iteration.
+
 ## Complete local gate
 
 From the repository root, run:

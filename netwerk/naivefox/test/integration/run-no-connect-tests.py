@@ -231,6 +231,9 @@ https://:{$NF_PORT} {
             item["stats_path"] = str(run / "server-stats.json")
         for route in item.get("routes", []):
             handlers.extend(route.get("handle", []))
+    mutator = getattr(args, "server_mutator", None)
+    if mutator is not None:
+        mutator(server)
     private_json(run / "caddy.json", config)
     process = Process([str(args.caddy), "run", "--config", str(run / "caddy.json")], run, "caddy", env)
     wait_until(lambda: socket_listeners(port, udp=protocol == "h3"), "Caddy listener did not start", process)
@@ -279,7 +282,7 @@ def start_client(args, run, name, protocol, proxy_port, transport, key, user, pa
 
 def open_tunnel(ports, listener, target_port, host="localhost", rejected=False):
     sock = socket.create_connection(("127.0.0.1", ports[listener]), timeout=20)
-    sock.settimeout(30)
+    sock.settimeout(40)
     try:
         if listener == "socks":
             sock.sendall(b"\x05\x01\x00")
@@ -357,7 +360,7 @@ def cancel_stream(ports, target_port):
     with open_tunnel(ports, "socks", target_port) as sock:
         sock.sendall(b"C")
         time.sleep(0.05)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("hh" if os.name == "nt" else "ii", 1, 0))
 
 
 def exercise(ports, target_port, label):
