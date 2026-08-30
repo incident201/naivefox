@@ -1011,6 +1011,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "h2-finite-both-read-through-http-connect": "document-first-buffer-http-connect",
         "h2-finite-both-read-through-budgeted-socks": "document-first-buffer-task-overlap",
         "h2-finite-both-read-through-budgeted-http-connect": "document-first-buffer-http-connect",
+        "h2-finite-both-read-through-budgeted-data-window-socks": "document-first-buffer-task-overlap",
+        "h2-finite-both-read-through-budgeted-data-window-http-connect": "document-first-buffer-http-connect",
     }
     if arm in finite_arms:
         if protocol != "h2":
@@ -1047,6 +1049,18 @@ def validate_sample(arm, protocol, log_text, feature_document):
             for line in log_text.splitlines()
             if (item := ESTABLISHED.fullmatch(line))
         ]
+        deferred = re.findall(
+            r"^(?:\[[^\]\r\n]+\] )?Connection (\d+) finite-exchanges "
+            r"download-window-deferred=1 initial=1 maximum=4$",
+            log_text,
+            re.M,
+        )
+        expanded = re.findall(
+            r"^(?:\[[^\]\r\n]+\] )?Connection (\d+) finite-exchanges "
+            r"download-window-expanded=1 trigger=first-data window=4$",
+            log_text,
+            re.M,
+        )
         if (
             not ready
             or len(set(ready)) != len(ready)
@@ -1067,11 +1081,33 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 if "budgeted" in arm
                 else bool(budgeted)
             )
+            or (
+                sorted(deferred) != sorted(ready) or sorted(expanded) != sorted(ready)
+                if "data-window" in arm
+                else bool(deferred or expanded)
+            )
             or "finite-exchanges failure=" in log_text
         ):
             raise ValueError(
                 "finite exchange negotiation or rotation evidence is incomplete"
             )
+        if "data-window" in arm:
+            for connection in ready:
+                phases = (
+                    "ready=1",
+                    "download-window-deferred=1",
+                    "streamed-before-stop=1",
+                    "download-window-expanded=1",
+                    "budgeted-download-complete=1",
+                )
+                positions = [
+                    log_text.index(f"Connection {connection} finite-exchanges {phase}")
+                    for phase in phases
+                ]
+                if positions != sorted(positions):
+                    raise ValueError(
+                        "finite download credit activation ordering is invalid"
+                    )
         features = feature_document.get("features", {})
         if features.get("tls_client_hello_count") != 1.0:
             raise ValueError("finite exchanges require exactly one outer ClientHello")
@@ -3573,6 +3609,8 @@ def main():
             "h2-finite-both-read-through-http-connect",
             "h2-finite-both-read-through-budgeted-socks",
             "h2-finite-both-read-through-budgeted-http-connect",
+            "h2-finite-both-read-through-budgeted-data-window-socks",
+            "h2-finite-both-read-through-budgeted-data-window-http-connect",
             "off",
             "gate",
             "root",

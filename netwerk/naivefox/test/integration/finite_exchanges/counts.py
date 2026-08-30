@@ -14,6 +14,7 @@ ARMS = tuple(
         "read-through-",
         "both-read-through-",
         "both-read-through-budgeted-",
+        "both-read-through-budgeted-data-window-",
     )
     for listener in ("socks", "http-connect")
 )

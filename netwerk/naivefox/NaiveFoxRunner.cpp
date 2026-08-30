@@ -167,6 +167,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
         aConfig.mDiagnosticH2FiniteStreamUploads;
     tunnelConfig.mDiagnosticH2FiniteBudgetedDownloads =
         aConfig.mDiagnosticH2FiniteBudgetedDownloads;
+    tunnelConfig.mDiagnosticH2FiniteDataWindow =
+        aConfig.mDiagnosticH2FiniteDataWindow;
   }
   return tunnelConfigs;
 }

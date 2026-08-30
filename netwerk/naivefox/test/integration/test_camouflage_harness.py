@@ -5209,6 +5209,14 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             ("h2-finite-both-read-through-http-connect", "first-data-buffer"),
             ("h2-finite-both-read-through-budgeted-socks", "first-data-buffer-task"),
             ("h2-finite-both-read-through-budgeted-http-connect", "first-data-buffer"),
+            (
+                "h2-finite-both-read-through-budgeted-data-window-socks",
+                "first-data-buffer-task",
+            ),
+            (
+                "h2-finite-both-read-through-budgeted-data-window-http-connect",
+                "first-data-buffer",
+            ),
         ):
             with self.subTest(arm=arm):
                 config = CONFIG.build_config(arm, "h2", 1080, 443, "u", "p")
@@ -5224,6 +5232,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                 self.assertEqual(
                     bool(config.get("diagnostic-h2-finite-budgeted-downloads")),
                     "budgeted" in arm,
+                )
+                self.assertEqual(
+                    bool(config.get("diagnostic-h2-finite-data-window")),
+                    "data-window" in arm,
                 )
                 self.assertEqual(
                     config["listen"].split(":")[0],
@@ -5243,10 +5255,20 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     "Connection 1 established target=localhost:443 outer=h2 padding=yes\n"
                     "Connection 1 finite-exchanges rotated=1\n"
                 )
+                if "data-window" in arm:
+                    log += (
+                        "Connection 1 finite-exchanges download-window-deferred=1 "
+                        "initial=1 maximum=4\n"
+                    )
                 if "read-through" in arm:
                     log += "Connection 1 finite-exchanges streamed-before-stop=1\n"
                 if "both-read-through" in arm:
                     log += "Connection 1 finite-exchanges upload-read-through=1\n"
+                if "data-window" in arm:
+                    log += (
+                        "Connection 1 finite-exchanges download-window-expanded=1 "
+                        "trigger=first-data window=4\n"
+                    )
                 if "budgeted" in arm:
                     log += (
                         "Connection 1 finite-exchanges "
@@ -5268,6 +5290,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     log + "Connection 1 finite-exchanges upload-read-through=1\n",
                     log + "Connection 1 finite-exchanges "
                     "budgeted-download-complete=1 bytes=65536\n",
+                    log + "Connection 1 finite-exchanges download-window-deferred=1 "
+                    "initial=1 maximum=4\n",
+                    log + "Connection 1 finite-exchanges download-window-expanded=1 "
+                    "trigger=first-data window=4\n",
                 ):
                     with self.assertRaises(ValueError):
                         SAMPLE.validate_sample(arm, "h2", bad, features)
@@ -5297,6 +5323,47 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     for bad in (
                         log.replace("budgeted-download-complete=1", "missing-marker"),
                         log.replace("bytes=65536\n", "bytes=65535\n"),
+                    ):
+                        with self.assertRaises(ValueError):
+                            SAMPLE.validate_sample(arm, "h2", bad, features)
+                if "data-window" in arm:
+                    for bad in (
+                        log.replace("download-window-deferred=1", "missing-marker"),
+                        log.replace("download-window-expanded=1", "missing-marker"),
+                        log.replace("initial=1 maximum=4", "initial=4 maximum=4"),
+                        log.replace("trigger=first-data", "trigger=timer"),
+                        log
+                        .replace(
+                            "download-window-deferred=1 initial=1 maximum=4",
+                            "placeholder",
+                        )
+                        .replace(
+                            "download-window-expanded=1 trigger=first-data window=4",
+                            "download-window-deferred=1 initial=1 maximum=4",
+                        )
+                        .replace(
+                            "placeholder",
+                            "download-window-expanded=1 trigger=first-data window=4",
+                        ),
+                        log
+                        .replace(
+                            "budgeted-download-complete=1 bytes=65536", "placeholder"
+                        )
+                        .replace(
+                            "download-window-expanded=1 trigger=first-data window=4",
+                            "budgeted-download-complete=1 bytes=65536",
+                        )
+                        .replace(
+                            "placeholder",
+                            "download-window-expanded=1 trigger=first-data window=4",
+                        ),
+                        log.replace(
+                            "download-window-deferred=1 initial=1 maximum=4",
+                            "download-window-expanded=1 trigger=first-data window=4",
+                        ).replace(
+                            "streamed-before-stop=1",
+                            "download-window-deferred=1 initial=1 maximum=4",
+                        ),
                     ):
                         with self.assertRaises(ValueError):
                             SAMPLE.validate_sample(arm, "h2", bad, features)

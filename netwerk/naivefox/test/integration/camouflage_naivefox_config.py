@@ -23,6 +23,8 @@ FINITE_ARMS = {
     "h2-finite-both-read-through-http-connect": "document-first-buffer-http-connect",
     "h2-finite-both-read-through-budgeted-socks": "document-first-buffer-task-overlap",
     "h2-finite-both-read-through-budgeted-http-connect": "document-first-buffer-http-connect",
+    "h2-finite-both-read-through-budgeted-data-window-socks": "document-first-buffer-task-overlap",
+    "h2-finite-both-read-through-budgeted-data-window-http-connect": "document-first-buffer-http-connect",
 }
 
 
@@ -59,6 +61,8 @@ def build_config(
             config["diagnostic-h2-finite-stream-uploads"] = True
         if "budgeted" in arm:
             config["diagnostic-h2-finite-budgeted-downloads"] = True
+        if "data-window" in arm:
+            config["diagnostic-h2-finite-data-window"] = True
         return config
     supported_arms = (
         "off",
@@ -562,6 +566,8 @@ def main():
             "h2-finite-both-read-through-http-connect",
             "h2-finite-both-read-through-budgeted-socks",
             "h2-finite-both-read-through-budgeted-http-connect",
+            "h2-finite-both-read-through-budgeted-data-window-socks",
+            "h2-finite-both-read-through-budgeted-data-window-http-connect",
             "off",
             "gate",
             "root",

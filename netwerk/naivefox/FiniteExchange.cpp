@@ -99,6 +99,7 @@ class FiniteExchange::Impl final {
   bool mReading = false;
   bool mFlushing = false;
   bool mStreamedBeforeStop = false;
+  bool mDataWindowActivated = false;
   bool mClosed = false;
 };
 
@@ -218,9 +219,20 @@ NS_IMETHODIMP FiniteExchange::Listener::OnDataAvailable(nsIRequest*,
     return NS_ERROR_UNEXPECTED;
   }
   RefPtr owner = mOwner;
-  return owner && owner->mImpl->mConfig.mDiagnosticH2FiniteReadThrough
-             ? owner->FlushDownloads()
-             : NS_OK;
+  if (owner && owner->mImpl->mConfig.mDiagnosticH2FiniteReadThrough) {
+    MOZ_TRY(owner->FlushDownloads());
+    auto& state = *owner->mImpl;
+    if (aCount && !state.mClosed && !state.mDataWindowActivated &&
+        state.mConfig.mDiagnosticH2FiniteDataWindow) {
+      state.mDataWindowActivated = true;
+      RuntimeLogEvent(
+          "Connection %llu finite-exchanges download-window-expanded=1 "
+          "trigger=first-data window=4\n",
+          static_cast<unsigned long long>(state.mConnectionId));
+      return owner->FillDownloads();
+    }
+  }
+  return NS_OK;
 }
 
 NS_IMETHODIMP FiniteExchange::Listener::OnStopRequest(nsIRequest*,
@@ -274,6 +286,13 @@ void FiniteExchange::Finished(Listener* aListener, nsresult aStatus) {
           "Connection %llu finite-exchanges upload-read-through=1\n",
           static_cast<unsigned long long>(mImpl->mConnectionId));
     }
+    if (mImpl->mConfig.mDiagnosticH2FiniteDataWindow) {
+      RuntimeLogEvent(
+          "Connection %llu finite-exchanges download-window-deferred=1 "
+          "initial=%llu maximum=%u\n",
+          static_cast<unsigned long long>(mImpl->mConnectionId),
+          static_cast<unsigned long long>(mImpl->mNextDownload), kDownloads);
+    }
     auto callback = std::move(mImpl->mCallback);
     callback(NS_OK, mImpl->mDownloadInput, mImpl->mUploadOutput);
     // The pipe endpoints are now owned by TunnelSession/DuplexPump. Keeping
@@ -319,7 +338,11 @@ nsresult FiniteExchange::FillDownloads() {
   if (mImpl->mDownloadFin || mImpl->mClosed) {
     return NS_OK;
   }
-  while (mImpl->mNextDownload - mImpl->mNextDelivery < kDownloads) {
+  const uint32_t window = mImpl->mConfig.mDiagnosticH2FiniteDataWindow &&
+                                  !mImpl->mDataWindowActivated
+                              ? 1
+                              : kDownloads;
+  while (mImpl->mNextDownload - mImpl->mNextDelivery < window) {
     const uint64_t seq = mImpl->mNextDownload;
     MOZ_TRY(Open("down", seq, EmptyCString(), false,
                  mImpl->mDownloads[seq % kDownloads]));

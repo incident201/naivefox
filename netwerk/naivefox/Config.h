@@ -233,6 +233,7 @@ struct Config final {
   bool mDiagnosticH2FiniteReadThrough = false;
   bool mDiagnosticH2FiniteStreamUploads = false;
   bool mDiagnosticH2FiniteBudgetedDownloads = false;
+  bool mDiagnosticH2FiniteDataWindow = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;

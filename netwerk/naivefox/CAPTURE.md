@@ -4333,6 +4333,15 @@ H2/inner-H2 blocks with Firefox A/B. Only p17--32 and Whole are preregistered.
 The breaking-default threshold, absence of site-specific waits, and the rule
 against a full matrix/resource sweep for weak candidates are unchanged.
 
+Functional admission for the data-activated window passed incremental minimized
+product/test builds, 105 C++ gtests and 175 Python tests. The ordinary v3
+controls and new candidates passed the complete four-arm integrity probes
+twice (`mefig5i4`, `gizsm6we`). The new capture gate checks actual initial
+request count and event ordering: ready, one-credit admission, streamed bytes,
+window expansion, full-budget completion. Missing, duplicate, reversed and
+timer-triggered evidence is rejected. Server source and the admitted Caddy
+binary remain byte-identical to the preceding v3 screen.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and

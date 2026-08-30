@@ -395,6 +395,7 @@ TEST(NaiveFoxConfig, FiniteExchangeDiagnosticIsExplicitAndH2Only)
   EXPECT_FALSE(config.mDiagnosticH2FiniteReadThrough);
   EXPECT_FALSE(config.mDiagnosticH2FiniteStreamUploads);
   EXPECT_FALSE(config.mDiagnosticH2FiniteBudgetedDownloads);
+  EXPECT_FALSE(config.mDiagnosticH2FiniteDataWindow);
   for (const char* listener : {"socks", "http"}) {
     nsAutoCString json("{\"listen\":\""_ns);
     json.Append(listener);
@@ -507,6 +508,32 @@ TEST(NaiveFoxConfig, BudgetedFiniteDownloadsRequireBidirectionalReadThrough)
     json.Append(tail);
     json.Append('}');
     EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+  }
+}
+
+TEST(NaiveFoxConfig, DataActivatedFiniteWindowRequiresBudgetedDownloads)
+{
+  Config config;
+  nsAutoCString error;
+  const nsCString prefix(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-finite-exchanges":true,"diagnostic-h2-finite-read-through":true,"diagnostic-h2-finite-stream-uploads":true,)"_ns);
+  nsCString valid(prefix);
+  valid.AppendLiteral(
+      R"("diagnostic-h2-finite-budgeted-downloads":true,"diagnostic-h2-finite-data-window":true})");
+  ASSERT_EQ(ParseConfig(valid, config, error), NS_OK) << error.get();
+  EXPECT_TRUE(config.mDiagnosticH2FiniteDataWindow);
+  for (
+      const char* tail : {
+          R"("diagnostic-h2-finite-data-window":true)",
+          R"("diagnostic-h2-finite-budgeted-downloads":false,"diagnostic-h2-finite-data-window":true)",
+          R"("diagnostic-h2-finite-budgeted-downloads":true,"diagnostic-h2-finite-data-window":1)",
+          R"("diagnostic-h2-finite-budgeted-downloads":true,"diagnostic-h2-finite-data-window":null)",
+          R"("diagnostic-h2-finite-budgeted-downloads":true,"diagnostic-h2-finite-data-window":true,"diagnostic-h2-finite-data-window":false)",
+      }) {
+    nsCString invalid(prefix);
+    invalid.Append(tail);
+    invalid.Append('}');
+    EXPECT_TRUE(NS_FAILED(ParseConfig(invalid, config, error)));
   }
 }
 
@@ -1129,6 +1156,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mDiagnosticH2FiniteReadThrough = true;
   source.mDiagnosticH2FiniteStreamUploads = true;
   source.mDiagnosticH2FiniteBudgetedDownloads = true;
+  source.mDiagnosticH2FiniteDataWindow = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1156,6 +1184,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mDiagnosticH2FiniteReadThrough);
     EXPECT_TRUE(copy->mDiagnosticH2FiniteStreamUploads);
     EXPECT_TRUE(copy->mDiagnosticH2FiniteBudgetedDownloads);
+    EXPECT_TRUE(copy->mDiagnosticH2FiniteDataWindow);
   }
 }
 

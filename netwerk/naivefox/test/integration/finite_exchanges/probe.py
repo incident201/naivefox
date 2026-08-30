@@ -103,6 +103,12 @@ def client(root, arm, bad_auth=False):
         "finite-exchanges budgeted-download-complete=1 bytes=65536" in text
     ):
         raise RuntimeError("finite download byte-budget mode was not verified")
+    for marker in (
+        "finite-exchanges download-window-deferred=1 initial=1 maximum=4",
+        "finite-exchanges download-window-expanded=1 trigger=first-data window=4",
+    ):
+        if not bad_auth and ("data-window" in arm) != (marker in text):
+            raise RuntimeError("finite data-activated receive window was not verified")
 
 
 def tunnel(arm, port, tls=False):
@@ -208,6 +214,8 @@ def main():
         "h2-finite-both-read-through-http-connect",
         "h2-finite-both-read-through-budgeted-socks",
         "h2-finite-both-read-through-budgeted-http-connect",
+        "h2-finite-both-read-through-budgeted-data-window-socks",
+        "h2-finite-both-read-through-budgeted-data-window-http-connect",
     )
     selected = os.environ.get("NAIVEFOX_FINITE_PROBE_ARMS")
     if selected:

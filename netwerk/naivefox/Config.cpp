@@ -337,6 +337,7 @@ class JsonParser final {
     bool sawDiagnosticH2FiniteReadThrough = false;
     bool sawDiagnosticH2FiniteStreamUploads = false;
     bool sawDiagnosticH2FiniteBudgetedDownloads = false;
+    bool sawDiagnosticH2FiniteDataWindow = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -463,6 +464,14 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticH2FiniteBudgetedDownloads,
             "diagnostic-h2-finite-budgeted-downloads must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-h2-finite-data-window")) {
+        if (sawDiagnosticH2FiniteDataWindow) {
+          return Error("duplicate diagnostic-h2-finite-data-window field");
+        }
+        sawDiagnosticH2FiniteDataWindow = true;
+        MOZ_TRY(
+            ParseBoolean(parsed.mDiagnosticH2FiniteDataWindow,
+                         "diagnostic-h2-finite-data-window must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -542,6 +551,10 @@ class JsonParser final {
         parsed.mPreamble.mCacheResources = usesH3ResourceDefault;
         parsed.mImplicitPreambleGate = !sawOuterSessionGate;
       }
+    }
+    if (parsed.mDiagnosticH2FiniteDataWindow &&
+        !parsed.mDiagnosticH2FiniteBudgetedDownloads) {
+      return Error("data-activated finite window requires budgeted downloads");
     }
     if (parsed.mDiagnosticH2FiniteBudgetedDownloads &&
         !parsed.mDiagnosticH2FiniteStreamUploads) {

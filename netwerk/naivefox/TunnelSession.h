@@ -106,7 +106,8 @@ struct TunnelConfig final {
         mDiagnosticH2FiniteStreamUploads(
             aOther.mDiagnosticH2FiniteStreamUploads),
         mDiagnosticH2FiniteBudgetedDownloads(
-            aOther.mDiagnosticH2FiniteBudgetedDownloads) {
+            aOther.mDiagnosticH2FiniteBudgetedDownloads),
+        mDiagnosticH2FiniteDataWindow(aOther.mDiagnosticH2FiniteDataWindow) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -128,6 +129,7 @@ struct TunnelConfig final {
           aOther.mDiagnosticH2FiniteStreamUploads;
       mDiagnosticH2FiniteBudgetedDownloads =
           aOther.mDiagnosticH2FiniteBudgetedDownloads;
+      mDiagnosticH2FiniteDataWindow = aOther.mDiagnosticH2FiniteDataWindow;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -149,6 +151,7 @@ struct TunnelConfig final {
   bool mDiagnosticH2FiniteReadThrough = false;
   bool mDiagnosticH2FiniteStreamUploads = false;
   bool mDiagnosticH2FiniteBudgetedDownloads = false;
+  bool mDiagnosticH2FiniteDataWindow = false;
 };
 
 class TunnelSession final {
