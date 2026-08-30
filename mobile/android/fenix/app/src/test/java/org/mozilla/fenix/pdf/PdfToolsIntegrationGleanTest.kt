@@ -7,6 +7,7 @@ package org.mozilla.fenix.pdf
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.test.core.app.ApplicationProvider
 import io.mockk.mockk
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.test.TestScope
@@ -89,5 +90,36 @@ class PdfToolsIntegrationGleanTest {
         integration().handleShareClick()
 
         assertNotNull(PdfViewer.shareTapped.testGetValue())
+    }
+
+    @Test
+    fun `WHEN the signature is cleared THEN the interaction is recorded`() {
+        integration().handleSignClearClick()
+
+        val event = assertNotNull(PdfViewer.signDialogClearTapped.testGetValue())
+        assertEquals(SignatureType.Typed.telemetryName, event.single().extra!!["signature_type"])
+    }
+
+    @Test
+    fun `WHEN the signature is added THEN the interaction is recorded`() {
+        integration().handleSignAddClick()
+
+        val event = assertNotNull(PdfViewer.signDialogAddTapped.testGetValue())
+        assertEquals(SignatureType.Typed.telemetryName, event.single().extra!!["signature_type"])
+    }
+
+    @Test
+    fun `WHEN the signature box is dismissed THEN the interaction is recorded`() {
+        integration().handleSignCloseClick()
+
+        val event = assertNotNull(PdfViewer.signDialogCloseTapped.testGetValue())
+        assertEquals(SignatureType.Typed.telemetryName, event.single().extra!!["signature_type"])
+    }
+
+    @Test
+    fun `WHEN sign is activated THEN the interaction is recorded`() {
+        integration().handleSignClick()
+
+        assertNotNull(PdfViewer.signTapped.testGetValue())
     }
 }

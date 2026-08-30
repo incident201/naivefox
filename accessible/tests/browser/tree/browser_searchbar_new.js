@@ -24,6 +24,12 @@ add_setup(async function () {
   let gCUITestUtils = new CustomizableUITestUtils(window);
   searchbar = await gCUITestUtils.addSearchBar();
   registerCleanupFunction(() => gCUITestUtils.removeSearchBar());
+
+  // The searchbar shows itself as a popover once it has set up its breakout
+  // dimensions, which happens off a document flush and an animation frame. The
+  // background is only part of the a11y tree while the popover is open, so the
+  // tree isn't stable until this settles.
+  await TestUtils.waitForCondition(() => searchbar.matches(":popover-open"));
 });
 
 // eslint-disable-next-line camelcase
@@ -32,6 +38,12 @@ add_task(async function test_searchbar_a11y_tree() {
     role: ROLE_GROUPING,
 
     children: [
+      // background
+      {
+        role: ROLE_SECTION,
+        children: [],
+      },
+
       // input container
       {
         role: ROLE_SECTION,
@@ -46,12 +58,6 @@ add_task(async function test_searchbar_a11y_tree() {
           // input element
           {
             role: ROLE_EDITCOMBOBOX,
-            children: [],
-          },
-
-          // context menu
-          {
-            role: ROLE_MENUPOPUP,
             children: [],
           },
 
@@ -79,7 +85,7 @@ add_task(async function test_searchbar_a11y_tree_with_results() {
     role: ROLE_GROUPING,
 
     children: [
-      // The background becomes visible while the result list is open.
+      // background
       {
         role: ROLE_SECTION,
         children: [],
@@ -106,12 +112,6 @@ add_task(async function test_searchbar_a11y_tree_with_results() {
                 children: [],
               },
             ],
-          },
-
-          // context menu
-          {
-            role: ROLE_MENUPOPUP,
-            children: [],
           },
 
           // go button

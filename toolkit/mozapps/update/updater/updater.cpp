@@ -91,7 +91,9 @@
 void CleanupElevatedMacUpdate(bool aFailureOccurred);
 bool IsOwnedByGroupAdmin(const char* aAppBundle);
 bool IsRecursivelyWritable(const char* aPath);
-void LaunchMacApp(int argc, const char** argv);
+// Pass a valid pid as aWaitForPid to wait for that process to go away before
+// the app is launched.
+void LaunchMacApp(int argc, const char** argv, pid_t aWaitForPid);
 void LaunchMacPostProcess(const char* aAppBundle);
 bool ObtainUpdaterArguments(int* aArgc, char*** aArgv,
                             MARChannelStringTable* aMARStrings);
@@ -384,6 +386,13 @@ static const int kCallbackWorkingDirIndex = 7;
 // This indicates the entry in `argv` that is the callback binary path. All
 // arguments after this one are treated as arguments to the callback.
 static const int kCallbackIndex = 8;
+
+#if defined(XP_MACOSX)
+// The pid of the process that invoked us, when it asked us to wait for it. We
+// hand this to the callback launch so that the relaunched application does not
+// overlap with the process it replaces. See LaunchMacApp().
+static pid_t gCallbackWaitPid = 0;
+#endif
 
 // This string contains the MAR channel IDs that are later extracted by one of
 // the `ReadMARChannelIDsFrom` variants.
@@ -2774,7 +2783,7 @@ static void LaunchCallbackApp(const NS_tchar* workingDir, int argc,
 #if defined(USE_EXECV)
   execv(argv[0], argv);
 #elif defined(XP_MACOSX)
-  LaunchMacApp(argc, (const char**)argv);
+  LaunchMacApp(argc, (const char**)argv, gCallbackWaitPid);
 #elif defined(XP_WIN)
   // Do not allow the callback to run when running an update through the
   // service as session 0.  The unelevated updater.exe will do the launching.
@@ -3652,11 +3661,19 @@ int NS_main(int argc, NS_tchar** argv) {
 #ifdef XP_MACOSX
   if (argc > 2 && NS_tstrcmp(argv[1], NS_T("--openAppBundle")) == 0) {
     LogToOS(NS_T("Opening App Bundle"));
-    // We have been asked to open a .app bundle. The path to the .app bundle and
-    // any command line arguments have been passed to us as arguments after
-    // "--openAppBundle", so remove the first two arguments and launch the .app
-    // bundle.
-    LaunchMacApp(argc - 2, (const char**)argv + 2);
+    // We have been asked to open a .app bundle:
+    //
+    //   --openAppBundle [--wait-pid <pid>] <app bundle> [arguments...]
+    //
+    // The optional pid belongs to the process we are replacing. Drop the
+    // arguments we consume here and launch the .app bundle with the rest.
+    int appIndex = 2;
+    pid_t waitForPid = 0;
+    if (argc > 4 && NS_tstrcmp(argv[2], NS_T("--wait-pid")) == 0) {
+      waitForPid = static_cast<pid_t>(NS_tatoi(argv[3]));
+      appIndex = 4;
+    }
+    LaunchMacApp(argc - appIndex, (const char**)argv + appIndex, waitForPid);
     return 0;
   }
 
@@ -3924,6 +3941,13 @@ int NS_main(int argc, NS_tchar** argv) {
       // update.
       sReplaceRequest = true;
     }
+#if defined(XP_MACOSX)
+    if (pid > 0) {
+      // Remember the caller so that we can wait for it to go away before we
+      // relaunch the application on its behalf.
+      gCallbackWaitPid = static_cast<pid_t>(pid);
+    }
+#endif
   }
 
   if (!isDMGInstall) {

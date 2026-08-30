@@ -25,6 +25,7 @@ import androidx.emoji2.text.EmojiCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration.Builder
 import androidx.work.Configuration.Provider
+import androidx.work.DelegatingWorkerFactory
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToLong
@@ -47,6 +48,8 @@ import mozilla.components.browser.state.action.SystemAction
 import mozilla.components.browser.state.state.selectedOrDefaultPrivateSearchEngine
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.browser.storage.sync.GlobalPlacesDependencyProvider
+import mozilla.components.compose.base.theme.Theme
+import mozilla.components.compose.base.theme.Theme.Private
 import mozilla.components.concept.ai.controls.isEnabled
 import mozilla.components.concept.base.crash.Breadcrumb
 import mozilla.components.concept.engine.webextension.WebExtension
@@ -116,6 +119,7 @@ import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.ext.containsQueryParameters
 import org.mozilla.fenix.ext.isCustomEngine
 import org.mozilla.fenix.ext.isKnownSearchDomain
+import org.mozilla.fenix.home.collections.migration.CollectionsToTabGroupsMigrationWorker
 import org.mozilla.fenix.home.topsites.TopSitesConfigConstants.TOP_SITES_PROVIDER_LIMIT
 import org.mozilla.fenix.home.topsites.TopSitesConfigConstants.TOP_SITES_PROVIDER_MAX_THRESHOLD
 import org.mozilla.fenix.lifecycle.StoreLifecycleObserver
@@ -128,6 +132,7 @@ import org.mozilla.fenix.perf.ProfilerMarkerFactProcessor
 import org.mozilla.fenix.perf.StartupTimeline
 import org.mozilla.fenix.perf.StorageStatsMetrics
 import org.mozilla.fenix.perf.runBlockingIncrement
+import org.mozilla.fenix.privacyreport.PrivacyReportWorkerFactory
 import org.mozilla.fenix.push.PushFxaIntegration
 import org.mozilla.fenix.push.WebPushEngineIntegration
 import org.mozilla.fenix.session.VisibilityLifecycleCallback
@@ -135,8 +140,6 @@ import org.mozilla.fenix.settings.doh.DefaultDohSettingsProvider
 import org.mozilla.fenix.settings.doh.DohSettingsProvider
 import org.mozilla.fenix.startupCrash.StartupCrashActivity
 import org.mozilla.fenix.theme.DefaultThemeProvider
-import org.mozilla.fenix.theme.Theme
-import org.mozilla.fenix.theme.Theme.Private
 import org.mozilla.fenix.theme.ThemeProvider
 import org.mozilla.fenix.utils.Settings
 import org.mozilla.fenix.utils.isLargeScreenSize
@@ -546,6 +549,11 @@ open class FenixApplication : Application(), Provider, ThemeProvider {
                 components.core.fileUploadsDirCleaner.cleanUploadsDirectory()
                 components.settings.deletePocketDatabaseIfNeeded()
                 components.settings.deleteReportSiteDomainsDataStoreIfNeeded()
+
+                CollectionsToTabGroupsMigrationWorker.enqueueIfNeeded(
+                    context = this@FenixApplication,
+                    collectionsMigrationRepository = components.collectionsMigrationRepository,
+                )
             }
             // Account manager initialization needs to happen on the main thread.
             GlobalScope.launch(Dispatchers.Main) {
@@ -1245,7 +1253,21 @@ open class FenixApplication : Application(), Provider, ThemeProvider {
     }
 
     override val workManagerConfiguration
-        get() = Builder().setMinimumLoggingLevel(INFO).build()
+        get() =
+            Builder()
+                .setMinimumLoggingLevel(INFO)
+                .setWorkerFactory(
+                    DelegatingWorkerFactory().apply {
+                        addFactory(
+                            PrivacyReportWorkerFactory(
+                                settings = components.settings,
+                                trackingProtectionUseCases = components.useCases.trackingProtectionUseCases,
+                                notificationsDelegate = components.notificationsDelegate,
+                            )
+                        )
+                    }
+                )
+                .build()
 
     @OptIn(DelicateCoroutinesApi::class)
     open fun downloadWallpapers() {

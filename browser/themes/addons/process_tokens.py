@@ -33,7 +33,10 @@ def _pick_variant(resolved, variant):
 def resolve_ref(path, tokens, variant):
     resolved = lookup_token(tokens, path.replace("/", "."))
     if isinstance(resolved, dict) and "value" in resolved:
-        resolved = resolved["value"]
+        if "nova" in resolved["value"]:
+            resolved = resolved["value"]["nova"]["value"]
+        else:
+            resolved = resolved["value"]
     resolved = _pick_variant(resolved, variant)
     if isinstance(resolved, str):
         return resolve_value(resolved, tokens, variant)
@@ -62,7 +65,9 @@ def resolve_section(section, tokens, variant):
 
 def _deep_merge(base, override):
     for key, val in override.items():
-        if isinstance(base.get(key), dict) and isinstance(val, dict):
+        if key == "value":
+            base[key] = val
+        elif isinstance(base.get(key), dict) and isinstance(val, dict):
             _deep_merge(base[key], val)
         else:
             base[key] = val

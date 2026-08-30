@@ -474,8 +474,13 @@ add_task(async function test_chat_storage_metric() {
     await ChatStore.updateConversation(conversation);
     const expectedSize = await ChatStore.getDatabaseSize();
 
-    await TestUtils.waitForCondition(
-      () => Glean.smartWindow.chatStorage.testGetValue() === expectedSize,
+    // Writes only queue a coalesced measurement, so flush it rather than
+    // waiting out DB_SIZE_RECORD_DELAY_MS.
+    await ChatStore.recordDatabaseSizeNow();
+
+    Assert.equal(
+      Glean.smartWindow.chatStorage.testGetValue(),
+      expectedSize,
       "chat storage metric should be recorded"
     );
   } finally {

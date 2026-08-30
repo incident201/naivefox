@@ -644,6 +644,11 @@ class RecursiveMakeBackend(MakeBackend):
             self._compile_graph[build_target]
             self._rust_targets.add(build_target)
             self._add_rust_build_order_deps(obj)
+            assert obj.import_path.full_path not in self._target_per_file
+            self._target_per_file[obj.import_path.full_path] = (
+                backend_file.relobjdir,
+                mozpath.basename(build_target),
+            )
 
             if obj.is_gkrust:
                 self._gkrust_target = build_target

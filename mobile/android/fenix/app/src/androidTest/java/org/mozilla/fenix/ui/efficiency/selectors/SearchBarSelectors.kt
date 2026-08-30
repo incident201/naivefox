@@ -120,7 +120,7 @@ object SearchBarSelectors {
         )
 
     // The same suggestion rows, but addressable individually so one can be clicked. Tag AND text: the
-    // text alone is ambiguous because an open tab's URL also renders in the homepage "Jump back in" row
+    // text alone is ambiguous because an open tab's URL also renders in the homepage "Continue" row
     // behind the search overlay. The row's text lives on a descendant, so this only resolves on the
     // merged tree — which resolveComposeNode reaches via its other-tree fallback.
     @Suppress("ktlint:standard:function-naming", "FunctionName")

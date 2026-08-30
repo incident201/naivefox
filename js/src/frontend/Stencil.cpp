@@ -3165,6 +3165,8 @@ bool CompilationStencil::delazifySelfHostedFunction(
         return false;
       }
       if (!jitCache.put(jitCacheKey, baselineScript)) {
+        jit::BaselineScript::Destroy(cx->gcContext(), baselineScript);
+        ReportOutOfMemory(cx);
         return false;
       }
     } else {

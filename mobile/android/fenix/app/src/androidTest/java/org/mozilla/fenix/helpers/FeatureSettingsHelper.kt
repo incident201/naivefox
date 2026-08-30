@@ -17,8 +17,8 @@ interface FeatureSettingsHelper {
     var isWallpaperOnboardingEnabled: Boolean
 
     /**
-     * Whether the "Jump back in" homescreen section is enabled or not. It shows the last visited tab on this device and
-     * on other synced devices.
+     * Whether the "Continue" homescreen section is enabled or not. It shows the last visited tab on this device and on
+     * other synced devices.
      */
     var isRecentTabsFeatureEnabled: Boolean
 

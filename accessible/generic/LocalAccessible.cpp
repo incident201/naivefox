@@ -593,9 +593,10 @@ LocalAccessible* LocalAccessible::LocalChildAtPoint(
   return accessible;
 }
 
-nsIFrame* LocalAccessible::FindNearestAccessibleAncestorFrame() {
+nsIFrame* LocalAccessible::FindNearestAccessibleAncestorFrame() const {
   nsIFrame* frame = GetFrame();
-  if (frame->StyleDisplay()->mPosition == StylePositionProperty::Fixed &&
+  if (frame &&
+      frame->StyleDisplay()->mPosition == StylePositionProperty::Fixed &&
       nsLayoutUtils::IsReallyFixedPos(frame)) {
     return mDoc->PresShellPtr()->GetRootFrame();
   }
@@ -617,8 +618,8 @@ nsIFrame* LocalAccessible::FindNearestAccessibleAncestorFrame() {
     ancestor = ancestor->LocalParent();
   }
 
-  MOZ_ASSERT_UNREACHABLE("No ancestor with frame?");
-  return nsLayoutUtils::GetContainingBlockForClientRect(frame);
+  return frame ? nsLayoutUtils::GetContainingBlockForClientRect(frame)
+               : nullptr;
 }
 
 nsRect LocalAccessible::ParentRelativeBounds() {

@@ -51,7 +51,7 @@
         <artifactMaxAge>-1</artifactMaxAge>
         <metadataMaxAge>1440</metadataMaxAge>
         <itemMaxAge>1440</itemMaxAge>
-        <autoBlockActive>true</autoBlockActive>
+        <autoBlockActive>false</autoBlockActive>
       </externalConfiguration>
     </repository>
     <repository>
@@ -82,7 +82,7 @@
         <artifactMaxAge>-1</artifactMaxAge>
         <metadataMaxAge>1440</metadataMaxAge>
         <itemMaxAge>1440</itemMaxAge>
-        <autoBlockActive>true</autoBlockActive>
+        <autoBlockActive>false</autoBlockActive>
       </externalConfiguration>
     </repository>
     <repository>
@@ -114,7 +114,7 @@
         <artifactMaxAge>-1</artifactMaxAge>
         <metadataMaxAge>1440</metadataMaxAge>
         <itemMaxAge>1440</itemMaxAge>
-        <autoBlockActive>true</autoBlockActive>
+        <autoBlockActive>false</autoBlockActive>
       </externalConfiguration>
     </repository>
     <repository>
@@ -145,6 +145,7 @@
         <downloadRemoteIndex>false</downloadRemoteIndex>
         <checksumPolicy>WARN</checksumPolicy>
         <repositoryPolicy>RELEASE</repositoryPolicy>
+        <autoBlockActive>false</autoBlockActive>
       </externalConfiguration>
     </repository>
     <repository>

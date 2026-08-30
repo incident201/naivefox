@@ -645,6 +645,7 @@ class BrowserToolbarMiddleware(
                                         ShareData(
                                             url = selectedTab.content.url,
                                             title = selectedTab.content.title,
+                                            private = selectedTab.content.private,
                                         )
                                     ),
                                 showPage = true,

@@ -11,4 +11,5 @@ gbrowser
 api
 progress-listeners
 async-tab-switcher
+tab-unloading
 ```

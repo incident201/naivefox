@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.Parcelable
 import android.os.StrictMode
 import android.text.format.DateUtils
 import android.util.AttributeSet
@@ -33,6 +34,7 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
+import androidx.core.os.BundleCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.text.layoutDirection
 import androidx.core.view.doOnLayout
@@ -52,6 +54,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.parcelize.Parcelize
 import mozilla.appservices.places.BookmarkRoot
 import mozilla.components.browser.state.action.MediaSessionAction
 import mozilla.components.browser.state.action.SearchAction
@@ -64,6 +67,9 @@ import mozilla.components.browser.state.state.WebExtensionState
 import mozilla.components.concept.engine.EngineSession
 import mozilla.components.concept.engine.EngineView
 import mozilla.components.concept.storage.HistoryMetadataKey
+import mozilla.components.concept.sync.AccountObserver
+import mozilla.components.concept.sync.AuthType
+import mozilla.components.concept.sync.OAuthAccount
 import mozilla.components.feature.contextmenu.DefaultSelectionActionDelegate
 import mozilla.components.feature.customtabs.isCustomTabIntent
 import mozilla.components.feature.media.ext.findActiveMediaTab
@@ -71,6 +77,7 @@ import mozilla.components.feature.privatemode.notification.PrivateNotificationFe
 import mozilla.components.feature.search.BrowserStoreSearchAdapter
 import mozilla.components.lib.crash.store.CrashAction
 import mozilla.components.service.fxa.sync.SyncReason
+import mozilla.components.support.base.ext.isNotificationChannelEnabled
 import mozilla.components.support.base.feature.ActivityResultHandler
 import mozilla.components.support.base.feature.UserInteractionHandler
 import mozilla.components.support.base.feature.UserInteractionOnBackPressedCallback
@@ -83,6 +90,8 @@ import mozilla.components.support.utils.BootUtils
 import mozilla.components.support.utils.Browsers
 import mozilla.components.support.utils.BrowsersCache
 import mozilla.components.support.utils.BuildManufacturerChecker
+import mozilla.components.support.utils.DateTimeProvider
+import mozilla.components.support.utils.DefaultDateTimeProvider
 import mozilla.components.support.utils.SafeIntent
 import mozilla.components.support.utils.toSafeIntent
 import mozilla.components.support.webextensions.WebExtensionOptionsPageObserver
@@ -95,8 +104,10 @@ import org.mozilla.fenix.GleanMetrics.Metrics
 import org.mozilla.fenix.GleanMetrics.NativeShareSheet
 import org.mozilla.fenix.GleanMetrics.SplashScreen
 import org.mozilla.fenix.GleanMetrics.StartOnHome
+import org.mozilla.fenix.GleanMetrics.SyncAccount
 import org.mozilla.fenix.addons.ExtensionsProcessDisabledBackgroundController
 import org.mozilla.fenix.addons.ExtensionsProcessDisabledForegroundController
+import org.mozilla.fenix.automation.AutomatedLaunch
 import org.mozilla.fenix.bindings.ExternalAppLinkStatusBinding
 import org.mozilla.fenix.bindings.HomepageTabBinding
 import org.mozilla.fenix.bindings.SummarizeToolbarHighlightBinding
@@ -107,6 +118,7 @@ import org.mozilla.fenix.browser.browsingmode.BrowsingModeManager
 import org.mozilla.fenix.browser.browsingmode.DefaultBrowsingModeManager
 import org.mozilla.fenix.components.DefaultHomepageAsANewTabPreferenceRepository
 import org.mozilla.fenix.components.DefaultShortcutManagerCompatWrapper
+import org.mozilla.fenix.components.accounts.FenixFxAEntryPoint
 import org.mozilla.fenix.components.appstate.AppAction
 import org.mozilla.fenix.components.appstate.AppAction.ShareAction
 import org.mozilla.fenix.components.appstate.OrientationMode
@@ -152,6 +164,7 @@ import org.mozilla.fenix.home.TopSitesRefresher
 import org.mozilla.fenix.home.intent.AssistIntentProcessor
 import org.mozilla.fenix.home.intent.CrashReporterIntentProcessor
 import org.mozilla.fenix.home.intent.HomeDeepLinkIntentProcessor
+import org.mozilla.fenix.home.intent.LensResultIntentProcessor
 import org.mozilla.fenix.home.intent.OpenBrowserIntentProcessor
 import org.mozilla.fenix.home.intent.OpenPasswordManagerIntentProcessor
 import org.mozilla.fenix.home.intent.OpenRecentlyClosedIntentProcessor
@@ -169,12 +182,14 @@ import org.mozilla.fenix.pbmlock.PrivateBrowsingLockFeature
 import org.mozilla.fenix.perf.DefaultStartupPathProvider
 import org.mozilla.fenix.perf.MarkersActivityLifecycleCallbacks
 import org.mozilla.fenix.perf.MarkersFragmentLifecycleCallbacks
-import org.mozilla.fenix.perf.Performance
 import org.mozilla.fenix.perf.PerformanceInflater
 import org.mozilla.fenix.perf.ProfilerMarkers
 import org.mozilla.fenix.perf.StartupPathProvider
 import org.mozilla.fenix.perf.StartupTimeline
 import org.mozilla.fenix.perf.StartupTypeTelemetry
+import org.mozilla.fenix.privacyreport.PRIVACY_REPORT_NOTIFICATION_CHANNEL_ID
+import org.mozilla.fenix.privacyreport.PrivacyReportNotificationWorker
+import org.mozilla.fenix.privacyreport.ensurePrivacyReportNotificationChannelExists
 import org.mozilla.fenix.session.PrivateNotificationService
 import org.mozilla.fenix.settings.SupportUtils
 import org.mozilla.fenix.shortcut.NewTabShortcutIntentProcessor.Companion.ACTION_OPEN_PRIVATE_TAB
@@ -373,6 +388,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             SpeechProcessingIntentProcessor(this, components.core.store),
             AssistIntentProcessor(),
             StartSearchIntentProcessor { components.fenixOnboarding.userHasBeenOnboarded() },
+            LensResultIntentProcessor(this),
             OpenBrowserIntentProcessor(this, ::getIntentSessionId),
             OpenSpecificTabIntentProcessor(this),
             OpenPasswordManagerIntentProcessor(),
@@ -478,7 +494,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
 
         binding = ActivityHomeBinding.inflate(layoutInflater)
 
-        Performance.processIntentIfPerformanceTest(intent, this)
+        AutomatedLaunch.processIntentIfPerformanceTestOrAutomation(intent, this)
 
         // Persist or clear a Glean debug view tag across restarts (Nightly/Debug only).
         DefaultGleanDebugToolsStorage.persistDebugViewTagIfRequested(intent, components.settings)
@@ -705,7 +721,29 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             uninstallSurveyManager.showUninstallSurvey(intent, navHost.navController)
         }
 
+        restorePendingSendToDevicesTab(savedInstanceState)
+
         StartupTimeline.onActivityCreateEndHome(this) // DO NOT MOVE ANYTHING BELOW HERE.
+    }
+
+    @VisibleForTesting
+    internal fun restorePendingSendToDevicesTab(savedInstanceState: Bundle?) {
+        val pending =
+            savedInstanceState?.let {
+                BundleCompat.getParcelable(it, PENDING_SEND_TO_DEVICES_TAB_KEY, PendingSendToDevicesTab::class.java)
+            } ?: return
+        pendingSendToDevicesTab = pending
+        // Recreated mid sign-in; re-arm so onResume can show it once authenticated.
+        if (components.backgroundServices.accountManager.authenticatedAccount() == null) {
+            beginAwaitingSignInForSendTab()
+        }
+    }
+
+    final override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingSendToDevicesTab?.let {
+            outState.putParcelable(PENDING_SEND_TO_DEVICES_TAB_KEY, it)
+        }
     }
 
     @VisibleForTesting
@@ -809,12 +847,54 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             }
         }
 
+        lifecycleScope.launch(IO) { updatePrivacyReportNotificationWorker() }
+
         onBackPressedCallback.isEnabled = true
 
         // This was done in order to refresh search engines when app is running in background
         // and the user changes the system language
         // More details here: https://github.com/mozilla-mobile/fenix/pull/27793#discussion_r1029892536
         components.core.store.dispatch(SearchAction.RefreshSearchEnginesAction)
+
+        showPendingSendToDevicesIfPossible()
+    }
+
+    /**
+     * Register the [PrivacyReportNotificationWorker]'s notification channel if the feature is enabled and app
+     * notifications are allowed, then schedule or cancel the worker based on whether the feature is enabled and that
+     * channel is enabled.
+     *
+     * @param dateTimeProvider Used to compute the worker's initial delay when scheduling. Overridable so tests can
+     *   control the resulting delay instead of it being computed against the real clock, which could otherwise be zero
+     *   and cause WorkManager's test harness to actually execute the worker.
+     */
+    @VisibleForTesting
+    internal fun updatePrivacyReportNotificationWorker(dateTimeProvider: DateTimeProvider = DefaultDateTimeProvider()) {
+        val settings = components.settings
+
+        // If the tracking protection feature is disabled then don't schedule the notification.
+        if (!settings.shouldUseTrackingProtection) {
+            PrivacyReportNotificationWorker.cancel(applicationContext)
+            return
+        }
+
+        val notificationManager = NotificationManagerCompat.from(applicationContext)
+        val featureEnabled = settings.weeklyPrivacyNotificationFeatureFlagEnabled
+
+        if (featureEnabled && notificationManager.areNotificationsEnabled()) {
+            // Register the channel so that it appears in the Android Settings App even
+            // before the first notification is sent.
+            ensurePrivacyReportNotificationChannelExists(applicationContext)
+        }
+
+        val shouldSchedule =
+            featureEnabled && notificationManager.isNotificationChannelEnabled(PRIVACY_REPORT_NOTIFICATION_CHANNEL_ID)
+
+        if (shouldSchedule) {
+            PrivacyReportNotificationWorker.schedule(applicationContext, settings, dateTimeProvider)
+        } else {
+            PrivacyReportNotificationWorker.cancel(applicationContext)
+        }
     }
 
     override fun onRestart() {
@@ -1042,6 +1122,102 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             intent.getStringExtra(SendToDevicesDialogFragment.EXTRA_PRIVACY) ==
                 SendToDevicesDialogFragment.PRIVACY_PRIVATE
 
+        if (components.backgroundServices.accountManager.authenticatedAccount() == null) {
+            // Send to Device needs an account, so sign in first and resume once authenticated.
+            pendingSendToDevicesTab = PendingSendToDevicesTab(urls, titles, isPrivate)
+            navigateToSignInForSendTab()
+        } else {
+            showSendToDevicesDialog(urls, titles, isPrivate)
+        }
+    }
+
+    // A Send to Device tab waiting on sign-in, shown once the user is authenticated.
+    @VisibleForTesting internal var pendingSendToDevicesTab: PendingSendToDevicesTab? = null
+
+    private var sendTabAuthObserver: AccountObserver? = null
+    private var sendTabSignInDestinationListener: NavController.OnDestinationChangedListener? = null
+    private var enteredSignInFlowForSendTab = false
+
+    @Parcelize
+    @VisibleForTesting
+    internal data class PendingSendToDevicesTab(
+        val urls: List<String>,
+        val titles: List<String>,
+        val isPrivate: Boolean,
+    ) : Parcelable
+
+    @VisibleForTesting
+    internal fun navigateToSignInForSendTab() {
+        SyncAccount.signInToSendTab.record(NoExtras())
+        beginAwaitingSignInForSendTab()
+        navHost.navController.navigate(
+            NavGraphDirections.actionGlobalTurnOnSync(entrypoint = FenixFxAEntryPoint.DeepLink)
+        )
+    }
+
+    // Sign-in finishes asynchronously (in a separate web flow), so watch both the account state and
+    // whether the user leaves the sign-in flow before authenticating.
+    private fun beginAwaitingSignInForSendTab() {
+        if (sendTabAuthObserver == null) {
+            val observer =
+                object : AccountObserver {
+                    override fun onAuthenticated(account: OAuthAccount, authType: AuthType) {
+                        runOnUiThread { showPendingSendToDevicesIfPossible() }
+                    }
+                }
+            sendTabAuthObserver = observer
+            components.backgroundServices.accountManager.register(
+                observer,
+                owner = this,
+                autoPause = false,
+            )
+        }
+
+        if (sendTabSignInDestinationListener == null) {
+            val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                onSendTabSignInDestinationChanged(destination.id)
+            }
+            sendTabSignInDestinationListener = listener
+            navHost.navController.addOnDestinationChangedListener(listener)
+        }
+    }
+
+    @VisibleForTesting
+    internal fun onSendTabSignInDestinationChanged(destinationId: Int) {
+        if (destinationId in SEND_TAB_SIGN_IN_DESTINATIONS) {
+            enteredSignInFlowForSendTab = true
+        } else if (
+            enteredSignInFlowForSendTab && components.backgroundServices.accountManager.authenticatedAccount() == null
+        ) {
+            // Left sign-in without an account, so drop the tab rather than let it pop up on a later sign-in.
+            pendingSendToDevicesTab = null
+            stopAwaitingSignInForSendTab()
+        }
+    }
+
+    private fun stopAwaitingSignInForSendTab() {
+        sendTabAuthObserver?.let { components.backgroundServices.accountManager.unregister(it) }
+        sendTabAuthObserver = null
+        sendTabSignInDestinationListener?.let { navHost.navController.removeOnDestinationChangedListener(it) }
+        sendTabSignInDestinationListener = null
+        enteredSignInFlowForSendTab = false
+    }
+
+    @VisibleForTesting
+    internal fun showPendingSendToDevicesIfPossible() {
+        val pending = pendingSendToDevicesTab ?: return
+        if (
+            components.backgroundServices.accountManager.authenticatedAccount() != null &&
+                !supportFragmentManager.isStateSaved
+        ) {
+            pendingSendToDevicesTab = null
+            stopAwaitingSignInForSendTab()
+            showSendToDevicesDialog(pending.urls, pending.titles, pending.isPrivate)
+        }
+    }
+
+    @VisibleForTesting
+    internal fun showSendToDevicesDialog(urls: List<String>, titles: List<String>, isPrivate: Boolean) {
         if (supportFragmentManager.findFragmentByTag(SendToDevicesDialogFragment.TAG) == null) {
             SendToDevicesDialogFragment.newInstance(urls, titles, isPrivate)
                 .showNow(
@@ -1663,6 +1839,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
     companion object {
         const val OPEN_TO_BROWSER = "open_to_browser"
         const val OPEN_TO_BROWSER_AND_LOAD = "open_to_browser_and_load"
+        const val LENS_RESULT_URL = "lens_result_url"
         const val OPEN_TO_SEARCH = "open_to_search"
         const val PRIVATE_BROWSING_MODE = "private_browsing_mode"
         const val START_IN_RECENTS_SCREEN = "start_in_recents_screen"
@@ -1686,6 +1863,14 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
                 R.id.addonInternalSettingsFragment,
                 R.id.addonDetailsFragment,
                 R.id.addonPermissionsDetailFragment,
+            )
+
+        @VisibleForTesting internal const val PENDING_SEND_TO_DEVICES_TAB_KEY = "pending_send_to_devices_tab"
+
+        private val SEND_TAB_SIGN_IN_DESTINATIONS =
+            setOf(
+                R.id.turnOnSyncFragment,
+                R.id.pairFragment,
             )
     }
 }

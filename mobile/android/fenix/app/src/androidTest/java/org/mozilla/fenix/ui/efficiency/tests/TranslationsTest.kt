@@ -13,6 +13,7 @@ import org.mozilla.fenix.helpers.TestAssetHelper.firstForeignWebPageAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.secondForeignWebPageAsset
 import org.mozilla.fenix.ui.efficiency.helpers.BaseTest
 import org.mozilla.fenix.ui.efficiency.helpers.SwipeDirection
+import org.mozilla.fenix.ui.efficiency.navigation.LaunchConfig
 import org.mozilla.fenix.ui.efficiency.selectors.BrowserPageSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.MainMenuSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.SearchBarSelectors
@@ -20,7 +21,7 @@ import org.mozilla.fenix.ui.efficiency.selectors.SettingsTranslationSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.TabDrawerSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.TranslationsSelectors
 
-class TranslationsTest : BaseTest(isPageLoadTranslationsPromptEnabled = true) {
+class TranslationsTest : BaseTest(LaunchConfig(isPageLoadTranslationsPromptEnabled = true)) {
 
     private val mockWebServer
         get() = fenixTestRule.mockWebServer

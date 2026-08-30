@@ -25,11 +25,13 @@ only-for-build-platforms:
     - win64-shippable/opt
 
 task-defaults:
+    from-deps:
+        copy-attributes: true
     worker-type: t-linux-docker-amd
     worker:
         env:
             BRANCH: main
-            TEST_SET: nightly
+            TEST_SET: ci
             WORKFLOW_ID: main.yml
             BUILD_TASK_ID: {task-reference: '<build>'}
         max-run-time: 4800

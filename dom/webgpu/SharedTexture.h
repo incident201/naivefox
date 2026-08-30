@@ -9,6 +9,7 @@
 #include "mozilla/layers/LayersSurfaces.h"
 #include "mozilla/webgpu/WebGPUTypes.h"
 #include "mozilla/webgpu/ffi/wgpu.h"
+#include "nsTArray.h"
 
 namespace mozilla {
 
@@ -63,7 +64,9 @@ class SharedTexture {
     return mOwnerId;
   }
 
-  virtual void onBeforeQueueSubmit(RawId aQueueId) {}
+  virtual void onBeforeQueueSubmit(
+      const ffi::WGPUGlobal* aContext, RawId aDeviceId, RawId aQueueId,
+      nsTArray<ffi::WGPUVkSemaphoreHandle>& aSignalSemaphores) {}
 
   virtual void CleanForRecycling() { mSubmissionIndex = 0; }
 

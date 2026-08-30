@@ -207,6 +207,10 @@ export class UrlbarProviderQuickSuggestContextualOptIn extends UrlbarProvider {
     };
   }
 
+  /**
+   * @param {UrlbarResult} result The result being selected.
+   * @param {Element} [element] The selected element. Undefined in the message path.
+   */
   onBeforeSelection(result, element) {
     if (element.getAttribute("name") == "learn_more") {
       this.#a11yAlertRow(element.closest(".urlbarView-row"));

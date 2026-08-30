@@ -58,6 +58,7 @@ import org.mozilla.fenix.helpers.ext.clearAndSetText
 import org.mozilla.fenix.helpers.waitUntilDisplayed
 import org.mozilla.fenix.settings.address.ui.edit.EditAddressTestTag
 import org.mozilla.fenix.settings.creditcards.ui.CreditCardEditorTestTags
+import org.mozilla.fenix.ui.efficiency.data.AddressDetails
 
 class SettingsSubMenuAutofillRobot(private val composeTestRule: ComposeTestRule) {
 
@@ -405,18 +406,20 @@ class SettingsSubMenuAutofillRobot(private val composeTestRule: ComposeTestRule)
     @OptIn(ExperimentalTestApi::class)
     fun fillAndSaveAddress(
         composeTestRule: ComposeTestRule,
+        address: AddressDetails,
         navigateToAutofillSettings: Boolean,
         isAddressAutofillEnabled: Boolean = true,
         userHasSavedAddress: Boolean = false,
-        name: String,
-        streetAddress: String,
-        city: String,
-        state: String,
-        zipCode: String,
-        country: String,
-        phoneNumber: String,
-        emailAddress: String,
     ) {
+        val name = address.name
+        val streetAddress = address.streetAddress
+        val city = address.city
+        val state = address.state
+        val zipCode = address.zipCode
+        val country = address.country
+        val phoneNumber = address.phoneNumber
+        val emailAddress = address.emailAddress
+
         if (navigateToAutofillSettings) {
             homeScreen(composeTestRule) {}
                 .openThreeDotMenu {}

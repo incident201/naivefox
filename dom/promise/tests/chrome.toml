@@ -23,3 +23,5 @@ support-files = [
 
 ["test_promise_xrays.html"]
 support-files = ["file_promise_xrays.html"]
+
+["test_scheduling_state_incumbent_hop.html"]

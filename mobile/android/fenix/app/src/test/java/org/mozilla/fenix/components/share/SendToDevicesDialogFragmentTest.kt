@@ -5,19 +5,12 @@
 package org.mozilla.fenix.components.share
 
 import android.os.Bundle
-import io.mockk.every
-import io.mockk.just
-import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.spyk
-import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import mozilla.components.concept.sync.OAuthAccount
 import mozilla.components.concept.sync.TabData
 import mozilla.components.concept.sync.TabPrivacy
-import mozilla.components.service.fxa.manager.FxaAccountManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -30,7 +23,6 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class SendToDevicesDialogFragmentTest {
 
-    private val mockAccountManager = mockk<FxaAccountManager>(relaxed = true)
     private lateinit var fragment: SendToDevicesDialogFragment
 
     @Before
@@ -43,8 +35,6 @@ class SendToDevicesDialogFragmentTest {
                     isPrivate = false,
                 )
             )
-        every { fragment.navigateToSignIn() } just runs
-        every { fragment.onAuthenticated() } just runs
     }
 
     // region loadTabData
@@ -107,38 +97,6 @@ class SendToDevicesDialogFragmentTest {
         fragment.loadTabData(null)
 
         assertTrue(fragment.tabsForTest.isEmpty())
-    }
-
-    // endregion
-
-    // region checkAuthAndNavigate
-
-    @Test
-    fun `GIVEN unauthenticated account WHEN checkAuthAndNavigate is called THEN navigateToSignIn is called`() {
-        every { mockAccountManager.authenticatedAccount() } returns null
-
-        fragment.checkAuthAndNavigate(mockAccountManager)
-
-        verify { fragment.navigateToSignIn() }
-    }
-
-    @Test
-    fun `GIVEN authenticated account WHEN checkAuthAndNavigate is called THEN navigateToSignIn is not called`() {
-        every { mockAccountManager.authenticatedAccount() } returns mockk<OAuthAccount>()
-
-        fragment.checkAuthAndNavigate(mockAccountManager)
-
-        verify(exactly = 0) { fragment.navigateToSignIn() }
-    }
-
-    @Test
-    fun `GIVEN unauthenticated account WHEN checkAuthAndNavigate is called twice THEN navigateToSignIn is called only once`() {
-        every { mockAccountManager.authenticatedAccount() } returns null
-
-        fragment.checkAuthAndNavigate(mockAccountManager)
-        fragment.checkAuthAndNavigate(mockAccountManager)
-
-        verify(exactly = 1) { fragment.navigateToSignIn() }
     }
 
     // endregion

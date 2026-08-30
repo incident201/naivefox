@@ -128,7 +128,7 @@ interface Document : Node {
 
 // https://html.spec.whatwg.org/multipage/dom.html#the-document-object
 partial interface Document {
-  [Throws, NeedsSubjectPrincipal=NonSystem]
+  [UseCounter, Throws, NeedsSubjectPrincipal=NonSystem]
   static Document parseHTMLUnsafe((TrustedHTML or DOMString) html, optional SetHTMLUnsafeOptions options = {});
 
   [PutForwards=href, LegacyUnforgeable] readonly attribute Location? location;
@@ -804,7 +804,7 @@ partial interface Document {
 
 // https://wicg.github.io/sanitizer-api/#sanitizer-api
 partial interface Document {
-  [Throws, Pref="dom.security.sanitizer.enabled"]
+  [UseCounter, Throws, Pref="dom.security.sanitizer.enabled"]
   static Document parseHTML(DOMString html, optional SetHTMLOptions options = {});
 };
 

@@ -624,6 +624,8 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
    * device is still appended so the list never shows fewer devices than the
    * tabs engine knows about (e.g. when the cached device list is stale or not
    * yet fetched).
+   *
+   * The current device gets excluded.
    */
   async _getMergedDeviceList() {
     let clients = await SyncedTabs.getTabClients();
@@ -645,12 +647,16 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
     let merged = [];
     let matchedClients = new Set();
     for (let device of devices) {
+      let client = clientByFxaId.get(device.id);
+      if (client) {
+        // Record the client even when the device is skipped below, so the pass
+        // over unmatched clients doesn't add it back.
+        matchedClients.add(client);
+      }
       if (device.isCurrentDevice) {
         continue;
       }
-      let client = clientByFxaId.get(device.id);
       if (client) {
-        matchedClients.add(client);
         merged.push(client);
       } else if (fxAccounts.commands.sendTab.isDeviceCompatible(device)) {
         merged.push({
@@ -707,6 +713,13 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
     return "desktop";
   }
 
+  _getTelemetryDeviceType(device) {
+    const isMobile =
+      device?.type === DEVICE_TYPE_MOBILE ||
+      device?.type === DEVICE_TYPE_TABLET;
+    return isMobile ? "mobile" : "desktop";
+  }
+
   _createDeviceEntry(client, device) {
     let btn = document.createXULElement("toolbarbutton");
     btn.classList.add(
@@ -730,12 +743,14 @@ this.FxAMenuDeviceList = class FxAMenuDeviceList {
       // was created (e.g. on the first menu open after signing in). Resolving
       // it now ensures the "Send Current Page to This Device" button is shown
       // when the device is sendTab-capable, instead of only on a later open.
-      this._showDeviceRecentTabs(
-        client,
-        this._getDeviceForClient(client) ?? device,
-        btn,
-        e
-      );
+      const resolvedDevice = this._getDeviceForClient(client) ?? device;
+
+      gSync.emitFxaToolbarTelemetry("synced_device_submenu", btn, {
+        device_type: this._getTelemetryDeviceType(resolvedDevice),
+        device_count: String(gSync.getSendTabTargets().length),
+      });
+
+      this._showDeviceRecentTabs(client, resolvedDevice, btn, e);
     });
     return btn;
   }
@@ -1085,6 +1100,16 @@ var gSync = {
   _obs: ["weave:engine:sync:finish", "quit-application", UIState.ON_UPDATE],
   // Track whether send tab exposure events have been recorded for current context menu session
   _sendTabExposureRecorded: new Set(),
+
+  // FxA menu telemetry types that already name their Glean metric in full.
+  // Every other type names only the `<object>` half of a legacy
+  // `fxa_*_menu.click#<object>` event and gets a `click` prefix added.
+  // See emitFxaToolbarTelemetry.
+  NONPREFIXED_EVENT_TYPES: new Set([
+    "send_tab_exposed",
+    "send_tab_opened",
+    "synced_device_submenu",
+  ]),
 
   get log() {
     if (!this._log) {
@@ -1549,18 +1574,36 @@ var gSync = {
   },
 
   _showSecureSyncSubpanel(anchor, event) {
-    const deviceName = fxAccounts.device.getLocalName();
+    this._updateSecureSyncNowLabel();
+    PanelUI.showSubView("PanelUI-fxa-menu-secure-sync-subpanel", anchor, event);
+  },
+
+  // Updates the secure sync subpanel's "Sync now" button label. While a sync is
+  // in progress it reads "Syncing…"; otherwise it reads "Sync <device> Now".
+  // The spinning sync icon is shown separately via the "syncstatus" attribute
+  // and CSS, and only when animations are enabled.
+  _updateSecureSyncNowLabel() {
     const labelEl = PanelMultiView.getViewNode(
       document,
       "PanelUI-fxa-menu-secure-sync-now-label"
     );
-    labelEl.setAttribute(
-      "value",
-      this.fluentStrings.formatValueSync("fxa-menu-sync-device-now", {
-        deviceName,
-      })
-    );
-    PanelUI.showSubView("PanelUI-fxa-menu-secure-sync-subpanel", anchor, event);
+    if (!labelEl) {
+      return;
+    }
+    if (this._isCurrentlySyncing) {
+      labelEl.setAttribute(
+        "value",
+        this.fluentStrings.formatValueSync("fxa-toolbar-sync-syncing2")
+      );
+    } else {
+      const deviceName = fxAccounts.device.getLocalName();
+      labelEl.setAttribute(
+        "value",
+        this.fluentStrings.formatValueSync("fxa-menu-sync-device-now", {
+          deviceName,
+        })
+      );
+    }
   },
 
   /**
@@ -1600,6 +1643,10 @@ var gSync = {
       document,
       "PanelUI-fxa-menu-sync-status-off-description"
     );
+    const onButtonEl = PanelMultiView.getViewNode(
+      document,
+      "PanelUI-fxa-menu-sync-status-off-button"
+    );
     const mobileBtn = PanelMultiView.getViewNode(
       document,
       "PanelUI-fxa-menu-get-firefox-mobile"
@@ -1614,14 +1661,21 @@ var gSync = {
 
     offCard.hidden = !syncOffCard;
     if (syncOffCard) {
-      btn.hidden = true;
-      offTitleEl.setAttribute(
-        "value",
-        this.fluentStrings.formatValueSync("fxa-menu-sync-status-off")
+      const offTitle = this.fluentStrings.formatValueSync(
+        "fxa-menu-sync-status-off"
       );
-      offDescEl.setAttribute(
-        "value",
-        this.fluentStrings.formatValueSync("fxa-menu-sync-off-data-description")
+      const offDesc = this.fluentStrings.formatValueSync(
+        "fxa-menu-sync-off-data-description"
+      );
+      const onText = this.fluentStrings.formatValueSync(
+        "fxa-menu-sync-status-turn-on-button-aria-label"
+      );
+      btn.hidden = true;
+      offTitleEl.setAttribute("value", offTitle);
+      offDescEl.setAttribute("value", offDesc);
+      onButtonEl.setAttribute(
+        "aria-label",
+        [offTitle, offDesc, onText].join(", ")
       );
       offCard.after(mobileBtn);
       mobileBtn.hidden = false;
@@ -1683,12 +1737,15 @@ var gSync = {
     const state = UIState.get();
     if (state.status == UIState.STATUS_SIGNED_IN && state.syncEnabled) {
       this._showSecureSyncSubpanel(anchor, event);
-    } else if (state.status == UIState.STATUS_SIGNED_IN) {
-      // Signed in with sync off: open preferences to turn sync on.
-      this.openPrefsFromFxaMenu("sync_settings", anchor);
     } else {
-      // Needs (re-)authentication: open the sign-in page.
-      this.openFxAEmailFirstPageFromFxaMenu(anchor);
+      if (state.status == UIState.STATUS_SIGNED_IN) {
+        // Signed in with sync off: open preferences to turn sync on.
+        this.openPrefsFromFxaMenu("sync_settings", anchor);
+      } else {
+        // Needs (re-)authentication: open the sign-in page.
+        this.openFxAEmailFirstPageFromFxaMenu(anchor);
+      }
+      CustomizableUI.hidePanelForNode(anchor);
     }
   },
 
@@ -2293,12 +2350,12 @@ var gSync = {
       ...extraOpts,
     };
 
-    // send_tab_exposed -> sendTabExposed, send_tab_opened -> sendTabOpened.
-    // All other types are legacy click events: sync_now -> clickSyncNow,
-    // send_tab -> clickSendTab, etc.
+    // Types listed in NONPREFIXED_EVENT_TYPES map straight to their camelCased
+    // Glean metric (send_tab_opened -> sendTabOpened). Everything else is a
+    // legacy click event and gets the prefix: sync_now -> clickSyncNow.
     const cap = w => w[0].toUpperCase() + w.slice(1);
     const parts = type.split("_");
-    const methodName = type.startsWith("send_tab_")
+    const methodName = gSync.NONPREFIXED_EVENT_TYPES.has(type)
       ? parts[0] + parts.slice(1).map(cap).join("")
       : "click" + parts.map(cap).join("");
 
@@ -3260,6 +3317,8 @@ var gSync = {
       .forEach(el => {
         el.setAttribute("syncstatus", "active");
       });
+
+    this._updateSecureSyncNowLabel();
   },
 
   _onActivityStop() {
@@ -3283,6 +3342,8 @@ var gSync = {
       .forEach(el => {
         el.removeAttribute("syncstatus");
       });
+
+    this._updateSecureSyncNowLabel();
 
     Services.obs.notifyObservers(null, "test:browser-sync:activity-stop");
   },

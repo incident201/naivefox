@@ -5,7 +5,6 @@
 import {
   html,
   when,
-  classMap,
   ifDefined,
 } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
@@ -21,6 +20,7 @@ class AutocompleteRowItem extends MozLitElement {
     icon: { type: String },
     actions: { type: Object },
     selected: { type: Boolean, reflect: true },
+    pointerselected: { type: Boolean, reflect: true },
     subfocused: { type: Boolean, reflect: true },
     type: { type: String },
     sources: { type: Array },
@@ -97,10 +97,7 @@ class AutocompleteRowItem extends MozLitElement {
         aria-label=${ifDefined(label)}
         title=${ifDefined(label)}
         .iconSrc=${this.getSecondaryActionItemIcon(type)}
-        class=${classMap({
-          "secondary-action": true,
-          selected: this.selected,
-        })}
+        class="secondary-action"
       ></moz-button>`;
     }
 
@@ -114,10 +111,7 @@ class AutocompleteRowItem extends MozLitElement {
         aria-label=${ifDefined(label)}
         title=${ifDefined(label)}
         .iconSrc=${this.getSecondaryActionItemIcon(type)}
-        class=${classMap({
-          "secondary-action": true,
-          selected: this.selected,
-        })}
+        class="secondary-action"
         menuId="secondary-action-menu"
       ></moz-button>`;
     }

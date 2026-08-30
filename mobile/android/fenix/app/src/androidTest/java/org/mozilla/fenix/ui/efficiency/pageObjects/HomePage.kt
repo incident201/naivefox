@@ -77,11 +77,6 @@ class HomePage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule, *
         return HomeSelectors.all.filter { it.groups.contains(group) }
     }
 
-    private fun safeId(prefix: String, raw: String): String {
-        val cleaned = raw.replace(Regex("[^A-Za-z0-9_\\-]"), "_")
-        return "'$prefix'_$cleaned".take(120)
-    }
-
     /*
      * Temporary stub for the Test Factory demo.
      *
@@ -93,6 +88,7 @@ class HomePage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule, *
      * The `UnsupportedOperationException` is intentional to ensure this placeholder
      * is never used in production or non-demo tests.
      */
+    @Suppress("UnusedParameter")
     fun visitWebsite(url: String) {
         throw UnsupportedOperationException("visitWebsite is not supported by ${this::class.simpleName}")
     }

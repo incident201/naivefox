@@ -614,7 +614,10 @@ function Widgets() {
             type="ghost"
             size="default"
           />
-          <panel-list id="widgets-header-context-panel">
+          <panel-list
+            className="panel-list-no-icons"
+            id="widgets-header-context-panel"
+          >
             <panel-item
               data-l10n-id="newtab-widget-section-menu-hide-all"
               onClick={handleHideAllWidgetsClick}

@@ -794,24 +794,17 @@ void SandboxBrokerPolicyFactory::InitContentPolicy() {
     policy->AddTree(rdwrcr, "/dev/shm");
   }
 
+  if (allowPulse) {
 #ifdef MOZ_WIDGET_GTK
-  if (const auto userDir = g_get_user_runtime_dir()) {
-    // Bug 1321134: DConf's single bit of shared memory
-    // The leaf filename is "user" by default, but is configurable.
-    nsPrintfCString shmPath("%s/dconf/", userDir);
-    policy->AddFutureDir(rdwrcr, shmPath.get());
-    policy->AddAncestors(shmPath.get());
-    if (allowPulse) {
+    if (const auto userDir = g_get_user_runtime_dir()) {
       // PulseAudio, if it can't get server info from X11, will break
       // unless it can open this directory (or create it, but in our use
       // case we know it already exists).  See bug 1335329.
       nsPrintfCString pulsePath("%s/pulse", userDir);
       policy->AddPath(rdonly, pulsePath.get());
     }
-  }
 #endif  // MOZ_WIDGET_GTK
 
-  if (allowPulse) {
     // PulseAudio also needs access to read the $XAUTHORITY file (see
     // bug 1384986 comment #1), but that's already allowed for hybrid
     // GPU drivers (see above).

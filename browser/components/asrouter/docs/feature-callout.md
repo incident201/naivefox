@@ -407,6 +407,11 @@ interface FeatureCallout {
         // tile, which shows a list of checkboxes or radio buttons.
         tiles?: {
           type: "multiselect";
+          // Alternate presentations for the items. "picker" renders them as
+          // pill-shaped chips with an emoji icon. "select-card" renders them
+          // as full-width rows with the label on the inline-start edge and the
+          // checkbox on the inline-end edge. Omit for the default list.
+          multiSelectItemDesign?: "picker" | "select-card";
           data: MultiSelectItem[];
           // Allows CSS overrides of the multiselect container.
           style?: {
@@ -702,8 +707,12 @@ interface LinkParagraphOrImage extends Logo {
   //       an `<img class="inline-icon">`. Unlike `inline_icons` on
   //       `LocalizableThing` (mode 1), this segment isn't backed by Fluent,
   //       so `alt` must be set directly on the segment (defaults to "").
-  //     * a `LocalizableThing` with neither `href`, `link_key`, nor
-  //       `imageURL`, rendered as a localized span.
+  //     * a `LocalizableThing` with `action`, rendered as an inline link
+  //       that dispatches that special message action directly, without
+  //       needing a matching key on `screen.content`. Use this when a link
+  //       in a paragraph has to do something other than open a URL.
+  //     * a `LocalizableThing` with none of `href`, `link_key`, `action`
+  //       or `imageURL`, rendered as a localized span.
   //   Because each segment can itself be a `LocalizableThing`, segments
   //   carry their own per-segment CSS overrides and `aria_label`. CSS
   //   overrides set on `LinkParagraphOrImage` itself (e.g. `textAlign`,
@@ -719,6 +728,16 @@ interface LinkParagraphOrImage extends Logo {
         // Inline link key. Resolved against `screen.content[link_key].action`.
         // Mutually exclusive with `href`; if both are set, `href` wins.
         link_key?: string;
+        // An action to dispatch when the link is clicked, specified inline
+        // rather than looked up by key. Takes precedence over `href` and
+        // `link_key`. When `href` is also set it is still rendered on the
+        // anchor (so the link has a visible target and context menu), but
+        // the click dispatches this action instead of OPEN_URL.
+        action?: Action;
+        // Reported as the telemetry `source` when this segment's link is
+        // clicked. Only used alongside `action`; `link_key` segments report
+        // the link key instead.
+        id?: string;
       })
     | {
         // URL of the inline image.
@@ -824,6 +843,23 @@ interface MultiSelectItem {
   };
   // The action is not performed until the user clicks the primary button.
   action: Action;
+  // An informational note shown directly beneath this item while it is
+  // unchecked, explaining what the user gives up by leaving it unchecked. It
+  // disappears when the item is checked again.
+  //
+  // The note is rendered in an `aria-live` region that is always present in
+  // the DOM, so assistive technology announces it when it appears.
+  //
+  // It is laid out as a full-width row beneath the item, so it is meant for
+  // wide surfaces such as about:welcome or a fullscreen Spotlight. It is not
+  // compatible with `multiSelectItemDesign: "picker"`, and is not recommended
+  // in a feature callout panel, which is too narrow for it.
+  uncheckedNotice?: {
+    title?: Label;
+    subtitle?: Label;
+    // Defaults to chrome://global/skin/icons/info.svg.
+    iconURL?: string;
+  };
 }
 
 interface SubmenuItem {

@@ -102,7 +102,7 @@ class ProviderTabGroups extends ActionsProvider {
     return results;
   }
 
-  onPick(_queryContext, controller, action) {
+  onPick(_queryContext, controller, action, _details) {
     let group;
     if (action.dataset.savedGroupId) {
       group = lazy.SessionStore.openSavedTabGroup(

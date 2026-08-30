@@ -439,6 +439,21 @@ class HomeDeepLinkIntentProcessorTest {
         verify { out wasNot Called }
     }
 
+    @Test
+    fun `process privacy_report deep link`() {
+        assertTrue(processorHome.process(testIntent("privacy_report"), navController, out, settings))
+
+        verify { activity wasNot Called }
+        verify {
+            navController.navigate(NavGraphDirections.actionGlobalProtectionsDashboard(null))
+        }
+        verify { out wasNot Called }
+        assertEquals(
+            PRIVACY_REPORT_NOTIFICATION_TELEMETRY_SOURCE,
+            TrackingProtection.privacyReportTapped.testGetValue()?.last()?.extra?.get("source"),
+        )
+    }
+
     private fun testIntent(uri: String) = Intent("", "$DEEP_LINK_SCHEME://$uri".toUri())
 
     private fun showAddSearchWidgetPrompt(activity: Activity) {

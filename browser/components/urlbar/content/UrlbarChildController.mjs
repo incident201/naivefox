@@ -19,7 +19,7 @@ if (lazy) {
 }
 
 /**
- * @import {UrlbarChild} from "../../../actors/UrlbarChild.sys.mjs"
+ * @import {UrlbarChild} from "moz-src:///browser/components/urlbar/actors/UrlbarChild.sys.mjs"
  * @import {UrlbarInput} from "chrome://browser/content/urlbar/UrlbarInput.mjs"
  * @import {UrlbarParentController} from "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs"
  * @import {UrlbarView} from "chrome://browser/content/urlbar/UrlbarView.mjs"
@@ -194,8 +194,8 @@ export class UrlbarChildController {
   onBeforeSelection(result, element) {
     return this.#parentController.onBeforeSelection(result, element);
   }
-  onSelection(result, element) {
-    return this.#parentController.onSelection(result, element);
+  onSelection(result) {
+    return this.#parentController.onSelection(result);
   }
   getHeuristicResult(queryContext) {
     return this.#parentController.getHeuristicResult(queryContext);
@@ -493,9 +493,15 @@ export class UrlbarChildController {
           if (this.view.isOpen) {
             this.view.close();
           } else if (
-            // Moving focus into the content document only makes sense for a
-            // chrome moz-urlbar; a content-process one already has focus in
-            // content. Only a browser window has `gBrowser`.
+            // An in-page urlbar returns focus to the host page.
+            !this.window.gBrowser &&
+            UrlbarPrefs.get("focusContentDocumentOnEsc") &&
+            !this.input.searchMode &&
+            this.input.value == ""
+          ) {
+            this.input.blur();
+          } else if (
+            // A chrome urlbar moves focus into the content document instead.
             this.window.gBrowser &&
             UrlbarPrefs.get("focusContentDocumentOnEsc") &&
             !this.input.searchMode &&
@@ -978,6 +984,11 @@ export class UrlbarChildController {
       inBackground,
       browserId
     );
+  }
+
+  /** @type {typeof UrlbarParentController.prototype.openPreferences} */
+  openPreferences(paneID) {
+    this.#parentController.openPreferences(paneID);
   }
 
   /** @type {typeof UrlbarParentController.prototype.getEngineIconURL} */

@@ -88,7 +88,6 @@ interface ShareController {
  * @param appStore Instance of [AppStore] for interacting with application wide state.
  * @param shareSubject Desired message subject used when sharing through 3rd party apps, like email clients.
  * @param shareData The list of [ShareData]s that can be shared.
- * @param isPrivate Whether the tab(s) being shared are from private browsing mode.
  * @param sendTabUseCases Instance of [SendTabUseCases] which allows sending tabs to account devices.
  * @param saveToPdfUseCase Instance of [SessionUseCases.SaveToPdfUseCase] to generate a PDF of a given tab.
  * @param printUseCase Instance of [SessionUseCases.PrintContentUseCase] to print content of a given tab.
@@ -107,7 +106,6 @@ class DefaultShareController(
     private val appStore: AppStore,
     private val shareSubject: String?,
     private val shareData: List<ShareData>,
-    private val isPrivate: Boolean,
     private val sendTabUseCases: SendTabUseCases,
     private val saveToPdfUseCase: SessionUseCases.SaveToPdfUseCase,
     private val printUseCase: SessionUseCases.PrintContentUseCase,
@@ -292,24 +290,11 @@ class DefaultShareController(
     internal fun getShareSubject() =
         shareSubject ?: shareData.filterNot { it.title.isNullOrEmpty() }.joinToString(", ") { it.title.toString() }
 
-    // Navigation between app fragments uses ShareTab as arguments. SendTabUseCases uses TabData.
-    @VisibleForTesting
-    internal fun List<ShareData>.toTabData() = map { data ->
-        TabData(
-            title = data.title.orEmpty(),
-            url = data.url ?: data.text?.toDataUri().orEmpty(),
-            privacy = if (isPrivate) TabPrivacy.Private else TabPrivacy.Normal,
-        )
-    }
-
-    private fun String.toDataUri(): String {
-        return "data:,${Uri.encode(this)}"
-    }
-
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun copyClipboard() {
         val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clipData = ClipData.newPlainText(getShareSubject(), getShareText())
+
+        val isPrivate = shareData.any { it.private }
 
         if (isPrivate) {
             clipData.description.extras =
@@ -324,4 +309,18 @@ class DefaultShareController(
     companion object {
         const val ACTION_COPY_LINK_TO_CLIPBOARD = "org.mozilla.fenix.COPY_LINK_TO_CLIPBOARD"
     }
+}
+
+// Navigation between app fragments uses ShareTab as arguments. SendTabUseCases uses TabData.
+@VisibleForTesting
+internal fun List<ShareData>.toTabData() = map { data ->
+    fun String.toDataUri(): String {
+        return "data:,${Uri.encode(this)}"
+    }
+
+    TabData(
+        title = data.title.orEmpty(),
+        url = data.url ?: data.text?.toDataUri().orEmpty(),
+        privacy = if (data.private) TabPrivacy.Private else TabPrivacy.Normal,
+    )
 }

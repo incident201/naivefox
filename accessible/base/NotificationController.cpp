@@ -14,8 +14,8 @@
 #include "mozilla/PerfStats.h"
 #include "mozilla/PresShell.h"
 #include "mozilla/ProfilerMarkers.h"
-#include "mozilla/dom/BrowserChild.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/WindowGlobalChild.h"
 #include "mozilla/glean/AccessibleMetrics.h"
 #include "nsAccessibilityService.h"
 #include "nsEventShell.h"
@@ -1082,17 +1082,13 @@ void NotificationController::WillRefresh(mozilla::TimeStamp aTime) {
         continue;
       }
 
-      ipcDoc = new DocAccessibleChild(childDoc, parentIPCDoc->Manager());
-      childDoc->SetIPCDoc(ipcDoc);
-
-      nsCOMPtr<nsIBrowserChild> browserChild =
-          do_GetInterface(mDocument->DocumentNode()->GetDocShell());
-      if (browserChild) {
-        static_cast<BrowserChild*>(browserChild.get())
-            ->SendPDocAccessibleConstructor(
-                ipcDoc, parentIPCDoc, id,
-                childDoc->DocumentNode()->GetBrowsingContext(),
-                childDoc->IsPrintDoc());
+      if (WindowGlobalChild* wgc =
+              childDoc->DocumentNode()->GetWindowGlobalChild()) {
+        RefPtr<DocAccessibleChild> newIpcDoc =
+            new DocAccessibleChild(childDoc, wgc);
+        childDoc->SetIPCDoc(newIpcDoc);
+        wgc->SendPDocAccessibleConstructor(newIpcDoc, id,
+                                           childDoc->IsPrintDoc());
       }
     }
   }

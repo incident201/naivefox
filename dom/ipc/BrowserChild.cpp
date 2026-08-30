@@ -5,7 +5,6 @@
 #include "BrowserChild.h"
 
 #ifdef ACCESSIBILITY
-#  include "mozilla/a11y/DocAccessibleChild.h"
 #  include "nsAccessibilityService.h"
 #endif
 #include <utility>
@@ -2737,21 +2736,6 @@ mozilla::ipc::IPCResult BrowserChild::RecvPasteTransferable(
   ourDocShell->DoCommandWithParams("cmd_pasteTransferable", params);
   return IPC_OK();
 }
-
-#ifdef ACCESSIBILITY
-a11y::PDocAccessibleChild* BrowserChild::AllocPDocAccessibleChild(
-    PDocAccessibleChild*, const uint64_t&, const MaybeDiscardedBrowsingContext&,
-    const bool&) {
-  MOZ_ASSERT_UNREACHABLE("should never call this!");
-  return nullptr;
-}
-
-bool BrowserChild::DeallocPDocAccessibleChild(
-    a11y::PDocAccessibleChild* aChild) {
-  delete static_cast<mozilla::a11y::DocAccessibleChild*>(aChild);
-  return true;
-}
-#endif
 
 RefPtr<VsyncMainChild> BrowserChild::GetVsyncChild() {
   // Initializing VsyncMainChild here turns on per-BrowserChild Vsync for a

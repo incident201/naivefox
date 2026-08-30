@@ -38,7 +38,6 @@ ml-perf-wasm: &ml-perf
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -73,7 +72,6 @@ ml-llama-summarizer-perf:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -97,7 +95,6 @@ ml-security-perf:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -128,7 +125,6 @@ ml-multi-perf-wasm: &ml-multi-perf
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -163,7 +159,6 @@ ml-perf-semantic-ft-wasm: &ml-perf-semantic-ft
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -204,7 +199,6 @@ ml-perf-suggest-ft-wasm: &ml-perf-suggest-ft
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -243,7 +237,6 @@ ml-perf-suggest-inf-wasm: &ml-perf-suggest-inf
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -283,7 +276,6 @@ ml-perf-autofill-wasm: &ml-perf-autofill
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -322,7 +314,6 @@ ml-perf-smart-tab-wasm: &ml-perf-smart-tab
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -362,7 +353,6 @@ ml-perf-smart-tab-cluster-wasm: &ml-perf-smart-tab-cluster
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -396,7 +386,6 @@ perftest-accessibility:
         cron: false
     run-on-projects: [autoland, mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -435,3 +424,8 @@ perftest-accessibility:
             --flavor mochitest
             --output $MOZ_FETCHES_DIR/../artifacts
             accessible/tests/browser/performance/browser_displayContentsBounds.js
+            && python3 python/mozperftest/mozperftest/runner.py
+            --mochitest-binary ${MOZ_FETCHES_DIR}/firefox/firefox.exe
+            --flavor mochitest
+            --output $MOZ_FETCHES_DIR/../artifacts
+            accessible/tests/browser/performance/browser_panManySVGShapes.js

@@ -1091,6 +1091,22 @@ class TestRecursiveMakeBackend(BackendTester):
         found = [str for str in lines if str.startswith("LOCAL_INCLUDES")]
         self.assertEqual(found, expected)
 
+    def test_generated_file_depends_on_rust_archive(self):
+        """Test a generated file depending on a non-default Rust archive."""
+        env = self._consume("generated-file-rust-archive-dep", RecursiveMakeBackend)
+
+        root_deps = [
+            l.strip()
+            for l in open(mozpath.join(env.topobjdir, "root-deps.mk")).readlines()
+        ]
+        self.assertIn("consumer/pre-compile: rust/test-category", root_deps)
+
+        backend_path = mozpath.join(env.topobjdir, "consumer/backend.mk")
+        self.assertIn(
+            "$(DEPTH)/x86_64-unknown-linux-gnu/release/librandom_crate.a",
+            open(backend_path).read(),
+        )
+
     def test_rust_library(self):
         """Test that a Rust library is written to backend.mk correctly."""
         env = self._consume("rust-library", RecursiveMakeBackend)

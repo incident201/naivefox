@@ -680,7 +680,7 @@ TEST(TestCookie, TestCookieMain)
   SetACookie(cookieService, "https://prefixed.test/",
              "__Secure-test=test; secure");
   SetACookie(cookieService, "https://prefixed.test/",
-             "__Host-test=test; secure");
+             "__Host-test=test; secure; path=/");
   GetACookie(cookieService, "https://prefixed.test/", cookie);
   EXPECT_TRUE(CheckResult(cookie.get(), MUST_CONTAIN, "__Secure-test=test"));
   EXPECT_TRUE(CheckResult(cookie.get(), MUST_CONTAIN, "__Host-test=test"));
@@ -710,6 +710,21 @@ TEST(TestCookie, TestCookieMain)
              "__Host-g=test; secure; path=/some");
   GetACookie(cookieService, "https://host.prefixed.test/", cookie);
   EXPECT_TRUE(CheckResult(cookie.get(), MUST_EQUAL, "__Host-f=test"));
+
+  // Host-prefixed cookies require an explicit Path attribute of "/": a default
+  // path that happens to be "/" is not enough.
+  SetACookie(cookieService, "https://explicit.prefixed.test/",
+             "__Host-h=test; secure");
+  SetACookie(cookieService, "https://explicit.prefixed.test/",
+             "__Host-i=test; secure; path=");
+  SetACookie(cookieService, "https://explicit.prefixed.test/",
+             "__Host-j=test; secure; path");
+  SetACookie(cookieService, "https://explicit.prefixed.test/",
+             "__Host-k=test; secure; path=relative");
+  SetACookie(cookieService, "https://explicit.prefixed.test/",
+             "__Host-l=test; secure; path=/");
+  GetACookie(cookieService, "https://explicit.prefixed.test/", cookie);
+  EXPECT_TRUE(CheckResult(cookie.get(), MUST_EQUAL, "__Host-l=test"));
 
   // *** leave-secure-alone tests
 

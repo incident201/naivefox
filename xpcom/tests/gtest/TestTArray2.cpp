@@ -1492,6 +1492,8 @@ TEST(TArray, test_comparator_objects)
   ASSERT_TRUE(TestCompareMethods(IntComparator()));
   ASSERT_TRUE(
       TestCompareMethods([](int aLeft, int aRight) { return aLeft - aRight; }));
+  ASSERT_TRUE(TestCompareMethods(
+      [](int aLeft, int aRight) { return aLeft <=> aRight; }));
   ASSERT_TRUE(TestCompareMethodsImpl(
       [](int aI) { return IntWrapper{.mI = aI}; }, IntComparator(),
       [](int aElem, const IntWrapper& aItem) { return aElem - aItem.mI; }));

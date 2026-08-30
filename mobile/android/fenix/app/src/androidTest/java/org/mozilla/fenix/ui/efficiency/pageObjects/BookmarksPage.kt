@@ -40,7 +40,7 @@ class BookmarksPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRu
             to = "BookmarkSearchPage",
             steps =
                 listOf(
-                    /* TODO: the search button only renders when at least one bookmark exists, so we add
+                    /* The search button only renders when at least one bookmark exists, so we add
                     one here as a navigation precondition. This adds a hidden "Mozilla" bookmark in any
                     test navigating through this path — safe as long as no test searches for "moz", "org", etc. */
                     NavigationStep.Action { createBookmarkItem("https://www.mozilla.org", "Mozilla", null) },

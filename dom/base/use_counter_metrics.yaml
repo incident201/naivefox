@@ -108,8 +108,8 @@ use.counter:
     send_in_pings:
       - use-counters
 
-# Total of 2620 use counter metrics (excludes denominators).
-# Total of 412 'page' use counters.
+# Total of 2628 use counter metrics (excludes denominators).
+# Total of 416 'page' use counters.
 use.counter.page:
   svgsvgelement_getelementbyid:
     type: counter
@@ -5279,10 +5279,10 @@ use.counter.page:
     send_in_pings:
       - use-counters
 
-  sanitizer_sanitize:
+  element_sethtml:
     type: counter
     description: >
-      Whether a page called called Sanitizer.sanitize.
+      Whether a page called called Element.setHTML.
       Compare against `use.counter.top_level_content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -5296,10 +5296,78 @@ use.counter.page:
     send_in_pings:
       - use-counters
 
-  element_sethtml:
+  shadowroot_sethtml:
     type: counter
     description: >
-      Whether a page called called Element.setHTML.
+      Whether a page called called ShadowRoot.setHTML.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  document_parsehtml:
+    type: counter
+    description: >
+      Whether a page called called Document.parseHTML.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  element_sethtmlunsafe:
+    type: counter
+    description: >
+      Whether a page called called Element.setHTMLUnsafe.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  shadowroot_sethtmlunsafe:
+    type: counter
+    description: >
+      Whether a page called called ShadowRoot.setHTMLUnsafe.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  document_parsehtmlunsafe:
+    type: counter
+    description: >
+      Whether a page called called Document.parseHTMLUnsafe.
       Compare against `use.counter.top_level_content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -7115,7 +7183,7 @@ use.counter.page:
     send_in_pings:
       - use-counters
 
-# Total of 412 'document' use counters.
+# Total of 416 'document' use counters.
 use.counter.doc:
   svgsvgelement_getelementbyid:
     type: counter
@@ -12285,10 +12353,10 @@ use.counter.doc:
     send_in_pings:
       - use-counters
 
-  sanitizer_sanitize:
+  element_sethtml:
     type: counter
     description: >
-      Whether a document called called Sanitizer.sanitize.
+      Whether a document called called Element.setHTML.
       Compare against `use.counter.content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -12302,10 +12370,78 @@ use.counter.doc:
     send_in_pings:
       - use-counters
 
-  element_sethtml:
+  shadowroot_sethtml:
     type: counter
     description: >
-      Whether a document called called Element.setHTML.
+      Whether a document called called ShadowRoot.setHTML.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  document_parsehtml:
+    type: counter
+    description: >
+      Whether a document called called Document.parseHTML.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  element_sethtmlunsafe:
+    type: counter
+    description: >
+      Whether a document called called Element.setHTMLUnsafe.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  shadowroot_sethtmlunsafe:
+    type: counter
+    description: >
+      Whether a document called called ShadowRoot.setHTMLUnsafe.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  document_parsehtmlunsafe:
+    type: counter
+    description: >
+      Whether a document called called Document.parseHTMLUnsafe.
       Compare against `use.counter.content_documents_destroyed`
       to calculate the rate.
     bugs:

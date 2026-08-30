@@ -975,7 +975,10 @@ export class _ASRouter {
   }
 
   /**
-   * Verify that the provider block the message through the `exclude` field
+   * Verify that the provider block the message through the `exclude` field.
+   * A message with no matching provider can only come from the devtools,
+   * and a message with no provider can't be excluded by one, so we treat it
+   * as not excluded.
    *
    * @param message Message to verify
    * @returns bool
@@ -983,7 +986,7 @@ export class _ASRouter {
   isExcludedByProvider(message) {
     const provider = this.state.providers.find(p => p.id === message.provider);
     if (!provider) {
-      return true;
+      return false;
     }
     if (provider.exclude) {
       return provider.exclude.includes(message.id);
@@ -1637,6 +1640,9 @@ export class _ASRouter {
       // This set default action is ONLY to be used in cases where an OS level
       // prompt or settings panel will obtain a user's consent to set default.
       "SET_DEFAULT_BROWSER",
+      // This set default action always shows the OS "Open with" picker
+      // (IOpenWithLauncher), which obtains the user's consent to set default.
+      "SET_DEFAULT_BROWSER_OPEN_WITH",
     ];
     // ALLOWED_ACTION_MESSAGE_ACTIONS above is the in-tree baseline. It can be
     // extended off-train via Remote Settings, except for the actions in
@@ -1671,7 +1677,9 @@ export class _ASRouter {
       return { message: {} };
     }
     const message = force
-      ? MessageLoaderUtils._delocalizeValues(originalMessage)
+      ? lazy.PanelTestProvider.tagMessageForTesting(
+          MessageLoaderUtils._delocalizeValues(originalMessage)
+        )
       : originalMessage;
 
     // Callers that need to know when it's safe to act on the fact that a

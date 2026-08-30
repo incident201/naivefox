@@ -1387,17 +1387,17 @@ auto AnchorPositioningUtils::GetCombinedFragmentRects(
            aContinuation->GetOffsetToIgnoringScrolling(aContainingBlock);
   };
 
-  // Collect rects from our continuations (limited to those that are on the
-  // same page if the context is paginated).
+  // Collect rects from our continuations and IB-split siblings (limited to
+  // those that are on the same page if the context is paginated).
   nsRect rect = GetRectInContainingBlockSpace(aFrame);
-  const auto* next = aFrame->GetNextContinuation();
+  const auto* next = nsLayoutUtils::GetNextContinuationOrIBSplitSibling(aFrame);
   for (; next && onSamePage(next) && inSameCBFragment(next);
-       next = next->GetNextContinuation()) {
+       next = nsLayoutUtils::GetNextContinuationOrIBSplitSibling(next)) {
     rect = rect.Union(GetRectInContainingBlockSpace(next));
   }
-  const auto* prev = aFrame->GetPrevContinuation();
+  const auto* prev = nsLayoutUtils::GetPrevContinuationOrIBSplitSibling(aFrame);
   for (; prev && onSamePage(prev) && inSameCBFragment(prev);
-       prev = prev->GetPrevContinuation()) {
+       prev = nsLayoutUtils::GetPrevContinuationOrIBSplitSibling(prev)) {
     rect = rect.Union(GetRectInContainingBlockSpace(prev));
   }
 

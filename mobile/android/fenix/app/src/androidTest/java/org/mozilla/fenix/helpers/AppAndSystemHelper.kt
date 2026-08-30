@@ -684,11 +684,7 @@ object AppAndSystemHelper {
             testBlock()
             Log.i(TAG, "Test block finished.")
         } catch (e: Exception) {
-            Log.i(
-                TAG,
-                "runWithSystemLocaleChanged: The test block has thrown an exception.${e.message}",
-            )
-            e.printStackTrace()
+            Log.e(TAG, "runWithSystemLocaleChanged: The test block has thrown an exception.", e)
             throw e
         } finally {
             ThreadUtils.runOnUiThread { AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList()) }
@@ -714,8 +710,7 @@ object AppAndSystemHelper {
             testBlock()
             Log.i(TAG, "runWithAppLocaleChanged: Test block finished.")
         } catch (e: Exception) {
-            Log.i(TAG, "runWithAppLocaleChanged: The test block has thrown an exception.${e.message}")
-            e.printStackTrace()
+            Log.e(TAG, "runWithAppLocaleChanged: The test block has thrown an exception.", e)
             throw e
         } finally {
             Log.i(
@@ -852,8 +847,7 @@ object AppAndSystemHelper {
             testBlock()
             Log.i(TAG, "runWithLauncherIntent: Finished running the test block.")
         } catch (e: Exception) {
-            Log.i(TAG, "runWithLauncherIntent: Exception caught while running the test block: ${e.message}")
-            e.printStackTrace()
+            Log.e(TAG, "runWithLauncherIntent: Exception caught while running the test block.", e)
         }
     }
 

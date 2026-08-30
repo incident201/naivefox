@@ -118,7 +118,7 @@ export class SearchModeSwitcher {
   #isEnabled() {
     return (
       UrlbarPrefs.get("scotchBonnet.enableOverride") ||
-      this.#input.sapName == "searchbar"
+      this.#input.isSearchbarSAP
     );
   }
 
@@ -144,7 +144,7 @@ export class SearchModeSwitcher {
   }
 
   #openPreferences() {
-    this.#input.window.openPreferences("paneSearch");
+    this.#input.controller.openPreferences("paneSearch");
 
     if (this.#input.sapName == "urlbar") {
       Glean.urlbarUnifiedsearchbutton.picked.settings.add(1);
@@ -283,9 +283,6 @@ export class SearchModeSwitcher {
         ) {
           return;
         }
-        // Prevent the keystroke from generating a
-        // click event and reopening the switcher.
-        keyboardEvent.preventDefault();
         break;
       }
       case "auxclick": {
@@ -371,8 +368,8 @@ export class SearchModeSwitcher {
       return;
     }
 
-    if (this.#input.sapName == "searchbar") {
-      // The searchbar cares about neither of the two remaining prefs.
+    if (this.#input.isSearchbarSAP) {
+      // A search bar cares about neither of the two remaining prefs.
       return;
     }
 
@@ -526,10 +523,7 @@ export class SearchModeSwitcher {
       labelEl.textContent = label;
     }
 
-    if (
-      !UrlbarPrefs.get("keyword.enabled") &&
-      this.#input.sapName != "searchbar"
-    ) {
+    if (!UrlbarShared.keywordEnabled(this.#input.sapName)) {
       this.#input.document.l10n.setAttributes(
         this.#button,
         "urlbar-searchmode-no-keyword2"
@@ -546,11 +540,7 @@ export class SearchModeSwitcher {
       // Search service failed but we continue anyways.
     }
 
-    if (
-      this.#input.sapName != "searchbar" &&
-      !UrlbarPrefs.get("keyword.enabled") &&
-      !searchMode
-    ) {
+    if (!UrlbarShared.keywordEnabled(this.#input.sapName) && !searchMode) {
       return { icon: SearchModeSwitcher.ICON_GLOBE };
     }
 

@@ -94,13 +94,8 @@ struct EmbedderColorSchemes {
   PrefersColorSchemeOverride mUsed{};
   PrefersColorSchemeOverride mPreferred{};
 
-  bool operator==(const EmbedderColorSchemes& aOther) const {
-    return mUsed == aOther.mUsed && mPreferred == aOther.mPreferred;
-  }
-
-  bool operator!=(const EmbedderColorSchemes& aOther) const {
-    return !(*this == aOther);
-  }
+  bool operator==(const EmbedderColorSchemes& aOther) const = default;
+  bool operator!=(const EmbedderColorSchemes& aOther) const = default;
 };
 
 // Fields are, by default, settable by any process and readable by any process.
@@ -868,7 +863,7 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
   BrowsingContext* Self() { return this; }
   void Location(JSContext* aCx, JS::MutableHandle<JSObject*> aLocation,
                 ErrorResult& aError);
-  void Close(CallerType aCallerType, ErrorResult& aError);
+  MOZ_CAN_RUN_SCRIPT void Close(CallerType aCallerType, ErrorResult& aError);
   bool GetClosed(ErrorResult&) { return GetClosed(); }
   void Focus(CallerType aCallerType, ErrorResult& aError);
   void Blur(CallerType aCallerType, ErrorResult& aError);

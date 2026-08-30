@@ -995,6 +995,7 @@ bool TextureParent::Init(const SurfaceDescriptor& aSharedData,
                          ReadLockDescriptor&& aReadLock,
                          const LayersBackend& aBackend,
                          const TextureFlags& aFlags) {
+  MOZ_ASSERT(mSurfaceAllocator);
   mTextureHost =
       TextureHost::Create(aSharedData, std::move(aReadLock), mSurfaceAllocator,
                           aBackend, aFlags, mExternalImageId);

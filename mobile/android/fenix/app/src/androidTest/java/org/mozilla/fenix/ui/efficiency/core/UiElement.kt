@@ -31,6 +31,19 @@ interface UiElement {
     fun isDisplayed(): Boolean
 
     fun click()
+
+    companion object {
+        /** Wrap a raw located node - whatever backend produced it - into the facade. */
+        fun wrap(any: Any?): UiElement? =
+            when (any) {
+                is UiElement -> any
+                is SemanticsNodeInteraction -> ComposeUiElement(any)
+                is ViewInteraction -> EspressoUiElement(any)
+                is UiObject -> UiObjectUiElement(any)
+                is UiObject2 -> UiObject2UiElement(any)
+                else -> null
+            }
+    }
 }
 
 class ComposeUiElement(private val node: SemanticsNodeInteraction) : UiElement {

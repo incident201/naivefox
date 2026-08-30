@@ -2270,6 +2270,28 @@ function renderSegment(segment, index, handleAction) {
       style: pickConfigurableStyles(segment)
     });
   }
+  if (segment?.action) {
+    return /*#__PURE__*/external_React_default().createElement("a", {
+      key: index,
+      href: segment.href,
+      value: segment.id,
+      role: segment.href ? null : "link",
+      className: "text-link",
+      tabIndex: "0",
+      onClick: event => {
+        event.preventDefault();
+        handleAction(event, segment.action);
+      },
+      onKeyPress: event => {
+        if (event.key === "Enter" && !event.repeat) {
+          event.preventDefault();
+          handleAction(event, segment.action);
+        }
+      }
+    }, /*#__PURE__*/external_React_default().createElement(Localized, {
+      text: segment
+    }, /*#__PURE__*/external_React_default().createElement("span", null)));
+  }
   if (segment?.href) {
     const action = {
       type: "OPEN_URL",
@@ -2852,6 +2874,52 @@ for (let i = MULTI_SELECT_STYLES.length - 1; i >= 0; i--) {
   }
 }
 const MULTI_SELECT_ICON_STYLES = [...CONFIGURABLE_STYLES, "width", "height", "background", "backgroundColor", "backgroundImage", "backgroundSize", "backgroundPosition", "backgroundRepeat", "backgroundOrigin", "backgroundClip", "border", "borderRadius", "appearance", "fill", "stroke", "outline", "outlineOffset", "boxShadow"];
+
+/**
+ * A note shown beneath a multi select item while that item is unchecked, used
+ * to explain what the user gives up by leaving it unchecked.
+ *
+ * The live region wrapper is always rendered, even when the notice is hidden,
+ * so that assistive technology announces the notice when it later appears.
+ *
+ * The notice is laid out as a full-width row beneath its item, so it is not
+ * compatible with `multiSelectItemDesign: "picker"`, whose items are
+ * pill-shaped chips.
+ *
+ * @param {object} notice the item's `uncheckedNotice` config
+ * @param {boolean} isShown whether the notice content should be rendered
+ */
+const UncheckedNotice = ({
+  notice,
+  isShown
+}) => {
+  const {
+    title,
+    subtitle,
+    iconURL
+  } = notice;
+  return /*#__PURE__*/external_React_default().createElement("div", {
+    className: "multi-select-notice-region",
+    role: "status"
+  }, isShown ? /*#__PURE__*/external_React_default().createElement("div", {
+    className: "multi-select-notice"
+  }, /*#__PURE__*/external_React_default().createElement("div", {
+    className: "multi-select-notice-icon",
+    style: iconURL ? {
+      backgroundImage: `url("${iconURL}")`
+    } : null
+  }), /*#__PURE__*/external_React_default().createElement("div", {
+    className: "multi-select-notice-content"
+  }, title ? /*#__PURE__*/external_React_default().createElement(Localized, {
+    text: title
+  }, /*#__PURE__*/external_React_default().createElement("p", {
+    className: "multi-select-notice-title"
+  })) : null, subtitle ? /*#__PURE__*/external_React_default().createElement(Localized, {
+    text: subtitle
+  }, /*#__PURE__*/external_React_default().createElement("p", {
+    className: "multi-select-notice-subtitle"
+  })) : null)) : null);
+};
 const MultiSelect = ({
   content,
   screenMultiSelects,
@@ -2973,43 +3041,56 @@ const MultiSelect = ({
     group,
     style,
     pickerEmoji,
-    pickerEmojiBackgroundColor
-  }) => /*#__PURE__*/external_React_default().createElement("div", {
-    key: id + label,
-    className: "checkbox-container multi-select-item",
-    style: MultiStageUtils.getValidStyle(style, MULTI_SELECT_STYLES),
-    tabIndex: isPicker ? "0" : null,
-    onClick: isPicker ? handleCheckboxContainerInteraction : null,
-    onKeyDown: isPicker ? handleCheckboxContainerInteraction : null,
-    role: isPicker ? "checkbox" : null,
-    "aria-checked": isPicker ? activeMultiSelect?.includes(id) : null
-  }, /*#__PURE__*/external_React_default().createElement("input", {
-    type: type // checkbox or radio
-    ,
-    id: id,
-    value: id,
-    name: group,
-    checked: activeMultiSelect?.includes(id),
-    style: MultiStageUtils.getValidStyle(icon?.style, MULTI_SELECT_ICON_STYLES),
-    onChange: handleChange,
-    ref: el => refs.current[id] = el,
-    "aria-describedby": description ? `${id}-description` : null,
-    "aria-labelledby": description ? `${id}-label` : null,
-    tabIndex: isPicker ? "-1" : "0"
-  }), isPicker && /*#__PURE__*/external_React_default().createElement(PickerIcon, {
-    emoji: pickerEmoji,
-    bgColor: pickerEmojiBackgroundColor,
-    isChecked: activeMultiSelect?.includes(id)
-  }), label ? /*#__PURE__*/external_React_default().createElement(Localized, {
-    text: label
-  }, /*#__PURE__*/external_React_default().createElement("label", {
-    id: `${id}-label`,
-    htmlFor: id
-  })) : null, description ? /*#__PURE__*/external_React_default().createElement(Localized, {
-    text: description
-  }, /*#__PURE__*/external_React_default().createElement("p", {
-    id: `${id}-description`
-  })) : null)), content.tiles.footer ? /*#__PURE__*/external_React_default().createElement(Localized, {
+    pickerEmojiBackgroundColor,
+    uncheckedNotice
+  }) => {
+    const checkboxContainer = /*#__PURE__*/external_React_default().createElement("div", {
+      key: id + label,
+      className: "checkbox-container multi-select-item",
+      style: MultiStageUtils.getValidStyle(style, MULTI_SELECT_STYLES),
+      tabIndex: isPicker ? "0" : null,
+      onClick: isPicker ? handleCheckboxContainerInteraction : null,
+      onKeyDown: isPicker ? handleCheckboxContainerInteraction : null,
+      role: isPicker ? "checkbox" : null,
+      "aria-checked": isPicker ? activeMultiSelect?.includes(id) : null
+    }, /*#__PURE__*/external_React_default().createElement("input", {
+      type: type // checkbox or radio
+      ,
+      id: id,
+      value: id,
+      name: group,
+      checked: activeMultiSelect?.includes(id),
+      style: MultiStageUtils.getValidStyle(icon?.style, MULTI_SELECT_ICON_STYLES),
+      onChange: handleChange,
+      ref: el => refs.current[id] = el,
+      "aria-describedby": description ? `${id}-description` : null,
+      "aria-labelledby": description ? `${id}-label` : null,
+      tabIndex: isPicker ? "-1" : "0"
+    }), isPicker && /*#__PURE__*/external_React_default().createElement(PickerIcon, {
+      emoji: pickerEmoji,
+      bgColor: pickerEmojiBackgroundColor,
+      isChecked: activeMultiSelect?.includes(id)
+    }), label ? /*#__PURE__*/external_React_default().createElement(Localized, {
+      text: label
+    }, /*#__PURE__*/external_React_default().createElement("label", {
+      id: `${id}-label`,
+      htmlFor: id
+    })) : null, description ? /*#__PURE__*/external_React_default().createElement(Localized, {
+      text: description
+    }, /*#__PURE__*/external_React_default().createElement("p", {
+      id: `${id}-description`
+    })) : null);
+    if (!uncheckedNotice) {
+      return checkboxContainer;
+    }
+    return /*#__PURE__*/external_React_default().createElement("div", {
+      className: "multi-select-item-group",
+      key: id + label
+    }, checkboxContainer, /*#__PURE__*/external_React_default().createElement(UncheckedNotice, {
+      notice: uncheckedNotice,
+      isShown: !activeMultiSelect?.includes(id)
+    }));
+  }), content.tiles.footer ? /*#__PURE__*/external_React_default().createElement(Localized, {
     text: items.some(i => activeMultiSelect?.includes(i.id)) ? content.tiles.footer.checkedLabel : content.tiles.footer.unCheckAllLabel
   }, /*#__PURE__*/external_React_default().createElement("h2", {
     id: "multi-stage-multi-select-footer-label"
@@ -4743,16 +4824,19 @@ class ProtonScreen extends (external_React_default()).PureComponent {
   }
   renderOrderedContent(content) {
     const elements = [];
-    for (const item of content) {
+    for (const [index, item] of content.entries()) {
       switch (item.type) {
         case "text":
           elements.push(/*#__PURE__*/external_React_default().createElement(LinkParagraph, {
+            key: index,
             text_content: item,
             handleAction: this.props.handleAction
           }));
           break;
         case "image":
-          elements.push(this.renderPicture({
+          elements.push(/*#__PURE__*/external_React_default().createElement((external_React_default()).Fragment, {
+            key: index
+          }, this.renderPicture({
             imageURL: item.url,
             darkModeImageURL: item.darkModeImageURL,
             height: item.height,
@@ -4760,7 +4844,7 @@ class ProtonScreen extends (external_React_default()).PureComponent {
             alt: item.alt_text,
             marginInline: item.marginInline,
             className: "inline-image"
-          }));
+          })));
       }
     }
     return /*#__PURE__*/external_React_default().createElement((external_React_default()).Fragment, null, elements);
@@ -4855,7 +4939,14 @@ class ProtonScreen extends (external_React_default()).PureComponent {
           ${screenClassName} ${textColorClass}`,
       "reverse-split": content.reverse_split ? "" : null,
       fullscreen: content.fullscreen ? "" : null,
-      style: content.screen_style && MultiStageUtils.getValidStyle(content.screen_style, ["overflow", "display"]),
+      style: {
+        ...(content.screen_style && MultiStageUtils.getValidStyle(content.screen_style, ["overflow", "display"])),
+        // center-large-fullscreen renders its background here, at the
+        // full-viewport screen level, rather than on .main-content, so it
+        // isn't confined to that inset card and can show behind the
+        // blurred glow (see .main-content below).
+        background: isCenterLargeFullscreen ? this.getEffectiveBackground(content) : null
+      },
       role: ariaRole ?? "alertdialog",
       layout: content.layout,
       pos: content.position || "center",
@@ -4874,7 +4965,7 @@ class ProtonScreen extends (external_React_default()).PureComponent {
     }, isCenterLargeFullscreen ? null : secondaryCTATop, includeNoodles ? this.renderNoodles() : null, content.more_button ? this.renderMoreButton() : null, content.dismiss_button && !content.reverse_split ? this.renderDismissButton() : null, /*#__PURE__*/external_React_default().createElement("div", {
       className: `main-content ${hideStepsIndicator ? "no-steps" : ""}`,
       style: {
-        background: isCenterPosition && this.getEffectiveBackground(content) ? this.getEffectiveBackground(content) : null,
+        background: isCenterPosition && !isCenterLargeFullscreen && this.getEffectiveBackground(content) ? this.getEffectiveBackground(content) : null,
         width: content.width && content.position !== "split" ? content.width : null,
         paddingBlock: content.split_content_padding_block ? content.split_content_padding_block : null,
         paddingInline: content.split_content_padding_inline ? content.split_content_padding_inline : null,

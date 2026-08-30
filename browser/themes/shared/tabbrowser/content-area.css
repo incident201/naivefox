@@ -679,8 +679,6 @@ split-view-footer {
 
 #clipboardReadPasteMenuPopup,
 #contentAreaContextMenu,
-#DateTimePickerPanel,
-#PopupAutoComplete,
 #remoteBrowserTooltip,
 #aHTMLTooltip[contenttooltip] {
   color-scheme: env(-moz-content-preferred-color-scheme);
@@ -880,6 +878,8 @@ split-view-footer {
     width: auto;
     max-height: none;
     max-width: none;
+    border-radius: inherit;
+    overflow: clip;
 
     > .dialogOverlay {
       width: 100%;

@@ -785,7 +785,11 @@ export class TopSite extends React.PureComponent {
             onClick={this.onMenuButtonClick}
             onKeyDown={this.onMenuButtonKeyDown}
           />
-          <panel-list id={menuId} ref={this.panelListRef}>
+          <panel-list
+            className="panel-list-no-icons"
+            id={menuId}
+            ref={this.panelListRef}
+          >
             <PanelListItems options={options} />
           </panel-list>
         </div>

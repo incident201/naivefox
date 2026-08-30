@@ -412,6 +412,18 @@ class MacroAssemblerX86Shared : public Assembler {
     vcvtsd2ss(src, HasAVX() ? src : dest, dest);
   }
 
+  // ROUNDSD/ROUNDSS read src0 as their merge operand, so pass the source
+  // register as src0 (when we have AVX) to avoid a false dependency on the
+  // output register.
+  void roundDoubleWithMode(X86Encoding::RoundingMode mode, FloatRegister src,
+                           FloatRegister dest) {
+    vroundsd(mode, src, HasAVX() ? src : dest, dest);
+  }
+  void roundFloat32WithMode(X86Encoding::RoundingMode mode, FloatRegister src,
+                            FloatRegister dest) {
+    vroundss(mode, src, HasAVX() ? src : dest, dest);
+  }
+
   void convertDoubleToFloat16(FloatRegister src, FloatRegister dest) {
     MOZ_CRASH("Not supported for this target");
   }

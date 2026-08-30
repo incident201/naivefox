@@ -473,6 +473,7 @@ dependencies {
     implementation project(':components:feature-addons')
     implementation project(':components:feature-app-links')
     implementation project(':components:feature-autofill')
+    implementation project(':components:feature-automotive')
     implementation project(':components:feature-awesomebar')
     implementation project(':components:feature-contextmenu')
     implementation project(':components:feature-customtabs')
@@ -785,7 +786,7 @@ mozilla {
     ktfmtSourcePaths = ["src/**/*.kt", "!**/build/**/*.kt"]
     detektSourcePaths = [
         "**/src/**/*.kt",
-        "!**/test/**", "!**/androidTest/**", "!**/build/**", "!**/resources/**", "!**/tmp/**",
+        "!**/build/**", "!**/resources/**", "!**/tmp/**",
         "!**/longfox/**"
     ]
     detektConfig = "$projectDir/../config/detekt.yml"

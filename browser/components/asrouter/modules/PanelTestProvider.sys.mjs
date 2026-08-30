@@ -2899,6 +2899,27 @@ const MESSAGES = () => [
     },
   },
   {
+    id: "INFOBAR_ACTION_86",
+    groups: [],
+    targeting: "false",
+    template: "infobar",
+    content: {
+      type: "global",
+      text: { string_id: "default-browser-notification-message" },
+      buttons: [
+        {
+          label: { string_id: "default-browser-notification-button" },
+          primary: true,
+          accessKey: "O",
+          action: {
+            type: "SET_DEFAULT_BROWSER",
+          },
+        },
+      ],
+    },
+    trigger: { id: "defaultBrowserCheck" },
+  },
+  {
     id: "TEST_PROFILE_SPOTLIGHT",
     groups: [],
     targeting: "canCreateSelectableProfiles",
@@ -3446,16 +3467,28 @@ const MESSAGES = () => [
 ];
 
 export const PanelTestProvider = {
+  /**
+   * Tag a message with the panel_local_testing provider and set
+   * its targeting.
+   *
+   * @param {object} message A message object
+   * @returns {object} The mutated message
+   */
+  tagMessageForTesting(message) {
+    message.provider = "panel_local_testing";
+    message.targeting =
+      typeof message.targeting === "string" &&
+      message.targeting?.includes("isAIWindow")
+        ? `isAIWindow && providerCohorts.panel_local_testing == "SHOW_TEST"`
+        : `providerCohorts.panel_local_testing == "SHOW_TEST"`;
+    return message;
+  },
+
   getMessages() {
     return Promise.resolve(
-      MESSAGES().map(message => ({
-        ...message,
-        targeting:
-          typeof message.targeting === "string" &&
-          message.targeting?.includes("isAIWindow")
-            ? `isAIWindow && providerCohorts.panel_local_testing == "SHOW_TEST"`
-            : `providerCohorts.panel_local_testing == "SHOW_TEST"`,
-      }))
+      MESSAGES().map(message =>
+        PanelTestProvider.tagMessageForTesting({ ...message })
+      )
     );
   },
 };

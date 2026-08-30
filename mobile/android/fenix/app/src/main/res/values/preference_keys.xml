@@ -102,6 +102,10 @@
     <string name="pref_key_enable_fxsuggest" translatable="false">pref_key_fxsuggest_enabled</string>
     <string name="pref_key_enable_debug_drawer" translatable="false">pref_key_enable_debug_drawer</string>
     <string name="pref_key_hide_collections" translatable="false">pref_key_hide_collections</string>
+    <string name="pref_key_migrate_collections_to_tab_groups" translatable="false">pref_key_migrate_collections_to_tab_groups</string>
+    <string name="pref_key_has_migrated_collections_to_tab_groups" translatable="false">pref_key_has_migrated_collections_to_tab_groups</string>
+    <string name="pref_key_migrated_collection_ids" translatable="false">pref_key_migrated_collection_ids</string>
+    <string name="pref_key_show_collections_migration_card" translatable="false">pref_key_show_collections_migration_card</string>
     <string name="pref_key_show_first_time_translation" translatable="false">pref_key_show_first_time_translation</string>
     <string name="pref_key_translations_offer" translatable="false">pref_key_translations_offer</string>
     <string name="pref_key_terms_accepted" translatable="false">pref_key_terms_accepted</string>
@@ -357,6 +361,7 @@
     <string name="pref_key_is_user_rakuten_attributed" translatable="false">pref_key_is_user_rakuten_attributed</string>
     <string name="pref_key_is_user_skyflag_attributed" translatable="false">pref_key_is_user_skyflag_attributed</string>
     <string name="pref_key_referral_ping_submitted" translatable="false">pref_key_referral_ping_submitted</string>
+    <string name="pref_key_referral_code" translatable="false">pref_key_referral_code</string>
 
     <!-- Return to AMO - addon to install at the first app launch -->
     <string name="pref_key_rtamo_addon_download_url" translatable="false">pref_key_rtamo_addon_download_url</string>
@@ -496,6 +501,8 @@
     <string name="pref_key_enable_pdf_tools" translatable="false">pref_key_enable_pdf_tools</string>
     <!-- Preference for the feature flag -->
     <string name="pref_key_enable_shake_to_summarize" translatable="false">pref_key_enable_shake_to_summarize</string>
+    <string name="pref_key_enable_weekly_privacy_notification" translatable="false">pref_key_enable_weekly_privacy_notification</string>
+    <string name="pref_key_debug_force_weekly_privacy_report_notification" translatable="false">pref_key_debug_force_weekly_privacy_report_notification</string>
     <string name="pref_key_page_summaries" translatable="false">pref_key_page_summaries</string>
 
   <!-- Summarize feature: preference key to track if the user has turned off the shake gesture or not -->

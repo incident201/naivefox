@@ -119,6 +119,10 @@ import org.mozilla.fenix.ext.requireComponents
 import org.mozilla.fenix.ext.tabClosedUndoMessage
 import org.mozilla.fenix.home.bookmarks.BookmarksFeature
 import org.mozilla.fenix.home.bookmarks.controller.DefaultBookmarksController
+import org.mozilla.fenix.home.collections.migration.CollectionsMigrationCardAction
+import org.mozilla.fenix.home.collections.migration.CollectionsMigrationCardMiddleware
+import org.mozilla.fenix.home.collections.migration.CollectionsMigrationCardState
+import org.mozilla.fenix.home.collections.migration.CollectionsMigrationCardStore
 import org.mozilla.fenix.home.ext.showWallpaperOnboardingDialog
 import org.mozilla.fenix.home.logo.LogoController
 import org.mozilla.fenix.home.logo.TrackingProtectionController
@@ -226,9 +230,11 @@ class HomeFragment : Fragment() {
     private val privacyNoticeBannerRepository by lazy {
         DefaultPrivacyNoticeBannerRepository(settings = requireComponents.settings)
     }
+
     private val dateTimeProvider: DateTimeProvider by lazy { DefaultDateTimeProvider() }
 
     private lateinit var privacyNoticeBannerStore: PrivacyNoticeBannerStore
+    private lateinit var collectionsMigrationCardStore: CollectionsMigrationCardStore
 
     private var _sessionControlController: SessionControlController? = null
 
@@ -572,6 +578,16 @@ class HomeFragment : Fragment() {
                     ),
             )
 
+        val collectionsMigrationRepository = requireComponents.collectionsMigrationRepository
+        collectionsMigrationCardStore =
+            CollectionsMigrationCardStore(
+                initialState =
+                    CollectionsMigrationCardState(
+                        visible = collectionsMigrationRepository.shouldShowCollectionsMigrationCard()
+                    ),
+                middleware = listOf(CollectionsMigrationCardMiddleware(repository = collectionsMigrationRepository)),
+            )
+
         initController()
         initInteractor()
 
@@ -647,6 +663,8 @@ class HomeFragment : Fragment() {
                     }
                 val privacyNoticeBannerState =
                     privacyNoticeBannerStore.flow().collectAsState(initial = privacyNoticeBannerStore.state)
+                val collectionsMigrationCardState =
+                    collectionsMigrationCardStore.flow().collectAsState(initial = collectionsMigrationCardStore.state)
                 val isToolbarAtTop = settings.toolbarPosition == ToolbarPosition.TOP
                 val captureToolbarBounds = remember { isToolbarSwipeToSwitchTabsEnabled() }
 
@@ -727,6 +745,7 @@ class HomeFragment : Fragment() {
                             HomeContent(
                                 appState = appState.value,
                                 privacyNoticeBannerState = privacyNoticeBannerState.value,
+                                collectionsMigrationCardState = collectionsMigrationCardState.value,
                                 settings = settings,
                                 innerPadding = innerPadding,
                                 microsurveyVisible = microsurveyVisible,
@@ -793,10 +812,12 @@ class HomeFragment : Fragment() {
         }
     }
 
+    @Suppress("LongParameterList")
     @Composable
     private fun HomeContent(
         appState: AppState,
         privacyNoticeBannerState: PrivacyNoticeBannerState,
+        collectionsMigrationCardState: CollectionsMigrationCardState,
         settings: Settings,
         innerPadding: PaddingValues,
         microsurveyVisible: Boolean,
@@ -820,10 +841,18 @@ class HomeFragment : Fragment() {
                     HomepageState.build(
                         appState = appState,
                         privacyNoticeBannerState = privacyNoticeBannerState,
+                        collectionsMigrationCardState = collectionsMigrationCardState,
                         settings = settings,
                         browsingModeManager = browsingModeManager,
                     ),
                 interactor = sessionControlInteractor,
+                onCollectionsMigrationCardAction = { action ->
+                    collectionsMigrationCardStore.dispatch(action)
+
+                    when (action) {
+                        is CollectionsMigrationCardAction.ViewTabGroupsClicked -> openTabGroups()
+                    }
+                },
                 onTopSitesItemBound = {
                     StartupTimeline.onTopSitesItemBound(activity = (requireActivity() as HomeActivity))
                 },
@@ -919,7 +948,12 @@ class HomeFragment : Fragment() {
                             private = (requireActivity() as HomeActivity).browsingModeManager.mode.isPrivate
                         )
                     } else {
-                        sessionControlInteractor.onNavigateSearch()
+                        findNavController()
+                            .navigate(
+                                NavGraphDirections.actionGlobalHome(
+                                    focusOnAddressBar = !requireComponents.settings.enableHomepageTrendingRecentSearch
+                                )
+                            )
                     }
                 },
                 onSelectedTabClick = { url ->
@@ -1129,6 +1163,14 @@ class HomeFragment : Fragment() {
                             BrowsingMode.Private -> Page.PrivateTabs
                         }
                 ),
+            )
+    }
+
+    private fun openTabGroups() {
+        findNavController()
+            .nav(
+                R.id.homeFragment,
+                HomeFragmentDirections.actionGlobalTabManagementFragment(page = Page.TabGroups),
             )
     }
 

@@ -21,7 +21,6 @@
 #include "nsContentUtils.h"
 #include "nsGkAtoms.h"
 #include "nsIContentInlines.h"
-#include "nsIDragService.h"
 #include "nsIDragSession.h"
 #include "nsIPopupContainer.h"
 #include "nsIScriptContext.h"
@@ -248,16 +247,12 @@ nsXULTooltipListener::HandleEvent(Event* aEvent) {
 
   // Note that mousemove, mouseover and mouseout might be
   // fired even during dragging due to widget's bug.
-  nsCOMPtr<nsIDragService> dragService =
-      do_GetService("@mozilla.org/widget/dragservice;1");
-  NS_ENSURE_TRUE(dragService, NS_OK);
   auto* widgetGuiEvent = aEvent->WidgetEventPtr()->AsGUIEvent();
   if (!widgetGuiEvent) {
     return NS_OK;
   }
-  nsCOMPtr<nsIDragSession> dragSession =
-      dragService->GetCurrentSession(widgetGuiEvent->mWidget);
-  if (dragSession) {
+  if (nsCOMPtr<nsIDragSession> dragSession =
+          nsContentUtils::GetDragSession(widgetGuiEvent->mWidget)) {
     return NS_OK;
   }
 

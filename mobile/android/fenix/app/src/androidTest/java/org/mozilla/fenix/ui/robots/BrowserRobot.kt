@@ -35,7 +35,6 @@ import androidx.core.net.toUri
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.By.text
@@ -534,12 +533,11 @@ class BrowserRobot(private val composeTestRule: ComposeTestRule) {
     }
 
     /**
-     * Asserts that in [waitingTime] the playback state of the current tab will be [expectedState].
+     * Asserts that in [waitingTime] the playback state of the current tab will be [expectedState], failing the
+     * assertion otherwise.
      *
      * @param store [BrowserStore] from which to get data about the current tab's state.
      * @param expectedState [MediaSession.PlaybackState] the playback state that will be asserted
-     * @param waitingTime maximum time the test will wait for the playback state to become [expectedState] before
-     *   failing the assertion.
      */
     fun assertPlaybackState(store: BrowserStore, expectedState: MediaSession.PlaybackState) {
         val startMills = SystemClock.uptimeMillis()
@@ -1870,19 +1868,11 @@ private fun navURLBar() = itemWithResId("$packageName:id/toolbar")
 
 private fun searchBar() = itemWithResId("$packageName:id/mozac_browser_toolbar_url_view")
 
-private fun threeDotButton() = onView(withContentDescription("Menu"))
-
-private fun tabsCounter() = mDevice.findObject(By.res("$packageName:id/counter_root"))
-
-private fun progressBar() = itemWithResId("$packageName:id/mozac_browser_toolbar_progress")
-
 private fun suggestedLogins() = itemWithResId("$packageName:id/loginSelectBar")
 
 private fun selectAddressButton() = itemWithResId("$packageName:id/select_address_header")
 
 private fun selectCreditCardButton() = itemWithResId("$packageName:id/select_credit_card_header")
-
-private fun siteInfoToolbarButton() = itemWithResId("$packageName:id/mozac_browser_toolbar_site_info_indicator")
 
 fun clickPageObject(composeTestRule: ComposeTestRule, item: UiObject) {
     for (i in 1..RETRY_COUNT) {

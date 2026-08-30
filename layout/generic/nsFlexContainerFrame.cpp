@@ -4748,14 +4748,20 @@ void nsFlexContainerFrame::Reflow(nsPresContext* aPresContext,
     // Calculate gap sizes for main and cross axis. We only need them in
     // DoFlexLayout in the first-in-flow, so no need to worry about consumed
     // block-size.
+    //
+    // NOTE: tentativeContentBoxSize might be definite but gapPercentageBasis
+    // indefinite, due to e.g. mTreatBSizeAsIndefinite.
+    LogicalSize gapPercentageBasis = tentativeContentBoxSize;
+    gapPercentageBasis.BSize(wm) =
+        aReflowInput.ComputedBSizeAsPercentageBasis();
     const auto& mainGapStyle =
         axisTracker.IsRowOriented() ? stylePos->mColumnGap : stylePos->mRowGap;
     const auto& crossGapStyle =
         axisTracker.IsRowOriented() ? stylePos->mRowGap : stylePos->mColumnGap;
     const nscoord mainGapSize = nsLayoutUtils::ResolveGapToLength(
-        mainGapStyle, tentativeContentBoxMainSize);
+        mainGapStyle, axisTracker.MainComponent(gapPercentageBasis));
     const nscoord crossGapSize = nsLayoutUtils::ResolveGapToLength(
-        crossGapStyle, tentativeContentBoxCrossSize);
+        crossGapStyle, axisTracker.CrossComponent(gapPercentageBasis));
 
     // When fragmenting a flex container, we run the flex algorithm without
     // regards to pagination in order to compute the flex container's desired

@@ -1401,11 +1401,12 @@ nsresult nsFrameLoader::SwapWithOtherRemoteLoader(
 
 class MOZ_RAII AutoResetInFrameSwap final {
  public:
-  AutoResetInFrameSwap(nsFrameLoader* aThisFrameLoader,
-                       nsFrameLoader* aOtherFrameLoader,
-                       nsDocShell* aThisDocShell, nsDocShell* aOtherDocShell,
-                       EventTarget* aThisEventTarget,
-                       EventTarget* aOtherEventTarget)
+  MOZ_CAN_RUN_SCRIPT AutoResetInFrameSwap(nsFrameLoader* aThisFrameLoader,
+                                          nsFrameLoader* aOtherFrameLoader,
+                                          nsDocShell* aThisDocShell,
+                                          nsDocShell* aOtherDocShell,
+                                          EventTarget* aThisEventTarget,
+                                          EventTarget* aOtherEventTarget)
       : mThisFrameLoader(aThisFrameLoader),
         mOtherFrameLoader(aOtherFrameLoader),
         mThisDocShell(aThisDocShell),
@@ -1430,7 +1431,7 @@ class MOZ_RAII AutoResetInFrameSwap final {
                                                         mOtherEventTarget);
   }
 
-  ~AutoResetInFrameSwap() {
+  MOZ_CAN_RUN_SCRIPT ~AutoResetInFrameSwap() {
     nsContentUtils::FirePageShowEventForFrameLoaderSwap(mThisDocShell,
                                                         mThisEventTarget, true);
     nsContentUtils::FirePageShowEventForFrameLoaderSwap(
@@ -1452,12 +1453,12 @@ class MOZ_RAII AutoResetInFrameSwap final {
   }
 
  private:
-  RefPtr<nsFrameLoader> mThisFrameLoader;
-  RefPtr<nsFrameLoader> mOtherFrameLoader;
-  RefPtr<nsDocShell> mThisDocShell;
-  RefPtr<nsDocShell> mOtherDocShell;
-  nsCOMPtr<EventTarget> mThisEventTarget;
-  nsCOMPtr<EventTarget> mOtherEventTarget;
+  MOZ_KNOWN_LIVE const RefPtr<nsFrameLoader> mThisFrameLoader;
+  MOZ_KNOWN_LIVE const RefPtr<nsFrameLoader> mOtherFrameLoader;
+  MOZ_KNOWN_LIVE const RefPtr<nsDocShell> mThisDocShell;
+  MOZ_KNOWN_LIVE const RefPtr<nsDocShell> mOtherDocShell;
+  MOZ_KNOWN_LIVE const nsCOMPtr<EventTarget> mThisEventTarget;
+  MOZ_KNOWN_LIVE const nsCOMPtr<EventTarget> mOtherEventTarget;
 };
 
 nsresult nsFrameLoader::SwapWithOtherLoader(nsFrameLoader* aOther,

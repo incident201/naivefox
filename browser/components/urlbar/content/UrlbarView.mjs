@@ -721,7 +721,9 @@ export class UrlbarView {
       this.#blobUrlsByResultUrl.clear();
     }
 
-    if (isShowingZeroPrefix) {
+    // TODO(bug 2066165): These counters have no per-SAP dimension, so they only
+    // cover the address bar.
+    if (isShowingZeroPrefix && this.input.sapName == "urlbar") {
       if (elementPicked) {
         Glean.urlbarZeroprefix.engagement.add(1);
       } else {
@@ -948,8 +950,10 @@ export class UrlbarView {
       this.clear();
     }
 
-    // Now that the view has finished updating for this query, record the exposure.
-    if (!queryContext.searchString) {
+    // Now that the view has finished updating for this query, record the
+    // exposure. TODO(bug 2066165): This counter has no per-SAP dimension, so it
+    // only covers the address bar.
+    if (!queryContext.searchString && this.input.sapName == "urlbar") {
       Glean.urlbarZeroprefix.exposure.add(1);
     }
 
@@ -1628,10 +1632,7 @@ export class UrlbarView {
     }
 
     let explanation = this.#createElement("span");
-    explanation.classList.add(
-      "urlbarView-explanation",
-      "urlbarView-overflowable"
-    );
+    explanation.classList.add("urlbarView-explanation");
     parentNode.appendChild(explanation);
     item._elements.set("explanation", explanation);
 
@@ -3189,10 +3190,6 @@ export class UrlbarView {
       if (tagsContainer) {
         this.#setElementOverflowing(tagsContainer, false);
       }
-      let explanation = row._elements.get("explanation");
-      if (explanation) {
-        this.#setElementOverflowing(explanation, false);
-      }
     }
   }
 
@@ -3292,11 +3289,10 @@ export class UrlbarView {
       if (element != row) {
         row?.toggleAttribute("descendant-selected", true);
       }
-      // Keep the selected row in view in the smartbar, where the results
-      // list is scrollable. `block: "nearest"` is a no-op when the row is
-      // already visible. Scoped to smartbar to avoid changing classic
-      // urlbar behavior.
-      if (this.input.sapName == "smartbar") {
+      // Keep the selected row in view in the inputs whose results list is
+      // scrollable. `block: "nearest"` is a no-op when the row is already
+      // visible. Scoped to those to avoid changing classic urlbar behavior.
+      if (["smartbar", "newtab_searchbar"].includes(this.input.sapName)) {
         (row ?? element).scrollIntoView({ block: "nearest" });
       }
     }
@@ -3321,7 +3317,7 @@ export class UrlbarView {
     }
 
     if (result) {
-      this.controller.onSelection(result, element);
+      this.controller.onSelection(result);
     }
   }
 

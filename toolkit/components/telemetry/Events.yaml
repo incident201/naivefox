@@ -1184,56 +1184,6 @@ telemetry.test.second:
       key1: This is just a test description.
 
 security.ui.protections:
-  show:
-    objects: [
-      "protection_report",
-      "vpn_banner",
-    ]
-    bug_numbers:
-      - 1557050
-      - 1610897
-      - 1643428
-      - 1650468
-      - 1661756
-      - 1678201
-      - 1739287
-      - 1787249
-    description: >
-      User arrived on the protection report. This also includes a 'value' attribute which defaults to 'direct' or will be the value that a referring website addds to the url. This also indicates if the vpn banner has been seen.
-    expiry_version: never
-    record_in_processes: ["content"]
-    release_channel_collection: opt-out
-    notification_emails:
-      - emz@mozilla.com
-      - seceng-telemetry@mozilla.com
-    products:
-      - firefox
-    extra_keys:
-      category: The category of protections the user is in, standard, strict or custom.
-  close:
-    objects: [
-      "protection_report",
-    ]
-    bug_numbers:
-      - 1557050
-      - 1610897
-      - 1612091
-      - 1643428
-      - 1678201
-      - 1739287
-      - 1787249
-    description: >
-      User closed on the protection report.
-    expiry_version: never
-    record_in_processes: ["content"]
-    release_channel_collection: opt-out
-    notification_emails:
-      - emz@mozilla.com
-      - seceng-telemetry@mozilla.com
-    products:
-      - firefox
-    extra_keys:
-      category: The category of protections the user is in, standard, strict or custom.
   click:
     bug_numbers:
       - 1557050
@@ -1250,18 +1200,10 @@ security.ui.protections:
     description: >
       User interaction by click events on the protection report.
     objects: [
-      "lw_open_button",
       "lw_sync_link",
-      "lw_about_link",
       "mtr_about_link",
       "mtr_report_link",
       "mtr_signup_button",
-      "trackers_about_link",
-      "mobile_app_link",
-      "settings_link",
-      "vpn_banner_link",
-      "vpn_banner_close",
-      "vpn_card_link",
       "vpn_app_link_android",
       "vpn_app_link_ios",
     ]
@@ -1560,36 +1502,6 @@ avif:
     expiry_version: never
     notification_emails:
       - media-alerts@mozilla.com
-
-installation:
-  first_seen:
-    description: >
-      Recorded after the application has been installed or reinstalled, the first time that
-      a profile sees that there was a new installation. This includes information about how
-      the installer was run.
-    objects:
-      - full # if the full installer was run directly
-      - stub # if the stub installer was used
-      - msix # if the installation was done through an MSIX package
-    release_channel_collection: opt-out
-    record_in_processes: ["main"]
-    products: ["firefox"]
-    extra_keys:
-      version: The application version installed by the installer (not necessarily the current version)
-      build_id: The build ID of the application installed by the installer (not necessarily the current version)
-      admin_user: Whether the installer is running from an elevated admin user
-      install_existed: Whether there was already an install in this location
-      other_inst: Whether there was already any non-MSIX install on this system
-      other_msix_inst: Whether there was already any MSIX install on this system
-      profdir_existed: Whether the top-level profile directory existed
-      silent: '(optional, present if object is "full") Whether this was a silent install'
-      from_msi: '(optional, present if object is "full") Whether this was an MSI install'
-      default_path: '(optional, present if object is "full") Whether the default path was used'
-    bug_numbers: [1660198, 1725295, 1743465, 1754638]
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - rtestard@mozilla.com
-    expiry_version: never
 
 service_request:
   bypass:

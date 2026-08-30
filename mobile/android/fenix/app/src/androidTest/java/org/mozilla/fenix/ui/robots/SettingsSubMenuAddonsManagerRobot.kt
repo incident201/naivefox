@@ -48,7 +48,6 @@ import org.mozilla.fenix.helpers.Constants.TAG
 import org.mozilla.fenix.helpers.Constants.recommendedAddons
 import org.mozilla.fenix.helpers.DataGenerationHelper.getRecommendedExtensionTitle
 import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
-import org.mozilla.fenix.helpers.HomeActivityIntentTestRule
 import org.mozilla.fenix.helpers.MatcherHelper.assertUIObjectExists
 import org.mozilla.fenix.helpers.MatcherHelper.assertUIObjectIsGone
 import org.mozilla.fenix.helpers.MatcherHelper.itemContainingText
@@ -151,7 +150,7 @@ class SettingsSubMenuAddonsManagerRobot(private val composeTestRule: ComposeTest
         }
     }
 
-    fun verifyAddonInstallCompletedPrompt(addonName: String, activityTestRule: HomeActivityIntentTestRule) {
+    fun verifyAddonInstallCompletedPrompt(addonName: String) {
         // Assigns a more descriptive name to the addon if it is "Bitwarden" or "Tomato Clock", otherwise keeps the
         // original name
         // The name of this extenssion is being displayed differently across the app
@@ -277,7 +276,7 @@ class SettingsSubMenuAddonsManagerRobot(private val composeTestRule: ComposeTest
         Log.i(TAG, "selectAllowInPrivateBrowsing: Clicked the \"Allow in private browsing\" check box")
     }
 
-    fun installAddon(addonName: String, activityTestRule: HomeActivityIntentTestRule) {
+    fun installAddon(addonName: String) {
         homeScreen(composeTestRule) {}
             .openThreeDotMenu {}
             .clickExtensionsButton {
@@ -285,11 +284,11 @@ class SettingsSubMenuAddonsManagerRobot(private val composeTestRule: ComposeTest
                 clickInstallAddon(addonName)
                 verifyAddonPermissionPrompt(addonName)
                 acceptPermissionToInstallAddon()
-                verifyAddonInstallCompletedPrompt(addonName, activityTestRule)
+                verifyAddonInstallCompletedPrompt(addonName)
             }
     }
 
-    fun installAddonInPrivateMode(addonName: String, activityTestRule: HomeActivityIntentTestRule) {
+    fun installAddonInPrivateMode(addonName: String) {
         homeScreen(composeTestRule) {}
             .openThreeDotMenu {}
             .clickExtensionsButton {
@@ -298,7 +297,7 @@ class SettingsSubMenuAddonsManagerRobot(private val composeTestRule: ComposeTest
                 verifyAddonPermissionPrompt(addonName)
                 selectAllowInPrivateBrowsing()
                 acceptPermissionToInstallAddon()
-                verifyAddonInstallCompletedPrompt(addonName, activityTestRule)
+                verifyAddonInstallCompletedPrompt(addonName)
             }
     }
 

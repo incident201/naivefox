@@ -274,30 +274,31 @@ ScriptLoader::~ScriptLoader() {
   mObservers.Clear();
 
   if (mParserBlockingRequest) {
-    FireScriptAvailable(NS_ERROR_ABORT, mParserBlockingRequest);
+    const RefPtr<ScriptLoadRequest> parserBlockRequest = mParserBlockingRequest;
+    FireScriptAvailable(NS_ERROR_ABORT, parserBlockRequest);
   }
 
-  for (ScriptLoadRequest* req = mXSLTRequests.getFirst(); req;
+  for (RefPtr<ScriptLoadRequest> req = mXSLTRequests.getFirst(); req;
        req = req->getNext()) {
     FireScriptAvailable(NS_ERROR_ABORT, req);
   }
 
-  for (ScriptLoadRequest* req = mDeferRequests.getFirst(); req;
+  for (RefPtr<ScriptLoadRequest> req = mDeferRequests.getFirst(); req;
        req = req->getNext()) {
     FireScriptAvailable(NS_ERROR_ABORT, req);
   }
 
-  for (ScriptLoadRequest* req = mLoadingAsyncRequests.getFirst(); req;
+  for (RefPtr<ScriptLoadRequest> req = mLoadingAsyncRequests.getFirst(); req;
        req = req->getNext()) {
     FireScriptAvailable(NS_ERROR_ABORT, req);
   }
 
-  for (ScriptLoadRequest* req = mLoadedAsyncRequests.getFirst(); req;
+  for (RefPtr<ScriptLoadRequest> req = mLoadedAsyncRequests.getFirst(); req;
        req = req->getNext()) {
     FireScriptAvailable(NS_ERROR_ABORT, req);
   }
 
-  for (ScriptLoadRequest* req =
+  for (RefPtr<ScriptLoadRequest> req =
            mNonAsyncExternalScriptInsertedRequests.getFirst();
        req; req = req->getNext()) {
     FireScriptAvailable(NS_ERROR_ABORT, req);
@@ -640,15 +641,17 @@ nsIURI* ScriptLoader::GetBaseURI() const {
 
 class ScriptRequestProcessor : public Runnable {
  private:
-  RefPtr<ScriptLoader> mLoader;
-  RefPtr<ScriptLoadRequest> mRequest;
+  MOZ_KNOWN_LIVE const RefPtr<ScriptLoader> mLoader;
+  MOZ_KNOWN_LIVE const RefPtr<ScriptLoadRequest> mRequest;
 
  public:
   ScriptRequestProcessor(ScriptLoader* aLoader, ScriptLoadRequest* aRequest)
       : Runnable("dom::ScriptRequestProcessor"),
         mLoader(aLoader),
         mRequest(aRequest) {}
-  NS_IMETHOD Run() override { return mLoader->ProcessRequest(mRequest); }
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY NS_IMETHOD Run() override {
+    return mLoader->ProcessRequest(mRequest);
+  }
 };
 
 void ScriptLoader::RunScriptWhenSafe(ScriptLoadRequest* aRequest) {
@@ -1864,7 +1867,7 @@ bool ScriptLoader::ProcessInlineScript(nsIScriptElement* aElement,
       mModuleLoader->DisallowImportMaps();
     }
 
-    ModuleLoadRequest* modReq = request->AsModuleRequest();
+    ModuleLoadRequest* const modReq = request->AsModuleRequest();
     if (aElement->GetParserCreated() != NOT_FROM_PARSER) {
       if (aElement->GetScriptAsync()) {
         AddAsyncRequest(modReq);
@@ -1878,7 +1881,7 @@ bool ScriptLoader::ProcessInlineScript(nsIScriptElement* aElement,
     nsresult rv = modReq->OnFetchComplete(NS_OK);
     if (NS_FAILED(rv)) {
       ReportErrorToConsole(modReq, rv);
-      HandleLoadError(modReq, rv);
+      HandleLoadError(MOZ_KnownLive(modReq), rv);
     }
 
     return false;
@@ -2196,7 +2199,7 @@ class OffThreadCompilationCompleteTask : public Task {
   }
 #endif
 
-  TaskResult Run() override {
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY TaskResult Run() override {
     MOZ_ASSERT(NS_IsMainThread());
 
     RefPtr<ScriptLoadContext> context = mRequest->GetScriptLoadContext();
@@ -2212,6 +2215,8 @@ class OffThreadCompilationCompleteTask : public Task {
       ProfilerString8View scriptSourceString;
       if (mRequest->IsFetchedAsTextSource()) {
         scriptSourceString = "ScriptCompileOffThread";
+      } else if (mRequest->IsWasmBytes()) {
+        scriptSourceString = "WasmCompileOffThread";
       } else {
         MOZ_ASSERT(mRequest->IsRetrievedAsSerializedStencil());
         scriptSourceString = "DecodeStencilOffThread";
@@ -2224,10 +2229,9 @@ class OffThreadCompilationCompleteTask : public Task {
                            profilerLabelString);
     }
 
-    (void)mLoader->ProcessOffThreadRequest(mRequest);
-
-    mRequest = nullptr;
-    mLoader = nullptr;
+    const RefPtr<ScriptLoadRequest> request = std::move(mRequest);
+    const RefPtr<ScriptLoader> loader = std::move(mLoader);
+    (void)loader->ProcessOffThreadRequest(request);
     return TaskResult::Complete;
   }
 
@@ -2257,6 +2261,7 @@ class OffThreadCompilationCompleteTask : public Task {
 //       (bug 1846160).
 static constexpr size_t OffThreadMinimumTextLength = 5 * 1000;
 static constexpr size_t OffThreadMinimumSerializedStencilLength = 5 * 1000;
+static constexpr size_t OffThreadMinimumWasmLength = 16 * 1024;
 
 nsresult ScriptLoader::AttemptOffThreadScriptCompile(
     ScriptLoadRequest* aRequest, bool* aCouldCompileOut) {
@@ -2315,9 +2320,18 @@ nsresult ScriptLoader::AttemptOffThreadScriptCompile(
       return NS_OK;
     }
   } else if (aRequest->IsWasmBytes()) {
-    // See Bug 2007696, off-thread compilation of wasm modules is
-    // not yet implemented.
-    return NS_OK;
+    if (!StaticPrefs::javascript_options_parallel_parsing() ||
+        aRequest->WasmBytes().length() < OffThreadMinimumWasmLength) {
+      TRACE_FOR_TEST(aRequest, "compile:main thread");
+      return NS_OK;
+    }
+
+    // Only source phase modules are compiled off-thread. Compilation of
+    // evaluation phase modules is not yet implemented (Bug 2030454).
+    if (!aRequest->AsModuleRequest()->IsSourcePhaseRequest(cx)) {
+      TRACE_FOR_TEST(aRequest, "compile:main thread");
+      return NS_OK;
+    }
   } else {
     MOZ_ASSERT(aRequest->IsRetrievedAsSerializedStencil());
 
@@ -2344,6 +2358,8 @@ nsresult ScriptLoader::AttemptOffThreadScriptCompile(
   TaskController::Get()->AddTask(compileOrDecodeTask.forget());
   TaskController::Get()->AddTask(completeTask.forget());
 
+  TRACE_FOR_TEST(aRequest, "compile:off thread");
+
   aRequest->GetScriptLoadContext()->BlockOnload(mDocument);
 
   // Once the compilation is finished, the completeTask will be run on
@@ -2367,19 +2383,31 @@ nsresult ScriptLoader::AttemptOffThreadScriptCompile(
   return NS_OK;
 }
 
-CompileOrDecodeTask::CompileOrDecodeTask()
+CompileOrDecodeTask::CompileOrDecodeTask(Type aType)
     : Task(Kind::OffMainThreadOnly, EventQueuePriority::Normal),
       mMutex("CompileOrDecodeTask"),
+      mType(aType) {}
+
+void CompileOrDecodeTask::Cancel() {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  MutexAutoLock lock(mMutex);
+
+  mIsCancelled = true;
+}
+
+StencilCompileOrDecodeTask::StencilCompileOrDecodeTask()
+    : CompileOrDecodeTask(Type::Stencil),
       mOptions(JS::OwningCompileOptions::ForFrontendContext()) {}
 
-CompileOrDecodeTask::~CompileOrDecodeTask() {
+StencilCompileOrDecodeTask::~StencilCompileOrDecodeTask() {
   if (mFrontendContext) {
     JS::DestroyFrontendContext(mFrontendContext);
     mFrontendContext = nullptr;
   }
 }
 
-nsresult CompileOrDecodeTask::InitFrontendContext() {
+nsresult StencilCompileOrDecodeTask::InitFrontendContext() {
   mFrontendContext = JS::NewFrontendContext();
   if (!mFrontendContext) {
     mIsCancelled = true;
@@ -2388,8 +2416,8 @@ nsresult CompileOrDecodeTask::InitFrontendContext() {
   return NS_OK;
 }
 
-void CompileOrDecodeTask::DidRunTask(const MutexAutoLock& aProofOfLock,
-                                     RefPtr<JS::Stencil>&& aStencil) {
+void StencilCompileOrDecodeTask::DidRunTask(const MutexAutoLock& aProofOfLock,
+                                            RefPtr<JS::Stencil>&& aStencil) {
   if (aStencil) {
     if (!JS::PrepareForInstantiate(mFrontendContext, *aStencil,
                                    mInstantiationStorage)) {
@@ -2400,7 +2428,7 @@ void CompileOrDecodeTask::DidRunTask(const MutexAutoLock& aProofOfLock,
   mStencil = std::move(aStencil);
 }
 
-already_AddRefed<JS::Stencil> CompileOrDecodeTask::StealResult(
+already_AddRefed<JS::Stencil> StencilCompileOrDecodeTask::StealResult(
     JSContext* aCx, JS::InstantiationStorage* aInstantiationStorage) {
   JS::FrontendContext* fc = mFrontendContext;
   mFrontendContext = nullptr;
@@ -2434,22 +2462,14 @@ already_AddRefed<JS::Stencil> CompileOrDecodeTask::StealResult(
   return mStencil.forget();
 }
 
-void CompileOrDecodeTask::Cancel() {
-  MOZ_ASSERT(NS_IsMainThread());
-
-  MutexAutoLock lock(mMutex);
-
-  mIsCancelled = true;
-}
-
 enum class CompilationTarget { Script, Module };
 
 template <CompilationTarget target>
-class ScriptOrModuleCompileTask final : public CompileOrDecodeTask {
+class ScriptOrModuleCompileTask final : public StencilCompileOrDecodeTask {
  public:
   explicit ScriptOrModuleCompileTask(
       ScriptLoader::MaybeSourceText&& aMaybeSource)
-      : CompileOrDecodeTask(), mMaybeSource(std::move(aMaybeSource)) {}
+      : StencilCompileOrDecodeTask(), mMaybeSource(std::move(aMaybeSource)) {}
 
   nsresult Init(JS::CompileOptions& aOptions) {
     nsresult rv = InitFrontendContext();
@@ -2513,7 +2533,7 @@ using ScriptCompileTask =
 using ModuleCompileTask =
     class ScriptOrModuleCompileTask<CompilationTarget::Module>;
 
-class ScriptDecodeTask final : public CompileOrDecodeTask {
+class ScriptDecodeTask final : public StencilCompileOrDecodeTask {
  public:
   explicit ScriptDecodeTask(const JS::TranscodeRange& aRange)
       : mRange(aRange) {}
@@ -2571,9 +2591,53 @@ class ScriptDecodeTask final : public CompileOrDecodeTask {
   JS::TranscodeRange mRange;
 };
 
+nsresult WasmCompileTask::Init(JSContext* aCx, JS::CompileOptions& aOptions) {
+  mCompileArgs = JS::BuildCompileArgsForESM(aCx, aOptions);
+  if (!mCompileArgs) {
+    mIsCancelled = true;
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  return NS_OK;
+}
+
+Task::TaskResult WasmCompileTask::Run() {
+  MutexAutoLock lock(mMutex);
+
+  if (IsCancelled(lock)) {
+    return TaskResult::Complete;
+  }
+
+  mCompileResult =
+      JS::CompileForESM(*mCompileArgs, mBytes.begin(), mBytes.length());
+
+  return TaskResult::Complete;
+}
+
+bool WasmCompileTask::StealResult(JSContext* aCx,
+                                  JS::MutableHandle<JSObject*> aModuleOut) {
+  JS::Rooted<JSObject*> wasmModuleObject(aCx);
+  if (!JS::FinishCompileForESM(aCx, *mCompileArgs, mCompileResult,
+                               &wasmModuleObject)) {
+    return false;
+  }
+
+  aModuleOut.set(JS::CreateWasmSourcePhaseModule(aCx, wasmModuleObject));
+  return !!aModuleOut;
+}
+
 nsresult ScriptLoader::CreateOffThreadTask(
     JSContext* aCx, ScriptLoadRequest* aRequest, JS::CompileOptions& aOptions,
     CompileOrDecodeTask** aCompileOrDecodeTask) {
+  if (aRequest->IsWasmBytes()) {
+    RefPtr<WasmCompileTask> compileTask =
+        new WasmCompileTask(std::move(aRequest->WasmBytes()));
+    nsresult rv = compileTask->Init(aCx, aOptions);
+    NS_ENSURE_SUCCESS(rv, rv);
+    compileTask.forget(aCompileOrDecodeTask);
+    return NS_OK;
+  }
+
   if (aRequest->IsRetrievedAsSerializedStencil()) {
     JS::TranscodeRange range = aRequest->SerializedStencil();
     JS::DecodeOptions decodeOptions(aOptions);
@@ -2802,21 +2866,21 @@ nsresult ScriptLoader::ProcessRequest(ScriptLoadRequest* aRequest) {
 
 void ScriptLoader::FireScriptAvailable(nsresult aResult,
                                        ScriptLoadRequest* aRequest) {
+  const nsCOMPtr<nsIScriptElement> scriptElement =
+      aRequest->GetScriptLoadContext()->GetScriptElementForObserver();
+  const nsCOMPtr<nsIURI> uri = aRequest->URI();
   for (int32_t i = 0; i < mObservers.Count(); i++) {
     nsCOMPtr<nsIScriptLoaderObserver> obs = mObservers[i];
-    obs->ScriptAvailable(
-        aResult,
-        aRequest->GetScriptLoadContext()->GetScriptElementForObserver(),
-        aRequest->GetScriptLoadContext()->mIsInline, aRequest->URI(),
-        aRequest->GetScriptLoadContext()->mLineNo);
+    obs->ScriptAvailable(aResult, scriptElement,
+                         aRequest->GetScriptLoadContext()->mIsInline, uri,
+                         aRequest->GetScriptLoadContext()->mLineNo);
   }
 
-  bool isInlineClassicScript = aRequest->GetScriptLoadContext()->mIsInline &&
-                               !aRequest->IsModuleRequest();
-  RefPtr<nsIScriptElement> scriptElement =
-      aRequest->GetScriptLoadContext()->GetScriptElementForObserver();
+  const bool isInlineClassicScript =
+      aRequest->GetScriptLoadContext()->mIsInline &&
+      !aRequest->IsModuleRequest();
   scriptElement->ScriptAvailable(aResult, scriptElement, isInlineClassicScript,
-                                 aRequest->URI(),
+                                 uri,
                                  aRequest->GetScriptLoadContext()->mLineNo);
 }
 
@@ -4349,7 +4413,8 @@ void ScriptLoader::ProcessPendingRequestsAsync() {
   }
 }
 
-void ProcessPendingRequestsCallback(nsITimer* aTimer, void* aClosure) {
+void ProcessPendingRequestsCallback(nsITimer* aTimer, void* aClosure)
+    MOZ_CAN_RUN_SCRIPT_BOUNDARY {
   RefPtr<ScriptLoader> sl = static_cast<ScriptLoader*>(aClosure);
   sl->ProcessPendingRequests(true);
 }

@@ -10,52 +10,44 @@
 #include "mozilla/DataMutex.h"
 #include "mozilla/ScopeExit.h"
 #include "nsPrintfCString.h"
-#if LIBAVCODEC_VERSION_MAJOR >= 60 && !defined(FFVPX_VERSION)
-#  if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
-#    include <dlfcn.h>
-#    include <errno.h>
+
+#ifdef MOZ_USE_HWDECODE_VULKAN
+#  include <dlfcn.h>
+#  include <errno.h>
 // mozilla/widget/DMABufFormats.h (via FFmpegVideoDecoder.h -> DMABufDevice.h)
 // may define DRM_FORMAT_MOD_INVALID before libdrm; same pattern as
 // DMABufSurface.cpp / FFmpegVideoFramePool.cpp.
-#    ifdef DRM_FORMAT_MOD_INVALID
-#      undef DRM_FORMAT_MOD_INVALID
-#    endif
-#    include <libdrm/drm_fourcc.h>
-#    ifndef DRM_FORMAT_MOD_INVALID
-#      define DRM_FORMAT_MOD_INVALID ((1ULL << 56) - 1)
-#    endif
-#    include <string.h>
-#    include <sys/stat.h>
+#  ifdef DRM_FORMAT_MOD_INVALID
+#    undef DRM_FORMAT_MOD_INVALID
+#  endif
+#  include <libdrm/drm_fourcc.h>
+#  ifndef DRM_FORMAT_MOD_INVALID
+#    define DRM_FORMAT_MOD_INVALID ((1ULL << 56) - 1)
+#  endif
+#  include <string.h>
+#  include <sys/stat.h>
 
-#    include <algorithm>
-#    include <vector>
+#  include <algorithm>
+#  include <vector>
 
-#    include "libavutil/hwcontext.h"
-#    include "libavutil/hwcontext_vulkan.h"
-#    include "libavutil/macros.h"
-#    include "libavutil/pixfmt.h"
-#    include "libavutil/version.h"
-#    include "mozilla/StaticPrefs_media.h"
-#    ifdef __linux__
-#      include <sys/sysmacros.h>
-#    elif defined(XP_SOLARIS) || defined(__sun)
-#      include <sys/mkdev.h>  // major(), minor() for st_rdev
-#    elif defined(XP_FREEBSD) || defined(XP_OPENBSD) || defined(XP_NETBSD)
-#      include <sys/types.h>  // major(), minor() for st_rdev (BSD)
-#    endif
-#  endif  // MOZ_USE_HWDECODE && MOZ_WIDGET_GTK
-#endif    // LIBAVCODEC_VERSION_MAJOR >= 60 && !defined(FFVPX_VERSION)
+#  include "libavutil/hwcontext.h"
+#  include "libavutil/hwcontext_vulkan.h"
+#  include "libavutil/macros.h"
+#  include "libavutil/pixfmt.h"
+#  include "libavutil/version.h"
+#  include "mozilla/StaticPrefs_media.h"
+#  ifdef __linux__
+#    include <sys/sysmacros.h>
+#  elif defined(XP_SOLARIS) || defined(__sun)
+#    include <sys/mkdev.h>  // major(), minor() for st_rdev
+#  elif defined(XP_FREEBSD) || defined(XP_OPENBSD) || defined(XP_NETBSD)
+#    include <sys/types.h>  // major(), minor() for st_rdev (BSD)
+#  endif
 
 namespace mozilla {
 
-#if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
-#  if LIBAVCODEC_VERSION_MAJOR >= 60 && !defined(FFVPX_VERSION)
-
 FFmpegVideoDecoder<
     LIBAV_VER>::FFmpegVulkanVideoDecoder::~FFmpegVulkanVideoDecoder() {
-  if (!StaticPrefs::media_ffvpx_hw_enabled()) {
-    return;
-  }
   // Resources should already be cleaned up by ProcessShutdown()
   // If mDevice is not null here, it means ProcessShutdown wasn't called
   // and the device may already be destroyed - don't try to clean up
@@ -196,12 +188,12 @@ struct InstanceFunctionCache {
   };
   CachedVideoCaps<VkVideoDecodeH264CapabilitiesKHR> mH264;
   CachedVideoCaps<VkVideoDecodeH265CapabilitiesKHR> mHevc;
-#    if LIBAVCODEC_VERSION_MAJOR >= 61
+#  if LIBAVCODEC_VERSION_MAJOR >= 61
   CachedVideoCaps<VkVideoDecodeAV1CapabilitiesKHR> mAv1;
-#    endif
-#    if LIBAVCODEC_VERSION_MAJOR >= 62
+#  endif
+#  if LIBAVCODEC_VERSION_MAJOR >= 62
   CachedVideoCaps<VkVideoDecodeVP9CapabilitiesKHR> mVp9;
-#    endif
+#  endif
   // Flat array of all the above pointers for use by IsLoaded().
   nsTArray<PFN_vkVoidFunction> mFnPtrs;
 };
@@ -281,12 +273,12 @@ void FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::
   cache->mFnPtrs = mInstanceFunctions.Clone();
   cache->mH264 = {};
   cache->mHevc = {};
-#    if LIBAVCODEC_VERSION_MAJOR >= 61
+#  if LIBAVCODEC_VERSION_MAJOR >= 61
   cache->mAv1 = {};
-#    endif
-#    if LIBAVCODEC_VERSION_MAJOR >= 62
+#  endif
+#  if LIBAVCODEC_VERSION_MAJOR >= 62
   cache->mVp9 = {};
-#    endif
+#  endif
 }
 
 namespace {
@@ -437,7 +429,7 @@ void EnsureVideoCaps(InstanceFunctionCache& aCache, VkPhysicalDevice aPhysDev,
           bitDepth, chromaBitDepth, &aCache.mHevc);
       break;
     }
-#    if LIBAVCODEC_VERSION_MAJOR >= 61
+#  if LIBAVCODEC_VERSION_MAJOR >= 61
     case AV_CODEC_ID_AV1: {
       VkVideoDecodeAV1ProfileInfoKHR av1Profile{};
       av1Profile.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_AV1_PROFILE_INFO_KHR;
@@ -450,8 +442,8 @@ void EnsureVideoCaps(InstanceFunctionCache& aCache, VkPhysicalDevice aPhysDev,
           av1Profile.filmGrainSupport, bitDepth, chromaBitDepth, &aCache.mAv1);
       break;
     }
-#    endif
-#    if LIBAVCODEC_VERSION_MAJOR >= 62
+#  endif
+#  if LIBAVCODEC_VERSION_MAJOR >= 62
     case AV_CODEC_ID_VP9: {
       VkVideoDecodeVP9ProfileInfoKHR vp9Profile{};
       vp9Profile.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_VP9_PROFILE_INFO_KHR;
@@ -463,7 +455,7 @@ void EnsureVideoCaps(InstanceFunctionCache& aCache, VkPhysicalDevice aPhysDev,
           chromaBitDepth, &aCache.mVp9);
       break;
     }
-#    endif
+#  endif
     default:
       break;
   }
@@ -476,15 +468,15 @@ uint32_t MapH264VulkanProfileIdc(uint8_t aIdc) {
     case STD_VIDEO_H264_PROFILE_IDC_HIGH:
     case STD_VIDEO_H264_PROFILE_IDC_HIGH_444_PREDICTIVE:
       return aIdc;
-#    if LIBAVCODEC_VERSION_MAJOR >= 61
+#  if LIBAVCODEC_VERSION_MAJOR >= 61
     case AV_PROFILE_H264_HIGH_10:
     case AV_PROFILE_H264_HIGH_422:
     case AV_PROFILE_H264_HIGH_444:
-#    else
+#  else
     case FF_PROFILE_H264_HIGH_10:
     case FF_PROFILE_H264_HIGH_422:
     case FF_PROFILE_H264_HIGH_444:
-#    endif
+#  endif
       return STD_VIDEO_H264_PROFILE_IDC_HIGH;
     default:
       return STD_VIDEO_H264_PROFILE_IDC_MAIN;
@@ -849,7 +841,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::
     SelectVulkanDecoderPhysicalDevice(const StaticMutexAutoLock& aProofOfLock,
                                       const nsCString& aRendererNode) {
   uint32_t rendererDrmMajor = 0, rendererDrmMinor = 0;
-#    if defined(MOZ_WIDGET_GTK)
+#  if defined(MOZ_WIDGET_GTK)
   if (!aRendererNode.IsEmpty()) {
     struct stat st = {};
     if (stat(aRendererNode.get(), &st) == 0) {
@@ -865,7 +857,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::
     // Empty when renderer is llvmpipe or glxtest failed to detect a DRM device
     FFMPEGV_LOG("Renderer device from GPU: empty (gfxVars::DrmRenderDevice)");
   }
-#    endif
+#  endif
 
   const bool useCache = (rendererDrmMajor == 0 && rendererDrmMinor == 0);
   if (!sVulkanEnumerated || !useCache) {
@@ -1198,9 +1190,9 @@ FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::InitCopyRingBuffer(
 
   bool useP010 =
       (aSwFormat == AV_PIX_FMT_P010) || (aSwFormat == AV_PIX_FMT_P016);
-#    if LIBAVCODEC_VERSION_MAJOR >= 60
+#  if LIBAVCODEC_VERSION_MAJOR >= 60
   useP010 = useP010 || (aSwFormat == AV_PIX_FMT_P012);
-#    endif
+#  endif
   const VkFormat vkFormat =
       useP010 ? VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16
               : VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
@@ -1471,9 +1463,9 @@ FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::PrepareImageToDRM(
       (AVHWFramesContext*)aSrcFrame->hw_frames_ctx->data;
   if (framesCtx->sw_format != AV_PIX_FMT_NV12 &&
       framesCtx->sw_format != AV_PIX_FMT_P010 &&
-#    if LIBAVCODEC_VERSION_MAJOR >= 60
+#  if LIBAVCODEC_VERSION_MAJOR >= 60
       framesCtx->sw_format != AV_PIX_FMT_P012 &&
-#    endif
+#  endif
       framesCtx->sw_format != AV_PIX_FMT_P016) {
     return MediaResult(
         NS_ERROR_DOM_MEDIA_DECODE_ERR,
@@ -1694,15 +1686,15 @@ FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::PrepareImageToDRM(
 
   AVHWDeviceContext* devCtx = (AVHWDeviceContext*)aVulkanDevCtx->data;
   AVVulkanDeviceContext* vkCtx = (AVVulkanDeviceContext*)devCtx->hwctx;
-#    if !defined(FF_API_VULKAN_SYNC_QUEUES) || FF_API_VULKAN_SYNC_QUEUES
+#  if !defined(FF_API_VULKAN_SYNC_QUEUES) || FF_API_VULKAN_SYNC_QUEUES
   const uint32_t qf = static_cast<uint32_t>(mQueueFamilyIndex);
   vkCtx->lock_queue(devCtx, qf, copySlot);
-#    endif
+#  endif
   VkResult submitRes =
       mQueueSubmit(mCopyQueue[copySlot], 1, &submitInfo, mCopyFence[copySlot]);
-#    if !defined(FF_API_VULKAN_SYNC_QUEUES) || FF_API_VULKAN_SYNC_QUEUES
+#  if !defined(FF_API_VULKAN_SYNC_QUEUES) || FF_API_VULKAN_SYNC_QUEUES
   vkCtx->unlock_queue(devCtx, qf, copySlot);
-#    endif
+#  endif
 
   if (submitRes != VK_SUCCESS) {
     NS_WARNING(
@@ -1748,7 +1740,6 @@ FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::PrepareImageToDRM(
   return NS_OK;
 }
 
-#  endif  // LIBAVCODEC_VERSION_MAJOR >= 60 && !defined(FFVPX_VERSION)
-#endif    // defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
-
 }  // namespace mozilla
+
+#endif  // MOZ_ENABLE_VULKAN_VIDEO

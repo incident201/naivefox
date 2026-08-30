@@ -76,6 +76,8 @@ import org.mozilla.fenix.home.PocketMiddleware
 import org.mozilla.fenix.home.SettingsBackedPocketSettings
 import org.mozilla.fenix.home.blocklist.BlocklistHandler
 import org.mozilla.fenix.home.blocklist.BlocklistMiddleware
+import org.mozilla.fenix.home.collections.migration.CollectionsMigrationRepository
+import org.mozilla.fenix.home.collections.migration.DefaultCollectionsMigrationRepository
 import org.mozilla.fenix.home.middleware.HomeTelemetryMiddleware
 import org.mozilla.fenix.home.setup.store.DefaultSetupChecklistRepository
 import org.mozilla.fenix.home.setup.store.SetupChecklistPreferencesMiddleware
@@ -100,6 +102,7 @@ import org.mozilla.fenix.termsofuse.store.DefaultTermsOfUsePromptRepository
 import org.mozilla.fenix.utils.Settings
 import org.mozilla.fenix.utils.isLargeScreenSize
 import org.mozilla.fenix.wifi.WifiConnectionMonitor
+import org.mozilla.gecko.search.SearchWidgetProvider
 
 private const val AMO_COLLECTION_MAX_CACHE_AGE = 2 * 24 * 60L // Two days in minutes
 
@@ -433,6 +436,10 @@ class Components(
         DefaultEmailMasksRepository(settings)
     }
 
+    val collectionsMigrationRepository: CollectionsMigrationRepository by lazyMonitored {
+        DefaultCollectionsMigrationRepository(settings)
+    }
+
     val relayFeatureIntegration by lazyMonitored {
         RelayFeatureIntegration(
             engine = core.engine,
@@ -463,7 +470,7 @@ class Components(
             it.register(
                 VoiceSearchAIControlFeature(
                     settings = settings,
-                    onUpdateWidget = { VoiceSearchAIControlFeature.updateWidget(context) },
+                    onUpdateWidget = { SearchWidgetProvider.updateAllWidgets(context) },
                 )
             )
         }

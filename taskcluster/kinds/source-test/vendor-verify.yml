@@ -167,7 +167,6 @@ misc:
         symbol: vendor(misc)
     members:
         - ipc/chromium/src/third_party/libevent/moz.yaml
-        - mobile/android/android-components/plugins/dependencies/src/main/java/moz.yaml
         - third_party/application-services/moz.yaml
         - third_party/content_analysis_sdk/moz.yaml
         - third_party/cups/moz.yaml

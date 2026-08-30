@@ -48,8 +48,9 @@ import {
 
 const VISIBLE = "visible";
 const VISIBILITY_CHANGE_EVENT = "visibilitychange";
-// Minimum scroll distance in pixels to record a scroll telemetry event.
-const SCROLL_TELEMETRY_THRESHOLD = 50;
+// Scroll distances in pixels, in ascending order, that each record a scroll
+// telemetry event the first time they are passed in a session.
+const SCROLL_TELEMETRY_THRESHOLDS = [50, 100, 250];
 const PREF_INFERRED_PERSONALIZATION_SYSTEM =
   "discoverystream.sections.personalization.inferred.enabled";
 const PREF_INFERRED_PERSONALIZATION_USER =
@@ -145,7 +146,7 @@ export class BaseContent extends React.PureComponent {
     this.attachSearchSentinel = this.attachSearchSentinel.bind(this);
     this.onSearchSentinelIntersect = this.onSearchSentinelIntersect.bind(this);
     this.searchStickyObserver = null;
-    this._hasScrolledForSession = false;
+    this._nextScrollThreshold = 0;
     this.state = {
       fixedSearch: false,
       colorMode: "",
@@ -470,12 +471,17 @@ export class BaseContent extends React.PureComponent {
   }
 
   onWindowScroll() {
-    if (
-      !this._hasScrolledForSession &&
-      global.scrollY > SCROLL_TELEMETRY_THRESHOLD
+    // A single scroll can pass several thresholds at once, so report every
+    // threshold that hasn't been reported yet.
+    while (
+      this._nextScrollThreshold < SCROLL_TELEMETRY_THRESHOLDS.length &&
+      global.scrollY > SCROLL_TELEMETRY_THRESHOLDS[this._nextScrollThreshold]
     ) {
-      this._hasScrolledForSession = true;
-      this.props.dispatch(ac.OnlyToMain({ type: at.NEW_TAB_SCROLL }));
+      const threshold =
+        SCROLL_TELEMETRY_THRESHOLDS[this._nextScrollThreshold++];
+      this.props.dispatch(
+        ac.OnlyToMain({ type: at.NEW_TAB_SCROLL, data: { threshold } })
+      );
     }
 
     if (this.props.Prefs.values[PREF_NOVA_ENABLED]) {
@@ -1285,6 +1291,11 @@ export class BaseContent extends React.PureComponent {
                 {contentFeed && (
                   <div className={bandClassName}>{contentFeed}</div>
                 )}
+                {/* Nova only shows the wallpaper when both prefs are on, unlike
+              classic; see updateWallpaper. */}
+                {wallpapersEnabled &&
+                  wallpapersUserEnabled &&
+                  this.renderWallpaperAttribution()}
               </main>
             </div>
             <ConfirmDialog />

@@ -2,10 +2,28 @@
  * Creates a Payment Method Identifier (PMI) URL pointing to payment-method-identifier.py.
  *
  * @param {string} testId - The unique test run token.
+ * @param {Object} [options] - URL configuration options.
+ * @param {string|string[]} [options.link] - Custom Link header(s).
  * @returns {string} Fully qualified PMI URL.
  */
-function createPaymentMethodIdentifierUrl(testId) {
+function createPaymentMethodIdentifierUrl(testId, options = {}) {
   const url = new URL(`https://${location.host}/payment-method-manifest/resources/payment-method-identifier.py`);
+  url.searchParams.set('id', testId);
+  if (options.link !== undefined) {
+    const links = Array.isArray(options.link) ? options.link : [options.link];
+    links.forEach(l => url.searchParams.append('link', l));
+  }
+  return url.href;
+}
+
+/**
+ * Creates a Payment Method Manifest URL pointing to payment-method-manifest.py.
+ *
+ * @param {string} testId - The unique test run token.
+ * @returns {string} Fully qualified manifest URL.
+ */
+function createPaymentMethodManifestUrl(testId) {
+  const url = new URL(`https://${location.host}/payment-method-manifest/resources/payment-method-manifest.py`);
   url.searchParams.set('id', testId);
   return url.href;
 }
@@ -35,13 +53,13 @@ async function waitForServerAccessLogs(t, testId, requiredCount = 2, timeout = 3
       const resp = await fetch(queryUrl);
       if (!resp.ok) {
         throw new Error(
-          `stash-query.py failed with HTTP status ${resp.status} for test ID '${testId}'`
+          `stash-query.py failed with HTTP status ${resp.status}`
         );
       }
       lastLogs = await resp.json();
       return lastLogs && lastLogs.length >= requiredCount;
     },
-    `Waiting for ${requiredCount} server access logs for test ID '${testId}'`,
+    `Waiting for ${requiredCount} server access logs`,
     timeout,
     interval
   );

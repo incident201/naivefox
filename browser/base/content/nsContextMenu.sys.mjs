@@ -37,7 +37,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-import { PdfjsContextMenu } from "resource://pdf.js/PdfjsContextMenu.sys.mjs";
+import { PdfJsContextMenu } from "resource://pdf.js/PdfJsContextMenu.sys.mjs";
 
 ChromeUtils.defineLazyGetter(lazy, "ReferrerInfo", () =>
   Components.Constructor(
@@ -335,7 +335,7 @@ export class nsContextMenu {
     this.hasTextFragments = context.hasTextFragments;
     this.textFragmentURL = null;
 
-    this.pdfjsContextMenu = new PdfjsContextMenu(this, context);
+    this.pdfjsContextMenu = new PdfJsContextMenu(this, context);
   } // setContext
 
   hiding(aXulMenu) {

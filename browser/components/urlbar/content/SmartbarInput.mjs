@@ -130,8 +130,6 @@ export class SmartbarInput extends HTMLElement {
         <html:moz-button class="searchmode-switcher chromeclass-toolbar-additional"
                          type="muted"
                          iconsrc="chrome://global/skin/icons/search-glass.svg"
-                         title="More options"
-                         aria-label="More options"
                          data-l10n-id="urlbar-searchmode-default2"
                          tabindex="-1"
                          role="presentation">
@@ -194,8 +192,7 @@ ${
                       role="listbox"/>
           </html:div>
         </html:div>
-        <menupopup class="urlbarView-result-menu"
-                   consumeoutsideclicks="false"/>
+        <html:panel-list class="urlbarView-result-menu"></html:panel-list>
         <html:moz-urlbar-slot name="search-one-offs" />
       </html:div>
       <html:div class="smartbar-button-container">
@@ -898,6 +895,16 @@ ${
 
   get sapName() {
     return this.#sapName;
+  }
+
+  /**
+   * Whether this is a bar dedicated to search.
+   *
+   * @see {UrlbarShared.isSearchbarSAP}
+   * @type {boolean}
+   */
+  get isSearchbarSAP() {
+    return UrlbarShared.isSearchbarSAP(this.#sapName);
   }
 
   get smartbarAction() {
@@ -5052,7 +5059,7 @@ ${
   /**
    * @typedef {object} LoadURLParams
    *   The parameters related to how and where the result will be opened.
-   *   Further supported parameters are listed in utilityOverlay.js#openUILinkIn.
+   *   Further supported parameters are listed in UrlbarChildController.mjs#loadURL.
    *
    * @property {object} [triggeringPrincipal]
    *   The principal that the action was triggered from.
@@ -6087,6 +6094,10 @@ ${
   }
 
   _on_blur(event) {
+    if (this.view.resultMenu.hasAttribute("open")) {
+      return;
+    }
+
     logger().debug("Blur Event");
     // We cannot count every blur events after a missed engagement as abandoment
     // because the user may have clicked on some view element that executes
@@ -6807,6 +6818,11 @@ ${
   }
 
   _on_keydown(event) {
+    // If the resultMenu is open then let them handle any key events.
+    if (this.view.resultMenu.hasAttribute("open")) {
+      return;
+    }
+
     if (event.currentTarget == this.window) {
       // Tab/Shift+Tab/Escape on the smartbar action buttons goes through
       // a dedicated handler. We detect membership via a manual ancestor

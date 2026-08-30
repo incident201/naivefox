@@ -578,6 +578,8 @@ prefs = [
 
 ["test_connection_coalescing.js"]
 
+["test_connection_coalescing_hash_collision.js"]
+
 ["test_content_decoding_error_telemetry.js"]
 run-sequentially = ["true"]
 

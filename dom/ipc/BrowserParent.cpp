@@ -62,6 +62,7 @@
 #include "mozilla/net/CookieJarSettings.h"
 #include "mozilla/net/NeckoChild.h"
 #include "mozilla/widget/Screen.h"
+#include "mozilla/widget/WidgetLogging.h"
 #include "nsCOMPtr.h"
 #include "nsContentPermissionHelper.h"
 #include "nsContentUtils.h"
@@ -123,6 +124,7 @@
 #include "nsIAuthPromptCallback.h"
 #include "nsICancelable.h"
 #include "nsILoginManagerAuthPrompter.h"
+#include "nsIScriptSecurityManager.h"
 #include "nsISecureBrowserUI.h"
 #include "nsIXULRuntime.h"
 #include "nsNetCID.h"
@@ -540,19 +542,15 @@ uint32_t BrowserParent::GetMaxTouchPoints(Element* aElement) {
 
 a11y::DocAccessibleParent* BrowserParent::GetTopLevelDocAccessible() const {
 #ifdef ACCESSIBILITY
-  // XXX Consider managing non top level PDocAccessibles with their parent
-  // document accessible.
-  const ManagedContainer<PDocAccessibleParent>& docs =
-      ManagedPDocAccessibleParent();
-  for (auto* key : docs) {
-    auto* doc = static_cast<a11y::DocAccessibleParent*>(key);
-    // We want the document for this BrowserParent even if it's for an
-    // embedded out-of-process iframe. Therefore, we use
-    // IsTopLevelInContentProcess. In contrast, using IsToplevel would only
-    // include documents that aren't embedded; e.g. tab documents.
-    if (doc->IsTopLevelInContentProcess() && !doc->IsShutdown()) {
-      return doc;
-    }
+  WindowGlobalParent* wgp = mBrowsingContext->GetCurrentWindowGlobal();
+  if (wgp && wgp->Manager() != this) {
+    // The BrowsingContext has navigated such that its current document is no
+    // longer within this PBrowser.
+    return nullptr;
+  }
+  if (auto* doc = a11y::DocAccessibleParent::GetFrom(wgp)) {
+    MOZ_ASSERT(doc->IsTopLevelInContentProcess());
+    return doc;
   }
 #endif
   return nullptr;
@@ -736,15 +734,6 @@ void BrowserParent::Destroy() {
   Deactivated();
 
   RemoveWindowListeners();
-
-#ifdef ACCESSIBILITY
-  if (a11y::DocAccessibleParent* tabDoc = GetTopLevelDocAccessible()) {
-#  if defined(ANDROID)
-    MonitorAutoLock mal(nsAccessibilityService::GetAndroidMonitor());
-#  endif
-    tabDoc->Destroy();
-  }
-#endif
 
   // If this fails, it's most likely due to a content-process crash, and
   // auto-cleanup will kick in.  Otherwise, the child side will destroy itself
@@ -932,17 +921,18 @@ mozilla::ipc::IPCResult BrowserParent::RecvDropLinks(
     // not been modified then it's safe to load those links using the
     // SystemPrincipal. If they have been modified by web content, then
     // we use a NullPrincipal which still allows to load web links.
-    bool loadUsingSystemPrincipal = true;
-    if (aLinks.Length() != mVerifyDropLinks.Length()) {
-      loadUsingSystemPrincipal = false;
-    }
-    for (uint32_t i = 0; i < aLinks.Length(); i++) {
-      if (loadUsingSystemPrincipal) {
+    const bool loadUsingSystemPrincipal = [&]() {
+      if (aLinks.Length() != mVerifyDropLinks.Length()) {
+        return false;
+      }
+      for (uint32_t i = 0; i < aLinks.Length(); i++) {
         if (!aLinks[i].Equals(mVerifyDropLinks[i])) {
-          loadUsingSystemPrincipal = false;
+          return false;
         }
       }
-    }
+      return true;
+    }();
+
     mVerifyDropLinks.Clear();
     nsCOMPtr<nsIPrincipal> triggeringPrincipal;
     if (loadUsingSystemPrincipal) {
@@ -1235,138 +1225,6 @@ void BrowserParent::Deactivate(bool aWindowLowering, uint64_t aActionId) {
     (void)SendDeactivate(aActionId);
   }
 }
-
-#ifdef ACCESSIBILITY
-a11y::PDocAccessibleParent* BrowserParent::AllocPDocAccessibleParent(
-    PDocAccessibleParent* aParent, const uint64_t&,
-    const MaybeDiscardedBrowsingContext&, const bool&) {
-  // Reference freed in DeallocPDocAccessibleParent.
-  return a11y::DocAccessibleParent::New().take();
-}
-
-bool BrowserParent::DeallocPDocAccessibleParent(PDocAccessibleParent* aParent) {
-  // Free reference from AllocPDocAccessibleParent.
-  static_cast<a11y::DocAccessibleParent*>(aParent)->Release();
-  return true;
-}
-
-mozilla::ipc::IPCResult BrowserParent::RecvPDocAccessibleConstructor(
-    PDocAccessibleParent* aDoc, PDocAccessibleParent* aParentDoc,
-    const uint64_t& aParentID,
-    const MaybeDiscardedBrowsingContext& aBrowsingContext,
-    const bool& aIsPrintDoc) {
-#  if defined(ANDROID)
-  MonitorAutoLock mal(nsAccessibilityService::GetAndroidMonitor());
-#  endif
-  auto doc = static_cast<a11y::DocAccessibleParent*>(aDoc);
-  doc->SetIsPrintDoc(aIsPrintDoc);
-  auto allow = doc->ShouldAllowConstruction();
-  if (allow == a11y::DocAccessibleParent::AllowConstruction::Disallow) {
-    return IPC_FAIL(
-        this,
-        "Attempt to construct PDocAccessible when accessibility not in use");
-  } else if (allow ==
-             a11y::DocAccessibleParent::AllowConstruction::AllowButIgnore) {
-    doc->MarkAsShutdown();
-    return IPC_OK();
-  }
-
-  // If this tab is already shutting down just mark the new actor as shutdown
-  // and ignore it.  When the tab actor is destroyed it will be too.
-  if (mIsDestroyed) {
-    doc->MarkAsShutdown();
-    return IPC_OK();
-  }
-
-  if (aParentDoc) {
-    // Iframe document rendered in the same process as its embedder.
-    // A document should never directly be the parent of another document.
-    // There should always be an outer doc accessible child of the outer
-    // document containing the child.
-    MOZ_ASSERT(aParentID);
-    if (!aParentID) {
-      return IPC_FAIL_NO_REASON(this);
-    }
-
-    auto parentDoc = static_cast<a11y::DocAccessibleParent*>(aParentDoc);
-    if (parentDoc->IsShutdown()) {
-      // This can happen if parentDoc is an OOP iframe, but its embedder has
-      // been destroyed. (DocAccessibleParent::Destroy destroys any child
-      // documents.) The OOP iframe (and anything it embeds) will die soon
-      // anyway, so mark this document as shutdown and ignore it.
-      doc->MarkAsShutdown();
-      return IPC_OK();
-    }
-
-    if (aBrowsingContext) {
-      doc->SetBrowsingContext(aBrowsingContext.get_canonical());
-    }
-
-    mozilla::ipc::IPCResult added = parentDoc->AddChildDoc(doc, aParentID);
-    if (!added) {
-      return added;
-    }
-
-#  ifdef XP_WIN
-    if (a11y::nsWinUtils::IsWindowEmulationStarted()) {
-      doc->SetEmulatedWindowHandle(parentDoc->GetEmulatedWindowHandle());
-    }
-#  endif
-
-    return IPC_OK();
-  }
-
-  if (auto* prevTopLevel = GetTopLevelDocAccessible()) {
-    // Sometimes, we can get a new top level DocAccessibleParent before the
-    // old one gets destroyed. The old one will die pretty shortly anyway,
-    // so just destroy it now. If we don't do this, GetTopLevelDocAccessible()
-    // might return the wrong document for a short while.
-    prevTopLevel->Destroy();
-  }
-
-  if (aBrowsingContext) {
-    doc->SetBrowsingContext(aBrowsingContext.get_canonical());
-  }
-
-  if (auto* bridge = GetBrowserBridgeParent()) {
-    // Iframe document rendered in a different process to its embedder.
-    // In this case, we don't get aParentDoc and aParentID.
-    MOZ_ASSERT(!aParentDoc && !aParentID);
-    doc->SetTopLevelInContentProcess();
-    if (!doc->IsPrintDoc()) {
-      a11y::ProxyCreated(doc);
-    }
-    // It's possible the embedder accessible hasn't been set yet; e.g.
-    // a hidden iframe. In that case, embedderDoc will be null and this will
-    // be handled when the embedder is set.
-    if (a11y::DocAccessibleParent* embedderDoc =
-            bridge->GetEmbedderAccessibleDoc()) {
-      mozilla::ipc::IPCResult added = embedderDoc->AddChildDoc(bridge);
-      if (!added) {
-        return added;
-      }
-    }
-    return IPC_OK();
-  } else {
-    // null aParentDoc means this document is at the top level in the child
-    // process.  That means it makes no sense to get an id for an accessible
-    // that is its parent.
-    MOZ_ASSERT(!aParentID);
-    if (aParentID) {
-      return IPC_FAIL_NO_REASON(this);
-    }
-
-    doc->SetTopLevel();
-    a11y::DocManager::RemoteDocAdded(doc);
-#  ifdef XP_WIN
-    if (!aIsPrintDoc) {
-      doc->MaybeInitWindowEmulation();
-    }
-#  endif
-  }
-  return IPC_OK();
-}
-#endif
 
 already_AddRefed<PFilePickerParent> BrowserParent::AllocPFilePickerParent(
     const nsString& aTitle, const nsIFilePicker::Mode& aMode,
@@ -1706,6 +1564,27 @@ bool BrowserParent::QueryDropLinksForVerification() {
     return false;
   }
 
+  nsCOMPtr<nsIPrincipal> triggeringPrincipal;
+  dragSession->GetTriggeringPrincipal(getter_AddRefs(triggeringPrincipal));
+
+  nsIScriptSecurityManager* secMan = nullptr;
+  if (triggeringPrincipal) {
+    if (!(secMan = nsContentUtils::GetSecurityManager())) {
+      NS_WARNING("No ScriptSecurityManager for links verification");
+      return false;
+    }
+  } else {
+    RefPtr<WindowContext> sourceWC = dragSession->GetSourceWindowContext();
+    RefPtr<WindowContext> sourceTopWC =
+        dragSession->GetSourceTopWindowContext();
+    if (sourceWC || sourceTopWC) {
+      NS_WARNING(
+          "How can we have a source window context while no triggering "
+          "principal?");
+      return false;
+    }
+  }
+
   // No more than one drop event can happen simultaneously; reset the link
   // verification array and store all links that are being dragged.
   mVerifyDropLinks.Clear();
@@ -1724,6 +1603,22 @@ bool BrowserParent::QueryDropLinksForVerification() {
       NS_WARNING("Failed to query url for verification");
       break;
     }
+
+    if (triggeringPrincipal) {
+      MOZ_ASSERT(secMan);
+      if (NS_FAILED(secMan->CheckLoadURIStrWithPrincipal(
+              triggeringPrincipal, NS_ConvertUTF16toUTF8(tmp),
+              nsIScriptSecurityManager::STANDARD |
+                  nsIScriptSecurityManager::DISALLOW_INHERIT_PRINCIPAL))) {
+        MOZ_LOG_FMT(sWidgetDragServiceLog, mozilla::LogLevel::Debug,
+                    "[{}] {} | dragSession: {} | Bad URI {} from {}",
+                    fmt::ptr(this), __FUNCTION__, fmt::ptr(dragSession.get()),
+                    NS_ConvertUTF16toUTF8(tmp).get(), triggeringPrincipal);
+        mVerifyDropLinks.Clear();
+        return true;
+      }
+    }
+
     mVerifyDropLinks.AppendElement(tmp);
 
     rv = item->GetName(tmp);
@@ -3998,9 +3893,7 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
     return IPC_OK();
   }
 
-  // XXX: Can we remove AllowNullPtr here?
-  if (!Manager()->ValidatePrincipal(aPrincipal,
-                                    {ValidatePrincipalOptions::AllowNullPtr})) {
+  if (!Manager()->ValidatePrincipal(aPrincipal, {})) {
     return ContentParent::PrincipalValidationIpcFail(aPrincipal, this,
                                                      __func__);
   }

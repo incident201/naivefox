@@ -3563,7 +3563,7 @@ export class UpdateService {
     await this.init();
 
     if (!this.disabled && AppConstants.NIGHTLY_BUILD) {
-      // Scalar ID: update.suppress_prompts
+      // Metric ID: update.suppress_prompts
       AUSTLMY.pingSuppressPrompts();
     }
     if (this.disabled || this.manualUpdateOnly) {
@@ -5483,7 +5483,7 @@ export class CheckerService {
         if ("AppUpdatePin" in policies) {
           updatePin = policies.AppUpdatePin;
 
-          // Scalar ID: update.version_pin
+          // Metric ID: update.version_pin
           AUSTLMY.pingPinPolicy(updatePin);
         }
       }

@@ -134,12 +134,10 @@
     <string name="home_screen_shortcut_uninstall_survey">Uninstall, why?</string>
 
     <!-- Recent Tabs -->
-    <!-- Header text for jumping back into the recent tab in the home screen -->
-    <string name="recent_tabs_header">Jump back in</string>
+    <!-- Header text on the homescreen for continuing to browse the most recent browser tab -->
+    <string name="recent_tabs_header_2">Continue</string>
     <!-- Button text for showing all the tabs in the tabs tray -->
     <string name="recent_tabs_show_all">Show all</string>
-    <!-- Content description for the button which navigates the user to show all recent tabs in the tabs tray. -->
-    <string name="recent_tabs_show_all_content_description_2">Show all recent tabs button</string>
     <!-- Text for button in synced tab card that opens synced tabs tray -->
     <string name="recent_tabs_see_all_synced_tabs_button_text">See all synced tabs</string>
     <!-- Accessibility description for device icon used for recent synced tab -->
@@ -576,7 +574,7 @@
     <string name="nova_onboarding_marketing_body" tools:ignore="BrandUsage,UnusedResources" >Share how you discovered Firefox, and that you use it, with Mozilla’s marketing partners. This data is never sold. %1$s</string>
 
     <!-- Marketing onboarding body. 'Firefox' and 'Mozilla' are intentionally hardcoded. -->
-    <string name="nova_onboarding_marketing_body_2" tools:ignore="BrandUsage">Share how you discovered Firefox, and that you use it, with Mozilla’s marketing partners. This data is never sold.</string>
+    <string name="nova_onboarding_marketing_body_2" tools:ignore="BrandUsage,UnusedResources">Share how you discovered Firefox, and that you use it, with Mozilla’s marketing partners. This data is never sold.</string>
 
     <!-- Marketing onboarding body. 'Firefox' and 'Mozilla' are intentionally hardcoded. -->
     <string name="nova_onboarding_marketing_body_3" tools:ignore="BrandUsage,UnusedResources">You can help us reach more people by allowing Mozilla to inform the channels where we promote Firefox that you’re a Firefox user.</string>
@@ -941,8 +939,8 @@
     <!-- Customize Home -->
     <!-- Title for the customize home screen section with privacy report. -->
     <string name="customize_toggle_privacy_report">Privacy report</string>
-    <!-- Header text for jumping back into the recent tab in customize the home screen -->
-    <string name="customize_toggle_jump_back_in">Jump back in</string>
+    <!-- Title for a customize home screen section. Continue is a section that displays the most recent browser tab, so users can continue browsing where they left off. -->
+    <string name="customize_toggle_continue">Continue</string>
     <!-- Title for the customize home screen section with bookmarks. -->
     <string name="customize_toggle_bookmarks">Bookmarks</string>
     <!-- Title for the customize home screen section with recently visited. Recently visited is
@@ -2245,6 +2243,16 @@
     The app name is in the text, due to limitations with localizing Nimbus experiments -->
     <string name="nimbus_notification_default_browser_text" tools:ignore="BrandUsage,UnusedResources">Make Firefox your default browser</string>
 
+    <!-- Privacy report notification -->
+    <!-- Name of the weekly privacy report notification channel. Displayed in the "App notifications" system settings for the app. -->
+    <string name="notification_privacy_report_channel_name">Privacy report</string>
+    <!-- Description of the weekly privacy report notification channel. Displayed in the "App notifications" system settings for the app. %1$s is the app name (e.g. Firefox) -->
+    <string name="notification_privacy_report_channel_description">%1$s shows how many trackers were blocked while you browsed.</string>
+    <!-- Body text for the weekly privacy report notification for when trackers have been blocked. %1$s is the app name (e.g. Firefox) -->
+    <string name="notification_privacy_report_body_has_trackers">Keep browsing. %1$s will keep blocking.</string>
+    <!-- Headline text of the weekly privacy report notification for when no trackers have been blocked. %1$s is the app name (e.g. Firefox) -->
+    <string name="notification_privacy_report_headline_no_trackers">%1$s blocks trackers as you browse. You’ll see them here.</string>
+
     <!-- Survey -->
     <!-- Text shown in the fullscreen message that pops up to ask user to take a short survey.
     The app name is in the text, due to limitations with localizing Nimbus experiments -->
@@ -2823,8 +2831,8 @@
     <string name="ip_protection_menu_paused">Paused</string>
     <!-- Badge label shown in the menu item when the browser VPN has an error -->
     <string name="ip_protection_menu_error">Error</string>
-    <!-- Badge label shown in the menu item when the user is eligible to use the browser VPN but should authenticate or authorize it first. -->
-    <string name="ip_protection_menu_auth_required">Try it</string>
+    <!-- Badge label shown in the VPN menu item when the user is eligible for the feature but needs to authenticate / authorize to enable it -->
+    <string name="ip_protection_menu_try_vpn_cta">Try it free</string>
     <!-- Content description for the chevron button that opens the browser VPN settings screen -->
     <string name="ip_protection_navigate_settings">Open VPN settings</string>
     <!-- Subtitle shown below the VPN label in menus when the monthly data allowance is exhausted.
@@ -2863,6 +2871,8 @@
     <string name="ip_protection_onboarding_not_now_button">Not now</string>
     <!-- Snackbar (in-app pop-up notification) text to signal the browser VPN connection error -->
     <string name="ip_protection_connection_error_snackbar">Couldn’t connect to VPN. Try again in a few minutes.</string>
+    <!-- Snackbar (in-app pop-up notification) text to signal the VPN location has been reset due to the previously selected VPN location being no longer available. -->
+    <string name="ip_protection_location_selection_reset_snackbar">Selected VPN location unavailable. Switched to the recommended location.</string>
     <!-- Snackbar (in-app pop-up notification) text to signal the browser VPN has reached the monthly data limit.
         %1$d is the total monthly allowance in GB (for example "50"). -->
     <string name="ip_protection_data_limit_reached_snackbar">%1$d GB of VPN data used. Access will reset next month.</string>
@@ -4158,4 +4168,16 @@
     <string name="pdf_tools_print_content_description">Print PDF</string>
     <!-- Content description for accessibility (used by screen readers): Description for the button that opens the sharing options for the PDF being displayed on the screen. -->
     <string name="pdf_tools_share_content_description">Share PDF</string>
+
+    <!-- PDF viewer add a signature dialog -->
+    <!-- The title of the dialog for adding a signature to a PDF. -->
+    <string name="pdf_tools_signature_title">Add a signature</string>
+    <!-- Content description for accessibility (used by screen readers): Description for the button that closes the dialog for adding a signature to a PDF. -->
+    <string name="pdf_tools_signature_close_content_description">Close PDF signature panel</string>
+    <!-- The placeholder text shown in the empty text input field where users can enter the signature they wish to add to a PDF. -->
+    <string name="pdf_tools_signature_placeholder">Type signature</string>
+    <!-- The text for the button that erases the text the user entered in the "add a signature" field. -->
+    <string name="pdf_tools_signature_clear_button">Clear</string>
+    <!-- The text for the button that adds the signature the user has typed to the PDF. -->
+    <string name="pdf_tools_signature_add_button">Add</string>
 </resources>

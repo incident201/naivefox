@@ -32,11 +32,8 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.espresso.Espresso.closeSoftKeyboard
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.ViewActions.pressImeActionButton
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.matcher.IntentMatchers
-import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.By.textContains
 import androidx.test.uiautomator.UiSelector
@@ -60,10 +57,8 @@ import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
 import org.mozilla.fenix.helpers.MatcherHelper.itemContainingText
 import org.mozilla.fenix.helpers.MatcherHelper.itemWithDescription
 import org.mozilla.fenix.helpers.MatcherHelper.itemWithResId
-import org.mozilla.fenix.helpers.SessionLoadedIdlingResource
 import org.mozilla.fenix.helpers.TestAssetHelper.waitingTime
 import org.mozilla.fenix.helpers.TestAssetHelper.waitingTimeShort
-import org.mozilla.fenix.helpers.TestHelper.appContext
 import org.mozilla.fenix.helpers.TestHelper.appName
 import org.mozilla.fenix.helpers.TestHelper.mDevice
 import org.mozilla.fenix.helpers.TestHelper.packageName
@@ -764,8 +759,6 @@ class SearchRobot(private val composeTestRule: ComposeTestRule) {
     }
 
     class Transition(private val composeTestRule: ComposeTestRule) {
-        private lateinit var sessionLoadedIdlingResource: SessionLoadedIdlingResource
-
         fun dismissSearchBar(interact: HomeScreenRobot.() -> Unit): HomeScreenRobot.Transition {
             Log.i(TAG, "dismissSearchBar: Trying to click device back button")
             mDevice.pressBack()
@@ -871,34 +864,6 @@ fun searchScreen(composeTestRule: ComposeTestRule, interact: SearchRobot.() -> U
     return SearchRobot.Transition(composeTestRule)
 }
 
-private fun browserToolbarEditView() = mDevice.findObject(UiSelector().resourceId(ADDRESSBAR_SEARCH_BOX))
-
-private fun pressImeActionOnToolbarEditView() {
-    val context = appContext
-    val resId =
-        context.resources.getIdentifier(
-            "mozac_browser_toolbar_edit_url_view",
-            "id",
-            packageName,
-        )
-
-    Log.i(TAG, "pressImeActionOnToolbarEditView: Trying to perform pressImeActionButton via Espresso")
-    onView(withId(resId)).perform(pressImeActionButton())
-    Log.i(TAG, "pressImeActionOnToolbarEditView: Performed pressImeActionButton via Espresso")
-}
-
 private fun dismissPermissionButton() = mDevice.findObject(UiSelector().text("Dismiss"))
 
 private fun goToPermissionsSettingsButton() = mDevice.findObject(UiSelector().text("Go to settings"))
-
-private fun scanButton() = itemWithDescription("Scan")
-
-private fun clearButton() =
-    mDevice.findObject(UiSelector().resourceId("$packageName:id/mozac_browser_toolbar_clear_view"))
-
-private fun searchWrapper() = mDevice.findObject(UiSelector().resourceId("$packageName:id/search_wrapper"))
-
-private fun searchShortcutList() =
-    mDevice.findObject(UiSelector().resourceId("$packageName:id/mozac_browser_menu_recyclerView"))
-
-private fun voiceSearchButton() = mDevice.findObject(UiSelector().description("Voice search"))

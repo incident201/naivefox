@@ -224,6 +224,7 @@ class MenuNavigationMiddleware(
                 is MenuAction.Navigate.Share -> {
                     val session: SessionState? = currentState.browserMenuState?.selectedTab
                     val url = session?.getTabUrl()
+                    val isPrivate = session?.content?.private ?: false
 
                     shareUseCases.shareUrl(
                         id = session?.id,
@@ -235,10 +236,17 @@ class MenuNavigationMiddleware(
                             } else {
                                 ShareSource.BROWSER_MENU
                             },
-                        isPrivate = session?.content?.private ?: false,
+                        isPrivate = isPrivate,
                         isCustomTab = session.isCustomTab(),
                         navigateToShareFragment = {
-                            val shareData = arrayOf(ShareData(title = session?.content?.title, url = url))
+                            val shareData =
+                                arrayOf(
+                                    ShareData(
+                                        title = session?.content?.title,
+                                        url = url,
+                                        private = isPrivate,
+                                    )
+                                )
                             val popUpToId =
                                 if (session.isCustomTab()) {
                                     R.id.externalAppBrowserFragment

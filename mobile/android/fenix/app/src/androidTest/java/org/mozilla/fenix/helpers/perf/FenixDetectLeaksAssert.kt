@@ -52,7 +52,8 @@ class FenixDetectLeaksAssert(
          * This is built upon the [LeakAssertions.assertNoLeaks] function from the library.
          *
          * @param tag The tag used to identify the calling code
-         * @param filename The filename to be used for the memory leak trace in the event of
+         * @param filename The filename to be used for the memory leak trace in the event of a leak
+         * @param directory The directory the leak trace file is written to
          */
         fun assertNoLeaks(tag: String, filename: String, directory: String = "memory_leaks") {
             DetectLeaksAssert.update(

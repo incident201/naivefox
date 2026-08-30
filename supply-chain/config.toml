@@ -156,6 +156,10 @@ notes = "This crate has two testing-only dependencies which are specified as reg
 audit-as-crates-io = true
 notes = "Patched version of upstream to avoid unnecessary unused dependencies and conflicts."
 
+[policy.libdbus-sys]
+audit-as-crates-io = true
+notes = "Patched version of upstream to avoid vendoring unnecessary massive libdbus source."
+
 [policy.libudev-sys]
 audit-as-crates-io = false
 notes = "This override is an api-compatible fork with an orthogonal implementation."
@@ -466,10 +470,6 @@ criteria = "safe-to-deploy"
 version = "2.3.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.dbus]]
-version = "0.6.5"
-criteria = "safe-to-deploy"
-
 [[exemptions.devd-rs]]
 version = "0.3.4"
 criteria = "safe-to-deploy"
@@ -564,10 +564,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.khronos_api]]
 version = "3.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.libdbus-sys]]
-version = "0.2.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.libloading]]

@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -29,6 +30,8 @@ import mozilla.components.feature.ipprotection.store.IPProtectionStore
 import mozilla.components.feature.ipprotection.store.InternalAction
 import mozilla.components.feature.ipprotection.store.state.AccountStatus
 import mozilla.components.feature.ipprotection.store.state.EligibilityStatus
+import mozilla.components.feature.ipprotection.store.state.LocationListUpdateState
+import mozilla.components.feature.ipprotection.store.state.PendingActivationRequest
 import mozilla.components.lib.state.ext.flow
 import mozilla.components.lib.state.ext.flowScoped
 import mozilla.components.service.fxa.manager.FxaAccountManager
@@ -68,6 +71,9 @@ class IPProtectionFeature(
         }
         mainScope.launch {
             observeAccount(store, mainDispatcher)
+        }
+        mainScope.launch {
+            observeLocationUpdates(store, mainDispatcher)
         }
     }
 
@@ -158,6 +164,24 @@ class IPProtectionFeature(
         }
     }
 
+    private fun observeLocationUpdates(store: IPProtectionStore, mainDispatcher: CoroutineDispatcher) {
+        store.flowScoped(dispatcher = mainDispatcher) { flow ->
+            flow
+                .map { it.serviceStatus to it.locationState.updateState }
+                .distinctUntilChanged()
+                .filter { (service, update) ->
+                    service == ServiceState.Ready && update == LocationListUpdateState.Requested
+                }
+                .collect {
+                    handler?.updateCountryList { error ->
+                        if (error != null) {
+                            store.dispatch(IPProtectionAction.LocationUpdateFailed(error))
+                        }
+                    }
+                }
+        }
+    }
+
     private suspend fun registerAndInit() =
         withContext(mainDispatcher) {
             handler =
@@ -204,8 +228,6 @@ class IPProtectionFeature(
                 // as a side effect, the init call triggers `IPProtectionController#onServiceStateChanged`
                 // that can trigger the account manager that leads to `AuthProvider#getToken`.
                 init()
-
-                updateCountryList()
             }
         }
 
@@ -219,23 +241,37 @@ class IPProtectionFeature(
             // Dedupe over the nullable so `true -> null -> true` reads as two edges, not one.
             store
                 .flow()
-                .map { it.activate }
+                .map { it.pendingActivationRequest }
                 .distinctUntilChanged()
                 .filterNotNull()
-                .collect { activate ->
-                    val onResult: (Throwable?) -> Unit = { err ->
-                        if (err != null) {
-                            store.dispatch(IPProtectionAction.ToggleFailed(err))
+                .collect { activationState ->
+                    when (activationState) {
+                        is PendingActivationRequest.Activate -> {
+                            handler?.activate(
+                                countryCode = activationState.selectedLocationCode,
+                                onResult = { err ->
+                                    dispatchActivationFailure(err, activationState.isLocationSwitch)
+                                },
+                            )
                         }
-                    }
-                    if (activate) {
-                        handler?.activate(
-                            countryCode = store.state.locationState.selectedLocation.countryCode,
-                            onResult = onResult,
-                        )
-                    } else {
-                        handler?.deactivate(onResult)
+                        is PendingActivationRequest.Deactivate -> {
+                            handler?.deactivate { err -> dispatchActivationFailure(err, isLocationSwitch = false) }
+                        }
                     }
                 }
         }
+
+    private fun dispatchActivationFailure(error: Throwable?, isLocationSwitch: Boolean) {
+        if (error == null) {
+            return
+        }
+
+        store.dispatch(
+            if (isLocationSwitch) {
+                IPProtectionAction.LocationSwitchFailed(error)
+            } else {
+                IPProtectionAction.ToggleFailed(error)
+            }
+        )
+    }
 }

@@ -650,6 +650,28 @@ JSObject* SandboxPrototypeOrNull(JSContext* aCx, JSObject* aObj) {
   return js::CheckedUnwrapDynamic(proto, aCx, /* stopAtWindowProxy = */ false);
 }
 
+already_AddRefed<nsGlobalWindowInner> SandboxAssociatedWindowOrNull(
+    JSObject* aObj) {
+  MOZ_ASSERT(aObj);
+
+  if (!IsSandbox(aObj)) {
+    return nullptr;
+  }
+
+  SandboxPrivate* priv = SandboxPrivate::GetPrivate(aObj);
+  if (!priv) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsPIDOMWindowInner> window = priv->GetAssociatedWindow();
+  if (!window) {
+    return nullptr;
+  }
+
+  RefPtr<nsGlobalWindowInner> win = nsGlobalWindowInner::Cast(window);
+  return win.forget();
+}
+
 nsGlobalWindowInner* CurrentWindowOrNull(JSContext* cx) {
   JSObject* glob = JS::CurrentGlobalOrNull(cx);
   return glob ? WindowOrNull(glob) : nullptr;

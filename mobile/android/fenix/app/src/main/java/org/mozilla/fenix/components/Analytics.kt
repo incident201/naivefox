@@ -153,7 +153,7 @@ class Analytics(
                     BuildRuntimeTagProvider(context.versionInfoProvider),
                     EnvironmentRuntimeProvider(),
                     ExperimentDataRuntimeTagProvider(
-                        NimbusExperimentDataProvider(nimbusApi = lazyMonitored { nimbusComponents.sdk })
+                        NimbusExperimentDataProvider(getEnrollments = nimbusComponents::getEnrollmentsForCrashReporter)
                     ),
                 ),
         )

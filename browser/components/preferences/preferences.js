@@ -641,6 +641,7 @@ function init_all() {
   });
 
   maybeDisplayPoliciesNotice();
+  maybeDisplayTLSKeyLoggingNotice();
 
   window.addEventListener("hashchange", onHashChange);
   window.addEventListener("beforeunload", onBeforeunload);
@@ -1167,6 +1168,14 @@ function maybeDisplayPoliciesNotice() {
   if (Services.policies.status == Services.policies.ACTIVE) {
     document
       .getElementById("policies-container-content")
+      .removeAttribute("hidden");
+  }
+}
+
+function maybeDisplayTLSKeyLoggingNotice() {
+  if (Services.env.exists("SSLKEYLOGFILE")) {
+    document
+      .getElementById("tls-key-logging-container-content")
       .removeAttribute("hidden");
   }
 }

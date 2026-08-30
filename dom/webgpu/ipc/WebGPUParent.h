@@ -176,10 +176,6 @@ class WebGPUParent final : public PWebGPUParent, public SupportsWeakPtr {
 
   ffi::WGPUGlobal* GetContext() const { return mContext.get(); }
 
-  bool IsDeviceActive(const RawId aDeviceId) {
-    return mActiveDeviceIds.Contains(aDeviceId);
-  }
-
   RefPtr<gfx::FileHandleWrapper> GetDeviceFenceHandle(const RawId aDeviceId);
 
   void RemoveSharedTexture(RawId aTextureId);
@@ -259,52 +255,9 @@ class WebGPUParent final : public PWebGPUParent, public SupportsWeakPtr {
   // limit each Device to one DeviceLost message.
   nsTHashSet<RawId> mLostDeviceIds;
 
-  // Store active DeviceIds
-  nsTHashSet<RawId> mActiveDeviceIds;
-
   // Shared handle of wgpu device's fence.
   std::unordered_map<RawId, RefPtr<gfx::FileHandleWrapper>> mDeviceFenceHandles;
 };
-
-#if defined(XP_LINUX) && !defined(MOZ_WIDGET_ANDROID)
-class VkImageHandle {
- public:
-  explicit VkImageHandle(WebGPUParent* aParent,
-                         const ffi::WGPUDeviceId aDeviceId,
-                         ffi::WGPUVkImageHandle* aVkImageHandle)
-      : mParent(aParent),
-        mDeviceId(aDeviceId),
-        mVkImageHandle(aVkImageHandle) {}
-
-  const ffi::WGPUVkImageHandle* Get() { return mVkImageHandle; }
-
-  ~VkImageHandle();
-
- protected:
-  const WeakPtr<WebGPUParent> mParent;
-  const RawId mDeviceId;
-  ffi::WGPUVkImageHandle* mVkImageHandle;
-};
-
-class VkSemaphoreHandle {
- public:
-  explicit VkSemaphoreHandle(WebGPUParent* aParent,
-                             const ffi::WGPUDeviceId aDeviceId,
-                             ffi::WGPUVkSemaphoreHandle* aVkSemaphoreHandle)
-      : mParent(aParent),
-        mDeviceId(aDeviceId),
-        mVkSemaphoreHandle(aVkSemaphoreHandle) {}
-
-  const ffi::WGPUVkSemaphoreHandle* Get() { return mVkSemaphoreHandle; }
-
-  ~VkSemaphoreHandle();
-
- protected:
-  const WeakPtr<WebGPUParent> mParent;
-  const RawId mDeviceId;
-  ffi::WGPUVkSemaphoreHandle* mVkSemaphoreHandle;
-};
-#endif
 
 }  // namespace webgpu
 }  // namespace mozilla

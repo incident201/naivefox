@@ -290,7 +290,6 @@ module.exports = [
       "toolkit/components/printing/content/printPagination.css",
       "toolkit/components/printing/content/printPreview.css",
       "toolkit/components/printing/content/simplifyMode.css",
-      "toolkit/components/printing/content/toggle-group.css",
       "toolkit/components/prompts/content/commonDialog.css",
       "toolkit/components/prompts/content/selectDialog.css",
       "toolkit/components/reader/moz-slider.css",

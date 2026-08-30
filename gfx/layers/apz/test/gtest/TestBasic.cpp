@@ -120,11 +120,11 @@ TEST_F(APZCBasicTester, ComplexTransform) {
   metrics.SetPresShellResolution(2.0f);
   metrics.SetZoom(CSSToParentLayerScale(6));
   metrics.SetDevPixelsPerCSSPixel(CSSToLayoutDeviceScale(3));
-  metrics.SetScrollId(ScrollableLayerGuid::START_SCROLL_ID);
+  metrics.SetScrollId(START_SCROLL_ID);
 
   ScrollMetadata childMetadata = metadata;
   FrameMetrics& childMetrics = childMetadata.GetMetrics();
-  childMetrics.SetScrollId(ScrollableLayerGuid::START_SCROLL_ID + 1);
+  childMetrics.SetScrollId(START_SCROLL_ID + 1);
 
   layers[0]->AppendScrollMetadata(layers, metadata);
   layers[1]->AppendScrollMetadata(layers, childMetadata);
@@ -217,8 +217,7 @@ TEST_F(APZCBasicTester, ResumeInterruptedTouchDrag_Bug1592435) {
   // Start a touch-drag and scroll some amount, not lifting the finger.
   SCOPED_GFX_PREF_FLOAT("apz.touch_start_tolerance", 1.0f / 1000.0f);
   ScreenIntPoint touchPos(10, 50);
-  uint64_t touchBlock = TouchDown(apzc, touchPos, mcc->Time()).mInputBlockId;
-  SetDefaultAllowedTouchBehavior(apzc, touchBlock);
+  TouchDown(apzc, touchPos, mcc->Time());
   for (int i = 0; i < 20; ++i) {
     touchPos.y -= 1;
     mcc->AdvanceByMillis(1);
@@ -420,7 +419,7 @@ TEST_F(APZCBasicTester, NotifyMainThreadTransaction_WithScrollUpdate) {
   // document was foregound.
   metrics.SetVisualScrollOffset(CSSPoint(10, 10));
   metrics.SetLayoutViewport(CSSRect(10, 10, 10, 10));
-  metrics.SetScrollId(ScrollableLayerGuid::START_SCROLL_ID);
+  metrics.SetScrollId(START_SCROLL_ID);
 
   // Add a new relative scroll update (10, 10) -> (15, 15).
   AutoTArray<ScrollPositionUpdate, 1> scrollUpdates;
@@ -459,7 +458,7 @@ TEST_F(APZCBasicTester, NotifyMainThreadTransaction_WithMultipleScrollUpdates) {
 
   metrics.SetVisualScrollOffset(CSSPoint(0, 0));
   metrics.SetLayoutViewport(CSSRect(0, 0, 10, 10));
-  metrics.SetScrollId(ScrollableLayerGuid::START_SCROLL_ID);
+  metrics.SetScrollId(START_SCROLL_ID);
 
   AutoTArray<ScrollPositionUpdate, 2> scrollUpdates;
   // Append a new scroll frame as if the scroll frame was reconstructed.
@@ -741,7 +740,7 @@ class APZCSmoothScrollTester : public APZCBasicTester {
     metrics.SetZoom(CSSToParentLayerScale(1.0));
     metrics.SetCompositionBounds(ParentLayerRect(0, 0, 1000, 1000));
     metrics.SetVisualScrollOffset(CSSPoint(0, 0));
-    metrics.SetScrollId(ScrollableLayerGuid::START_SCROLL_ID);
+    metrics.SetScrollId(START_SCROLL_ID);
     metrics.SetIsRootContent(true);
     // Set the line scroll amount to 100 pixels. The key event we send
     // will scroll by a multiple of this amount.
@@ -995,8 +994,7 @@ TEST_F(APZCBasicTester, StartTolerance) {
   fm.SetIsRootContent(true);
   apzc->SetFrameMetrics(fm);
 
-  uint64_t touchBlock = TouchDown(apzc, {50, 50}, mcc->Time()).mInputBlockId;
-  SetDefaultAllowedTouchBehavior(apzc, touchBlock);
+  TouchDown(apzc, {50, 50}, mcc->Time());
 
   CSSPoint initialScrollOffset =
       apzc->GetFrameMetrics().GetVisualScrollOffset();

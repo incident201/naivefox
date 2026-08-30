@@ -3,11 +3,24 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * Per-realm accessors for things a content module can't reach for itself: the
- * privileged branch reads them directly, the content branch goes through the
- * port the Urlbar actor publishes on the window. One module for all of them, so
- * the branch isn't duplicated per accessor.
+ * Per-realm accessors for things a content module can't reach for itself. Where
+ * the Urlbar actor has published a port on the window, they go through it;
+ * otherwise this realm reaches them directly. Keying on the port rather than on
+ * the realm means the chrome message path takes the same route an unprivileged
+ * input does. One module for all of them, so the branch isn't duplicated per
+ * accessor.
  */
+
+/**
+ * The port the actor publishes on a realm that routes through it, or null where
+ * this realm reaches its privileged side itself. The actor's own scope has no
+ * window, so its handlers always take the direct branch and never re-enter.
+ *
+ * @returns {?object}
+ */
+function port() {
+  return globalThis.window?.UrlbarActorPort ?? null;
+}
 
 /**
  * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
@@ -26,7 +39,7 @@ export function getPlatform() {
   if (platform) {
     return platform;
   }
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     platform = ChromeUtils.importESModule(
       "resource://gre/modules/AppConstants.sys.mjs"
     ).AppConstants.platform;
@@ -34,7 +47,7 @@ export function getPlatform() {
     // In child processes the Urlbar actor exposes this on the window, as part of
     // the single port it publishes there. To expose more, change the Urlbar
     // actor.
-    platform = window.UrlbarActorPort.getPlatform();
+    platform = port().getPlatform();
   }
   return platform;
 }
@@ -47,12 +60,12 @@ export function getPlatform() {
  * @returns {boolean}
  */
 export function isWindowPrivate(win) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return ChromeUtils.importESModule(
       "resource://gre/modules/PrivateBrowsingUtils.sys.mjs"
     ).PrivateBrowsingUtils.isWindowPrivate(win);
   }
-  return win.UrlbarActorPort.isWindowPrivate;
+  return port().isWindowPrivate;
 }
 
 /**
@@ -64,14 +77,14 @@ export function isWindowPrivate(win) {
  *   The display spec, or null if the URL can't be parsed.
  */
 export function getDisplaySpec(url) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     try {
       return Services.io.newURI(url).displaySpec;
     } catch (ex) {
       return null;
     }
   }
-  return window.UrlbarActorPort.getDisplaySpec(url);
+  return port().getDisplaySpec(url);
 }
 
 /**
@@ -83,10 +96,10 @@ export function getDisplaySpec(url) {
  * @returns {string}
  */
 export function unEscapeURIForUI(uri) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return Services.textToSubURI.unEscapeURIForUI(uri);
   }
-  return window.UrlbarActorPort.unEscapeURIForUI(uri);
+  return port().unEscapeURIForUI(uri);
 }
 
 /**
@@ -97,10 +110,10 @@ export function unEscapeURIForUI(uri) {
  * @returns {string}
  */
 export function getSupportUrl(topic) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return Services.urlFormatter.formatURLPref("app.support.baseURL") + topic;
   }
-  return window.UrlbarActorPort.getSupportUrl(topic);
+  return port().getSupportUrl(topic);
 }
 
 /**
@@ -115,12 +128,12 @@ export function getSupportUrl(topic) {
  *   The primitives, or null if fixup threw.
  */
 export function getFixupPrimitives(searchString, isPrivate) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return ChromeUtils.importESModule(
       "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs"
     ).UrlbarUtils.getFixupPrimitives(searchString, isPrivate);
   }
-  return window.UrlbarActorPort.getFixupPrimitives(searchString, isPrivate);
+  return port().getFixupPrimitives(searchString, isPrivate);
 }
 
 /**
@@ -134,13 +147,13 @@ export function getFixupPrimitives(searchString, isPrivate) {
  * @returns {boolean}
  */
 export function isTextDirectionRTL(value, win) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return (
       win.windowUtils.getDirectionFromText(value) ==
       win.windowUtils.DIRECTION_RTL
     );
   }
-  return win.UrlbarActorPort.isTextDirectionRTL(value, win);
+  return port().isTextDirectionRTL(value, win);
 }
 
 /**
@@ -151,12 +164,12 @@ export function isTextDirectionRTL(value, win) {
  * @returns {"current" | "tabshifted" | "tab" | "save" | "window"}
  */
 export function whereToOpenLink(event) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return ChromeUtils.importESModule(
       "resource://gre/modules/BrowserUtils.sys.mjs"
     ).BrowserUtils.whereToOpenLink(event, false, false);
   }
-  return window.UrlbarActorPort.whereToOpenLink(event);
+  return port().whereToOpenLink(event);
 }
 
 /**
@@ -169,10 +182,10 @@ export function whereToOpenLink(event) {
  * @returns {boolean}
  */
 export function willLoadInBackground(where, params) {
-  if (typeof ChromeUtils != "undefined") {
+  if (!port()) {
     return ChromeUtils.importESModule(
       "resource://gre/modules/BrowserUtils.sys.mjs"
     ).BrowserUtils.willLoadInBackground(where, params);
   }
-  return window.UrlbarActorPort.willLoadInBackground(where, params);
+  return port().willLoadInBackground(where, params);
 }

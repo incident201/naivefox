@@ -113,7 +113,13 @@ SessionCacheInfo SessionCacheInfo::Clone() const {
 //   [1: has_succeeded_chain] if 1: [1: count] then for each [4: len][bytes]
 //   [1: has_handshake_certs] if 1: [1: count] then for each [4: len][bytes]
 //
-// Stored compressed with a 4-byte LE original-size prefix.
+// Stored compressed with an LE original-size prefix.
+static constexpr size_t kOriginalLenSize = sizeof(uint32_t);
+
+// Sanity bounds on the length fields above.
+static constexpr uint32_t kMaxPayloadSize = 256 * 1024;
+static constexpr uint32_t kMaxTokenSize = 256 * 1024;
+static constexpr uint32_t kMaxCertSize = 0xffff;
 
 template <typename T>
 static void AppendLE(nsTArray<uint8_t>& aBuf, T aVal) {
@@ -163,31 +169,35 @@ static constexpr int kRecordCompressionQuality = 1;
 
 // Returns empty array on failure.
 static nsTArray<uint8_t> CompressRecord(Span<const uint8_t> aPayload) {
-  size_t bound = BrotliEncoderMaxCompressedSize(aPayload.Length());
-  nsTArray<uint8_t> result;
-  if (!result.SetLength(4 + bound, fallible)) {
+  nsTArray<uint8_t> encoded;
+  if (!encoded.SetLength(BrotliEncoderMaxCompressedSize(aPayload.Length()),
+                         fallible)) {
     return {};
   }
-  uint32_t originalLen = AssertedCast<uint32_t>(aPayload.Length());
-  LittleEndian::writeUint32(result.Elements(), originalLen);
-  size_t encodedSize = bound;
+  size_t encodedSize = encoded.Length();
   if (!BrotliEncoderCompress(kRecordCompressionQuality, BROTLI_DEFAULT_WINDOW,
                              BROTLI_MODE_GENERIC, aPayload.Length(),
                              aPayload.Elements(), &encodedSize,
-                             result.Elements() + 4)) {
+                             encoded.Elements())) {
     return {};
   }
-  result.TruncateLength(4 + encodedSize);
+
+  nsTArray<uint8_t> result;
+  if (!result.SetCapacity(kOriginalLenSize + encodedSize, fallible)) {
+    return {};
+  }
+  AppendLE(result, AssertedCast<uint32_t>(aPayload.Length()));
+  result.AppendElements(encoded.Elements(), encodedSize);
   return result;
 }
 
 // Returns empty array on failure.
 static nsTArray<uint8_t> DecompressRecord(Span<const uint8_t> aCompressed) {
-  if (aCompressed.Length() < 4) {
+  if (aCompressed.Length() < kOriginalLenSize) {
     return {};
   }
   uint32_t originalLen = LittleEndian::readUint32(aCompressed.Elements());
-  if (originalLen > 256 * 1024) {
+  if (originalLen > kMaxPayloadSize) {
     LOG(("SSLTokensCache: implausible payload originalLen %" PRIu32,
          originalLen));
     return {};
@@ -196,10 +206,10 @@ static nsTArray<uint8_t> DecompressRecord(Span<const uint8_t> aCompressed) {
   if (!result.SetLength(originalLen, fallible)) {
     return {};
   }
+  auto encoded = aCompressed.From(kOriginalLenSize);
   size_t decodedSize = originalLen;
   BrotliDecoderResult r = BrotliDecoderDecompress(
-      aCompressed.Length() - 4, aCompressed.Elements() + 4, &decodedSize,
-      result.Elements());
+      encoded.Length(), encoded.Elements(), &decodedSize, result.Elements());
   if (r != BROTLI_DECODER_RESULT_SUCCESS || decodedSize != originalLen) {
     return {};
   }
@@ -240,7 +250,7 @@ static bool DeserializeRecord(Span<const uint8_t> aBuf,
 
   uint32_t tokenLen;
   if (!r.Read(tokenLen)) return false;
-  if (tokenLen > 256 * 1024) return false;
+  if (tokenLen > kMaxTokenSize) return false;
   if (!r.Bytes(aToken, tokenLen)) return false;
 
   uint8_t evStatus;
@@ -271,7 +281,7 @@ static bool DeserializeRecord(Span<const uint8_t> aBuf,
 
   uint32_t serverCertLen;
   if (!r.Read(serverCertLen)) return false;
-  if (serverCertLen > 64 * 1024) return false;
+  if (serverCertLen > kMaxCertSize) return false;
   if (!r.Bytes(aInfo.mServerCertBytes, serverCertLen)) return false;
 
   auto readChain = [&](Maybe<nsTArray<nsTArray<uint8_t>>>& aChain) -> bool {
@@ -287,7 +297,7 @@ static bool DeserializeRecord(Span<const uint8_t> aBuf,
     for (uint8_t i = 0; i < count; i++) {
       uint32_t certLen;
       if (!r.Read(certLen)) return false;
-      if (certLen > 64 * 1024) return false;
+      if (certLen > kMaxCertSize) return false;
       nsTArray<uint8_t> cert;
       if (!r.Bytes(cert, certLen)) return false;
       chain.AppendElement(std::move(cert));

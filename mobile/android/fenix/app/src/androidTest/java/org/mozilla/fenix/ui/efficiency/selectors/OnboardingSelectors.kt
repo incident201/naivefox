@@ -11,7 +11,7 @@ import org.mozilla.fenix.ui.efficiency.helpers.SelectorStrategy
 
 /**
  * Selectors for the first-run Onboarding flow (Compose cards shown when the app launches with onboarding enabled —
- * BaseTest(skipOnboarding = false)).
+ * BaseTest(LaunchConfig(skipOnboarding = false))).
  *
  * Verified against onboarding.fml.yaml + on-device dumps. The live card order (by `ordering`) is: Terms of Use →
  * Default Browser.

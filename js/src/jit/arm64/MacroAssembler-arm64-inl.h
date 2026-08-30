@@ -285,6 +285,11 @@ void MacroAssembler::xor64(Imm64 imm, Register64 dest) {
   Eor(ARMRegister(dest.reg, 64), ARMRegister(dest.reg, 64), Operand(imm.value));
 }
 
+void MacroAssembler::nor32(Imm32 imm, Register src, Register dest) {
+  or32(imm, src, dest);
+  not32(dest);
+}
+
 // ===============================================================
 // Swap instructions
 
@@ -1981,8 +1986,12 @@ void MacroAssembler::branchTestInt32Impl(Condition cond, const T& t,
 void MacroAssembler::branchTestInt32Truthy(bool truthy,
                                            const ValueOperand& value,
                                            Label* label) {
-  Condition c = testInt32Truthy(truthy, value);
-  B(label, c);
+  ARMRegister payload32(value.valueReg(), 32);
+  if (truthy) {
+    Cbnz(payload32, label);
+  } else {
+    Cbz(payload32, label);
+  }
 }
 
 void MacroAssembler::branchTestDouble(Condition cond, Register tag,
@@ -2078,8 +2087,12 @@ void MacroAssembler::branchTestBooleanImpl(Condition cond, const T& tag,
 void MacroAssembler::branchTestBooleanTruthy(bool truthy,
                                              const ValueOperand& value,
                                              Label* label) {
-  Condition c = testBooleanTruthy(truthy, value);
-  B(label, c);
+  ARMRegister payload32(value.valueReg(), 32);
+  if (truthy) {
+    Cbnz(payload32, label);
+  } else {
+    Cbz(payload32, label);
+  }
 }
 
 void MacroAssembler::branchTestString(Condition cond, Register tag,

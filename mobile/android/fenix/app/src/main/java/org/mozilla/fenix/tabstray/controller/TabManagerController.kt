@@ -529,7 +529,7 @@ class DefaultTabManagerController(
         TabsTray.shareSelectedTabs.record(TabsTray.ShareSelectedTabsExtra(tabCount = tabs.size))
 
         val data = tabs.map {
-            ShareData(url = it.url, title = it.title)
+            ShareData(url = it.url, title = it.title, private = it.private)
         }
 
         shareUseCases.shareItems(
@@ -554,7 +554,7 @@ class DefaultTabManagerController(
 
         val data =
             group.tabs.map {
-                ShareData(url = it.url, title = it.title)
+                ShareData(url = it.url, title = it.title, private = it.private)
             }
 
         shareUseCases.shareItems(

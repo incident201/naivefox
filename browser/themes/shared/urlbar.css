@@ -242,6 +242,27 @@ toolbar[inactive="true"] .urlbar,
   }
 }
 
+/* In a page, the element goes in the top layer anchored to the container it sits
+   in, which the embedder names. A chrome window's own bars are popovers too, and
+   the element lays out in flow until it is shown, hence both parts of the
+   selector. */
+.urlbar[in-page][breakout] {
+  width: 100%;
+
+  &:popover-open {
+    /* The element takes the space below the input, bounded by a screenful so a
+       long page doesn't give it one, and by the page itself minus the room the
+       background needs past the border box (--urlbar-background-inset-breakout
+       is negative, hence the addition). */
+    position-anchor: --urlbar-anchor;
+    position-area: span-block-end center;
+    inset-block-start: 0;
+    max-height: min(calc(100% + var(--urlbar-background-inset-breakout)), 100vh);
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .urlbar-background {
   display: block;
   position: absolute;
@@ -292,12 +313,7 @@ toolbar[inactive="true"] .urlbar,
 }
 
 .urlbar-input-container {
-  /* The buttons keep the same distance to the inline edges as to the block ones,
-     which is half of the height they leave over. This resolves the height here
-     rather than reusing --urlbar-input-container-padding, which substitutes it
-     at :root and so misses a --urlbar-height set further down, as New Tab
-     does. */
-  padding-inline: calc((var(--urlbar-height) - var(--urlbar-basic-component-size)) / 2);
+  padding-inline: var(--urlbar-input-container-padding);
   min-width: 0;
   display: flex;
   align-items: center;
@@ -305,13 +321,6 @@ toolbar[inactive="true"] .urlbar,
   box-sizing: border-box;
   border-radius: var(--urlbar-border-radius);
   overflow: clip;
-
-  /* stylelint-disable-next-line media-query-no-invalid */
-  @media not -moz-pref("browser.nova.enabled") {
-    /* This branch draws a border on the container, and that insets the buttons
-       too, so it comes out of the padding. */
-    padding-inline: calc((var(--urlbar-height) - var(--urlbar-basic-component-size)) / 2 - var(--urlbar-input-container-border-width));
-  }
 
   .urlbar[breakout] > & {
     width: 100%;
@@ -326,11 +335,6 @@ toolbar[inactive="true"] .urlbar,
   .urlbar[breakout][breakout-extend][focused] > & {
     outline: var(--urlbar-input-container-outline-breakout-focused);
   }
-}
-
-.urlbar:not([open]) > .urlbarView,
-.urlbar:not([breakout]) > .urlbarView {
-  display: none;
 }
 
 #searchbar {
@@ -535,9 +539,7 @@ toolbar[inactive="true"] .urlbar,
 
 .urlbar-input-box {
   /* The box spans the container, so the buttons after it stay at its end, and
-     is a flex container, so the input fills it. xul.css gives a XUL element
-     both, through `* { display: flex }` and `[flex="1"]`, and a content
-     document does not load it. */
+     is a flex container, so the input fills it. */
   display: flex;
   flex-grow: 1;
   min-width: 0;
@@ -1387,7 +1389,7 @@ toolbar[inactive="true"] .urlbar,
     top: -999px;
   }
 
-  .urlbar:not(#searchbar-new) & {
+  .urlbar:not([sap-name="searchbar"], [sap-name="newtab_searchbar"]) & {
     @media (not -moz-pref("browser.urlbar.searchModeSwitcher.featureGate")) and (not -moz-pref("browser.urlbar.scotchBonnet.enableOverride")) {
       display: none;
     }
@@ -1468,27 +1470,25 @@ toolbar[inactive="true"] .urlbar,
 
 .searchmode-switcher-panel-list {
   max-width: var(--search-engine-name-max-width);
-  /* TODO bug 2032017: clean this up after 1826841 is done */
-  --panel-list-border-radius: var(--panel-border-radius);
-
   min-width: var(--urlbar-searchmode-switcher-panel-list-min-width);
 
   .searchmode-switcher-panel > & {
-    --panel-list-background-color: var(--panel-background);
+    /* The panel zeroes its own padding because the list is the scroll
+       container, so the body padding has to go inside it. */
     padding: var(--panel-subview-body-padding);
   }
 
   > panel-item::part(button) {
-    -moz-context-properties: fill;
-    fill: currentColor;
     /* The --icon-url variable allows setting an icon in JS. */
     background-image: var(--icon-url, url("chrome://global/skin/icons/search-glass.svg"));
-    background-size: 16px 16px;
-    /* TODO bug 2032017: clean this up after 1826841 is done */
-    padding: var(--panel-menuitem-padding);
-    padding-inline-start: calc(var(--panel-menuitem-padding-inline) + 22px);
-    border-radius: var(--panel-menuitem-border-radius);
-    margin: var(--panel-menuitem-margin);
+    /* With Nova, panel-list already has these styles by default; Proton needs
+       adjustments to look like a proper menu. */
+    /* stylelint-disable-next-line media-query-no-invalid */
+    @media not -moz-pref("browser.nova.enabled") {
+      padding: var(--panel-menuitem-padding);
+      border-radius: var(--panel-menuitem-border-radius);
+      margin: var(--panel-menuitem-margin);
+    }
   }
 
   > .searchmode-switcher-panel-search-settings-button::part(button) {
@@ -1505,10 +1505,6 @@ toolbar[inactive="true"] .urlbar,
     width: 11px;
     top: 4px;
     inset-inline-start: 17px;
-  }
-
-  > hr {
-    margin: var(--panel-menuitem-margin);
   }
 }
 

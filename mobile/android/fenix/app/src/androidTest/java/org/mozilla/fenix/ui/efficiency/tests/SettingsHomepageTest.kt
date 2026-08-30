@@ -11,11 +11,11 @@ import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
 import org.mozilla.fenix.helpers.TestHelper.restartApp
 import org.mozilla.fenix.ui.efficiency.helpers.BaseTest
 import org.mozilla.fenix.ui.efficiency.selectors.HomeSelectors
-import org.mozilla.fenix.ui.efficiency.selectors.HomeSelectors.JUMP_BACK_IN_SECTION
+import org.mozilla.fenix.ui.efficiency.selectors.HomeSelectors.CONTINUE_SECTION
 import org.mozilla.fenix.ui.efficiency.selectors.HomeSelectors.RECENT_BOOKMARKS_SECTION
 import org.mozilla.fenix.ui.efficiency.selectors.MainMenuSelectors.BOOKMARK_THIS_PAGE_BUTTON
 import org.mozilla.fenix.ui.efficiency.selectors.SettingsHomepageSelectors
-import org.mozilla.fenix.ui.efficiency.selectors.SettingsHomepageSelectors.JUMP_BACK_IN_BUTTON
+import org.mozilla.fenix.ui.efficiency.selectors.SettingsHomepageSelectors.CONTINUE_BUTTON
 import org.mozilla.fenix.ui.efficiency.selectors.SettingsHomepageSelectors.RECENT_BOOKMARKS_BUTTON
 import org.mozilla.fenix.ui.efficiency.selectors.SettingsSelectors
 
@@ -33,13 +33,13 @@ class SettingsHomepageTest : BaseTest() {
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/1564999
     @SmokeTest
     @Test
-    fun jumpBackInOptionTest() {
+    fun continueOptionTest() {
         val genericURL = mockWebServer.getGenericAsset(1)
 
         on.browserPage.navigateToPage(genericURL.url.toString())
-        on.home.navigateToPage().mozVerifyElementsByGroup("jumpBackIn")
-        on.settingsHomepage.navigateToPage().mozClick(JUMP_BACK_IN_BUTTON)
-        on.home.navigateToPage().mozVerifyElementAbsent(JUMP_BACK_IN_SECTION)
+        on.home.navigateToPage().mozVerifyElementsByGroup("continue")
+        on.settingsHomepage.navigateToPage().mozClick(CONTINUE_BUTTON)
+        on.home.navigateToPage().mozVerifyElementAbsent(CONTINUE_SECTION)
     }
 
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/1565000

@@ -132,6 +132,15 @@ CONFIGS = defaultdict(
                 "HOST_BIN_SUFFIX": ".exe",
             },
         },
+        "generated-file-rust-archive-dep": {
+            "defines": {},
+            "substs": {
+                "COMPILE_ENVIRONMENT": "1",
+                "RUST_TARGET": "x86_64-unknown-linux-gnu",
+                "LIB_PREFIX": "lib",
+                "LIB_SUFFIX": "a",
+            },
+        },
         "rust-programs": {
             "defines": {},
             "substs": {

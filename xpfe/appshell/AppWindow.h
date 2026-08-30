@@ -192,7 +192,7 @@ class AppWindow final : public nsIBaseWindow,
   NS_IMETHOD ForceRoundedDimensions();
   NS_IMETHOD GetAvailScreenSize(int32_t* aAvailWidth, int32_t* aAvailHeight);
 
-  void FinishFullscreenChange(bool aInFullscreen);
+  MOZ_CAN_RUN_SCRIPT void FinishFullscreenChange(bool aInFullscreen);
 
   void ApplyChromeFlags();
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void SizeShell();
@@ -202,7 +202,7 @@ class AppWindow final : public nsIBaseWindow,
   bool LoadPositionFromXUL(int32_t aSpecWidth, int32_t aSpecHeight);
   bool LoadSizeFromXUL(int32_t& aSpecWidth, int32_t& aSpecHeight);
   void SetSpecifiedSize(int32_t aSpecWidth, int32_t aSpecHeight);
-  bool UpdateWindowStateFromMiscXULAttributes();
+  MOZ_CAN_RUN_SCRIPT bool UpdateWindowStateFromMiscXULAttributes();
   void SyncAttributesToWidget();
   void SavePersistentAttributes(PersistentAttributes);
   void MaybeSavePersistentPositionAndSize(PersistentAttributes,

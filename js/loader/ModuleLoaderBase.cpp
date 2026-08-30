@@ -9,6 +9,7 @@
 #include "mozilla/dom/ScriptLoadContext.h"
 #include "mozilla/dom/ScriptSettings.h"  // AutoJSAPI
 #include "mozilla/dom/ScriptTrace.h"
+#include "mozilla/mozalloc_oom.h"  // mozalloc_handle_oom
 #include "mozilla/Preferences.h"
 #include "mozilla/RefPtr.h"  // mozilla::StaticRefPtr
 #include "mozilla/StaticPrefs_dom.h"
@@ -26,8 +27,9 @@
 #include "js/Array.h"         // JS::GetArrayLength
 #include "js/ColumnNumber.h"  // JS::ColumnNumberOneOrigin
 #include "js/CompilationAndEvaluation.h"
-#include "js/ContextOptions.h"        // JS::ContextOptionsRef
-#include "js/ErrorReport.h"           // JSErrorBase
+#include "js/ContextOptions.h"  // JS::ContextOptionsRef
+#include "js/ErrorReport.h"     // JSErrorBase
+#include "js/Exception.h"  // JS_IsExceptionPending, JS_IsThrowingOutOfMemory
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/Modules.h"  // JS::FinishLoadingImportedModule, JS::{G,S}etModuleResolveHook, JS::Get{ModulePrivate,ModuleScript,RequestedModule{s,Specifier,SourcePos}}, JS::SetModule{Load,Metadata}Hook
 #include "js/PropertyAndElement.h"  // JS_DefineProperty, JS_GetElement
@@ -326,18 +328,26 @@ bool ModuleLoaderBase::FinishLoadingImportedModule(
 
   Rooted<JSScript*> referrer(aCx, aRequest->mReferrerScript);
   Rooted<JSObject*> moduleReqObj(aCx, aRequest->mModuleRequestObj);
-  Rooted<Value> statePrivate(aCx, aRequest->mPayload);
   Rooted<Value> payload(aCx, aRequest->mPayload);
 
   LOG(("ScriptLoadRequest (%p): FinishLoadingImportedModule module (%p)",
        aRequest, module.get()));
   bool usePromise = aRequest->HasScriptLoadContext();
-  MOZ_ALWAYS_TRUE(JS::FinishLoadingImportedModule(aCx, referrer, moduleReqObj,
-                                                  payload, module, usePromise));
+  bool ok = JS::FinishLoadingImportedModule(aCx, referrer, moduleReqObj,
+                                            payload, module, usePromise);
+  // FinishLoadingImportedModule returns false when OOM or
+  // RejectPromiseWithPendingError returns false, which means there is no
+  // exception pending or the exception is uncatchable.
+  if (!ok && JS_IsThrowingOutOfMemory(aCx)) {
+    mozalloc_handle_oom(0);
+  }
+
+  // RejectPromiseWithPendingError has already settled the promise so there is
+  // nothing left to do.
   MOZ_ASSERT(!JS_IsExceptionPending(aCx));
   aRequest->ClearImport();
 
-  return true;
+  return ok;
 }
 
 // static
@@ -850,7 +860,12 @@ void ModuleLoaderBase::OnFetchSucceeded(ModuleLoadRequest* aRequest) {
       return;
     }
     JSContext* cx = jsapi.cx();
-    FinishLoadingImportedModule(cx, aRequest);
+    if (!FinishLoadingImportedModule(cx, aRequest)) {
+      // The graph load was abandoned by an uncatchable error, e.g. the script
+      // being terminated, so the parent request is never going to complete.
+      aRequest->Cancel();
+      return;
+    }
 
     aRequest->SetReady();
     aRequest->LoadFinished();
@@ -1702,7 +1717,11 @@ void ModuleLoaderBase::ProcessDynamicImport(ModuleLoadRequest* aRequest) {
   JSContext* cx = jsapi.cx();
 
   LOG(("ScriptLoadRequest (%p): ProcessDynamicImport", aRequest));
-  FinishLoadingImportedModule(cx, aRequest);
+  if (!FinishLoadingImportedModule(cx, aRequest)) {
+    // The import was abandoned by an uncatchable error, e.g. the script being
+    // terminated, so don't record it as a successful execution.
+    return;
+  }
 
   // TODO: Implement caching for wasm modules (Bug 1998240).
   if (!aRequest->IsWasmBytes()) {

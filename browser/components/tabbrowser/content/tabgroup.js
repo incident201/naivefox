@@ -595,7 +595,7 @@
     /**
      * add tabs to the group
      *
-     * @param {MozTabbrowserTab[] | MozSplitViewWrapper} tabsOrSplitViews
+     * @param {(MozTabbrowserTab|MozTabSplitViewWrapper)[]} tabsOrSplitViews
      * @param {TabMetricsContext} [metricsContext]
      *   Optional context to record for metrics purposes.
      */

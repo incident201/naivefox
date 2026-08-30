@@ -3902,7 +3902,7 @@ class nsDisplayListFocus final : public nsPaintedDisplayItem {
       br->DrawBorders();
     }
   }
-  bool CreateWebRenderCommands(
+  WebRenderCommandsResult CreateWebRenderCommands(
       wr::DisplayListBuilder& aBuilder, wr::IpcResourceUpdateQueue& aResources,
       const StackingContextHelper& aSc,
       layers::RenderRootStateManager* aManager,
@@ -3910,7 +3910,7 @@ class nsDisplayListFocus final : public nsPaintedDisplayItem {
     if (auto br = Renderer(nullptr)) {
       br->CreateWebRenderCommands(this, aBuilder, aResources, aSc);
     }
-    return true;
+    return Ok();
   }
   NS_DISPLAY_DECL_NAME("ListFocus", TYPE_LIST_FOCUS)
 };

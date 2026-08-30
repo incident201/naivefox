@@ -304,7 +304,7 @@ class nsWindow final : public nsIWidget {
       IsNonclient aIgnoreAPZ = IsNonclient::No,
       mozilla::Maybe<LayoutDeviceIntPoint> aMovement = mozilla::Nothing());
   void DispatchPendingEvents();
-  void DispatchCustomEvent(const nsString& eventName);
+  MOZ_CAN_RUN_SCRIPT void DispatchCustomEvent(const nsString& eventName);
 
 #ifdef ACCESSIBILITY
   /**
@@ -520,8 +520,8 @@ class nsWindow final : public nsIWidget {
    */
   static LRESULT CALLBACK WindowProc(HWND hWnd, UINT msg, WPARAM wParam,
                                      LPARAM lParam);
-  static LRESULT CALLBACK WindowProcInternal(HWND hWnd, UINT msg, WPARAM wParam,
-                                             LPARAM lParam);
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY static LRESULT CALLBACK
+  WindowProcInternal(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
   static BOOL CALLBACK DispatchStarvedPaints(HWND aTopWindow, LPARAM aMsg);
   static BOOL CALLBACK RegisterTouchForDescendants(HWND aTopWindow,
@@ -566,11 +566,12 @@ class nsWindow final : public nsIWidget {
   HWND GetTopLevelForFocus(HWND aCurWnd);
   void DispatchFocusToTopLevelWindow(bool aIsActivate);
   void RelayMouseEvent(UINT aMsg, WPARAM wParam, LPARAM lParam);
-  bool ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
-                      LRESULT* aRetValue);
+  MOZ_CAN_RUN_SCRIPT bool ProcessMessage(UINT msg, WPARAM& wParam,
+                                         LPARAM& lParam, LRESULT* aRetValue);
   // We wrap this in ProcessMessage so we can log the return value
-  bool ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,
-                              LRESULT* aRetValue);
+  MOZ_CAN_RUN_SCRIPT bool ProcessMessageInternal(UINT msg, WPARAM& wParam,
+                                                 LPARAM& lParam,
+                                                 LRESULT* aRetValue);
   bool ExternalHandlerProcessMessage(UINT aMessage, WPARAM& aWParam,
                                      LPARAM& aLParam, MSGResult& aResult);
   LRESULT ProcessCharMessage(const MSG& aMsg, bool* aEventDispatched);

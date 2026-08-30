@@ -3129,7 +3129,7 @@ class TabStorageMiddlewareTest {
                                     )
                             ) {
                             override suspend fun addTabGroupAssignment(tabId: String, tabGroupId: String) {
-                                throw Exception("Storage layer exception")
+                                throw StorageLayerException()
                             }
                         },
                 )
@@ -3235,3 +3235,6 @@ class TabStorageMiddlewareTest {
         )
     }
 }
+
+/** Simulates a failure raised by the storage layer behind the tab group repository. */
+private class StorageLayerException : Exception("Storage layer exception")

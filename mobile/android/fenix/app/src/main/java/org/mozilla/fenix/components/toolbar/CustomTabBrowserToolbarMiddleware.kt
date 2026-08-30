@@ -248,15 +248,16 @@ class CustomTabBrowserToolbarMiddleware(
                         surface = SURFACE_CUSTOM_TAB,
                     )
                 )
-                val customTab = customTab
+                val tabContent = customTab?.content ?: return
                 navController.navigate(
                     NavGraphDirections.actionGlobalShareFragment(
                         sessionId = customTabId,
                         data =
                             arrayOf(
                                 ShareData(
-                                    url = customTab?.content?.url,
-                                    title = customTab?.content?.title,
+                                    url = tabContent.url,
+                                    title = tabContent.title,
+                                    private = tabContent.private,
                                 )
                             ),
                         showPage = true,

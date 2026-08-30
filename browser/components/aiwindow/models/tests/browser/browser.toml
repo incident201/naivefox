@@ -17,6 +17,7 @@ prefs = [
 ["browser_conversation_stream.js"]
 ["browser_getCurrentTabMetadata.js"]
 ["browser_monitor_agent.js"]
+["browser_monitor_errors.js"]
 ["browser_monitor_store.js"]
 ["browser_prompt_loader_browser_context.js"]
 ["browser_prompt_loader_build_conversation.js"]

@@ -25,7 +25,7 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::mem;
 #[cfg(target_os = "linux")]
-use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -54,7 +54,7 @@ use ash::{khr, vk};
 pub const MAX_BUFFER_SIZE: wgt::BufferAddress = (1u64 << 31) - 4;
 
 // Mesa has issues with height/depth that don't fit in a 16 bits signed integers.
-const MAX_TEXTURE_EXTENT: u32 = std::i16::MAX as u32;
+const MAX_TEXTURE_EXTENT: u32 = i16::MAX as u32;
 // We have to restrict the number of bindings for any given resource type so that
 // the sum of these limits multiplied by the number of shader stages fits
 // maxBindingsPerBindGroup (1000). This restriction is arbitrary and is likely to
@@ -64,7 +64,7 @@ const MAX_TEXTURE_EXTENT: u32 = std::i16::MAX as u32;
 // Then we may have to ignore the spec or get it changed.
 const MAX_BINDINGS_PER_RESOURCE_TYPE: u32 = 64;
 
-#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 fn emit_critical_invalid_note(what: &'static str) {
     // SAFETY: We ensure that the pointer provided is not null.
     let msg = CString::new(format!("{what} is invalid")).unwrap();
@@ -91,6 +91,28 @@ fn get_linux_dmabuf_modifiers() -> Option<Vec<u64>> {
     // The pointer is owned by gfxVars storage and copied immediately.
     let modifiers = unsafe { std::slice::from_raw_parts(modifiers_ptr, modifier_count as usize) };
     Some(modifiers.to_vec())
+}
+
+#[cfg(target_os = "linux")]
+const DMABUF_DEVICE_EXTENSIONS: &[&'static std::ffi::CStr] = &[
+    khr::external_memory_fd::NAME,
+    ash::ext::external_memory_dma_buf::NAME,
+    ash::ext::image_drm_format_modifier::NAME,
+    khr::external_semaphore_fd::NAME,
+    khr::dedicated_allocation::NAME,
+    khr::get_memory_requirements2::NAME,
+];
+
+#[cfg(target_os = "linux")]
+fn unsupported_dmabuf_extensions(
+    hal_adapter: &wgh::vulkan::Adapter,
+) -> Vec<&'static std::ffi::CStr> {
+    let capabilities = hal_adapter.physical_device_capabilities();
+    DMABUF_DEVICE_EXTENSIONS
+        .iter()
+        .copied()
+        .filter(|&extension| !capabilities.supports_extension(extension))
+        .collect()
 }
 
 fn restrict_limits(limits: wgt::Limits) -> wgt::Limits {
@@ -310,27 +332,7 @@ fn support_use_shared_texture_in_swap_chain(
             unreachable!("given adapter ID was actually for a different backend");
         };
 
-        let capabilities = hal_adapter.physical_device_capabilities();
-        static REQUIRED: &[&'static std::ffi::CStr] = &[
-            khr::external_memory_fd::NAME,
-            ash::ext::external_memory_dma_buf::NAME,
-            ash::ext::image_drm_format_modifier::NAME,
-            khr::external_semaphore_fd::NAME,
-        ];
-        let all_extensions_supported = REQUIRED.iter().all(|&extension| {
-            let supported = capabilities.supports_extension(extension);
-            if !supported {
-                log::info!(
-                    concat!(
-                        "WebGPU: disabling SharedTexture swapchain: \n",
-                        "Vulkan extension not supported: {:?}",
-                    ),
-                    extension.to_string_lossy()
-                );
-            }
-            supported
-        });
-        if !all_extensions_supported {
+        if !unsupported_dmabuf_extensions(&hal_adapter).is_empty() {
             return false;
         }
 
@@ -487,33 +489,35 @@ unsafe fn adapter_request_device(
 
     #[cfg(target_os = "linux")]
     {
-        let hal_adapter = unsafe { global.adapter_as_hal::<wgc::api::Vulkan>(self_id) };
+        let hal_adapter = unsafe { global.adapter_as_hal::<wgc::api::Vulkan>(self_id) }
+            .expect("Vulkan backend adapter on linux");
 
-        let support_dma_buf = hal_adapter.as_ref().is_some_and(|hal_adapter| {
-            let capabilities = hal_adapter.physical_device_capabilities();
-
-            capabilities.supports_extension(khr::external_memory_fd::NAME)
-                && capabilities.supports_extension(ash::ext::external_memory_dma_buf::NAME)
-                && capabilities.supports_extension(ash::ext::image_drm_format_modifier::NAME)
-                && capabilities.supports_extension(khr::external_semaphore_fd::NAME)
-        });
-
-        match (hal_adapter, support_dma_buf) {
-            (None, _) => {
-                emit_critical_invalid_note("Vulkan adapter");
+        let support_dma_buf = {
+            let unsupported = unsupported_dmabuf_extensions(&hal_adapter);
+            if unsupported.is_empty() {
+                true
+            } else {
+                log::info!(
+                    concat!(
+                        "WebGPU: disabling SharedTexture swapchain: \n",
+                        "Vulkan extensions not supported: {:?}",
+                    ),
+                    unsupported
+                );
+                false
             }
-            (Some(_), false) => {}
-            (Some(hal_adapter), true) => {
+        };
+
+        match support_dma_buf {
+            false => {}
+            true => {
                 global
                     .adapter_validate_device_descriptor(self_id, &mut sanitized_desc)
                     .map_err(|err| err.to_string())?;
 
                 let mut enabled_extensions =
                     hal_adapter.required_device_extensions(sanitized_desc.required_features);
-                enabled_extensions.push(khr::external_memory_fd::NAME);
-                enabled_extensions.push(ash::ext::external_memory_dma_buf::NAME);
-                enabled_extensions.push(ash::ext::image_drm_format_modifier::NAME);
-                enabled_extensions.push(khr::external_semaphore_fd::NAME);
+                enabled_extensions.extend_from_slice(DMABUF_DEVICE_EXTENSIONS);
 
                 let mut enabled_phd_features = hal_adapter.physical_device_features(
                     &enabled_extensions,
@@ -1095,7 +1099,7 @@ pub extern "C" fn wgpu_server_get_device_fence_handle(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(C)]
 pub struct DMABufInfo {
     pub is_valid: bool,
@@ -1105,34 +1109,85 @@ pub struct DMABufInfo {
     pub strides: [u64; 3],
 }
 
-#[derive(Debug)]
+/// Destroys a `VkImage` and its dedicated `VkDeviceMemory` unless ownership has
+/// been handed over with [`ScopedVkImage::release`].
 #[cfg(target_os = "linux")]
-pub struct VkImageHandle {
-    pub device: vk::Device,
-    pub image: vk::Image,
-    pub memory: vk::DeviceMemory,
-    pub memory_size: u64,
-    pub memory_type_index: u32,
-    pub modifier: u64,
-    pub layouts: Vec<vk::SubresourceLayout>,
+struct ScopedVkImage<'a> {
+    device: &'a ash::Device,
+    image: vk::Image,
+    memory: vk::DeviceMemory,
 }
 
 #[cfg(target_os = "linux")]
-impl VkImageHandle {
-    fn destroy(&self, global: &Global, device_id: id::DeviceId) {
-        unsafe {
-            let Some(hal_device) = global.device_as_hal::<wgc::api::Vulkan>(device_id) else {
-                return;
-            };
+impl<'a> ScopedVkImage<'a> {
+    fn new(device: &'a ash::Device, image: vk::Image) -> Self {
+        Self {
+            device,
+            image,
+            memory: vk::DeviceMemory::null(),
+        }
+    }
 
-            let device = hal_device.raw_device();
-
-            (device.fp_v1_0().destroy_image)(self.device, self.image, ptr::null());
-            (device.fp_v1_0().free_memory)(self.device, self.memory, ptr::null());
-        };
+    fn release(&mut self) {
+        self.image = vk::Image::null();
+        self.memory = vk::DeviceMemory::null();
     }
 }
 
+#[cfg(target_os = "linux")]
+impl Drop for ScopedVkImage<'_> {
+    fn drop(&mut self) {
+        if self.image != vk::Image::null() {
+            unsafe {
+                self.device.destroy_image(self.image, None);
+            }
+        }
+        if self.memory != vk::DeviceMemory::null() {
+            unsafe {
+                self.device.free_memory(self.memory, None);
+            }
+        }
+    }
+}
+
+/// Queries the memory requirements of `image` through
+/// `vkGetImageMemoryRequirements2`. The caller always makes a dedicated
+/// allocation, so the dedicated requirements are only reported, never acted on.
+#[cfg(target_os = "linux")]
+unsafe fn dedicated_image_memory_requirements(
+    instance: &ash::Instance,
+    device: &ash::Device,
+    image: vk::Image,
+) -> vk::MemoryRequirements {
+    let loader = khr::get_memory_requirements2::Device::new(instance, device);
+
+    let mut dedicated_requirements = vk::MemoryDedicatedRequirements::default();
+    let requirements = {
+        let mut requirements2 =
+            vk::MemoryRequirements2::default().push_next(&mut dedicated_requirements);
+        let info = vk::ImageMemoryRequirementsInfo2::default().image(image);
+        loader.get_image_memory_requirements2(&info, &mut requirements2);
+        requirements2.memory_requirements
+    };
+
+    if dedicated_requirements.requires_dedicated_allocation == vk::FALSE
+        && dedicated_requirements.prefers_dedicated_allocation == vk::FALSE
+    {
+        let msg = c"dmabuf image neither requires nor prefers a dedicated allocation";
+        gfx_critical_note(msg.as_ptr());
+    }
+
+    requirements
+}
+
+/// Allocates a dma-buf backed `VkImage`, exports the dma-buf file descriptor to
+/// `out_fd` (-1 on failure) and returns its layout.
+///
+/// The `VkImage` and its memory are destroyed before returning: the exported
+/// file descriptor keeps the underlying dma-buf alive on its own, and the image
+/// is never used in a submission, so there is nothing for
+/// `VUID-vkDestroyImage-image-01000` or `VUID-vkFreeMemory-memory-00677` to
+/// wait on.
 #[no_mangle]
 #[cfg(target_os = "linux")]
 pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
@@ -1140,13 +1195,32 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
     device_id: id::DeviceId,
     width: u32,
     height: u32,
-    out_memory_size: *mut u64,
-) -> *mut VkImageHandle {
+    out_fd: *mut i32,
+) -> DMABufInfo {
+    match create_dma_buf(global, device_id, width, height) {
+        Ok((info, fd)) => {
+            unsafe { *out_fd = fd };
+            info
+        }
+        Err(msg) => {
+            unsafe { gfx_critical_note(msg.as_ptr()) };
+            unsafe { *out_fd = -1 };
+            DMABufInfo::default()
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn create_dma_buf(
+    global: &Global,
+    device_id: id::DeviceId,
+    width: u32,
+    height: u32,
+) -> Result<(DMABufInfo, i32), CString> {
     unsafe {
-        let Some(hal_device) = global.device_as_hal::<wgc::api::Vulkan>(device_id) else {
-            emit_critical_invalid_note("Vulkan device");
-            return ptr::null_mut();
-        };
+        let hal_device = global
+            .device_as_hal::<wgc::api::Vulkan>(device_id)
+            .expect("Vulkan backend device on linux");
 
         let device = hal_device.raw_device();
         let physical_device = hal_device.raw_physical_device();
@@ -1167,9 +1241,7 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
         };
 
         if count == 0 {
-            let msg = c"get_physical_device_format_properties2() failed";
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            return Err(c"get_physical_device_format_properties2() failed".to_owned());
         }
 
         let mut modifier_props =
@@ -1200,15 +1272,11 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
         });
 
         if modifier_props.is_empty() {
-            let msg = c"format not supported for dmabuf import";
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            return Err(c"format not supported for dmabuf import".to_owned());
         }
 
         let Some(consumer_modifiers) = get_linux_dmabuf_modifiers() else {
-            let msg = c"failed to get consumer dmabuf modifiers";
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            return Err(c"failed to get consumer dmabuf modifiers".to_owned());
         };
 
         modifier_props.retain(|modifier_prop| {
@@ -1216,9 +1284,9 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
         });
 
         if modifier_props.is_empty() {
-            let msg = c"no common dmabuf modifier found for WebGPU shared-texture swapchain";
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            let msg =
+                c"no common dmabuf modifier found for WebGPU shared-texture swapchain".to_owned();
+            return Err(msg);
         }
 
         let modifiers: Vec<u64> = modifier_props
@@ -1262,11 +1330,15 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
         let image = match device.create_image(&vk_info, None) {
             Err(err) => {
                 let msg = CString::new(format!("create_image() failed: {:?}", err)).unwrap();
-                gfx_critical_note(msg.as_ptr());
-                return ptr::null_mut();
+                return Err(msg);
             }
             Ok(image) => image,
         };
+
+        // From here on, every early return destroys the image (and, once
+        // allocated, its memory) through this guard. The success path destroys
+        // them too, after the dma-buf fd has been exported.
+        let mut scoped_image = ScopedVkImage::new(device, image);
 
         let mut image_modifier_properties = vk::ImageDrmFormatModifierPropertiesEXT::default();
         let image_drm_format_modifier =
@@ -1279,68 +1351,60 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
                 ret
             ))
             .unwrap();
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            return Err(msg);
         }
 
-        let memory_req = device.get_image_memory_requirements(image);
-
+        let memory_req = dedicated_image_memory_requirements(instance, device, image);
         let mem_properties = instance.get_physical_device_memory_properties(physical_device);
-
-        let index = mem_properties
-            .memory_types
-            .iter()
-            .enumerate()
-            .position(|(i, t)| {
-                ((1 << i) & memory_req.memory_type_bits) != 0
-                    && t.property_flags
-                        .contains(vk::MemoryPropertyFlags::DEVICE_LOCAL)
-            });
-
-        let Some(index) = index else {
+        let memory_type_index = select_memory_type(
+            &mem_properties,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            memory_req.memory_type_bits,
+        );
+        let Some(memory_type_index) = memory_type_index else {
             let msg = c"Failed to get DEVICE_LOCAL memory index";
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            return Err(msg.to_owned());
         };
 
         let mut dedicated_memory_info = vk::MemoryDedicatedAllocateInfo::default().image(image);
 
         let memory_allocate_info = vk::MemoryAllocateInfo::default()
             .allocation_size(memory_req.size)
-            .memory_type_index(index as u32)
+            .memory_type_index(memory_type_index)
             .push_next(&mut dedicated_memory_info)
             .push_next(&mut export_memory_alloc_info);
 
         let memory = match device.allocate_memory(&memory_allocate_info, None) {
             Err(err) => {
                 let msg = CString::new(format!("allocate_memory() failed: {:?}", err)).unwrap();
-                gfx_critical_note(msg.as_ptr());
-                return ptr::null_mut();
+                return Err(msg);
             }
             Ok(memory) => memory,
         };
+        scoped_image.memory = memory;
 
         let result = device.bind_image_memory(image, memory, /* offset */ 0);
         if result.is_err() {
             let msg = CString::new(format!("bind_image_memory() failed: {:?}", result)).unwrap();
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            return Err(msg);
         }
-
-        *out_memory_size = memory_req.size;
 
         let modifier_prop = modifier_props
             .iter()
             .find(|prop| prop.drm_format_modifier == image_modifier_properties.drm_format_modifier);
         let Some(modifier_prop) = modifier_prop else {
-            let msg = c"failed to find modifier_prop";
-            gfx_critical_note(msg.as_ptr());
-            return ptr::null_mut();
+            let msg = c"failed to find modifier_prop".to_owned();
+            return Err(msg);
         };
 
         let plane_count = modifier_prop.drm_format_modifier_plane_count;
+        if plane_count as usize > 3 {
+            let msg = c"too many dmabuf memory planes".to_owned();
+            return Err(msg);
+        }
 
-        let mut layouts = Vec::new();
+        let mut offsets: [u64; 3] = [0; 3];
+        let mut strides: [u64; 3] = [0; 3];
         for i in 0..plane_count {
             // VUID-vkGetImageSubresourceLayout-tiling-09433: For
             // `DMA_BUF` images, the planes must be identified using the
@@ -1353,82 +1417,35 @@ pub extern "C" fn wgpu_vkimage_create_with_dma_buf(
             };
             let subresource = vk::ImageSubresource::default().aspect_mask(flag);
             let layout = device.get_image_subresource_layout(image, subresource);
-            layouts.push(layout);
+            offsets[i as usize] = layout.offset;
+            strides[i as usize] = layout.row_pitch;
         }
 
-        let image_handle = VkImageHandle {
-            device: device.handle(),
-            image,
-            memory,
-            memory_size: memory_req.size,
-            memory_type_index: index as u32,
-            modifier: image_modifier_properties.drm_format_modifier,
-            layouts,
-        };
-
-        Box::into_raw(Box::new(image_handle))
-    }
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub unsafe extern "C" fn wgpu_vkimage_destroy(
-    global: &Global,
-    device_id: id::DeviceId,
-    handle: &VkImageHandle,
-) {
-    handle.destroy(global, device_id);
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub unsafe extern "C" fn wgpu_vkimage_delete(handle: *mut VkImageHandle) {
-    let _ = Box::from_raw(handle);
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub extern "C" fn wgpu_vkimage_get_file_descriptor(
-    global: &Global,
-    device_id: id::DeviceId,
-    handle: &VkImageHandle,
-) -> i32 {
-    unsafe {
-        let Some(hal_device) = global.device_as_hal::<wgc::api::Vulkan>(device_id) else {
-            emit_critical_invalid_note("Vulkan device");
-            return -1;
-        };
-
-        let device = hal_device.raw_device();
-        let instance = hal_device.shared_instance().raw_instance();
-
+        // `vkGetMemoryFdKHR` returns a new file descriptor holding a reference
+        // to the memory object's payload, so the dma-buf outlives the
+        // `VkDeviceMemory` we free below. This must happen before the free.
         let get_fd_info = vk::MemoryGetFdInfoKHR::default()
-            .memory(handle.memory)
+            .memory(memory)
             .handle_type(vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT);
-
         let loader = khr::external_memory_fd::Device::new(instance, device);
+        let fd = match loader.get_memory_fd(&get_fd_info) {
+            Err(err) => {
+                let msg = CString::new(format!("get_memory_fd() failed: {:?}", err)).unwrap();
+                return Err(msg);
+            }
+            Ok(fd) => fd,
+        };
 
-        loader.get_memory_fd(&get_fd_info).unwrap_or(-1)
-    }
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub extern "C" fn wgpu_vkimage_get_dma_buf_info(handle: &VkImageHandle) -> DMABufInfo {
-    let mut offsets: [u64; 3] = [0; 3];
-    let mut strides: [u64; 3] = [0; 3];
-    let plane_count = handle.layouts.len();
-    for i in 0..plane_count {
-        offsets[i] = handle.layouts[i].offset;
-        strides[i] = handle.layouts[i].row_pitch;
-    }
-
-    DMABufInfo {
-        is_valid: true,
-        modifier: handle.modifier,
-        plane_count: plane_count as u32,
-        offsets,
-        strides,
+        Ok((
+            DMABufInfo {
+                is_valid: true,
+                modifier: image_modifier_properties.drm_format_modifier,
+                plane_count,
+                offsets,
+                strides,
+            },
+            fd,
+        ))
     }
 }
 
@@ -1500,11 +1517,7 @@ extern "C" {
         id: id::TextureId,
     ) -> *mut core::ffi::c_void;
     #[cfg(target_os = "linux")]
-    #[allow(improper_ctypes)] // VkImageHandle is behind a pointer but this still triggers
-    fn wgpu_server_get_vk_image_handle(
-        parent: WebGPUParentPtr,
-        texture_id: id::TextureId,
-    ) -> *const VkImageHandle;
+    fn wgpu_server_get_dma_buf_info(parent: WebGPUParentPtr, id: id::TextureId) -> DMABufInfo;
     #[cfg(target_os = "linux")]
     fn wgpu_server_get_dma_buf_fd(parent: WebGPUParentPtr, id: id::TextureId) -> i32;
     #[cfg(target_os = "linux")]
@@ -1656,29 +1669,36 @@ pub unsafe fn is_dmabuf_supported(
         }
     }
 
-    drm_props
+    if !drm_props
         .external_memory_properties
         .compatible_handle_types
         .contains(vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT)
+    {
+        return false;
+    }
+
+    drm_props
+        .external_memory_properties
+        .external_memory_features
+        .contains(
+            vk::ExternalMemoryFeatureFlags::EXPORTABLE | vk::ExternalMemoryFeatureFlags::IMPORTABLE,
+        )
 }
 
 #[cfg(target_os = "linux")]
 pub fn select_memory_type(
     props: &vk::PhysicalDeviceMemoryProperties,
     flags: vk::MemoryPropertyFlags,
-    memory_type_bits: Option<u32>,
+    memory_type_bits: u32,
 ) -> Option<u32> {
     for i in 0..props.memory_type_count {
-        if let Some(mask) = memory_type_bits {
-            if mask & (1 << i) == 0 {
-                continue;
-            }
+        if memory_type_bits & (1 << i) == 0 {
+            continue;
         }
 
-        if flags.is_empty()
-            || props.memory_types[i as usize]
-                .property_flags
-                .contains(flags)
+        if props.memory_types[i as usize]
+            .property_flags
+            .contains(flags)
         {
             return Some(i);
         }
@@ -1803,14 +1823,17 @@ impl Global {
                 return false;
             }
 
-            let handle = wgpu_server_get_vk_image_handle(self.owner, texture_id);
-            if handle.is_null() {
-                let msg = c"Failed to get VkImageHandle";
+            let info = wgpu_server_get_dma_buf_info(self.owner, texture_id);
+            if !info.is_valid {
+                let msg = c"Failed to get DMABufInfo";
                 gfx_critical_note(msg.as_ptr());
                 return false;
             }
-
-            let vk_image_wrapper = &*handle;
+            if info.plane_count as usize > info.offsets.len() {
+                let msg = c"Invalid dmabuf plane count";
+                gfx_critical_note(msg.as_ptr());
+                return false;
+            }
 
             let fd = wgpu_server_get_dma_buf_fd(self.owner, texture_id);
             if fd < 0 {
@@ -1822,12 +1845,13 @@ impl Global {
             // Ensure to close file descriptor
             let owned_fd = OwnedFd::from_raw_fd(fd as RawFd);
 
-            let Some(hal_device) = self.device_as_hal::<wgc::api::Vulkan>(device_id) else {
-                emit_critical_invalid_note("Vulkan device");
-                return false;
-            };
+            let hal_device = self
+                .device_as_hal::<wgc::api::Vulkan>(device_id)
+                .expect("Vulkan backend device on linux");
 
             let device = hal_device.raw_device();
+            let instance = hal_device.shared_instance().raw_instance();
+            let physical_device = hal_device.raw_physical_device();
 
             let extent = vk::Extent3D {
                 width: desc.size.width,
@@ -1851,12 +1875,15 @@ impl Global {
             // > size. The implementation calculates the size of each plane, which
             // > the application can query with vkGetImageSubresourceLayout.
             //
-            // So, make a temporary copy of the plane layouts and zero
-            // out their sizes.
-            let memory_plane_layouts: Vec<_> = vk_image_wrapper
-                .layouts
-                .iter()
-                .map(|layout| vk::SubresourceLayout { size: 0, ..*layout })
+            // So, the plane layouts we rebuild here leave `size` at 0.
+            let memory_plane_layouts: Vec<_> = (0..info.plane_count as usize)
+                .map(|i| vk::SubresourceLayout {
+                    offset: info.offsets[i],
+                    size: 0,
+                    row_pitch: info.strides[i],
+                    array_pitch: 0,
+                    depth_pitch: 0,
+                })
                 .collect();
 
             // VUID-VkImageCreateInfo-pNext-00990
@@ -1869,7 +1896,7 @@ impl Global {
             // The only thing we're adding is the `ALIAS` flag, because this
             // aliases the original image.
             let mut modifier_list = vk::ImageDrmFormatModifierExplicitCreateInfoEXT::default()
-                .drm_format_modifier(vk_image_wrapper.modifier)
+                .drm_format_modifier(info.modifier)
                 .plane_layouts(&memory_plane_layouts);
 
             let vk_info = vk::ImageCreateInfo::default()
@@ -1903,25 +1930,55 @@ impl Global {
                 Ok(image) => image,
             };
 
-            let memory_req = device.get_image_memory_requirements(image);
-            if memory_req.size > vk_image_wrapper.memory_size {
-                let msg = c"Invalid memory size";
+            // Every early return below destroys the image, and its memory once
+            // allocated, through this guard.
+            let mut scoped_image = ScopedVkImage::new(device, image);
+
+            // The memory requirements of this image are not necessarily the
+            // ones of the image the dma-buf was allocated from, so they must be
+            // queried afresh: `VUID-VkMemoryAllocateInfo-memoryTypeIndex-00648`
+            // and `VUID-VkMemoryDedicatedAllocateInfo-image-02964`.
+            let memory_req = dedicated_image_memory_requirements(instance, device, image);
+
+            let mut fd_props = vk::MemoryFdPropertiesKHR::default();
+            let external_memory_fd = khr::external_memory_fd::Device::new(instance, device);
+            if let Err(err) = external_memory_fd.get_memory_fd_properties(
+                vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT,
+                owned_fd.as_raw_fd(),
+                &mut fd_props,
+            ) {
+                let msg =
+                    CString::new(format!("get_memory_fd_properties() failed: {:?}", err)).unwrap();
                 gfx_critical_note(msg.as_ptr());
                 return false;
             }
+
+            let mem_properties = instance.get_physical_device_memory_properties(physical_device);
+            let memory_type_index = select_memory_type(
+                &mem_properties,
+                vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                memory_req.memory_type_bits & fd_props.memory_type_bits,
+            );
+            let Some(memory_type_index) = memory_type_index else {
+                let msg = c"Failed to find a memory type for the imported dmabuf";
+                gfx_critical_note(msg.as_ptr());
+                return false;
+            };
 
             let mut dedicated_memory_info = vk::MemoryDedicatedAllocateInfo::default().image(image);
 
             let mut import_memory_fd_info = vk::ImportMemoryFdInfoKHR::default()
                 .handle_type(vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT)
-                .fd(owned_fd.into_raw_fd());
+                .fd(owned_fd.as_raw_fd());
 
             let memory_allocate_info = vk::MemoryAllocateInfo::default()
-                .allocation_size(vk_image_wrapper.memory_size)
-                .memory_type_index(vk_image_wrapper.memory_type_index)
+                .allocation_size(memory_req.size)
+                .memory_type_index(memory_type_index)
                 .push_next(&mut dedicated_memory_info)
                 .push_next(&mut import_memory_fd_info);
 
+            // `vkAllocateMemory` takes ownership of the fd on success only, so
+            // `owned_fd` closes it for us on every failure path above and here.
             let memory = match device.allocate_memory(&memory_allocate_info, None) {
                 Err(err) => {
                     let msg = CString::new(format!(
@@ -1932,8 +1989,12 @@ impl Global {
                     gfx_critical_note(msg.as_ptr());
                     return false;
                 }
-                Ok(memory) => memory,
+                Ok(memory) => {
+                    let _ = owned_fd.into_raw_fd();
+                    memory
+                }
             };
+            scoped_image.memory = memory;
 
             match device.bind_image_memory(image, memory, /* offset */ 0) {
                 Ok(()) => {}
@@ -1981,6 +2042,9 @@ impl Global {
                 gfx_critical_note(msg.as_ptr());
                 return false;
             }
+
+            // wgpu-core now owns the image and its memory.
+            scoped_image.release();
 
             true
         }
@@ -3072,7 +3136,7 @@ unsafe fn process_message(
                         usage,
                         view_formats: Vec::from(view_formats),
                     },
-                    size
+                    size,
                 )
             };
 
@@ -3089,10 +3153,11 @@ unsafe fn process_message(
 
             // In order to support `getCurrentTexture()` on invalid canvas configurations,
             // we store the configuration even when it is not valid.
-            global.swap_chain_configs.lock().unwrap().insert(
-                SwapChainId(remote_texture_owner_id.0),
-                sanitized_desc,
-            );
+            global
+                .swap_chain_configs
+                .lock()
+                .unwrap()
+                .insert(SwapChainId(remote_texture_owner_id.0), sanitized_desc);
 
             if let Some(err) = res {
                 // This is a validation error from the device timeline
@@ -3275,15 +3340,95 @@ pub unsafe extern "C" fn wgpu_server_queue_write_texture(
     }
 }
 
+/// A raw `VkSemaphore`, or 0 for null. Defined on all platforms so that
+/// `wgpu_server_queue_submit` keeps a single signature.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct VkSemaphoreHandle(pub u64);
+
+/// Queues the destruction of the semaphores that
+/// `wgpu_vksemaphore_create_signal_semaphore` registered on the queue, now that
+/// the submission they belong to has been attempted. The actual
+/// `vkDestroySemaphore` calls happen later, from an `on_submitted_work_done`
+/// closure.
+#[cfg(target_os = "linux")]
+fn enqueue_signal_semaphores_destruction(
+    global: &Global,
+    device_id: id::DeviceId,
+    queue_id: id::QueueId,
+    handles: &[VkSemaphoreHandle],
+    submission_errored: bool,
+) {
+    use ash::vk::Handle as _;
+
+    if handles.is_empty() {
+        return;
+    }
+
+    let semaphores: Vec<vk::Semaphore> = handles
+        .iter()
+        .map(|handle| vk::Semaphore::from_raw(handle.0))
+        .collect();
+
+    let device = global.resolve_device_id(device_id);
+    let queue = global.resolve_queue_id(queue_id);
+
+    if !submission_errored {
+        // Unregister the pending signals so that a later submission on this
+        // queue does not signal them. This is a no-op for any semaphore that a
+        // batch already consumed before `queue_submit` reported the failure.
+        let queue = queue.clone();
+        let hal_queue =
+            unsafe { queue.as_hal::<wgc::api::Vulkan>() }.expect("Vulkan backend queue on linux");
+        for &semaphore in &semaphores {
+            hal_queue.remove_signal_semaphore(semaphore);
+        }
+    }
+
+    // Destroying a semaphore has to wait for any submission referencing it to
+    // complete (VUID-vkDestroySemaphore-semaphore-05149). This must therefore
+    // run after `queue_submit`, so that the closure attaches to the submission
+    // that signals these semaphores. A failed submit that still reached the
+    // driver is tracked as well, so deferring is correct on both paths.
+    //
+    // The closure is owned by the queue's own `LifetimeTracker`, so it must not
+    // capture an `Arc<Queue>`, which would be an unbreakable cycle. Capturing
+    // `Arc<Device>` is fine because `Device::queue` is only a `Weak`, and it
+    // lets us reach the hal device without a registry lookup that would panic
+    // once the device id has been dropped.
+    queue.on_submitted_work_done(Box::new(move || {
+        let hal_device =
+            unsafe { device.as_hal::<wgc::api::Vulkan>() }.expect("Vulkan backend device on linux");
+        let raw_device = hal_device.raw_device();
+        for semaphore in semaphores {
+            unsafe {
+                raw_device.destroy_semaphore(semaphore, None);
+            }
+        }
+    }));
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn wgpu_server_queue_submit(
     global: &Global,
     device_id: id::DeviceId,
-    self_id: id::QueueId,
-    command_buffers: FfiSlice<'_, id::CommandBufferId>,
+    queue_id: id::QueueId,
+    command_buffer_ids: FfiSlice<'_, id::CommandBufferId>,
+    signal_semaphores: FfiSlice<'_, VkSemaphoreHandle>,
     mut error_buf: ErrorBuffer,
 ) -> u64 {
-    let result = global.queue_submit(self_id, command_buffers.as_slice());
+    let result = global.queue_submit(queue_id, command_buffer_ids.as_slice());
+
+    #[cfg(target_os = "linux")]
+    enqueue_signal_semaphores_destruction(
+        global,
+        device_id,
+        queue_id,
+        signal_semaphores.as_slice(),
+        result.is_ok(),
+    );
+    #[cfg(not(target_os = "linux"))]
+    let _ = signal_semaphores;
 
     match result {
         Err((_index, err)) => {
@@ -3300,25 +3445,31 @@ pub struct SubmittedWorkDoneClosure {
     pub user_data: *mut u8,
 }
 
-#[derive(Debug)]
-#[cfg(target_os = "linux")]
-pub struct VkSemaphoreHandle {
-    pub semaphore: vk::Semaphore,
-    queue_id: id::QueueId,
-}
-
+/// Creates a binary semaphore, registers it as a signal semaphore of the next
+/// submission on `queue_id`, and exports it to `out_fd` (-1 on failure).
+///
+/// Ownership of the semaphore itself stays here: `wgpu_server_queue_submit`
+/// destroys it once the submission it signals has completed.
 #[no_mangle]
 #[cfg(target_os = "linux")]
 pub extern "C" fn wgpu_vksemaphore_create_signal_semaphore(
     global: &Global,
+    device_id: id::DeviceId,
     queue_id: id::QueueId,
-) -> *mut VkSemaphoreHandle {
-    let semaphore_handle = unsafe {
-        let Some(hal_queue) = global.queue_as_hal::<wgc::api::Vulkan>(queue_id) else {
-            emit_critical_invalid_note("Vulkan queue");
-            return ptr::null_mut();
-        };
-        let device = hal_queue.raw_device();
+    out_fd: *mut i32,
+) -> VkSemaphoreHandle {
+    use ash::vk::Handle as _;
+
+    unsafe {
+        *out_fd = -1;
+
+        let hal_queue = global
+            .queue_as_hal::<wgc::api::Vulkan>(queue_id)
+            .expect("Vulkan backend queue on linux");
+        let hal_device = global
+            .device_as_hal::<wgc::api::Vulkan>(device_id)
+            .expect("Vulkan backend device on linux");
+        let device = hal_device.raw_device();
 
         let mut export_semaphore_create_info = vk::ExportSemaphoreCreateInfo::default()
             .handle_types(vk::ExternalSemaphoreHandleTypeFlags::OPAQUE_FD);
@@ -3328,84 +3479,32 @@ pub extern "C" fn wgpu_vksemaphore_create_signal_semaphore(
             Err(err) => {
                 let msg = CString::new(format!("create_semaphore() failed: {:?}", err)).unwrap();
                 gfx_critical_note(msg.as_ptr());
-                return ptr::null_mut();
+                return VkSemaphoreHandle(0);
             }
             Ok(semaphore) => semaphore,
         };
 
-        hal_queue.add_signal_semaphore(semaphore, None);
+        let instance = hal_device.shared_instance().raw_instance();
+        let external_semaphore_fd = khr::external_semaphore_fd::Device::new(instance, device);
+        let get_fd_info = vk::SemaphoreGetFdInfoKHR::default()
+            .semaphore(semaphore)
+            .handle_type(vk::ExternalSemaphoreHandleTypeFlags::OPAQUE_FD);
 
-        VkSemaphoreHandle {
-            semaphore,
-            queue_id,
-        }
-    };
+        match external_semaphore_fd.get_semaphore_fd(&get_fd_info) {
+            Err(err) => {
+                let msg = CString::new(format!("vkGetSemaphoreFdKHR failed: {:?}", err)).unwrap();
+                gfx_critical_note(msg.as_ptr());
 
-    Box::into_raw(Box::new(semaphore_handle))
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub unsafe extern "C" fn wgpu_vksemaphore_get_file_descriptor(
-    global: &Global,
-    device_id: id::DeviceId,
-    handle: &VkSemaphoreHandle,
-) -> i32 {
-    let file_descriptor = unsafe {
-        match global.device_as_hal::<wgc::api::Vulkan>(device_id) {
-            None => {
-                emit_critical_invalid_note("Vulkan device");
-                None
+                device.destroy_semaphore(semaphore, None);
+                VkSemaphoreHandle(0)
             }
-            Some(hal_device) => {
-                let device = hal_device.raw_device();
-                let instance = hal_device.shared_instance().raw_instance();
-
-                let external_semaphore_fd =
-                    khr::external_semaphore_fd::Device::new(instance, device);
-                let get_fd_info = vk::SemaphoreGetFdInfoKHR::default()
-                    .semaphore(handle.semaphore)
-                    .handle_type(vk::ExternalSemaphoreHandleTypeFlags::OPAQUE_FD);
-
-                external_semaphore_fd.get_semaphore_fd(&get_fd_info).ok()
+            Ok(fd) => {
+                *out_fd = fd;
+                hal_queue.add_signal_semaphore(semaphore, None);
+                VkSemaphoreHandle(semaphore.as_raw())
             }
         }
-    };
-
-    // From [Wikipedia](https://en.wikipedia.org/wiki/File_descriptor):
-    //
-    // > File descriptors typically have non-negative integer values, with negative values
-    // > being reserved to indicate "no value" or error conditions.
-    file_descriptor.unwrap_or(-1)
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub unsafe extern "C" fn wgpu_vksemaphore_destroy(
-    global: &Global,
-    device_id: id::DeviceId,
-    handle: &VkSemaphoreHandle,
-) {
-    unsafe {
-        if let Some(hal_queue) = global.queue_as_hal::<wgc::api::Vulkan>(handle.queue_id) {
-            if !hal_queue.remove_signal_semaphore(handle.semaphore) {
-                let _ = hal_queue.raw_device().queue_wait_idle(hal_queue.as_raw());
-            }
-        }
-
-        let Some(hal_device) = global.device_as_hal::<wgc::api::Vulkan>(device_id) else {
-            emit_critical_invalid_note("Vulkan device");
-            return;
-        };
-        let device = hal_device.raw_device();
-        device.destroy_semaphore(handle.semaphore, None);
-    };
-}
-
-#[no_mangle]
-#[cfg(target_os = "linux")]
-pub unsafe extern "C" fn wgpu_vksemaphore_delete(handle: *mut VkSemaphoreHandle) {
-    let _ = Box::from_raw(handle);
+    }
 }
 
 #[no_mangle]

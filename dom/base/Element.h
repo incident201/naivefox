@@ -62,6 +62,7 @@ class JSObject;
 class mozAutoDocUpdate;
 class nsAttrName;
 class nsAttrValueOrString;
+class nsAutoScriptBlocker;
 class nsDOMAttributeMap;
 class nsDOMCSSAttributeDeclaration;
 class nsDOMStringMap;
@@ -963,9 +964,10 @@ class Element : public FragmentOrElement {
    * `AttrArray::InfallibleMarkAsPendingPresAttributeEvaluation` at
    * most once.
    */
-  nsresult SetNoNameSpaceAttrOnNewlyCreatedElement(
+  MOZ_CAN_RUN_SCRIPT nsresult SetNoNameSpaceAttrOnNewlyCreatedElement(
       already_AddRefed<nsAtom> aName, nsHtml5String& aValue,
-      bool& aIsPendingMappedAttributeEvaluation);
+      bool& aIsPendingMappedAttributeEvaluation,
+      const nsAutoScriptBlocker& aGuard);
 
   /**
    * Get the current value of the attribute. This returns a form that is
@@ -1654,8 +1656,8 @@ class Element : public FragmentOrElement {
 
   void ReleaseCapture();
 
-  already_AddRefed<Promise> RequestFullscreen(const FullscreenOptions&,
-                                              CallerType, ErrorResult&);
+  MOZ_CAN_RUN_SCRIPT already_AddRefed<Promise> RequestFullscreen(
+      const FullscreenOptions&, CallerType, ErrorResult&);
   already_AddRefed<Promise> RequestPointerLock(
       const PointerLockOptions& aOptions, CallerType aCallerType,
       ErrorResult& aRv);
@@ -1723,21 +1725,47 @@ class Element : public FragmentOrElement {
       const Maybe<RefPtr<CustomElementRegistry>>& aRegistry,
       CustomSlotDispatch = CustomSlotDispatch::No, bool aNotify = true);
 
-  // Attach UA Shadow Root if it is not attached.
   enum class NotifyUAWidget : bool { No, Yes };
-  void AttachAndSetUAShadowRoot(NotifyUAWidget = NotifyUAWidget::Yes,
+
+  /**
+   * Attach a UA shadow root if no one is attached. If aNotifyUAWidget is "Yes",
+   * this will dispatch a chrome event to UAWidgetsChild via the script runner
+   * to trigger construction or onchange callback on the existing widget.
+   *
+   * Be aware, the caller must have to block script if aNotifyUAWidget is "Yes"
+   * because this may be called by methods which should not run script, e.g.,
+   * BindToTree and UnbindFromTree, and we don't want to mark them as
+   * MOZ_CAN_RUN_SCRIPT.
+   */
+  void AttachAndSetUAShadowRoot(NotifyUAWidget aNotifyUAWidget,
                                 DelegatesFocus = DelegatesFocus::No,
                                 CustomSlotDispatch = CustomSlotDispatch::No,
                                 bool aNotify = true);
 
-  // Dispatch an event to UAWidgetsChild, triggering construction
-  // or onchange callback on the existing widget.
-  void NotifyUAWidgetSetupOrChange();
+  /**
+   * Dispatch a chrome event to UAWidgetsChild via the script runner. The event
+   * will trigger construction or onchange callback on the existing widget.
+   *
+   * Be aware, the caller must have to block script because this may be called
+   * by methods which should not run script, e.g., * BindToTree and
+   * UnbindFromTree, and we don't want to mark them as MOZ_CAN_RUN_SCRIPT.
+   */
+  void AddScriptRunnerToNotifyUAWidgetSetupOrChange();
 
   enum class UnattachShadowRoot : bool { No, Yes };
-  // Dispatch an event to UAWidgetsChild, triggering UA Widget destruction.
-  // and optionally remove the shadow root.
-  void TeardownUAShadowRoot(NotifyUAWidget = NotifyUAWidget::Yes,
+
+  /**
+   * Remove the UA shadow root. If aNOtifyUAWidget is "Yes", this will dispatch
+   * a chrome event to UAWidgetChild, triggering UA widget destruction and
+   * optionally remove the shadow root.
+   *
+   * Be aware, the caller must have to block script if aNotifyUAWidget is "Yes"
+   * because this may be called by methods which should not run script, e.g.,
+   * UnbindFromTree, and we don't want to mark them as MOZ_CAN_RUN_SCRIPT.
+   *
+   * @return true if this actually unattach a shadow.
+   */
+  void TeardownUAShadowRoot(NotifyUAWidget aNotifyUAWidget,
                             UnattachShadowRoot = UnattachShadowRoot::Yes);
 
   void UnattachShadow();

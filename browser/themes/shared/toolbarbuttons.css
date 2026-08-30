@@ -747,9 +747,6 @@ toolbar[keyNav]:not([collapsed], [customizing]) toolbartabstop,
 /* Smart Window auto tab grouping button */
 #smartwindow-group-tabs-button {
   align-items: center;
-}
-
-#smartwindow-group-tabs-button-inner {
   -moz-user-focus: normal;
   align-self: center;
 
@@ -768,6 +765,11 @@ toolbar[keyNav]:not([collapsed], [customizing]) toolbartabstop,
   &[aria-expanded="true"] > .toolbarbutton-icon {
     background-color: var(--toolbarbutton-background-color-active);
   }
+}
+
+/* Smart Window monitor button */
+#smartwindow-monitor-button[aria-expanded="true"] > .toolbarbutton-icon {
+  background-color: var(--toolbarbutton-background-color-active);
 }
 
 /* Document Picture-in-Picture API window */

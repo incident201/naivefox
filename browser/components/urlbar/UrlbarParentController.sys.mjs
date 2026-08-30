@@ -189,6 +189,17 @@ export class UrlbarParentController {
   }
 
   /**
+   * Whether the view showing these results renders in a content process, which
+   * decodes what it displays itself. For an in-page urlbar that is the
+   * privileged about process.
+   *
+   * @type {boolean}
+   */
+  get rendersInContentProcess() {
+    return !!this.#actor?.browsingContext?.isContent;
+  }
+
+  /**
    * Resolves the `<browser>` a `browserId` refers to. A content sender always
    * targets its own tab, so its `browserId` is ignored; only a chrome sender
    * resolves a pinned id globally.
@@ -222,8 +233,11 @@ export class UrlbarParentController {
    * Notifies a result's provider that the result is about to be selected.
    * Mediates the view's access to the (parent-process) provider.
    *
-   * @param {UrlbarResult} result The result being selected.
-   * @param {Element} element The selected element.
+   * @param {UrlbarResult} result
+   *   The result being selected.
+   * @param {Element} [element]
+   *   The selected element. Undefined in the message path.
+   *   New providers should not use this parameter!
    */
   onBeforeSelection(result, element) {
     this.manager
@@ -236,12 +250,11 @@ export class UrlbarParentController {
    * view's access to the (parent-process) provider.
    *
    * @param {UrlbarResult} result The selected result.
-   * @param {Element} element The selected element.
    */
-  onSelection(result, element) {
+  onSelection(result) {
     this.manager
       .getProvider(result?.providerName)
-      ?.tryMethod("onSelection", result, element);
+      ?.tryMethod("onSelection", result);
   }
 
   /**
@@ -842,6 +855,18 @@ export class UrlbarParentController {
   }
 
   /**
+   * Opens the preferences page. The chrome window's `openPreferences` is a
+   * script global of the browser window, out of reach of an input hosted in a
+   * content page, so the call is made here.
+   *
+   * @param {string} paneID
+   *   The preferences pane to open, per `openPreferences`.
+   */
+  openPreferences(paneID) {
+    this.browserWindow.openPreferences(paneID);
+  }
+
+  /**
    * Returns the icon URL of the engine with the given id. This can be a blob
    * URL, which only resolves in this process, so UrlbarParent serializes it
    * before handing it to another process.
@@ -906,7 +931,7 @@ export class UrlbarParentController {
             // Speculative connect only if search suggestions are enabled.
             if (
               (lazy.UrlbarPrefs.get("suggest.searches") ||
-                context.sapName == "searchbar") &&
+                context.isSearchbarSAP) &&
               lazy.UrlbarPrefs.get("browser.search.suggest.enabled")
             ) {
               let engine = lazy.SearchService.getEngineByName(
@@ -1243,7 +1268,9 @@ export class UrlbarParentController {
    * @param {UrlbarQueryContext} queryContext the object to cache.
    */
   setLastQueryContextCache(queryContext) {
-    this._lastQueryContextWrapper = { queryContext };
+    // Marked done: no query is running behind a context cached this way, so
+    // cancelQuery() must not treat it as one.
+    this._lastQueryContextWrapper = { queryContext, done: true };
   }
 
   /**
@@ -1499,6 +1526,12 @@ export class TelemetryEvent {
         lazy.UrlbarTelemetryUtils.startInteractionType(event, searchString),
       searchString,
     };
+
+    // Engagements that run no query would otherwise reach the provider
+    // notifications with no context at all.
+    if (!this._controller._lastQueryContextWrapper) {
+      this._controller.setLastQueryContextCache(queryContext);
+    }
   }
 
   /**
@@ -1759,6 +1792,11 @@ export class TelemetryEvent {
   }) {
     try {
       let { queryContext } = this._controller._lastQueryContextWrapper || {};
+      if (!queryContext) {
+        // start() caches one for every session, so this means a caller ended a
+        // session it never started.
+        console.error(`Recording a ${method} with no query context`);
+      }
       let sap = this.#searchSourceToSap(searchSource);
 
       if (built && sap) {

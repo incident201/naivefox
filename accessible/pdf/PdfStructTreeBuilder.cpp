@@ -180,7 +180,7 @@ bool PdfStructTreeBuilder::BuildStructTree(SkPDF::StructureElementNode& aRoot) {
       rootAcc = GetExistingDocAccessible(doc);
     }
   } else {
-    rootAcc = DocAccessibleParent::GetFrom(wgp->GetBrowsingContext());
+    rootAcc = DocAccessibleParent::GetFrom(wgp);
   }
   if (!rootAcc) {
     return false;
@@ -193,10 +193,7 @@ bool PdfStructTreeBuilder::BuildStructTree(SkPDF::StructureElementNode& aRoot) {
 // the id computed by GetAccId in the process rendering that document.
 static uint64_t InnerWindowIdFor(Accessible* aAcc) {
   if (RemoteAccessible* remoteAcc = aAcc->AsRemote()) {
-    dom::CanonicalBrowsingContext* bc =
-        remoteAcc->Document()->GetBrowsingContext();
-    dom::WindowContext* wc = bc ? bc->GetCurrentWindowContext() : nullptr;
-    return wc ? wc->InnerWindowId() : 0;
+    return remoteAcc->Document()->Manager()->InnerWindowId();
   }
   return aAcc->AsLocal()->Document()->DocumentNode()->InnerWindowID();
 }

@@ -3338,7 +3338,7 @@ pub extern "C" fn Servo_KeyframesRule_FindRule(
     rule.read_with(&guard)
         .find_rule(&guard, key)
         .map(|index| index as u32)
-        .unwrap_or(u32::max_value())
+        .unwrap_or(u32::MAX)
 }
 
 #[no_mangle]
@@ -8202,7 +8202,7 @@ pub extern "C" fn Servo_StyleSet_MightHaveAttributeDependency(
     element: &RawGeckoElement,
     local_name: *mut nsAtom,
 ) -> bool {
-    let data = raw_data.borrow();
+    let data = unsafe { borrow_assert_main_thread(raw_data) };
     let element = GeckoElement(element);
 
     unsafe {
@@ -8220,7 +8220,7 @@ pub extern "C" fn Servo_StyleSet_MightHaveAttributeDependencyInContainer(
     element: &RawGeckoElement,
     local_name: *mut nsAtom,
 ) -> ContainerAttributeDependencyKind {
-    let data = raw_data.borrow();
+    let data = unsafe { borrow_assert_main_thread(raw_data) };
     let element = GeckoElement(element);
     unsafe {
         AtomIdent::with(local_name, |local_name| {
@@ -9530,7 +9530,11 @@ unsafe fn compute_color(
     value: &nsACString,
     loader: *mut Loader,
 ) -> Result<ComputeColorResult, ()> {
-    let mut input = ParserInput::new(value.as_str_unchecked());
+    use style::error_reporting::ContextualParseError;
+    use style_traits::StyleParseErrorKind;
+
+    let value = value.as_str_unchecked();
+    let mut input = ParserInput::new(value);
     let mut input = Parser::new(&mut input);
     let reporter = loader.as_mut().and_then(|loader| {
         // Make an ErrorReporter that will report errors as being "from DOM".
@@ -9558,7 +9562,17 @@ unsafe fn compute_color(
         None => None,
     };
 
-    let computed = specified::Color::parse_and_compute(&context, &mut input, device)?;
+    let computed = specified::Color::parse_and_compute(&context, &mut input, device);
+
+    if computed.is_err() && context.error_reporting_enabled() {
+        // TODO(emilio): Revise whether we want to keep this at all, we use this only for canvas,
+        // these warnings are disabled by default and not available on OffscreenCanvas anyways...
+        let e = ParseError::custom(StyleParseErrorKind::OtherInvalidValue);
+        let error = ContextualParseError::UnsupportedValue(value, e);
+        context.log_css_error(SourceLocation::default(), error);
+    }
+
+    let computed = computed?;
 
     let result_color = computed.resolve_to_absolute(current_color);
     let was_current_color = computed.is_currentcolor();
@@ -10481,7 +10495,7 @@ pub extern "C" fn Servo_EasingFunctionAt(
 
 fn parse_no_context<'i, F, R>(string: &'i str, parse: F) -> Result<R, ()>
 where
-    F: FnOnce(&ParserContext, &mut Parser<'i, '_>) -> Result<R, ParseError<'i>>,
+    F: FnOnce(&ParserContext, &mut Parser<'i, '_>) -> Result<R, ParseError>,
 {
     let context = ParserContext::new(
         Origin::Author,
@@ -10814,8 +10828,7 @@ pub extern "C" fn Servo_GetRuleBodyText(initial_text: &nsACString, ret_val: &mut
 
     let token_start = input.position();
     // Parse the nested block to move the parser to the end of the block
-    let _ =
-        input.parse_nested_block(|_i| -> Result<(), CssParseError<'_, BasicParseError>> { Ok(()) });
+    let _ = input.parse_nested_block(|_i| -> Result<(), CssParseError<BasicParseError>> { Ok(()) });
 
     // We're not guaranteed to have a closing bracket, but when we do, we need to move
     // the end offset before it.
@@ -10865,8 +10878,7 @@ pub extern "C" fn Servo_ReplaceBlockRuleBodyTextInStylesheetText(
     let token_start = input.position();
     let rule_body_start = rule_start_index + token_start.byte_index();
     // Parse the nested block to move the parser to the end of the block
-    let _ =
-        input.parse_nested_block(|_i| -> Result<(), CssParseError<'_, BasicParseError>> { Ok(()) });
+    let _ = input.parse_nested_block(|_i| -> Result<(), CssParseError<BasicParseError>> { Ok(()) });
     let mut rule_body_end = rule_start_index + input.position().byte_index();
 
     // We're not guaranteed to have a closing bracket, but when we do, we need to move
@@ -11110,7 +11122,7 @@ pub unsafe extern "C" fn Servo_CSSParser_NextToken(
     css_token.column = location_start.column;
 
     if need_to_parse_nested_block {
-        let _ = input.parse_nested_block(|i| -> Result<(), CssParseError<'_, BasicParseError>> {
+        let _ = input.parse_nested_block(|i| -> Result<(), CssParseError<BasicParseError>> {
             *state = i.state();
             Ok(())
         });
@@ -11635,18 +11647,11 @@ pub unsafe extern "C" fn Servo_GetComputationSteps(
     // At the moment, we're only supporting top-level Math function
     // TODO: we should handle simple values too.
     let math_func = match parser.next() {
-        Ok(Token::Function(ref name)) => {
-            match CalcNode::math_function(
-                &parser_context,
-                name,
-                // we don't need to have a valid location here, it's only used to report errors
-                SourceLocation { line: 0, column: 0 },
-            ) {
-                Ok(f) => f,
-                Err(_) => {
-                    return;
-                },
-            }
+        Ok(Token::Function(ref name)) => match CalcNode::math_function(&parser_context, name) {
+            Ok(f) => f,
+            Err(_) => {
+                return;
+            },
         },
         _ => {
             return;

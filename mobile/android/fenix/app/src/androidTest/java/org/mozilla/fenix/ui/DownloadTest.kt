@@ -392,7 +392,7 @@ class DownloadTest {
             .openThreeDotMenu {}
             .clickShareButton {}
             .clickSaveAsPDF(composeTestRule) {
-                verifyDownloadPrompt(composeTestRule, downloadFile)
+                verifyDownloadPrompt(composeTestRule)
             }
             .clickDownload(composeTestRule) {
                 verifyDownloadCompleteSnackbar(fileName = downloadFile)

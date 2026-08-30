@@ -29,7 +29,6 @@ try-xpcshell:
     treeherder:
         symbol: perftest(xpcshell)
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -48,7 +47,6 @@ try-browsertime:
     treeherder:
         symbol: perftest(bt)
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -70,7 +68,6 @@ browsertime-sample:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -94,7 +91,6 @@ service-worker:
         cron: false
     run-on-projects: [autoland, mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -128,7 +124,6 @@ domcount:
         batch: false
         cron: false
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -152,7 +147,6 @@ http3:
         # Disabled due to bug 1849400
         cron: false
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -256,7 +250,6 @@ livesites:
             default:
                 - [null, browsertime.waitTime=1000]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -283,7 +276,6 @@ controlled:
         batch: false
         cron: false
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -310,7 +302,6 @@ perfstats:
         batch: false
         cron: false
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -338,7 +329,6 @@ record-websites:
         - secrets:get:project/releng/gecko/build/level-{level}/conditioned-profiles
         - secrets:get:project/perftest/gecko/level-{level}/perftest-login
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -369,7 +359,6 @@ ml-perf-wasm: &ml-perf
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -404,7 +393,6 @@ ml-llama-summarizer-perf:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -429,7 +417,6 @@ ml-security-perf:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -460,7 +447,6 @@ ml-multi-perf-wasm: &ml-multi-perf
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -495,7 +481,6 @@ ml-perf-semantic-ft-wasm: &ml-perf-semantic-ft
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -536,7 +521,6 @@ ml-perf-suggest-ft-wasm: &ml-perf-suggest-ft
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -575,7 +559,6 @@ ml-perf-suggest-inf-wasm: &ml-perf-suggest-inf
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -615,7 +598,6 @@ ml-perf-autofill-wasm: &ml-perf-autofill
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -652,7 +634,6 @@ tr8ns-perf-tiny:
         cron: false
     run-on-projects: [autoland, mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -678,7 +659,6 @@ tr8ns-perf-basememory:
         cron: false
     run-on-projects: [autoland, mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -704,7 +684,6 @@ tr8ns-perf-base:
         cron: false
     run-on-projects: [autoland, mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -732,7 +711,6 @@ ml-perf-smart-tab-wasm: &ml-perf-smart-tab
         env:
             MOZ_ML_BACKENDS: onnx
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -772,7 +750,6 @@ ml-perf-smart-tab-cluster-wasm: &ml-perf-smart-tab-cluster
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -806,7 +783,6 @@ perftest-accessibility:
         cron: false
     run-on-projects: [autoland, mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&
@@ -845,6 +821,11 @@ perftest-accessibility:
             --flavor mochitest
             --output $MOZ_FETCHES_DIR/../artifacts
             accessible/tests/browser/performance/browser_displayContentsBounds.js
+            && python3 python/mozperftest/mozperftest/runner.py
+            --mochitest-binary ${MOZ_FETCHES_DIR}/target.dmg
+            --flavor mochitest
+            --output $MOZ_FETCHES_DIR/../artifacts
+            accessible/tests/browser/performance/browser_panManySVGShapes.js
 
 perftest-places:
     description: Run Places related performance tests
@@ -856,7 +837,6 @@ perftest-places:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&

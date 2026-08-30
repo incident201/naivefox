@@ -73,6 +73,7 @@
  *       cc-exp-year,          // 2-digit year will be converted to 4 digits
  *                             // upon saving
  *       cc-type,              // Optional card network id (instrument type)
+ *       cc-csc,               // Optional card security code
  *
  *       // computed fields (These fields are computed based on the above fields
  *       // and are not allowed to be modified directly.)
@@ -196,6 +197,8 @@ export const VALID_CREDIT_CARD_FIELDS = [
   "cc-exp-month",
   "cc-exp-year",
   "cc-type",
+  // TODO: Uncomment this when storage is ready.
+  // "cc-csc",
 ];
 
 const VALID_CREDIT_CARD_COMPUTED_FIELDS = [

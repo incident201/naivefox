@@ -34,7 +34,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
-import mozilla.components.ui.tabcounter.TabCounterTestTags
 import org.mozilla.fenix.R
 import org.mozilla.fenix.helpers.Constants
 import org.mozilla.fenix.helpers.Constants.RETRY_COUNT
@@ -749,20 +748,11 @@ private fun ComposeTestRule.dropdownMenuItemTabSettings() = onNodeWithTag(TabsTr
 /** Obtains the dropdown menu item to share tabs. */
 private fun ComposeTestRule.dropdownMenuItemShare() = onNodeWithTag(TabsTrayTestTag.SHARE_BUTTON)
 
-/** Obtains the normal tabs counter. */
-private fun ComposeTestRule.normalTabsCounter() = onNodeWithTag(TabCounterTestTags.NORMAL_TABS_COUNTER)
-
 /** Obtains the Tabs Tray banner collections button. */
 private fun ComposeTestRule.collectionsButton() = onNodeWithTag(TabsTrayTestTag.COLLECTIONS_BUTTON)
 
 /** Obtains the Tabs Tray banner multi selection counter. */
 private fun ComposeTestRule.multiSelectionCounter() = onNodeWithTag(TabsTrayTestTag.SELECTION_COUNTER)
-
-/** Obtains the Tabs Tray banner handle. */
-private fun ComposeTestRule.bannerHandle() = onNodeWithTag(TabsTrayTestTag.BANNER_HANDLE)
-
-/** Obtains the media control button with the given [action] as its content description. */
-private fun ComposeTestRule.tabMediaControlButton(action: String) = onNodeWithContentDescription(action)
 
 /** Obtains the root of the Tabs Tray banner. */
 private fun ComposeTestRule.banner() = onNodeWithTag(TabsTrayTestTag.BANNER_ROOT)

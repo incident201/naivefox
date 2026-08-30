@@ -38,7 +38,7 @@ import org.mozilla.fenix.ui.efficiency.selectors.SettingsSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.TabHistorySelectors
 import org.mozilla.fenix.ui.efficiency.selectors.WebCompatReporterSelectors
 
-class MainMenuTest : BaseTest(isPageLoadTranslationsPromptEnabled = false) {
+class MainMenuTest : BaseTest() {
 
     private val mockWebServer
         get() = fenixTestRule.mockWebServer

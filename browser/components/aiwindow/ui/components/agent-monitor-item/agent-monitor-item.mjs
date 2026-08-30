@@ -26,7 +26,7 @@ const SCHEDULE_TYPES = Object.freeze({
 
 const SCHEDULE_ICON = "chrome://browser/skin/calendar-24.svg";
 const TIME_ICON = "chrome://browser/skin/history-20.svg";
-const MAX_WATCH_URLS = 5;
+const DEFAULT_MAX_WATCH_URLS = 5;
 
 // How long to coalesce typing before mirroring the form to the host
 const DRAFT_PERSIST_DELAY_MS = 250;
@@ -123,6 +123,7 @@ const WEEKDAYS = [
  * @property {boolean} expanded - Whether the display card is expanded
  * @property {boolean} editing - Whether the editable condition field is shown
  * @property {boolean} showLastResult - Whether to show the last check result chip (defaults to false)
+ * @property {number} maxWatchUrls - How many pages one monitor may watch
  */
 export class AgentMonitorItem extends MozLitElement {
   static properties = {
@@ -132,6 +133,7 @@ export class AgentMonitorItem extends MozLitElement {
     expanded: { type: Boolean, reflect: true },
     editing: { type: Boolean, reflect: true },
     showLastResult: { type: Boolean },
+    maxWatchUrls: { type: Number },
     checkFrequency: { type: String, state: true },
     scheduleTime: { type: String, state: true },
     scheduleWeekday: { type: Number, state: true },
@@ -149,6 +151,7 @@ export class AgentMonitorItem extends MozLitElement {
     this.expanded = false;
     this.editing = false;
     this.showLastResult = false;
+    this.maxWatchUrls = DEFAULT_MAX_WATCH_URLS;
     this.checkFrequency = SCHEDULE_TYPES.DAILY;
     this.scheduleTime = "09:00";
     this.scheduleWeekday = 1;
@@ -403,10 +406,10 @@ export class AgentMonitorItem extends MozLitElement {
       );
       return;
     }
-    if (this.pageUrls.length >= MAX_WATCH_URLS) {
+    if (this.pageUrls.length >= this.maxWatchUrls) {
       this.pendingUrlError = await document.l10n.formatValue(
         "ai-tasks-alert-error-max-urls",
-        { count: MAX_WATCH_URLS }
+        { maxUrls: this.maxWatchUrls }
       );
       return;
     }
@@ -557,7 +560,7 @@ export class AgentMonitorItem extends MozLitElement {
               data-l10n-id="ai-tasks-alert-pages"
               data-l10n-attrs="placeholder,label"
               data-l10n-args=${JSON.stringify({
-                maxPages: MAX_WATCH_URLS,
+                maxPages: this.maxWatchUrls,
               })}
               .value=${this.pendingUrl}
               @input=${this.#onPendingUrlInput}
@@ -571,7 +574,6 @@ export class AgentMonitorItem extends MozLitElement {
               iconsrc="chrome://global/skin/icons/plus.svg"
               data-l10n-id="ai-tasks-alert-add-url"
               data-l10n-attrs="aria-label"
-              ?disabled=${this.pageUrls.length >= MAX_WATCH_URLS}
               @click=${() => this.#addUrl()}
             ></moz-button>
           </div>
@@ -897,6 +899,7 @@ export class AgentMonitorItem extends MozLitElement {
             type="primary"
             data-l10n-id="ai-tasks-alert-create-button"
             data-l10n-attrs="label"
+            ?disabled=${!this.#isFormValid}
             @click=${this.#onSubmit}
           ></moz-button>
         </div>
@@ -909,20 +912,25 @@ export class AgentMonitorItem extends MozLitElement {
     return html`
       <div class="monitor-card chatcard" @click=${this.#onCardClick}>
         <div class="monitor-card-head">
-          ${this.#renderStatusChip()}
-          <span class="monitor-card-title"
-            ><span class="monitor-card-name">${agent.monitorName}</span></span
-          >
-          <span class="spacer"></span>
-          ${this.showLastResult ? this.#renderLastCheckedCondition() : nothing}
-          <button
-            type="button"
-            class="chev"
-            aria-expanded=${this.expanded}
-            data-l10n-id="ai-tasks-alert-show-details"
-            data-l10n-attrs="aria-label"
-            @click=${this.#onToggle}
-          ></button>
+          <div class="monitor-card-head-left">
+            ${this.#renderStatusChip()}
+            <span class="monitor-card-title"
+              ><span class="monitor-card-name">${agent.monitorName}</span></span
+            >
+          </div>
+          <div class="monitor-card-head-right">
+            ${this.showLastResult
+              ? this.#renderLastCheckedCondition()
+              : nothing}
+            <button
+              type="button"
+              class="chev"
+              aria-expanded=${this.expanded}
+              data-l10n-id="ai-tasks-alert-show-details"
+              data-l10n-attrs="aria-label"
+              @click=${this.#onToggle}
+            ></button>
+          </div>
         </div>
         ${this.expanded ? this.#renderExpand() : nothing}
       </div>

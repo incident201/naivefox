@@ -249,6 +249,14 @@ features:
         value:
           enabled: true
 
+  weekly-privacy-notification:
+    description: A feature that shows a recurring weekly notification summarizing Tracking Protection activity.
+    variables:
+      enabled:
+        description: If true, the weekly privacy notification will be scheduled.
+        type: Boolean
+        default: false
+
   import-bookmarks:
     description: A feature that lets users import bookmarks from another browser.
     variables:
@@ -1287,6 +1295,10 @@ features:
     variables:
       hide-collections-ui:
         description: If true, the Collections UI is hidden.
+        type: Boolean
+        default: false
+      enabled:
+        description: If true, run the one-time migration that converts existing Collections into Tab Groups.
         type: Boolean
         default: false
 

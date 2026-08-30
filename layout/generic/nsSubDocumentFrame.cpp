@@ -1242,14 +1242,14 @@ void nsDisplayRemote::Paint(nsDisplayListBuilder* aBuilder, gfxContext* aCtx) {
   target->DrawDependentSurface(mPaintData.mTabId, destRect);
 }
 
-bool nsDisplayRemote::CreateWebRenderCommands(
+WebRenderCommandsResult nsDisplayRemote::CreateWebRenderCommands(
     mozilla::wr::DisplayListBuilder& aBuilder,
     mozilla::wr::IpcResourceUpdateQueue& aResources,
     const StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
     nsDisplayListBuilder* aDisplayListBuilder) {
   if (!mPaintData.mLayersId.IsValid()) {
-    return true;
+    return Ok();
   }
 
   auto* subDocFrame = static_cast<nsSubDocumentFrame*>(mFrame);
@@ -1277,7 +1277,7 @@ bool nsDisplayRemote::CreateWebRenderCommands(
                       mozilla::wr::AsPipelineId(mPaintData.mLayersId),
                       /*ignoreMissingPipelines*/ true);
 
-  return true;
+  return Ok();
 }
 
 bool nsDisplayRemote::UpdateScrollData(

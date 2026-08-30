@@ -2258,6 +2258,7 @@ class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {
         wantExportHelpers(false),
         isWebExtensionContentScript(false),
         proto(cx),
+        associatedWindow(cx),
         sameZoneAs(cx),
         forceSecureContext(false),
         freshCompartment(false),
@@ -2278,6 +2279,7 @@ class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {
   bool wantExportHelpers;
   bool isWebExtensionContentScript;
   JS::RootedObject proto;
+  JS::RootedObject associatedWindow;
   mozilla::Maybe<nsString> sandboxContentSecurityPolicy;
   nsCString sandboxName;
   JS::RootedObject sameZoneAs;

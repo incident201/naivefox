@@ -114,7 +114,10 @@ function RecentSearches({
             size="small"
             data-l10n-id="newtab-recent-searches-widget-menu-button"
           />
-          <panel-list id="recent-searches-context-menu">
+          <panel-list
+            className="panel-list-no-icons"
+            id="recent-searches-context-menu"
+          >
             {/* No items above the footer yet, so its leading divider is off.
                 Add widget items here and set showDivider back to true. */}
             <WidgetMenuFooter

@@ -436,9 +436,10 @@ LightweightThemeConsumer.prototype = {
     root.toggleAttribute(
       "theme-image-in-toolbox",
       (() => {
+        if (theme.backgroundsArea && theme.backgroundsArea != "auto") {
+          return theme.backgroundsArea == "top_toolbars";
+        }
         if (hasTheme) {
-          // TODO(emilio): Consider adding an opt-in to lwthemes into this
-          // behavior.
           return !!theme.backgroundsAlignment?.split(",").some(alignment => {
             if (alignment == "center" || alignment == "bottom") {
               return true;

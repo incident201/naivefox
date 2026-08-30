@@ -129,6 +129,10 @@ class SettingsAutofillPage(composeRule: AndroidComposeTestRule<HomeActivityInten
         onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().size
 
     /**
+     * Opens [dropdownTag] and picks the entry matching [optionText].
+     *
+     * @param dropdownTag the test tag of the dropdown to open.
+     * @param optionText the text of the option to select.
      * @param substring match the option by substring, case-insensitively. The card expiry dropdowns render their
      *   options with surrounding text (e.g. the month number alongside the name), so an exact match finds nothing
      *   there; the address dropdowns render the value on its own and match exactly.

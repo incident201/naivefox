@@ -1266,6 +1266,8 @@ class CustomTabBrowserToolbarMiddlewareTest {
  * that behavior and return true for any IP address.
  */
 @Implements(InetAddresses::class)
+// Robolectric instantiates shadows, so this has to stay a class.
+@Suppress("UtilityClassWithPublicConstructor")
 private class ShadowInetAddresses {
     companion object {
         @Implementation

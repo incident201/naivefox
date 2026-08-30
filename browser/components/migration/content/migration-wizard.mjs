@@ -79,14 +79,14 @@ export class MigrationWizard extends HTMLElement {
               </ol>
             </div>
 
-            <div data-l10n-id="migration-wizard-selection-list" class="resource-selection-preamble text-deemphasized hide-on-error"></div>
+            <div id="migration-wizard-selection-list" data-l10n-id="migration-wizard-selection-list" class="resource-selection-preamble text-deemphasized hide-on-error"></div>
             <details class="resource-selection-details hide-on-error">
               <summary id="resource-selection-summary">
                 <div class="selected-data-header" data-l10n-id="migration-all-available-data-label"></div>
                 <div class="selected-data text-deemphasized">&nbsp;</div>
                 <span class="expand-collapse-icon" role="img"></span>
               </summary>
-              <fieldset id="resource-type-list">
+              <fieldset id="resource-type-list" aria-labelledby="migration-wizard-selection-list">
                 <label id="select-all">
                   <input type="checkbox" class="select-all-checkbox"/><span data-l10n-id="migration-select-all-option-label"></span>
                 </label>

@@ -2007,103 +2007,6 @@ os.environment:
     record_in_processes:
       - main
 
-  launch_method:
-    bug_numbers:
-      - 1685213
-      - 1725298
-      - 1754656
-    description: >
-      Records how Firefox was started on Windows.
-      Currently will be one of "Desktop", "DesktopPrivate",
-      "StartMenu" (including pins), "StartMenuPrivate",
-      "Taskbar", "TaskbarPrivate", "OtherShortcut", or "Other"
-    expires: never
-    kind: string
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - rtestard@mozilla.com
-      - shong@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - firefox
-    record_in_processes:
-      - main
-
-  launched_to_handle:
-    bug_numbers:
-      - 1243603
-      - 1781984
-    description: >
-      Records counts for when Firefox was launched afresh (i.e., was not already
-      running) to handle a file type or protocol with `-osint -url ...`.  The
-      result is split into keys which represent the file extension: currently,
-      the set of file types Firefox registers to handle, namely ".avif", ".htm",
-      ".html", ".pdf", ".shtml", ".xht", ".xhtml", ".svg", ".webp", and the set
-      of protocol schemes that Firefox registers to handle, namely "about",
-      "http", "https", "mailto".  If Firefox was launched to handle a file type
-      or protocol it does not register to handle by default, the count is
-      recorded as ".<other extension>" or "<other protocol>", respectively
-      (neither of which are valid extension or protocol identifiers).
-    keyed: true
-    expires: never
-    kind: uint
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - firefox
-    record_in_processes:
-      - main
-
-  invoked_to_handle:
-    bug_numbers:
-      - 1243603
-      - 1781984
-    description: >
-      Records counts for when Firefox was invoked (i.e., was already running and
-      was not launched) to handle a file type or protocol with `-osint -url
-      ...`.  The result is split into keys which represent the file extension:
-      currently, the set of file types Firefox registers to handle, namely
-      ".avif", ".htm", ".html", ".pdf", ".shtml", ".xht", ".xhtml", ".svg",
-      ".webp", and the set of protocol schemes that Firefox registers to handle,
-      namely "about", "http", "https", "mailto".  If Firefox was invoked to
-      handle a file type or protocol it does not register to handle by default,
-      the count is recorded as ".<other extension>" or "<other protocol>",
-      respectively (neither of which are valid extension or protocol
-      identifiers).
-    keyed: true
-    expires: never
-    kind: uint
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - firefox
-    record_in_processes:
-      - main
-
-  is_default_handler:
-    bug_numbers:
-      - 1743914
-      - 1781984
-      - 1842290
-    description: >
-      Records whether Firefox was the default handler for particular file types
-      or protocols.  The result is split into keys which represent the file
-      extension or scheme: currently, a subset of the file types Firefox
-      registers to handle, namely ".pdf" and "mailto" as protocol. In the
-      future, more file types may be recorded.
-    keyed: true
-    expires: never
-    kind: boolean
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - firefox
-    record_in_processes:
-      - main
-
   is_kept_in_dock:
     bug_numbers:
       - 1715348
@@ -2112,37 +2015,6 @@ os.environment:
     kind: boolean
     notification_emails:
       - elee@mozilla.com
-      - shong@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - firefox
-    record_in_processes:
-      - main
-
-  is_taskbar_pinned:
-    bug_numbers:
-      - 1685213
-      - 1725298
-    description: Whether the non-Private Browsing version of this app was pinned to taskbar on startup
-    expires: never
-    kind: boolean
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - shong@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - firefox
-    record_in_processes:
-      - main
-
-  is_taskbar_pinned_private:
-    bug_numbers:
-      - 1751038
-    description: Whether the Private Browsing version of this app was pinned to taskbar on startup
-    expires: never
-    kind: boolean
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
       - shong@mozilla.com
     release_channel_collection: opt-out
     products:
@@ -2211,7 +2083,7 @@ media:
       - 1570634
       - 1652108
     description: >
-      The number of times a document hierarchy contained at least one HTMLMediaElement. In addition, the telemetry probe 'MIXED_CONTENT_UNBLOCK_COUNTER' records the total number of loaded top level content documents, which can help us calculate the result of the percentage of documents using media.
+      The number of times a document hierarchy contained at least one HTMLMediaElement.
     expires: never
     kind: uint
     notification_emails:
@@ -2372,23 +2244,6 @@ dom.contentprocess:
 
 # The following section contains parent process base counters.
 dom.parentprocess:
-  private_window_used:
-    bug_numbers:
-      - 1491047
-    description: >
-      Whether a private browsing window has been used in the session.
-    expires: never
-    kind: boolean
-    notification_emails:
-      - seceng-telemetry@mozilla.com
-      - ehsan+telemetry@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - 'firefox'
-      - 'fennec'
-    record_in_processes:
-      - 'main'
-
   process_launch_errors:
     bug_numbers:
       - 1819311
@@ -2936,119 +2791,6 @@ widget:
       - 'firefox'
     record_in_processes:
       - 'main'
-
-update:
-  bitshresult:
-    bug_numbers:
-      - 1343669
-      - 1540193
-      - 1520321
-    description: >
-      If a BITS download fails on the Windows side (that is to say, BITS
-      ecounters an error rather than Firefox failing to interact with BITS),
-      it will likely give an hresult error indicating what happened. This probe
-      reports those error codes to allow us to see if BITS is commonly failing
-      on some systems. This probe is keyed on the type of update download,
-      either "PARTIAL" or "COMPLETE".
-    expires: never
-    kind: uint
-    keyed: true
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - bytesized@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - 'firefox'
-      - 'fennec'
-    record_in_processes:
-      - main
-
-  move_result:
-    bug_numbers:
-      - 353804
-    description: >
-      Firefox keeps downloading updates in a different place from updates that
-      are ready to install. Once the download completes, the resulting file has
-      to be moved from the downloading update directory to the ready update
-      directory. This probe counts the results that we get when attempting to
-      perform this file move. Valid values for the keys for this probe are
-      stored in the MOVE_RESULT_* values in UpdateTelemetry.sys.mjs.
-    expires: never
-    kind: uint
-    keyed: true
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - bytesized@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - 'firefox'
-    record_in_processes:
-      - main
-
-  no_window_auto_restarts:
-    bug_numbers:
-      - 1720742
-    description: >
-      On macOS, all browser windows can be closed without exiting Firefox. If
-      there is an update pending in that case, and we can install it silently,
-      we restart automatically in order to do so. This probe counts the number
-      of times the browser restarts to silently install a pending update.
-    expires: never
-    kind: uint
-    keyed: false
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - bytesized@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - 'firefox'
-    record_in_processes:
-      - main
-
-  suppress_prompts:
-    bug_numbers:
-      - 1749155
-    description: >
-      When an update is available and app.update.auto is disabled, a popup is
-      opened prompting the user to download and install the update. The pref
-      app.update.suppressPrompts causes Firefox Nightly to wait up to 7 days
-      before showing the prompt, instead showing a badge and banner in the
-      meantime. It also prevents Nightly from showing update restart prompts,
-      instead showing a badge and banner immediately. This value is set for
-      the users who set this pref to true.
-    expires: never
-    kind: boolean
-    keyed: false
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - bytesized@mozilla.com
-    release_channel_collection: opt-in
-    products:
-      - 'firefox'
-    record_in_processes:
-      - main
-
-  version_pin:
-    bug_numbers:
-      - 1762957
-    description: >
-      The AppUpdatePin Enterprise Policy controls the maximum version that the
-      browser can update to. If the policy is set, this probe will report the
-      policy's value. The possible policy values are "X." and "X.Y.", where
-      X is the pinned major version and Y is the pinned minor version.
-    expires: never
-    kind: string
-    keyed: false
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-      - bytesized@mozilla.com
-      - telemetry-client-dev@thunderbird.net
-    release_channel_collection: opt-out
-    products:
-      - 'firefox'
-      - 'thunderbird'
-    record_in_processes:
-      - main
 
 browser.search.content:
   urlbar:
@@ -4483,21 +4225,6 @@ urlbar.unifiedsearchbutton:
       - main
 
 migration:
-  uninstaller_profile_refresh:
-    bug_numbers:
-      - 1634115
-      - 1672585
-    description: >
-      Set when a profile refresh is initiated from the uninstaller.
-    expires: never
-    kind: boolean
-    notification_emails:
-      - application-update-telemetry-alerts@mozilla.com
-    release_channel_collection: opt-out
-    products:
-      - 'firefox'
-    record_in_processes:
-      - main
   discovered_migrators:
     bug_numbers:
       - 1825655

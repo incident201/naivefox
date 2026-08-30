@@ -257,7 +257,7 @@
   }
 
   .sw-prompt-button {
-    --focus-outline-offset: var(--dimension-2);
+    --focus-outline-offset: 2px;
 
     outline: none;
   }

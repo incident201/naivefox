@@ -30,8 +30,8 @@ user-login = "Amanieu"
 user-name = "Amanieu d'Antras"
 
 [[publisher.audio_thread_priority]]
-version = "0.35.1"
-when = "2026-04-27"
+version = "0.37.0"
+when = "2026-08-10"
 user-id = 1258
 user-login = "padenot"
 user-name = "Paul Adenot"
@@ -525,36 +525,36 @@ user-login = "afranchuk"
 user-name = "Alex Franchuk"
 
 [[publisher.phf]]
-version = "0.13.1"
-when = "2025-08-23"
+version = "0.14.0"
+when = "2026-06-21"
 user-id = 51017
 user-login = "JohnTitor"
 user-name = "Yuki Okushi"
 
 [[publisher.phf_codegen]]
-version = "0.13.1"
-when = "2025-08-23"
+version = "0.14.0"
+when = "2026-06-21"
 user-id = 51017
 user-login = "JohnTitor"
 user-name = "Yuki Okushi"
 
 [[publisher.phf_generator]]
-version = "0.13.1"
-when = "2025-08-23"
+version = "0.14.0"
+when = "2026-06-21"
 user-id = 51017
 user-login = "JohnTitor"
 user-name = "Yuki Okushi"
 
 [[publisher.phf_macros]]
-version = "0.13.1"
-when = "2025-08-23"
+version = "0.14.0"
+when = "2026-06-21"
 user-id = 51017
 user-login = "JohnTitor"
 user-name = "Yuki Okushi"
 
 [[publisher.phf_shared]]
-version = "0.13.1"
-when = "2025-08-23"
+version = "0.14.0"
+when = "2026-06-21"
 user-id = 51017
 user-login = "JohnTitor"
 user-name = "Yuki Okushi"

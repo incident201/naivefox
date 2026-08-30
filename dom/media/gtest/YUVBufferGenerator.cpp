@@ -11,7 +11,8 @@
 using namespace mozilla::layers;
 using namespace mozilla;
 
-void YUVBufferGenerator::Init(const mozilla::gfx::IntSize& aSize) {
+void YUVBufferGenerator::Init(const mozilla::gfx::IntSize& aSize, uint8_t aLuma,
+                              uint8_t aChroma) {
   mImageSize = aSize;
 
   // Size the chroma region the way the image creators below lay it out, using
@@ -31,10 +32,10 @@ void YUVBufferGenerator::Init(const mozilla::gfx::IntSize& aSize) {
   mSourceBuffer.SetLength(frameLen.value());
 
   // Fill Y plane.
-  memset(mSourceBuffer.Elements(), 0x10, yPlaneLen.value());
+  memset(mSourceBuffer.Elements(), aLuma, yPlaneLen.value());
 
   // Fill Cb/Cr planes.
-  memset(mSourceBuffer.Elements() + yPlaneLen.value(), 0x80,
+  memset(mSourceBuffer.Elements() + yPlaneLen.value(), aChroma,
          cbcrPlaneLen.value());
 }
 

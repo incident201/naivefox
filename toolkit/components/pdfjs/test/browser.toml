@@ -46,6 +46,12 @@ support-files = [
 ["browser_pdfjs_download_button.js"]
 
 ["browser_pdfjs_editing_contextmenu.js"]
+support-files = [
+  "file_pdfjs_iframe.html",
+  "file_pdfjs_middle_iframe.html",
+  "file_pdfjs_nested_iframe.html",
+  "file_pdfjs_target.html",
+]
 run-if = [
   "!headless", # the headless clipboard only recognizes unicode mime type
 ]
@@ -130,6 +136,12 @@ support-files = ["file_pdfjs_numbered_pages.pdf"]
 ["browser_pdfjs_pages_contextmenu.js"]
 support-files = ["file_pdfjs_numbered_pages.pdf"]
 
+["browser_pdfjs_preloaded_worker.js"]
+support-files = [
+  "pdf_empty.sjs",
+  "pdf_truncated.sjs",
+]
+
 ["browser_pdfjs_print_enabled.js"]
 
 ["browser_pdfjs_properties.js"]
@@ -150,6 +162,7 @@ support-files = [
 support-files = [
   "!/toolkit/content/tests/browser/common/mockTransfer.js",
   "file_pdf_download_link.html",
+  "file_pdfjs_form.pdf",
 ]
 
 ["browser_pdfjs_savedialog.js"]
@@ -159,6 +172,12 @@ support-files = [
 ["browser_pdfjs_signature_storage.js"]
 
 ["browser_pdfjs_signature_telemetry.js"]
+
+["browser_pdfjs_slow_script.js"]
+support-files = [
+  "file_pdfjs_slow_script.html",
+  "file_pdfjs_slow_script.pdf",
+]
 
 ["browser_pdfjs_stamp_telemetry.js"]
 support-files = ["moz.png"]

@@ -87,6 +87,7 @@ class IPProtectionFragment : Fragment(), SystemInsetsPaddedFragment {
 
         LaunchedEffect(Unit) {
             requireComponents.ipProtection.store.dispatch(IPProtectionAction.CheckAccount)
+            requireComponents.ipProtection.store.dispatch(IPProtectionAction.CheckLocations)
         }
 
         FirefoxTheme {

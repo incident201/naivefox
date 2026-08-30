@@ -719,16 +719,6 @@ items from that key's value."
 
         self._generate_build_stats()
 
-    def static_analysis_autotest(self):
-        """Run mach static-analysis autotest, in order to make sure we dont regress"""
-        self.preflight_build()
-        self._run_mach_command_in_build_env(["configure"])
-        self._run_mach_command_in_build_env([
-            "static-analysis",
-            "autotest",
-            "--intree-tool",
-        ])
-
     def _query_mach(self):
         return [sys.executable, "mach"]
 

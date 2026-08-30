@@ -1261,45 +1261,76 @@ describe("<BaseContent> onWindowScroll", () => {
     return ref.current;
   }
 
+  // onWindowScroll is throttled, so let the throttle lapse after each scroll.
+  function scrollWindowTo(instance, value) {
+    setScrollY(value);
+    instance.onWindowScroll();
+    jest.advanceTimersByTime(10);
+  }
+
+  function scrollAction(threshold) {
+    return ac.OnlyToMain({ type: at.NEW_TAB_SCROLL, data: { threshold } });
+  }
+
   beforeEach(() => {
+    // performance is left real so componentDidMount's getEntriesByType works
+    jest.useFakeTimers({ doNotFake: ["performance"] });
     setScrollY(0);
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     setScrollY(0);
   });
 
-  it("should dispatch NEW_TAB_SCROLL when scrollY exceeds threshold", () => {
+  it("should dispatch NEW_TAB_SCROLL when scrollY exceeds the first threshold", () => {
     const dispatch = jest.fn();
     const instance = mountScroll({ ...DEFAULT_PROPS, dispatch });
-    setScrollY(150);
-    instance.onWindowScroll();
-    expect(dispatch).toHaveBeenCalledWith(
-      ac.OnlyToMain({ type: at.NEW_TAB_SCROLL })
-    );
+    scrollWindowTo(instance, 60);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(50));
   });
 
-  it("should not dispatch NEW_TAB_SCROLL when scrollY is at or below threshold", () => {
+  it("should not dispatch NEW_TAB_SCROLL when scrollY is at or below the first threshold", () => {
     const dispatch = jest.fn();
     const instance = mountScroll({ ...DEFAULT_PROPS, dispatch });
-    setScrollY(10);
-    instance.onWindowScroll();
+    scrollWindowTo(instance, 50);
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it("should set _hasScrolledForSession to true when scroll threshold exceeded", () => {
-    const instance = mountScroll(DEFAULT_PROPS);
-    setScrollY(150);
-    instance.onWindowScroll();
-    expect(instance._hasScrolledForSession).toBe(true);
-  });
-
-  it("should not dispatch NEW_TAB_SCROLL again once _hasScrolledForSession is true", () => {
+  it("should dispatch every threshold passed by a single scroll", () => {
     const dispatch = jest.fn();
     const instance = mountScroll({ ...DEFAULT_PROPS, dispatch });
-    instance._hasScrolledForSession = true;
-    setScrollY(150);
-    instance.onWindowScroll();
+    scrollWindowTo(instance, 300);
+    expect(dispatch).toHaveBeenCalledTimes(3);
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(50));
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(100));
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(250));
+  });
+
+  it("should dispatch each threshold as the user scrolls further", () => {
+    const dispatch = jest.fn();
+    const instance = mountScroll({ ...DEFAULT_PROPS, dispatch });
+    scrollWindowTo(instance, 60);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(50));
+
+    scrollWindowTo(instance, 150);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(100));
+
+    scrollWindowTo(instance, 300);
+    expect(dispatch).toHaveBeenCalledTimes(3);
+    expect(dispatch).toHaveBeenCalledWith(scrollAction(250));
+  });
+
+  it("should not dispatch NEW_TAB_SCROLL again for an already reported threshold", () => {
+    const dispatch = jest.fn();
+    const instance = mountScroll({ ...DEFAULT_PROPS, dispatch });
+    scrollWindowTo(instance, 300);
+    dispatch.mockClear();
+
+    scrollWindowTo(instance, 400);
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
@@ -2083,5 +2114,153 @@ describe("<BaseContent> five column gate", () => {
     expect(container.querySelector(".container")).not.toHaveClass(
       "sections-5-col"
     );
+  });
+});
+
+describe("<Base> wallpaper attribution", () => {
+  const ATTRIBUTED_WALLPAPER = {
+    title: "photo-hills",
+    wallpaperUrl: "https://example.com/hills.avif",
+    attribution: {
+      name: { string: "Ada Lovelace", url: "https://example.com/ada" },
+      webpage: { string: "example.com", url: "https://example.com" },
+    },
+  };
+
+  const PLAIN_WALLPAPER = { title: "solid-blue", solid_color: "#0000ff" };
+
+  // Mounting runs updateWallpaper, which writes to the shared jsdom body.
+  afterEach(() => {
+    document.body.style.removeProperty("--newtab-wallpaper");
+    document.body.style.removeProperty("--newtab-wallpaper-color");
+    document.body.style.removeProperty("--newtab-wallpaper-backgroundPosition");
+    document.body.classList.remove("lightWallpaper", "darkWallpaper");
+  });
+
+  function renderWithWallpaper({ prefs = {}, wallpapers = {} } = {}) {
+    return render(
+      <Provider
+        store={makeStore(
+          {
+            "nova.enabled": true,
+            "newtabWallpapers.enabled": true,
+            "newtabWallpapers.user.enabled": true,
+            "newtabWallpapers.wallpaper": ATTRIBUTED_WALLPAPER.title,
+            ...prefs,
+          },
+          {
+            Wallpapers: {
+              ...INITIAL_STATE.Wallpapers,
+              wallpaperList: [ATTRIBUTED_WALLPAPER, PLAIN_WALLPAPER],
+              ...wallpapers,
+            },
+          }
+        )}
+      >
+        <ConnectedBase />
+      </Provider>
+    );
+  }
+
+  it("renders the attribution under Nova when the wallpaper credits a photographer", () => {
+    const { container } = renderWithWallpaper();
+
+    const attribution = container.querySelector(".wallpaper-attribution");
+    expect(attribution).toBeInTheDocument();
+    expect(attribution).toHaveAttribute(
+      "data-l10n-id",
+      "newtab-wallpaper-attribution"
+    );
+    expect(JSON.parse(attribution.getAttribute("data-l10n-args"))).toEqual({
+      author_string: "Ada Lovelace",
+      author_url: "https://example.com/ada",
+      webpage_string: "example.com",
+      webpage_url: "https://example.com",
+    });
+  });
+
+  // Screen reader parity with classic, which also puts the attribution in the
+  // main landmark. Asserting on lastElementChild rather than a descendant match
+  // so a move into .content fails here: _Grid.scss gives every direct child of
+  // .content inline-size containment, which collapses the credit to its padding.
+  it("renders the attribution as the last child of the Nova main landmark", () => {
+    const { container } = renderWithWallpaper();
+
+    expect(
+      container.querySelector(".content-main").lastElementChild
+    ).toHaveClass("wallpaper-attribution");
+  });
+
+  it("does not render the attribution under Nova when the user turned wallpapers off", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "newtabWallpapers.user.enabled": false },
+    });
+
+    expect(
+      container.querySelector(".wallpaper-attribution")
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render the attribution under Nova when wallpapers are disabled system-wide", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "newtabWallpapers.enabled": false },
+    });
+
+    expect(
+      container.querySelector(".wallpaper-attribution")
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render the attribution for a wallpaper that ships no credit", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "newtabWallpapers.wallpaper": PLAIN_WALLPAPER.title },
+    });
+
+    expect(
+      container.querySelector(".wallpaper-attribution")
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render the attribution for an uploaded custom wallpaper", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "newtabWallpapers.wallpaper": "custom" },
+      wallpapers: { uploadedWallpaper: "blob:custom-wallpaper" },
+    });
+
+    expect(
+      container.querySelector(".wallpaper-attribution")
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render the attribution for a colour from the solid colour picker", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "newtabWallpapers.wallpaper": "solid-color-picker-#0000ff" },
+    });
+
+    expect(
+      container.querySelector(".wallpaper-attribution")
+    ).not.toBeInTheDocument();
+  });
+
+  it("still renders the attribution in the classic layout", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "nova.enabled": false },
+    });
+
+    expect(
+      container.querySelector("main.newtab-main .wallpaper-attribution")
+    ).toBeInTheDocument();
+  });
+
+  // The user pref applies to Nova only; classic checks newtabWallpapers.enabled
+  // on its own.
+  it("still renders the attribution in classic when the user pref is off", () => {
+    const { container } = renderWithWallpaper({
+      prefs: { "nova.enabled": false, "newtabWallpapers.user.enabled": false },
+    });
+
+    expect(
+      container.querySelector("main.newtab-main .wallpaper-attribution")
+    ).toBeInTheDocument();
   });
 });

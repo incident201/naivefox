@@ -6,7 +6,7 @@ import { UrlbarQueryContext } from "chrome://browser/content/urlbar/UrlbarQueryC
 import { UrlbarResult } from "chrome://browser/content/urlbar/UrlbarResult.mjs";
 
 /**
- * @import {UrlbarChild} from "../../../actors/UrlbarChild.sys.mjs"
+ * @import {UrlbarChild} from "moz-src:///browser/components/urlbar/actors/UrlbarChild.sys.mjs"
  * @import {UrlbarParentController} from "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs"
  */
 
@@ -417,7 +417,7 @@ export class UrlbarParentControllerProxy {
    * @param {UrlbarQueryContext} queryContext The context to cache.
    */
   setLastQueryContextCache(queryContext) {
-    this.#lastQueryContextWrapper = { queryContext };
+    this.#lastQueryContextWrapper = { queryContext, done: true };
     this.#actor.sendAsyncMessage("SetLastQueryContextCache", {
       instanceId: this.#instanceId,
       queryContext: queryContext.toWire(),
@@ -498,6 +498,14 @@ export class UrlbarParentControllerProxy {
       where,
       inBackground,
       browserId,
+    });
+  }
+
+  /** @type {UrlbarParentController["openPreferences"]} */
+  openPreferences(paneID) {
+    this.#actor.sendAsyncMessage("OpenPreferences", {
+      instanceId: this.#instanceId,
+      paneID,
     });
   }
 }

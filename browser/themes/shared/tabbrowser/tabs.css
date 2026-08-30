@@ -7,6 +7,11 @@
   --tab-group-suggestions-loading-animation-color-1: color-mix(in srgb, currentColor 5%, transparent);
   --tab-group-suggestions-loading-animation-color-2: color-mix(in srgb, currentColor 35%, transparent);
   --tab-min-height: 32px;
+  /* Size and padding shared by the close and audio buttons in .tab-content.
+     The padding keeps their 12px icons in a 12px content box. Pinned and
+     collapsed tabs show .tab-icon-overlay instead, sized separately. */
+  --tab-content-button-size: 20px;
+  --tab-content-button-padding: 4px;
   &[uidensity="compact"] {
     --tab-min-height: 28px;
     --tab-inline-padding: 6px;
@@ -15,6 +20,7 @@
   }
   --tab-group-label-size: var(--tab-min-height);
   &[uidensity="touch"] {
+    --tab-min-height: 41px;
     --tab-group-label-size: var(--tab-min-height);
   }
 
@@ -26,11 +32,12 @@
     --tab-min-height: 36px;
     --tab-group-label-size: 24px;
     --tab-box-shadow-selected: var(--box-shadow-level-1);
+    --tab-content-button-size: 24px;
+    --tab-content-button-padding: var(--tab-close-button-padding);
     &[uidensity="compact"] {
       --tab-min-height: 29px;
     }
     &[uidensity="touch"] {
-      --tab-min-height: 41px;
       --tab-group-label-size: 27px;
     }
   }
@@ -52,7 +59,7 @@
   --tab-collapsed-width: calc(var(--tab-collapsed-background-width) + 2 * var(--tab-inner-inline-margin));
   --tab-collapsed-split-pill-offset: 0px;
   --tab-pinned-min-width-expanded: calc(var(--tab-pinned-expanded-background-width) + 2 * var(--tab-pinned-margin-inline-expanded));
-  --tab-note-icon-end-margin: var(--dimension-4);
+  --tab-note-icon-end-margin: 4px;
   --tab-selected-color-scheme: var(--toolbar-color-scheme);
   &[lwt-tab-selected="light"] {
     --tab-selected-color-scheme: light;
@@ -206,7 +213,7 @@
     @media -moz-pref("browser.nova.enabled") {
       /* The hover highlight fills a full tab-height row and the tab group
        * label is inset within it. */
-      --tab-group-label-hover-inset: var(--dimension-2);
+      --tab-group-label-hover-inset: 2px;
       --tab-group-label-container-size: var(--tab-min-height);
       --tab-group-label-size: calc(var(--tab-group-label-container-size) - 2 * var(--tab-group-label-hover-inset));
     }
@@ -687,6 +694,7 @@ tab-split-view-wrapper[dragtarget] {
       fill: var(--tab-selected-textcolor);
       color-scheme: var(--tab-selected-color-scheme);
       border-radius: var(--border-radius-circle);
+      border: var(--border-width) solid var(--button-border-color-ghost);
 
       background-image: image(var(--audio-overlay-extra-background)), image(var(--toolbox-background-color));
       &:-moz-window-inactive {
@@ -702,10 +710,20 @@ tab-split-view-wrapper[dragtarget] {
 
       &:hover {
         --audio-overlay-extra-background: var(--button-background-color-ghost-hover);
+
+        /* stylelint-disable-next-line max-nesting-depth */
+        @media -moz-pref("browser.nova.enabled") {
+          border-color: var(--button-border-color-hover);
+        }
       }
 
       &:hover:active {
         --audio-overlay-extra-background: var(--button-background-color-ghost-active);
+
+        /* stylelint-disable-next-line max-nesting-depth */
+        @media -moz-pref("browser.nova.enabled") {
+          border-color: var(--button-border-color-active);
+        }
       }
     }
   }
@@ -756,6 +774,7 @@ tab-split-view-wrapper[dragtarget] {
         fill: var(--tab-selected-textcolor);
         color-scheme: var(--tab-selected-color-scheme);
         border-radius: var(--border-radius-circle);
+        border: var(--border-width) solid var(--button-background-color-ghost);
 
         &:-moz-window-inactive {
           background-image: image(var(--audio-overlay-extra-background)), image(var(--toolbox-background-color-inactive));
@@ -772,10 +791,20 @@ tab-split-view-wrapper[dragtarget] {
 
         &:hover {
           --audio-overlay-extra-background: var(--button-background-color-ghost-hover);
+
+          /* stylelint-disable-next-line max-nesting-depth */
+          @media -moz-pref("browser.nova.enabled") {
+            border-color: var(--button-border-color-hover);
+          }
         }
 
         &:hover:active {
           --audio-overlay-extra-background: var(--button-background-color-ghost-active);
+
+          /* stylelint-disable-next-line max-nesting-depth */
+          @media -moz-pref("browser.nova.enabled") {
+            border-color: var(--button-border-color-active);
+          }
         }
       }
     }
@@ -860,9 +889,13 @@ tab-split-view-wrapper[dragtarget] {
   display: none;
   margin-inline-end: var(--tab-icon-end-margin);
   --icon-size: var(--icon-size-xsmall);
-  --button-size-icon-small: 24px;
-  --button-min-height-small: 24px;
-  --button-border-radius: var(--border-radius-small);
+  --button-size-icon-small: var(--tab-content-button-size);
+  --button-min-height-small: var(--tab-content-button-size);
+  --button-border-radius: var(--tab-border-radius);
+
+  @media not -moz-pref("browser.nova.enabled") {
+    --button-border-radius: var(--border-radius-small);
+  }
 
   @media not -moz-pref("sidebar.visibility", "expand-on-hover") {
     /* We need these rules to apply at all times when the sidebar.visibility
@@ -921,15 +954,34 @@ tab-split-view-wrapper[dragtarget] {
 .tab-close-button {
   -moz-context-properties: fill, fill-opacity;
   margin-inline-end: calc(var(--tab-inline-padding) / -2);
-  width: 24px;
-  height: 24px;
+  width: var(--tab-content-button-size);
+  height: var(--tab-content-button-size);
   box-sizing: border-box;
-  padding: var(--tab-close-button-padding);
+  padding: var(--tab-content-button-padding);
   list-style-image: url(resource://content-accessible/close-12.svg);
 
   /* Adjust border radius by the distance to the tab. This is a hardcoded approximation
      because the exact distance is intentionally not always equal across all sides. */
   border-radius: calc(var(--tab-border-radius) - 3px);
+
+  /* Match the hover and active backgrounds of .tab-audio-button, which is a
+     ghost variant moz-button. */
+  @media -moz-pref("browser.nova.enabled") {
+    color: var(--button-text-color-ghost);
+    border: var(--border-width) solid var(--button-border-color-ghost);
+
+    &:hover {
+      background-color: var(--button-background-color-ghost-hover);
+      color: var(--button-text-color-ghost-hover);
+      border-color: var(--button-border-color-ghost-hover);
+    }
+
+    &:hover:active {
+      background-color: var(--button-background-color-ghost-active);
+      color: var(--button-text-color-ghost-active);
+      border-color: var(--button-border-color-ghost-active);
+    }
+  }
 
   #tabbrowser-tabs[orient="horizontal"] &[pinned],
   :root:not([sidebar-expand-on-hover]) #tabbrowser-tabs[orient="vertical"] &[pinned],
@@ -943,9 +995,11 @@ tab-split-view-wrapper[dragtarget] {
  * the button has a visible outline shown */
 @media not (forced-colors) {
   #tabbrowser-tabs[orient="horizontal"] {
-    .tabbrowser-tab:not([labelendaligned], [tab-note], :hover) > .tab-stack > .tab-content > .tab-close-button {
-      padding-inline-start: 0;
-      width: 18px;
+    @media not -moz-pref("browser.nova.enabled") {
+      .tabbrowser-tab:not([labelendaligned], [tab-note], :hover) > .tab-stack > .tab-content > .tab-close-button {
+        padding-inline-start: 0;
+        width: 18px;
+      }
     }
 
     .tabbrowser-tab[visuallyselected]:not([labelendaligned]):hover,
@@ -2222,12 +2276,21 @@ tab-group {
 
 .tab-group-editor-panel {
   --panel-width: 22em;
+  --panel-padding: 0;
   font: menu;
 
   @media -moz-pref("browser.nova.enabled") {
+    --panel-padding: var(--space-large) var(--space-small) 0;
+    --input-text-background-color: var(--background-color-box);
+    --panel-separator-padding: 0;
+    --panel-menuitem-padding-block: var(--space-xsmall);
+    --panel-width: 24em;
+
     > .panel-header {
       justify-content: start;
       text-align: start;
+      min-height: 0;
+      padding-block: var(--space-xsmall) var(--space-medium);
     }
 
     /* Clip the header in the edit modal for a11y. */
@@ -2241,14 +2304,10 @@ tab-group {
       pointer-events: none;
     }
 
-    /* Hide all toolbarseperators except the tab group suggestions one.
+    /* Hide all toolbarseparators except the tab group suggestions one.
      * Remove this rule and the toolbarseparators post-Nova (Bug 2056954). */
     toolbarseparator:not(#tab-group-suggestions-separator) {
       display: none;
-    }
-
-    &.tab-group-editor-mode-create .tab-group-editor-swatches {
-      padding-top: 0;
     }
 
     /* Clip the name label in the edit modal for a11y. */
@@ -2259,6 +2318,11 @@ tab-group {
       width: 0;
       height: 0;
       pointer-events: none;
+    }
+
+    .panel-footer {
+      margin-block-start: var(--space-small);
+      margin-inline: var(--panel-menuitem-margin-inline);
     }
   }
 
@@ -2295,6 +2359,10 @@ tab-group {
     justify-content: space-between;
     margin: var(--panel-menuitem-margin);
     padding-block: var(--panel-menuitem-padding-block);
+
+    @media -moz-pref("browser.nova.enabled") {
+      padding-block: 0 var(--space-large);
+    }
   }
 
   input[name="tab-group-color"] {
@@ -2692,10 +2760,14 @@ tab-group {
     border-radius: var(--border-radius-medium);
   }
 
-  @media -moz-pref("sidebar.visibility", "expand-on-hover") {
-    #tabbrowser-tabs[expanded] > &:not(:hover) {
-      background-image: none;
-      border-top: var(--tabstrip-inner-border);
+  #tabbrowser-tabs[expanded] > & {
+    background-image: none;
+
+    /* Expand on hover keeps the full width line, with the hover state on top. */
+    @media -moz-pref("sidebar.visibility", "expand-on-hover") {
+      &:not(:hover) {
+        border-top: var(--tabstrip-inner-border);
+      }
     }
   }
 
@@ -2805,11 +2877,28 @@ tab-group {
       outline-color: var(--tab-selected-outline-color);
       box-shadow: var(--tab-box-shadow-selected);
       border-radius: var(--border-radius-circle);
+      border: var(--border-width) solid var(--button-border-color-ghost);
       display: block;
       position: absolute;
       inset: auto;
       top: -3px;
       inset-inline-start: 2px;
+
+      /* Nova: 16px button with a 12px icon box, matching .tab-icon-overlay. */
+      @media -moz-pref("browser.nova.enabled") {
+        width: var(--icon-size);
+        height: var(--icon-size);
+        padding: 2px;
+        box-shadow: var(--box-shadow-level-1);
+
+        &:hover {
+          border-color: var(--button-border-color-hover);
+        }
+
+        &:hover:active {
+          border-color: var(--button-border-color-active);
+        }
+      }
 
       &:-moz-window-inactive {
         background-image:
@@ -2853,12 +2942,25 @@ tab-group {
     .tabbrowser-tab {
       max-width: none;
 
+      .tab-content {
+        /* This 'contain' styling lets us have efficient reflows inside of the
+           tab, e.g. to hide/show the tab close icon. The drawback of doing
+           this is that this element won't automagically grow the tab to fit
+           the height of our contents (the tab label).  So, to preserve that
+           behavior, we use 'contain-intrinsic-block-size' to mock the label's
+           exact content-size (a single line of text with our hardcoded
+           tab-label line-height). */
+        contain: size layout;
+        line-height: var(--tab-label-line-height);
+        contain-intrinsic-block-size: 1lh;
+      }
+
       .tab-close-button {
         margin-inline-end: calc(var(--tab-close-button-padding) / -2);
       }
 
       &:not(:hover) .tab-close-button:not([selected]) {
-        display: none;
+        visibility: collapse;
       }
     }
   }
@@ -3015,7 +3117,7 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
 
   &.grouped {
     /* Indent further by the size of a favicon and the favicon's padding-inline-start. */
-    margin-inline-start: calc(var(--panel-menuitem-margin-inline) + var(--icon-size) + var(--dimension-8));
+    margin-inline-start: calc(var(--panel-menuitem-margin-inline) + var(--icon-size) + var(--panel-menuitem-padding-inline));
   }
 
   &[selected] {
@@ -3151,8 +3253,8 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
   /* Vertical expanded: reserve space so the note icon does not jump when the close shows.*/
   #tabbrowser-tabs[orient="vertical"][expanded] & {
     .tabbrowser-tab:not(:hover) & {
-      /* .tab-close-button is 24px wide with border-box sizing */
-      margin-inline-end: calc(var(--tab-note-icon-end-margin) + 24px - var(--tab-close-button-padding) / 2);
+      /* .tab-close-button is --tab-content-button-size wide with border-box sizing */
+      margin-inline-end: calc(var(--tab-note-icon-end-margin) + var(--tab-content-button-size) - var(--tab-content-button-padding) / 2);
     }
 
     .tabbrowser-tab:is([visuallyselected], :hover) & {
@@ -3286,6 +3388,9 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
 #tab-group-suggestions-container,
 #tab-group-suggestions-optin-container {
   margin: var(--panel-menuitem-margin);
+  @media -moz-pref("browser.nova.enabled") {
+    margin-block-start: var(--space-medium);
+  }
 }
 
 .tab-group-suggestions-loading-header,

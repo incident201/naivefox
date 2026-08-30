@@ -103,5 +103,6 @@ run-if = [
 ["browser_topsites_contextMenu_options.js"]
 
 ["browser_topsites_section.js"]
+tags = "urlbar"
 
 ["browser_topsites_sponsored.js"]

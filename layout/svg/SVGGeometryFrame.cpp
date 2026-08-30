@@ -675,7 +675,7 @@ bool SVGGeometryFrame::IsInvisible() const {
   return true;
 }
 
-bool SVGGeometryFrame::CreateWebRenderCommands(
+WebRenderCommandsResult SVGGeometryFrame::CreateWebRenderCommands(
     mozilla::wr::DisplayListBuilder& aBuilder,
     mozilla::wr::IpcResourceUpdateQueue& aResources,
     const mozilla::layers::StackingContextHelper& aSc,
@@ -690,35 +690,35 @@ bool SVGGeometryFrame::CreateWebRenderCommands(
   element->GetAsSimplePath(&simplePath);
 
   if (!simplePath.IsRect()) {
-    return false;
+    return Err("path is not a simple rect");
   }
 
   const nsStyleSVG* style = StyleSVG();
   MOZ_ASSERT(style);
 
   if (!style->mFill.kind.IsColor()) {
-    return false;
+    return Err("fill is not a plain color");
   }
 
   switch (style->mFill.kind.tag) {
     case StyleSVGPaintKind::Tag::Color:
       break;
     default:
-      return false;
+      return Err("fill is not a plain color");
   }
 
   if (!style->mStroke.kind.IsNone()) {
-    return false;
+    return Err("stroke is not supported");
   }
 
   if (StyleEffects()->HasMixBlendMode()) {
     // FIXME: not implemented
-    return false;
+    return Err("mix-blend-mode is not supported");
   }
 
   if (style->HasMarker() && element->IsMarkable()) {
     // Markers aren't suppported yet.
-    return false;
+    return Err("markers are not supported");
   }
 
   if (!aDryRun) {
@@ -755,7 +755,7 @@ bool SVGGeometryFrame::CreateWebRenderCommands(
                       color);
   }
 
-  return true;
+  return Ok();
 }
 
 void SVGGeometryFrame::PaintMarkers(gfxContext& aContext,

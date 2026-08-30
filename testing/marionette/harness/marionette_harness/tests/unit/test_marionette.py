@@ -6,7 +6,6 @@ import os
 import socket
 import sys
 import time
-import unittest
 
 from marionette_driver import errors
 from marionette_driver.geckoinstance import GeckoInstance
@@ -59,7 +58,6 @@ class TestMarionette(MarionetteTestCase):
             os.path.exists(active_port_file), "MarionetteActivePort file removed"
         )
 
-    @unittest.skipIf(sys.platform.startswith("win"), "Bug 2055174")
     @run_if_manage_instance("Only runnable if Marionette manages the instance")
     def test_exit_code_for_marionette_server_failure(self):
         second_marionette = Marionette(host=self.marionette.host, port=self.marionette.port)

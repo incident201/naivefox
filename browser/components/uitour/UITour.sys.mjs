@@ -505,7 +505,7 @@ export var UITour = {
           );
         }
 
-        lazy.AIWindow.launchWindow(browser).then(success => {
+        lazy.AIWindow.launchWindow(browser, false, "bedrock").then(success => {
           if (!success) {
             lazy.log.warn(
               "showFirefoxAccountsForAIWindow: Failed to launch Smart Window"

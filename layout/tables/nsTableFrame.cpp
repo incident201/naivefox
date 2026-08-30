@@ -7138,7 +7138,7 @@ class nsDisplayTableBorderCollapse final : public nsDisplayTableItem {
   MOZ_COUNTED_DTOR_FINAL(nsDisplayTableBorderCollapse)
 
   void Paint(nsDisplayListBuilder* aBuilder, gfxContext* aCtx) override;
-  bool CreateWebRenderCommands(
+  WebRenderCommandsResult CreateWebRenderCommands(
       wr::DisplayListBuilder& aBuilder, wr::IpcResourceUpdateQueue& aResources,
       const StackingContextHelper& aSc,
       layers::RenderRootStateManager* aManager,
@@ -7164,7 +7164,7 @@ void nsDisplayTableBorderCollapse::Paint(nsDisplayListBuilder* aBuilder,
       *drawTarget, GetPaintRect(aBuilder, aCtx) - pt);
 }
 
-bool nsDisplayTableBorderCollapse::CreateWebRenderCommands(
+WebRenderCommandsResult nsDisplayTableBorderCollapse::CreateWebRenderCommands(
     wr::DisplayListBuilder& aBuilder, wr::IpcResourceUpdateQueue& aResources,
     const StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
@@ -7173,7 +7173,7 @@ bool nsDisplayTableBorderCollapse::CreateWebRenderCommands(
   static_cast<nsTableFrame*>(mFrame)->CreateWebRenderCommandsForBCBorders(
       aBuilder, aSc, GetBounds(aDisplayListBuilder, &dummy),
       ToReferenceFrame());
-  return true;
+  return Ok();
 }
 
 }  // namespace mozilla

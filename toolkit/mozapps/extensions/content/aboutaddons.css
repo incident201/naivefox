@@ -52,7 +52,7 @@ h2 {
 }
 
 .category-badge {
-  min-width: var(--dimension-20);
+  min-width: 20px;
   background-color: var(--color-accent-primary);
   color: var(--button-text-color-primary);
   font-weight: var(--font-weight-bold);
@@ -134,7 +134,7 @@ aboutaddons-themes-mode {
   addon-page-header[current-view="list"][type="theme"] & {
     display: block;
     margin-inline-start: var(--main-margin-start);
-    width: calc(var(--page-main-content-width) - var(--space-medium));
+    width: var(--page-main-content-width);
 
     @media not -moz-pref("browser.nova.enabled") {
       display: none;

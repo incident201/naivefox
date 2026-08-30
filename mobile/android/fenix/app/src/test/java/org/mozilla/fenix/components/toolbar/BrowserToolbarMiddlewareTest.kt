@@ -1474,6 +1474,7 @@ class BrowserToolbarMiddlewareTest {
                                     ShareData(
                                         url = currentTab.content.url,
                                         title = currentTab.content.title,
+                                        private = false,
                                     )
                                 ),
                             showPage = true,

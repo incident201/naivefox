@@ -295,7 +295,7 @@ static nscoord GetBaselinePosition(nsTextFrame* aFrame,
 
     case StyleDominantBaseline::TextBottom:
     case StyleDominantBaseline::Ideographic:
-      return writingMode.IsVerticalLR() ? 0 : ascent + descent;
+      return convertIfVerticalRL(ascent + descent);
 
     case StyleDominantBaseline::Central:
       return (ascent + descent) / 2.0;

@@ -4,6 +4,7 @@
 
 package mozilla.components.feature.ipprotection.store
 
+import kotlin.test.assertNotNull
 import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.concept.engine.ipprotection.IPProtectionHandler
 import mozilla.components.concept.engine.ipprotection.IPProtectionHandler.StateInfo
@@ -19,12 +20,13 @@ import mozilla.components.feature.ipprotection.store.state.AccountStatus
 import mozilla.components.feature.ipprotection.store.state.Authorized
 import mozilla.components.feature.ipprotection.store.state.Country
 import mozilla.components.feature.ipprotection.store.state.EligibilityStatus
+import mozilla.components.feature.ipprotection.store.state.LocationListUpdateState
 import mozilla.components.feature.ipprotection.store.state.LocationState
+import mozilla.components.feature.ipprotection.store.state.PendingActivationRequest
 import mozilla.components.feature.ipprotection.store.state.ProxyActivation
 import mozilla.components.feature.ipprotection.store.state.Recommended
 import mozilla.components.feature.ipprotection.store.state.Uninitialized
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -67,108 +69,109 @@ class IPProtectionReducerTest {
     fun `WHEN service is ready and proxy state is ready THEN proxyStatus is Idle`() {
         val state = buildIPProtectionState()
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_READY)
-        assertEquals(
-            state.copy(
-                serviceStatus = ServiceState.Ready,
-                proxyStatus = Authorized.Idle,
-                accountState = state.accountState.copy(status = AccountStatus.EnrolledAndEntitled),
-            ),
-            iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info)),
-        )
+
+        val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
+
+        assertEquals(Authorized.Idle, resultState.proxyStatus)
     }
 
     @Test
     fun `WHEN service is ready and proxy state is activating THEN proxyStatus is Activating`() {
         val state = buildIPProtectionState()
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_ACTIVATING)
-        assertEquals(
-            state.copy(
-                serviceStatus = ServiceState.Ready,
-                proxyStatus = Authorized.Activating,
-                accountState = state.accountState.copy(status = AccountStatus.EnrolledAndEntitled),
-            ),
-            iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info)),
-        )
+
+        val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
+
+        assertEquals(Authorized.Activating, resultState.proxyStatus)
     }
 
     @Test
     fun `WHEN service is ready and proxy state is active THEN proxyStatus is Active`() {
         val state = buildIPProtectionState()
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_ACTIVE)
-        assertEquals(
-            state.copy(
-                serviceStatus = ServiceState.Ready,
-                proxyStatus = Authorized.Active,
-                proxyActivation = ProxyActivation.TurningOn,
-                accountState = state.accountState.copy(status = AccountStatus.EnrolledAndEntitled),
-            ),
-            iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info)),
-        )
+
+        val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
+
+        assertEquals(Authorized.Active, resultState.proxyStatus)
     }
 
     @Test
     fun `WHEN service is ready and proxy state is paused THEN proxyStatus is DataLimitReached`() {
         val state = buildIPProtectionState()
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_PAUSED)
-        assertEquals(
-            state.copy(
-                serviceStatus = ServiceState.Ready,
-                proxyStatus = Authorized.DataLimitReached,
-                accountState = state.accountState.copy(status = AccountStatus.EnrolledAndEntitled),
-            ),
-            iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info)),
-        )
+
+        val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
+
+        assertEquals(Authorized.DataLimitReached, resultState.proxyStatus)
     }
 
     @Test
     fun `WHEN service is ready and proxy state is error THEN proxyStatus is ConnectionError`() {
         val state = buildIPProtectionState()
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_ERROR)
-        assertEquals(
-            state.copy(
-                serviceStatus = ServiceState.Ready,
-                proxyStatus = Authorized.ConnectionError,
-                accountState = state.accountState.copy(status = AccountStatus.EnrolledAndEntitled),
-            ),
-            iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info)),
-        )
+
+        val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
+
+        assertEquals(Authorized.ConnectionError, resultState.proxyStatus)
     }
 
     @Test
-    fun `WHEN ToggleFailed is dispatched THEN activate is cleared`() {
-        val state = buildIPProtectionState().copy(activate = true)
+    fun `WHEN ToggleFailed is dispatched THEN activation state is cleared`() {
+        val state = buildIPProtectionState().copy(pendingActivationRequest = PendingActivationRequest.Activate(null))
         assertEquals(
-            state.copy(activate = null),
+            state.copy(pendingActivationRequest = null),
             iPProtectionReducer(state, IPProtectionAction.ToggleFailed()),
         )
     }
 
     @Test
-    fun `GIVEN user has already finished auth flow successfully but service is still unauthenticated WHEN ToggleFailed is dispatched THEN activate is cleared and account is set for another check`() {
+    fun `WHEN LocationSwitchFailed is dispatched THEN activation state is cleared and location is reset to the previous one`() {
+        val previousLocation = Country("JP", available = true)
         val state =
             buildIPProtectionState()
                 .copy(
-                    activate = true,
+                    pendingActivationRequest = PendingActivationRequest.Activate("CA", isLocationSwitch = true),
+                    locationState =
+                        LocationState(
+                            selectedLocation = Country("CA", available = true),
+                            previousLocation = previousLocation,
+                        ),
+                )
+
+        val result = iPProtectionReducer(state, IPProtectionAction.LocationSwitchFailed())
+
+        assertEquals(previousLocation, result.locationState.selectedLocation)
+    }
+
+    @Test
+    fun `GIVEN user has already finished auth flow successfully but service is still unauthenticated WHEN ToggleFailed is dispatched THEN activation state is cleared and account is set for another check`() {
+        val state =
+            buildIPProtectionState()
+                .copy(
+                    pendingActivationRequest = PendingActivationRequest.Activate(null),
                     accountState = AccountState(status = AccountStatus.EnrolledAndEntitled),
                     serviceStatus = ServiceState.Unauthenticated,
                 )
         assertEquals(
-            state.copy(activate = null, accountState = state.accountState.copy(status = AccountStatus.TryAgain)),
+            state.copy(
+                pendingActivationRequest = null,
+                accountState = state.accountState.copy(status = AccountStatus.TryAgain),
+            ),
             iPProtectionReducer(state, IPProtectionAction.ToggleFailed()),
         )
     }
 
     @Test
-    fun `GIVEN user is entitled and service is ready WHEN ToggleFailed is dispatched THEN activate is cleared and account does not do extra checks`() {
+    fun `GIVEN user is entitled and service is ready WHEN ToggleFailed is dispatched THEN activation state is cleared and account does not do extra checks`() {
         val state =
             buildIPProtectionState()
                 .copy(
-                    activate = true,
+                    pendingActivationRequest = PendingActivationRequest.Activate(null),
                     accountState = AccountState(status = AccountStatus.EnrolledAndEntitled),
                     serviceStatus = ServiceState.Ready,
                 )
         assertEquals(
-            state.copy(activate = null, accountState = state.accountState),
+            state.copy(pendingActivationRequest = null, accountState = state.accountState),
             iPProtectionReducer(state, IPProtectionAction.ToggleFailed()),
         )
     }
@@ -195,15 +198,10 @@ class IPProtectionReducerTest {
     fun `WHEN proxy transitions into active from idle THEN proxyActivation is TurningOn`() {
         val state = buildIPProtectionState(proxyStatus = Authorized.Idle)
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_ACTIVE)
-        assertEquals(
-            state.copy(
-                serviceStatus = ServiceState.Ready,
-                proxyStatus = Authorized.Active,
-                proxyActivation = ProxyActivation.TurningOn,
-                accountState = state.accountState.copy(status = AccountStatus.EnrolledAndEntitled),
-            ),
-            iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info)),
-        )
+
+        val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
+
+        assertEquals(ProxyActivation.TurningOn, resultState.proxyActivation)
     }
 
     @Test
@@ -240,18 +238,18 @@ class IPProtectionReducerTest {
     }
 
     @Test
-    fun `WHEN engine settles to ready while a pending activate was queued THEN activate is cleared`() {
+    fun `WHEN engine settles to ready while there is a pending activation queued THEN activation state is cleared`() {
         val state =
             buildIPProtectionState(
                     serviceStatus = ServiceState.Ready,
                     proxyStatus = Authorized.Activating,
                 )
-                .copy(activate = true)
+                .copy(pendingActivationRequest = PendingActivationRequest.Activate(null))
         val info = StateInfo(serviceState = ServiceState.Ready, proxyState = PROXY_STATE_READY)
         val nextState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
         assertEquals(
             null,
-            nextState.activate,
+            nextState.pendingActivationRequest,
         )
     }
 
@@ -339,7 +337,7 @@ class IPProtectionReducerTest {
         val resultState = iPProtectionReducer(initialState, InternalAction.FinishingEnrollment(true))
 
         assertEquals(AccountStatus.EnrolledAndEntitled, resultState.accountState.status)
-        assertEquals(true, resultState.activate)
+        assertEquals(PendingActivationRequest.Activate(null), resultState.pendingActivationRequest)
     }
 
     @Test
@@ -352,7 +350,7 @@ class IPProtectionReducerTest {
     }
 
     @Test
-    fun `WHEN AccountManagerStateChanged to Uninitialized is dispatched THEN data and proxy flags are reset to defaults`() {
+    fun `WHEN AccountManagerStateChanged to NoAccount is dispatched THEN data and proxy flags are reset to defaults and a deactivation request is set`() {
         val dirtyState =
             buildIPProtectionState(
                     accountStatus = AccountStatus.EnrolledAndEntitled,
@@ -365,7 +363,7 @@ class IPProtectionReducerTest {
                     maxDataBytes = 5000L,
                     resetDate = "2026-06-01T00:00:00Z",
                     proxyActivation = ProxyActivation.TurningOn,
-                    activate = true,
+                    pendingActivationRequest = PendingActivationRequest.Activate(null),
                 )
 
         val resultState =
@@ -380,7 +378,7 @@ class IPProtectionReducerTest {
                 maxDataBytes = -1L,
                 resetDate = null,
                 proxyActivation = ProxyActivation.Idle,
-                activate = false,
+                pendingActivationRequest = PendingActivationRequest.Deactivate,
                 accountState = AccountState(AccountStatus.NoAccount),
             ),
             resultState,
@@ -407,7 +405,7 @@ class IPProtectionReducerTest {
 
         val resultState = iPProtectionReducer(state, IPProtectionAction.Toggle)
 
-        assertEquals(true, resultState.activate)
+        assertEquals(PendingActivationRequest.Activate(null), resultState.pendingActivationRequest)
     }
 
     @Test
@@ -417,7 +415,11 @@ class IPProtectionReducerTest {
 
             val resultState = iPProtectionReducer(state, IPProtectionAction.Toggle)
 
-            assertEquals("Toggle should turn off a $proxyStatus proxy", false, resultState.activate)
+            assertEquals(
+                "Toggle should turn off a $proxyStatus proxy",
+                PendingActivationRequest.Deactivate,
+                resultState.pendingActivationRequest,
+            )
         }
     }
 
@@ -518,23 +520,28 @@ class IPProtectionReducerTest {
     fun `WHEN the engine reports it cannot authenticate THEN a queued activation is dropped`() {
         // The engine cannot honour the pending activation, so the request must not linger.
         listOf(ServiceState.Unauthenticated, ServiceState.OptedOut, ServiceState.Unavailable).forEach { serviceStatus ->
-            val state = buildIPProtectionState().copy(activate = true)
+            val state =
+                buildIPProtectionState().copy(pendingActivationRequest = PendingActivationRequest.Activate(null))
             val info = StateInfo(serviceState = serviceStatus, proxyState = PROXY_STATE_READY)
 
             val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
 
-            assertEquals("Pending activation should be dropped for $serviceStatus", false, resultState.activate)
+            assertEquals(
+                "Pending activation should be dropped for $serviceStatus",
+                PendingActivationRequest.Deactivate,
+                resultState.pendingActivationRequest,
+            )
         }
     }
 
     @Test
     fun `WHEN the engine resets to uninitialized THEN a queued activation is cleared so a later request reads as new`() {
-        val state = buildIPProtectionState().copy(activate = true)
+        val state = buildIPProtectionState().copy(pendingActivationRequest = PendingActivationRequest.Activate(null))
         val info = StateInfo(serviceState = ServiceState.Uninitialized)
 
         val resultState = iPProtectionReducer(state, IPProtectionAction.EngineStateChanged(info))
 
-        assertEquals(null, resultState.activate)
+        assertEquals(null, resultState.pendingActivationRequest)
     }
 
     @Test
@@ -774,7 +781,10 @@ class IPProtectionReducerTest {
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
-        assertEquals(true, resultState.activate)
+        assertEquals(
+            PendingActivationRequest.Activate(updatedLocation.countryCode, isLocationSwitch = true),
+            resultState.pendingActivationRequest,
+        )
     }
 
     @Test
@@ -791,6 +801,214 @@ class IPProtectionReducerTest {
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
-        assertEquals(null, resultState.activate)
+        assertEquals(null, resultState.pendingActivationRequest)
+    }
+
+    @Test
+    fun `GIVEN a pending activation and an idle proxy WHEN user changes the location THEN the pending activation is preserved`() {
+        val updatedLocation = Country("JP", available = true)
+        val pendingActivationRequest = PendingActivationRequest.Activate(null)
+        val initialState =
+            buildIPProtectionState(serviceStatus = ServiceState.Ready, proxyStatus = Authorized.Idle)
+                .copy(pendingActivationRequest = pendingActivationRequest)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.LocationChanged(updatedLocation),
+            )
+
+        assertEquals(updatedLocation, resultState.locationState.selectedLocation)
+        assertEquals(
+            PendingActivationRequest.Activate(pendingActivationRequest.selectedLocationCode),
+            resultState.pendingActivationRequest,
+        )
+    }
+
+    @Test
+    fun `GIVEN a pending deactivation and an idle proxy WHEN user changes the location THEN the pending deactivation is preserved`() {
+        val updatedLocation = Country("JP", available = true)
+        val initialState =
+            buildIPProtectionState(serviceStatus = ServiceState.Ready, proxyStatus = Authorized.Idle)
+                .copy(pendingActivationRequest = PendingActivationRequest.Deactivate)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.LocationChanged(updatedLocation),
+            )
+
+        assertEquals(updatedLocation, resultState.locationState.selectedLocation)
+        assertEquals(PendingActivationRequest.Deactivate, resultState.pendingActivationRequest)
+    }
+
+    @Test
+    fun `WHEN the service becomes ready THEN a location list update is requested`() {
+        val initialState = buildIPProtectionState()
+
+        assertEquals(LocationListUpdateState.NotRequested, initialState.locationState.updateState)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.EngineStateChanged(StateInfo(serviceState = ServiceState.Ready)),
+            )
+
+        assertEquals(LocationListUpdateState.Requested, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `WHEN the service is not ready THEN no location list update is requested`() {
+        val initialState = buildIPProtectionState()
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.EngineStateChanged(StateInfo(serviceState = ServiceState.Unauthenticated)),
+            )
+
+        assertEquals(LocationListUpdateState.NotRequested, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `WHEN CountryListChanged is dispatched THEN the location list is marked as updated`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.Requested)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.CountryListChanged(emptyList()),
+            )
+
+        assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN an updated location list WHEN another engine state arrives THEN no new update is requested`() {
+        val initialState =
+            buildIPProtectionState(
+                serviceStatus = ServiceState.Ready,
+                updateState = LocationListUpdateState.Updated,
+            )
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.EngineStateChanged(StateInfo(serviceState = ServiceState.Ready)),
+            )
+
+        assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN an updated location list WHEN the user changes the location THEN the update state is preserved`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.Updated)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.LocationChanged(Country("JP", available = true)),
+            )
+
+        assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN an updated location list WHEN the location is reset THEN the update state is preserved`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.Updated)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.LocationReset,
+            )
+
+        assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `WHEN the user signs out THEN the location list update state is reset`() {
+        val initialState =
+            buildIPProtectionState(
+                serviceStatus = ServiceState.Ready,
+                updateState = LocationListUpdateState.Updated,
+            )
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = InternalAction.AccountManagerStateChanged(AccountStatus.NoAccount),
+            )
+
+        assertEquals(LocationListUpdateState.NotRequested, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `WHEN LocationUpdateFailed is dispatched THEN the location list update is marked as failed`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.Requested)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.LocationUpdateFailed(RuntimeException("unknown-error")),
+            )
+
+        assertEquals(LocationListUpdateState.Failed, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN no pending location list update WHEN LocationUpdateFailed is dispatched THEN the update state is unchanged`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.NotRequested)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.LocationUpdateFailed(RuntimeException("unknown-error")),
+            )
+
+        assertEquals(LocationListUpdateState.NotRequested, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN a failed location list update WHEN EngineStateChanged is dispatched THEN the update is not retried`() {
+        val initialState =
+            buildIPProtectionState(
+                serviceStatus = ServiceState.Ready,
+                updateState = LocationListUpdateState.Failed,
+            )
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.EngineStateChanged(StateInfo(serviceState = ServiceState.Ready)),
+            )
+
+        assertEquals(LocationListUpdateState.Failed, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN a failed location list update WHEN CheckLocations is dispatched THEN the update is retried`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.Failed)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.CheckLocations,
+            )
+
+        assertEquals(LocationListUpdateState.Requested, resultState.locationState.updateState)
+    }
+
+    @Test
+    fun `GIVEN an updated location list WHEN CheckLocations is dispatched THEN no update is requested`() {
+        val initialState = buildIPProtectionState(updateState = LocationListUpdateState.Updated)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.CheckLocations,
+            )
+
+        assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)
     }
 }

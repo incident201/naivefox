@@ -748,10 +748,7 @@ struct SegmentKind {
     return mozilla::HashGeneric(mState, mType, mProtect, mIsStack);
   }
 
-  bool operator==(const SegmentKind& aOther) const {
-    return mState == aOther.mState && mType == aOther.mType &&
-           mProtect == aOther.mProtect && mIsStack == aOther.mIsStack;
-  }
+  bool operator==(const SegmentKind& aOther) const = default;
 };
 
 struct SegmentStats {

@@ -27,6 +27,7 @@
 #include "js/friend/StackLimits.h"      // js::AutoCheckRecursionLimit
 #include "js/RootingAPI.h"              // JS::MutableHandle
 #include "js/Value.h"                   // JS::Value
+#include "js/WasmModule.h"              // JS::WasmModule
 #include "vm/EnvironmentObject.h"       // js::ModuleEnvironmentObject
 #include "vm/JSAtomUtils.h"             // AtomizeString
 #include "vm/JSContext.h"               // CHECK_THREAD, JSContext
@@ -343,11 +344,28 @@ JS_PUBLIC_API JSObject* JS::CompileWasmModuleAsSource(
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
 
-  wasm::BytecodeSource source(srcBuf.begin(), srcBuf.length());
-  RootedObject wasmModuleObject(cx);
-  if (!wasm::CompileForESM(cx, options, source, &wasmModuleObject)) {
+  SharedWasmCompileArgs compileArgs = BuildCompileArgsForESM(cx, options);
+  if (!compileArgs) {
     return nullptr;
   }
+
+  ESMCompileResult compileResult =
+      CompileForESM(*compileArgs, srcBuf.begin(), srcBuf.length());
+
+  RootedObject wasmModuleObject(cx);
+  if (!FinishCompileForESM(cx, *compileArgs, compileResult,
+                           &wasmModuleObject)) {
+    return nullptr;
+  }
+
+  return CreateWasmSourcePhaseModule(cx, wasmModuleObject);
+}
+
+JS_PUBLIC_API JSObject* JS::CreateWasmSourcePhaseModule(
+    JSContext* cx, Handle<JSObject*> wasmModuleObject) {
+  MOZ_ASSERT(!cx->zone()->isAtomsZone());
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
 
   Rooted<ModuleObject*> moduleObject(cx, ModuleObject::create(cx));
   if (!moduleObject) {
@@ -3132,7 +3150,10 @@ bool ContinueDynamicImport(JSContext* cx, Handle<JSScript*> referrer,
   // Step 8. Perform PerformPromiseThen(loadPromise, linkAndEvaluate,
   // onRejected).
   js::SetFunctionNativeReserved(linkAndEvaluate, 0, ObjectValue(*context));
-  JS::AddPromiseReactions(cx, loadPromise, linkAndEvaluate, nullptr);
+  if (!JS::AddPromiseReactions(cx, loadPromise, linkAndEvaluate, nullptr)) {
+    return RejectPromiseWithPendingError(cx, promiseCapability);
+  }
+
   return AsyncFunctionReturned(cx, loadPromise, UndefinedHandleValue);
 }
 

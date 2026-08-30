@@ -26,7 +26,7 @@ button {
   display: flex;
   font: inherit;
   padding: var(--panel-item-button-padding);
-  padding-inline-start: var(--panel-item-button-padding-inline-start);
+  padding-inline-start: calc(var(--panel-item-button-padding-inline-start) + var(--panel-item-button-padding-inline-start-offset));
   text-align: start;
   width: 100%;
   -moz-context-properties: fill;

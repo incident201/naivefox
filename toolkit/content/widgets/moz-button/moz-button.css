@@ -418,4 +418,11 @@ button {
     height: var(--icon-size);
     pointer-events: none;
   }
+
+  :host(moz-segmented-control-item) & label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

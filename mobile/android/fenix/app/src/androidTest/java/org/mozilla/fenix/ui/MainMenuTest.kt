@@ -308,10 +308,7 @@ class MainMenuTest {
                 recommendedExtensionTitle = installRecommendedAddon(composeTestRule)
                 verifyAddonPermissionPrompt(recommendedExtensionTitle)
                 acceptPermissionToInstallAddon()
-                verifyAddonInstallCompletedPrompt(
-                    recommendedExtensionTitle,
-                    composeTestRule.activityRule,
-                )
+                verifyAddonInstallCompletedPrompt(recommendedExtensionTitle)
                 closeAddonInstallCompletePrompt()
             }
 
@@ -356,10 +353,7 @@ class MainMenuTest {
                 recommendedExtensionTitle = installRecommendedAddon(composeTestRule)
                 verifyAddonPermissionPrompt(recommendedExtensionTitle)
                 acceptPermissionToInstallAddon()
-                verifyAddonInstallCompletedPrompt(
-                    recommendedExtensionTitle,
-                    composeTestRule.activityRule,
-                )
+                verifyAddonInstallCompletedPrompt(recommendedExtensionTitle)
                 closeAddonInstallCompletePrompt()
             }
         browserScreen(composeTestRule) {
@@ -527,7 +521,7 @@ class MainMenuTest {
                 clickTheMoreButton()
             }
             .clickSaveAsPDFButton {
-                verifyDownloadPrompt(composeTestRule, testPage.title + ".pdf")
+                verifyDownloadPrompt(composeTestRule)
             }
             .clickDownload(composeTestRule) {
                 clickSnackbarButton(composeTestRule = composeTestRule, "OPEN")
@@ -697,10 +691,7 @@ class MainMenuTest {
             .clickExtensionsButton {
                 recommendedExtensionTitle = installRecommendedAddon(composeTestRule)
                 acceptPermissionToInstallAddon()
-                verifyAddonInstallCompletedPrompt(
-                    recommendedExtensionTitle,
-                    composeTestRule.activityRule,
-                )
+                verifyAddonInstallCompletedPrompt(recommendedExtensionTitle)
                 closeAddonInstallCompletePrompt()
             }
         browserScreen(composeTestRule) {}
@@ -945,10 +936,7 @@ class MainMenuTest {
             .clickExtensionsButton {
                 recommendedExtensionTitle = installRecommendedAddon(composeTestRule)
                 acceptPermissionToInstallAddon()
-                verifyAddonInstallCompletedPrompt(
-                    recommendedExtensionTitle,
-                    composeTestRule.activityRule,
-                )
+                verifyAddonInstallCompletedPrompt(recommendedExtensionTitle)
                 closeAddonInstallCompletePrompt()
             }
         browserScreen(composeTestRule) {}

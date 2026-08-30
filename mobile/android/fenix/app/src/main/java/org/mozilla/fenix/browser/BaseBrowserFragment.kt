@@ -145,6 +145,7 @@ import mozilla.components.support.base.feature.PermissionsFeature
 import mozilla.components.support.base.feature.UserInteractionHandler
 import mozilla.components.support.base.feature.ViewBoundFeatureWrapper
 import mozilla.components.support.ktx.android.content.appName
+import mozilla.components.support.ktx.android.content.isEdgeToEdgeDisabled
 import mozilla.components.support.ktx.android.view.ImeInsetsSynchronizer
 import mozilla.components.support.ktx.android.view.enterImmersiveMode
 import mozilla.components.support.ktx.android.view.exitImmersiveMode
@@ -2213,11 +2214,13 @@ abstract class BaseBrowserFragment :
         pipFeature?.onPictureInPictureModeChanged(isInPipMode)
     }
 
-    private fun viewportFitChange(layoutInDisplayCutoutMode: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val layoutParams = activity?.window?.attributes
-            layoutParams?.layoutInDisplayCutoutMode = layoutInDisplayCutoutMode
-            activity?.window?.attributes = layoutParams
+    @VisibleForTesting
+    internal fun viewportFitChange(layoutInDisplayCutoutMode: Int) {
+        val activity = activity ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && activity.isEdgeToEdgeDisabled()) {
+            val layoutParams = activity.window.attributes
+            layoutParams.layoutInDisplayCutoutMode = layoutInDisplayCutoutMode
+            activity.window.attributes = layoutParams
         }
     }
 

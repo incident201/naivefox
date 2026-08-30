@@ -12,7 +12,7 @@ System handles:
 - {searchfox}`Action Only <browser/components/asrouter/content-src/templates/OnboardingMessage/ActionOnlyMessage.schema.json>`
 - {searchfox}`CFR URLBar Chiclet <browser/components/asrouter/content-src/templates/CFR/templates/CFRUrlbarChiclet.schema.json>`
 - {searchfox}`Extension Doorhanger <browser/components/asrouter/content-src/templates/CFR/templates/ExtensionDoorhanger.schema.json>`
-- {searchfox}`Infobar <browser/components/asrouter/content-src/templates/CFR/templates/InfoBar.schema.json>`
+- {searchfox}`Infobar <browser/components/asrouter/content-src/templates/InfoBar/InfoBar.schema.json>`
 - {searchfox}`Spotlight <browser/components/asrouter/content-src/templates/OnboardingMessage/Spotlight.schema.json>`
 - {searchfox}`Toast Notification <browser/components/asrouter/content-src/templates/ToastNotification/ToastNotification.schema.json>`
 - {searchfox}`Toolbar Badge <browser/components/asrouter/content-src/templates/OnboardingMessage/ToolbarBadgeMessage.schema.json>`
@@ -144,7 +144,7 @@ library, which is reused in the {searchfox}`Firefox MS Schemas CI job <taskclust
 {searchfox}`CFRMessageProvider <browser/components/asrouter/modules/CFRMessageProvider.sys.mjs>`, {searchfox}`OnboardingMessageProvider <browser/components/asrouter/modules/OnboardingMessageProvider.sys.mjs>`, and {searchfox}`PanelTestProvider <browser/components/asrouter/modules/PanelTestProvider.sys.mjs>`
 with the same JSON schema validation library and configuration as Experimenter.
 
-See how to run these tests {ref}`above <run_make_schemas>`.
+See how to run these tests {ref}`above <run-make-schemas>`.
 
 ## Triggers and actions
 

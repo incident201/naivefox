@@ -183,36 +183,6 @@ ID3D11Device* GLBlitHelper::GetD3D11() const {
 
 // -------------------------------------
 
-bool GLBlitHelper::BlitImage(layers::D3D11ShareHandleImage* const srcImage,
-                             const gfx::IntRect& destRect,
-                             const OriginPos destOrigin,
-                             const gfx::IntSize& fbSize) const {
-  const auto& data = srcImage->GetData();
-  if (!data) return false;
-
-  layers::SurfaceDescriptorD3D10 desc;
-  if (!data->SerializeSpecific(&desc)) return false;
-
-  return BlitDescriptor(desc, destRect, destOrigin, fbSize);
-}
-
-// -------------------------------------
-
-bool GLBlitHelper::BlitImage(layers::D3D11ZeroCopyTextureImage* const srcImage,
-                             const gfx::IntRect& destRect,
-                             const OriginPos destOrigin,
-                             const gfx::IntSize& fbSize) const {
-  const auto& data = srcImage->GetData();
-  if (!data) return false;
-
-  layers::SurfaceDescriptorD3D10 desc;
-  if (!data->SerializeSpecific(&desc)) return false;
-
-  return BlitDescriptor(desc, destRect, destOrigin, fbSize);
-}
-
-// -------------------------------------
-
 bool GLBlitHelper::BlitDescriptor(const layers::SurfaceDescriptorD3D10& desc,
                                   const gfx::IntRect& destRect,
                                   const OriginPos destOrigin,

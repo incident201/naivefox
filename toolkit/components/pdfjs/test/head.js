@@ -80,7 +80,17 @@ async function waitForPdfJSAllLayers(browser, url, layers) {
     annotationEditorPromise,
   ]);
 
-  await SpecialPowers.spawn(browser, [layers], async function (layers) {
+  await waitForPdfJSLayers(browser, layers);
+}
+
+/**
+ * Wait for each page's expected PDF layers.
+ *
+ * @param {MozBrowser|BrowsingContext} target Target containing the viewer.
+ * @param {Array<Array<string>>} layers Expected layer classes by page.
+ */
+async function waitForPdfJSLayers(target, layers) {
+  await SpecialPowers.spawn(target, [layers], async function (layers) {
     const { ContentTaskUtils } = ChromeUtils.importESModule(
       "resource://testing-common/ContentTaskUtils.sys.mjs"
     );
@@ -296,21 +306,11 @@ async function countElements(browser, selector) {
  */
 async function clickAt(browser, x, y, n = 1) {
   info(`Click at: (${x}, ${y}), ${n} times`);
+  // Keep mousedown and mouseup in one content query.
   await BrowserTestUtils.synthesizeMouseAtPoint(
     x,
     y,
     {
-      type: "mousedown",
-      button: 0,
-      clickCount: n,
-    },
-    browser
-  );
-  await BrowserTestUtils.synthesizeMouseAtPoint(
-    x,
-    y,
-    {
-      type: "mouseup",
       button: 0,
       clickCount: n,
     },
@@ -327,20 +327,10 @@ async function clickAt(browser, x, y, n = 1) {
  */
 async function clickOn(browser, selector) {
   await waitForSelector(browser, selector);
-  const [x, y] = await SpecialPowers.spawn(
-    browser,
-    [selector],
-    async selector => {
-      const element = content.document.querySelector(selector);
-      Assert.ok(
-        !!element,
-        `Element "${selector}" must be available in order to be clicked`
-      );
-      const { x, y, width, height } = element.getBoundingClientRect();
-      return [x + width / 2, y + height / 2];
-    }
-  );
-  await clickAt(browser, x, y);
+  info(`Click on: ${selector}`);
+  // Resolve the target and dispatch its click in the same content query.
+  await BrowserTestUtils.synthesizeMouseAtCenter(selector, {}, browser);
+  await TestUtils.waitForTick();
 }
 
 function focusEditorLayer(browser) {

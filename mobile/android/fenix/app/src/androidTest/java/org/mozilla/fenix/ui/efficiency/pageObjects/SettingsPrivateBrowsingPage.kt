@@ -61,6 +61,7 @@ class SettingsPrivateBrowsingPage(composeRule: AndroidComposeTestRule<HomeActivi
      * The `UnsupportedOperationException` is intentional to ensure this placeholder is never used in production or
      * non-demo tests.
      */
+    @Suppress("UnusedParameter")
     fun setPrivateBrowsing(on: Boolean) {
         throw UnsupportedOperationException("setPrivateBrowsing is not supported by ${this::class.simpleName}")
     }

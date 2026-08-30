@@ -302,6 +302,7 @@
   skin/classic/browser/sidebar/kit-page-history.svg           (../shared/sidebar/kit-page-history.svg)
   skin/classic/browser/sidebar/kit-tabs-devices.svg           (../shared/sidebar/kit-tabs-devices.svg)
   skin/classic/browser/sidebar/kit-tabs-devices-error.svg     (../shared/sidebar/kit-tabs-devices-error.svg)
+  skin/classic/browser/sidebar/kit-qr-tabs-devices-empty.svg  (../shared/sidebar/kit-qr-tabs-devices-empty.svg)
   skin/classic/browser/tabbrowser/content-area.css             (../shared/tabbrowser/content-area.css)
   skin/classic/browser/tabbrowser/crashed.svg                  (../shared/tabbrowser/crashed.svg)
   skin/classic/browser/tabbrowser/ctrlTab.css                  (../shared/tabbrowser/ctrlTab.css)

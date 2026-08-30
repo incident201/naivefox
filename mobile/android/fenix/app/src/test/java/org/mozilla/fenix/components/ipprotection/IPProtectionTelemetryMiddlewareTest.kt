@@ -107,6 +107,35 @@ class IPProtectionTelemetryMiddlewareTest {
     }
 
     @Test
+    fun `GIVEN the location switch failed with no or a non-proxy error THEN no error code is recorded`() {
+        assertNull(Vpn.locationSwitchError.testGetValue())
+
+        val store = createStore(initialStatus = AccountStatus.EnrolledAndEntitled)
+
+        store.dispatch(IPProtectionAction.LocationSwitchFailed())
+        store.dispatch(IPProtectionAction.LocationSwitchFailed(RuntimeException("It's a null-pointer!")))
+
+        val events = Vpn.locationSwitchError.testGetValue()
+        assertNotNull(events)
+        assertEquals(2, events.size)
+        assertTrue(events.all { it.extra?.get("error_code") == "null" })
+    }
+
+    @Test
+    fun `GIVEN the location list update failed THEN the error class name is recorded`() {
+        assertNull(Vpn.locationUpdateError.testGetValue())
+
+        val store = createStore(initialStatus = AccountStatus.EnrolledAndEntitled)
+
+        store.dispatch(IPProtectionAction.LocationUpdateFailed(RuntimeException("generic-error")))
+
+        val events = Vpn.locationUpdateError.testGetValue()
+        assertNotNull(events)
+        assertEquals(1, events.size)
+        assertEquals("RuntimeException", events.first().extra?.get("error_code"))
+    }
+
+    @Test
     fun `GIVEN user has already finished auth flow successfully but service is still unauthenticated WHEN the VPN toggle failed THEN a generic network error telemetry is recorded`() {
         assertNull(Vpn.entitledAccountUnauthenticated.testGetValue())
 

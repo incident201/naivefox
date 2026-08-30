@@ -115,6 +115,12 @@ export class PanelList extends HTMLElement {
   }
 
   show(triggeringEvent, target) {
+    // Re-arming the triggeringEvent guard in handleEvent() on an open list
+    // would make it ignore the event currently being dispatched.
+    if (this.open) {
+      return;
+    }
+
     this.triggeringEvent = triggeringEvent;
     this.lastAnchorNode =
       target || this.getTargetForEvent(this.triggeringEvent);
@@ -243,8 +249,14 @@ export class PanelList extends HTMLElement {
     // Set the showing attribute to hide the panel until its alignment is set.
     this.setAttribute("showing", "true");
     // Tell the host element to hide any overflow in case the panel extends off
-    // the page before the alignment is set.
-    hostElement.style.overflow = "hidden";
+    // the page before the alignment is set. A popover skips it: mutating the
+    // host's overflow reconstructs its frame, which makes every scrollable
+    // descendant dispatch a `scroll` event it never scrolled for (bug 2066409),
+    // and `addHideListeners()` reads that as the anchor moving away.
+    const hideHostOverflow = !this.supportsPopover();
+    if (hideHostOverflow) {
+      hostElement.style.overflow = "hidden";
+    }
 
     // Wait for a layout flush, then find the bounds.
     let {
@@ -365,7 +377,9 @@ export class PanelList extends HTMLElement {
       // Set the alignments and show the panel.
       this.setAttribute("align", align);
       this.setAttribute("valign", valign);
-      hostElement.style.overflow = "";
+      if (hideHostOverflow) {
+        hostElement.style.overflow = "";
+      }
       // Decide positioning based on where this panel will be rendered
       const offsetParentIsBody =
         this.supportsPopover() ||

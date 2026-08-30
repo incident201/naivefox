@@ -2228,7 +2228,8 @@ void RTCRtpSender::UpdateBaseConfig(BaseConfig* aConfig) {
       // @@NG read extmap from track
       details.ForEachRTPHeaderExtension(
           [&extmaps](const SdpExtmapAttributeList::Extmap& extmap) {
-            extmaps.emplace_back(extmap.extensionname, extmap.entry);
+            extmaps.emplace_back(extmap.extensionname,
+                                 webrtc::RtpHeaderExtensionId(extmap.entry));
           });
       aConfig->mLocalRtpExtensions = std::move(extmaps);
     }

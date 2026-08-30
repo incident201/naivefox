@@ -255,13 +255,43 @@ class Settings(
 
     /** Indicates whether or not the "Collections" section should be shown on the home screen. */
     val collections: Boolean
-        get() = FxNimbus.features.homescreen.value().sectionsEnabled[HomeScreenSection.COLLECTIONS] == true
+        get() =
+            !hideCollectionsUi &&
+                FxNimbus.features.homescreen.value().sectionsEnabled[HomeScreenSection.COLLECTIONS] == true
 
     /** Whether the Collections UI should be hidden. */
     var hideCollectionsUi by
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_hide_collections),
             default = { FxNimbus.features.collectionsToTabGroupsMigration.value().hideCollectionsUi },
+        )
+
+    /** Whether the Collections to Tab Groups migration should run. */
+    var migrateCollectionsToTabGroupsEnabled by
+        booleanPreference(
+            appContext.getPreferenceKey(R.string.pref_key_migrate_collections_to_tab_groups),
+            default = { FxNimbus.features.collectionsToTabGroupsMigration.value().enabled },
+        )
+
+    /** Whether the Collections to Tab Groups has been migrated. */
+    var hasMigratedCollectionsToTabGroups by
+        booleanPreference(
+            appContext.getPreferenceKey(R.string.pref_key_has_migrated_collections_to_tab_groups),
+            default = false,
+        )
+
+    /** The set of Collections IDs migrated to Tab Groups. */
+    var migratedCollectionIds by
+        stringSetPreference(
+            appContext.getPreferenceKey(R.string.pref_key_migrated_collection_ids),
+            default = setOf(),
+        )
+
+    /** Indicates whether the collections migration card should be shown. */
+    var shouldShowCollectionsMigrationCard by
+        booleanPreference(
+            appContext.getPreferenceKey(R.string.pref_key_show_collections_migration_card),
+            default = false,
         )
 
     /** Indicates whether or not the Firefox Japan Guide default site should be shown. */
@@ -505,6 +535,13 @@ class Settings(
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_referral_ping_submitted),
             default = false,
+        )
+
+    /** The referral code carried by the install referrer, recorded for display in the debug drawer only. */
+    var referralCode by
+        stringPreference(
+            appContext.getPreferenceKey(R.string.pref_key_referral_code),
+            default = "",
         )
 
     var rtamoAddonDownloadUrl by
@@ -2730,6 +2767,23 @@ class Settings(
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_enable_listen_to_page),
             default = { FxNimbus.features.listenToPage.value().enabled },
+        )
+
+    /** Nimbus controlled feature flag that indicates if the weekly privacy notification feature should be enabled. */
+    var weeklyPrivacyNotificationFeatureFlagEnabled by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_enable_weekly_privacy_notification),
+            default = { FxNimbus.features.weeklyPrivacyNotification.value().enabled },
+        )
+
+    /**
+     * Debug-only switch to force the weekly privacy report notification to show, without needing real
+     * tracking-protection data to cross the notification's blocked-tracker threshold.
+     */
+    var debugForceWeeklyPrivacyReportNotification by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_debug_force_weekly_privacy_report_notification),
+            default = false,
         )
 
     var aiControlsFeatureFlagEnabled by

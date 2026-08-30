@@ -42,7 +42,7 @@ typescript/index
    * - cpp virtual final
      -
      -
-     - :ref:`cpp virtual final <cpp virtual final>`
+     - :ref:`cpp virtual final <cpp-virtual-final>`
      -
    * - clang-format
      - Yes

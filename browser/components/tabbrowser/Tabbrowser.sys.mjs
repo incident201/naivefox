@@ -61,6 +61,16 @@ const lazy = XPCOMUtils.declareLazy({
   SponsorProtection:
     "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
   TabCrashHandler: "resource:///modules/ContentCrashHandlers.sys.mjs",
+  tabLocalization: () =>
+    new Localization(
+      [
+        "browser/tabbrowser.ftl",
+        "browser/taskbartabs.ftl",
+        "branding/brand.ftl",
+      ],
+      true
+    ),
+  TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
   TabStateFlusher:
     "moz-src:///browser/components/sessionstore/TabStateFlusher.sys.mjs",
   TaskbarTabs: "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs",
@@ -218,22 +228,6 @@ export class Tabbrowser {
     this.splitViewCommandSet =
       this.document.getElementById("splitViewCommands");
 
-    // Defined on the instance, not on `lazy`, because callers reach it as
-    // `gBrowser.TabMetrics`.
-    // eslint-disable-next-line mozilla/lazy-getter-object-name
-    ChromeUtils.defineESModuleGetters(this, {
-      TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
-    });
-    ChromeUtils.defineLazyGetter(this, "tabLocalization", () => {
-      return new Localization(
-        [
-          "browser/tabbrowser.ftl",
-          "browser/taskbartabs.ftl",
-          "branding/brand.ftl",
-        ],
-        true
-      );
-    });
     XPCOMUtils.defineLazyPreferenceGetter(
       this,
       "tabGroupsEnabled",
@@ -307,6 +301,16 @@ export class Tabbrowser {
   // are updated separately.
   get ownerDocument() {
     return this.document;
+  }
+
+  // `TabMetrics` and `tabLocalization` are read from outside this module as
+  // `gBrowser.TabMetrics` and `gBrowser.tabLocalization`.
+  get TabMetrics() {
+    return lazy.TabMetrics;
+  }
+
+  get tabLocalization() {
+    return lazy.tabLocalization;
   }
 
   constructor(window) {
@@ -2474,6 +2478,26 @@ export class Tabbrowser {
     return this.#setTabLabel(aTab, aLabel);
   }
 
+  /**
+   * Sets a tab's label, shortened and clamped for display.
+   *
+   * @param {MozTabbrowserTab} aTab
+   *   The tab to label.
+   * @param {string} aLabel
+   *   The label to set.
+   * @param {object} [options]
+   * @param {boolean} [options.beforeTabOpen]
+   *   Whether the tab is yet to dispatch TabOpen, in which case no
+   *   TabAttrModified event is dispatched for the label.
+   * @param {boolean} [options.isContentTitle]
+   *   Whether the label is the content's title. Anything else has its
+   *   protocol and leading "www." stripped.
+   * @param {boolean} [options.isURL]
+   *   Whether the label is a URL, which truncates a long base64 `data:` URL
+   *   and leaves an `about:reader` URL unset.
+   * @returns {boolean}
+   *   Whether the label changed.
+   */
   #setTabLabel(aTab, aLabel, { beforeTabOpen, isContentTitle, isURL } = {}) {
     if (!aLabel || (isURL && /^about:reader\?url=/.test(aLabel))) {
       return false;
@@ -2725,6 +2749,20 @@ export class Tabbrowser {
     return tabs;
   }
 
+  /**
+   * Moves a browser to another content process, replacing its frameloader.
+   *
+   * @param {MozBrowser} aBrowser
+   *   The browser to switch.
+   * @param {object} [options]
+   * @param {boolean} [options.newFrameloader]
+   *   Replace the frameloader even if the remote type stays the same.
+   * @param {string} [options.remoteType]
+   *   The remote type to switch to, `E10SUtils.NOT_REMOTE` for a non-remote
+   *   browser. Required.
+   * @returns {boolean}
+   *   Whether the browser changed.
+   */
   updateBrowserRemoteness(aBrowser, { newFrameloader, remoteType } = {}) {
     let isRemote = aBrowser.hasAttribute("remote");
 
@@ -2899,6 +2937,31 @@ export class Tabbrowser {
     return false;
   }
 
+  /**
+   * Creates a browser element, along with the containers it lives in.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.isPreloadBrowser]
+   *   Whether the browser is being preloaded for a tab yet to be opened.
+   * @param {string} [options.name]
+   *   The name content sees for the window the browser hosts.
+   * @param {nsIOpenWindowInfo} [options.openWindowInfo]
+   *   Information about the content window that asked for the browser.
+   * @param {string} [options.remoteType]
+   *   The content process type the browser starts out in.
+   * @param {number} [options.initialBrowsingContextGroupId]
+   *   The browsing context group to create the browser in, which takes part in
+   *   choosing its content process.
+   * @param {boolean} [options.uriIsAboutBlank]
+   *   Whether the browser is about to load about:blank, which the initial
+   *   blank document then serves.
+   * @param {number} [options.userContextId]
+   *   The container the browser loads in.
+   * @param {boolean} [options.skipLoad]
+   *   Whether the browser is created without a load, which leaves it without
+   *   an initial blank document.
+   * @returns {MozBrowser}
+   */
   createBrowser({
     isPreloadBrowser,
     name,
@@ -3472,9 +3535,9 @@ export class Tabbrowser {
    *   Whether this tab was opened from a URL supplied to Firefox from an
    *   external application.
    * @param {boolean} [options.inBackground=true]
-   *   Whether the tab is being opened in the background. This does not
-   *   select the tab - it only decides whether the selected tab becomes the
-   *   new tab's owner, i.e. the tab to select when the new tab is closed.
+   *   Whether to open the tab in the background. A foreground tab is
+   *   selected, and takes the previously selected tab as its owner, i.e. the
+   *   tab to select when this one is closed.
    * @param {boolean} [options.isCaptivePortalTab]
    *   Whether the tab loads a captive portal login page, whose load must not
    *   use DNS over HTTPS.
@@ -4278,12 +4341,12 @@ export class Tabbrowser {
   }
 
   /**
-   * @param {MozSplitViewWrapper} container
+   * @param {MozTabSplitViewWrapper} container
    * @param {object} [options]
    * @param {number} [options.elementIndex]
    * @param {number} [options.tabIndex]
    * @param {boolean} [options.selectTab]
-   * @returns {MozSplitViewWrapper}
+   * @returns {MozTabSplitViewWrapper}
    */
   adoptSplitView(container, { elementIndex, tabIndex, selectTab } = {}) {
     if (container.ownerDocument == this.document) {
@@ -4971,6 +5034,11 @@ export class Tabbrowser {
         if (!splitView) {
           tabsFragment.appendChild(tab);
         } else if (splitView?.node) {
+          // Treat split views as a unit for hiding purposes -- both tabs and
+          // the split view wrapper itself should be hidden.
+          if (splitView.tabs.some(t => t.hidden)) {
+            splitView.node.toggleAttribute("hidden", true);
+          }
           tabsFragment.appendChild(splitView.node);
         }
 
@@ -5048,6 +5116,16 @@ export class Tabbrowser {
     return tabs;
   }
 
+  /**
+   * Moves a tab, or all selected tabs if it is one of them, to the start of
+   * the tab strip.
+   *
+   * @param {MozTabbrowserTab} contextTab
+   *   The tab the command was invoked on.
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   moveTabsToStart(contextTab, { metricsContext } = {}) {
     let tabs = contextTab.multiselected ? this.selectedTabs : [contextTab];
     this.recordTabMetrics(this.TabMetrics.METRIC_ACTION.MOVE, metricsContext, {
@@ -5061,6 +5139,16 @@ export class Tabbrowser {
     }
   }
 
+  /**
+   * Moves a tab, or all selected tabs if it is one of them, to the end of the
+   * tab strip.
+   *
+   * @param {MozTabbrowserTab} contextTab
+   *   The tab the command was invoked on.
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   moveTabsToEnd(contextTab, { metricsContext } = {}) {
     let tabs = contextTab.multiselected ? this.selectedTabs : [contextTab];
     this.recordTabMetrics(this.TabMetrics.METRIC_ACTION.MOVE, metricsContext, {
@@ -5647,6 +5735,16 @@ export class Tabbrowser {
     this.removeTabs(tabsToRemove, aParams);
   }
 
+  /**
+   * Closes the selected tabs, warning about the number of tabs first if the
+   * user asked to be warned.
+   *
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   * @param {boolean} [options.excludePinnedTabs]
+   *   Leave the selected tabs that are pinned open.
+   */
   removeMultiSelectedTabs({ metricsContext, excludePinnedTabs } = {}) {
     let selectedTabs = this.selectedTabs;
     if (
@@ -5706,6 +5804,7 @@ export class Tabbrowser {
    * @param {TabMetricsContext} options.metricsContext
    *   The context for the operation for telemetry purposes.
    * @returns {StartRemoveTabsResult}
+   * @see Tabbrowser.runBeforeUnloadForTabs
    */
   #startRemoveTabs(
     tabs,
@@ -5913,6 +6012,7 @@ export class Tabbrowser {
    *   Used by removeTabGroup.
    * @param {TabMetricsContext} [options.metricsContext]
    *   The context for the operation for telemetry purposes
+   * @see Tabbrowser.runBeforeUnloadForTabs
    */
   removeTabs(
     tabs,
@@ -6077,6 +6177,33 @@ export class Tabbrowser {
     this.removeTab(tab, { skipPermitUnload: true });
   }
 
+  /**
+   * Closes a tab.
+   *
+   * @param {MozTabbrowserTab} aTab
+   *   The tab to close.
+   * @param {object} [options]
+   * @param {boolean} [options.animate]
+   *   Whether or not to animate closing.
+   * @param {MouseEvent} [options.triggeringEvent]
+   *   The event the close comes from. A mouse click on a tab keeps the
+   *   remaining tabs at their current width, so that the next tab moves under
+   *   the pointer.
+   * @param {boolean} [options.skipPermitUnload]
+   *   Skips the before unload checks for the tab. Only set this to true when
+   *   using it in tandem with `runBeforeUnloadForTabs`.
+   * @param {boolean} [options.closeWindowWithLastTab]
+   *   Whether closing the last tab of the window closes the window. Defaults
+   *   to what the `browser.tabs.closeWindowWithLastTab` preference and the
+   *   window's toolbar visibility say.
+   * @param {boolean} [options.prewarmed]
+   *   Whether the tab that would be selected next has already been warmed up.
+   * @param {boolean} [options.skipSessionStore]
+   *   If true, don't record the closed tab in SessionStore.
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   * @see Tabbrowser.runBeforeUnloadForTabs
+   */
   removeTab(
     aTab,
     {
@@ -6235,6 +6362,36 @@ export class Tabbrowser {
     return false;
   }
 
+  /**
+   * Takes a tab out of the tab strip, up to the point where its closing
+   * animation can run.
+   *
+   * @param {MozTabbrowserTab} aTab
+   *   The tab to remove.
+   * @param {object} [options]
+   * @param {MozTabbrowserTab} [options.adoptedByTab]
+   *   The tab in another window taking this one's browser over, which leaves
+   *   the browser alive for it.
+   * @param {boolean} [options.closeWindowWithLastTab]
+   *   Whether closing the last tab of the window closes the window. Defaults
+   *   to what the `browser.tabs.closeWindowWithLastTab` preference and the
+   *   window's toolbar visibility say.
+   * @param {boolean} [options.closeWindowFastpath]
+   *   Whether closing the window may skip replacing the last tab with a blank
+   *   one, which is notably faster.
+   * @param {boolean} [options.skipPermitUnload]
+   *   Skips the before unload checks for the tab. Only set this to true when
+   *   using it in tandem with `runBeforeUnloadForTabs`.
+   * @param {boolean} [options.prewarmed]
+   *   Whether the tab that would be selected next has already been warmed up.
+   * @param {boolean} [options.skipSessionStore]
+   *   If true, don't record the closed tab in SessionStore.
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   * @returns {boolean}
+   *   Whether the caller should go on to finish removing the tab.
+   * @see Tabbrowser.runBeforeUnloadForTabs
+   */
   #beginRemoveTab(
     aTab,
     {
@@ -6618,9 +6775,9 @@ export class Tabbrowser {
    * Closes all tabs matching the list of nsURIs.
    * This does not close any tabs that have a beforeUnload prompt.
    *
-   * @param {nsURI[]} urisToClose
+   * @param {nsIURI[]} urisToClose
    *   The set of uris to remove.
-   * @returns {number} The count of successfully closed tabs.
+   * @returns {Promise<number>} The count of successfully closed tabs.
    */
   async closeTabsByURI(urisToClose) {
     let tabsToRemove = [];
@@ -7186,6 +7343,10 @@ export class Tabbrowser {
     const notifyAll = Ci.nsIWebProgress.NOTIFY_ALL;
     filter.addProgressListener(tabListener, notifyAll);
     ourBrowser.webProgress.addProgressListener(filter, notifyAll);
+
+    // The swap gave this tab a different browsing context, and therefore a
+    // different media controller to listen to.
+    aOurTab.registerAudibleChangeHandler();
   }
 
   #swapRegisteredOpenURIs(aOurBrowser, aOtherBrowser) {
@@ -7319,6 +7480,7 @@ export class Tabbrowser {
           this.showTab(sibling);
         }
       }
+      aTab.splitview.toggleAttribute("hidden", false);
     }
   }
 
@@ -7367,9 +7529,22 @@ export class Tabbrowser {
           this.hideTab(sibling, aSource);
         }
       }
+      aTab.splitview.toggleAttribute("hidden", true);
     }
   }
 
+  /**
+   * Selects a visible tab by index, counting from the end for a negative
+   * index and clamping to either end.
+   *
+   * @param {number} aIndex
+   *   Index within the visible tabs.
+   * @param {object} [options]
+   * @param {Event} [options.event]
+   *   The event the selection comes from, which is consumed.
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   selectTabAtIndex(aIndex, { event, metricsContext } = {}) {
     let tabs = this.visibleTabs;
 
@@ -7543,18 +7718,20 @@ export class Tabbrowser {
   }
 
   /**
+   * Whether the element is a `<tab>`.
+   *
    * @param {Element} element
-   * @returns {boolean}
-   *   `true` if element is a `<tab>`
+   * @returns {element is MozTabbrowserTab}
    */
   isTab(element) {
     return !!(element?.tagName == "tab");
   }
 
   /**
+   * Whether the element is a `<tab-group>`.
+   *
    * @param {Element} element
-   * @returns {boolean}
-   *   `true` if element is a `<tab-group>`
+   * @returns {element is MozTabbrowserTabGroup}
    */
   isTabGroup(element) {
     return !!(element?.tagName == "tab-group");
@@ -7570,9 +7747,10 @@ export class Tabbrowser {
   }
 
   /**
+   * Whether the element is a `<tab-split-view-wrapper>`.
+   *
    * @param {Element} element
-   * @returns {boolean}
-   *   `true` if element is a `<tab-split-view-wrapper>`
+   * @returns {element is MozTabSplitViewWrapper}
    */
   isSplitViewWrapper(element) {
     return !!(element?.tagName == "tab-split-view-wrapper");
@@ -7855,7 +8033,7 @@ export class Tabbrowser {
    *
    * @param {MozTabbrowserTab} aTab
    * @param {MozTabSplitViewWrapper} aSplitViewWrapper
-   * @param {int} [insertAtIndex=-1] An optional index for a tab to insert into the split view
+   * @param {number} [insertAtIndex=-1] An optional index for a tab to insert into the split view
    */
   moveTabToSplitView(aTab, aSplitViewWrapper, insertAtIndex = -1) {
     if (!this.isTab(aTab)) {
@@ -7923,7 +8101,7 @@ export class Tabbrowser {
 
   /**
    *
-   * @param {MozSplitViewWrapper} aSplitView
+   * @param {MozTabSplitViewWrapper} aSplitView
    * @param {MozTabbrowserTabGroup} aGroup
    * @param {object} [options]
    * @param {TabMetricsContext} [options.metricsContext]
@@ -8192,6 +8370,15 @@ export class Tabbrowser {
     return newTab;
   }
 
+  /**
+   * Moves the selected tab, or the split view holding it, one position toward
+   * the end of the tab strip. A collapsed tab group is stepped over, an
+   * expanded one is entered, and a tab at the end of a group leaves it.
+   *
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   moveTabForward({ metricsContext } = {}) {
     let { selectedTab } = this;
     let selectedTabOrSplitview = selectedTab.splitview || selectedTab;
@@ -8234,6 +8421,15 @@ export class Tabbrowser {
     }
   }
 
+  /**
+   * Moves the selected tab, or the split view holding it, one position toward
+   * the start of the tab strip. A collapsed tab group is stepped over, an
+   * expanded one is entered, and a tab at the start of a group leaves it.
+   *
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   moveTabBackward({ metricsContext } = {}) {
     let { selectedTab } = this;
     let selectedTabOrSplitview = selectedTab.splitview || selectedTab;
@@ -8273,6 +8469,16 @@ export class Tabbrowser {
     }
   }
 
+  /**
+   * Moves a tab to the start of the tab strip, out of its group if it is in
+   * one.
+   *
+   * @param {MozTabbrowserTab} [aTab=this.selectedTab]
+   *   The tab to move.
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   moveTabToStart(aTab = this.selectedTab, { metricsContext } = {}) {
     this.moveTabTo(aTab, {
       tabIndex: 0,
@@ -8281,6 +8487,16 @@ export class Tabbrowser {
     });
   }
 
+  /**
+   * Moves a tab to the end of the tab strip, out of its group if it is in
+   * one.
+   *
+   * @param {MozTabbrowserTab} [aTab=this.selectedTab]
+   *   The tab to move.
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   moveTabToEnd(aTab = this.selectedTab, { metricsContext } = {}) {
     this.moveTabTo(aTab, {
       tabIndex: this.tabs.length - 1,
@@ -8545,7 +8761,7 @@ export class Tabbrowser {
     ) {
       tabs.push(selectedTab);
     }
-    return tabs.sort((a, b) => a.index > b.index);
+    return tabs.sort((a, b) => a.index - b.index);
   }
 
   /**
@@ -8647,6 +8863,13 @@ export class Tabbrowser {
     }
   }
 
+  /**
+   * Pins the selected tabs.
+   *
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   pinMultiSelectedTabs({
     metricsContext = this.TabMetrics.UNKNOWN_CONTEXT,
   } = {}) {
@@ -8655,10 +8878,19 @@ export class Tabbrowser {
       tabCount: tabs.length,
     });
     for (let tab of tabs) {
-      this.pinTab(tab, this.TabMetrics.decomposedContext(metricsContext));
+      this.pinTab(tab, {
+        metricsContext: this.TabMetrics.decomposedContext(metricsContext),
+      });
     }
   }
 
+  /**
+   * Unpins the selected tabs, keeping their visual order.
+   *
+   * @param {object} [options]
+   * @param {TabMetricsContext} [options.metricsContext]
+   *   The context for the operation for telemetry purposes.
+   */
   unpinMultiSelectedTabs({ metricsContext } = {}) {
     // The selectedTabs getter returns the tabs
     // in visual order. We need to unpin in reverse

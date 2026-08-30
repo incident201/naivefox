@@ -120,13 +120,6 @@ class DefaultTabManagerControllerTest {
     private val collectionStorage: TabCollectionStorage = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
-    private val testPrivateTab =
-        createTab(
-            id = "privateTestTabId",
-            url = "",
-            private = true,
-        )
-
     private val testNormalTab =
         createTab(
             id = "testTabId",
@@ -1919,7 +1912,14 @@ class DefaultTabManagerControllerTest {
 
         verify {
             shareUseCases.shareItems(
-                items = listOf(ShareData(url = tab.content.url, title = tab.content.title)),
+                items =
+                    listOf(
+                        ShareData(
+                            url = tab.content.url,
+                            title = tab.content.title,
+                            private = tab.content.private,
+                        )
+                    ),
                 source = ShareSource.TABS_TRAY,
                 isPrivate = false,
                 chooserActions = ShareSheetChooserAction.tabChooserActions,
@@ -1946,8 +1946,16 @@ class DefaultTabManagerControllerTest {
             shareUseCases.shareItems(
                 items =
                     listOf(
-                        ShareData(url = tab1.content.url, title = tab1.content.title),
-                        ShareData(url = tab2.content.url, title = tab2.content.title),
+                        ShareData(
+                            url = tab1.content.url,
+                            title = tab1.content.title,
+                            private = tab1.content.private,
+                        ),
+                        ShareData(
+                            url = tab2.content.url,
+                            title = tab2.content.title,
+                            private = tab2.content.private,
+                        ),
                     ),
                 source = ShareSource.TABS_TRAY,
                 isPrivate = false,
@@ -1982,8 +1990,16 @@ class DefaultTabManagerControllerTest {
             shareUseCases.shareItems(
                 items =
                     listOf(
-                        ShareData(url = tab1.content.url, title = tab1.content.title),
-                        ShareData(url = tab2.content.url, title = tab2.content.title),
+                        ShareData(
+                            url = tab1.content.url,
+                            title = tab1.content.title,
+                            private = tab1.content.private,
+                        ),
+                        ShareData(
+                            url = tab2.content.url,
+                            title = tab2.content.title,
+                            private = tab2.content.private,
+                        ),
                     ),
                 source = ShareSource.TABS_TRAY,
                 isPrivate = false,

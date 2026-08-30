@@ -10,7 +10,7 @@
   const lazy = {};
 
   ChromeUtils.defineESModuleGetters(lazy, {
-    AutoCompleteParent: "resource://gre/actors/AutoCompleteParent.sys.mjs",
+    AutoCompleteParent: "moz-src:///toolkit/actors/AutoCompleteParent.sys.mjs",
   });
 
   if (!customElements.get("autocomplete-row-item")) {
@@ -110,9 +110,15 @@
 
                 let item = event.target.closest("richlistbox,richlistitem");
 
-                // If we hit the richlistbox and not a richlistitem, we ignore
-                // the event.
+                // The pointer is over the richlistbox but not a row (the gap
+                // between rows), so clear pointer selection. Otherwise
+                // it stays selected while nothing is visually highlighted.
                 if (item.localName == "richlistbox") {
+                  if (this.richlistbox.hasAttribute("pointerselected")) {
+                    lazy.AutoCompleteParent.getCurrentActor()?.clearAutoCompletePreview();
+                    this.mousedOverIndex = -1;
+                    this._setSelectedIndex(-1, false, true);
+                  }
                   return;
                 }
 
@@ -203,10 +209,12 @@
 
       if (prevSelectedItem) {
         prevSelectedItem.selected = false;
+        prevSelectedItem.pointerselected = false;
       }
 
       if (selectedItem) {
         selectedItem.selected = true;
+        selectedItem.pointerselected = pointer;
       }
 
       if (changed) {
@@ -340,6 +348,10 @@
         aInput.popup.hidden = false;
 
         this.mInput = aInput;
+        // The content path sets these from the input the popup drops out of;
+        // a chrome input takes them from the chrome document.
+        this.style.direction = "";
+        this.style.colorScheme = "";
         // clear any previous selection, see bugs 400671 and 488357
         this.selectedIndex = -1;
 

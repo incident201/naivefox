@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 package org.mozilla.fenix.tabstray.ui.tabpage
 
 import androidx.compose.foundation.layout.Box
@@ -24,6 +28,7 @@ import junit.framework.TestCase.assertEquals
 import kotlin.math.ceil
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import mozilla.components.compose.base.theme.Theme
 import mozilla.components.compose.base.utils.LocalUnderTest
 import org.junit.Rule
 import org.junit.Test
@@ -34,7 +39,6 @@ import org.mozilla.fenix.tabstray.data.createTab
 import org.mozilla.fenix.tabstray.redux.state.TabsTrayState
 import org.mozilla.fenix.tabstray.ui.tabitems.TabGridColumnCountKey
 import org.mozilla.fenix.theme.FirefoxTheme
-import org.mozilla.fenix.theme.Theme
 
 // Number of tabs supplied to the layout under test.
 private const val TAB_COUNT = 10

@@ -4,6 +4,7 @@
 
 import {
   MAX_HISTORY_ENTRIES,
+  MONITOR_ERROR_CODES,
   trimAndFilterWatchUrls,
 } from "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs";
 
@@ -26,6 +27,7 @@ const MONITOR_STORE_NAME = "monitors";
 const CREATED_AT_INDEX = "createdAt";
 const PREF_BRANCH = "browser.smartwindow.monitorStore";
 const HISTORY_STATUSES = new Set(["error", "running", "success"]);
+const HISTORY_ERROR_CODES = new Set(Object.values(MONITOR_ERROR_CODES));
 
 function invalidField(field) {
   return new Error(`Monitor ${field} is invalid.`);
@@ -158,13 +160,20 @@ function historyRecord(entry) {
     throw invalidField("history condition result");
   }
 
-  return {
+  const record = {
     id: stringField(entry.id, "history ID"),
     checkedAt: timestampField(entry.checkedAt, "history timestamp"),
     status: entry.status,
     resultExplanation: entry.resultExplanation,
     conditionMet: entry.conditionMet,
   };
+  if (entry.errorCode != null) {
+    if (!HISTORY_ERROR_CODES.has(entry.errorCode)) {
+      throw invalidField("history error code");
+    }
+    record.errorCode = entry.errorCode;
+  }
+  return record;
 }
 
 function sanitizeHistoryRecords(history, recoverInvalid) {

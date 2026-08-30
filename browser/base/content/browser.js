@@ -4777,9 +4777,9 @@ var gDialogBox = {
     window.focus();
 
     try {
-      // Prevent moz-urlbars from showing on top of modal
-      for (let mozUrlbar of document.querySelectorAll("moz-urlbar")) {
-        mozUrlbar.incrementBreakoutBlockerCount();
+      // Prevent urlbars from showing on top of modal
+      for (let urlbar of document.querySelectorAll(".urlbar")) {
+        urlbar.incrementBreakoutBlockerCount();
       }
     } catch (ex) {
       console.error(ex);
@@ -4808,9 +4808,9 @@ var gDialogBox = {
       this._updateMenuAndCommandState(true /* to enable */);
       this._dialog = null;
       UpdatePopupNotificationsVisibility();
-      // Restore moz-urlbar breakout if needed
-      for (let mozUrlbar of document.querySelectorAll("moz-urlbar")) {
-        mozUrlbar.decrementBreakoutBlockerCount();
+      // Restore urlbar breakout if needed
+      for (let urlbar of document.querySelectorAll(".urlbar")) {
+        urlbar.decrementBreakoutBlockerCount();
       }
     }
     if (this._queued.length) {

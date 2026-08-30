@@ -233,7 +233,8 @@ export class ImpressionStats extends React.PureComponent {
         )
       ) {
         this._dispatchImpressionStats();
-        this.impressionObserver.unobserve(this.impressionRef.current);
+        this._hasReported = true;
+        this._teardownImpressionObserver();
       }
     };
 
@@ -246,21 +247,42 @@ export class ImpressionStats extends React.PureComponent {
   }
 
   componentDidMount() {
-    if (this.props.rows.length) {
+    if (this.props.rows.length && this.props.isActive) {
       this.setImpressionObserverOrAddListener();
     }
   }
 
-  componentWillUnmount() {
-    if (this._handleIntersect && this.impressionObserver) {
+  _teardownImpressionObserver() {
+    if (this.impressionObserver) {
       this.impressionObserver.unobserve(this.impressionRef.current);
+      this.impressionObserver = null;
     }
     if (this._onVisibilityChange) {
       this.props.document.removeEventListener(
         VISIBILITY_CHANGE_EVENT,
         this._onVisibilityChange
       );
+      this._onVisibilityChange = null;
     }
+  }
+
+  // A carousel stacks its slides, so a hidden slide still intersects and would
+  // report an impression while invisible. A slide only observes while it is
+  // the visible one, and never observes again once it has reported, so a card
+  // that cycles back around isn't counted twice.
+  componentDidUpdate(prevProps) {
+    if (this._hasReported || this.props.isActive === prevProps.isActive) {
+      return;
+    }
+    if (this.props.isActive && this.props.rows.length) {
+      this.setImpressionObserverOrAddListener();
+    } else if (!this.props.isActive) {
+      this._teardownImpressionObserver();
+    }
+  }
+
+  componentWillUnmount() {
+    this._teardownImpressionObserver();
   }
 
   render() {
@@ -277,4 +299,6 @@ ImpressionStats.defaultProps = {
   document: globalThis.document,
   rows: [],
   source: "",
+  // Only a carousel slide passes this as false, and only while hidden.
+  isActive: true,
 };

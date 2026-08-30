@@ -95,7 +95,8 @@
   width: 100%;
 }
 
-#policies-container-content:not([hidden]) + #searchInput {
+#policies-container-content:not([hidden]) + #searchInput,
+#tls-key-logging-container-content:not([hidden]) + #searchInput {
   margin-block-start: var(--space-small);
 }
 
@@ -1663,6 +1664,10 @@ setting-pane[onsearchpane] {
 
 .box-header-bold {
   --box-label-font-weight: var(--font-weight-heading);
+}
+
+#containers-list {
+  --box-group-max-height: 525px;
 }
 
 .containers-identity-item {

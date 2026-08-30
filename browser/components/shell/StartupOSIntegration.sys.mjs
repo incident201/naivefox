@@ -144,7 +144,7 @@ export let StartupOSIntegration = {
   },
 
   checkForLaunchOnLogin() {
-    if (lazy.LaunchOnLogin.isSupported()) {
+    if (!lazy.LaunchOnLogin.isSupported()) {
       return;
     }
     let launchOnLoginPref = "browser.startup.windowsLaunchOnLogin.enabled";

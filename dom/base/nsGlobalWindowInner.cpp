@@ -436,10 +436,12 @@ class nsGlobalWindowObserver final : public nsIObserver,
   explicit nsGlobalWindowObserver(nsGlobalWindowInner* aWindow)
       : mWindow(aWindow) {}
   NS_DECL_ISUPPORTS
-  NS_IMETHOD Observe(nsISupports* aSubject, const char* aTopic,
-                     const char16_t* aData) override {
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY NS_IMETHOD
+  Observe(nsISupports* aSubject, const char* aTopic,
+          const char16_t* aData) override {
     if (!mWindow) return NS_OK;
-    return mWindow->Observe(aSubject, aTopic, aData);
+    const RefPtr<nsGlobalWindowInner> win = mWindow;
+    return win->Observe(aSubject, aTopic, aData);
   }
   void Forget() { mWindow = nullptr; }
   NS_IMETHOD GetInterface(const nsIID& aIID, void** aResult) override {
@@ -1437,8 +1439,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindowInner)
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWebTaskScheduler)
 
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWebTaskSchedulingState)
-
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTrustedTypePolicyFactory)
 
 #ifdef MOZ_WEBSPEECH
@@ -1549,8 +1549,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindowInner)
     tmp->mWebTaskScheduler->Disconnect();
     NS_IMPL_CYCLE_COLLECTION_UNLINK(mWebTaskScheduler)
   }
-
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mWebTaskSchedulingState)
 
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mTrustedTypePolicyFactory)
 
@@ -1868,7 +1866,7 @@ void nsGlobalWindowInner::InitDocumentDependentState(JSContext* aCx) {
   if (mWebTaskScheduler) {
     mWebTaskScheduler->Disconnect();
     mWebTaskScheduler = nullptr;
-    mWebTaskSchedulingState = nullptr;
+    SetWebTaskSchedulingState(nullptr);
   }
 
   // This must be called after nullifying the internal objects because here we
@@ -4379,11 +4377,6 @@ WebTaskScheduler* nsGlobalWindowInner::Scheduler() {
   return mWebTaskScheduler;
 }
 
-inline void nsGlobalWindowInner::SetWebTaskSchedulingState(
-    WebTaskSchedulingState* aState) {
-  mWebTaskSchedulingState = aState;
-}
-
 bool nsGlobalWindowInner::Find(const nsAString& aString, bool aCaseSensitive,
                                bool aBackwards, bool aWrapAround,
                                bool aWholeWord, bool aSearchInFrames,
@@ -5213,7 +5206,7 @@ void nsGlobalWindowInner::FireOfflineStatusEventIfChanged() {
   } else {
     name.AssignLiteral("online");
   }
-  nsContentUtils::DispatchTrustedEvent(mDoc, this, name, CanBubble::eNo,
+  nsContentUtils::DispatchTrustedEvent(this, this, name, CanBubble::eNo,
                                        Cancelable::eNo);
 }
 
@@ -6265,8 +6258,8 @@ nsresult nsGlobalWindowInner::FireDelayedDOMEvents(bool aIncludeSubWindows) {
     }
 
     for (const nsCOMPtr<nsIDocShellTreeItem>& childShell : children) {
-      if (nsCOMPtr<nsPIDOMWindowOuter> pWin = childShell->GetWindow()) {
-        auto* win = nsGlobalWindowOuter::Cast(pWin);
+      if (const RefPtr<nsGlobalWindowOuter> win =
+              nsGlobalWindowOuter::Cast(childShell->GetWindow())) {
         win->FireDelayedDOMEvents(true);
       }
     }

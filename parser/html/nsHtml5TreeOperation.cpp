@@ -10,6 +10,7 @@
 #include "mozilla/dom/Comment.h"
 #include "mozilla/dom/CustomElementRegistry.h"
 #include "mozilla/dom/DocGroup.h"
+#include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentFragment.h"
 #include "mozilla/dom/DocumentType.h"
 #include "mozilla/dom/Element.h"
@@ -229,6 +230,8 @@ static void AbortNodeInsertion(nsINode* aNode) {
     // Clear form for this element, since it will not actually be
     // inserted.
     formControl->ClearForm(true, true);
+  } else if (auto* image = HTMLImageElement::FromNode(aNode)) {
+    image->ClearForm(true);
   }
 }
 
@@ -566,6 +569,10 @@ void nsHtml5TreeOperation::SetHTMLElementAttributesFast(
   if (aAttributes->getDuplicateAttributeError()) {
     aElement->SetParserHadDuplicateAttributeError();
   }
+  // Element::SetNoNameSpaceAttrOnNewlyCreatedElement() may call AfterSetAttr
+  // and its callers assume that the script is blocked.
+  const nsAutoScriptBlocker scriptBlocker;
+
   // This boolean is state that is shared between the
   // SetNoNameSpaceAttrOnNewlyCreatedElement calls so that
   // if one call schedules pending mapped attribute evaluation,
@@ -575,7 +582,7 @@ void nsHtml5TreeOperation::SetHTMLElementAttributesFast(
   for (nsHtml5AttributeEntry& entry : *aAttributes) {
     aElement->SetNoNameSpaceAttrOnNewlyCreatedElement(
         entry.ForgetNameHTML(), entry.ValueRef(),
-        isPendingMappedAttributeEvaluation);
+        isPendingMappedAttributeEvaluation, scriptBlocker);
   }
 #ifdef DEBUG
   aAttributes->MarkAsMovedFrom();

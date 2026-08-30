@@ -22,6 +22,7 @@ import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
 import org.mozilla.fenix.helpers.TestHelper.appContext
 import org.mozilla.fenix.helpers.TestHelper.mDevice
 import org.mozilla.fenix.ui.efficiency.helpers.BaseTest
+import org.mozilla.fenix.ui.efficiency.navigation.LaunchConfig
 import org.mozilla.fenix.ui.efficiency.pageObjects.HistorySearchGroupPage
 import org.mozilla.fenix.ui.efficiency.pageObjects.SystemSettingsPage
 import org.mozilla.fenix.ui.efficiency.selectors.BrowserPageSelectors
@@ -37,7 +38,7 @@ import org.mozilla.fenix.ui.efficiency.selectors.ToolbarSelectors
 // with isPocketEnabled = false. It matters for the search-group tests: with Pocket on, "Recently visited"
 // can sit below the fold, and mozVerify does not scroll — so a "group is displayed" assertion fails and, far
 // worse, a "group is gone" assertion passes for the wrong reason.
-class SearchTest : BaseTest(isPocketEnabled = false) {
+class SearchTest : BaseTest(LaunchConfig(isPocketEnabled = false)) {
 
     private val queryString = "firefox"
     private val generalEnginesList = listOf("DuckDuckGo", "Google", "Bing")

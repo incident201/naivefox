@@ -533,7 +533,10 @@ function Stocks({
                 size="small"
                 data-l10n-id="newtab-stocks-widget-menu-button"
               />
-              <panel-list id="stocks-context-menu">
+              <panel-list
+                className="panel-list-no-icons"
+                id="stocks-context-menu"
+              >
                 <panel-item
                   data-l10n-id="newtab-stocks-menu-search-stocks"
                   onClick={handleSearchTickers}

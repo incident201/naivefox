@@ -279,9 +279,10 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                         engine = context.components.core.engine,
                         store = context.components.core.store,
                         controlsView = binding.readerViewControlsBar,
-                    ) { available, active ->
-                        browserScreenStore.dispatch(ReaderModeStatusUpdated(ReaderModeStatus(available, active)))
-                    }
+                        onReaderViewStatusChange = { available, active ->
+                            browserScreenStore.dispatch(ReaderModeStatusUpdated(ReaderModeStatus(available, active)))
+                        },
+                    )
                 },
             owner = this,
             view = view,
@@ -505,6 +506,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                             title = context.getString(contextMenuR.string.mozac_feature_contextmenu_share_link),
                             text = it,
                             url = it,
+                            private = getCurrentTab()?.content?.private == true,
                         )
                     )
                 },
@@ -517,27 +519,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                         )
                         .defaultLocation
                 },
-                navigateToShareFragment = { currentTab, hitTabUrl ->
-                    val shareData = arrayOf(ShareData(title = hitTabUrl, url = hitTabUrl))
-                    val popUpToId =
-                        if (currentTab is CustomTabSessionState) {
-                            R.id.externalAppBrowserFragment
-                        } else {
-                            R.id.browserFragment
-                        }
-
-                    findNavController()
-                        .nav(
-                            id = R.id.browserFragment,
-                            directions =
-                                BrowserFragmentDirections.actionGlobalShareFragment(
-                                    sessionId = currentTab.id,
-                                    data = shareData,
-                                    showPage = true,
-                                ),
-                            navOptions = NavOptions.Builder().setPopUpTo(popUpToId, false).build(),
-                        )
-                },
+                navigateToShareFragment = ::navigateToShareFragment,
             )
         } else {
             ContextMenuCandidate.defaultCandidates(
@@ -560,6 +542,38 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                 contextMenuCandidateAppLinksUseCases,
             ) +
             createOpenWithGoogleLensCandidate(context)
+    }
+
+    private fun navigateToShareFragment(
+        currentTab: SessionState,
+        hitTabUrl: String,
+    ) {
+        val shareData =
+            arrayOf(
+                ShareData(
+                    title = hitTabUrl,
+                    url = hitTabUrl,
+                    private = currentTab.content.private,
+                )
+            )
+        val popUpToId =
+            if (currentTab is CustomTabSessionState) {
+                R.id.externalAppBrowserFragment
+            } else {
+                R.id.browserFragment
+            }
+
+        findNavController()
+            .nav(
+                id = R.id.browserFragment,
+                directions =
+                    BrowserFragmentDirections.actionGlobalShareFragment(
+                        sessionId = currentTab.id,
+                        data = shareData,
+                        showPage = true,
+                    ),
+                navOptions = NavOptions.Builder().setPopUpTo(popUpToId, false).build(),
+            )
     }
 
     private fun createOpenWithGoogleLensCandidate(context: Context) =

@@ -227,7 +227,7 @@ class HTMLMediaElement : public nsGenericHTMLElement,
                       nsAttrValue& aResult) override;
 
   nsresult BindToTree(BindContext&, nsINode& aParent) override;
-  void UnbindFromTree(UnbindContext&) override;
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY void UnbindFromTree(UnbindContext&) override;
   void DoneCreatingElement() override;
 
   bool IsHTMLFocusable(IsFocusableFlags, bool* aIsFocusable,
@@ -1436,11 +1436,10 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   // suspend-video-decoder is disabled.
   void MarkAsTainted();
 
-  virtual void AfterSetAttr(int32_t aNameSpaceID, nsAtom* aName,
-                            const nsAttrValue* aValue,
-                            const nsAttrValue* aOldValue,
-                            nsIPrincipal* aMaybeScriptedPrincipal,
-                            bool aNotify) override;
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY void AfterSetAttr(
+      int32_t aNameSpaceID, nsAtom* aName, const nsAttrValue* aValue,
+      const nsAttrValue* aOldValue, nsIPrincipal* aMaybeScriptedPrincipal,
+      bool aNotify) override;
   virtual void OnAttrSetButNotChanged(int32_t aNamespaceID, nsAtom* aName,
                                       const nsAttrValueOrString& aValue,
                                       bool aNotify) override;
@@ -1768,6 +1767,13 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   // True if this element is suspended because the document is inactive or the
   // inactive docshell is not allowing media to play.
   bool mSuspendedByInactiveDocOrDocshell = false;
+
+#if defined(MOZ_WIDGET_ANDROID)
+  // Android-only state for the temporary background media playback probe (bug
+  // 2066141): true once we have recorded telemetry for the current background
+  // episode. Reset when the document becomes visible again.
+  bool mRecordedBackgroundAudioPlayback = false;
+#endif
 
   // True if we're running the "load()" method.
   bool mIsRunningLoadMethod = false;

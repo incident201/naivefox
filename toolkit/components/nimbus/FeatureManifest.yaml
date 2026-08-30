@@ -39,6 +39,19 @@ testFeature:
         pref: nimbus.testing.testSetString
       description: A string pref set by Nimbus tests
 
+testPlatformExposureFeature:
+    description: Test only feature
+    owner: beth@mozilla.com
+    applications:
+      - firefox-desktop
+    hasExposure: true
+    exposureDescription: Test feature for exposures.
+    isEarlyStartup: true
+    variables:
+      enabled:
+        type: boolean
+        description: Whether or not this feature is enabled
+
 nimbus-qa-1:
   description: A feature for testing pref-setting on the default branch.
   owner: beth@mozilla.com
@@ -362,6 +375,12 @@ urlbar:
       type: int
       fallbackPref: browser.urlbar.merino.timeoutMs
       description: Timeout for Merino fetches (ms)
+    newtabFeatureGate:
+      type: boolean
+      fallbackPref: browser.urlbar.newtab.featureGate
+      description: >-
+        Feature gate that controls whether about:newtab and about:home show the
+        address bar in place of the handoff search bar.
     exposureResults:
       type: string
       setPref:
@@ -4103,40 +4122,6 @@ legacyHeartbeat:
       type: json
       description: The Heartbeat survey parameters.
 
-queryStripping:
-  description: Query parameter stripping anti-tracking feature.
-  owner: emz@mozilla.com
-  hasExposure: false
-  variables:
-    enabledNormalBrowsing:
-      type: boolean
-      setPref:
-        branch: default
-        pref: privacy.query_stripping.enabled
-      description: Enables / disables URL query string stripping in normal browsing mode.
-    enabledPrivateBrowsing:
-      type: boolean
-      setPref:
-        branch: default
-        pref: privacy.query_stripping.enabled.pbmode
-      description: Enables / disables URL query string stripping in private browsing mode.
-    allowList:
-      type: string
-      setPref:
-        branch: default
-        pref: privacy.query_stripping.allow_list
-      description: >-
-        List of sites exempt from query stripping. This list will be merged with
-        records coming from RemoteSettings.
-    stripList:
-      type: string
-      setPref:
-        branch: default
-        pref: privacy.query_stripping.strip_list
-      description: >-
-        List of query params to be stripped from URIs. This list will be merged
-        with records coming from RemoteSettings.
-
 fingerprintingProtection:
   description: Control Fingerprinting Protection
   owner: tihuang@mozilla.com
@@ -6215,3 +6200,15 @@ webNotificationsPermissionUi:
         Fluent message id for the (Always) Block button, resolved in-tree.
         Takes precedence over secondaryCtaLabel; its .accesskey attribute, if
         present, sets the access key. Not applied in private browsing.
+
+editContext:
+  description: EditContext API
+  owner: ltenenbaum@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: default
+        pref: dom.editcontext.enabled
+      description: Whether the EditContext API is enabled.

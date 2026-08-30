@@ -213,7 +213,7 @@
     static markup = /*html*/ `
       <panel
         type="arrow"
-        class="tab-group-editor-panel panel-no-padding"
+        class="tab-group-editor-panel"
         orient="vertical"
         role="dialog"
         ignorekeys="true"

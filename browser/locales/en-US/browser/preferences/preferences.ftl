@@ -52,6 +52,9 @@ managed-notice-info-icon =
 managed-notice-nav =
     .label = Your browser is being managed by your organization.
 
+tls-key-logging-notice-nav =
+    .label = An app or service may see your encrypted traffic.
+
 category-list =
     .aria-label = Categories
 
@@ -2573,9 +2576,9 @@ preferences-ai-controls-key-points-control =
     .label = Key points in link previews
     .description = See a quick summary before opening a link.
 
-preferences-ai-controls-sidebar-chatbot-group-2 =
+preferences-ai-controls-sidebar-chatbot-group-3 =
     .label = AI chatbot providers in sidebar
-    .description = Keep a chatbot in view as you browse. Choose from Anthropic Claude, ChatGPT, Copilot, Google Gemini, and Mistral Vibe.
+    .description = Keep a chatbot in view as you browse. Choose from multiple providers and switch anytime.
 
 preferences-ai-controls-sidebar-chatbot-control =
     .label = Chatbot in sidebar
@@ -2733,8 +2736,8 @@ preferences-etp-custom-cookie-behavior =
 
 preferences-etp-custom-cookie-behavior-accept-all =
     .label = Allow all cookies
-preferences-etp-custom-cookie-behavior-block-cross-site-cookies =
-    .label = Block cross-site cookies
+preferences-etp-custom-cookie-behavior-block-cross-site-tracking-cookies =
+    .label = Block cross-site tracking cookies
 preferences-etp-custom-cookie-behavior-isolate-cross-site-cookies =
     .label = Isolate cross-site cookies
 preferences-etp-custom-cookie-behavior-block-unvisited =

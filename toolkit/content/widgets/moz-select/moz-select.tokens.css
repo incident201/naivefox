@@ -42,7 +42,6 @@
       --select-font-size: var(--font-size-root);
       --select-font-size-small: var(--font-size-small);
       --select-min-height-small: var(--button-min-height-small);
-      --select-min-height: var(--button-min-height);
       --select-padding-block: var(--button-padding-block);
       --select-space-inline: var(--button-padding-inline);
       --select-space-inline-small: var(--space-medium);

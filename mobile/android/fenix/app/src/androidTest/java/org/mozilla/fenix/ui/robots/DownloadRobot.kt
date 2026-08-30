@@ -58,7 +58,7 @@ import org.mozilla.fenix.helpers.ext.waitNotNull
 /** Implementation of Robot Pattern for download UI handling. */
 class DownloadRobot(private val composeTestRule: ComposeTestRule) {
 
-    fun verifyDownloadPrompt(composeTestRule: ComposeTestRule, fileName: String) {
+    fun verifyDownloadPrompt(composeTestRule: ComposeTestRule) {
         Log.i(
             TAG,
             "verifyDownloadPrompt: Waiting for $waitingTime ms for the \"Download file?\" download prompt to exist",
@@ -172,7 +172,7 @@ class DownloadRobot(private val composeTestRule: ComposeTestRule) {
                 assertUIObjectExists(itemContainingText(downloadFile))
             }
             .clickDownloadLink(downloadFile) {
-                verifyDownloadPrompt(composeTestRule, downloadFile)
+                verifyDownloadPrompt(composeTestRule)
             }
             .clickDownload(composeTestRule) {}
         Log.i(TAG, "openPageAndDownloadFile: Download initiated for $downloadFile")

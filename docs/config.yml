@@ -110,6 +110,7 @@ redirects:
     performance/memory/monster_example.html: devtools-user/memory/monster_example/index.html
     browser/browser: browser
     browser/components/newtab/docs/index.html: browser/extensions/newtab/docs/index.html
+    browser/tabunloader/index.html: browser/components/tabbrowser/docs/tab-unloading.html
     contributing/how_to_contribute_firefox.html: contributing/contribution_quickref.html
     mobile/android/geckoview/contributor/contributing-to-firefox.html: contributing/contribution_quickref.html
     contributing/artifact_builds.html: contributing/build/artifact_builds.html
@@ -153,13 +154,11 @@ allowed_warnings:
     - "UITour-lib.Mozilla.UITour.* WARNING: duplicate class description of Mozilla.UITour"
     # Unknown document warnings
     # Undefined label warnings.
-    - "code-quality/.*\\.md:.*: WARNING: undefined label"
     - "dom/navigation/nav_replace\\.md:.*: WARNING: undefined label"
     - "devtools-user/page_inspector/how_to/work_with_animations/index\\.(rst|md):.*: WARNING: undefined label"
-    - "layout/Reftest\\.md:.*: WARNING: undefined label"
-    - "nspr/.* WARNING: undefined label"
     # Bug 1915274 - Clean up documentation warnings in NSS
     - "security/nss/.* WARNING: undefined label"
+    - "WARNING: duplicate label header-files, other instance in"
     - "security/nss/.* WARNING: duplicate label"
     - "security/nss/.* WARNING: more than one target found for 'myst' cross-reference"
     # Various python issues
@@ -180,31 +179,11 @@ allowed_warnings:
     - "devtools-user/migrating_from_firebug/index\\.(rst|md):.*: WARNING: unknown document"
     - "devtools-user/tips/index\\.(rst|md):.*: WARNING: unknown document"
     - "devtools-user/tools_toolbox/index\\.(rst|md):.*: WARNING: unknown document"
-    - "bug-mgmt/guides/bug-types\\.md:.*: WARNING: undefined label"
-    - "bug-mgmt/policies/triage-bugzilla\\.md:.*: WARNING: undefined label"
-    - "bug-mgmt/processes/fixing-security-bugs\\.md:.*: WARNING: undefined label"
-    - "bug-mgmt/processes/labels\\.md:.*: WARNING: undefined label"
-    - "bug-mgmt/processes/security-approval\\.md:.*: WARNING: undefined label"
-    - "devtools-user/page_inspector/how_to/examine_and_edit_css/index\\.(rst|md):.*: WARNING: undefined label"
-    - "devtools-user/tips/index\\.(rst|md):.*: WARNING: undefined label"
     - "devtools-user/web_console/console_messages/index\\.(rst|md):.*: ERROR: Undefined substitution referenced"
     # mdn-imported content with image width values that confuse the parser.
-    - "crash-reporting/index\\.md:.*: WARNING: undefined label"
-    - "crash-reporting/searching_crash_reports\\.md:.*: WARNING: undefined label"
     - "ipc/ipdl\\.md:.*: WARNING: Duplicate explicit target name"
-    - "setup/building_with_debug_symbols\\.md:.*: WARNING: undefined label"
-    - "setup/configuring_build_options\\.md:.*: WARNING: undefined label"
-    - "setup/linux_32bit_build_on_64bit_OS\\.md:.*: WARNING: undefined label"
-    - "setup/linux_build\\.md:.*: WARNING: undefined label"
-    - "setup/macos_build\\.md:.*: WARNING: undefined label"
-    - "setup/windows_build\\.md:.*: WARNING: undefined label"
-    - "setup/windows_wsl_build\\.md:.*: WARNING: undefined label"
     - "contributing/.*\\.md:.*: WARNING: undefined label"
     - "permissions\\.py:.*: ERROR: Unknown target name: \"server-locations\\.txt\""
-    - "layout/Reftest\\.md:.*: WARNING: undefined label"
-    - "taskcluster/release-promotion-action\\.md:.*: WARNING: undefined label"
-    - "toolkit/components/messaging-system/docs/index\\.md:.*: WARNING: undefined label"
-    - "toolkit/components/telemetry/obsolete/collection/custom-pings\\.md:.*: WARNING: undefined label"
     - "toolkit/components/telemetry/data/install-ping\\.md:.*: ERROR: Document or section may not begin with a transition"
 exclude_patterns:
     - js/src/doc/Debugger
@@ -231,6 +210,9 @@ js_source_paths:
     - browser/components/uitour
     - browser/components/urlbar
     - browser/components/urlbar/content
+    # Limited to URILoadingHelper.sys.mjs: the rest of the directory holds
+    # modules which do not currently run cleanly for jsdoc.
+    - browser/modules/URILoadingHelper.sys.mjs
     - js/xpconnect/loader
     - remote/marionette
     - testing/mochitest/BrowserTestUtils

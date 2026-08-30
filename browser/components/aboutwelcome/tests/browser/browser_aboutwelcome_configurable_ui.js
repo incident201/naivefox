@@ -417,15 +417,30 @@ add_task(async function test_aboutwelcome_center_large_position() {
     "main.screen .section-main .main-content",
     // Expected styles:
     {
-      "backdrop-filter": "blur(8px)",
-      "background-color": "color(srgb 0 0 0 / 0.05)",
-      "border-left-color": novaEnabled
-        ? "rgb(214, 213, 218)"
-        : "rgb(186, 194, 202)",
-      "border-left-style": "solid",
-      "border-left-width": "1px",
+      "backdrop-filter": "none",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border-left-style": "none",
+      "border-left-width": "0px",
     }
   );
+
+  await SpecialPowers.spawn(browser, [], async () => {
+    const mainContentInner = await ContentTaskUtils.waitForCondition(() =>
+      content.document.querySelector(
+        "main.screen .section-main .main-content .main-content-inner"
+      )
+    );
+    const glowStyles = content.window.getComputedStyle(
+      mainContentInner,
+      "::before"
+    );
+    is(glowStyles.filter, "blur(70px)", "center-large glow should be blurred");
+    isnot(
+      glowStyles.backgroundColor,
+      "rgba(0, 0, 0, 0)",
+      "center-large glow should have a visible fill color"
+    );
+  });
 
   // Ensure secondary action has button styling
   await test_element_styles(
@@ -1388,5 +1403,78 @@ add_task(async function test_aboutwelcome_link_paragraph_inline_image() {
     [`.link-paragraph img.inline-icon[src="${TEST_ICON_URL}"][alt="icon"]`]
   );
 
+  browser.closeBrowser();
+});
+
+add_task(async function test_aboutwelcome_link_paragraph_segment_action() {
+  const MANAGE_DATA_PREF = "test-manage-data-pref";
+  // SET_PREF namespaces the prefs it writes.
+  const MANAGE_DATA_FULL_PREF = `messaging-system-action.${MANAGE_DATA_PREF}`;
+  const TEST_CONTENT = makeTestContent("TEST_LINK_PARAGRAPH_ACTION_STEP", {
+    above_button_content: [
+      {
+        type: "text",
+        font_styles: "legal",
+        text: [
+          "By continuing, you agree to the ",
+          { raw: "Firefox Terms of Use", link_key: "terms_of_use" },
+          ".",
+        ],
+      },
+      {
+        type: "text",
+        font_styles: "legal",
+        text: [
+          {
+            raw: "Manage diagnostic and interaction data",
+            id: "manage_data",
+            action: {
+              type: "SET_PREF",
+              data: { pref: { name: MANAGE_DATA_PREF, value: true } },
+            },
+          },
+        ],
+      },
+    ],
+    terms_of_use: {
+      action: {
+        type: "OPEN_URL",
+        data: { args: "https://example.com/terms", where: "tab" },
+      },
+    },
+  });
+
+  let browser = await openAboutWelcome(JSON.stringify([TEST_CONTENT]));
+
+  await test_screen_content(
+    browser,
+    "renders multiple legal paragraphs above the primary button",
+    [
+      `.legal-paragraph a[value="terms_of_use"]`,
+      `.legal-paragraph a[value="manage_data"]`,
+    ]
+  );
+
+  await SpecialPowers.spawn(browser, [], async () => {
+    is(
+      content.document.querySelectorAll(".legal-paragraph").length,
+      2,
+      "Both legal paragraphs render"
+    );
+  });
+
+  // A segment carrying its own action triggers that special message action,
+  // rather than only being able to open a URL through `href`.
+  ok(
+    !Services.prefs.getBoolPref(MANAGE_DATA_FULL_PREF, false),
+    "Manage data pref is unset before clicking the link"
+  );
+  await onButtonClick(browser, `.legal-paragraph a[value="manage_data"]`);
+  await TestUtils.waitForCondition(
+    () => Services.prefs.getBoolPref(MANAGE_DATA_FULL_PREF, false),
+    "Waiting for the manage data link's SET_PREF action"
+  );
+
+  Services.prefs.clearUserPref(MANAGE_DATA_FULL_PREF);
   browser.closeBrowser();
 });

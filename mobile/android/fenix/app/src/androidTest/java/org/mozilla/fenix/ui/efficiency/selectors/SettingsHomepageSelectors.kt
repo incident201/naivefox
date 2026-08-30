@@ -34,11 +34,11 @@ object SettingsHomepageSelectors {
             groups = listOf("homepageSettings", "requiredForPage"),
         )
 
-    val JUMP_BACK_IN_BUTTON =
+    val CONTINUE_BUTTON =
         Selector(
             strategy = SelectorStrategy.UIAUTOMATOR_WITH_TEXT,
-            value = "Jump back in",
-            description = "the Jump Back In button",
+            value = "Continue",
+            description = "the Continue button",
             groups = listOf("homepageSettings"),
         )
 
@@ -81,7 +81,7 @@ object SettingsHomepageSelectors {
             SETTINGS_HOMEPAGE_TITLE,
             SHOW_TOP_SITES_TOGGLE,
             SHORTCUTS_BUTTON,
-            JUMP_BACK_IN_BUTTON,
+            CONTINUE_BUTTON,
             RECENT_BOOKMARKS_BUTTON,
             RECENTLY_VISITED_BUTTON,
             POCKET_BUTTON,

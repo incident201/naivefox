@@ -27,7 +27,7 @@ const val BYTES_PER_GB = 1024 * 1024 * 1024f
  * @property accountState The state of the authenticator being used.
  * @property lastError The last error received from the IPProtection service.
  * @property proxyActivation Tracks recent activation or deactivation state changes. See [ProxyActivation].
- * @property activate To turn protection on or off.
+ * @property pendingActivationRequest The activation state - handles activation and deactivation of the proxy.
  * @property locationState The location selection state.
  */
 data class IPProtectionState(
@@ -40,7 +40,7 @@ data class IPProtectionState(
     val accountState: AccountState = AccountState(),
     val lastError: String? = null,
     val proxyActivation: ProxyActivation = ProxyActivation.Idle,
-    val activate: Boolean? = null,
+    val pendingActivationRequest: PendingActivationRequest? = null,
     val locationState: LocationState = LocationState(),
 ) : State
 
@@ -82,10 +82,15 @@ data class AccountState(val status: AccountStatus = AccountStatus.Uninitialized)
  *
  * @property selectedLocation The location to use when connecting to VPN.
  * @property locations The list of locations for user to choose from.
+ * @property previousLocation Cached previous selection. Intended to be used as a rollback value in case switching to a
+ *   new locations fails.
+ * @property updateState the state of the location list update.
  */
 data class LocationState(
     val selectedLocation: Location = Recommended,
     val locations: List<Location> = listOf(Recommended),
+    val previousLocation: Location? = null,
+    val updateState: LocationListUpdateState = LocationListUpdateState.NotRequested,
 )
 
 /**
@@ -120,6 +125,39 @@ data class Country(
             } catch (_: IllformedLocaleException) {
                 countryCode
             }
+}
+
+/** Represents the state of the location list update. */
+sealed class LocationListUpdateState {
+    /** The default, "no request yet", state. */
+    data object NotRequested : LocationListUpdateState()
+
+    /** A pending update request. */
+    data object Requested : LocationListUpdateState()
+
+    /** The location list has been updated. */
+    data object Updated : LocationListUpdateState()
+
+    /** The location list update failed. */
+    data object Failed : LocationListUpdateState()
+}
+
+/** Represents a pending proxy activation request. */
+sealed class PendingActivationRequest {
+    /**
+     * Requesting proxy activation.
+     *
+     * @property selectedLocationCode ISO 3166-1 alpha-2 country code for the desired proxy location, or null to use the
+     *   recommended default.
+     * @property isLocationSwitch Whether the proxy was already running, meaning a failure rolls the selection back.
+     */
+    data class Activate(
+        val selectedLocationCode: String?,
+        val isLocationSwitch: Boolean = false,
+    ) : PendingActivationRequest()
+
+    /** Requesting proxy deactivation. */
+    object Deactivate : PendingActivationRequest()
 }
 
 /**

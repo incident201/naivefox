@@ -358,10 +358,7 @@ struct CanvasFingerprintingEvent {
         knownTextBitmask(aKnownTextBitmask),
         sourcesBitmask(aSourcesBitmask) {}
 
-  bool operator==(const CanvasFingerprintingEvent& other) const {
-    return alias == other.alias && knownTextBitmask == other.knownTextBitmask &&
-           sourcesBitmask == other.sourcesBitmask;
-  }
+  bool operator==(const CanvasFingerprintingEvent& other) const = default;
 };
 
 // ============================================================================

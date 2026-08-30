@@ -85,6 +85,9 @@ import kotlinx.coroutines.flow.first
 import mozilla.components.compose.base.RadioCheckmark
 import mozilla.components.compose.base.annotation.FlexibleWindowPreview
 import mozilla.components.compose.base.modifier.thenConditional
+import mozilla.components.compose.base.theme.Theme
+import mozilla.components.compose.base.theme.ThemedValue
+import mozilla.components.compose.base.theme.ThemedValueProvider
 import org.mozilla.fenix.R
 import org.mozilla.fenix.tabgroups.TabGroupCard
 import org.mozilla.fenix.tabgroups.TabGroupRow
@@ -130,9 +133,6 @@ import org.mozilla.fenix.tabstray.ui.tabitems.tabGridColumnCount
 import org.mozilla.fenix.tabstray.ui.tabitems.tabItemGroupListInteractionAnimation
 import org.mozilla.fenix.tabstray.ui.tabitems.tabListItemShapeStyling
 import org.mozilla.fenix.theme.FirefoxTheme
-import org.mozilla.fenix.theme.Theme
-import org.mozilla.fenix.theme.ThemedValue
-import org.mozilla.fenix.theme.ThemedValueProvider
 import org.mozilla.fenix.trackingprotection.TrackersBlockedCard
 
 // Key for the span item at the bottom of the tray, used to make the item not reorderable.

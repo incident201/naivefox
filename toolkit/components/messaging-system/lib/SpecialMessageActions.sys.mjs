@@ -258,6 +258,18 @@ export const SpecialMessageActions = {
   },
 
   /**
+   * Set browser as the OS default browser via the "Open with" picker
+   * (IOpenWithLauncher), guaranteeing an OS-level prompt. Claiming the https
+   * protocol handler this way sets the whole web-browser default (http and
+   * https) with a single picker. Windows only.
+   *
+   * @param {Window} window Reference to a window object
+   */
+  async setDefaultBrowserViaOpenWith(window) {
+    await window.getShellService().setAsDefaultProtocolHandler("https");
+  },
+
+  /**
    * Reset browser homepage and newtab to default with a certain section configuration
    *
    * @param {"default"|null} home Value to set for browser homepage
@@ -948,6 +960,9 @@ export const SpecialMessageActions = {
       case "SET_DEFAULT_BROWSER":
         await this.setDefaultBrowser(window);
         break;
+      case "SET_DEFAULT_BROWSER_OPEN_WITH":
+        await this.setDefaultBrowserViaOpenWith(window);
+        break;
       case "SET_DEFAULT_PDF_HANDLER":
         await this.setDefaultPDFHandler(
           window,
@@ -1043,7 +1058,11 @@ export const SpecialMessageActions = {
         return this.fxaSignInFlow(action.data, browser);
       case "FXA_AIWINDOW_SIGNIN_FLOW":
         /** @returns {Promise<boolean>} */
-        return lazy.AIWindow.launchWindow(browser);
+        return lazy.AIWindow.launchWindow(
+          browser,
+          false,
+          action.data?.source ?? "asrouter"
+        );
       case "OPEN_PROTECTION_PANEL": {
         let { gProtectionsHandler } = window;
         gProtectionsHandler.showProtectionsPopup({});

@@ -246,10 +246,12 @@ class SidebarManager extends EventTarget {
       DEFAULT_VERTICAL_VISIBILITY
     );
     if (!isEnabled) {
-      // Switching to (or initializing) horizontal tabs.
-      if (currentVisibility === "expand-on-hover") {
-        this.#savedVisibility = currentVisibility;
-      }
+      // Switching to (or initializing) horizontal tabs. The saved value is only
+      // consumed by a switch back that finds an invalid visibility, so record
+      // the absence of a choice too: otherwise one left over from an earlier
+      // switch stays latched and is restored over an unrelated one.
+      this.#savedVisibility =
+        currentVisibility === "expand-on-hover" ? currentVisibility : null;
       if (!HORIZONTAL_VISIBILITIES.includes(currentVisibility)) {
         Services.prefs.setStringPref(
           VISIBILITY_SETTING_PREF,

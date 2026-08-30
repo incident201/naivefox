@@ -29,6 +29,7 @@
 #include "mozilla/TimeStamp.h"
 
 #include "nsPrintfCString.h"
+#include "nsSystemInfo.h"
 #include "nsThreadUtils.h"
 #include "nsThread.h"
 #include "jsfriendapi.h"
@@ -106,6 +107,7 @@
 #ifdef XP_WIN
 #  include <filesystem>
 #endif
+#include <fmt/format.h>
 #include <fstream>
 #include <optional>
 
@@ -262,14 +264,6 @@ static bool isGarbageCollecting;
 static uint32_t eventloopNestingLevel = 0;
 static time_t inactiveStateStart = 0;
 
-static
-#if defined(XP_UNIX)
-    pthread_t
-#elif defined(XP_WIN)  // defined(XP_UNIX)
-    DWORD
-#endif                 // defined(XP_WIN)
-        gMainThreadId;
-
 // Avoid a race during application termination.
 static Mutex* dumpSafetyLock;
 static bool isSafeToDump = false;
@@ -290,32 +284,6 @@ static int serverSocketFd = -1;
 static int crashHelperClientFd = -1;
 #  endif
 #endif
-
-void RecordMainThreadId() {
-  gMainThreadId =
-#if defined(XP_UNIX)
-      pthread_self()
-#elif defined(XP_WIN)  // defined(XP_UNIX)
-      GetCurrentThreadId()
-#endif                 // defined(XP_WIN)
-      ;
-}
-
-bool SignalSafeIsMainThread() {
-  // We can't rely on NS_IsMainThread() because we are in a signal handler, and
-  // sTLSIsMainThread is a thread local variable and it can be lazy allocated
-  // i.e., we could hit code path where this variable has not been accessed
-  // before and needs to be allocated right now, which will lead to spinlock
-  // deadlock effectively hanging the process, as in bug 1756407.
-
-#if defined(XP_UNIX)
-  pthread_t th = pthread_self();
-  return pthread_equal(th, gMainThreadId);
-#elif defined(XP_WIN)  // defined(XP_UNIX)
-  DWORD th = GetCurrentThreadId();
-  return th == gMainThreadId;
-#endif                 // defined(XP_WIN)
-}
 
 #if defined(XP_WIN)
 // the following are used to prevent other DLLs reverting the last chance
@@ -1299,6 +1267,108 @@ static bool LaunchCrashHandlerService(const XP_CHAR* aProgramPath,
 
 #endif
 
+nsresult RecordPlatformAnnotations() {
+  // CPU architecture values corresponding to `system_info.cpu_arch` values in
+  // https://github.com/rust-minidump/rust-minidump/blob/main/minidump-processor/json-schema.md,
+  // which is the format expected by Socorro.
+  MOZ_TRY(RecordAnnotationCString(Annotation::CPUArchitecture,
+#if defined(__i386__) || defined(_M_IX86)
+                                  "x86"
+#elif defined(__x86_64__) || defined(_M_X64)
+                                  "amd64"
+#elif defined(__powerpc__) || defined(__POWERPC__) || defined(__ppc__) || \
+    defined(__PPC__)
+                                  "ppc"
+#elif defined(__powerpc64__) || defined(__PPC64__) || defined(__ppc64__)
+                                  "ppc64"
+#elif defined(__sparc__) || defined(__sparc)
+                                  "sparc"
+#elif defined(__arm__)
+                                  "arm"
+#elif defined(__aarch64__) || defined(_M_ARM64)
+                                  "arm64"
+#else
+                                  "unknown"
+#endif
+                                  ));
+
+  // OS values corresponding to `system_info.os` values in
+  // https://github.com/rust-minidump/rust-minidump/blob/main/minidump-processor/json-schema.md,
+  // which is the format expected by Socorro.
+  MOZ_TRY(RecordAnnotationCString(Annotation::OS,
+#if defined(XP_WIN)
+                                  "Windows NT"
+#elif defined(XP_MACOSX)
+                                  "Mac OS X"
+#elif defined(ANDROID)
+                                  "Android"
+#elif defined(XP_IOS)
+                                  "iOS"
+#elif defined(XP_LINUX)
+                                  "Linux"
+#elif defined(XP_SOLARIS)
+                                  "Solaris"
+#else
+                                  "Unknown"
+#endif
+                                  ));
+
+  return NS_OK;
+}
+
+static nsresult RecordCPUInfoAnnotation() {
+  // Run in a background task so we don't block the main thread with
+  // CollectProcessInfo().
+  return NS_DispatchBackgroundTask(
+      NS_NewRunnableFunction("CPUInfoAnnotation", [] {
+        ProcessInfo procinfo = {};
+        if (NS_SUCCEEDED(CollectProcessInfo(procinfo))) {
+          nsCString cpuInfo(fmt::format("family {} model {} stepping {}",
+                                        procinfo.cpuFamily, procinfo.cpuModel,
+                                        procinfo.cpuStepping));
+          RecordAnnotationNSCString(Annotation::CPUInfo, std::move(cpuInfo));
+        }
+      }));
+}
+
+nsresult RecordXPCOMPlatformAnnotations() {
+  nsCOMPtr<nsIPropertyBag2> sysInfo = do_GetService(NS_SYSTEMINFO_CONTRACTID);
+  if (!sysInfo) {
+    NS_WARNING(
+        "expected nsSystemInfo to be available for platform crash annotations");
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+
+  nsCString osVersion;
+  if (NS_SUCCEEDED(sysInfo->GetPropertyAsACString(u"version"_ns, osVersion))) {
+    nsCString build;
+    if (NS_SUCCEEDED(sysInfo->GetPropertyAsACString(u"build"_ns, build))) {
+      osVersion.Append(
+#if defined(XP_WIN)
+          '.'
+#else
+          ' '
+#endif
+      );
+      osVersion.Append(build);
+    }
+    MOZ_TRY(
+        RecordAnnotationNSCString(Annotation::OSVersion, std::move(osVersion)));
+  }
+
+#if defined(XP_LINUX)
+  nsCString lsbDesc;
+  if (NS_SUCCEEDED(sysInfo->GetPropertyAsACString(u"distroDesc"_ns, lsbDesc))) {
+    MOZ_TRY(RecordAnnotationNSCString(
+        CrashReporter::Annotation::LinuxLSBDescription, std::move(lsbDesc)));
+  }
+#endif
+
+  MOZ_TRY(RecordCPUInfoAnnotation());
+
+  return NS_OK;
+}
+
 static void WriteAnnotations(AnnotationWriter& aWriter,
                              const AnnotationTable& aAnnotations) {
   for (auto key : MakeEnumeratedRange(Annotation::Count)) {
@@ -1313,6 +1383,9 @@ static void WriteSynthesizedAnnotations(AnnotationWriter& aWriter) {
   AnnotateMemoryStatus(aWriter);
 }
 
+// WARNING: This function is called from within the exception handler, and must
+// not do things that are unsafe from an exception handler (like allocating
+// memory).
 static void WriteAnnotationsForMainProcessCrash(PlatformWriter& pw,
                                                 const phc::AddrInfo* addrInfo,
                                                 time_t crashTime) {
@@ -2012,8 +2085,6 @@ nsresult SetExceptionHandler(nsIFile* aXREDirectory, bool force /*=false*/) {
   SetJitExceptionHandler();
 #  endif
 
-  RecordMainThreadId();
-
   // protect the crash reporter from being unloaded
   gBlockUnhandledExceptionFilter = true;
   gKernel32Intercept.Init("kernel32.dll");
@@ -2518,7 +2589,7 @@ void MergeCrashAnnotations(AnnotationTable& aDst, const AnnotationTable& aSrc) {
   }
 }
 
-// Adds crash time, uptime and memory report annotations
+// Adds crash time, uptime, and last interaction duration annotations
 static void AddCommonAnnotations(AnnotationTable& aAnnotations) {
   const time_t crashTime = time(nullptr);
   nsAutoCString crashTimeStr;
@@ -3424,8 +3495,6 @@ bool SetRemoteExceptionHandler(int& aArgc, char** aArgv) {
                                             crash_pipe);
 #endif
 
-  RecordMainThreadId();
-
   oldTerminateHandler = std::set_terminate(&TerminateHandler);
 
   // If we didn't fail earlier because of a missing IPC channel then all of the
@@ -3582,39 +3651,14 @@ ThreadId CurrentThreadId() {
   return ::GetCurrentThreadId();
 #elif defined(XP_LINUX)
   return sys_gettid();
-#elif defined(XP_MACOSX)
-  // Just return an index, since Mach ports can't be directly serialized
-  thread_act_port_array_t threads_for_task;
-  mach_msg_type_number_t thread_count;
-
-  if (task_threads(mach_task_self(), &threads_for_task, &thread_count))
-    return -1;
-
-  for (unsigned int i = 0; i < thread_count; ++i) {
-    if (threads_for_task[i] == mach_thread_self()) return i;
-  }
-  abort();
+#elif defined(XP_DARWIN)
+  // Note that this will leak the mach port unless it's explicitly closed or
+  // assigned to a RAII type such as `UniqueMachSendRight`.
+  return mach_thread_self();
 #else
 #  error "Unsupported platform"
 #endif
 }
-
-#ifdef XP_MACOSX
-static mach_port_t GetChildThread(ProcessHandle childPid,
-                                  ThreadId childBlamedThread) {
-  mach_port_t childThread = MACH_PORT_NULL;
-  thread_act_port_array_t threads_for_task;
-  mach_msg_type_number_t thread_count;
-
-  if (task_threads(childPid, &threads_for_task, &thread_count) ==
-          KERN_SUCCESS &&
-      childBlamedThread < thread_count) {
-    childThread = threads_for_task[childBlamedThread];
-  }
-
-  return childThread;
-}
-#endif
 
 bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
                             ThreadId aTargetBlamedThread,
@@ -3626,12 +3670,6 @@ bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
   }
 
   AutoIOInterposerDisable disableIOInterposition;
-
-#ifdef XP_MACOSX
-  mach_port_t targetThread = GetChildThread(aTargetHandle, aTargetBlamedThread);
-#else
-  ThreadId targetThread = aTargetBlamedThread;
-#endif
 
   xpstring dump_path;
 #ifndef XP_LINUX
@@ -3646,7 +3684,7 @@ bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
 
   // dump the target
   if (!google_breakpad::ExceptionHandler::WriteMinidumpForChild(
-          aTargetHandle, targetThread,
+          aTargetHandle, aTargetBlamedThread,
 #if defined(XP_LINUX) && defined(MOZ_OXIDIZED_BREAKPAD)
           /* auxvInfo */ nullptr,
 #endif  // defined(XP_LINUX) && defined(MOZ_OXIDIZED_BREAKPAD)

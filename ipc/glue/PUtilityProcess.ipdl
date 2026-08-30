@@ -31,8 +31,6 @@ include "mozilla/ipc/ByteBufUtils.h";
 
 include GraphicsMessages;
 
-using mozilla::dom::NativeThreadId from "mozilla/dom/NativeThreadId.h";
-
 // Telemetry
 using mozilla::Telemetry::HistogramAccumulation from "mozilla/TelemetryComms.h";
 using mozilla::Telemetry::KeyedHistogramAccumulation from "mozilla/TelemetryComms.h";

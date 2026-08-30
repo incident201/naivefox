@@ -30,7 +30,7 @@
 
     /** font-size **/
     --font-size-root: 15px;
-    /* 13px (in-content) */
+    /* 13px in-content, unset in platform (we want to avoid going too small when the root font size is already quite small) */
     --font-size-small: 0.867rem;
 
     /** page **/

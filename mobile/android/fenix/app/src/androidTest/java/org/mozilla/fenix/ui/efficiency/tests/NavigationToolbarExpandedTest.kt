@@ -15,13 +15,14 @@ import org.mozilla.fenix.helpers.Constants
 import org.mozilla.fenix.helpers.HomeActivityIntentTestRule
 import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
 import org.mozilla.fenix.ui.efficiency.helpers.BaseTest
+import org.mozilla.fenix.ui.efficiency.navigation.LaunchConfig
 import org.mozilla.fenix.ui.efficiency.selectors.BookmarksSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.BrowserPageSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.HomeSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.SearchBarSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.ToolbarSelectors
 
-class NavigationToolbarExpandedTest : BaseTest(shouldUseExpandedToolbar = true) {
+class NavigationToolbarExpandedTest : BaseTest(LaunchConfig(shouldUseExpandedToolbar = true)) {
 
     private val mockWebServer
         get() = fenixTestRule.mockWebServer

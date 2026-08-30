@@ -4111,7 +4111,7 @@ class XREMain {
   int XRE_mainInit(bool* aExitFlag, AppRunnerTelemFlags& appRunnerTelemFlags);
   int XRE_mainStartup(bool* aExitFlag,
                       AppRunnerTelemFlags& appRunnerTelemFlags);
-  nsresult XRE_mainRun();
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY nsresult XRE_mainRun();
 
   bool CheckLastStartupWasCrash();
 
@@ -4617,6 +4617,8 @@ int XREMain::XRE_mainInit(bool* aExitFlag,
     nsDependentCString releaseChannel(MOZ_STRINGIFY(MOZ_UPDATE_CHANNEL));
     CrashReporter::RecordAnnotationNSCString(
         CrashReporter::Annotation::ReleaseChannel, releaseChannel);
+
+    CrashReporter::RecordPlatformAnnotations();
 
 #ifdef XP_WIN
     nsAutoString appInitDLLs;
@@ -5816,7 +5818,7 @@ int XREMain::XRE_mainStartup(bool* aExitFlag,
 }
 
 #if defined(MOZ_SANDBOX)
-void AddSandboxAnnotations() {
+void AddSandboxAnnotations() MOZ_CAN_RUN_SCRIPT_BOUNDARY {
   CrashReporter::RecordAnnotationU32(
       CrashReporter::Annotation::ContentSandboxLevel,
       GetEffectiveContentSandboxLevel());
@@ -5876,6 +5878,9 @@ nsresult XREMain::XRE_mainRun() {
 
     rv = mScopedXPCOM->SetWindowCreator(mNativeApp);
     NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
+
+    // Record platform annotations which need XPCOM initialized.
+    CrashReporter::RecordXPCOMPlatformAnnotations();
 
     // tell the crash reporter to also send the release channel
     nsCOMPtr<nsIPrefService> prefs =
@@ -6027,8 +6032,9 @@ nsresult XREMain::XRE_mainRun() {
           initializedJSContext = true;
         }
 
-        nsresult backupCreated =
-            ProfileResetCleanup(mProfileSvc, gResetOldProfile);
+        const RefPtr<nsToolkitProfileService> profileSvc = mProfileSvc;
+        const nsCOMPtr<nsIToolkitProfile> oldProfile = gResetOldProfile;
+        nsresult backupCreated = ProfileResetCleanup(profileSvc, oldProfile);
         if (NS_FAILED(backupCreated)) {
           NS_WARNING("Could not cleanup the profile that was reset");
         }

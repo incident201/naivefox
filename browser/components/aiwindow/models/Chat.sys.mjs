@@ -151,6 +151,11 @@ const TOOLS_WITH_PENDING_ACTION_LOG = new Set([SEARCH_THE_WEB]);
  * model is never offered tools the build is not configured to support, and
  * swaps in pref-selected variants of a tool's config.
  *
+ * Treats `tools` as read-only: it only ever drops or substitutes whole entries,
+ * so every operation here must be non-mutating (`filter`/`map`/`toSorted`, never
+ * `splice`/`sort`/index assignment). Callers pass the shared `toolsConfig`
+ * constant, and when no gate applies it is returned by identity.
+ *
  * @param {object[]} tools
  * @returns {object[]}
  */
@@ -160,9 +165,7 @@ function filterFeatureGatedTools(tools) {
   // and parameters the model sees have to match the path that will run.
   if (Services.prefs.getBoolPref(SEARCH_THE_WEB_FAST_PREF, false)) {
     filtered = filtered.map(t =>
-      t.function?.name === SEARCH_THE_WEB
-        ? structuredClone(SEARCH_THE_WEB_TOOL_CONFIG_FAST)
-        : t
+      t.function?.name === SEARCH_THE_WEB ? SEARCH_THE_WEB_TOOL_CONFIG_FAST : t
     );
   }
   if (!Services.prefs.getBoolPref(AITAB_PREF, false)) {
@@ -330,7 +333,7 @@ Object.assign(Chat, {
      * comment above tool execution for further details.
      */
     const isVerbatimQuery = currentTurn === 0;
-    let chatToolsConfig = filterFeatureGatedTools(structuredClone(toolsConfig));
+    const chatToolsConfig = filterFeatureGatedTools(toolsConfig);
 
     let fullResponseText = "";
 

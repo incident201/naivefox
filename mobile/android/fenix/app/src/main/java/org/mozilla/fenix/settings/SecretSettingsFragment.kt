@@ -347,6 +347,30 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
 
+        requirePreference<SwitchPreferenceCompat>(R.string.pref_key_enable_weekly_privacy_notification).apply {
+            isVisible = Config.channel.isNightlyOrDebug
+            isChecked = settings.weeklyPrivacyNotificationFeatureFlagEnabled
+            onPreferenceChangeListener =
+                object : SharedPreferenceUpdater() {
+                    override fun onPreferenceChange(preference: Preference, newValue: Any?): Boolean {
+                        if (newValue as? Boolean == false) {
+                            requirePreference<SwitchPreferenceCompat>(
+                                    R.string.pref_key_debug_force_weekly_privacy_report_notification
+                                )
+                                .isChecked = false
+                        }
+                        return super.onPreferenceChange(preference, newValue)
+                    }
+                }
+        }
+
+        requirePreference<SwitchPreferenceCompat>(R.string.pref_key_debug_force_weekly_privacy_report_notification)
+            .apply {
+                isVisible = Config.channel.isNightlyOrDebug
+                isChecked = settings.debugForceWeeklyPrivacyReportNotification
+                onPreferenceChangeListener = SharedPreferenceUpdater()
+            }
+
         requirePreference<SwitchPreferenceCompat>(R.string.pref_key_enable_import_bookmarks).apply {
             isVisible = Config.channel.isDebug
             isChecked = settings.importBookmarksFeatureFlagEnabled
@@ -471,6 +495,11 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
         requirePreference<SwitchPreferenceCompat>(R.string.pref_key_tab_groups_onboarding).apply {
             isVisible = Config.channel.isNightlyOrDebug
             isChecked = context.components.settings.tabGroupsOnboardingEnabled
+            onPreferenceChangeListener = SharedPreferenceUpdater()
+        }
+
+        requirePreference<SwitchPreferenceCompat>(R.string.pref_key_migrate_collections_to_tab_groups).apply {
+            isChecked = settings.migrateCollectionsToTabGroupsEnabled
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
 

@@ -338,16 +338,26 @@ class HistoryFragment :
             R.id.share_history_multi_select -> {
                 val selectedHistory = historyStore.state.mode.selectedItems
                 val shareTabs = mutableListOf<ShareData>()
-
+                val isPrivate = requireComponents.appStore.state.mode.isPrivate
                 for (history in selectedHistory) {
                     when (history) {
                         is History.Regular -> {
-                            shareTabs.add(ShareData(url = history.url, title = history.title))
+                            shareTabs.add(
+                                ShareData(
+                                    url = history.url,
+                                    title = history.title,
+                                    private = isPrivate,
+                                )
+                            )
                         }
                         is History.Group -> {
                             shareTabs.addAll(
                                 history.items.map { metadata ->
-                                    ShareData(url = metadata.url, title = metadata.title)
+                                    ShareData(
+                                        url = metadata.url,
+                                        title = metadata.title,
+                                        private = isPrivate,
+                                    )
                                 }
                             )
                         }

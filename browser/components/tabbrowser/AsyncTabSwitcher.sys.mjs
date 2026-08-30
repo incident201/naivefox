@@ -1122,7 +1122,7 @@ export class AsyncTabSwitcher {
           this.onLoadTimeout();
           break;
         case "tabRemoved":
-          this.onTabRemovedImpl(event.tab);
+          this.onTabRemovedImpl();
           break;
         case "MozLayerTreeReady": {
           let browser = event.originalTarget;

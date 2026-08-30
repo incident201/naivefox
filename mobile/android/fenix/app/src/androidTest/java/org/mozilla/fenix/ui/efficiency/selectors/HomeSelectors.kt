@@ -91,20 +91,12 @@ object HomeSelectors {
             groups = listOf("homeScreen"),
         )
 
-    val JUMP_BACK_IN_SECTION =
+    val CONTINUE_SECTION =
         Selector(
             strategy = SelectorStrategy.COMPOSE_BY_TEXT,
-            value = getStringResource(R.string.recent_tabs_header),
-            description = "Jump Back In section header",
-            groups = listOf("jumpBackIn"),
-        )
-
-    val JUMP_BACK_IN_SHOW_ALL =
-        Selector(
-            strategy = SelectorStrategy.UIAUTOMATOR_WITH_TEXT,
-            value = getStringResource(R.string.recent_tabs_show_all),
-            description = "Jump Back In Show All button",
-            groups = listOf("jumpBackIn"),
+            value = getStringResource(R.string.recent_tabs_header_2),
+            description = "Continue section header",
+            groups = listOf("continue"),
         )
 
     val RECENT_BOOKMARKS_SECTION =
@@ -169,8 +161,7 @@ object HomeSelectors {
             HOME_WORDMARK_TEXT,
             COLLECTIONS_HEADER,
             TAB_COUNTER_ZERO,
-            JUMP_BACK_IN_SECTION,
-            JUMP_BACK_IN_SHOW_ALL,
+            CONTINUE_SECTION,
             RECENT_BOOKMARKS_SECTION,
             PRIVATE_BROWSING_INFO_CARD_TITLE,
             TOP_SITE_ITEM(),

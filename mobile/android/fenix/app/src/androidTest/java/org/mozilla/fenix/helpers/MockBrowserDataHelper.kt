@@ -150,6 +150,7 @@ object MockBrowserDataHelper {
     /**
      * Adds a new custom search engine to the apps Search Engines list.
      *
+     * @param mockWebServer The server the search engine will query.
      * @param searchEngineName Use createCustomSearchEngine method to create one.
      */
     fun addCustomSearchEngine(mockWebServer: MockWebServer, searchEngineName: String) {
@@ -162,6 +163,7 @@ object MockBrowserDataHelper {
     /**
      * Adds and selects as default a new custom search engine to the apps Search Engines list.
      *
+     * @param mockWebServer The server the search engine will query.
      * @param searchEngineName Use createCustomSearchEngine method to create one.
      */
     fun setCustomSearchEngine(mockWebServer: MockWebServer, searchEngineName: String) {
@@ -178,6 +180,7 @@ object MockBrowserDataHelper {
      * Adds a new pinned site to the app home screen.
      *
      * @param webPageMetadata A pair of website title and URL.
+     * @param activityTestRule The rule used to restart the app so that the pinned site is displayed.
      */
     fun addPinnedSite(vararg webPageMetadata: Pair<String, String>, activityTestRule: HomeActivityIntentTestRule) {
         runBlocking {

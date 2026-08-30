@@ -1558,8 +1558,8 @@ void HTMLSelectElement::UserFinishedInteracting(bool aChanged) {
 
   // 5. Fire an event named change at element, with the bubbles attribute
   //    initialized to true.
-  nsContentUtils::DispatchTrustedEvent(OwnerDoc(), this, u"change"_ns,
-                                       CanBubble::eYes, Cancelable::eNo);
+  nsContentUtils::DispatchTrustedEvent(this, u"change"_ns, CanBubble::eYes,
+                                       Cancelable::eNo);
 }
 
 void HTMLSelectElement::AttributeChanged(dom::Element* aElement,
@@ -1640,23 +1640,24 @@ void HTMLSelectElement::ContentWillBeRemoved(nsIContent* aChild,
   }
   MutatedOptions options;
   const bool anySelected = CollectOptions(*this, aChild, options);
-  if (!options.IsEmpty() && !IsCombobox()) {
+  const bool combobox = IsCombobox();
+  if (!options.IsEmpty() && !combobox) {
     for (auto& option : options) {
       RemoveOptionFromListBoxSelection(*option);
     }
   }
-  if (anySelected) {
+  const bool selectedOptionMayHaveChanged =
+      anySelected || (!options.IsEmpty() && combobox && SelectedIndex() < 0);
+  if (selectedOptionMayHaveChanged) {
     RunSelectednessSettingAlgorithm(/*aNotify=*/true,
                                     /*aSkipSelectedcontentUpdate=*/true,
                                     options);
   }
-  if (IsInComposedDoc() && IsCombobox()) {
+  if (IsInComposedDoc() && combobox) {
     OptionValueMightHaveChanged(aChild);
-    if (anySelected) {
-      // If there's any selected option getting removed, we need to call
-      // SelectedContentTextMightHaveChanged ignoring the options here
-      // to get the correct text.
-      // TODO(emilio): Maybe plumb options down further or something.
+    if (selectedOptionMayHaveChanged) {
+      // If the selected option might've changed, we need to update the selected
+      // content text ignoring the options here to get the correct text.
       SelectedContentTextMightHaveChanged(true, options);
     } else if (InsideSelectedOption(aChild, this)) {
       // If content mutates in our selected option, we need to use a script
@@ -1677,7 +1678,7 @@ void HTMLSelectElement::ContentWillBeRemoved(nsIContent* aChild,
     // options in the list. So gotta invalidate it manually here.
     mOptions->SetDirty();
   }
-  if (anySelected && !mIsUpdatingSelectedContent) {
+  if (selectedOptionMayHaveChanged && !mIsUpdatingSelectedContent) {
     ScheduleSelectedContentUpdate();
   }
 }
@@ -1721,16 +1722,10 @@ void HTMLSelectElement::ContentAppendedOrInserted(nsIContent* aFirstNewContent,
   // https://html.spec.whatwg.org/#selectedness-setting-algorithm
   // Run once per mutation (not per-option) since caches are already set by
   // each option's BindToTree → UpdateNearestAncestorSelect.
-  //
-  // The algorithm is linear in the number of options, so running it on every
-  // insertion would make bulk insertion (e.g. `select.options.length = N`)
-  // quadratic. Skip it when it would provably be a no-op: inserting options
-  // can only change the selection (or validity) when one of the inserted
-  // options is itself selected (step 5), or when a combobox has no option
-  // selected yet and step 6 picks the first enabled option. Otherwise the
-  // currently-selected option and the value-missing state are unchanged.
-  if (!options.IsEmpty() &&
-      (anySelected || (IsCombobox() && SelectedIndex() < 0))) {
+  const bool selectedOptionMayHaveChanged =
+      anySelected ||
+      (!options.IsEmpty() && IsCombobox() && SelectedIndex() < 0);
+  if (selectedOptionMayHaveChanged) {
     RunSelectednessSettingAlgorithm(/*aNotify=*/true,
                                     /*aSkipSelectedcontentUpdate=*/true);
   }
@@ -1743,12 +1738,10 @@ void HTMLSelectElement::ContentAppendedOrInserted(nsIContent* aFirstNewContent,
   }
   // Per the option post-connection steps, the selectedcontent update only
   // happens when an option was inserted (not for content inserted inside an
-  // existing option, which is not a trigger in the spec). Gate on the inserted
-  // options like the selectedness algorithm call above. This means mutating the
-  // contents of an already-selected option does not refresh the selectedcontent
-  // clone; whether that is the right behavior is tracked in
-  // https://github.com/whatwg/html/issues/12509.
-  if (!options.IsEmpty() && !mIsUpdatingSelectedContent) {
+  // existing option, which is not a trigger in the spec). Gate on
+  // selectedOptionMayHaveChanged. Whether that's the right thing to do is
+  // tracked in https://github.com/whatwg/html/issues/12509.
+  if (selectedOptionMayHaveChanged && !mIsUpdatingSelectedContent) {
     ScheduleSelectedContentUpdate(SelectedContentUpdateMode::ScriptRunner);
   }
 }
@@ -1918,8 +1911,8 @@ void HTMLSelectElement::FireDropDownEvent(bool aShow,
     }
     return u"mozhidedropdown"_ns;
   }();
-  nsContentUtils::DispatchChromeEvent(OwnerDoc(), this, eventName,
-                                      CanBubble::eYes, Cancelable::eNo);
+  nsContentUtils::DispatchChromeEvent(this, eventName, CanBubble::eYes,
+                                      Cancelable::eNo);
 }
 
 void HTMLSelectElement::PostHandleKeyEvent(int32_t aNewIndex,

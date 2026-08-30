@@ -6,14 +6,10 @@
 
 #include <stdlib.h>
 
-#include <new>  // for placement new
-
 #include "LogModulePrefWatcher.h"
 #include "ManifestParser.h"
 #include "StaticComponents.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/FileUtils.h"
-#include "mozilla/GenericFactory.h"
 #include "mozilla/Logging.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Omnijar.h"
@@ -28,7 +24,6 @@
 #include "mozilla/Variant.h"
 #include "nsArray.h"
 #include "nsCOMPtr.h"
-#include "nsCRT.h"  // for atoll
 #include "nsCategoryManager.h"
 #include "nsDirectoryService.h"
 #include "nsDirectoryServiceDefs.h"
@@ -36,23 +31,12 @@
 #include "nsIObserverService.h"
 #include "nsIStringEnumerator.h"
 #include "nsISupports.h"
-#include "nsISupportsPrimitives.h"
 #include "nsLayoutModule.h"
-#include "nsLocalFile.h"
 #include "nsNetUtil.h"
-#include "nsReadableUtils.h"
 #include "nsString.h"
-#include "nsSupportsPrimitives.h"
 #include "nsTArray.h"
-#include "nsThreadManager.h"
-#include "nsThreadUtils.h"
 #include "nsXPCOM.h"
-#include "nsXPCOMPrivate.h"
 #include "nscore.h"
-#include "nspr.h"
-#include "prcmon.h"
-#include "prio.h"
-#include "private/pprthred.h"
 #include "prthread.h"
 #include "xpcpublic.h"
 
@@ -60,11 +44,6 @@ using namespace mozilla;
 using namespace mozilla::xpcom;
 
 static LazyLogModule nsComponentManagerLog("nsComponentManager");
-
-#if 0
-#  define SHOW_DENIED_ON_SHUTDOWN
-#  define SHOW_CI_ON_EXISTING_SERVICE
-#endif
 
 namespace {
 
@@ -158,6 +137,10 @@ class MOZ_STACK_CLASS EntryWrapper final {
 
   already_AddRefed<nsIFactory> GetFactory() const {
     return mEntry.match([](const auto* e) { return e->GetFactory(); });
+  }
+
+  bool IsSingleton() const {
+    return mEntry.match([](const auto* e) { return e->IsSingleton(); });
   }
 
   /**
@@ -616,13 +599,8 @@ already_AddRefed<nsIFactory> nsComponentManagerImpl::FindFactory(
 NS_IMETHODIMP
 nsComponentManagerImpl::GetClassObject(const nsCID& aClass, const nsIID& aIID,
                                        void** aResult) {
-  nsresult rv;
-
-  if (MOZ_LOG_TEST(nsComponentManagerLog, LogLevel::Debug)) {
-    char buf[NSID_LENGTH];
-    aClass.ToProvidedString(buf);
-    PR_LogPrint("nsComponentManager: GetClassObject(%s)", buf);
-  }
+  MOZ_LOG(nsComponentManagerLog, LogLevel::Debug,
+          ("GetClassObject(%s)", AutoIDString(aClass).get()));
 
   MOZ_ASSERT(aResult != nullptr);
 
@@ -631,7 +609,7 @@ nsComponentManagerImpl::GetClassObject(const nsCID& aClass, const nsIID& aIID,
     return NS_ERROR_FACTORY_NOT_REGISTERED;
   }
 
-  rv = factory->QueryInterface(aIID, aResult);
+  nsresult rv = factory->QueryInterface(aIID, aResult);
 
   MOZ_LOG(
       nsComponentManagerLog, LogLevel::Warning,
@@ -677,17 +655,10 @@ nsComponentManagerImpl::GetClassObjectByContractID(const char* aContractID,
 NS_IMETHODIMP
 nsComponentManagerImpl::CreateInstance(const nsCID& aClass, const nsIID& aIID,
                                        void** aResult) {
-  // test this first, since there's no point in creating a component during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Creating new instance on shutdown. Denied.\n"
-            "         CID: %s\n         IID: %s\n",
-            AutoIDString(aClass).get(), AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
+            ("Can't CreateInstance during shutdown. CID: %s; IID: %s",
+             AutoIDString(aClass).get(), AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -702,14 +673,12 @@ nsComponentManagerImpl::CreateInstance(const nsCID& aClass, const nsIID& aIID,
     return NS_ERROR_FACTORY_NOT_REGISTERED;
   }
 
-#ifdef SHOW_CI_ON_EXISTING_SERVICE
-  if (entry->ServiceInstance()) {
-    nsAutoCString message;
-    message = "You are calling CreateInstance \""_ns + AutoIDString(aClass) +
-              "\" when a service for this CID already exists!"_ns;
-    NS_ERROR(message.get());
+  if (NS_WARN_IF(entry->IsSingleton())) {
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Error,
+            ("Not allowed to CreateInstance for singleton %s",
+             AutoIDString(aClass).get()));
+    return NS_ERROR_NOT_IMPLEMENTED;
   }
-#endif
 
   nsresult rv;
   nsCOMPtr<nsIFactory> factory = entry->GetFactory();
@@ -724,13 +693,10 @@ nsComponentManagerImpl::CreateInstance(const nsCID& aClass, const nsIID& aIID,
     rv = NS_ERROR_FACTORY_NOT_REGISTERED;
   }
 
-  if (MOZ_LOG_TEST(nsComponentManagerLog, LogLevel::Warning)) {
-    char buf[NSID_LENGTH];
-    aClass.ToProvidedString(buf);
-    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
-            ("nsComponentManager: CreateInstance(%s) %s", buf,
-             NS_SUCCEEDED(rv) ? "succeeded" : "FAILED"));
-  }
+  MOZ_LOG(
+      nsComponentManagerLog, LogLevel::Warning,
+      ("nsComponentManager: CreateInstance(%s) %s", AutoIDString(aClass).get(),
+       NS_SUCCEEDED(rv) ? "succeeded" : "FAILED"));
 
   return rv;
 }
@@ -753,17 +719,11 @@ nsComponentManagerImpl::CreateInstanceByContractID(const char* aContractID,
     return NS_ERROR_INVALID_ARG;
   }
 
-  // test this first, since there's no point in creating a component during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Creating new instance on shutdown. Denied.\n"
-            "  ContractID: %s\n         IID: %s\n",
-            aContractID, AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
+            ("Can't CreateInstanceByContractID during shutdown. ContractID: "
+             "%s; IID: %s",
+             aContractID, AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -779,18 +739,12 @@ nsComponentManagerImpl::CreateInstanceByContractID(const char* aContractID,
     return NS_ERROR_FACTORY_NOT_REGISTERED;
   }
 
-#ifdef SHOW_CI_ON_EXISTING_SERVICE
-  if (entry->ServiceInstance()) {
-    nsAutoCString message;
-    message =
-        "You are calling CreateInstance \""_ns +
-        nsDependentCString(aContractID) +
-        nsLiteralCString(
-            "\" when a service for this CID already exists! "
-            "Add it to abusedContracts to track down the service consumer.");
-    NS_ERROR(message.get());
+  if (NS_WARN_IF(entry->IsSingleton())) {
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Error,
+            ("Not allowed to CreateInstanceByContractID for singleton %s",
+             aContractID));
+    return NS_ERROR_NOT_IMPLEMENTED;
   }
-#endif
 
   nsresult rv;
   nsCOMPtr<nsIFactory> factory = entry->GetFactory();
@@ -963,17 +917,10 @@ nsresult nsComponentManagerImpl::GetServiceLocked(Maybe<MonitorAutoLock>& aLock,
 NS_IMETHODIMP
 nsComponentManagerImpl::GetService(const nsCID& aClass, const nsIID& aIID,
                                    void** aResult) {
-  // test this first, since there's no point in returning a service during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Getting service on shutdown. Denied.\n"
-            "         CID: %s\n         IID: %s\n",
-            AutoIDString(aClass).get(), AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
+            ("Can't GetService during shutdown. CID: %s; IID: %s",
+             AutoIDString(aClass).get(), AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -990,18 +937,10 @@ nsComponentManagerImpl::GetService(const nsCID& aClass, const nsIID& aIID,
 nsresult nsComponentManagerImpl::GetService(ModuleID aId, const nsIID& aIID,
                                             void** aResult) {
   const auto& entry = gStaticModules[size_t(aId)];
-
-  // test this first, since there's no point in returning a service during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Getting service on shutdown. Denied.\n"
-            "         CID: %s\n         IID: %s\n",
-            AutoIDString(entry.CID()).get(), AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
+            ("Can't GetService during shutdown. CID: %s; IID: %s",
+             AutoIDString(entry.CID()).get(), AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -1027,20 +966,11 @@ NS_IMETHODIMP
 nsComponentManagerImpl::IsServiceInstantiated(const nsCID& aClass,
                                               const nsIID& aIID,
                                               bool* aResult) {
-  // Now we want to get the service if we already got it. If not, we don't want
-  // to create an instance of it. mmh!
-
-  // test this first, since there's no point in returning a service during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Checking for service on shutdown. Denied.\n"
-            "         CID: %s\n         IID: %s\n",
-            AutoIDString(aClass).get(), AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(
+        nsComponentManagerLog, LogLevel::Warning,
+        ("Can't call IsServiceInstantiated during shutdown. CID: %s; IID: %s",
+         AutoIDString(aClass).get(), AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -1060,20 +990,11 @@ nsComponentManagerImpl::IsServiceInstantiated(const nsCID& aClass,
 NS_IMETHODIMP
 nsComponentManagerImpl::IsServiceInstantiatedByContractID(
     const char* aContractID, const nsIID& aIID, bool* aResult) {
-  // Now we want to get the service if we already got it. If not, we don't want
-  // to create an instance of it. mmh!
-
-  // test this first, since there's no point in returning a service during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Checking for service on shutdown. Denied.\n"
-            "  ContractID: %s\n         IID: %s\n",
-            aContractID, AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
+            ("Can't call IsServiceInstantiatedByContractID during shutdown. "
+             "ContractID: %s; IID: %s",
+             aContractID, AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -1095,17 +1016,11 @@ NS_IMETHODIMP
 nsComponentManagerImpl::GetServiceByContractID(const char* aContractID,
                                                const nsIID& aIID,
                                                void** aResult) {
-  // test this first, since there's no point in returning a service during
-  // shutdown -- whether it's available or not would depend on the order it
-  // occurs in the list
   if (gXPCOMShuttingDown) {
-    // When processing shutdown, don't process new GetService() requests
-#ifdef SHOW_DENIED_ON_SHUTDOWN
-    fprintf(stderr,
-            "Getting service on shutdown. Denied.\n"
-            "  ContractID: %s\n         IID: %s\n",
-            aContractID, AutoIDString(aIID).get());
-#endif /* SHOW_DENIED_ON_SHUTDOWN */
+    MOZ_LOG(nsComponentManagerLog, LogLevel::Warning,
+            ("Can't call GetServiceByContractID during shutdown. "
+             "ContractID: %s; IID: %s",
+             aContractID, AutoIDString(aIID).get()));
     return NS_ERROR_UNEXPECTED;
   }
 

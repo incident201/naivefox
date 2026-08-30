@@ -40,10 +40,6 @@ class CustomTabsTest {
     private val customMenuItem = "TestMenuItem"
     private val customTabActionButton = "CustomActionButton"
 
-    /* Updated externalLinks.html to v2.0,
-      changed the hypertext reference to mozilla-mobile.github.io/testapp/downloads for "External link"
-    */
-    private val externalLinksPWAPage = "https://mozilla-mobile.github.io/testapp/v2.0/externalLinks.html"
     private val loginPage = "https://mozilla-mobile.github.io/testapp/loginForm"
 
     @get:Rule(order = 1)
@@ -155,7 +151,7 @@ class CustomTabsTest {
 
         browserScreen(composeTestRule) {}
             .clickDownloadLink(downloadFile) {
-                verifyDownloadPrompt(composeTestRule, downloadFile)
+                verifyDownloadPrompt(composeTestRule)
             }
             .clickDownload(composeTestRule) {
                 verifyDownloadCompleteSnackbar(fileName = "web_icon.png")

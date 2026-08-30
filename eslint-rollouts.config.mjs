@@ -306,6 +306,7 @@ export default [
     ],
     ignores: [
       "browser/components/tabbrowser/Tabbrowser.sys.mjs",
+      "browser/modules/URILoadingHelper.sys.mjs",
       "devtools/shared/css/parsing-utils.js",
       "devtools/startup/**",
     ],
@@ -478,6 +479,7 @@ export default [
     ],
     ignores: [
       "browser/components/tabbrowser/Tabbrowser.sys.mjs",
+      "browser/modules/URILoadingHelper.sys.mjs",
       "devtools/shared/css/parsing-utils.js",
       "devtools/startup/**",
     ],

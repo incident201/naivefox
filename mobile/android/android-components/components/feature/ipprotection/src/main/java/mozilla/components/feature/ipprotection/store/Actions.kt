@@ -32,6 +32,9 @@ sealed class IPProtectionAction : Action {
      */
     data class LocationChanged(val location: Location) : IPProtectionAction()
 
+    /** Reports a location reset, due to the previously selected location being unavailable. */
+    object LocationReset : IPProtectionAction()
+
     /** Reports a change in whether the user is signed in to a Firefox Account. */
     data class AccountStateChanged(val state: AccountStatus) : IPProtectionAction()
 
@@ -56,10 +59,27 @@ sealed class IPProtectionAction : Action {
     data class ToggleFailed(val error: Throwable? = null) : IPProtectionAction()
 
     /**
+     * Reports that switching to a new location failed.
+     *
+     * @property error The [Throwable] the engine rejected the request with, or null when the engine gave no reason.
+     */
+    data class LocationSwitchFailed(val error: Throwable? = null) : IPProtectionAction()
+
+    /**
+     * Reports that a location list update has failed.
+     *
+     * @property error The [Throwable] the engine rejected the request with.
+     */
+    data class LocationUpdateFailed(val error: Throwable) : IPProtectionAction()
+
+    /**
      * Checks if an account has already been entitled. If so, this will lead to a token exchange that gives us a new
      * refresh token with increased scopes. If not, we do nothing.
      */
     object CheckAccount : IPProtectionAction()
+
+    /** Checks if the list of available locations needs to be updated due to a previously failed attempt. */
+    object CheckLocations : IPProtectionAction()
 }
 
 /** Internal actions that can be dispatched to [IPProtectionStore]. */

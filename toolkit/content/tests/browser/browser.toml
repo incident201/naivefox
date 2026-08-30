@@ -187,6 +187,8 @@ skip-if = [
   "os == 'win' && opt && standalone", # Bug 2028650
 ]
 
+["browser_input_picker_color_scheme.js"]
+
 ["browser_isSynthetic.js"]
 
 ["browser_keyevents_during_autoscrolling.js"]

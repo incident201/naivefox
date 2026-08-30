@@ -374,7 +374,7 @@ class SnackbarBinding(
                     is SnackbarState.IPProtectionDataLimitReached ->
                         handleIPProtectionDataLimitReachedSnackbarState(state)
 
-                    is SnackbarState.IPProtectionConnectionError -> handleIPProtectionConnectionErrorSnackbarSate(state)
+                    is SnackbarState.IPProtectionShowSnackbar -> showIPProtectionSnackBar(state.title)
                 }
             }
     }
@@ -457,10 +457,10 @@ class SnackbarBinding(
      * The state could be consumed by [IPProtectionSnackbarBinding] as well (e.g. three dot menu or trust panel opened),
      * in which case, to avoid showing snackbar twice, we only show it here if the view is active.
      */
-    private fun handleIPProtectionConnectionErrorSnackbarSate(state: SnackbarState.IPProtectionConnectionError) {
+    private fun showIPProtectionSnackBar(title: String) {
         if (viewHasFocus()) {
             snackbarDelegate.show(
-                text = state.title,
+                text = title,
                 duration = Snackbar.LENGTH_SHORT,
             )
 

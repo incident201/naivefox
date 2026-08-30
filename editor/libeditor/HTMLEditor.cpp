@@ -482,11 +482,11 @@ void HTMLEditor::PreDestroy() {
 }
 
 bool HTMLEditor::IsStyleEditable(const Element* aEditingHost) const {
-  if (IsInDesignMode()) {
-    return true;
-  }
   if (IsPlaintextMailComposer()) {
     return false;
+  }
+  if (IsInDesignMode()) {
+    return true;
   }
   const Element* const editingHost =
       aEditingHost ? aEditingHost : ComputeEditingHost(LimitInBodyElement::No);

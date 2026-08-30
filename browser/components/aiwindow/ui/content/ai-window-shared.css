@@ -4,7 +4,7 @@
 
 :root {
   /* 580px - max width for chat content and smartbar */
-  --smartwindow-content-max-width: calc(var(--size-layout-xlarge) + var(--dimension-80));
+  --smartwindow-content-max-width: calc(var(--size-layout-xlarge) + 80px);
   --smartwindow-brand-accent: light-dark(var(--color-violet-90), var(--color-violet-20));
   --smartwindow-prompt-button-background-color: light-dark(var(--color-white), var(--color-gray-80));
   --smartwindow-text-color-accent-deemphasized: light-dark(var(--color-violet-60), var(--color-violet-30));

@@ -361,7 +361,7 @@ option:read-write {
   user-select: text;
 }
 
-select > option {
+select option:not(optgroup option) {
   padding-inline: 4px;
 }
 
@@ -387,7 +387,7 @@ optgroup {
   word-wrap: normal !important;
 }
 
-optgroup > option {
+optgroup option {
   padding-inline-start: 20px;
   font-style: normal;
   font-weight: normal;

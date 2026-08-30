@@ -9214,6 +9214,12 @@ bool BaseCompiler::emitRefCast(bool nullable) {
     masm.appendAndVerify(wasm::Trap::BadCast,
                          wasm::TrapMachineInsnForLoadWord(), fcr,
                          trapSiteDesc());
+    // stackmap for: debug: emitRefCast
+    if (compilerEnv_.debugEnabled() &&
+        !createStackMap(Some(Trap::BadCast), fcr,
+                        HasDebugFrameWithLiveRefs::Maybe)) {
+      return false;
+    }
   }
   freeRegistersForBranchIfRefSubtype(regs);
 

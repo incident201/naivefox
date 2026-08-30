@@ -247,6 +247,14 @@ internal class ReleaseMetricController(
                 Addresses.autofillPromptExpanded.record(NoExtras())
             Component.FEATURE_PROMPTS to AddressAutofillDialogFacts.Items.AUTOFILL_ADDRESS_PROMPT_DISMISSED ->
                 Addresses.autofillPromptDismissed.record(NoExtras())
+            Component.FEATURE_PROMPTS to AddressAutofillDialogFacts.Items.AUTOFILL_ADDRESS_SAVE_PROMPT_SHOWN ->
+                Addresses.savePromptShown.record(NoExtras())
+            Component.FEATURE_PROMPTS to AddressAutofillDialogFacts.Items.AUTOFILL_ADDRESS_SAVE_PROMPT_DISMISSED ->
+                Addresses.savePromptDismissed.record(NoExtras())
+            Component.FEATURE_PROMPTS to AddressAutofillDialogFacts.Items.AUTOFILL_ADDRESS_CREATED ->
+                Addresses.savePromptCreate.record(NoExtras())
+            Component.FEATURE_PROMPTS to AddressAutofillDialogFacts.Items.AUTOFILL_ADDRESS_UPDATED ->
+                Addresses.savePromptUpdate.record(NoExtras())
 
             Component.FEATURE_PROMPTS to LoginAutofillDialogFacts.Items.AUTOFILL_LOGIN_PERFORMED ->
                 Logins.autofilled.record(NoExtras())

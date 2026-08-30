@@ -711,12 +711,12 @@ let JSWINDOWACTORS = {
     safeForUntrustedWebProcess: true,
   },
 
-  Pdfjs: {
+  PdfJs: {
     parent: {
-      esModuleURI: "resource://pdf.js/PdfjsParent.sys.mjs",
+      esModuleURI: "resource://pdf.js/PdfJsParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource://pdf.js/PdfjsChild.sys.mjs",
+      esModuleURI: "resource://pdf.js/PdfJsChild.sys.mjs",
     },
     allFrames: true,
     safeForUntrustedWebProcess: true,
@@ -933,6 +933,27 @@ let JSWINDOWACTORS = {
     },
   },
 
+  SmartFormFillReview: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SmartFormFillReviewParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SmartFormFillReviewChild.sys.mjs",
+      events: {
+        "SmartFormFillReview:Ready": { wantUntrusted: true },
+        "fill-form": { wantUntrusted: true },
+        cancel: { wantUntrusted: true },
+        stop: { wantUntrusted: true },
+        close: { wantUntrusted: true },
+      },
+    },
+    matches: ["about:smartformfillreview"],
+    remoteTypes: ["privilegedabout"],
+    enablePreference: "browser.smartwindow.smartformfill.enabled",
+  },
+
   SpeechDispatcher: {
     parent: {
       esModuleURI: "resource:///actors/SpeechDispatcherParent.sys.mjs",
@@ -997,10 +1018,12 @@ let JSWINDOWACTORS = {
 
   Urlbar: {
     parent: {
-      esModuleURI: "resource:///actors/UrlbarParent.sys.mjs",
+      esModuleURI:
+        "moz-src:///browser/components/urlbar/actors/UrlbarParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource:///actors/UrlbarChild.sys.mjs",
+      esModuleURI:
+        "moz-src:///browser/components/urlbar/actors/UrlbarChild.sys.mjs",
       events: {
         // A content-realm `<moz-urlbar>` reads `window.UrlbarActorPort`
         // synchronously as it connects, and can't create the actor itself, so

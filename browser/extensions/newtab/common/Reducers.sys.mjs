@@ -70,7 +70,7 @@ export const INITIAL_STATE = {
   },
   Prefs: {
     initialized: false,
-    values: { featureConfig: {} },
+    values: { featureConfig: {}, lockedPrefs: [] },
   },
   Dialog: {
     visible: false,
@@ -303,6 +303,10 @@ export const INITIAL_STATE = {
     // "sites where we blocked something"; see PrivacyFeed).
     sitesToday: 0,
     lastUpdated: null,
+    // True when the user has turned off every Enhanced Tracking Protection
+    // blocking option, so nothing is being counted (Bug 2063525). The widget
+    // shows a warning card instead of the readout.
+    etpOff: false,
     // Secondary-message decision chosen by PrivacyFeed's selector
     // (Bug 2050954). variant: empty | blank | streak | tip. `category` is the
     // message family (CATEGORY) so the UI can tell a celebration from an

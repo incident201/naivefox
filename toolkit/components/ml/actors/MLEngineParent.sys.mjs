@@ -34,6 +34,7 @@ const lazy = XPCOMUtils.declareLazy({
   Progress: "chrome://global/content/ml/Utils.sys.mjs",
   OPFS: "chrome://global/content/ml/OPFS.sys.mjs",
   BACKENDS: "chrome://global/content/ml/EngineProcess.sys.mjs",
+  EngineProcess: "chrome://global/content/ml/EngineProcess.sys.mjs",
   stringifyForLog: "chrome://global/content/ml/Utils.sys.mjs",
   console: () =>
     console.createInstance({
@@ -47,6 +48,11 @@ const lazy = XPCOMUtils.declareLazy({
 
 const ONE_GiB = 1024 * 1024 * 1024;
 const RS_RUNTIME_COLLECTION = "ml-onnx-runtime";
+
+// Vendored llama.cpp revision, mirrored from third_party/llama.cpp/moz.yaml.
+// Update alongside a vendor bump so engine_run telemetry reflects the
+// running library. See the matching comment in that moz.yaml.
+const LLAMA_CPP_VERSION = "74ade52741203e5c8f81eaf06a96cb1cfe15f2a3";
 const RS_INFERENCE_OPTIONS_COLLECTION = "ml-inference-options";
 const RS_ALLOW_DENY_COLLECTION = "ml-model-allow-deny-list";
 const TERMINATE_TIMEOUT = 5000;
@@ -407,6 +413,11 @@ export class MLEngineParent extends JSProcessActorParent {
 
       case "MLEngine:GetWorkerConfig":
         return MLEngineParent.getWorkerConfig();
+
+      case "MLEngine:GetNativeOnnxRuntimeAvailability":
+        // Routed through EngineProcess so the child shares the parent's single
+        // cached probe result instead of running its own.
+        return lazy.EngineProcess.requestIsNativeOnnxRuntimeAvailable();
 
       case "MLEngine:DestroyEngineProcess":
         if (this.processKeepAlive) {
@@ -1603,6 +1614,8 @@ export class MLEngine {
       engineId: this.engineId,
       modelId: this.pipelineOptions.modelId,
       backend: this.pipelineOptions.backend,
+      backendSourceRevision:
+        this.pipelineOptions.backend === "llama.cpp" ? LLAMA_CPP_VERSION : null,
     });
 
     return result;
@@ -1800,6 +1813,8 @@ export class MLEngine {
       engineId: this.engineId,
       modelId: this.pipelineOptions.modelId,
       backend: this.pipelineOptions.backend,
+      backendSourceRevision:
+        this.pipelineOptions.backend === "llama.cpp" ? LLAMA_CPP_VERSION : null,
       tokenCount,
       characterCount,
       timeToFirstChunk:

@@ -41,8 +41,17 @@ internal class IPProtectionTelemetryMiddleware(
         action: IPProtectionAction,
     ) {
         // The entitled but unauthenticated error state can be only captured before the reducer processes the action.
-        if (action is IPProtectionAction.ToggleFailed) {
-            handleToggleFailedAction(store.state, action.error)
+        // It could happen because the user might start vpn auth before their FXA account is ready. We patched the more
+        // prominent case when user is navigating into VPN auth flow from the onboarding card in bug 2057032, but there
+        // is nothing stopping them accessing the feature very quickly through the menu or settings, and running into
+        // the said problem.
+        when (action) {
+            is IPProtectionAction.ToggleFailed -> handleToggleFailedAction(store.state, action.error)
+            is IPProtectionAction.LocationSwitchFailed -> handleLocationSwitchFailed(action.error)
+            is IPProtectionAction.LocationUpdateFailed -> handleLocationUpdateFailed(action.error)
+            else -> {
+                // no-op
+            }
         }
 
         val previousStatus = store.state.accountState.status
@@ -114,7 +123,6 @@ internal class IPProtectionTelemetryMiddleware(
         }
     }
 
-    @androidx.annotation.OptIn(ExperimentalGeckoViewApi::class)
     private fun handleToggleFailedAction(state: IPProtectionState, error: Throwable?) {
         if (
             state.accountState.status == AccountStatus.EnrolledAndEntitled &&
@@ -122,8 +130,22 @@ internal class IPProtectionTelemetryMiddleware(
         ) {
             Vpn.entitledAccountUnauthenticated.record()
         }
-        Vpn.errorEncountered.record(Vpn.ErrorEncounteredExtra(errorCode = "${(error as? IPProxyException)?.code}"))
+        Vpn.errorEncountered.record(Vpn.ErrorEncounteredExtra(errorCode = errorCodeOf(error)))
     }
+
+    private fun handleLocationSwitchFailed(error: Throwable?) {
+        Vpn.locationSwitchError.record(extra = Vpn.LocationSwitchErrorExtra(errorCode = errorCodeOf(error)))
+    }
+
+    // The location list is fetched over the GeckoView event dispatcher, which rejects with an
+    // exception that carries no message, so we report the class name instead of an error code.
+    private fun handleLocationUpdateFailed(error: Throwable) {
+        Vpn.locationUpdateError.record(extra = Vpn.LocationUpdateErrorExtra(errorCode = error::class.simpleName))
+    }
+
+    // FIXME(IPP) the engine should pass the error code through: https://bugzilla.mozilla.org/show_bug.cgi?id=2066553
+    @androidx.annotation.OptIn(ExperimentalGeckoViewApi::class)
+    private fun errorCodeOf(error: Throwable?): String = "${(error as? IPProxyException)?.code}"
 
     private fun durationSince(startMs: Long?): Int? = startMs?.let { (currentTimeInMillis() - it).toInt() }
 

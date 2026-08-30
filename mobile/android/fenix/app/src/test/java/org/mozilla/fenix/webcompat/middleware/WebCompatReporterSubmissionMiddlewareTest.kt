@@ -28,7 +28,7 @@ import org.mozilla.fenix.webcompat.store.WebCompatReporterStore
 import org.mozilla.fenix.webcompat.testdata.WebCompatTestData
 import org.robolectric.RobolectricTestRunner
 
-class TestGleanBrokenSiteReportSender() : GleanBrokenSiteReportSender {
+class TestGleanBrokenSiteReportSender : GleanBrokenSiteReportSender {
     internal var lastSentDetails: JSONObject? = null
     internal var lastSentDescription: String? = null
     internal var lastSentReason: WebCompatReporterState.BrokenSiteReason? = null

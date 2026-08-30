@@ -539,7 +539,7 @@ static bool IsFontSizeInflationContainer(nsIFrame* aFrame,
        frameType == LayoutFrameType::Letter) ||
       // Given multiple frames for the same node, only the
       // outer one should be considered a container.
-      // (Important, e.g., for nsSelectsAreaFrame.)
+      // (Important, e.g., for scrolled frames.)
       (aFrame->GetParent()->GetContent() == content) ||
       (content &&
        // Form controls shouldn't become inflation containers.
@@ -3037,17 +3037,50 @@ static bool ItemParticipatesIn3DContext(nsIFrame* aAncestor,
   return FrameParticipatesIn3DContext(aAncestor, transformFrame);
 }
 
-static void WrapSeparatorTransform(nsDisplayListBuilder* aBuilder,
-                                   nsIFrame* aFrame,
-                                   nsDisplayList* aNonParticipants,
-                                   nsDisplayList* aParticipants, int aIndex,
-                                   nsDisplayItem** aSeparator) {
+/**
+ * If the frame of aItem is, or descends from, a frame that participates in the
+ * 3D rendering context of aAncestor and has a hidden backface, returns that
+ * participant, else null.
+ *
+ * Combines3DTransformWithAncestors() counts a hidden backface as participating
+ * even without a transform, but such a frame never gets a transform item of its
+ * own, so ItemParticipatesIn3DContext() cannot see it. Reporting the
+ * participant lets the caller build the leaf that both the painting and the hit
+ * testing paths cull on. The frame is reported for descendants too, because
+ * backface-visibility is not inherited yet the whole subtree has to disappear
+ * with the participant.
+ */
+static nsIFrame* BackfaceHidden3DParticipantFor(nsIFrame* aAncestor,
+                                                nsDisplayItem* aItem) {
+  MOZ_ASSERT(aAncestor->Extend3DContext());
+
+  nsIFrame* ancestor = aAncestor->FirstContinuation();
+  for (nsIFrame* frame = aItem->Frame(); frame && frame != ancestor;
+       frame = frame->GetClosestFlattenedTreeAncestorPrimaryFrame()) {
+    if (frame->In3DContextAndBackfaceIsHidden()) {
+      return frame;
+    }
+  }
+  return nullptr;
+}
+
+/**
+ * Flushes the non-participants accumulated so far into a separator transform
+ * item on aFrame, and moves that item over to aParticipants. It does not touch
+ * anything already in aParticipants, and it is a no-op when nothing has
+ * accumulated. This should be called whenever there is a switch between
+ * the participants and non-participants.
+ */
+static void FlushNonParticipantsIntoSeparatorTransform(
+    nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
+    nsDisplayList* aNonParticipants, nsDisplayList* aParticipants, int& aIndex,
+    nsDisplayItem** aSeparator) {
   if (aNonParticipants->IsEmpty()) {
     return;
   }
 
   nsDisplayTransform* item = MakeDisplayItemWithIndex<nsDisplayTransform>(
-      aBuilder, aFrame, aIndex, aNonParticipants, aBuilder->GetVisibleRect());
+      aBuilder, aFrame, aIndex++, aNonParticipants, aBuilder->GetVisibleRect());
 
   if (*aSeparator == nullptr && item) {
     *aSeparator = item;
@@ -3060,6 +3093,14 @@ static void WrapSeparatorTransform(nsDisplayListBuilder* aBuilder,
 // that will be built for |aMaskedFrame|. If we're not able to compute
 // one, return an empty Maybe.
 // The returned clip rect, if there is one, is relative to |aMaskedFrame|.
+// Bug 1958124: If this is inlined in
+// nsIFrame::BuildDisplayListForStackingContext on Win32, its variables enlarge
+// that function's stack frame, which is on a deeply recursive path that is
+// already up against the stack limit. Only masked frames reach this code, so
+// never inlining it on Win32 costs us nothing.
+#if defined(XP_WIN) && !defined(_WIN64)
+MOZ_NEVER_INLINE
+#endif
 static Maybe<nsRect> ComputeClipForMaskItem(
     nsDisplayListBuilder* aBuilder, nsIFrame* aMaskedFrame,
     const SVGUtils::MaskUsage& aMaskUsage) {
@@ -3885,10 +3926,26 @@ void nsIFrame::BuildDisplayListForStackingContext(
         if (ItemParticipatesIn3DContext(this, item) &&
             !item->GetClip().HasClip()) {
           // The frame of this item participates the same 3D context.
-          WrapSeparatorTransform(aBuilder, this, &nonparticipants,
-                                 &participants, index++, &separator);
+          FlushNonParticipantsIntoSeparatorTransform(
+              aBuilder, this, &nonparticipants, &participants, index,
+              &separator);
 
           participants.AppendToTop(item);
+        } else if (nsIFrame* backfaceHidden =
+                       BackfaceHidden3DParticipantFor(this, item)) {
+          // The item belongs to a participant with a hidden backface. Give it a
+          // leaf keyed on that participant rather than adding it to the shared
+          // separator below, which is keyed on us and so would be culled only
+          // when our own backface is turned away.
+          FlushNonParticipantsIntoSeparatorTransform(
+              aBuilder, this, &nonparticipants, &participants, index,
+              &separator);
+
+          nsDisplayList itemList(aBuilder);
+          itemList.AppendToTop(item);
+          participants.AppendToTop(MakeDisplayItemWithIndex<nsDisplayTransform>(
+              aBuilder, backfaceHidden, index++, &itemList,
+              aBuilder->GetVisibleRect()));
         } else {
           // The frame of the item doesn't participate the current
           // context, or has no transform.
@@ -3900,8 +3957,8 @@ void nsIFrame::BuildDisplayListForStackingContext(
           nonparticipants.AppendToTop(item);
         }
       }
-      WrapSeparatorTransform(aBuilder, this, &nonparticipants, &participants,
-                             index++, &separator);
+      FlushNonParticipantsIntoSeparatorTransform(
+          aBuilder, this, &nonparticipants, &participants, index, &separator);
 
       if (separator) {
         createdContainer = true;

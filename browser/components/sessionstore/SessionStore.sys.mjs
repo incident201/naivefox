@@ -149,13 +149,7 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { GlobalState } from "moz-src:///browser/components/sessionstore/GlobalState.sys.mjs";
 
-const lazy = {};
-
-XPCOMUtils.defineLazyServiceGetters(lazy, {
-  gScreenManager: ["@mozilla.org/gfx/screenmanager;1", Ci.nsIScreenManager],
-});
-
-ChromeUtils.defineESModuleGetters(lazy, {
+const lazy = XPCOMUtils.declareLazy({
   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   AIWindow:
@@ -191,17 +185,15 @@ ChromeUtils.defineESModuleGetters(lazy, {
   TabStateFlusher:
     "moz-src:///browser/components/sessionstore/TabStateFlusher.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
+  blankURI: () => Services.io.newURI("about:blank"),
+  gRestoreWindowsToVirtualDesktop: {
+    pref: "browser.sessionstore.restore_windows_to_virtual_desktop",
+  },
+  gScreenManager: {
+    service: "@mozilla.org/gfx/screenmanager;1",
+    iid: Ci.nsIScreenManager,
+  },
 });
-
-ChromeUtils.defineLazyGetter(lazy, "blankURI", () => {
-  return Services.io.newURI("about:blank");
-});
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "gRestoreWindowsToVirtualDesktop",
-  "browser.sessionstore.restore_windows_to_virtual_desktop"
-);
 
 /**
  * |true| if we are in debug mode, |false| otherwise.

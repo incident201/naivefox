@@ -66,6 +66,8 @@ support-files = ["data/engine.xml"]
 
 ["test_UrlbarUtils_getBackspaceBlock.js"]
 
+["test_UrlbarUtils_getRemoteIconUrl.js"]
+
 ["test_UrlbarUtils_getShortcutOrURIAndPostData.js"]
 
 ["test_UrlbarUtils_reintegrateAutofill.js"]

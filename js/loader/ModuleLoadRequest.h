@@ -57,6 +57,8 @@ class ModuleLoadRequest final : public ScriptLoadRequest {
   bool IsStaticImport() const { return mKind == Kind::StaticImport; }
   bool IsDynamicImport() const { return mKind == Kind::DynamicImport; }
 
+  bool IsSourcePhaseRequest(JSContext* aCx) const;
+
   bool IsErrored() const;
 
   nsIGlobalObject* GetGlobalObject();

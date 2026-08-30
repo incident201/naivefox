@@ -31,6 +31,7 @@ import org.mozilla.fenix.settings.PhoneFeature
  *
  * @param initialTouchMode See [ActivityTestRule]
  * @param launchActivity See [ActivityTestRule]
+ * @param skipOnboarding Whether onboarding is skipped before the activity launches.
  */
 class HomeActivityTestRule(
     initialTouchMode: Boolean = false,
@@ -141,7 +142,6 @@ class HomeActivityTestRule(
             initialTouchMode: Boolean = false,
             launchActivity: Boolean = true,
             skipOnboarding: Boolean = true,
-            useNewCrashReporterFlow: Boolean = false,
         ) =
             HomeActivityTestRule(
                 initialTouchMode = initialTouchMode,
@@ -170,6 +170,7 @@ class HomeActivityTestRule(
  *
  * @param initialTouchMode See [IntentsTestRule]
  * @param launchActivity See [IntentsTestRule]
+ * @param skipOnboarding Whether onboarding is skipped before the activity launches.
  */
 class HomeActivityIntentTestRule
 internal constructor(
@@ -360,8 +361,7 @@ fun setLongTapTimeout(delay: Int) {
             Log.i(TAG, "setLongTapTimeout: Executed command \"settings put secure long_press_timeout $delay\"")
             break
         } catch (e: RuntimeException) {
-            Log.i(TAG, "setLongTapTimeout: RuntimeException caught, executing fallback methods")
-            e.printStackTrace()
+            Log.e(TAG, "setLongTapTimeout: RuntimeException caught, executing fallback methods", e)
         }
     }
 }

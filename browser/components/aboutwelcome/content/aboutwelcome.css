@@ -565,7 +565,7 @@ div#feature-callout.hidden {
   border: 1px solid var(--fc-border);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
   border-radius: var(--panel-border-radius, var(--border-radius-large));
-  padding: var(--callout-padding, var(--dimension-20));
+  padding: var(--callout-padding, 20px);
   width: 25em;
   gap: 16px;
   background: var(--fc-background);
@@ -663,7 +663,7 @@ div#feature-callout.hidden {
 #feature-callout .screen[pos=callout] .section-main .main-content .steps {
   height: auto;
   position: absolute;
-  bottom: calc(var(--callout-padding, var(--dimension-20)) + var(--cta-height, var(--button-min-height-small, 24px)) / 2 - 4px);
+  bottom: calc(var(--callout-padding, 20px) + var(--cta-height, var(--button-min-height-small, 24px)) / 2 - 4px);
   padding-block: 0;
 }
 #feature-callout .screen[pos=callout] .section-main .main-content .steps .indicator {
@@ -1342,7 +1342,7 @@ html {
     font-size: 13px;
   }
   .onboardingContainer:has(.pinnable-sites-list) .screen[pos=split] .section-secondary {
-    background: linear-gradient(0deg, light-dark(rgb(252, 245, 240), #210340) 0%, light-dark(rgb(250, 236, 241), #210340) 57%, light-dark(rgb(245, 212, 245), #210340) 100%);
+    background: linear-gradient(0deg, light-dark(rgb(252, 245, 240), var(--onboarding-dark-backdrop-color)) 0%, light-dark(rgb(250, 236, 241), var(--onboarding-dark-backdrop-color)) 57%, light-dark(rgb(245, 212, 245), var(--onboarding-dark-backdrop-color)) 100%);
     height: auto;
     min-height: 100px;
   }
@@ -1377,7 +1377,7 @@ html {
   font-size: 13px;
 }
 [narrow] .onboardingContainer:has(.pinnable-sites-list) .screen[pos=split] .section-secondary {
-  background: linear-gradient(0deg, light-dark(rgb(252, 245, 240), #210340) 0%, light-dark(rgb(250, 236, 241), #210340) 57%, light-dark(rgb(245, 212, 245), #210340) 100%);
+  background: linear-gradient(0deg, light-dark(rgb(252, 245, 240), var(--onboarding-dark-backdrop-color)) 0%, light-dark(rgb(250, 236, 241), var(--onboarding-dark-backdrop-color)) 57%, light-dark(rgb(245, 212, 245), var(--onboarding-dark-backdrop-color)) 100%);
   height: auto;
   min-height: 100px;
 }
@@ -1433,6 +1433,12 @@ html {
   --screen-1-yellow-circle-background-color: var(--color-purple-60);
   --screen-2-yellow-circle-background-color: var(--color-pink-50);
   --message-bar-icon-color: light-dark(var(--color-blue-60), var(--color-blue-20));
+  --multi-select-card-background-color: light-dark(var(--color-violet-10), var(--color-violet-80));
+  --multi-select-notice-background-color: light-dark(color-mix(in srgb, var(--color-violet-10) 40%, transparent), color-mix(in srgb, var(--color-violet-80) 30%, transparent));
+  --multi-select-notice-border-color: light-dark(color-mix(in srgb, var(--color-violet-70) 15%, transparent), color-mix(in srgb, var(--color-violet-30) 10%, transparent));
+  --multi-select-notice-icon-color: light-dark(var(--color-violet-70), var(--color-violet-30));
+  --onboarding-dark-backdrop-color: #210340;
+  --center-large-glow-color: light-dark(var(--color-white), var(--onboarding-dark-backdrop-color));
   font-family: system-ui;
   font-size: 16px;
   position: relative;
@@ -1447,9 +1453,13 @@ html {
     --picker-border-color: ButtonText;
     --picker-checked-border-color: var(--picker-border-color);
     --picker-hover-border-color: SelectedItem;
-    --picker-focus-ring-color: CanvasText;
     --picker-checkbox-color: ButtonText;
     --picker-checkbox-hover-color: SelectedItem;
+    --picker-focus-ring-color: CanvasText;
+    --multi-select-card-background-color: ButtonFace;
+    --multi-select-notice-background-color: ButtonFace;
+    --multi-select-notice-border-color: ButtonText;
+    --multi-select-notice-icon-color: ButtonText;
   }
 }
 @media (prefers-contrast) {
@@ -1497,6 +1507,9 @@ html {
 }
 .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content {
   box-shadow: none;
+  position: relative;
+  justify-content: center;
+  overflow: visible;
 }
 .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content > .secondary-buttons-top-container,
 .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content > .secondary-cta.top {
@@ -1510,19 +1523,34 @@ html {
 }
 @media not (prefers-contrast) {
   .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content {
-    border: 1px solid var(--border-color-deemphasized);
-    backdrop-filter: blur(8px);
-    background-color: light-dark(color-mix(in srgb, var(--color-black) 5%, transparent), color-mix(in srgb, var(--color-black) 20%, transparent));
+    background-color: transparent;
   }
 }
 .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content .main-content-inner {
+  position: relative;
   width: 50%;
   margin: auto;
+  flex-grow: 0;
   justify-content: center;
 }
 @media (width <= 720px) {
   .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content .main-content-inner {
     width: 80%;
+  }
+}
+@media not (prefers-contrast) {
+  .onboardingContainer:has([pos=center-large][fullscreen]) .section-main .main-content .main-content-inner::before {
+    content: "";
+    position: absolute;
+    inset-inline: -100px;
+    margin: auto;
+    z-index: -1;
+    width: calc(100% + 200px);
+    height: calc(100% + 120px);
+    border-radius: 50%;
+    background-color: var(--center-large-glow-color);
+    filter: blur(70px);
+    pointer-events: none;
   }
 }
 .onboardingContainer:has([pos=center-large][fullscreen]) .corner-image-container {
@@ -3739,6 +3767,82 @@ html {
   flex-grow: 0;
   flex-shrink: 0;
 }
+.onboardingContainer .multi-select-container .multi-select-item-group {
+  align-self: stretch;
+  text-align: initial;
+}
+.onboardingContainer .multi-select-container.select-card {
+  align-items: stretch;
+  gap: var(--space-medium);
+  margin-block: 0;
+  margin-inline: 0;
+  padding: 0;
+}
+.onboardingContainer .multi-select-container.select-card .checkbox-container.multi-select-item {
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-medium);
+  padding: var(--space-xxlarge);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--multi-select-card-background-color);
+  font-size: 16px;
+}
+@media (forced-colors: active) {
+  .onboardingContainer .multi-select-container.select-card .checkbox-container.multi-select-item {
+    border: 1px solid ButtonText;
+  }
+}
+.onboardingContainer .multi-select-container.select-card .checkbox-container.multi-select-item label {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--text-color);
+}
+.onboardingContainer .multi-select-container.select-card .checkbox-container.multi-select-item > input {
+  margin: 0;
+}
+.onboardingContainer .multi-select-container .multi-select-notice-region:not(:empty) {
+  display: block;
+  margin-block-start: var(--space-small);
+}
+.onboardingContainer .multi-select-container .multi-select-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  padding: var(--space-large);
+  border: 1px solid var(--multi-select-notice-border-color);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--multi-select-notice-background-color);
+  font-size: 15px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .onboardingContainer .multi-select-container .multi-select-notice {
+    animation: fadein 0.2s;
+  }
+}
+.onboardingContainer .multi-select-container .multi-select-notice-icon {
+  flex: 0 0 auto;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background-image: url("chrome://global/skin/icons/info.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  -moz-context-properties: fill;
+  fill: var(--multi-select-notice-icon-color);
+}
+.onboardingContainer .multi-select-container .multi-select-notice-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onboardingContainer .multi-select-container .multi-select-notice-title {
+  margin-block: 0;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-color);
+}
+.onboardingContainer .multi-select-container .multi-select-notice-subtitle {
+  margin-block: var(--space-xxsmall) 0;
+}
 .onboardingContainer .textarea-container {
   display: flex;
   flex-flow: column nowrap;
@@ -4414,6 +4518,10 @@ html {
   inset-block: 4px;
   inset-inline-start: 0;
   border-inline-start: 1px solid var(--button-border-color);
+}
+.onboardingContainer .split-button-container .submenu-button .fxms-multi-stage-submenu,
+.onboardingContainer .screen .action-buttons .split-button-container .submenu-button .fxms-multi-stage-submenu {
+  text-align: start;
 }
 .onboardingContainer .split-button-container > button:is(:focus-visible, :hover, [open]) + .submenu-button::before,
 .onboardingContainer .split-button-container > .submenu-button:is(:focus-visible, :hover, [open])::before,

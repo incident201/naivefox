@@ -1425,6 +1425,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(FragmentOrElement)
   } */
 
   if (ShadowRoot* shadowRoot = tmp->GetShadowRoot()) {
+    nsAutoScriptBlocker scriptBlocker;
     shadowRoot->Unbind();
     tmp->ExtendedDOMSlots()->mShadowRoot = nullptr;
   }

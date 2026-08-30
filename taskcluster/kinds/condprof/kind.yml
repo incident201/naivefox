@@ -55,7 +55,6 @@ tasks:
             toolchain:
                 - win64-geckodriver
         run:
-            clone-with: hg
             command: >-
                 python3.exe condprof/main.py
                 ${EXTRA_ARGS}
@@ -91,7 +90,6 @@ tasks:
             toolchain:
                 - linux64-geckodriver
         run:
-            clone-with: hg
             command: >-
                 python3 -m venv . &&
                 bin/python3 condprof/main.py
@@ -130,7 +128,6 @@ tasks:
             toolchain:
                 - macosx64-geckodriver
         run:
-            clone-with: hg
             command: >-
                 python3 -m venv . &&
                 bin/python3 condprof/main.py

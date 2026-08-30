@@ -1007,10 +1007,7 @@ export const PREFS_CONFIG = new Map([
     "discoverystream.sections.ordering",
     {
       title: "Name of the sections ordering to render from Remote Settings",
-      // Channel-derived (resolves on the host), so it's set in Nightly but stays
-      // empty after the XPI train-hops to Beta/Release. Hardcoding the value
-      // would bake it into the XPI and wrongly activate it on other channels.
-      value: AppConstants.NIGHTLY_BUILD ? "default" : "",
+      value: "default",
     },
   ],
   [

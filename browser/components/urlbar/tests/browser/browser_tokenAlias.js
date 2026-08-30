@@ -1171,10 +1171,13 @@ async function doSelectionTest(value, { find, normal }) {
   let findSelection = gURLBar.editor.selectionController.getSelection(
     Ci.nsISelectionController.SELECTION_FIND
   );
-  await TestUtils.waitForCondition(
-    () => findSelection.rangeCount == (find ? 1 : 0),
-    `Waiting for the expected find selection for "${value}"`
-  );
+  await TestUtils.waitForCondition(() => {
+    if (find) {
+      return findSelection.rangeCount == 1;
+    }
+    return findSelection.isCollapsed;
+  }, `Waiting for the expected find selection for "${value}"`);
+
   if (find) {
     let range = findSelection.getRangeAt(0);
     Assert.equal(range.startOffset, find.start, `Find start for "${value}"`);

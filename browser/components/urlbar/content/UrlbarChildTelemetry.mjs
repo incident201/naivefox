@@ -64,7 +64,7 @@ export class UrlbarChildTelemetry {
    * @param {Event} event
    *   The event that started the session.
    * @param {object} queryContext
-   *   The query context (unused here, kept for signature parity).
+   *   The query context, cached for the session when no query has run.
    * @param {string} [searchString]
    *   The search string related to the event, if any.
    * @param {string} [interactionType]
@@ -114,6 +114,12 @@ export class UrlbarChildTelemetry {
         UrlbarTelemetryUtils.startInteractionType(event, searchString),
       searchString,
     };
+
+    // Engagements that run no query would otherwise reach the provider
+    // notifications with no context at all.
+    if (!this.#controller._lastQueryContextWrapper) {
+      this.#controller.setLastQueryContextCache(queryContext);
+    }
   }
 
   /**
