@@ -3936,6 +3936,38 @@ all 100 restored NaiveFox C++ gtests and 172 analysis/harness/lifecycle Python
 tests. No full Firefox rebuild, generated-source export or default-matrix
 replacement was performed for this rejected candidate.
 
+### Finite-exchange read-through ablation
+
+The follow-up history preflight checked all-ref commit messages and pickaxe
+history for finite/body buffering and streaming delivery, the retained finite
+capture metadata, and the earlier document-body and server-coalescing reports.
+The first-buffer preamble policies change CONNECT admission; server coalescing
+and TLS alignment change tunnel write boundaries. None removed the newly
+introduced client-side `OnStopRequest` barrier inside a finite response. This
+is a controlled correction to the rejected prototype, not another finite-cell
+size or timing sweep.
+
+Restore that prototype only as an explicit diagnostic control, and add an H2-only
+read-through variant. It forwards validated response bytes from
+`OnDataAvailable` as the next ordered response arrives, rather than waiting for
+the complete body. It must retain the same finite-response boundary, sequence
+ordering, 64 KiB body bound, two-upload/four-download windows, server binary,
+eight-record padding and listener-specific preambles. Slots are not recycled
+until a response completes normally and its buffered bytes have drained;
+backpressure, error propagation and cancellation remain mandatory. The server
+upload-body barrier is deliberately unchanged so this test isolates receive
+delivery. No resource-size threshold, pacing timer or RTT guess is added.
+
+Before scoring, require the functional probes and a runtime marker proving that
+bytes were actually delivered before response completion. The short randomized
+same-base H2 screen compares both listener defaults, the original finite arms
+and their read-through counterparts with shared Firefox A/B controls, in the
+isolated namespace. The preregistered views remain packets 17--32 and Whole.
+An improvement over the poor finite control alone is not enough: a breaking
+default still needs at least 20% meaningful improvement over the current
+listener default and fresh replication. Do not run a full matrix or size/link
+sweep unless this new candidate first earns those gates.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
