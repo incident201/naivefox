@@ -83,6 +83,27 @@ def page(start=1000, port=45500):
 
 
 class H2RequestLifecycleTests(unittest.TestCase):
+    def test_identity_matches_actual_superblock_schedule(self):
+        spec = importlib.util.spec_from_file_location(
+            "camouflage_superblocks", HERE / "camouflage_superblocks.py"
+        )
+        planner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(planner)
+        rows = planner.schedule_rows(
+            2026083074,
+            "h2",
+            1,
+            ["browser_page"],
+            arms=(
+                "document-first-buffer-task-overlap",
+                "document-first-buffer-http-connect",
+            ),
+        )
+        for index, row in enumerate(rows, 1):
+            SUMMARY.validate_identity(f"h2_s{index:06d}", row["experiment_block"])
+        with self.assertRaises(ValueError):
+            SUMMARY.validate_identity("h2_s000001", "h2_b000000")
+
     def summarize(self, outer, inner=None, role="firefox_a"):
         return SUMMARY.summarize(
             outer,

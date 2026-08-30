@@ -3488,6 +3488,13 @@ Firefox build. Its purpose is to locate the early server-byte deficit, not to
 select a new default from one block or feed HTTP semantics into passive
 features.
 
+The first plumbing attempt, private artifact `3e128eb9258b2b81`, completed its
+first proxy navigation but stopped before publishing any metrics: the new
+summary accepted single-design `h2_b...` identities while the selected
+superblock planner emits `h2_sb...`. The validator was corrected to the actual
+superblock contract, with a regression test that consumes the real planner's
+output. This failed run is not candidate or residual evidence.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after

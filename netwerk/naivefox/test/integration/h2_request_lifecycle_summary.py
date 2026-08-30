@@ -263,6 +263,13 @@ def summarize(
     }
 
 
+def validate_identity(session_id, experiment_block):
+    if not re.fullmatch(r"h2_s[0-9]{6}", session_id) or not re.fullmatch(
+        r"h2_sb[0-9]{6}", experiment_block
+    ):
+        raise ValueError("invalid structural sample identity")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--outer-access-log", required=True)
@@ -278,10 +285,10 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--wait-seconds", type=float, default=2)
     args = parser.parse_args()
-    if not re.fullmatch(r"h2_s[0-9]{6}", args.session_id) or not re.fullmatch(
-        r"h2_b[0-9]{6}", args.experiment_block
-    ):
-        parser.error("invalid structural sample identity")
+    try:
+        validate_identity(args.session_id, args.experiment_block)
+    except ValueError as error:
+        parser.error(str(error))
     if not 0 <= args.wait_seconds <= 5:
         parser.error("wait must be between zero and five seconds")
     deadline = time.monotonic() + args.wait_seconds
