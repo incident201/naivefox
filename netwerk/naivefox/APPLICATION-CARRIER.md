@@ -733,3 +733,36 @@ current server hint uses only sendable bytes, so it can return to interactive
 before the next upload returns credits. Multiple streams have more aggregate
 credit and may avoid this transition. This is a code-supported hypothesis,
 not yet a measured attribution; do not increase the window to hide it.
+
+Both H3 pairs (`continuous-bulk-h3-pairs`, seed 202608320) passed on one QUIC
+connection with zero outer TCP. Curl means: single download 119.035 ->
+116.828 ms (-1.85%); parallel downloads 210.764 -> 96.671 ms (-54.13%);
+slow upload 321.333 -> 334.469 ms (+4.09%); small wake 21.031 -> 20.354 ms.
+Wire 6,560,020 -> 6,653,805.5 bytes (+1.43%). One candidate upload includes
+a 30.882-ms TLS timing outlier; it is retained, not removed from the mean.
+The parallel improvement replicates; a general single-stream improvement does not.
+
+The shared 10-Mbit/s H2 pair (`continuous-bulk-h2-10mbit-pair`, seed 202608321)
+passed, but single download regressed: 1140.619 -> 1262.169 ms (+10.66%).
+Parallel downloads improved 2195.232 -> 2043.784 ms (-6.90%); slow upload
+1133.267 -> 1129.245 ms; small wake 61.567 -> 60.600 ms. Wire rose from
+6,462,993 to 6,575,884 bytes (+1.75%). Some parallel candidate first-byte
+times rose to about 320 ms from control's 60--76 ms: buffering a 256-KiB
+response can delay useful delivery even when total completion improves.
+This single exploratory pair is a regression signal, not a precise population
+estimate. No new residual/default claim is admitted on these results.
+
+Next, test bounded credit-state handoff independently of response streaming.
+All-ref credit/backpressure history includes the old finite initial-credit
+ablation and native H3 experiments, not this continuous SPA hint decision.
+Expose queued bytes separately from currently credit-sendable bytes. Only an
+opt-in profile may preserve a download hint when a bulk response just made
+substantial useful progress, queued target data remains, but ready bytes have
+fallen below the existing 32-KiB threshold. Never promote on backlog alone:
+an unread local socket must not sustain empty 256-KiB responses indefinitely.
+Count opportunities and promotions, retain the 256-KiB credit window, and
+compare directly against continuous-bulk before comparing against v1.
+
+The completed bulk block and matching server `c211251` binaries/history are
+preserved in `continuous-bulk-evidence`, manifest SHA-256
+`130ef0879353b423e1d386aabb026d3902cdc0c8e486eb01fd9f5549273e24b4`.
