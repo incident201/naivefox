@@ -73,6 +73,13 @@ Use Mozilla's `mach`, managed toolchains, source style, and ownership types.
 Do not introduce CMake or a replacement build system. Use `searchfox-cli` for
 upstream symbol research and narrow local `rg` searches for project code.
 
+Before implementing or running a new residual experiment, search the current
+documentation, retained artifact metadata, and the complete Git history for
+both the exact proposal and causally equivalent mechanisms. Record the overlap
+in the experiment notes. Do not repeat a closed experiment under a new name;
+proceed only when the new proposal has a distinct, previously unmeasured causal
+premise.
+
 The normal two-stage cycle never builds the Firefox browser:
 
 1. `upstream/main -> firefox-upstream -> naivefox-full-source`: source,
