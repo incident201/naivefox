@@ -58,7 +58,10 @@ def client(root, arm, bad_auth=False):
             stderr=subprocess.STDOUT,
         )
         try:
-            for _ in range(150):
+            readiness_polls = (
+                1500 if os.environ.get("NAIVEFOX_FINITE_GDB") == "1" else 150
+            )
+            for _ in range(readiness_polls):
                 if " listening on " in log_path.read_text(errors="replace"):
                     break
                 if proc.poll() is not None:
@@ -71,6 +74,9 @@ def client(root, arm, bad_auth=False):
                 proc.wait(timeout=8)
             except subprocess.TimeoutExpired as error:
                 raise RuntimeError("bounded client did not drain and exit") from error
+        except BaseException:
+            print(f"FAIL {arm}: client_process_status={proc.poll()}", flush=True)
+            raise
         finally:
             if proc.poll() is None:
                 proc.terminate()
@@ -89,6 +95,10 @@ def client(root, arm, bad_auth=False):
         "finite-exchanges streamed-before-stop=1" in text
     ):
         raise RuntimeError("finite response delivery mode was not verified")
+    if not bad_auth and ("both-read-through" in arm) != (
+        "finite-exchanges upload-read-through=1" in text
+    ):
+        raise RuntimeError("finite upload streaming mode was not verified")
 
 
 def tunnel(arm, port, tls=False):
@@ -138,7 +148,22 @@ def download(arm, port, size=None, tls=False, half_close=False, slow=False):
             if slow:
                 time.sleep(0.0001)
         expected = SMALL_BODY if size is None else pattern_bytes(0, size)
-        assert bytes(body) == expected, "download integrity mismatch"
+        actual = bytes(body)
+        if actual != expected:
+            first = next(
+                (
+                    index
+                    for index, pair in enumerate(zip(actual, expected))
+                    if pair[0] != pair[1]
+                ),
+                min(len(actual), len(expected)),
+            )
+            raise AssertionError(
+                f"download integrity mismatch: expected_bytes={len(expected)} "
+                f"actual_bytes={len(actual)} first_mismatch_offset={first} "
+                f"expected_sha256={hashlib.sha256(expected).hexdigest()} "
+                f"actual_sha256={hashlib.sha256(actual).hexdigest()}"
+            )
 
 
 def upload(arm, port):
@@ -170,12 +195,21 @@ def main():
         )
     )
     print(f"private finite probe diagnostics: {root}", flush=True)
-    for arm in (
+    arms = (
         "h2-finite-socks",
         "h2-finite-http-connect",
         "h2-finite-read-through-socks",
         "h2-finite-read-through-http-connect",
-    ):
+        "h2-finite-both-read-through-socks",
+        "h2-finite-both-read-through-http-connect",
+    )
+    selected = os.environ.get("NAIVEFOX_FINITE_PROBE_ARMS")
+    if selected:
+        requested = tuple(selected.split(","))
+        if not requested or any(arm not in arms for arm in requested):
+            raise ValueError("unknown finite probe arm")
+        arms = requested
+    for arm in arms:
         with client(root, arm) as port:
             download(arm, port, tls=True)
             download(arm, port, half_close=True)

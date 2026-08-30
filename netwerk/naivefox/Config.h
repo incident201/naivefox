@@ -231,6 +231,7 @@ struct Config final {
   bool mDiagnosticOptimisticLocalReply = false;
   bool mDiagnosticH2FiniteExchanges = false;
   bool mDiagnosticH2FiniteReadThrough = false;
+  bool mDiagnosticH2FiniteStreamUploads = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;

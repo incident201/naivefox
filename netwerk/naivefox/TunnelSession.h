@@ -102,7 +102,9 @@ struct TunnelConfig final {
             aOther.mDiagnosticFirstSocksTunnelUrgentStart),
         mDiagnosticOptimisticLocalReply(aOther.mDiagnosticOptimisticLocalReply),
         mDiagnosticH2FiniteExchanges(aOther.mDiagnosticH2FiniteExchanges),
-        mDiagnosticH2FiniteReadThrough(aOther.mDiagnosticH2FiniteReadThrough) {
+        mDiagnosticH2FiniteReadThrough(aOther.mDiagnosticH2FiniteReadThrough),
+        mDiagnosticH2FiniteStreamUploads(
+            aOther.mDiagnosticH2FiniteStreamUploads) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -120,6 +122,8 @@ struct TunnelConfig final {
       mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
       mDiagnosticH2FiniteExchanges = aOther.mDiagnosticH2FiniteExchanges;
       mDiagnosticH2FiniteReadThrough = aOther.mDiagnosticH2FiniteReadThrough;
+      mDiagnosticH2FiniteStreamUploads =
+          aOther.mDiagnosticH2FiniteStreamUploads;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -139,6 +143,7 @@ struct TunnelConfig final {
   bool mDiagnosticOptimisticLocalReply = false;
   bool mDiagnosticH2FiniteExchanges = false;
   bool mDiagnosticH2FiniteReadThrough = false;
+  bool mDiagnosticH2FiniteStreamUploads = false;
 };
 
 class TunnelSession final {

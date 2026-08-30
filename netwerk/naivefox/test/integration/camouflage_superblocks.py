@@ -12,6 +12,8 @@ SUPPORTED_ARMS = (
     "h2-finite-http-connect",
     "h2-finite-read-through-socks",
     "h2-finite-read-through-http-connect",
+    "h2-finite-both-read-through-socks",
+    "h2-finite-both-read-through-http-connect",
     "firefox-proxied",
     "off",
     "gate",

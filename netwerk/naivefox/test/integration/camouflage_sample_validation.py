@@ -1007,6 +1007,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "h2-finite-http-connect": "document-first-buffer-http-connect",
         "h2-finite-read-through-socks": "document-first-buffer-task-overlap",
         "h2-finite-read-through-http-connect": "document-first-buffer-http-connect",
+        "h2-finite-both-read-through-socks": "document-first-buffer-task-overlap",
+        "h2-finite-both-read-through-http-connect": "document-first-buffer-http-connect",
     }
     if arm in finite_arms:
         if protocol != "h2":
@@ -1027,6 +1029,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
             log_text,
             re.M,
         )
+        streamed_upload = re.findall(
+            r"^(?:\[[^\]\r\n]+\] )?Connection (\d+) finite-exchanges upload-read-through=1$",
+            log_text,
+            re.M,
+        )
         established = [
             item["connection"]
             for line in log_text.splitlines()
@@ -1041,6 +1048,11 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 sorted(streamed) != sorted(ready)
                 if "read-through" in arm
                 else bool(streamed)
+            )
+            or (
+                sorted(streamed_upload) != sorted(ready)
+                if "both-read-through" in arm
+                else bool(streamed_upload)
             )
             or "finite-exchanges failure=" in log_text
         ):
@@ -3544,6 +3556,8 @@ def main():
             "h2-finite-http-connect",
             "h2-finite-read-through-socks",
             "h2-finite-read-through-http-connect",
+            "h2-finite-both-read-through-socks",
+            "h2-finite-both-read-through-http-connect",
             "off",
             "gate",
             "root",

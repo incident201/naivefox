@@ -393,6 +393,7 @@ TEST(NaiveFoxConfig, FiniteExchangeDiagnosticIsExplicitAndH2Only)
   nsAutoCString error;
   EXPECT_FALSE(config.mDiagnosticH2FiniteExchanges);
   EXPECT_FALSE(config.mDiagnosticH2FiniteReadThrough);
+  EXPECT_FALSE(config.mDiagnosticH2FiniteStreamUploads);
   for (const char* listener : {"socks", "http"}) {
     nsAutoCString json("{\"listen\":\""_ns);
     json.Append(listener);
@@ -454,6 +455,32 @@ TEST(NaiveFoxConfig, FiniteReadThroughRequiresExplicitFiniteTransport)
   EXPECT_TRUE(NS_FAILED(ParseConfig(
       R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-h2-finite-exchanges":true,"diagnostic-h2-finite-read-through":true})"_ns,
       config, error)));
+}
+
+TEST(NaiveFoxConfig, FiniteUploadStreamingRequiresBothReadThroughDirections)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"http://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-finite-exchanges":true,"diagnostic-h2-finite-read-through":true,"diagnostic-h2-finite-stream-uploads":true})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_TRUE(config.mDiagnosticH2FiniteStreamUploads);
+  for (
+      const char* tail :
+      {R"("diagnostic-h2-finite-stream-uploads":true)",
+       R"("diagnostic-h2-finite-read-through":false,"diagnostic-h2-finite-stream-uploads":true)",
+       R"("diagnostic-h2-finite-read-through":true,"diagnostic-h2-finite-stream-uploads":null)",
+       R"("diagnostic-h2-finite-read-through":true,"diagnostic-h2-finite-stream-uploads":1)",
+       R"("diagnostic-h2-finite-read-through":true,"diagnostic-h2-finite-stream-uploads":true,"diagnostic-h2-finite-stream-uploads":false)"}) {
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","diagnostic-h2-finite-exchanges":true,)"_ns);
+    json.Append(tail);
+    json.Append('}');
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+  }
 }
 
 TEST(NaiveFoxConfig, PreambleModesAndBudgets)
@@ -1073,6 +1100,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mDiagnosticOptimisticLocalReply = true;
   source.mDiagnosticH2FiniteExchanges = true;
   source.mDiagnosticH2FiniteReadThrough = true;
+  source.mDiagnosticH2FiniteStreamUploads = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1098,6 +1126,7 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
     EXPECT_TRUE(copy->mDiagnosticH2FiniteExchanges);
     EXPECT_TRUE(copy->mDiagnosticH2FiniteReadThrough);
+    EXPECT_TRUE(copy->mDiagnosticH2FiniteStreamUploads);
   }
 }
 

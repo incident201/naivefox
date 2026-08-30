@@ -926,6 +926,8 @@ def main():
             "h2-finite-http-connect",
             "h2-finite-read-through-socks",
             "h2-finite-read-through-http-connect",
+            "h2-finite-both-read-through-socks",
+            "h2-finite-both-read-through-http-connect",
             "reference",
             "firefox-proxied",
             "off",

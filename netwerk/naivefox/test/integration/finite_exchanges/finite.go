@@ -96,6 +96,7 @@ func (l *finiteLane) ordered(ctx context.Context, done <-chan struct{}, seq, win
 type finiteSession struct {
 	mu      sync.Mutex
 	id      string
+	version string
 	handler *Handler
 	peer    string
 	auth    [32]byte
@@ -160,7 +161,8 @@ func (h *Handler) newFinite(ctx context.Context, r *http.Request) (*finiteSessio
 		return nil, err
 	}
 	s := &finiteSession{id: hex.EncodeToString(token[:]), handler: h,
-		peer: r.RemoteAddr, auth: sha256.Sum256([]byte(r.Header.Get("Proxy-Authorization"))),
+		version: r.Header.Get("X-Naivefox-Finite"),
+		peer:    r.RemoteAddr, auth: sha256.Sum256([]byte(r.Header.Get("Proxy-Authorization"))),
 		done: make(chan struct{})}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.upIn, s.upOut = io.Pipe()
@@ -203,7 +205,7 @@ func (h *Handler) newFinite(ctx context.Context, r *http.Request) (*finiteSessio
 }
 
 func finiteHeaders(w http.ResponseWriter, s *finiteSession, seq uint64) {
-	w.Header().Set("X-Naivefox-Finite", "1")
+	w.Header().Set("X-Naivefox-Finite", s.version)
 	w.Header().Set("X-Naivefox-Session", s.id)
 	w.Header().Set("X-Naivefox-Sequence", strconv.FormatUint(seq, 10))
 	w.Header().Set("Cache-Control", "no-store")
@@ -227,7 +229,8 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 	bad := func() error {
 		return caddyhttp.Error(http.StatusBadRequest, errors.New("invalid finite exchange"))
 	}
-	if r.ProtoMajor != 2 || r.Header.Get("X-Naivefox-Finite") != "1" {
+	version := r.Header.Get("X-Naivefox-Finite")
+	if r.ProtoMajor != 2 || (version != "1" && version != "2") {
 		return bad()
 	}
 	op := r.Header.Get("X-Naivefox-Operation")
@@ -261,7 +264,7 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 	finiteRegistry.Lock()
 	s := finiteRegistry.sessions[r.Header.Get("X-Naivefox-Session")]
 	finiteRegistry.Unlock()
-	if s == nil || s.handler != h || s.peer != r.RemoteAddr ||
+	if s == nil || s.version != version || s.handler != h || s.peer != r.RemoteAddr ||
 		s.auth != sha256.Sum256([]byte(r.Header.Get("Proxy-Authorization"))) || !s.touch() {
 		return caddyhttp.Error(http.StatusConflict, errors.New("finite session unavailable"))
 	}
@@ -273,7 +276,8 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 		return nil
 	}
 	// Cancellation must interrupt an active pipe read/write too, not only a
-	// sequence waiter. No new goroutine is retained after the request ends.
+	// sequence waiter. Stop watching before a successful HTTP response finishes;
+	// its context cancellation must not close the logical tunnel.
 	stop := context.AfterFunc(r.Context(), s.close)
 	defer stop()
 	if op == "up" {
@@ -284,6 +288,16 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 		err = s.up.ordered(r.Context(), s.done, seq, finiteUploads, func() error {
 			if s.up.fin {
 				return errors.New("upload after FIN")
+			}
+			if s.version == "2" && fin != "1" {
+				if r.ContentLength == 0 {
+					return errors.New("empty upload without FIN")
+				}
+				n, copyErr := io.Copy(s.upOut, http.MaxBytesReader(w, r.Body, finiteBytes))
+				if copyErr != nil || n != r.ContentLength {
+					return errors.New("invalid streaming upload body")
+				}
+				return nil
 			}
 			body, readErr := io.ReadAll(http.MaxBytesReader(w, r.Body, finiteBytes))
 			if readErr != nil || int64(len(body)) != r.ContentLength {
@@ -299,6 +313,7 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 			_, writeErr := s.upOut.Write(body)
 			return writeErr
 		})
+		stop()
 		if err == nil {
 			w.Header().Set("Content-Length", "0")
 			w.WriteHeader(http.StatusOK)
@@ -317,6 +332,7 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 			}
 			return readErr
 		})
+		stop()
 		if err == nil {
 			if eof {
 				w.WriteHeader(http.StatusNoContent)
@@ -329,6 +345,9 @@ func (h *Handler) serveFinite(w http.ResponseWriter, r *http.Request, ctx contex
 			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 			w.WriteHeader(http.StatusOK)
 			_, err = w.Write(body)
+			if err != nil {
+				s.close()
+			}
 			return err
 		}
 	}

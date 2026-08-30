@@ -335,6 +335,7 @@ class JsonParser final {
     bool sawDiagnosticOptimisticLocalReply = false;
     bool sawDiagnosticH2FiniteExchanges = false;
     bool sawDiagnosticH2FiniteReadThrough = false;
+    bool sawDiagnosticH2FiniteStreamUploads = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -444,6 +445,14 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticH2FiniteReadThrough,
             "diagnostic-h2-finite-read-through must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-h2-finite-stream-uploads")) {
+        if (sawDiagnosticH2FiniteStreamUploads) {
+          return Error("duplicate diagnostic-h2-finite-stream-uploads field");
+        }
+        sawDiagnosticH2FiniteStreamUploads = true;
+        MOZ_TRY(ParseBoolean(
+            parsed.mDiagnosticH2FiniteStreamUploads,
+            "diagnostic-h2-finite-stream-uploads must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -523,6 +532,10 @@ class JsonParser final {
         parsed.mPreamble.mCacheResources = usesH3ResourceDefault;
         parsed.mImplicitPreambleGate = !sawOuterSessionGate;
       }
+    }
+    if (parsed.mDiagnosticH2FiniteStreamUploads &&
+        !parsed.mDiagnosticH2FiniteReadThrough) {
+      return Error("finite upload streaming requires receive read-through");
     }
     if (parsed.mDiagnosticH2FiniteReadThrough &&
         !parsed.mDiagnosticH2FiniteExchanges) {

@@ -5204,6 +5204,8 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
             ("h2-finite-http-connect", "first-data-buffer"),
             ("h2-finite-read-through-socks", "first-data-buffer-task"),
             ("h2-finite-read-through-http-connect", "first-data-buffer"),
+            ("h2-finite-both-read-through-socks", "first-data-buffer-task"),
+            ("h2-finite-both-read-through-http-connect", "first-data-buffer"),
         ):
             with self.subTest(arm=arm):
                 config = CONFIG.build_config(arm, "h2", 1080, 443, "u", "p")
@@ -5211,6 +5213,10 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                 self.assertEqual(
                     bool(config.get("diagnostic-h2-finite-read-through")),
                     "read-through" in arm,
+                )
+                self.assertEqual(
+                    bool(config.get("diagnostic-h2-finite-stream-uploads")),
+                    "both-read-through" in arm,
                 )
                 self.assertEqual(
                     config["listen"].split(":")[0],
@@ -5232,6 +5238,8 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                 )
                 if "read-through" in arm:
                     log += "Connection 1 finite-exchanges streamed-before-stop=1\n"
+                if "both-read-through" in arm:
+                    log += "Connection 1 finite-exchanges upload-read-through=1\n"
                 SAMPLE.validate_sample(arm, "h2", log, features)
                 SAMPLE.validate_sample(
                     arm,
@@ -5245,6 +5253,7 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     log + "Connection 1 finite-exchanges failure=0x80004005\n",
                     log + "Connection 1 finite-exchanges rotated=1\n",
                     log + "Connection 1 finite-exchanges streamed-before-stop=1\n",
+                    log + "Connection 1 finite-exchanges upload-read-through=1\n",
                 ):
                     with self.assertRaises(ValueError):
                         SAMPLE.validate_sample(arm, "h2", bad, features)
@@ -5256,6 +5265,14 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                             arm,
                             "h2",
                             log.replace("streamed-before-stop=1", "missing-marker"),
+                            features,
+                        )
+                if "both-read-through" in arm:
+                    with self.assertRaises(ValueError):
+                        SAMPLE.validate_sample(
+                            arm,
+                            "h2",
+                            log.replace("upload-read-through=1", "missing-marker"),
                             features,
                         )
                 with self.assertRaisesRegex(ValueError, "unexpectedly used finite"):

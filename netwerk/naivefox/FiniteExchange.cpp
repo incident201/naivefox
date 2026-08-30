@@ -128,7 +128,8 @@ nsresult FiniteExchange::Open(const char* aOperation, uint64_t aSequence,
   auto add = [&headers](const char* name, const nsACString& value) {
     headers.AppendElement(ExtraHeader{nsCString(name), nsCString(value)});
   };
-  add("X-Naivefox-Finite", "1"_ns);
+  add("X-Naivefox-Finite",
+      mImpl->mConfig.mDiagnosticH2FiniteStreamUploads ? "2"_ns : "1"_ns);
   add("X-Naivefox-Operation", nsDependentCString(aOperation));
   nsAutoCString sequence;
   sequence.AppendInt(aSequence);
@@ -168,7 +169,10 @@ NS_IMETHODIMP FiniteExchange::Listener::OnStartRequest(nsIRequest* aRequest) {
   MOZ_TRY(http->GetResponseHeader("X-Naivefox-Sequence"_ns, sequence));
   nsAutoCString expectedSequence;
   expectedSequence.AppendInt(mSequence);
-  if (!protocol.EqualsLiteral("h2") || !marker.EqualsLiteral("1") ||
+  if (!protocol.EqualsLiteral("h2") ||
+      marker != (mOwner->mImpl->mConfig.mDiagnosticH2FiniteStreamUploads
+                     ? "2"_ns
+                     : "1"_ns) ||
       sequence != expectedSequence ||
       (mHttpStatus != 200 &&
        !(mOperation.EqualsLiteral("down") && mHttpStatus == 204))) {
@@ -261,6 +265,11 @@ void FiniteExchange::Finished(Listener* aListener, nsresult aStatus) {
         "upload-window=%u download-window=%u\n",
         static_cast<unsigned long long>(mImpl->mConnectionId), kExchangeBytes,
         kUploads, kDownloads);
+    if (mImpl->mConfig.mDiagnosticH2FiniteStreamUploads) {
+      RuntimeLogEvent(
+          "Connection %llu finite-exchanges upload-read-through=1\n",
+          static_cast<unsigned long long>(mImpl->mConnectionId));
+    }
     auto callback = std::move(mImpl->mCallback);
     callback(NS_OK, mImpl->mDownloadInput, mImpl->mUploadOutput);
     // The pipe endpoints are now owned by TunnelSession/DuplexPump. Keeping

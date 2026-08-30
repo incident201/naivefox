@@ -1,0 +1,6 @@
+# Private mount/network namespaces only: upstream ACL rejection fixtures.
+127.0.0.1 localhost
+::1 localhost
+203.0.113.1 google.com
+8.8.8.8 google-public-dns-a.google.com
+2001:4860:4860::8888 google-public-dns-a.google.com

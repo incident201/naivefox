@@ -4031,6 +4031,32 @@ null-target callback behavior. New comparative collection must use a corrected
 binary and fresh controls; include the original finite arms as well as the two
 read-through variants so the unsafe earlier scores are not reused as controls.
 
+### Finite-exchange response-lifetime correction
+
+After fixing callback affinity, repeated functional probes still exposed
+intermittent truncation, including the v1 receive-only SOCKS arm in private
+probe `finite-exchange-probes.xzwrpdtf`: 34,752 of 131,072 bytes arrived, with
+every received byte matching the expected prefix. Thus it was not evidence
+against the v2 upload change specifically, and no new capture was admitted.
+
+The server's request-context cancellation guard covered both the ordered pipe
+operation and the subsequent HTTP response write. A focused regression test
+cancelling the request context during an otherwise successful response write
+reproduced closure of the entire logical tunnel. The guard is now stopped
+after the pipe operation, before response completion; cancellation still
+interrupts blocked pipe reads/writes, and a failed response write still closes
+the session. The regression fails before this change and passes afterwards.
+
+Three complete six-arm functional rounds then passed, with private probe IDs
+`a61atabm`, `z6vb6jpe`, and `665h90o8`: TLS, exact 1 MiB slow download,
+768 KiB slow upload, half-close, four concurrent 128 KiB downloads,
+cancellation, wrong credentials, and bounded process shutdown. This is
+functional admission for a new screen, not evidence that the historical
+finite captures were safe. The Caddy overlay's complete Go race-test suite
+also passes in a private network/mount namespace. Its two upstream ACL tests
+use namespace-local static host mappings for rejected destinations instead
+of consulting host DNS; no tests are skipped or host files changed.
+
 ### Finite-exchange server upload read-through ablation
 
 History preflight for the symmetric server-side barrier checked all-ref
@@ -4048,10 +4074,22 @@ error closure, half-close and cancellation. The one-byte finite protocol marker
 selects v1 (original upload buffering) or v2 (streamed upload); a session may
 not mix them. Authentication, target ACL/DNS, response boundaries, window sizes,
 padding and every unmarked CONNECT remain unchanged. Add a deterministic
-prefix-before-request-EOF server test before capturing. Compare v1 read-through,
-v2 read-through and the two listener defaults in short randomized paired blocks;
-the same two residual views and promotion gates apply. This is not permission
-to tune resource sizes, introduce a delay or launch a full matrix.
+prefix-before-request-EOF server test before capturing. Compare original v1,
+v1 receive read-through, v2 read-through and the two listener defaults in short
+randomized paired blocks; the same two residual views and promotion gates
+apply. This is not permission to tune resource sizes, introduce a delay or
+launch a full matrix.
+
+Functional admission includes the prefix-before-request-EOF test, rejection
+of short/long/oversized streamed bodies and mixed session versions, the
+response-lifetime regression above, 103 project gtests and 174 Python tests.
+The minimized product/test graphs were rebuilt incrementally, not Firefox.
+The corrected diagnostic Caddy binary has SHA-256
+`f8afd1146cfbebd66b689bacf6e0f59f1911246e0a3df9a5e5636e3cc309f02e`.
+The next screen is preregistered as seed `2026083088`, two randomized blocks,
+eight client arms plus shared Firefox A/B, H2 / inner HTTPS-H2, stock medium
+outer fixture and private MTU-1500 network namespace. Defaults and the
+fronting-site contract remain unchanged.
 
 ## Sensitive data handling
 

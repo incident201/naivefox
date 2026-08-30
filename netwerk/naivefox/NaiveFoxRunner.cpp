@@ -163,6 +163,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
         aConfig.mDiagnosticH2FiniteExchanges;
     tunnelConfig.mDiagnosticH2FiniteReadThrough =
         aConfig.mDiagnosticH2FiniteReadThrough;
+    tunnelConfig.mDiagnosticH2FiniteStreamUploads =
+        aConfig.mDiagnosticH2FiniteStreamUploads;
   }
   return tunnelConfigs;
 }

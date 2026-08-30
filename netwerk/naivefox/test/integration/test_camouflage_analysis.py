@@ -586,6 +586,8 @@ class CamouflageAnalysisTests(unittest.TestCase):
             "h2-finite-http-connect",
             "h2-finite-read-through-socks",
             "h2-finite-read-through-http-connect",
+            "h2-finite-both-read-through-socks",
+            "h2-finite-both-read-through-http-connect",
         ):
             for protocol in ("h2", "h3"):
                 with self.subTest(
