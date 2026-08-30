@@ -3319,8 +3319,8 @@ mutation log.
 
 The clean sample measured 31.667 ms from direct root response HEADERS to the
 CSS GET. Its exhaustive coarse decomposition was 0.775 ms to root suspension,
-4.095 ms in the ordinary classifier suspend/resume phase, 2.960 ms to parser
-body delivery, 0.201 ms to stylesheet discovery, 0.168 ms to child
+4.095 ms in the ordinary document-channel suspend/resume phase, 2.960 ms to
+parser body delivery, 0.201 ms to stylesheet discovery, 0.168 ms to child
 `AsyncOpen`, 14.996 ms to parent `RecvAsyncOpen`, 3.198 ms to parent
 `InvokeAsyncOpen`, 4.974 ms through parent channel open/transaction dispatch,
 and only 0.300 ms from socket-thread dispatch through
@@ -3537,10 +3537,81 @@ document request and its resource wave, beyond the direct browser's ordinary
 29-ms phase. It is not explained by the roughly 5-ms CONNECT-to-inner-root
 setup or by slow fixture root handlers. Access logs do not show when the
 browser receives or parses the body, however, so this does not yet assign the
-extra interval to NaiveFox, Caddy, or Firefox's proxy/channel path. The next
-low-cost diagnostic must trace those already-existing browser events before
-changing another outer admission gate. Production defaults and fronting-site
-requirements remain unchanged.
+extra interval to NaiveFox, Caddy, or Firefox's proxy/channel path. The
+browser-side follow-up below supersedes any interpretation of this one-block
+difference as a constant nested-tunnel penalty. Production defaults and
+fronting-site requirements remain unchanged.
+
+#### Browser-side follow-up: document handoff, not a constant tunnel delay
+
+The exact and causal-history preflight rechecked the closed classifier/cache,
+manual-proxy-versus-PAC, and parser/process-topology experiments, plus the
+already-fixed accepted-socket Nagle issue. None was reopened. The new task was
+attribution of an already-observed interval, not another implementation of
+those mechanisms. Ordinary `nsHttp`/`nsCSSLoader` logging was enabled without
+rebuilding Firefox, NaiveFox, or Caddy, or changing browser preferences or the
+fixture page. All following runs used the isolated unshaped namespace,
+same-base Selenium-prelaunched browser, canonical inner HTTPS/H2, and current
+defaults.
+
+Single-SOCKS lifecycle artifact `1ec060018f1c3ca0`, seed `2026083075`, already
+failed to reproduce the proposed extra 26--30 ms. The canonical 494-byte HTML
+body reached the browser transaction 0.055 ms after its response-header
+processing; root suspend/resume took 4.790 ms and the CSS transaction reached
+socket dispatch at 28.823 ms. This diagnostic collected no Firefox controls
+and published no residual comparison.
+
+Clean-worktree artifact `7e642a9b7006c992`, seed `2026083076`, then collected
+one four-participant block with both server request timelines and ordinary
+browser logs. All four capture/network/timeline participants and both inner-H2
+workloads passed. In collection order:
+
+| Participant | Server workload root to CSS | Browser root headers to CSS socket dispatch | Root suspend to resume | CSS child open to parent receive |
+| --- | ---: | ---: | ---: | ---: |
+| Firefox B | 53.080 ms | 51.674 ms | 26.017 ms | 11.278 ms |
+| Current H2 HTTP CONNECT | 57.785 ms | 55.657 ms | 30.003 ms | 10.873 ms |
+| Current H2 SOCKS | 32.494 ms | 30.616 ms | 4.655 ms | 13.460 ms |
+| Firefox A | 57.496 ms | 56.264 ms | 33.457 ms | 13.385 ms |
+
+Every browser was already processing the root body within 0.054--0.062 ms of
+root header processing, before the long suspension. Root server handlers took
+only 0.547--0.906 ms. Outer-root-to-inner-root setup was 7.532 ms for HTTP and
+7.898 ms for SOCKS. The direct controls now exhibited the longer interval,
+while SOCKS did not: its dominant variation is therefore not an invariant
+26--30-ms nested transport delay. Each participant made one API image request
+and one empty favicon request; none was removed from capture. Logging can
+perturb scheduling, so this block is lifecycle evidence only, not a new
+passive ranking, default matrix, or proof that SOCKS became faster.
+
+The offline HTTP log mapping initially found two `HandleContentStart` events
+on the root transaction. They are the local proxy CONNECT response and the
+later origin response, not duplicate root requests. The latter is anchored to
+the canonical HTML body; the former precedes it by 6.602 ms. Transaction
+pointer lifetimes also have to be respected because Firefox can reuse freed
+objects. This mapping was corrected using the retained logs, without another
+capture or dropping a network event.
+
+Finally, single-SOCKS lifecycle artifact `47e393e61eb24d6a`, seed
+`2026083077`, added the existing `DocumentChannel` log module to identify the
+suspending caller. `DocumentLoadListener::OnStartRequest` immediately preceded
+root `Suspend` by 0.021 ms. Redirect-to-real-channel finished at 27.754 ms,
+`ResumeSuspendedChannel` ran at 27.764 ms, and root `ResumeInternal` at
+27.885 ms, all relative to origin-response header processing. The suspension
+itself lasted 27.319 ms; the root body had already reached the browser
+transaction at 0.057 ms. CSS socket dispatch followed at 54.448 ms.
+The upstream `DocumentLoadListener::DoOnStartRequest` and
+`ResumeSuspendedChannel` call sites confirm this document handoff. The earlier
+H2 audit's description of this interval as a "classifier" phase was therefore
+incorrect and is corrected above; these timings do not measure a URL
+classifier lookup.
+
+This rejects the interpretation of the observed extra 26--30 ms as a constant
+inner-tunnel penalty and prevents a misdirected Caddy buffering fix,
+classifier/cache retry, or another renamed full-process reconstruction. It
+does not establish the cause of all handoff variance or solve the residual.
+No product default, fronting-site restriction,
+resource-size recommendation, or canonical matrix entry changed. There was no
+product/browser/Caddy rebuild, size/link matrix, or compatibility break.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
