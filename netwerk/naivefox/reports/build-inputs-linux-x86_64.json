@@ -76,7 +76,7 @@
     "ohttp",
     "unicode-bidi"
   ],
-  "cargo_manifest_parse_package_count": 318,
+  "cargo_manifest_parse_package_count": 317,
   "cargo_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -500,16 +500,16 @@
     {
       "manifest_path": "third_party/rust/cssparser/Cargo.toml",
       "name": "cssparser",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=eff8704e994dc54e5df2a936b78b51828ee21464#eff8704e994dc54e5df2a936b78b51828ee21464",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=84af7967fc0093c81f44c2d03029fe6db546485e#84af7967fc0093c81f44c2d03029fe6db546485e",
       "target_entry_points": [
         "third_party/rust/cssparser/src/lib.rs"
       ],
-      "version": "0.37.0"
+      "version": "0.38.0"
     },
     {
       "manifest_path": "third_party/rust/cssparser-macros/Cargo.toml",
       "name": "cssparser-macros",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=eff8704e994dc54e5df2a936b78b51828ee21464#eff8704e994dc54e5df2a936b78b51828ee21464",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=84af7967fc0093c81f44c2d03029fe6db546485e#84af7967fc0093c81f44c2d03029fe6db546485e",
       "target_entry_points": [
         "third_party/rust/cssparser-macros/lib.rs"
       ],
@@ -1779,16 +1779,7 @@
       "target_entry_points": [
         "third_party/rust/phf/src/lib.rs"
       ],
-      "version": "0.13.1"
-    },
-    {
-      "manifest_path": "third_party/rust/phf_codegen/Cargo.toml",
-      "name": "phf_codegen",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/phf_codegen/src/lib.rs"
-      ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/phf_generator/Cargo.toml",
@@ -1798,7 +1789,7 @@
         "third_party/rust/phf_generator/src/bin/gen_hash_test.rs",
         "third_party/rust/phf_generator/src/lib.rs"
       ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/phf_macros/Cargo.toml",
@@ -1807,7 +1798,7 @@
       "target_entry_points": [
         "third_party/rust/phf_macros/src/lib.rs"
       ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/phf_shared/Cargo.toml",
@@ -1816,7 +1807,7 @@
       "target_entry_points": [
         "third_party/rust/phf_shared/src/lib.rs"
       ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/pin-project-lite/Cargo.toml",
@@ -1835,7 +1826,7 @@
         "third_party/rust/pkcs11-bindings/build.rs",
         "third_party/rust/pkcs11-bindings/src/lib.rs"
       ],
-      "version": "0.1.7"
+      "version": "0.1.8"
     },
     {
       "manifest_path": "third_party/rust/pkg-config/Cargo.toml",
@@ -2082,7 +2073,6 @@
       "name": "selectors",
       "source": null,
       "target_entry_points": [
-        "servo/components/selectors/build.rs",
         "servo/components/selectors/lib.rs"
       ],
       "version": "0.26.0"
@@ -2992,7 +2982,7 @@
       "version": "1.0.20"
     }
   ],
-  "cargo_package_count": 302,
+  "cargo_package_count": 301,
   "cargo_packages": [
     {
       "license": "MPL-2.0",
@@ -3617,8 +3607,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/cssparser/Cargo.toml",
       "name": "cssparser",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=eff8704e994dc54e5df2a936b78b51828ee21464#eff8704e994dc54e5df2a936b78b51828ee21464",
-      "version": "0.37.0"
+      "source": "git+https://github.com/servo/rust-cssparser?rev=84af7967fc0093c81f44c2d03029fe6db546485e#84af7967fc0093c81f44c2d03029fe6db546485e",
+      "version": "0.38.0"
     },
     {
       "license": "MPL-2.0",
@@ -3631,7 +3621,7 @@
       "license_file": null,
       "manifest_path": "third_party/rust/cssparser-macros/Cargo.toml",
       "name": "cssparser-macros",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=eff8704e994dc54e5df2a936b78b51828ee21464#eff8704e994dc54e5df2a936b78b51828ee21464",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=84af7967fc0093c81f44c2d03029fe6db546485e#84af7967fc0093c81f44c2d03029fe6db546485e",
       "version": "0.7.0"
     },
     {
@@ -5490,21 +5480,7 @@
       "manifest_path": "third_party/rust/phf/Cargo.toml",
       "name": "phf",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.13.1"
-    },
-    {
-      "license": "MIT",
-      "license_candidates": [
-        "third_party/rust/phf_codegen/LICENSE"
-      ],
-      "license_coverage": [
-        "third_party/rust/phf_codegen/LICENSE"
-      ],
-      "license_file": null,
-      "manifest_path": "third_party/rust/phf_codegen/Cargo.toml",
-      "name": "phf_codegen",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "license": "MIT",
@@ -5518,7 +5494,7 @@
       "manifest_path": "third_party/rust/phf_generator/Cargo.toml",
       "name": "phf_generator",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "license": "MIT",
@@ -5532,7 +5508,7 @@
       "manifest_path": "third_party/rust/phf_macros/Cargo.toml",
       "name": "phf_macros",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "license": "MIT",
@@ -5546,7 +5522,7 @@
       "manifest_path": "third_party/rust/phf_shared/Cargo.toml",
       "name": "phf_shared",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "license": "Apache-2.0 OR MIT",
@@ -5576,7 +5552,7 @@
       "manifest_path": "third_party/rust/pkcs11-bindings/Cargo.toml",
       "name": "pkcs11-bindings",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.1.7"
+      "version": "0.1.8"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -7370,15 +7346,15 @@
   "cargo_target": "x86_64-unknown-linux-gnu",
   "cargo_workspace_member_count": 44,
   "category_counts": {
-    "cargo:cbindgen-manifest-parse-closure": 348,
-    "cargo:cbindgen-manifest-parse-entry": 406,
+    "cargo:cbindgen-manifest-parse-closure": 347,
+    "cargo:cbindgen-manifest-parse-entry": 404,
     "cargo:git-patch-entry": 29,
     "cargo:git-patch-manifest": 15,
-    "cargo:local-patch-metadata": 82,
-    "cargo:local-patch-target-entry": 118,
-    "cargo:target-build-closure": 9752,
-    "cargo:target-manifest-parse-closure": 318,
-    "cargo:target-manifest-parse-entry": 370,
+    "cargo:local-patch-metadata": 83,
+    "cargo:local-patch-target-entry": 120,
+    "cargo:target-build-closure": 9746,
+    "cargo:target-manifest-parse-closure": 317,
+    "cargo:target-manifest-parse-entry": 368,
     "cargo:vendor-checksum-index": 621,
     "make:active-assembly-include": 1,
     "make:active-assembly-source": 5,
@@ -7391,16 +7367,16 @@
     "objdir:backend.RecursiveMakeBackend.in": 449,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 122,
-    "objdir:generated-action-depfile": 5226,
+    "objdir:generated-action-depfile": 5249,
     "objdir:generated-action-relative-depfile": 1437,
-    "objdir:generated-make-fragment-source": 875,
-    "objdir:generated-make-prerequisite": 858,
+    "objdir:generated-make-fragment-source": 877,
+    "objdir:generated-make-prerequisite": 860,
     "objdir:install-manifest-pattern": 511,
-    "objdir:install-manifest-source": 1739,
+    "objdir:install-manifest-source": 1740,
     "python:build-site-manifest": 1,
     "python:build-site-package": 1229
   },
-  "cbindgen_manifest_parse_package_count": 348,
+  "cbindgen_manifest_parse_package_count": 347,
   "cbindgen_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -7870,16 +7846,16 @@
     {
       "manifest_path": "third_party/rust/cssparser/Cargo.toml",
       "name": "cssparser",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=eff8704e994dc54e5df2a936b78b51828ee21464#eff8704e994dc54e5df2a936b78b51828ee21464",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=84af7967fc0093c81f44c2d03029fe6db546485e#84af7967fc0093c81f44c2d03029fe6db546485e",
       "target_entry_points": [
         "third_party/rust/cssparser/src/lib.rs"
       ],
-      "version": "0.37.0"
+      "version": "0.38.0"
     },
     {
       "manifest_path": "third_party/rust/cssparser-macros/Cargo.toml",
       "name": "cssparser-macros",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=eff8704e994dc54e5df2a936b78b51828ee21464#eff8704e994dc54e5df2a936b78b51828ee21464",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=84af7967fc0093c81f44c2d03029fe6db546485e#84af7967fc0093c81f44c2d03029fe6db546485e",
       "target_entry_points": [
         "third_party/rust/cssparser-macros/lib.rs"
       ],
@@ -9177,16 +9153,7 @@
       "target_entry_points": [
         "third_party/rust/phf/src/lib.rs"
       ],
-      "version": "0.13.1"
-    },
-    {
-      "manifest_path": "third_party/rust/phf_codegen/Cargo.toml",
-      "name": "phf_codegen",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "target_entry_points": [
-        "third_party/rust/phf_codegen/src/lib.rs"
-      ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/phf_generator/Cargo.toml",
@@ -9196,7 +9163,7 @@
         "third_party/rust/phf_generator/src/bin/gen_hash_test.rs",
         "third_party/rust/phf_generator/src/lib.rs"
       ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/phf_macros/Cargo.toml",
@@ -9205,7 +9172,7 @@
       "target_entry_points": [
         "third_party/rust/phf_macros/src/lib.rs"
       ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/phf_shared/Cargo.toml",
@@ -9214,7 +9181,7 @@
       "target_entry_points": [
         "third_party/rust/phf_shared/src/lib.rs"
       ],
-      "version": "0.13.1"
+      "version": "0.14.0"
     },
     {
       "manifest_path": "third_party/rust/pin-project-lite/Cargo.toml",
@@ -9233,7 +9200,7 @@
         "third_party/rust/pkcs11-bindings/build.rs",
         "third_party/rust/pkcs11-bindings/src/lib.rs"
       ],
-      "version": "0.1.7"
+      "version": "0.1.8"
     },
     {
       "manifest_path": "third_party/rust/pkg-config/Cargo.toml",
@@ -9498,7 +9465,6 @@
       "name": "selectors",
       "source": null,
       "target_entry_points": [
-        "servo/components/selectors/build.rs",
         "servo/components/selectors/lib.rs"
       ],
       "version": "0.26.0"
@@ -10595,9 +10561,9 @@
   "collector_sha256": "e46f07ae32fef66efe010e885e486a118b637741361daa93c2fc4ce85a2f5bac",
   "counts": {
     "directory_contracts": 36,
-    "files": 16963
+    "files": 16985
   },
-  "depfile_count": 1082,
+  "depfile_count": 1089,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -14110,6 +14076,10 @@
     "netwerk/naivefox/NeckoChannelParams.h",
     "netwerk/naivefox/NeckoTunnel.cpp",
     "netwerk/naivefox/NeckoTunnel.h",
+    "netwerk/naivefox/NoConnectCodec.cpp",
+    "netwerk/naivefox/NoConnectCodec.h",
+    "netwerk/naivefox/NoConnectTransport.cpp",
+    "netwerk/naivefox/NoConnectTransport.h",
     "netwerk/naivefox/OuterSessionGate.cpp",
     "netwerk/naivefox/OuterSessionGate.h",
     "netwerk/naivefox/PaddingNegotiation.cpp",
@@ -15257,6 +15227,41 @@
     "security/nss/lib/freebl/kyber-pqcrystals-ref.h",
     "security/nss/lib/freebl/kyber.c",
     "security/nss/lib/freebl/ldvector.c",
+    "security/nss/lib/freebl/libcrux/combined_core.c",
+    "security/nss/lib/freebl/libcrux/combined_core.h",
+    "security/nss/lib/freebl/libcrux/eurydice_glue.h",
+    "security/nss/lib/freebl/libcrux/internal/combined_core.h",
+    "security/nss/lib/freebl/libcrux/internal/libcrux_mldsa_core.h",
+    "security/nss/lib/freebl/libcrux/internal/libcrux_mlkem_common.h",
+    "security/nss/lib/freebl/libcrux/internal/libcrux_mlkem_core.h",
+    "security/nss/lib/freebl/libcrux/internal/libcrux_mlkem_portable.h",
+    "security/nss/lib/freebl/libcrux/internal/libcrux_sha3_portable.h",
+    "security/nss/lib/freebl/libcrux/karamel/krml/internal/target.h",
+    "security/nss/lib/freebl/libcrux/karamel/krml/lowstar_endianness.h",
+    "security/nss/lib/freebl/libcrux/libcrux_ct_ops.c",
+    "security/nss/lib/freebl/libcrux/libcrux_ct_ops.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa44_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa44_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa65_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa65_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa87_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa87_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa_core.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa_core.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mldsa_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem1024.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem1024_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem1024_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem768.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem768_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem768_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem_core.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem_core.h",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_mlkem_portable.h",
+    "security/nss/lib/freebl/libcrux/libcrux_sha3_portable.c",
+    "security/nss/lib/freebl/libcrux/libcrux_sha3_portable.h",
     "security/nss/lib/freebl/loader.c",
     "security/nss/lib/freebl/loader.h",
     "security/nss/lib/freebl/lowhash_vector.c",
@@ -15343,7 +15348,6 @@
     "security/nss/lib/freebl/verified/Hacl_Poly1305_32.h",
     "security/nss/lib/freebl/verified/Hacl_Streaming_Types.h",
     "security/nss/lib/freebl/verified/config.h",
-    "security/nss/lib/freebl/verified/eurydice_glue.h",
     "security/nss/lib/freebl/verified/internal/Hacl_Bignum25519_51.h",
     "security/nss/lib/freebl/verified/internal/Hacl_Bignum_Base.h",
     "security/nss/lib/freebl/verified/internal/Hacl_Chacha20.h",
@@ -15356,8 +15360,6 @@
     "security/nss/lib/freebl/verified/internal/Hacl_P256_PrecompTable.h",
     "security/nss/lib/freebl/verified/internal/Hacl_Poly1305_128.h",
     "security/nss/lib/freebl/verified/internal/Hacl_Poly1305_256.h",
-    "security/nss/lib/freebl/verified/internal/libcrux_core.h",
-    "security/nss/lib/freebl/verified/internal/libcrux_mlkem_portable.h",
     "security/nss/lib/freebl/verified/karamel/include/krml/internal/builtin.h",
     "security/nss/lib/freebl/verified/karamel/include/krml/internal/compat.h",
     "security/nss/lib/freebl/verified/karamel/include/krml/internal/target.h",
@@ -15368,19 +15370,6 @@
     "security/nss/lib/freebl/verified/karamel/krmllib/dist/minimal/LowStar_Endianness.h",
     "security/nss/lib/freebl/verified/karamel/krmllib/dist/minimal/fstar_uint128_gcc64.h",
     "security/nss/lib/freebl/verified/lib_intrinsics.h",
-    "security/nss/lib/freebl/verified/libcrux_core.c",
-    "security/nss/lib/freebl/verified/libcrux_core.h",
-    "security/nss/lib/freebl/verified/libcrux_mlkem1024.h",
-    "security/nss/lib/freebl/verified/libcrux_mlkem1024_portable.c",
-    "security/nss/lib/freebl/verified/libcrux_mlkem1024_portable.h",
-    "security/nss/lib/freebl/verified/libcrux_mlkem768.h",
-    "security/nss/lib/freebl/verified/libcrux_mlkem768_portable.c",
-    "security/nss/lib/freebl/verified/libcrux_mlkem768_portable.h",
-    "security/nss/lib/freebl/verified/libcrux_mlkem_portable.c",
-    "security/nss/lib/freebl/verified/libcrux_mlkem_portable.h",
-    "security/nss/lib/freebl/verified/libcrux_sha3_internal.h",
-    "security/nss/lib/freebl/verified/libcrux_sha3_portable.c",
-    "security/nss/lib/freebl/verified/libcrux_sha3_portable.h",
     "security/nss/lib/freebl/verified/libintvector.h",
     "security/nss/lib/jar/exports.gyp",
     "security/nss/lib/jar/jar-ds.c",
@@ -15744,7 +15733,6 @@
     "servo/components/selectors/README.md",
     "servo/components/selectors/attr.rs",
     "servo/components/selectors/bloom.rs",
-    "servo/components/selectors/build.rs",
     "servo/components/selectors/builder.rs",
     "servo/components/selectors/context.rs",
     "servo/components/selectors/kleene_value.rs",
@@ -21671,6 +21659,9 @@
     "third_party/rust/libcrux-p256/.cargo-checksum.json",
     "third_party/rust/libcrux-sha2/.cargo-checksum.json",
     "third_party/rust/libdbus-sys/.cargo-checksum.json",
+    "third_party/rust/libdbus-sys/Cargo.toml",
+    "third_party/rust/libdbus-sys/build.rs",
+    "third_party/rust/libdbus-sys/src/lib.rs",
     "third_party/rust/libloading/.cargo-checksum.json",
     "third_party/rust/libloading/.cargo_vcs_info.json",
     "third_party/rust/libloading/.github/workflows/libloading.yml",
@@ -23131,14 +23122,6 @@
     "third_party/rust/phf/src/ordered_set.rs",
     "third_party/rust/phf/src/set.rs",
     "third_party/rust/phf_codegen/.cargo-checksum.json",
-    "third_party/rust/phf_codegen/.cargo_vcs_info.json",
-    "third_party/rust/phf_codegen/CHANGELOG.md",
-    "third_party/rust/phf_codegen/Cargo.lock",
-    "third_party/rust/phf_codegen/Cargo.toml",
-    "third_party/rust/phf_codegen/Cargo.toml.orig",
-    "third_party/rust/phf_codegen/LICENSE",
-    "third_party/rust/phf_codegen/README.md",
-    "third_party/rust/phf_codegen/src/lib.rs",
     "third_party/rust/phf_generator/.cargo-checksum.json",
     "third_party/rust/phf_generator/.cargo_vcs_info.json",
     "third_party/rust/phf_generator/CHANGELOG.md",
@@ -23150,6 +23133,7 @@
     "third_party/rust/phf_generator/benches/benches.rs",
     "third_party/rust/phf_generator/src/bin/gen_hash_test.rs",
     "third_party/rust/phf_generator/src/lib.rs",
+    "third_party/rust/phf_generator/src/ptrhash.rs",
     "third_party/rust/phf_macros/.cargo-checksum.json",
     "third_party/rust/phf_macros/.cargo_vcs_info.json",
     "third_party/rust/phf_macros/CHANGELOG.md",
@@ -23159,6 +23143,7 @@
     "third_party/rust/phf_macros/LICENSE",
     "third_party/rust/phf_macros/README.md",
     "third_party/rust/phf_macros/src/lib.rs",
+    "third_party/rust/phf_macros/src/parse.rs",
     "third_party/rust/phf_shared/.cargo-checksum.json",
     "third_party/rust/phf_shared/.cargo_vcs_info.json",
     "third_party/rust/phf_shared/CHANGELOG.md",
@@ -23167,7 +23152,9 @@
     "third_party/rust/phf_shared/Cargo.toml.orig",
     "third_party/rust/phf_shared/LICENSE",
     "third_party/rust/phf_shared/README.md",
+    "third_party/rust/phf_shared/src/hasher.rs",
     "third_party/rust/phf_shared/src/lib.rs",
+    "third_party/rust/phf_shared/src/ptrhash.rs",
     "third_party/rust/pin-cell/.cargo-checksum.json",
     "third_party/rust/pin-project-internal/.cargo-checksum.json",
     "third_party/rust/pin-project-lite/.cargo-checksum.json",
@@ -26900,6 +26887,7 @@
     "tools/profiler/gecko/nsIProfiler.idl",
     "tools/profiler/moz.build",
     "tools/profiler/public/ChildProfilerController.h",
+    "tools/profiler/public/ChromeProfilerCounter.h",
     "tools/profiler/public/ETWTools.h",
     "tools/profiler/public/FlowMarkers.h",
     "tools/profiler/public/GeckoProfiler.h",
@@ -27602,9 +27590,9 @@
     "xpcom/xpidl/Makefile.in",
     "xpcom/xpidl/moz.build"
   ],
-  "firefox_base_commit": "44e151427db27db6b789e3be5439f0edbcf446de",
-  "generated_makefile_count": 376,
-  "generated_makefiles_sha256": "9bfa7509f19444b181dedcd5a96f6f3eb1bbc4f7066db2da5d297d6007093ac5",
+  "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
+  "generated_makefile_count": 380,
+  "generated_makefiles_sha256": "2398a3f68978be6d2717341abf12204e656644130973d2c9cada26283c1ef5d3",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -27615,19 +27603,19 @@
     "dist_public",
     "xpidl"
   ],
-  "install_manifest_record_count": 2444,
-  "install_manifests_sha256": "f2e7eb89c798c909f591703c12156febad2bc1a2b1d4ca312fae46be5a0101fd",
+  "install_manifest_record_count": 2445,
+  "install_manifests_sha256": "2dee283ca8dbc977af138d40e9fe250536c3bd0abf901312127e64b146af7c83",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "03e7581d0f3023568f6b1dac19d87add5cfab400af3d909894bd6c49b2f4cf6b",
-  "naivefox_reference_commit": "545087bba6a15333a3dd34b91e85b607d6a79727",
+  "naivefox_reference_commit": "529bbfd90a265e7e6d2de6010b2a7c5255020d26",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "20d32c104204fb65816faef6a5d21d1dbf239a290fce5c87af79573446e0d71b",
-    "config_status_deps.in": "5665ddf3c39d5cc23d1ffeccb76c136dc3bba0353244781e2ffdfe17374aaffc"
+    "backend.RecursiveMakeBackend.in": "b7fe58b6bb0589442c0216e99b5eb0b6a8f1cb90bde689593b6d969d8b739826",
+    "config_status_deps.in": "7cef5541b9777f56fb719d6f80a142d0faa808f52d3aa44eb957f8c632b985e6"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "545087bba6a15333a3dd34b91e85b607d6a79727",
+  "source_commit": "529bbfd90a265e7e6d2de6010b2a7c5255020d26",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
