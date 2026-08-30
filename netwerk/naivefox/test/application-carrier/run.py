@@ -51,6 +51,7 @@ PROFILES = {
     "continuous-bulk-interactive1": (20, 65536),
     "continuous-bulk-upload1": (20, 65536),
     "continuous-bulk-noack": (20, 65536),
+    "continuous-bulk-noack-download": (20, 65536),
 }
 
 
@@ -123,7 +124,7 @@ def validate_http_graph(stats, name, mode):
         if stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
         if bulk:
-            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack")
+            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download")
             count = actual.get("POST /api/sync/bulk" if bulk_duplex else "GET /api/data/bulk", 0)
             if (bulk_duplex and actual.get("GET /api/data/bulk", 0)) or count != actual.get("POST /api/sync/bulk", 0) or actual.get("GET /api/data/download", 0):
                 raise RuntimeError("coalesced download lease graph")

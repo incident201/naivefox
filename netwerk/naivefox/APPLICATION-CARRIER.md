@@ -1014,3 +1014,22 @@ were converted from fragile positional boolean lists to named inheritance.
 A digest captured *before* that refactor freezes all twenty previously measured
 profile JSON objects (`52e73811661919f765e75c444927a42abf28e383a50b58068f2b1dd9350372da`);
 it still passes, so old controls' parameters were not silently changed.
+
+`continuous-bulk-noack-h2-pairs` passed both pairs with 82/78 deferred
+deliveries. Wire 6,890,371.5 -> 6,799,866.5 bytes (-1.31%); single download
+78.787 -> 62.034 ms (-21.26%); parallel 94.040 -> 86.508 ms (-8.01%);
+slow upload 319.860 -> 319.948 ms. Small wake regressed 19.434 -> 25.729 ms
+(+6.296 ms). Candidate idle/wake activity increased (one run reached 22 polls
+and 13 wake POSTs versus the usual ~9/5), consistent with requests observing
+credit before local writers have returned it. This supports a timing/credit
+interaction, not a proven attribution of every millisecond. No default or
+residual promotion. Snapshot `continuous-bulk-noack-evidence`, server `7264a13`,
+manifest SHA-256 `5a66026fb27f2140f96176b4e481330b3b212bfc40231bceb2c69dc0dc16c81e`.
+
+One scoped follow-up, `continuous-bulk-noack-download`, defers only while the
+SPA is in the bulk download state. Startup, idle, interactive, upload and mixed
+retain their original delivery ACK. Same one-cell fence and body budgets.
+This isolates the observed small-state penalty; it does not retest optimistic
+SOCKS success. Two H2 pairs against bulk-duplex, seed 202608335. After that,
+measure the best surviving profile's sustained throughput and fresh residuals,
+rather than continuing tiny scheduler variants without a demonstrated cause.

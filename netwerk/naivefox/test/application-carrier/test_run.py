@@ -76,6 +76,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         del duplex["requests"]["GET /api/data/bulk"]
         runner.validate_http_graph(duplex, "continuous-bulk-duplex", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-noack", "replace")
+        runner.validate_http_graph(duplex, "continuous-bulk-noack-download", "replace")
         for profile, state, up, down in (("continuous-bulk-interactive1", "interactive", 4096, 8192), ("continuous-bulk-upload1", "upload", 131072, 8192)):
             short = copy.deepcopy(duplex)
             short["requests"]["GET /api/data/" + state] = 1
@@ -140,6 +141,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         down["continuous-bulk-interactive1"] = 901120
         down["continuous-bulk-upload1"] = 901120
         down["continuous-bulk-noack"] = 901120
+        down["continuous-bulk-noack-download"] = 901120
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)
