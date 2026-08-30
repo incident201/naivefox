@@ -218,6 +218,7 @@ enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
 
 struct Config final {
   TransportMode mTransport = TransportMode::Classic;
+  // Retained but unused by classic so one config can select either transport.
   nsCString mNoConnectKey;
   nsTArray<ListenerConfig> mListeners;
   nsTArray<UpstreamProxyConfig> mProxies;
@@ -256,12 +257,12 @@ class ProfileDirectory final {
   bool mTemporary = false;
 };
 
-nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
-                     nsACString& aError,
-                     const Maybe<TransportMode>& aTransportOverride = Nothing());
-nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
-                        nsACString& aError,
-                        const Maybe<TransportMode>& aTransportOverride = Nothing());
+nsresult ParseConfig(
+    const nsACString& aJson, Config& aConfig, nsACString& aError,
+    const Maybe<TransportMode>& aTransportOverride = Nothing());
+nsresult LoadConfigFile(
+    const nsACString& aPath, Config& aConfig, nsACString& aError,
+    const Maybe<TransportMode>& aTransportOverride = Nothing());
 nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
                                  nsACString& aError);
 

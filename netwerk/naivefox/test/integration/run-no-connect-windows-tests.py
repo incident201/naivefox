@@ -91,8 +91,19 @@ def worker(path):
                NAIVEFOX_PROFILE=str(profile), MOZ_CRASHREPORTER_DISABLE="1")
     if job.get("ca"):
         env["SSL_CERT_FILE"] = job["ca"]
-    process = module.Process(
-        [str(runtime), str(directory / "config.json")], directory, "client", env)
+    original_popen = subprocess.Popen
+
+    def hidden_popen(*arguments, **keywords):
+        keywords["creationflags"] = (
+            keywords.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW)
+        return original_popen(*arguments, **keywords)
+
+    subprocess.Popen = hidden_popen
+    try:
+        process = module.Process(
+            [str(runtime), str(directory / "config.json")], directory, "client", env)
+    finally:
+        subprocess.Popen = original_popen
     kernel = handle = None
     try:
         kernel, handle = windows_job(process.process)

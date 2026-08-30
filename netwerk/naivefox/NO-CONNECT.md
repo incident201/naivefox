@@ -15,30 +15,32 @@ Its registered Caddy module is `http.handlers.naivefox_transport`.
 ```json
 {
   "listen": ["socks://127.0.0.1:1080", "http://127.0.0.1:8080"],
-  "proxy": "quic://proxy.example:443",
-  "transport": "no-connect",
-  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET"
+  "proxy": "quic://user:password@proxy.example:443",
+  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET",
+  "preamble": {"mode": "off"}
 }
 ```
 
-Launch this private file with `./naivefox /absolute/path/to/config.json`.
-To override the JSON selection, use
+Launch this private file with `./naivefox /absolute/path/to/config.json` to
+use the default classic transport. To change only the transport, use
 `./naivefox /absolute/path/to/config.json --transport no-connect` or
 `./naivefox --transport=classic /absolute/path/to/config.json`. The option may
 precede or follow the path; omission of the path reads `./config.json`.
 Replace the example key with a cryptographically random secret shared with the
 module. `no-connect-key` accepts 32 through 1024 printable ASCII bytes and is
 required when the effective transport is `no-connect`; it is never a CLI
-argument, URL parameter or log field. An explicit `--transport classic`
-discards a retained key, so changing modes does not require deleting it from
-the file. Without an override, JSON classic plus a key is still rejected.
-Selection precedes validation and implicit preamble defaults; malformed fields
+argument, URL parameter or log field. A valid key is retained but unused
+whenever classic is selected; the key never enables no-connect by itself.
+The proxy URI can retain classic credentials for either selection, but
+no-connect never puts them in its request headers. The same file can therefore
+switch in either direction without editing either secret. Selection precedes
+validation and implicit preamble defaults; malformed fields
 and incompatible mode options are not bypassed. JSON values do not expand
 environment variables. Protect the config file as a credential. Diagnostic CLI
 modes cannot be combined with `--transport`.
 
-No-connect rejects upstream URI userinfo, extra CONNECT headers, active classic
-preambles, enabled outer-session gates and classic diagnostic options. Explicit
+No-connect rejects extra CONNECT headers, active classic preambles, enabled
+outer-session gates and classic diagnostic options. Explicit
 `preamble: {"mode":"off"}` and false diagnostic values remain harmless.
 Local SOCKS username/password authentication, listener mapping,
 `host-resolver-rules`, certificate trust and `max-connections` keep their usual
@@ -122,6 +124,12 @@ python3 netwerk/naivefox/test/integration/run-transport-cli-tests.py \
   --binary /absolute/path/to/warm-obj-naivefox-linux/dist/bin/naivefox \
   --work-dir /absolute/path/to/warm-obj-naivefox-linux/no-connect/cli
 ```
+
+Add `--caddy /absolute/path/to/combined-caddy` to that command for an active
+H2/H3 check of one unchanged config containing both credentials. It starts
+classic by default, selects no-connect through the CLI, then selects classic
+again; both local listeners must work and no-connect must send neither outer
+CONNECT nor unused classic authentication headers.
 
 Acceptance covers both transports against one Caddy process, H2 and H3, and
 SOCKS5 and HTTP CONNECT listeners. No-connect additionally needs authentication

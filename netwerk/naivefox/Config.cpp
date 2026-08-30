@@ -504,9 +504,6 @@ class JsonParser final {
       if (!sawNoConnectKey) {
         return Error("no-connect transport requires no-connect-key");
       }
-      if (mSawProxyUserInfo) {
-        return Error("no-connect transport does not accept proxy credentials");
-      }
       if (parsed.mPreamble.mMode != PreambleMode::Off ||
           parsed.mPreamble.ModeForProtocol(ProxyProtocol::H2) !=
               PreambleMode::Off ||
@@ -518,12 +515,6 @@ class JsonParser final {
         return Error(
             "no-connect transport does not accept classic preamble, "
             "headers, gate, or diagnostic options");
-      }
-    } else if (sawNoConnectKey) {
-      if (aTransportOverride == Some(TransportMode::Classic)) {
-        parsed.mNoConnectKey.Truncate();
-      } else {
-        return Error("no-connect-key requires no-connect transport");
       }
     }
     if (!sawPreamble && parsed.mTransport == TransportMode::Classic) {
@@ -1742,7 +1733,6 @@ class JsonParser final {
     const int32_t at = authority.RFindChar('@');
     size_t endpointStart = 0;
     if (at >= 0) {
-      mSawProxyUserInfo = true;
       if (at == 0 || authority.FindChar('@') != at) {
         return Error("proxy URI contains invalid credentials");
       }
@@ -1786,7 +1776,6 @@ class JsonParser final {
   const nsACString& mInput;
   nsACString& mError;
   size_t mPosition = 0;
-  bool mSawProxyUserInfo = false;
 };
 
 }  // namespace

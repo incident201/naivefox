@@ -35,9 +35,26 @@ reads `./config.json`; one positional argument selects another config:
 precede or follow the optional config path; without a path, it uses
 `./config.json`. The `--transport=value` form is also accepted. A no-connect
 key must remain in the private config, never on the command line. An explicit
-classic override discards a retained no-connect key. Selection occurs before
-mode validation and implicit preamble defaults; incompatible options still
-fail. Diagnostic CLI modes cannot be combined with this config-mode override.
+classic selection retains a valid no-connect key but does not use it.
+Selection occurs before mode validation and implicit preamble defaults;
+incompatible options still fail. Diagnostic CLI modes cannot be combined with
+this config-mode override.
+
+One private config can contain both credentials and work unchanged with either
+transport. With no override this example uses classic; add
+`--transport no-connect` to select the application protocol:
+
+```json
+{
+  "listen": "socks://127.0.0.1:1080",
+  "proxy": "https://user:password@proxy.example:443",
+  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET",
+  "preamble": {"mode": "off"}
+}
+```
+
+The key never enables no-connect by itself. Proxy URI credentials remain
+available for classic and are not sent by no-connect.
 
 The staged Windows package provides `run-naivefox.cmd` beside its runtime and
 accepts the same optional config path.
@@ -67,10 +84,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   application transport. This is independent of H2/H3 selection in `proxy`.
   `no-connect-key` is required for the effective `no-connect` selection and
   contains 32 through 1024 printable ASCII bytes shared with the server; keep it
-  in a private config.
-  Upstream URI credentials, active classic preambles, extra CONNECT headers,
-  enabled outer-session gates and classic diagnostic options are rejected in
-  this mode. Local SOCKS authentication remains available.
+  in a private config. A valid key may remain unused in classic mode; its
+  presence never changes the selected transport. No-connect ignores the parsed
+  upstream URI credentials and never sends them. Active classic preambles,
+  extra CONNECT headers, enabled outer-session gates and classic diagnostic
+  options are rejected in this mode. Local SOCKS authentication remains available.
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -80,8 +98,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   `listen`. `https://` is strict H2 over TLS/TCP and `quic://` is strict H3
   over QUIC. Upstream credentials are optional and percent-decoded; when
   userinfo is present it uses `username:password`, so either side may be
-  empty (`user:`, `:password`, or `:@`). They are passed to Necko's
-  proxy-auth path. Port 443 is used when omitted.
+  empty (`user:`, `:password`, or `:@`). Classic passes them to Necko's
+  proxy-auth path; no-connect leaves them unused. Port 443 is used when omitted.
 - `insecure-concurrency` accepts a positive JSON integer or a decimal string for
   NaiveProxy/Exclave config compatibility. NaiveFox validates the value and
   ignores it; connection pooling, concurrency, and tunnel lifecycle remain
