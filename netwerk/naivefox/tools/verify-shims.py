@@ -4,7 +4,7 @@ verify-shims.py - Focused Unit & Targeted Shim Semantics Verification Suite
 Verifies the exact invariants, fail-closed semantics, and symbol boundaries of all NaiveFox shims.
 """
 
-import json
+import argparse
 import os
 import re
 import subprocess
@@ -18,8 +18,8 @@ def test_symbol_absence(topsrcdir, objdir):
     if not os.path.exists(libxul_path):
         libxul_path = os.path.join(objdir, "toolkit", "library", "build", "libxul.so")
     if not os.path.exists(libxul_path):
-        print(f"Skipping symbol check (libxul.so not found at {libxul_path})")
-        return True
+        print(f"FAIL: libxul.so not found in explicit object directory: {objdir}", file=sys.stderr)
+        return False
 
     print("[SHIM TEST 1] Verifying absence of heavy symbols in libxul binary...")
     forbidden_symbols = [
@@ -31,9 +31,9 @@ def test_symbol_absence(topsrcdir, objdir):
     ]
 
     try:
-        nm_out = subprocess.check_output(["nm", "-D", libxul_path], stderr=subprocess.DEVNULL, text=True)
+        nm_out = subprocess.check_output(["nm", "-D", "-C", libxul_path], stderr=subprocess.DEVNULL, text=True)
     except Exception:
-        nm_out = subprocess.check_output(["readelf", "-s", libxul_path], stderr=subprocess.DEVNULL, text=True)
+        nm_out = subprocess.check_output(["readelf", "--wide", "--demangle", "-s", libxul_path], stderr=subprocess.DEVNULL, text=True)
 
     failed = False
     for desc, syms in forbidden_symbols:
@@ -114,16 +114,45 @@ def test_necko_channel_params(topsrcdir):
     return True
 
 
+def test_cache_crypto_boundary(topsrcdir):
+    """Reject changes that turn unavailable profile encryption into plaintext."""
+    print("[SHIM TEST 6] Verifying unavailable profile-keystore boundary...")
+    cache = Path(topsrcdir) / "netwerk" / "cache2"
+    crypto = (cache / "CacheCrypto.cpp").read_text(encoding="utf-8")
+    native_file = (cache / "CacheFile.cpp").read_text(encoding="utf-8")
+    assert re.search(
+        r"CacheCrypto::LoadFromKeystore\([^)]*\)\s*\{\s*"
+        r"#ifdef MOZ_NAIVEFOX\s*return nullptr;\s*#else", crypto
+    ), "NaiveFox must not synthesize a key when the profile keystore is unavailable"
+    setup = native_file.split("void CacheFile::SetupEncryption()", 1)[1]
+    assert re.search(
+        r"if \(!CacheCrypto::IsActive\(\)\)\s*\{\s*"
+        r"if \(CacheCrypto::IsEnabled\(\)\)\s*\{"
+        r"(?:(?!\n    \}).)*SetError\(NS_ERROR_NOT_AVAILABLE\)", setup, re.S
+    ), "Encryption requested without a cipher must fail disk cache entries closed"
+    print("  PASS: No fallback key; native encrypted-cache requests fail closed.")
+    return True
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--objdir", help="Linux build to inspect (or NAIVEFOX_OBJDIR)")
+    mode.add_argument("--source-only", action="store_true", help="explicitly omit the binary check")
+    args = parser.parse_args()
     topsrcdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    objdir = os.path.join(topsrcdir, "obj-naivefox-minimal")
+    objdir = args.objdir or os.environ.get("NAIVEFOX_OBJDIR")
+    if not args.source_only and not objdir:
+        parser.error("provide --objdir/NAIVEFOX_OBJDIR, or use --source-only for Gate 1")
 
     print("=" * 65)
     print("NaiveFox Targeted Shim Semantics & Invariants Test Suite")
     print("=" * 65)
 
     all_passed = True
-    if not test_symbol_absence(topsrcdir, objdir):
+    if args.source_only:
+        print("Source-only mode: binary symbols were not checked.")
+    elif not test_symbol_absence(topsrcdir, objdir):
         all_passed = False
     if not test_profiler_stub_invariants(topsrcdir, objdir):
         all_passed = False
@@ -132,6 +161,8 @@ def main():
     if not test_lean_dom_psm_invariants(topsrcdir):
         all_passed = False
     if not test_necko_channel_params(topsrcdir):
+        all_passed = False
+    if not test_cache_crypto_boundary(topsrcdir):
         all_passed = False
 
     print("=" * 65)

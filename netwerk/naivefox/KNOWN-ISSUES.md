@@ -40,6 +40,14 @@ and do not persist in either profile mode.
 The embedded API does not use this fallback. Its caller must provide an
 existing writable profile directory and owns that directory's lifecycle.
 
+## Profile-keystore cache encryption
+
+The lean runtime does not include Firefox's profile keystore. Ordinary Cache2
+resource caching remains available, but explicitly enabling
+`browser.cache.disk.encryption.enabled` cannot load a cache cipher. Native
+cache handling rejects affected disk entries instead of persisting plaintext.
+This does not change NSS transport encryption or certificate validation.
+
 ## Embedded Gecko lifecycle is one-shot
 
 `NaiveFoxRunEmbedded()` is blocking and supports one process-wide runtime.

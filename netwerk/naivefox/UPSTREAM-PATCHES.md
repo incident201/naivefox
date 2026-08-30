@@ -364,6 +364,25 @@ proves the range and pre-open contract while the H2 request remains ordinary;
 and H3 integration preserves one physical outer connection and normal stream
 lifecycle.
 
+## NF-UPSTREAM-016: unavailable profile-keystore cache boundary
+
+Files:
+
+```text
+netwerk/cache2/CacheCrypto.cpp
+```
+
+The lean product excludes the browser profile keystore. Its cache encryption
+initializer and keystore lookup therefore leave the cipher unavailable without
+changing the requested encryption preference. Native CacheFile error handling
+must reject disk entries when encryption was requested but no key is available;
+there is no fallback to plaintext or a newly invented key. Ordinary unencrypted
+Cache2 resource channels, NSS cryptography, and non-NaiveFox builds are unchanged.
+
+Review obligations: preserve the enabled/inactive distinction and upstream
+fail-closed entry handling; keep Lockstore dependencies out of the lean graph;
+run `NaiveFoxCacheCrypto.*`, shim checks, and H3 cached-resource listener gates.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

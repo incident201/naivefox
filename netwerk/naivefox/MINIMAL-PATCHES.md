@@ -26,6 +26,15 @@ available, and remove the downstream guard instead of preserving it by habit.
 | `NF-UPSTREAM-021` | Let the test-enabled NaiveFox graph use Mozilla gtest without linking browser FOG/XRE startup. Ordinary Firefox gtest remains unchanged. | `testing/gtest/mozilla/GTestRunner.cpp`, `NaiveFoxRunner.cpp`, `core/moz.build` | `mach gtest 'NaiveFoxTunnelSessionLifecycle.*'` on the test-enabled minimal graph. |
 | `NF-UPSTREAM-022` | Retain the native NDK/Bionic pieces needed by the Android ARM64 NaiveFox product while excluding GeckoView, JNI/Java application services, and browser/mobile graph edges. | Exact existing-Firefox file set below. | Clean Android configure/build/stage; dependency and four-symbol export audit; static harness; online-device H2/H3 embedded startup, traffic, stop, and XPCOM shutdown. |
 
+## Profile-keystore exclusion
+
+`NF-UPSTREAM-016` in `UPSTREAM-PATCHES.md` owns the lean cache-encryption
+boundary in `netwerk/cache2/CacheCrypto.cpp`. Review it together with the
+`security/moz.build` Lockstore exclusion and native CacheFile fail-closed
+handling whenever upstream changes cache key initialization. Cache encryption
+is unsupported without the profile keystore; enabling its preference must not
+silently permit plaintext persistence.
+
 ## NF-UPSTREAM-022 Android native target watchpoints
 
 The exact existing Firefox files carried for this target are:

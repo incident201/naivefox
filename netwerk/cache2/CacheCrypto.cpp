@@ -8,7 +8,9 @@
 #include "CacheIOThread.h"
 #include "CacheLog.h"
 #include "CacheObserver.h"
-#include "LockstoreService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "LockstoreService.h"
+#endif
 #include "ScopedNSSTypes.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/StaticMutex.h"
@@ -27,8 +29,10 @@ using mozilla::security::lockstore::LockstoreService;
 
 // Name of the disk cache's data encryption key in the profile keystore, and
 // the identifier of the "local" KEK wrapping it.
+#ifndef MOZ_NAIVEFOX
 static constexpr auto kDekName = "httpcache"_ns;
 static constexpr auto kKekIdentifier = "profileEncryption"_ns;
+#endif
 
 // Written on the cache I/O thread when the key load finishes, and on the main
 // thread at lifecycle boundaries (InitForTesting/Shutdown), so every access
@@ -129,6 +133,9 @@ void CacheCrypto::Init() {
     return;
   }
 
+#ifdef MOZ_NAIVEFOX
+  LOG(("CacheCrypto::Init() - profile keystore unavailable"));
+#else
   // The cipher needs NSS, here and later on the cache I/O thread.
   if (!EnsureNSSInitializedChromeOrContent()) {
     LOG(("CacheCrypto::Init() - NSS not available"));
@@ -170,6 +177,7 @@ void CacheCrypto::Init() {
   if (NS_FAILED(rv)) {
     LOG(("CacheCrypto::Init() - failed to dispatch the key load"));
   }
+#endif
 }
 
 // static
@@ -199,6 +207,9 @@ void CacheCrypto::InitForTesting() {
 // static
 already_AddRefed<CacheCrypto> CacheCrypto::LoadFromKeystore(
     LockstoreService* aLockstore) {
+#ifdef MOZ_NAIVEFOX
+  return nullptr;
+#else
   MOZ_ASSERT(!NS_IsMainThread());
 
   // A non-empty identifier makes this a deterministic get-or-create, so the
@@ -259,6 +270,7 @@ already_AddRefed<CacheCrypto> CacheCrypto::LoadFromKeystore(
   SecureZero(keyBytes.Elements(), keyBytes.Length());
   crypto->mUsable = true;
   return crypto.forget();
+#endif
 }
 
 // static
