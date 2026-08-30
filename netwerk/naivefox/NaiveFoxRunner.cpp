@@ -46,7 +46,7 @@ class AutoLogging final {
 
 void PrintUsage(const char* aProgram) {
   std::printf(
-      "Usage: %s [CONFIG_PATH]\n"
+      "Usage: %s [CONFIG_PATH] [--transport classic|no-connect]\n"
       "       %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
       "       %s --profile PATH --activation-process-smoke\n"
@@ -56,6 +56,54 @@ void PrintUsage(const char* aProgram) {
       "       %s --profile PATH --socks-listen 127.0.0.1:PORT "
       "--proxy PROXY_URL [--protocol h2|h3|auto] [--max-connections N]\n",
       aProgram, aProgram, aProgram, aProgram, aProgram, aProgram, aProgram);
+}
+
+bool IsTransportArgument(const char* aArgument) {
+  return std::strcmp(aArgument, "--transport") == 0 ||
+         std::strncmp(aArgument, "--transport=", 12) == 0;
+}
+
+bool ParseConfigArguments(
+    int aArgc, char* aArgv[], nsACString& aPath,
+    mozilla::Maybe<mozilla::naivefox::TransportMode>& aTransport,
+    nsACString& aError) {
+  aPath.AssignLiteral("config.json");
+  bool sawPath = false;
+  for (int index = 1; index < aArgc; ++index) {
+    const char* argument = aArgv[index];
+    if (!IsTransportArgument(argument)) {
+      if (!*argument || argument[0] == '-' || sawPath) {
+        aError.AssignLiteral(
+            "expected one config path and optional --transport; "
+            "diagnostic CLI options cannot be combined with --transport");
+        return false;
+      }
+      sawPath = true;
+      aPath.Assign(argument);
+      continue;
+    }
+    if (aTransport) {
+      aError.AssignLiteral("duplicate --transport option");
+      return false;
+    }
+    const char* value = argument + 12;
+    if (std::strcmp(argument, "--transport") == 0) {
+      if (++index == aArgc) {
+        aError.AssignLiteral("--transport requires classic or no-connect");
+        return false;
+      }
+      value = aArgv[index];
+    }
+    if (std::strcmp(value, "classic") == 0) {
+      aTransport = mozilla::Some(mozilla::naivefox::TransportMode::Classic);
+    } else if (std::strcmp(value, "no-connect") == 0) {
+      aTransport = mozilla::Some(mozilla::naivefox::TransportMode::NoConnect);
+    } else {
+      aError.AssignLiteral("--transport requires classic or no-connect");
+      return false;
+    }
+  }
+  return true;
 }
 
 bool ParseProxyProtocol(const char* aValue,
@@ -150,6 +198,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mProxyUser = proxy.mUser;
     tunnelConfig.mProxyPassword = proxy.mPassword;
     tunnelConfig.mProtocol = proxy.mProtocol;
+    tunnelConfig.mTransport = aConfig.mTransport;
+    tunnelConfig.mNoConnectKey = aConfig.mNoConnectKey;
     tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
     tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
     tunnelConfig.mPreamble = aConfig.mPreamble;
@@ -157,6 +207,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mImplicitPreambleGate = aConfig.mImplicitPreambleGate;
     tunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart =
         aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
+    tunnelConfig.mDiagnosticOptimisticLocalReply =
+        aConfig.mDiagnosticOptimisticLocalReply;
   }
   return tunnelConfigs;
 }
@@ -292,13 +344,26 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
   AutoLogging logging;
   mozilla::LogModule::Init(aArgc, aArgv);
 
-  const bool configMode = aArgc == 1 || (aArgc == 2 && aArgv[1][0] != '-' &&
-                                         std::strlen(aArgv[1]) != 0);
+  bool hasTransportArgument = false;
+  for (int index = 1; index < aArgc; ++index) {
+    hasTransportArgument |= IsTransportArgument(aArgv[index]);
+  }
+  const bool configMode =
+      hasTransportArgument || aArgc == 1 ||
+      (aArgc == 2 && aArgv[1][0] != '-' && std::strlen(aArgv[1]) != 0);
   if (configMode) {
-    nsAutoCString configPath(aArgc == 1 ? "config.json" : aArgv[1]);
+    nsAutoCString configPath;
     mozilla::naivefox::Config config;
+    mozilla::Maybe<mozilla::naivefox::TransportMode> transportOverride;
     nsAutoCString error;
-    nsresult rv = mozilla::naivefox::LoadConfigFile(configPath, config, error);
+    if (!ParseConfigArguments(aArgc, aArgv, configPath, transportOverride,
+                              error)) {
+      std::fprintf(stderr, "NaiveFox command line error: %s\n", error.get());
+      PrintUsage(aArgv[0]);
+      return 2;
+    }
+    nsresult rv = mozilla::naivefox::LoadConfigFile(
+        configPath, config, error, transportOverride);
     if (NS_SUCCEEDED(rv)) {
       rv = mozilla::naivefox::ConfigureRuntimeLogging(config.mLogMode,
                                                       config.mLogPath, error);
@@ -322,7 +387,10 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
         PreambleNeedsNativeActivationProcessRuntime(config));
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
-          "NaiveFox started listeners=%u upstreams=%u\n",
+          "NaiveFox started transport=%s listeners=%u upstreams=%u\n",
+          config.mTransport == mozilla::naivefox::TransportMode::NoConnect
+              ? "no-connect"
+              : "classic",
           static_cast<unsigned>(config.mListeners.Length()),
           static_cast<unsigned>(config.mProxies.Length()));
       for (size_t index = 0; index < config.mProxies.Length(); ++index) {

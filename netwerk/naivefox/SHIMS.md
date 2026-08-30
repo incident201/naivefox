@@ -26,6 +26,14 @@ check. It must not silently approximate browser behavior.
 | `UnknownProtocolHandler.cpp` | Explicit rejection for schemes outside the retained protocol set. | External-app dispatch and UI prompts; returns unknown-protocol failure. | Protocol-handler interfaces and component registration. |
 | Android native product fallbacks in `intl/locale/android`, `netwerk/system/android`, PSM, `mozglue`, and XPCOM | NDK/Bionic locale and API-level discovery, native filesystem/runtime behavior, conservative network availability hints, and logcat output needed by the headless runtime. | GeckoAppShell/JNI network notifications, Android local-network permission UI, Java enterprise-root import, Android keystore client-certificate discovery/signing, application metadata, and Java abort bridging. Security-sensitive Java-backed facilities are unavailable or use the normal non-Android NSS path; they are never treated as successful verification. | Android locale/JNI wrappers, NetworkLinkService and local-permission APIs, PSM enterprise-root/client-auth hooks, Android linker/bootstrap code, system-info, console, manifest, and local-file code. |
 
+The lean boundary in `netwerk/cache2/CacheCrypto.cpp` excludes only the
+profile-keystore initialization and lookup. It returns no cipher and preserves
+the requested encryption preference, so native CacheFile handling fails disk
+entries closed when encryption was requested. It must never substitute a key,
+disable that preference, or persist such entries as plaintext. Ordinary Cache2
+and NSS operations are retained; `NaiveFoxCacheCrypto.*` and the shim invariant
+check cover this unsupported boundary.
+
 ## Non-negotiable behavior
 
 - TLS certificate and hostname verification stay in NSS/PSM and are never
@@ -47,13 +55,25 @@ check. It must not silently approximate browser behavior.
 
 ## Verification
 
+The product Rust root must explicitly link `mozglue-static` and retain its
+`moz_memory` feature when the C++ graph enables `MOZ_MEMORY`. An unused Cargo
+dependency does not select the global allocator. Mixing Rust's platform
+allocator with Gecko's allocator can hang or corrupt memory when C++ destroys
+Rust-owned `ThinVec`/`nsTArray` buffers; the Windows H3 certificate-chain path
+exercises this boundary. `--runtime-smoke` now allocates, reallocates and frees
+nested arrays across that ABI in both directions, and the static shim check
+guards the dependency/feature wiring. A networking handshake-only test is not
+a substitute for live H3 payload acceptance.
+
 Run the static shim checks and the clean minimal build:
 
 ```bash
-python3 netwerk/naivefox/tools/verify-shims.py
+python3 netwerk/naivefox/tools/verify-shims.py --source-only
 MOZCONFIG=netwerk/naivefox/mozconfig-minimal \
 NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-linux \
 ./mach build -j4
+python3 netwerk/naivefox/tools/verify-shims.py \
+  --objdir /absolute/path/to/obj-naivefox-linux
 ```
 
 Android fallback changes additionally require a clean

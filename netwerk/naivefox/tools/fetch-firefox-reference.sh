@@ -71,6 +71,13 @@ archive="$tmp/firefox.tar.bz2"
 
 effective_url=$(curl --fail --location --silent --show-error --retry 3 \
   --proto '=https' --tlsv1.2 "$url" -o "$archive" -w '%{url_effective}')
+sha256=$(sha256sum "$archive" | awk '{print $1}')
+if [[ $sha256 != "$expected_sha256" ]]; then
+  printf 'Firefox reference archive SHA-256 mismatch: expected %s, got %s\n' \
+    "$expected_sha256" "$sha256" >&2
+  printf 'Inspect the official artifact provenance before refreshing the pinned reference; a matching version string alone is insufficient.\n' >&2
+  exit 1
+fi
 case "$effective_url" in
   *.tar.xz) tar -xJf "$archive" -C "$tmp" ;;
   *.tar.bz2) tar -xjf "$archive" -C "$tmp" ;;
@@ -87,13 +94,6 @@ if [[ -z "$extracted" || ! -f "$extracted/libxul.so" || ! -f "$extracted/libssl3
 fi
 
 version=$(LD_LIBRARY_PATH="$extracted" "$extracted/firefox" --version 2>/dev/null)
-sha256=$(sha256sum "$archive" | awk '{print $1}')
-if [[ $sha256 != "$expected_sha256" ]]; then
-  printf 'Firefox reference archive SHA-256 mismatch: expected %s, got %s\n' \
-    "$expected_sha256" "$sha256" >&2
-  printf 'The Nightly URL is mutable; inspect the reported Firefox version and refresh archive_sha256 only when it still matches the manifest version.\n' >&2
-  exit 1
-fi
 if [[ $version != "$expected_version" ]]; then
   printf 'Firefox reference version mismatch: expected %s, got %s\n' \
     "$expected_version" "$version" >&2

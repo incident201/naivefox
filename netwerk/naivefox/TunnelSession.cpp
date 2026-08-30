@@ -12,6 +12,7 @@
 #include "AutoFallback.h"
 #include "HeaderPadding.h"
 #include "NeckoTunnel.h"
+#include "NoConnectTransport.h"
 #include "OuterSessionGate.h"
 #include "PaddingNegotiation.h"
 #include "RuntimeLogging.h"
@@ -431,6 +432,7 @@ class TunnelSession::Impl final {
   nsCString mTargetAuthority;
   nsTArray<uint8_t> mInitialPayload;
   RefPtr<DuplexPump> mPump;
+  RefPtr<NoConnectStream> mNoConnect;
   ProxyProtocol mAttemptProtocol = ProxyProtocol::H2;
   uint64_t mAttemptGeneration = 0;
   bool mFallbackUsed = false;
@@ -559,6 +561,21 @@ nsresult TunnelSession::Start(const nsACString& aTargetAuthority,
   mImpl->mStarted = true;
   mImpl->mTargetAuthority = aTargetAuthority;
   mImpl->mInitialPayload.AppendElements(aInitialPayload);
+  if (mImpl->mConfig.mTransport == TransportMode::NoConnect) {
+    RefPtr self = this;
+    mImpl->mAttemptProtocol = mImpl->mConfig.mProtocol;
+    mImpl->mNoConnect = new NoConnectStream(
+        mImpl->mLocalIn, mImpl->mLocalOut, mImpl->mConfig, mImpl->mSocketTarget,
+        [self]() {
+          self->mImpl->mOuterProtocol.Assign(
+              ProtocolName(self->mImpl->mConfig.mProtocol));
+          self->TunnelReady();
+        },
+        [self](nsresult aStatus) { self->Fail(aStatus); },
+        [self](nsresult aStatus) { self->Cancel(aStatus); });
+    mImpl->mInitialPayload.Clear();
+    return mImpl->mNoConnect->Start(aTargetAuthority, aInitialPayload);
+  }
   const ProxyProtocol firstProtocol =
       mImpl->mConfig.mProtocol == ProxyProtocol::Auto
           ? ProxyProtocol::H3
@@ -1669,6 +1686,11 @@ void TunnelSession::TunnelReady() {
 }
 
 nsresult TunnelSession::StartPump() {
+  if (mImpl->mNoConnect && mImpl->mReady && !mImpl->mClosed &&
+      !mImpl->mFailed && !mImpl->mPumpStarted) {
+    mImpl->mPumpStarted = true;
+    return mImpl->mNoConnect->StartPump();
+  }
   if (!mImpl->mReady || mImpl->mPumpStarted || mImpl->mClosed ||
       mImpl->mFailed || !mImpl->mPendingTunnelIn || !mImpl->mPendingTunnelOut) {
     return NS_ERROR_NOT_AVAILABLE;
@@ -1720,6 +1742,10 @@ void TunnelSession::Fail(nsresult aStatus) {
     return;
   }
   mImpl->mFailed = true;
+  if (mImpl->mNoConnect) {
+    mImpl->mNoConnect->Cancel(aStatus);
+    mImpl->mNoConnect = nullptr;
+  }
   mImpl->mCancelRequested.store(true, std::memory_order_release);
   ReleaseOuterGate();
   RefPtr self = this;
@@ -1753,6 +1779,10 @@ void TunnelSession::CancelInternal(nsresult aStatus, bool aCancelRequest) {
     return;
   }
   mImpl->mClosed = true;
+  if (mImpl->mNoConnect) {
+    mImpl->mNoConnect->Cancel(aStatus);
+    mImpl->mNoConnect = nullptr;
+  }
   mImpl->mCancelRequested.store(true, std::memory_order_release);
   ReleaseOuterGate();
   if (aCancelRequest) {

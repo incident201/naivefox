@@ -7,6 +7,7 @@ and clear reporting of verified capabilities.
 
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import os
 import socket
@@ -17,6 +18,42 @@ import time
 import urllib.parse
 
 SOCKS_NO_AUTH_GREETING = b"\x05\x01\x00"
+
+
+def validate_necko_localization(package_dir):
+    resource = os.path.join(package_dir, "localization", "en-US", "netwerk", "necko.ftl")
+    assert os.path.isfile(resource) and os.path.getsize(resource) > 0, (
+        "required Necko localization resource is missing or empty: "
+        "localization/en-US/netwerk/necko.ftl"
+    )
+
+
+def fetch_digest(target_url, local_proxy=None):
+    command = ["curl.exe", "--fail", "--silent", "--show-error", "--noproxy", "",
+               "--connect-timeout", "10", "--max-time", "60"]
+    if os.environ.get("SSL_CERT_FILE"):
+        command.extend(["--cacert", os.environ["SSL_CERT_FILE"]])
+    if local_proxy:
+        command.extend(["--proxy", local_proxy, "--proxytunnel"])
+    else:
+        command.extend(["--proxy", ""])
+    command.append(target_url)
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=70)
+    except subprocess.TimeoutExpired:
+        raise AssertionError("live transfer timed out") from None
+    # Avoid echoing potentially private target URLs or upstream diagnostics.
+    assert result.returncode == 0, f"live transfer failed (curl exit {result.returncode})"
+    assert result.stdout, "live transfer returned an empty body"
+    return hashlib.sha256(result.stdout).hexdigest()
+
+
+def verify_live_transfers(target_url, local_proxy, expected_digest):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        digests = list(executor.map(
+            lambda _: fetch_digest(target_url, local_proxy), range(8)
+        ))
+    assert all(digest == expected_digest for digest in digests), "live transfer body mismatch"
 
 
 def find_free_port():
@@ -441,7 +478,7 @@ def main():
     )
     parser.add_argument(
         "--proxy-url",
-        default=None,
+        default=os.environ.get("NAIVEFOX_WINDOWS_PROXY_URL"),
         help="Upstream H2/H3 proxy URL for live acceptance testing",
     )
     parser.add_argument(
@@ -486,15 +523,17 @@ def main():
     print(f"NaiveFox Windows Package Verification: {exe_path}")
     print("=" * 70)
 
+    validate_necko_localization(os.path.dirname(exe_path))
+
     # 1. Version check
-    out = subprocess.check_output([exe_path, "--version"], text=True)
+    out = subprocess.check_output([exe_path, "--version"], text=True, timeout=30)
     print(f"[1] Version Output: {out.strip()}")
     assert "NaiveFox" in out, "Version check failed"
 
     # 2. Runtime smoke test
     with tempfile.TemporaryDirectory(prefix="nf_win_smoke_") as temp_prof:
         out = subprocess.check_output(
-            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True
+            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True, timeout=30
         )
         print(f"[2] Runtime Smoke: {out.strip()}")
         assert "completed successfully" in out, "Smoke test failed"
@@ -503,6 +542,7 @@ def main():
     socks_port = find_free_port()
     proxy_endpoint = args.proxy_url or "https://dummy_user:dummy_pass@127.0.0.1:28443"
     proxy_secrets = proxy_secret_tokens(proxy_endpoint)
+    expected_digest = fetch_digest(args.target_url) if args.proxy_url else None
 
     with tempfile.TemporaryDirectory(prefix="nf_win_socks_") as temp_prof:
         cfg_path = os.path.join(temp_prof, "config.json")
@@ -546,6 +586,9 @@ def main():
                 assert resp == b"\x05\x00", f"Consecutive connection {i} failed"
                 s.close()
             print("    5 Consecutive SOCKS5 handshakes: PASSED")
+            if expected_digest:
+                verify_live_transfers(args.target_url, f"socks5h://127.0.0.1:{socks_port}", expected_digest)
+                print("    SOCKS5 live payload integrity (8 transfers, concurrency 4): PASSED")
 
         finally:
             proc.terminate()
@@ -587,6 +630,9 @@ def main():
 
             print(f"    HTTP CONNECT Listener: {'PASSED' if opened else 'FAILED'}")
             assert opened, "HTTP CONNECT listener did not accept connections"
+            if expected_digest:
+                verify_live_transfers(args.target_url, f"http://127.0.0.1:{http_port}", expected_digest)
+                print("    HTTP CONNECT live payload integrity (8 transfers, concurrency 4): PASSED")
 
         finally:
             proc.terminate()
@@ -611,7 +657,7 @@ def main():
     # 6. Prove a fresh runtime still starts and exits naturally after churn.
     with tempfile.TemporaryDirectory(prefix="nf_win_post_churn_") as temp_prof:
         out = subprocess.check_output(
-            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True
+            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True, timeout=30
         )
         assert "completed successfully" in out, "post-churn smoke test failed"
     print("[6] Post-churn runtime smoke clean exit: PASSED")

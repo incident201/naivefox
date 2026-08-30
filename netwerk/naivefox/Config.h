@@ -17,6 +17,7 @@
 namespace mozilla::naivefox {
 
 enum class ListenerType : uint8_t { Socks5, HttpConnect };
+enum class TransportMode : uint8_t { Classic, NoConnect };
 
 struct ListenerConfig final {
   ListenerType mType = ListenerType::Socks5;
@@ -216,6 +217,9 @@ constexpr bool PreambleModeUsesNativeCacheOpen(PreambleMode aMode) {
 enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
 
 struct Config final {
+  TransportMode mTransport = TransportMode::Classic;
+  // Retained but unused by classic so one config can select either transport.
+  nsCString mNoConnectKey;
   nsTArray<ListenerConfig> mListeners;
   nsTArray<UpstreamProxyConfig> mProxies;
   Maybe<HostResolverRule> mHostResolverRule;
@@ -228,6 +232,7 @@ struct Config final {
   // gate is deliberately distinct from the user-visible gate.
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
+  bool mDiagnosticOptimisticLocalReply = false;
   bool mNoPostQuantum = false;
   RuntimeLogMode mLogMode = RuntimeLogMode::Disabled;
   nsCString mLogPath;
@@ -252,10 +257,12 @@ class ProfileDirectory final {
   bool mTemporary = false;
 };
 
-nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
-                     nsACString& aError);
-nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
-                        nsACString& aError);
+nsresult ParseConfig(
+    const nsACString& aJson, Config& aConfig, nsACString& aError,
+    const Maybe<TransportMode>& aTransportOverride = Nothing());
+nsresult LoadConfigFile(
+    const nsACString& aPath, Config& aConfig, nsACString& aError,
+    const Maybe<TransportMode>& aTransportOverride = Nothing());
 nsresult ResolveAndCreateProfile(ProfileDirectory& aProfile,
                                  nsACString& aError);
 

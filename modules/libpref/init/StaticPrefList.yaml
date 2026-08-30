@@ -1097,22 +1097,15 @@
   value: true
   mirror: always
 
-# Whether to encrypt HTTP disk cache data at rest with an in-memory key. The
-# decrypted cache content only ever lives in memory. Off by default; takes
-# effect on restart. Read via CacheCrypto::IsEnabled(), which caches the value
-# on first use so it is stable for the session.
+# Whether to encrypt HTTP disk cache data at rest. The key is a data encryption
+# key held by the profile keystore (security/lockstore); the decrypted cache
+# content only ever lives in memory. Off by default; takes effect on restart.
+# Read via CacheCrypto::IsEnabled(), which caches the value on first use so it
+# is stable for the session.
 - name: browser.cache.disk.encryption.enabled
   type: RelaxedAtomicBool
   value: false
   mirror: always
-
-# Base64 of the 32-byte AES-256 key used for disk cache encryption. Empty means
-# "generate one on first use and store it here". This is a development scaffold;
-# the key will move to the OS keystore later.
-- name: browser.cache.disk.encryption.key
-  type: String
-  value: ""
-  mirror: never
 
 # Minimum number of unwritten changes before the disk cache index is written
 # back to disk. Lowering it (e.g. to 1) forces the index to be persisted
@@ -2759,6 +2752,12 @@
 # and compositionend events.
 - name: dom.compositionevent.allow_control_characters
   type: bool
+  value: false
+  mirror: always
+
+# Whether to enable large window for brotli on DecompressionStream.
+- name: dom.compression_streams.brotli.large_window.enabled
+  type: RelaxedAtomicBool
   value: false
   mirror: always
 
@@ -7906,6 +7905,12 @@
     type: RelaxedAtomicUint32
     value: 3
     mirror: always
+
+# Whether to hide legacy font formats (Type 1 and PCF) from the font list.
+-   name: gfx.font_rendering.fontconfig.skip_legacy_fonts
+    type: RelaxedAtomicBool
+    value: @IS_NIGHTLY_BUILD@
+    mirror: always
 #endif
 
 #if defined(XP_WIN)
@@ -10026,6 +10031,18 @@
   mirror: always
   set_spidermonkey_pref: always
 
+# Read once per ContStackAllocator at first allocation; changes at runtime
+# do not take effect for an already-initialized allocator.
+- name: javascript.options.wasm_cont_stack_max_vmem
+  type: uint32_t
+#if defined(HAVE_64BIT_BUILD)
+  value: 2u * 1024 * 1024 * 1024
+#else
+  value: 128 * 1024 * 1024
+#endif
+  mirror: always
+  set_spidermonkey_pref: always
+
 -   name: javascript.options.wasm_js_promise_integration
     type: bool
     value: true
@@ -10905,13 +10922,6 @@
   mirror: always
   rust: true
 
-# Is support for the contrast-color() function enabled?
-- name: layout.css.contrast-color.enabled
-  type: RelaxedAtomicBool
-  value: true
-  mirror: always
-  rust: true
-
 # Whether alt text in content is enabled.
 - name: layout.css.content.alt-text.enabled
   type: RelaxedAtomicBool
@@ -10950,13 +10960,6 @@
 - name: layout.css.calc-typed-arithmetic.enabled
   type: RelaxedAtomicBool
   value: @IS_NIGHTLY_BUILD@
-  mirror: always
-  rust: true
-
-# Is support for light-dark() on images in content enabled?
-- name: layout.css.light-dark.images.enabled
-  type: RelaxedAtomicBool
-  value: true
   mirror: always
   rust: true
 
@@ -11293,7 +11296,7 @@
 # Is the at-rule() function in @supports enabled?
 - name: layout.css.supports.at-rule.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
   rust: true
 
@@ -11491,7 +11494,7 @@
 # See https://github.com/w3c/csswg-drafts/issues/14190
 - name: layout.forms.button-input-align-content-block.enabled
   type: bool
-  value: true
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # If enabled, textareas won't include 'overflow:auto' scrollbars in their
@@ -13867,10 +13870,11 @@
 # Encoder creation strategy for WebRTC
 # 0: prefer builtin WebRTC encoder (including OpenH264 via GMP)
 # 1: prefer PlatformEncoderModule
+# 2: prefer PlatformEncoderModule for HW, then builtin WebRTC encoder for SW
 - name: media.webrtc.encoder_creation_strategy
   type: RelaxedAtomicUint32
 #ifdef ANDROID
-  value: 1
+  value: 2
 #else
   value: 0
 #endif
@@ -14120,11 +14124,7 @@
 # can be turned on for other platforms.
 - name: media.audio.reuse-stream-on-seek
   type: RelaxedAtomicBool
-#if defined(XP_MACOSX)
-  value: true
-#else
-  value: false
-#endif
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # The duration, in milliseconds, of decoded audio to keep around in the
@@ -14674,6 +14674,20 @@
 - name: network.cookie.skip_browsing_context_check_in_parent_for_testing
   type: bool
   value: false
+  mirror: always
+
+# Maximum size of the cookie database write-ahead log before sqlite
+# checkpoints it. Only read at database initialization.
+- name: network.cookie.db.maxWalBytes
+  type: uint32_t
+  value: 524288 # 512KiB
+  mirror: always
+
+# Extra amount the cookie database write-ahead log is allowed to grow past
+# network.cookie.db.maxWalBytes before being truncated back.
+- name: network.cookie.db.journalOverheadBytes
+  type: uint32_t
+  value: 524288 # 512KiB
   mirror: always
 
 # The string to return to the server as the 'workstation' that the user is
@@ -16201,16 +16215,6 @@
   value: 50
 #else
   value: 0
-#endif
-  mirror: always
-
-# The idle timeout for the HTTP/3 connection that is used for DoH
-- name: network.trr.idle_timeout_for_http3_conn
-  type: RelaxedAtomicUint32
-#ifdef EARLY_BETA_OR_EARLIER
-  value: 400
-#else
-  value: 30
 #endif
   mirror: always
 
@@ -21081,6 +21085,15 @@
 - name: widget.windows.fullscreen_marking_method
   type: RelaxedAtomicUint32
   value: 2
+  mirror: always
+
+# Whether to always set "NonRudeHWND" on non-fullscreen visible windows,
+# which seems to give us the benefit of using "NonRudeHWND" for the
+# fullscreen_marking_method without causing issues with the taskbar showing
+# when Firefox is fullscreen. (bug 1965699)
+- name: widget.windows.fullscreen_set_nonrudehwnd
+  type: RelaxedAtomicBool
+  value: true
   mirror: always
 
 # Whether to open the Windows file and folder pickers "remotely" (in a utility

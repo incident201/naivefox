@@ -5,6 +5,7 @@ import pathlib
 import socket
 import threading
 import unittest
+from unittest import mock
 
 SCRIPT = pathlib.Path(__file__).parents[2] / "tools" / "verify-staged-windows-smoke.py"
 SPEC = importlib.util.spec_from_file_location("verify_staged_windows_smoke", SCRIPT)
@@ -18,6 +19,27 @@ class AlwaysAliveProcess:
 
 
 class LifecycleChurnHelpersTest(unittest.TestCase):
+    def test_live_transfers_require_matching_payloads(self):
+        with mock.patch.object(SMOKE, "fetch_digest", return_value="expected") as fetch:
+            SMOKE.verify_live_transfers("http://target/", "http://localhost:1234", "expected")
+            self.assertEqual(fetch.call_count, 8)
+        with mock.patch.object(SMOKE, "fetch_digest", return_value="different"):
+            with self.assertRaisesRegex(AssertionError, "body mismatch"):
+                SMOKE.verify_live_transfers("http://target/", "socks5h://localhost:1234", "expected")
+
+    def test_failed_live_request_cannot_hash_as_success(self):
+        result = mock.Mock(returncode=7, stdout=b"error body")
+        with mock.patch.object(SMOKE.subprocess, "run", return_value=result):
+            with self.assertRaisesRegex(AssertionError, "curl exit 7"):
+                SMOKE.fetch_digest("http://target/")
+
+    def test_live_timeout_does_not_echo_private_target(self):
+        private_target = "http://private-target.invalid/secret"
+        error = SMOKE.subprocess.TimeoutExpired(["curl.exe", private_target], 70)
+        with mock.patch.object(SMOKE.subprocess, "run", side_effect=error):
+            with self.assertRaisesRegex(AssertionError, "^live transfer timed out$"):
+                SMOKE.fetch_digest(private_target)
+
     def test_socks_request_is_a_valid_domain_connect(self):
         request = SMOKE.make_socks_connect_request("race.test", 8443)
         self.assertEqual(request[:4], b"\x05\x01\x00\x03")

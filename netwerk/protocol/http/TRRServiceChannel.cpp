@@ -26,6 +26,7 @@
 #include "nsIOService.h"
 #include "nsIProtocolProxyService2.h"
 #include "nsISeekableStream.h"
+#include "nsSocketTransportService2.h"
 #include "nsThreadUtils.h"
 #include "nsURLHelper.h"
 

@@ -17,7 +17,10 @@ small predeclared range of ordinary fixture sizes before promotion.
 Use `--scenario browser_page --browser-page-base-size BYTES` to scale all six
 page assets coherently for that check. Omitting it preserves the established
 262144-byte fixture; the sanitized metadata records either the explicit base
-or `default_262144`.
+or `default_262144`. For a dense H3 fronting-page arm, this option scales the
+inner tunneled `browser_page`; the outer Caddy page remains the fixed profile
+documented in [`FRONTING-PAGE.md`](FRONTING-PAGE.md). It is therefore not an
+outer fronting-resource size sweep.
 
 Use `--network-one-way-delay-ms N` and `--network-rate-mbit N` only inside the
 one-shot isolated namespace to test RTT and bandwidth robustness. The verified
@@ -25,6 +28,181 @@ loopback `netem` profile applies symmetrically to every participant. Shaped
 captures use the receive copy so packet timestamps occur after netem rather
 than at the pre-qdisc transmit tap; metadata records the profile and capture
 copy policy.
+
+## Experiment-history preflight
+
+Before implementing a new candidate, search this file, `README.md`,
+`FRONTING-PAGE.md`, and the integration harness for both the proposed name
+and causal synonyms. Then search Git history with message grep and pickaxe
+(`git log --grep`, `-S`, and `-G`) at the intended code boundary. Compare
+the causal mechanism rather than only arm names: a renamed timer, task hop,
+response gate, parser/process topology, cache condition, framing rule, or
+server read policy is still a duplicate if it waits on or changes the same
+event.
+
+If a causal analog already has an admitted artifact, do not reimplement or
+rebuild it. Cite the existing commit/artifact in the research notes and move
+to another hypothesis. A new screen proceeds only after this preflight finds
+no prior analog; its successful or failed result is then added here so the
+same search closes the loop for later work.
+
+This preflight is mandatory for every implementation attempt, including a
+follow-on variation of the most recently tested experiment. A different arm
+name, protocol branch, task boundary, or number of resources does not make an
+idea new when the changed code still controls the same causal event. Record a
+rejected premise here even when timing evidence makes implementation and
+capture unnecessary.
+
+Do not begin a product edit, fixture fork, or harness arm until that exact and
+causal-history search is complete. This is a per-idea gate, not a one-time
+review for an extended research session.
+
+## Predeclared outer-resource size campaign
+
+The first actual outer-resource matrix is fixed before collection. It uses the
+same promoted product binary and one H3 same-base superblock containing
+Firefox A/B, SOCKS5 `document-start-overlap`, SOCKS5 six-resource tree, HTTP
+CONNECT `document-start-overlap`, and HTTP CONNECT six-resource tree. The
+inner `browser_page` remains at its default 262144-byte base. Every run uses a
+fresh-profile, unshaped isolated WSL namespace unless a shaped row explicitly
+says otherwise, seed `2026082971`, four complete blocks, and the five dashboard
+views. These rows are descriptive screens below the 30-block inference floor.
+
+The fixed profiles are:
+
+| Profile | CSS | JavaScript | Images | Resource bytes excluding root | Purpose |
+| --- | ---: | ---: | ---: | ---: | --- |
+| exact current | 12 KiB | 24 KiB | 8 KiB x3 plus 34-byte JSON | 61,474 | Reproduce the currently measured fixture |
+| coherent small, unit 1024 | 3 KiB | 6 KiB | 2 KiB x4 valid SVG | 17 KiB | Small-resource endpoint |
+| coherent nominal, unit 4096 | 12 KiB | 24 KiB | 8 KiB x4 valid SVG | 68 KiB | Isolate replacement of the fourth response |
+| coherent large, unit 16384 | 48 KiB | 96 KiB | 32 KiB x4 valid SVG | 272 KiB | Four-times nominal endpoint below the 384-KiB cap |
+
+Comparisons among the three coherent rows isolate body-size scaling at fixed
+topology, URLs, MIME types, inner workload, and product policy. Exact current
+versus coherent nominal separately exposes the historical fourth-response
+shape change and must not be described as a pure size comparison. A secondary
+endpoint screen uses only coherent small and coherent large at 20-ms one-way
+delay and 20 Mbit/s, seed `2026082972`, and four blocks. No default promotion
+or acceptable-size guarantee will be inferred from these screening runs. Each
+fixture first passes a live byte-count and MIME preflight outside the capture;
+declared sizes alone are not accepted as evidence that the intended profile
+was served.
+
+The campaign completed on 2026-08-29. All six runs used the promoted product
+binary (`naivefox_binary_build_id=929cd10f5dc1a5a286ba4d09ccc0c9c0`,
+libxul SHA-256
+`9df4dfb2b2b45475931a0155a8e336f5a8dcc1bb377e1d724eaa33785db7e39c`),
+inner HTTPS/H2, the default 262144-byte inner workload, cold profiles, and 24
+successful proxy resets and network-mutation checks. Every coherent-profile
+artifact records a passed live size/MIME preflight. Values below are ordered
+as packets 1--16 / packets 17--32 / packets 1--32 / first 250 ms / whole.
+
+| Link | Outer profile | Safe artifact | SOCKS5 six-resource default | HTTP CONNECT six-resource default |
+| --- | --- | --- | --- | --- |
+| unshaped | exact current, 61,474 B | `27cd617551df09e1` | 0.11371 / 0.48209 / 0.18401 / 0.15601 / 0.42831 | 0.10430 / 0.48934 / 0.18104 / 0.16029 / 0.43444 |
+| unshaped | coherent 17 KiB | `797c93e5e5de5b77` | 0.13154 / 0.50255 / 0.19260 / 0.17128 / 0.50407 | 0.12961 / 0.50641 / 0.19508 / 0.18269 / 0.50456 |
+| unshaped | coherent 68 KiB | `6cd4be128b6cdaef` | 0.10774 / 0.46957 / 0.18568 / 0.16721 / 0.42231 | 0.10576 / 0.49428 / 0.19396 / 0.16441 / 0.42534 |
+| unshaped | coherent 272 KiB | `7eeda921f5be8f0e` | 0.08663 / 0.37350 / 0.15555 / 0.14808 / 0.37166 | 0.08330 / 0.38149 / 0.14741 / 0.12599 / 0.35411 |
+| 20-ms one-way, 20 Mbit/s | coherent 17 KiB | `6a9ff85817ad6a41` | 0.09260 / 0.24379 / 0.12282 / 0.07891 / 0.40498 | 0.09482 / 0.31374 / 0.13610 / 0.08995 / 0.40292 |
+| 20-ms one-way, 20 Mbit/s | coherent 272 KiB | `1a6aeb8439779ae7` | 0.10323 / 0.23608 / 0.13335 / 0.11601 / 0.30535 | 0.09898 / 0.25181 / 0.13569 / 0.11801 / 0.30231 |
+
+The unshaped coherent series is monotonic in every displayed default view:
+larger outer bodies produced lower residuals. From 17 to 272 KiB, SOCKS5
+changed by -0.04491 / -0.12905 / -0.03705 / -0.02320 / -0.13241 and HTTP
+CONNECT by -0.04631 / -0.12492 / -0.04767 / -0.05670 / -0.15045. Under the
+shaped link, the same endpoint comparison is mixed: SOCKS5 changed by
++0.01063 / -0.00771 / +0.01053 / +0.03710 / -0.09963 and HTTP CONNECT by
++0.00416 / -0.06193 / -0.00041 / +0.02806 / -0.10061. Thus a larger natural
+page strongly improved whole-flow point estimates and improved HTTP CONNECT
+packets 17--32 in both link conditions, but it did not dominate the small
+page in the shaped 250-ms view.
+
+The corresponding document-start causal controls support a scheduling effect
+rather than only dilution by more outer bytes. Their packets 17--32 / whole
+values were: exact current SOCKS5 0.61855 / 0.46008 and HTTP CONNECT 0.63062 /
+0.43776; coherent 17 KiB unshaped 0.54084 / 0.51579 and 0.55695 / 0.49752;
+coherent 68 KiB unshaped 0.64363 / 0.46323 and 0.65259 / 0.43256; coherent
+272 KiB unshaped 0.56182 / 0.41738 and 0.57931 / 0.37375; coherent 17 KiB
+shaped 0.52894 / 0.46855 and 0.51583 / 0.45591; coherent 272 KiB shaped
+0.48775 / 0.40952 and 0.46932 / 0.39760. The six-resource defaults were lower
+than their listener-matched controls in packets 17--32 for every row and in
+whole for every row except the four-block unshaped 17-KiB HTTP point estimate
+(0.50456 versus 0.49752).
+
+This is evidence that outer resource size materially affects passive residuals,
+not permission to tune a production site to one fixture. Four blocks are
+descriptive, their bootstrap intervals remain broad, and the four-block exact
+repeat does not reproduce the canonical ten-block point estimates exactly.
+The coherent 17--272-KiB range is now functionally exercised, including both
+endpoints on a slower link, but it is not an equivalence interval or a new
+default measurement matrix. The canonical four-row table below remains
+unchanged. The exact-current and coherent-nominal comparison is mixed and also
+changes the fourth response from tiny JSON to a valid SVG, so it is not used
+as a size effect.
+
+Two one-block plumbing artifacts preceded the matrix. `1f49e855f3652c2c`
+successfully exercised the coherent 68-KiB fixture before the live preflight
+was added. `15c737ffa606b880` then exercised coherent 17 KiB with the new
+preflight and passed. Neither is candidate evidence and neither is substituted
+for a complete four-block row.
+
+## Current implicit-default matrix
+
+This is the canonical published-default residual dashboard. Lower is closer to
+the same Firefox A/B controls in the same randomized block. The columns are
+packets 1--16, packets 17--32, packets 1--32, the first 250 ms, and the whole
+flow. Harness-only arm names in parentheses select the listener while keeping
+the listed product policy and budgets.
+
+The numbers attest the recorded source and runtime digests below, not an
+unmeasured later upstream refresh on `naivefox-full-source`. Functional gates
+alone do not establish residual equivalence; before publishing a refreshed
+runtime, rerun all four rows under the common contract below.
+
+| Outer | Local ingress | Effective omitted-preamble policy | Safe artifact | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| H2 | SOCKS5 | `document-first-buffer-task-overlap` | `e026109117dd8141` | 0.08824 | 0.42884 | 0.19744 | 0.09826 | 0.27527 |
+| H2 | HTTP CONNECT | `document-first-buffer-overlap` (`document-first-buffer-http-connect`) | `e026109117dd8141` | 0.08222 | 0.42859 | 0.19466 | 0.09400 | 0.25955 |
+| H3 | SOCKS5 | `tree-native-parser-resource-committed-overlap`, six cached resources, 384 KiB | `8bc66f8738d559b2` | 0.07392 | 0.39623 | 0.13837 | 0.15011 | 0.39149 |
+| H3 | HTTP CONNECT | `tree-native-parser-resource-committed-overlap`, six cached resources, 384 KiB (`tree-native-parser-resource-committed-page-http-connect`) | `8bc66f8738d559b2` | 0.06375 | 0.40952 | 0.13753 | 0.14458 | 0.39012 |
+
+Both artifacts use seed `2026082968`, ten complete same-base smoke blocks,
+the 262144-byte `browser_page`, inner HTTPS/H2, Selenium, an unshaped isolated
+WSL namespace, loopback MTU 1500, disabled offloads, and fresh Firefox profiles.
+The reference browser was installed from the canonical upstream base as a CI
+artifact; no full Firefox build was performed. H2 contains Firefox A/B and the
+two defaults (40 participants). H3 contains Firefox A/B, both defaults, and the
+required SOCKS5 and HTTP-CONNECT `document-start-overlap` causal controls (60
+participants). All capture-drop,
+network-mutation, transport-origin, inner-H2, and preamble-drain checks passed.
+Ten smoke blocks provide a uniform descriptive dashboard; they are below the
+30-block minimum and do not make a new paired-inference or absolute
+indistinguishability claim. Bootstrap intervals and diagnostics remain in each
+safe artifact's `arm-comparison.txt`. Both identify source revision
+`aa4bd846af3a76170aee845ce7f2a356f6c768ee`, NaiveFox build ID
+`929cd10f5dc1a5a286ba4d09ccc0c9c0`, and libxul digest
+`9df4dfb2b2b45475931a0155a8e336f5a8dcc1bb377e1d724eaa33785db7e39c`.
+
+This table is the single source of current residual numbers. A change to an
+implicit default, published runtime, fixture, capture policy, or residual view
+is incomplete until all four rows are rerun together under one declared
+measurement contract and this table is updated in the same logical change.
+Never splice a row from a different seed, reference, network profile, or
+workload into the current matrix; prior results remain in the chronological
+evidence below and in Git history.
+
+The campaign also retained its failed attempts. Two quick-reference H3 gates
+failed in direct Firefox with `connectionFailure` before NaiveFox ran, so they
+produced no candidate data and were rejected. The exact same-base reference
+was then installed without building Firefox. Three initial same-base H3 gates
+were rejected because the HTTP PAC proxied Selenium's local remote-control
+port, creating the sole outer QUIC identity before capture and therefore
+failing the client-Initial origin check. A 100-ms capture-readiness delay did
+not change that result and was removed. Restricting the PAC to the exact
+workload authority, keeping other namespace-local control ports direct, and
+keeping every non-loopback host fail-closed fixed the cause. One-block H2
+artifact `e8e45098f22f8a09` and H3 artifact `96c46e62fc03a3c7` then passed
+before the ten-block runs above.
 
 The first 20-ms/20-Mbit plumbing smoke, `e97a1bae045f29d8` (seed
 `20260828145`), successfully shaped and analyzed all four participants but
@@ -395,17 +573,29 @@ it proves neither a causal abort nor a complete natural stylesheet lifecycle.
 
 ## Modes and policy
 
+Every proposed experiment has a mandatory history gate before implementation.
+Search this document and the other NaiveFox Markdown, the product and capture
+harness, and the complete Git history (including pickaxe/regex searches for
+removed implementations). The search must cover both the proposed name and
+the causal wire/lifecycle mechanism: renaming an earlier delay, boundary,
+carrier, padding, scheduling, cache/classifier, process-topology, or
+multiplexing experiment does not make it new. Record either the specific
+difference which makes the mechanism new or the earlier evidence which rejects
+it before writing product, Caddy, or harness code. If the same causal variable
+was already tested, do not implement it again unless new evidence identifies a
+materially different condition and the preflight records that distinction.
+
 The runners support two reference modes:
 
-- `quick` (default) downloads the current official Firefox Nightly artifact
+- `quick` (default) downloads the pinned official Firefox Nightly/CI artifact
   named by the tooling manifest and uses that binary directly; it does not
   build Firefox. The manifest records the expected Nightly version and the
-  SHA-256 of the last verified archive. Mozilla may republish a mutable
-  `latest-mozilla-central` URL without changing the version string. When that
-  happens, verify the downloaded binary still reports the manifest version and
-  refresh only `archive_sha256` before rerunning the gate. This keeps the
-  comparison against the current Nightly while retaining an explicit artifact
-  integrity check.
+  SHA-256 of the verified archive. Prefer an immutable Taskcluster artifact
+  URL. During a refresh, verify its task revision routes and application
+  metadata before updating the URL, version, and hash together. A matching
+  version string alone does not prove provenance. The fetcher verifies the
+  archive hash before extraction or execution. Quick mode is not automatically
+  a same-base comparison merely because the versions match.
 - `same-base` uses caller-supplied Firefox and NaiveFox packages built from the
   same Firefox base. It is the only meaningful exact stack comparison and the
   only mode that may require a Firefox browser build.
@@ -1082,7 +1272,9 @@ when object sizes, response pacing, RTT, and available bandwidth vary. Those
 conditions must remain experimental inputs, not values inferred from packet
 indices in this artifact.
 
-The complete follow-up screen is recorded below. Distances are ordered as
+The complete follow-up screen is recorded below. Every `page base` label in
+this table refers to the inner tunneled browser workload; the six outer
+fronting resources retained their fixed fixture sizes. Distances are ordered as
 packets 1--16 / packets 17--32 / packets 1--32 / first 250 ms / whole flow.
 One- and two-block rows are diagnostics only; their purpose is to reject ideas
 cheaply and preserve negative results, not compare tiny differences across
@@ -1192,14 +1384,16 @@ The corrected fixed-dwell size screen rebuilt the six-resource arm explicitly
 with `SetProxyPreambleHandshakeDwell(16)`. Both new artifacts identify NaiveFox
 build ID `fa86f083ff437943123733a262ce02ff` and libxul digest
 `eb462bba4c0ffe345bbc5961b5a9d90b70b55ae65b3850dc7ad51715b9c181b7`.
-At a 65536-byte page base, packets 17--32 measured 0.13934 and whole flow
-0.37883; at 1048576 bytes they measured 0.18591 and 0.36313. Both sizes retain
+At a 65536-byte inner-workload page base, packets 17--32 measured 0.13934 and
+whole flow 0.37883; at 1048576 bytes they measured 0.18591 and 0.36313. Both
+sizes retain
 the main advantage over `document-start-overlap`, whose corresponding values
 were 0.63512/0.45239 and 0.60016/0.45256. The tradeoff is consistent and
 limited but real: candidate packets 1--16 exceeded control by 0.05848 and
-0.05072, while 250 ms exceeded it by 0.01797 and 0.00784. Thus object size
-alone does not invalidate the dwell, but these four-block diagnostics do not
-answer slower-link or RTT robustness and do not promote the timer to default.
+0.05072, while 250 ms exceeded it by 0.01797 and 0.00784. Thus inner-workload
+size alone does not invalidate the dwell, but these four-block diagnostics do
+not vary the outer resource bodies, answer slower-link or RTT robustness, or
+promote the timer to default.
 
 The predeclared shaped-link run rejects the fixed dwell as a general default.
 Artifact `a8977a8f77e3e129` uses the same identified 16-ms binary at the default
@@ -1396,8 +1590,8 @@ residual. Both new artifacts identify NaiveFox build ID
 `89a4a90ceb64afd12b532dbe7ee67913` and libxul digest
 `eb4ed5f1dd05c40d1ab17a4419f5ca238ef620854149b501ff0a40bc4b32dcb4`.
 The mechanism and fail-closed lifecycle validation are retained for
-cross-size and unshaped robustness screens; these gate-sized runs do not yet
-promote it to the product default.
+inner-workload-size and unshaped robustness screens; these gate-sized runs do
+not vary the outer resources or yet promote it to the product default.
 
 Unshaped localhost artifact `4e4edd7c53b91735` used the identical binary and
 measured 0.44214 [`0.37933`, `0.50496`] for packets 17--32 and 0.38250
@@ -1408,13 +1602,14 @@ Packets 1--16 were effectively tied with the matched control
 (0.10945 versus 0.10739); the first 250 ms paid a limited 0.01567 descriptive
 cost. The causal body-buffer boundary therefore retains its shaped-link gain
 without repeating the previous scheduler's localhost whole-flow regression.
-Resource-size and slower-link screens remain required because the first body
-callback depends on actual server and path progress even though it contains no
-fixed time or byte threshold.
+Outer-resource-size and slower-link screens remain required because the first
+body callback depends on actual server and path progress even though it
+contains no fixed time or byte threshold.
 
-The first one-block size screens are mixed and remain diagnostic. At a
-65536-byte page base, artifact `c9643a1e000b3c2c` measured 0.72418 for packets
-17--32 and 0.45906 whole; at 1048576 bytes, artifact `8925499c80a97688`
+The first one-block inner-workload size screens are mixed and remain
+diagnostic. At a 65536-byte page base, artifact `c9643a1e000b3c2c` measured
+0.72418 for packets 17--32 and 0.45906 whole; at 1048576 bytes, artifact
+`8925499c80a97688`
 measured 0.41138 and 0.42297. In both cases the candidate still improved all
 five views over its matched `document-start-overlap` control, whose target
 pairs were respectively 0.88117/0.58286 and 0.58080/0.53749. The high absolute
@@ -1423,27 +1618,28 @@ the simultaneous control movement makes a single-block rejection equally
 unsafe. The smaller-size condition is therefore selected for four-block
 replication before changing the mechanism.
 
-That replication rejects the apparent small-resource failure rather than the
-mechanism. Four-block artifact `47adda8f2a4b7783` measured 0.33185
+That replication rejects the apparent small-inner-workload failure rather
+than the mechanism. Four-block artifact `47adda8f2a4b7783` measured 0.33185
 [`0.23825`, `0.41572`] for packets 17--32 and 0.31845
 [`0.28458`, `0.34555`] whole at the same 65536-byte page base. All five views
 improved over the matched control: 0.08814/0.33185/0.14079/0.13174/0.31845
 versus 0.17985/0.55323/0.23522/0.16931/0.43635. The earlier 0.72418 one-block
 target was therefore an unstable Firefox-envelope diagnostic, not evidence
-that a small response deterministically releases CONNECT at the wrong phase.
-Large-resource and slower-link replication are still needed.
+that a smaller tunneled workload deterministically releases CONNECT at the
+wrong phase. Outer-resource and slower-link replication are still needed.
 
-The large-resource replication also retains the candidate. Four-block
+The large inner-workload replication also retains the candidate. Four-block
 artifact `07c422cacf441cd1` measured 0.39571 [`0.29175`, `0.49966`] for packets
 17--32 and 0.36178 [`0.33620`, `0.38808`] whole at the 1048576-byte page base.
 All five views again improved over the matched control:
 0.14312/0.39571/0.18047/0.15179/0.36178 versus
 0.20947/0.63845/0.26754/0.16318/0.48312. The target residual is higher than
 the default-size 0.29471/0.34363 and small-size 0.33185/0.31845, but it does
-not collapse as resource duration grows because admission waits only for the
-first delivered buffer. Together the two four-block size endpoints reject a
-fixed object-size dependency; lower bandwidth and higher RTT remain a separate
-robustness axis.
+not collapse as the inner workload duration grows. The historical claim that
+this validated first-resource-body admission against outer resource duration
+was too broad: those outer bodies did not change. Together the two four-block
+endpoints reject only a fixed inner-workload-size explanation; outer resource
+sizes and lower bandwidth or higher RTT remain separate robustness axes.
 
 The slower-link screen retains the causal candidate where the fixed dwell had
 failed. One-block artifact `d62dc8f4ca95d6e1` at 50-ms one-way delay and
@@ -2094,6 +2290,1334 @@ responses damaged the early packet shape. The binary identified build ID
 The four-resource allowance, selection cap, and temporary harness expectations
 were removed; this result does not justify testing still smaller topologies.
 
+Applying the retained six-resource native-parser topology to the HTTP CONNECT
+listener was first screened without changing the implicit default. The
+experimental arm kept the exact
+`tree-native-parser-resource-committed-overlap` product mode, dense page,
+six cached resources, 384-KiB budget, next-main-turn image activation, and
+first-complete-resource-body admission used by the SOCKS candidate; only the
+local ingress changes from SOCKS5 to HTTP CONNECT. It therefore introduces no
+fixed pause, packet-index rule, response-size threshold, or measured-link
+parameter.
+
+One-block isolated gate `22509d99648b3070` (seed `2026082961`) first measured
+the current `document-start-http-connect` control at
+0.21680/0.73137/0.32695/0.24582/0.52378 and the tree treatment at
+0.17979/0.60120/0.27555/0.29096/0.47956. Because a single QUIC ordering can be
+misleading, six fresh randomized same-base blocks were collected next.
+Artifact `695873adeb4f7f4b` (seed `2026082962`) measured the control at
+0.09215/0.54761/0.18906/0.15156/0.43277 and the tree treatment at
+0.08777/0.35793/0.15090/0.15903/0.41305. Thus packets 17--32 improved by
+0.18968 and whole by 0.01971 while packets 1--16 and 1--32 also improved; the
+first 250 ms regressed slightly by 0.00747. Every one of the six paired blocks
+favored the treatment on packets 17--32 and whole (descriptive exact sign-flip
+`p=0.03125` for each), but six gate blocks remain below the 30-block paired
+inference minimum and cannot support an absolute verdict. Size and shaped-link
+robustness must be checked before promotion or replacement of the canonical
+four-row matrix.
+
+A deliberately broad HTTP CONNECT document-barrier family does not beat that
+tree mechanism. One isolated randomized block `062396842874c530` (seed
+`2026082963`) compared request commit, response HEADERS, first complete body
+buffer, an additional ordinary main-thread turn after each of those events,
+and the tree treatment. In arm order, the five-view distances were:
+
+| H3 HTTP CONNECT screening arm | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `document-start-http-connect` | 0.20480 | 0.79587 | 0.32684 | 0.21093 | 0.51381 |
+| `document-start-task-http-connect` | 0.20089 | 0.79061 | 0.32202 | 0.21640 | 0.50653 |
+| `document-overlap-http-connect` | 0.19888 | 0.74201 | 0.31147 | 0.20236 | 0.50199 |
+| `document-headers-task-http-connect` | 0.20232 | 0.73568 | 0.31820 | 0.20387 | 0.51003 |
+| `document-first-buffer-http-connect` | 0.20153 | 0.73336 | 0.31345 | 0.20661 | 0.50500 |
+| `document-first-buffer-task-http-connect` | 0.20663 | 0.74508 | 0.31869 | 0.20485 | 0.50277 |
+| six-resource tree over HTTP CONNECT | 0.19516 | 0.66853 | 0.28654 | 0.20601 | 0.48066 |
+
+The extra main-thread turn had no useful directional effect at any of the
+three document boundaries. Response HEADERS and first body progress improved
+packets 17--32 relative to request commit in that block, but remained well
+behind the tree. A fresh four-block screen retained only the simplest
+response-HEADERS variant, the current start control, and tree. Sanitized
+artifact `b24fe9b411e9cca4` (seed `2026082964`) measured start at
+0.11398/0.52914/0.19860/0.16573/0.43794, response HEADERS at
+0.09509/0.46146/0.18541/0.17115/0.43099, and tree at
+0.09779/0.35342/0.15104/0.16612/0.41673. The response-HEADERS barrier is a real
+improvement over the current H3 HTTP default, but tree wins packets 17--32,
+1--32, and whole while essentially tying start in the 250-ms view. These gate
+screens remain descriptive and below the 30-block minimum. The late document
+barriers and their task variants are retained as explicit harness aliases so
+the negative family is reproducible, but they are not product-default
+candidates and should not be repeated without a new mechanism hypothesis.
+
+The HTTP tree treatment also passed the predeclared inner-workload-size and
+slower-link directional screens. All runs kept the same product policy and
+budgets; only the inner fixture input or namespace link profile changed:
+
+| Safe artifact | Condition | Blocks | Start control | HTTP tree treatment |
+| --- | --- | ---: | --- | --- |
+| `2608e4200af64969` | 65536-byte inner-workload base, unshaped | 2 | 0.14352 / 0.58915 / 0.24531 / 0.18110 / 0.46113 | 0.12884 / 0.45060 / 0.19795 / 0.20407 / 0.44064 |
+| `8d81953d90610c34` | 1048576-byte inner-workload base, unshaped | 2 | 0.18880 / 0.59725 / 0.25579 / 0.20983 / 0.44874 | 0.17881 / 0.44431 / 0.22058 / 0.22831 / 0.43562 |
+| `ef1c22cb0e387413` | default inner workload, 20-ms one-way and 20 Mbit/s | 2 | 0.16877 / 0.59901 / 0.24823 / 0.13968 / 0.42727 | 0.09124 / 0.33052 / 0.14420 / 0.11115 / 0.30928 |
+
+Packets 17--32, packets 1--32, and whole improved at both inner-workload bases.
+The unshaped 250-ms view regressed by 0.023 and 0.018 respectively, while the
+shaped profile improved every retained view, including 250 ms by 0.029. Safe
+shaped metadata confirms receive-side capture after netem, the exact
+20-ms/20-Mbit profile, eight successful proxy resets, and zero dropped or
+offload-oversized captures. These two-block gates are not inferential.
+Together with the six- and four-block default-size screens they reject a
+tunneled-workload-size or localhost-speed explanation, but they do not vary
+the outer fronting resources. The existing six-resource mode was still a
+viable H3 HTTP implicit-default candidate, while an outer-resource size matrix
+remains open. These screening rows were not spliced into the dashboard;
+promotion required a fresh product build and canonical four-row campaign.
+
+That promotion was completed at revision `aa4bd846af3a`. Omitted-preamble H3
+now selects the same exact six-resource tree policy for SOCKS5, HTTP CONNECT,
+and mixed listeners; explicit preamble fields remain authoritative. The lean
+release product was rebuilt incrementally without a clobber or a Firefox
+build, and the staged package passed the complete runtime verifier. Product
+gtests passed 114/114 across 17 suites. The first staged verifier attempt is
+retained as a failed integration-fixture check: its root still returned the
+old text-only response, so the newly exact tree default correctly failed
+closed rather than silently admitting CONNECT. Rewriting that test root to
+the existing dense camouflage page restored the same documented stylesheet,
+deferred-script, and four-image contract; both H2 and H3 SOCKS/HTTP config
+tests and the full staged verifier then passed.
+
+The fresh canonical artifacts `e026109117dd8141` (H2) and
+`8bc66f8738d559b2` (H3), both seed `2026082968`, regenerated all four dashboard
+rows together. The H3 superblock retained both historical request-commit
+controls so the mechanism remained visible:
+
+| H3 arm in the canonical superblock | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SOCKS5 `document-start-overlap` control | 0.09075 | 0.58376 | 0.18757 | 0.13718 | 0.41942 |
+| SOCKS5 six-resource tree default | 0.07392 | 0.39623 | 0.13837 | 0.15011 | 0.39149 |
+| HTTP CONNECT `document-start-overlap` control | 0.08747 | 0.58210 | 0.18384 | 0.13771 | 0.39665 |
+| HTTP CONNECT six-resource tree default | 0.06375 | 0.40952 | 0.13753 | 0.14458 | 0.39012 |
+
+For HTTP CONNECT, the tree lowers packets 17--32 by 0.17258 and whole by
+0.00653 relative to its contemporaneous control. Relative to the preceding
+published HTTP default row, packets 17--32 fall from 0.55108 to 0.40952
+(25.7%), packets 1--32 from 0.19621 to 0.13753, and whole from 0.40795 to
+0.39012; packets 1--16 and 250 ms also improve in that cross-campaign
+dashboard comparison. Within the new matched block, the tree trades a small
+0.00687 increase in the 250-ms distance for the large non-overlapping packet
+gain. All 60 H3 participants passed capture-drop, network-mutation, QUIC
+origin, inner-H2, exact resource-commit, and normal-drain validation. Ten
+smoke blocks remain descriptive and below the 30-block inference minimum, so
+this promotes a robust default rather than claiming absolute
+indistinguishability.
+
+Several bring-up attempts produced no candidate result and must not be
+reinterpreted as measurements. A clean research objdir initially tried to
+download the pinned Go/Caddy fixture toolchain after entering the isolated
+namespace, where public DNS is deliberately unavailable; fixture dependencies
+are now prepared before namespace entry. Subsequent partial collections found
+that the newly added HTTP alias was missing independently from the superblock,
+feature-extractor, and lifecycle-validator CLI registries. Those collections
+stopped fail-closed before analysis. The registries and a cross-registry parser
+test were fixed before either successful artifact above was collected.
+
+### H2 server and payload-framing follow-up
+
+A later H2 campaign kept the canonical browser-page workload, inner HTTPS/H2,
+same-base Firefox controls, MTU 1500, offload rejection, and isolated Linux
+network namespace, but screened changes to the document boundary and the
+Caddy/forwardproxy tunnel. Only packets 17--32 and whole were retained during
+these one- and two-block screens. They are mechanism diagnostics, not new
+dashboard rows or paired inference. The canonical H2 defaults and their
+published rows remain unchanged.
+
+The first HTTP-listener screen revisited next-main-thread-task admission after
+the non-suspending implementation had been completed. One-block artifact
+`0c0770517e13dc9c` ranked response-HEADERS plus one task best: packets 17--32
+and whole were `0.58977/0.34708`, versus `0.66674/0.40737` for direct
+first-buffer, `0.60401/0.39263` for first-buffer plus one task, and
+`0.65518/0.36600` for request-commit plus one task. The focused two-block
+replication `477043458740c175` did not reproduce the early result: direct
+first-buffer measured `0.48415/0.33816`, while HEADERS plus one task measured
+`0.51567/0.28978`. The large whole improvement is interesting, but the
+packets-17--32 direction is unstable. No default or extended run followed.
+
+Server-only candidates were then built from isolated forwardproxy source
+forks and installed only into the private fixture. Establishing the target TCP
+connection before returning `200 CONNECT` is causal and timer-free, but
+one-block artifact `d93ef627d2851497` was a clear rejection: SOCKS and HTTP
+measured `0.76902/0.41583` and `0.76899/0.37055`. Keeping the ordinary eight
+framed response records while forcing their server padding lengths to zero
+also failed in `556cd86759536f2f`: SOCKS measured `0.62161/0.31906` and HTTP
+`0.64853/0.30986`. Thus neither target-readiness ordering nor the random
+server padding bytes themselves explain the useful no-padding early shape.
+
+Earlier server framing diagnostics are retained here with the same caveat. A
+self-compensating TLS-flight alignment first deadlocked because it withheld a
+final write while waiting for a future target read; private artifact
+`7fa83b2ca397dc2` published no metrics. The corrected form repaid alignment
+debt only from bytes already queued on the target socket. One-block artifact
+`40509fc9a437ded0` measured SOCKS at `0.51330/0.31894`, but HTTP at
+`0.52996/0.31830`; the HTTP whole regression rejected a shared mechanism.
+Forcing the first eight server padding lengths to 255 was worse in
+`a348380e48c8c17e`: SOCKS was `0.53812/0.35133` and HTTP
+`0.64055/0.34906`. These forks were not installed as product dependencies.
+
+Complete H2 payload-padding removal was admitted only under the explicit
+fail-closed `NAIVEFOX_CAPTURE_EXPECT_PADDING=no` diagnostic condition. It is
+otherwise rejected by the harness, and it remains restricted to gate/smoke
+runs. Artifact `96e8e7354ee5ea05` produced the largest early change in this
+family: SOCKS measured `0.41146/0.33675` and HTTP `0.37249/0.31880`. The HTTP
+whole regression prevents promotion. The result nevertheless localized much
+of the packets-17--32 residual to the historical eight-record payload-framing
+phase rather than to a fixed Caddy resource size or delay.
+
+Because a jointly changed client and server was explicitly allowed for
+research, two incompatible directional variants decomposed that phase. Raw
+client-to-server with ordinary padded server-to-client records measured
+`0.37641/0.38446` for SOCKS and `0.46791/0.41060` for HTTP in
+`02d82188c376ca39`. The inverse measured `0.47376/0.40367` and
+`0.40755/0.34275` in `e98d177eb118ac30`. Both improved at least one early
+point estimate but made the flow directionally asymmetric and substantially
+worsened whole. Directional framing is therefore rejected.
+
+A final incompatible symmetric sweep shortened the framed phase while keeping
+the normal random padding distribution in both directions:
+
+| Initial framed records per direction | Safe artifact | SOCKS 17--32 / whole | HTTP 17--32 / whole |
+| ---: | --- | ---: | ---: |
+| 2 | `130419efd9b6390a` | 0.52067 / 0.41692 | 0.45217 / 0.35922 |
+| 4 | `a8e8a4e61187fe7d` | 0.45298 / 0.34698 | 0.47416 / 0.30469 |
+| 6 | `4401f010fe86411a` | 0.48939 / 0.29574 | 0.48971 / 0.26763 |
+| 6, fresh two-block replication | `4a16e9903f386398` | 0.42907 / 0.26369 | 0.41778 / 0.30528 |
+
+The six-record replication is the most balanced result, but relative to the
+canonical H2 rows it changes packets 17--32 by approximately 0% for SOCKS and
+2.5% for HTTP, improves SOCKS whole by about 4%, and worsens HTTP whole by
+about 18%. This is far below the product rule for an incompatible Caddy/client
+wire change: compatibility may be broken for a default only when a replicated
+candidate gives at least a 20% material improvement and does not introduce an
+unacceptable counter-regression. No candidate in this campaign meets that
+bar. The client record count, product source, incremental object directory,
+and fixture Caddy were restored to the canonical eight-record/stock state.
+Because the record boundary is driven by actual read calls, it is not a fixed
+timer or response-byte cutoff, but it can still vary with chunking and link
+conditions; size/link matrices would have been required after a strong result.
+They were deliberately not spent on these rejected screens.
+
+A compatible server-side queued-burst read was also rejected. The fork kept
+the ordinary eight-record padding format, performed the normal blocking target
+read, and then appended only bytes already readable from the target TCP socket
+with `MSG_DONTWAIT`. It therefore added no timer, future-data wait, response
+size threshold, or client compatibility change. One-block artifact
+`7e680bed35085449` nevertheless measured SOCKS at
+`0.70503/0.43634` and HTTP at `0.74554/0.36086`. Coalescing an already
+queued target burst made the early packet order much less Firefox-like and did
+not repair whole flow. The stock Caddy binary was restored.
+
+Combining complete no-padding with alternative client admission boundaries
+did not rescue that incompatible family. In HTTP artifact
+`e857415d5ad9effe`, direct first-buffer admission measured
+`0.36749/0.29565`, while response HEADERS plus one task measured
+`0.37989/0.32720`; direct admission won both retained views. In SOCKS
+artifact `077729c45551dcca`, direct and next-task first-buffer admission
+measured `0.62721/0.46215` and `0.62055/0.43814`. Both were much worse
+than the earlier no-padding point estimate and the canonical whole result.
+The screens show that a task or HEADERS boundary does not make removal of the
+framing phase robust. Padding and all temporary admission changes were
+restored.
+
+The next site-side experiment used HTTP `103 Early Hints` with same-origin
+`Link: rel=preload` fields before the ordinary final `browser_page`
+response. History preflight found no prior NaiveFox experiment at this causal
+boundary: earlier native `FromParser` preload arms discovered resources only
+after root body bytes arrived. The diagnostic flag changes only the outer
+reference/preamble path; the tunneled inner workload remains the canonical
+page. Stock Caddy and the normal H2 framing/default policies were retained.
+
+| Early Hint set | Safe artifact | SOCKS 17--32 / whole | HTTP 17--32 / whole |
+| --- | --- | ---: | ---: |
+| stylesheet only | `567f47778b70c4d9` | 0.64002 / 0.27867 | 0.65291 / 0.29663 |
+| stylesheet plus blocking script | `f589490d0ab2c0f9` | 0.34743 / 0.37827 | 0.36667 / 0.37973 |
+| all six page resources | `e98062104b89ccbe` | 0.40660 / 0.36125 | 0.40563 / 0.34438 |
+
+These are one-block isolated-namespace screens with seed `2026082971`, not
+paired inference. The two blocking-resource hints produced the interesting
+early direction, approximately 19% below the canonical SOCKS packets-17--32
+row and 14% below HTTP, but whole regressed by approximately 37% and 46%.
+Hinting every resource retained only a small early gain and still regressed
+whole materially; stylesheet-only hints regressed packets 17--32 outright.
+Requiring a special `103` response from the fronting site is therefore not a
+default contract, and no replication or size/link matrix was spent on it. The
+gate/smoke-only H2 switch
+`--outer-early-hints css|blocking|all` remains only to reproduce this rejected
+causal family.
+
+A separate history preflight found no experiment which put the same preload
+links on the ordinary final `200` response. This boundary is later than
+`103` but earlier than discovering the URLs in the HTML body. The
+gate/smoke-only `--outer-final-preloads` switch again changes only the outer
+reference and preamble path; it is mutually exclusive with Early Hints and
+does not alter the inner tunneled workload or product binary.
+
+The first one-block blocking-pair screen `aade9604cf410007` looked balanced:
+SOCKS and HTTP packets 17--32 were `0.39982/0.38275`, with whole
+`0.26172/0.26969`. A stylesheet-only control was then clearly rejected in
+`1deeda6981aeba33`: it measured `0.68566/0.35983` for SOCKS and
+`0.63957/0.39122` for HTTP. This non-monotonic result made a fresh
+replication mandatory rather than treating the first ordering as a tuning
+point.
+
+Four-block artifact `ea162ea7be104577` (seed `2026082974`) did not
+reproduce a common blocking-pair win. SOCKS measured `0.43769/0.24862` and
+HTTP `0.41999/0.27334`. Relative to the canonical rows, that is roughly a 2%
+packets-17--32 regression and 9.7% whole improvement for SOCKS, but a 2%
+packets-17--32 improvement and 5.3% whole regression for HTTP. A special
+final-response `Link` contract therefore transfers residual between
+listeners rather than reducing both targets. It is not a fronting-site
+requirement or default; the all-resource variant and size/link matrix were not
+spent after this replicated rejection. The bounded harness switch remains for
+reproduction.
+
+Optimistically acknowledging the local proxy request before the outer CONNECT
+completed is rejected after a focused replication. History preflight separated
+this boundary from the earlier `bfd151c6ae8b307f` and `5b393915a38fb0e4`
+experiments: those held local SOCKS success later than outer readiness, while
+this diagnostic deliberately let Firefox construct and queue its inner TLS
+ClientHello earlier. The duplex pump still remained closed until Necko reported
+the real outer tunnel established. Strict markers required the local SOCKS
+success or HTTP `200` to flush before outer establishment and required pump
+startup afterwards; an upstream failure closed the already acknowledged local
+connection because the success could no longer be retracted.
+
+One-block artifact `5d118ec9a43a1d3d` initially made HTTP CONNECT look
+interesting. Its default and optimistic arms measured `0.58627/0.37557` and
+`0.45023/0.38087` for packets 17--32/whole: a 23.2% early improvement with a
+1.4% whole regression. The same block rejected the SOCKS form outright:
+default and optimistic measured `0.55083/0.28560` and
+`0.57846/0.31942`. A fresh four-block HTTP-only replication was therefore
+collected instead of spending a full listener/protocol or resource-size
+matrix.
+
+Artifact `2402ddf719abded2` did not retain the large HTTP change. Default and
+optimistic HTTP CONNECT measured `0.51647/0.23874` and
+`0.48820/0.26799`: packets 17--32 improved only 5.5%, while whole regressed
+12.3%. All participants ran in the isolated namespace and passed the strict
+local-reply, outer-establishment, pump, inner-H2, and single-outer-connection
+contracts. The diagnostic product identified libxul digest
+`08ce2a8de1e7b61544f2d9f4d4d4572cf2336e395c6f11c369e1020694f53dea`.
+An irreversible early success is not justified by that replicated tradeoff,
+so production semantics and both H2 defaults remain unchanged. The opt-in
+arms remain only to reproduce the rejected mechanism.
+
+An informational response on the CONNECT stream itself was rejected before
+passive measurement. History preflight found only the later site-page `103`
+experiment above; no earlier server fork inserted `1xx` before the proxy's
+final `200 CONNECT`. A private forwardproxy fork therefore flushed an empty
+standards-defined `103 Early Hints` and then followed the ordinary fast-open
+path, including its random `Padding` header and final `200`. This added no
+timer, target-byte threshold, or dependency on the fronting page resources.
+
+The fork's own tests immediately proved that legacy Go CONNECT clients treat
+the first `103` as final and fail, so the mechanism was already known to be
+compatibility-breaking. Firefox's general HTTP transaction parser can consume
+multiple informational responses, but private fail-closed capture
+`c62a7a440da14346` exposed a narrower tunnel handoff problem: NaiveFox logged
+the first CONNECT HEADERS as established with `padding=no`, then the inner
+browser navigation never completed before its 45-second cutoff. No passive
+distances were published and the sample was not retried. Adding client-side
+special handling solely to make an unmeasured incompatible shaping mechanism
+work was not justified. The fixture was restored byte-for-byte to stock Caddy
+digest `444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+
+A later preflight found no previous experiment with the ordering `outer
+preamble ready -> local proxy success -> first inner browser bytes -> outer
+CONNECT`. This looked like a possible timer-free source of the natural pause
+seen in direct Firefox: in fresh artifact `2402ddf719abded2`, direct packet 22
+followed packet 21 after 29--36 ms, while the corresponding NaiveFox gap was
+about 0.28 ms. Before changing the cross-thread tunnel lifecycle, a scratch
+loopback HTTP proxy measured the necessary premise directly with the same-base
+reference Firefox. It accepted only `timing.invalid:443`, disabled Nagle on the
+accepted socket, flushed a normal local `200`, and timestamped the first inner
+TLS bytes without logging the CONNECT authority or payload.
+
+Three independent headless launches delivered the same 1827-byte first inner
+TLS flight after `0.555`, `0.770`, and `0.869` ms. Thus Firefox contributes
+less than 1 ms of natural work at this boundary on the isolated local setup,
+not the missing tens of milliseconds. Interposing an inner-byte gate would add
+lifecycle complexity while merely moving outer CONNECT by approximately the
+existing sub-millisecond gap. No product code, build, passive capture, or
+matrix was spent on this rejected premise.
+
+The next H2 preflight revisited the retained six-resource native-parser policy
+without repeating the old H2 resource-tree experiment. Commit `1589da63dcdc`
+had used three resources and admitted CONNECT at document request commit, so
+its observable order was root GET, CONNECT, then resource GETs. The exact
+six-resource policy instead opens the stylesheet and blocking script
+immediately, defers four image opens to the next main-thread turn, and admits
+CONNECT only after all six requests commit and the first complete successful
+resource body buffer is consumed. History and documentation searches found
+that exact contract only in H3 runs.
+
+The first one-block attempt stopped fail-closed in private artifact
+`a433dcc2d6f252a8` and published no distances. Configuration and harness
+validation accepted the explicit H2 mode, but a second runtime whitelist in
+`ProxyPreambleOperation::Start` returned `NS_ERROR_INVALID_ARG` before opening
+the root. The whitelist was corrected without changing scheduling: H2 accepts
+this mode only with exactly six resources, while H3 retains its three- or
+six-resource contract. The same seed then completed all eight participants in
+safe artifact `4266ee23a358db8b`:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.58908 | 0.52290 | control |
+| SOCKS six-resource candidate | 0.54909 | 0.51022 | -6.8% / -2.4% |
+| HTTP current `document-first-buffer-http-connect` | 0.49645 | 0.51241 | control |
+| HTTP six-resource candidate | 0.65647 | 0.53841 | +32.2% / +5.1% |
+
+This was an isolated, unshaped, same-base H2/inner-HTTPS block with seed
+`2026082921`, the canonical 262144-byte page, stock Caddy, Firefox A/B, and
+the required listener-specific `document-start` causal controls. One block is
+not inference, but the SOCKS movement is far below the threshold for a costly
+replication and HTTP CONNECT moves strongly in the wrong direction. No
+default, site contract, resource-size matrix, or link-profile matrix followed.
+The explicit arms remain only for reproduction of this rejected mechanism.
+
+Before the next H2 implementation, a proposed cancellation of the active
+outer root at the first target response was rejected without implementation.
+The history search found the H3 response-stop/cancellation family, including
+commit `6f32c2baf9c1115f`, where the cover resources had already completed and
+the stop was a no-op. More importantly, preserved H2 default lifecycle logs
+showed that its document-only root was 620 bytes and drained within about
+0.1 ms of first-buffer admission; outer CONNECT was established roughly
+0.65 ms later. A target-response callback therefore occurs after the only H2
+cover stream has already ended and cannot change the packet sequence. No code,
+build, or passive matrix was spent on that causally ineffective variant.
+
+A distinct ordering then passed the mandatory history preflight. Old H2
+three-resource work admitted CONNECT before resource opens, while the H2
+six-resource screen above waited for all six request commits plus a successful
+resource body buffer. The related H3 image-deferral experiment also admitted
+CONNECT only after the deferred image commits and body progress. No prior arm
+used the ordering `exact root parsed -> CSS and blocking script committed ->
+CONNECT -> four image opens on the next main-thread turn`.
+
+Commit `38fc853f9ccb` implemented that ordering only in the explicit H2
+six-resource diagnostic arm. It used no timer, RTT estimate, response-size
+threshold, or target-body event: the exact root had to finish successfully,
+the native parser had to accept the fixed page contract, and request-commit
+events for streams 1 and 2 released CONNECT. Streams 3--6 remained prepared
+until a queued main-thread task after the admission callback. H3 and every
+production default were unchanged. The strict synthetic lifecycle validator
+covered both listener aliases and rejected a missing commit barrier or wrong
+deferred-open cause; the implementation passed 121/121 harness tests, 57/57
+focused C++ gtests, and an incremental product build.
+
+The isolated same-base one-block screen used seed `2026082922`, the canonical
+262144-byte inner page, the fixed stock-Caddy outer profile, Firefox A/B, both
+current defaults, and both required document-start controls. Safe artifact
+`a2ea4b3dcde8c23a` was directionally strong:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.67644 | 0.50223 | control |
+| SOCKS CSS/JS-commit candidate | 0.41428 | 0.48613 | -38.8% / -3.2% |
+| HTTP current `document-first-buffer-http-connect` | 0.63848 | 0.49068 | control |
+| HTTP CSS/JS-commit candidate | 0.55869 | 0.48713 | -12.5% / -0.7% |
+
+Because the SOCKS movement crossed the strong-screen threshold, the candidate
+received a focused four-block replication rather than a size, link-profile,
+or full default matrix. The harness retained both listener-specific
+document-start controls, so each of the four isolated blocks contained eight
+participants. Safe artifact `7a9df73a476bf808`, seed `2026082923`, did not
+reproduce the first block's magnitude:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.45379 | 0.43380 | control |
+| SOCKS CSS/JS-commit candidate | 0.42451 | 0.42214 | -6.5% / -2.7% |
+| HTTP current `document-first-buffer-http-connect` | 0.42051 | 0.42717 | control |
+| HTTP CSS/JS-commit candidate | 0.40848 | 0.43004 | -2.9% / +0.7% |
+
+Four gate blocks remain below the 30-block inference floor. The conditional
+paired bootstrap difference for SOCKS 17--32 favored the candidate by 0.02928
+with interval `[0.00493, 0.04591]`, but its exact four-block sign-flip
+`p=0.25`; the SOCKS Whole interval crossed zero. Both HTTP intervals crossed
+zero, and its mean Whole direction was slightly worse. This is too small and
+unstable to justify replacing the more general H2 defaults with an exact-page
+policy. No promotion or robustness matrix followed. Commit `1c05e11d6a3f`
+retired the experimental runtime/validator changes and restored the prior
+explicit six-resource behavior; the two safe artifacts and these notes retain
+the complete result for future preflight searches.
+
+The next incompatible padding experiment also passed the mandatory exact and
+causal history preflight before implementation. Searches across this document,
+commit messages, pickaxe diffs for the eight-record codec constant, and the
+old forwardproxy forks found complete no-padding, client padding ranges,
+two/four/six framed records, first-eight zero or maximum server padding,
+directional framing, and an early server padding-only phase. None kept eight
+random padding lengths per direction while moving that same random budget from
+records 1--8 to records 9--16. This distinction was recorded before code so a
+superficially new name could not repeat an old mechanism.
+
+Commits `1680114ac61f` and `c6629c50c443` implemented the explicit H2-only
+`diagnostic-delayed-padding-phase` client, codec, and two listener-specific
+harness arms. Records 1--8 were still framed but used zero padding; records
+9--16 used the ordinary eight independently random 0--255 padding lengths;
+the stream was raw afterwards. Thus the random byte budget was preserved and
+only 24 bytes of additional record headers were introduced per direction.
+There was no timer, future-byte wait, RTT estimate, page-resource dependency,
+or response-size threshold. A `~2` prefix which the normal header-padding
+generator cannot emit negotiated the mode in both CONNECT directions. A
+diagnostic client failed closed if the server did not echo it, and a normal
+client rejected an unexpected delayed marker before starting its duplex pump.
+
+The matching forwardproxy fork selected legacy or delayed framing separately
+for every CONNECT request, so current and candidate arms shared one Caddy
+process without changing their respective wire contracts. Its own `go test
+./...` passed. The private Caddy digest was
+`0456d1d3b515ee4966a86eb6073c8c8baf5e4f25dd287aad971597cfd4e5d327`;
+the preserved stock digest was
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 67/67 focused C++ gtests, including all fail-closed
+negotiation combinations and fragmented codec round trips, 123/123 complete
+harness tests, and an incremental product build. Isolated single-arm smoke
+artifact `6af887ff30cebc6b` (seed `2026082924`) then proved the real negotiated
+path and strict runtime marker before comparative collection.
+
+The one-block same-base screen `3b0d17fb60e70fca` (seed `2026082925`) used
+the canonical 262144-byte browser page, inner HTTPS/H2, Firefox A/B, and both
+current and delayed listener arms in one randomized six-participant block:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.59685 | 0.30333 | control |
+| SOCKS delayed-padding candidate | 0.61947 | 0.28784 | +3.8% / -5.1% |
+| HTTP current `document-first-buffer-http-connect` | 0.60158 | 0.29358 | control |
+| HTTP delayed-padding candidate | 0.62224 | 0.28766 | +3.4% / -2.0% |
+
+Moving the random budget later therefore worsened the primary packets-17--32
+slice for both listeners and improved Whole only slightly. It is nowhere near
+the at-least-20% rule required to justify a client/Caddy compatibility break,
+so no replication, resource-size matrix, or constrained-link matrix was
+spent. Commit `7823a21c5b01` retired the client and harness diagnostics;
+121/121 harness tests and a second incremental product build passed after the
+retirement. The active fixture was restored byte-for-byte to the stock Caddy
+digest above. Future padding work must treat delayed random budget as tested
+and rejected rather than retrying it under another record-count or phase name.
+
+The next idea pass applied the experiment-history gate before touching code.
+Two superficially new proposals were rejected at that stage. First, sharing or
+echoing one constant CONNECT `Padding` value so HPACK could reuse it has no
+causal opportunity in the canonical browser-page workload: one
+`TunnelSession` opens one CONNECT on its outer H2 session. Necko's H2 encoder
+does index an ordinary non-sensitive `Padding` field, but there is no second
+CONNECT header block on which that dynamic-table entry could save bytes. The
+strict negotiation validator used by the preceding smoke also required exactly
+one marker for that session and would have rejected a second one. Therefore
+header-value reuse could not change the measured wire and was not implemented.
+
+Second, replacing forwardproxy's per-target-read response flushes with ordinary
+Go buffering is causally the already closed response-coalescing family, not a
+new transport idea. Safe artifact `01c1250aa7a7f14a` had already tested a 1-ms
+idle batch and found only a small packets-17--32 movement while 1--32 and the
+server-byte deficit worsened. The later semantic full-TLS-record and flight
+cutoffs in artifacts `e742cfd3a0c19fe9` and `9ce752e81ecd307b` improved an
+early slice but significantly worsened Whole; cleartext-handshake-only artifact
+`64e7a03ff341ffe2` removed the apparent benefit. The no-code preflight therefore
+prevented another implementation of the same read-boundary batching mechanism.
+
+The genuinely untried branch was the size of the single CONNECT `Padding`
+header itself. History and pickaxe searches found payload-padding ranges,
+record-count changes, server zero/max padding, and the delayed budget above,
+but no experiment that changed the request/response header-value endpoints
+while leaving the payload codec intact. Commits `adf9d49a91d0` and
+`6efd6724218e` added four explicit H2-only diagnostic arms for SOCKS and HTTP
+CONNECT. A `~5` request selected an exact two-byte value in both directions; a
+`~6` prefix on an exact 96-byte request selected exact 96-byte values. These
+markers cannot be emitted by the stock 16--32-byte client generator. An arm
+failed closed unless the response had the same exact profile, protocol, and
+connection identity. The ordinary eight randomized payload records in each
+direction and the raw stream after them were unchanged; there was no timer,
+resource-size dependency, link estimate, or future-byte wait.
+
+The matching private forwardproxy fork selected a profile per CONNECT while
+preserving the stock 30--61-byte response generator for every unmarked request.
+Pinned `go test ./...` passed, including marker near misses. The custom Caddy
+digest was
+`4dcd4ad6a59791510e08910898d4f22c42d4bf8f50d7ce7deab197d061f1266b`;
+the preserved and restored stock digest was
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 105/105 NaiveFox C++ gtests, 123/123 complete harness tests,
+and incremental test/product builds without a clobber. Isolated single-arm
+smoke artifact `ca9910ed900dc422` (seed `2026082926`) proved real 2/2-byte
+negotiation through the strict runtime validator.
+
+The one-block same-base screen `2ac627c3521ec666` (seed `2026082927`) used the
+canonical 262144-byte browser page, inner HTTPS/H2, Firefox A/B, and all six
+current/profile listener arms in one randomized eight-participant block:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.55473 | 0.34608 | control |
+| SOCKS two-byte header | 0.48077 | 0.35099 | -13.3% / +1.4% |
+| SOCKS 96-byte header | 0.58148 | 0.34886 | +4.8% / +0.8% |
+| HTTP current `document-first-buffer-http-connect` | 0.59045 | 0.35839 | control |
+| HTTP two-byte header | 0.58654 | 0.34527 | -0.7% / -3.7% |
+| HTTP 96-byte header | 0.61926 | 0.32556 | +4.9% / -9.2% |
+
+The best focus movement, SOCKS with two-byte headers, was only 13.3% and made
+Whole slightly worse. The best Whole movement, HTTP with 96-byte headers, was
+9.2% and made packets 17--32 worse. Neither endpoint approached the required
+20% compatibility-break threshold or improved both target views, so no
+replication, resource-size matrix, or constrained-link matrix followed.
+Commit `c67adfa9ccc9` retired the diagnostic client and harness; 100/100 C++
+gtests, 121/121 harness tests, and an incremental product build passed after
+retirement. The active fixture is again byte-for-byte stock. Future work must
+treat CONNECT header-size endpoints, HPACK reuse without a second CONNECT, and
+server read-boundary batching as examined rather than recycling them under new
+names.
+
+The next candidate passed the mandatory causal-history preflight before code
+was written. The earlier full multi-process reconstruction changed where
+Firefox subsystems ran but retained one bidirectional CONNECT stream and did
+not help. Likewise, CAPTURE's earlier "directional framing" changed Variant-1
+record boundaries inside one stream. Neither experiment split the two
+transport directions across independently scheduled H2 streams. Existing
+captures with several CONNECT stream IDs represented several independent
+browser tunnels, not two lanes paired to one logical tunnel. A two-stream
+directional tunnel was therefore new rather than another process-topology or
+payload-framing retry.
+
+Commits `ca672f0faa73`, `27dd6854d0a7`, `86d89858439d`, and
+`db3d8dda57fc` implemented and admitted the explicit H2-only
+`diagnostic-directional-connect` screen. Each logical tunnel used two classic
+CONNECT requests with a shared random token and complementary fail-closed
+markers: the first request body carried only local-to-target bytes, while the
+second response body carried only target-to-local bytes. The server paired the
+lanes, made exactly one target dial, and rejected duplicates, mismatched
+targets, and incomplete pairs. Variant-1 framing remained unchanged exactly
+once in each direction. The downstream lane was opened only after a valid
+upstream H2 `200` with an echoed marker. There was no timer, page-resource
+condition, link estimate, target-body threshold, or future-byte wait.
+
+The pinned forwardproxy fork was based on
+`github.com/klzgrad/forwardproxy` commit `d62c80d3dd2c`; its modified
+`forwardproxy.go` digest was
+`19477a1885d7c7500f09fcf483484c7f857b244bd0d672cce45065e4d1b17535`,
+and `go test ./...` passed. The private Caddy 2.11.2 binary digest was
+`335ee7df79a8a975abdc365e0c06c3f7bac2b051e403e46c162a5056258729b2`;
+the preserved stock binary remained
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 106/106 focused C++ gtests, 124/124 complete harness tests,
+and incremental test/product builds without a clobber.
+
+Three failed private lifecycle smokes were diagnostically useful and must not
+be repeated as nominal candidate captures. Seed `2026082928` opened 58 outer
+TCP flows because both lanes were released together. Staging the downstream
+lane reduced this to 29 flows at seed `2026082929`, but did not restore H2
+multiplexing. A private Necko pool log at seed `2026082930` still observed 31
+flows and exposed the cause: each H2 CONNECT stream becomes a virtual
+`nsHttpConnection`, and `UsingConnect()` applies
+`network.http.max-persistent-connections-per-server`, whose default limit is
+six. Five upstream CONNECTs released by the outer-session gate plus the first
+downstream CONNECT consumed all six slots; later lanes started new H2 winners
+and a `DontReuse`/TLS-race cascade. This was not host-network churn.
+
+The diagnostic profile was therefore given the structural bound of 12 slots,
+two lanes for each of the six browser connections; every non-directional arm
+rejected that override. Seed `2026082931` then used one physical outer TCP
+connection and paired all six logical tunnels, but exposed an overly narrow
+validator which expected one marker for the entire session. After the
+validator required one ordered, unique pair per established logical CONNECT,
+isolated smoke artifact `668436d850d86dfd` (seed `2026082932`) passed with
+one ClientHello, one outer TCP flow, and all six pairs.
+
+The randomized same-base one-block SOCKS screen `a9ffaf1c49a77777` (seed
+`2026082933`) used the canonical 262144-byte browser page, inner HTTPS/H1.1,
+Firefox A/B, and only the two requested target views:
+
+| H2 SOCKS arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| current `document-first-buffer-task-overlap` | 0.73616 | 0.35785 | control |
+| two-stream directional candidate | 0.65013 | 0.33508 | -11.7% / -6.4% |
+
+Both views moved in the desired direction, but the gains were far below the
+at-least-20% requirement for making the client and Caddy mutually incompatible.
+No HTTP-listener screen, replication, resource-size matrix, or constrained-link
+matrix was spent on it. Commit `bfcef096f398` retired the client and harness
+experiment; the affected files exactly match their pre-experiment state.
+After retirement, 100/100 C++ gtests, 121/121 harness tests, and incremental
+test/product builds passed. Production defaults are unchanged and the active
+fixture remains stock Caddy.
+
+A related proposal to stop cover traffic on the first inner or target bytes
+was also rejected by the same preflight rather than reimplemented. Artifact
+`54ea85af8f8ade5a` had already made cancellation on first tunneled application
+bytes strongly worse on a shaped link. H3 commit `08c70e5382e9` tried the
+target-response form and `983b1705709e` retired it as ineffective; the retained
+H2 lifecycle evidence also shows its small root finishes before such a callback
+can affect the wire. Future research must treat two-stream direction splitting,
+raising the per-server cap solely to support it, and first-inner/target-byte
+cover cancellation as tested causal families, not rename and retry them.
+
+### H2 ordinary-method carrier follow-up
+
+The next H2 candidate also passed the mandatory causal-history preflight before
+implementation. The full multi-process reconstruction had already changed
+Firefox process/parser topology without changing the classic bidirectional
+CONNECT carrier and did not help. The strict H2 priority experiment had already
+reported `mechanism_verdict=wire-null`; WebSocket extended CONNECT, two-stream
+direction splitting, CONNECT header-size endpoints, and HPACK reuse were
+separate previously tested causes. Searches through this document, the harness,
+the full git history, and pickaxe history for `HTTPUpgrade`, `SetConnectOnly`,
+ordinary GET/POST tunnel methods, and `Http2StreamTunnel` found no experiment
+which kept the raw Necko duplex stream but replaced classic H2 CONNECT with an
+ordinary H2 request. That method-carrier cause was therefore new; process
+topology, priority, cache/classifier, and directional framing were not retried.
+
+Commits `24abb804708a` and `b8a3bebf5236` implemented and admitted an explicit
+H2-only `diagnostic-h2-get-carrier` screen. Request padding retained the stock
+16--32-byte distribution but reserved the impossible-in-stock `~8` prefix.
+Only a valid marked H2 request used ordinary `GET`; all other traffic remained
+classic CONNECT. The forwardproxy fork accepted only that bounded marker,
+returned the stock 30--61-byte response-padding distribution while echoing the
+first 16 marker bytes, and then used the unchanged Variant-1 duplex stream.
+The client required H2 plus the exact marker echo before admitting the tunnel.
+There was no timer, resource-size threshold, link estimate, target-body
+condition, or future-byte wait. The server retained the stock forwardproxy
+Fast Open order (`200` before target dial), so slow-origin behavior was not
+silently replaced by an extra target-dial barrier.
+
+The fork was based on `github.com/klzgrad/forwardproxy` commit
+`d62c80d3dd2c`. Its final modified `forwardproxy.go` digest was
+`642f8d3ca7b4822c82322e351c8402f9dfb193a2518977efda4c6886b2027fdc`,
+the focused Go-test digest was
+`55f856b826c7ec81376a60c22eab1f0659534f5750a4d81c242c2a6ce4ad1b0e`,
+and `go test ./...` passed. The private Caddy 2.11.2 binary digest was
+`954e0c3c9ff5c87cc54666a3b9f74935cd2a5d8ea4835f4fe7db2f75ab5f80c2`;
+the preserved stock binary remained
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+Client work passed 103/103 focused C++ gtests, 124/124 complete harness tests,
+and incremental test/product builds without a clobber.
+
+One failed private lifecycle smoke, `87f8b5dd8029eb50` (seed `2026082934`),
+must not be treated as a candidate measurement or repeated as the nominal
+configuration. It proved a valid marked H2 GET reached forwardproxy, but an
+over-specific server guard required path `/`. The fixture's ordinary
+`rewrite / /camouflage/index.html?scenario=fronting_page_dense` runs before
+forwardproxy, so the guard rejected a correctly negotiated request before any
+target dial. Removing that path guard made negotiation independent of the
+fronting-site route and resource set. An isolated manual SOCKS/TLS duplex probe
+then succeeded, followed by strict one-sample SOCKS artifact
+`0b0ffa018502ae33` (seed `2026082935`) and HTTP-listener artifact
+`8765f4f771bfca1e` (seed `2026082936`). Each admitted one physical H2 session,
+one exact marker echo, a completed preamble, and a working inner HTTPS/H2
+request.
+
+The randomized same-base one-block screen `9a73f27ea029dcd5` (seed
+`2026082937`) used the canonical 262144-byte browser page, inner HTTPS/H2,
+Firefox A/B, an isolated network namespace, and only packets 17--32 plus Whole:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.49978 | 0.44192 | control |
+| SOCKS ordinary-GET carrier | 0.50532 | 0.42741 | +1.1% / -3.3% |
+| HTTP current `document-first-buffer-http-connect` | 0.49030 | 0.39485 | control |
+| HTTP ordinary-GET carrier | 0.40576 | 0.45081 | -17.2% / +14.2% |
+
+SOCKS was effectively neutral in the focus window. HTTP improved packets
+17--32 by only 17.2%, below the required 20% threshold for a mutually breaking
+client/Caddy change, while making Whole 14.2% worse. No replication,
+resource-size matrix, constrained-link matrix, or full default matrix was
+spent on this weak trade. Commits `e5522f840f78` and `52c456d88c98` retired the
+harness and client experiment respectively. After retirement, 121/121 harness
+tests, 100/100 C++ gtests, and both incremental test/product builds passed.
+Production defaults and the documented fronting-site requirements are
+unchanged; the active fixture is stock Caddy.
+
+Future preflight must treat replacing H2 CONNECT with an ordinary GET or POST,
+or merely moving the same negotiation marker between headers, as this rejected
+method-carrier causal family. A new proposal needs a distinct mechanism which
+explains both the 17--32 signal and Whole rather than renaming this wire-method
+substitution.
+
+### H2 early CONNECT request-DATA follow-up
+
+The next H2 idea passed the mandatory exact and causal-history preflight before
+implementation. Prior work had tried optimistic local listener admission,
+ordinary GET/POST carriers, two directional CONNECT streams, payload framing
+and padding variants, CONNECT header sizes, H2 priority, parser/process
+topology, classifier/cache changes, and fixed or event-driven response gates.
+None put bytes which were already buffered from the inner TLS ClientHello into
+DATA on the same classic H2 CONNECT request before the proxy response. That
+wire-ordering mechanism was therefore distinct; it did not wait for a future
+resource, fixed delay, target response, bandwidth estimate, or page size.
+
+Commits `87c158b74f2f`, `1cc1c6edafdb`, and `51354215991e` implemented the
+explicit H2-only client and two listener-specific harness arms. The first
+implementation exposed an important false path which must not be repeated:
+attaching the 1,822 buffered bytes through the original channel upload stream
+produced zero request-body bytes at the server and a 45-second timeout. H2
+CONNECT does not serialize that upload stream; `nsHttpConnection` constructs a
+separate `mProxyConnectStream`. The corrected diagnostic stored a bounded
+payload in the private request head and appended it directly after that
+CONNECT stream's headers, which Necko then encoded as request DATA before the
+`200`. The normal CONNECT path stayed unchanged, and the client required an
+H2-only exact length echo before accepting the experimental tunnel.
+
+The matching forwardproxy fork read exactly the declared 1--65,536 bytes after
+the stock-time `200`, copied them to the dialed target, and then continued with
+the unchanged Variant-1 decoder. It rejected duplicate, malformed, short, and
+H3-marked requests; unmarked requests retained the stock behavior. Its pinned
+`go test ./...` passed. The final `forwardproxy.go` digest was
+`1ef5885d5ed1d9d9645ece4d6df4a4d45d4eb1f33522738f2792b8d19cf597fb`,
+the focused Go-test digest was
+`5671cc976a8c9fb8c97f23ea149b17256c630b9089eb03b05cd9b77e046e6ef8`,
+and the private Caddy 2.11.2 digest was
+`429d56eb01bb4cf81b781b3b0df7b94601edb7b8530d5e3bc9c3bfa3f456b533`.
+The preserved stock Caddy digest remained
+`444ca421ae27be5d83f6cc5e6641badd8bcd7a1a92e1130dab027cbf8bb2a938`.
+
+Incremental product and test builds passed without a clobber, as did the three
+new request-head boundary tests, the existing NaiveFox focused gtests, and
+124/124 complete harness tests. Clean isolated lifecycle artifacts
+`4a4d42ffd0fcf2f2` (SOCKS, seed `2026082945`) and
+`e750bcf796a4b2cb` (HTTP listener, seed `2026082946`) proved real pre-response
+DATA delivery, exact echo negotiation, one physical H2 session, and a working
+inner HTTPS/H2 request.
+
+The randomized same-base one-block screen `797aa31a0b8d8e73` (seed
+`2026082947`) used the canonical 262144-byte browser page, inner HTTPS/H2, an
+isolated WSL network namespace, Firefox A/B, both current defaults, and both
+early-DATA arms. Only the requested packets 17--32 and Whole views were
+collected:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.64087 | 0.38297 | control |
+| SOCKS early CONNECT DATA | 0.62021 | 0.38350 | -3.2% / +0.1% |
+| HTTP current `document-first-buffer-http-connect` | 0.56351 | 0.34759 | control |
+| HTTP early CONNECT DATA | 0.53051 | 0.40755 | -5.9% / +17.3% |
+
+The focus-window changes were weak, and HTTP Whole regressed substantially.
+The mutually incompatible client/Caddy mechanism is far below the required
+20% improvement and does not improve both targets, so no replication,
+resource-size matrix, constrained-link matrix, or full default matrix was
+spent. The diagnostic client, harness, and fixture fork were retired; active
+defaults and fronting-site requirements remain unchanged. Future preflight
+must treat both attaching buffered bytes to the original request upload and
+injecting them into the actual H2 proxy CONNECT stream as the tested and
+rejected pre-response request-DATA causal family, rather than retrying either
+form under a new early-data, Fast Open, or zero-RTT name.
+
+### H2 single-CONNECT multiplexing premise check
+
+Before implementing another incompatible transport, the mandatory history
+gate searched the documentation, harness, full Git history, and pickaxe diffs
+for shared tunnels, substreams, demultiplexing, and multiple local transports
+inside one outer CONNECT. No prior NaiveFox experiment had implemented that
+custom multiplexing layer; the two-stream directional experiment did the
+opposite and split one logical tunnel across two CONNECT streams. A new
+implementation was nevertheless rejected because its required premise was
+false for the focus workload.
+
+Clean isolated lifecycle-only artifacts `74cf25555a2a36a7` (SOCKS, seed
+`2026082948`) and `80c8273acbc4565f` (HTTP listener, seed `2026082949`) each
+ran the current H2 default with the canonical browser page and inner HTTPS/H2.
+The fixture access lifecycle contained exactly one outer CONNECT in each run.
+Consequently there were no repeated CONNECT headers or Variant-1 startup
+phases for an application substream multiplexer to eliminate. Adding a custom
+flow-control, target-routing, and demultiplexing protocol would only replace
+the already single tunnel, not collapse several tunnels into one. No product,
+Caddy, harness, build, or passive matrix change was spent. Future preflight
+must not infer multiple logical tunnels merely from the old directional
+experiment's diagnostic slot bound; it must first measure the actual workload
+being proposed for multiplexing.
+
+A proposed bodyless/`HEAD` companion-resource variant was also rejected at
+this gate without implementation. The exact method label was new, but its
+causal event was not: the earlier interleaved blocking-resource experiments
+already exercised `stylesheet and script request commits -> CONNECT`, and the
+related H3 `HEAD`/Range family showed that replacing ordinary resource bodies
+can alter terminal channel behavior without creating a new admission event.
+Changing GET volume to a bodyless response would tune the fixture resource
+shape while leaving the controlling two-commit boundary intact. No product,
+fixture, harness, build, or capture work was spent on this causally equivalent
+proposal.
+
+### H2 DATA-frame padding follow-up
+
+The next incompatible client/server candidate passed the mandatory exact and
+causal-history search before code was written. Prior experiments had varied
+Variant-1 application-record padding, initial record count, directionality,
+CONNECT header padding, TLS-flight alignment, batching, and H2 priority.
+Searches of the Markdown, harness, complete Git history, and pickaxe/regex
+history for H2 PADDED flags and padded-DATA writer paths found no experiment
+which placed padding in the outer H2 DATA frames themselves. This was therefore
+a distinct framing-layer cause rather than another application-record count or
+amount endpoint.
+
+Commits `5dcc4e3cb25f` and `e7c825c10367` implemented and admitted an explicit
+H2-only diagnostic. A reserved request-padding marker negotiated the candidate
+and had to be echoed by the response; the client rejected a protocol mismatch,
+missing echo, or observed/requested diagnostic mismatch. Request-side
+Variant-1 framing remained stock. On the response side, the first eight
+Variant-1 records remained decodable but used zero application padding, while
+up to the first eight Caddy handler writes used standards-compliant H2 DATA
+padding. Pad Length was random in `0..255`, padding octets were zero, and both
+frame-size and flow-control accounting included the pad-length field and pad
+octets. There was no pause, resource-size threshold, fronting-page condition,
+bandwidth/RTT estimate, or wait for future target bytes; unmarked clients kept
+the stock path.
+
+The first server build exposed an implementation path which must not be
+repeated. Patching Go's bundled `net/http/h2_bundle.go` produced private Caddy
+binary digest
+`a342d1abd21569473dc5516254220cbf88e62d437fc4b974861cdda1dac132ca`,
+and its unit tests passed, but Caddy 2.11.2 actually used
+`golang.org/x/net/http2`. Private lifecycle artifact `c55165adc9ced6d8`
+therefore negotiated the marker on five established tunnels but contained no
+PADDED DATA frames and published no passive distances. The first validator
+also passed decrypted PDML bytes to the XML parser as a pathname; wrapping the
+bytes in an in-memory stream fixed that diagnostic error. Neither failure is a
+candidate measurement.
+
+The corrected fork patched the pinned `golang.org/x/net` v0.51.0 writer and
+scheduler, added marker, zero-padding, split-frame, and flow-control tests, and
+passed `go test ./http2`; the pinned forwardproxy fork passed `go test ./...`.
+The resulting Caddy 2.11.2 binary digest was
+`6d3ba1829b4f2d3ad87bbc3e21d7810e804bf2447e852fb36a51da3491283c31`.
+Incremental product/test builds required no clobber, 103/103 focused C++ gtests
+passed, and 129/129 harness plus validator tests passed. Strict isolated
+lifecycle artifacts `f6e7e40aba138a05` (SOCKS) and `0236019a82b63c4c`
+(HTTP listener) each admitted the expected marker and padded-frame sample,
+proved that padding occurred only on server-to-client DATA of marked CONNECT
+streams, and deleted the private key log/capture after retaining safe counts.
+
+The randomized one-block same-base screen `06350ee8cab9df76` (seed
+`2026083053`) used the canonical 262144-byte inner page, inner HTTPS/H1.1,
+Firefox A/B, both current listener defaults, an isolated WSL network namespace,
+and only packets 17--32 plus Whole:
+
+| H2 listener / arm | 17--32 | Whole | Change from same-block current default |
+| --- | ---: | ---: | --- |
+| SOCKS current `document-first-buffer-task-overlap` | 0.45765 | 0.31613 | control |
+| SOCKS H2 DATA padding | 0.45872 | 0.29880 | +0.2% / -5.5% |
+| HTTP current `document-first-buffer-http-connect` | 0.45128 | 0.40461 | control |
+| HTTP H2 DATA padding | 0.39976 | 0.29954 | -11.4% / -26.0% |
+
+The isolated wire validator admitted both candidate samples. SOCKS was
+effectively neutral in the focus window. The HTTP point estimate was promising
+for Whole but below the 20% breaking-change rule for packets 17--32, so it
+required a focused replication instead of a full matrix.
+
+Fresh four-block HTTP-only artifact `b0454b18ae89a387` (seed `2026083054`)
+also used inner HTTPS/H1.1 and reversed both directions. The current HTTP default measured
+`0.46318 [0.42335, 0.50301]` for packets 17--32 and
+`0.26826 [0.23575, 0.30440]` for Whole. DATA padding measured
+`0.49186 [0.44626, 0.53385]` and `0.28606 [0.25119, 0.33062]`, regressions of
+6.2% and 6.6%. All four candidate samples passed decrypted wire admission and
+all 16 participants passed the isolated-network mutation gate. Four smoke
+blocks remain descriptive rather than paired inference, but they directly
+reject the one-block promotion signal.
+
+The jointly incompatible Caddy/client mechanism therefore fails replication,
+does not meet the at-least-20% default threshold, and must not be tuned through
+nearby DATA-padding counts or lengths as though those were new causal ideas.
+No resource-size, constrained-link, cross-platform, or full default matrix was
+spent after this rejection. The product and harness diagnostics are retired;
+the production defaults and documented fronting-site requirements remain
+unchanged. The named custom Caddy and forks remain only as inactive private
+scratch material for reproducing this negative result.
+
+A follow-on connection-control proposal was rejected by the history gate and
+a read-only decrypted audit rather than implemented. Injecting H2 PINGs,
+no-op repeated SETTINGS, or extra WINDOW_UPDATE frames would be distinct from
+DATA padding, but it first needed evidence that direct Firefox naturally used
+such control traffic in the target phase. Safe lifecycle artifact
+`20260829T230030Z-bf81d6e9` used one isolated same-base H2 connection per
+cohort and confirmed equal client SETTINGS. Direct Firefox emitted only the
+initial SETTINGS/WINDOW_UPDATE exchange and acknowledgements, then ordinary
+GET/HEADERS/DATA until its late connection shutdown; it emitted no PING and no
+repeated SETTINGS in the resource-start phase. Its first six resource GETs
+began about 135 ms after the first H2 request in this cold command-line trace,
+whereas the diagnostic document-start arm emitted its first CONNECT after
+0.444 ms. Synthetic control frames would add a new stable marker without
+reproducing the browser parser/resource cause of that gap, so no product,
+Caddy, or passive-screen code was written.
+
+The first attempt to collect that audit, private artifact
+`20260829T225655Z-05bd71e8`, stopped after the reference cohort and published
+no comparison. Commit `5efc697fe10b` had made the PAC generator require both
+the local listener and exact workload target ports, while three dedicated
+decrypted runners still passed only the listener port. Commit `11af5b11b318`
+updated those callers, added a cross-runner regression test, and restored the
+fail-closed exact-target PAC scope. The complete harness then passed 122/122
+tests before the successful audit above. This is harness provenance, not a
+candidate residual measurement.
+
+A proposed asymmetric reuse of the outer root response was also rejected by
+the mandatory causal-history preflight without implementation. The suggested
+shape would keep the ordinary root `GET` response open as the
+target-to-client lane and use a separately paired `CONNECT` only for
+client-to-target bytes. Although that exact arm name had not appeared before,
+all of its wire-changing causes are already bracketed by admitted failures:
+the paired two-stream tunnel improved the SOCKS focus/Whole views by only
+11.7%/6.4% in `a9ffaf1c49a77777`; the ordinary-GET carrier was neutral for
+SOCKS and traded a 17.2% HTTP focus gain for a 14.2% Whole regression in
+`9a73f27ea029dcd5`; the retained-open bounded response carrier worsened every
+reported HTTP view in `59cb2995524f019d`; and CSS/JS resource interleaving
+collapsed to -6.5%/-2.7% for SOCKS and -2.9%/+0.7% for HTTP in four-block
+replication `7a9df73a476bf808`.
+
+The decrypted direct-H2 audit above also contradicts the proposed causal
+model: Firefox completed its small root DATA stream before issuing the later
+resource-request wave. Keeping that root response alive for tunneled target
+bytes would therefore invent a stable half-duplex carrier rather than copy a
+native Firefox stream lifecycle. It would additionally require a new
+cross-channel backpressure, half-close, and pairing layer in both client and
+Caddy while combining two changes that individually fell below the 20%
+compatibility-break threshold. There is no untested causal premise here which
+justifies that cost, so no product, server, harness, build, or capture work was
+started. Future preflight must treat root/resource-response reuse, including
+renaming a real resource as the downstream lane, as this rejected hybrid
+rather than retrying its component mechanisms.
+
+### H2 pre-launched reference lifecycle audit
+
+The next investigation began with the mandatory exact and causal history gate,
+not a product implementation. The cold command-line H2 control above measured
+a 135-ms startup-heavy request gap and was not the Selenium cohort used by the
+current matrix. Conversely, commits `0f80b315388f`, `d5d41e52bfbd`, and
+`bbc166eea5e9` built a repeated-navigation decomposition only for H3. The
+parser-process, activation-process, and full-process arms had already moved
+real parser/channel work across process boundaries and all lost to the retained
+H3 candidate; the larger full-tree IPC form and its two-wave follow-up were
+also rejected. Thus reproducing that process topology for H2 would repeat a
+closed causal family. What remained unmeasured was the actual pre-launched H2
+reference lifecycle.
+
+Commit `f97476fdbac1` added only a Selenium backend to the existing decrypted
+H2 runner; command-line behavior and every product/Caddy path remained
+unchanged. Clean isolated artifact
+`20260829T233038Z-27a63bf9` then used a browser which was ready before capture
+and navigated only after capture began. The direct root GET was packet 16,
+response HEADERS packet 19 at 0.985 ms, and terminal root DATA packet 20. CSS
+and script GETs did not appear until packets 22--23 at 27.627/27.736 ms; later
+resource GETs followed at 29.201--29.916 ms. The matching NaiveFox root began
+at packet 15, while its first CONNECT request/response appeared at packets
+22--23 only 1.099/1.284 ms after that root request. This closes the earlier
+cohort mismatch: the roughly 27-ms native phase is neither cold browser launch,
+target RTT, nor a large root body, and a fixed pause would still worsen the
+observed early server-byte deficit.
+
+Four reference-only H2 lifecycle collections then enabled ordinary
+`nsHttp`/`nsCSSLoader` logging without changing or rebuilding Firefox. The
+runner was intentionally stopped after the reference cohort by supplying a
+non-starting candidate, so it correctly retained private diagnostics and
+published no passive candidate distances. The final clean-worktree artifact is
+`20260829T235802Z-3f09871c`; earlier private replications
+`20260829T234644Z-11c2fd2a`, `20260829T234910Z-bcda1188`, and
+`20260829T234939Z-a31fc615` had an unrelated temporary repeat-analyzer/docs
+edit in the worktree and are used only to check lifecycle stability. Every
+reference capture completed in the isolated namespace with an empty network
+mutation log.
+
+The clean sample measured 31.667 ms from direct root response HEADERS to the
+CSS GET. Its exhaustive coarse decomposition was 0.775 ms to root suspension,
+4.095 ms in the ordinary document-channel suspend/resume phase, 2.960 ms to
+parser body delivery, 0.201 ms to stylesheet discovery, 0.168 ms to child
+`AsyncOpen`, 14.996 ms to parent `RecvAsyncOpen`, 3.198 ms to parent
+`InvokeAsyncOpen`, 4.974 ms through parent channel open/transaction dispatch,
+and only 0.300 ms from socket-thread dispatch through
+`Http2Session::AddStream` to the wire. Across all four diagnostics the total
+was 33.029/27.869/30.380/31.667 ms. The dominant child-to-parent interval was
+remarkably stable at 14.055--14.996 ms; parent channel dispatch was
+2.766--5.160 ms. After H2 `AddStream`, the GET reached the wire in only
+0.136--0.235 ms.
+
+An attempted run of the older H3 repeat-navigation tool also failed closed and
+must not be promoted to safe evidence. Private artifact
+`20260829T233458Z-bab07379` contained the eight requested tokenized trees plus
+one Firefox-generated `/favicon.ico` GET, while the analyzer requires exactly
+seven GETs per navigation. Its pristine same-base reference also lacks the
+product-branch-only fine-grained `NATIVE_CHANNEL_ACTIVATION_DIAGNOSTIC`
+markers. A read-only coarse decomposition was possible, but no analyzer or
+fixture relaxation was retained merely to rescue this side diagnostic.
+
+The H2 result identifies the missing native interval but does not justify
+copying its implementation into NaiveFox. The earlier real multi-process
+screens already show that process startup, parser IPC, and native-channel
+rendezvous add their own stable traffic and scheduling without improving both
+target views. The new audit therefore strengthens their rejection: H2 encoder,
+socket dispatch, and wire emission are not the bottleneck, and future work must
+not rename full-process reconstruction as an H2 IPC, PBackground, or channel
+bootstrap experiment.
+
+The same preflight rejected two other no-code variants. Negotiating a smaller
+TLS record-size limit would add a ClientHello marker while reproducing the
+already rejected record-fragmentation/ordinal family. Adding more directional
+H2 lanes would quantitatively repeat the rejected paired-stream tunnel: Gecko's
+12-MiB initial H2 receive window already exceeds the complete canonical flow,
+so extra lanes cannot aggregate flow-control capacity and would only add
+HEADERS, pairing, and reordering. Neither proposal reached product, Caddy,
+harness, build, or passive-screen code.
+
+### H2 root-document size endpoint
+
+The next idea also passed through the complete exact and causal history gate
+before implementation. The history already contained H2 resource trees,
+Early Hints and final-response preloads, document-start/HEADERS/body barriers,
+and the H3 outer-resource size campaign. The H2 `initial`, bulk-download, and
+bidirectional controls changed only small HTML programs, while
+`--browser-page-base-size` changed tunneled resources rather than the root
+document. No prior run had scaled the H2 root body itself. This made root size
+a distinct site-envelope question rather than a renamed resource or admission
+experiment.
+
+Commit `6dff7c66142d` added a diagnostic-only
+`--document-body-size` fixture input. It pads the exact same HTML response path
+seen by Firefox A/B, the outer preamble, and the tunneled browser, preserves
+the resource URLs and completion semantics, is limited to H2 gate/smoke runs
+and 64 KiB, and cannot be combined with another fixture-shape axis. It changes
+neither product nor Caddy defaults. The ordinary measured `browser_page` root
+is 494 bytes including its fixed-length completion token.
+
+Predeclared one-block endpoint artifact `46354f735ce3d8a6` (seed
+`2026083073`) used a 65,536-byte root, inner HTTPS/H2, Selenium, the isolated
+WSL namespace, Firefox A/B, and both current listener policies. All four
+participants passed capture-drop, network-mutation, inner-H2, offload, and
+normal-drain checks. Its descriptive distances were:
+
+| H2 policy at 65,536-byte root | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SOCKS `document-first-buffer-task-overlap` | 0.07051 | 0.31378 | 0.16014 | 0.15433 | 0.33178 |
+| HTTP `document-first-buffer-http-connect` | 0.06084 | 0.14497 | 0.10085 | 0.16218 | 0.33533 |
+
+The 17--32 values are much lower than the separate canonical small-root
+dashboard, but this is not a joint improvement. The 250-ms and Whole values
+move materially upward, and the signed Whole diagnostic reports an initial
+50-ms server-wire deficit of 611,296.5/611,169.5 bytes for SOCKS/HTTP, versus
+362,854.6/100,530.4 bytes in the separate ten-block canonical artifact. The
+large direct Firefox document changes the early server envelope more than the
+candidate can reproduce; extra root volume therefore transfers residual out
+of packets 17--32 instead of removing it. Cross-artifact differences and one
+block cannot support inference, but they are sufficient for the predeclared
+screening stop rule because both requested aggregate views regress strongly.
+No larger run, product build, Caddy change, or default promotion was started.
+The 64-KiB limit remains a functional safety bound, not a residual-equivalence
+claim, and future work must not retry root padding as an H2 timing fix.
+
+### H2 server stream-concurrency premise check
+
+The next server-side proposal was stopped by the mandatory exact and causal
+history gate before implementation. Full-history and current-tree searches
+found prior measurement of `SETTINGS_MAX_CONCURRENT_STREAMS`, the rejected
+two-directional-CONNECT experiment's client connection-slot override, and the
+rejected synthetic SETTINGS/PING family, but no experiment which lowered the
+Caddy H2 server's advertised stream limit. The mechanism was therefore
+syntactically new: unlike a no-op SETTINGS marker, it would serialize native
+resource admission.
+
+The measured lifecycle makes the only potentially effective endpoint unsafe.
+In safe decrypted artifact `20260829T233038Z-27a63bf9`, direct Firefox opened
+the stylesheet and script as streams 2 and 3 at 27.627/27.736 ms; their server
+responses were already present at packets 25 and 29. The next request began at
+packet 26, but its response did not begin until packet 227. Consequently a
+limit of two cannot remove either of the two resource responses already inside
+packets 17--32. A limit of one could, but the first long-lived proxy CONNECT
+would then permanently consume the only stream after the root completed. A
+second target connection or origin could not share that H2 connection, while
+a direct site would fetch its blocking stylesheet and script serially. Older
+diagnostic evidence also observed up to six ordinary browser target
+connections, confirming that this is a real lifecycle rather than a
+theoretical edge case.
+
+Caddy 2.11.2 does not expose this field in its Caddyfile or JSON server model;
+the stock `x/net/http2` default is 250 and the only relevant knob is the
+internal `http2.Server.MaxConcurrentStreams`. A private Caddy fork would thus
+be required merely to test an endpoint which either misses the focus window
+(`2` or more) or creates an unbounded multi-origin/page-load regression (`1`).
+No Caddy fork, harness arm, build, or passive capture was created. Future
+preflight must not retry a static low H2 stream limit as a safe site-independent
+fix; any genuinely new concurrency proposal must preserve multiple
+long-lived CONNECT streams and ordinary parallel page loading by construction.
+
+Two further proposals were closed by retained evidence rather than code. A
+combined optimistic-local-reply plus pre-response ClientHello pipeline would
+still be the rejected early CONNECT request-DATA family. That earlier arm
+already included the optimistic local reply, captured the real 1,822-byte
+inner ClientHello, and delivered it as request DATA before `200`; its focus
+gain was only 3.2%/5.9% for SOCKS/HTTP and HTTP Whole regressed 17.3%.
+Separately, dialing the target before `200` made both listener focus views
+approximately 0.77. Combining the two could overlap only target dial and the
+first target TLS flight. The measured local-listener premise puts the complete
+1,827-byte ClientHello less than 0.9 ms after local success, while the direct
+Firefox gap which needs explaining is 28--33 ms of parser/channel/IPC work.
+The composition therefore has no untested event capable of closing the main
+gap and would repeat two incompatible rejected causes. No client or Caddy
+source was restored from the retired diagnostics.
+
+Changing the tunneled origin from H2 to H1.1 had also already been measured
+with the current listener controls. Artifact `06350ee8cab9df76` used the same
+`browser_page`, outer H2, and `inner_transport=https` (the fixture's
+HTTPS/H1.1 server). Its one-block current controls measured
+`0.45765/0.31613` for SOCKS and `0.45128/0.40461` for HTTP at packets
+17--32/Whole. Fresh four-block HTTP control `b0454b18ae89a387` measured
+`0.46318 [0.42335, 0.50301]` and
+`0.26826 [0.23575, 0.30440]`. These screens are not an H1.1-versus-H2 paired
+inference, but they rule out the proposed large structural reduction: their
+focus values are not lower than the separate current inner-H2 dashboard, and
+the four-block HTTP Whole point is similar. Creating several ordinary target
+connections instead of the canonical single inner-H2 CONNECT is therefore not
+a new unmeasured cause and did not receive a duplicate run.
+
+### H2 nested request lifecycle diagnosis
+
+Before adding instrumentation, the mandatory exact and causal-history search
+checked the existing native-proxy floor, local first-inner-byte timing,
+inner-H2 validation, and repeated/pre-launched Firefox lifecycle diagnostics.
+The first three did not retain a request timeline; the last decomposed direct
+outer root-to-resource discovery only. No retained artifact correlated the
+current default's outer root/CONNECT with the tunneled H2 root, stylesheet,
+script, images, and completion. This missing decomposition is distinct from
+another parser/process reconstruction or admission-boundary experiment.
+
+The predeclared diagnostic is one isolated, unshaped H2/inner-HTTPS-H2 block
+with Firefox A/B and both current listener defaults, the canonical page, seed
+`2026083074`, and only packets 17--32 plus Whole. The opt-in
+`--h2-request-timing` harness reads already-existing Caddy access logs after
+capture and shutdown. It publishes only a separate sanitized timeline using
+`log timestamp - handler duration` as a coarse request-start estimate. This
+does not add log fields, timing barriers, product code, a Caddy fork, or a
+Firefox build. Its purpose is to locate the early server-byte deficit, not to
+select a new default from one block or feed HTTP semantics into passive
+features.
+
+The first plumbing attempt, private artifact `3e128eb9258b2b81`, completed its
+first proxy navigation but stopped before publishing any metrics: the new
+summary accepted single-design `h2_b...` identities while the selected
+superblock planner emits `h2_sb...`. The validator was corrected to the actual
+superblock contract, with a regression test that consumes the real planner's
+output. This failed run is not candidate or residual evidence.
+
+Two further plumbing collections (`1a3ed0a8763d08d8` and the private-snapshot
+follow-up `b2e28a878b737d35`) stopped on a duplicate API image request, again
+without publishing metrics. The snapshot proved one outer root and one
+CONNECT, but two inner image-destination GETs of the canonical 34-byte JSON
+API response, followed by an empty favicon request. This is consistent with
+Firefox repeating the invalid image after its speculative attempt, not an
+extra proxy session. The diagnostic now explicitly retains one bounded API
+repeat only with the unchanged image destination, JSON MIME, and 34-byte
+response, plus one optional empty favicon. It still rejects duplicate roots,
+stylesheets, scripts, ordinary images, completions, or further API attempts.
+No request is removed from the passive capture and no fixture response is
+changed to make the diagnostic pass. Private log slices are retained on error
+so future admission failures can be investigated without another capture.
+
+Clean-worktree artifact `8c774dd53fa31ff7` completed the predeclared four-member
+block. All participants passed the unchanged capture-drop, offload,
+network-mutation, protocol, and drain gates; both proxy workloads passed inner
+H2 validation, and all four request timelines passed. Product and stock Caddy
+were not rebuilt. The coarse server intervals were:
+
+| Participant | Outer root to CONNECT | CONNECT to inner root | Workload root to CSS | Workload root to script | Outer root to workload completion |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Firefox A | n/a | n/a | 29.113 ms | 29.137 ms | 53.937 ms |
+| Firefox B | n/a | n/a | 28.934 ms | 28.933 ms | 53.921 ms |
+| Current H2 SOCKS | 1.538 ms | 5.660 ms | 54.826 ms | 54.820 ms | 90.154 ms |
+| Current H2 HTTP CONNECT | 1.145 ms | 4.964 ms | 58.963 ms | 58.967 ms | 93.319 ms |
+
+All root handlers completed in 0.498--0.860 ms. The direct resource wave
+arrived at Caddy about 29--33 ms after root; the tunneled waves did not reach
+the inner Caddy until about 62--66 ms after the outer root. Both proxy
+workloads had two canonical API image requests, whereas each direct Firefox
+control had one; every participant also made one empty favicon request. These
+events are preserved, not filtered from the passive sample. Descriptive
+17--32/Whole distances were `0.65340/0.42868` for SOCKS and
+`0.52648/0.40525` for HTTP, with first-50-ms server-wire deficits of
+679,622/680,339 bytes. One block is not a new default dashboard or inference.
+
+The new localization is the extra roughly 26--30 ms between the tunneled
+document request and its resource wave, beyond the direct browser's ordinary
+29-ms phase. It is not explained by the roughly 5-ms CONNECT-to-inner-root
+setup or by slow fixture root handlers. Access logs do not show when the
+browser receives or parses the body, however, so this does not yet assign the
+extra interval to NaiveFox, Caddy, or Firefox's proxy/channel path. The
+browser-side follow-up below supersedes any interpretation of this one-block
+difference as a constant nested-tunnel penalty. Production defaults and
+fronting-site requirements remain unchanged.
+
+#### Browser-side follow-up: document handoff, not a constant tunnel delay
+
+The exact and causal-history preflight rechecked the closed classifier/cache,
+manual-proxy-versus-PAC, and parser/process-topology experiments, plus the
+already-fixed accepted-socket Nagle issue. None was reopened. The new task was
+attribution of an already-observed interval, not another implementation of
+those mechanisms. Ordinary `nsHttp`/`nsCSSLoader` logging was enabled without
+rebuilding Firefox, NaiveFox, or Caddy, or changing browser preferences or the
+fixture page. All following runs used the isolated unshaped namespace,
+same-base Selenium-prelaunched browser, canonical inner HTTPS/H2, and current
+defaults.
+
+Single-SOCKS lifecycle artifact `1ec060018f1c3ca0`, seed `2026083075`, already
+failed to reproduce the proposed extra 26--30 ms. The canonical 494-byte HTML
+body reached the browser transaction 0.055 ms after its response-header
+processing; root suspend/resume took 4.790 ms and the CSS transaction reached
+socket dispatch at 28.823 ms. This diagnostic collected no Firefox controls
+and published no residual comparison.
+
+Clean-worktree artifact `7e642a9b7006c992`, seed `2026083076`, then collected
+one four-participant block with both server request timelines and ordinary
+browser logs. All four capture/network/timeline participants and both inner-H2
+workloads passed. In collection order:
+
+| Participant | Server workload root to CSS | Browser root headers to CSS socket dispatch | Root suspend to resume | CSS child open to parent receive |
+| --- | ---: | ---: | ---: | ---: |
+| Firefox B | 53.080 ms | 51.674 ms | 26.017 ms | 11.278 ms |
+| Current H2 HTTP CONNECT | 57.785 ms | 55.657 ms | 30.003 ms | 10.873 ms |
+| Current H2 SOCKS | 32.494 ms | 30.616 ms | 4.655 ms | 13.460 ms |
+| Firefox A | 57.496 ms | 56.264 ms | 33.457 ms | 13.385 ms |
+
+Every browser was already processing the root body within 0.054--0.062 ms of
+root header processing, before the long suspension. Root server handlers took
+only 0.547--0.906 ms. Outer-root-to-inner-root setup was 7.532 ms for HTTP and
+7.898 ms for SOCKS. The direct controls now exhibited the longer interval,
+while SOCKS did not: its dominant variation is therefore not an invariant
+26--30-ms nested transport delay. Each participant made one API image request
+and one empty favicon request; none was removed from capture. Logging can
+perturb scheduling, so this block is lifecycle evidence only, not a new
+passive ranking, default matrix, or proof that SOCKS became faster.
+
+The offline HTTP log mapping initially found two `HandleContentStart` events
+on the root transaction. They are the local proxy CONNECT response and the
+later origin response, not duplicate root requests. The latter is anchored to
+the canonical HTML body; the former precedes it by 6.602 ms. Transaction
+pointer lifetimes also have to be respected because Firefox can reuse freed
+objects. This mapping was corrected using the retained logs, without another
+capture or dropping a network event.
+
+Finally, single-SOCKS lifecycle artifact `47e393e61eb24d6a`, seed
+`2026083077`, added the existing `DocumentChannel` log module to identify the
+suspending caller. `DocumentLoadListener::OnStartRequest` immediately preceded
+root `Suspend` by 0.021 ms. Redirect-to-real-channel finished at 27.754 ms,
+`ResumeSuspendedChannel` ran at 27.764 ms, and root `ResumeInternal` at
+27.885 ms, all relative to origin-response header processing. The suspension
+itself lasted 27.319 ms; the root body had already reached the browser
+transaction at 0.057 ms. CSS socket dispatch followed at 54.448 ms.
+The upstream `DocumentLoadListener::DoOnStartRequest` and
+`ResumeSuspendedChannel` call sites confirm this document handoff. The earlier
+H2 audit's description of this interval as a "classifier" phase was therefore
+incorrect and is corrected above; these timings do not measure a URL
+classifier lookup.
+
+This rejects the interpretation of the observed extra 26--30 ms as a constant
+inner-tunnel penalty and prevents a misdirected Caddy buffering fix,
+classifier/cache retry, or another renamed full-process reconstruction. It
+does not establish the cause of all handoff variance or solve the residual.
+No product default, fronting-site restriction,
+resource-size recommendation, or canonical matrix entry changed. There was no
+product/browser/Caddy rebuild, size/link matrix, or compatibility break.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
@@ -2224,6 +3748,667 @@ extensions. Multi-arm superblocks provide the screening collection design but
 cannot support an absolute camouflage conclusion; that requires a fresh,
 preregistered single-arm research run. The suite selects explicit runtime
 configuration but never mutates production defaults.
+
+## H2 finite-exchange transport experiment
+
+The causal-history preflight checked the complete Git history (including
+pickaxe searches for finite exchanges, finite responses, long polling and
+exchange sequencing), the carrier sections above, and retained metadata for
+`a9ffaf1c49a77777` and `9a73f27ea029dcd5`. Two directional CONNECTs kept two
+long-lived streams; the ordinary-GET carrier changed the method but kept one
+long-lived raw stream. Neither tested repeatedly completed ordinary HTTP
+transactions. Retaining an unfinished fronting response and changing padding
+or process topology are also closed, distinct families, not the proposed test.
+
+The first prototype is explicitly diagnostic, H2-only and incompatible with
+stock servers. Native Necko channels carry a finite session-open POST, finite
+upload POSTs and finite download responses. One logical byte stream is ordered
+by per-direction sequence numbers. The initial structural bounds are 64 KiB
+per exchange, two outstanding uploads, four outstanding downloads, and bounded
+native pipes. A download completes after the first available bounded read;
+it does not wait for a full block, a timer, a packet ordinal, a resource-size
+target or an estimate of bandwidth. Empty receive requests may wait for target
+data, but a response carrying data completes normally and is replaced within
+the bounded window. Upload and receive admission are independent, avoiding a
+request/response deadlock and one stop-and-wait RTT per useful block.
+
+The initial test deliberately preserves the stock eight Variant-1 records per
+direction across exchange boundaries. It also preserves target-dial Fast Open
+ordering, existing listener-specific preamble policy, scoped TLS verification,
+server-side target DNS/ACL checks and unmodified default CONNECT operation.
+This avoids attributing padding removal or a new dial barrier to finite stream
+lifecycle. Sequence errors, oversized bodies, unexpected protocol/negotiation,
+and transport loss must fail closed. Cancellation, half-close and bounded
+buffering are functional gates before passive comparisons.
+
+First collect short randomized H2/inner-H2 screens against both current local
+listener defaults and Firefox A/B in the isolated WSL namespace. Validate one
+physical outer H2 connection, useful byte integrity and actual normal response
+completion. Compare packets 17--32 and Whole first; do not spend a full default,
+resource-size or link matrix on a weak candidate. Only a replicated improvement
+of at least 20%, without unacceptable regressions, justifies developing this
+breaking transport as a default. A short screen is not statistical acceptance.
+The ordinary fronting-site requirements and canonical default matrix remain
+unchanged during this experiment.
+
+### Finite-exchange prototype functional admission
+
+The prototype client used the explicit `diagnostic-h2-finite-exchanges` boolean and
+rejects H3, other transport diagnostics, extra CONNECT headers and native-parser
+preamble combinations. Stock CONNECT defaults are untouched. The diagnostic
+Caddy overlay was reproducibly built by `build-finite-exchange-caddy.sh` from the
+pinned forwardproxy module; it does not replace the fixture's stock binary.
+The harness accepts it only by an explicit private fixture path inside the
+isolated namespace. Ordinary requests and CONNECT on that same server retain
+the unmodified path when the finite version marker is absent.
+
+Two setup smokes (`131d5be5034efaa4`, seed `2026083080`, and
+`ce3c6953f9c8d9d1`, seed `2026083081`) failed before establishment with HTTP 407.
+Necko correctly prunes `Proxy-Authorization` from ordinary origin requests.
+The finite API now uses scoped origin `Authorization`, with redirects forbidden;
+the server feeds it into its existing credential verifier only for explicitly
+marked finite requests. No shared Necko/authentication behavior was weakened.
+The API must reach that authenticated handler before ordinary fronting-page
+handlers; unlike the unauthenticated preamble, these are protocol requests, not
+cover resources. This is an experimental server-routing requirement, not a
+change to the stock-default fronting-page contract.
+
+Seed `2026083082` loaded the inner page but hit an unregistered arm name in the
+feature extractor (`bd8b6f3fbb60e8ee`). Seed `2026083083` also completed the
+workload but the new marker validator omitted the optional timestamp prefix
+(`f88357f9c6d35234`). These harness defects were corrected and regression-tested;
+neither failed artifact is a passive candidate score. Clean isolated smoke
+`c8dabc167b8b4df8` (seed `2026083084`) then passed the one-connection, one
+ClientHello, preamble, inner-H2, unchanged-padding and finite-rotation gates.
+
+The prototype passed 101 focused C++ gtests, 138 harness/lifecycle tests, the
+server module's `go test -race ./...`, and incremental product/test builds.
+`run-finite-exchange-tests.sh` passed both SOCKS and HTTP CONNECT with TLS,
+byte-exact slow 1 MiB download, digest-checked 768 KiB upload, half-close,
+four-way concurrency, cancellation, invalid upstream credentials and bounded
+normal process shutdown. Test-driver setup errors (a preamble path outside its
+allowlist, an omitted newline in the small-body expectation, and treating
+SIGTERM as orderly CLI shutdown) were corrected against the existing fixture
+contracts; shutdown is now verified through the exact accepted-connection
+bound. Functional success does not establish a residual improvement.
+
+The first randomized four-arm block, seed `2026083085`, completed all six
+captures and their per-sample gates, but the aggregate analyzer still had a
+separate arm-name allowlist. Its rejection was repaired and tested. Existing
+feature fragments were revalidated and reanalyzed without recollection or
+sample selection as recovered artifact `a6381fe95c5b49d9`; recovery metadata
+records that provenance separately from an ordinary successful harness run.
+
+| H2 listener / arm | 17--32 | Whole |
+| --- | ---: | ---: |
+| SOCKS current default | 0.64830 | 0.41413 |
+| SOCKS finite exchanges | 0.71753 | 0.46926 |
+| HTTP CONNECT current default | 0.53741 | 0.40328 |
+| HTTP CONNECT finite exchanges | 0.71826 | 0.47271 |
+
+This first block is negative in both target views: SOCKS worsens by 10.7% / 13.3%
+and HTTP CONNECT by 33.7% / 17.2%. It is not evidence for a breaking default.
+Two additional short paired blocks were collected to check whether the negative
+direction repeats despite browser scheduling variance. No outer-size, shaped
+link, full default matrix or release build is justified by these results.
+
+### Finite-exchange replication and decision
+
+Fresh artifact `9de8396c3b9573d7` (seed `2026083086`) completed normally after
+the analyzer admission fix. It contains two randomized paired blocks: all four
+client/listener arms plus Firefox A/B, 12 controlled navigations in total. The
+same unshaped isolated H2/inner-H2 fixture, canonical browser workload, cold
+profiles, prelaunched Selenium control and unchanged eight-record padding were
+used. All 12 samples passed capture health, network-mutation and one-connection
+gates; every finite sample also proved negotiation and repeated successful
+ordinary-response completion. The private server digest was
+`e7367ab1b188aa2e701129f746b8d087d45ae84f5fa355da52acd3f418846a70`.
+
+| H2 listener / arm | 17--32 | Whole | Change from same-run listener default |
+| --- | ---: | ---: | --- |
+| SOCKS current default | 0.34590 | 0.24936 | control |
+| SOCKS finite exchanges | 0.36622 | 0.35459 | +5.9% / +42.2% |
+| HTTP CONNECT current default | 0.37813 | 0.25720 | control |
+| HTTP CONNECT finite exchanges | 0.37581 | 0.35068 | -0.6% / +36.3% |
+
+Whole regressed in both the initial block and the fresh replication. HTTP's
+0.6% packets-17--32 reduction in the repeat is effectively neutral at this
+screening scale, not the required 20% gain; SOCKS worsened. These are diagnostic
+point estimates from three blocks total, not a statistical camouflage claim.
+Do not compare their absolute values with another campaign's Firefox-only
+normalization or replace the canonical default matrix with these rows.
+
+Byte accounting helps explain the negative direction without inventing a
+fixed browser pause. In the repeat, mean client wire bytes rose from 18,573.5
+to 27,288 on SOCKS and from 20,852.5 to 26,752 on HTTP. Server wire traffic in
+the first 128 packets fell from 89,965.5 to 47,967.5 bytes and from 89,833.5 to
+38,727.5 bytes respectively. Extra request/response lifecycle traffic is
+consistent with displacing server payload in the early packet-index views;
+normal finite completion alone does not reproduce Firefox's application
+resource-discovery schedule. This is an interpretation of the measured
+accounting, not proof that every possible finite-exchange design must fail.
+
+Post-hoc accounting of the same retained features (no new captures or changed
+ranking) separates the Whole score into disjoint feature families. The entries
+below are additive score changes, not percentages or causal effect estimates.
+Explicit timing includes millisecond-valued features, idle gaps and timed
+bursts; packet structure excludes those timing features. The remaining group
+includes byte/direction aggregates, including aggregates in clock-time windows.
+
+| Whole contribution, finite minus same-run default | SOCKS | HTTP CONNECT |
+| --- | ---: | ---: |
+| Explicit timing and timed bursts | +0.04531 | +0.03465 |
+| Packet sizes and directions | +0.01659 | +0.02172 |
+| TLS record structure | -0.00163 | +0.00004 |
+| Remaining aggregates and handshake features | +0.04496 | +0.03706 |
+| Total | +0.10523 | +0.09348 |
+
+For a concrete early-window mismatch, Firefox and both listener defaults had
+a mean 1,500-byte server packet at index 28, whereas finite SOCKS had a mean
+209-byte client packet. At index 29 Firefox again had 1,500 server bytes, while
+finite HTTP had 209 client bytes. Direction and packet placement changed, not
+just an overall latency scalar. SOCKS mean whole duration was essentially
+unchanged, 118.037 to 116.885 ms; HTTP changed from 124.855 to 132.160 ms.
+Whole is a distance over the entire feature vector, not page-load duration.
+
+The archived implementation also exposes two plausible contributors that this
+screen did not isolate by ablation. `FillDownloads()` replenishes four receive
+GETs independently of resource discovery, and upload POST boundaries follow
+available opaque tunnel bytes rather than browser resource boundaries. In
+addition, `OnDataAvailable()` buffers each response and `FlushDownloads()`
+delivers it only after `OnStopRequest()`; the server likewise accepts a complete
+finite upload body before forwarding it. These completion barriers can alter
+inner TLS/request scheduling even though individual bodies are bounded and the
+directions are pipelined. A successful native response completion is therefore
+not equivalent to reproducing Firefox's resource-discovery/application work.
+The byte/direction changes and score decomposition are observed; attributing
+specific fractions to headers, receive-ahead or completion buffering would
+require distinct controlled ablations and is not established here.
+
+Decision: reject this bounded, independently sequenced upload/download
+prototype for default and do not proceed to a full breaking implementation.
+Its implementation and tests remain reproducible in commits `ab19acb41807`
+and `f6f1500cd629`. The diagnostic client, server overlay and capture admission
+were removed from the active tree; all affected runtime, configuration and
+test/harness files were checked byte-for-byte against the pre-experiment
+version. Stock Caddy, both H2 listener defaults, H3 defaults, the canonical
+matrix and the stock fronting-site contract remain unchanged. Future preflight
+must treat this exact finite-cell topology as tested, and require a different
+causal premise rather than merely renaming the cells or changing a bound.
+
+After retirement, incremental minimized product and test builds passed, as did
+all 100 restored NaiveFox C++ gtests and 172 analysis/harness/lifecycle Python
+tests. No full Firefox rebuild, generated-source export or default-matrix
+replacement was performed for this rejected candidate.
+
+### Finite-exchange read-through ablation
+
+The follow-up history preflight checked all-ref commit messages and pickaxe
+history for finite/body buffering and streaming delivery, the retained finite
+capture metadata, and the earlier document-body and server-coalescing reports.
+The first-buffer preamble policies change CONNECT admission; server coalescing
+and TLS alignment change tunnel write boundaries. None removed the newly
+introduced client-side `OnStopRequest` barrier inside a finite response. This
+is a controlled correction to the rejected prototype, not another finite-cell
+size or timing sweep.
+
+Restore that prototype only as an explicit diagnostic control, and add an H2-only
+read-through variant. It forwards validated response bytes from
+`OnDataAvailable` as the next ordered response arrives, rather than waiting for
+the complete body. It must retain the same finite-response boundary, sequence
+ordering, 64 KiB body bound, two-upload/four-download windows, server binary,
+eight-record padding and listener-specific preambles. Slots are not recycled
+until a response completes normally and its buffered bytes have drained;
+backpressure, error propagation and cancellation remain mandatory. The server
+upload-body barrier is deliberately unchanged so this test isolates receive
+delivery. No resource-size threshold, pacing timer or RTT guess is added.
+
+Before scoring, require the functional probes and a runtime marker proving that
+bytes were actually delivered before response completion. The short randomized
+same-base H2 screen compares both listener defaults, the original finite arms
+and their read-through counterparts with shared Firefox A/B controls, in the
+isolated namespace. The preregistered views remain packets 17--32 and Whole.
+An improvement over the poor finite control alone is not enough: a breaking
+default still needs at least 20% meaningful improvement over the current
+listener default and fresh replication. Do not run a full matrix or size/link
+sweep unless this new candidate first earns those gates.
+
+The read-through prototype passed incremental minimized product/test builds,
+102 C++ gtests and 174 analysis/harness tests. Both original finite arms and
+both read-through arms passed the private TLS, exact 1 MiB slow download,
+768 KiB upload, half-close, concurrency, cancellation, bad-authentication and
+normal-shutdown probes. Read-through probes additionally proved successful
+delivery before `OnStopRequest`; the original arms rejected that marker. The
+server source and binary are byte-identical to the first finite experiment.
+These are functional admissions, not camouflage results.
+
+Two-block same-base artifact `52eeaed67ad9bdad` (seed `2026083087`) passed all
+16 isolated captures, including the new per-connection delivery marker. Only
+the preregistered packets-17--32 and Whole views were evaluated:
+
+| H2 listener / arm | 17--32 | Whole |
+| --- | ---: | ---: |
+| SOCKS current default | 0.40875 | 0.30114 |
+| SOCKS original finite | 0.37773 | 0.38091 |
+| SOCKS finite read-through | 0.30714 | 0.40301 |
+| HTTP CONNECT current default | 0.41450 | 0.33340 |
+| HTTP CONNECT original finite | 0.32026 | 0.40024 |
+| HTTP CONNECT finite read-through | 0.30342 | 0.38115 |
+
+Read-through improves packets 17--32 by 24.9% / 26.8% relative to the same-run
+SOCKS / HTTP defaults, but Whole regresses by 33.8% / 14.3%. Relative to the
+original finite controls, the focus window improves by 18.7% / 5.3%, while
+Whole changes by +5.8% / -4.8%. This is a useful early-window diagnostic, not
+a qualifying default or a replicated statistical claim. The original finite
+arms themselves score better in this campaign's early window than in prior
+campaigns, reinforcing the need for within-block comparisons and fresh controls.
+
+The receive-completion barrier was therefore not a sufficient explanation of
+the Whole failure. Client wire bytes remain elevated (25,948 / 27,625 versus
+19,704 / 17,686.5 for the defaults), and server bytes in the first 128 packets
+remain deficient (41,698 / 36,265.5 versus 90,401 / 87,587). The code and this
+screen are retained in history; no default or fronting-site contract changes.
+
+### Finite-exchange callback-affinity correction
+
+Functional admission of the subsequent upload variant exposed a shared bug in
+the diagnostic adapter, before any new comparative capture. Private probe
+`finite-exchange-probes.s280pm5e` reset a second local HTTP connection in the
+original finite arm. Instrumented repeat `finite-exchange-probes.sy70g37m`
+recorded SIGSEGV after the receive-read-through SOCKS concurrency test. The
+debugger caught `PumpDirection::Produce()` on the socket thread dereferencing
+its cancelled owner. A conditional main-thread breakpoint then proved the
+other side of the race: `FiniteExchange::FlushDownloads()` wrote the native
+pipe, whose inline `CallbackHolder::Notify` invoked
+`PumpDirection::OnInputStreamReady()` on the main thread.
+
+The pump's null-target `AsyncWait` had relied on native socket streams to
+provide socket-thread callbacks. A native pipe has a different callback
+contract; the first finite prototype had not explicitly restored that thread
+affinity. All finite variants inherited the defect, not just upload v2.
+Historical finite captures remain observations of that unsafe prototype and
+must not qualify a default or establish the final effect of read-through.
+
+The correction supplies the existing socket event target to both pump callback
+registrations only for the diagnostic finite adapter, with release assertions
+on callback thread affinity. Ordinary socket-backed defaults keep their exact
+null-target callback behavior. New comparative collection must use a corrected
+binary and fresh controls; include the original finite arms as well as the two
+read-through variants so the unsafe earlier scores are not reused as controls.
+
+### Finite-exchange response-lifetime correction
+
+After fixing callback affinity, repeated functional probes still exposed
+intermittent truncation, including the v1 receive-only SOCKS arm in private
+probe `finite-exchange-probes.xzwrpdtf`: 34,752 of 131,072 bytes arrived, with
+every received byte matching the expected prefix. Thus it was not evidence
+against the v2 upload change specifically, and no new capture was admitted.
+
+The server's request-context cancellation guard covered both the ordered pipe
+operation and the subsequent HTTP response write. A focused regression test
+cancelling the request context during an otherwise successful response write
+reproduced closure of the entire logical tunnel. The guard is now stopped
+after the pipe operation, before response completion; cancellation still
+interrupts blocked pipe reads/writes, and a failed response write still closes
+the session. The regression fails before this change and passes afterwards.
+
+Three complete six-arm functional rounds then passed, with private probe IDs
+`a61atabm`, `z6vb6jpe`, and `665h90o8`: TLS, exact 1 MiB slow download,
+768 KiB slow upload, half-close, four concurrent 128 KiB downloads,
+cancellation, wrong credentials, and bounded process shutdown. This is
+functional admission for a new screen, not evidence that the historical
+finite captures were safe. The Caddy overlay's complete Go race-test suite
+also passes in a private network/mount namespace. Its two upstream ACL tests
+use namespace-local static host mappings for rejected destinations instead
+of consulting host DNS; no tests are skipped or host files changed.
+
+### Finite-exchange server upload read-through ablation
+
+History preflight for the symmetric server-side barrier checked all-ref
+pickaxe history for upload streaming and `ReadAll`, the finite metadata above,
+and the rejected early-CONNECT-DATA report. That older experiment moved initial
+payload before the CONNECT response; this one preserves establishment and
+changes only forwarding of already-accepted ordinary finite POST bodies. It
+also does not batch server target reads or align inner TLS records. The
+unmeasured variable is the explicit full-body wait introduced by the finite
+server adapter itself.
+
+Keep client receive read-through enabled and replace server upload `ReadAll`
+with bounded streaming copy, preserving ordered delivery, exact length checks,
+error closure, half-close and cancellation. The one-byte finite protocol marker
+selects v1 (original upload buffering) or v2 (streamed upload); a session may
+not mix them. Authentication, target ACL/DNS, response boundaries, window sizes,
+padding and every unmarked CONNECT remain unchanged. Add a deterministic
+prefix-before-request-EOF server test before capturing. Compare original v1,
+v1 receive read-through, v2 read-through and the two listener defaults in short
+randomized paired blocks; the same two residual views and promotion gates
+apply. This is not permission to tune resource sizes, introduce a delay or
+launch a full matrix.
+
+Functional admission includes the prefix-before-request-EOF test, rejection
+of short/long/oversized streamed bodies and mixed session versions, the
+response-lifetime regression above, 103 project gtests and 174 Python tests.
+The minimized product/test graphs were rebuilt incrementally, not Firefox.
+The corrected diagnostic Caddy binary has SHA-256
+`f8afd1146cfbebd66b689bacf6e0f59f1911246e0a3df9a5e5636e3cc309f02e`.
+The next screen is preregistered as seed `2026083088`, two randomized blocks,
+eight client arms plus shared Firefox A/B, H2 / inner HTTPS-H2, unchanged
+scheduled outer fixture and private MTU-1500 network namespace. Defaults and the
+fronting-site contract remain unchanged.
+
+### Corrected finite-exchange H2 screen
+
+Seed `2026083088` completed as safe artifact `adf8c603b590072c` on
+`dbf22ddf2906`, with the corrected client callback affinity and Caddy response
+lifetime shared by all finite arms. Both randomized blocks and all 20
+participants passed transport, completion, padding, stream ownership, drain,
+capture-drop and network-mutation admission. Both streaming markers were
+checked where required. Private capture inputs were deleted after success.
+
+These are within-campaign screening distances, not a replacement for the
+canonical default matrix and not statistically established gains: two blocks,
+`INSUFFICIENT_FOR_INFERENCE`, no independent Firefox null verdict. Lower is
+better; percentages compare with the same listener's default in this campaign.
+
+| Arm | p17--32 | Whole | p17--32 vs default | Whole vs default |
+| --- | ---: | ---: | ---: | ---: |
+| SOCKS current default | 0.38048 | 0.31653 | — | — |
+| SOCKS original finite | 0.36945 | 0.34185 | -2.9% | +8.0% |
+| SOCKS receive read-through | 0.38717 | 0.35177 | +1.8% | +11.1% |
+| SOCKS receive + upload read-through | 0.34145 | 0.37551 | -10.3% | +18.6% |
+| HTTP CONNECT current default | 0.37918 | 0.28976 | — | — |
+| HTTP CONNECT original finite | 0.35150 | 0.35130 | -7.3% | +21.2% |
+| HTTP CONNECT receive read-through | 0.34426 | 0.35849 | -9.2% | +23.7% |
+| HTTP CONNECT receive + upload read-through | 0.35780 | 0.35972 | -5.6% | +24.1% |
+
+No finite variant improves Whole, and none meets the >=20% breaking-default
+gate. The receive-only early-window improvement from the unsafe earlier
+prototype is not reproduced here. Do not start a full implementation, full
+matrix or resource/link sweep for these variants. This rejects the measured
+variants as default candidates, not every possible finite-exchange protocol.
+
+Post-hoc accounting is retained in `mechanism-accounting.json` beside the safe
+dataset and exactly reconstructs the unchanged distance metric. For
+bidirectional SOCKS, the Whole timing/burst contribution improves by 0.00450,
+but packet size/direction, other aggregates and TLS-record contributions
+worsen by 0.02548, 0.03573 and 0.00228: net +0.05899. Thus another pause cannot
+by itself explain this arm's failure. For bidirectional HTTP CONNECT,
+timing/bursts add 0.03627 of the net +0.06995 penalty; non-timing structure also
+contributes substantially.
+
+The raw aggregates support investigating exchange overhead, not assuming it
+has been causally isolated: bidirectional SOCKS / HTTP send 25,690.5 / 25,175
+client wire bytes versus 16,601.5 / 18,646 for their defaults. Server bytes in
+the first 128 packets are 45,982.5 / 49,149 versus 93,588 / 98,125. A smaller
+completion barrier has not removed the extra exchanges or their changed
+packet/record ordering. These data do not prove that trimming headers alone
+would recover the deficit; any continuation needs a distinct preregistered
+transport premise, not another fixed delay or a new name for read-through.
+
+There is no new fronting-site requirement and no production compatibility
+change. H2 and H3 defaults, their canonical matrix, and the existing site
+contract remain unchanged. The finite measurements do not establish
+size-independent or slow-link performance.
+
+The corrected prototype and its functional tests are preserved in
+`dbf22ddf2906`; all three finite variants and their fixture-only protocol were
+retired from the working product after this screen. Runtime and integration
+files were verified byte-for-byte against pre-finite base `0c67b4388495`,
+excluding this experiment log. Incremental minimized product/test rebuilds,
+100 project gtests, 172 Python tests and the staged H2 config/listener gate
+against stock Caddy all pass after retirement. The latter runs in a private
+network namespace and exercises SOCKS, authenticated SOCKS and HTTP CONNECT.
+No Firefox rebuild, default promotion, full matrix, resource sweep or history
+rewrite was performed. The retained safe datasets and prototype commits allow
+reproduction without retaining an unsuccessful transport in the product.
+
+### Budgeted streaming finite responses: preregistration
+
+The next history preflight searched the complete all-ref Git history with
+pickaxe terms for finite/bounded streaming and response byte budgets, current
+documentation, the three retained finite metadata sets, and corrected source
+`dbf22ddf2906`. Earlier finite variants all completed each download after one
+available pipe read. Client read-through and streamed uploads did not change
+that response-completion rule. The rejected 1-ms server read-coalescing and
+inner-TLS alignment experiments instead delayed or regrouped target delivery;
+they did not keep immediately flushed bytes inside a size-bounded ordinary
+HTTP response. The present proposal must not repeat those delivery barriers.
+
+Two alternatives were screened out before implementation. Piggybacking open
+with an optimistic first ClientHello overlaps the already rejected early
+CONNECT-DATA/local-success family. Combining separate Naive header, payload
+and padding writes has no opportunity in the pinned server: its existing
+codec already constructs each padded record in one buffer and calls `Write`
+once. Compacting session/auth headers remains a separate, unmeasured overhead
+idea; it is not combined with the response-count experiment.
+
+Restore only the corrected diagnostic adapter as a control. Keep both client
+receive read-through and server upload streaming enabled. The new v3 changes
+download response completion only: retain the existing 64-KiB maximum body,
+forward and flush every positive read immediately, and finish at that budget
+or target EOF. H2 response length is unspecified until END_STREAM, not padded
+to a target. No delivery waits for a full block, timer, TLS boundary, resource
+size, RTT or bandwidth estimate. An underfilled response may remain open
+while the tunnel is idle, just as the previous next empty receive request
+could; its already received bytes must remain available to the application.
+Successful data progress refreshes the existing idle safety timeout.
+
+Preserve the two-upload/four-download windows, ordered delivery, bounded
+pipes, eight Variant-1 records, target Fast Open, TLS/auth/ACL checks, listener
+admission and fronting-page policy. Every unmarked CONNECT remains unchanged.
+The one-byte finite version marker selects the new mode explicitly and mixed
+versions fail closed. Required tests prove a flushed prefix before the target
+produces the suffix, exact 64-KiB rotation and short EOF, cancellation during
+an unfinished response, response-write failure, and the prior callback-affinity
+and response-lifetime fixes. Failed partial responses must abort the H2 stream,
+not report a successful truncated body.
+
+After functional admission, collect two randomized H2/inner-H2 blocks at seed
+`2026083089`: SOCKS/HTTP defaults, corrected v2 read-through controls and v3
+budgeted candidates, with shared Firefox A/B. Keep the scheduled outer/inner
+fixtures, cold profiles, capture cutoff and isolated MTU-1500 namespace fixed.
+Compare p17--32 and Whole only; retain a proof of a completed full-budget
+response and report request/response count and byte aggregates separately
+from passive features. Improvement over v2 alone is insufficient: the breaking
+default gate remains a replicated >=20% gain against current defaults without
+unacceptable regressions. No full matrix or size/link sweep for a weak screen.
+There is no change to the site's contract or the canonical default matrix.
+
+### Finite-exchange native-pool ownership correction
+
+The first v3 functional round stopped before reaching v3: the old v1
+receive-read-through HTTP arm truncated a parallel 128-KiB download at 66,984
+bytes in private probe `smzg6q09`. The received prefix was exact. Client
+diagnostics recorded HTTP 409 on later exchanges, not a codec mismatch.
+An aggregate audit of the server log showed successful requests on the
+session's initial TCP source port and rejected requests on another source
+port. Native Necko pooling had moved ordinary requests between outer
+connections, while the diagnostic server required exact `RemoteAddr` equality.
+
+All-ref history preflight found no previous correction for this ownership
+case. A deterministic port-migration test fails with HTTP 409 for v1, v2 and
+v3 before the fix. The adapter now compares normalized peer IP addresses,
+retaining the same credential digest, random 128-bit session capability,
+handler/version checks, sequence/replay bounds and target ACL. Different
+addresses, malformed addresses and wrong credentials still fail closed;
+only the source port may change. This correction is shared by controls and
+candidates. Ordinary CONNECT defaults are unaffected.
+
+The camouflage admission rule still requires exactly one outer ClientHello;
+the functional correction is not permission to accept extra connections in
+the primary capture. Earlier singleton measurements are not reused as fresh
+controls. No residual measurement was collected during the failed functional
+round, and no default or site policy changed.
+
+### Budgeted-response functional admission
+
+After the ownership correction, all eight finite/listener combinations passed
+in private probe `pciwebne`; both v2 controls and both v3 candidates repeated
+successfully in `gzoy8pf3` and `xf4p22jo`. Every arm exercised TLS, exact 1-MiB
+slow download, 768-KiB upload, half-close, four concurrent 128-KiB downloads,
+cancellation, bad authentication and bounded process shutdown. The v3 probes
+also required a completed 65,536-byte response and receive-before-stop proof.
+
+Incremental minimized product/test builds, 104 C++ gtests, 175 Python tests and
+the complete server Go race-test suite passed. The server tests include v2/v3
+upload-prefix and length validation, byte-budget rotation without target EOF,
+a short final response, cancellation before and after the first body bytes,
+write failure and the earlier response-lifetime regression. A real local H2
+client additionally receives the prefix immediately and then a stream error,
+not successful EOF, when the target fails mid-response. All network checks
+run in private WSL namespaces, including the Go suite.
+
+The admitted Caddy overlay SHA-256 is
+`b7bed380ba5845cd121d489962b2a51b6af3e01204a5be8e5988b1e241708272`.
+The new per-sample `finite-exchanges/*.json` files contain only summed numeric
+counters and arm/schema/scope labels. Their scope is the entire product
+session including post-capture shutdown; open/close requests are excluded.
+They are mechanism diagnostics, not new passive classifier features or a
+change to capture cutoff. Missing/duplicate terminal counters fail closed.
+Body-byte counters describe encoded tunnel bytes, including Naive padding,
+not the application resources themselves.
+The planned seed `2026083089` screen remains p17--32 and Whole only.
+
+### Budgeted-response H2 screen: fewer exchanges, no default win
+
+Seed `2026083089` completed on `7be2c317e82f` as safe artifact
+`25de70a0225eed54`. All 16 participants passed isolated-network, completion,
+padding, single-outer-ClientHello, drain and capture admission. Every candidate
+proved full-budget rotation. The safe artifact includes eight terminal counter
+files plus `finite-counts-summary.json` and the unchanged-distance decomposition
+in `mechanism-accounting.json`. Successful private capture inputs were deleted.
+
+Two randomized blocks are a diagnostic screen (`INSUFFICIENT_FOR_INFERENCE`),
+not a statistical camouflage verdict or a replacement for the canonical
+default matrix. Lower is better; the default comparisons below are within
+this campaign only.
+
+| H2 listener / arm | p17--32 | Whole | p17--32 vs default | Whole vs default |
+| --- | ---: | ---: | ---: | ---: |
+| SOCKS default | 0.41901 | 0.30911 | — | — |
+| SOCKS v2 read-through control | 0.42534 | 0.40280 | +1.5% | +30.3% |
+| SOCKS v3 budgeted response | 0.39065 | 0.38571 | -6.8% | +24.8% |
+| HTTP CONNECT default | 0.39524 | 0.35644 | — | — |
+| HTTP CONNECT v2 read-through control | 0.37937 | 0.39327 | -4.0% | +10.3% |
+| HTTP CONNECT v3 budgeted response | 0.39875 | 0.36429 | +0.9% | +2.2% |
+
+The transport premise did work: mean started download requests fell from
+28.5 to 15 for SOCKS (-47.4%) and 27.5 to 15 for HTTP (-45.5%). Each v3
+session completed ten full-budget responses. Upload request counts stayed
+near 11--12.5. These counters include post-capture shutdown and exclude
+open/close requests; they are not additional features of the primary metric.
+Client wire bytes fell from 25,518 to 22,788.5 and 26,009 to 23,657.5 versus
+v2, but remain above their defaults of 17,766 and 19,737. Server bytes in the
+first 128 packets rose from 44,187.5 to 63,956.5 and 53,342.5 to 69,157, still
+below defaults of 105,866 and 87,289.5.
+
+Relative to v2, Whole improves by only 4.2% / 7.4%; neither listener beats its
+default. SOCKS retains both timing/burst (+0.03455) and non-timing (+0.04205)
+Whole penalties against its default. HTTP timing/bursts improve slightly
+(-0.00237), but non-timing structure adds +0.01021. Reducing response count is
+therefore helpful to the prototype, not sufficient to solve its camouflage
+gap. There is no >=20% default candidate, no full matrix/size/link sweep, and
+no production or site-contract change. This result does not prove that a
+different bounded protocol cannot work.
+
+### Data-activated receive credits: preregistration
+
+The next all-ref history preflight covers finite window/credit/lookahead,
+`FillDownloads`, initial receive terms, the retained finite arms and their
+source. They all issue four download requests immediately after open. The
+older rejection of additional H2 lanes concerns transport flow-control
+capacity (the 12-MiB initial window), not when these four ordinary GETs start.
+No earlier finite variant starts with one request and expands on received data.
+
+Keep v3 and its server byte-for-byte. The single new client variable is to
+start with one outstanding receive request, then restore the four-request
+maximum on the first positive, validated response body callback. Forward those
+bytes immediately; do not wait for a complete response, timer, resource size
+or throughput estimate. This removes three speculative GETs from the initial
+exchange without reducing the steady-state receive window. It is an event-
+driven startup experiment, not another fixed pause or H2 SETTINGS change.
+
+The motivation is specific but not yet causal proof: v3 still has small
+client-direction packets where the Firefox controls already deliver large
+server-direction packets in the late p17--32 region. Retain strict markers
+for initial one-credit admission and expansion after data, plus the existing
+read-through, rotation, body cap, integrity and single-outer-session gates.
+
+After functional checks, seed `2026083090` will compare both defaults, both
+ordinary v3 controls and both data-activated v3 candidates in two randomized
+H2/inner-H2 blocks with Firefox A/B. Only p17--32 and Whole are preregistered.
+The breaking-default threshold, absence of site-specific waits, and the rule
+against a full matrix/resource sweep for weak candidates are unchanged.
+
+Functional admission for the data-activated window passed incremental minimized
+product/test builds, 105 C++ gtests and 175 Python tests. The ordinary v3
+controls and new candidates passed the complete four-arm integrity probes
+twice (`mefig5i4`, `gizsm6we`). The new capture gate checks actual initial
+request count and event ordering: ready, one-credit admission, streamed bytes,
+window expansion, full-budget completion. Missing, duplicate, reversed and
+timer-triggered evidence is rejected. Server source and the admitted Caddy
+binary remain byte-identical to the preceding v3 screen.
+
+### Data-activated receive credits: negative H2 screen
+
+Seed `2026083090` completed on `c2c29bdded77` as safe artifact
+`bd4a3c377ba1a291`. All 16 participants passed the same admission gates;
+candidate markers additionally proved one initial request and expansion after
+streamed data but before full-budget completion. Caddy is unchanged from the
+preceding screen. Private successful capture inputs were deleted. The safe
+artifact retains terminal counters, `finite-counts-summary.json`,
+`wire-aggregate-summary.json` and `mechanism-accounting.json`.
+
+These are within-campaign two-block diagnostics, not inference and not new
+default-matrix values. In particular, do not compare the absolute p17--32
+distances with the previous campaign: the Firefox observations and distance
+normalization differ. The contemporaneous defaults and controls are mandatory.
+
+| H2 listener / arm | p17--32 | Whole | p17--32 vs default | Whole vs default |
+| --- | ---: | ---: | ---: | ---: |
+| SOCKS default | 0.57654 | 0.33963 | — | — |
+| SOCKS v3 four-credit control | 0.57708 | 0.40297 | +0.1% | +18.6% |
+| SOCKS v3 data-activated credits | 0.57635 | 0.43450 | -0.03% | +27.9% |
+| HTTP CONNECT default | 0.54448 | 0.30949 | — | — |
+| HTTP CONNECT v3 four-credit control | 0.55403 | 0.38339 | +1.8% | +23.9% |
+| HTTP CONNECT v3 data-activated credits | 0.53002 | 0.39721 | -2.7% | +28.3% |
+
+Against v3 itself, p17--32 changes by -0.1% / -4.3%, while Whole worsens by
+7.8% / 3.6%. Both controls and candidates start fifteen download requests and
+complete ten full-budget bodies, as expected: this changes startup ordering,
+not total response count or steady-state capacity.
+
+The early direction/size mismatch remains. Mean client bytes in the first
+32 packets rise from 4,548.5 to 6,016 for SOCKS and 4,548 to 5,962.5 for HTTP;
+server bytes rise only from 4,539.5 to 4,656.5 and 4,536.5 to 4,615.5.
+Server bytes in the first 128 packets improve from 64,831 to 70,564 and
+73,399 to 74,262, still below defaults of 89,593 and 98,049. The experiment
+does not establish the identity of encrypted payloads from these aggregates.
+It does show that deferring speculative GETs did not yield the hoped-for
+server-heavy early profile. The SOCKS Whole penalty against v3 includes
++0.01514 timing/bursts and +0.01640 non-timing terms; HTTP adds +0.00504 and
++0.00877 respectively. A timer is not justified by these results.
+
+Reject this startup-credit variant as a default candidate. Together, the two
+new screens isolate response count and initial receive lookahead; neither
+meets the >=20% breaking-default threshold, so neither proceeds to a full
+implementation, full matrix or resource/link sweep. These observations do
+not prove that all possible finite protocols fail, but repeating fixed block
+sizes or adding another arbitrary pause has no support here. Any next trial
+needs a distinct transport premise, history preflight and fresh controls.
+H2/H3 defaults, the canonical matrix and the fronting-site contract are
+unchanged; no size-independent or slow-link improvement is claimed.
+
+After these screens, both new modes and the restored finite controls were
+retired from the working product. The budgeted prototype, ownership correction
+and tests are preserved in `7be2c317e82f`; data-activated credits are preserved
+in `c2c29bdded77`. All runtime/integration files were verified byte-for-byte
+against pre-finite base `0c67b4388495` (also `c75be29167da`), excluding this
+experiment log. No history was rewritten and no safe dataset was removed.
+Incremental minimized product/test rebuilds, 100 C++ gtests, 172 Python tests,
+and the newly staged H2 config/listener gate against stock Caddy all pass.
+The latter tests SOCKS, authenticated SOCKS and HTTP CONNECT inside a fresh
+private WSL namespace. No full Firefox rebuild or default promotion occurred.
 
 ## Sensitive data handling
 

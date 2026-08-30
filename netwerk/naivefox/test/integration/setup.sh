@@ -35,7 +35,9 @@ fi
 
 export GOCACHE="$TOOLS_DIR/go-build-cache"
 export GOMODCACHE="$TOOLS_DIR/go-module-cache"
-mkdir -p "$GOCACHE" "$GOMODCACHE"
+export TMPDIR="$TOOLS_DIR/tmp"
+export GOTMPDIR="$TMPDIR"
+mkdir -p "$GOCACHE" "$GOMODCACHE" "$TMPDIR"
 
 XCADDY_BIN=
 if command -v xcaddy >/dev/null 2>&1 && xcaddy version 2>/dev/null | rg -q "^${XCADDY_VERSION}([[:space:]]|$)"; then
@@ -50,13 +52,18 @@ else
   fi
 fi
 
-build_id="caddy=$CADDY_VERSION xcaddy=$XCADDY_VERSION module=$FORWARDPROXY_MODULE@$FORWARDPROXY_VERSION=$FORWARDPROXY_REPLACEMENT@$FORWARDPROXY_COMMIT go=$GO_VERSION"
+if [[ ! $NAIVEFOX_TRANSPORT_COMMIT =~ ^[0-9a-f]{40}$ ]]; then
+  printf 'NAIVEFOX_TRANSPORT_COMMIT must be an immutable full Git commit\n' >&2
+  exit 1
+fi
+build_id="caddy=$CADDY_VERSION xcaddy=$XCADDY_VERSION module=$FORWARDPROXY_MODULE@$FORWARDPROXY_VERSION=$FORWARDPROXY_REPLACEMENT@$FORWARDPROXY_COMMIT transport=$NAIVEFOX_TRANSPORT_MODULE@$NAIVEFOX_TRANSPORT_COMMIT go=$GO_VERSION"
 caddy_marker="$TOOLS_DIR/bin/caddy.build-id"
 if [[ ! -x "$CADDY_BIN" || ! -f "$caddy_marker" || $(<"$caddy_marker") != "$build_id" ]]; then
   caddy_tmp="$TOOLS_DIR/bin/caddy.tmp.$$"
   trap 'rm -f -- "$caddy_tmp"' EXIT
   PATH="$(dirname "$GO_BIN"):$PATH" "$XCADDY_BIN" build "$CADDY_VERSION" --output "$caddy_tmp" \
-    --with "$FORWARDPROXY_MODULE@$FORWARDPROXY_VERSION=$FORWARDPROXY_REPLACEMENT@$FORWARDPROXY_COMMIT"
+    --with "$FORWARDPROXY_MODULE@$FORWARDPROXY_VERSION=$FORWARDPROXY_REPLACEMENT@$FORWARDPROXY_COMMIT" \
+    --with "$NAIVEFOX_TRANSPORT_MODULE@$NAIVEFOX_TRANSPORT_COMMIT"
   chmod 0755 "$caddy_tmp"
   mv "$caddy_tmp" "$CADDY_BIN"
   printf '%s\n' "$build_id" >"$caddy_marker"
@@ -66,6 +73,11 @@ fi
 if ! "$CADDY_BIN" list-modules --packages | rg \
   '^http\.handlers\.forward_proxy[[:space:]]+github\.com/caddyserver/forwardproxy'; then
   printf 'Caddy is missing the pinned http.handlers.forward_proxy module\n' >&2
+  exit 1
+fi
+if ! "$CADDY_BIN" list-modules --packages | rg \
+  '^http\.handlers\.naivefox_transport[[:space:]]+github\.com/incident201/naivefox-transport'; then
+  printf 'Caddy is missing the pinned http.handlers.naivefox_transport module\n' >&2
   exit 1
 fi
 if [[ $("$CADDY_BIN" version) != "$CADDY_VERSION"* ]]; then
@@ -78,7 +90,7 @@ fi
   printf 'go=%s\n' "$("$GO_BIN" version)"
   printf 'xcaddy=%s\n' "$("$XCADDY_BIN" version)"
   printf 'caddy=%s\n' "$("$CADDY_BIN" version)"
-  "$CADDY_BIN" list-modules --packages | rg '^http\.handlers\.forward_proxy[[:space:]]'
+  "$CADDY_BIN" list-modules --packages | rg '^http\.handlers\.(forward_proxy|naivefox_transport)[[:space:]]'
 } >"$STATE_ROOT/setup-diagnostics.txt"
 
 printf 'fixture dependencies ready in %s\n' "$TOOLS_DIR"

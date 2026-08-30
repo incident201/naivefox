@@ -4254,7 +4254,8 @@ void CheckForBrokenChromeURL(nsILoadInfo* aLoadInfo, nsIURI* aURI) {
   }
   nsAutoCString scheme;
   aURI->GetScheme(scheme);
-  if (!scheme.EqualsLiteral("chrome") && !scheme.EqualsLiteral("resource")) {
+  if (!scheme.EqualsLiteral("chrome") && !scheme.EqualsLiteral("resource") &&
+      !scheme.EqualsLiteral("moz-src")) {
     return;
   }
   nsAutoCString host;
@@ -4310,6 +4311,12 @@ void CheckForBrokenChromeURL(nsILoadInfo* aLoadInfo, nsIURI* aURI) {
       StringBeginsWith(spec, "resource://android/assets/web_extensions/"_ns)) {
     return;
   }
+
+  // browser/ is not built for GeckoView, so toolkit code that references it
+  // can never resolve these here.
+  if (StringBeginsWith(spec, "moz-src:///browser/"_ns)) {
+    return;
+  }
 #endif
 
   // DTD files from gre may not exist when requested by tests.
@@ -4321,13 +4328,6 @@ void CheckForBrokenChromeURL(nsILoadInfo* aLoadInfo, nsIURI* aURI) {
   // command line, which is then looked up in both app-specific and toolkit-wide
   // locations.
   if (spec.Find("backgroundtasks") != kNotFound) {
-    return;
-  }
-
-  // SessionStoreFunctions.sys.mjs may be missing at runtime in xpcshell tests:
-  // https://bugzilla.mozilla.org/show_bug.cgi?id=2018078#c3
-  if (spec.EqualsLiteral("moz-src:///browser/components/sessionstore/"
-                         "SessionStoreFunctions.sys.mjs")) {
     return;
   }
 

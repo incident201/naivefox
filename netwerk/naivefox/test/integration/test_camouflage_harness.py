@@ -302,9 +302,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("WaitForStartupCondition", wait_body)
         self.assertIn("NS_NewTimerWithCallback", runtime)
         self.assertIn("InitialNetworkStateAllowsStartup", wait_body)
-        self.assertIn(
-            "terminalState, kAllowUnavailableNetworkMonitor", wait_body
-        )
+        self.assertIn("terminalState, kAllowUnavailableNetworkMonitor", wait_body)
         self.assertIn(
             "#  ifdef ANDROID\n"
             "constexpr bool kAllowUnavailableNetworkMonitor = true;\n"
@@ -507,6 +505,42 @@ class CamouflageHarnessTests(unittest.TestCase):
                 rows, expected_blocks=1, arms=(control, treatment)
             )
 
+    def test_http_connect_resource_tree_requires_matching_control(self):
+        treatment = "tree-native-parser-resource-committed-page-http-connect"
+        control = "document-start-http-connect"
+        with self.assertRaisesRegex(ValueError, "requires the .* control"):
+            SUPERBLOCKS.validate_arm_sequence(("root", treatment))
+        with self.assertRaisesRegex(ValueError, "browser_page"):
+            SUPERBLOCKS.schedule_rows(
+                1, "h3", 1, ["initial"], arms=(control, treatment)
+            )
+        rows = SUPERBLOCKS.schedule_rows(
+            1, "h3", 1, ["browser_page"], arms=(control, treatment)
+        )
+        SUPERBLOCKS.validate_superblocks(
+            rows, expected_blocks=1, arms=(control, treatment)
+        )
+
+    def test_pipeline_parsers_accept_every_superblock_arm(self):
+        parsers = (
+            ("camouflage_features.py", ("extract", "--help"), set()),
+            (
+                "camouflage_sample_validation.py",
+                ("--help",),
+                {"firefox-proxied"},
+            ),
+        )
+        for filename, arguments, excluded in parsers:
+            with self.subTest(filename=filename):
+                result = subprocess.run(
+                    [sys.executable, os.path.join(HERE, filename), *arguments],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                for arm in set(SUPERBLOCKS.SUPPORTED_ARMS) - excluded:
+                    self.assertIn(arm, result.stdout)
+
     def test_resource_tree_config_and_lifecycle_are_fail_closed(self):
         arm = "tree-native-parser-document-start-resource-tree"
         config = CONFIG.build_config(
@@ -573,6 +607,7 @@ class CamouflageHarnessTests(unittest.TestCase):
 
     def test_resource_committed_page_requires_deferred_image_opens(self):
         arm = "tree-native-parser-resource-committed-page"
+        http_arm = "tree-native-parser-resource-committed-page-http-connect"
         protocol = "h3"
         lines = [
             "Preamble native-parser-preload lifecycle=chunk-flushed sequence=1 "
@@ -622,12 +657,26 @@ class CamouflageHarnessTests(unittest.TestCase):
             },
         }
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
+        SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
+        h2_lines = [
+            line.replace("protocol=h3", "protocol=h2").replace(
+                "outer=h3", "outer=h2"
+            )
+            for line in lines
+        ]
+        h2_features = {
+            "protocol": "h2",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        }
+        SAMPLE.validate_sample(arm, "h2", "\n".join(h2_lines), h2_features)
+        SAMPLE.validate_sample(http_arm, "h2", "\n".join(h2_lines), h2_features)
         prefixed_lines = [
             f"[0829/001452.366705:INFO:naivefox] {line}" for line in lines
         ]
-        SAMPLE.validate_sample(
-            arm, protocol, "\n".join(prefixed_lines), features
-        )
+        SAMPLE.validate_sample(arm, protocol, "\n".join(prefixed_lines), features)
 
         body_before_later_commits = list(lines)
         first_body = body_before_later_commits.pop(17)
@@ -655,14 +704,10 @@ class CamouflageHarnessTests(unittest.TestCase):
             )
 
         missing_open = [
-            line
-            for line in lines
-            if "deferred-resource-opened stream=6" not in line
+            line for line in lines if "deferred-resource-opened stream=6" not in line
         ]
         with self.assertRaisesRegex(ValueError, "configured resource opens"):
-            SAMPLE.validate_sample(
-                arm, protocol, "\n".join(missing_open), features
-            )
+            SAMPLE.validate_sample(arm, protocol, "\n".join(missing_open), features)
 
         wrong_lifecycle = [
             line.replace(
@@ -672,9 +717,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             for line in lines
         ]
         with self.assertRaisesRegex(ValueError, "causal state"):
-            SAMPLE.validate_sample(
-                arm, protocol, "\n".join(wrong_lifecycle), features
-            )
+            SAMPLE.validate_sample(arm, protocol, "\n".join(wrong_lifecycle), features)
 
     def test_opt_in_superblock_arms_share_one_control_pair(self):
         arms = (
@@ -785,6 +828,19 @@ class CamouflageHarnessTests(unittest.TestCase):
                 ["browser_page"],
                 arms=("root", "tree-native-parser-full-process-overlap-css"),
             )
+
+    def test_h2_resource_committed_page_arms_are_schedulable(self):
+        arms = (
+            "document-start-overlap",
+            "document-start-http-connect",
+            "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
+        )
+        rows = SUPERBLOCKS.schedule_rows(
+            29, "h2", 1, ["browser_page"], arms=arms
+        )
+        SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
+        self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
     def test_multi_arm_parser_rejects_alias_duplication(self):
         with self.assertRaisesRegex(ValueError, "aliases"):
@@ -1123,8 +1179,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertTrue(config["outer-session-gate"])
         self.assertEqual(config["preamble"], {"mode": "off"})
 
-    def test_http_connect_ingress_uses_same_document_start_outer_mode(self):
-        config = CONFIG.build_config(
+    def test_http_connect_ingress_uses_document_start_for_h2_and_h3(self):
+        h2_config = CONFIG.build_config(
             "document-start-http-connect",
             "h2",
             1080,
@@ -1132,63 +1188,286 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-user",
             "fixture-pass",
         )
+        self.assertEqual(h2_config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(h2_config["preamble"]["mode"], "document-start-overlap")
+        self.assertEqual(urlsplit(h2_config["proxy"]).scheme, "https")
+        self.assertTrue(h2_config["outer-session-gate"])
+
+        h3_config = CONFIG.build_config(
+            "document-start-http-connect",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(h3_config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(h3_config["preamble"]["mode"], "document-start-overlap")
+        self.assertEqual(urlsplit(h3_config["proxy"]).scheme, "quic")
+        self.assertTrue(h3_config["outer-session-gate"])
+
+    def test_http_connect_ingress_combines_with_h3_resource_page(self):
+        config = CONFIG.build_config(
+            "tree-native-parser-resource-committed-page-http-connect",
+            "h3",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
         self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(config["preamble"]["mode"], "document-start-overlap")
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h2"):
-            CONFIG.build_config(
-                "document-start-http-connect",
-                "h3",
-                1080,
-                4433,
-                "fixture-user",
-                "fixture-pass",
-            )
+        self.assertEqual(urlsplit(config["proxy"]).scheme, "quic")
+        self.assertEqual(
+            config["preamble"],
+            {
+                "mode": "off",
+                "h3-mode": "tree-native-parser-resource-committed-overlap",
+                "path": "/camouflage/index.html",
+                "max-assets": 6,
+                "max-bytes": 384 * 1024,
+                "cache-resources": True,
+            },
+        )
+        h2_config = CONFIG.build_config(
+            "tree-native-parser-resource-committed-page-http-connect",
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(h2_config["listen"], "http://127.0.0.1:1080")
+        self.assertEqual(urlsplit(h2_config["proxy"]).scheme, "https")
+        self.assertEqual(
+            h2_config["preamble"],
+            {
+                "mode": "off",
+                "h2-mode": "tree-native-parser-resource-committed-overlap",
+                "path": "/camouflage/index.html",
+                "max-assets": 6,
+                "max-bytes": 384 * 1024,
+                "cache-resources": True,
+            },
+        )
+
+        h2_socks_config = CONFIG.build_config(
+            "tree-native-parser-resource-committed-page",
+            "h2",
+            1080,
+            4433,
+            "fixture-user",
+            "fixture-pass",
+        )
+        self.assertEqual(h2_socks_config["listen"], "socks://127.0.0.1:1080")
+        self.assertEqual(h2_socks_config["preamble"], h2_config["preamble"])
 
     def test_http_connect_ingress_combines_with_response_header_admission(self):
-        config = CONFIG.build_config(
-            "document-overlap-http-connect",
-            "h2",
-            1080,
-            4433,
-            "fixture-user",
-            "fixture-pass",
-        )
-        self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(config["preamble"]["mode"], "document-overlap")
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h2"):
-            CONFIG.build_config(
+        for protocol in ("h2", "h3"):
+            config = CONFIG.build_config(
                 "document-overlap-http-connect",
-                "h3",
+                protocol,
                 1080,
                 4433,
                 "fixture-user",
                 "fixture-pass",
             )
+            self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+            self.assertEqual(config["preamble"]["mode"], "document-overlap")
+            self.assertTrue(config["outer-session-gate"])
 
     def test_http_connect_ingress_combines_with_first_buffer_admission(self):
-        config = CONFIG.build_config(
-            "document-first-buffer-http-connect",
-            "h2",
-            1080,
-            4433,
-            "fixture-user",
-            "fixture-pass",
-        )
-        self.assertEqual(config["listen"], "http://127.0.0.1:1080")
-        self.assertEqual(
-            config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
-        self.assertTrue(config["outer-session-gate"])
-        with self.assertRaisesRegex(ValueError, "requires h2"):
-            CONFIG.build_config(
+        for protocol in ("h2", "h3"):
+            config = CONFIG.build_config(
                 "document-first-buffer-http-connect",
-                "h3",
+                protocol,
                 1080,
                 4433,
                 "fixture-user",
                 "fixture-pass",
+            )
+            self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+            self.assertEqual(
+                config["preamble"]["mode"], "document-first-buffer-overlap"
+            )
+            self.assertTrue(config["outer-session-gate"])
+
+    def test_optimistic_local_reply_arms_are_explicit_and_listener_specific(self):
+        cases = {
+            "document-first-buffer-task-optimistic": (
+                "socks://127.0.0.1:1080",
+                "document-first-buffer-task-overlap",
+            ),
+            "document-first-buffer-http-connect-optimistic": (
+                "http://127.0.0.1:1080",
+                "document-first-buffer-overlap",
+            ),
+        }
+        for arm, (listener, mode) in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+                self.assertEqual(config["listen"], listener)
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertTrue(config["diagnostic-optimistic-local-reply"])
+        for arm in (
+            "document-first-buffer-task-overlap",
+            "document-first-buffer-http-connect",
+        ):
+            self.assertNotIn(
+                "diagnostic-optimistic-local-reply",
+                CONFIG.build_config(
+                    arm,
+                    "h2",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                ),
+            )
+
+    def test_http_connect_task_barriers_map_to_product_modes(self):
+        cases = {
+            "document-start-task-http-connect": "document-start-task-overlap",
+            "document-headers-task-http-connect": "document-headers-task-overlap",
+            "document-first-buffer-task-http-connect": (
+                "document-first-buffer-task-overlap"
+            ),
+        }
+        for arm, mode in cases.items():
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(
+                    arm,
+                    "h3",
+                    1080,
+                    4433,
+                    "fixture-user",
+                    "fixture-pass",
+                )
+                self.assertEqual(config["listen"], "http://127.0.0.1:1080")
+                self.assertEqual(config["preamble"]["mode"], mode)
+                self.assertTrue(config["proxy"].startswith("quic://"))
+
+    def test_http_connect_task_aliases_reuse_causal_validation(self):
+        features = {
+            "protocol": "h3",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        samples = {
+            "document-start-task-http-connect": (
+                "Connection 1 preamble document-start-overlap "
+                "admission=request-committed-task request_committed=1 "
+                "root_done=0 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=512 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble document-start-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+            ),
+            "document-headers-task-http-connect": (
+                "Connection 1 preamble document-overlap "
+                "admission=response-headers-task response_accepted=1 "
+                "root_done=0 protocol=h3\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=0 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble document-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+            ),
+            "document-first-buffer-task-http-connect": (
+                "Connection 1 preamble document-overlap "
+                "admission=first-data-buffer-task response_accepted=1 "
+                "root_done=0 protocol=h3\n"
+                "Connection 1 established target=localhost:443 "
+                "outer=h3 padding=yes\n"
+                "Connection 1 preamble result=success status=0x00000000 "
+                "http=200 bytes=512 protocol=h3\n"
+                "Connection 1 preamble document-overlap drain=complete "
+                "root_done=1 completed_resources=0 protocol=h3\n"
+            ),
+        }
+        for arm, log_text in samples.items():
+            with self.subTest(arm=arm):
+                SAMPLE.validate_sample(arm, "h3", log_text, features)
+
+    def test_optimistic_local_reply_lifecycle_is_fail_closed(self):
+        features = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        cases = {
+            "document-first-buffer-task-optimistic": (
+                "socks",
+                "first-data-buffer-task",
+            ),
+            "document-first-buffer-http-connect-optimistic": (
+                "http-connect",
+                "first-data-buffer",
+            ),
+        }
+        for arm, (listener, admission) in cases.items():
+            with self.subTest(arm=arm):
+                markers = "".join(
+                    f"Local optimistic reply phase={phase} listener={listener}\n"
+                    for phase in (
+                        "queued",
+                        "reply-flushed-before-outer",
+                        "outer-established",
+                        "pump-started",
+                    )
+                )
+                lifecycle = (
+                    "Connection 1 preamble document-overlap "
+                    f"admission={admission} response_accepted=1 "
+                    "root_done=0 protocol=h2\n"
+                    "Connection 1 established target=localhost:443 "
+                    "outer=h2 padding=yes\n"
+                    "Connection 1 preamble result=success status=0x00000000 "
+                    "http=200 bytes=512 protocol=h2\n"
+                    "Connection 1 preamble document-overlap drain=complete "
+                    "root_done=1 completed_resources=0 protocol=h2\n"
+                )
+                SAMPLE.validate_sample(arm, "h2", markers + lifecycle, features)
+                with self.assertRaisesRegex(ValueError, "incomplete or unordered"):
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        markers.replace(
+                            "Local optimistic reply "
+                            "phase=reply-flushed-before-outer "
+                            f"listener={listener}\n",
+                            "",
+                        )
+                        + lifecycle,
+                        features,
+                    )
+                with self.assertRaisesRegex(ValueError, "listener identity"):
+                    wrong_listener = "http-connect" if listener == "socks" else "socks"
+                    SAMPLE.validate_sample(
+                        arm,
+                        "h2",
+                        markers.replace(
+                            f"listener={listener}", f"listener={wrong_listener}"
+                        )
+                        + lifecycle,
+                        features,
+                    )
+        with self.assertRaisesRegex(ValueError, "unexpectedly logged optimistic"):
+            SAMPLE.validate_sample(
+                "document-first-buffer-task-overlap",
+                "h2",
+                "Local optimistic reply phase=queued listener=socks\n"
+                "Connection 1 preamble document-overlap "
+                "admission=first-data-buffer-task response_accepted=1 "
+                "root_done=0 protocol=h2\n",
+                features,
             )
 
     def test_socks_ingress_combines_with_first_buffer_admission(self):
@@ -1201,9 +1480,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-pass",
         )
         self.assertEqual(config["listen"], "socks://127.0.0.1:1080")
-        self.assertEqual(
-            config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(config["outer-session-gate"])
         h3_config = CONFIG.build_config(
             "document-first-buffer-overlap",
@@ -1213,9 +1490,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "fixture-user",
             "fixture-pass",
         )
-        self.assertEqual(
-            h3_config["preamble"]["mode"], "document-first-buffer-overlap"
-        )
+        self.assertEqual(h3_config["preamble"]["mode"], "document-first-buffer-overlap")
         self.assertTrue(h3_config["proxy"].startswith("quic://"))
 
     def test_socks_first_buffer_task_arm_uses_explicit_task_mode(self):
@@ -1370,9 +1645,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             encoding="utf-8",
         ) as stream:
             source = stream.read()
-        self.assertIn(
-            'mode.EqualsLiteral("document-native-channel-open")', source
-        )
+        self.assertIn('mode.EqualsLiteral("document-native-channel-open")', source)
         self.assertIn("was retired because the falsified", source)
         self.assertIn("diagnostic pulled the full Safe Browsing", source)
         self.assertNotIn("DocumentNativeChannelOpen", source)
@@ -2019,6 +2292,210 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(f"/camouflage/api?size=1024&nav={token}", page)
         self.assertEqual(page.count(f"nav={token}"), 6)
 
+    def test_browser_page_document_body_size_is_exact_and_bounded(self):
+        query = {
+            "scenario": ["browser_page"],
+            "document_size": [str(64 * 1024)],
+        }
+        page = TARGET.Handler.camouflage_page(object(), query)
+        self.assertEqual(len(page), 64 * 1024)
+        self.assertIn(b"/camouflage/style.css", page)
+        self.assertIn(b"/camouflage/app.js", page)
+        self.assertIsNone(
+            TARGET.Handler.camouflage_page(
+                object(),
+                {"scenario": ["browser_page"], "document_size": ["100"]},
+            )
+        )
+        for invalid in ("65537", "invalid"):
+            self.assertIsNone(
+                TARGET.Handler.camouflage_page(
+                    object(),
+                    {
+                        "scenario": ["browser_page"],
+                        "document_size": [invalid],
+                    },
+                )
+            )
+        self.assertIsNone(
+            TARGET.Handler.camouflage_page(
+                object(),
+                {
+                    "scenario": ["browser_page"],
+                    "document_size": ["4096", "8192"],
+                },
+            )
+        )
+
+    def test_browser_page_early_hints_match_document_urls(self):
+        for mode, expected_count in (("css", 1), ("blocking", 2), ("all", 6)):
+            query = {"scenario": ["browser_page"], "early_hints": [mode]}
+            page = TARGET.Handler.camouflage_page(object(), query).decode()
+            links = TARGET.browser_page_early_hint_links(query)
+            self.assertEqual(len(links), expected_count)
+            for link in links:
+                url = link.split(">", 1)[0][1:]
+                self.assertIn(url, page)
+
+    def test_browser_page_final_preloads_match_document_urls(self):
+        for mode, expected_count in (("css", 1), ("blocking", 2), ("all", 6)):
+            query = {"scenario": ["browser_page"], "final_preloads": [mode]}
+            page = TARGET.Handler.camouflage_page(object(), query).decode()
+            links = TARGET.browser_page_final_preload_links(query)
+            self.assertEqual(len(links), expected_count)
+            for link in links:
+                url = link.split(">", 1)[0][1:]
+                self.assertIn(url, page)
+
+    def test_browser_page_rejects_unknown_early_hints_mode(self):
+        self.assertIsNone(
+            TARGET.browser_page_early_hint_links({
+                "scenario": ["browser_page"],
+                "early_hints": ["invalid"],
+            })
+        )
+        self.assertIsNone(
+            TARGET.browser_page_early_hint_links({
+                "scenario": ["initial"],
+                "early_hints": ["css"],
+            })
+        )
+
+    def test_outer_early_hints_cli_is_bounded_and_h2_browser_only(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-early-hints",
+                    "invalid",
+                ],
+                "must be none, css, blocking, or all",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h3",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-early-hints",
+                    "css",
+                ],
+                "requires --protocol h2 --scenario browser_page",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "initial",
+                    "--outer-early-hints",
+                    "css",
+                ],
+                "requires --protocol h2 --scenario browser_page",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
+    def test_outer_final_preloads_cli_is_bounded_and_exclusive(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-final-preloads",
+                    "invalid",
+                ],
+                "must be none, css, blocking, or all",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h3",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-final-preloads",
+                    "blocking",
+                ],
+                "requires --protocol h2 --scenario browser_page",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--outer-early-hints",
+                    "css",
+                    "--outer-final-preloads",
+                    "css",
+                ],
+                "mutually exclusive",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
+    def test_browser_page_emits_early_hints_before_final_response(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = (
+            "/camouflage/index.html?scenario=browser_page&early_hints=blocking"
+        )
+        handler.headers = {}
+        handler.send_response_only = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.wfile = mock.Mock()
+        handler.send_bytes = mock.Mock()
+
+        TARGET.Handler.do_GET(handler)
+
+        handler.send_response_only.assert_called_once_with(103)
+        self.assertEqual(handler.send_header.call_count, 2)
+        handler.end_headers.assert_called_once_with()
+        handler.wfile.flush.assert_called_once_with()
+        handler.send_bytes.assert_called_once()
+
+    def test_browser_page_adds_final_preloads_to_final_response(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = (
+            "/camouflage/index.html?scenario=browser_page&final_preloads=blocking"
+        )
+        handler.headers = {}
+        handler.send_bytes = mock.Mock()
+
+        TARGET.Handler.do_GET(handler)
+
+        handler.send_bytes.assert_called_once()
+        headers = handler.send_bytes.call_args.args[3]
+        links = [value for name, value in headers if name == "Link"]
+        self.assertEqual(
+            links,
+            [
+                "</camouflage/style.css>; rel=preload; as=style",
+                "</camouflage/app.js>; rel=preload; as=script",
+            ],
+        )
+
     def test_browser_page_rejects_invalid_navigation_token(self):
         page = TARGET.Handler.camouflage_page(
             object(), {"scenario": ["browser_page"], "nav": ["../bad"]}
@@ -2080,6 +2557,126 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn(message, result.stderr)
 
+    def test_document_body_size_cli_is_h2_browser_page_diagnostic(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (["--document-body-size", "65536"], "requires --protocol h2"),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--document-body-size",
+                    "65537",
+                ],
+                "between 1024 and 65536",
+            ),
+            (
+                [
+                    "--mode",
+                    "standard",
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--document-body-size",
+                    "65536",
+                ],
+                "restricted to gate/smoke",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--browser-page-base-size",
+                    "65536",
+                    "--document-body-size",
+                    "65536",
+                ],
+                "another fixture-shape axis",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
+    def test_outer_resource_profiles_are_coherent_and_bounded(self):
+        self.assertEqual(
+            TARGET.fronting_resource_profile(None),
+            (12 * 1024, 24 * 1024, 8 * 1024, 34, False),
+        )
+        for unit in (1024, 4096, 16384, 22000):
+            style, script, image, fourth, fourth_is_svg = (
+                TARGET.fronting_resource_profile(unit)
+            )
+            self.assertEqual(
+                (style, script, image, fourth),
+                (3 * unit, 6 * unit, 2 * unit, 2 * unit),
+            )
+            self.assertTrue(fourth_is_svg)
+            self.assertLess(17 * unit + 1024, 384 * 1024)
+        for invalid in (1023, 22001):
+            with self.assertRaises(ValueError):
+                TARGET.fronting_resource_profile(invalid)
+
+    def test_scaled_outer_fourth_image_is_a_valid_svg(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = "/camouflage/api?item=4"
+        handler.send_svg = mock.Mock()
+        handler.send_bytes = mock.Mock()
+        with mock.patch.object(
+            TARGET, "FRONTING_FOURTH_IMAGE_IS_SVG", True
+        ), mock.patch.object(TARGET, "FRONTING_FOURTH_IMAGE_SIZE", 8192):
+            TARGET.Handler.do_GET(handler)
+        handler.send_svg.assert_called_once_with(8192)
+        handler.send_bytes.assert_not_called()
+
+    def test_exact_outer_fourth_response_remains_the_measured_json(self):
+        handler = object.__new__(TARGET.Handler)
+        handler.path = "/camouflage/api?item=4"
+        handler.send_svg = mock.Mock()
+        handler.send_bytes = mock.Mock()
+        with mock.patch.object(TARGET, "FRONTING_FOURTH_IMAGE_IS_SVG", False):
+            TARGET.Handler.do_GET(handler)
+        handler.send_svg.assert_not_called()
+        self.assertEqual(handler.send_bytes.call_args.args[0], 200)
+        self.assertEqual(len(handler.send_bytes.call_args.args[1]), 34)
+        self.assertEqual(handler.send_bytes.call_args.args[2], "application/json")
+
+    def test_outer_resource_unit_cli_is_bounded_and_dense_only(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (
+                ["--outer-resource-unit-size", "1023"],
+                "between 1024 and 22000",
+            ),
+            (
+                [
+                    "--scenario",
+                    "browser_page",
+                    "--outer-resource-unit-size",
+                    "4096",
+                ],
+                "requires a dense fronting-page arm",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
     def test_network_profile_is_isolated_recorded_and_uses_receive_copy(self):
         runner_path = os.path.join(HERE, "run-camouflage-suite.sh")
         with open(runner_path, encoding="utf-8") as stream:
@@ -2101,6 +2698,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, "NAIVEFOX_CAPTURE_ISOLATED_NETWORK": "0",
+                 "NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED": "0"},
+            timeout=30,
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("requires NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1", result.stderr)
@@ -2160,6 +2760,22 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(
             "camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE",
             suite,
+        )
+        self.assertIn(
+            "document_body_size=${document_body_size:-fixture_default}", suite
+        )
+        self.assertIn("outer_resource_profile=$outer_resource_profile", suite)
+        self.assertIn(
+            "outer_resource_body_bytes_excluding_root=",
+            suite,
+        )
+        self.assertIn("validate_outer_resource_fixture", suite)
+        self.assertIn("outer_resource_profile_preflight=", suite)
+        self.assertLess(
+            suite.index(
+                "validate_outer_resource_fixture", suite.index("for protocol in")
+            ),
+            suite.index("apply_network_profile", suite.index("for protocol in")),
         )
 
         class ResponseRecorder:
@@ -3716,9 +4332,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             summary,
         )
         self.assertIn("root or stylesheet lacks END_STREAM", summary)
-        self.assertIn(
-            "tree-native-parser-document-start-navigation-stop-css", runner
-        )
+        self.assertIn("tree-native-parser-document-start-navigation-stop-css", runner)
         self.assertIn("http2.rst_stream.error", runner)
         self.assertIn("stylesheet completed instead of being canceled", summary)
         self.assertIn("lacks one causal H2 CANCEL", summary)
@@ -3809,6 +4423,32 @@ class CamouflageHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "one physical outer connection"):
             SAMPLE.validate_sample("gate", "h2", "", two_connections)
 
+    def test_sample_validation_requires_explicit_padding_condition(self):
+        one_connection = {
+            "protocol": "h2",
+            "features": {"lifecycle_connection_count": 1.0},
+        }
+        padding_yes = (
+            "Connection 1 established target=localhost:443 outer=h2 padding=yes\n"
+        )
+        padding_no = (
+            "Connection 1 established target=localhost:443 outer=h2 padding=no\n"
+        )
+        SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
+        with self.assertRaisesRegex(ValueError, "differs from expected"):
+            SAMPLE.validate_sample("gate", "h2", padding_no, one_connection)
+        with mock.patch.dict(
+            os.environ, {"NAIVEFOX_CAPTURE_EXPECT_PADDING": "no"}, clear=False
+        ):
+            SAMPLE.validate_sample("gate", "h2", padding_no, one_connection)
+            with self.assertRaisesRegex(ValueError, "differs from expected"):
+                SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
+        with mock.patch.dict(
+            os.environ, {"NAIVEFOX_CAPTURE_EXPECT_PADDING": "maybe"}, clear=False
+        ):
+            with self.assertRaisesRegex(ValueError, "unsupported expected padding"):
+                SAMPLE.validate_sample("gate", "h2", padding_yes, one_connection)
+
     def test_root_sample_requires_exactly_one_successful_preamble(self):
         one_connection = {
             "protocol": "h2",
@@ -3876,7 +4516,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         )
 
     def test_socks_browser_uses_fail_closed_pac_without_outer_h3_mapping(self):
-        preferences = CONTROLLER.firefox_preferences("h3", 4433, 1080)
+        preferences = CONTROLLER.firefox_preferences("h3", 4433, 1080, 0, 8443)
         self.assertFalse(preferences["network.http.http3.enable"])
         self.assertNotIn("network.http.http3.alt-svc-mapping-for-testing", preferences)
         self.assertEqual(preferences["network.proxy.type"], 2)
@@ -3886,22 +4526,23 @@ class CamouflageHarnessTests(unittest.TestCase):
         pac_url = preferences["network.proxy.autoconfig_url"]
         self.assertTrue(pac_url.startswith(prefix))
         pac = base64.b64decode(pac_url.removeprefix(prefix)).decode()
-        self.assertEqual(pac, CONTROLLER.proxy_pac_script(1080))
+        self.assertEqual(pac, CONTROLLER.proxy_pac_script(1080, 8443))
 
     def test_http_proxy_browser_uses_native_connect_path_and_fail_closed_pac(self):
-        preferences = CONTROLLER.firefox_preferences("h2", 4433, 0, 1080)
+        preferences = CONTROLLER.firefox_preferences("h2", 4433, 0, 1080, 8443)
         self.assertFalse(preferences["network.http.http3.enable"])
         self.assertEqual(preferences["network.proxy.type"], 2)
         self.assertFalse(preferences["network.proxy.failover_direct"])
         prefix = "data:application/x-ns-proxy-autoconfig;base64,"
         pac_url = preferences["network.proxy.autoconfig_url"]
         pac = base64.b64decode(pac_url.removeprefix(prefix)).decode()
-        self.assertEqual(pac, CONTROLLER.http_proxy_pac_script(1080))
+        self.assertEqual(pac, CONTROLLER.http_proxy_pac_script(1080, 8443))
         self.assertIn('return "PROXY 127.0.0.1:1080"', pac)
         self.assertNotIn("SOCKS", pac)
-        self.assertNotIn("DIRECT", pac)
+        self.assertIn('authority === "localhost:8443"', pac)
+        self.assertIn('return "DIRECT"', pac)
         with self.assertRaisesRegex(ValueError, "mutually exclusive"):
-            CONTROLLER.firefox_preferences("h2", 4433, 1080, 1081)
+            CONTROLLER.firefox_preferences("h2", 4433, 1080, 1081, 8443)
 
     def test_suite_profile_roles_keep_test_alt_svc_out_of_naivefox(self):
         path = os.path.join(HERE, "run-camouflage-suite.sh")
@@ -3915,8 +4556,8 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn("case $participant in", runner)
         self.assertIn('make_profile "$profile" "$protocol" reference', runner)
         self.assertIn('make_profile "$naivefox_profile" "$protocol" naivefox', runner)
-        self.assertIn('local browser_participant=socks-browser', runner)
-        self.assertIn('browser_participant=http-browser', runner)
+        self.assertIn("local browser_participant=socks-browser", runner)
+        self.assertIn("browser_participant=http-browser", runner)
         self.assertIn(
             'make_profile "$browser_profile" "$protocol" "$browser_participant"',
             runner,
@@ -3962,7 +4603,7 @@ class CamouflageHarnessTests(unittest.TestCase):
                 f"make_profile {shlex.quote(reference)} h3 reference",
                 f"make_profile {shlex.quote(naivefox)} h3 naivefox",
                 f"make_profile {shlex.quote(pmtud_control)} h3 naivefox '' root-pmtud-control",
-                f"make_profile {shlex.quote(socks)} h3 socks-browser 1080",
+                f"make_profile {shlex.quote(socks)} h3 socks-browser 1080 '' 8443",
             ))
             subprocess.run(["bash"], input=script, text=True, check=True)
 
@@ -3988,23 +4629,28 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertNotIn(pmtud_pref, socks_prefs)
             self.assertIn(pmtud_pref, pmtud_control_prefs)
 
-    def test_proxy_pac_sends_only_loopback_hosts_to_sample_socks(self):
-        pac = CONTROLLER.proxy_pac_script(1080)
+    def test_proxy_pac_sends_only_target_loopback_port_to_sample_socks(self):
+        pac = CONTROLLER.proxy_pac_script(1080, 8443)
         for host in ("localhost", "127.0.0.1", "::1", "[::1]"):
             self.assertIn(f'host === "{host}"', pac)
         self.assertIn('return "SOCKS5 127.0.0.1:1080"', pac)
+        self.assertIn('authority === "localhost:8443"', pac)
+        self.assertIn('return "DIRECT"', pac)
         self.assertIn(
             f'return "PROXY 127.0.0.1:{CONTROLLER.DEAD_LOCAL_PROXY_PORT}"',
             pac,
         )
-        self.assertNotIn("DIRECT", pac)
 
     def test_proxy_pac_rejects_invalid_ports(self):
         for port in (0, 65536):
             with self.assertRaisesRegex(ValueError, "outside 1..65535"):
-                CONTROLLER.proxy_pac_script(port)
+                CONTROLLER.proxy_pac_script(port, 8443)
             with self.assertRaisesRegex(ValueError, "outside 1..65535"):
-                CONTROLLER.http_proxy_pac_script(port)
+                CONTROLLER.http_proxy_pac_script(port, 8443)
+            with self.assertRaisesRegex(ValueError, "outside 1..65535"):
+                CONTROLLER.proxy_pac_script(1080, port)
+            with self.assertRaisesRegex(ValueError, "outside 1..65535"):
+                CONTROLLER.http_proxy_pac_script(1080, port)
 
     def test_commandline_profile_generator_uses_same_pac_preferences(self):
         result = subprocess.run(
@@ -4013,12 +4659,13 @@ class CamouflageHarnessTests(unittest.TestCase):
                 os.path.join(HERE, "camouflage_browser_controller.py"),
                 "--generate-pac-user-js",
                 "1080",
+                "8443",
             ],
             check=True,
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.stdout, CONTROLLER.proxy_user_js(1080))
+        self.assertEqual(result.stdout, CONTROLLER.proxy_user_js(1080, 8443))
         self.assertIn('user_pref("network.proxy.type", 2);', result.stdout)
         self.assertIn('user_pref("network.proxy.autoconfig_url", "data:', result.stdout)
         self.assertIn(
@@ -4033,15 +4680,37 @@ class CamouflageHarnessTests(unittest.TestCase):
                 os.path.join(HERE, "camouflage_browser_controller.py"),
                 "--generate-http-pac-user-js",
                 "1080",
+                "8443",
             ],
             check=True,
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.stdout, CONTROLLER.http_proxy_user_js(1080))
+        self.assertEqual(
+            result.stdout,
+            CONTROLLER.http_proxy_user_js(1080, 8443),
+        )
         self.assertIn('user_pref("network.proxy.type", 2);', result.stdout)
         self.assertIn('user_pref("network.proxy.autoconfig_url", "data:', result.stdout)
         self.assertNotIn("SOCKS5", result.stdout)
+
+    def test_dedicated_capture_pac_generators_scope_the_exact_target(self):
+        expected = (
+            '--generate-pac-user-js "$socks_port" '
+            '"$NAIVEFOX_FIXTURE_HTTPS_PORT"'
+        )
+        for filename in (
+            "run-h2-capture-comparison.sh",
+            "run-h2-connect-priority-comparison.sh",
+            "run-h3-capture-comparison.sh",
+        ):
+            with self.subTest(filename=filename):
+                with open(os.path.join(HERE, filename), encoding="utf-8") as stream:
+                    flattened = " ".join(
+                        line.strip().removesuffix("\\").strip()
+                        for line in stream.read().splitlines()
+                    )
+                    self.assertIn(expected, flattened)
 
     def test_dumpcap_clean_shutdown_is_accepted(self):
         CAPTURE.validate_dumpcap_log(

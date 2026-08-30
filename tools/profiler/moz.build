@@ -25,6 +25,7 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla += [
+    "public/ChromeProfilerCounter.h",
     "public/FlowMarkers.h",
     "public/ProfileBufferEntrySerializationGeckoExtensions.h",
     "public/ProfileJSONWriter.h",
@@ -50,6 +51,7 @@ EXPORTS.mozilla += [
 
 if not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
+        "core/ChromeProfilerCounter.cpp",
         "core/PageInformation.cpp",
         "core/platform.cpp",
         "core/ProfileBuffer.cpp",

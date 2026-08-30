@@ -8,6 +8,107 @@ targets, and binds all fixture services to dynamically selected loopback ports.
 Generated binaries, credentials, private keys, profiles, bodies, logs, and
 captures live under `<objdir>/naivefox-fixture/`; none belongs in Git.
 
+## Native classic/no-connect interoperability
+
+The optional application transport has a separate fixture using the combined
+Caddy module build. It creates private loopback PKI and configuration below
+one existing product object directory, runs the rebuilt native executable, and
+never starts a Firefox browser or rebuilds Caddy implicitly:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy
+```
+
+Both transports use the same Caddy process for each protocol. The fixture checks
+strict H2 and UDP-only H3, both local listeners, 1-MiB uploads/downloads,
+backpressure, half-close, four parallel streams, idle wake, abrupt local
+cancellation, bounded graceful shutdown, rejected application keys, exact target
+allowlists and untrusted certificates. It records zero outer
+CONNECT during the no-connect phase and then exercises classic CONNECT on that
+same endpoint. By default, classic uses an explicit disabled preamble so this
+gate measures transport interoperability. Repeat with `--classic-preamble default`
+to verify the normal implicit H2/H3 preambles against the module's gallery page
+on that same combined endpoint. `--parallel-batches 32` repeats the four-stream
+mixed upload/download batch to cover H3 buffered-FIN and callback scheduling;
+run that regression with both preamble policies. Each transfer checks exact
+length, SHA-256 and half-close, and still respects bounded client shutdown.
+
+Use `--protocol h2` or `--protocol h3` for a focused iteration. `--runtime`
+selects an already-built Linux executable; omission uses `dist/bin/naivefox`
+inside `--objdir`. Per-run configs, certificates and logs remain private;
+`result.json` contains only sanitized gate results. Retained failed runs are
+not passing evidence. Server build instructions and the maintained protocol
+boundary are linked from [NO-CONNECT.md](../../NO-CONNECT.md).
+
+Run the separate fail-closed HTTP-envelope gate with the same arguments:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-adversarial-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy
+```
+
+It rejects mismatched profiles, appended/oversized cells, wrong capacities,
+truncated filler, invalid sequence/reserved fields, redirects, HTTP authentication
+prompts and cross-protocol fallback. The corrupt responses come from isolated
+Caddy test routes; production server code is not modified. `--case` narrows a
+run to one or more named cases, and `--protocol` selects H2 or H3. Each refusal
+must reach a local connection failure without an outer CONNECT, redirect follow,
+authentication retry or target open after rejected bootstrap.
+
+The Windows adapter runs the base transport interoperability matrix with the
+actual staged Windows executable and Windows local clients:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-windows \
+  --runtime /absolute/path/to/staged/naivefox.exe \
+  --caddy /absolute/path/to/combined-linux-caddy \
+  --windows-python '/mnt/c/absolute/path/to/python.exe'
+```
+
+Run the adapter as root in WSL. It creates its own isolated network namespace,
+uses a loopback relay for the private Caddy/target fixture, and owns the Windows
+client process through a kill-on-close Job Object. All fixture state remains
+below the supplied object directory; no existing network-namespace wrapper is
+needed. `--protocol h2` or `--protocol h3` narrows an iteration. The adapter also
+accepts `--classic-preamble default --parallel-batches 32` for the repeated H3
+buffered-FIN regression against the normal fronting-page policy.
+
+The Android adapter runs the same matrix against an existing ARM64 API-26+
+device/emulator, followed by the embedded lifecycle and stop tests:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-android.py \
+  --objdir /absolute/path/to/fixture-objdir \
+  --package /absolute/path/to/staged-android-package \
+  --caddy /absolute/path/to/combined-linux-caddy \
+  --ndk /absolute/path/to/android-ndk-r29 \
+  --serial emulator-5554 --parallel-batches 4
+```
+
+Its small NDK socket probe runs inside Android against the actual loopback
+listeners. It validates half-close directly: ADB forwarding closes both
+directions and is unsuitable for this particular assertion. The upstream uses
+the emulator's host alias (`10.0.2.2` by default, configurable with `--host-alias`)
+while the logical TLS hostname and certificate checks remain intact. Temporary
+runtime, profile and probe files are isolated and removed from the device.
+The older embedded runner's `--direct-host` option likewise avoids ADB reverse
+for H2; it still requires the fixture's explicit host-alias certificate SAN.
+Keep a task-owned emulator alive across gates. The managed software ARM64
+emulator allows up to 900 seconds for normal boot; it never substitutes a fake
+boot-complete property. An isolated ADB server can be selected with
+`ADB_SERVER_SOCKET` and the matching `ANDROID_ADB_SERVER_PORT`.
+
+The standalone `run-no-connect-codec-tests.sh <linux-objdir> [output-directory]`
+runner requires the full-source checkout and its bundled GoogleTest sources.
+Generated minimal-source exports intentionally omit those unit-test dependencies;
+their HTTP integration runners remain available. The standalone codec runner
+reuses a warm product NSS/NSPR build and can enable ASan/UBSan with
+`NAIVEFOX_CODEC_SANITIZERS=1`.
+
 ## Complete local gate
 
 From the repository root, run:
@@ -87,6 +188,12 @@ device is running, append --start-emulator. The runner invokes
 tools/start-android-emulator.sh, supplies the ARM64-safe -qemu -machine virt
 launch override, waits for boot completion, and shuts down only the emulator
 instance it started during cleanup.
+On WSL the managed emulator and image are Linux-local, discovered under
+`${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/`; the launcher does not silently
+fall back to a Windows installation. Run adb, the emulator and the fixture in
+one isolated namespace. See [the managed emulator setup](https://github.com/incident201/naivefox/blob/naivefox-full-source/netwerk/naivefox/MINIMAL.md).
+Boot readiness requires an Android boot-completed property, not just a stopped
+animation; the latter can precede clock and networking initialization.
 
 The Android ARM64 embedded package has a test-only native harness and emulator
 gate. It compiles the harness with NDK r29, relocates the package below
@@ -182,11 +289,13 @@ key log, browser identity and Mozilla logs are deliberately retained under
 `NAIVEFOX_CAPTURE_MODE=same-base` and the same
 `NAIVEFOX_CAPTURE_REFERENCE_*` inputs used by the other same-base diagnostics.
 
-Quick capture downloads the current official Nightly binary from the URL in
+Quick capture downloads the pinned official Nightly/CI binary from the URL in
 `../../tools/firefox-reference-manifest` and compares its observed behavior
-with the same fixture run through NaiveFox. The archive checksum in that
-manifest is refreshed only when Mozilla republishes the same Nightly version;
-the fetch script still verifies both the checksum and the Firefox version.
+with the same fixture run through NaiveFox. Prefer immutable Taskcluster URLs
+and verify task revision routes and application metadata when refreshing the
+manifest. The fetch script verifies the archive checksum before extraction or
+execution, then verifies the Firefox version; a version string alone does not
+establish same-base provenance.
 
 Optional throughput scripts (`run-throughput-benchmark.sh` and
 `run-h3-throughput-benchmark.sh`) produce local diagnostics; their point-in-time
@@ -197,9 +306,14 @@ H2 sequence check. It uses the isolated namespace and mutation monitor,
 requires healthy loss-free capture, verifies one TCP/H2 connection, `h2` ALPN,
 equal client SETTINGS, padding, and per-stream preamble GET/CONNECT ordering,
 then exports only a sanitized event sequence with relative timing and a
-summary. Both reference and
-inner Firefox use an explicitly recorded cold command-line start after capture
-begins; the diagnostic never silently mixes that cohort with warm Selenium.
+summary. Its default keeps both reference and inner Firefox on an explicitly
+recorded cold command-line start after capture begins. Select
+`--browser-backend selenium` to pre-launch both browsers, wait for controller
+readiness before capture, and navigate only after capture starts. The selected
+startup cohort is recorded in safe metadata and the runner never silently
+mixes the two contracts. The pre-launched option is restricted to the
+`browser_page` reference; the fixed `fronting_page` resource-tree comparison
+continues to use the command-line cohort.
 Tree admission privately verifies the document plus same-origin CSS/JS
 `Referer`, `Sec-Fetch-*`, exact document `Priority: u=0, i`, and naturally
 computed resource `Priority: u=2` semantics;
@@ -418,15 +532,17 @@ Caddy, certificate, IP, port, namespace, and interface.
 
 All cohorts use the selected reference Firefox to execute the controlled page.
 The NaiveFox cohort configures that browser to use the sample's private SOCKS
-listener. Its target uses HTTPS inside CONNECT by default; the fixture CA is
-trusted only by the isolated test profile. `--inner-transport http` selects a
-separate cleartext diagnostic dataset. Forced Alt-Svc applies only to the
-direct H3 reference browser; the SOCKS browser leaves origin H3 disabled while
-NaiveFox independently owns the selected outer H2 or H3 transport. A
-fail-closed PAC sends exact loopback destinations to the sample's SOCKS5
-listener and every other hostname to a dead local proxy. It has no `DIRECT`
-fallback, so Mozilla background traffic cannot contaminate the captured outer
-flow. A Selenium controller is preferred for H2 when available. Same-base H3
+or HTTP CONNECT listener. Its target uses HTTPS inside CONNECT by default; the
+fixture CA is trusted only by the isolated test profile. `--inner-transport
+http` selects a separate cleartext diagnostic dataset. Forced Alt-Svc applies
+only to the direct H3 reference browser; the proxied browser leaves origin H3
+disabled while NaiveFox independently owns the selected outer H2 or H3
+transport. A fail-closed PAC sends only the exact loopback workload authority
+to the sample listener and every non-loopback hostname to a dead local proxy.
+Other loopback ports remain direct so Selenium's local remote-control channel
+cannot create a pre-capture NaiveFox flow; the isolated namespace prevents
+those local control connections from escaping to the host network. A Selenium
+controller is preferred for H2 when available. Same-base H3
 multi-arm screening requires Selenium and launches Firefox before capture;
 the command-line backend is rejected because its readiness marker precedes
 Firefox process startup. Direct H3 reference participants first complete an
@@ -462,6 +578,37 @@ the common direct Firefox A/B noise floor for packets 1--16, 17--32, 1--32,
 the first 250 ms, and the whole flow. `firefox-proxied` is an analysis-only
 candidate arm; its internal `label=naivefox` value is merely the legacy
 candidate slot required by the feature schema.
+
+`--h2-request-timing` adds a separate, sanitized outer/inner request timeline
+to one canonical H2 diagnostic. It requires isolated gate/smoke `browser_page`
+superblocks, inner HTTPS/H2, pre-launched Selenium, and exactly the two current
+H2 listener arms. Resource-size, preload, padding, and shaped-link variants are
+not admitted. With the usual same-base binary environment already set:
+
+```bash
+NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 ./run-camouflage-suite.sh \
+  --mode gate --protocol h2 --inner-transport https-h2 \
+  --scenario browser_page --samples-per-cohort 1 --seed 2026083074 \
+  --multi-arm-arms document-first-buffer-task-overlap,document-first-buffer-http-connect \
+  --multi-arm-views packets_17_32,whole --h2-request-timing
+```
+
+`h2-request-lifecycle/*.json` contains fixed event labels, relative intervals,
+handler durations, and response byte counts only. Per-sample access-log offsets
+exclude earlier participants; missing requests, unexplained duplicates, wrong
+protocols, unexpected authorities, invalid timestamps, or ambiguous navigation
+identities fail closed. The canonical fourth image returns 34-byte JSON and
+may be fetched twice by Firefox; one such extra image attempt and one empty
+favicon request are explicitly counted and retained as separate events.
+Other duplicates, a third API attempt, or changed API MIME/size are rejected.
+CONNECT records are read after browser/product shutdown, outside
+the primary capture. Caddy writes an access record when its handler ends, so
+request start is estimated as `log timestamp - handler duration`. These are
+coarse millisecond-scale server intervals, not exact wire or Necko timestamps.
+They never enter passive feature CSVs, distance calculation, or inference.
+Private access-log slices are deleted with the capture after success and
+retained only in the private diagnostic directory on failure. Product, Caddy,
+page contents, and capture cutoff remain unchanged.
 
 The controlled workloads are cold initial, browser-page navigation, warm
 sequential, burst/concurrent streams, bulk download, bulk upload,
@@ -509,13 +656,36 @@ It is useful for private lifecycle diagnostics such as stressing `sequential`
 connection reuse; the selected scenario is recorded in sanitized metadata and
 does not relax any capture-health or sample-count rule.
 
-For a predeclared resource-size robustness check, combine
+For a predeclared inner browser-workload resource-size robustness check, combine
 `--scenario browser_page` with `--browser-page-base-size BYTES` (65536 through
 4194304).
 The base scales the six ordinary page assets in the same 1/4, 1/2, 1,
 1/64 profile as the default 262144-byte fixture. Omitting the option preserves
 the established fixture exactly. The selected base is recorded in sanitized
 metadata; it is a diagnostic input and must not be tuned to a packet window.
+When a dense fronting-page arm replaces the outer scenario, this option still
+scales the inner tunneled workload only. The fixed outer origin profile and
+the completed independent outer-size campaign are documented in
+[`../../FRONTING-PAGE.md`](../../FRONTING-PAGE.md).
+
+Use `--outer-resource-unit-size BYTES` only with a dense H3 fronting-page arm
+to scale the actual outer resources independently of the inner workload. The
+accepted unit is 1024 through 22000 bytes. CSS, JavaScript, and each of four
+valid SVG image bodies then use `3/6/2/2/2/2` units respectively, so their
+aggregate excluding the small root is exactly 17 units and remains below the
+384-KiB product budget. Omitting the option preserves the historical measured
+fixture exactly, including its 34-byte JSON fourth image response. Sanitized
+metadata records the selected profile, each body size, and the aggregate.
+Before network shaping or capture begins, the runner downloads all six bodies
+from the isolated target and fails closed unless their actual byte counts and
+MIME types match that metadata; the number of validated protocol fixtures is
+also recorded. The predeclared 17/68/272-KiB unshaped screen and shaped
+17/272-KiB endpoint screen, including safe artifact IDs and all five default
+views, are recorded in
+[`../../CAPTURE.md`](../../CAPTURE.md#predeclared-outer-resource-size-campaign).
+Those four-block results are descriptive robustness evidence, not an
+acceptable-size equivalence claim or a reason to tune fixture bytes after
+observing a packet window.
 
 For an isolated link-robustness check, add `--network-one-way-delay-ms N`,
 `--network-rate-mbit N`, or both. Network shaping is rejected unless
@@ -589,6 +759,13 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
+`--protocol h2 --scenario browser_page --document-body-size BYTES` is a
+gate/smoke-only site-envelope diagnostic. It pads the exact shared outer,
+direct-reference, and tunneled HTML response body to 1024--65536 bytes without
+changing its resource URLs or completion behavior. Omitting the option keeps
+the ordinary fixture body. Sanitized metadata records the selected size; this
+option never changes a product or Caddy default.
+
 `--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-resource-tree|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the
@@ -596,8 +773,8 @@ gate without a preamble. `root` is the short alias for `document-complete` and
 adds one bounded document GET before CONNECT. The harness always emits these
 fields explicitly. Thus `off` remains a true
 control even though a successfully parsed product config which omits
-`preamble` now promotes `document-start-overlap` for explicit H2 and H3
-upstreams.
+`preamble` now selects the documented protocol- and listener-specific implicit
+default. The harness never depends on that omission during arm screening.
 The tree modes also fetch two resources from that browser page;
 `tree-complete` waits for them, while
 `tree-overlap` may overlap their completion with CONNECT.
@@ -878,12 +1055,31 @@ are opt-in screening diagnostics even in `research` mode. They are not added to
 the large default superblock: its five-member `off`/`gate`/`root` design keeps
 collection cost bounded and remains screening-only. `--multi-arm-arms` can opt
 a deliberate screening run into a different arm list without increasing every
-routine run.
+routine run. `tree-native-parser-resource-committed-page-http-connect` is the
+H3-only ingress-control alias for the six-resource page arm. It preserves the
+same preamble mode, path, cache policy, limits, and lifecycle validation while
+selecting the local HTTP CONNECT listener; a multi-arm run must include the
+matched `document-start-http-connect` control. The operator-facing exact HTML
+and response contract is maintained in
+[`../../FRONTING-PAGE.md`](../../FRONTING-PAGE.md).
+
+The HTTP CONNECT ingress can also be combined with the existing causal
+document barriers on either H2 or H3. `document-overlap-http-connect` waits
+for accepted response HEADERS, while `document-first-buffer-http-connect`
+waits for the first complete body buffer. The
+`document-start-task-http-connect`, `document-headers-task-http-connect`, and
+`document-first-buffer-task-http-connect` aliases preserve the corresponding
+product modes but add exactly one ordinary main-thread turn after their native
+Necko event. These are listener-selection aliases only: they do not add a
+timer, byte threshold, packet-index condition, or new production mode. They
+remain opt-in screening arms and do not alter implicit defaults.
 
 Profiles have explicit participant roles. Direct H3 Firefox alone receives
 the local test Alt-Svc mapping; the NaiveFox process profile enables the real
 H3 stack without that mapping, and the workload browser uses only its
-fail-closed SOCKS PAC. The runner validates those generated profiles before
+exact-authority SOCKS or HTTP proxy PAC. Non-loopback traffic remains
+fail-closed and namespace-local browser control ports remain direct. The runner
+validates those generated profiles before
 capture and rejects inherited `AlternateServices.bin` state. Private run
 `5f45fb110cc57517` predated this role separation and stopped after exposing a
 second resumed QUIC route; all of its samples are invalid harness evidence.

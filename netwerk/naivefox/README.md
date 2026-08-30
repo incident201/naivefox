@@ -4,7 +4,9 @@ NaiveFox is a headless Naive-compatible proxy client built on Firefox's real
 networking stack. Necko supplies HTTP/2, HTTP/3, CONNECT, pooling, and flow
 control; NSS/PSM supplies TLS and certificate validation; Neqo supplies QUIC.
 NaiveFox adds local proxy listeners, transport selection, CONNECT orchestration,
-Naive padding, bounded stream pumping, configuration, and packaging.
+Naive padding, bounded stream pumping, configuration, and packaging. The default
+transport is `classic`; `no-connect` opts into the separate Caddy transport
+module through ordinary HTTP request bodies, using the same lean executable.
 
 ```text
 application -> SOCKS5 or HTTP CONNECT -> NaiveFox
@@ -12,8 +14,10 @@ application -> SOCKS5 or HTTP CONNECT -> NaiveFox
             -> Caddy forwardproxy@naive -> destination
 ```
 
-The server is an unmodified Naive-compatible Caddy build. NaiveFox does not
-ship another HTTP/TLS stack and does not synthesize a Firefox fingerprint.
+The default `classic` transport uses an unmodified Naive-compatible Caddy
+forward proxy. The optional `no-connect` transport requires the
+`naivefox_transport` module. Both modules can share one Caddy endpoint. NaiveFox
+does not ship another HTTP/TLS stack or synthesize a Firefox fingerprint.
 
 ## Running the desktop product
 
@@ -23,7 +27,34 @@ reads `./config.json`; one positional argument selects another config:
 ```bash
 ./naivefox
 ./naivefox /absolute/path/to/config.json
+./naivefox /absolute/path/to/config.json --transport no-connect
+./naivefox --transport=classic /absolute/path/to/config.json
 ```
+
+`--transport classic|no-connect` overrides the JSON `transport` field. It may
+precede or follow the optional config path; without a path, it uses
+`./config.json`. The `--transport=value` form is also accepted. A no-connect
+key must remain in the private config, never on the command line. An explicit
+classic selection retains a valid no-connect key but does not use it.
+Selection occurs before mode validation and implicit preamble defaults;
+incompatible options still fail. Diagnostic CLI modes cannot be combined with
+this config-mode override.
+
+One private config can contain both credentials and work unchanged with either
+transport. With no override this example uses classic; add
+`--transport no-connect` to select the application protocol:
+
+```json
+{
+  "listen": "socks://127.0.0.1:1080",
+  "proxy": "https://user:password@proxy.example:443",
+  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET",
+  "preamble": {"mode": "off"}
+}
+```
+
+The key never enables no-connect by itself. Proxy URI credentials remain
+available for classic and are not sent by no-connect.
 
 The staged Windows package provides `run-naivefox.cmd` beside its runtime and
 accepts the same optional config path.
@@ -49,6 +80,15 @@ The supported config is a strict NaiveProxy-compatible subset:
 }
 ```
 
+- `transport` is `"classic"` by default or `"no-connect"` for the optional
+  application transport. This is independent of H2/H3 selection in `proxy`.
+  `no-connect-key` is required for the effective `no-connect` selection and
+  contains 32 through 1024 printable ASCII bytes shared with the server; keep it
+  in a private config. A valid key may remain unused in classic mode; its
+  presence never changes the selected transport. No-connect ignores the parsed
+  upstream URI credentials and never sends them. Active classic preambles,
+  extra CONNECT headers, enabled outer-session gates and classic diagnostic
+  options are rejected in this mode. Local SOCKS authentication remains available.
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -58,8 +98,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   `listen`. `https://` is strict H2 over TLS/TCP and `quic://` is strict H3
   over QUIC. Upstream credentials are optional and percent-decoded; when
   userinfo is present it uses `username:password`, so either side may be
-  empty (`user:`, `:password`, or `:@`). They are passed to Necko's
-  proxy-auth path. Port 443 is used when omitted.
+  empty (`user:`, `:password`, or `:@`). Classic passes them to Necko's
+  proxy-auth path; no-connect leaves them unused. Port 443 is used when omitted.
 - `insecure-concurrency` accepts a positive JSON integer or a decimal string for
   NaiveProxy/Exclave config compatibility. NaiveFox validates the value and
   ignores it; connection pooling, concurrency, and tunnel lifecycle remain
@@ -78,15 +118,23 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
-- `preamble` is optional. When it is omitted, an explicit H2 upstream behind
+- `preamble` controls only `classic`; `no-connect` uses its own bounded
+  application lifecycle and never receives an implicit classic preamble.
+  For `classic`, `preamble` is optional. When it is omitted, an explicit H2 upstream behind
   SOCKS-only listeners uses the promoted `document-first-buffer-task-overlap`
   policy. HTTP-CONNECT-only and mixed listeners use
-  `document-first-buffer-overlap`. An explicit H3 upstream behind SOCKS-only
-  listeners uses the promoted
+  `document-first-buffer-overlap`. An explicit H3 upstream behind any supported
+  listener layout uses the promoted
   `tree-native-parser-resource-committed-overlap` policy with path `/`, exactly
   six parser-discovered resources, ordinary resource caching, and a 384 KiB
-  aggregate safety budget. HTTP-CONNECT-only and mixed H3 listeners retain
-  `document-start-overlap` with path `/` and a 64 KiB document budget. The
+  aggregate safety budget. The exact H2/H3 origin requirements, supported HTML
+  topology, measured fixture sizes, and unvalidated variations are maintained
+  in [`FRONTING-PAGE.md`](FRONTING-PAGE.md). A change to that contract is not
+  complete until that document and the canonical matrix are updated. The
+  canonical H2/H3 by SOCKS5/HTTP-CONNECT residual matrix is maintained in
+  [Current implicit-default matrix](CAPTURE.md#current-implicit-default-matrix);
+  all four rows must be regenerated together whenever the implicit policy or
+  its measurement contract changes. The
   implicit cold-route gate applies to the selected H2 or H3 upstream, so one
   established outer session does not repeat the synthetic page for every
   tunnel. An
@@ -94,9 +142,10 @@ The supported config is a strict NaiveProxy-compatible subset:
   explicit `outer-session-gate` value remains authoritative: `false` runs the
   implicit protocol-specific document on every tunnel, while `true` retains
   the existing global gate semantics. An older H3 gate-only config must now
-  add explicit `mode: off` to keep sending no document GET. The 64 KiB value is
-  a safety cap, not a target response size. `mode` is still required when the
-  preamble object is present; optional `h2-mode` and `h3-mode` override it only
+  add explicit `mode: off` to keep sending no document GET. For document
+  modes, the 64 KiB value is a safety cap, not a target response size. `mode`
+  is still required when the preamble object is present; optional `h2-mode`
+  and `h3-mode` override it only
   for that negotiated outer protocol. This allows Auto mode to choose a fresh
   policy on fallback instead of reusing the failed H3 attempt's policy.
   Supported modes are `off`, `document-complete`,
@@ -145,7 +194,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   body buffer delivered by Necko has been consumed successfully. The event is
   a channel-delivery boundary, not a byte count or fixture-size threshold; a
   short or failed read cannot release CONNECT, and normal 2xx document drain
-  remains mandatory. Two independent six-block H2/inner-H2 screens with an
+  remains mandatory. This mechanism is size-independent, but its passive
+  residual is not claimed to be invariant across the full 64-KiB functional
+  envelope: the canonical matrix uses a 494-byte root, and the rejected
+  65,536-byte endpoint is recorded in `FRONTING-PAGE.md` and `CAPTURE.md`.
+  Two independent six-block H2/inner-H2 screens with an
   HTTP CONNECT local frontend (`306a249a46d33a5c` and
   `2b8dd75c4e682940`) reproduced lower packets-17--32, 1--32, 250 ms, and
   whole-flow distances than both response-HEADERS admission and the former
@@ -184,12 +237,13 @@ The supported config is a strict NaiveProxy-compatible subset:
   (`0.76117` to `0.65828`), packets 1--32 (`0.26499` to `0.22720`), and the
   250 ms view (`0.14026` to `0.12081`); no whole-flow regression was detected
   (`0.38926` to `0.38660`, with a paired interval crossing zero). It remains
-  the H3 policy for HTTP CONNECT and mixed listeners. A final
+  the historical H3 HTTP CONNECT control. A final
   six-block H2 screen against the bounded resource-tree candidate retained the
   lower distance for this mode in packets 17--32, packets 1--32, 250 ms, and
   whole-flow views, while packets 1--16 were effectively tied.
-  `tree-native-parser-resource-committed-overlap` is the promoted SOCKS-only
-  H3 policy. Its lean parser accepts exactly one same-origin stylesheet, one
+  `tree-native-parser-resource-committed-overlap` is the promoted H3 policy
+  for SOCKS5, HTTP CONNECT, and mixed listeners. Its lean parser accepts
+  exactly one same-origin stylesheet, one
   classic deferred script, and four images. CSS and script open from the
   parser callback; the four prepared images open together on the next ordinary
   main-thread turn. CONNECT is admitted only after all six native H3 resource
@@ -200,10 +254,16 @@ The supported config is a strict NaiveProxy-compatible subset:
   request or response fails. Four-block shaped artifact `390cc24ccb6ef8c9`
   measured `0.11745/0.29471/0.15293/0.16835/0.34363` for packets 1--16,
   packets 17--32, packets 1--32, 250 ms, and whole flow. Separate four-block
-  runs retained the improvement with 64 KiB and 1 MiB page bases and at 50 ms
-  one-way delay with 5 Mbit/s bandwidth. Unshaped localhost retained the
-  whole-flow gain. These robustness checks promote the event-driven mode for
-  SOCKS-only H3; explicit preamble configuration remains authoritative.
+  runs retained the improvement while the inner tunneled workload used 64 KiB
+  and 1 MiB page bases and at 50 ms one-way delay with 5 Mbit/s bandwidth.
+  Unshaped localhost retained the whole-flow gain. HTTP CONNECT screens then
+  reproduced the gain in six and four default-size blocks, with those same
+  inner-workload bases, and with 20 ms one-way delay at 20 Mbit/s. The outer
+  Caddy fronting resources remained at their fixed documented sizes in those
+  screens; the subsequent [outer-resource size campaign](CAPTURE.md) exercises
+  coherent 17--272 KiB pages, including slower-link endpoints. The available
+  robustness checks promote the event-driven mode for all H3 listener layouts;
+  explicit preamble configuration remains authoritative.
   `tree-native-parser-document-start-overlap` preserves that same early
   request-commit admission, then continues the root response through the lean
   HTML5 speculative scanner. Exactly one parser-discovered stylesheet opens
@@ -296,7 +356,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   product policy or a recommended default.
   `cache-resources` is an explicit-config diagnostic boolean, defaulting to
   `false`, and is accepted only when at least one effective protocol mode is a
-  tree mode. The promoted implicit SOCKS-only H3 policy enables it for its six
+  tree mode. The promoted implicit H3 policy enables it for its six
   resource channels.
   It enables Gecko's ordinary HTTP cache path only for discovered resource
   channels; the root document remains cache-inhibited, as do direct requests,
@@ -463,6 +523,32 @@ NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for component, event-target, stream,
 and fallback details. Downstream Firefox hooks are inventoried in
 `UPSTREAM-PATCHES.md` in the full maintenance checkout.
+
+## Opting into no-connect
+
+Use the normal config-file launcher with a separately provisioned transport key:
+
+```json
+{
+  "listen": ["socks://127.0.0.1:1080", "http://127.0.0.1:8080"],
+  "proxy": "quic://proxy.example:443",
+  "transport": "no-connect",
+  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET"
+}
+```
+
+`https://` selects strict H2 and `quic://` selects strict H3 in either transport.
+The key is an application credential, separate from classic proxy user/password.
+No automatic fallback from `no-connect` to `classic` occurs. To use `classic`,
+remove `no-connect-key` and set `transport` to `classic` or omit it; restore
+upstream URI credentials if the forward proxy requires them.
+
+The native client does not run the experimental browser worker, JavaScript,
+DOM, graphics, or loopback WebSocket bridge. Its HTTP bodies interoperate with
+the module's `continuous-bulk-pipeline` profile. The exact port boundary,
+server setup, resource bounds and validation requirements are in
+[NO-CONNECT.md](NO-CONNECT.md). Historical full-browser measurements are not
+measurements of the native implementation.
 
 ## Building and testing
 

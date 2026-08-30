@@ -307,7 +307,8 @@ class JsonParser final {
   JsonParser(const nsACString& aInput, nsACString& aError)
       : mInput(aInput), mError(aError) {}
 
-  nsresult Parse(Config& aConfig) {
+  nsresult Parse(Config& aConfig,
+                 const Maybe<TransportMode>& aTransportOverride) {
     if (!mozilla::IsUtf8(Span(mInput.BeginReading(), mInput.Length()))) {
       return Error("config must be valid UTF-8");
     }
@@ -323,6 +324,8 @@ class JsonParser final {
     Config parsed;
     bool sawListen = false;
     bool sawProxy = false;
+    bool sawTransport = false;
+    bool sawNoConnectKey = false;
     bool sawLog = false;
     bool sawHostResolverRules = false;
     bool sawExtraHeaders = false;
@@ -332,6 +335,7 @@ class JsonParser final {
     bool sawPreamble = false;
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
+    bool sawDiagnosticOptimisticLocalReply = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -352,6 +356,38 @@ class JsonParser final {
         }
         sawProxy = true;
         MOZ_TRY(ParseProxies(parsed.mProxies));
+      } else if (key.EqualsLiteral("transport")) {
+        if (sawTransport) {
+          return Error("duplicate transport field");
+        }
+        sawTransport = true;
+        nsAutoCString value;
+        MOZ_TRY(ParseString(value, "transport must be a string"));
+        if (value.EqualsLiteral("classic")) {
+          parsed.mTransport = TransportMode::Classic;
+        } else if (value.EqualsLiteral("no-connect")) {
+          parsed.mTransport = TransportMode::NoConnect;
+        } else {
+          return Error("transport must be classic or no-connect");
+        }
+      } else if (key.EqualsLiteral("no-connect-key")) {
+        if (sawNoConnectKey) {
+          return Error("duplicate no-connect-key field");
+        }
+        sawNoConnectKey = true;
+        MOZ_TRY(ParseString(parsed.mNoConnectKey,
+                            "no-connect-key must be a string"));
+        if (parsed.mNoConnectKey.Length() < 32 ||
+            parsed.mNoConnectKey.Length() > 1024) {
+          return Error(
+              "no-connect-key must contain 32 through 1024 ASCII bytes");
+        }
+        for (size_t index = 0; index < parsed.mNoConnectKey.Length(); ++index) {
+          const char value = parsed.mNoConnectKey.CharAt(index);
+          if (value < 0x20 || value > 0x7e) {
+            return Error("no-connect-key must contain printable ASCII only");
+          }
+        }
       } else if (key.EqualsLiteral("log")) {
         if (sawLog) {
           return Error("duplicate log field");
@@ -417,6 +453,14 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticFirstSocksTunnelUrgentStart,
             "diagnostic-first-socks-tunnel-urgent-start must be a boolean"));
+      } else if (key.EqualsLiteral("diagnostic-optimistic-local-reply")) {
+        if (sawDiagnosticOptimisticLocalReply) {
+          return Error("duplicate diagnostic-optimistic-local-reply field");
+        }
+        sawDiagnosticOptimisticLocalReply = true;
+        MOZ_TRY(ParseBoolean(
+            parsed.mDiagnosticOptimisticLocalReply,
+            "diagnostic-optimistic-local-reply must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -453,7 +497,27 @@ class JsonParser final {
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
       return Error("listen addresses do not match multiple proxies");
     }
-    if (!sawPreamble) {
+    if (aTransportOverride) {
+      parsed.mTransport = *aTransportOverride;
+    }
+    if (parsed.mTransport == TransportMode::NoConnect) {
+      if (!sawNoConnectKey) {
+        return Error("no-connect transport requires no-connect-key");
+      }
+      if (parsed.mPreamble.mMode != PreambleMode::Off ||
+          parsed.mPreamble.ModeForProtocol(ProxyProtocol::H2) !=
+              PreambleMode::Off ||
+          parsed.mPreamble.ModeForProtocol(ProxyProtocol::H3) !=
+              PreambleMode::Off ||
+          parsed.mOuterSessionGate || !parsed.mExtraHeaders.IsEmpty() ||
+          parsed.mDiagnosticFirstSocksTunnelUrgentStart ||
+          parsed.mDiagnosticOptimisticLocalReply) {
+        return Error(
+            "no-connect transport does not accept classic preamble, "
+            "headers, gate, or diagnostic options");
+      }
+    }
+    if (!sawPreamble && parsed.mTransport == TransportMode::Classic) {
       bool hasExplicitH2Proxy = false;
       bool hasExplicitH3Proxy = false;
       bool hasOnlySocksListeners = true;
@@ -474,24 +538,21 @@ class JsonParser final {
         // SOCKS-only H2 uses the next-task first-buffer boundary that improved
         // both packets 17--32 and whole flow in the final paired campaign.
         // HTTP CONNECT and mixed listeners retain direct first-buffer
-        // admission for H2 and document-start admission for H3.  SOCKS-only
-        // H3 uses the retained six-resource native-parser policy.  Explicit
-        // preamble and gate fields remain authoritative.
+        // admission for H2.  Every H3 listener layout uses the retained
+        // six-resource native-parser policy.  Explicit preamble and gate
+        // fields remain authoritative.
         if (hasExplicitH2Proxy) {
-          parsed.mPreamble.mH2Mode = Some(
-              hasOnlySocksListeners
-                  ? PreambleMode::DocumentFirstBufferTaskOverlap
-                  : PreambleMode::DocumentFirstBufferOverlap);
+          parsed.mPreamble.mH2Mode =
+              Some(hasOnlySocksListeners
+                       ? PreambleMode::DocumentFirstBufferTaskOverlap
+                       : PreambleMode::DocumentFirstBufferOverlap);
         }
         if (hasExplicitH3Proxy) {
-          parsed.mPreamble.mH3Mode = Some(
-              hasOnlySocksListeners
-                  ? PreambleMode::TreeNativeParserResourceCommittedOverlap
-                  : PreambleMode::DocumentStartOverlap);
+          parsed.mPreamble.mH3Mode =
+              Some(PreambleMode::TreeNativeParserResourceCommittedOverlap);
         }
         parsed.mPreamble.mPath.AssignLiteral("/");
-        const bool usesH3ResourceDefault =
-            hasExplicitH3Proxy && hasOnlySocksListeners;
+        const bool usesH3ResourceDefault = hasExplicitH3Proxy;
         parsed.mPreamble.mMaxAssets = usesH3ResourceDefault ? 6 : 0;
         parsed.mPreamble.mMaxBytes =
             usesH3ResourceDefault ? PreambleConfig::kMaximumBytes
@@ -840,30 +901,35 @@ class JsonParser final {
     }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserDocumentStartResourceTree))) {
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResourceTree))) {
       return Error(
           "tree-native-parser-document-start-resource-tree must be selected "
           "explicitly with h3-mode");
     }
     if (h2Mode == PreambleMode::TreeNativeParserDocumentStartResourceTree &&
         (!sawH2Mode ||
-         aPreamble.mH2Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserDocumentStartResourceTree))) {
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserDocumentStartResourceTree))) {
       return Error(
           "tree-native-parser-document-start-resource-tree must be selected "
           "explicitly with h2-mode");
     }
     if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
         (!sawH3Mode ||
-         aPreamble.mH3Mode != Some(
-                                  PreambleMode::
-                                      TreeNativeParserResourceCommittedOverlap))) {
+         aPreamble.mH3Mode !=
+             Some(PreambleMode::TreeNativeParserResourceCommittedOverlap))) {
       return Error(
           "tree-native-parser-resource-committed-overlap must be selected "
           "explicitly with h3-mode");
+    }
+    if (h2Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+        (!sawH2Mode ||
+         aPreamble.mH2Mode !=
+             Some(PreambleMode::TreeNativeParserResourceCommittedOverlap))) {
+      return Error(
+          "tree-native-parser-resource-committed-overlap must be selected "
+          "explicitly with h2-mode");
     }
     if (h3Mode == PreambleMode::TreeNativeParserDocumentStartNavigationStop &&
         (!sawH3Mode ||
@@ -942,6 +1008,7 @@ class JsonParser final {
         (PreambleModeUsesNativeParser(h2Mode) &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartOverlap &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartResourceTree &&
+         h2Mode != PreambleMode::TreeNativeParserResourceCommittedOverlap &&
          h2Mode != PreambleMode::TreeNativeParserDocumentStartNavigationStop)) {
       return Error("selected resource-committed preamble is H3-only");
     }
@@ -1026,14 +1093,18 @@ class JsonParser final {
       if (!aPreamble.mCacheResources) {
         return Error(
             "tree-native-parser-document-start-resource-tree requires "
-          "cache-resources=true");
+            "cache-resources=true");
       }
     }
-    if (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
-      if (aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 6) {
+    if (h2Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap ||
+        h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+      if ((h2Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+           aPreamble.mMaxAssets != 6) ||
+          (h3Mode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+           aPreamble.mMaxAssets != 3 && aPreamble.mMaxAssets != 6)) {
         return Error(
-            "tree-native-parser-resource-committed-overlap requires exactly "
-            "three or six assets");
+            "tree-native-parser-resource-committed-overlap requires six H2 "
+            "assets or three/six H3 assets");
       }
       if (!aPreamble.mCacheResources) {
         return Error(
@@ -1710,16 +1781,18 @@ class JsonParser final {
 }  // namespace
 
 nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
-                     nsACString& aError) {
+                     nsACString& aError,
+                     const Maybe<TransportMode>& aTransportOverride) {
   aError.Truncate();
   if (aJson.Length() > kMaximumConfigSize) {
     return Fail(aError, "config is too large", NS_ERROR_FILE_TOO_BIG);
   }
-  return JsonParser(aJson, aError).Parse(aConfig);
+  return JsonParser(aJson, aError).Parse(aConfig, aTransportOverride);
 }
 
 nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
-                        nsACString& aError) {
+                        nsACString& aError,
+                        const Maybe<TransportMode>& aTransportOverride) {
   std::unique_ptr<FILE, decltype(&std::fclose)> file(
       std::fopen(PromiseFlatCString(aPath).get(), "rb"), &std::fclose);
   if (!file) {
@@ -1744,7 +1817,7 @@ nsresult LoadConfigFile(const nsACString& aPath, Config& aConfig,
                     static_cast<size_t>(length)) {
     return Fail(aError, "cannot read config file", NS_ERROR_FAILURE);
   }
-  return ParseConfig(json, aConfig, aError);
+  return ParseConfig(json, aConfig, aError, aTransportOverride);
 }
 
 ProfileDirectory::~ProfileDirectory() {

@@ -286,7 +286,7 @@ nsresult ConnectionEstablisher::ActivateConnectionWithTransaction(
                self->mTransaction.get(), static_cast<uint32_t>(aResult)));
         }
 #endif
-        nsresult dispatchRv = NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+        nsresult dispatchRv = DispatchToCurrent(NS_NewRunnableFunction(
             "ConnectionEstablisher::ActivateCallback",
             [self, aResult, onActivated = std::move(onActivated)]() {
 #ifdef MOZ_NAIVEFOX
@@ -638,6 +638,11 @@ nsresult TCPConnectionEstablisher::CreateAndConfigureSocketTransport() {
   socketTransport->SetConnectionFlags(tmpFlags);
   socketTransport->SetTlsFlags(mConnInfo->GetTlsFlags());
   socketTransport->SetOriginAttributes(mConnInfo->GetOriginAttributes());
+  // Must match DnsAndConnectSocket::TransportSetup::SetupStreams: without this
+  // TRR sockets established through Happy Eyeballs are not marked, so neither
+  // nsSocketEvent::GetPriority nor the socket thread's TRR-first servicing sees
+  // them.
+  socketTransport->SetIsTRRConnection(mConnInfo->GetIsTrrServiceChannel());
 
   socketTransport->SetQoSBits(gHttpHandler->GetQoSBits());
 

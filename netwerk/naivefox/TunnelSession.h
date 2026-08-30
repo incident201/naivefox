@@ -94,12 +94,16 @@ struct TunnelConfig final {
         mProxyUser(aOther.mProxyUser),
         mProxyPassword(aOther.mProxyPassword),
         mProtocol(aOther.mProtocol),
+        mTransport(aOther.mTransport),
+        mNoConnectKey(aOther.mNoConnectKey),
         mHostResolverRule(aOther.mHostResolverRule),
         mPreamble(aOther.mPreamble),
         mOuterSessionGate(aOther.mOuterSessionGate),
         mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
-            aOther.mDiagnosticFirstSocksTunnelUrgentStart) {
+            aOther.mDiagnosticFirstSocksTunnelUrgentStart),
+        mDiagnosticOptimisticLocalReply(
+            aOther.mDiagnosticOptimisticLocalReply) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -108,12 +112,15 @@ struct TunnelConfig final {
       mProxyUser = aOther.mProxyUser;
       mProxyPassword = aOther.mProxyPassword;
       mProtocol = aOther.mProtocol;
+      mTransport = aOther.mTransport;
+      mNoConnectKey = aOther.mNoConnectKey;
       mHostResolverRule = aOther.mHostResolverRule;
       mPreamble = aOther.mPreamble;
       mOuterSessionGate = aOther.mOuterSessionGate;
       mImplicitPreambleGate = aOther.mImplicitPreambleGate;
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
+      mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -124,12 +131,15 @@ struct TunnelConfig final {
   nsCString mProxyUser;
   nsCString mProxyPassword;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
+  TransportMode mTransport = TransportMode::Classic;
+  nsCString mNoConnectKey;
   Maybe<HostResolverRule> mHostResolverRule;
   nsTArray<ExtraHeader> mExtraHeaders;
   PreambleConfig mPreamble;
   bool mOuterSessionGate = false;
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
+  bool mDiagnosticOptimisticLocalReply = false;
 };
 
 class TunnelSession final {

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import re
 
 PREAMBLE_RESULT = re.compile(
@@ -10,6 +11,12 @@ PREAMBLE_RESULT = re.compile(
     r"status=0x[0-9a-fA-F]+ "
     r"http=(?P<http>\d+) bytes=(?P<bytes>\d+) "
     r"protocol=(?P<protocol>h2|h3)$"
+)
+OPTIMISTIC_LOCAL_REPLY = re.compile(
+    r"^(?:\[[^\]\r\n]+\] )?Local optimistic reply "
+    r"phase=(?P<phase>queued|reply-flushed-before-outer|outer-established|"
+    r"pump-started|outer-failed) "
+    r"listener=(?P<listener>socks|http-connect)$"
 )
 ROOT_OVERLAP_ADMISSION = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
@@ -376,7 +383,8 @@ NATIVE_PARSER_RESOURCE_TREE_DRAIN = re.compile(
 )
 ESTABLISHED = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
-    r"established target=\S+ outer=(?P<protocol>h2|h3) padding=yes$"
+    r"established target=\S+ outer=(?P<protocol>h2|h3) "
+    r"padding=(?P<padding>yes|no)$"
 )
 NATIVE_CACHE_OPEN = re.compile(
     r"^(?:\[[^\]\r\n]+\] )?Connection (?P<connection>\d+) "
@@ -1008,13 +1016,18 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "document-handshake-confirmed",
         "document-first-buffer-overlap",
         "document-first-buffer-task-overlap",
+        "document-first-buffer-task-optimistic",
+        "document-first-buffer-task-http-connect",
         "document-first-buffer-http-connect",
+        "document-first-buffer-http-connect-optimistic",
         "document-overlap",
         "document-headers-task-overlap",
+        "document-headers-task-http-connect",
         "document-overlap-http-connect",
         "document-start-http-connect",
         "document-start-overlap",
         "document-start-task-overlap",
+        "document-start-task-http-connect",
         "tree-complete",
         "tree-complete-css",
         "tree-complete-resource-tree",
@@ -1031,6 +1044,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         "tree-native-parser-document-start-resource-tree",
         "tree-native-parser-resource-committed-tree",
         "tree-native-parser-resource-committed-page",
+        "tree-native-parser-resource-committed-page-http-connect",
         "tree-native-parser-document-start-navigation-stop-css",
         "tree-native-parser-document-start-response-stop-css",
         "tree-native-parser-document-handoff-overlap-css",
@@ -1046,12 +1060,6 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("unsupported NaiveFox arm")
     if protocol not in ("h2", "h3"):
         raise ValueError("unsupported outer protocol")
-    if arm in (
-        "document-first-buffer-http-connect",
-        "document-overlap-http-connect",
-        "document-start-http-connect",
-    ) and protocol != "h2":
-        raise ValueError(f"{arm} requires h2")
     if arm == "root-pmtud-control" and protocol != "h3":
         raise ValueError("root-pmtud-control requires h3")
     if arm == "document-handshake-confirmed" and protocol != "h3":
@@ -1064,15 +1072,18 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("document-native-cache-open requires h3")
     if arm == "document-native-channel-open" and protocol != "h3":
         raise ValueError("document-native-channel-open requires h3")
-    if arm in (
-        "tree-resource-committed-overlap-css",
-        "tree-resource-committed-overlap-tree",
-        "tree-resource-committed-overlap-page",
-        "tree-native-parser-resource-committed-tree",
-        "tree-native-parser-resource-committed-page",
-        "tree-complete-resource-tree",
-        "tree-early-overlap-resource-tree",
-    ) and protocol != "h3":
+    if (
+        arm
+        in (
+            "tree-resource-committed-overlap-css",
+            "tree-resource-committed-overlap-tree",
+            "tree-resource-committed-overlap-page",
+            "tree-native-parser-resource-committed-tree",
+            "tree-complete-resource-tree",
+            "tree-early-overlap-resource-tree",
+        )
+        and protocol != "h3"
+    ):
         raise ValueError(f"{arm} requires h3")
     if arm == "tree-resource-native-cache-committed-overlap" and protocol != "h3":
         raise ValueError("tree-resource-native-cache-committed-overlap requires h3")
@@ -1097,6 +1108,54 @@ def validate_sample(arm, protocol, log_text, feature_document):
         raise ValueError("tree-native-parser-process-overlap-css requires h3")
     if arm == "tree-native-parser-full-process-overlap-css" and protocol != "h3":
         raise ValueError("tree-native-parser-full-process-overlap-css requires h3")
+    requested_arm = arm
+    arm = {
+        "document-first-buffer-http-connect": "document-first-buffer-overlap",
+        "document-first-buffer-http-connect-optimistic": (
+            "document-first-buffer-overlap"
+        ),
+        "document-first-buffer-task-http-connect": (
+            "document-first-buffer-task-overlap"
+        ),
+        "document-first-buffer-task-optimistic": ("document-first-buffer-task-overlap"),
+        "document-headers-task-http-connect": "document-headers-task-overlap",
+        "document-overlap-http-connect": "document-overlap",
+        "document-start-http-connect": "document-start-overlap",
+        "document-start-task-http-connect": "document-start-task-overlap",
+        "tree-native-parser-resource-committed-page-http-connect": (
+            "tree-native-parser-resource-committed-page"
+        ),
+    }.get(arm, arm)
+    optimistic_lines = [
+        line for line in log_lines if "Local optimistic reply phase=" in line
+    ]
+    parsed_optimistic = [
+        OPTIMISTIC_LOCAL_REPLY.fullmatch(line) for line in optimistic_lines
+    ]
+    if any(marker is None for marker in parsed_optimistic):
+        raise ValueError("malformed optimistic local reply evidence")
+    optimistic_arms = {
+        "document-first-buffer-task-optimistic": "socks",
+        "document-first-buffer-http-connect-optimistic": "http-connect",
+    }
+    if requested_arm in optimistic_arms:
+        expected_phases = (
+            "queued",
+            "reply-flushed-before-outer",
+            "outer-established",
+            "pump-started",
+        )
+        if tuple(marker["phase"] for marker in parsed_optimistic) != expected_phases:
+            raise ValueError(
+                "optimistic local reply lifecycle is incomplete or unordered"
+            )
+        if any(
+            marker["listener"] != optimistic_arms[requested_arm]
+            for marker in parsed_optimistic
+        ):
+            raise ValueError("optimistic local reply listener identity differs")
+    elif parsed_optimistic:
+        raise ValueError(f"{requested_arm} arm unexpectedly logged optimistic reply")
     result_lines = [line for line in log_lines if " preamble result=" in line]
     parsed_results = [PREAMBLE_RESULT.fullmatch(line) for line in result_lines]
     if any(result is None for result in parsed_results):
@@ -1248,8 +1307,8 @@ def validate_sample(arm, protocol, log_text, feature_document):
         for line in log_lines
         if (
             "Preamble native-parser-resource-tree lifecycle=resource-opened " in line
-            or "Preamble native-parser-resource-tree "
-            "lifecycle=resource-prepared " in line
+            or "Preamble native-parser-resource-tree lifecycle=resource-prepared "
+            in line
         )
     ]
     parsed_native_resource_tree_opens = [
@@ -1724,6 +1783,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
     parsed_established = [ESTABLISHED.fullmatch(line) for line in established_lines]
     if any(established is None for established in parsed_established):
         raise ValueError("malformed CONNECT-established evidence")
+    expected_padding = os.environ.get("NAIVEFOX_CAPTURE_EXPECT_PADDING", "yes")
+    if expected_padding not in ("yes", "no"):
+        raise ValueError("unsupported expected padding condition")
+    if any(
+        established["padding"] != expected_padding for established in parsed_established
+    ):
+        raise ValueError("CONNECT-established padding condition differs from expected")
     native_cache_lines = [
         line for line in log_lines if " preamble native-cache-open cache=" in line
     ]
@@ -1969,14 +2035,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
             1 if arm == "tree-resource-committed-overlap-page" else 0
         )
         if len(resource_commit_task_barrier_lines) != expected_task_barriers:
-            raise ValueError(
-                "resource-committed arm has invalid task-barrier evidence"
+            raise ValueError("resource-committed arm has invalid task-barrier evidence")
+        if (
+            resource_commit_task_barrier_lines
+            and not resource_commit_task_barrier_lines[0].endswith(
+                "Preamble resource-committed-overlap barrier=task-dispatched "
+                f"assets=6 protocol={protocol}"
             )
-        if resource_commit_task_barrier_lines and not resource_commit_task_barrier_lines[
-            0
-        ].endswith(
-            "Preamble resource-committed-overlap barrier=task-dispatched "
-            f"assets=6 protocol={protocol}"
         ):
             raise ValueError("resource-committed task-barrier identity is invalid")
         if len(parsed_admissions) != 1:
@@ -2172,8 +2237,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["completed_resources"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection
-                or marker["protocol"] != protocol
+                marker["connection"] != connection or marker["protocol"] != protocol
                 for marker in (channel, admission, barrier, drain)
             )
             or result["connection"] != connection
@@ -2315,9 +2379,9 @@ def validate_sample(arm, protocol, log_text, feature_document):
         drain = parsed_native_resource_tree_drains[0]
         connection = admission["connection"]
         expected_resources = {1: "style", 2: "script"}
-        expected_resources.update(
-            {index: "image" for index in range(3, expected_resource_count + 1)}
-        )
+        expected_resources.update({
+            index: "image" for index in range(3, expected_resource_count + 1)
+        })
         opens = {
             int(marker["stream"]): marker["kind"]
             for marker in parsed_native_resource_tree_opens
@@ -2401,8 +2465,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             log_lines.index(line) for line in native_resource_tree_open_lines
         ]
         deferred_open_indices = [
-            log_lines.index(line)
-            for line in native_resource_tree_deferred_open_lines
+            log_lines.index(line) for line in native_resource_tree_deferred_open_lines
         ]
         commit_indices = [
             log_lines.index(line) for line in native_resource_tree_commit_lines
@@ -2424,9 +2487,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
         if arm == "tree-native-parser-resource-committed-page":
             first_body = parsed_native_resource_tree_first_bodies[0]
             first_body_stream = int(first_body["stream"])
-            first_body_index = log_lines.index(
-                native_resource_tree_first_body_lines[0]
-            )
+            first_body_index = log_lines.index(native_resource_tree_first_body_lines[0])
             body_barrier_index = log_lines.index(
                 native_resource_tree_body_barrier_lines[0]
             )
@@ -2437,15 +2498,13 @@ def validate_sample(arm, protocol, log_text, feature_document):
                     parsed_native_resource_tree_opens,
                 )
             }
-            open_index_by_stream.update(
-                {
-                    int(marker["stream"]): log_lines.index(line)
-                    for line, marker in zip(
-                        native_resource_tree_deferred_open_lines,
-                        parsed_native_resource_tree_deferred_opens,
-                    )
-                }
-            )
+            open_index_by_stream.update({
+                int(marker["stream"]): log_lines.index(line)
+                for line, marker in zip(
+                    native_resource_tree_deferred_open_lines,
+                    parsed_native_resource_tree_deferred_opens,
+                )
+            })
             commit_index_by_stream = {
                 int(marker["stream"]): log_lines.index(line)
                 for line, marker in zip(
@@ -2464,12 +2523,10 @@ def validate_sample(arm, protocol, log_text, feature_document):
                 and descriptor_index < min(open_indices)
                 and max(open_indices) < min(deferred_open_indices)
                 and all(
-                    open_index_by_stream[stream]
-                    < commit_index_by_stream[stream]
+                    open_index_by_stream[stream] < commit_index_by_stream[stream]
                     for stream in expected_resources
                 )
-                and commit_index_by_stream[first_body_stream]
-                < first_body_index
+                and commit_index_by_stream[first_body_stream] < first_body_index
                 and max(commit_indices) < body_barrier_index
                 and first_body_index < body_barrier_index
                 and body_barrier_index < admission_index
@@ -2547,8 +2604,7 @@ def validate_sample(arm, protocol, log_text, feature_document):
             or drain["css_aborted"] != "1"
             or not 200 <= int(drain["http"]) < 300
             or any(
-                marker["connection"] != connection
-                or marker["protocol"] != protocol
+                marker["connection"] != connection or marker["protocol"] != protocol
                 for marker in (
                     stylesheet,
                     tunnel_active,
@@ -3440,13 +3496,18 @@ def main():
             "document-handshake-confirmed",
             "document-first-buffer-overlap",
             "document-first-buffer-task-overlap",
+            "document-first-buffer-task-optimistic",
+            "document-first-buffer-task-http-connect",
             "document-first-buffer-http-connect",
+            "document-first-buffer-http-connect-optimistic",
             "document-overlap",
             "document-headers-task-overlap",
+            "document-headers-task-http-connect",
             "document-overlap-http-connect",
             "document-start-http-connect",
             "document-start-overlap",
             "document-start-task-overlap",
+            "document-start-task-http-connect",
             "tree-complete",
             "tree-complete-css",
             "tree-complete-resource-tree",
@@ -3463,6 +3524,7 @@ def main():
             "tree-native-parser-document-start-resource-tree",
             "tree-native-parser-resource-committed-tree",
             "tree-native-parser-resource-committed-page",
+            "tree-native-parser-resource-committed-page-http-connect",
             "tree-native-parser-document-start-navigation-stop-css",
             "tree-native-parser-document-start-response-stop-css",
             "tree-native-parser-document-handoff-overlap-css",

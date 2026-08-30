@@ -58,6 +58,15 @@ for asset_size in "$camouflage_style_size" "$camouflage_script_size"; do
 done
 export NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE=$camouflage_style_size
 export NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE=$camouflage_script_size
+fronting_resource_unit_size=${NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE:-}
+if [[ -n $fronting_resource_unit_size ]] &&
+   { [[ ! $fronting_resource_unit_size =~ ^[0-9]+$ ]] ||
+     (( fronting_resource_unit_size < 1024 ||
+        fronting_resource_unit_size > 22000 )); }; then
+  printf 'fronting resource unit size must be an integer in 1024..22000\n' >&2
+  exit 2
+fi
+export NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE=$fronting_resource_unit_size
 
 init_paths
 "$INTEGRATION_DIR/setup.sh"
@@ -302,6 +311,7 @@ NAIVEFOX_FIXTURE_CACHE_REQUEST_JOURNAL=$RUN_DIR/cache-requests.jsonl
 NAIVEFOX_FIXTURE_PROXY_IP_SAN=${NAIVEFOX_FIXTURE_PROXY_IP_SAN:-}
 NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE=$camouflage_style_size
 NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE=$camouflage_script_size
+NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE=$fronting_resource_unit_size
 EOF
 chmod 0600 "$RUN_DIR/fixture.env"
 

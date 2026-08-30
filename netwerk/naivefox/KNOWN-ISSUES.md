@@ -40,6 +40,14 @@ and do not persist in either profile mode.
 The embedded API does not use this fallback. Its caller must provide an
 existing writable profile directory and owns that directory's lifecycle.
 
+## Profile-keystore cache encryption
+
+The lean runtime does not include Firefox's profile keystore. Ordinary Cache2
+resource caching remains available, but explicitly enabling
+`browser.cache.disk.encryption.enabled` cannot load a cache cipher. Native
+cache handling rejects affected disk entries instead of persisting plaintext.
+This does not change NSS transport encryption or certificate validation.
+
 ## Embedded Gecko lifecycle is one-shot
 
 `NaiveFoxRunEmbedded()` is blocking and supports one process-wide runtime.
@@ -83,13 +91,38 @@ Normal JSON config deliberately has no Auto scheme: `https://` is strict H2 and
 
 ## Implicit H3 fronting page has an exact resource contract
 
-The promoted SOCKS-only H3 preamble expects the configured origin root to
+The promoted implicit H3 preamble on SOCKS5, HTTP CONNECT, or mixed listeners
+expects the configured origin root to
 contain exactly one same-origin stylesheet, one classic deferred script, and
 four images accepted by the lean parser, within the documented aggregate
 budget. Strict H3 fails closed when that contract is not met; it does not
 silently fall back to a document-only request or to H2. Operators using a
 different fronting page must select an explicit compatible `preamble` policy,
-including `document-start-overlap`, or explicitly disable the preamble.
+including `document-start-overlap`, or explicitly disable the preamble. The
+canonical tag/attribute constraints, response limits, measured resource sizes,
+and remaining size-validation gap are in
+[`FRONTING-PAGE.md`](FRONTING-PAGE.md); they must be updated whenever this
+implicit contract changes.
+
+## No-connect compatibility and evidence
+
+`no-connect` is opt-in and requires the matching Caddy `naivefox_transport`
+module with a private transport key, an explicit target allowlist and the
+`continuous-bulk-pipeline` profile. It does not interoperate with an ordinary
+forward proxy or an arbitrary static website. A module mismatch or rejected
+key fails the connection; it does not trigger a downgrade to `classic`.
+
+The native port has bounded logical streams and 32-bit per-stream byte
+sequences; long-lived streams must close before sequence exhaustion. Session
+resumption and transparent replay after an outer-session failure are not
+supported. Automatic key provisioning/rotation is an operator concern.
+
+The earlier experimental residual and throughput measurements used a full
+Firefox SPA worker. They cannot be attributed to the lean native client, which
+does not execute that page's JavaScript or render its UI. Functional
+interoperability and lean-closure checks do not establish indistinguishability,
+throughput parity, or browser-equivalent request scheduling. Protocol details
+and the exact port boundary are maintained in [NO-CONNECT.md](NO-CONNECT.md).
 
 ## Product scope
 

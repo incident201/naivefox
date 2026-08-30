@@ -1262,6 +1262,10 @@ nsresult ProxyPreambleOperation::Start(
     ProxyPreambleFinishedCallback&& aFinishedCallback,
     const Maybe<HostResolverRule>& aHostResolverRule, uint64_t aConnectionId) {
   MOZ_ASSERT(NS_IsMainThread());
+  const uint32_t expectedH2NativeParserResourceCount =
+      aConfig.mMode == PreambleMode::TreeNativeParserResourceCommittedOverlap
+          ? 6U
+          : 3U;
   if (!aBarrierCallback || aConfig.mMode == PreambleMode::Off ||
       !IsValidPreamblePath(aConfig.mPath) || aConfig.mMaxBytes == 0 ||
       aConfig.mMaxBytes > PreambleConfig::kMaximumBytes ||
@@ -1278,9 +1282,14 @@ nsresult ProxyPreambleOperation::Start(
             aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartResourceTree ||
             aConfig.mMode ==
+                PreambleMode::TreeNativeParserResourceCommittedOverlap ||
+            aConfig.mMode ==
                 PreambleMode::TreeNativeParserDocumentStartNavigationStop))) ||
         (PreambleModeUsesNativeParserResourceTree(aConfig.mMode)
-             ? (aConfig.mMaxAssets != 3U && aConfig.mMaxAssets != 6U)
+             ? (aProtocol == ProxyProtocol::H2
+                    ? aConfig.mMaxAssets !=
+                          expectedH2NativeParserResourceCount
+                    : (aConfig.mMaxAssets != 3U && aConfig.mMaxAssets != 6U))
              : aConfig.mMaxAssets != 1U) ||
         !aConfig.mCacheResources))) {
     return NS_ERROR_INVALID_ARG;
@@ -4289,6 +4298,57 @@ nsresult BuildProxyAuthorization(const nsACString& aUser,
                                  const nsACString& aPassword,
                                  nsACString& aAuthorization) {
   return MakeBasicAuthorization(aUser, aPassword, aAuthorization);
+}
+
+nsresult CreateNoConnectChannel(
+    const nsACString& aProxyUrl, const nsACString& aPath,
+    ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule,
+    nsIChannel** aChannel) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!IsValidPreamblePath(aPath)) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  ExplicitProxyRoute route;
+  MOZ_TRY(BuildExplicitProxyRoute(aProxyUrl, EmptyCString(), EmptyCString(),
+                                  aProtocol, aHostResolverRule, false, route));
+  nsAutoCString spec;
+  MOZ_TRY(route.mProxyUri->GetPrePath(spec));
+  spec.Append(aPath);
+  nsCOMPtr<nsIURI> uri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(uri), spec));
+  nsCOMPtr<nsIPrincipal> principal;
+  MOZ_TRY(GetSystemPrincipal(getter_AddRefs(principal)));
+  nsCOMPtr<nsIChannel> templateChannel;
+  MOZ_TRY(NS_NewChannel(
+      getter_AddRefs(templateChannel), uri, principal,
+      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+          nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS |
+          nsILoadInfo::SEC_COOKIES_OMIT,
+      nsIContentPolicy::TYPE_OTHER));
+  nsCOMPtr<nsIProxiedProtocolHandler> handler =
+      do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
+  if (!handler) {
+    return NS_ERROR_FAILURE;
+  }
+  nsCOMPtr<nsIChannel> channel;
+  nsCOMPtr<nsILoadInfo> loadInfo = templateChannel->LoadInfo();
+  MOZ_TRY(handler->NewProxiedChannel(uri, route.mProxyInfo, 0, nullptr, loadInfo,
+                                    getter_AddRefs(channel)));
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
+  if (!internal) {
+    return NS_ERROR_FAILURE;
+  }
+  MOZ_TRY(internal->SetAllowSpdy(true));
+  MOZ_TRY(internal->SetAllowHttp3(aProtocol == ProxyProtocol::H3));
+  MOZ_TRY(internal->SetBlockAuthPrompt(true));
+  // The existing route-only hook sends ordinary origin requests over the
+  // explicit strict H2/H3 route, without a proxy CONNECT or proxy credentials.
+  MOZ_TRY(internal->SetProxyPreamble());
+  MOZ_TRY(channel->SetLoadFlags(nsIRequest::INHIBIT_CACHING |
+                                nsIRequest::LOAD_ANONYMOUS |
+                                nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+  channel.forget(aChannel);
+  return NS_OK;
 }
 
 nsresult OpenProxyPreamble(const nsACString& aProxyUrl,

@@ -231,29 +231,28 @@ void CanRunScriptChecker::registerMatchers(MatchFinder *AstMatcher) {
   // because we check that the corresponding functions can run script later in
   // the checker code.
   AstMatcher->addMatcher(
-      expr(
-          anyOf(
-              // We want to match a method call expression,
-              cxxMemberCallExpr(
-                  // which optionally has an invalid arg,
-                  OptionalInvalidExplicitArg,
-                  // or which optionally has an invalid this argument,
-                  optionally(on(InvalidArg)), expr().bind("callExpr")),
-              // or a regular call expression,
-              callExpr(
-                  // which optionally has an invalid arg.
-                  OptionalInvalidExplicitArg, expr().bind("callExpr")),
-              // or a construct expression,
-              cxxConstructExpr(
-                  // which optionally has an invalid arg.
-                  OptionalInvalidExplicitArg, expr().bind("constructExpr"))),
+      expr(anyOf(
+               // We want to match a method call expression,
+               cxxMemberCallExpr(
+                   // which optionally has an invalid arg,
+                   OptionalInvalidExplicitArg,
+                   // or which optionally has an invalid this argument,
+                   optionally(on(InvalidArg)), expr().bind("callExpr")),
+               // or a regular call expression,
+               callExpr(
+                   // which optionally has an invalid arg.
+                   OptionalInvalidExplicitArg, expr().bind("callExpr")),
+               // or a construct expression,
+               cxxConstructExpr(
+                   // which optionally has an invalid arg.
+                   OptionalInvalidExplicitArg, expr().bind("constructExpr"))),
 
-              // We want to match the parent function.
-              optionally(forFunction(functionDecl().bind("nonCanRunScriptParentFunction"))),
+           // We want to match the parent function.
+           optionally(forFunction(
+               functionDecl().bind("nonCanRunScriptParentFunction"))),
 
-              // Not concerned by standard headers or third party.
-              isFirstParty()
-              ),
+           // Not concerned by standard headers or third party.
+           isFirstParty()),
       this);
 }
 

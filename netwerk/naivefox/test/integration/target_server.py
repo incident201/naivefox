@@ -55,6 +55,38 @@ def configured_camouflage_asset_size(name, default):
     return size
 
 
+def configured_fronting_resource_unit_size():
+    raw = os.environ.get("NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE")
+    if raw in (None, ""):
+        return None
+    try:
+        size = int(raw)
+    except ValueError as exc:
+        raise ValueError(
+            "NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE must be an integer"
+        ) from exc
+    if not 1024 <= size <= 22000:
+        raise ValueError(
+            "NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE must be between "
+            "1024 and 22000 bytes"
+        )
+    return size
+
+
+def fronting_resource_profile(unit_size):
+    if unit_size is None:
+        return (12 * 1024, 24 * 1024, 8 * 1024, 34, False)
+    if not 1024 <= unit_size <= 22000:
+        raise ValueError("fronting resource unit must be between 1024 and 22000")
+    return (
+        3 * unit_size,
+        6 * unit_size,
+        2 * unit_size,
+        2 * unit_size,
+        True,
+    )
+
+
 CAMOUFLAGE_STYLE_SIZE = configured_camouflage_asset_size(
     "NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE", 64 * 1024
 )
@@ -62,9 +94,14 @@ CAMOUFLAGE_SCRIPT_SIZE = configured_camouflage_asset_size(
     "NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE", 128 * 1024
 )
 CAMOUFLAGE_API_IMAGE_SIZE = 4096
-FRONTING_STYLE_SIZE = 12 * 1024
-FRONTING_SCRIPT_SIZE = 24 * 1024
-FRONTING_IMAGE_SIZE = 8 * 1024
+FRONTING_RESOURCE_UNIT_SIZE = configured_fronting_resource_unit_size()
+(
+    FRONTING_STYLE_SIZE,
+    FRONTING_SCRIPT_SIZE,
+    FRONTING_IMAGE_SIZE,
+    FRONTING_FOURTH_IMAGE_SIZE,
+    FRONTING_FOURTH_IMAGE_IS_SVG,
+) = fronting_resource_profile(FRONTING_RESOURCE_UNIT_SIZE)
 
 
 def sized_source_asset(size, prefix, filler):
@@ -132,6 +169,94 @@ def write_completion(completion_dir, token):
     finally:
         os.close(descriptor)
     os.replace(temporary, path)
+
+
+def browser_page_asset_urls(query):
+    navigation = query.get("nav", [""])[0]
+    asset_base_values = query.get("asset_base", [])
+    if asset_base_values:
+        asset_base = min(
+            max(int(asset_base_values[0]), 64 * 1024), 4 * 1024 * 1024
+        )
+        asset_sizes = (
+            asset_base // 4,
+            asset_base // 2,
+            asset_base,
+            asset_base // 64,
+        )
+
+        def asset_url(path, asset_size):
+            suffix = f"?size={asset_size}"
+            if navigation:
+                suffix += f"&nav={navigation}"
+            return path + suffix
+
+        style_url = asset_url("/camouflage/style.css", asset_sizes[0])
+        script_url = asset_url("/camouflage/app.js", asset_sizes[1])
+        image_urls = (
+            asset_url("/camouflage/resource", asset_sizes[0]),
+            asset_url("/camouflage/resource", asset_sizes[1]),
+            asset_url("/camouflage/resource", asset_sizes[2]),
+        )
+        api_url = asset_url("/camouflage/api", asset_sizes[3])
+    else:
+        suffix = f"?nav={navigation}" if navigation else ""
+        resource_suffix = f"&nav={navigation}" if navigation else ""
+        style_url = "/camouflage/style.css" + suffix
+        script_url = "/camouflage/app.js" + suffix
+        image_urls = (
+            "/camouflage/resource?size=65536" + resource_suffix,
+            "/camouflage/resource?size=131072" + resource_suffix,
+            "/camouflage/resource?size=262144" + resource_suffix,
+        )
+        api_url = "/camouflage/api" + suffix
+    return style_url, script_url, image_urls, api_url
+
+
+def browser_page_preload_links(query, parameter):
+    mode = query.get(parameter, ["none"])[0]
+    if mode == "none":
+        return ()
+    if (
+        mode not in ("css", "blocking", "all")
+        or query.get("scenario", ["browser_page"])[0] != "browser_page"
+    ):
+        return None
+    style_url, script_url, image_urls, api_url = browser_page_asset_urls(query)
+    resources = [
+        (style_url, "style"),
+        (script_url, "script"),
+        *((url, "image") for url in image_urls),
+        (api_url, "image"),
+    ]
+    limit = {"css": 1, "blocking": 2, "all": 6}[mode]
+    return tuple(
+        f"<{url}>; rel=preload; as={destination}"
+        for url, destination in resources[:limit]
+    )
+
+
+def browser_page_early_hint_links(query):
+    return browser_page_preload_links(query, "early_hints")
+
+
+def browser_page_final_preload_links(query):
+    return browser_page_preload_links(query, "final_preloads")
+
+
+def sized_document_body(body, query):
+    requested_sizes = query.get("document_size", [])
+    if not requested_sizes:
+        return body
+    if len(requested_sizes) != 1:
+        return None
+    try:
+        requested_size = int(requested_sizes[0])
+    except ValueError:
+        return None
+    if requested_size < len(body) or requested_size > 64 * 1024:
+        return None
+    return body + b" " * (requested_size - len(body))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -242,43 +367,9 @@ class Handler(BaseHTTPRequestHandler):
         if scenario == "initial":
             body = '<img src="/camouflage/resource?size=16384">'
         elif scenario == "browser_page":
-            asset_base_values = query.get("asset_base", [])
-            if asset_base_values:
-                asset_base = min(
-                    max(int(asset_base_values[0]), 64 * 1024), 4 * 1024 * 1024
-                )
-                asset_sizes = (
-                    asset_base // 4,
-                    asset_base // 2,
-                    asset_base,
-                    asset_base // 64,
-                )
-
-                def asset_url(path, asset_size):
-                    suffix = f"?size={asset_size}"
-                    if navigation:
-                        suffix += f"&nav={navigation}"
-                    return path + suffix
-
-                style_url = asset_url("/camouflage/style.css", asset_sizes[0])
-                script_url = asset_url("/camouflage/app.js", asset_sizes[1])
-                image_urls = (
-                    asset_url("/camouflage/resource", asset_sizes[0]),
-                    asset_url("/camouflage/resource", asset_sizes[1]),
-                    asset_url("/camouflage/resource", asset_sizes[2]),
-                )
-                api_url = asset_url("/camouflage/api", asset_sizes[3])
-            else:
-                suffix = f"?nav={navigation}" if navigation else ""
-                resource_suffix = f"&nav={navigation}" if navigation else ""
-                style_url = "/camouflage/style.css" + suffix
-                script_url = "/camouflage/app.js" + suffix
-                image_urls = (
-                    "/camouflage/resource?size=65536" + resource_suffix,
-                    "/camouflage/resource?size=131072" + resource_suffix,
-                    "/camouflage/resource?size=262144" + resource_suffix,
-                )
-                api_url = "/camouflage/api" + suffix
+            style_url, script_url, image_urls, api_url = browser_page_asset_urls(
+                query
+            )
             body = (
                 f'<link rel="stylesheet" href="{style_url}">'
                 f'<script src="{script_url}"></script>'
@@ -352,7 +443,7 @@ window.addEventListener('load',async()=>{{
 await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
 }});
 </script>"""
-        return (head + body).encode()
+        return sized_document_body((head + body).encode(), query)
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -403,11 +494,26 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
             if body is None:
                 self.send_error(400)
                 return
+            hints = browser_page_early_hint_links(query)
+            final_preloads = browser_page_final_preload_links(query)
+            if hints is None or final_preloads is None:
+                self.send_error(400)
+                return
+            if hints:
+                self.send_response_only(103)
+                for link in hints:
+                    self.send_header("Link", link)
+                self.end_headers()
+                self.wfile.flush()
+            response_headers = [
+                ("Referrer-Policy", "strict-origin-when-cross-origin"),
+                *(("Link", link) for link in final_preloads),
+            ]
             self.send_bytes(
                 200,
                 body,
                 "text/html; charset=utf-8",
-                (("Referrer-Policy", "strict-origin-when-cross-origin"),),
+                response_headers,
             )
         elif parsed.path == "/camouflage/style.css":
             if "size" in query:
@@ -444,6 +550,8 @@ await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
                     MAX_BODY,
                 )
                 self.send_svg(size)
+            elif query.get("item") == ["4"] and FRONTING_FOURTH_IMAGE_IS_SVG:
+                self.send_svg(FRONTING_FOURTH_IMAGE_SIZE)
             else:
                 self.send_bytes(
                     200, b'{"status":"ok","items":[1,2,3,4]}\n', "application/json"

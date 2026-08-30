@@ -5,7 +5,10 @@
 include("gkrust-features.mozbuild")
 
 if CONFIG["MOZ_BUILD_APP"] == "netwerk/naivefox":
-    RustLibrary("gkrust", ["naivefox"], is_gkrust=True)
+    naivefox_features = ["naivefox"]
+    if CONFIG["MOZ_MEMORY"]:
+        naivefox_features.append("mozglue-static/moz_memory")
+    RustLibrary("gkrust", naivefox_features, is_gkrust=True)
 else:
     gkrust_features.append("full")
     RustLibrary("gkrust", gkrust_features, is_gkrust=True)

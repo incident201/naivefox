@@ -609,13 +609,21 @@ class H2DecryptedParitySummaryTests(unittest.TestCase):
         self.assertIn('safe_root="$STATE_ROOT/h2-capture-safe"', runner)
         self.assertIn('$(dirname -- "$safe_dir") == "$safe_root"', runner)
         self.assertIn("traffic_secret", runner)
-        self.assertIn("browser_backend=commandline", runner)
+        self.assertIn("--browser-backend commandline|selenium", runner)
+        self.assertIn("browser_backend=%s", runner)
+        self.assertIn("camouflage_browser_controller.py", runner)
+        self.assertIn("wait_for_marker", runner)
+        self.assertIn("stop_controller", runner)
         self.assertIn("http2.header.value", runner)
         self.assertIn("safe summary exports boolean results only", runner)
         self.assertIn("capture_worktree_dirty", runner)
         self.assertIn("capture_source_state_sha256", runner)
         self.assertIn(
             "browser_start_state=cold_after_capture_start_both_cohorts", runner
+        )
+        self.assertIn(
+            "browser_start_state=ready_before_capture_navigation_after_capture",
+            runner,
         )
         self.assertIn("document-start-overlap", runner)
         self.assertIn("--mode h2 --outer-h2-only", runner)

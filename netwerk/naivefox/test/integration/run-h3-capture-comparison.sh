@@ -908,7 +908,8 @@ EOF
     "$reference_profile/user.js" "$browser_profile/user.js"
   chmod 0600 "$naivefox_profile/user.js"
   python3 "$INTEGRATION_DIR/camouflage_browser_controller.py" \
-    --generate-pac-user-js "$socks_port" >>"$browser_profile/user.js"
+    --generate-pac-user-js "$socks_port" \
+    "$NAIVEFOX_FIXTURE_HTTPS_PORT" >>"$browser_profile/user.js"
   cat >>"$browser_profile/user.js" <<'EOF'
 user_pref("app.update.enabled", false);
 user_pref("browser.shell.checkDefaultBrowser", false);
