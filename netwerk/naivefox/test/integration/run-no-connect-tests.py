@@ -260,7 +260,8 @@ def start_client(args, run, name, protocol, proxy_port, transport, key, user, pa
         config["no-connect-key"] = key
     else:
         config["proxy"] = f"{scheme}://{user}:{password}@{authority}"
-        config["preamble"] = {"mode": "off"}
+        if getattr(args, "classic_preamble", "off") == "off":
+            config["preamble"] = {"mode": "off"}
     private_json(directory / "config.json", config)
     env = {key: value for key, value in os.environ.items()
            if key not in {"NAIVEFOX_PROFILE", "NAIVEFOX_PROXY_USER", "NAIVEFOX_PROXY_PASS", "SSL_CERT_FILE",
@@ -332,7 +333,10 @@ def download(ports, listener, target_port, length=1024 * 1024, slow=False):
             require(received <= length, "download exceeded declared length")
             if slow:
                 time.sleep(0.0005)
-        require(received == length and digest.digest() == payload_digest(length), "download integrity or half-close failed")
+        expected = payload_digest(length)
+        require(received == length and digest.digest() == expected,
+                f"download integrity or half-close failed ({received}/{length} bytes; "
+                f"sha256={digest.hexdigest()}, expected={expected.hex()})")
 
 
 def upload(ports, listener, target_port, length=1024 * 1024):
@@ -363,7 +367,7 @@ def cancel_stream(ports, target_port):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("hh" if os.name == "nt" else "ii", 1, 0))
 
 
-def exercise(ports, target_port, label):
+def exercise(ports, target_port, label, parallel_batches=1):
     for listener in ("socks", "http"):
         try:
             download(ports, listener, target_port, slow=True)
@@ -373,11 +377,15 @@ def exercise(ports, target_port, label):
         except (OSError, RuntimeError) as error:
             raise RuntimeError(f"{label} {listener} transfer: {error}") from error
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [pool.submit(download if index % 2 == 0 else upload, ports,
-                               "socks" if index < 2 else "http", target_port, 256 * 1024)
-                   for index in range(4)]
-        for future in futures:
-            future.result(timeout=60)
+        for batch in range(parallel_batches):
+            futures = [pool.submit(download if index % 2 == 0 else upload, ports,
+                                   "socks" if index < 2 else "http", target_port, 256 * 1024)
+                       for index in range(4)]
+            for index, future in enumerate(futures):
+                try:
+                    future.result(timeout=60)
+                except (OSError, RuntimeError) as error:
+                    raise RuntimeError(f"{label} parallel batch {batch} transfer {index}: {error}") from error
     for listener in ("socks", "http"):
         echo_wake(ports, listener, target_port)
 
@@ -400,13 +408,14 @@ def run_protocol(args, base, protocol):
     try:
         caddy, proxy_port = start_caddy(args, run, protocol, target_port, key, user, password)
         processes.append(caddy)
+        batches = getattr(args, "parallel_batches", 1)
         candidate, candidate_ports = start_client(args, run, "no-connect", protocol, proxy_port,
-                                                  "no-connect", key, user, password, 13)
+                                                  "no-connect", key, user, password, 9 + 4 * batches)
         processes.append(candidate)
         classic, classic_ports = start_client(args, run, "classic", protocol, proxy_port,
-                                              "classic", key, user, password, 10)
+                                              "classic", key, user, password, 6 + 4 * batches)
         processes.append(classic)
-        exercise(candidate_ports, target_port, f"{protocol} no-connect")
+        exercise(candidate_ports, target_port, f"{protocol} no-connect", batches)
         cancel_stream(candidate_ports, target_port)
         for listener in ("socks", "http"):
             open_tunnel(candidate_ports, listener, target_port, host="127.0.0.1", rejected=True)
@@ -419,14 +428,14 @@ def run_protocol(args, base, protocol):
             client.exited_cleanly()
         require(not any(item.get("method") == "CONNECT" for item in access_requests(run)),
                 "no-connect emitted an outer CONNECT")
-        exercise(classic_ports, target_port, f"{protocol} classic")
+        exercise(classic_ports, target_port, f"{protocol} classic", batches)
         classic.exited_cleanly()
         caddy.stop()
         stats_path = run / "server-stats.json"
         require(stats_path.exists(), "server did not write protocol counters")
         stats = json.loads(stats_path.read_text())
-        require(stats["connect"] >= 10, "classic did not traverse the combined server's CONNECT handler")
-        require(stats["opens"] >= 10, "no-connect did not open expected logical streams")
+        require(stats["connect"] >= 6 + 4 * batches, "classic did not traverse the combined server's CONNECT handler")
+        require(stats["opens"] >= 6 + 4 * batches, "no-connect did not open expected logical streams")
         require(stats["rejected"] >= 1, "wrong application key was not rejected")
         require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
         require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
@@ -437,6 +446,7 @@ def run_protocol(args, base, protocol):
         require(not target.failures, "target detected a truncated or failed data stream")
         summary = {"protocol": protocol, "same_caddy_process": True, "strict_udp_only": protocol == "h3",
                    "no_connect_outer_connects": 0, "classic_connects": stats["connect"],
+                   "classic_preamble": getattr(args, "classic_preamble", "off"), "parallel_batches": batches,
                    "logical_opens": stats["opens"], "idle_started": stats["idle_started"],
                    "idle_completed": stats["idle_completed"], "status": "PASS"}
         private_json(run / "result.json", summary)
@@ -454,6 +464,8 @@ def main():
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")
+    parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1, metavar="1..128")
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)

@@ -188,12 +188,17 @@ netwerk/test/unit/test_proxyconnect_h3_raw.js
 Caps connect-only H3 slow-consumer buffering at 256 KiB, reports buffered bytes
 through `Available()`, retains received FIN until buffered data is drained, and
 treats tunnel `STOP_SENDING` as a send-direction event rather than discarding
-the receive side.
+the receive side. A zero-byte FIN read must preserve previously buffered bytes
+just as a data-plus-FIN read does; once FIN is known, buffering must not read
+from Neqo again. Otherwise an asynchronously blocked consumer can lose a valid
+response tail while the tunnel incorrectly reports a successful close.
 
 Review obligations: scope remains classic connect-only tunnels; ordinary H3,
 WebTransport, CONNECT-UDP, and non-tunnel reset handling are unchanged; slow
 drain, large integrity, bounded memory, proxy loss, and concurrent-stream tests
-pass.
+pass. The raw-H3 xpcshell regression delays a separate FIN while its consumer
+is unregistered; the native combined-Caddy gate repeats mixed parallel
+transfers with both disabled and implicit classic preambles.
 
 ## NF-UPSTREAM-010: ordinary request on an outer proxy session
 

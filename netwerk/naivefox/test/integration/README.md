@@ -27,8 +27,13 @@ backpressure, half-close, four parallel streams, idle wake, abrupt local
 cancellation, bounded graceful shutdown, rejected application keys, exact target
 allowlists and untrusted certificates. It records zero outer
 CONNECT during the no-connect phase and then exercises classic CONNECT on that
-same endpoint. Classic uses an explicit disabled preamble so this gate measures
-transport interoperability, not the separate fronting-page contract.
+same endpoint. By default, classic uses an explicit disabled preamble so this
+gate measures transport interoperability. Repeat with `--classic-preamble default`
+to verify the normal implicit H2/H3 preambles against the module's gallery page
+on that same combined endpoint. `--parallel-batches 32` repeats the four-stream
+mixed upload/download batch to cover H3 buffered-FIN and callback scheduling;
+run that regression with both preamble policies. Each transfer checks exact
+length, SHA-256 and half-close, and still respects bounded client shutdown.
 
 Use `--protocol h2` or `--protocol h3` for a focused iteration. `--runtime`
 selects an already-built Linux executable; omission uses `dist/bin/naivefox`
@@ -53,8 +58,8 @@ run to one or more named cases, and `--protocol` selects H2 or H3. Each refusal
 must reach a local connection failure without an outer CONNECT, redirect follow,
 authentication retry or target open after rejected bootstrap.
 
-The Windows adapter runs the same transfer and rejection matrix with the actual
-staged Windows executable and Windows local clients:
+The Windows adapter runs the base transport interoperability matrix with the
+actual staged Windows executable and Windows local clients:
 
 ```bash
 python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py \

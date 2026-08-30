@@ -15,17 +15,30 @@ add_setup(async function () {
   await setup_http3_proxy();
 });
 
-add_task(async function test_empty_protocol_raw_h3_connect() {
+async function checkRawH3Connect(delayedFin = false) {
+  const expectedSize = delayedFin ? 64 * 1024 : RESPONSE_SIZE;
   let target = new NodeHTTPServer();
   await target.start();
-  await target.registerPathHandler("/raw-h3", (_request, response) => {
-    response.writeHead(200, {
-      "Content-Type": "text/plain",
-      "Content-Length": 512 * 1024,
+  if (delayedFin) {
+    await target.registerPathHandler("/raw-h3", (_request, response) => {
+      response.writeHead(200, {
+        "Content-Type": "text/plain",
+        "Content-Length": 64 * 1024,
+      });
+      const marker = "raw-h3-tunnel-ok";
+      response.write(marker + "x".repeat(64 * 1024 - marker.length));
+      setTimeout(() => response.end(), 250);
     });
-    const marker = "raw-h3-tunnel-ok";
-    response.end(marker + "x".repeat(512 * 1024 - marker.length));
-  });
+  } else {
+    await target.registerPathHandler("/raw-h3", (_request, response) => {
+      response.writeHead(200, {
+        "Content-Type": "text/plain",
+        "Content-Length": 512 * 1024,
+      });
+      const marker = "raw-h3-tunnel-ok";
+      response.end(marker + "x".repeat(512 * 1024 - marker.length));
+    });
+  }
   registerCleanupFunction(async () => target.stop());
 
   let channel = makeChan(`http://localhost:${target.port()}/`);
@@ -56,7 +69,7 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
         const headerEnd = response.indexOf("\r\n\r\n");
         if (
           headerEnd >= 0 &&
-          response.length - headerEnd - 4 === RESPONSE_SIZE
+          response.length - headerEnd - 4 === expectedSize
         ) {
           resolve();
         } else {
@@ -83,12 +96,18 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
           output.closeWithStatus(Cr.NS_OK);
           // Consume only one small chunk per callback. Neqo reaches flow
           // control and FIN while this listener drains the tunnel slowly.
-          tunnelInput.asyncWait(
-            slowInputCallback,
-            0,
-            0,
-            Services.tm.mainThread
-          );
+          const beginReading = () =>
+            tunnelInput.asyncWait(
+              slowInputCallback,
+              0,
+              0,
+              Services.tm.mainThread
+            );
+          if (delayedFin) {
+            do_timeout(500, beginReading);
+          } else {
+            beginReading();
+          }
         }
       } catch (error) {
         reject(error);
@@ -140,7 +159,7 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
   const headerEnd = response.indexOf("\r\n\r\n");
   Assert.greaterOrEqual(headerEnd, 0);
   const body = response.slice(headerEnd + 4);
-  Assert.equal(body.length, RESPONSE_SIZE);
+  Assert.equal(body.length, expectedSize);
   Assert.ok(body.startsWith(RESPONSE_MARKER));
   Assert.ok(/^x+$/.test(body.slice(RESPONSE_MARKER.length)));
   Assert.equal(writeOffset, request.length);
@@ -148,4 +167,12 @@ add_task(async function test_empty_protocol_raw_h3_connect() {
   tunnelInput.close();
   tunnelOutput.close();
   tunnelTransport.close(Cr.NS_BINDING_ABORTED);
+}
+
+add_task(async function test_empty_protocol_raw_h3_connect() {
+  await checkRawH3Connect();
+});
+
+add_task(async function test_buffered_response_survives_separate_fin() {
+  await checkRawH3Connect(true);
 });

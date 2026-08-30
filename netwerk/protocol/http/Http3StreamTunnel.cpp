@@ -681,6 +681,10 @@ nsresult Http3StreamTunnel::ReadSegments() {
 nsresult Http3StreamTunnel::BufferInput() {
   char buf[SimpleBufferPage::kSimpleBufferPageSize];
   const size_t buffered = mSimpleBuffer.Available();
+  if (IsConnectOnly() && mFin) {
+    mRecvState = buffered ? RECEIVED_FIN : RECV_DONE;
+    return buffered ? NS_OK : NS_BASE_STREAM_CLOSED;
+  }
   if (IsConnectOnly() && buffered >= kMaxTunnelBufferedInput) {
     mInputBufferBlocked = true;
     return NS_BASE_STREAM_WOULD_BLOCK;
@@ -700,8 +704,9 @@ nsresult Http3StreamTunnel::BufferInput() {
        countWritten, mFin));
   if (countWritten == 0) {
     if (mFin) {
-      mRecvState = RECV_DONE;
-      rv = NS_BASE_STREAM_CLOSED;
+      const bool pending = IsConnectOnly() && buffered;
+      mRecvState = pending ? RECEIVED_FIN : RECV_DONE;
+      rv = pending ? NS_OK : NS_BASE_STREAM_CLOSED;
     } else {
       rv = NS_BASE_STREAM_WOULD_BLOCK;
     }
@@ -711,7 +716,7 @@ nsresult Http3StreamTunnel::BufferInput() {
       mRecvState = RECEIVED_FIN;
     }
   }
-  if (NS_SUCCEEDED(rv)) {
+  if (NS_SUCCEEDED(rv) && countWritten) {
     rv = mSimpleBuffer.Write(buf, countWritten);
     if (NS_FAILED(rv)) {
       MOZ_ASSERT(rv == NS_ERROR_OUT_OF_MEMORY);
