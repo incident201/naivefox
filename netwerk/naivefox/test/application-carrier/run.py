@@ -6,6 +6,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import random
 from pathlib import Path
 import secrets
 import shlex
@@ -37,7 +38,32 @@ PROFILES = {
     "compact-sync20": (20, 65536), "compact-fast20": (20, 65536),
     "staged": (18, 65536), "staged-fast": (18, 65536),
     "staged-fast20": (20, 65536),
+    "staged-stream20": (20, 65536),
 }
+
+
+def profile_budget(name):
+    rounds, media = PROFILES[name]
+    down = 4 * 24576 + (rounds - 4) * media
+    if name.startswith("staged"):
+        down = 770048 + (rounds - 18) * 65536
+    duplex = name.startswith("duplex") or name.startswith("compact-sync") or name == "compact-fast20"
+    return rounds, down, rounds * 4096, 7 + rounds * (1 if duplex else 2)
+
+
+def validate_http_graph(stats, name, mode):
+    if mode == "default":
+        return
+    rounds, down, up, requests = profile_budget(name)
+    if stats["connect"] or stats["rejected"] or sum(stats["requests"].values()) != requests:
+        raise RuntimeError("HTTP graph admission")
+    if mode == "append":
+        if stats["download_bytes"] < down or stats["upload_bytes"] < up or stats["download_filler"] != down - rounds * 16 or stats["upload_filler"] != up - rounds * 16:
+            raise RuntimeError("append fixed filler admission")
+    elif stats["download_bytes"] != down or stats["upload_bytes"] != up:
+        raise RuntimeError("exact HTTP capacity admission")
+    if mode == "reference" and (stats["opens"] or stats["download_useful"] or stats["upload_useful"]):
+        raise RuntimeError("empty visitor admission")
 
 
 def wait_for(predicate, timeout=20):
@@ -116,8 +142,21 @@ class Campaign:
         self.env = dict(os.environ, NAIVEFOX_OBJDIR=str(root / "fixture"))
         self.fixture = None
         self.base_config = None
+        self.outer_rate_mbit = 0
 
     def start(self):
+        binaries = {}
+        for name in ("caddy", "bridge"):
+            with (self.root.parent / "bin" / name).open("rb") as source:
+                binaries[name] = hashlib.file_digest(source, "sha256").hexdigest()
+        write_json(self.root / "provenance.json", {
+            "binary_sha256": binaries,
+            "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "server_revision": subprocess.check_output(["git", "-C", str(TRANSPORT), "rev-parse", "HEAD"], text=True).strip(),
+            "server_worktree_dirty": bool(subprocess.check_output(["git", "-C", str(TRANSPORT), "status", "--porcelain"], text=True)),
+            "firefox_base": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
+            "firefox_ci_task": "L5Q0X7WRRqCc5qenw0iRZQ",
+        })
         state = self.root / "fixture/naivefox-fixture"
         state.mkdir(parents=True, exist_ok=True)
         if not (state / "tools").exists():
@@ -146,6 +185,20 @@ class Campaign:
         with (self.root / "fixture-stop.log").open("w") as log:
             subprocess.run([str(INTEGRATION / "stop.sh"), "--quiet"], env=self.env, stdout=log, stderr=subprocess.STDOUT)
 
+    def shape_outer(self, rate):
+        if not os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED"):
+            raise RuntimeError("refusing shaping outside isolated namespace")
+        commands = [
+            ["tc", "qdisc", "add", "dev", "lo", "root", "handle", "1:", "prio", "bands", "3", "priomap", *(["0"] * 16)],
+            ["tc", "qdisc", "add", "dev", "lo", "parent", "1:3", "handle", "30:", "netem", "rate", f"{rate}mbit", "limit", "10000"],
+        ]
+        for priority, direction in enumerate(("sport", "dport"), 10):
+            commands.append(["tc", "filter", "add", "dev", "lo", "protocol", "ip", "parent", "1:", "prio", str(priority), "u32", "match", "ip", "protocol", "6" if self.protocol == "h2" else "17", "0xff", "match", "ip", direction, str(self.port), "0xffff", "flowid", "1:3"])
+        for command in commands:
+            subprocess.run(command, check=True, capture_output=True)
+        self.outer_rate_mbit = rate
+        write_json(self.root / "outer-shaping.json", {"rate_mbit": rate, "scope": "outer-port-only-both-directions", "qdisc": subprocess.check_output(["tc", "qdisc", "show", "dev", "lo"], text=True)})
+
     def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1"):
         rounds = rounds or PROFILES[app_profile][0]
         directory = self.root / name
@@ -170,7 +223,7 @@ class Campaign:
         def launch(args, logname, env=None):
             log = (directory / logname).open("w"); files.append(log)
             return subprocess.Popen([str(v) for v in args], stdout=log, stderr=subprocess.STDOUT, env=env)
-        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile}
+        result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile,"outer_rate_mbit":self.outer_rate_mbit}
         try:
             caddy = launch([self.root.parent / "bin/caddy","run","--config",directory / "caddy.json"], "caddy.log",
                            dict(os.environ, XDG_DATA_HOME=str(directory / "xdg-data"), XDG_CONFIG_HOME=str(directory / "xdg-config")))
@@ -238,11 +291,13 @@ class Campaign:
             target_done=reference
             while time.monotonic()-start<(2 if capture else 15):
                 if worker:
-                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0}")
+                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0}")
                     if not isinstance(state,dict):time.sleep(.01);continue
                     if state["error"]:raise RuntimeError("SPA admission: "+state["error"])
                     app_done=state["done"]
                     result["completed_rounds"]=state["round"]
+                    result["early_prefix_cells"]=state["early"]
+                    result["filler_pending_at_delivery"]=state["early_filler"]
                 target_done=all(p.poll()==0 for p in probes) if probe else reference or (self.fixture / "completions" / completion).exists()
                 if not reference and target_done and "target_done_ms" not in result:result["target_done_ms"]=round((time.monotonic()-start)*1000,3)
                 if app_done and (not control or target_done):
@@ -318,12 +373,7 @@ class Campaign:
             if mode=="default" and self.protocol=="h3":
                 required=["GET /","GET /assets/site.css","GET /assets/app.js",*[f"GET /assets/image-{i}.svg" for i in range(1,5)]]
                 if any(stats["requests"].get(path)!=1 for path in required):raise RuntimeError("default H3 six-resource admission")
-            count_rounds,down=PROFILES[app_profile]
-            expected_down=4*24576+(count_rounds-4)*down
-            if app_profile.startswith("staged"):expected_down=770048
-            if app_profile=="staged-fast20":expected_down=901120
-            if mode!="default" and (stats["connect"]!=0 or stats["download_bytes"] < expected_down or stats["rejected"]!=0):
-                raise RuntimeError("HTTP graph admission")
+            validate_http_graph(stats,app_profile,mode)
             destination=feature_dir / (name+".json")
             features.extract(SimpleNamespace(pcap=str(self.root / name / "outer.pcapng"),protocol=self.protocol,server_port=self.port,
                 scenario="browser_page",label=row["label"],session_id=name,naivefox_arm=arm,experiment_block=row["experiment_block"],output=str(destination)))
@@ -354,11 +404,17 @@ def main():
     parser.add_argument("--app-profile",choices=PROFILES,default="v1")
     parser.add_argument("--screen-lean",action="store_true")
     parser.add_argument("--sweep",action="store_true")
+    parser.add_argument("--timing-pair",type=int,default=0)
+    parser.add_argument("--outer-rate-mbit",type=int,default=0)
     parser.add_argument("--capture",action="store_true")
     parser.add_argument("--probe",action="store_true")
     parser.add_argument("--screen",type=int,default=0)
     parser.add_argument("--seed",type=int,default=202608301)
     args=parser.parse_args()
+    if args.outer_rate_mbit < 0 or args.outer_rate_mbit > 1000 or args.timing_pair < 0:
+        parser.error("invalid timing/rate bounds")
+    if args.outer_rate_mbit and (args.capture or args.screen):
+        parser.error("shaped links are functional timing only; no transmit-copy residual scoring")
     if os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK")!="1" or not os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED"):
         raise SystemExit("isolated fixture namespace required")
     args.root.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -372,6 +428,23 @@ def main():
     campaign=Campaign(args.root,args.protocol)
     try:
         campaign.start()
+        if args.outer_rate_mbit:
+            campaign.shape_outer(args.outer_rate_mbit)
+        if args.timing_pair:
+            rng=random.Random(args.seed)
+            schedule=[]
+            for block in range(args.timing_pair):
+                profiles=["staged-fast20","staged-stream20"]
+                rng.shuffle(profiles)
+                schedule.extend({"block":block,"profile":value} for value in profiles)
+            write_json(args.root / "timing-schedule.json",schedule)
+            failed=False
+            for index,row in enumerate(schedule):
+                result=campaign.sample(f"timing-{index:03d}",app_profile=row["profile"])
+                print(json.dumps(result,sort_keys=True),flush=True)
+                failed |= not result["admitted"]
+            write_json(args.root / "outer-shaping-final.json",{"qdisc":subprocess.check_output(["tc","-s","qdisc","show","dev","lo"],text=True)})
+            return 1 if failed else 0
         if args.sweep:
             for variant in PROFILES:
                 result=campaign.sample("functional-"+variant,app_profile=variant)

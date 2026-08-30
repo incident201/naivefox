@@ -320,3 +320,68 @@ less filler. Status remains `INSUFFICIENT_FOR_INFERENCE`. The reference profile
 changed with the application, so these absolute residuals cannot rank v1 and
 staged across different screens. This profile is a cost candidate, not a
 default, universal workload budget or established speed improvement.
+
+### Prefix-delivery cost hypothesis
+
+History preflight re-read the corrected finite read-through record (including
+the negative Whole results in `dbf22ddf2906` / `c75be29167da`) and the retained
+metadata identified above. Read-through itself is not new. The distinct test
+here removes a local `response.arrayBuffer()` barrier while retaining the
+new application's fixed-capacity replacement protocol. No slot replenishment,
+queue-dependent sizing, new delay, GET/POST boundary or target-read batching
+is introduced. Compare `staged-fast20` with `staged-stream20`: identical slots,
+uploads and animation cadence. Only the latter validates and delivers the used
+prefix before draining the response's filler. The next slot still waits for
+successful full response completion. A short/truncated/malformed body aborts
+the session even if a valid prefix was already delivered.
+
+Add deterministic split-boundary, prefix-before-EOF, full-drain, truncation and
+backpressure tests before admission. Record actual early-prefix deliveries;
+do not infer benefit merely from enabling a flag. First H2 functional admission
+and a short paired timing check; no full matrix. A targeted slower-link test is
+appropriate only to isolate this barrier, not to claim general link robustness.
+
+Eight deterministic JavaScript tests and the complete Go race suite passed.
+H2 admission at full loopback speed completed, but recorded zero early useful
+prefixes: this condition does not exercise the supposed advantage. The targeted
+`prefix-10mbit` check then ran three randomized pairs, seed 202608308. A separate
+queue discipline rate-limited only the outer port to 10 Mbit/s in both directions;
+local IPC and target links stayed unshaped. All six workloads completed with
+zero queue drops and identical fixed body budgets. This timing-only test does
+not use transmit-side captures for shaped-link residual scoring.
+
+Buffered completion averaged 1,074.466 ms, prefix delivery 1,040.491 ms: 3.16%
+less time / 3.27% more effective fixed-page rate. Each streaming run recorded
+2--3 useful prefixes delivered with 64--112 KiB of aggregate filler still
+unconsumed by the reader. This is consumption/IPC evidence, not a measurement
+of how many bytes were still in flight on the wire. Three pairs do not establish
+a robust speed gain; the total application job was not shorter and traffic
+capacity did not decrease. Four simultaneous mixed-listener hash probes also
+passed over H3 at 10 Mbit/s. Keep this as an opt-in building block, not a claimed
+solution to the main speed deficit, and do not run its own residual matrix.
+
+The more substantial cost candidate remains `staged-fast20`, without prefix
+delivery. Its H2 screen earned one lean H3 check (two blocks, seed 202608309)
+with unchanged inner workload and no link shaping. This is a targeted second
+protocol admission, not the full listener/resource/link matrix.
+
+That H3 screen stopped at its first replacement (`sample-001`). All seven
+inner page/resource requests returned 200 and the inner document was complete,
+but no completion beacon reached the target. The bridge/server delivered
+665,695 downstream bytes and only 3,142 upstream bytes; successful canonical
+runs send roughly 3,400 upstream bytes including the final beacon. The fixed
+20-round application had no upload opportunity after its final render callback.
+Do not score this incomplete screen or generalize the H2 candidate to H3.
+
+History preflight for a terminal application confirmation checked the all-ref
+carrier/finite commit history, current completion/tail notes and this retained
+failure. Earlier finite streams flushed/replenished their data-driven windows;
+they did not join the new SPA's final render with another fixed-capacity API
+transaction. The new `staged-commit20` hypothesis retains the 20-round job and
+adds one `/api/action` POST/response after its existing final animation callback.
+Each direction is exactly 4096 bytes, regardless of queue state. No extra
+timer, retry-until-complete, target-size threshold or changed media slot is
+introduced. This gives late application acknowledgements a transport slot at
+about 0.8% more body budget, not proof of general long-session liveness.
+Functional admission comes first; if admitted, preregister lean H2/H3 screens
+with seeds 202608310/202608311 rather than extending the failed job in place.
