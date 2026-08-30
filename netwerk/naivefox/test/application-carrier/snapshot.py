@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from costs import summarize
+from session_costs import summarize as summarize_sessions
 
 
 def digest(path):
@@ -47,12 +48,18 @@ def main(root, name, profile):
         for result in results:
             destination = target / (result.parent.name + "-result.json")
             shutil.copy2(result, destination)
-        for name in ("schedule.json", "features.csv", "analysis.json", "analysis.md", "timing-schedule.json", "provenance.json", "outer-shaping.json", "outer-shaping-final.json"):
+        for name in ("schedule.json", "features.csv", "analysis.json", "analysis.md", "timing-schedule.json", "session-schedule.json", "connection-audit.json", "provenance.json", "outer-shaping.json", "outer-shaping-final.json"):
             source = campaign / name
             if source.exists():
                 shutil.copy2(source, target / name)
         if (campaign / "analysis.json").exists():
             (target / "costs.json").write_text(json.dumps(summarize(campaign), indent=2) + "\n")
+        if (campaign / "session-schedule.json").exists():
+            try:
+                costs = summarize_sessions(campaign)
+            except ValueError:
+                costs = {"status": "incomplete-session-campaign"}
+            (target / "session-costs.json").write_text(json.dumps(costs, indent=2) + "\n")
         campaigns.append(campaign.name)
     manifest["campaigns"] = campaigns
     for path in sorted(evidence.rglob("*")):

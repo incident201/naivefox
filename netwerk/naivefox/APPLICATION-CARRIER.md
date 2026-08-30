@@ -500,3 +500,58 @@ grew from 304.755 to 343.731 ms; its 11.34% rate loss is not an unrestricted
 upload-throughput result because the target deliberately pauses per read.
 The protocol is live and economical at rest, but active transport throughput
 is not solved. `session_costs.py` reproduces these paired-session calculations.
+
+H3's two session pairs likewise passed. Wire grew from 4,985,291.5 to 6,588,756
+bytes (+32.16%). The 1-MiB download grew from 20.793 to 159.564 ms (86.97% rate
+loss); concurrent downloads from 32.049 to 243.590 ms (86.84%). Slow-upload
+completion grew from 309.629 to 347.494 ms. A derived connection audit corrected
+an accounting field that had counted an empty dissector connection value as a
+second flow: every full H3 session has one real QUIC identity and zero TCP
+packets. Primary result files are unchanged and their wire totals remain valid.
+The idle-only capture has no Initial or TCP packets; without a handshake in
+that capture the dissector does not assign a connection number. Do not count
+that missing field as another connection.
+
+Under one shared 10-Mbit/s outer-port rate limit, the H2 fixed-work pair used
+4,930,688 default versus 6,512,717 replacement wire bytes (+32.09%). Its 1-MiB
+download was 918.207 versus 1,158.506 ms (20.74% lower effective rate), parallel
+downloads 1,819.143 versus 2,196.301 ms (17.17%), and the slow upload 945.010
+versus 1,159.156 ms (18.47%). Small post-idle work still paid a latency cost:
+4 KiB took 20.761 versus 81.432 ms. This one paired link condition is not a
+general network guarantee. It shows why the loopback throughput penalty and
+the loss on a bandwidth-limited link must be reported separately.
+
+Both preregistered lean residual screens completed all eight samples, with
+one outer connection per sample and zero TCP in H3. These are two-block
+diagnostic screens, `INSUFFICIENT_FOR_INFERENCE`, not a default promotion.
+
+| Continuous screen, SOCKS | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| H2 default | 0.08975 | 0.46738 | 0.21209 | 0.21354 | 0.37620 |
+| H2 replacement | 0.05204 | 0.30473 | 0.12605 | 0.10050 | 0.21085 |
+| H3 default | 0.11015 | 0.33619 | 0.17327 | 0.15875 | 0.34739 |
+| H3 replacement | 0.11602 | 0.20926 | 0.14830 | 0.18394 | 0.21306 |
+
+The 17--32/Whole point improvements are about 34.8%/44.0% on H2 and
+37.8%/38.7% on H3. H3 1--16 and 250 ms are worse, not silently waived.
+Early H3 results remain noisy. Artifacts: `continuous-h2-residual` and
+`continuous-h3-residual`. These compare the canonical inner browser page
+against independent normal visitors of the current application, not an old
+static-site dashboard or a replay of the loaded worker's state transitions.
+
+Canonical-page wire accounting is separate from the larger session above:
+H2 default/replacement means are 724,179.5/1,174,797.5 bytes (+62.22%), with
+117.309/293.213 ms useful completion; H3 is 799,368/1,175,091 bytes (+47.00%),
+with 116.328/329.797 ms. Thus +32% is a measured mixed-session result, not a
+universal traffic surcharge. The startup budget is less amortized on small
+workloads. Long sessions, economical idle and valid late work are now admitted;
+startup cost, active speed, memory, reconnect/resumption and native integration
+remain experimental limitations.
+
+Continuous baseline verification passed 160 capture/analysis tests, eight
+focused harness tests, fifteen JavaScript tests and all four Go race-test
+packages. Frozen evidence `continuous-v1-evidence` includes matching binaries
+and the server repository bundle through `d444393`; manifest SHA-256 is
+`80dce75db0bb295e82474d3a360b38136ce8f46601357a8c1805c8a3ddee1559`.
+The server repository still has no remote; this bundle is local preservation,
+not a server push. Product defaults and Firefox binaries are unchanged.

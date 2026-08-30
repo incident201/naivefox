@@ -15,7 +15,7 @@ spec.loader.exec_module(runner)
 
 class CarrierAdmissionTests(unittest.TestCase):
     def test_coalesced_quic_ids_are_not_extra_connections(self):
-        self.assertEqual(runner.outer_flow_count([{"flow": "0"}, {"flow": "0,0"}]), 1)
+        self.assertEqual(runner.outer_flow_count([{"flow": ""}, {"flow": "0"}, {"flow": "0;0"}]), 1)
 
     def test_continuous_budget_includes_active_leases_and_idle(self):
         stats = self.stats()
