@@ -4394,6 +4394,17 @@ needs a distinct transport premise, history preflight and fresh controls.
 H2/H3 defaults, the canonical matrix and the fronting-site contract are
 unchanged; no size-independent or slow-link improvement is claimed.
 
+After these screens, both new modes and the restored finite controls were
+retired from the working product. The budgeted prototype, ownership correction
+and tests are preserved in `7be2c317e82f`; data-activated credits are preserved
+in `c2c29bdded77`. All runtime/integration files were verified byte-for-byte
+against pre-finite base `0c67b4388495` (also `c75be29167da`), excluding this
+experiment log. No history was rewritten and no safe dataset was removed.
+Incremental minimized product/test rebuilds, 100 C++ gtests, 172 Python tests,
+and the newly staged H2 config/listener gate against stock Caddy all pass.
+The latter tests SOCKS, authenticated SOCKS and HTTP CONNECT inside a fresh
+private WSL namespace. No full Firefox rebuild or default promotion occurred.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and

@@ -36,7 +36,6 @@ INNER_H2 = load("camouflage_inner_h2_validation", "camouflage_inner_h2_validatio
 SAMPLE = load("camouflage_sample_validation", "camouflage_sample_validation.py")
 SUPERBLOCKS = load("camouflage_superblocks", "camouflage_superblocks.py")
 TARGET = load("target_server", "target_server.py")
-FINITE_COUNTS = load("finite_exchange_counts", "finite_exchanges/counts.py")
 
 
 def native_parser_process_lifecycle_lines():
@@ -660,7 +659,9 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
         SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
         h2_lines = [
-            line.replace("protocol=h3", "protocol=h2").replace("outer=h3", "outer=h2")
+            line.replace("protocol=h3", "protocol=h2").replace(
+                "outer=h3", "outer=h2"
+            )
             for line in lines
         ]
         h2_features = {
@@ -835,7 +836,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-native-parser-resource-committed-page",
             "tree-native-parser-resource-committed-page-http-connect",
         )
-        rows = SUPERBLOCKS.schedule_rows(29, "h2", 1, ["browser_page"], arms=arms)
+        rows = SUPERBLOCKS.schedule_rows(
+            29, "h2", 1, ["browser_page"], arms=arms
+        )
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
@@ -4689,7 +4692,10 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertNotIn("SOCKS5", result.stdout)
 
     def test_dedicated_capture_pac_generators_scope_the_exact_target(self):
-        expected = '--generate-pac-user-js "$socks_port" "$NAIVEFOX_FIXTURE_HTTPS_PORT"'
+        expected = (
+            '--generate-pac-user-js "$socks_port" '
+            '"$NAIVEFOX_FIXTURE_HTTPS_PORT"'
+        )
         for filename in (
             "run-h2-capture-comparison.sh",
             "run-h2-connect-priority-comparison.sh",
@@ -5191,229 +5197,6 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     "tree-overlap",
                 },
             )
-
-    def test_finite_exchange_config_and_mechanism_gates(self):
-        features = {
-            "protocol": "h2",
-            "features": {
-                "lifecycle_connection_count": 1.0,
-                "tls_client_hello_count": 1.0,
-            },
-        }
-        for arm, admission in (
-            ("h2-finite-socks", "first-data-buffer-task"),
-            ("h2-finite-http-connect", "first-data-buffer"),
-            ("h2-finite-read-through-socks", "first-data-buffer-task"),
-            ("h2-finite-read-through-http-connect", "first-data-buffer"),
-            ("h2-finite-both-read-through-socks", "first-data-buffer-task"),
-            ("h2-finite-both-read-through-http-connect", "first-data-buffer"),
-            ("h2-finite-both-read-through-budgeted-socks", "first-data-buffer-task"),
-            ("h2-finite-both-read-through-budgeted-http-connect", "first-data-buffer"),
-            (
-                "h2-finite-both-read-through-budgeted-data-window-socks",
-                "first-data-buffer-task",
-            ),
-            (
-                "h2-finite-both-read-through-budgeted-data-window-http-connect",
-                "first-data-buffer",
-            ),
-        ):
-            with self.subTest(arm=arm):
-                config = CONFIG.build_config(arm, "h2", 1080, 443, "u", "p")
-                self.assertTrue(config["diagnostic-h2-finite-exchanges"])
-                self.assertEqual(
-                    bool(config.get("diagnostic-h2-finite-read-through")),
-                    "read-through" in arm,
-                )
-                self.assertEqual(
-                    bool(config.get("diagnostic-h2-finite-stream-uploads")),
-                    "both-read-through" in arm,
-                )
-                self.assertEqual(
-                    bool(config.get("diagnostic-h2-finite-budgeted-downloads")),
-                    "budgeted" in arm,
-                )
-                self.assertEqual(
-                    bool(config.get("diagnostic-h2-finite-data-window")),
-                    "data-window" in arm,
-                )
-                self.assertEqual(
-                    config["listen"].split(":")[0],
-                    "socks" if arm.endswith("socks") else "http",
-                )
-                with self.assertRaises(ValueError):
-                    CONFIG.build_config(arm, "h3", 1080, 443, "u", "p")
-                log = (
-                    "Connection 1 preamble document-overlap "
-                    f"admission={admission} response_accepted=1 root_done=0 protocol=h2\n"
-                    "Connection 1 preamble result=success status=0x00000000 "
-                    "http=200 bytes=494 protocol=h2\n"
-                    "Connection 1 preamble document-overlap drain=complete "
-                    "root_done=1 completed_resources=0 protocol=h2\n"
-                    "Connection 1 finite-exchanges ready=1 block-bytes=65536 "
-                    "upload-window=2 download-window=4\n"
-                    "Connection 1 established target=localhost:443 outer=h2 padding=yes\n"
-                    "Connection 1 finite-exchanges rotated=1\n"
-                )
-                if "data-window" in arm:
-                    log += (
-                        "Connection 1 finite-exchanges download-window-deferred=1 "
-                        "initial=1 maximum=4\n"
-                    )
-                if "read-through" in arm:
-                    log += "Connection 1 finite-exchanges streamed-before-stop=1\n"
-                if "both-read-through" in arm:
-                    log += "Connection 1 finite-exchanges upload-read-through=1\n"
-                if "data-window" in arm:
-                    log += (
-                        "Connection 1 finite-exchanges download-window-expanded=1 "
-                        "trigger=first-data window=4\n"
-                    )
-                if "budgeted" in arm:
-                    log += (
-                        "Connection 1 finite-exchanges "
-                        "budgeted-download-complete=1 bytes=65536\n"
-                    )
-                SAMPLE.validate_sample(arm, "h2", log, features)
-                SAMPLE.validate_sample(
-                    arm,
-                    "h2",
-                    "\n".join("[timestamp] " + line for line in log.splitlines()),
-                    features,
-                )
-                for bad in (
-                    log.replace("finite-exchanges rotated=1", "missing-marker"),
-                    log.replace("download-window=4", "download-window=40"),
-                    log + "Connection 1 finite-exchanges failure=0x80004005\n",
-                    log + "Connection 1 finite-exchanges rotated=1\n",
-                    log + "Connection 1 finite-exchanges streamed-before-stop=1\n",
-                    log + "Connection 1 finite-exchanges upload-read-through=1\n",
-                    log + "Connection 1 finite-exchanges "
-                    "budgeted-download-complete=1 bytes=65536\n",
-                    log + "Connection 1 finite-exchanges download-window-deferred=1 "
-                    "initial=1 maximum=4\n",
-                    log + "Connection 1 finite-exchanges download-window-expanded=1 "
-                    "trigger=first-data window=4\n",
-                ):
-                    with self.assertRaises(ValueError):
-                        SAMPLE.validate_sample(arm, "h2", bad, features)
-                with self.assertRaises(ValueError):
-                    SAMPLE.validate_sample(arm, "h3", log, features)
-                if "read-through" in arm:
-                    with self.assertRaises(ValueError):
-                        SAMPLE.validate_sample(
-                            arm,
-                            "h2",
-                            log.replace("streamed-before-stop=1", "missing-marker"),
-                            features,
-                        )
-                if "both-read-through" in arm:
-                    with self.assertRaises(ValueError):
-                        SAMPLE.validate_sample(
-                            arm,
-                            "h2",
-                            log.replace("upload-read-through=1", "missing-marker"),
-                            features,
-                        )
-                with self.assertRaisesRegex(ValueError, "unexpectedly used finite"):
-                    SAMPLE.validate_sample(
-                        "document-first-buffer-task-overlap", "h2", log, features
-                    )
-                if "budgeted" in arm:
-                    for bad in (
-                        log.replace("budgeted-download-complete=1", "missing-marker"),
-                        log.replace("bytes=65536\n", "bytes=65535\n"),
-                    ):
-                        with self.assertRaises(ValueError):
-                            SAMPLE.validate_sample(arm, "h2", bad, features)
-                if "data-window" in arm:
-                    for bad in (
-                        log.replace("download-window-deferred=1", "missing-marker"),
-                        log.replace("download-window-expanded=1", "missing-marker"),
-                        log.replace("initial=1 maximum=4", "initial=4 maximum=4"),
-                        log.replace("trigger=first-data", "trigger=timer"),
-                        log
-                        .replace(
-                            "download-window-deferred=1 initial=1 maximum=4",
-                            "placeholder",
-                        )
-                        .replace(
-                            "download-window-expanded=1 trigger=first-data window=4",
-                            "download-window-deferred=1 initial=1 maximum=4",
-                        )
-                        .replace(
-                            "placeholder",
-                            "download-window-expanded=1 trigger=first-data window=4",
-                        ),
-                        log
-                        .replace(
-                            "budgeted-download-complete=1 bytes=65536", "placeholder"
-                        )
-                        .replace(
-                            "download-window-expanded=1 trigger=first-data window=4",
-                            "budgeted-download-complete=1 bytes=65536",
-                        )
-                        .replace(
-                            "placeholder",
-                            "download-window-expanded=1 trigger=first-data window=4",
-                        ),
-                        log.replace(
-                            "download-window-deferred=1 initial=1 maximum=4",
-                            "download-window-expanded=1 trigger=first-data window=4",
-                        ).replace(
-                            "streamed-before-stop=1",
-                            "download-window-deferred=1 initial=1 maximum=4",
-                        ),
-                    ):
-                        with self.assertRaises(ValueError):
-                            SAMPLE.validate_sample(arm, "h2", bad, features)
-
-    def test_finite_exchange_aggregate_counts_are_safe_and_terminal(self):
-        ready = (
-            "Connection 7 finite-exchanges ready=1 block-bytes=65536 "
-            "upload-window=2 download-window=4\n"
-        )
-        closed = (
-            "Connection 7 finite-exchanges closed=1 uploads=3 downloads=5 "
-            "upload-bytes=1000 download-bytes=70000 uploads-started=4 "
-            "downloads-started=9 full-download-bodies=1\n"
-        )
-        arm = "h2-finite-both-read-through-budgeted-socks"
-        log = ready + closed
-        duplicate_session = log.replace("Connection 7", "Connection 99")
-        document = FINITE_COUNTS.extract_counts(
-            arm,
-            "arbitrary private diagnostic: secret-value\n" + log + duplicate_session,
-        )
-        self.assertEqual(document["connection_count"], 2)
-        self.assertEqual(document["counts"]["completed_download_responses"], 10)
-        self.assertEqual(document["counts"]["started_download_requests"], 18)
-        self.assertEqual(document["counts"]["download_body_bytes_delivered"], 140000)
-        self.assertEqual(document["counts"]["full_download_bodies"], 2)
-        self.assertNotIn("secret-value", json.dumps(document))
-        self.assertNotIn("Connection", json.dumps(document))
-        self.assertEqual(
-            FINITE_COUNTS.extract_counts(
-                arm, "\n".join("[timestamp] " + line for line in log.splitlines())
-            ),
-            FINITE_COUNTS.extract_counts(arm, log),
-        )
-        for bad in (
-            ready,
-            closed,
-            log + ready,
-            log + closed,
-            log + closed.replace("Connection 7", "Connection 8"),
-            log.replace("downloads=5", "downloads=10"),
-            log.replace("full-download-bodies=1", "full-download-bodies=6"),
-            log.replace("upload-bytes=1000", "upload-bytes=999999"),
-            log.replace("downloads-started=9", "downloads-started=-1"),
-            log + closed.replace("uploads=3", "uploads=bad"),
-        ):
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                FINITE_COUNTS.extract_counts(arm, bad)
-        with self.assertRaises(ValueError):
-            FINITE_COUNTS.extract_counts("document-first-buffer-task-overlap", log)
 
 
 if __name__ == "__main__":
