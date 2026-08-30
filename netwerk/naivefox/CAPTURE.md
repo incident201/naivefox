@@ -4262,6 +4262,77 @@ They are mechanism diagnostics, not new passive classifier features or a
 change to capture cutoff. Missing/duplicate terminal counters fail closed.
 The planned seed `2026083089` screen remains p17--32 and Whole only.
 
+### Budgeted-response H2 screen: fewer exchanges, no default win
+
+Seed `2026083089` completed on `7be2c317e82f` as safe artifact
+`25de70a0225eed54`. All 16 participants passed isolated-network, completion,
+padding, single-outer-ClientHello, drain and capture admission. Every candidate
+proved full-budget rotation. The safe artifact includes eight terminal counter
+files plus `finite-counts-summary.json` and the unchanged-distance decomposition
+in `mechanism-accounting.json`. Successful private capture inputs were deleted.
+
+Two randomized blocks are a diagnostic screen (`INSUFFICIENT_FOR_INFERENCE`),
+not a statistical camouflage verdict or a replacement for the canonical
+default matrix. Lower is better; the default comparisons below are within
+this campaign only.
+
+| H2 listener / arm | p17--32 | Whole | p17--32 vs default | Whole vs default |
+| --- | ---: | ---: | ---: | ---: |
+| SOCKS default | 0.41901 | 0.30911 | — | — |
+| SOCKS v2 read-through control | 0.42534 | 0.40280 | +1.5% | +30.3% |
+| SOCKS v3 budgeted response | 0.39065 | 0.38571 | -6.8% | +24.8% |
+| HTTP CONNECT default | 0.39524 | 0.35644 | — | — |
+| HTTP CONNECT v2 read-through control | 0.37937 | 0.39327 | -4.0% | +10.3% |
+| HTTP CONNECT v3 budgeted response | 0.39875 | 0.36429 | +0.9% | +2.2% |
+
+The transport premise did work: mean started download requests fell from
+28.5 to 15 for SOCKS (-47.4%) and 27.5 to 15 for HTTP (-45.5%). Each v3
+session completed ten full-budget responses. Upload request counts stayed
+near 11--12.5. These counters include post-capture shutdown and exclude
+open/close requests; they are not additional features of the primary metric.
+Client wire bytes fell from 25,518 to 22,788.5 and 26,009 to 23,657.5 versus
+v2, but remain above their defaults of 17,766 and 19,737. Server bytes in the
+first 128 packets rose from 44,187.5 to 63,956.5 and 53,342.5 to 69,157, still
+below defaults of 105,866 and 87,289.5.
+
+Relative to v2, Whole improves by only 4.2% / 7.4%; neither listener beats its
+default. SOCKS retains both timing/burst (+0.03455) and non-timing (+0.04205)
+Whole penalties against its default. HTTP timing/bursts improve slightly
+(-0.00237), but non-timing structure adds +0.01021. Reducing response count is
+therefore helpful to the prototype, not sufficient to solve its camouflage
+gap. There is no >=20% default candidate, no full matrix/size/link sweep, and
+no production or site-contract change. This result does not prove that a
+different bounded protocol cannot work.
+
+### Data-activated receive credits: preregistration
+
+The next all-ref history preflight covers finite window/credit/lookahead,
+`FillDownloads`, initial receive terms, the retained finite arms and their
+source. They all issue four download requests immediately after open. The
+older rejection of additional H2 lanes concerns transport flow-control
+capacity (the 12-MiB initial window), not when these four ordinary GETs start.
+No earlier finite variant starts with one request and expands on received data.
+
+Keep v3 and its server byte-for-byte. The single new client variable is to
+start with one outstanding receive request, then restore the four-request
+maximum on the first positive, validated response body callback. Forward those
+bytes immediately; do not wait for a complete response, timer, resource size
+or throughput estimate. This removes three speculative GETs from the initial
+exchange without reducing the steady-state receive window. It is an event-
+driven startup experiment, not another fixed pause or H2 SETTINGS change.
+
+The motivation is specific but not yet causal proof: v3 still has small
+client-direction packets where the Firefox controls already deliver large
+server-direction packets in the late p17--32 region. Retain strict markers
+for initial one-credit admission and expansion after data, plus the existing
+read-through, rotation, body cap, integrity and single-outer-session gates.
+
+After functional checks, seed `2026083090` will compare both defaults, both
+ordinary v3 controls and both data-activated v3 candidates in two randomized
+H2/inner-H2 blocks with Firefox A/B. Only p17--32 and Whole are preregistered.
+The breaking-default threshold, absence of site-specific waits, and the rule
+against a full matrix/resource sweep for weak candidates are unchanged.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
