@@ -53,12 +53,34 @@ class CarrierAdmissionTests(unittest.TestCase):
         handler.do_POST()
         self.assertEqual(json.loads(received[-1][1]), {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
 
+    def test_combined_activity_uses_post_response_capacity(self):
+        stats = self.stats()
+        stats.update({"requests": runner.profile_requests("continuous-sync"), "write_errors": 0,
+                      "cell_capacities": {"8192": 6, "32768": 2, "65536": 12},
+                      "idle_started": 1, "idle_completed": 0, "idle_cancelled": 1})
+        stats["requests"]["GET /api/events/idle"] = 1
+        for state, up, down in (("interactive", 4096, 8192), ("download", 4096, 65536), ("upload", 131072, 8192), ("mixed", 131072, 65536)):
+            stats["requests"]["POST /api/exchange/" + state] = 4
+            stats["upload_bytes"] += 4 * up
+            stats["download_bytes"] += 4 * down
+            stats["cell_capacities"][str(down)] += 4
+        runner.validate_http_graph(stats, "continuous-sync", "replace")
+        for method in ("GET /api/data/download", "POST /api/exchange/unknown"):
+            changed = copy.deepcopy(stats)
+            changed["requests"][method] = 4
+            with self.assertRaises(RuntimeError):
+                runner.validate_http_graph(changed, "continuous-sync", "replace")
+        stats["requests"]["POST /api/exchange/download"] -= 1
+        with self.assertRaises(RuntimeError):
+            runner.validate_http_graph(stats, "continuous-sync", "replace")
+
     def test_frozen_budgets(self):
         down = {"v1": 1671168, "duplex-v1": 1671168, "compact": 884736,
                 "compact-sync": 884736, "compact-sync20": 1146880,
                 "compact-fast20": 1146880, "staged": 770048,
                 "staged-fast": 770048, "staged-fast20": 901120,
-                "staged-stream20": 901120, "staged-commit20": 905216, "continuous-v1": 901120}
+                "staged-stream20": 901120, "staged-commit20": 905216, "continuous-v1": 901120, "continuous-sync": 901120}
+
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)

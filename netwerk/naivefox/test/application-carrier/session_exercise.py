@@ -39,8 +39,16 @@ def settle(worker, seconds=2):
     raise RuntimeError("continuous worker did not settle")
 
 
-def run(worker, directory, fixture, ready, target_port, http_port, outer_port, protocol, launch, idle_seconds=0):
+def run(worker, directory, fixture, ready, target_port, http_port, outer_port, protocol, launch, idle_seconds=0, profile_stages=False):
     checks = []
+    if profile_stages:
+        worker.execute_script(Path(__file__).with_name("profile-stages.js").read_text())
+
+    def begin():
+        settle(worker)
+        if profile_stages:
+            worker.execute_script("window.__NFC_PROFILE_STAGES__ = {}")
+
     def direct(path):
         return subprocess.check_output(["curl", "--silent", "--show-error", "--fail", "--noproxy", "*", f"http://127.0.0.1:{http_port}" + path])
 
@@ -48,7 +56,9 @@ def run(worker, directory, fixture, ready, target_port, http_port, outer_port, p
         output = directory / (name + ".body")
         scheme = "socks5h" if kind == "socks" else "http"
         args = ["curl", "--silent", "--show-error", "--fail", "--max-time", "40", "--noproxy", "", "--proxy", scheme + "://" + ready[kind],
-                "--http2", "--cacert", fixture / "pki/root.crt", "--output", output, f"https://localhost:{target_port}" + path]
+                "--http2", "--cacert", fixture / "pki/root.crt", "--output", output,
+                "--write-out", '{"total":%{time_total},"connect":%{time_connect},"tls":%{time_appconnect},"first_byte":%{time_starttransfer}}',
+                f"https://localhost:{target_port}" + path]
         if upload is not None:
             args += ["--data-binary", "@" + str(upload)]
         started = time.monotonic()
@@ -82,27 +92,32 @@ def run(worker, directory, fixture, ready, target_port, http_port, outer_port, p
                     raise RuntimeError("session upload digest")
                 useful += len(upload)
         value = {"stage": name, "connections": len(jobs), "useful_bytes": useful, "completion_ms": round(elapsed, 3), "idle_seen_while_pending": idle_seen}
+        timings = [json.loads(output.with_suffix(".log").read_text()) for _, output, _ in jobs]
+        value["curl_timings_seconds"] = timings
+        value["curl_completion_ms"] = round(1000 * (max(job[2] + timing["total"] for job, timing in zip(jobs, timings)) - started), 3)
+        if profile_stages:
+            value["stage_profile"] = worker.execute_script("return window.__NFC_PROFILE_STAGES__")
         checks.append(value)
         (directory / "session-checks.json").write_text(json.dumps(checks, indent=2) + "\n")
         print(json.dumps(value), flush=True)
 
-    settle(worker)
+    begin()
     expected = direct("/camouflage/resource?size=1048576")
     await_jobs("download-after-idle", [job("late-download", "socks", "/camouflage/resource?size=1048576")], expected)
-    settle(worker)
+    begin()
     expected = direct("/camouflage/delay?ms=0")
     await_jobs("delayed-server-response", [job("delayed", "http", "/camouflage/delay?ms=1500")], expected)
     if worker is not None and not checks[-1]["idle_seen_while_pending"]:
         raise RuntimeError("delayed server response did not exercise idle")
-    settle(worker)
+    begin()
     payload = bytes(range(256)) * 4096
     upload = directory / "upload.body"
     upload.write_bytes(payload)
     await_jobs("slow-upload-after-idle", [job("upload", "http", "/camouflage/slow-upload?ms=1", upload)], upload=payload)
-    settle(worker)
+    begin()
     expected = direct("/camouflage/resource?size=524288")
     await_jobs("mixed-concurrent-after-idle", [job(f"parallel-{index}", "socks" if index % 2 == 0 else "http", "/camouflage/resource?size=524288") for index in range(4)], expected)
-    settle(worker)
+    begin()
     idle_measurement = None
     if idle_seconds:
         print(json.dumps({"session_stage": "idle-wire", "seconds": idle_seconds}), flush=True)

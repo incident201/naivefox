@@ -42,13 +42,18 @@ PROFILES = {
     "staged-stream20": (20, 65536),
     "staged-commit20": (20, 65536),
     "continuous-v1": (20, 65536),
+    "continuous-sync": (20, 65536),
 }
+
+
+def continuous(name):
+    return name.startswith("continuous-")
 
 
 def profile_budget(name):
     rounds, media = PROFILES[name]
     down = 4 * 24576 + (rounds - 4) * media
-    if name.startswith("staged") or name == "continuous-v1":
+    if name.startswith("staged") or continuous(name):
         down = 770048 + (rounds - 18) * 65536
     duplex = name.startswith("duplex") or name.startswith("compact-sync") or name == "compact-fast20"
     cells = rounds + (name == "staged-commit20")
@@ -67,7 +72,7 @@ def profile_requests(name):
         requests[upload] = requests.get(upload, 0) + 1
         if not duplex:
             capacity = media if middle else 24576
-            if name.startswith("staged") or name == "continuous-v1":
+            if name.startswith("staged") or continuous(name):
                 capacity = 8192 if index < 4 or index >= rounds - 2 else 32768 if index < 6 else media
             path = {8192: "/api/events/brief", 32768: "/api/events/state", 24576: "/api/events"}.get(capacity, f"/media/chunk/{index}")
             requests["GET " + path] = requests.get("GET " + path, 0) + 1
@@ -83,26 +88,34 @@ def outer_flow_count(events):
 def validate_http_graph(stats, name, mode):
     if mode == "default":
         return
-    if name == "continuous-v1":
+    if continuous(name):
         initial = profile_requests(name)
         actual = stats["requests"]
-        dynamic = {"POST /api/sync", "POST /api/upload/chunk", "GET /api/events/idle", *("GET /api/data/" + state for state in ("interactive", "download", "upload", "mixed"))}
+        combined = name == "continuous-sync"
+        prefix = "POST /api/exchange/" if combined else "GET /api/data/"
+        dynamic = {"POST /api/sync", "GET /api/events/idle", *(prefix + state for state in ("interactive", "download", "upload", "mixed"))}
+        if not combined:
+            dynamic.add("POST /api/upload/chunk")
         if stats["connect"] or stats["rejected"] or stats["write_errors"]:
             raise RuntimeError("continuous transport errors")
         if any(actual.get(path, 0) < count for path, count in initial.items()) or any(path not in initial and path not in dynamic for path in actual):
             raise RuntimeError("continuous HTTP surface")
         if any(actual.get(path) != count for path, count in initial.items() if path != "POST /api/sync"):
             raise RuntimeError("continuous bootstrap multiplicity")
-        if any(actual.get("GET /api/data/" + state, 0) % 4 for state in ("interactive", "download", "upload", "mixed")):
+        if any(actual.get(prefix + state, 0) % 4 for state in ("interactive", "download", "upload", "mixed")):
             raise RuntimeError("incomplete continuous activity lease")
         capacities = stats["cell_capacities"]
-        expected = {"8192": 6 + actual.get("GET /api/data/interactive", 0) + actual.get("GET /api/data/upload", 0),
-                    "32768": 2, "65536": 12 + actual.get("GET /api/data/download", 0) + actual.get("GET /api/data/mixed", 0)}
+        expected = {"8192": 6 + actual.get(prefix + "interactive", 0) + actual.get(prefix + "upload", 0),
+                    "32768": 2, "65536": 12 + actual.get(prefix + "download", 0) + actual.get(prefix + "mixed", 0)}
         if stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
         if capacities != expected or stats["download_bytes"] != sum(int(capacity) * count for capacity, count in capacities.items()):
             raise RuntimeError("continuous fixed response capacities")
-        if stats["upload_bytes"] != actual.get("POST /api/sync", 0) * 4096 + actual.get("POST /api/upload/chunk", 0) * 131072:
+        up = actual.get("POST /api/sync", 0) * 4096 + actual.get("POST /api/upload/chunk", 0) * 131072
+        if combined:
+            up += 4096 * (actual.get(prefix + "interactive", 0) + actual.get(prefix + "download", 0))
+            up += 131072 * (actual.get(prefix + "upload", 0) + actual.get(prefix + "mixed", 0))
+        if stats["upload_bytes"] != up:
             raise RuntimeError("continuous fixed upload capacities")
         if stats["idle_started"] != stats["idle_completed"] + stats["idle_cancelled"] or stats["idle_cancelled"] > 1:
             raise RuntimeError("continuous idle ownership")
@@ -254,7 +267,7 @@ class Campaign:
         self.outer_rate_mbit = rate
         write_json(self.root / "outer-shaping.json", {"rate_mbit": rate, "scope": "outer-port-only-both-directions", "qdisc": subprocess.check_output(["tc", "qdisc", "show", "dev", "lo"], text=True)})
 
-    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False):
         probe = probe or session_probe
         capturing = capture or session_wire
         rounds = rounds or PROFILES[app_profile][0]
@@ -314,7 +327,7 @@ class Campaign:
                 else:
                     write_json(directory / "bridge.json",{"key":key,"token":token,"origin":f"https://localhost:{self.port}",
                                "certificate":str(self.fixture / "pki/target.crt"),"private_key":str(self.fixture / "pki/target.key"),
-                               "ready":str(directory / "bridge-ready.json"),"stats":str(directory / "bridge-stats.json"),"append":mode=="append","continuous":app_profile=="continuous-v1"})
+                               "ready":str(directory / "bridge-ready.json"),"stats":str(directory / "bridge-stats.json"),"append":mode=="append","continuous":continuous(app_profile)})
                     bridge = launch([self.root.parent / "bin/bridge","--config",directory / "bridge.json"],"bridge.log")
                     wait_for(lambda:(directory / "bridge-ready.json").exists() or bridge.poll() is not None)
                     if bridge.poll() is not None: raise RuntimeError("bridge startup")
@@ -371,7 +384,7 @@ class Campaign:
                 if not reference and target_done and "target_done_ms" not in result:result["target_done_ms"]=round((time.monotonic()-start)*1000,3)
                 if app_done and (not control or target_done) and "app_done_ms" not in result:
                     result["app_done_ms"]=round((time.monotonic()-start)*1000,3)
-                if app_done and target_done and (app_profile!="continuous-v1" or control or state.get("phase")=="idle"):
+                if app_done and target_done and (not continuous(app_profile) or control or state.get("phase")=="idle"):
                     break
                 time.sleep(.01)
             result["app_done"]=app_done;result["target_done"]=target_done
@@ -385,7 +398,7 @@ class Campaign:
                     process = launch(args, log)
                     probes.append(process)
                     return process
-                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds)
+                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds,profile_stages)
             if journal.exists():
                 with journal.open() as source:
                     source.seek(journal_offset)
@@ -414,7 +427,7 @@ class Campaign:
                         raise RuntimeError("TCP traffic in strict H3 session capture")
                     result["session_wire"]={"bytes":sum(event["wire_size"] for event in events),"packets":len(events),"client_bytes":sum(event["wire_size"] for event in events if event["direction"]>0),"server_bytes":sum(event["wire_size"] for event in events if event["direction"]<0),"outer_flows":outer_flow_count(events)}
             if worker:result["worker_memory"]=process_memory(worker.capabilities["moz:processID"])
-            if worker and app_profile=="continuous-v1":
+            if worker and continuous(app_profile):
                 final=worker.execute_script("return {phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,error:window.__NFC_ERROR__,dynamic:window.__NFC_DYNAMIC_ROUNDS__,idle:window.__NFC_IDLE_POLLS__,wake:window.__NFC_IDLE_WAKE_POSTS__}")
                 result["application_state"]=final
                 if final["error"] or not final["alive"] or final["phase"]!="idle":
@@ -509,22 +522,28 @@ def main():
     parser.add_argument("--probe",action="store_true")
     parser.add_argument("--session-probe",action="store_true")
     parser.add_argument("--session-pairs",type=int,default=0)
+    parser.add_argument("--session-variants",action="store_true")
     parser.add_argument("--session-wire",action="store_true")
+    parser.add_argument("--profile-stages",action="store_true")
     parser.add_argument("--idle-seconds",type=int,default=0)
     parser.add_argument("--screen",type=int,default=0)
     parser.add_argument("--seed",type=int,default=202608301)
     args=parser.parse_args()
-    if args.session_pairs < 0 or args.session_pairs > 8 or (args.session_pairs and (args.app_profile!="continuous-v1" or args.screen or args.capture or args.idle_seconds)):
+    if args.profile_stages and (not args.session_probe or args.mode!="replace" or args.session_pairs or args.session_wire or args.idle_seconds):
+        parser.error("stage profiling requires a standalone replacement session probe without wire/idle accounting")
+    if args.session_variants and (not args.session_pairs or args.app_profile!="continuous-sync"):
+        parser.error("session variant pairs require continuous-sync and a positive pair count")
+    if args.session_pairs < 0 or args.session_pairs > 8 or (args.session_pairs and (not continuous(args.app_profile) or args.screen or args.capture or args.idle_seconds)):
         parser.error("session pairs require the continuous profile, no residual/idle capture, and at most eight pairs")
     if args.session_wire and (not args.session_probe or args.idle_seconds):
         parser.error("whole-session wire accounting requires a session probe without long-idle measurement")
-    if args.session_probe and (args.app_profile!="continuous-v1" or args.mode not in ("replace","default") or args.capture or args.screen):
+    if args.session_probe and (not continuous(args.app_profile) or args.mode not in ("replace","default") or args.capture or args.screen):
         parser.error("session probes require the continuous profile or its native control without a residual screen")
     if args.idle_seconds < 0 or args.idle_seconds > 120 or (args.idle_seconds and not args.session_probe):
         parser.error("idle duration requires a session probe and must be at most 120 seconds")
     if args.idle_seconds and args.mode!="replace":
         parser.error("idle wire measurement currently requires the continuous worker")
-    if args.app_profile=="continuous-v1" and (args.mode=="append" or (args.screen and not args.screen_lean)):
+    if continuous(args.app_profile) and (args.mode=="append" or (args.screen and not args.screen_lean)):
         parser.error("continuous append ablation is not qualified; use lean screens")
     if args.outer_rate_mbit < 0 or args.outer_rate_mbit > 1000 or args.timing_pair < 0:
         parser.error("invalid timing/rate bounds")
@@ -549,12 +568,12 @@ def main():
             rng=random.Random(args.seed)
             schedule=[]
             for block in range(args.session_pairs):
-                modes=["default","replace"]
+                modes=["continuous-v1",args.app_profile] if args.session_variants else ["default","replace"]
                 rng.shuffle(modes)
-                schedule.extend({"block":block,"mode":value} for value in modes)
+                schedule.extend({"block":block,"mode":"replace" if args.session_variants else value,"profile":value if args.session_variants else args.app_profile} for value in modes)
             write_json(args.root / "session-schedule.json",schedule)
             for index,row in enumerate(schedule):
-                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=args.app_profile,session_probe=True,session_wire=True)
+                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=row["profile"],session_probe=True,session_wire=True)
                 print(json.dumps({key:value for key,value in result.items() if key not in ("server-stats","bridge-stats","inner_http_statuses")},sort_keys=True),flush=True)
                 if not result["admitted"]:
                     return 1
@@ -582,7 +601,7 @@ def main():
         if args.screen:
             campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean)
             return 0
-        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire)
+        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire,args.profile_stages)
         print(json.dumps(result,sort_keys=True),flush=True)
         return 0 if result["admitted"] else 1
     finally:campaign.close()

@@ -555,3 +555,64 @@ and the server repository bundle through `d444393`; manifest SHA-256 is
 `80dce75db0bb295e82474d3a360b38136ce8f46601357a8c1805c8a3ddee1559`.
 The server repository still has no remote; this bundle is local preservation,
 not a server push. Product defaults and Firefox binaries are unchanged.
+
+## Active-speed diagnosis
+
+Before changing the next mechanism, history preflight checked the all-ref
+duplex, pipeline, batching and multiplexing records, including `fac638485497`,
+the existing `duplex-v1` cost failure and the prefix-delivery experiment above.
+Duplex alone was already tried during the animation-gated startup; removing
+the same HTTP boundary is not an untested startup hypothesis. Continuous
+active leases have no paint barrier, however, and their time distribution has
+not been measured. First instrument a separate H2 session (not a residual or
+cost capture) to split fetch headers, response-body reads and local bridge IPC.
+Do not infer a kernel/Firefox delay from total completion alone.
+
+Session checks additionally record curl's own connection/TLS/first-byte/total
+times. Existing `completion_ms` remains the observed subprocess completion
+bound for historical comparisons; its 10-ms poll interval and browser-health
+query are too coarse for precise small-transfer latency. Instrumentation is
+explicitly opt-in, only after startup, with aggregate numeric timings and no
+payloads or secret URLs in reported evidence.
+
+The first trace (`continuous-h2-stage-profile`) had invalid IPC attribution:
+its event listener ran after the application callback's microtasks. Retain
+that trace but do not use its missing delivery counts. With the observer in
+the capture phase (`continuous-h2-stage-profile2`), 1-MiB download took
+120.236 ms by curl: upload/download fetch headers consumed 46/42 ms over
+23/22 calls, body reads 5 ms, and take/deliver/pressure IPC 12/14/4 ms.
+These rounded, instrumented aggregates can include work just after curl ends;
+idle-request times spanning the preceding settle period are not stage latency.
+They identify sequential HTTP turnaround as a large cost, not an unexplained
+fixed Firefox pause or proof that IPC is free.
+
+Next opt-in profile `continuous-sync` changes active leases only: a POST to
+`/api/exchange/{interactive,download,upload,mixed}` receives the same fixed
+8/64-KiB response directly, replacing POST-204 then GET. Initial 20-round
+startup, four-slot lease size, upload/down capacities, pressure thresholds,
+30-second idle poll and wake POST stay unchanged. No speculative parallel
+request, extra padding budget, new delay or removal of flow control is added.
+The prior animation-gated duplex failure is not overwritten. This tests the
+newly measured active-stage barrier, while explicitly checking for additional
+filler caused by turning slots faster. Admission first, then three randomized
+H2 replacement-profile session pairs (seed 202608317), without instrumentation.
+Only a substantial measured gain earns further protocol/residual checks.
+
+All six sessions in `continuous-sync-h2-pairs` passed. Curl completion means
+fell from 116.376 to 100.585 ms for 1 MiB (13.57% less time), and 217.034 to
+165.671 ms for four parallel downloads (23.67%). Slow-upload time fell 3.90%,
+but the 4-KiB wake grew from 22.419 to 23.927 ms (+6.72%). Complete-session wire
+increased from 6,590,795 to 7,209,682 bytes (+9.39% against the previous
+prototype, not against the native default). Combined exchanges are a measured
+bulk-speed improvement with a traffic/small-latency regression, not a preferred
+default. Do not run a full residual matrix for this tradeoff yet.
+
+The extra cost includes more underfilled upload leases; in the first pair
+the baseline issued eight 128-KiB upload slots, the combined profile twelve.
+Faster turnaround can cross state/credit/target-readiness boundaries sooner;
+these counters do not isolate a unique cause. A four-slot upload commitment
+reserves 512 KiB, twice one stream's 256-KiB credit window, and can waste a
+large fixed tail even without a credit stall. Keep per-stream flow control;
+investigate shorter fixed state leases rather than increasing queues or
+switching to byte-exact response sizes. Verification passed seventeen JS tests,
+nine harness tests and all four Go race-test packages; no Firefox build.
