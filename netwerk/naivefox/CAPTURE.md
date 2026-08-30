@@ -3744,6 +3744,48 @@ cannot support an absolute camouflage conclusion; that requires a fresh,
 preregistered single-arm research run. The suite selects explicit runtime
 configuration but never mutates production defaults.
 
+## H2 finite-exchange transport experiment
+
+The causal-history preflight checked the complete Git history (including
+pickaxe searches for finite exchanges, finite responses, long polling and
+exchange sequencing), the carrier sections above, and retained metadata for
+`a9ffaf1c49a77777` and `9a73f27ea029dcd5`. Two directional CONNECTs kept two
+long-lived streams; the ordinary-GET carrier changed the method but kept one
+long-lived raw stream. Neither tested repeatedly completed ordinary HTTP
+transactions. Retaining an unfinished fronting response and changing padding
+or process topology are also closed, distinct families, not the proposed test.
+
+The first prototype is explicitly diagnostic, H2-only and incompatible with
+stock servers. Native Necko channels carry a finite session-open POST, finite
+upload POSTs and finite download responses. One logical byte stream is ordered
+by per-direction sequence numbers. The initial structural bounds are 64 KiB
+per exchange, two outstanding uploads, four outstanding downloads, and bounded
+native pipes. A download completes after the first available bounded read;
+it does not wait for a full block, a timer, a packet ordinal, a resource-size
+target or an estimate of bandwidth. Empty receive requests may wait for target
+data, but a response carrying data completes normally and is replaced within
+the bounded window. Upload and receive admission are independent, avoiding a
+request/response deadlock and one stop-and-wait RTT per useful block.
+
+The initial test deliberately preserves the stock eight Variant-1 records per
+direction across exchange boundaries. It also preserves target-dial Fast Open
+ordering, existing listener-specific preamble policy, scoped TLS verification,
+server-side target DNS/ACL checks and unmodified default CONNECT operation.
+This avoids attributing padding removal or a new dial barrier to finite stream
+lifecycle. Sequence errors, oversized bodies, unexpected protocol/negotiation,
+and transport loss must fail closed. Cancellation, half-close and bounded
+buffering are functional gates before passive comparisons.
+
+First collect short randomized H2/inner-H2 screens against both current local
+listener defaults and Firefox A/B in the isolated WSL namespace. Validate one
+physical outer H2 connection, useful byte integrity and actual normal response
+completion. Compare packets 17--32 and Whole first; do not spend a full default,
+resource-size or link matrix on a weak candidate. Only a replicated improvement
+of at least 20%, without unacceptable regressions, justifies developing this
+breaking transport as a default. A short screen is not statistical acceptance.
+The ordinary fronting-site requirements and canonical default matrix remain
+unchanged during this experiment.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
