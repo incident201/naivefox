@@ -5,7 +5,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
 usage() {
-  printf 'usage: %s [--package DIR] [--protocol h2|h3|all] [--check-only] [--allow-skip-device] [--start-emulator]\n' "$0"
+  printf 'usage: %s [--package DIR] [--protocol h2|h3|all] [--check-only] [--allow-skip-device] [--start-emulator] [--direct-host]\n' "$0"
 }
 
 package_arg=${NAIVEFOX_ANDROID_PACKAGE:-}
@@ -13,6 +13,7 @@ protocol=all
 check_only=0
 allow_skip_device=0
 start_emulator=0
+direct_host=0
 while (( $# )); do
   case $1 in
     --package)
@@ -35,6 +36,10 @@ while (( $# )); do
       ;;
     --start-emulator)
       start_emulator=1
+      shift
+      ;;
+    --direct-host)
+      direct_host=1
       shift
       ;;
     --help)
@@ -304,10 +309,10 @@ run_protocol() {
   local host_alias=${NAIVEFOX_ANDROID_HOST_ALIAS:-10.0.2.2}
   local proxy_scheme=https
   local fixture_environment=()
-  if [[ $current_protocol == h3 ]]; then
-    proxy_scheme=quic
+  if [[ $current_protocol == h3 || $direct_host == 1 ]]; then
     fixture_environment=(env "NAIVEFOX_FIXTURE_PROXY_IP_SAN=$host_alias")
   fi
+  [[ $current_protocol != h3 ]] || proxy_scheme=quic
   "${fixture_environment[@]}" "$INTEGRATION_DIR/start.sh" --mode "$current_protocol"
   run_dir=$(<"$ACTIVE_RUN_FILE")
   source "$run_dir/fixture.env"
@@ -325,7 +330,7 @@ run_protocol() {
 
   proxy_host=localhost
   proxy_port=$NAIVEFOX_FIXTURE_PROXY_PORT
-  if [[ $current_protocol == h2 ]]; then
+  if [[ $current_protocol == h2 && $direct_host == 0 ]]; then
     current_reverse=$(free_device_port 38443)
     "${ADB[@]}" reverse "tcp:$current_reverse" \
       "tcp:$NAIVEFOX_FIXTURE_PROXY_PORT" >/dev/null

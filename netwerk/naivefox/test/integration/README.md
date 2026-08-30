@@ -77,6 +77,31 @@ needed. `--protocol h2` or `--protocol h3` narrows an iteration. The adapter als
 accepts `--classic-preamble default --parallel-batches 32` for the repeated H3
 buffered-FIN regression against the normal fronting-page policy.
 
+The Android adapter runs the same matrix against an existing ARM64 API-26+
+device/emulator, followed by the embedded lifecycle and stop tests:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-android.py \
+  --objdir /absolute/path/to/fixture-objdir \
+  --package /absolute/path/to/staged-android-package \
+  --caddy /absolute/path/to/combined-linux-caddy \
+  --ndk /absolute/path/to/android-ndk-r29 \
+  --serial emulator-5554 --parallel-batches 4
+```
+
+Its small NDK socket probe runs inside Android against the actual loopback
+listeners. It validates half-close directly: ADB forwarding closes both
+directions and is unsuitable for this particular assertion. The upstream uses
+the emulator's host alias (`10.0.2.2` by default, configurable with `--host-alias`)
+while the logical TLS hostname and certificate checks remain intact. Temporary
+runtime, profile and probe files are isolated and removed from the device.
+The older embedded runner's `--direct-host` option likewise avoids ADB reverse
+for H2; it still requires the fixture's explicit host-alias certificate SAN.
+Keep a task-owned emulator alive across gates. The managed software ARM64
+emulator allows up to 900 seconds for normal boot; it never substitutes a fake
+boot-complete property. An isolated ADB server can be selected with
+`ADB_SERVER_SOCKET` and the matching `ANDROID_ADB_SERVER_PORT`.
+
 The standalone `run-no-connect-codec-tests.sh <linux-objdir> [output-directory]`
 runner requires the full-source checkout and its bundled GoogleTest sources.
 Generated minimal-source exports intentionally omit those unit-test dependencies;

@@ -11,6 +11,8 @@ Before changing NaiveFox, read:
 - [`UPSTREAM.md`](UPSTREAM.md) for branch and refresh rules;
 - [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) for active limitations;
 - [`test/integration/README.md`](test/integration/README.md) when changing runtime behavior.
+- [`NO-CONNECT.md`](NO-CONNECT.md) when changing transport selection or the
+  native application carrier.
 
 ## Repository discipline
 
@@ -35,8 +37,8 @@ Before changing NaiveFox, read:
   frames to imitate Firefox.
 - A raw CONNECT must not emit a synthetic `ALPN`, `Upgrade`, or `Connection`
   marker. The Naive `padding` header is the intentional compatibility signal.
-- SOCKS domain targets remain hostnames in CONNECT authority; do not resolve
-  them locally.
+- SOCKS domain targets remain hostnames in classic CONNECT authority or
+  no-connect OPEN frames; do not resolve them locally.
 - Strict H2 and H3 must fail closed. Auto may retry H2 only after an H3
   establishment failure before CONNECT response or tunnel creation.
 - The current product intentionally runs networking in one process. Do not
@@ -66,6 +68,14 @@ Naive payload compatibility is legacy Variant 1: eight framed records per
 direction followed by raw bytes. The streaming decoder must accept every
 header/payload/padding split, coalesced records, and raw bytes following the
 last framed record. Production padding must not use a deterministic RNG.
+
+That padding contract applies to `classic`, the default transport. The opt-in
+`no-connect` carrier uses bounded NFC1 application cells over Necko's ordinary
+GET/POST channels and requires the separately maintained Caddy module. Preserve
+the documented profile, ordered OPENs and cell sequences, credit only after
+local delivery, HTTP completion checks, and per-stream half-close. Do not import
+the experimental browser worker, DOM, JavaScript engine, or WSS bridge into the
+lean runtime. Transport selection in JSON and the desktop CLI must agree.
 
 ## Build and test policy
 

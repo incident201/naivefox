@@ -21,7 +21,7 @@ Environment:
   NAIVEFOX_ANDROID_EMULATOR
   ANDROID_SDK_ROOT or ANDROID_HOME
   ANDROID_AVD_HOME
-  NAIVEFOX_ANDROID_BOOT_TIMEOUT (seconds, default: 360)
+  NAIVEFOX_ANDROID_BOOT_TIMEOUT (seconds, default: 900)
 
 On Linux/WSL the managed default lives under
 ${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/{android-sdk,android-avd}.
@@ -32,7 +32,7 @@ EOF
 avd=${NAIVEFOX_ANDROID_AVD:-naivefox-arm64-api27-raw}
 serial=${NAIVEFOX_ANDROID_SERIAL:-emulator-5554}
 emulator=${NAIVEFOX_ANDROID_EMULATOR:-}
-boot_timeout=${NAIVEFOX_ANDROID_BOOT_TIMEOUT:-360}
+boot_timeout=${NAIVEFOX_ANDROID_BOOT_TIMEOUT:-900}
 
 while (( $# )); do
   case "$1" in
@@ -89,8 +89,8 @@ if [[ -z ${ANDROID_AVD_HOME:-} && -d $managed_root/android-avd ]]; then
   export ANDROID_AVD_HOME=$managed_root/android-avd
 fi
 
-if "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
-   [[ $("$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
+   [[ $(timeout 5 "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
        tr -d '\r') == arm64-v8a ]]; then
   printf 'Android ARM64 emulator already online: %s\n' "$serial"
   exit 0
@@ -125,7 +125,7 @@ if [[ -n $avd_home && ! -f $avd_home/$avd.avd/config.ini ]]; then
   exit 1
 fi
 
-"$adb" start-server >/dev/null
+timeout 15 "$adb" start-server >/dev/null
 log_file=${NAIVEFOX_ANDROID_EMULATOR_LOG:-${TMPDIR:-/tmp}/naivefox-android-emulator.log}
 printf 'Starting Android ARM64 AVD %s with QEMU virt machine; log: %s\n' \
   "$avd" "$log_file"
