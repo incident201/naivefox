@@ -20,14 +20,19 @@ Environment:
   NAIVEFOX_ANDROID_SERIAL
   NAIVEFOX_ANDROID_EMULATOR
   ANDROID_SDK_ROOT or ANDROID_HOME
-  NAIVEFOX_ANDROID_BOOT_TIMEOUT (seconds, default: 180)
+  ANDROID_AVD_HOME
+  NAIVEFOX_ANDROID_BOOT_TIMEOUT (seconds, default: 360)
+
+On Linux/WSL the managed default lives under
+${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/{android-sdk,android-avd}.
+No Windows emulator is selected automatically from WSL.
 EOF
 }
 
 avd=${NAIVEFOX_ANDROID_AVD:-naivefox-arm64-api27-raw}
 serial=${NAIVEFOX_ANDROID_SERIAL:-emulator-5554}
 emulator=${NAIVEFOX_ANDROID_EMULATOR:-}
-boot_timeout=${NAIVEFOX_ANDROID_BOOT_TIMEOUT:-180}
+boot_timeout=${NAIVEFOX_ANDROID_BOOT_TIMEOUT:-360}
 
 while (( $# )); do
   case "$1" in
@@ -71,10 +76,17 @@ adb=${NAIVEFOX_ADB:-$(command -v adb || true)}
   exit 1
 }
 
-windows_user=${NAIVEFOX_WINDOWS_USER:-${USERNAME:-}}
-if [[ -z $windows_user && -x /mnt/c/WINDOWS/system32/cmd.exe ]]; then
-  windows_user=$(cd / && /mnt/c/WINDOWS/system32/cmd.exe /c echo %USERNAME% 2>/dev/null |
-    tr -d '\r\n')
+managed_root=${XDG_DATA_HOME:-$HOME/.local/share}/naivefox
+sdk_root=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}
+if [[ -z $sdk_root && $(uname -s) == Linux &&
+      -x $managed_root/android-sdk/emulator/emulator ]]; then
+  sdk_root=$managed_root/android-sdk
+fi
+if [[ -n $sdk_root ]]; then
+  export ANDROID_SDK_ROOT=$sdk_root
+fi
+if [[ -z ${ANDROID_AVD_HOME:-} && -d $managed_root/android-avd ]]; then
+  export ANDROID_AVD_HOME=$managed_root/android-avd
 fi
 
 if "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
@@ -85,7 +97,6 @@ if "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
 fi
 
 if [[ -z $emulator ]]; then
-  sdk_root=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}
   if [[ -n $sdk_root && -x $sdk_root/emulator/emulator ]]; then
     emulator=$sdk_root/emulator/emulator
   elif [[ -n $sdk_root && -x $sdk_root/emulator/emulator.exe ]]; then
@@ -95,26 +106,17 @@ if [[ -z $emulator ]]; then
   fi
 fi
 
-# WSL commonly has adb in Linux but the emulator installed on the Windows
-# host. Resolve the conventional per-user SDK location without requiring an
-# Android application toolchain.
-if [[ -z $emulator && -n $windows_user &&
-      -x /mnt/c/Users/$windows_user/AppData/Local/Android/Sdk/emulator/emulator.exe ]]; then
-  emulator=/mnt/c/Users/$windows_user/AppData/Local/Android/Sdk/emulator/emulator.exe
-fi
 [[ -n $emulator && -x $emulator ]] || {
   printf 'Android emulator binary is unavailable; set NAIVEFOX_ANDROID_EMULATOR\n' >&2
   exit 1
 }
 
-if [[ -n ${ANDROID_SDK_ROOT:-} ]]; then
-  avd_home=${ANDROID_AVD_HOME:-$ANDROID_SDK_ROOT/.android/avd}
+if [[ -n ${ANDROID_AVD_HOME:-} ]]; then
+  avd_home=$ANDROID_AVD_HOME
 elif [[ -n ${ANDROID_HOME:-} ]]; then
   avd_home=${ANDROID_AVD_HOME:-$ANDROID_HOME/.android/avd}
 elif [[ -d ${HOME:-}/.android/avd ]]; then
   avd_home=${HOME}/.android/avd
-elif [[ -n $windows_user && -d /mnt/c/Users/$windows_user/.android/avd ]]; then
-  avd_home=/mnt/c/Users/$windows_user/.android/avd
 else
   avd_home=
 fi
@@ -131,7 +133,15 @@ printf 'Starting Android ARM64 AVD %s with QEMU virt machine; log: %s\n' \
 # Keep these options in one place. In particular, -qemu -machine virt avoids
 # the host QEMU audio device selecting a PCI bus that is not present on ARM64
 # software-emulation launches.
-nohup "$emulator" \
+emulator_environment=()
+emulator_extra_args=()
+if [[ $(uname -s) == Linux && $emulator != *.exe ]]; then
+  # A headless network gate must not load Windows GPU drivers via WSLg.
+  emulator_environment=(env -u DISPLAY -u WAYLAND_DISPLAY
+    QT_QPA_PLATFORM=offscreen LIBGL_ALWAYS_SOFTWARE=1)
+  emulator_extra_args=(-feature -Vulkan)
+fi
+nohup "${emulator_environment[@]}" "$emulator" \
   -avd "$avd" \
   -no-window \
   -no-audio \
@@ -139,26 +149,30 @@ nohup "$emulator" \
   -accel off \
   -no-snapshot \
   -no-boot-anim \
+  "${emulator_extra_args[@]}" \
   -qemu -machine virt \
   >"$log_file" 2>&1 &
+emulator_pid=$!
 
-for ((second = 0; second < boot_timeout; second++)); do
-  boot_completed=
-  boot_animation=
-  legacy_boot_completed=
-  if "$adb" -s "$serial" get-state >/dev/null 2>&1; then
-    boot_completed=$("$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-      tr -d '\r')
-    boot_animation=$("$adb" -s "$serial" shell getprop init.svc.bootanim 2>/dev/null |
-      tr -d '\r')
-    legacy_boot_completed=$("$adb" -s "$serial" shell getprop dev.bootcomplete 2>/dev/null |
-      tr -d '\r')
+deadline=$((SECONDS + boot_timeout))
+while (( SECONDS < deadline )); do
+  if ! kill -0 "$emulator_pid" 2>/dev/null; then
+    printf 'Android emulator exited before boot: %s\n' "$log_file" >&2
+    tail -40 "$log_file" >&2 || true
+    exit 1
   fi
-  if "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
-     [[ $("$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+  boot_completed=
+  legacy_boot_completed=
+  if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1; then
+    boot_completed=$(timeout 5 "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
+      tr -d '\r') || boot_completed=
+    legacy_boot_completed=$(timeout 5 "$adb" -s "$serial" shell getprop dev.bootcomplete 2>/dev/null |
+      tr -d '\r') || legacy_boot_completed=
+  fi
+  if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
+     [[ $(timeout 5 "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
        tr -d '\r') == arm64-v8a ]] &&
-     [[ $boot_completed == 1 || $legacy_boot_completed == 1 ||
-        $boot_animation == stopped ]]; then
+     [[ $boot_completed == 1 || $legacy_boot_completed == 1 ]]; then
     printf 'Android ARM64 emulator ready: %s\n' "$serial"
     exit 0
   fi
@@ -167,5 +181,6 @@ done
 
 printf 'Android emulator did not boot within %ss: %s\n' \
   "$boot_timeout" "$log_file" >&2
+kill -TERM "$emulator_pid" 2>/dev/null || true
 tail -40 "$log_file" >&2 || true
 exit 1

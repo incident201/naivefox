@@ -87,6 +87,12 @@ device is running, append --start-emulator. The runner invokes
 tools/start-android-emulator.sh, supplies the ARM64-safe -qemu -machine virt
 launch override, waits for boot completion, and shuts down only the emulator
 instance it started during cleanup.
+On WSL the managed emulator and image are Linux-local, discovered under
+`${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/`; the launcher does not silently
+fall back to a Windows installation. Run adb, the emulator and the fixture in
+one isolated namespace. See [the managed emulator setup](../../MINIMAL.md).
+Boot readiness requires an Android boot-completed property, not just a stopped
+animation; the latter can precede clock and networking initialization.
 
 The Android ARM64 embedded package has a test-only native harness and emulator
 gate. It compiles the harness with NDK r29, relocates the package below

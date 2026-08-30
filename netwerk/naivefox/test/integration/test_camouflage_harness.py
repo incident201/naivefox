@@ -2698,6 +2698,9 @@ class CamouflageHarnessTests(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, "NAIVEFOX_CAPTURE_ISOLATED_NETWORK": "0",
+                 "NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED": "0"},
+            timeout=30,
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("requires NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1", result.stderr)

@@ -152,16 +152,6 @@ emulator_stop_adb=$adb_bin
 emulator_stop_serial=${NAIVEFOX_ANDROID_SERIAL:-emulator-5554}
 if [[ -n ${NAIVEFOX_ANDROID_STOP_ADB:-} ]]; then
   emulator_stop_adb=$NAIVEFOX_ANDROID_STOP_ADB
-elif [[ -n ${NAIVEFOX_WINDOWS_USER:-} &&
-        -x /mnt/c/Users/$NAIVEFOX_WINDOWS_USER/AppData/Local/Android/Sdk/platform-tools/adb.exe ]]; then
-  emulator_stop_adb=/mnt/c/Users/$NAIVEFOX_WINDOWS_USER/AppData/Local/Android/Sdk/platform-tools/adb.exe
-else
-  for candidate in /mnt/c/Users/*/AppData/Local/Android/Sdk/platform-tools/adb.exe; do
-    if [[ -x $candidate ]]; then
-      emulator_stop_adb=$candidate
-      break
-    fi
-  done
 fi
 ADB=("$adb_bin")
 [[ -z ${NAIVEFOX_ANDROID_SERIAL:-} ]] || ADB+=(-s "$NAIVEFOX_ANDROID_SERIAL")

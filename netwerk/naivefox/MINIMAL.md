@@ -60,6 +60,7 @@ export NAIVEFOX_ENABLE_TESTS=1
 export NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-linux-tests
 ./netwerk/naivefox/tools/build-product.sh linux
 export LD_LIBRARY_PATH="$NAIVEFOX_OBJDIR/dist/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export NAIVEFOX_DISABLE_SCCACHE=1 SCCACHE_DISABLE=1
 ./mach gtest 'NaiveFoxTunnelSessionLifecycle.*'
 ```
 
@@ -90,6 +91,13 @@ py -3 netwerk/naivefox/tools/verify-staged-windows-smoke.py `
   --package-dir C:\absolute\path\to\naivefox-windows-x86_64
 ```
 
+For live H2 and H3 acceptance, run this verifier once for each fixture protocol
+with `NAIVEFOX_WINDOWS_PROXY_URL` set privately and `--target-url` pointing to
+a deterministic fixture body. It compares eight transfers at concurrency four
+through each local listener with the direct body digest. Set `SSL_CERT_FILE`
+to the fixture CA for both NaiveFox and curl. Without an upstream URL the
+verifier checks local lifecycle and malformed-input behavior only, not traffic.
+
 Android ARM64 cross-build, staging, and static harness verification:
 
 ```bash
@@ -105,9 +113,29 @@ NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-android-aarch64 \
   --check-only
 ```
 
-On the configured WSL/Windows host, the device gate can start the local ARM64
-AVD itself, including the required QEMU virt machine override, by appending
---start-emulator to the runner command above.
+The WSL gate uses a Linux ARM64 emulator, not a Windows-host emulator. Keep the
+managed SDK and AVD under `${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/` in
+`android-sdk` and `android-avd`, respectively. The launcher discovers these
+directories and the `naivefox-arm64-api27-raw` AVD automatically; explicit SDK,
+AVD and emulator environment overrides remain supported. Append
+`--start-emulator` to the online runner (without `--check-only`). Launch the
+runner inside the isolated WSL network namespace so adb, QEMU and Caddy share
+the same loopback network. No KVM is required for ARM64 software emulation.
+
+The maintained emulator is the official Linux x86-64 build `34.1.20`, build ID
+`11610631`, with the Android API-27 default ARM64 system image. The archive
+`https://dl.google.com/android/repository/emulator-linux_x64-11610631.zip` has
+SHA-256 `83a27f7936a8e89fa9e5e220a2cd2622db05f343065d66a92c4397f94df247a0`.
+The SDK needs `platforms`, `platform-tools` and `system-images` directories;
+its runtime needs Linux `libpulse0` and `libgl1` even with `-no-audio` and
+`-no-window`. The launcher adds `-qemu -machine virt` and waits for Android's
+boot-completed property (up to 360 seconds), not merely a stopped animation.
+Headless Linux launches disable Vulkan and WSLg display discovery and select
+software rendering, so the test does not depend on Windows GPU drivers.
+When running as another user (for example root inside the namespace), set
+`XDG_DATA_HOME` to the SDK owner's data directory or pass explicit SDK/AVD paths.
+Do not remove a previous emulator/image until a relocated, Windows-independent
+H2/H3 runtime gate has passed. Keep the managed emulator when cleaning objdirs.
 
 The final command compiles and inspects the native harness but does not start
 Gecko on Android. Device acceptance requires the runner without `--check-only`

@@ -1991,8 +1991,11 @@ start_browser_controller() {
   browser_shutdown_file="$sample_dir/browser-shutdown.json"
   rm -f -- "$NAIVEFOX_FIXTURE_RUN_DIR/completions/$completion"
   local -a warmup_args=()
-  if [[ $effective_backend == selenium && $protocol == h3 &&
-        $experiment_design == multi_arm_superblocks && $socks_port -eq 0 ]]; then
+  # Initialize the fresh profile's NSS/trust state before its first strict H3
+  # navigation. The same preparation is required by single-arm structural
+  # gates, not only multi-arm measurements; otherwise Firefox can attempt TCP
+  # against the UDP-only fixture before H3 becomes available.
+  if [[ $effective_backend == selenium && $protocol == h3 && $socks_port -eq 0 ]]; then
     local warmup_completion
     warmup_completion=$(openssl rand -hex 16)
     local warmup_completion_file="$NAIVEFOX_FIXTURE_RUN_DIR/completions/$warmup_completion"
