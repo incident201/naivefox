@@ -2292,6 +2292,41 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(f"/camouflage/api?size=1024&nav={token}", page)
         self.assertEqual(page.count(f"nav={token}"), 6)
 
+    def test_browser_page_document_body_size_is_exact_and_bounded(self):
+        query = {
+            "scenario": ["browser_page"],
+            "document_size": [str(64 * 1024)],
+        }
+        page = TARGET.Handler.camouflage_page(object(), query)
+        self.assertEqual(len(page), 64 * 1024)
+        self.assertIn(b"/camouflage/style.css", page)
+        self.assertIn(b"/camouflage/app.js", page)
+        self.assertIsNone(
+            TARGET.Handler.camouflage_page(
+                object(),
+                {"scenario": ["browser_page"], "document_size": ["100"]},
+            )
+        )
+        for invalid in ("65537", "invalid"):
+            self.assertIsNone(
+                TARGET.Handler.camouflage_page(
+                    object(),
+                    {
+                        "scenario": ["browser_page"],
+                        "document_size": [invalid],
+                    },
+                )
+            )
+        self.assertIsNone(
+            TARGET.Handler.camouflage_page(
+                object(),
+                {
+                    "scenario": ["browser_page"],
+                    "document_size": ["4096", "8192"],
+                },
+            )
+        )
+
     def test_browser_page_early_hints_match_document_urls(self):
         for mode, expected_count in (("css", 1), ("blocking", 2), ("all", 6)):
             query = {"scenario": ["browser_page"], "early_hints": [mode]}
@@ -2522,6 +2557,57 @@ class CamouflageHarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn(message, result.stderr)
 
+    def test_document_body_size_cli_is_h2_browser_page_diagnostic(self):
+        runner = os.path.join(HERE, "run-camouflage-suite.sh")
+        for arguments, message in (
+            (["--document-body-size", "65536"], "requires --protocol h2"),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--document-body-size",
+                    "65537",
+                ],
+                "between 1024 and 65536",
+            ),
+            (
+                [
+                    "--mode",
+                    "standard",
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--document-body-size",
+                    "65536",
+                ],
+                "restricted to gate/smoke",
+            ),
+            (
+                [
+                    "--protocol",
+                    "h2",
+                    "--scenario",
+                    "browser_page",
+                    "--browser-page-base-size",
+                    "65536",
+                    "--document-body-size",
+                    "65536",
+                ],
+                "another fixture-shape axis",
+            ),
+        ):
+            result = subprocess.run(
+                ["bash", runner, *arguments],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(message, result.stderr)
+
     def test_outer_resource_profiles_are_coherent_and_bounded(self):
         self.assertEqual(
             TARGET.fronting_resource_profile(None),
@@ -2671,6 +2757,9 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertIn(
             "camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE",
             suite,
+        )
+        self.assertIn(
+            "document_body_size=${document_body_size:-fixture_default}", suite
         )
         self.assertIn("outer_resource_profile=$outer_resource_profile", suite)
         self.assertIn(

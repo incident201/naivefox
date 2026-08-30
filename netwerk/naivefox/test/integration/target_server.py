@@ -244,6 +244,21 @@ def browser_page_final_preload_links(query):
     return browser_page_preload_links(query, "final_preloads")
 
 
+def sized_document_body(body, query):
+    requested_sizes = query.get("document_size", [])
+    if not requested_sizes:
+        return body
+    if len(requested_sizes) != 1:
+        return None
+    try:
+        requested_size = int(requested_sizes[0])
+    except ValueError:
+        return None
+    if requested_size < len(body) or requested_size > 64 * 1024:
+        return None
+    return body + b" " * (requested_size - len(body))
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -428,7 +443,7 @@ window.addEventListener('load',async()=>{{
 await fetch('/camouflage/complete?token={completion}',{{method:'POST'}});
 }});
 </script>"""
-        return (head + body).encode()
+        return sized_document_body((head + body).encode(), query)
 
     def do_GET(self):
         parsed = urlparse(self.path)

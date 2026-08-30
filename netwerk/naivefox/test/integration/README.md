@@ -619,6 +619,13 @@ RESET_STREAM, and STOP_SENDING positions. It deliberately omits headers,
 request targets, connection IDs, and secrets. It refuses to infer that GOAWAY
 was absent unless H3 frames from the first connection were actually decrypted.
 
+`--protocol h2 --scenario browser_page --document-body-size BYTES` is a
+gate/smoke-only site-envelope diagnostic. It pads the exact shared outer,
+direct-reference, and tunneled HTML response body to 1024--65536 bytes without
+changing its resource URLs or completion behavior. Omitting the option keeps
+the ordinary fixture body. Sanitized metadata records the selected size; this
+option never changes a product or Caddy default.
+
 `--naivefox-arm off|gate|root|root-pmtud-control|document-complete|document-carrier-dispatch|document-cold-winner-handoff|document-native-cache-open|document-handshake-confirmed|document-overlap|document-start-overlap|tree-complete|tree-complete-css|tree-early-overlap|tree-resource-committed-overlap-css|tree-resource-native-cache-committed-overlap|tree-native-parser-preload-overlap-css|tree-native-parser-document-start-overlap-css|tree-native-parser-document-start-resource-tree|tree-native-parser-document-start-navigation-stop-css|tree-native-parser-document-start-response-stop-css|tree-native-parser-document-handoff-overlap-css|tree-native-parser-retarget-overlap-css|tree-native-parser-ipc-rendezvous-overlap-css|tree-native-parser-root-rendezvous-overlap-css|tree-native-parser-process-overlap-css|tree-native-parser-full-process-overlap-css|tree-root-overlap|tree-root-overlap-css|tree-warm-css-304|tree-overlap`
 selects a separate one-binary NaiveFox arm. All use the same config-mode startup
 path. `off` disables the outer-session gate and preamble. `gate` enables the

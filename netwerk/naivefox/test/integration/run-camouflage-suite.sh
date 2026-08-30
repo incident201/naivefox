@@ -24,6 +24,7 @@ multi_arm_views_csv=all
 scenario_override=
 scenario_option_count=0
 browser_page_base_size=
+document_body_size=
 outer_resource_unit_size=
 outer_early_hints=none
 outer_final_preloads=none
@@ -89,6 +90,10 @@ while [[ $# -gt 0 ]]; do
       browser_page_base_size=${2:-}
       shift 2
       ;;
+    --document-body-size)
+      document_body_size=${2:-}
+      shift 2
+      ;;
     --outer-resource-unit-size)
       outer_resource_unit_size=${2:-}
       shift 2
@@ -118,7 +123,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--outer-resource-unit-size BYTES] [--outer-early-hints none|css|blocking|all] [--outer-final-preloads none|css|blocking|all] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--document-body-size BYTES] [--outer-resource-unit-size BYTES] [--outer-early-hints none|css|blocking|all] [--outer-final-preloads none|css|blocking|all] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -240,6 +245,27 @@ if [[ -n $browser_page_base_size ]]; then
   if [[ ! $browser_page_base_size =~ ^[0-9]+$ ]] ||
      ((browser_page_base_size < 65536 || browser_page_base_size > 4194304)); then
     printf '%s\n' '--browser-page-base-size must be an integer between 65536 and 4194304' >&2
+    exit 2
+  fi
+fi
+if [[ -n $document_body_size ]]; then
+  if [[ $protocol_selection != h2 ||
+        $scenario_option_count -ne 1 || $scenario_override != browser_page ]]; then
+    printf '%s\n' '--document-body-size requires --protocol h2 --scenario browser_page' >&2
+    exit 2
+  fi
+  if [[ $mode != gate && $mode != smoke ]]; then
+    printf '%s\n' '--document-body-size is restricted to gate/smoke research diagnostics' >&2
+    exit 2
+  fi
+  if [[ ! $document_body_size =~ ^[0-9]+$ ]] ||
+     ((document_body_size < 1024 || document_body_size > 65536)); then
+    printf '%s\n' '--document-body-size must be an integer between 1024 and 65536' >&2
+    exit 2
+  fi
+  if [[ -n $browser_page_base_size || -n $outer_resource_unit_size ||
+        $outer_early_hints != none || $outer_final_preloads != none ]]; then
+    printf '%s\n' '--document-body-size cannot be combined with another fixture-shape axis' >&2
     exit 2
   fi
 fi
@@ -697,6 +723,11 @@ if [[ $naivefox_arm == tree-resource-committed-overlap-page ||
     printf 'tree-resource-committed-overlap-page requires --inner-transport https-h2\n' >&2
     exit 2
   fi
+fi
+if [[ -n $document_body_size &&
+      ( $resource_tree_experiment == 1 || $dense_resource_tree_experiment == 1 ) ]]; then
+  printf '%s\n' '--document-body-size requires document-only preamble arms' >&2
+  exit 2
 fi
 if [[ -n $outer_resource_unit_size && $dense_resource_tree_experiment != 1 ]]; then
   printf '%s\n' '--outer-resource-unit-size requires a dense fronting-page arm' >&2
@@ -1657,15 +1688,16 @@ scenario_path() {
   local scenario=$1
   local completion=$2
   scenario_parameters "$scenario"
+  local path
+  path=$(printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s' \
+    "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms")
   if [[ $scenario_kind == browser_page && -n $browser_page_base_size ]]; then
-    printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&asset_base=%s&completion=%s\n' \
-      "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
-      "$browser_page_base_size" "$completion"
-  else
-    printf '/camouflage/index.html?scenario=%s&size=%s&count=%s&idle_ms=%s&completion=%s\n' \
-      "$scenario_kind" "$scenario_size" "$scenario_count" "$scenario_idle_ms" \
-      "$completion"
+    path+="&asset_base=$browser_page_base_size"
   fi
+  if [[ $scenario_kind == browser_page && -n $document_body_size ]]; then
+    path+="&document_size=$document_body_size"
+  fi
+  printf '%s&completion=%s\n' "$path" "$completion"
 }
 
 outer_scenario_path() {
@@ -3034,6 +3066,7 @@ outer_h2_alpn_policy=$([[ $protocol_selection == h3 ]] && printf not_applicable 
 camouflage_style_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_STYLE_SIZE
 camouflage_script_size=$NAIVEFOX_FIXTURE_CAMOUFLAGE_SCRIPT_SIZE
 browser_page_base_size=${browser_page_base_size:-default_262144}
+document_body_size=${document_body_size:-fixture_default}
 outer_resource_profile=$outer_resource_profile
 outer_resource_unit_size=${outer_resource_unit_size:-not_applicable}
 outer_early_hints=$outer_early_hints
