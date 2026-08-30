@@ -843,3 +843,45 @@ bridge refuses mixed whole-cell/partial commands until finalization. Numeric
 final-state counters distinguish frame deliveries with still-unread useful
 bytes from the older filler-only early-prefix metric. Next: two randomized
 10-Mbit/s H2 pairs against bulk-ready, seed 202608325.
+
+`continuous-bulk-frames-h2-10mbit-pairs` passed all four full sessions. The
+candidate recorded 119/134 deliveries while useful bytes remained unread,
+145/160 total fragment IPCs including finalization, and about 2.80/2.82 MB
+aggregate remaining-used-prefix bytes at first delivery per cell. This is
+reader-side progress evidence, not additional bytes or a wire-in-flight count.
+Curl means: single download 1185.605 -> 1155.670 ms (-2.52%); parallel
+2046.702 -> 2035.026 ms (-0.57%); slow upload 1148.080 -> 1139.301 ms;
+small wake 61.722 -> 62.854 ms. Wire 6,587,394 -> 6,759,519.5 bytes (+2.61%).
+Control singles varied 1305.780/1065.430 ms, exceeding the mean gain, so this
+is not a robust throughput improvement. One control parallel pair also had
+~322-ms first-byte samples; candidate samples stayed near 61--82 ms, but this
+was not consistent across all control transfers. Run two unshaped H2 pairs
+(202608326) specifically to check the extra IPC cost, not a residual matrix.
+
+## Selective bulk exchange preregistration
+
+The unshaped frame screen also passed all four sessions: single download
+72.935 -> 68.758 ms (-5.73%); parallel 96.078 -> 97.693 ms (+1.68%);
+slow upload 320.175 -> 320.769 ms; small wake 18.499 -> 21.331 ms (+2.833 ms).
+Wire 6,794,236 -> 6,853,684 bytes (+0.87%). No substantial fast-link regression,
+but no decisive overall gain either. Retain frame delivery as an opt-in latency
+building block; do not add H3/residual sweeps for this weak standalone result.
+`continuous-bulk-frames-evidence` preserves matching server `871f9f1`, manifest
+SHA-256 `94376b054b7d5342d58dd0701678ebe942fe97464c68eebbdddca9b68e541fff`.
+
+Before another implementation, history preflight checked the all-ref pipeline
+record (`fac638485497`), native/finite batching failures, `duplex-v1`, and the
+continuous-sync/sync2 results. Combined exchanges are already measured: they
+accelerated bulk but inflated upload tails and hurt short-request latency when
+applied to every active state. The distinct proposed ablation combines only
+the bulk download lease's 16-KiB POST and 256-KiB response. Interactive, upload,
+mixed, startup and idle retain bulk-ready behavior; no frame streaming is
+included, so its IPC cost is not confounded with HTTP turnaround.
+
+The candidate uses one POST-200 `/api/sync/bulk` instead of POST-204 plus GET,
+with exactly the same per-lease capacity. Compare directly against bulk-ready,
+two randomized H2 pairs, seed 202608327. Request/body/auth/replay tests and
+strict graph accounting precede performance. A positive result must retain
+traffic and small-request behavior before H3/slow-link follow-up. This is a
+selective composition of known mechanisms, not a newly invented carrier or
+evidence that fewer HTTP requests alone guarantee better residuals.
