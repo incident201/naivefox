@@ -44,6 +44,7 @@ PROFILES = {
     "continuous-v1": (20, 65536),
     "continuous-sync": (20, 65536),
     "continuous-sync2": (20, 65536),
+    "continuous-bulk": (20, 65536),
 }
 
 
@@ -98,6 +99,9 @@ def validate_http_graph(stats, name, mode):
         dynamic = {"POST /api/sync", "GET /api/events/idle", *(prefix + state for state in ("interactive", "download", "upload", "mixed"))}
         if not combined:
             dynamic.add("POST /api/upload/chunk")
+        bulk = name == "continuous-bulk"
+        if bulk:
+            dynamic.update({"POST /api/sync/bulk", "GET /api/data/bulk"})
         if stats["connect"] or stats["rejected"] or stats["write_errors"]:
             raise RuntimeError("continuous transport errors")
         if any(actual.get(path, 0) < count for path, count in initial.items()) or any(path not in initial and path not in dynamic for path in actual):
@@ -111,9 +115,17 @@ def validate_http_graph(stats, name, mode):
                     "32768": 2, "65536": 12 + actual.get(prefix + "download", 0) + actual.get(prefix + "mixed", 0)}
         if stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
+        if bulk:
+            count = actual.get("GET /api/data/bulk", 0)
+            if count != actual.get("POST /api/sync/bulk", 0) or actual.get("GET /api/data/download", 0):
+                raise RuntimeError("coalesced download lease graph")
+            if count:
+                expected["262144"] = count
         if capacities != expected or stats["download_bytes"] != sum(int(capacity) * count for capacity, count in capacities.items()):
             raise RuntimeError("continuous fixed response capacities")
         up = actual.get("POST /api/sync", 0) * 4096 + actual.get("POST /api/upload/chunk", 0) * 131072
+        if bulk:
+            up += 16384 * actual.get("POST /api/sync/bulk", 0)
         if combined:
             up += 4096 * (actual.get(prefix + "interactive", 0) + actual.get(prefix + "download", 0))
             up += 131072 * (actual.get(prefix + "upload", 0) + actual.get(prefix + "mixed", 0))
@@ -533,8 +545,8 @@ def main():
     args=parser.parse_args()
     if args.profile_stages and (not args.session_probe or args.mode!="replace" or args.session_pairs or args.session_wire or args.idle_seconds):
         parser.error("stage profiling requires a standalone replacement session probe without wire/idle accounting")
-    if args.session_variants and (not args.session_pairs or not args.app_profile.startswith("continuous-sync")):
-        parser.error("session variant pairs require a combined profile and a positive pair count")
+    if args.session_variants and (not args.session_pairs or not continuous(args.app_profile) or args.app_profile == "continuous-v1"):
+        parser.error("session variant pairs require an experimental continuous profile and a positive pair count")
     if args.session_pairs < 0 or args.session_pairs > 8 or (args.session_pairs and (not continuous(args.app_profile) or args.screen or args.capture or args.idle_seconds)):
         parser.error("session pairs require the continuous profile, no residual/idle capture, and at most eight pairs")
     if args.session_wire and (not args.session_probe or args.idle_seconds):

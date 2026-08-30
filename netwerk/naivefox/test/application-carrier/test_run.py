@@ -53,6 +53,23 @@ class CarrierAdmissionTests(unittest.TestCase):
         handler.do_POST()
         self.assertEqual(json.loads(received[-1][1]), {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
 
+    def test_bulk_lease_has_equal_aggregate_body_budget(self):
+        stats = self.stats()
+        stats.update({"requests": runner.profile_requests("continuous-bulk"), "write_errors": 0,
+                      "cell_capacities": {"8192": 6, "32768": 2, "65536": 12, "262144": 1},
+                      "idle_started": 1, "idle_completed": 0, "idle_cancelled": 1})
+        stats["requests"].update({"GET /api/events/idle": 1, "POST /api/sync/bulk": 1, "GET /api/data/bulk": 1})
+        stats["download_bytes"] += 4 * 65536
+        stats["upload_bytes"] += 4 * 4096
+        runner.validate_http_graph(stats, "continuous-bulk", "replace")
+        for change in ("budget", "post", "legacy"):
+            invalid = copy.deepcopy(stats)
+            if change == "budget": invalid["download_bytes"] += 1
+            elif change == "post": invalid["requests"]["POST /api/sync/bulk"] += 1
+            else: invalid["requests"]["GET /api/data/download"] = 4
+            with self.assertRaises(RuntimeError):
+                runner.validate_http_graph(invalid, "continuous-bulk", "replace")
+
     def test_combined_activity_uses_post_response_capacity(self):
         stats = self.stats()
         stats.update({"requests": runner.profile_requests("continuous-sync"), "write_errors": 0,
@@ -89,6 +106,7 @@ class CarrierAdmissionTests(unittest.TestCase):
                 "staged-fast": 770048, "staged-fast20": 901120,
                 "staged-stream20": 901120, "staged-commit20": 905216, "continuous-v1": 901120, "continuous-sync": 901120, "continuous-sync2": 901120}
 
+        down["continuous-bulk"] = 901120
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)

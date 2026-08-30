@@ -688,3 +688,48 @@ Only the separate Caddy/bridge module was incrementally rebuilt. No full
 Firefox build, minimal-source export, release workflow or default change was
 performed. The source experiment branch is pushed in logical blocks; the
 server remains a local repository with its committed history in the bundle.
+
+## Download-lease coalescing
+
+The next history preflight reviewed all-ref finite/carrier/batching commits,
+the earlier v3 budgeted-response record (`7be2c317e82f`, `a09db4ff155a` and
+artifact `25de70a0225eed54`), rejected timed server-read coalescing, and all
+application cost/combined/short-lease results above. Fewer HTTP boundaries and
+larger responses are not new in themselves. The unmeasured premise here is
+coalescing a continuous download state's existing capacity commitment, while
+leaving interactive, upload, mixed, idle and startup behavior at continuous-v1.
+Earlier finite v3 changed data-driven response rotation; fixed startup profiles
+changed total capacity and paint cadence. Neither measured this steady-state,
+equal-budget lease substitution. No claim of a new camouflage mechanism is made.
+
+Opt-in `continuous-bulk` replaces four 4-KiB POST/64-KiB GET pairs in a download
+lease with one 16-KiB POST followed by one 256-KiB GET. The aggregate up/down
+body budget remains 16/256 KiB per lease. There is no combined POST response,
+wait-for-full-target-buffer, timer, speculative parallel request or credit
+increase. The same coarse download-state decision grants the lease; its body
+capacity is fixed even with an empty target queue. The larger full-body reader
+may worsen delivery on a constrained link, and early snapshots may waste filler.
+Those are explicit risks, not assumed-away benefits.
+
+First test maximum-size framing, fixed budgets and full H2 session liveness.
+Then two randomized H2 profile pairs against continuous-v1, seed 202608319.
+A clear bulk-time reduction with no material total-wire or small-request penalty
+earns targeted H3 and 10-Mbit/s pairs; residual checks only after these gates.
+These are exploratory performance screens, not statistical/default promotion.
+
+H2 functional admission and both seed-202608319 pairs passed. Curl means:
+1 MiB 125.520 -> 106.189 ms (-15.40% time); four parallel 512-KiB downloads
+211.276 -> 96.377 ms (-54.38%); slow upload 324.309 -> 317.767 ms (-2.02%);
+small wake 21.612 -> 19.943 ms. Total wire 6,572,120.5 -> 6,743,066 bytes
+(+2.60% versus continuous-v1). Thus equal per-lease budgets do not guarantee
+equal total work: state transitions can still change the number of leases.
+The large parallel improvement earns two H3 pairs (202608320) and one H2
+10-Mbit/s pair (202608321), with unchanged binaries and no residual sweep yet.
+
+The single-versus-parallel gap motivates a separate credit-state investigation.
+After a 256-KiB response, one stream's remaining ready credit may fall below
+the existing download threshold, even though queued target data remains. The
+current server hint uses only sendable bytes, so it can return to interactive
+before the next upload returns credits. Multiple streams have more aggregate
+credit and may avoid this transition. This is a code-supported hypothesis,
+not yet a measured attribution; do not increase the window to hide it.
