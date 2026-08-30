@@ -4087,9 +4087,63 @@ The minimized product/test graphs were rebuilt incrementally, not Firefox.
 The corrected diagnostic Caddy binary has SHA-256
 `f8afd1146cfbebd66b689bacf6e0f59f1911246e0a3df9a5e5636e3cc309f02e`.
 The next screen is preregistered as seed `2026083088`, two randomized blocks,
-eight client arms plus shared Firefox A/B, H2 / inner HTTPS-H2, stock medium
-outer fixture and private MTU-1500 network namespace. Defaults and the
+eight client arms plus shared Firefox A/B, H2 / inner HTTPS-H2, unchanged
+scheduled outer fixture and private MTU-1500 network namespace. Defaults and the
 fronting-site contract remain unchanged.
+
+### Corrected finite-exchange H2 screen
+
+Seed `2026083088` completed as safe artifact `adf8c603b590072c` on
+`dbf22ddf2906`, with the corrected client callback affinity and Caddy response
+lifetime shared by all finite arms. Both randomized blocks and all 20
+participants passed transport, completion, padding, stream ownership, drain,
+capture-drop and network-mutation admission. Both streaming markers were
+checked where required. Private capture inputs were deleted after success.
+
+These are within-campaign screening distances, not a replacement for the
+canonical default matrix and not statistically established gains: two blocks,
+`INSUFFICIENT_FOR_INFERENCE`, no independent Firefox null verdict. Lower is
+better; percentages compare with the same listener's default in this campaign.
+
+| Arm | p17--32 | Whole | p17--32 vs default | Whole vs default |
+| --- | ---: | ---: | ---: | ---: |
+| SOCKS current default | 0.38048 | 0.31653 | — | — |
+| SOCKS original finite | 0.36945 | 0.34185 | -2.9% | +8.0% |
+| SOCKS receive read-through | 0.38717 | 0.35177 | +1.8% | +11.1% |
+| SOCKS receive + upload read-through | 0.34145 | 0.37551 | -10.3% | +18.6% |
+| HTTP CONNECT current default | 0.37918 | 0.28976 | — | — |
+| HTTP CONNECT original finite | 0.35150 | 0.35130 | -7.3% | +21.2% |
+| HTTP CONNECT receive read-through | 0.34426 | 0.35849 | -9.2% | +23.7% |
+| HTTP CONNECT receive + upload read-through | 0.35780 | 0.35972 | -5.6% | +24.1% |
+
+No finite variant improves Whole, and none meets the >=20% breaking-default
+gate. The receive-only early-window improvement from the unsafe earlier
+prototype is not reproduced here. Do not start a full implementation, full
+matrix or resource/link sweep for these variants. This rejects the measured
+variants as default candidates, not every possible finite-exchange protocol.
+
+Post-hoc accounting is retained in `mechanism-accounting.json` beside the safe
+dataset and exactly reconstructs the unchanged distance metric. For
+bidirectional SOCKS, the Whole timing/burst contribution improves by 0.00450,
+but packet size/direction, other aggregates and TLS-record contributions
+worsen by 0.02548, 0.03573 and 0.00228: net +0.05899. Thus another pause cannot
+by itself explain this arm's failure. For bidirectional HTTP CONNECT,
+timing/bursts add 0.03627 of the net +0.06995 penalty; non-timing structure also
+contributes substantially.
+
+The raw aggregates support investigating exchange overhead, not assuming it
+has been causally isolated: bidirectional SOCKS / HTTP send 25,690.5 / 25,175
+client wire bytes versus 16,601.5 / 18,646 for their defaults. Server bytes in
+the first 128 packets are 45,982.5 / 49,149 versus 93,588 / 98,125. A smaller
+completion barrier has not removed the extra exchanges or their changed
+packet/record ordering. These data do not prove that trimming headers alone
+would recover the deficit; any continuation needs a distinct preregistered
+transport premise, not another fixed delay or a new name for read-through.
+
+There is no new fronting-site requirement and no production compatibility
+change. H2 and H3 defaults, their canonical matrix, and the existing site
+contract remain unchanged. The finite measurements do not establish
+size-independent or slow-link performance.
 
 ## Sensitive data handling
 
