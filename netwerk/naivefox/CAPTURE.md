@@ -4157,6 +4157,58 @@ No Firefox rebuild, default promotion, full matrix, resource sweep or history
 rewrite was performed. The retained safe datasets and prototype commits allow
 reproduction without retaining an unsuccessful transport in the product.
 
+### Budgeted streaming finite responses: preregistration
+
+The next history preflight searched the complete all-ref Git history with
+pickaxe terms for finite/bounded streaming and response byte budgets, current
+documentation, the three retained finite metadata sets, and corrected source
+`dbf22ddf2906`. Earlier finite variants all completed each download after one
+available pipe read. Client read-through and streamed uploads did not change
+that response-completion rule. The rejected 1-ms server read-coalescing and
+inner-TLS alignment experiments instead delayed or regrouped target delivery;
+they did not keep immediately flushed bytes inside a size-bounded ordinary
+HTTP response. The present proposal must not repeat those delivery barriers.
+
+Two alternatives were screened out before implementation. Piggybacking open
+with an optimistic first ClientHello overlaps the already rejected early
+CONNECT-DATA/local-success family. Combining separate Naive header, payload
+and padding writes has no opportunity in the pinned server: its existing
+codec already constructs each padded record in one buffer and calls `Write`
+once. Compacting session/auth headers remains a separate, unmeasured overhead
+idea; it is not combined with the response-count experiment.
+
+Restore only the corrected diagnostic adapter as a control. Keep both client
+receive read-through and server upload streaming enabled. The new v3 changes
+download response completion only: retain the existing 64-KiB maximum body,
+forward and flush every positive read immediately, and finish at that budget
+or target EOF. H2 response length is unspecified until END_STREAM, not padded
+to a target. No delivery waits for a full block, timer, TLS boundary, resource
+size, RTT or bandwidth estimate. An underfilled response may remain open
+while the tunnel is idle, just as the previous next empty receive request
+could; its already received bytes must remain available to the application.
+Successful data progress refreshes the existing idle safety timeout.
+
+Preserve the two-upload/four-download windows, ordered delivery, bounded
+pipes, eight Variant-1 records, target Fast Open, TLS/auth/ACL checks, listener
+admission and fronting-page policy. Every unmarked CONNECT remains unchanged.
+The one-byte finite version marker selects the new mode explicitly and mixed
+versions fail closed. Required tests prove a flushed prefix before the target
+produces the suffix, exact 64-KiB rotation and short EOF, cancellation during
+an unfinished response, response-write failure, and the prior callback-affinity
+and response-lifetime fixes. Failed partial responses must abort the H2 stream,
+not report a successful truncated body.
+
+After functional admission, collect two randomized H2/inner-H2 blocks at seed
+`2026083089`: SOCKS/HTTP defaults, corrected v2 read-through controls and v3
+budgeted candidates, with shared Firefox A/B. Keep the scheduled outer/inner
+fixtures, cold profiles, capture cutoff and isolated MTU-1500 namespace fixed.
+Compare p17--32 and Whole only; retain a proof of a completed full-budget
+response and report request/response count and byte aggregates separately
+from passive features. Improvement over v2 alone is insufficient: the breaking
+default gate remains a replicated >=20% gain against current defaults without
+unacceptable regressions. No full matrix or size/link sweep for a weak screen.
+There is no change to the site's contract or the canonical default matrix.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
