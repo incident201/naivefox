@@ -14,6 +14,17 @@ spec.loader.exec_module(runner)
 
 
 class CarrierAdmissionTests(unittest.TestCase):
+    def test_mux_window_configuration_requires_both_peer_counters(self):
+        for name,window in (("continuous-bulk-duplex",262144),("continuous-bulk-pipeline-events",524288)):
+            result={"bridge-stats":{"receive_window":window},"server-stats":{"peers":[{"receive_window":window}]}}
+            runner.validate_mux_window(result,name,"replace")
+            for field in ("bridge-stats","server-stats"):
+                invalid=copy.deepcopy(result);del invalid[field]
+                with self.assertRaises(RuntimeError):runner.validate_mux_window(invalid,name,"replace")
+            result["server-stats"]["peers"][0]["receive_window"]=786432-window
+            with self.assertRaises(RuntimeError):runner.validate_mux_window(result,name,"replace")
+        runner.validate_mux_window({},"continuous-bulk-pipeline-events","default")
+
     def test_sustained_download_workload_bound(self):
         self.assertEqual(runner.session_exercise.download_resource(8388608),"/camouflage/resource?size=8388608")
         for invalid in (0,4095,16777217):
@@ -74,6 +85,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         stats["requests"]["GET /api/events/idle"]=3
         stats["download_bytes"]+=8192
         runner.validate_http_graph(stats,"continuous-bulk-idle-events","reference")
+        runner.validate_http_graph(stats,"continuous-bulk-pipeline-events","reference")
         with self.assertRaises(RuntimeError):runner.validate_http_graph(stats,"continuous-bulk-duplex","reference")
         for heartbeats in (-1,0,2,3):
             invalid=copy.deepcopy(stats);invalid["idle_heartbeats"]=heartbeats
@@ -99,7 +111,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         runner.validate_http_graph(duplex, "continuous-bulk-filler", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-progress", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-idle-events", "replace")
-        for profile in ("continuous-bulk-pair","continuous-bulk-pipeline"):
+        for profile in ("continuous-bulk-pair","continuous-bulk-pipeline","continuous-bulk-pipeline-events"):
             with self.assertRaises(RuntimeError):runner.validate_http_graph(duplex,profile,"replace")
             paired=copy.deepcopy(duplex)
             paired["requests"]["POST /api/sync/bulk"]+=1
@@ -178,6 +190,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         down["continuous-bulk-pair"] = 901120
         down["continuous-bulk-pipeline"] = 901120
         down["continuous-bulk-idle-events"] = 901120
+        down["continuous-bulk-pipeline-events"] = 901120
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)

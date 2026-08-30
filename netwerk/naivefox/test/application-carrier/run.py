@@ -58,11 +58,25 @@ PROFILES = {
     "continuous-bulk-pair": (20, 65536),
     "continuous-bulk-pipeline": (20, 65536),
     "continuous-bulk-idle-events": (20, 65536),
+    "continuous-bulk-pipeline-events": (20, 65536),
 }
+
+PAIRED_BULK_PROFILES = {"continuous-bulk-pair", "continuous-bulk-pipeline", "continuous-bulk-pipeline-events"}
+IDLE_EVENT_PROFILES = {"continuous-bulk-idle-events", "continuous-bulk-pipeline-events"}
+WINDOW512_PROFILES = PAIRED_BULK_PROFILES | {"continuous-bulk-window512"}
 
 
 def continuous(name):
     return name.startswith("continuous-")
+
+
+def validate_mux_window(result, name, mode):
+    if mode not in ("replace", "append"):
+        return
+    expected = 524288 if name in WINDOW512_PROFILES else 262144
+    peers = result.get("server-stats", {}).get("peers", [])
+    if result.get("bridge-stats", {}).get("receive_window") != expected or not isinstance(peers, list) or len(peers) != 1 or peers[0].get("receive_window") != expected:
+        raise RuntimeError("mismatched or missing mux window evidence")
 
 
 def profile_budget(name):
@@ -128,16 +142,16 @@ def validate_http_graph(stats, name, mode):
         expected = {"8192": 6 + actual.get(prefix + "interactive", 0) + actual.get(prefix + "upload", 0),
                     "32768": 2, "65536": 12 + actual.get(prefix + "download", 0) + actual.get(prefix + "mixed", 0)}
         heartbeats=stats.get("idle_heartbeats",0)
-        if heartbeats<0 or heartbeats>stats["idle_completed"] or (heartbeats and name!="continuous-bulk-idle-events"):
+        if heartbeats<0 or heartbeats>stats["idle_completed"] or (heartbeats and name not in IDLE_EVENT_PROFILES):
             raise RuntimeError("idle heartbeat accounting")
-        if name=="continuous-bulk-idle-events":
+        if name in IDLE_EVENT_PROFILES:
             expected["8192"]+=stats["idle_completed"]-heartbeats
         elif stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
         if bulk:
-            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download", "continuous-bulk-window512", "continuous-bulk-filler", "continuous-bulk-progress", "continuous-bulk-pair", "continuous-bulk-pipeline", "continuous-bulk-idle-events")
+            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download", "continuous-bulk-window512", "continuous-bulk-filler", "continuous-bulk-progress") or name in PAIRED_BULK_PROFILES or name in IDLE_EVENT_PROFILES
             count = actual.get("POST /api/sync/bulk" if bulk_duplex else "GET /api/data/bulk", 0)
-            if name in ("continuous-bulk-pair","continuous-bulk-pipeline") and count % 2:
+            if name in PAIRED_BULK_PROFILES and count % 2:
                 raise RuntimeError("incomplete paired bulk lease")
             if (bulk_duplex and actual.get("GET /api/data/bulk", 0)) or count != actual.get("POST /api/sync/bulk", 0) or actual.get("GET /api/data/download", 0):
                 raise RuntimeError("coalesced download lease graph")
@@ -376,7 +390,7 @@ class Campaign:
                     write_json(directory / "bridge.json",{"key":key,"token":token,"origin":f"https://localhost:{self.port}",
                                "certificate":str(self.fixture / "pki/target.crt"),"private_key":str(self.fixture / "pki/target.key"),
                                "ready":str(directory / "bridge-ready.json"),"stats":str(directory / "bridge-stats.json"),"append":mode=="append","continuous":continuous(app_profile),
-                               "receive_window":524288 if app_profile in ("continuous-bulk-window512","continuous-bulk-pair","continuous-bulk-pipeline") else 0,"filler_only":app_profile in ("continuous-bulk-filler","continuous-bulk-progress")})
+                               "receive_window":524288 if app_profile in WINDOW512_PROFILES else 0,"filler_only":app_profile in ("continuous-bulk-filler","continuous-bulk-progress")})
                     bridge = launch([self.root.parent / "bin/bridge","--config",directory / "bridge.json"],"bridge.log")
                     wait_for(lambda:(directory / "bridge-ready.json").exists() or bridge.poll() is not None)
                     if bridge.poll() is not None: raise RuntimeError("bridge startup")
@@ -514,6 +528,7 @@ class Campaign:
                 if path.exists():result[source]=json.loads(path.read_text())
             if result.get("admitted") and rounds == PROFILES[app_profile][0]:
                 try:
+                    validate_mux_window(result,app_profile,mode)
                     validate_http_graph(result["server-stats"],app_profile,mode)
                 except RuntimeError as error:
                     result["admitted"]=False;result["failure"]=str(error)

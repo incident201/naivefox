@@ -4,6 +4,12 @@ This campaign is confined to an experimental branch and a separate Caddy
 module repository. It does not change product defaults, the published matrix,
 the stock-server contract, or the deferred export/publication state.
 
+Current research priority (user clarification): speed and latency take precedence
+over a small traffic increase when the acceleration is material. Continue
+recording wire/memory cost, but do not reject a strong speed candidate merely
+for a few percent additional bytes. This does not waive functional, residual,
+bounded-resource or real-link checks, and is not permission for unbounded cover.
+
 The latest qualified lifecycle baseline is `continuous-v1`: startup followed
 by ongoing interactive/download/upload/mixed states and economical idle. See
 [continuous lifecycle](#continuous-lifecycle-preregistration) for its current
@@ -1283,3 +1289,43 @@ a timeout is observed by the next poll. First two H2 fixed-work pairs against
 bulk-duplex with the original 1-MiB workload (seed 202608346), not the sustained
 8-MiB variant. Then a separate real 65-second idle check; unit millisecond
 timeouts are not substituted for the production 30-second poll behavior.
+
+`continuous-bulk-idle-events-h2-pairs` passed: 1-MiB single
+71.815 -> 59.325 ms (-17.39%), parallel 93.163 -> 87.704 ms (-5.86%),
+slow upload 320.042 -> 319.731 ms, small wake 24.732 -> 21.501 ms (-3.231 ms).
+Small control samples were 20.331/29.132, so this is not yet a stable latency
+claim. Active-session wire 6,735,279 -> 6,935,446.5 bytes (+2.97%). No 30-second
+heartbeat timeout occurs in these short sessions: this isolates event capacity.
+Next real H3 65-second idle/liveness check, then two H2 1-MiB pairs on
+40-ms RTT/shared-50-Mbit (seed 202608348), to distinguish exchange-count
+latency from local scheduling noise.
+
+The H3 `continuous-bulk-idle-events-h3-idle` admission passed all twelve logical
+connections and a real 65.182-second rest: 1,566 outer IP wire bytes, 16 packets,
+two new poll starts, no new QUIC Initial, no TCP, no active-state turnover or
+upload wakes during rest. Extrapolation is ~86,490 bytes/hour, not an hour-long
+measurement. Final 4-KiB wake completed in 22.042 ms. Server heartbeat/body
+accounting remains subject to the exact graph gate; no header-only response
+is mistaken for a transported cell.
+
+`continuous-bulk-idle-events-h2-rtt40-pairs` passed with zero shaper drops.
+Single 1206.812 -> 940.787 ms (-22.04%; control 1386.650/1026.973, candidate
+951.524/930.049); parallel 1306.835 -> 1304.121 ms; slow upload 1405.990 ->
+1483.563 ms (+5.52%; candidates 1560.947/1406.179). Small wake
+315.028 -> 273.218 ms (-13.27%), but candidates 227.874/318.561 show the
+extra exchange was avoided only once. Wire 6,805,734.5 -> 6,536,711.5 bytes
+(-3.95%). Retain the variance/upload penalty, not a universal latency claim.
+Snapshot `continuous-idle-events-evidence`, server `d082fe2`, manifest SHA-256
+`5d94ca8f0737b2045da4f2d8866c5a9500b30db8f08ed087c7a13ee46e3ad931`.
+
+## Compose separately measured speed mechanisms
+
+Per the clarified speed/latency priority, test `continuous-bulk-pipeline-events`:
+bounded two-transaction pipeline plus 204 heartbeat / 8-KiB idle events.
+History preflight is the two independently measured families above; this is
+their first composition, not a rerun of failed all-active ACK/sync changes.
+Retain 512-KiB credit and all bounds; add no fast filler or progress-hint probe.
+First two H2 original-workload pairs against pipeline alone (seed 202608349)
+isolate composition. Then qualify the best surviving candidate's original
+1-MiB/native cost and fresh canonical p17--32/Whole; neither 8-MiB scaling
+results nor old continuous-v1 residuals substitute for this check.
