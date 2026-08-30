@@ -28,6 +28,7 @@ document_body_size=
 outer_resource_unit_size=
 outer_early_hints=none
 outer_final_preloads=none
+h2_request_timing=0
 network_one_way_delay_ms=0
 network_rate_mbit=0
 private_h3_keylog=${NAIVEFOX_CAPTURE_PRIVATE_H3_KEYLOG:-0}
@@ -106,6 +107,10 @@ while [[ $# -gt 0 ]]; do
       outer_final_preloads=${2:-}
       shift 2
       ;;
+    --h2-request-timing)
+      h2_request_timing=1
+      shift
+      ;;
     --network-one-way-delay-ms)
       network_one_way_delay_ms=${2:-}
       shift 2
@@ -123,7 +128,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--document-body-size BYTES] [--outer-resource-unit-size BYTES] [--outer-early-hints none|css|blocking|all] [--outer-final-preloads none|css|blocking|all] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
+      printf 'usage: %s [--mode gate|smoke|standard|research] [--protocol h2|h3|both] [--inner-transport http|https|https-h2] [--scenario NAME] [--browser-page-base-size BYTES] [--document-body-size BYTES] [--outer-resource-unit-size BYTES] [--outer-early-hints none|css|blocking|all] [--outer-final-preloads none|css|blocking|all] [--h2-request-timing] [--network-one-way-delay-ms N] [--network-rate-mbit N] [--naivefox-arm ARM | --multi-arm-superblocks | --multi-arm-arms ARM,... | --h2-proxy-floor-superblocks] [--multi-arm-views VIEW,...] [--samples-per-cohort N] [--seed N]\n' "$0"
       exit 0
       ;;
     *)
@@ -812,6 +817,27 @@ if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
     exit 2
   fi
 fi
+if [[ $h2_request_timing == 1 ]]; then
+  if [[ ( $mode != gate && $mode != smoke ) ||
+        $protocol_selection != h2 || $inner_transport != https-h2 ||
+        $scenario_override != browser_page || $isolated_network != 1 ||
+        $experiment_design != multi_arm_superblocks ||
+        ${#multi_arm_arms[@]} -ne 2 ||
+        ,$multi_arm_arms_csv, != *,document-first-buffer-task-overlap,* ||
+        ,$multi_arm_arms_csv, != *,document-first-buffer-http-connect,* ||
+        $diagnostic_naivefox_only == 1 || $private_h3_keylog == 1 ||
+        $expected_padding != yes ]]; then
+    printf 'H2 request timing requires isolated gate/smoke H2/inner-H2 browser_page superblocks with exactly both current listener defaults\n' >&2
+    exit 2
+  fi
+  if [[ -n $browser_page_base_size || -n $document_body_size ||
+        -n $outer_resource_unit_size || $outer_early_hints != none ||
+        $outer_final_preloads != none || $network_one_way_delay_ms != 0 ||
+        $network_rate_mbit != 0 ]]; then
+    printf 'H2 request timing requires the canonical unshaped fixture\n' >&2
+    exit 2
+  fi
+fi
 if [[ -z $samples_per_cohort ]]; then
   samples_per_cohort=$default_samples
 fi
@@ -871,6 +897,14 @@ if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
     printf 'H2 proxy-floor superblocks require Selenium\n' >&2
     exit 1
   }
+fi
+if [[ $h2_request_timing == 1 ]]; then
+  [[ $browser_backend != commandline ]] || {
+    printf 'H2 request timing requires pre-launched Selenium browsers\n' >&2
+    exit 2
+  }
+  browser_backend=selenium
+  "$browser_python" -c 'import selenium'
 fi
 dumpcap_path=$(command -v dumpcap)
 dumpcap_caps=$(getcap "$dumpcap_path" 2>/dev/null || true)
@@ -958,6 +992,9 @@ mkdir -p "$private_dir" "$feature_fragments" "$safe_dir"
 : >"$sensitive_values"
 chmod 0700 "$private_dir" "$feature_fragments" "$safe_dir"
 chmod 0700 "$capture_stage_dir"
+if [[ $h2_request_timing == 1 ]]; then
+  mkdir -m 0700 "$safe_dir/h2-request-lifecycle"
+fi
 
 capture_pid=
 capture_stage_pcap=
@@ -974,6 +1011,7 @@ network_monitor_done=
 network_mutation_validated_samples=0
 cache_validated_participants=0
 inner_h2_validated_participants=0
+h2_request_timing_validated_participants=0
 response_stop_aborted_samples=0
 response_stop_natural_completion_samples=0
 controller_backends="$private_dir/controller-backends.txt"
@@ -1503,6 +1541,32 @@ validate_inner_h2_request() {
     --offset "$offset" --completion "$completion" \
     --port "$NAIVEFOX_FIXTURE_INNER_H2_PORT" --wait-seconds 2
   inner_h2_validated_participants=$((inner_h2_validated_participants + 1))
+}
+
+record_h2_request_timing() {
+  [[ $h2_request_timing == 1 ]] || return 0
+  local role=$1
+  local session_id=$2
+  local experiment_block=$3
+  local completion=$4
+  local outer_offset=$5
+  local inner_offset=${6:-0}
+  local -a inner_args=()
+  if [[ $role == socks || $role == http ]]; then
+    inner_args=(--inner-access-log "$NAIVEFOX_FIXTURE_INNER_H2_ACCESS_LOG"
+      --inner-offset "$inner_offset")
+  fi
+  # CONNECT access records are emitted on handler exit, after capture and
+  # process shutdown. Only the separate sanitized timeline sees these logs.
+  python3 "$INTEGRATION_DIR/h2_request_lifecycle_summary.py" \
+    --outer-access-log "$NAIVEFOX_FIXTURE_RUN_DIR/caddy.log" \
+    --outer-offset "$outer_offset" "${inner_args[@]}" \
+    --role "$role" --completion "$completion" \
+    --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
+    --inner-port "$NAIVEFOX_FIXTURE_INNER_H2_PORT" \
+    --session-id "$session_id" --experiment-block "$experiment_block" \
+    --output "$safe_dir/h2-request-lifecycle/$session_id.json"
+  h2_request_timing_validated_participants=$((h2_request_timing_validated_participants + 1))
 }
 
 validate_profile_role() {
@@ -2181,6 +2245,7 @@ run_reference_sample() {
   local path
   local warm_token=
   local cache_journal_start=0
+  local outer_access_log_start=0
   path=$(outer_scenario_path "$scenario" "$completion")
   mkdir -m 0700 -- "$sample_dir"
   make_profile "$profile" "$protocol" reference "" "$naivefox_arm"
@@ -2201,6 +2266,9 @@ run_reference_sample() {
   # monitor only after that setup has converged, but before Firefox can create
   # the measured connection.
   start_network_mutation_monitor "$sample_dir"
+  if [[ $h2_request_timing == 1 ]]; then
+    outer_access_log_start=$(stat -c %s "$NAIVEFOX_FIXTURE_RUN_DIR/caddy.log")
+  fi
   start_browser_controller "$profile" \
     "https://localhost:$NAIVEFOX_FIXTURE_PROXY_PORT$path" \
     "$completion" "$sample_dir" "$protocol"
@@ -2215,6 +2283,8 @@ run_reference_sample() {
   extract_sample "$protocol" "$scenario" "$label" "$session_id" "$pcap" \
     "$experiment_block" reference
   stop_browser_controller
+  record_h2_request_timing "$label" "$session_id" "$experiment_block" \
+    "$completion" "$outer_access_log_start"
   if [[ $naivefox_arm == tree-warm-css-304 ]]; then
     validate_cache_evidence reference "$warm_token" "$completion" \
       "$sample_dir" "$cache_journal_start" "$experiment_block"
@@ -2287,6 +2357,7 @@ run_naivefox_sample() {
   local warm_trigger_token=
   local cache_journal_start=0
   local inner_h2_log_start=0
+  local outer_access_log_start=0
   local browser_participant=socks-browser
   local browser_socks_port
   local browser_http_proxy_port=0
@@ -2380,6 +2451,9 @@ run_naivefox_sample() {
   # The cold reset is not part of the sample. Any mutation after this marker,
   # including during NaiveFox startup, capture, or drain, invalidates it.
   start_network_mutation_monitor "$sample_dir"
+  if [[ $h2_request_timing == 1 ]]; then
+    outer_access_log_start=$(stat -c %s "$NAIVEFOX_FIXTURE_RUN_DIR/caddy.log")
+  fi
   NAIVEFOX_FIXTURE_USER="$NAIVEFOX_FIXTURE_USER" \
     NAIVEFOX_FIXTURE_PASS="$NAIVEFOX_FIXTURE_PASS" \
   python3 "$INTEGRATION_DIR/camouflage_naivefox_config.py" \
@@ -2542,6 +2616,10 @@ run_naivefox_sample() {
   stop_browser_controller
   stop_pid "$naivefox_pid"
   naivefox_pid=
+  local h2_timing_role=socks
+  [[ $browser_participant != http-browser ]] || h2_timing_role=http
+  record_h2_request_timing "$h2_timing_role" "$session_id" "$experiment_block" \
+    "$completion" "$outer_access_log_start" "$inner_h2_log_start"
   if [[ $arm == tree-warm-css-304 ]]; then
     validate_cache_evidence naivefox "$warm_outer_token" "$completion" \
       "$sample_dir" "$cache_journal_start" "$experiment_block"
@@ -2664,6 +2742,12 @@ PY
     fixture_caddy_child_pid=
   fi
 done
+
+if [[ $h2_request_timing == 1 &&
+      $h2_request_timing_validated_participants -ne $session_counter ]]; then
+  printf 'H2 request timing did not validate every captured participant\n' >&2
+  exit 1
+fi
 
 if [[ $experiment_design == h2_proxy_floor_superblocks ]]; then
   expected_inner_h2_validations=$((samples_per_cohort * 2))
@@ -3084,6 +3168,8 @@ fixture_proxy_reset_policy=$fixture_proxy_reset_policy
 fixture_proxy_restart_count=$proxy_restart_count
 fixture_proxy_expected_restart_count=$expected_proxy_restart_count
 private_h3_keylog=$private_h3_keylog
+h2_request_timing=$h2_request_timing
+h2_request_timing_validated_participants=$h2_request_timing_validated_participants
 isolated_network=$isolated_network
 network_mutation_policy=reject_route_address_link
 network_mutation_monitor=netlink_route_v1_fail_closed

@@ -470,6 +470,31 @@ the first 250 ms, and the whole flow. `firefox-proxied` is an analysis-only
 candidate arm; its internal `label=naivefox` value is merely the legacy
 candidate slot required by the feature schema.
 
+`--h2-request-timing` adds a separate, sanitized outer/inner request timeline
+to one canonical H2 diagnostic. It requires isolated gate/smoke `browser_page`
+superblocks, inner HTTPS/H2, pre-launched Selenium, and exactly the two current
+H2 listener arms. Resource-size, preload, padding, and shaped-link variants are
+not admitted. With the usual same-base binary environment already set:
+
+```bash
+NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 ./run-camouflage-suite.sh \
+  --mode gate --protocol h2 --inner-transport https-h2 \
+  --scenario browser_page --samples-per-cohort 1 --seed 2026083074 \
+  --multi-arm-arms document-first-buffer-task-overlap,document-first-buffer-http-connect \
+  --multi-arm-views packets_17_32,whole --h2-request-timing
+```
+
+`h2-request-lifecycle/*.json` contains fixed event labels, relative intervals,
+handler durations, and response byte counts only. Per-sample access-log offsets
+exclude earlier participants; missing/duplicate requests, wrong protocols,
+unexpected authorities, invalid timestamps, or ambiguous navigation identities
+fail closed. CONNECT records are read after browser/product shutdown, outside
+the primary capture. Caddy writes an access record when its handler ends, so
+request start is estimated as `log timestamp - handler duration`. These are
+coarse millisecond-scale server intervals, not exact wire or Necko timestamps.
+They never enter passive feature CSVs, distance calculation, or inference.
+Product, Caddy, page contents, and capture cutoff remain unchanged.
+
 The controlled workloads are cold initial, browser-page navigation, warm
 sequential, burst/concurrent streams, bulk download, bulk upload,
 bidirectional, and idle/resume. Features include only passive-visible packet or

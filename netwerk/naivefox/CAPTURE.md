@@ -3466,6 +3466,28 @@ the four-block HTTP Whole point is similar. Creating several ordinary target
 connections instead of the canonical single inner-H2 CONNECT is therefore not
 a new unmeasured cause and did not receive a duplicate run.
 
+### H2 nested request lifecycle diagnosis
+
+Before adding instrumentation, the mandatory exact and causal-history search
+checked the existing native-proxy floor, local first-inner-byte timing,
+inner-H2 validation, and repeated/pre-launched Firefox lifecycle diagnostics.
+The first three did not retain a request timeline; the last decomposed direct
+outer root-to-resource discovery only. No retained artifact correlated the
+current default's outer root/CONNECT with the tunneled H2 root, stylesheet,
+script, images, and completion. This missing decomposition is distinct from
+another parser/process reconstruction or admission-boundary experiment.
+
+The predeclared diagnostic is one isolated, unshaped H2/inner-HTTPS-H2 block
+with Firefox A/B and both current listener defaults, the canonical page, seed
+`2026083074`, and only packets 17--32 plus Whole. The opt-in
+`--h2-request-timing` harness reads already-existing Caddy access logs after
+capture and shutdown. It publishes only a separate sanitized timeline using
+`log timestamp - handler duration` as a coarse request-start estimate. This
+does not add log fields, timing barriers, product code, a Caddy fork, or a
+Firefox build. Its purpose is to locate the early server-byte deficit, not to
+select a new default from one block or feed HTTP semantics into passive
+features.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after
