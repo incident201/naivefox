@@ -923,6 +923,11 @@ def main():
         "--naivefox-arm",
         choices=(
             "reference",
+            "application-default-socks",
+            "application-default-http",
+            "application-replace-socks",
+            "application-replace-http",
+            "application-append-socks",
             "firefox-proxied",
             "off",
             "gate",

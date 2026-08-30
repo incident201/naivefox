@@ -7,7 +7,14 @@ import random
 
 DEFAULT_ARMS = ("off", "gate", "root")
 ARMS = DEFAULT_ARMS
-SUPPORTED_ARMS = (
+APPLICATION_ARMS = (
+    "application-default-socks",
+    "application-default-http",
+    "application-replace-socks",
+    "application-replace-http",
+    "application-append-socks",
+)
+SUPPORTED_ARMS = APPLICATION_ARMS + (
     "firefox-proxied",
     "off",
     "gate",

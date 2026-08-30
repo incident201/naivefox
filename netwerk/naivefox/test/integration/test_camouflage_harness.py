@@ -527,7 +527,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             (
                 "camouflage_sample_validation.py",
                 ("--help",),
-                {"firefox-proxied"},
+                {"firefox-proxied", *SUPERBLOCKS.APPLICATION_ARMS},
             ),
         )
         for filename, arguments, excluded in parsers:
@@ -540,6 +540,15 @@ class CamouflageHarnessTests(unittest.TestCase):
                 )
                 for arm in set(SUPERBLOCKS.SUPPORTED_ARMS) - excluded:
                     self.assertIn(arm, result.stdout)
+
+    def test_application_arms_have_distinct_complete_blocks(self):
+        arms = SUPERBLOCKS.APPLICATION_ARMS
+        rows = SUPERBLOCKS.schedule_rows(37, "h2", 2, ["browser_page"], arms)
+        SUPERBLOCKS.validate_superblocks(rows, expected_blocks=2, arms=arms)
+        self.assertEqual(len(rows), 2 * (len(arms) + 2))
+        for arm in arms:
+            with self.assertRaises(ValueError):
+                CONFIG.build_config(arm, "h2", 1080, 4433, "fixture-user", "fixture-pass")
 
     def test_resource_tree_config_and_lifecycle_are_fail_closed(self):
         arm = "tree-native-parser-document-start-resource-tree"

@@ -65,6 +65,9 @@ The supported and measured minimal form is:
 
 The lean parser requires:
 
+- ASCII-only root HTML in the current implementation, including ordinary text;
+  UTF-8 non-ASCII characters such as typographic punctuation are rejected before
+  resource discovery (use ASCII text or HTML character references);
 - exactly one stylesheet, one classic deferred script from the document head,
   and four images;
 - six pairwise-distinct resource URLs on the same scheme, host, and port as
