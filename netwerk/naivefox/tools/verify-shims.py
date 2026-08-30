@@ -134,6 +134,19 @@ def test_cache_crypto_boundary(topsrcdir):
     return True
 
 
+def test_rust_allocator_boundary(topsrcdir):
+    print("[SHIM TEST 7] Verifying Rust/C++ allocator ownership...")
+    rust = Path(topsrcdir) / "toolkit" / "library" / "rust"
+    product = (rust / "naivefox" / "lib.rs").read_text(encoding="utf-8")
+    build = (rust / "moz.build").read_text(encoding="utf-8")
+    runtime = (Path(topsrcdir) / "netwerk" / "naivefox" / "GeckoRuntime.cpp").read_text(encoding="utf-8")
+    assert "extern crate mozglue_static;" in product, "GeckoAlloc must be linked, not just listed as an unused Cargo dependency"
+    assert 'naivefox_features.append("mozglue-static/moz_memory")' in build
+    assert "NaiveFoxRustAllocatorSmoke(&ownershipProbe)" in runtime
+    print("  PASS: GeckoAlloc selected; --runtime-smoke exercises nested ThinVec/nsTArray ownership.")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
@@ -163,6 +176,8 @@ def main():
     if not test_necko_channel_params(topsrcdir):
         all_passed = False
     if not test_cache_crypto_boundary(topsrcdir):
+        all_passed = False
+    if not test_rust_allocator_boundary(topsrcdir):
         all_passed = False
 
     print("=" * 65)

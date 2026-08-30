@@ -27,6 +27,9 @@ class ShimVerificationTest(unittest.TestCase):
     def test_current_cache_boundary(self):
         self.assertTrue(shims.test_cache_crypto_boundary(TOOLS.parents[2]))
 
+    def test_current_allocator_boundary(self):
+        self.assertTrue(shims.test_rust_allocator_boundary(TOOLS.parents[2]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -28,6 +28,7 @@ locale_service_glue = { path = "../../../../intl/locale/rust/locale_service_glue
 fluent-langneg-ffi = { path = "../../../../intl/locale/rust/fluent-langneg-ffi" }
 log = { version = "0.4", features = ["release_max_level_info"] }
 mozurl = { path = "../../../../netwerk/base/mozurl" }
+mozglue-static = { path = "../../../../mozglue/static/rust" }
 netwerk_helper = { path = "../../../../netwerk/base/rust-helper" }
 neqo_glue = { path = "../../../../netwerk/socket/neqo_glue", default-features = false, features = ["naivefox"] }
 nserror = { path = "../../../../xpcom/rust/nserror" }
@@ -37,6 +38,7 @@ prefs_parser = { path = "../../../../modules/libpref/parser" }
 qwac-trust-anchors = { path = "../../../../security/manager/ssl/qwac_trust_anchors" }
 signature_cache = { path = "../../../../security/certverifier/signature_cache" }
 static_prefs = { path = "../../../../modules/libpref/init/static_prefs" }
+thin-vec = { version = "0.2.1", features = ["gecko-ffi"] }
 storage = { path = "../../../../storage/rust" }
 trust-anchors = { path = "../../../../security/manager/ssl/trust_anchors" }
 unicode-bidi-ffi = { path = "../../../../intl/bidi/rust/unicode-bidi-ffi" }

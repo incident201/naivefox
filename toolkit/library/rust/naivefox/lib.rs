@@ -11,19 +11,22 @@ extern crate data_storage;
 extern crate encoding_c;
 extern crate encoding_c_mem;
 extern crate encoding_glue;
+extern crate fluent_langneg_ffi;
 extern crate gecko_logger;
 extern crate gecko_tracing;
 extern crate gkrust_utils;
 extern crate happy_eyeballs_glue;
 extern crate http_sfv;
-extern crate icu_capi;
 extern crate icu4x_unicode_glue;
+extern crate icu_capi;
 extern crate idna_glue;
 extern crate locale_service_glue;
-extern crate fluent_langneg_ffi;
 extern crate mozurl;
-extern crate netwerk_helper;
+// ThinVec/nsTArray ownership crosses the Rust/C++ boundary. Linking this
+// crate selects GeckoAlloc instead of Rust's platform System allocator.
+extern crate mozglue_static;
 extern crate neqo_glue;
+extern crate netwerk_helper;
 extern crate nserror;
 extern crate nsstring;
 extern crate pdf_trust_anchors;
@@ -33,9 +36,9 @@ extern crate signature_cache;
 extern crate static_prefs;
 extern crate storage;
 extern crate trust_anchors;
-extern crate unicode_bidi_ffi;
 extern crate unic_langid;
 extern crate unic_langid_ffi;
+extern crate unicode_bidi_ffi;
 extern crate uritemplate_glue;
 extern crate xpcom;
 
@@ -53,6 +56,26 @@ pub extern "C" fn GkRust_Init() {
 
 #[no_mangle]
 pub extern "C" fn GkRust_Shutdown() {}
+
+// Used only by --runtime-smoke. Exercise ownership in both directions using
+// the same ThinVec/nsTArray ABI as Neqo's certificate chains.
+#[no_mangle]
+pub unsafe extern "C" fn NaiveFoxRustAllocatorSmoke(
+    output: *mut thin_vec::ThinVec<thin_vec::ThinVec<u8>>,
+) -> bool {
+    let Some(output) = (unsafe { output.as_mut() }) else {
+        return false;
+    };
+    if output.len() != 1 || output[0].as_slice() != [17, 34, 51] {
+        return false;
+    }
+    output.clear();
+    output.reserve(32);
+    for size in [257, 4097] {
+        output.push((0..size).map(|index| (index % 251) as u8).collect());
+    }
+    true
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn intentional_panic(message: *const c_char) {

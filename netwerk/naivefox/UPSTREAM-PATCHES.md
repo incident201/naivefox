@@ -383,6 +383,29 @@ Review obligations: preserve the enabled/inactive distinction and upstream
 fail-closed entry handling; keep Lockstore dependencies out of the lean graph;
 run `NaiveFoxCacheCrypto.*`, shim checks, and H3 cached-resource listener gates.
 
+## NF-UPSTREAM-018: shared allocator in the isolated Rust workspace
+
+Files:
+
+```text
+toolkit/library/rust/moz.build
+toolkit/library/rust/naivefox/Cargo.toml
+toolkit/library/rust/naivefox/lib.rs
+Cargo.lock
+```
+
+This is the allocator boundary of the existing `NF-UPSTREAM-018` workspace
+entry in [the minimization inventory](MINIMAL-PATCHES.md). The product root
+must link `mozglue-static`, not merely list it as an unused dependency, and
+propagate C++ `MOZ_MEMORY` to its `moz_memory` feature. Otherwise Rust's system
+allocator and C++ Gecko allocation can disagree when ownership crosses the
+`ThinVec`/`nsTArray` ABI, including H3 certificate chains on Windows.
+
+Review obligations: normal Firefox feature selection remains unchanged;
+all three product targets select matching allocation/deallocation functions;
+the staged `--runtime-smoke` nested-array probe and live Windows H3 pass; and
+the static shim check guards the crate linkage and feature propagation.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

@@ -43,6 +43,7 @@
 #include "nsNetUtil.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
+#include "nsTArray.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
 #if defined(XP_LINUX) || defined(ANDROID)
@@ -53,6 +54,8 @@
 #endif
 
 namespace mozilla::naivefox {
+
+extern "C" bool NaiveFoxRustAllocatorSmoke(nsTArray<nsTArray<uint8_t>>* aOutput);
 
 #if !defined(ANDROID) && !defined(__ANDROID__)
 // Implemented by the lean activation transport. Keep the exported C entry
@@ -546,6 +549,28 @@ nsresult GeckoRuntime::WaitForNetworkStartup() {
 nsresult GeckoRuntime::RunEventLoopSmoke() {
   if (!mXPCOMInitialized) {
     return NS_ERROR_NOT_INITIALIZED;
+  }
+
+  {
+    nsTArray<nsTArray<uint8_t>> ownershipProbe;
+    ownershipProbe.AppendElement(nsTArray<uint8_t>{17, 34, 51});
+    if (!NaiveFoxRustAllocatorSmoke(&ownershipProbe) ||
+        ownershipProbe.Length() != 2) {
+      return NS_ERROR_FAILURE;
+    }
+    const size_t expectedLengths[] = {257, 4097};
+    for (size_t i = 0; i < 2; ++i) {
+      if (ownershipProbe[i].Length() != expectedLengths[i]) {
+        return NS_ERROR_FAILURE;
+      }
+      for (size_t j = 0; j < expectedLengths[i]; ++j) {
+        if (ownershipProbe[i][j] != static_cast<uint8_t>(j % 251)) {
+          return NS_ERROR_FAILURE;
+        }
+      }
+    }
+    // Reallocate and destroy Rust-owned nested arrays on the C++ side.
+    ownershipProbe.SetCapacity(64);
   }
 
   bool handled = false;

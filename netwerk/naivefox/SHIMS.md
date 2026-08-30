@@ -55,6 +55,16 @@ check cover this unsupported boundary.
 
 ## Verification
 
+The product Rust root must explicitly link `mozglue-static` and retain its
+`moz_memory` feature when the C++ graph enables `MOZ_MEMORY`. An unused Cargo
+dependency does not select the global allocator. Mixing Rust's platform
+allocator with Gecko's allocator can hang or corrupt memory when C++ destroys
+Rust-owned `ThinVec`/`nsTArray` buffers; the Windows H3 certificate-chain path
+exercises this boundary. `--runtime-smoke` now allocates, reallocates and frees
+nested arrays across that ABI in both directions, and the static shim check
+guards the dependency/feature wiring. A networking handshake-only test is not
+a substitute for live H3 payload acceptance.
+
 Run the static shim checks and the clean minimal build:
 
 ```bash
