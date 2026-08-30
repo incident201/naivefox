@@ -907,3 +907,49 @@ capture-drop and namespace checks, but lack that separate shaper-drop proof.
 The new session gate also requires one outer flow rather than only reporting
 the count. Fifteen focused Python tests cover delay construction and missing/
 dropping-shaper rejection.
+
+H3 `continuous-bulk-duplex-h3-pairs` passed both pairs: single download
+81.556 -> 71.083 ms (-12.84%); parallel 99.141 -> 82.804 ms (-16.48%);
+slow upload 331.959 -> 322.077 ms; small wake 24.498 -> 21.944 ms.
+Wire 6,833,694.5 -> 6,650,729.5 bytes (-2.68%). The selective bulk result thus
+replicates across protocols, unlike the earlier all-state combined profile.
+
+H2 `continuous-bulk-duplex-h2-10mbit-pair` passed with zero netem drops:
+single 1115.058 -> 1053.129 ms (-5.55%); parallel 2040.760 -> 2025.476 ms;
+slow upload 1382.691 -> 1145.263 ms; small wake 60.887 -> 63.407 ms.
+Wire 7,062,364 -> 6,472,511 bytes (-8.35%). The control's upload stage is
+unusually slow and wire-heavy versus earlier controls. Retain it, but one
+pair does not establish an upload improvement caused by a download-only change.
+
+The 20-ms one-way/50-Mbit/s H2 pair (`continuous-bulk-duplex-h2-rtt40-pair`)
+also passed with zero shaper drops. Single download 1468.789 -> 1046.475 ms
+(-28.75%); parallel 1653.903 -> 1305.619 ms (-21.06%); slow upload
+1406.953 -> 1452.350 ms (+3.23%); small wake 361.716 -> 315.171 ms.
+Wire 6,542,301 -> 6,779,223 bytes (+3.62%). This exposes a real serial-HTTP
+cost but is not an RTT-independent or free throughput improvement. Only one
+delay/rate pair was tested. Matching server `39f24a1` evidence is frozen in
+`continuous-bulk-duplex-evidence`, manifest SHA-256
+`dd4bf745867681a79725d1faf9c55e3e79fb4a5e2d68d64a6f3c53d16f676aa3`.
+
+## Per-state lease-length preregistration
+
+History preflight revisited the all-ref finite initial-window ablation
+(`a09db4ff155a`), continuous-sync2 and the selective-exchange evidence above.
+Short leases are not new. The previous two-slot trial shortened every state
+and combined every active exchange. It did not isolate the commitment of one
+state while retaining the now-faster selective bulk path and original small
+POST/GET exchanges. Test two independent profiles against bulk-duplex:
+
+- `continuous-bulk-interactive1`: one interactive slot, all other leases unchanged.
+  This can switch sooner when an inner TLS handshake produces download work,
+  especially under RTT, but adds pressure-query boundaries and could spend
+  larger cells prematurely.
+- `continuous-bulk-upload1`: one upload slot, all other leases unchanged.
+  This may remove up to three empty 128-KiB tail uploads; premature state
+  transitions or credit timing could instead fragment the transfer.
+
+Both retain fixed capacity per slot, the 32-KiB class threshold, bounded credits,
+four-slot mixed state, same startup and idle. No data-sized body, fitted pause
+or response wait is added. First independent two-pair H2 screens with seeds
+202608331/202608332, then only the stronger candidate's H3/slow-link checks.
+Do not combine these interventions before measuring them separately.
