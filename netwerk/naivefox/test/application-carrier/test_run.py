@@ -16,15 +16,17 @@ class CarrierAdmissionTests(unittest.TestCase):
                 "compact-sync": 884736, "compact-sync20": 1146880,
                 "compact-fast20": 1146880, "staged": 770048,
                 "staged-fast": 770048, "staged-fast20": 901120,
-                "staged-stream20": 901120}
+                "staged-stream20": 901120, "staged-commit20": 905216}
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)
+            self.assertEqual(sum(runner.profile_requests(name).values()), runner.profile_budget(name)[3])
         self.assertEqual(runner.profile_budget("staged-fast20"), (20, 901120, 81920, 47))
         self.assertEqual(runner.profile_budget("duplex-v1"), (16, 1671168, 65536, 23))
+        self.assertEqual(runner.profile_budget("staged-commit20"), (21, 905216, 86016, 48))
 
     def stats(self):
-        return {"connect": 0, "rejected": 0, "requests": {"GET /": 47},
+        return {"connect": 0, "rejected": 0, "requests": runner.profile_requests("staged-fast20"),
                 "download_bytes": 901120, "upload_bytes": 81920,
                 "opens": 0, "download_useful": 0, "upload_useful": 0,
                 "download_filler": 900800, "upload_filler": 81600}
@@ -38,6 +40,10 @@ class CarrierAdmissionTests(unittest.TestCase):
                 runner.validate_http_graph(stats, "staged-fast20", "reference")
         stats = self.stats()
         stats["requests"]["GET /"] += 1
+        with self.assertRaises(RuntimeError):
+            runner.validate_http_graph(stats, "staged-fast20", "replace")
+        stats = self.stats()
+        stats["requests"]["GET /wrong"] = stats["requests"].pop("GET /api/events/state")
         with self.assertRaises(RuntimeError):
             runner.validate_http_graph(stats, "staged-fast20", "replace")
 

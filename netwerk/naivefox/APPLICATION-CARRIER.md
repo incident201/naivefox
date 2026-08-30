@@ -385,3 +385,37 @@ introduced. This gives late application acknowledgements a transport slot at
 about 0.8% more body budget, not proof of general long-session liveness.
 Functional admission comes first; if admitted, preregister lean H2/H3 screens
 with seeds 202608310/202608311 rather than extending the failed job in place.
+
+`staged-commit20` passed one H3 admission at 282.860 ms, but the first
+replacement in its H3 screen failed again (`sample-003`): 665,700 downstream
+bytes delivered, 3,222 upstream, inner document complete, no final beacon.
+The action transaction itself completed normally. A single terminal slot does
+not guarantee transport liveness after the application job. The screen is
+incomplete/unscored; the planned H2 screen is cancelled rather than spending
+more captures on a profile that has already failed this gate. Retain the
+profile and deterministic final-render/confirmation tests as a negative result,
+not as the repair or a recommended operating mode.
+
+The next structural requirement is an ongoing interactive/idle lifecycle, not
+more finite tail slots fitted to this beacon. Any continuation must retain
+bounded queues, multiplexing, fixed capacities within each application state,
+an explicit idle traffic budget and state-transition evidence. The reduced-cost
+H2 screen is promising but does not solve this general-liveness limitation;
+v1 and all current product defaults remain unchanged.
+
+Harness follow-up: retain per-sample rather than cumulative inner HTTP status
+counts; require exact method/path multiplicities as well as byte budgets; and
+wait for both useful completion and the SPA inside the existing fixed capture
+window. Previously the polling loop stopped at SPA completion even if the
+last delivered bytes might still produce a target acknowledgement. Waiting
+does not add a slot, retry, timer in the application, or change the two-second
+capture bound. The two failed screens above remain unscored, not retrospectively
+reclassified. Their missing upstream beacon bytes still indicate a finite-slot
+limitation, but the stricter observation separates that from a bookkeeping race.
+
+The corrected two-second drain audit (`commit-h3-drain-audit`) still failed:
+663,271 downstream bytes, 3,141 upstream, inner document still interactive.
+Thus merely waiting for the late marker does not repair the finite lifecycle.
+Final checks for this block passed 160 capture/analysis tests, five focused
+carrier harness tests, eleven JavaScript tests and all four Go race-test
+packages in the isolated namespace. No minimized/full Firefox rebuild was needed.

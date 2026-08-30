@@ -39,6 +39,7 @@ PROFILES = {
     "staged": (18, 65536), "staged-fast": (18, 65536),
     "staged-fast20": (20, 65536),
     "staged-stream20": (20, 65536),
+    "staged-commit20": (20, 65536),
 }
 
 
@@ -48,14 +49,36 @@ def profile_budget(name):
     if name.startswith("staged"):
         down = 770048 + (rounds - 18) * 65536
     duplex = name.startswith("duplex") or name.startswith("compact-sync") or name == "compact-fast20"
-    return rounds, down, rounds * 4096, 7 + rounds * (1 if duplex else 2)
+    cells = rounds + (name == "staged-commit20")
+    if name == "staged-commit20":
+        down += 4096
+    return cells, down, cells * 4096, 7 + rounds * (1 if duplex else 2) + (name == "staged-commit20")
+
+
+def profile_requests(name):
+    rounds, media = PROFILES[name]
+    requests = {path: 1 for path in ("GET /", "GET /assets/site.css", "GET /assets/app.js", *(f"GET /assets/image-{i}.svg" for i in range(1, 5)))}
+    duplex = name.startswith("duplex") or name.startswith("compact-sync") or name == "compact-fast20"
+    for index in range(rounds):
+        middle = 2 <= index < rounds - 2
+        upload = "POST /api/sync/media" if duplex and middle else "POST /api/sync"
+        requests[upload] = requests.get(upload, 0) + 1
+        if not duplex:
+            capacity = media if middle else 24576
+            if name.startswith("staged"):
+                capacity = 8192 if index < 4 or index >= rounds - 2 else 32768 if index < 6 else media
+            path = {8192: "/api/events/brief", 32768: "/api/events/state", 24576: "/api/events"}.get(capacity, f"/media/chunk/{index}")
+            requests["GET " + path] = requests.get("GET " + path, 0) + 1
+    if name == "staged-commit20":
+        requests["POST /api/action"] = 1
+    return requests
 
 
 def validate_http_graph(stats, name, mode):
     if mode == "default":
         return
     rounds, down, up, requests = profile_budget(name)
-    if stats["connect"] or stats["rejected"] or sum(stats["requests"].values()) != requests:
+    if stats["connect"] or stats["rejected"] or sum(stats["requests"].values()) != requests or stats["requests"] != profile_requests(name):
         raise RuntimeError("HTTP graph admission")
     if mode == "append":
         if stats["download_bytes"] < down or stats["upload_bytes"] < up or stats["download_filler"] != down - rounds * 16 or stats["upload_filler"] != up - rounds * 16:
@@ -224,6 +247,8 @@ class Campaign:
             log = (directory / logname).open("w"); files.append(log)
             return subprocess.Popen([str(v) for v in args], stdout=log, stderr=subprocess.STDOUT, env=env)
         result = {"sample":name,"protocol":self.protocol,"kind":kind,"mode":mode,"rounds":rounds,"app_profile":app_profile,"outer_rate_mbit":self.outer_rate_mbit}
+        journal = self.fixture / "inner-h2-access.jsonl"
+        journal_offset = journal.stat().st_size if journal.exists() else 0
         try:
             caddy = launch([self.root.parent / "bin/caddy","run","--config",directory / "caddy.json"], "caddy.log",
                            dict(os.environ, XDG_DATA_HOME=str(directory / "xdg-data"), XDG_CONFIG_HOME=str(directory / "xdg-config")))
@@ -291,17 +316,19 @@ class Campaign:
             target_done=reference
             while time.monotonic()-start<(2 if capture else 15):
                 if worker:
-                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0}")
+                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0,action:!!window.__NFC_ACTION_DONE__}")
                     if not isinstance(state,dict):time.sleep(.01);continue
                     if state["error"]:raise RuntimeError("SPA admission: "+state["error"])
                     app_done=state["done"]
                     result["completed_rounds"]=state["round"]
                     result["early_prefix_cells"]=state["early"]
                     result["filler_pending_at_delivery"]=state["early_filler"]
+                    result["action_done"]=state["action"]
                 target_done=all(p.poll()==0 for p in probes) if probe else reference or (self.fixture / "completions" / completion).exists()
                 if not reference and target_done and "target_done_ms" not in result:result["target_done_ms"]=round((time.monotonic()-start)*1000,3)
-                if app_done and (not control or target_done):
+                if app_done and (not control or target_done) and "app_done_ms" not in result:
                     result["app_done_ms"]=round((time.monotonic()-start)*1000,3)
+                if app_done and target_done:
                     break
                 time.sleep(.01)
             result["app_done"]=app_done;result["target_done"]=target_done
@@ -310,9 +337,10 @@ class Campaign:
                     raise RuntimeError("byte-exact proxy probe digest")
                 result["byte_exact_concurrent_probes"]=4
                 result["probe_body_bytes_each"]=len(expected)
-            journal=self.fixture / "inner-h2-access.jsonl"
             if journal.exists():
-                requests=[json.loads(line) for line in journal.read_text().splitlines() if line]
+                with journal.open() as source:
+                    source.seek(journal_offset)
+                    requests=[json.loads(line) for line in source if line.strip()]
                 result["inner_http_statuses"]=[r.get("status") for r in requests if "camouflage" in r.get("request",{}).get("uri","")]
             if inner and not target_done:
                 uri=inner.execute_script("return document.documentURI")
@@ -332,6 +360,10 @@ class Campaign:
             if bridge:result["bridge_memory"]=process_memory(bridge.pid)
             if naive:result["native_memory"]=process_memory(naive.pid)
             if not app_done or not target_done:raise RuntimeError("workload outside application capacity phase")
+            if capture and (result.get("target_done_ms", 0) > 2000 or result["app_done_ms"] > 2000):
+                raise RuntimeError("completion outside fixed capture window")
+            if worker and app_profile=="staged-commit20" and not result.get("action_done"):
+                raise RuntimeError("terminal confirmation incomplete")
             result["admitted"]=True
         except Exception as error:
             with (directory / "private-error.log").open("w") as failure_log:traceback.print_exc(file=failure_log)

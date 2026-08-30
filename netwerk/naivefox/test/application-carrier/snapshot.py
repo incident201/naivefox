@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import hashlib
+import argparse
 import json
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 from costs import summarize
@@ -17,11 +17,13 @@ def digest(path):
     return value.hexdigest()
 
 
-def main(root):
-    evidence = root / "baseline-v1-evidence"
+def main(root, name, profile):
+    if Path(name).name != name or name in (".", ".."):
+        raise ValueError("snapshot name must be one directory component")
+    evidence = root / name
     evidence.mkdir(mode=0o700)
     manifest = {"schema_version": 1, "purpose": "experimental baseline, not default promotion",
-                "profile": "16 rounds; 4096 up; 4x24576 + 12x131072 down; two-second capture",
+                "profile": profile,
                 "firefox_base": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
                 "firefox_ci_task": "L5Q0X7WRRqCc5qenw0iRZQ", "files": {}}
     for name in ("caddy", "bridge"):
@@ -45,7 +47,7 @@ def main(root):
         for result in results:
             destination = target / (result.parent.name + "-result.json")
             shutil.copy2(result, destination)
-        for name in ("schedule.json", "features.csv", "analysis.json", "analysis.md"):
+        for name in ("schedule.json", "features.csv", "analysis.json", "analysis.md", "timing-schedule.json", "provenance.json", "outer-shaping.json", "outer-shaping-final.json"):
             source = campaign / name
             if source.exists():
                 shutil.copy2(source, target / name)
@@ -61,4 +63,9 @@ def main(root):
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("root", type=Path)
+    parser.add_argument("--name", default="baseline-v1-evidence")
+    parser.add_argument("--profile", default="16 rounds; 4096 up; 4x24576 + 12x131072 down; two-second capture")
+    args = parser.parse_args()
+    main(args.root, args.name, args.profile)
