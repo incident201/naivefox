@@ -218,7 +218,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   reproduced the gain in six and four default-size blocks, with those same
   inner-workload bases, and with 20 ms one-way delay at 20 Mbit/s. The outer
   Caddy fronting resources remained at their fixed documented sizes in those
-  screens; an outer-resource size matrix is still required. The available
+  screens; the subsequent [outer-resource size campaign](CAPTURE.md) exercises
+  coherent 17--272 KiB pages, including slower-link endpoints. The available
   robustness checks promote the event-driven mode for all H3 listener layouts;
   explicit preamble configuration remains authoritative.
   `tree-native-parser-document-start-overlap` preserves that same early

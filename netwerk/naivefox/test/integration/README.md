@@ -182,11 +182,13 @@ key log, browser identity and Mozilla logs are deliberately retained under
 `NAIVEFOX_CAPTURE_MODE=same-base` and the same
 `NAIVEFOX_CAPTURE_REFERENCE_*` inputs used by the other same-base diagnostics.
 
-Quick capture downloads the current official Nightly binary from the URL in
+Quick capture downloads the pinned official Nightly/CI binary from the URL in
 `../../tools/firefox-reference-manifest` and compares its observed behavior
-with the same fixture run through NaiveFox. The archive checksum in that
-manifest is refreshed only when Mozilla republishes the same Nightly version;
-the fetch script still verifies both the checksum and the Firefox version.
+with the same fixture run through NaiveFox. Prefer immutable Taskcluster URLs
+and verify task revision routes and application metadata when refreshing the
+manifest. The fetch script verifies the archive checksum before extraction or
+execution, then verifies the Firefox version; a version string alone does not
+establish same-base provenance.
 
 Optional throughput scripts (`run-throughput-benchmark.sh` and
 `run-h3-throughput-benchmark.sh`) produce local diagnostics; their point-in-time

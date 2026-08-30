@@ -1,5 +1,5 @@
 mode=nightly
 product=Firefox
-version=Mozilla Firefox 156.0a1
-url=https://download-installer.cdn.mozilla.net/pub/firefox/nightly/latest-mozilla-central/firefox-156.0a1.en-US.linux-x86_64.tar.xz
-archive_sha256=d4919fa00401e3c1200a2c14797eb2d341f928711ba6c93dbc299d19e8915fc7
+version=Mozilla Firefox 157.0a1
+url=https://firefoxci.taskcluster-artifacts.net/L5Q0X7WRRqCc5qenw0iRZQ/0/public/build/target.tar.xz
+archive_sha256=10d6cf659b8c175ee523f5d1cf784b14fb09c3f2a615ad989e5fa23589cc9de5

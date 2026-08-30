@@ -582,15 +582,15 @@ materially different condition and the preflight records that distinction.
 
 The runners support two reference modes:
 
-- `quick` (default) downloads the current official Firefox Nightly artifact
+- `quick` (default) downloads the pinned official Firefox Nightly/CI artifact
   named by the tooling manifest and uses that binary directly; it does not
   build Firefox. The manifest records the expected Nightly version and the
-  SHA-256 of the last verified archive. Mozilla may republish a mutable
-  `latest-mozilla-central` URL without changing the version string. When that
-  happens, verify the downloaded binary still reports the manifest version and
-  refresh only `archive_sha256` before rerunning the gate. This keeps the
-  comparison against the current Nightly while retaining an explicit artifact
-  integrity check.
+  SHA-256 of the verified archive. Prefer an immutable Taskcluster artifact
+  URL. During a refresh, verify its task revision routes and application
+  metadata before updating the URL, version, and hash together. A matching
+  version string alone does not prove provenance. The fetcher verifies the
+  archive hash before extraction or execution. Quick mode is not automatically
+  a same-base comparison merely because the versions match.
 - `same-base` uses caller-supplied Firefox and NaiveFox packages built from the
   same Firefox base. It is the only meaningful exact stack comparison and the
   only mode that may require a Firefox browser build.
