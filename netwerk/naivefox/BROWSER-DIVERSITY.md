@@ -48,16 +48,21 @@ logic, not their paired distance as its classification score.
   of browser versus proxy. HTTP-listener generalization is not inferred.
 - Per page instance: independent Firefox A/B visits, classic native CONNECT,
   and No Connect. Native and No Connect carry the same inner workload. The
-  direct-browser page and inner page are permuted independently within the
-  preassigned held-out family partition, so the outer browser background is
-  not the exact fronting page or a matched trace used for scoring.
+  direct-browser page and inner page use different content/graph variants of
+  the same family (a frozen derangement). This keeps workload families balanced
+  without a cross-family dependency in the uncertainty units. The outer
+  browser background is not the proxy fronting page, and no matched trace
+  subtraction or same-page reference distance enters classifier features.
 - Additional genuine Firefox visits to the actual fronting SPA are a separate
   diagnostic: flagging both a proxy and that real browser equally is evidence
   of surface/corpus mismatch, not proof of a non-browser stack.
 - Fresh profiles and pre-launched browser readiness, one measured origin flow,
-  valid certificates, strict H3 without TCP fallback, fixed capture duration,
+  valid certificates, strict H3 without TCP fallback, fixed five-second capture,
   and no process shutdown before capture ends. Single-origin mirroring,
   controlled cache state and synthetic content are explicit limitations.
+- All browser/target navigations use `/`. A server-internal corpus selector
+  chooses the page; resource URLs use ordinary relative paths. Long corpus-ID
+  URLs must not become an encrypted request-length shortcut for class labels.
 - Run a small unscored infrastructure pilot first. The main schedule is fixed
   and randomized before capture. Invalid capture/transport runs are recorded;
   failures cannot be discarded based on their classifier score.
@@ -106,8 +111,11 @@ indistinguishability from this benchmark.
 
 ## Status
 
-Default selection and explicit-legacy regression checks passed. Corpus,
-collector and page-family analysis are being implemented; no diversity score
-has been measured yet. The stopped optimization campaign's existing numerical
+Default selection and explicit-legacy regression checks passed. The corpus has
+96 pages/24 families and 1,257 generated assets (about 36 MB including the
+licensed system font). The collector is in unscored pilot validation; no
+diversity score has been measured yet. The main schedule has 392 samples per
+protocol (96 of each primary role plus eight genuine fronting-browser controls).
+The stopped optimization campaign's existing numerical
 matrix remains in `APPLICATION-CARRIER-STATUS.md` and is not overwritten by a
 new, differently defined benchmark.

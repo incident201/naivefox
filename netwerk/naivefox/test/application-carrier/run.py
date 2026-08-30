@@ -344,7 +344,11 @@ class Campaign:
             raise RuntimeError("shaper missing or dropped packets")
         return value
 
-    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile=DEFAULT_PROFILE, session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576, download_bytes=1048576):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile=DEFAULT_PROFILE, session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576, download_bytes=1048576, browser_workload=None):
+        plain_reference = browser_workload is not None and mode == "reference" and not browser_workload.fronting
+        capture_seconds = browser_workload.capture_seconds if browser_workload else 2
+        if browser_workload and (not capture or probe or session_probe or session_wire or capture_seconds != 5):
+            raise ValueError("diversity workload requires its separate five-second page capture")
         probe = probe or session_probe
         capturing = capture or session_wire
         rounds = rounds or PROFILES[app_profile][0]
@@ -361,6 +365,7 @@ class Campaign:
         for server in servers.values():
             if f"127.0.0.1:{self.port}" in server["listen"]:
                 server["routes"].insert(0, {"handle":[handler]})
+        if browser_workload:browser_workload.configure(config,self,mode)
         write_json(directory / "caddy.json", config)
         caddy = bridge = naive = cap = monitor = None
         worker = inner = None
@@ -421,10 +426,12 @@ class Campaign:
                     wait_for(lambda:(self.fixture / "completions" / warm).exists())
             completion=secrets.token_hex(16)
             workload=f"https://localhost:{self.target_port}/camouflage/index.html?scenario=browser_page&asset_base=262144&completion={completion}"
+            if browser_workload:workload=f"https://localhost:{self.target_port}/"
             fragment={"rounds":str(rounds)}
             if not reference and not control:
                 fragment["bridge"]=f"wss://127.0.0.1:{ready['websocket'].split(':')[1]}/bridge?token={token}"
             outer=f"https://localhost:{self.port}/#"+urllib.parse.urlencode(fragment)
+            if plain_reference:outer=f"https://localhost:{self.port}/"
             if probe:
                 if reference or capture:raise RuntimeError("probe is separate functional admission")
                 expected=subprocess.check_output(["curl","--silent","--show-error","--fail","--noproxy","*",f"http://127.0.0.1:{self.values['NAIVEFOX_FIXTURE_HTTP_PORT']}/camouflage/resource?size=98304"])
@@ -447,9 +454,10 @@ class Campaign:
             if worker:worker.get(outer)
             app_done=control
             target_done=reference
-            while time.monotonic()-start<(2 if capture else 15):
+            while time.monotonic()-start<(capture_seconds if capture else 15):
                 if worker:
-                    state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0,action:!!window.__NFC_ACTION_DONE__,phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,dynamic:window.__NFC_DYNAMIC_ROUNDS__||0,idle:window.__NFC_IDLE_POLLS__||0,wake:window.__NFC_IDLE_WAKE_POSTS__||0}")
+                    if plain_reference:state=browser_workload.reference_state(worker,time.monotonic()-start)
+                    else:state=worker.execute_script("return {done:!!window.__NFC_DONE__,error:window.__NFC_ERROR__||null,round:window.__NFC_ROUND__||0,early:window.__NFC_EARLY_CELLS__||0,early_filler:window.__NFC_EARLY_FILLER__||0,action:!!window.__NFC_ACTION_DONE__,phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,dynamic:window.__NFC_DYNAMIC_ROUNDS__||0,idle:window.__NFC_IDLE_POLLS__||0,wake:window.__NFC_IDLE_WAKE_POSTS__||0}")
                     if not isinstance(state,dict):time.sleep(.01);continue
                     if state["error"]:raise RuntimeError("SPA admission: "+state["error"])
                     app_done=state["done"]
@@ -458,7 +466,8 @@ class Campaign:
                     result["filler_pending_at_delivery"]=state["early_filler"]
                     result["action_done"]=state["action"]
                     result["application_state"]={key:state.get(key) for key in ("phase","alive","dynamic","idle","wake")}
-                target_done=all(p.poll()==0 for p in probes) if probe else reference or (self.fixture / "completions" / completion).exists()
+                if browser_workload and inner:target_done=browser_workload.target_done(inner,time.monotonic()-start)
+                else:target_done=all(p.poll()==0 for p in probes) if probe else reference or (self.fixture / "completions" / completion).exists()
                 if not reference and target_done and "target_done_ms" not in result:result["target_done_ms"]=round((time.monotonic()-start)*1000,3)
                 if app_done and (not control or target_done) and "app_done_ms" not in result:
                     result["app_done_ms"]=round((time.monotonic()-start)*1000,3)
@@ -487,12 +496,12 @@ class Campaign:
                 result["inner_state"]=inner.execute_script("return document.readyState")
                 result["inner_error_code"]=urllib.parse.parse_qs(urllib.parse.urlsplit(uri).query).get("e",[""])[0]
             if capturing:
-                remaining=2-(time.monotonic()-start) if capture else 0
+                remaining=capture_seconds-(time.monotonic()-start) if capture else 0
                 if remaining>0:time.sleep(remaining)
                 if cap.poll() is None:cap.send_signal(signal.SIGINT);cap.wait(timeout=10)
                 validate_dumpcap_log((directory / "dumpcap.log").read_text())
-                result["capture_window_seconds"]=2 if capture else round(time.monotonic()-start,3)
-                result["capture_purpose"]="residual-fixed-window" if capture else "fixed-work-session-wire-cost"
+                result["capture_window_seconds"]=capture_seconds if capture else round(time.monotonic()-start,3)
+                result["capture_purpose"]="browser-diversity-fixed-window" if browser_workload else "residual-fixed-window" if capture else "fixed-work-session-wire-cost"
                 stop(monitor)
                 if monitor.returncode!=0 or not (directory / "network-done").exists() or (directory / "network-events").stat().st_size:
                     raise RuntimeError("capture network mutation")
@@ -507,7 +516,7 @@ class Campaign:
                         raise RuntimeError("TCP traffic in strict H3 session capture")
                     result["session_wire"]={"bytes":sum(event["wire_size"] for event in events),"packets":len(events),"client_bytes":sum(event["wire_size"] for event in events if event["direction"]>0),"server_bytes":sum(event["wire_size"] for event in events if event["direction"]<0),"outer_flows":outer_flow_count(events)}
             if worker:result["worker_memory"]=process_memory(worker.capabilities["moz:processID"])
-            if worker and continuous(app_profile):
+            if worker and continuous(app_profile) and not plain_reference:
                 final=worker.execute_script("return {phase:window.__NFC_PHASE__,alive:!!window.__NFC_ALIVE__,error:window.__NFC_ERROR__,dynamic:window.__NFC_DYNAMIC_ROUNDS__,idle:window.__NFC_IDLE_POLLS__,wake:window.__NFC_IDLE_WAKE_POSTS__}")
                 result["application_state"]=final
                 if final["error"] or not final["alive"] or final["phase"]!="idle":
@@ -515,7 +524,8 @@ class Campaign:
             if bridge:result["bridge_memory"]=process_memory(bridge.pid)
             if naive:result["native_memory"]=process_memory(naive.pid)
             if not app_done or not target_done:raise RuntimeError("workload outside application capacity phase")
-            if capture and (result.get("target_done_ms", 0) > 2000 or result["app_done_ms"] > 2000):
+            if browser_workload:result["browser_workload"]=browser_workload.finish(inner or worker,reference)
+            if capture and (result.get("target_done_ms", 0) > capture_seconds*1000 or result["app_done_ms"] > capture_seconds*1000):
                 raise RuntimeError("completion outside fixed capture window")
             if worker and app_profile=="staged-commit20" and not result.get("action_done"):
                 raise RuntimeError("terminal confirmation incomplete")
@@ -541,7 +551,7 @@ class Campaign:
             for source in ("server-stats","bridge-stats"):
                 path=directory / (source+".json")
                 if path.exists():result[source]=json.loads(path.read_text())
-            if result.get("admitted") and rounds == PROFILES[app_profile][0]:
+            if result.get("admitted") and rounds == PROFILES[app_profile][0] and not plain_reference:
                 try:
                     validate_mux_window(result,app_profile,mode)
                     validate_http_graph(result["server-stats"],app_profile,mode)
