@@ -48,6 +48,8 @@ PROFILES = {
     "continuous-bulk-ready": (20, 65536),
     "continuous-bulk-frames": (20, 65536),
     "continuous-bulk-duplex": (20, 65536),
+    "continuous-bulk-interactive1": (20, 65536),
+    "continuous-bulk-upload1": (20, 65536),
 }
 
 
@@ -111,7 +113,8 @@ def validate_http_graph(stats, name, mode):
             raise RuntimeError("continuous HTTP surface")
         if any(actual.get(path) != count for path, count in initial.items() if path != "POST /api/sync"):
             raise RuntimeError("continuous bootstrap multiplicity")
-        if any(actual.get(prefix + state, 0) % lease_slots for state in ("interactive", "download", "upload", "mixed")):
+        short_state = {"continuous-bulk-interactive1": "interactive", "continuous-bulk-upload1": "upload"}.get(name)
+        if any(actual.get(prefix + state, 0) % (1 if state == short_state else lease_slots) for state in ("interactive", "download", "upload", "mixed")):
             raise RuntimeError("incomplete continuous activity lease")
         capacities = stats["cell_capacities"]
         expected = {"8192": 6 + actual.get(prefix + "interactive", 0) + actual.get(prefix + "upload", 0),
@@ -119,7 +122,7 @@ def validate_http_graph(stats, name, mode):
         if stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
         if bulk:
-            bulk_duplex = name == "continuous-bulk-duplex"
+            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1")
             count = actual.get("POST /api/sync/bulk" if bulk_duplex else "GET /api/data/bulk", 0)
             if (bulk_duplex and actual.get("GET /api/data/bulk", 0)) or count != actual.get("POST /api/sync/bulk", 0) or actual.get("GET /api/data/download", 0):
                 raise RuntimeError("coalesced download lease graph")
