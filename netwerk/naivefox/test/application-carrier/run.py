@@ -59,15 +59,25 @@ PROFILES = {
     "continuous-bulk-pipeline": (20, 65536),
     "continuous-bulk-idle-events": (20, 65536),
     "continuous-bulk-pipeline-events": (20, 65536),
+    "continuous-bulk-pipeline-interactive": (20, 65536),
 }
 
-PAIRED_BULK_PROFILES = {"continuous-bulk-pair", "continuous-bulk-pipeline", "continuous-bulk-pipeline-events"}
+PAIRED_BULK_PROFILES = {"continuous-bulk-pair", "continuous-bulk-pipeline", "continuous-bulk-pipeline-events", "continuous-bulk-pipeline-interactive"}
 IDLE_EVENT_PROFILES = {"continuous-bulk-idle-events", "continuous-bulk-pipeline-events"}
 WINDOW512_PROFILES = PAIRED_BULK_PROFILES | {"continuous-bulk-window512"}
 
 
 def continuous(name):
     return name.startswith("continuous-")
+
+
+def screen_arms(lean=False, matrix=False):
+    if lean and matrix:
+        raise ValueError("choose a lean screen or a full listener matrix")
+    if lean:
+        return ("application-default-socks","application-replace-socks")
+    arms=("application-default-socks","application-default-http","application-replace-socks","application-replace-http")
+    return arms if matrix else arms+("application-append-socks",)
 
 
 def validate_mux_window(result, name, mode):
@@ -123,7 +133,9 @@ def validate_http_graph(stats, name, mode):
         combined = name.startswith("continuous-sync")
         lease_slots = 2 if name == "continuous-sync2" else 4
         prefix = "POST /api/exchange/" if combined else "GET /api/data/"
-        dynamic = {"POST /api/sync", "GET /api/events/idle", *(prefix + state for state in ("interactive", "download", "upload", "mixed"))}
+        interactive_duplex = name == "continuous-bulk-pipeline-interactive"
+        state_paths = {state: ("POST /api/exchange/" if combined or (interactive_duplex and state=="interactive") else "GET /api/data/") + state for state in ("interactive","download","upload","mixed")}
+        dynamic = {"POST /api/sync", "GET /api/events/idle", *state_paths.values()}
         if not combined:
             dynamic.add("POST /api/upload/chunk")
         bulk = name.startswith("continuous-bulk")
@@ -136,11 +148,11 @@ def validate_http_graph(stats, name, mode):
         if any(actual.get(path) != count for path, count in initial.items() if path != "POST /api/sync"):
             raise RuntimeError("continuous bootstrap multiplicity")
         short_state = {"continuous-bulk-interactive1": "interactive", "continuous-bulk-upload1": "upload"}.get(name)
-        if any(actual.get(prefix + state, 0) % (1 if state == short_state else lease_slots) for state in ("interactive", "download", "upload", "mixed")):
+        if any(actual.get(state_paths[state], 0) % (1 if state == short_state else lease_slots) for state in state_paths):
             raise RuntimeError("incomplete continuous activity lease")
         capacities = stats["cell_capacities"]
-        expected = {"8192": 6 + actual.get(prefix + "interactive", 0) + actual.get(prefix + "upload", 0),
-                    "32768": 2, "65536": 12 + actual.get(prefix + "download", 0) + actual.get(prefix + "mixed", 0)}
+        expected = {"8192": 6 + actual.get(state_paths["interactive"], 0) + actual.get(state_paths["upload"], 0),
+                    "32768": 2, "65536": 12 + actual.get(state_paths["download"], 0) + actual.get(state_paths["mixed"], 0)}
         heartbeats=stats.get("idle_heartbeats",0)
         if heartbeats<0 or heartbeats>stats["idle_completed"] or (heartbeats and name not in IDLE_EVENT_PROFILES):
             raise RuntimeError("idle heartbeat accounting")
@@ -165,6 +177,8 @@ def validate_http_graph(stats, name, mode):
         if combined:
             up += 4096 * (actual.get(prefix + "interactive", 0) + actual.get(prefix + "download", 0))
             up += 131072 * (actual.get(prefix + "upload", 0) + actual.get(prefix + "mixed", 0))
+        elif interactive_duplex:
+            up += 4096 * actual.get(state_paths["interactive"],0)
         if stats["upload_bytes"] != up:
             raise RuntimeError("continuous fixed upload capacities")
         if stats["idle_started"] != stats["idle_completed"] + stats["idle_cancelled"] or stats["idle_cancelled"] > 1:
@@ -535,8 +549,8 @@ class Campaign:
             write_json(directory / "result.json",result)
         return result
 
-    def screen(self, count, seed, app_profile="v1", lean=False):
-        arms=("application-default-socks","application-replace-socks") if lean else ("application-default-socks","application-default-http","application-replace-socks","application-replace-http","application-append-socks")
+    def screen(self, count, seed, app_profile="v1", lean=False, matrix=False):
+        arms=screen_arms(lean,matrix)
         schedule=superblocks.schedule_rows(seed,self.protocol,count,["browser_page"],arms)
         write_json(self.root / "schedule.json",schedule)
         feature_dir=self.root / "features";feature_dir.mkdir()
@@ -583,6 +597,7 @@ def main():
     parser.add_argument("--rounds",type=int,default=0)
     parser.add_argument("--app-profile",choices=PROFILES,default="v1")
     parser.add_argument("--screen-lean",action="store_true")
+    parser.add_argument("--screen-matrix",action="store_true")
     parser.add_argument("--sweep",action="store_true")
     parser.add_argument("--timing-pair",type=int,default=0)
     parser.add_argument("--outer-rate-mbit",type=int,default=0)
@@ -621,8 +636,10 @@ def main():
         parser.error("idle duration requires a session probe and must be at most 120 seconds")
     if args.idle_seconds and args.mode!="replace":
         parser.error("idle wire measurement currently requires the continuous worker")
-    if continuous(args.app_profile) and (args.mode=="append" or (args.screen and not args.screen_lean)):
-        parser.error("continuous append ablation is not qualified; use lean screens")
+    if args.screen_matrix and (args.screen_lean or not args.screen):
+        parser.error("matrix mode requires a screen and cannot also be lean")
+    if continuous(args.app_profile) and (args.mode=="append" or (args.screen and not (args.screen_lean or args.screen_matrix))):
+        parser.error("continuous append ablation is not qualified; use lean or matrix screens")
     if args.outer_rate_mbit < 0 or args.outer_rate_mbit > 1000 or not 0 <= args.outer_delay_ms <= 200 or args.timing_pair < 0:
         parser.error("invalid timing/rate bounds")
     if (args.outer_rate_mbit or args.outer_delay_ms) and (args.capture or args.screen):
@@ -678,7 +695,7 @@ def main():
                 print(json.dumps(result,sort_keys=True),flush=True)
             return 0
         if args.screen:
-            campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean)
+            campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean,args.screen_matrix)
             return 0
         result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire,args.profile_stages,args.upload_bytes,args.download_bytes)
         print(json.dumps(result,sort_keys=True),flush=True)

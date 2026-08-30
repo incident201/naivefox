@@ -1329,3 +1329,57 @@ First two H2 original-workload pairs against pipeline alone (seed 202608349)
 isolate composition. Then qualify the best surviving candidate's original
 1-MiB/native cost and fresh canonical p17--32/Whole; neither 8-MiB scaling
 results nor old continuous-v1 residuals substitute for this check.
+
+Composition screen `continuous-bulk-pipeline-events-h2-pairs` passed with the
+new mandatory bridge/server window-counter gate. Pipeline -> pipeline-events:
+single 53.207 -> 55.913 ms (+2.706 ms), parallel 69.284 -> 69.516 ms,
+slow upload 318.796 -> 316.759 ms, small wake 19.618 -> 17.964 ms.
+Wire 7,191,658 -> 7,228,666.5 bytes (+0.51%). Gains do not simply add:
+composition mildly improves short wake/idle cost but does not accelerate the
+already-pipelined fast-link download. Next two H2 RTT40/shared-50-Mbit pairs
+against pipeline (seed 202608350), then one original-workload shared-10-Mbit
+pair against original bulk-duplex (seed 202608351). These are focused real-link
+checks of the surviving candidate, not a matrix for every discarded variant.
+
+RTT40 composition check (`continuous-bulk-pipeline-events-h2-rtt40-pairs`)
+passed with zero drops but did not confirm an additional latency win:
+single 1008.351 -> 1013.957 ms, parallel 1208.966 -> 1201.131 ms,
+slow upload 1407.954 -> 1472.338 ms, small wake 316.117 -> 317.266 ms.
+Wire 7,063,080.5 -> 7,089,948.5 bytes (+0.38%).
+
+Shared-10-Mbit screen against original bulk-duplex passed with zero drops:
+single 1298.815 -> 1338.875 ms (+3.08%), parallel 2028.049 -> 2003.140 ms,
+slow upload 1134.765 -> 1139.213 ms, small wake 62.061 -> 70.139 ms.
+Wire 6,755,155 -> 7,094,257 bytes (+5.02%). Thus the larger idle event is
+not a speed default on these results; retain plain pipeline as the stronger
+candidate. Snapshot `continuous-pipeline-events-evidence`, server `0dd9d14`,
+manifest SHA-256 `4052f37d69180ae194599f65220b41bdaac95979c785caad7d6da0f54f954537`.
+
+## Interactive-only combined exchange preregistration
+
+History preflight re-read continuous-sync/sync2 and their twelve-versus-eight
+upload-slot cost, plus the successful bulk-only split. Combining all states
+was measured; combining only interactive slots has not been isolated. Test
+`continuous-bulk-pipeline-interactive`, derived from plain pipeline: only the
+interactive 4-KiB POST returns its 8-KiB cell directly. Keep four interactive
+slots, bulk pairs, upload/mixed POST-GET, 512-byte idle, startup and 512-KiB
+window unchanged. There is no guessed server-readiness delay or earlier local
+SOCKS success. The causal target is interactive HTTP turnaround on nonzero RTT.
+
+First two H2 original-workload RTT40/shared-50-Mbit pairs against pipeline,
+seed 202608352. Validate the exact per-state graph, status, replay and budgets.
+The user's requested final qualification is H2/H3 x SOCKS/HTTP, with fresh
+p1--16, p17--32, p1--32, 250-ms and Whole scores plus measured native-relative
+wire and speed costs. Add a continuous four-arm capture mode without enabling
+the unsupported append ablation; do not infer the HTTP-listener row from SOCKS.
+
+Campaign stop requested before that new performance run: the interactive-only
+implementation is retained with unit/route/graph tests but **unmeasured**.
+Seed 202608352 was not run and this profile is not selected for the final
+matrix. No further optimization experiment is authorized in this closeout.
+The strongest cross-protocol measured speed profile remains
+`continuous-bulk-pipeline` (without the unproven idle composition).
+Final qualification uses four superblocks per protocol, two fresh Firefox
+references and all four native/replacement listener arms: H2 seed 202608353,
+H3 seed 202608354. Same two-second canonical page capture and unchanged
+native defaults, not a claim that warm 1-MiB cost equals cold-page cost.
