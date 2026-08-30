@@ -3357,6 +3357,51 @@ so extra lanes cannot aggregate flow-control capacity and would only add
 HEADERS, pairing, and reordering. Neither proposal reached product, Caddy,
 harness, build, or passive-screen code.
 
+### H2 root-document size endpoint
+
+The next idea also passed through the complete exact and causal history gate
+before implementation. The history already contained H2 resource trees,
+Early Hints and final-response preloads, document-start/HEADERS/body barriers,
+and the H3 outer-resource size campaign. The H2 `initial`, bulk-download, and
+bidirectional controls changed only small HTML programs, while
+`--browser-page-base-size` changed tunneled resources rather than the root
+document. No prior run had scaled the H2 root body itself. This made root size
+a distinct site-envelope question rather than a renamed resource or admission
+experiment.
+
+Commit `6dff7c66142d` added a diagnostic-only
+`--document-body-size` fixture input. It pads the exact same HTML response path
+seen by Firefox A/B, the outer preamble, and the tunneled browser, preserves
+the resource URLs and completion semantics, is limited to H2 gate/smoke runs
+and 64 KiB, and cannot be combined with another fixture-shape axis. It changes
+neither product nor Caddy defaults. The ordinary measured `browser_page` root
+is 494 bytes including its fixed-length completion token.
+
+Predeclared one-block endpoint artifact `46354f735ce3d8a6` (seed
+`2026083073`) used a 65,536-byte root, inner HTTPS/H2, Selenium, the isolated
+WSL namespace, Firefox A/B, and both current listener policies. All four
+participants passed capture-drop, network-mutation, inner-H2, offload, and
+normal-drain checks. Its descriptive distances were:
+
+| H2 policy at 65,536-byte root | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SOCKS `document-first-buffer-task-overlap` | 0.07051 | 0.31378 | 0.16014 | 0.15433 | 0.33178 |
+| HTTP `document-first-buffer-http-connect` | 0.06084 | 0.14497 | 0.10085 | 0.16218 | 0.33533 |
+
+The 17--32 values are much lower than the separate canonical small-root
+dashboard, but this is not a joint improvement. The 250-ms and Whole values
+move materially upward, and the signed Whole diagnostic reports an initial
+50-ms server-wire deficit of 611,296.5/611,169.5 bytes for SOCKS/HTTP, versus
+362,854.6/100,530.4 bytes in the separate ten-block canonical artifact. The
+large direct Firefox document changes the early server envelope more than the
+candidate can reproduce; extra root volume therefore transfers residual out
+of packets 17--32 instead of removing it. Cross-artifact differences and one
+block cannot support inference, but they are sufficient for the predeclared
+screening stop rule because both requested aggregate views regress strongly.
+No larger run, product build, Caddy change, or default promotion was started.
+The 64-KiB limit remains a functional safety bound, not a residual-equivalence
+claim, and future work must not retry root padding as an H2 timing fix.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after

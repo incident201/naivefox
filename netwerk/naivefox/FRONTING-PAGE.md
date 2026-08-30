@@ -26,6 +26,17 @@ task for SOCKS-only ingress) and still requires a normal successful root
 drain. The HTML may therefore be the same page used by H3, but its CSS, script,
 and images do not affect the H2 outer preamble.
 
+The H2 64-KiB value is a functional safety ceiling, not a promise of identical
+passive residuals for every document size. The canonical four-row dashboard
+uses a 494-byte fixture root including its completion token. One-block endpoint
+artifact `46354f735ce3d8a6` exercised the exact same page padded to 65,536 bytes:
+packets 17--32 fell to `0.31378/0.14497` for SOCKS/HTTP, but 250 ms rose to
+`0.15433/0.16218` and Whole rose to `0.33178/0.33533`. Thus padding the root is
+not an optimization and was not promoted. Sites requiring the published
+dashboard rather than only functional admission should keep the H2 root close
+to the measured small-document profile; referenced resource sizes remain
+irrelevant to the H2 preamble itself.
+
 H3 fetches the root and all six resources through the selected outer route.
 The 384-KiB limit covers the root and resource body bytes delivered by Necko
 to the preamble listener; it is a safety ceiling, not a target. A mismatch or
@@ -88,7 +99,7 @@ resource bodies are:
 
 | Resource | Fixture body size |
 | --- | ---: |
-| Root HTML | A few hundred bytes |
+| Dense H3 root HTML | 620 bytes with the measurement completion token |
 | Stylesheet | 12 KiB |
 | Classic deferred script | 24 KiB |
 | Image descriptors 1--3 | 8 KiB each |

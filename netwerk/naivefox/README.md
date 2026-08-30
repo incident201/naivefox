@@ -152,7 +152,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   body buffer delivered by Necko has been consumed successfully. The event is
   a channel-delivery boundary, not a byte count or fixture-size threshold; a
   short or failed read cannot release CONNECT, and normal 2xx document drain
-  remains mandatory. Two independent six-block H2/inner-H2 screens with an
+  remains mandatory. This mechanism is size-independent, but its passive
+  residual is not claimed to be invariant across the full 64-KiB functional
+  envelope: the canonical matrix uses a 494-byte root, and the rejected
+  65,536-byte endpoint is recorded in `FRONTING-PAGE.md` and `CAPTURE.md`.
+  Two independent six-block H2/inner-H2 screens with an
   HTTP CONNECT local frontend (`306a249a46d33a5c` and
   `2b8dd75c4e682940`) reproduced lower packets-17--32, 1--32, 250 ms, and
   whole-flow distances than both response-HEADERS admission and the former
