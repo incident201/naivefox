@@ -15,6 +15,10 @@ application -> SOCKS5 or HTTP CONNECT -> NaiveFox
 The server is an unmodified Naive-compatible Caddy build. NaiveFox does not
 ship another HTTP/TLS stack and does not synthesize a Firefox fingerprint.
 
+This document describes the native product. The separate experimental No
+Connect transport defaults to `continuous-bulk-pipeline`; its additional
+evaluation is described in [BROWSER-DIVERSITY.md](BROWSER-DIVERSITY.md).
+
 ## Running the desktop product
 
 The staged Linux package has one launcher at its root. With no argument it

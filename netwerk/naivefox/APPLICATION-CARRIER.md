@@ -1,9 +1,11 @@
 # Application-capacity transport experiment
 
-**Campaign stopped.** The selected measured speed profile and complete fresh
+**Previous optimization campaign stopped.** Its selected measured speed profile and complete
 H2/H3 x SOCKS/HTTP matrix, native-relative cold/warm costs, site requirements
 and cleanup state are in [APPLICATION-CARRIER-STATUS.md](APPLICATION-CARRIER-STATUS.md).
-No further optimization, export or publication is in progress.
+`continuous-bulk-pipeline` is now the default for the new experimental transport.
+The additional [browser-diversity benchmark](BROWSER-DIVERSITY.md) does not
+replace these measurements or change native defaults. No export/publication is in progress.
 
 This campaign is confined to an experimental branch and a separate Caddy
 module repository. It does not change product defaults, the published matrix,

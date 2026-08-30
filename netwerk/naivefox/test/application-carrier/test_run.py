@@ -14,6 +14,11 @@ spec.loader.exec_module(runner)
 
 
 class CarrierAdmissionTests(unittest.TestCase):
+    def test_experimental_default_is_measured_pipeline(self):
+        self.assertEqual(runner.DEFAULT_PROFILE,"continuous-bulk-pipeline")
+        self.assertIn(runner.DEFAULT_PROFILE,runner.WINDOW512_PROFILES)
+        self.assertEqual(runner.profile_budget(runner.DEFAULT_PROFILE),(20,901120,81920,47))
+
     def test_listener_matrix_keeps_all_four_arms_without_append(self):
         self.assertEqual(set(runner.screen_arms(matrix=True)),{"application-default-socks","application-default-http","application-replace-socks","application-replace-http"})
         self.assertEqual(len(runner.screen_arms(lean=True)),2)

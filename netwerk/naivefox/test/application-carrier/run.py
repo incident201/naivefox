@@ -33,6 +33,7 @@ OLD = Path("/home/zubastik/naivefox-refresh-20260830.fJHfmY")
 FIREFOX = OLD / "reference/firefox/firefox"
 PACKAGE = OLD / "full-linux/package/allocator-fixed"
 TRANSPORT = Path("/home/zubastik/naivefox-transport")
+DEFAULT_PROFILE = "continuous-bulk-pipeline"
 PROFILES = {
     "v1": (16, 131072), "duplex-v1": (16, 131072),
     "compact": (16, 65536), "compact-sync": (16, 65536),
@@ -343,7 +344,7 @@ class Campaign:
             raise RuntimeError("shaper missing or dropped packets")
         return value
 
-    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576, download_bytes=1048576):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile=DEFAULT_PROFILE, session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576, download_bytes=1048576):
         probe = probe or session_probe
         capturing = capture or session_wire
         rounds = rounds or PROFILES[app_profile][0]
@@ -549,7 +550,7 @@ class Campaign:
             write_json(directory / "result.json",result)
         return result
 
-    def screen(self, count, seed, app_profile="v1", lean=False, matrix=False):
+    def screen(self, count, seed, app_profile=DEFAULT_PROFILE, lean=False, matrix=False):
         arms=screen_arms(lean,matrix)
         schedule=superblocks.schedule_rows(seed,self.protocol,count,["browser_page"],arms)
         write_json(self.root / "schedule.json",schedule)
@@ -595,7 +596,7 @@ def main():
     parser.add_argument("--mode",choices=["reference","replace","append","default"],default="replace")
     parser.add_argument("--kind",choices=["socks","http"],default="socks")
     parser.add_argument("--rounds",type=int,default=0)
-    parser.add_argument("--app-profile",choices=PROFILES,default="v1")
+    parser.add_argument("--app-profile",choices=PROFILES,default=DEFAULT_PROFILE)
     parser.add_argument("--screen-lean",action="store_true")
     parser.add_argument("--screen-matrix",action="store_true")
     parser.add_argument("--sweep",action="store_true")

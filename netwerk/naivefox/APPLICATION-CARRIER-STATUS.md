@@ -1,7 +1,10 @@
 # Application carrier — stopped campaign / current results
 
-Campaign stopped at the user's request. No further experiments, minimal export,
-release workflow or default promotion are in progress.
+This is the frozen result of the previous optimization campaign. Subsequently,
+`continuous-bulk-pipeline` became the default only for the new experimental
+transport. The additional [browser-diversity benchmark](BROWSER-DIVERSITY.md)
+has a different comparison population and does not replace the values below.
+Native defaults, minimal export and release state are unchanged.
 
 Selected measured speed profile: `continuous-bulk-pipeline`. The native product
 defaults and stock-Caddy compatibility remain unchanged. The experimental profile
