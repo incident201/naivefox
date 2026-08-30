@@ -2927,7 +2927,7 @@ isolated smoke artifact `668436d850d86dfd` (seed `2026082932`) passed with
 one ClientHello, one outer TCP flow, and all six pairs.
 
 The randomized same-base one-block SOCKS screen `a9ffaf1c49a77777` (seed
-`2026082933`) used the canonical 262144-byte browser page, inner HTTPS/H2,
+`2026082933`) used the canonical 262144-byte browser page, inner HTTPS/H1.1,
 Firefox A/B, and only the two requested target views:
 
 | H2 SOCKS arm | 17--32 | Whole | Change from same-block current default |
@@ -3436,6 +3436,35 @@ No Caddy fork, harness arm, build, or passive capture was created. Future
 preflight must not retry a static low H2 stream limit as a safe site-independent
 fix; any genuinely new concurrency proposal must preserve multiple
 long-lived CONNECT streams and ordinary parallel page loading by construction.
+
+Two further proposals were closed by retained evidence rather than code. A
+combined optimistic-local-reply plus pre-response ClientHello pipeline would
+still be the rejected early CONNECT request-DATA family. That earlier arm
+already included the optimistic local reply, captured the real 1,822-byte
+inner ClientHello, and delivered it as request DATA before `200`; its focus
+gain was only 3.2%/5.9% for SOCKS/HTTP and HTTP Whole regressed 17.3%.
+Separately, dialing the target before `200` made both listener focus views
+approximately 0.77. Combining the two could overlap only target dial and the
+first target TLS flight. The measured local-listener premise puts the complete
+1,827-byte ClientHello less than 0.9 ms after local success, while the direct
+Firefox gap which needs explaining is 28--33 ms of parser/channel/IPC work.
+The composition therefore has no untested event capable of closing the main
+gap and would repeat two incompatible rejected causes. No client or Caddy
+source was restored from the retired diagnostics.
+
+Changing the tunneled origin from H2 to H1.1 had also already been measured
+with the current listener controls. Artifact `06350ee8cab9df76` used the same
+`browser_page`, outer H2, and `inner_transport=https` (the fixture's
+HTTPS/H1.1 server). Its one-block current controls measured
+`0.45765/0.31613` for SOCKS and `0.45128/0.40461` for HTTP at packets
+17--32/Whole. Fresh four-block HTTP control `b0454b18ae89a387` measured
+`0.46318 [0.42335, 0.50301]` and
+`0.26826 [0.23575, 0.30440]`. These screens are not an H1.1-versus-H2 paired
+inference, but they rule out the proposed large structural reduction: their
+focus values are not lower than the separate current inner-H2 dashboard, and
+the four-block HTTP Whole point is similar. Creating several ordinary target
+connections instead of the canonical single inner-H2 CONNECT is therefore not
+a new unmeasured cause and did not receive a duplicate run.
 
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
