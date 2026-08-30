@@ -1275,3 +1275,11 @@ Expect possible active-session filler growth from larger wake cells; measure
 both it and idle wire cost. The scope is latency/idle cost, not a claimed
 large-download acceleration or new residual winner. Implement after freezing
 the pipeline evidence, with exact status/capacity/sequence/cancellation tests.
+
+`continuous-bulk-idle-events` admission passed 36 JS tests, all four Go race
+packages and 18 focused harness tests. Timeouts and events retain distinct
+accounting; a 204 cannot consume cell sequence or carrier capacity. Work after
+a timeout is observed by the next poll. First two H2 fixed-work pairs against
+bulk-duplex with the original 1-MiB workload (seed 202608346), not the sustained
+8-MiB variant. Then a separate real 65-second idle check; unit millisecond
+timeouts are not substituted for the production 30-second poll behavior.

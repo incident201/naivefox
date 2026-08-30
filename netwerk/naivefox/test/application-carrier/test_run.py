@@ -66,6 +66,19 @@ class CarrierAdmissionTests(unittest.TestCase):
         handler.do_POST()
         self.assertEqual(json.loads(received[-1][1]), {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
 
+    def test_idle_heartbeat_has_no_cell_but_event_has_fixed_capacity(self):
+        stats=self.stats()
+        stats.update({"requests":runner.profile_requests("continuous-bulk-idle-events"),"write_errors":0,
+                      "cell_capacities":{"8192":7,"32768":2,"65536":12},
+                      "idle_started":3,"idle_completed":2,"idle_cancelled":1,"idle_heartbeats":1})
+        stats["requests"]["GET /api/events/idle"]=3
+        stats["download_bytes"]+=8192
+        runner.validate_http_graph(stats,"continuous-bulk-idle-events","reference")
+        with self.assertRaises(RuntimeError):runner.validate_http_graph(stats,"continuous-bulk-duplex","reference")
+        for heartbeats in (-1,0,2,3):
+            invalid=copy.deepcopy(stats);invalid["idle_heartbeats"]=heartbeats
+            with self.assertRaises(RuntimeError):runner.validate_http_graph(invalid,"continuous-bulk-idle-events","reference")
+
     def test_bulk_lease_has_equal_aggregate_body_budget(self):
         stats = self.stats()
         stats.update({"requests": runner.profile_requests("continuous-bulk"), "write_errors": 0,
@@ -85,6 +98,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         runner.validate_http_graph(duplex, "continuous-bulk-window512", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-filler", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-progress", "replace")
+        runner.validate_http_graph(duplex, "continuous-bulk-idle-events", "replace")
         for profile in ("continuous-bulk-pair","continuous-bulk-pipeline"):
             with self.assertRaises(RuntimeError):runner.validate_http_graph(duplex,profile,"replace")
             paired=copy.deepcopy(duplex)
@@ -163,6 +177,7 @@ class CarrierAdmissionTests(unittest.TestCase):
         down["continuous-bulk-progress"] = 901120
         down["continuous-bulk-pair"] = 901120
         down["continuous-bulk-pipeline"] = 901120
+        down["continuous-bulk-idle-events"] = 901120
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)

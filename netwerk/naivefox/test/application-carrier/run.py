@@ -57,6 +57,7 @@ PROFILES = {
     "continuous-bulk-progress": (20, 65536),
     "continuous-bulk-pair": (20, 65536),
     "continuous-bulk-pipeline": (20, 65536),
+    "continuous-bulk-idle-events": (20, 65536),
 }
 
 
@@ -126,10 +127,15 @@ def validate_http_graph(stats, name, mode):
         capacities = stats["cell_capacities"]
         expected = {"8192": 6 + actual.get(prefix + "interactive", 0) + actual.get(prefix + "upload", 0),
                     "32768": 2, "65536": 12 + actual.get(prefix + "download", 0) + actual.get(prefix + "mixed", 0)}
-        if stats["idle_completed"]:
+        heartbeats=stats.get("idle_heartbeats",0)
+        if heartbeats<0 or heartbeats>stats["idle_completed"] or (heartbeats and name!="continuous-bulk-idle-events"):
+            raise RuntimeError("idle heartbeat accounting")
+        if name=="continuous-bulk-idle-events":
+            expected["8192"]+=stats["idle_completed"]-heartbeats
+        elif stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
         if bulk:
-            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download", "continuous-bulk-window512", "continuous-bulk-filler", "continuous-bulk-progress", "continuous-bulk-pair", "continuous-bulk-pipeline")
+            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download", "continuous-bulk-window512", "continuous-bulk-filler", "continuous-bulk-progress", "continuous-bulk-pair", "continuous-bulk-pipeline", "continuous-bulk-idle-events")
             count = actual.get("POST /api/sync/bulk" if bulk_duplex else "GET /api/data/bulk", 0)
             if name in ("continuous-bulk-pair","continuous-bulk-pipeline") and count % 2:
                 raise RuntimeError("incomplete paired bulk lease")
