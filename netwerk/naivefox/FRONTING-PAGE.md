@@ -5,6 +5,14 @@ upstream origin when `preamble` is omitted. It separates requirements needed
 for a successful connection from the particular fixture profile whose passive
 residuals were measured.
 
+The opt-in CONNECT-free application transport is a separate experiment, not an
+implicit product policy. Its dedicated Caddy module, same-origin application,
+carrier body/cache constraints and ongoing idle/active lifecycle are specified
+in [APPLICATION-CARRIER.md](APPLICATION-CARRIER.md#admission-and-site-constraints)
+and the separate server repository. An arbitrary static site cannot replace
+that application. None of those experimental requirements changes the stock
+server/default contract in this file.
+
 Changing an implicit policy, path, parser topology, accepted HTML attributes,
 resource count, byte budget, cache policy, compression assumption, or fixture
 response shape is incomplete until this file, the linked README and known

@@ -43,6 +43,7 @@ PROFILES = {
     "staged-commit20": (20, 65536),
     "continuous-v1": (20, 65536),
     "continuous-sync": (20, 65536),
+    "continuous-sync2": (20, 65536),
 }
 
 
@@ -91,7 +92,8 @@ def validate_http_graph(stats, name, mode):
     if continuous(name):
         initial = profile_requests(name)
         actual = stats["requests"]
-        combined = name == "continuous-sync"
+        combined = name.startswith("continuous-sync")
+        lease_slots = 2 if name == "continuous-sync2" else 4
         prefix = "POST /api/exchange/" if combined else "GET /api/data/"
         dynamic = {"POST /api/sync", "GET /api/events/idle", *(prefix + state for state in ("interactive", "download", "upload", "mixed"))}
         if not combined:
@@ -102,7 +104,7 @@ def validate_http_graph(stats, name, mode):
             raise RuntimeError("continuous HTTP surface")
         if any(actual.get(path) != count for path, count in initial.items() if path != "POST /api/sync"):
             raise RuntimeError("continuous bootstrap multiplicity")
-        if any(actual.get(prefix + state, 0) % 4 for state in ("interactive", "download", "upload", "mixed")):
+        if any(actual.get(prefix + state, 0) % lease_slots for state in ("interactive", "download", "upload", "mixed")):
             raise RuntimeError("incomplete continuous activity lease")
         capacities = stats["cell_capacities"]
         expected = {"8192": 6 + actual.get(prefix + "interactive", 0) + actual.get(prefix + "upload", 0),
@@ -531,8 +533,8 @@ def main():
     args=parser.parse_args()
     if args.profile_stages and (not args.session_probe or args.mode!="replace" or args.session_pairs or args.session_wire or args.idle_seconds):
         parser.error("stage profiling requires a standalone replacement session probe without wire/idle accounting")
-    if args.session_variants and (not args.session_pairs or args.app_profile!="continuous-sync"):
-        parser.error("session variant pairs require continuous-sync and a positive pair count")
+    if args.session_variants and (not args.session_pairs or not args.app_profile.startswith("continuous-sync")):
+        parser.error("session variant pairs require a combined profile and a positive pair count")
     if args.session_pairs < 0 or args.session_pairs > 8 or (args.session_pairs and (not continuous(args.app_profile) or args.screen or args.capture or args.idle_seconds)):
         parser.error("session pairs require the continuous profile, no residual/idle capture, and at most eight pairs")
     if args.session_wire and (not args.session_probe or args.idle_seconds):

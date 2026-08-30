@@ -4,6 +4,14 @@ This campaign is confined to an experimental branch and a separate Caddy
 module repository. It does not change product defaults, the published matrix,
 the stock-server contract, or the deferred export/publication state.
 
+The latest qualified lifecycle baseline is `continuous-v1`: startup followed
+by ongoing interactive/download/upload/mixed states and economical idle. See
+[continuous lifecycle](#continuous-lifecycle-preregistration) for its current
+cost and residual evidence, and [active-speed diagnosis](#active-speed-diagnosis)
+for the opt-in combined-exchange/short-lease trials. The finite profiles below
+are retained experiment history, not instructions to terminate a live proxy
+after its initial application job.
+
 ## History preflight and distinct hypothesis
 
 Reviewed the complete all-ref carrier/finite/multiplexing history, the carrier
@@ -607,6 +615,11 @@ prototype, not against the native default). Combined exchanges are a measured
 bulk-speed improvement with a traffic/small-latency regression, not a preferred
 default. Do not run a full residual matrix for this tradeoff yet.
 
+Scheduling deviation: that command omitted the intended seed argument and
+therefore used the runner default 202608301, not preregistered 202608317.
+Its saved randomized schedule is retained unchanged; there was no order
+selection or rerun. Treat it as exploratory paired evidence.
+
 The extra cost includes more underfilled upload leases; in the first pair
 the baseline issued eight 128-KiB upload slots, the combined profile twelve.
 Faster turnaround can cross state/credit/target-readiness boundaries sooner;
@@ -616,3 +629,62 @@ large fixed tail even without a credit stall. Keep per-stream flow control;
 investigate shorter fixed state leases rather than increasing queues or
 switching to byte-exact response sizes. Verification passed seventeen JS tests,
 nine harness tests and all four Go race-test packages; no Firefox build.
+
+Frozen `continuous-sync-evidence` includes server `9fe57b4` and the first
+combined-exchange trial; manifest SHA-256
+`f8a65f55003571d8e7ca4e7eb05d1816a6da8b0ef92fdcf5402880597b88026b`.
+
+History preflight for shorter activity leases also checked the all-ref credit
+and finite-window records, specifically `a09db4ff155a`: that experiment changed
+speculative initial concurrent receive requests, not the number of sequential
+fixed-capacity slots committed before an active SPA state transition. Here
+`continuous-sync2` retains combined exchanges and changes only four-slot active
+leases to two slots, for every state. It halves a lease's potential empty tail
+and upload commitment to 256 KiB, without changing the per-stream credit window,
+body sizes, startup, idle timeout or any target-size-specific threshold.
+The two-slot commitment remains fixed when pressure changes inside it.
+
+First H2 functional admission; then two randomized H2 pairs against the same
+binary's `continuous-v1` (seed 202608318). This is a speed/cost comparison, not
+proof that every credit stall or arbitrary workload is solved. If this admits
+useful speed without additional wire cost, check H3 and short canonical residuals.
+
+`continuous-sync2-h2-session` passed all late, delayed, upload, concurrent and
+post-idle work. Both pairs in `continuous-sync2-h2-pairs` (actual seed
+202608318) also passed with exact bodies, live idle and one outer connection.
+
+| H2 fixed-work stage, curl timing | continuous-v1 | continuous-sync2 | Time change |
+| --- | ---: | ---: | ---: |
+| 1-MiB download after idle | 134.351 ms | 103.708 ms | -22.81% |
+| Four concurrent 512-KiB downloads | 249.779 ms | 182.362 ms | -26.99% |
+| Target-throttled 1-MiB upload | 319.637 ms | 311.386 ms | -2.58% |
+| 4-KiB post-idle request | 23.055 ms | 26.649 ms | +15.59% (+3.595 ms) |
+
+Complete-session wire was 6,541,600 versus 6,859,046.5 bytes, +4.85% relative
+to continuous-v1. This is less cost than the earlier four-slot combined
+variant's +9.39%, but those are separate paired campaigns, not a direct
+four-slot/two-slot latency comparison. Native controls were not rerun here;
+do not describe +4.85% as the new total overhead over native or claim the
+previous +32% surcharge was preserved. The stricter no-extra-wire gate is not
+met, and small-request latency regresses, so the proposed H3/residual extension
+is not run. These profiles remain opt-in tradeoffs; continuous-v1 remains the
+qualified cross-protocol lifecycle baseline.
+
+The new evidence supports reducing active HTTP turnaround as a useful bulk
+speed direction. It does not establish a general latency fix. Before another
+implementation, investigate the interactive-versus-bulk split, readiness at
+response snapshot time, and bounded overlap of local delivery/HTTP work;
+check their history first. Do not add fitted sleeps, silently enlarge credits,
+reuse the old residual scores for a new profile, or trim failed work from
+cost totals. The helper now rejects incomplete stage/precise-timing pairs and
+retains historical polling observations separately from curl timings.
+
+Final verification passed 160 capture/analysis tests, twelve focused Python
+tests, eighteen JavaScript tests and all four Go race-test packages. Server
+`1de273a` and matching binaries are preserved in `continuous-sync2-evidence`;
+manifest SHA-256
+`32cfaa086fe31e817c18f6ca68d8b2ac9caf016b03454bb68a4ea23cd813ff2e`.
+Only the separate Caddy/bridge module was incrementally rebuilt. No full
+Firefox build, minimal-source export, release workflow or default change was
+performed. The source experiment branch is pushed in logical blocks; the
+server remains a local repository with its committed history in the bundle.

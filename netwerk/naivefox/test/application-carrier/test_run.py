@@ -65,6 +65,14 @@ class CarrierAdmissionTests(unittest.TestCase):
             stats["download_bytes"] += 4 * down
             stats["cell_capacities"][str(down)] += 4
         runner.validate_http_graph(stats, "continuous-sync", "replace")
+        short = copy.deepcopy(stats)
+        short["requests"]["POST /api/exchange/download"] -= 2
+        short["download_bytes"] -= 2 * 65536
+        short["upload_bytes"] -= 2 * 4096
+        short["cell_capacities"]["65536"] -= 2
+        runner.validate_http_graph(short, "continuous-sync2", "replace")
+        with self.assertRaises(RuntimeError):
+            runner.validate_http_graph(short, "continuous-sync", "replace")
         for method in ("GET /api/data/download", "POST /api/exchange/unknown"):
             changed = copy.deepcopy(stats)
             changed["requests"][method] = 4
@@ -79,7 +87,7 @@ class CarrierAdmissionTests(unittest.TestCase):
                 "compact-sync": 884736, "compact-sync20": 1146880,
                 "compact-fast20": 1146880, "staged": 770048,
                 "staged-fast": 770048, "staged-fast20": 901120,
-                "staged-stream20": 901120, "staged-commit20": 905216, "continuous-v1": 901120, "continuous-sync": 901120}
+                "staged-stream20": 901120, "staged-commit20": 905216, "continuous-v1": 901120, "continuous-sync": 901120, "continuous-sync2": 901120}
 
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():

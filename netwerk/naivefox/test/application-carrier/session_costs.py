@@ -10,7 +10,12 @@ import sys
 def summarize(root):
     rows = [json.loads(path.read_text()) for path in sorted(root.glob("session-*/result.json"))]
     variants = rows and all(result["mode"] == "replace" for result in rows)
-    control, candidate = ("continuous-v1", "continuous-sync") if variants else ("default", "replace")
+    control, candidate = "default", "replace"
+    if variants:
+        candidates = {result["app_profile"] for result in rows} - {"continuous-v1"}
+        if len(candidates) != 1:
+            raise ValueError("one candidate profile required")
+        control, candidate = "continuous-v1", candidates.pop()
     grouped = {control: [], candidate: []}
     for result in rows:
         if not result.get("admitted"):
@@ -32,6 +37,8 @@ def summarize(root):
                     exact[mode].append(check["curl_completion_ms"])
     summary["wire"]["growth_percent"] = 100 * (summary["wire"][candidate] / summary["wire"][control] - 1)
     for stage in summary["stages"].values():
+        if any(len(stage[mode]) != len(grouped[mode]) for mode in grouped):
+            raise ValueError("incomplete stage comparison")
         for mode in grouped:
             stage[mode + "_samples_ms"] = stage[mode]
             stage[mode] = statistics.mean(stage[mode])
