@@ -115,7 +115,9 @@ def worker(path):
 
         module.wait_until(ready, "native Windows listeners did not start",
                           process, timeout=30)
-        module.private_json(directory / "ready.json", ports)
+        pending_ready = directory / "ready.pending.json"
+        module.private_json(pending_ready, ports)
+        pending_ready.replace(directory / "ready.json")
         while process.process.poll() is None:
             if (directory / "stop").exists():
                 process.stop()
@@ -316,6 +318,8 @@ def main():
     parser.add_argument("--caddy", required=True, type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")
+    parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1, metavar="1..128")
     parser.add_argument("--host-pid", type=int)
     args = parser.parse_args()
     for name in ("objdir", "runtime", "caddy", "windows_python"):

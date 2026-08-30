@@ -73,7 +73,9 @@ Run the adapter as root in WSL. It creates its own isolated network namespace,
 uses a loopback relay for the private Caddy/target fixture, and owns the Windows
 client process through a kill-on-close Job Object. All fixture state remains
 below the supplied object directory; no existing network-namespace wrapper is
-needed. `--protocol h2` or `--protocol h3` narrows an iteration.
+needed. `--protocol h2` or `--protocol h3` narrows an iteration. The adapter also
+accepts `--classic-preamble default --parallel-batches 32` for the repeated H3
+buffered-FIN regression against the normal fronting-page policy.
 
 The standalone `run-no-connect-codec-tests.sh <linux-objdir> [output-directory]`
 runner requires the full-source checkout and its bundled GoogleTest sources.
