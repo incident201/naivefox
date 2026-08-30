@@ -3788,10 +3788,10 @@ unchanged during this experiment.
 
 ### Finite-exchange prototype functional admission
 
-The client uses the explicit `diagnostic-h2-finite-exchanges` boolean and
+The prototype client used the explicit `diagnostic-h2-finite-exchanges` boolean and
 rejects H3, other transport diagnostics, extra CONNECT headers and native-parser
 preamble combinations. Stock CONNECT defaults are untouched. The diagnostic
-Caddy overlay is reproducibly built by `build-finite-exchange-caddy.sh` from the
+Caddy overlay was reproducibly built by `build-finite-exchange-caddy.sh` from the
 pinned forwardproxy module; it does not replace the fixture's stock binary.
 The harness accepts it only by an explicit private fixture path inside the
 isolated namespace. Ordinary requests and CONNECT on that same server retain
@@ -3843,9 +3843,98 @@ records that provenance separately from an ordinary successful harness run.
 
 This first block is negative in both target views: SOCKS worsens by 10.7% / 13.3%
 and HTTP CONNECT by 33.7% / 17.2%. It is not evidence for a breaking default.
-Two additional short paired blocks are reserved to check whether the negative
+Two additional short paired blocks were collected to check whether the negative
 direction repeats despite browser scheduling variance. No outer-size, shaped
 link, full default matrix or release build is justified by these results.
+
+### Finite-exchange replication and decision
+
+Fresh artifact `9de8396c3b9573d7` (seed `2026083086`) completed normally after
+the analyzer admission fix. It contains two randomized paired blocks: all four
+client/listener arms plus Firefox A/B, 12 controlled navigations in total. The
+same unshaped isolated H2/inner-H2 fixture, canonical browser workload, cold
+profiles, prelaunched Selenium control and unchanged eight-record padding were
+used. All 12 samples passed capture health, network-mutation and one-connection
+gates; every finite sample also proved negotiation and repeated successful
+ordinary-response completion. The private server digest was
+`e7367ab1b188aa2e701129f746b8d087d45ae84f5fa355da52acd3f418846a70`.
+
+| H2 listener / arm | 17--32 | Whole | Change from same-run listener default |
+| --- | ---: | ---: | --- |
+| SOCKS current default | 0.34590 | 0.24936 | control |
+| SOCKS finite exchanges | 0.36622 | 0.35459 | +5.9% / +42.2% |
+| HTTP CONNECT current default | 0.37813 | 0.25720 | control |
+| HTTP CONNECT finite exchanges | 0.37581 | 0.35068 | -0.6% / +36.3% |
+
+Whole regressed in both the initial block and the fresh replication. HTTP's
+0.6% packets-17--32 reduction in the repeat is effectively neutral at this
+screening scale, not the required 20% gain; SOCKS worsened. These are diagnostic
+point estimates from three blocks total, not a statistical camouflage claim.
+Do not compare their absolute values with another campaign's Firefox-only
+normalization or replace the canonical default matrix with these rows.
+
+Byte accounting helps explain the negative direction without inventing a
+fixed browser pause. In the repeat, mean client wire bytes rose from 18,573.5
+to 27,288 on SOCKS and from 20,852.5 to 26,752 on HTTP. Server wire traffic in
+the first 128 packets fell from 89,965.5 to 47,967.5 bytes and from 89,833.5 to
+38,727.5 bytes respectively. Extra request/response lifecycle traffic is
+consistent with displacing server payload in the early packet-index views;
+normal finite completion alone does not reproduce Firefox's application
+resource-discovery schedule. This is an interpretation of the measured
+accounting, not proof that every possible finite-exchange design must fail.
+
+Post-hoc accounting of the same retained features (no new captures or changed
+ranking) separates the Whole score into disjoint feature families. The entries
+below are additive score changes, not percentages or causal effect estimates.
+Explicit timing includes millisecond-valued features, idle gaps and timed
+bursts; packet structure excludes those timing features. The remaining group
+includes byte/direction aggregates, including aggregates in clock-time windows.
+
+| Whole contribution, finite minus same-run default | SOCKS | HTTP CONNECT |
+| --- | ---: | ---: |
+| Explicit timing and timed bursts | +0.04531 | +0.03465 |
+| Packet sizes and directions | +0.01659 | +0.02172 |
+| TLS record structure | -0.00163 | +0.00004 |
+| Remaining aggregates and handshake features | +0.04496 | +0.03706 |
+| Total | +0.10523 | +0.09348 |
+
+For a concrete early-window mismatch, Firefox and both listener defaults had
+a mean 1,500-byte server packet at index 28, whereas finite SOCKS had a mean
+209-byte client packet. At index 29 Firefox again had 1,500 server bytes, while
+finite HTTP had 209 client bytes. Direction and packet placement changed, not
+just an overall latency scalar. SOCKS mean whole duration was essentially
+unchanged, 118.037 to 116.885 ms; HTTP changed from 124.855 to 132.160 ms.
+Whole is a distance over the entire feature vector, not page-load duration.
+
+The archived implementation also exposes two plausible contributors that this
+screen did not isolate by ablation. `FillDownloads()` replenishes four receive
+GETs independently of resource discovery, and upload POST boundaries follow
+available opaque tunnel bytes rather than browser resource boundaries. In
+addition, `OnDataAvailable()` buffers each response and `FlushDownloads()`
+delivers it only after `OnStopRequest()`; the server likewise accepts a complete
+finite upload body before forwarding it. These completion barriers can alter
+inner TLS/request scheduling even though individual bodies are bounded and the
+directions are pipelined. A successful native response completion is therefore
+not equivalent to reproducing Firefox's resource-discovery/application work.
+The byte/direction changes and score decomposition are observed; attributing
+specific fractions to headers, receive-ahead or completion buffering would
+require distinct controlled ablations and is not established here.
+
+Decision: reject this bounded, independently sequenced upload/download
+prototype for default and do not proceed to a full breaking implementation.
+Its implementation and tests remain reproducible in commits `ab19acb41807`
+and `f6f1500cd629`. The diagnostic client, server overlay and capture admission
+were removed from the active tree; all affected runtime, configuration and
+test/harness files were checked byte-for-byte against the pre-experiment
+version. Stock Caddy, both H2 listener defaults, H3 defaults, the canonical
+matrix and the stock fronting-site contract remain unchanged. Future preflight
+must treat this exact finite-cell topology as tested, and require a different
+causal premise rather than merely renaming the cells or changing a bound.
+
+After retirement, incremental minimized product and test builds passed, as did
+all 100 restored NaiveFox C++ gtests and 172 analysis/harness/lifecycle Python
+tests. No full Firefox rebuild, generated-source export or default-matrix
+replacement was performed for this rejected candidate.
 
 ## Sensitive data handling
 

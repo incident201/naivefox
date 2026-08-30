@@ -14,10 +14,6 @@ RESOURCE_TREE_PREAMBLE_MAX_BYTES = 128 * 1024
 RESOURCE_TREE_PREAMBLE_MAX_ASSETS = 3
 PAGE_PREAMBLE_MAX_BYTES = 384 * 1024
 PAGE_PREAMBLE_MAX_ASSETS = 6
-FINITE_ARMS = {
-    "h2-finite-socks": "document-first-buffer-task-overlap",
-    "h2-finite-http-connect": "document-first-buffer-http-connect",
-}
 
 
 def build_config(
@@ -31,23 +27,6 @@ def build_config(
     preamble_path=PREAMBLE_PATH,
     max_connections=0,
 ):
-    if arm in FINITE_ARMS:
-        if protocol != "h2" or diagnostic_first_socks_tunnel_urgent_start:
-            raise ValueError(
-                "finite exchanges require strict H2 without other diagnostics"
-            )
-        config = build_config(
-            FINITE_ARMS[arm],
-            protocol,
-            socks_port,
-            proxy_port,
-            proxy_user,
-            proxy_pass,
-            preamble_path=preamble_path,
-            max_connections=max_connections,
-        )
-        config["diagnostic-h2-finite-exchanges"] = True
-        return config
     supported_arms = (
         "off",
         "gate",
@@ -542,8 +521,6 @@ def main():
     parser.add_argument(
         "--arm",
         choices=(
-            "h2-finite-socks",
-            "h2-finite-http-connect",
             "off",
             "gate",
             "root",

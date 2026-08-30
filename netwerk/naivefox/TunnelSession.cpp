@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "AutoFallback.h"
-#include "FiniteExchange.h"
 #include "HeaderPadding.h"
 #include "NeckoTunnel.h"
 #include "OuterSessionGate.h"
@@ -466,8 +465,6 @@ class TunnelSession::Impl final {
   nsCOMPtr<nsITimer> mPreambleTimer;
   nsCOMPtr<nsITimer> mPreambleDrainTimer;
   RefPtr<ProxyPreambleOperation> mPreambleOperation;
-  // Main-thread owned; the pump sees only the opposite ends of its pipes.
-  RefPtr<FiniteExchange> mFiniteExchange;
   uint64_t mPreambleOperationGeneration = 0;
   nsCString mPreambleTargetAuthority;
   detail::PreambleSequenceState mPreambleSequence;
@@ -1235,36 +1232,6 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
       !mImpl->mPreambleSequence.TryStartConnect(aGeneration)) {
     return;
   }
-  if (mImpl->mConfig.mDiagnosticH2FiniteExchanges) {
-    RefPtr self = this;
-    mImpl->mFiniteExchange = new FiniteExchange(
-        mImpl->mConfig, mImpl->mConnectionId,
-        [self, aGeneration](nsresult status, nsIAsyncInputStream* input,
-                             nsIAsyncOutputStream* output) {
-          nsCOMPtr<nsIAsyncInputStream> heldInput = input;
-          nsCOMPtr<nsIAsyncOutputStream> heldOutput = output;
-          nsresult dispatch = self->mImpl->mSocketTarget->Dispatch(
-              NS_NewRunnableFunction(
-                  "NaiveFox::FiniteExchangeReady",
-                  [self, aGeneration, status, heldInput, heldOutput]() {
-                    self->ApplyFiniteTransport(aGeneration, status, heldInput,
-                                                heldOutput);
-                  }),
-              NS_DISPATCH_NORMAL);
-          if (NS_FAILED(dispatch)) {
-            if (input) {
-              (void)input->CloseWithStatus(dispatch);
-              (void)output->CloseWithStatus(dispatch);
-            }
-            self->CancelRequestOnMain(dispatch);
-          }
-        });
-    nsresult rv = mImpl->mFiniteExchange->Start(aTargetAuthority);
-    if (NS_FAILED(rv)) {
-      mImpl->mFiniteExchange->Cancel(rv);
-    }
-    return;
-  }
   nsAutoCString padding;
   nsresult rv = GenerateHeaderPadding(padding);
   if (NS_SUCCEEDED(rv)) {
@@ -1426,10 +1393,6 @@ void TunnelSession::FailPreambleOnMain(nsresult aStatus) {
 
 void TunnelSession::CancelRequestOnMain(nsresult aStatus) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mImpl->mFiniteExchange) {
-    RefPtr exchange = std::move(mImpl->mFiniteExchange);
-    exchange->Cancel(aStatus);
-  }
   if (mImpl->mPreambleTimer) {
     (void)mImpl->mPreambleTimer->Cancel();
     mImpl->mPreambleTimer = nullptr;
@@ -1540,32 +1503,6 @@ void TunnelSession::ApplyTransport(uint64_t aGeneration,
   mImpl->mPendingTunnelOut = aSocketOut;
   mImpl->mTransportReady = true;
   MaybeFinishAttempt();
-}
-
-void TunnelSession::ApplyFiniteTransport(uint64_t aGeneration, nsresult aStatus,
-                                         nsIAsyncInputStream* aInput,
-                                         nsIAsyncOutputStream* aOutput) {
-  if (!IsCurrentAttempt(aGeneration, ProxyProtocol::H2) || mImpl->mClosed ||
-      mImpl->mFailed) {
-    if (aInput) {
-      (void)aInput->CloseWithStatus(NS_ERROR_ABORT);
-      (void)aOutput->CloseWithStatus(NS_ERROR_ABORT);
-    }
-    return;
-  }
-  if (NS_FAILED(aStatus) || !aInput || !aOutput) {
-    Fail(NS_FAILED(aStatus) ? aStatus : NS_ERROR_FAILURE);
-    return;
-  }
-  // The finite adapter has verified H2, the explicit version/session echo,
-  // padding support and normal completion of the session-open transaction.
-  // It does not pretend to have received a raw CONNECT upgrade callback.
-  mImpl->mPendingTunnelIn = aInput;
-  mImpl->mPendingTunnelOut = aOutput;
-  mImpl->mOuterProtocol.AssignLiteral("h2");
-  mImpl->mPaddingEnabled = true;
-  mImpl->mTransportReady = true;
-  TunnelReady();
 }
 
 void TunnelSession::ApplyConnectMetadata(

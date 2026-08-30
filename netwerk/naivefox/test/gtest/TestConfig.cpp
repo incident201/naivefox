@@ -387,40 +387,6 @@ TEST(NaiveFoxConfig, RejectsInvalidDiagnosticOptimisticLocalReply)
   }
 }
 
-TEST(NaiveFoxConfig, FiniteExchangeDiagnosticIsExplicitAndH2Only)
-{
-  Config config;
-  nsAutoCString error;
-  EXPECT_FALSE(config.mDiagnosticH2FiniteExchanges);
-  for (const char* listener : {"socks", "http"}) {
-    nsAutoCString json("{\"listen\":\""_ns);
-    json.Append(listener);
-    json.AppendLiteral("://127.0.0.1:1080\",\"proxy\":\"https://proxy.example\","
-                       "\"diagnostic-h2-finite-exchanges\":true}");
-    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
-    EXPECT_TRUE(config.mDiagnosticH2FiniteExchanges);
-    EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
-              nsDependentCString(listener).EqualsLiteral("socks")
-                  ? PreambleMode::DocumentFirstBufferTaskOverlap
-                  : PreambleMode::DocumentFirstBufferOverlap);
-  }
-  for (const char* tail : {
-           R"("diagnostic-h2-finite-exchanges":null)",
-           R"("diagnostic-h2-finite-exchanges":1)",
-           R"("diagnostic-h2-finite-exchanges":"true")",
-           R"("diagnostic-h2-finite-exchanges":true,"diagnostic-h2-finite-exchanges":false)",
-           R"("diagnostic-h2-finite-exchanges":true,"diagnostic-optimistic-local-reply":true)"}) {
-    nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example",)"_ns);
-    json.Append(tail);
-    json.Append('}');
-    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
-  }
-  EXPECT_TRUE(NS_FAILED(ParseConfig(
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://proxy.example","diagnostic-h2-finite-exchanges":true})"_ns,
-      config, error)));
-}
-
 TEST(NaiveFoxConfig, PreambleModesAndBudgets)
 {
   struct Expected {
@@ -1036,7 +1002,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
   source.mImplicitPreambleGate = true;
   source.mDiagnosticFirstSocksTunnelUrgentStart = true;
   source.mDiagnosticOptimisticLocalReply = true;
-  source.mDiagnosticH2FiniteExchanges = true;
 
   TunnelConfig constructed(source);
   TunnelConfig assigned;
@@ -1060,7 +1025,6 @@ TEST(NaiveFoxConfig, TunnelConfigPreambleCopySemantics)
     EXPECT_TRUE(copy->mImplicitPreambleGate);
     EXPECT_TRUE(copy->mDiagnosticFirstSocksTunnelUrgentStart);
     EXPECT_TRUE(copy->mDiagnosticOptimisticLocalReply);
-    EXPECT_TRUE(copy->mDiagnosticH2FiniteExchanges);
   }
 }
 

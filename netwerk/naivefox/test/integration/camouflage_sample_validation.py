@@ -1002,50 +1002,6 @@ def validate_native_parser_process(
 
 
 def validate_sample(arm, protocol, log_text, feature_document):
-    finite_arms = {
-        "h2-finite-socks": "document-first-buffer-task-overlap",
-        "h2-finite-http-connect": "document-first-buffer-http-connect",
-    }
-    if arm in finite_arms:
-        if protocol != "h2":
-            raise ValueError("finite exchanges require h2")
-        ready = re.findall(
-            r"^(?:\[[^\]\r\n]+\] )?Connection (\d+) finite-exchanges ready=1 block-bytes=65536 "
-            r"upload-window=2 download-window=4$",
-            log_text,
-            re.M,
-        )
-        rotated = re.findall(
-            r"^(?:\[[^\]\r\n]+\] )?Connection (\d+) finite-exchanges rotated=1$",
-            log_text,
-            re.M,
-        )
-        established = [
-            item["connection"]
-            for line in log_text.splitlines()
-            if (item := ESTABLISHED.fullmatch(line))
-        ]
-        if (
-            not ready
-            or len(set(ready)) != len(ready)
-            or sorted(ready) != sorted(established)
-            or sorted(rotated) != sorted(ready)
-            or "finite-exchanges failure=" in log_text
-        ):
-            raise ValueError(
-                "finite exchange negotiation or rotation evidence is incomplete"
-            )
-        features = feature_document.get("features", {})
-        if features.get("tls_client_hello_count") != 1.0:
-            raise ValueError("finite exchanges require exactly one outer ClientHello")
-        normal_lifecycle = "\n".join(
-            line for line in log_text.splitlines() if " finite-exchanges " not in line
-        )
-        return validate_sample(
-            finite_arms[arm], protocol, normal_lifecycle, feature_document
-        )
-    if " finite-exchanges " in log_text:
-        raise ValueError("ordinary arm unexpectedly used finite exchanges")
     log_lines = log_text.splitlines()
     supported_arms = (
         "off",
@@ -3528,8 +3484,6 @@ def main():
     parser.add_argument(
         "--arm",
         choices=(
-            "h2-finite-socks",
-            "h2-finite-http-connect",
             "off",
             "gate",
             "root",

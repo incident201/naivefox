@@ -333,7 +333,6 @@ class JsonParser final {
     bool sawOuterSessionGate = false;
     bool sawDiagnosticFirstSocksTunnelUrgentStart = false;
     bool sawDiagnosticOptimisticLocalReply = false;
-    bool sawDiagnosticH2FiniteExchanges = false;
     while (true) {
       nsAutoCString key;
       MOZ_TRY(ParseString(key, "object field name must be a string"));
@@ -427,13 +426,6 @@ class JsonParser final {
         MOZ_TRY(ParseBoolean(
             parsed.mDiagnosticOptimisticLocalReply,
             "diagnostic-optimistic-local-reply must be a boolean"));
-      } else if (key.EqualsLiteral("diagnostic-h2-finite-exchanges")) {
-        if (sawDiagnosticH2FiniteExchanges) {
-          return Error("duplicate diagnostic-h2-finite-exchanges field");
-        }
-        sawDiagnosticH2FiniteExchanges = true;
-        MOZ_TRY(ParseBoolean(parsed.mDiagnosticH2FiniteExchanges,
-                             "diagnostic-h2-finite-exchanges must be a boolean"));
       } else if (key.EqualsLiteral("insecure-concurrency")) {
         if (sawInsecureConcurrency) {
           return Error("duplicate insecure-concurrency field");
@@ -512,20 +504,6 @@ class JsonParser final {
                                   : PreambleConfig::kDefaultDocumentMaxBytes;
         parsed.mPreamble.mCacheResources = usesH3ResourceDefault;
         parsed.mImplicitPreambleGate = !sawOuterSessionGate;
-      }
-    }
-    if (parsed.mDiagnosticH2FiniteExchanges) {
-      for (const auto& proxy : parsed.mProxies) {
-        if (proxy.mProtocol != ProxyProtocol::H2) {
-          return Error("diagnostic-h2-finite-exchanges requires strict H2");
-        }
-      }
-      if (!parsed.mExtraHeaders.IsEmpty() ||
-          parsed.mDiagnosticOptimisticLocalReply ||
-          parsed.mDiagnosticFirstSocksTunnelUrgentStart ||
-          PreambleModeUsesNativeParser(
-              parsed.mPreamble.ModeForProtocol(ProxyProtocol::H2))) {
-        return Error("finite exchanges cannot combine with other diagnostics");
       }
     }
     aConfig = std::move(parsed);

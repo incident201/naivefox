@@ -61,7 +61,9 @@ class CamouflageAnalysisTests(unittest.TestCase):
             )
         )
 
-        sufficient = ANALYZE.absolute_inference_status(synthetic_rows(240), "research")
+        sufficient = ANALYZE.absolute_inference_status(
+            synthetic_rows(240), "research"
+        )
         self.assertTrue(sufficient["supports_absolute_verdict"])
         self.assertTrue(sufficient["research_samples_sufficient"])
 
@@ -579,46 +581,6 @@ class CamouflageAnalysisTests(unittest.TestCase):
                     })
             rows, _ = ANALYZE.load_dataset(path)
         self.assertEqual(rows[-1]["naivefox_arm"], "firefox-proxied")
-
-    def test_finite_exchange_metadata_is_h2_only(self):
-        for arm in ("h2-finite-socks", "h2-finite-http-connect"):
-            for protocol in ("h2", "h3"):
-                with self.subTest(
-                    arm=arm, protocol=protocol
-                ), tempfile.TemporaryDirectory() as directory:
-                    path = os.path.join(directory, "features.csv")
-                    fields = [
-                        "schema_version",
-                        "protocol",
-                        "scenario",
-                        "label",
-                        "session_id",
-                        "naivefox_arm",
-                        "whole_packet_count",
-                    ]
-                    with open(path, "w", newline="", encoding="utf-8") as stream:
-                        writer = csv.DictWriter(stream, fieldnames=fields)
-                        writer.writeheader()
-                        for label, selected in (
-                            ("firefox_a", "reference"),
-                            ("firefox_b", "reference"),
-                            ("naivefox", arm),
-                        ):
-                            writer.writerow({
-                                "schema_version": 1,
-                                "protocol": protocol,
-                                "scenario": "browser_page",
-                                "label": label,
-                                "session_id": label,
-                                "naivefox_arm": selected,
-                                "whole_packet_count": 1,
-                            })
-                    if protocol == "h2":
-                        rows, _ = ANALYZE.load_dataset(path)
-                        self.assertEqual(rows[-1]["naivefox_arm"], arm)
-                    else:
-                        with self.assertRaisesRegex(SystemExit, "requires h2"):
-                            ANALYZE.load_dataset(path)
 
 
 if __name__ == "__main__":

@@ -159,8 +159,6 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
         aConfig.mDiagnosticFirstSocksTunnelUrgentStart;
     tunnelConfig.mDiagnosticOptimisticLocalReply =
         aConfig.mDiagnosticOptimisticLocalReply;
-    tunnelConfig.mDiagnosticH2FiniteExchanges =
-        aConfig.mDiagnosticH2FiniteExchanges;
   }
   return tunnelConfigs;
 }
