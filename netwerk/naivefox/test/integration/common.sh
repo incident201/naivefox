@@ -29,6 +29,23 @@ init_paths() {
   mkdir -p "$TOOLS_DIR/bin" "$STATE_ROOT/runs"
 }
 
+select_finite_caddy() {
+  [[ -n ${NAIVEFOX_DIAGNOSTIC_FINITE_CADDY:-} ]] || return 0
+  if [[ ${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0} != 1 ||
+        ${NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED:-0} != 1 ]]; then
+    printf 'finite Caddy requires the isolated network namespace\n' >&2
+    return 1
+  fi
+  local candidate
+  candidate=$(realpath -- "$NAIVEFOX_DIAGNOSTIC_FINITE_CADDY")
+  case $candidate in
+    "$STATE_ROOT"/finite-exchange-build.*/caddy.finite) ;;
+    *) printf 'finite Caddy must be a private fixture build\n' >&2; return 1 ;;
+  esac
+  [[ -x $candidate ]] || return 1
+  CADDY_BIN=$candidate
+}
+
 find_certutil() {
   if command -v certutil >/dev/null 2>&1; then
     CERTUTIL=$(command -v certutil)

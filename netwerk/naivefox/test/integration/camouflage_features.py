@@ -922,6 +922,8 @@ def main():
     extract_parser.add_argument(
         "--naivefox-arm",
         choices=(
+            "h2-finite-socks",
+            "h2-finite-http-connect",
             "reference",
             "firefox-proxied",
             "off",

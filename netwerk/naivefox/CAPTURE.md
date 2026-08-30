@@ -3786,6 +3786,47 @@ breaking transport as a default. A short screen is not statistical acceptance.
 The ordinary fronting-site requirements and canonical default matrix remain
 unchanged during this experiment.
 
+### Finite-exchange prototype functional admission
+
+The client uses the explicit `diagnostic-h2-finite-exchanges` boolean and
+rejects H3, other transport diagnostics, extra CONNECT headers and native-parser
+preamble combinations. Stock CONNECT defaults are untouched. The diagnostic
+Caddy overlay is reproducibly built by `build-finite-exchange-caddy.sh` from the
+pinned forwardproxy module; it does not replace the fixture's stock binary.
+The harness accepts it only by an explicit private fixture path inside the
+isolated namespace. Ordinary requests and CONNECT on that same server retain
+the unmodified path when the finite version marker is absent.
+
+Two setup smokes (`131d5be5034efaa4`, seed `2026083080`, and
+`ce3c6953f9c8d9d1`, seed `2026083081`) failed before establishment with HTTP 407.
+Necko correctly prunes `Proxy-Authorization` from ordinary origin requests.
+The finite API now uses scoped origin `Authorization`, with redirects forbidden;
+the server feeds it into its existing credential verifier only for explicitly
+marked finite requests. No shared Necko/authentication behavior was weakened.
+The API must reach that authenticated handler before ordinary fronting-page
+handlers; unlike the unauthenticated preamble, these are protocol requests, not
+cover resources. This is an experimental server-routing requirement, not a
+change to the stock-default fronting-page contract.
+
+Seed `2026083082` loaded the inner page but hit an unregistered arm name in the
+feature extractor (`bd8b6f3fbb60e8ee`). Seed `2026083083` also completed the
+workload but the new marker validator omitted the optional timestamp prefix
+(`f88357f9c6d35234`). These harness defects were corrected and regression-tested;
+neither failed artifact is a passive candidate score. Clean isolated smoke
+`c8dabc167b8b4df8` (seed `2026083084`) then passed the one-connection, one
+ClientHello, preamble, inner-H2, unchanged-padding and finite-rotation gates.
+
+The prototype passed 101 focused C++ gtests, 138 harness/lifecycle tests, the
+server module's `go test -race ./...`, and incremental product/test builds.
+`run-finite-exchange-tests.sh` passed both SOCKS and HTTP CONNECT with TLS,
+byte-exact slow 1 MiB download, digest-checked 768 KiB upload, half-close,
+four-way concurrency, cancellation, invalid upstream credentials and bounded
+normal process shutdown. Test-driver setup errors (a preamble path outside its
+allowlist, an omitted newline in the small-body expectation, and treating
+SIGTERM as orderly CLI shutdown) were corrected against the existing fixture
+contracts; shutdown is now verified through the exact accepted-connection
+bound. Functional success does not establish a residual improvement.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
