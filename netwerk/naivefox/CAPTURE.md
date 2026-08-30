@@ -3827,6 +3827,26 @@ SIGTERM as orderly CLI shutdown) were corrected against the existing fixture
 contracts; shutdown is now verified through the exact accepted-connection
 bound. Functional success does not establish a residual improvement.
 
+The first randomized four-arm block, seed `2026083085`, completed all six
+captures and their per-sample gates, but the aggregate analyzer still had a
+separate arm-name allowlist. Its rejection was repaired and tested. Existing
+feature fragments were revalidated and reanalyzed without recollection or
+sample selection as recovered artifact `a6381fe95c5b49d9`; recovery metadata
+records that provenance separately from an ordinary successful harness run.
+
+| H2 listener / arm | 17--32 | Whole |
+| --- | ---: | ---: |
+| SOCKS current default | 0.64830 | 0.41413 |
+| SOCKS finite exchanges | 0.71753 | 0.46926 |
+| HTTP CONNECT current default | 0.53741 | 0.40328 |
+| HTTP CONNECT finite exchanges | 0.71826 | 0.47271 |
+
+This first block is negative in both target views: SOCKS worsens by 10.7% / 13.3%
+and HTTP CONNECT by 33.7% / 17.2%. It is not evidence for a breaking default.
+Two additional short paired blocks are reserved to check whether the negative
+direction repeats despite browser scheduling variance. No outer-size, shaped
+link, full default matrix or release build is justified by these results.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and

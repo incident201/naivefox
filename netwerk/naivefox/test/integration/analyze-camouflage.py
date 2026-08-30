@@ -159,6 +159,8 @@ def load_dataset(path):
                 raise SystemExit("invalid label metadata")
             arm = source.get("naivefox_arm") or None
             naivefox_arms = {
+                "h2-finite-socks",
+                "h2-finite-http-connect",
                 "firefox-proxied",
                 "off",
                 "gate",
@@ -213,6 +215,11 @@ def load_dataset(path):
             }
             if arm not in {None, "reference", *naivefox_arms}:
                 raise SystemExit("invalid NaiveFox arm metadata")
+            if (
+                arm in {"h2-finite-socks", "h2-finite-http-connect"}
+                and source["protocol"] != "h2"
+            ):
+                raise SystemExit("finite exchange analysis requires h2")
             if arm == "firefox-proxied" and source["protocol"] != "h2":
                 raise SystemExit("firefox-proxied analysis requires h2")
             if arm == "root-pmtud-control" and source["protocol"] != "h3":
