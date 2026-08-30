@@ -19,9 +19,11 @@ class SessionCostTests(unittest.TestCase):
         candidate["session_exercise"]["checks"][0].update({"completion_ms": 15, "curl_completion_ms": 10})
         return [baseline, candidate]
 
-    def report(self, rows):
+    def report(self, rows, comparison=None):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            if comparison is not None:
+                (root / "session-comparison.json").write_text(json.dumps(comparison))
             for index, row in enumerate(rows):
                 sample = root / f"session-{index:03d}"
                 sample.mkdir()
@@ -35,6 +37,19 @@ class SessionCostTests(unittest.TestCase):
             self.assertEqual(result["candidate"], variant or "replace")
             self.assertAlmostEqual(result["wire"]["growth_percent"], 10)
             self.assertAlmostEqual(result["curl_stages"]["download"]["completion_reduction_percent"], 100 / 3)
+
+    def test_explicit_non_v1_control(self):
+        rows = self.rows("continuous-bulk-ready")
+        rows[0]["app_profile"] = "continuous-bulk"
+        comparison = {"variants": True, "control": "continuous-bulk", "candidate": "continuous-bulk-ready", "seed": 12}
+        result = self.report(rows, comparison)
+        self.assertEqual(result["control"], "continuous-bulk")
+        self.assertAlmostEqual(result["wire"]["growth_percent"], 10)
+        with self.assertRaises(ValueError):
+            self.report(rows)
+        comparison["control"] = "continuous-v1"
+        with self.assertRaises(ValueError):
+            self.report(rows, comparison)
 
     def test_incomplete_or_unequal_work_never_scores(self):
         rows = self.rows("continuous-sync2")

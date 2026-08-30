@@ -48,7 +48,7 @@ def main(root, name, profile):
         for result in results:
             destination = target / (result.parent.name + "-result.json")
             shutil.copy2(result, destination)
-        for name in ("schedule.json", "features.csv", "analysis.json", "analysis.md", "timing-schedule.json", "session-schedule.json", "connection-audit.json", "provenance.json", "outer-shaping.json", "outer-shaping-final.json"):
+        for name in ("schedule.json", "features.csv", "analysis.json", "analysis.md", "timing-schedule.json", "session-schedule.json", "session-comparison.json", "connection-audit.json", "provenance.json", "outer-shaping.json", "outer-shaping-final.json"):
             source = campaign / name
             if source.exists():
                 shutil.copy2(source, target / name)

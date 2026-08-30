@@ -11,7 +11,13 @@ def summarize(root):
     rows = [json.loads(path.read_text()) for path in sorted(root.glob("session-*/result.json"))]
     variants = rows and all(result["mode"] == "replace" for result in rows)
     control, candidate = "default", "replace"
-    if variants:
+    metadata = root / "session-comparison.json"
+    if metadata.exists():
+        comparison = json.loads(metadata.read_text())
+        if comparison["variants"] != variants or comparison["control"] == comparison["candidate"]:
+            raise ValueError("invalid explicit comparison")
+        control, candidate = comparison["control"], comparison["candidate"]
+    elif variants:
         candidates = {result["app_profile"] for result in rows} - {"continuous-v1"}
         if len(candidates) != 1:
             raise ValueError("one candidate profile required")
@@ -20,7 +26,10 @@ def summarize(root):
     for result in rows:
         if not result.get("admitted"):
             raise ValueError("incomplete fixed-work session campaign")
-        grouped[result["app_profile"] if variants else result["mode"]].append(result)
+        label = result["app_profile"] if variants else result["mode"]
+        if label not in grouped:
+            raise ValueError("unexpected comparison arm")
+        grouped[label].append(result)
     if not all(grouped.values()) or len(grouped[control]) != len(grouped[candidate]):
         raise ValueError("complete paired comparison required")
     summary = {"campaign": root.name, "pairs": len(grouped[control]), "control": control, "candidate": candidate, "wire": {}, "stages": {}, "curl_stages": {}}

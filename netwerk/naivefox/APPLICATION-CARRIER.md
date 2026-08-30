@@ -766,3 +766,30 @@ compare directly against continuous-bulk before comparing against v1.
 The completed bulk block and matching server `c211251` binaries/history are
 preserved in `continuous-bulk-evidence`, manifest SHA-256
 `130ef0879353b423e1d386aabb026d3902cdc0c8e486eb01fd9f5549273e24b4`.
+
+## Bounded credit-state handoff
+
+Server `d02b4e1` adds `continuous-bulk-ready`. A bulk response must have sent
+at least 128 KiB useful data before its remaining queued >=32 KiB can preserve
+a download hint across low ready credit. Empty replies cannot sustain this
+hint. The underlying receive window, per-stream credit enforcement, body
+capacities and local receiver backpressure remain unchanged. The first unit
+run caught the omitted frozen-budget entry for the new profile; after adding
+it, 21 JavaScript tests, 14 focused Python tests and all four Go race packages
+passed. No Firefox rebuild was required.
+
+`continuous-bulk-ready-h2-pairs` (two randomized pairs, seed 202608322) compares
+against continuous-bulk, not v1. All four sessions passed. All four observed
+exactly three credit-handoff opportunities; only the candidate promoted them.
+Curl single download means 121.482 -> 70.818 ms (-41.71% time); parallel
+94.159 -> 99.459 ms (+5.63%); slow upload 319.018 -> 320.051 ms (+0.32%);
+small wake 22.049 -> 19.661 ms. Wire 6,690,704 -> 6,714,406 bytes (+0.35%).
+The two control opportunities and two candidate interventions support the
+proposed cause for the single-stream gap; they do not establish every stall's
+cause or guarantee a universal gain. Extend to two H3 pairs (202608323) and one
+H2 10-Mbit/s pair (202608324) with identical binaries.
+
+The runner now records explicit pair control/candidate/seed metadata and admits
+non-v1 profile controls. Older campaigns retain their historical implicit v1
+comparison. Incomplete or mislabeled pairs still fail closed; snapshots retain
+the new comparison metadata.

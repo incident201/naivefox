@@ -45,6 +45,7 @@ PROFILES = {
     "continuous-sync": (20, 65536),
     "continuous-sync2": (20, 65536),
     "continuous-bulk": (20, 65536),
+    "continuous-bulk-ready": (20, 65536),
 }
 
 
@@ -99,7 +100,7 @@ def validate_http_graph(stats, name, mode):
         dynamic = {"POST /api/sync", "GET /api/events/idle", *(prefix + state for state in ("interactive", "download", "upload", "mixed"))}
         if not combined:
             dynamic.add("POST /api/upload/chunk")
-        bulk = name == "continuous-bulk"
+        bulk = name.startswith("continuous-bulk")
         if bulk:
             dynamic.update({"POST /api/sync/bulk", "GET /api/data/bulk"})
         if stats["connect"] or stats["rejected"] or stats["write_errors"]:
@@ -537,6 +538,7 @@ def main():
     parser.add_argument("--session-probe",action="store_true")
     parser.add_argument("--session-pairs",type=int,default=0)
     parser.add_argument("--session-variants",action="store_true")
+    parser.add_argument("--session-control",choices=PROFILES,default="continuous-v1")
     parser.add_argument("--session-wire",action="store_true")
     parser.add_argument("--profile-stages",action="store_true")
     parser.add_argument("--idle-seconds",type=int,default=0)
@@ -545,7 +547,9 @@ def main():
     args=parser.parse_args()
     if args.profile_stages and (not args.session_probe or args.mode!="replace" or args.session_pairs or args.session_wire or args.idle_seconds):
         parser.error("stage profiling requires a standalone replacement session probe without wire/idle accounting")
-    if args.session_variants and (not args.session_pairs or not continuous(args.app_profile) or args.app_profile == "continuous-v1"):
+    if args.session_control != "continuous-v1" and not args.session_variants:
+        parser.error("session control requires variant pairs")
+    if args.session_variants and (not args.session_pairs or not continuous(args.app_profile) or not continuous(args.session_control) or args.app_profile == args.session_control):
         parser.error("session variant pairs require an experimental continuous profile and a positive pair count")
     if args.session_pairs < 0 or args.session_pairs > 8 or (args.session_pairs and (not continuous(args.app_profile) or args.screen or args.capture or args.idle_seconds)):
         parser.error("session pairs require the continuous profile, no residual/idle capture, and at most eight pairs")
@@ -582,10 +586,11 @@ def main():
             rng=random.Random(args.seed)
             schedule=[]
             for block in range(args.session_pairs):
-                modes=["continuous-v1",args.app_profile] if args.session_variants else ["default","replace"]
+                modes=[args.session_control,args.app_profile] if args.session_variants else ["default","replace"]
                 rng.shuffle(modes)
                 schedule.extend({"block":block,"mode":"replace" if args.session_variants else value,"profile":value if args.session_variants else args.app_profile} for value in modes)
             write_json(args.root / "session-schedule.json",schedule)
+            write_json(args.root / "session-comparison.json",{"seed":args.seed,"variants":args.session_variants,"control":args.session_control if args.session_variants else "default","candidate":args.app_profile if args.session_variants else "replace"})
             for index,row in enumerate(schedule):
                 result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=row["profile"],session_probe=True,session_wire=True)
                 print(json.dumps({key:value for key,value in result.items() if key not in ("server-stats","bridge-stats","inner_http_statuses")},sort_keys=True),flush=True)
