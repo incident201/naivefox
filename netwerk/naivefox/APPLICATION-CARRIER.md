@@ -207,3 +207,50 @@ so its two-sample speed percentage is especially uncertain. Neither these
 percentages nor the residual gains are claimed invariant under resource sizes,
 slow links, long sessions or a future native implementation. The larger-scale
 rate/idle cost remains unmeasured.
+
+### Independent identical-URL replication
+
+Two new complete blocks per protocol, seeds 202608305 / 202608306, directories
+`h2-replication` / `h3-replication`. All 28 participants passed. These results
+supersede the query-selected append variant for causal comparison, while the
+earlier observations remain above. The small sample remains non-inferential.
+
+| Protocol / arm | 17--32 | Whole |
+| --- | ---: | ---: |
+| H2 default SOCKS | 0.38998 | 0.38001 |
+| H2 default HTTP | 0.35961 | 0.38258 |
+| H2 replace SOCKS | 0.11342 | 0.20262 |
+| H2 replace HTTP | 0.20376 | 0.20417 |
+| H2 append SOCKS | 0.11700 | 0.27992 |
+| H3 default SOCKS | 0.33851 | 0.39290 |
+| H3 default HTTP | 0.31308 | 0.38931 |
+| H3 replace SOCKS | 0.27528 | 0.21481 |
+| H3 replace HTTP | 0.17142 | 0.17600 |
+| H3 append SOCKS | 0.23173 | 0.22008 |
+
+Whole improved again (roughly 45--55% against defaults), but H3 SOCKS 17--32
+is unstable: this replication improves only 18.7%, unlike the large first-screen
+point gain. Do not claim the early shape is solved or promote this prototype.
+Replacement versus append reduced Whole by 27.6% in H2 but only 2.4% in this
+H3 repeat; removal of CONNECT/full-browser application topology and substitution
+are not yet quantitatively separated for every protocol/view.
+
+The repeat measured H2 SOCKS/HTTP completion at 277/294 ms against 107/107 ms,
+and H3 at 319/265 ms against 126/117 ms. Effective fixed-page rates fall about
+61/63% and 60/56%, respectively. Wire growth stays approximately +168% (H2)
+and +141% (H3). The earlier H3 HTTP rate-loss estimate of 34% was driven by the
+slow control observation; the repeat demonstrates why it must not be generalized.
+
+### Next cost campaign preflight
+
+Before implementation, re-read the finite source in `ab19acb41807`, corrected
+read-through and budgeted records through `1807e1954dd4`, and the all-ref
+carrier/finite history. Earlier finite transports separately replenished GETs
+and data-driven POSTs, with no application-defined fixed filler substitution.
+The next trials keep the new protocol's independently specified capacity slots:
+smaller cells, and optional downstream cells in a POST response instead of a
+separate following GET. Decoupling network turnover from animation callbacks
+is an explicit application-scheduler axis. None is claimed as an untested
+general finite-exchange idea; the distinct premise remains fixed-capacity
+application traffic replacing filler. Functional capacity failures will be
+recorded before any residual scoring. Start with H2/SOCKS only, not full matrices.
