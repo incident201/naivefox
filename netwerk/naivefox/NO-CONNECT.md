@@ -114,7 +114,8 @@ connection failure remains the local client's responsibility.
 
 Use the existing warm minimized product object directories. New source files
 may regenerate the incremental product backend; they do not justify a cold
-Firefox build or another object directory. See [MINIMAL.md](MINIMAL.md).
+Firefox build or another object directory. See the
+[full-source build runbook](https://github.com/incident201/naivefox/blob/naivefox-full-source/netwerk/naivefox/MINIMAL.md).
 
 Check CLI syntax, JSON precedence and mode validation without starting the
 network runtime:

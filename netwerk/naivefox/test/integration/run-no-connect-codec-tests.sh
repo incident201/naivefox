@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the production codec's gtests against a warm product NSS/NSPR build.
+# Full-source-only: run codec gtests against a warm product NSS/NSPR build.
 # NAIVEFOX_CODEC_SANITIZERS=1 enables ASan/UBSan without rebuilding NSS.
 set -euo pipefail
 
@@ -14,6 +14,13 @@ output=${2:-"$objdir/no-connect-codec-tests"}
 mkdir -p "$output"
 output=$(cd "$output" && pwd)
 gtest="$source_root/third_party/googletest/googletest"
+if [[ ! -f "$gtest/src/gtest-all.cc" ||
+      ! -d "$source_root/testing/gtest/mozilla/gtest-custom" ]]; then
+  printf '%s\n' \
+    'This runner requires the full-source checkout with bundled GoogleTest.' \
+    'Generated minimal-source exports intentionally omit these test dependencies.' >&2
+  exit 2
+fi
 runtime="$objdir/dist/bin"
 compiler=${CXX:-"${MOZBUILD_STATE_PATH:-$HOME/.mozbuild}/clang/bin/clang++"}
 if [[ ! -x $compiler ]]; then
@@ -22,8 +29,7 @@ if [[ ! -x $compiler ]]; then
 fi
 for required in "$objdir/dist/include/nss/nss.h" \
                 "$objdir/dist/include/nspr/nspr.h" \
-                "$runtime/libnss3.so" "$runtime/libnspr4.so" \
-                "$gtest/src/gtest-all.cc"; do
+                "$runtime/libnss3.so" "$runtime/libnspr4.so"; do
   if [[ ! -f $required ]]; then
     printf 'Missing warm-build dependency: %s\n' "$required" >&2
     exit 2

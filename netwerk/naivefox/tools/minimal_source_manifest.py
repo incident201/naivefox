@@ -24,6 +24,8 @@ PRODUCT_DOC_SOURCES = {
     "netwerk/naivefox/README.md": "netwerk/naivefox/README.md",
     "netwerk/naivefox/ARCHITECTURE.md": "netwerk/naivefox/ARCHITECTURE.md",
     "netwerk/naivefox/KNOWN-ISSUES.md": "netwerk/naivefox/KNOWN-ISSUES.md",
+    "netwerk/naivefox/NO-CONNECT.md": "netwerk/naivefox/NO-CONNECT.md",
+    "netwerk/naivefox/FRONTING-PAGE.md": "netwerk/naivefox/FRONTING-PAGE.md",
     "netwerk/naivefox/CAPTURE.md": "netwerk/naivefox/CAPTURE.md",
     "netwerk/naivefox/SHIMS.md": "netwerk/naivefox/SHIMS.md",
     "netwerk/naivefox/test/integration/README.md": (
@@ -33,6 +35,8 @@ PRODUCT_DOC_SOURCES = {
 ROOT_README_LINKS = {
     "ARCHITECTURE.md": "netwerk/naivefox/ARCHITECTURE.md",
     "KNOWN-ISSUES.md": "netwerk/naivefox/KNOWN-ISSUES.md",
+    "NO-CONNECT.md": "netwerk/naivefox/NO-CONNECT.md",
+    "FRONTING-PAGE.md": "netwerk/naivefox/FRONTING-PAGE.md",
     "CAPTURE.md": "netwerk/naivefox/CAPTURE.md",
     "test/integration/README.md": "netwerk/naivefox/test/integration/README.md",
 }

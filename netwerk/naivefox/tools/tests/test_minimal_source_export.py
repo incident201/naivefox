@@ -46,6 +46,8 @@ class MinimalSourceExportTest(unittest.TestCase):
             "netwerk/naivefox/README.md": nested_readme,
             "netwerk/naivefox/ARCHITECTURE.md": "# Architecture\n",
             "netwerk/naivefox/KNOWN-ISSUES.md": "# Known issues\n",
+            "netwerk/naivefox/NO-CONNECT.md": "# No-connect\n",
+            "netwerk/naivefox/FRONTING-PAGE.md": "# Fronting page\n",
             "netwerk/naivefox/CAPTURE.md": "# Capture\n",
             "netwerk/naivefox/SHIMS.md": "# Shims\n",
             "netwerk/naivefox/test/integration/README.md": "# Integration\n",
@@ -130,12 +132,26 @@ class MinimalSourceExportTest(unittest.TestCase):
         source = (
             "ARCHITECTURE.md prose\n"
             "[architecture](ARCHITECTURE.md#threading)\n"
+            "[transport](NO-CONNECT.md#configuration)\n"
+            "[fronting](FRONTING-PAGE.md)\n"
             "[external](https://example.invalid/ARCHITECTURE.md)\n"
         )
         rendered = render_root_readme(source)
         self.assertIn("ARCHITECTURE.md prose", rendered)
         self.assertIn("](netwerk/naivefox/ARCHITECTURE.md#threading)", rendered)
+        self.assertIn("](netwerk/naivefox/NO-CONNECT.md#configuration)", rendered)
+        self.assertIn("](netwerk/naivefox/FRONTING-PAGE.md)", rendered)
         self.assertIn("https://example.invalid/ARCHITECTURE.md", rendered)
+
+    def test_operator_documents_are_required(self) -> None:
+        for path in ("netwerk/naivefox/NO-CONNECT.md",
+                     "netwerk/naivefox/FRONTING-PAGE.md"):
+            plan = dict(self.plan)
+            plan["entries"] = [
+                entry for entry in self.plan["entries"] if entry["path"] != path
+            ]
+            with self.assertRaisesRegex(ValueError, "product document mapping"):
+                create_public_manifest(plan)
 
     def test_missing_file_is_rejected(self) -> None:
         (self.root / "config.example.json").unlink()

@@ -59,6 +59,8 @@ PRODUCT_DOCS = {
     pathlib.PurePosixPath("netwerk/naivefox/README.md"),
     pathlib.PurePosixPath("netwerk/naivefox/ARCHITECTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/KNOWN-ISSUES.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/NO-CONNECT.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/FRONTING-PAGE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/CAPTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/SHIMS.md"),
     pathlib.PurePosixPath("netwerk/naivefox/test/integration/README.md"),

@@ -45,6 +45,8 @@ PRODUCT_DOCS = {
     "README.md",
     "ARCHITECTURE.md",
     "KNOWN-ISSUES.md",
+    "NO-CONNECT.md",
+    "FRONTING-PAGE.md",
     "CAPTURE.md",
     "SHIMS.md",
     "test/integration/README.md",

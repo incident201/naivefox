@@ -70,6 +70,13 @@ client process through a kill-on-close Job Object. All fixture state remains
 below the supplied object directory; no existing network-namespace wrapper is
 needed. `--protocol h2` or `--protocol h3` narrows an iteration.
 
+The standalone `run-no-connect-codec-tests.sh <linux-objdir> [output-directory]`
+runner requires the full-source checkout and its bundled GoogleTest sources.
+Generated minimal-source exports intentionally omit those unit-test dependencies;
+their HTTP integration runners remain available. The standalone codec runner
+reuses a warm product NSS/NSPR build and can enable ASan/UBSan with
+`NAIVEFOX_CODEC_SANITIZERS=1`.
+
 ## Complete local gate
 
 From the repository root, run:
@@ -152,7 +159,7 @@ instance it started during cleanup.
 On WSL the managed emulator and image are Linux-local, discovered under
 `${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/`; the launcher does not silently
 fall back to a Windows installation. Run adb, the emulator and the fixture in
-one isolated namespace. See [the managed emulator setup](../../MINIMAL.md).
+one isolated namespace. See [the managed emulator setup](https://github.com/incident201/naivefox/blob/naivefox-full-source/netwerk/naivefox/MINIMAL.md).
 Boot readiness requires an Android boot-completed property, not just a stopped
 animation; the latter can precede clock and networking initialization.
 
