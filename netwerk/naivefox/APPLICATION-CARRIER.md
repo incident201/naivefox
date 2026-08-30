@@ -1217,3 +1217,61 @@ Deliver responses in order; finish/cancel both before the next state decision.
 At most two fixed responses, no reorder queue, unbounded requests, raw outer
 stream, retry or new timer. Test error cancellation, header ordering, exact
 pair budget and IPC exclusivity, then two H2 8-MiB pairs, seed 202608342.
+
+Admission passed 33 JS tests, all four Go race packages and 17 focused harness
+tests. `continuous-bulk-pipeline-h2-8m-pairs` passed all four full sessions,
+each with 21 paired bulk leases (42 POSTs); only candidates recorded 21 completed
+overlapped pairs. These counters prove application scheduling, not simultaneous
+packets on the wire. Serial -> pipeline: single 265.653 -> 237.809 ms (-10.48%),
+parallel 84.413 -> 77.467 ms (-8.23%), slow upload 322.153 -> 318.721 ms,
+small wake 23.595 -> 18.601 ms. Wire 15,412,336 -> 15,413,555 bytes (+0.008%).
+Compare next against original bulk-duplex, two H2 8-MiB pairs, seed 202608343,
+to include the pair-length and larger-window costs rather than hiding them
+inside a weaker matched control.
+
+`continuous-bulk-pipeline-h2-8m-strong-pairs` passed: bulk-duplex -> pipeline
+single 261.850 -> 230.080 ms (-12.13%), parallel 87.368 -> 75.893 ms
+(-13.13%), slow upload 319.974 -> 318.242 ms, small wake 20.310 -> 22.469 ms.
+Wire 15,118,088 -> 15,403,160.5 bytes (+1.89%). This merits a focused H3
+8-MiB two-pair check against the same strong control (seed 202608344), followed
+by one H2 40-ms-RTT/shared-50-Mbit pair (seed 202608345) if admission holds.
+No full resource matrix or default claim.
+
+H3 `continuous-bulk-pipeline-h3-8m-strong-pairs` passed with one QUIC flow
+and no outer TCP. Single 324.221 -> 257.453 ms (-20.59%; controls
+296.176/352.265, candidates 251.543/263.362); parallel 92.012 -> 81.462 ms
+(-11.47%), slow upload 325.930 -> 321.704 ms, small wake 24.617 -> 23.495 ms.
+Wire 14,994,489 -> 15,256,638.5 bytes (+1.75%). Cross-protocol speed evidence
+is positive, but these remain two-pair screens, not a residual qualification.
+
+H2 `continuous-bulk-pipeline-h2-8m-rtt40-pair` passed with zero shaper drops:
+single 3641.031 -> 3259.259 ms (-10.49%), parallel 1304.737 -> 1197.594 ms
+(-8.21%), slow upload 1560.152 -> 1405.583 ms, small wake 360.803 -> 314.653 ms.
+The latter stages include different observed inner-handshake turns in this
+one pair; do not attribute all their difference to a bulk-only change.
+Wire 15,067,111 -> 15,349,364 bytes (+1.87%). Snapshot
+`continuous-pipeline-evidence`, server `fa778cb`, manifest SHA-256
+`77fba374a3ef5888743b3cc0e59c2105a74b63c2df3ee0571c4ecfd42d06d620`.
+
+## Idle event/heartbeat split preregistration
+
+Separate next premise: current continuous idle always returns a 512-byte cell,
+including empty 30-second timeouts. Such a response can carry only a small
+fragment of the first inner TLS flight. History preflight reviewed continuous
+idle/wake implementation and retained finite-lifecycle records; this is not
+the rejected optimistic local ACK or a timeout before target delivery.
+
+Test an opt-in profile based on original bulk-duplex: a genuine idle timeout
+returns HTTP 204 with no cell, while an activity wake returns one fixed 8-KiB
+cell, regardless of the exact target queue size. Leave the 30-second maximum
+poll duration, POST wake, startup, bulk and all active leases unchanged.
+No new wait, repeated rapid polling or per-byte body sizing. HTTP 204 does
+not advance cell sequence; an event body still does. A wake/timeout race must
+not lose work, and ordinary visitors use the same API semantics.
+
+These are disjoint conditions: short fixed-work sessions isolate event size;
+a separate 65-second idle run verifies zero-body heartbeat accounting/liveness.
+Expect possible active-session filler growth from larger wake cells; measure
+both it and idle wire cost. The scope is latency/idle cost, not a claimed
+large-download acceleration or new residual winner. Implement after freezing
+the pipeline evidence, with exact status/capacity/sequence/cancellation tests.
