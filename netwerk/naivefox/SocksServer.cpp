@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "HttpConnectParser.h"
+#include "NoConnectTransport.h"
 #include "RuntimeLogging.h"
 #include "Socks5Parser.h"
 #include "TunnelSession.h"
@@ -940,6 +941,7 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
     aControl->SetMainEventTarget(GetMainThreadSerialEventTarget());
   }
   auto clearControl = MakeScopeExit([aControl]() {
+    ShutdownNoConnectCarriers();
     if (aControl) {
       aControl->ClearMainEventTarget();
     }

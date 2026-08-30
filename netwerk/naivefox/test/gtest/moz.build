@@ -12,6 +12,7 @@ UNIFIED_SOURCES += [
     "TestNaivePadding.cpp",
     "TestNativeStylePreloadProcessLifecycle.cpp",
     "TestNetworkStartupState.cpp",
+    "TestNoConnectCodec.cpp",
     "TestOuterSessionGate.cpp",
     "TestPaddingNegotiation.cpp",
     "TestPreambleRequestSemantics.cpp",

@@ -218,9 +218,15 @@ the selected outer HTTPS proxy session. The flagged request bypasses proxy
 CONNECT creation and the H3 proxy's CONNECT-UDP stream selection while still
 using Necko's normal H2/H3 request streams and wildcard proxy pool.
 
+The native `no-connect` transport also reuses this route-only flag for its
+bounded GET/POST application exchanges. Its channel factory remains under
+`netwerk/naivefox/`; no additional Firefox hook or dependency is needed. The
+combined-server runtime suite verifies both methods over strict H2/H3 and
+checks that these exchanges emit no outer CONNECT.
+
 Review obligations: the flag is opt-in and pre-open only; unflagged Firefox
 proxy traffic is unchanged; the first H2/H3 activation safely reaches the
-wildcard pool; the request is an ordinary GET rather than CONNECT or
+wildcard pool; the request is an ordinary GET/POST rather than CONNECT or
 CONNECT-UDP; and the resulting outer connection remains eligible for a
 subsequent proxy CONNECT.
 

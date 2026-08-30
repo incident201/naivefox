@@ -17,6 +17,8 @@ SOURCES += [
     "../NativeStylePreloadProcessBackground.cpp",
     "../NativeStylePreloadProcessBridge.cpp",
     "../NeckoTunnel.cpp",
+    "../NoConnectCodec.cpp",
+    "../NoConnectTransport.cpp",
     "../OuterSessionGate.cpp",
     "../PaddingNegotiation.cpp",
     "../RuntimeLogging.cpp",

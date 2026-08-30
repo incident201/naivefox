@@ -19,6 +19,7 @@
 #include "nscore.h"
 
 class nsIHttpUpgradeListener;
+class nsIChannel;
 class nsIHttpChannel;
 class nsIInputStream;
 class nsIRequest;
@@ -31,6 +32,11 @@ namespace mozilla::naivefox {
 struct NativeStylePreloadActivationDescriptor;
 struct NativeRootReplacementActivationDescriptor;
 struct NativeStylePreloadProcessDescriptor;
+
+nsresult CreateNoConnectChannel(
+    const nsACString& aProxyUrl, const nsACString& aPath,
+    ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule,
+    nsIChannel** aChannel);
 
 // Internal Naive proxy authentication helper. This is not part of the
 // embedded C ABI.
