@@ -63,11 +63,13 @@
 #include "nsITimer.h"
 #include "nsITransportSecurityInfo.h"
 #include "nsIURI.h"
+#include "nsIUploadChannel2.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsProxyInfo.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
+#include "nsStringStream.h"
 #include "nsThreadUtils.h"
 
 namespace mozilla::naivefox {
@@ -4479,6 +4481,82 @@ nsresult OpenNeckoTunnel(
     nsCOMPtr<nsIRequest> request = channel;
     request.forget(aOpenedRequest);
   }
+  return NS_OK;
+}
+
+nsresult OpenFiniteHttpExchange(
+    const nsACString& aProxyUrl, const nsACString& aProxyUser,
+    const nsACString& aProxyPassword,
+    const Maybe<HostResolverRule>& aHostResolverRule,
+    const nsACString& aMethod, const nsTArray<ExtraHeader>& aHeaders,
+    const nsACString& aBody, nsIStreamListener* aListener,
+    nsIRequest** aOpenedRequest) {
+  MOZ_ASSERT(NS_IsMainThread());
+  ExplicitProxyRoute route;
+  MOZ_TRY(BuildExplicitProxyRoute(aProxyUrl, aProxyUser, aProxyPassword,
+                                  ProxyProtocol::H2, aHostResolverRule, false,
+                                  route));
+  nsAutoCString url;
+  MOZ_TRY(route.mProxyUri->GetPrePath(url));
+  url.Append('/');
+  nsCOMPtr<nsIURI> uri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(uri), url));
+  nsCOMPtr<nsIPrincipal> principal;
+  MOZ_TRY(GetSystemPrincipal(getter_AddRefs(principal)));
+  nsCOMPtr<nsIChannel> templateChannel;
+  MOZ_TRY(NS_NewChannel(
+      getter_AddRefs(templateChannel), uri, principal,
+      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+          nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS | nsILoadInfo::SEC_COOKIES_OMIT,
+      nsIContentPolicy::TYPE_OTHER));
+  nsCOMPtr<nsIProxiedProtocolHandler> handler =
+      do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
+  if (!handler) {
+    return NS_ERROR_FAILURE;
+  }
+  nsCOMPtr<nsIChannel> channel;
+  nsCOMPtr<nsILoadInfo> finiteLoadInfo = templateChannel->LoadInfo();
+  MOZ_TRY(handler->NewProxiedChannel(uri, route.mProxyInfo, 0, nullptr,
+                                    finiteLoadInfo,
+                                    getter_AddRefs(channel)));
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
+  nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(channel);
+  if (!internal || !http) {
+    return NS_ERROR_NO_INTERFACE;
+  }
+  MOZ_TRY(internal->SetAllowSpdy(true));
+  MOZ_TRY(internal->SetAllowHttp3(false));
+  MOZ_TRY(internal->SetBlockAuthPrompt(true));
+  MOZ_TRY(internal->SetProxyPreamble());
+  MOZ_TRY(channel->SetLoadFlags(
+      nsIRequest::INHIBIT_CACHING | nsIRequest::LOAD_BYPASS_CACHE |
+      nsIRequest::LOAD_ANONYMOUS | nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+  MOZ_TRY(http->SetRequestMethod(aMethod));
+  nsAutoCString authorization;
+  MOZ_TRY(BuildProxyAuthorization(aProxyUser, aProxyPassword, authorization));
+  if (!authorization.IsEmpty()) {
+    // This is an ordinary origin request to the proxy's own API. Necko
+    // correctly prunes Proxy-Authorization from such requests; use scoped
+    // origin authorization with redirects forbidden instead.
+    MOZ_TRY(http->SetRequestHeader("Authorization"_ns, authorization,
+                                   false));
+  }
+  for (const auto& header : aHeaders) {
+    MOZ_TRY(http->SetRequestHeader(header.mName, header.mValue, false));
+  }
+  if (aMethod.EqualsLiteral("POST")) {
+    nsCOMPtr<nsIInputStream> body;
+    MOZ_TRY(NS_NewCStringInputStream(getter_AddRefs(body), aBody));
+    nsCOMPtr<nsIUploadChannel2> upload = do_QueryInterface(channel);
+    if (!upload) {
+      return NS_ERROR_NO_INTERFACE;
+    }
+    MOZ_TRY(upload->ExplicitSetUploadStream(body, "application/octet-stream"_ns,
+                                            aBody.Length(), aMethod));
+  }
+  MOZ_TRY(channel->AsyncOpen(aListener));
+  nsCOMPtr<nsIRequest> request = channel;
+  request.forget(aOpenedRequest);
   return NS_OK;
 }
 

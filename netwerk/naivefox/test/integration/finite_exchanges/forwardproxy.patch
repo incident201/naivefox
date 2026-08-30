@@ -1,0 +1,31 @@
+--- a/forwardproxy.go
++++ b/forwardproxy.go
+@@ -246,6 +246,7 @@
+ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
++	finiteNormalizeAuth(r)
+ 	// start by splitting the request host and port
+ 	reqHost, _, err := net.SplitHostPort(r.Host)
+ 	if err != nil {
+ 		reqHost = r.Host // OK; probably just didn't have a port
+ 	}
+@@ -260,7 +260,8 @@
+ 	if h.ProbeResistance != nil && len(h.ProbeResistance.Domain) > 0 && reqHost == h.ProbeResistance.Domain {
+ 		return serveHiddenPage(w, authErr)
+ 	}
+-	if h.Hosts.Match(r) && (r.Method != http.MethodConnect || authErr != nil) {
++	finiteRequested := r.Header.Get("X-Naivefox-Finite") != ""
++	if h.Hosts.Match(r) && !finiteRequested && (r.Method != http.MethodConnect || authErr != nil) {
+ 		// Always pass non-CONNECT requests to hostname
+ 		// Pass CONNECT requests only if probe resistance is enabled and not authenticated
+ 		if h.shouldServePACFile(r) {
+@@ -299,6 +300,10 @@
+ 		ctx = context.WithValue(ctx, httpclient.ContextKeyHeader{}, ctxHeader)
+ 	}
+ 
++	if finiteRequested {
++		return h.serveFinite(w, r, ctx)
++	}
++
+ 	if r.Method == http.MethodConnect {
+ 		if r.ProtoMajor == 2 || r.ProtoMajor == 3 {
+ 			if len(r.URL.Scheme) > 0 || len(r.URL.Path) > 0 {

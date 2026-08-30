@@ -659,9 +659,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         SAMPLE.validate_sample(arm, protocol, "\n".join(lines), features)
         SAMPLE.validate_sample(http_arm, protocol, "\n".join(lines), features)
         h2_lines = [
-            line.replace("protocol=h3", "protocol=h2").replace(
-                "outer=h3", "outer=h2"
-            )
+            line.replace("protocol=h3", "protocol=h2").replace("outer=h3", "outer=h2")
             for line in lines
         ]
         h2_features = {
@@ -836,9 +834,7 @@ class CamouflageHarnessTests(unittest.TestCase):
             "tree-native-parser-resource-committed-page",
             "tree-native-parser-resource-committed-page-http-connect",
         )
-        rows = SUPERBLOCKS.schedule_rows(
-            29, "h2", 1, ["browser_page"], arms=arms
-        )
+        rows = SUPERBLOCKS.schedule_rows(29, "h2", 1, ["browser_page"], arms=arms)
         SUPERBLOCKS.validate_superblocks(rows, expected_blocks=1, arms=arms)
         self.assertEqual(set(SUPERBLOCKS.infer_arms(rows)), set(arms))
 
@@ -4692,10 +4688,7 @@ class CamouflageHarnessTests(unittest.TestCase):
         self.assertNotIn("SOCKS5", result.stdout)
 
     def test_dedicated_capture_pac_generators_scope_the_exact_target(self):
-        expected = (
-            '--generate-pac-user-js "$socks_port" '
-            '"$NAIVEFOX_FIXTURE_HTTPS_PORT"'
-        )
+        expected = '--generate-pac-user-js "$socks_port" "$NAIVEFOX_FIXTURE_HTTPS_PORT"'
         for filename in (
             "run-h2-capture-comparison.sh",
             "run-h2-connect-priority-comparison.sh",
@@ -5197,6 +5190,78 @@ Packets received/dropped on interface 'any': 84/1 (pcap:1/dumpcap:0/flushed:0/ps
                     "tree-overlap",
                 },
             )
+
+    def test_finite_exchange_config_and_mechanism_gates(self):
+        features = {
+            "protocol": "h2",
+            "features": {
+                "lifecycle_connection_count": 1.0,
+                "tls_client_hello_count": 1.0,
+            },
+        }
+        for arm, admission in (
+            ("h2-finite-socks", "first-data-buffer-task"),
+            ("h2-finite-http-connect", "first-data-buffer"),
+            ("h2-finite-read-through-socks", "first-data-buffer-task"),
+            ("h2-finite-read-through-http-connect", "first-data-buffer"),
+        ):
+            with self.subTest(arm=arm):
+                config = CONFIG.build_config(arm, "h2", 1080, 443, "u", "p")
+                self.assertTrue(config["diagnostic-h2-finite-exchanges"])
+                self.assertEqual(
+                    bool(config.get("diagnostic-h2-finite-read-through")),
+                    "read-through" in arm,
+                )
+                self.assertEqual(
+                    config["listen"].split(":")[0],
+                    "socks" if arm.endswith("socks") else "http",
+                )
+                with self.assertRaises(ValueError):
+                    CONFIG.build_config(arm, "h3", 1080, 443, "u", "p")
+                log = (
+                    "Connection 1 preamble document-overlap "
+                    f"admission={admission} response_accepted=1 root_done=0 protocol=h2\n"
+                    "Connection 1 preamble result=success status=0x00000000 "
+                    "http=200 bytes=494 protocol=h2\n"
+                    "Connection 1 preamble document-overlap drain=complete "
+                    "root_done=1 completed_resources=0 protocol=h2\n"
+                    "Connection 1 finite-exchanges ready=1 block-bytes=65536 "
+                    "upload-window=2 download-window=4\n"
+                    "Connection 1 established target=localhost:443 outer=h2 padding=yes\n"
+                    "Connection 1 finite-exchanges rotated=1\n"
+                )
+                if "read-through" in arm:
+                    log += "Connection 1 finite-exchanges streamed-before-stop=1\n"
+                SAMPLE.validate_sample(arm, "h2", log, features)
+                SAMPLE.validate_sample(
+                    arm,
+                    "h2",
+                    "\n".join("[timestamp] " + line for line in log.splitlines()),
+                    features,
+                )
+                for bad in (
+                    log.replace("finite-exchanges rotated=1", "missing-marker"),
+                    log.replace("download-window=4", "download-window=40"),
+                    log + "Connection 1 finite-exchanges failure=0x80004005\n",
+                    log + "Connection 1 finite-exchanges rotated=1\n",
+                    log + "Connection 1 finite-exchanges streamed-before-stop=1\n",
+                ):
+                    with self.assertRaises(ValueError):
+                        SAMPLE.validate_sample(arm, "h2", bad, features)
+                with self.assertRaises(ValueError):
+                    SAMPLE.validate_sample(arm, "h3", log, features)
+                if "read-through" in arm:
+                    with self.assertRaises(ValueError):
+                        SAMPLE.validate_sample(
+                            arm,
+                            "h2",
+                            log.replace("streamed-before-stop=1", "missing-marker"),
+                            features,
+                        )
+                with self.assertRaisesRegex(ValueError, "unexpectedly used finite"):
+                    SAMPLE.validate_sample(
+                        "document-first-buffer-task-overlap", "h2", log, features
+                    )
 
 
 if __name__ == "__main__":

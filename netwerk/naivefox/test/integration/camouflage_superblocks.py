@@ -8,6 +8,10 @@ import random
 DEFAULT_ARMS = ("off", "gate", "root")
 ARMS = DEFAULT_ARMS
 SUPPORTED_ARMS = (
+    "h2-finite-socks",
+    "h2-finite-http-connect",
+    "h2-finite-read-through-socks",
+    "h2-finite-read-through-http-connect",
     "firefox-proxied",
     "off",
     "gate",

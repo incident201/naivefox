@@ -3968,6 +3968,15 @@ default still needs at least 20% meaningful improvement over the current
 listener default and fresh replication. Do not run a full matrix or size/link
 sweep unless this new candidate first earns those gates.
 
+The read-through prototype passed incremental minimized product/test builds,
+102 C++ gtests and 174 analysis/harness tests. Both original finite arms and
+both read-through arms passed the private TLS, exact 1 MiB slow download,
+768 KiB upload, half-close, concurrency, cancellation, bad-authentication and
+normal-shutdown probes. Read-through probes additionally proved successful
+delivery before `OnStopRequest`; the original arms rejected that marker. The
+server source and binary are byte-identical to the first finite experiment.
+These are functional admissions, not camouflage results.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
