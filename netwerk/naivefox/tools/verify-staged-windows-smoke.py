@@ -30,7 +30,10 @@ def fetch_digest(target_url, local_proxy=None):
     else:
         command.extend(["--proxy", ""])
     command.append(target_url)
-    result = subprocess.run(command, capture_output=True, timeout=70)
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=70)
+    except subprocess.TimeoutExpired:
+        raise AssertionError("live transfer timed out") from None
     # Avoid echoing potentially private target URLs or upstream diagnostics.
     assert result.returncode == 0, f"live transfer failed (curl exit {result.returncode})"
     assert result.stdout, "live transfer returned an empty body"

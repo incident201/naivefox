@@ -148,11 +148,16 @@ for a complete four-block row.
 
 ## Current implicit-default matrix
 
-This is the canonical current-default residual dashboard. Lower is closer to
+This is the canonical published-default residual dashboard. Lower is closer to
 the same Firefox A/B controls in the same randomized block. The columns are
 packets 1--16, packets 17--32, packets 1--32, the first 250 ms, and the whole
 flow. Harness-only arm names in parentheses select the listener while keeping
 the listed product policy and budgets.
+
+The numbers attest the recorded source and runtime digests below, not an
+unmeasured later upstream refresh on `naivefox-full-source`. Functional gates
+alone do not establish residual equivalence; before publishing a refreshed
+runtime, rerun all four rows under the common contract below.
 
 | Outer | Local ingress | Effective omitted-preamble policy | Safe artifact | 1--16 | 17--32 | 1--32 | 250 ms | Whole |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |

@@ -33,6 +33,13 @@ class LifecycleChurnHelpersTest(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "curl exit 7"):
                 SMOKE.fetch_digest("http://target/")
 
+    def test_live_timeout_does_not_echo_private_target(self):
+        private_target = "http://private-target.invalid/secret"
+        error = SMOKE.subprocess.TimeoutExpired(["curl.exe", private_target], 70)
+        with mock.patch.object(SMOKE.subprocess, "run", side_effect=error):
+            with self.assertRaisesRegex(AssertionError, "^live transfer timed out$"):
+                SMOKE.fetch_digest(private_target)
+
     def test_socks_request_is_a_valid_domain_connect(self):
         request = SMOKE.make_socks_connect_request("race.test", 8443)
         self.assertEqual(request[:4], b"\x05\x01\x00\x03")
