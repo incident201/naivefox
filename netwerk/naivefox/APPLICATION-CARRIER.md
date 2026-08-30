@@ -1058,3 +1058,46 @@ H2 native-versus-bulk-duplex fixed-work pairs (seed 202608336) to measure the
 remaining absolute gap and overhead. The runner records explicit workload sizes,
 source revision and helper digests for new campaigns. Seventeen focused Python
 tests pass; old campaigns keep their original workload and evidence.
+
+The separate instrumented `continuous-bulk-duplex-h2-8m-stage` passed. Its
+8-MiB download took 273.837 ms by curl. Rounded stage totals: upload fetch
+headers 128 ms over 41 calls, ordinary download headers 12 ms/6 calls,
+body reads 32 ms/41 calls, local delivery 58 ms/41, pressure 18 ms/37 and
+take 20 ms/41. As before, counters can include work just after curl finishes;
+idle fetch spans from the preceding settle are not stage latency. This points
+to HTTP and local-IPC turnover rather than a mysterious fixed Firefox pause.
+It does not prove all such time is removable or equate this laboratory
+full-browser worker's limit with the transport architecture's global ceiling.
+
+The uninstrumented two-pair `continuous-bulk-duplex-h2-8m-native-pairs` screen
+passed all gates. Native -> replacement: 8-MiB completion 55.701 -> 304.994 ms;
+parallel 17.099 -> 104.494 ms; slow upload 292.120 -> 324.687 ms;
+small wake 6.764 -> 26.472 ms. Whole fixed-session IP wire grew
+12,715,588.5 -> 15,125,210.5 bytes (+18.95%). On this fast isolated loopback,
+8-MiB effective throughput is therefore 81.74% below native, despite the
+lower percentage wire overhead than the earlier 1-MiB workload. These are
+not WAN throughput predictions. Snapshot `continuous-selective-ack-sustained-evidence`,
+server `37153fb`, manifest SHA-256
+`c1695822abd95401e970d04872544db17dc3a1ff3a9d90062a5fef37b22cf3a9`.
+
+## Bounded byte-window ablation preregistration
+
+All-ref history preflight reviewed `6ce3fc4ddc3d`: its data-activated receive
+credits meant outstanding finite HTTP GETs (one to four), not the logical
+stream byte window. It worsened Whole and remains rejected. Current mux history
+has the bounded hint change but no independent byte-window experiment.
+Here one 256-KiB bulk body nearly exhausts the 256-KiB stream credit, although
+the next exchange could otherwise continue bulk. Test exactly 512 KiB per
+logical stream in both peers, as a separate profile derived from bulk-duplex.
+Keep cell capacities, request concurrency, prefetch queue depth, state logic,
+delivery ACK and body buffering unchanged. This is not the prior hint ablation:
+it explicitly spends memory, up to 256 KiB more outstanding receive data per
+stream/direction, or 8 MiB across 32 streams per peer, excluding existing
+prefetch/in-flight overhead. No speculative delivery credit.
+
+Prototype configuration pins the same window at bridge and Caddy; there is
+no on-wire negotiation and mismatched peers are unsupported. Preserve the
+old default and reject unsupported configured windows. First deterministic
+credit/budget/overflow tests, then two H2 pairs against bulk-duplex with the
+8-MiB workload (seed 202608337), to exercise the diagnosed sustained stage.
+No residual or cross-protocol expansion unless the result warrants it.
