@@ -22,6 +22,7 @@ PAGE_PATHS = {
     "/camouflage/app.js": "script",
     "/camouflage/api": "api",
     "/camouflage/complete": "complete",
+    "/favicon.ico": "favicon",
 }
 IMAGE_SIZES = {
     "65536": "image_small",
@@ -58,7 +59,7 @@ def access_records(lines):
     return records
 
 
-def read_slice(path, offset):
+def read_slice(path, offset, snapshot=None):
     if offset < 0:
         raise ValueError("access-log offset is negative")
     with open(path, "rb") as stream:
@@ -66,6 +67,9 @@ def read_slice(path, offset):
             raise ValueError("access log was truncated after the sample marker")
         stream.seek(offset)
         payload = stream.read()
+    if snapshot is not None:
+        Path(snapshot).write_bytes(payload)
+        Path(snapshot).chmod(0o600)
     try:
         text = payload.decode("utf-8")
     except UnicodeDecodeError as error:
@@ -126,21 +130,40 @@ def page_events(records, *, host, completion, root_only=False):
                 )
         elif query:
             name = None
+        if name == "api":
+            # The canonical fourth image intentionally serves 34-byte JSON.
+            # Firefox may fetch it again after the speculative image attempt.
+            # Preserve both observable requests without changing the fixture.
+            if (
+                record.get("size") != 34
+                or request.get("headers", {}).get("Sec-Fetch-Dest") != ["image"]
+                or record.get("resp_headers", {}).get("Content-Type")
+                != ["application/json"]
+            ):
+                raise ValueError(
+                    "API image request does not match the canonical fixture"
+                )
+            if "api" in found:
+                name = "api_repeat"
         if name is None or (root_only and name != "root"):
             raise ValueError("unexpected measured page request in access-log slice")
         if name in found:
-            raise ValueError("duplicate measured page request in access-log slice")
+            raise ValueError(
+                f"duplicate measured page request in access-log slice: {name}"
+            )
         expected_method, expected_status = (
             ("POST", 204) if name == "complete" else ("GET", 200)
         )
-        if (
-            request.get("method") != expected_method
-            or record.get("status") != expected_status
-        ):
+        valid_status = record.get("status") == expected_status
+        if name == "favicon":
+            # Caddy's unmatched route records status 0 before net/http emits
+            # the implicit empty 200. This browser request is not a page asset.
+            valid_status = record.get("status") in (0, 200) and record.get("size") == 0
+        if request.get("method") != expected_method or not valid_status:
             raise ValueError("measured page request has an unexpected method or status")
         found[name] = request_event(record)
     expected = {"root"} if root_only else set(PAGE_EVENTS)
-    if set(found) != expected:
+    if set(found) - {"api_repeat", "favicon"} != expected:
         raise ValueError("access-log slice lacks the exact measured page request set")
     root_start = found["root"]["start"]
     if any(event["start"] < root_start - 0.001 for event in found.values()):
@@ -258,6 +281,8 @@ def summarize(
         "time_source": "caddy_log_timestamp_minus_handler_duration",
         "time_origin": "outer_root_handler_start_estimate",
         "role": role,
+        "workload_api_request_count": 1 + int("api_repeat" in workload),
+        "workload_favicon_request_count": int("favicon" in workload),
         "events": events,
         "intervals_ms": {name: round(value, 3) for name, value in deltas.items()},
     }
@@ -283,6 +308,7 @@ def main():
     parser.add_argument("--session-id", required=True)
     parser.add_argument("--experiment-block", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--private-snapshot-dir")
     parser.add_argument("--wait-seconds", type=float, default=2)
     args = parser.parse_args()
     try:
@@ -291,12 +317,21 @@ def main():
         parser.error(str(error))
     if not 0 <= args.wait_seconds <= 5:
         parser.error("wait must be between zero and five seconds")
+    snapshots = (None, None)
+    if args.private_snapshot_dir:
+        directory = Path(args.private_snapshot_dir)
+        if not directory.is_dir() or directory.stat().st_mode & 0o077:
+            parser.error("private snapshot directory must already exist with mode 0700")
+        snapshots = (
+            directory / "h2-outer-access.jsonl",
+            directory / "h2-inner-access.jsonl",
+        )
     deadline = time.monotonic() + args.wait_seconds
     while True:
         try:
             result = summarize(
-                read_slice(args.outer_access_log, args.outer_offset),
-                read_slice(args.inner_access_log, args.inner_offset)
+                read_slice(args.outer_access_log, args.outer_offset, snapshots[0]),
+                read_slice(args.inner_access_log, args.inner_offset, snapshots[1])
                 if args.inner_access_log
                 else [],
                 role=args.role,

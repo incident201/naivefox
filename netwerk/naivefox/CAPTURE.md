@@ -3495,6 +3495,20 @@ superblock planner emits `h2_sb...`. The validator was corrected to the actual
 superblock contract, with a regression test that consumes the real planner's
 output. This failed run is not candidate or residual evidence.
 
+Two further plumbing collections (`1a3ed0a8763d08d8` and the private-snapshot
+follow-up `b2e28a878b737d35`) stopped on a duplicate API image request, again
+without publishing metrics. The snapshot proved one outer root and one
+CONNECT, but two inner image-destination GETs of the canonical 34-byte JSON
+API response, followed by an empty favicon request. This is consistent with
+Firefox repeating the invalid image after its speculative attempt, not an
+extra proxy session. The diagnostic now explicitly retains one bounded API
+repeat only with the unchanged image destination, JSON MIME, and 34-byte
+response, plus one optional empty favicon. It still rejects duplicate roots,
+stylesheets, scripts, ordinary images, completions, or further API attempts.
+No request is removed from the passive capture and no fixture response is
+changed to make the diagnostic pass. Private log slices are retained on error
+so future admission failures can be investigated without another capture.
+
 Strict decrypted artifact `20260826T051112Z-deaf291f` admits the H3-only
 `tree-resource-committed-overlap-css` experiment. It uses the same root and
 64-KiB stylesheet as `tree-complete-css`, but releases CONNECT only after

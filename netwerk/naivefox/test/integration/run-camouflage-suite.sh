@@ -1565,6 +1565,7 @@ record_h2_request_timing() {
     --proxy-port "$NAIVEFOX_FIXTURE_PROXY_PORT" \
     --inner-port "$NAIVEFOX_FIXTURE_INNER_H2_PORT" \
     --session-id "$session_id" --experiment-block "$experiment_block" \
+    --private-snapshot-dir "$private_dir/$session_id" \
     --output "$safe_dir/h2-request-lifecycle/$session_id.json"
   h2_request_timing_validated_participants=$((h2_request_timing_validated_participants + 1))
 }

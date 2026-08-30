@@ -486,14 +486,20 @@ NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 ./run-camouflage-suite.sh \
 
 `h2-request-lifecycle/*.json` contains fixed event labels, relative intervals,
 handler durations, and response byte counts only. Per-sample access-log offsets
-exclude earlier participants; missing/duplicate requests, wrong protocols,
-unexpected authorities, invalid timestamps, or ambiguous navigation identities
-fail closed. CONNECT records are read after browser/product shutdown, outside
+exclude earlier participants; missing requests, unexplained duplicates, wrong
+protocols, unexpected authorities, invalid timestamps, or ambiguous navigation
+identities fail closed. The canonical fourth image returns 34-byte JSON and
+may be fetched twice by Firefox; one such extra image attempt and one empty
+favicon request are explicitly counted and retained as separate events.
+Other duplicates, a third API attempt, or changed API MIME/size are rejected.
+CONNECT records are read after browser/product shutdown, outside
 the primary capture. Caddy writes an access record when its handler ends, so
 request start is estimated as `log timestamp - handler duration`. These are
 coarse millisecond-scale server intervals, not exact wire or Necko timestamps.
 They never enter passive feature CSVs, distance calculation, or inference.
-Product, Caddy, page contents, and capture cutoff remain unchanged.
+Private access-log slices are deleted with the capture after success and
+retained only in the private diagnostic directory on failure. Product, Caddy,
+page contents, and capture cutoff remain unchanged.
 
 The controlled workloads are cold initial, browser-page navigation, warm
 sequential, burst/concurrent streams, bulk download, bulk upload,

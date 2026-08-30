@@ -31,9 +31,13 @@ def record(uri, start, duration, *, port=45500, method="GET", status=200, size=4
             "method": method,
             "proto": "HTTP/2.0",
             "uri": uri,
-            "headers": {"Authorization": ["secret-sentinel"]},
+            "headers": {
+                "Authorization": ["secret-sentinel"],
+                "Sec-Fetch-Dest": ["image"],
+            },
         },
         "user_id": "private-user-sentinel",
+        "resp_headers": {"Content-Type": ["application/json"]},
     }
 
 
@@ -258,6 +262,10 @@ class H2RequestLifecycleTests(unittest.TestCase):
             )
             path.write_bytes(prefix + payload.encode())
             self.assertEqual(len(SUMMARY.read_slice(path, len(prefix))), 8)
+            snapshot = Path(temporary) / "private-snapshot.jsonl"
+            SUMMARY.read_slice(path, len(prefix), snapshot)
+            self.assertEqual(snapshot.read_text(), payload)
+            self.assertEqual(snapshot.stat().st_mode & 0o777, 0o600)
             for offset in (-1, path.stat().st_size + 1):
                 with self.assertRaises(ValueError):
                     SUMMARY.read_slice(path, offset)
@@ -266,6 +274,33 @@ class H2RequestLifecycleTests(unittest.TestCase):
             path.write_bytes(b"\xff\n")
             with self.assertRaises(ValueError):
                 SUMMARY.read_slice(path, 0)
+
+    def test_canonical_api_repeat_and_favicon_are_explicit_not_dropped(self):
+        entries = page()
+        entries.append(record("/camouflage/api", 1000.050, 0.001, size=34))
+        entries.append(record("/favicon.ico", 1000.055, 0.001, status=0, size=0))
+        result = self.summarize(entries)
+        self.assertEqual(result["workload_api_request_count"], 2)
+        self.assertEqual(result["workload_favicon_request_count"], 1)
+        self.assertIn(
+            "outer_api_repeat", {event["event"] for event in result["events"]}
+        )
+        self.assertIn("outer_favicon", {event["event"] for event in result["events"]})
+        entries.append(record("/camouflage/api", 1000.052, 0.001, size=34))
+        with self.assertRaises(ValueError):
+            self.summarize(entries)
+
+    def test_api_repeat_requires_the_canonical_invalid_image_response(self):
+        for field, value in (
+            ("size", 4096),
+            ("resp_headers", {"Content-Type": ["image/svg+xml"]}),
+        ):
+            entries = page()
+            extra = record("/camouflage/api", 1000.050, 0.001, size=34)
+            extra[field] = value
+            entries.append(extra)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.summarize(entries)
 
     def test_runner_keeps_timeline_separate_and_after_shutdown(self):
         runner = (HERE / "run-camouflage-suite.sh").read_text()
