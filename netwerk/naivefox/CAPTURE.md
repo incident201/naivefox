@@ -4260,6 +4260,8 @@ counters and arm/schema/scope labels. Their scope is the entire product
 session including post-capture shutdown; open/close requests are excluded.
 They are mechanism diagnostics, not new passive classifier features or a
 change to capture cutoff. Missing/duplicate terminal counters fail closed.
+Body-byte counters describe encoded tunnel bytes, including Naive padding,
+not the application resources themselves.
 The planned seed `2026083089` screen remains p17--32 and Whole only.
 
 ### Budgeted-response H2 screen: fewer exchanges, no default win
@@ -4341,6 +4343,56 @@ request count and event ordering: ready, one-credit admission, streamed bytes,
 window expansion, full-budget completion. Missing, duplicate, reversed and
 timer-triggered evidence is rejected. Server source and the admitted Caddy
 binary remain byte-identical to the preceding v3 screen.
+
+### Data-activated receive credits: negative H2 screen
+
+Seed `2026083090` completed on `c2c29bdded77` as safe artifact
+`bd4a3c377ba1a291`. All 16 participants passed the same admission gates;
+candidate markers additionally proved one initial request and expansion after
+streamed data but before full-budget completion. Caddy is unchanged from the
+preceding screen. Private successful capture inputs were deleted. The safe
+artifact retains terminal counters, `finite-counts-summary.json`,
+`wire-aggregate-summary.json` and `mechanism-accounting.json`.
+
+These are within-campaign two-block diagnostics, not inference and not new
+default-matrix values. In particular, do not compare the absolute p17--32
+distances with the previous campaign: the Firefox observations and distance
+normalization differ. The contemporaneous defaults and controls are mandatory.
+
+| H2 listener / arm | p17--32 | Whole | p17--32 vs default | Whole vs default |
+| --- | ---: | ---: | ---: | ---: |
+| SOCKS default | 0.57654 | 0.33963 | — | — |
+| SOCKS v3 four-credit control | 0.57708 | 0.40297 | +0.1% | +18.6% |
+| SOCKS v3 data-activated credits | 0.57635 | 0.43450 | -0.03% | +27.9% |
+| HTTP CONNECT default | 0.54448 | 0.30949 | — | — |
+| HTTP CONNECT v3 four-credit control | 0.55403 | 0.38339 | +1.8% | +23.9% |
+| HTTP CONNECT v3 data-activated credits | 0.53002 | 0.39721 | -2.7% | +28.3% |
+
+Against v3 itself, p17--32 changes by -0.1% / -4.3%, while Whole worsens by
+7.8% / 3.6%. Both controls and candidates start fifteen download requests and
+complete ten full-budget bodies, as expected: this changes startup ordering,
+not total response count or steady-state capacity.
+
+The early direction/size mismatch remains. Mean client bytes in the first
+32 packets rise from 4,548.5 to 6,016 for SOCKS and 4,548 to 5,962.5 for HTTP;
+server bytes rise only from 4,539.5 to 4,656.5 and 4,536.5 to 4,615.5.
+Server bytes in the first 128 packets improve from 64,831 to 70,564 and
+73,399 to 74,262, still below defaults of 89,593 and 98,049. The experiment
+does not establish the identity of encrypted payloads from these aggregates.
+It does show that deferring speculative GETs did not yield the hoped-for
+server-heavy early profile. The SOCKS Whole penalty against v3 includes
++0.01514 timing/bursts and +0.01640 non-timing terms; HTTP adds +0.00504 and
++0.00877 respectively. A timer is not justified by these results.
+
+Reject this startup-credit variant as a default candidate. Together, the two
+new screens isolate response count and initial receive lookahead; neither
+meets the >=20% breaking-default threshold, so neither proceeds to a full
+implementation, full matrix or resource/link sweep. These observations do
+not prove that all possible finite protocols fail, but repeating fixed block
+sizes or adding another arbitrary pause has no support here. Any next trial
+needs a distinct transport premise, history preflight and fresh controls.
+H2/H3 defaults, the canonical matrix and the fronting-site contract are
+unchanged; no size-independent or slow-link improvement is claimed.
 
 ## Sensitive data handling
 
