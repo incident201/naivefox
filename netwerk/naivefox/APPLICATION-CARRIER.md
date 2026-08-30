@@ -1173,3 +1173,47 @@ with possible tail overhead; do not call it free. Add separate promotion
 counters and deterministic empty/stalled/EOF tests. Compare two H2 8-MiB pairs
 against the failed filler control (seed 202608340), then compare to the strong
 original bulk-duplex before claiming a net improvement.
+
+`continuous-bulk-progress-h2-8m-pairs` passed. Filler -> progress: single
+758.165 -> 257.875 ms (-65.99%); parallel 85.980 -> 87.460 ms; slow upload
+320.383 -> 332.304 ms; small wake 23.855 -> 21.944 ms. Wire
+15,460,777.5 -> 15,740,392 bytes (+1.81%). Controls exposed 23/24 progress
+opportunities and used 136/140 interactive GETs; candidates promoted 26/28
+opportunities and used 48 interactive GETs. Bulk POSTs rose 38 -> 43.
+This directly supports the transient-queue handoff mechanism, with a measured
+tail/budget cost. The 66% recovery is against the broken fast-encoder control,
+not against the strong original. Next two H2 8-MiB pairs against bulk-duplex,
+seed 202608341; preserve both positive and negative controls.
+
+Strong-control `continuous-bulk-progress-h2-8m-strong-pairs`: single
+280.257 -> 257.494 ms (-8.12%), parallel 89.911 -> 83.887 ms (-6.70%),
+slow upload 339.722 -> 332.155 ms, small wake 23.412 -> 27.454 ms
+(+4.042 ms). Wire 15,116,067.5 -> 15,510,984.5 (+2.61%). The causal repair
+works but the net gain is modest and not free; no H3/residual matrix or
+default promotion. This also demonstrates why a faster microbenchmark alone
+cannot justify changing a timing-sensitive transport. Snapshot
+`continuous-progress-evidence`, server `114930d`, manifest SHA-256
+`fac922a8fee1ccb73c0305aee7b5e906add6ee2a71af64e0ecaf154074dd1d54`.
+
+## Bounded two-transaction overlap preregistration
+
+History preflight re-read `fac638485497` (duplicate early CONNECT pipelining)
+and `6ce3fc4ddc3d` (finite GET concurrency failed Whole), as well as the
+single bulk-lease change `c211251`. Concurrency is not an untried general cure.
+The distinct scope here is an established continuous SPA bulk phase, after
+unchanged startup/idle, with two fixed application transactions per lease.
+Compare a serial pair against a bounded overlapped pair with identical
+2 x 16-KiB POST / 256-KiB response capacity and identical 512-KiB logical
+window. Both derive from window512, without fast encoding, progress hints,
+short-state leases or deferred ACK. Each pair spends twice the single-lease
+budget and retains the documented window memory cost; a pair-only result
+must later beat the original single lease before any promotion.
+
+Do not dispatch the second POST before the first response headers: server
+upload processing and response sequence assignment are then ordered. Prepare
+the second local upload before starting delivery of the first, avoiding IPC
+overlap, then overlap its HTTP wait with the first body's validation/delivery.
+Deliver responses in order; finish/cancel both before the next state decision.
+At most two fixed responses, no reorder queue, unbounded requests, raw outer
+stream, retry or new timer. Test error cancellation, header ordering, exact
+pair budget and IPC exclusivity, then two H2 8-MiB pairs, seed 202608342.

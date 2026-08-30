@@ -55,6 +55,8 @@ PROFILES = {
     "continuous-bulk-window512": (20, 65536),
     "continuous-bulk-filler": (20, 65536),
     "continuous-bulk-progress": (20, 65536),
+    "continuous-bulk-pair": (20, 65536),
+    "continuous-bulk-pipeline": (20, 65536),
 }
 
 
@@ -127,8 +129,10 @@ def validate_http_graph(stats, name, mode):
         if stats["idle_completed"]:
             expected["512"] = stats["idle_completed"]
         if bulk:
-            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download", "continuous-bulk-window512", "continuous-bulk-filler", "continuous-bulk-progress")
+            bulk_duplex = name in ("continuous-bulk-duplex", "continuous-bulk-interactive1", "continuous-bulk-upload1", "continuous-bulk-noack", "continuous-bulk-noack-download", "continuous-bulk-window512", "continuous-bulk-filler", "continuous-bulk-progress", "continuous-bulk-pair", "continuous-bulk-pipeline")
             count = actual.get("POST /api/sync/bulk" if bulk_duplex else "GET /api/data/bulk", 0)
+            if name in ("continuous-bulk-pair","continuous-bulk-pipeline") and count % 2:
+                raise RuntimeError("incomplete paired bulk lease")
             if (bulk_duplex and actual.get("GET /api/data/bulk", 0)) or count != actual.get("POST /api/sync/bulk", 0) or actual.get("GET /api/data/download", 0):
                 raise RuntimeError("coalesced download lease graph")
             if count:
@@ -366,7 +370,7 @@ class Campaign:
                     write_json(directory / "bridge.json",{"key":key,"token":token,"origin":f"https://localhost:{self.port}",
                                "certificate":str(self.fixture / "pki/target.crt"),"private_key":str(self.fixture / "pki/target.key"),
                                "ready":str(directory / "bridge-ready.json"),"stats":str(directory / "bridge-stats.json"),"append":mode=="append","continuous":continuous(app_profile),
-                               "receive_window":524288 if app_profile=="continuous-bulk-window512" else 0,"filler_only":app_profile in ("continuous-bulk-filler","continuous-bulk-progress")})
+                               "receive_window":524288 if app_profile in ("continuous-bulk-window512","continuous-bulk-pair","continuous-bulk-pipeline") else 0,"filler_only":app_profile in ("continuous-bulk-filler","continuous-bulk-progress")})
                     bridge = launch([self.root.parent / "bin/bridge","--config",directory / "bridge.json"],"bridge.log")
                     wait_for(lambda:(directory / "bridge-ready.json").exists() or bridge.poll() is not None)
                     if bridge.poll() is not None: raise RuntimeError("bridge startup")

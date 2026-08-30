@@ -85,6 +85,14 @@ class CarrierAdmissionTests(unittest.TestCase):
         runner.validate_http_graph(duplex, "continuous-bulk-window512", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-filler", "replace")
         runner.validate_http_graph(duplex, "continuous-bulk-progress", "replace")
+        for profile in ("continuous-bulk-pair","continuous-bulk-pipeline"):
+            with self.assertRaises(RuntimeError):runner.validate_http_graph(duplex,profile,"replace")
+            paired=copy.deepcopy(duplex)
+            paired["requests"]["POST /api/sync/bulk"]+=1
+            paired["cell_capacities"]["262144"]+=1
+            paired["download_bytes"]+=262144
+            paired["upload_bytes"]+=16384
+            runner.validate_http_graph(paired,profile,"replace")
         for profile, state, up, down in (("continuous-bulk-interactive1", "interactive", 4096, 8192), ("continuous-bulk-upload1", "upload", 131072, 8192)):
             short = copy.deepcopy(duplex)
             short["requests"]["GET /api/data/" + state] = 1
@@ -153,6 +161,8 @@ class CarrierAdmissionTests(unittest.TestCase):
         down["continuous-bulk-window512"] = 901120
         down["continuous-bulk-filler"] = 901120
         down["continuous-bulk-progress"] = 901120
+        down["continuous-bulk-pair"] = 901120
+        down["continuous-bulk-pipeline"] = 901120
         self.assertEqual(set(down), set(runner.PROFILES))
         for name, capacity in down.items():
             self.assertEqual(runner.profile_budget(name)[1], capacity)
