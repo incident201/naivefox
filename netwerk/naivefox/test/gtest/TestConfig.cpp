@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <iterator>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -106,6 +107,8 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mProxies[0].mUrl.EqualsLiteral("https://example.com:443"));
   EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user"));
   EXPECT_TRUE(config.mProxies[0].mPassword.EqualsLiteral("pass"));
+  EXPECT_EQ(config.mTransport, TransportMode::Classic);
+  EXPECT_TRUE(config.mNoConnectKey.IsEmpty());
   EXPECT_EQ(config.mLogMode, RuntimeLogMode::Disabled);
   EXPECT_EQ(config.mPreamble.mMode, PreambleMode::Off);
   EXPECT_TRUE(config.mPreamble.mPath.EqualsLiteral("/"));
@@ -119,6 +122,156 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_TRUE(config.mImplicitPreambleGate);
   EXPECT_FALSE(config.mDiagnosticFirstSocksTunnelUrgentStart);
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
+}
+
+TEST(NaiveFoxConfig, NoConnectKeepsStrictProtocolsWithoutClassicPreamble)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":["socks://local:password@127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://proxy.example","quic://proxy.example"],"transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef"})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnect);
+  EXPECT_EQ(config.mNoConnectKey.Length(), 32U);
+  ASSERT_EQ(config.mProxies.Length(), 2U);
+  EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H2);
+  EXPECT_EQ(config.mProxies[1].mProtocol, ProxyProtocol::H3);
+  EXPECT_TRUE(
+      config.mProxies[0].mUrl.EqualsLiteral("https://proxy.example:443"));
+  EXPECT_TRUE(
+      config.mProxies[1].mUrl.EqualsLiteral("https://proxy.example:443"));
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H2),
+            PreambleMode::Off);
+  EXPECT_EQ(config.mPreamble.ModeForProtocol(ProxyProtocol::H3),
+            PreambleMode::Off);
+  EXPECT_EQ(config.mPreamble.mMaxBytes, 0U);
+  EXPECT_EQ(config.mPreamble.mMaxAssets, 0U);
+  EXPECT_FALSE(config.mPreamble.mCacheResources);
+  EXPECT_FALSE(config.mOuterSessionGate);
+  EXPECT_FALSE(config.mImplicitPreambleGate);
+  EXPECT_TRUE(config.mListeners[0].mUser.EqualsLiteral("local"));
+}
+
+TEST(NaiveFoxConfig, TransportOptionsAreOrderIndependent)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"no-connect-key":"0123456789abcdef0123456789abcdef","listen":"socks://127.0.0.1:1080","transport":"no-connect","proxy":"quic://proxy.example","preamble":{"mode":"off"},"outer-session-gate":false,"extra-headers":"","diagnostic-optimistic-local-reply":false,"diagnostic-first-socks-tunnel-urgent-start":false})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnect);
+  EXPECT_FALSE(config.mImplicitPreambleGate);
+
+  ASSERT_EQ(
+      ParseConfig(
+          R"({"listen":"socks://127.0.0.1:1080","transport":"classic","proxy":"https://user:password@proxy.example"})"_ns,
+          config, error),
+      NS_OK)
+      << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::Classic);
+  EXPECT_TRUE(config.mNoConnectKey.IsEmpty());
+  EXPECT_TRUE(config.mImplicitPreambleGate);
+}
+
+TEST(NaiveFoxConfig, RejectsInvalidTransportConfiguration)
+{
+  const char* fields[] = {
+      R"("transport":"no-connect")",
+      R"("transport":"unknown")",
+      R"("transport":"Classic")",
+      R"("transport":false)",
+      R"("transport":null)",
+      R"("transport":"classic","transport":"classic")",
+      R"("no-connect-key":"0123456789abcdef0123456789abcdef")",
+      R"("transport":"classic","no-connect-key":"0123456789abcdef0123456789abcdef")",
+      R"("transport":"no-connect","no-connect-key":true)",
+      R"("transport":"no-connect","no-connect-key":"")",
+      R"("transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcde")",
+      R"("transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef\n")",
+      R"("transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef\u007f")",
+      R"("transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef\u00e9")",
+      R"("transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef","no-connect-key":"0123456789abcdef0123456789abcdef")",
+  };
+  for (size_t index = 0; index < std::size(fields); ++index) {
+    SCOPED_TRACE(index);
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example",)"_ns);
+    json.Append(fields[index]);
+    json.Append('}');
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+    EXPECT_FALSE(error.IsEmpty());
+  }
+}
+
+TEST(NaiveFoxConfig, NoConnectKeyLengthBound)
+{
+  for (size_t length : {32U, 1024U, 1025U}) {
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","transport":"no-connect","no-connect-key":")"_ns);
+    for (size_t index = 0; index < length; ++index) {
+      json.Append('x');
+    }
+    json.AppendLiteral(R"("})");
+    Config config;
+    nsAutoCString error;
+    EXPECT_EQ(NS_SUCCEEDED(ParseConfig(json, config, error)), length <= 1024);
+  }
+}
+
+TEST(NaiveFoxConfig, NoConnectRejectsProxyUserInfoAndClassicOptions)
+{
+  for (const char* proxy :
+       {"https://user:password@proxy.example", "https://:@proxy.example",
+        "quic://user:@proxy.example"}) {
+    nsAutoCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":")"_ns);
+    json.Append(proxy);
+    json.AppendLiteral(
+        R"(","transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef"})");
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+  }
+  for (const char* option : {
+           R"("preamble":{"mode":"document-complete"})",
+           R"("preamble":{"mode":"off","h3-mode":"document-complete"})",
+           R"("extra-headers":"X-Test: value\r\n")",
+           R"("outer-session-gate":true)",
+           R"("diagnostic-optimistic-local-reply":true)",
+           R"("diagnostic-first-socks-tunnel-urgent-start":true)",
+       }) {
+    nsAutoCString json(
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","transport":"no-connect","no-connect-key":"0123456789abcdef0123456789abcdef",)"_ns);
+    json.Append(option);
+    json.Append('}');
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+  }
+}
+
+TEST(NaiveFoxConfig, TunnelConfigCopiesTransportAuthentication)
+{
+  TunnelConfig original;
+  original.mTransport = TransportMode::NoConnect;
+  original.mNoConnectKey.AssignLiteral("0123456789abcdef0123456789abcdef");
+  TunnelConfig copied(original);
+  EXPECT_EQ(copied.mTransport, TransportMode::NoConnect);
+  EXPECT_TRUE(copied.mNoConnectKey.Equals(original.mNoConnectKey));
+  TunnelConfig assigned;
+  assigned = original;
+  EXPECT_EQ(assigned.mTransport, TransportMode::NoConnect);
+  EXPECT_TRUE(assigned.mNoConnectKey.Equals(original.mNoConnectKey));
+  assigned = TunnelConfig{};
+  EXPECT_EQ(assigned.mTransport, TransportMode::Classic);
+  EXPECT_TRUE(assigned.mNoConnectKey.IsEmpty());
 }
 
 TEST(NaiveFoxConfig, OmittedPreamblePromotesExplicitProtocols)

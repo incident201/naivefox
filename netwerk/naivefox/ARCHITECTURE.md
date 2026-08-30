@@ -14,8 +14,15 @@ local client
   -> local client
 ```
 
+The diagram above is the default `classic` path. The optional `no-connect`
+path replaces CONNECT and the Naive codec with ordinary origin GET/POST
+channels, bounded application cells, logical streams and the matching Caddy
+`naivefox_transport` module. Both paths use the same local listener parsers,
+headless Gecko runtime and Necko/NSS/Neqo stack.
+
 NaiveFox does not construct TLS handshakes, H2/H3 frames, HPACK/QPACK, stream
-IDs, connection pools, or transport flow control.
+IDs, connection pools, or transport flow control. Application cell framing is
+above HTTP; it is not H2/H3 or TLS framing.
 
 ## Components and ownership
 
@@ -27,8 +34,8 @@ Gecko-facing implementation remains inside `libxul` behind a controlled C ABI.
 `Config` parses the strict JSON subset and produces one or more listener/proxy
 pairs. `SocksServer` owns the local server sockets. Each accepted connection is
 handled by either the bounded SOCKS5 state machine or the bounded HTTP CONNECT
-parser; both pass the destination and any already-read payload to the same
-tunnel backend.
+parser; both pass the destination and any already-read payload to the selected
+transport backend.
 
 `TunnelSession` owns the H2/H3/Auto attempt lifecycle, CONNECT metadata,
 padding negotiation, and transition to one established tunnel. Attempt
@@ -137,7 +144,22 @@ H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
 - ordinary H3 requests, WebTransport, and CONNECT-UDP retain their normal
   lifecycle.
 
-## Protocol selection
+## Transport and protocol selection
+
+`transport` chooses `classic` or `no-connect`; omission selects `classic`.
+The `proxy` URI independently selects strict H2 or H3. Configuration carries a
+separate application key for `no-connect`, and never reuses proxy-auth userinfo.
+The classic preamble and padding negotiation do not run in `no-connect`.
+
+`no-connect` ports only the experimental cell/multiplexer and bounded
+`continuous-bulk-pipeline` lifecycle into native C++. It opens ordinary Necko
+channels, validates response status/capacity/encoding and uses NSS randomness
+for filler. The experiment's Firefox process, DOM, animation, JavaScript
+scheduler and loopback WSS bridge are outside the port. See
+[NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
+
+The following fallback rules describe `classic`; the opt-in application
+transport has no automatic downgrade to `classic`:
 
 - H2: one strict HTTPS/H2 attempt; any other outer protocol is failure.
 - H3: one strict QUIC/H3 attempt; no TCP/H2 traffic is permitted as fallback.

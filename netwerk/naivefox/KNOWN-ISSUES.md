@@ -104,6 +104,26 @@ and remaining size-validation gap are in
 [`FRONTING-PAGE.md`](FRONTING-PAGE.md); they must be updated whenever this
 implicit contract changes.
 
+## No-connect compatibility and evidence
+
+`no-connect` is opt-in and requires the matching Caddy `naivefox_transport`
+module with a private transport key, an explicit target allowlist and the
+`continuous-bulk-pipeline` profile. It does not interoperate with an ordinary
+forward proxy or an arbitrary static website. A module mismatch or rejected
+key fails the connection; it does not trigger a downgrade to `classic`.
+
+The native port has bounded logical streams and 32-bit per-stream byte
+sequences; long-lived streams must close before sequence exhaustion. Session
+resumption and transparent replay after an outer-session failure are not
+supported. Automatic key provisioning/rotation is an operator concern.
+
+The earlier experimental residual and throughput measurements used a full
+Firefox SPA worker. They cannot be attributed to the lean native client, which
+does not execute that page's JavaScript or render its UI. Functional
+interoperability and lean-closure checks do not establish indistinguishability,
+throughput parity, or browser-equivalent request scheduling. Protocol details
+and the exact port boundary are maintained in [NO-CONNECT.md](NO-CONNECT.md).
+
 ## Product scope
 
 - SOCKS BIND and UDP ASSOCIATE are not implemented.

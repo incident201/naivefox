@@ -150,6 +150,8 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mProxyUser = proxy.mUser;
     tunnelConfig.mProxyPassword = proxy.mPassword;
     tunnelConfig.mProtocol = proxy.mProtocol;
+    tunnelConfig.mTransport = aConfig.mTransport;
+    tunnelConfig.mNoConnectKey = aConfig.mNoConnectKey;
     tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
     tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
     tunnelConfig.mPreamble = aConfig.mPreamble;
@@ -324,7 +326,10 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
         PreambleNeedsNativeActivationProcessRuntime(config));
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
-          "NaiveFox started listeners=%u upstreams=%u\n",
+          "NaiveFox started transport=%s listeners=%u upstreams=%u\n",
+          config.mTransport == mozilla::naivefox::TransportMode::NoConnect
+              ? "no-connect"
+              : "classic",
           static_cast<unsigned>(config.mListeners.Length()),
           static_cast<unsigned>(config.mProxies.Length()));
       for (size_t index = 0; index < config.mProxies.Length(); ++index) {

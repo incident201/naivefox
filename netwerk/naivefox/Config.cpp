@@ -323,6 +323,8 @@ class JsonParser final {
     Config parsed;
     bool sawListen = false;
     bool sawProxy = false;
+    bool sawTransport = false;
+    bool sawNoConnectKey = false;
     bool sawLog = false;
     bool sawHostResolverRules = false;
     bool sawExtraHeaders = false;
@@ -353,6 +355,38 @@ class JsonParser final {
         }
         sawProxy = true;
         MOZ_TRY(ParseProxies(parsed.mProxies));
+      } else if (key.EqualsLiteral("transport")) {
+        if (sawTransport) {
+          return Error("duplicate transport field");
+        }
+        sawTransport = true;
+        nsAutoCString value;
+        MOZ_TRY(ParseString(value, "transport must be a string"));
+        if (value.EqualsLiteral("classic")) {
+          parsed.mTransport = TransportMode::Classic;
+        } else if (value.EqualsLiteral("no-connect")) {
+          parsed.mTransport = TransportMode::NoConnect;
+        } else {
+          return Error("transport must be classic or no-connect");
+        }
+      } else if (key.EqualsLiteral("no-connect-key")) {
+        if (sawNoConnectKey) {
+          return Error("duplicate no-connect-key field");
+        }
+        sawNoConnectKey = true;
+        MOZ_TRY(ParseString(parsed.mNoConnectKey,
+                            "no-connect-key must be a string"));
+        if (parsed.mNoConnectKey.Length() < 32 ||
+            parsed.mNoConnectKey.Length() > 1024) {
+          return Error(
+              "no-connect-key must contain 32 through 1024 ASCII bytes");
+        }
+        for (size_t index = 0; index < parsed.mNoConnectKey.Length(); ++index) {
+          const char value = parsed.mNoConnectKey.CharAt(index);
+          if (value < 0x20 || value > 0x7e) {
+            return Error("no-connect-key must contain printable ASCII only");
+          }
+        }
       } else if (key.EqualsLiteral("log")) {
         if (sawLog) {
           return Error("duplicate log field");
@@ -462,7 +496,29 @@ class JsonParser final {
         parsed.mProxies.Length() != parsed.mListeners.Length()) {
       return Error("listen addresses do not match multiple proxies");
     }
-    if (!sawPreamble) {
+    if (parsed.mTransport == TransportMode::NoConnect) {
+      if (!sawNoConnectKey) {
+        return Error("no-connect transport requires no-connect-key");
+      }
+      if (mSawProxyUserInfo) {
+        return Error("no-connect transport does not accept proxy credentials");
+      }
+      if (parsed.mPreamble.mMode != PreambleMode::Off ||
+          parsed.mPreamble.ModeForProtocol(ProxyProtocol::H2) !=
+              PreambleMode::Off ||
+          parsed.mPreamble.ModeForProtocol(ProxyProtocol::H3) !=
+              PreambleMode::Off ||
+          parsed.mOuterSessionGate || !parsed.mExtraHeaders.IsEmpty() ||
+          parsed.mDiagnosticFirstSocksTunnelUrgentStart ||
+          parsed.mDiagnosticOptimisticLocalReply) {
+        return Error(
+            "no-connect transport does not accept classic preamble, "
+            "headers, gate, or diagnostic options");
+      }
+    } else if (sawNoConnectKey) {
+      return Error("no-connect-key requires no-connect transport");
+    }
+    if (!sawPreamble && parsed.mTransport == TransportMode::Classic) {
       bool hasExplicitH2Proxy = false;
       bool hasExplicitH3Proxy = false;
       bool hasOnlySocksListeners = true;
@@ -1678,6 +1734,7 @@ class JsonParser final {
     const int32_t at = authority.RFindChar('@');
     size_t endpointStart = 0;
     if (at >= 0) {
+      mSawProxyUserInfo = true;
       if (at == 0 || authority.FindChar('@') != at) {
         return Error("proxy URI contains invalid credentials");
       }
@@ -1721,6 +1778,7 @@ class JsonParser final {
   const nsACString& mInput;
   nsACString& mError;
   size_t mPosition = 0;
+  bool mSawProxyUserInfo = false;
 };
 
 }  // namespace

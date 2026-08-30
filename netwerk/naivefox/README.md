@@ -4,7 +4,9 @@ NaiveFox is a headless Naive-compatible proxy client built on Firefox's real
 networking stack. Necko supplies HTTP/2, HTTP/3, CONNECT, pooling, and flow
 control; NSS/PSM supplies TLS and certificate validation; Neqo supplies QUIC.
 NaiveFox adds local proxy listeners, transport selection, CONNECT orchestration,
-Naive padding, bounded stream pumping, configuration, and packaging.
+Naive padding, bounded stream pumping, configuration, and packaging. The default
+transport is `classic`; `no-connect` opts into the separate Caddy transport
+module through ordinary HTTP request bodies, using the same lean executable.
 
 ```text
 application -> SOCKS5 or HTTP CONNECT -> NaiveFox
@@ -12,8 +14,10 @@ application -> SOCKS5 or HTTP CONNECT -> NaiveFox
             -> Caddy forwardproxy@naive -> destination
 ```
 
-The server is an unmodified Naive-compatible Caddy build. NaiveFox does not
-ship another HTTP/TLS stack and does not synthesize a Firefox fingerprint.
+The default `classic` transport uses an unmodified Naive-compatible Caddy
+forward proxy. The optional `no-connect` transport requires the
+`naivefox_transport` module. Both modules can share one Caddy endpoint. NaiveFox
+does not ship another HTTP/TLS stack or synthesize a Firefox fingerprint.
 
 ## Running the desktop product
 
@@ -49,6 +53,13 @@ The supported config is a strict NaiveProxy-compatible subset:
 }
 ```
 
+- `transport` is `"classic"` by default or `"no-connect"` for the optional
+  application transport. This is independent of H2/H3 selection in `proxy`.
+  `no-connect-key` is required only for `no-connect` and contains 32 through
+  1024 printable ASCII bytes shared with the server; keep it in a private config.
+  Upstream URI credentials, active classic preambles, extra CONNECT headers,
+  enabled outer-session gates and classic diagnostic options are rejected in
+  this mode. Local SOCKS authentication remains available.
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -78,7 +89,9 @@ The supported config is a strict NaiveProxy-compatible subset:
 - `extra-headers` is a CRLF-separated list added only to the outer upstream
   CONNECT request. Malformed, duplicate, or service headers such as `Host`,
   `Padding`, and `Proxy-Authorization` are rejected.
-- `preamble` is optional. When it is omitted, an explicit H2 upstream behind
+- `preamble` controls only `classic`; `no-connect` uses its own bounded
+  application lifecycle and never receives an implicit classic preamble.
+  For `classic`, `preamble` is optional. When it is omitted, an explicit H2 upstream behind
   SOCKS-only listeners uses the promoted `document-first-buffer-task-overlap`
   policy. HTTP-CONNECT-only and mixed listeners use
   `document-first-buffer-overlap`. An explicit H3 upstream behind any supported
@@ -481,6 +494,32 @@ NaiveFox's outer TLS/QUIC session terminates at the upstream proxy.
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for component, event-target, stream,
 and fallback details. Downstream Firefox hooks are inventoried in
 `UPSTREAM-PATCHES.md` in the full maintenance checkout.
+
+## Opting into no-connect
+
+Use the normal config-file launcher with a separately provisioned transport key:
+
+```json
+{
+  "listen": ["socks://127.0.0.1:1080", "http://127.0.0.1:8080"],
+  "proxy": "quic://proxy.example:443",
+  "transport": "no-connect",
+  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET"
+}
+```
+
+`https://` selects strict H2 and `quic://` selects strict H3 in either transport.
+The key is an application credential, separate from classic proxy user/password.
+No automatic fallback from `no-connect` to `classic` occurs. To use `classic`,
+remove `no-connect-key` and set `transport` to `classic` or omit it; restore
+upstream URI credentials if the forward proxy requires them.
+
+The native client does not run the experimental browser worker, JavaScript,
+DOM, graphics, or loopback WebSocket bridge. Its HTTP bodies interoperate with
+the module's `continuous-bulk-pipeline` profile. The exact port boundary,
+server setup, resource bounds and validation requirements are in
+[NO-CONNECT.md](NO-CONNECT.md). Historical full-browser measurements are not
+measurements of the native implementation.
 
 ## Building and testing
 

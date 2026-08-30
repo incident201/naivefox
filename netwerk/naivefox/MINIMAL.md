@@ -41,6 +41,20 @@ closure evidence.
 
 ## 2. Build and test the minimal graph
 
+Both `classic` and `no-connect` belong to the same minimized product graph.
+The native application-cell codec and ordinary Necko HTTP channels do not
+require a browser worker, WebSocket bridge, DOM, graphics or SpiderMonkey.
+The exact experimental port boundary is maintained in
+[NO-CONNECT.md](NO-CONNECT.md).
+
+For iteration, reuse an existing object directory whose `.mozconfig.json`
+selects this source checkout and `--enable-project=netwerk/naivefox`. Keep new
+object directories in one external build-root directory, with one child per
+target, instead of scattering them through the checkout or home directory.
+A build-file change needs an incremental full **product** graph gate; it never
+requires configuring or cold-building the Firefox browser. Preserve the
+existing configure options and managed toolchain to keep warm objects reusable.
+
 Linux product build:
 
 ```bash
@@ -146,6 +160,12 @@ pass and must be recorded as an unrun device gate, not replaced with
 Run the integration suites appropriate to the change as described in
 `test/integration/README.md`. H2, H3, Auto, config, padding, parser robustness,
 and staged-runtime checks are release gates when their code paths change.
+Transport integration additionally requires both `classic` and `no-connect`
+against one Caddy with both modules, using H2/H3 and both local listeners.
+Inspect the actual linker inputs and dynamic dependencies after rebuilding:
+no `js_static`, JavaScript execution, full DOM, layout, GFX or ICU4C may enter
+the closure. A mozconfig label or a small executable launcher alone is not
+proof that its dependent `libxul` remains lean.
 
 ## 3. Freeze source commit S and evidence commit E
 
