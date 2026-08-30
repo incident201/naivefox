@@ -977,6 +977,18 @@ seed 202608333. This is a causal boundary check, not a resource-size matrix.
 
 ## Local delivery acknowledgement preregistration
 
+The partial-upload follow-up passed all four sessions and exercised the cause:
+bulk-duplex used four 128-KiB uploads; upload1 used three. However total-session
+wire still rose 5,892,770 -> 6,095,529.5 bytes (+3.44%), while upload completion
+was unchanged (125.497 -> 125.525 ms). Single download varied adversely
+61.261 -> 68.890 ms; parallel 82.014 -> 80.603 ms; small wake
+19.678 -> 22.336 ms. Thus one upload tail slot was removed, but the full-session
+cost did not improve in this small screen. Do not claim the upload change caused
+all unrelated download variation, or promote this as an overall saving. Retain
+both lease ablations without H3/residual expansion. Matching server `2793377`
+is frozen in `continuous-state-leases-evidence`, manifest SHA-256
+`956fd50d46362c3ad6756876deb8de81f9c52a16b979f460ccb50afea4dfc521`.
+
 History preflight searched all-ref acknowledgement/IPC/optimistic records and
 reviewed the rejected local SOCKS-success change (`8468a8adec14`) plus the SPA
 stage trace. This proposal does not acknowledge a target connection earlier
@@ -994,3 +1006,11 @@ speculate credit for bytes not written to the local application. Missing early
 credit grants could spend an empty outer cell, so measure wire cost as well as
 IPC latency. Compare against bulk-duplex with two H2 pairs, seed 202608334,
 after deterministic ordering/fence tests and full-session admission.
+
+Implementation admission passed 27 JavaScript tests, all four Go race packages
+and 16 focused Python tests. A one-cell delivery fence is cleared only by an
+awaited command reply; wake notifications cannot clear it. Profile definitions
+were converted from fragile positional boolean lists to named inheritance.
+A digest captured *before* that refactor freezes all twenty previously measured
+profile JSON objects (`52e73811661919f765e75c444927a42abf28e383a50b58068f2b1dd9350372da`);
+it still passes, so old controls' parameters were not silently changed.
