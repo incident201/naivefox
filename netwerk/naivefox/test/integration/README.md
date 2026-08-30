@@ -8,6 +8,35 @@ targets, and binds all fixture services to dynamically selected loopback ports.
 Generated binaries, credentials, private keys, profiles, bodies, logs, and
 captures live under `<objdir>/naivefox-fixture/`; none belongs in Git.
 
+## Native classic/no-connect interoperability
+
+The optional application transport has a separate fixture using the combined
+Caddy module build. It creates private loopback PKI and configuration below
+one existing product object directory, runs the rebuilt native executable, and
+never starts a Firefox browser or rebuilds Caddy implicitly:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy
+```
+
+Both transports use the same Caddy process for each protocol. The fixture checks
+strict H2 and UDP-only H3, both local listeners, 1-MiB uploads/downloads,
+backpressure, half-close, four parallel streams, idle wake, abrupt local
+cancellation, bounded graceful shutdown, rejected application keys, exact target
+allowlists and untrusted certificates. It records zero outer
+CONNECT during the no-connect phase and then exercises classic CONNECT on that
+same endpoint. Classic uses an explicit disabled preamble so this gate measures
+transport interoperability, not the separate fronting-page contract.
+
+Use `--protocol h2` or `--protocol h3` for a focused iteration. `--runtime`
+selects an already-built Linux executable; omission uses `dist/bin/naivefox`
+inside `--objdir`. Per-run configs, certificates and logs remain private;
+`result.json` contains only sanitized gate results. Retained failed runs are
+not passing evidence. Server build instructions and the maintained protocol
+boundary are linked from [NO-CONNECT.md](../../NO-CONNECT.md).
+
 ## Complete local gate
 
 From the repository root, run:
