@@ -4145,6 +4145,18 @@ change. H2 and H3 defaults, their canonical matrix, and the existing site
 contract remain unchanged. The finite measurements do not establish
 size-independent or slow-link performance.
 
+The corrected prototype and its functional tests are preserved in
+`dbf22ddf2906`; all three finite variants and their fixture-only protocol were
+retired from the working product after this screen. Runtime and integration
+files were verified byte-for-byte against pre-finite base `0c67b4388495`,
+excluding this experiment log. Incremental minimized product/test rebuilds,
+100 project gtests, 172 Python tests and the staged H2 config/listener gate
+against stock Caddy all pass after retirement. The latter runs in a private
+network namespace and exercises SOCKS, authenticated SOCKS and HTTP CONNECT.
+No Firefox rebuild, default promotion, full matrix, resource sweep or history
+rewrite was performed. The retained safe datasets and prototype commits allow
+reproduction without retaining an unsuccessful transport in the product.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and

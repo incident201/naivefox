@@ -425,16 +425,6 @@ nsresult RunRawTunnelSmoke(const nsACString& aProxyUrl,
                            const nsACString& aProxyPassword,
                            ProxyProtocol aProtocol);
 
-// Diagnostic finite HTTP transactions on the same explicit H2 proxy route as
-// the document preamble. Normal channel bodies, not upgraded tunnel streams.
-nsresult OpenFiniteHttpExchange(
-    const nsACString& aProxyUrl, const nsACString& aProxyUser,
-    const nsACString& aProxyPassword,
-    const Maybe<HostResolverRule>& aHostResolverRule,
-    const nsACString& aMethod, const nsTArray<ExtraHeader>& aHeaders,
-    const nsACString& aBody, nsIStreamListener* aListener,
-    nsIRequest** aOpenedRequest);
-
 // Paired with the process-wide lazy "HTML5 Parser" thread used by the
 // DOM-free native speculative-preload arm. Must run on main before XPCOM
 // thread shutdown.
