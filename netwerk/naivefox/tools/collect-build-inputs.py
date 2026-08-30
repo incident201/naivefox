@@ -41,6 +41,21 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def declared_jar_source_paths(
+    manifest: Path, source_tree: Path, source: str
+) -> list[Path]:
+    if source.startswith("%"):
+        pattern = manifest.parent / "en-US" / source.removeprefix("%")
+    elif source.startswith("/"):
+        pattern = source_tree / source.lstrip("/")
+    else:
+        pattern = manifest.parent / source
+    if glob.has_magic(str(pattern)):
+        matches = sorted(glob.glob(str(pattern), recursive=True))
+        return [Path(value) for value in matches]
+    return [pattern]
+
+
 def assembly_preprocessor_inputs(
     backend: Path, source_tree: Path, objdir: Path
 ) -> tuple[list[Path], list[Path], list[Path]]:
@@ -412,13 +427,8 @@ def main() -> int:
         for source in JAR_SOURCE.findall(
             manifest.read_text(encoding="utf-8", errors="replace")
         ):
-            if source.startswith("%"):
-                path = manifest.parent / "en-US" / source.removeprefix("%")
-            elif source.startswith("/"):
-                path = source_tree / source.lstrip("/")
-            else:
-                path = manifest.parent / source
-            add_make_path(str(path), "make:active-jar-source")
+            for path in declared_jar_source_paths(manifest, source_tree, source):
+                add_make_path(str(path), "make:active-jar-source")
 
     for fragment in make_fragments:
         text = fragment.read_text(encoding="utf-8", errors="replace")

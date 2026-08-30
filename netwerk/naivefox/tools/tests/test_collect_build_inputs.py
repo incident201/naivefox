@@ -69,5 +69,45 @@ class AssemblyPreprocessorInputsTest(unittest.TestCase):
             self.assertEqual(include_directories, [include_dir])
 
 
+class DeclaredJarSourceInputsTest(unittest.TestCase):
+    def test_recursive_localization_glob_includes_root_and_nested_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            manifest = root / "netwerk/locales/jar.mn"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                "[localization] @AB_CD@.jar:\n"
+                "  netwerk (%netwerk/**/*.ftl)\n",
+                encoding="utf-8",
+            )
+            expected = {
+                root / "netwerk/locales/en-US/netwerk/necko.ftl",
+                root / "netwerk/locales/en-US/netwerk/status/details.ftl",
+            }
+            unrelated = root / "browser/locales/en-US/browser/browser.ftl"
+            for path in expected | {unrelated}:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("message = Value\n", encoding="utf-8")
+            patterns = collector.JAR_SOURCE.findall(manifest.read_text())
+            self.assertEqual(patterns, ["%netwerk/**/*.ftl"])
+            self.assertEqual(
+                set(collector.declared_jar_source_paths(manifest, root, patterns[0])),
+                expected,
+            )
+
+    def test_explicit_jar_sources_keep_their_declared_roots(self) -> None:
+        root = pathlib.Path("/source")
+        manifest = root / "netwerk/locales/jar.mn"
+        for source, expected in (
+            ("%necko.properties", root / "netwerk/locales/en-US/necko.properties"),
+            ("/shared/resource.txt", root / "shared/resource.txt"),
+            ("local/resource.txt", root / "netwerk/locales/local/resource.txt"),
+        ):
+            self.assertEqual(
+                collector.declared_jar_source_paths(manifest, root, source),
+                [expected],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

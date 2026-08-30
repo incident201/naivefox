@@ -20,6 +20,14 @@ import urllib.parse
 SOCKS_NO_AUTH_GREETING = b"\x05\x01\x00"
 
 
+def validate_necko_localization(package_dir):
+    resource = os.path.join(package_dir, "localization", "en-US", "netwerk", "necko.ftl")
+    assert os.path.isfile(resource) and os.path.getsize(resource) > 0, (
+        "required Necko localization resource is missing or empty: "
+        "localization/en-US/netwerk/necko.ftl"
+    )
+
+
 def fetch_digest(target_url, local_proxy=None):
     command = ["curl.exe", "--fail", "--silent", "--show-error", "--noproxy", "",
                "--connect-timeout", "10", "--max-time", "60"]
@@ -514,6 +522,8 @@ def main():
     print("=" * 70)
     print(f"NaiveFox Windows Package Verification: {exe_path}")
     print("=" * 70)
+
+    validate_necko_localization(os.path.dirname(exe_path))
 
     # 1. Version check
     out = subprocess.check_output([exe_path, "--version"], text=True, timeout=30)
