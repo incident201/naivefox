@@ -3977,6 +3977,55 @@ delivery before `OnStopRequest`; the original arms rejected that marker. The
 server source and binary are byte-identical to the first finite experiment.
 These are functional admissions, not camouflage results.
 
+Two-block same-base artifact `52eeaed67ad9bdad` (seed `2026083087`) passed all
+16 isolated captures, including the new per-connection delivery marker. Only
+the preregistered packets-17--32 and Whole views were evaluated:
+
+| H2 listener / arm | 17--32 | Whole |
+| --- | ---: | ---: |
+| SOCKS current default | 0.40875 | 0.30114 |
+| SOCKS original finite | 0.37773 | 0.38091 |
+| SOCKS finite read-through | 0.30714 | 0.40301 |
+| HTTP CONNECT current default | 0.41450 | 0.33340 |
+| HTTP CONNECT original finite | 0.32026 | 0.40024 |
+| HTTP CONNECT finite read-through | 0.30342 | 0.38115 |
+
+Read-through improves packets 17--32 by 24.9% / 26.8% relative to the same-run
+SOCKS / HTTP defaults, but Whole regresses by 33.8% / 14.3%. Relative to the
+original finite controls, the focus window improves by 18.7% / 5.3%, while
+Whole changes by +5.8% / -4.8%. This is a useful early-window diagnostic, not
+a qualifying default or a replicated statistical claim. The original finite
+arms themselves score better in this campaign's early window than in prior
+campaigns, reinforcing the need for within-block comparisons and fresh controls.
+
+The receive-completion barrier was therefore not a sufficient explanation of
+the Whole failure. Client wire bytes remain elevated (25,948 / 27,625 versus
+19,704 / 17,686.5 for the defaults), and server bytes in the first 128 packets
+remain deficient (41,698 / 36,265.5 versus 90,401 / 87,587). The code and this
+screen are retained in history; no default or fronting-site contract changes.
+
+### Finite-exchange server upload read-through ablation
+
+History preflight for the symmetric server-side barrier checked all-ref
+pickaxe history for upload streaming and `ReadAll`, the finite metadata above,
+and the rejected early-CONNECT-DATA report. That older experiment moved initial
+payload before the CONNECT response; this one preserves establishment and
+changes only forwarding of already-accepted ordinary finite POST bodies. It
+also does not batch server target reads or align inner TLS records. The
+unmeasured variable is the explicit full-body wait introduced by the finite
+server adapter itself.
+
+Keep client receive read-through enabled and replace server upload `ReadAll`
+with bounded streaming copy, preserving ordered delivery, exact length checks,
+error closure, half-close and cancellation. The one-byte finite protocol marker
+selects v1 (original upload buffering) or v2 (streamed upload); a session may
+not mix them. Authentication, target ACL/DNS, response boundaries, window sizes,
+padding and every unmarked CONNECT remain unchanged. Add a deterministic
+prefix-before-request-EOF server test before capturing. Compare v1 read-through,
+v2 read-through and the two listener defaults in short randomized paired blocks;
+the same two residual views and promotion gates apply. This is not permission
+to tune resource sizes, introduce a delay or launch a full matrix.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
