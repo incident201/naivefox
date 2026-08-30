@@ -102,7 +102,8 @@ class PumpDirection final : public nsIInputStreamCallback,
   NS_DECL_NSIOUTPUTSTREAMCALLBACK
 
   PumpDirection(DuplexPump* aOwner, nsIAsyncInputStream* aInput,
-                nsIAsyncOutputStream* aOutput, bool aEncode, bool aDecode);
+                nsIAsyncOutputStream* aOutput, bool aEncode, bool aDecode,
+                nsIEventTarget* aCallbackTarget);
 
   nsresult Start(Span<const uint8_t> aInitial = {});
   void Cancel();
@@ -119,6 +120,7 @@ class PumpDirection final : public nsIInputStreamCallback,
   DuplexPump* mOwner;
   nsCOMPtr<nsIAsyncInputStream> mInput;
   nsCOMPtr<nsIAsyncOutputStream> mOutput;
+  nsCOMPtr<nsIEventTarget> mCallbackTarget;
   std::array<uint8_t, kPumpBufferSize> mInputBuffer;
   std::array<uint8_t, kPumpBufferSize> mOutputBuffer;
   size_t mInputOffset = 0;
@@ -136,7 +138,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
 
   DuplexPump(nsIAsyncInputStream* aLocalIn, nsIAsyncOutputStream* aLocalOut,
              nsIAsyncInputStream* aTunnelIn, nsIAsyncOutputStream* aTunnelOut,
-             bool aPaddingEnabled,
+             bool aPaddingEnabled, nsIEventTarget* aCallbackTarget,
              std::function<void()>&& aOnUpstreamApplicationActive,
              std::function<void()>&& aOnDownstreamApplicationActive,
              std::function<void(nsresult)>&& aOnClose)
@@ -145,15 +147,17 @@ class DuplexPump final : public RefCounted<DuplexPump> {
         mTunnelIn(aTunnelIn),
         mTunnelOut(aTunnelOut),
         mPaddingEnabled(aPaddingEnabled),
+        mCallbackTarget(aCallbackTarget),
         mOnUpstreamApplicationActive(std::move(aOnUpstreamApplicationActive)),
         mOnDownstreamApplicationActive(
             std::move(aOnDownstreamApplicationActive)),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start(Span<const uint8_t> aInitialLocalPayload) {
-    mUp = new PumpDirection(this, mLocalIn, mTunnelOut, mPaddingEnabled, false);
-    mDown =
-        new PumpDirection(this, mTunnelIn, mLocalOut, false, mPaddingEnabled);
+    mUp = new PumpDirection(this, mLocalIn, mTunnelOut, mPaddingEnabled, false,
+                            mCallbackTarget);
+    mDown = new PumpDirection(this, mTunnelIn, mLocalOut, false,
+                              mPaddingEnabled, mCallbackTarget);
     RefPtr<PumpDirection> down = mDown;
     nsresult rv = down->Start();
     if (NS_FAILED(rv)) {
@@ -240,6 +244,7 @@ class DuplexPump final : public RefCounted<DuplexPump> {
   RefPtr<PumpDirection> mUp;
   RefPtr<PumpDirection> mDown;
   bool mPaddingEnabled;
+  nsCOMPtr<nsIEventTarget> mCallbackTarget;
   std::function<void()> mOnUpstreamApplicationActive;
   std::function<void()> mOnDownstreamApplicationActive;
   std::function<void(nsresult)> mOnClose;
@@ -249,8 +254,11 @@ class DuplexPump final : public RefCounted<DuplexPump> {
 
 PumpDirection::PumpDirection(DuplexPump* aOwner, nsIAsyncInputStream* aInput,
                              nsIAsyncOutputStream* aOutput, bool aEncode,
-                             bool aDecode)
-    : mOwner(aOwner), mInput(aInput), mOutput(aOutput) {
+                             bool aDecode, nsIEventTarget* aCallbackTarget)
+    : mOwner(aOwner),
+      mInput(aInput),
+      mOutput(aOutput),
+      mCallbackTarget(aCallbackTarget) {
   if (aEncode) {
     mEncoder.emplace(mPaddingGenerator);
   }
@@ -265,11 +273,11 @@ NS_IMPL_ISUPPORTS(PumpDirection, nsIInputStreamCallback,
                   nsIOutputStreamCallback)
 
 nsresult PumpDirection::WaitForInput() {
-  return mInput->AsyncWait(this, 0, 0, nullptr);
+  return mInput->AsyncWait(this, 0, 0, mCallbackTarget);
 }
 
 nsresult PumpDirection::WaitForOutput() {
-  return mOutput->AsyncWait(this, 0, 0, nullptr);
+  return mOutput->AsyncWait(this, 0, 0, mCallbackTarget);
 }
 
 void PumpDirection::Fail(nsresult aStatus) {
@@ -377,6 +385,7 @@ nsresult PumpDirection::Produce() {
 }
 
 NS_IMETHODIMP PumpDirection::OnInputStreamReady(nsIAsyncInputStream* aStream) {
+  MOZ_RELEASE_ASSERT(!mCallbackTarget || mCallbackTarget->IsOnCurrentThread());
   if (!mOwner || mOwner->Closed()) {
     return NS_OK;
   }
@@ -389,6 +398,7 @@ NS_IMETHODIMP PumpDirection::OnInputStreamReady(nsIAsyncInputStream* aStream) {
 
 NS_IMETHODIMP PumpDirection::OnOutputStreamReady(
     nsIAsyncOutputStream* aStream) {
+  MOZ_RELEASE_ASSERT(!mCallbackTarget || mCallbackTarget->IsOnCurrentThread());
   if (!mOwner || mOwner->Closed()) {
     return NS_OK;
   }
@@ -791,8 +801,7 @@ void TunnelSession::FinishPreambleOnMain(
       NS_SUCCEEDED(aStatus) && aHttpStatus >= 200 && aHttpStatus < 300;
   if ((PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        !requestCommittedAdmission) ||
-      (preambleMode ==
-           PreambleMode::TreeNativeParserResourceCommittedOverlap &&
+      (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap &&
        !resourceTreeCommittedAdmission) ||
       (!PreambleModeUsesNativeParserDocumentStart(preambleMode) &&
        PreambleModeRequiresFailClosed(preambleMode) && !succeeded)) {
@@ -890,15 +899,14 @@ void TunnelSession::FinishPreambleOnMain(
       admission = "response-headers-task";
     } else if (preambleMode == PreambleMode::DocumentFirstBufferOverlap) {
       admission = "first-data-buffer";
-    } else if (preambleMode ==
-               PreambleMode::DocumentFirstBufferTaskOverlap) {
+    } else if (preambleMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
       admission = "first-data-buffer-task";
     }
     RuntimeLogEvent(
         "Connection %llu preamble document-overlap admission=%s "
         "response_accepted=%d root_done=%d protocol=%s\n",
-        static_cast<unsigned long long>(mImpl->mConnectionId),
-        admission, !aRootDone, aRootDone, ProtocolName(aProtocol));
+        static_cast<unsigned long long>(mImpl->mConnectionId), admission,
+        !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::DocumentStartOverlap ||
       preambleMode == PreambleMode::DocumentStartTaskOverlap) {
@@ -907,9 +915,9 @@ void TunnelSession::FinishPreambleOnMain(
         "request_committed=%d root_done=%d protocol=%s\n",
         static_cast<unsigned long long>(mImpl->mConnectionId),
         aRootDone ? "terminal-fallback"
-                  : preambleMode == PreambleMode::DocumentStartTaskOverlap
-                        ? "request-committed-task"
-                        : "request-committed",
+        : preambleMode == PreambleMode::DocumentStartTaskOverlap
+            ? "request-committed-task"
+            : "request-committed",
         !aRootDone, aRootDone, ProtocolName(aProtocol));
   }
   if (preambleMode == PreambleMode::TreeNativeParserDocumentStartOverlap) {
@@ -928,8 +936,7 @@ void TunnelSession::FinishPreambleOnMain(
         static_cast<unsigned long long>(mImpl->mConnectionId),
         ProtocolName(aProtocol));
   }
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserResourceCommittedOverlap) {
+  if (preambleMode == PreambleMode::TreeNativeParserResourceCommittedOverlap) {
     RuntimeLogEvent(
         "Connection %llu preamble native-parser-resource-tree "
         "admission=resources-committed request_committed=1 root_done=%d "
@@ -1240,7 +1247,7 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
     mImpl->mFiniteExchange = new FiniteExchange(
         mImpl->mConfig, mImpl->mConnectionId,
         [self, aGeneration](nsresult status, nsIAsyncInputStream* input,
-                             nsIAsyncOutputStream* output) {
+                            nsIAsyncOutputStream* output) {
           nsCOMPtr<nsIAsyncInputStream> heldInput = input;
           nsCOMPtr<nsIAsyncOutputStream> heldOutput = output;
           nsresult dispatch = self->mImpl->mSocketTarget->Dispatch(
@@ -1248,7 +1255,7 @@ void TunnelSession::OpenConnectOnMain(uint64_t aGeneration,
                   "NaiveFox::FiniteExchangeReady",
                   [self, aGeneration, status, heldInput, heldOutput]() {
                     self->ApplyFiniteTransport(aGeneration, status, heldInput,
-                                                heldOutput);
+                                               heldOutput);
                   }),
               NS_DISPATCH_NORMAL);
           if (NS_FAILED(dispatch)) {
@@ -1741,8 +1748,7 @@ nsresult TunnelSession::StartPump() {
   std::function<void()> onDownstreamApplicationActive;
   const PreambleMode preambleMode =
       mImpl->mConfig.mPreamble.ModeForProtocol(mImpl->mAttemptProtocol);
-  if (preambleMode ==
-      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+  if (preambleMode == PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     onDownstreamApplicationActive = [self,
                                      generation = mImpl->mAttemptGeneration,
                                      protocol = mImpl->mAttemptProtocol]() {
@@ -1759,6 +1765,8 @@ nsresult TunnelSession::StartPump() {
   mImpl->mPump = new DuplexPump(
       mImpl->mLocalIn, mImpl->mLocalOut, mImpl->mPendingTunnelIn,
       mImpl->mPendingTunnelOut, mImpl->mPaddingEnabled,
+      mImpl->mConfig.mDiagnosticH2FiniteExchanges ? mImpl->mSocketTarget.get()
+                                                  : nullptr,
       [self, generation = mImpl->mAttemptGeneration,
        protocol = mImpl->mAttemptProtocol]() {
         nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(

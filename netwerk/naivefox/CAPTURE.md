@@ -4004,6 +4004,33 @@ the Whole failure. Client wire bytes remain elevated (25,948 / 27,625 versus
 remain deficient (41,698 / 36,265.5 versus 90,401 / 87,587). The code and this
 screen are retained in history; no default or fronting-site contract changes.
 
+### Finite-exchange callback-affinity correction
+
+Functional admission of the subsequent upload variant exposed a shared bug in
+the diagnostic adapter, before any new comparative capture. Private probe
+`finite-exchange-probes.s280pm5e` reset a second local HTTP connection in the
+original finite arm. Instrumented repeat `finite-exchange-probes.sy70g37m`
+recorded SIGSEGV after the receive-read-through SOCKS concurrency test. The
+debugger caught `PumpDirection::Produce()` on the socket thread dereferencing
+its cancelled owner. A conditional main-thread breakpoint then proved the
+other side of the race: `FiniteExchange::FlushDownloads()` wrote the native
+pipe, whose inline `CallbackHolder::Notify` invoked
+`PumpDirection::OnInputStreamReady()` on the main thread.
+
+The pump's null-target `AsyncWait` had relied on native socket streams to
+provide socket-thread callbacks. A native pipe has a different callback
+contract; the first finite prototype had not explicitly restored that thread
+affinity. All finite variants inherited the defect, not just upload v2.
+Historical finite captures remain observations of that unsafe prototype and
+must not qualify a default or establish the final effect of read-through.
+
+The correction supplies the existing socket event target to both pump callback
+registrations only for the diagnostic finite adapter, with release assertions
+on callback thread affinity. Ordinary socket-backed defaults keep their exact
+null-target callback behavior. New comparative collection must use a corrected
+binary and fresh controls; include the original finite arms as well as the two
+read-through variants so the unsafe earlier scores are not reused as controls.
+
 ### Finite-exchange server upload read-through ablation
 
 History preflight for the symmetric server-side barrier checked all-ref
