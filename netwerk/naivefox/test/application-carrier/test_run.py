@@ -14,6 +14,11 @@ spec.loader.exec_module(runner)
 
 
 class CarrierAdmissionTests(unittest.TestCase):
+    def test_sustained_download_workload_bound(self):
+        self.assertEqual(runner.session_exercise.download_resource(8388608),"/camouflage/resource?size=8388608")
+        for invalid in (0,4095,16777217):
+            with self.assertRaises(ValueError):runner.session_exercise.download_resource(invalid)
+
     def test_partial_upload_workload_is_exact_and_bounded(self):
         payload = runner.session_exercise.upload_payload(333333)
         self.assertEqual(len(payload),333333)

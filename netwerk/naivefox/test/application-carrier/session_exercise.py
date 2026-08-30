@@ -45,7 +45,13 @@ def upload_payload(size):
     return (bytes(range(256)) * ((size + 255) // 256))[:size]
 
 
-def run(worker, directory, fixture, ready, target_port, http_port, outer_port, protocol, launch, idle_seconds=0, profile_stages=False, upload_bytes=1048576):
+def download_resource(size):
+    if not 4096 <= size <= 16777216:
+        raise ValueError("download size bound")
+    return "/camouflage/resource?size=" + str(size)
+
+
+def run(worker, directory, fixture, ready, target_port, http_port, outer_port, protocol, launch, idle_seconds=0, profile_stages=False, upload_bytes=1048576, download_bytes=1048576):
     checks = []
     if profile_stages:
         worker.execute_script(Path(__file__).with_name("profile-stages.js").read_text())
@@ -108,8 +114,9 @@ def run(worker, directory, fixture, ready, target_port, http_port, outer_port, p
         print(json.dumps(value), flush=True)
 
     begin()
-    expected = direct("/camouflage/resource?size=1048576")
-    await_jobs("download-after-idle", [job("late-download", "socks", "/camouflage/resource?size=1048576")], expected)
+    resource = download_resource(download_bytes)
+    expected = direct(resource)
+    await_jobs("download-after-idle", [job("late-download", "socks", resource)], expected)
     begin()
     expected = direct("/camouflage/delay?ms=0")
     await_jobs("delayed-server-response", [job("delayed", "http", "/camouflage/delay?ms=1500")], expected)

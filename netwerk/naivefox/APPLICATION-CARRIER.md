@@ -1033,3 +1033,28 @@ This isolates the observed small-state penalty; it does not retest optimistic
 SOCKS success. Two H2 pairs against bulk-duplex, seed 202608335. After that,
 measure the best surviving profile's sustained throughput and fresh residuals,
 rather than continuing tiny scheduler variants without a demonstrated cause.
+
+The bulk-only ACK screen passed all four sessions with exactly thirteen deferred
+deliveries per candidate. Single download 67.229 -> 65.719 ms (-2.25%);
+parallel 90.283 -> 90.303 ms; slow upload 320.690 -> 324.677 ms;
+small wake 23.710 -> 26.085 ms. Wire 6,863,867 -> 6,894,285 bytes (+0.44%).
+The strong all-active ACK speed gain did not survive isolation to bulk, and
+small latency is still not better. Keep both ACK profiles opt-in; no H3 or
+residual sweep. Bulk-duplex remains the simpler strongest cross-protocol
+candidate, while continuous-v1 is still the last residual-qualified lifecycle.
+
+## Sustained-transfer diagnosis preregistration
+
+Current 1-MiB screens include inner TLS startup and a small number of large
+cells; control samples vary when a final lease changes. To distinguish these
+from an established-transfer limit, expose one explicit 8-MiB single download
+in the existing session workload, identically in all arms. Do not alter the
+transport's capacities, thresholds or resource graph to fit it. Other stages
+and the original 1-MiB upload stay fixed. This is one focused scaling check,
+not a resource-size sweep or a replacement for canonical residual captures.
+
+First a separate, non-cost H2 bulk-duplex stage profile with 8 MiB. Then two
+H2 native-versus-bulk-duplex fixed-work pairs (seed 202608336) to measure the
+remaining absolute gap and overhead. The runner records explicit workload sizes,
+source revision and helper digests for new campaigns. Seventeen focused Python
+tests pass; old campaigns keep their original workload and evidence.

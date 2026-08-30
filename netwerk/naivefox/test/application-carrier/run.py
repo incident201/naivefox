@@ -244,6 +244,8 @@ class Campaign:
         write_json(self.root / "provenance.json", {
             "binary_sha256": binaries,
             "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "session_helpers_sha256": {name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest() for name in ("session_exercise.py","session_costs.py","profile-stages.js")},
+            "source_revision": subprocess.check_output(["git","-C",str(Path(__file__).parent),"rev-parse","HEAD"],text=True).strip(),
             "server_revision": subprocess.check_output(["git", "-C", str(TRANSPORT), "rev-parse", "HEAD"], text=True).strip(),
             "server_worktree_dirty": bool(subprocess.check_output(["git", "-C", str(TRANSPORT), "status", "--porcelain"], text=True)),
             "firefox_base": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
@@ -300,7 +302,7 @@ class Campaign:
             raise RuntimeError("shaper missing or dropped packets")
         return value
 
-    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576, download_bytes=1048576):
         probe = probe or session_probe
         capturing = capture or session_wire
         rounds = rounds or PROFILES[app_profile][0]
@@ -431,7 +433,7 @@ class Campaign:
                     process = launch(args, log)
                     probes.append(process)
                     return process
-                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds,profile_stages,upload_bytes)
+                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds,profile_stages,upload_bytes,download_bytes)
             if journal.exists():
                 with journal.open() as source:
                     source.seek(journal_offset)
@@ -563,6 +565,7 @@ def main():
     parser.add_argument("--session-variants",action="store_true")
     parser.add_argument("--session-control",choices=PROFILES,default="continuous-v1")
     parser.add_argument("--upload-bytes",type=int,default=1048576)
+    parser.add_argument("--download-bytes",type=int,default=1048576)
     parser.add_argument("--session-wire",action="store_true")
     parser.add_argument("--profile-stages",action="store_true")
     parser.add_argument("--idle-seconds",type=int,default=0)
@@ -571,6 +574,8 @@ def main():
     args=parser.parse_args()
     if not 4096 <= args.upload_bytes <= 4194304 or (args.upload_bytes != 1048576 and not (args.session_probe or args.session_pairs)):
         parser.error("upload size requires a session probe/pair and 4 KiB through 4 MiB")
+    if not 4096 <= args.download_bytes <= 16777216 or (args.download_bytes != 1048576 and not (args.session_probe or args.session_pairs)):
+        parser.error("download size requires a session probe/pair and 4 KiB through 16 MiB")
     if args.profile_stages and (not args.session_probe or args.mode!="replace" or args.session_pairs or args.session_wire or args.idle_seconds):
         parser.error("stage profiling requires a standalone replacement session probe without wire/idle accounting")
     if args.session_control != "continuous-v1" and not args.session_variants:
@@ -616,9 +621,9 @@ def main():
                 rng.shuffle(modes)
                 schedule.extend({"block":block,"mode":"replace" if args.session_variants else value,"profile":value if args.session_variants else args.app_profile} for value in modes)
             write_json(args.root / "session-schedule.json",schedule)
-            write_json(args.root / "session-comparison.json",{"seed":args.seed,"variants":args.session_variants,"control":args.session_control if args.session_variants else "default","candidate":args.app_profile if args.session_variants else "replace","upload_bytes":args.upload_bytes})
+            write_json(args.root / "session-comparison.json",{"seed":args.seed,"variants":args.session_variants,"control":args.session_control if args.session_variants else "default","candidate":args.app_profile if args.session_variants else "replace","upload_bytes":args.upload_bytes,"download_bytes":args.download_bytes})
             for index,row in enumerate(schedule):
-                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=row["profile"],session_probe=True,session_wire=True,upload_bytes=args.upload_bytes)
+                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=row["profile"],session_probe=True,session_wire=True,upload_bytes=args.upload_bytes,download_bytes=args.download_bytes)
                 print(json.dumps({key:value for key,value in result.items() if key not in ("server-stats","bridge-stats","inner_http_statuses")},sort_keys=True),flush=True)
                 if not result["admitted"]:
                     return 1
@@ -646,7 +651,7 @@ def main():
         if args.screen:
             campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean)
             return 0
-        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire,args.profile_stages,args.upload_bytes)
+        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire,args.profile_stages,args.upload_bytes,args.download_bytes)
         print(json.dumps(result,sort_keys=True),flush=True)
         return 0 if result["admitted"] else 1
     finally:campaign.close()
