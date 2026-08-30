@@ -298,7 +298,7 @@ class Campaign:
             raise RuntimeError("shaper missing or dropped packets")
         return value
 
-    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False):
+    def sample(self, name, kind="socks", mode="replace", rounds=0, capture=False, probe=False, app_profile="v1", session_probe=False, idle_seconds=0, session_wire=False, profile_stages=False, upload_bytes=1048576):
         probe = probe or session_probe
         capturing = capture or session_wire
         rounds = rounds or PROFILES[app_profile][0]
@@ -429,7 +429,7 @@ class Campaign:
                     process = launch(args, log)
                     probes.append(process)
                     return process
-                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds,profile_stages)
+                result["session_exercise"]=session_exercise.run(worker,directory,self.fixture,ready,self.target_port,self.values["NAIVEFOX_FIXTURE_HTTP_PORT"],self.port,self.protocol,launch_job,idle_seconds,profile_stages,upload_bytes)
             if journal.exists():
                 with journal.open() as source:
                     source.seek(journal_offset)
@@ -560,12 +560,15 @@ def main():
     parser.add_argument("--session-pairs",type=int,default=0)
     parser.add_argument("--session-variants",action="store_true")
     parser.add_argument("--session-control",choices=PROFILES,default="continuous-v1")
+    parser.add_argument("--upload-bytes",type=int,default=1048576)
     parser.add_argument("--session-wire",action="store_true")
     parser.add_argument("--profile-stages",action="store_true")
     parser.add_argument("--idle-seconds",type=int,default=0)
     parser.add_argument("--screen",type=int,default=0)
     parser.add_argument("--seed",type=int,default=202608301)
     args=parser.parse_args()
+    if not 4096 <= args.upload_bytes <= 4194304 or (args.upload_bytes != 1048576 and not (args.session_probe or args.session_pairs)):
+        parser.error("upload size requires a session probe/pair and 4 KiB through 4 MiB")
     if args.profile_stages and (not args.session_probe or args.mode!="replace" or args.session_pairs or args.session_wire or args.idle_seconds):
         parser.error("stage profiling requires a standalone replacement session probe without wire/idle accounting")
     if args.session_control != "continuous-v1" and not args.session_variants:
@@ -611,9 +614,9 @@ def main():
                 rng.shuffle(modes)
                 schedule.extend({"block":block,"mode":"replace" if args.session_variants else value,"profile":value if args.session_variants else args.app_profile} for value in modes)
             write_json(args.root / "session-schedule.json",schedule)
-            write_json(args.root / "session-comparison.json",{"seed":args.seed,"variants":args.session_variants,"control":args.session_control if args.session_variants else "default","candidate":args.app_profile if args.session_variants else "replace"})
+            write_json(args.root / "session-comparison.json",{"seed":args.seed,"variants":args.session_variants,"control":args.session_control if args.session_variants else "default","candidate":args.app_profile if args.session_variants else "replace","upload_bytes":args.upload_bytes})
             for index,row in enumerate(schedule):
-                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=row["profile"],session_probe=True,session_wire=True)
+                result=campaign.sample(f"session-{index:03d}",mode=row["mode"],app_profile=row["profile"],session_probe=True,session_wire=True,upload_bytes=args.upload_bytes)
                 print(json.dumps({key:value for key,value in result.items() if key not in ("server-stats","bridge-stats","inner_http_statuses")},sort_keys=True),flush=True)
                 if not result["admitted"]:
                     return 1
@@ -641,7 +644,7 @@ def main():
         if args.screen:
             campaign.screen(args.screen,args.seed,args.app_profile,args.screen_lean)
             return 0
-        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire,args.profile_stages)
+        result=campaign.sample("admission-"+secrets.token_hex(4),args.kind,args.mode,args.rounds,args.capture,args.probe,args.app_profile,args.session_probe,args.idle_seconds,args.session_wire,args.profile_stages,args.upload_bytes)
         print(json.dumps(result,sort_keys=True),flush=True)
         return 0 if result["admitted"] else 1
     finally:campaign.close()

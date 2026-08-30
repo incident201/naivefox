@@ -39,7 +39,13 @@ def settle(worker, seconds=2):
     raise RuntimeError("continuous worker did not settle")
 
 
-def run(worker, directory, fixture, ready, target_port, http_port, outer_port, protocol, launch, idle_seconds=0, profile_stages=False):
+def upload_payload(size):
+    if not 4096 <= size <= 4194304:
+        raise ValueError("upload size bound")
+    return (bytes(range(256)) * ((size + 255) // 256))[:size]
+
+
+def run(worker, directory, fixture, ready, target_port, http_port, outer_port, protocol, launch, idle_seconds=0, profile_stages=False, upload_bytes=1048576):
     checks = []
     if profile_stages:
         worker.execute_script(Path(__file__).with_name("profile-stages.js").read_text())
@@ -110,7 +116,7 @@ def run(worker, directory, fixture, ready, target_port, http_port, outer_port, p
     if worker is not None and not checks[-1]["idle_seen_while_pending"]:
         raise RuntimeError("delayed server response did not exercise idle")
     begin()
-    payload = bytes(range(256)) * 4096
+    payload = upload_payload(upload_bytes)
     upload = directory / "upload.body"
     upload.write_bytes(payload)
     await_jobs("slow-upload-after-idle", [job("upload", "http", "/camouflage/slow-upload?ms=1", upload)], upload=payload)

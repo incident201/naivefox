@@ -14,6 +14,14 @@ spec.loader.exec_module(runner)
 
 
 class CarrierAdmissionTests(unittest.TestCase):
+    def test_partial_upload_workload_is_exact_and_bounded(self):
+        payload = runner.session_exercise.upload_payload(333333)
+        self.assertEqual(len(payload),333333)
+        self.assertEqual(payload[-1],(333333-1)%256)
+        self.assertEqual(runner.session_exercise.upload_payload(1048576),bytes(range(256))*4096)
+        for invalid in (0,4095,4194305):
+            with self.assertRaises(ValueError):runner.session_exercise.upload_payload(invalid)
+
     def test_coalesced_quic_ids_are_not_extra_connections(self):
         self.assertEqual(runner.outer_flow_count([{"flow": ""}, {"flow": "0"}, {"flow": "0;0"}]), 1)
 

@@ -953,3 +953,44 @@ four-slot mixed state, same startup and idle. No data-sized body, fitted pause
 or response wait is added. First independent two-pair H2 screens with seeds
 202608331/202608332, then only the stronger candidate's H3/slow-link checks.
 Do not combine these interventions before measuring them separately.
+
+Server `2793377` passed 26 JavaScript tests, all four Go race packages and
+15 focused Python tests. `continuous-bulk-interactive1-h2-pairs` passed both
+pairs but is rejected as the next preferred candidate: wire 6,812,547.5 ->
+7,420,479 bytes (+8.92%). Single download 63.400 -> 57.539 ms (-9.24%);
+parallel 83.546 -> 83.879 ms; slow upload 317.810 -> 308.514 ms;
+small wake 22.393 -> 18.588 ms. Both candidates used twelve large upload slots
+instead of controls' eight, despite reducing interactive responses to 23/24
+from 44. Earlier state transition spent more capacity elsewhere. No H3 or
+residual follow-up for this unfavorable traffic tradeoff.
+
+`continuous-bulk-upload1-h2-pairs` also passed both pairs but barely changed
+the fixed workload: single 59.922 -> 59.720 ms; parallel 81.142 -> 81.341 ms;
+slow upload 321.219 -> 317.181 ms; small wake 17.764 -> 19.747 ms.
+Wire 6,888,809.5 -> 6,857,862 bytes (-0.45%). Critically, every arm consumed
+exactly eight large upload slots. The proposed partial-tail saving was not
+exercised by this nearly block-aligned 1-MiB upload. Do not infer that shorter
+upload commitment helps, or that the tail mechanism is absent, from this test.
+One narrowly targeted follow-up changes only the upload workload to 333,333
+bytes for both arms, leaving all transport parameters unchanged: two H2 pairs,
+seed 202608333. This is a causal boundary check, not a resource-size matrix.
+
+## Local delivery acknowledgement preregistration
+
+History preflight searched all-ref acknowledgement/IPC/optimistic records and
+reviewed the rejected local SOCKS-success change (`8468a8adec14`) plus the SPA
+stage trace. This proposal does not acknowledge a target connection earlier
+or remove an outer handshake. It concerns the private loopback bridge's
+per-response *delivery* ACK, which is followed by an already-required pressure
+or upload-capacity request on the same ordered WebSocket.
+
+An opt-in bulk-noack profile may defer that ACK to the next command's reply.
+Only active/idle delivery changes; startup stays identical. Allow at most one
+unacknowledged cell. The next pressure/take command is processed after delivery
+and must finish before another response can be delivered, bounding local
+buffering without a timer. Keep codec/stream sequencing and receive credit;
+invalid delivery closes the socket and rejects the pending command. Never
+speculate credit for bytes not written to the local application. Missing early
+credit grants could spend an empty outer cell, so measure wire cost as well as
+IPC latency. Compare against bulk-duplex with two H2 pairs, seed 202608334,
+after deterministic ordering/fence tests and full-session admission.
