@@ -100,8 +100,13 @@ struct TunnelConfig final {
         mImplicitPreambleGate(aOther.mImplicitPreambleGate),
         mDiagnosticFirstSocksTunnelUrgentStart(
             aOther.mDiagnosticFirstSocksTunnelUrgentStart),
-        mDiagnosticOptimisticLocalReply(
-            aOther.mDiagnosticOptimisticLocalReply) {
+        mDiagnosticOptimisticLocalReply(aOther.mDiagnosticOptimisticLocalReply),
+        mDiagnosticH2FiniteExchanges(aOther.mDiagnosticH2FiniteExchanges),
+        mDiagnosticH2FiniteReadThrough(aOther.mDiagnosticH2FiniteReadThrough),
+        mDiagnosticH2FiniteStreamUploads(
+            aOther.mDiagnosticH2FiniteStreamUploads),
+        mDiagnosticH2FiniteBudgetedDownloads(
+            aOther.mDiagnosticH2FiniteBudgetedDownloads) {
     mExtraHeaders.AppendElements(aOther.mExtraHeaders);
   }
   TunnelConfig& operator=(const TunnelConfig& aOther) {
@@ -117,6 +122,12 @@ struct TunnelConfig final {
       mDiagnosticFirstSocksTunnelUrgentStart =
           aOther.mDiagnosticFirstSocksTunnelUrgentStart;
       mDiagnosticOptimisticLocalReply = aOther.mDiagnosticOptimisticLocalReply;
+      mDiagnosticH2FiniteExchanges = aOther.mDiagnosticH2FiniteExchanges;
+      mDiagnosticH2FiniteReadThrough = aOther.mDiagnosticH2FiniteReadThrough;
+      mDiagnosticH2FiniteStreamUploads =
+          aOther.mDiagnosticH2FiniteStreamUploads;
+      mDiagnosticH2FiniteBudgetedDownloads =
+          aOther.mDiagnosticH2FiniteBudgetedDownloads;
       mExtraHeaders.Clear();
       mExtraHeaders.AppendElements(aOther.mExtraHeaders);
     }
@@ -134,6 +145,10 @@ struct TunnelConfig final {
   bool mImplicitPreambleGate = false;
   bool mDiagnosticFirstSocksTunnelUrgentStart = false;
   bool mDiagnosticOptimisticLocalReply = false;
+  bool mDiagnosticH2FiniteExchanges = false;
+  bool mDiagnosticH2FiniteReadThrough = false;
+  bool mDiagnosticH2FiniteStreamUploads = false;
+  bool mDiagnosticH2FiniteBudgetedDownloads = false;
 };
 
 class TunnelSession final {
@@ -207,6 +222,9 @@ class TunnelSession final {
                       nsISocketTransport* aTransport,
                       nsIAsyncInputStream* aSocketIn,
                       nsIAsyncOutputStream* aSocketOut);
+  void ApplyFiniteTransport(uint64_t aGeneration, nsresult aStatus,
+                            nsIAsyncInputStream* aInput,
+                            nsIAsyncOutputStream* aOutput);
   void ApplyUpgradeFailure(uint64_t aGeneration, ProxyProtocol aProtocol,
                            nsresult aStatus);
   void ApplyEstablishmentTimeout(uint64_t aGeneration, ProxyProtocol aProtocol);

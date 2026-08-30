@@ -4209,6 +4209,59 @@ default gate remains a replicated >=20% gain against current defaults without
 unacceptable regressions. No full matrix or size/link sweep for a weak screen.
 There is no change to the site's contract or the canonical default matrix.
 
+### Finite-exchange native-pool ownership correction
+
+The first v3 functional round stopped before reaching v3: the old v1
+receive-read-through HTTP arm truncated a parallel 128-KiB download at 66,984
+bytes in private probe `smzg6q09`. The received prefix was exact. Client
+diagnostics recorded HTTP 409 on later exchanges, not a codec mismatch.
+An aggregate audit of the server log showed successful requests on the
+session's initial TCP source port and rejected requests on another source
+port. Native Necko pooling had moved ordinary requests between outer
+connections, while the diagnostic server required exact `RemoteAddr` equality.
+
+All-ref history preflight found no previous correction for this ownership
+case. A deterministic port-migration test fails with HTTP 409 for v1, v2 and
+v3 before the fix. The adapter now compares normalized peer IP addresses,
+retaining the same credential digest, random 128-bit session capability,
+handler/version checks, sequence/replay bounds and target ACL. Different
+addresses, malformed addresses and wrong credentials still fail closed;
+only the source port may change. This correction is shared by controls and
+candidates. Ordinary CONNECT defaults are unaffected.
+
+The camouflage admission rule still requires exactly one outer ClientHello;
+the functional correction is not permission to accept extra connections in
+the primary capture. Earlier singleton measurements are not reused as fresh
+controls. No residual measurement was collected during the failed functional
+round, and no default or site policy changed.
+
+### Budgeted-response functional admission
+
+After the ownership correction, all eight finite/listener combinations passed
+in private probe `pciwebne`; both v2 controls and both v3 candidates repeated
+successfully in `gzoy8pf3` and `xf4p22jo`. Every arm exercised TLS, exact 1-MiB
+slow download, 768-KiB upload, half-close, four concurrent 128-KiB downloads,
+cancellation, bad authentication and bounded process shutdown. The v3 probes
+also required a completed 65,536-byte response and receive-before-stop proof.
+
+Incremental minimized product/test builds, 104 C++ gtests, 175 Python tests and
+the complete server Go race-test suite passed. The server tests include v2/v3
+upload-prefix and length validation, byte-budget rotation without target EOF,
+a short final response, cancellation before and after the first body bytes,
+write failure and the earlier response-lifetime regression. A real local H2
+client additionally receives the prefix immediately and then a stream error,
+not successful EOF, when the target fails mid-response. All network checks
+run in private WSL namespaces, including the Go suite.
+
+The admitted Caddy overlay SHA-256 is
+`b7bed380ba5845cd121d489962b2a51b6af3e01204a5be8e5988b1e241708272`.
+The new per-sample `finite-exchanges/*.json` files contain only summed numeric
+counters and arm/schema/scope labels. Their scope is the entire product
+session including post-capture shutdown; open/close requests are excluded.
+They are mechanism diagnostics, not new passive classifier features or a
+change to capture cutoff. Missing/duplicate terminal counters fail closed.
+The planned seed `2026083089` screen remains p17--32 and Whole only.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and

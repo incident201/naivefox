@@ -5,6 +5,7 @@
 SOURCES += [
     "../AutoFallback.cpp",
     "../Config.cpp",
+    "../FiniteExchange.cpp",
     "../GeckoRuntime.cpp",
     "../HeaderPadding.cpp",
     "../HttpClient.cpp",

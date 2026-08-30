@@ -63,11 +63,13 @@
 #include "nsITimer.h"
 #include "nsITransportSecurityInfo.h"
 #include "nsIURI.h"
+#include "nsIUploadChannel2.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsProxyInfo.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
+#include "nsStringStream.h"
 #include "nsThreadUtils.h"
 
 namespace mozilla::naivefox {
@@ -1114,7 +1116,7 @@ nsresult ProxyPreambleOperation::NotifyTunnelApplicationActive() {
 nsresult ProxyPreambleOperation::NotifyTunnelServerApplicationActive() {
   MOZ_ASSERT(NS_IsMainThread());
   if (mImpl->mConfig.mMode !=
-          PreambleMode::TreeNativeParserDocumentStartResponseStop) {
+      PreambleMode::TreeNativeParserDocumentStartResponseStop) {
     return NS_OK;
   }
   if (mImpl->mCancelled || mImpl->mFinishedFired) {
@@ -1287,8 +1289,7 @@ nsresult ProxyPreambleOperation::Start(
                 PreambleMode::TreeNativeParserDocumentStartNavigationStop))) ||
         (PreambleModeUsesNativeParserResourceTree(aConfig.mMode)
              ? (aProtocol == ProxyProtocol::H2
-                    ? aConfig.mMaxAssets !=
-                          expectedH2NativeParserResourceCount
+                    ? aConfig.mMaxAssets != expectedH2NativeParserResourceCount
                     : (aConfig.mMaxAssets != 3U && aConfig.mMaxAssets != 6U))
              : aConfig.mMaxAssets != 1U) ||
         !aConfig.mCacheResources))) {
@@ -1547,8 +1548,7 @@ nsresult ProxyPreambleOperation::DispatchDocumentBarrierTask() {
   }
   mImpl->mDocumentBarrierTaskDispatched = true;
   if (mImpl->mConfig.mMaxAssets == 6) {
-    if (mImpl->mConfig.mMode ==
-        PreambleMode::TreeResourceCommittedOverlap) {
+    if (mImpl->mConfig.mMode == PreambleMode::TreeResourceCommittedOverlap) {
       RuntimeLogEvent(
           "Preamble resource-committed-overlap barrier=task-dispatched "
           "assets=6 protocol=%s\n",
@@ -1556,8 +1556,8 @@ nsresult ProxyPreambleOperation::DispatchDocumentBarrierTask() {
     }
   }
   RefPtr self = this;
-  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
-      "NaiveFox::DocumentBarrierTask", [self]() {
+  nsresult rv = NS_DispatchToMainThread(
+      NS_NewRunnableFunction("NaiveFox::DocumentBarrierTask", [self]() {
         if (!self->mImpl->mCancelled) {
           self->FireBarrierCallback();
         }
@@ -3125,15 +3125,13 @@ void ProxyPreambleOperation::ReleaseDeferredNativeParserImages() {
       mImpl->mConfig.mMaxAssets != 6) {
     return;
   }
-  for (uint32_t streamId = 1; streamId < mImpl->mStreams.Length();
-       ++streamId) {
+  for (uint32_t streamId = 1; streamId < mImpl->mStreams.Length(); ++streamId) {
     auto& stream = mImpl->mStreams[streamId];
     if (!stream.mPendingOpenListener) {
       continue;
     }
     nsCOMPtr<nsIChannel> channel = do_QueryInterface(stream.mRequest);
-    nsCOMPtr<nsIStreamListener> listener =
-        stream.mPendingOpenListener.forget();
+    nsCOMPtr<nsIStreamListener> listener = stream.mPendingOpenListener.forget();
     if (!channel || !listener) {
       FailNativeParserContract(NS_ERROR_UNEXPECTED,
                                "deferred-image-open-invalid");
@@ -3692,17 +3690,14 @@ nsresult ProxyPreambleOperation::OnDataAvailable(uint32_t aStreamId,
 
   if (aStreamId == 0 &&
       (mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferOverlap ||
-       mImpl->mConfig.mMode ==
-           PreambleMode::DocumentFirstBufferTaskOverlap) &&
-      !mImpl->mBarrierFired &&
-      mImpl->mStreams[0].mResponseHeadersReceived &&
+       mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferTaskOverlap) &&
+      !mImpl->mBarrierFired && mImpl->mStreams[0].mResponseHeadersReceived &&
       mImpl->mStreams[0].mHttpStatus >= 200 &&
       mImpl->mStreams[0].mHttpStatus < 300 && !mImpl->mStreams[0].mDone) {
     // Admit only after the complete first Necko-delivered body buffer was
     // consumed successfully.  This is a channel event, not a byte threshold:
     // a short read or failed buffer never releases CONNECT.
-    if (mImpl->mConfig.mMode ==
-        PreambleMode::DocumentFirstBufferTaskOverlap) {
+    if (mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferTaskOverlap) {
       if (!mImpl->mDocumentBarrierTaskDispatched) {
         nsresult dispatchRv = DispatchDocumentBarrierTask();
         if (NS_FAILED(dispatchRv)) {
@@ -3959,8 +3954,7 @@ void ProxyPreambleOperation::OnStopRequest(uint32_t aStreamId,
   }
   if (aStreamId == 0 &&
       (mImpl->mConfig.mMode == PreambleMode::DocumentHeadersTaskOverlap ||
-       mImpl->mConfig.mMode ==
-           PreambleMode::DocumentFirstBufferTaskOverlap ||
+       mImpl->mConfig.mMode == PreambleMode::DocumentFirstBufferTaskOverlap ||
        mImpl->mConfig.mMode == PreambleMode::DocumentStartTaskOverlap) &&
       mImpl->mDocumentBarrierTaskDispatched && !mImpl->mBarrierFired &&
       !mImpl->mDocumentRootStopDeferred) {
@@ -4207,8 +4201,7 @@ void ProxyPreambleOperation::MaybeFireBarrier() {
       FireBarrierCallback();
       return;
     }
-    if (mImpl->mConfig.mMode ==
-            PreambleMode::TreeResourceCommittedOverlap &&
+    if (mImpl->mConfig.mMode == PreambleMode::TreeResourceCommittedOverlap &&
         mImpl->mConfig.mMaxAssets == 6) {
       if (!mImpl->mDocumentBarrierTaskDispatched) {
         nsresult dispatchRv = DispatchDocumentBarrierTask();
@@ -4479,6 +4472,80 @@ nsresult OpenNeckoTunnel(
     nsCOMPtr<nsIRequest> request = channel;
     request.forget(aOpenedRequest);
   }
+  return NS_OK;
+}
+
+nsresult OpenFiniteHttpExchange(
+    const nsACString& aProxyUrl, const nsACString& aProxyUser,
+    const nsACString& aProxyPassword,
+    const Maybe<HostResolverRule>& aHostResolverRule, const nsACString& aMethod,
+    const nsTArray<ExtraHeader>& aHeaders, const nsACString& aBody,
+    nsIStreamListener* aListener, nsIRequest** aOpenedRequest) {
+  MOZ_ASSERT(NS_IsMainThread());
+  ExplicitProxyRoute route;
+  MOZ_TRY(BuildExplicitProxyRoute(aProxyUrl, aProxyUser, aProxyPassword,
+                                  ProxyProtocol::H2, aHostResolverRule, false,
+                                  route));
+  nsAutoCString url;
+  MOZ_TRY(route.mProxyUri->GetPrePath(url));
+  url.Append('/');
+  nsCOMPtr<nsIURI> uri;
+  MOZ_TRY(NS_NewURI(getter_AddRefs(uri), url));
+  nsCOMPtr<nsIPrincipal> principal;
+  MOZ_TRY(GetSystemPrincipal(getter_AddRefs(principal)));
+  nsCOMPtr<nsIChannel> templateChannel;
+  MOZ_TRY(
+      NS_NewChannel(getter_AddRefs(templateChannel), uri, principal,
+                    nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
+                        nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS |
+                        nsILoadInfo::SEC_COOKIES_OMIT,
+                    nsIContentPolicy::TYPE_OTHER));
+  nsCOMPtr<nsIProxiedProtocolHandler> handler =
+      do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
+  if (!handler) {
+    return NS_ERROR_FAILURE;
+  }
+  nsCOMPtr<nsIChannel> channel;
+  nsCOMPtr<nsILoadInfo> finiteLoadInfo = templateChannel->LoadInfo();
+  MOZ_TRY(handler->NewProxiedChannel(uri, route.mProxyInfo, 0, nullptr,
+                                     finiteLoadInfo, getter_AddRefs(channel)));
+  nsCOMPtr<nsIHttpChannelInternal> internal = do_QueryInterface(channel);
+  nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(channel);
+  if (!internal || !http) {
+    return NS_ERROR_NO_INTERFACE;
+  }
+  MOZ_TRY(internal->SetAllowSpdy(true));
+  MOZ_TRY(internal->SetAllowHttp3(false));
+  MOZ_TRY(internal->SetBlockAuthPrompt(true));
+  MOZ_TRY(internal->SetProxyPreamble());
+  MOZ_TRY(channel->SetLoadFlags(
+      nsIRequest::INHIBIT_CACHING | nsIRequest::LOAD_BYPASS_CACHE |
+      nsIRequest::LOAD_ANONYMOUS | nsIChannel::LOAD_BYPASS_SERVICE_WORKER));
+  MOZ_TRY(http->SetRequestMethod(aMethod));
+  nsAutoCString authorization;
+  MOZ_TRY(BuildProxyAuthorization(aProxyUser, aProxyPassword, authorization));
+  if (!authorization.IsEmpty()) {
+    // This is an ordinary origin request to the proxy's own API. Necko
+    // correctly prunes Proxy-Authorization from such requests; use scoped
+    // origin authorization with redirects forbidden instead.
+    MOZ_TRY(http->SetRequestHeader("Authorization"_ns, authorization, false));
+  }
+  for (const auto& header : aHeaders) {
+    MOZ_TRY(http->SetRequestHeader(header.mName, header.mValue, false));
+  }
+  if (aMethod.EqualsLiteral("POST")) {
+    nsCOMPtr<nsIInputStream> body;
+    MOZ_TRY(NS_NewCStringInputStream(getter_AddRefs(body), aBody));
+    nsCOMPtr<nsIUploadChannel2> upload = do_QueryInterface(channel);
+    if (!upload) {
+      return NS_ERROR_NO_INTERFACE;
+    }
+    MOZ_TRY(upload->ExplicitSetUploadStream(body, "application/octet-stream"_ns,
+                                            aBody.Length(), aMethod));
+  }
+  MOZ_TRY(channel->AsyncOpen(aListener));
+  nsCOMPtr<nsIRequest> request = channel;
+  request.forget(aOpenedRequest);
   return NS_OK;
 }
 

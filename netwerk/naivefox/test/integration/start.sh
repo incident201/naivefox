@@ -70,6 +70,7 @@ export NAIVEFOX_FIXTURE_FRONTING_RESOURCE_UNIT_SIZE=$fronting_resource_unit_size
 
 init_paths
 "$INTEGRATION_DIR/setup.sh"
+select_finite_caddy
 find_certutil
 "$INTEGRATION_DIR/stop.sh" --quiet
 
