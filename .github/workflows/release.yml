@@ -449,6 +449,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out the frozen release provenance
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+          fetch-depth: 1
+
       - name: Download platform archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -473,6 +479,39 @@ jobs:
               cat "${checksum}"
             done
           } > assets/release-notes.md
+
+      - name: Verify or create the annotated release tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+          SOURCE_SHA: ${{ needs.metadata.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          tag_ref="refs/tags/${RELEASE_TAG}"
+          tag_message="${RUNNER_TEMP}/naivefox-release-tag.txt"
+          {
+            printf 'NaiveFox release %s\n' "${RELEASE_TAG}"
+            printf 'Product snapshot SHA: %s\n\n' "${SOURCE_SHA}"
+            cat UPSTREAM-BASE
+          } | git stripspace > "${tag_message}"
+          if git ls-remote --exit-code --refs origin "${tag_ref}" \
+              > "${RUNNER_TEMP}/naivefox-release-tag-ref.txt"; then
+            git fetch --no-tags origin "${tag_ref}:${tag_ref}"
+            test "$(git cat-file -t "${tag_ref}")" = tag
+            test "$(git rev-parse "${tag_ref}^{commit}")" = "${SOURCE_SHA}"
+            git cat-file tag "${tag_ref}" | sed '1,/^$/d' \
+              > "${RUNNER_TEMP}/naivefox-existing-tag.txt"
+            cmp "${tag_message}" "${RUNNER_TEMP}/naivefox-existing-tag.txt"
+          else
+            status=$?
+            test "${status}" -eq 2
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              tag --annotate "${RELEASE_TAG}" "${SOURCE_SHA}" \
+                --file "${tag_message}"
+            git push origin "${tag_ref}"
+          fi
 
       - name: Create or update draft release (never publish)
         shell: bash
@@ -500,6 +539,7 @@ jobs:
             gh release create "${RELEASE_TAG}" "${archives[@]}" \
               --repo "${GITHUB_REPOSITORY}" \
               --target "${SOURCE_SHA}" \
+              --verify-tag \
               --title "NaiveFox ${RELEASE_TAG}" \
               --notes-file assets/release-notes.md \
               --draft
