@@ -145,6 +145,26 @@ class MatchedApplicationTests(unittest.TestCase):
         self.assertTrue(M.ack_covers(3, 0xffffffff))
         self.assertFalse(M.ack_covers(0xfffffffe, 3))
 
+    def test_complete_tcp_fin_payload_wrap_and_retransmission(self):
+        def packet(frame, incoming=False, syn=False, fin=False, seq=0, ack=0, length=0):
+            return {"tcp.stream": "0", "tcp.dstport": "42000" if incoming else "443",
+                    "tcp.srcport": "443" if incoming else "42000", "tcp.flags.syn": str(int(syn)),
+                    "tcp.flags.ack": str(int(not syn)), "tcp.flags.fin": str(int(fin)), "tcp.flags.reset": "0",
+                    "tcp.seq_raw": str(seq), "tcp.ack_raw": str(ack), "tcp.len": str(length), "frame.number": str(frame)}
+        rows = [packet(1, syn=True), packet(2, fin=True, seq=0xfffffffe, length=2),
+                packet(3, incoming=True, fin=True, seq=100, ack=0),
+                packet(4, fin=True, seq=0xfffffffe, length=2, ack=101),
+                packet(5, incoming=True, seq=101, ack=1)]
+        with mock.patch.object(M.features, "tshark_rows", return_value=rows) as tshark:
+            self.assertEqual(M.validate_tcp_termination(Path("capture.pcapng"), 443),
+                             {"tcp_flows": 1, "tcp_fin_completed": 1, "tcp_reset_completed": 0})
+            self.assertIn("sll.pkttype==0", tshark.call_args.args[2])
+            self.assertIn("!icmp && !icmpv6", tshark.call_args.args[2])
+        rows[-1]["tcp.ack_raw"] = "0"
+        with mock.patch.object(M.features, "tshark_rows", return_value=rows):
+            with self.assertRaisesRegex(RuntimeError, "TCP FIN is not acknowledged"):
+                M.validate_tcp_termination(Path("capture.pcapng"), 443)
+
     def test_nonce_cannot_hide_packet_arriving_after_producer_exit(self):
         class Clock:
             value = 0.0
