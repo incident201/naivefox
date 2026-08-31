@@ -158,6 +158,17 @@ python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
   --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/functional
 ```
 
+Check explicit host mappings with a nonresolving logical hostname, a
+certificate that names only that hostname, and byte-exact transfers through
+both local listeners:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-hybrid-routing-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy \
+  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/routing
+```
+
 The startup remains strict H2 or H3. The fixture additionally enables H1 on
 TCP for Firefox's WebSocket handshake; `quic://` in this explicit mode is not
 a claim of UDP-only traffic. Server counters must prove a completed startup

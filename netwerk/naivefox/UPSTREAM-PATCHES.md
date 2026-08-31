@@ -459,6 +459,8 @@ netwerk/protocol/websocket/BaseWebSocketChannel.h
 netwerk/protocol/websocket/WebSocketChannel.cpp
 netwerk/protocol/websocket/WebSocketChannel.h
 netwerk/protocol/websocket/WebSocketLog.h
+netwerk/protocol/http/nsHttpChannel.cpp
+netwerk/protocol/http/nsHttpTransaction.h
 ```
 
 The experimental hybrid carrier needs the existing Necko RFC6455 engine, but
@@ -473,6 +475,15 @@ Native queued message delivery is capped at 32 callbacks and 2 MiB, and queued
 PONG replies at 32. Unsolicited extensions are rejected before data processing;
 the native path never enables the decompressor. Focused gtests exercise the
 real parser with a blocked consumer and the response-header extension gate.
+
+An explicit native WSS host mapping uses Necko's fixed routed transport.
+Happy Eyeballs treats routed hosts as Alt-Svc alternatives and may resolve or
+fall back to the logical origin, so mapped system-principal WebSockets bypass
+that selection and retain their route across transaction restarts. NSS still
+validates the logical hostname with its ordinary TLS settings. The mapped
+routing regression uses a nonresolving authority and a certificate without
+the physical address in its SAN, then verifies H2/H3 startup, both local
+frontends and byte-exact traffic through one WebSocket.
 
 Review obligations: ordinary Firefox builds retain their existing behavior;
 the opt-in native path is main-thread-only and cannot enable DOM or JavaScript;

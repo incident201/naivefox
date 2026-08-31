@@ -96,6 +96,7 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   bool Closed() { return mClosed; }
 
 #ifdef MOZ_NAIVEFOX
+  void RetainNaiveFoxRoutedHost() { mDontRetryWithDirectRoute = true; }
   void SetWaitForH3HandshakeConfirmation(bool aValue) {
     mWaitForH3HandshakeConfirmation = aValue;
   }
